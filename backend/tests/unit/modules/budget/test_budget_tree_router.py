@@ -342,6 +342,14 @@ def test_expense_list_forbidden_without_budget_perm(fake: _FakeService) -> None:
     assert _app_as(fake, {"meeting.manage"}).get("/api/expenses").status_code == 403
 
 
+def test_expense_list_id_filter_passthrough(fake: _FakeService) -> None:
+    """``id=`` (#expenses-ux2): exakter Buchungs-Deeplink (Konten → Buchungen) wird
+    als ``expense_id`` an den Service durchgereicht."""
+    resp = _app_as(fake, {"budget.view"}).get("/api/expenses", params={"id": str(_EID)})
+    assert resp.status_code == 200
+    assert fake.calls["list_expenses_paged"]["expense_id"] == _EID
+
+
 def test_account_options_readable_by_booker(fake: _FakeService) -> None:
     """#5-2/#2: Die Bankkonto-Auswahl (id+Name, ohne IBAN) ist für Bucher lesbar,
     ohne account.manage — das war die Ursache, dass das Konto nicht setzbar war."""

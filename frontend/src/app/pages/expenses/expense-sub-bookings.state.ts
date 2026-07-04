@@ -3,7 +3,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import type { Uuid } from '@core/api/models';
 import { BudgetTreeApi, type Expense } from '../budget/budget-tree.api';
-import { problemCode } from '../budget/expense-display.util';
+import { formatEur, problemCode } from '../budget/expense-display.util';
 import type { ExpensesListState } from './expenses-list.state';
 
 /**
@@ -19,7 +19,6 @@ export class ExpenseSubBookingsState {
   readonly expandedSub = signal<ReadonlySet<string>>(new Set());
   readonly subRows = signal<ReadonlyMap<string, Expense[]>>(new Map());
   readonly loadingSub = signal<ReadonlySet<string>>(new Set());
-  readonly subImporting = signal<ReadonlySet<string>>(new Set());
   readonly subParent = signal<Expense | null>(null);
   readonly subAmount = signal('');
   readonly subDescription = signal('');
@@ -38,10 +37,6 @@ export class ExpenseSubBookingsState {
 
   isLoadingSub(id: string): boolean {
     return this.loadingSub().has(id);
-  }
-
-  isSubImporting(id: string): boolean {
-    return this.subImporting().has(id);
   }
 
   toggleSub(e: Expense): void {
@@ -78,34 +73,86 @@ export class ExpenseSubBookingsState {
     });
   }
 
-  onSubFile(e: Expense, event: Event): void {
+  // --- global file import (toolbar action instead of per-row, #expenses-ux2) ---
+  readonly importOpen = signal(false);
+  readonly importQuery = signal('');
+  readonly importCandidates = signal<Expense[]>([]);
+  readonly importTarget = signal<Expense | null>(null);
+  readonly importFile = signal<File | null>(null);
+  readonly importBusy = signal(false);
+  private importTimer: ReturnType<typeof setTimeout> | null = null;
+
+  openImportDialog(): void {
+    this.importOpen.set(true);
+    this.importQuery.set('');
+    this.importCandidates.set([]);
+    this.importTarget.set(null);
+    this.importFile.set(null);
+  }
+
+  closeImportDialog(): void {
+    this.importOpen.set(false);
+    if (this.importTimer) clearTimeout(this.importTimer);
+  }
+
+  importCandidateLabel(e: Expense): string {
+    const parts = [e.description, formatEur(Math.abs(Number(e.amount)), this.i18n.locale())];
+    if (e.pathKey) parts.push(e.pathKey);
+    return parts.join(' · ');
+  }
+
+  onImportSearch(q: string): void {
+    this.importQuery.set(q);
+    this.importTarget.set(null);
+    if (this.importTimer) clearTimeout(this.importTimer);
+    this.importTimer = setTimeout(() => this.searchImportTargets(q.trim()), 300);
+  }
+
+  /** Target candidates: the list endpoint only returns top-level bookings, so
+   *  every hit is a valid sub-booking parent. */
+  private searchImportTargets(q: string): void {
+    this.api.listExpenses({ q: q || undefined, limit: 10 }).subscribe({
+      next: (page) => this.importCandidates.set(page.items),
+      error: () => this.importCandidates.set([]),
+    });
+  }
+
+  pickImportTarget(e: Expense): void {
+    this.importTarget.set(e);
+    this.importCandidates.set([]);
+    this.importQuery.set(this.importCandidateLabel(e));
+  }
+
+  onImportFile(event: Event): void {
     const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
-    input.value = '';
-    if (!file) return;
-    this.subImporting.update((s) => new Set(s).add(e.id));
-    this.api.importSubBookings(e.id as Uuid, file).subscribe({
+    this.importFile.set(input.files?.[0] ?? null);
+  }
+
+  canSubmitImport(): boolean {
+    return !!this.importTarget() && !!this.importFile() && !this.importBusy();
+  }
+
+  submitImport(event?: Event): void {
+    event?.preventDefault();
+    const target = this.importTarget();
+    const file = this.importFile();
+    if (!target || !file || this.importBusy()) return;
+    this.importBusy.set(true);
+    this.api.importSubBookings(target.id as Uuid, file).subscribe({
       next: (children) => {
         // Response only holds the import batch → reload the full child list and
         // the list (parent amount = sum of children changed).
-        this.expandedSub.update((s) => new Set(s).add(e.id));
-        this.loadSub(e.id);
-        this.subImporting.update((s) => {
-          const n = new Set(s);
-          n.delete(e.id);
-          return n;
-        });
+        this.importBusy.set(false);
+        this.importOpen.set(false);
+        this.expandedSub.update((s) => new Set(s).add(target.id));
+        this.loadSub(target.id);
         this.toast.success(
           this.i18n.translate('expenses.sub.imported', { count: String(children.length) }),
         );
         this.list.refresh();
       },
       error: (err) => {
-        this.subImporting.update((s) => {
-          const n = new Set(s);
-          n.delete(e.id);
-          return n;
-        });
+        this.importBusy.set(false);
         this.toast.error(
           this.i18n.translate(
             problemCode(err) === 'bank_statement_unparseable'
@@ -115,6 +162,10 @@ export class ExpenseSubBookingsState {
         );
       },
     });
+  }
+
+  dispose(): void {
+    if (this.importTimer) clearTimeout(this.importTimer);
   }
 
   openCreateSub(parent: Expense): void {

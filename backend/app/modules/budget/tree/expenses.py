@@ -327,6 +327,7 @@ class ExpenseOps(BudgetTreeServiceBase):
     async def list_expenses_paged(
         self,
         *,
+        expense_id: UUID | None = None,
         budget_id: UUID | None = None,
         fiscal_year_id: UUID | None = None,
         account_id: UUID | None = None,
@@ -350,6 +351,9 @@ class ExpenseOps(BudgetTreeServiceBase):
         # List only top-level bookings — sub-bookings show up when expanding the
         # parent booking, not as own rows (and not as link candidates).
         filters: list[ColumnElement[bool]] = [BudgetExpense.parent_expense_id.is_(None)]
+        if expense_id is not None:
+            # Exact-booking deep link (Konten "view booking", #expenses-ux).
+            filters.append(BudgetExpense.id == expense_id)
         if budget_id is not None:
             node = await self._get_node(budget_id)
             subtree = select(Budget.id).where(

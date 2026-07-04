@@ -58,6 +58,7 @@ const LINE: StatementLine = {
   suggestedBudgetId: null,
   suggestedPathKey: null,
   suggestedExpenseId: null,
+  matchedExpenseId: null,
   createdAt: '2026-05-03T00:00:00Z',
 };
 const LINE_MATCHED: StatementLine = {
@@ -69,6 +70,7 @@ const LINE_MATCHED: StatementLine = {
   counterpartyName: 'Uni Kasse',
   counterpartyIban: null,
   matchState: 'matched',
+  matchedExpenseId: 'e-77',
 };
 const LINE_IGNORED: StatementLine = { ...LINE, id: 'l-3', matchState: 'ignored' };
 
@@ -1430,8 +1432,11 @@ describe('KontenComponent (batch/bulk #expenses-ux)', () => {
     jest.useRealTimers();
   });
 
-  it('bookingLink prefers reference, then endToEndId, then purpose', () => {
+  it('bookingLink uses the exact booking id when present, else the text fallback', () => {
     const { cmp } = build();
+    // Matched line with an allocation → exact deep link via the hidden id filter.
+    expect(cmp.bookingLink(LINE_MATCHED)).toEqual({ id: 'e-77' });
+    // No matchedExpenseId (legacy) → account + reference/endToEndId/purpose fallback.
     expect(cmp.bookingLink(LINE)).toEqual({ account: 'a-1', q: 'Miete Mai' }); // purpose
     expect(cmp.bookingLink({ ...LINE, reference: 'RF-1' })).toEqual({ account: 'a-1', q: 'RF-1' });
     expect(cmp.bookingLink({ ...LINE, purpose: null, endToEndId: 'E2E-9' })).toEqual({

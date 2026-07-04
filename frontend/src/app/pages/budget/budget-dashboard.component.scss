@@ -258,21 +258,32 @@
   text-decoration: underline;
 }
 
-/* Cross-Link zur gefilterten Buchungsliste neben der Kostenstelle (#expenses-ux). */
-.bd__nodeCell {
-  display: inline-flex;
+/* Section-Kopf mit Cross-Link in den Buchungen-/Antrags-Tab (#expenses-ux2). */
+.bd__sectionHead {
+  display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-2);
+  margin-bottom: var(--space-2);
 }
-.bd__ksLink {
+.bd__sectionHead--end {
+  justify-content: flex-end;
+}
+.bd__sectionHead .bd__panel-h {
+  margin: 0;
+}
+.bd__sectionLink {
   display: inline-flex;
   align-items: center;
+  gap: var(--space-1);
+  font-size: var(--fs-sm);
   color: var(--color-text-muted);
-  opacity: 0.7;
+  text-decoration: none;
+  white-space: nowrap;
 }
-.bd__ksLink:hover {
+.bd__sectionLink:hover {
   color: var(--color-primary);
-  opacity: 1;
+  text-decoration: underline;
 }
 
 .bd__path {

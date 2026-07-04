@@ -125,7 +125,11 @@ class BankServiceBase:
         acc.fints_balance_at = as_of
 
     @staticmethod
-    def _line_out(line: BankStatementLine, suggested_path_key: str | None) -> StatementLineOut:
+    def _line_out(
+        line: BankStatementLine,
+        suggested_path_key: str | None,
+        matched_expense_id: uuid.UUID | None = None,
+    ) -> StatementLineOut:
         # ALWAYS resolve counterparty + purpose from the raw data — never from the
         # stored counterparty_*/purpose columns, which may stem from an older
         # parser version (e.g. "KRZL" placeholder, glued IBAN/purpose). CAMT raw
@@ -158,6 +162,7 @@ class BankServiceBase:
             suggestedBudgetId=line.suggested_budget_id,
             suggestedPathKey=suggested_path_key,
             suggestedExpenseId=line.suggested_expense_id,
+            matchedExpenseId=matched_expense_id,
             createdAt=line.created_at,
         )
 

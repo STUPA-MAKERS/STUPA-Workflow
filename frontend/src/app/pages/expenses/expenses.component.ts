@@ -119,6 +119,7 @@ export class ExpensesComponent implements OnDestroy {
   readonly createdTo = this.list.createdTo;
   readonly budgetId = this.list.budgetId;
   readonly accountId = this.list.accountId;
+  readonly expenseId = this.list.expenseId;
   readonly sortField = this.list.sortField;
   readonly sortOrder = this.list.sortOrder;
   readonly activeFilterCount = this.list.activeFilterCount;
@@ -139,6 +140,9 @@ export class ExpensesComponent implements OnDestroy {
   });
   /** Bulk confirm dialog: null = closed, else the pending yes/no action. */
   readonly bulkConfirm = signal<null | 'delete' | 'export'>(null);
+  /** Select-all must not enable mass deletion — rows have to be picked
+   *  individually for the destructive bulk action (#expenses-ux2). */
+  readonly bulkDeleteBlocked = computed(() => this.allSelected() && this.selectedCount() > 1);
   readonly bulkReassignOpen = signal(false);
   readonly bulkBudgetId = signal('');
   readonly bulkCategory = signal('');
@@ -216,6 +220,7 @@ export class ExpensesComponent implements OnDestroy {
     // Mirror active filters back into the URL on every change.
     effect(() => {
       const queryParams = {
+        id: this.expenseId() || null,
         budget: this.budgetId() || null,
         account: this.accountId() || null,
         kind: this.kind() || null,
@@ -251,22 +256,27 @@ export class ExpensesComponent implements OnDestroy {
     });
   }
 
-  /** Adopt budget/account/kind/q filters from the URL; returns true if any were present. */
+  /** Adopt id/budget/account/kind/q filters from the URL; returns true if any were
+   *  present. ``id`` = exact-booking deep link (Konten "Buchung ansehen") — it has
+   *  no own control, but counts as an active filter and resets with the others. */
   private applyQueryParams(): boolean {
     const qp = this.route.snapshot.queryParamMap;
+    const id = qp.get('id');
     const budget = qp.get('budget');
     const account = qp.get('account');
     const kind = qp.get('kind');
     const q = qp.get('q');
+    if (id) this.expenseId.set(id);
     if (budget) this.budgetId.set(budget);
     if (account) this.accountId.set(account);
     if (kind === 'expense' || kind === 'income') this.kind.set(kind);
     if (q) this.q.set(q);
-    return !!(budget || account || kind || q);
+    return !!(id || budget || account || kind || q);
   }
 
   ngOnDestroy(): void {
     this.list.dispose();
+    this.sub.dispose();
   }
 
   // --- display helpers -------------------------------------------------------------
@@ -353,16 +363,8 @@ export class ExpensesComponent implements OnDestroy {
     return this.sub.isLoadingSub(id);
   }
 
-  isSubImporting(id: string): boolean {
-    return this.sub.isSubImporting(id);
-  }
-
   toggleSub(e: Expense): void {
     this.sub.toggleSub(e);
-  }
-
-  onSubFile(e: Expense, event: Event): void {
-    this.sub.onSubFile(e, event);
   }
 
   openCreateSub(parent: Expense): void {
@@ -379,6 +381,46 @@ export class ExpensesComponent implements OnDestroy {
 
   createSub(event?: Event): void {
     this.sub.createSub(event);
+  }
+
+  // --- global file import (ExpenseSubBookingsState, #expenses-ux2) -------------------
+  readonly importOpen = this.sub.importOpen;
+  readonly importQuery = this.sub.importQuery;
+  readonly importCandidates = this.sub.importCandidates;
+  readonly importTarget = this.sub.importTarget;
+  readonly importFile = this.sub.importFile;
+  readonly importBusy = this.sub.importBusy;
+
+  openImportDialog(): void {
+    this.sub.openImportDialog();
+  }
+
+  closeImportDialog(): void {
+    this.sub.closeImportDialog();
+  }
+
+  importCandidateLabel(e: Expense): string {
+    return this.sub.importCandidateLabel(e);
+  }
+
+  onImportSearch(q: string): void {
+    this.sub.onImportSearch(q);
+  }
+
+  pickImportTarget(e: Expense): void {
+    this.sub.pickImportTarget(e);
+  }
+
+  onImportFile(event: Event): void {
+    this.sub.onImportFile(event);
+  }
+
+  canSubmitImport(): boolean {
+    return this.sub.canSubmitImport();
+  }
+
+  submitImport(event?: Event): void {
+    this.sub.submitImport(event);
   }
 
   // --- dialog delegates -----------------------------------------------------------
@@ -479,6 +521,7 @@ export class ExpensesComponent implements OnDestroy {
 
   askBulk(kind: 'delete' | 'export'): void {
     if (!this.selectedCount()) return;
+    if (kind === 'delete' && this.bulkDeleteBlocked()) return;
     this.bulkConfirm.set(kind);
   }
   runBulk(): void {

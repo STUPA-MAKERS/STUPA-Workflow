@@ -816,6 +816,17 @@ async def test_list_expenses_paged_all_filters_and_search() -> None:
     assert page.items[0].application_title is None
 
 
+async def test_list_expenses_paged_exact_id_filter() -> None:
+    # expense_id gesetzt → Exakt-Filter-Branch (Deeplink Konten → Buchungen,
+    # #expenses-ux2); budget_id None → kein _get_node.
+    e = _expense(actor=None)
+    sess = fake_session(result(1), result((e, "VS", None, None, None)))
+    svc = BudgetTreeService(sess)
+    page = await svc.list_expenses_paged(expense_id=e.id)
+    assert page.total == 1
+    assert page.items[0].id == e.id
+
+
 async def test_list_expenses_paged_blank_query_no_rank() -> None:
     # q whitespace only → kein Trigram-Pfad (rank_expr None), sort='amount', order desc.
     node = _budget(id=uuid.uuid4(), path_key="VS", key="VS")

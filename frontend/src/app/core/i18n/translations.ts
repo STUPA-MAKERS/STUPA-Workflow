@@ -272,6 +272,8 @@ export const de = {
   'expenses.bulk.reassignDone': '{count} Buchung(en) aktualisiert.',
   'expenses.bulk.reassignError': 'Sammel-Umbuchung fehlgeschlagen.',
   'expenses.bulk.keepValue': 'unverändert lassen',
+  'expenses.bulk.deleteAllBlocked':
+    'Sammel-Löschen ist bei „Alle auswählen" gesperrt — Zeilen gezielt auswählen.',
   'expenses.toast.created': 'Buchung angelegt.',
   'expenses.toast.saved': 'Buchung gespeichert.',
   'expenses.toast.deleted': 'Buchung gelöscht.',
@@ -289,6 +291,14 @@ export const de = {
   'expenses.sub.parentAmount': 'Betrag = Summe der Unterbuchungen',
   'expenses.sub.loadError': 'Unterbuchungen konnten nicht geladen werden.',
   'expenses.sub.importError': 'Import der Unterbuchungen fehlgeschlagen.',
+  // Globaler Datei-Import (Toolbar statt Zeilen-Aktion, #expenses-ux2)
+  'expenses.sub.importTitle': 'Unterbuchungen aus Datei importieren',
+  'expenses.sub.importHint':
+    'Alle Umsätze der Datei werden als Unterbuchungen der gewählten Ziel-Buchung angelegt.',
+  'expenses.sub.importTarget': 'Ziel-Buchung',
+  'expenses.sub.importTargetPlaceholder': 'Buchung suchen …',
+  'expenses.sub.importFile': 'Datei (CAMT.053/MT940)',
+  'expenses.sub.importSubmit': 'Importieren',
   'expenses.field.invoice': 'Rechnung',
   'expenses.field.invoicePlaceholder': 'Keine Rechnung',
 
@@ -1932,6 +1942,7 @@ export const de = {
   'budget.usage.bar': 'Auslastung',
   'budget.usage.viewExpenses': 'Buchungen ansehen',
   'budget.apps.heading': 'Anträge in dieser Kostenstelle',
+  'budget.apps.viewAll': 'Im Antrags-Tab öffnen',
   'budget.apps.empty': 'Keine Anträge in dieser Kostenstelle (inkl. Unterbaum).',
   'budget.apps.col.id': 'Antrag',
   'budget.apps.col.title': 'Antrag',
@@ -2471,6 +2482,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'expenses.bulk.reassignDone': '{count} booking(s) updated.',
   'expenses.bulk.reassignError': 'Bulk reassignment failed.',
   'expenses.bulk.keepValue': 'keep unchanged',
+  'expenses.bulk.deleteAllBlocked':
+    'Bulk delete is locked for “select all” — pick rows individually.',
   'expenses.toast.created': 'Booking created.',
   'expenses.toast.saved': 'Booking saved.',
   'expenses.toast.deleted': 'Booking deleted.',
@@ -2488,6 +2501,14 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'expenses.sub.parentAmount': 'Amount = sum of sub-bookings',
   'expenses.sub.loadError': 'Could not load sub-bookings.',
   'expenses.sub.importError': 'Sub-booking import failed.',
+  // Global file import (toolbar instead of row action, #expenses-ux2)
+  'expenses.sub.importTitle': 'Import sub-bookings from file',
+  'expenses.sub.importHint':
+    'All transactions in the file are created as sub-bookings of the chosen target booking.',
+  'expenses.sub.importTarget': 'Target booking',
+  'expenses.sub.importTargetPlaceholder': 'Search booking …',
+  'expenses.sub.importFile': 'File (CAMT.053/MT940)',
+  'expenses.sub.importSubmit': 'Import',
   'expenses.field.invoice': 'Invoice',
   'expenses.field.invoicePlaceholder': 'No invoice',
 
@@ -4110,6 +4131,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'budget.usage.bar': 'Utilisation',
   'budget.usage.viewExpenses': 'View bookings',
   'budget.apps.heading': 'Applications in this cost centre',
+  'budget.apps.viewAll': 'Open in applications tab',
   'budget.apps.empty': 'No applications in this cost centre (incl. subtree).',
   'budget.apps.col.id': 'Application',
   'budget.apps.col.title': 'Application',

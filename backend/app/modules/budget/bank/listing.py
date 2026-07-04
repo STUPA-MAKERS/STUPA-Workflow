@@ -7,7 +7,7 @@ import uuid
 from sqlalchemy import and_, func, or_, select
 
 from app.modules.budget.bank.service_base import BankServiceBase
-from app.modules.budget.tree_models import BankStatementLine
+from app.modules.budget.tree_models import BankAllocation, BankStatementLine
 from app.modules.budget.tree_schemas import StatementLineOut
 from app.shared.paging import Page
 
@@ -92,10 +92,34 @@ class ListingOps(BankServiceBase):
         paths = await self._path_keys(
             {r.suggested_budget_id for r in rows if r.suggested_budget_id}
         )
+        matched = await self._matched_expense_ids(
+            [r.id for r in rows if r.match_state == "matched"]
+        )
         items = [
             self._line_out(
-                r, paths.get(r.suggested_budget_id) if r.suggested_budget_id else None
+                r,
+                paths.get(r.suggested_budget_id) if r.suggested_budget_id else None,
+                matched_expense_id=matched.get(r.id),
             )
             for r in rows
         ]
         return Page(items=items, total=total or 0, limit=limit, offset=offset)
+
+    async def _matched_expense_ids(
+        self, line_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, uuid.UUID]:
+        """Booking per matched line from ``bank_allocation``. Split payments have
+        several allocations — the oldest one wins as the deep-link target."""
+        if not line_ids:
+            return {}
+        rows = (
+            await self.session.execute(
+                select(BankAllocation.statement_line_id, BankAllocation.expense_id)
+                .where(BankAllocation.statement_line_id.in_(line_ids))
+                .order_by(BankAllocation.created_at.asc())
+            )
+        ).all()
+        out: dict[uuid.UUID, uuid.UUID] = {}
+        for line_id, expense_id in rows:
+            out.setdefault(line_id, expense_id)
+        return out

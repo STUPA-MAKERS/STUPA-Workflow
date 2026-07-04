@@ -72,15 +72,19 @@
       }
 
       <section class="bd__usage" [attr.aria-label]="'budget.usage.heading' | t">
+        <!-- Cross-link for the selected cost centre — replaces the per-row icon link (#expenses-ux2). -->
+        <div class="bd__sectionHead bd__sectionHead--end">
+          <a class="bd__sectionLink" [routerLink]="['/expenses']" [queryParams]="{ budget: selectedKsId() }">
+            <app-icon name="euro" [size]="14" />
+            {{ 'budget.usage.viewExpenses' | t }}
+          </a>
+        </div>
         <app-data-table [columns]="usageColumns()" [rows]="usageRows()" [rowKey]="usageRowId">
           <ng-template appCell="node" let-row>
-            <span class="bd__nodeCell">
-              <button type="button" class="bd__ks" [style.paddingLeft.rem]="$any(row).depth * 1.25" (click)="drillInto($any(row).node)">
-                <span class="bd__path">{{ $any(row).node.pathKey | simplifyPath }}</span>
-                <span class="bd__name">{{ $any(row).node.name }}</span>
-              </button>
-              <a class="bd__ksLink" [routerLink]="['/expenses']" [queryParams]="{ budget: $any(row).node.id }" [title]="'budget.usage.viewExpenses' | t" [attr.aria-label]="'budget.usage.viewExpenses' | t"><app-icon name="export" [size]="14" /></a>
-            </span>
+            <button type="button" class="bd__ks" [style.paddingLeft.rem]="$any(row).depth * 1.25" (click)="drillInto($any(row).node)">
+              <span class="bd__path">{{ $any(row).node.pathKey | simplifyPath }}</span>
+              <span class="bd__name">{{ $any(row).node.name }}</span>
+            </button>
           </ng-template>
           <ng-template appCell="bar" let-row>
             <span class="bd__bar-cell">
@@ -101,7 +105,13 @@
       </section>
 
       <section class="bd__apps" aria-labelledby="bd-apps-h">
-        <h2 id="bd-apps-h" class="bd__panel-h">{{ 'budget.apps.heading' | t }}</h2>
+        <div class="bd__sectionHead">
+          <h2 id="bd-apps-h" class="bd__panel-h">{{ 'budget.apps.heading' | t }}</h2>
+          <a class="bd__sectionLink" [routerLink]="['/applications']" [queryParams]="{ budget: selectedKsId() }">
+            <app-icon name="form" [size]="14" />
+            {{ 'budget.apps.viewAll' | t }}
+          </a>
+        </div>
         <app-applications-table [rows]="appRows()" [emptyText]="'budget.apps.empty' | t" />
       </section>
     </main>

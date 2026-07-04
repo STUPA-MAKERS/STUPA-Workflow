@@ -1295,25 +1295,64 @@ describe('ExpensesComponent (sub-bookings #subbookings)', () => {
     expect(error).toHaveBeenCalledWith('Unterbuchungen konnten nicht geladen werden.');
   });
 
-  it('onSubFile without a file is a no-op', () => {
+  it('submitImport without a target or file is a no-op', () => {
     const { cmp, http } = build({ expenses: page([PARENT], 1) });
-    cmp.onSubFile(PARENT, fileEvent(null));
-    expect(cmp.isSubImporting('parent-1')).toBe(false);
+    cmp.openImportDialog();
+    cmp.onImportFile(fileEvent(null));
+    expect(cmp.canSubmitImport()).toBe(false);
+    cmp.submitImport();
     http.expectNone((r) => r.url.includes('/sub-bookings'));
   });
 
-  it('onSubFile imports, expands the parent, reloads children + list and toasts the count', () => {
+  it('import dialog: open resets state, debounced search lists candidates, pick fills the query', () => {
+    jest.useFakeTimers();
+    const { cmp, http } = build({ expenses: page([PARENT], 1) });
+    cmp.importQuery.set('stale');
+    cmp.openImportDialog();
+    expect(cmp.importOpen()).toBe(true);
+    expect(cmp.importQuery()).toBe('');
+    expect(cmp.importTarget()).toBeNull();
+    cmp.onImportSearch('Druck');
+    jest.advanceTimersByTime(300);
+    http
+      .expectOne(
+        (r) =>
+          r.url.endsWith('/expenses') && r.method === 'GET' && r.params.get('q') === 'Druck',
+      )
+      .flush(page([PARENT], 1));
+    expect(cmp.importCandidates().length).toBe(1);
+    cmp.pickImportTarget(PARENT);
+    expect(cmp.importTarget()).toBe(PARENT);
+    expect(cmp.importCandidates()).toEqual([]);
+    expect(cmp.importQuery()).toContain('Druckkosten Flyer');
+    // search errors clear the candidate list
+    cmp.onImportSearch('kaputt');
+    jest.advanceTimersByTime(300);
+    http
+      .expectOne((r) => r.url.endsWith('/expenses') && r.method === 'GET')
+      .error(new ProgressEvent('err'));
+    expect(cmp.importCandidates()).toEqual([]);
+    cmp.closeImportDialog();
+    expect(cmp.importOpen()).toBe(false);
+    jest.useRealTimers();
+  });
+
+  it('submitImport imports into the target, expands it, reloads children + list and toasts', () => {
     const { cmp, http } = build({ expenses: page([PARENT], 1) });
     const { success } = toastSpies(cmp);
-    const file = new File(['camt'], 'auszug.xml', { type: 'text/xml' });
-    cmp.onSubFile(PARENT, fileEvent(file));
-    expect(cmp.isSubImporting('parent-1')).toBe(true);
+    cmp.openImportDialog();
+    cmp.pickImportTarget(PARENT);
+    cmp.onImportFile(fileEvent(new File(['camt'], 'auszug.xml', { type: 'text/xml' })));
+    expect(cmp.canSubmitImport()).toBe(true);
+    cmp.submitImport();
+    expect(cmp.importBusy()).toBe(true);
     const req = http.expectOne(
       (r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings/import') && r.method === 'POST',
     );
     expect(req.request.body).toBeInstanceOf(FormData);
     req.flush([SUB, { ...SUB, id: 'sub-2' }]);
-    expect(cmp.isSubImporting('parent-1')).toBe(false);
+    expect(cmp.importBusy()).toBe(false);
+    expect(cmp.importOpen()).toBe(false);
     expect(cmp.isSubExpanded('parent-1')).toBe(true);
     expect(success).toHaveBeenCalledWith('2 Unterbuchung(en) importiert.');
     // the response is only the import batch → reload the full child list + parent amount.
@@ -1324,18 +1363,22 @@ describe('ExpensesComponent (sub-bookings #subbookings)', () => {
     expect(cmp.subOf('parent-1').length).toBe(2);
   });
 
-  it('onSubFile maps bank_statement_unparseable to the FinTS file error, otherwise generic', () => {
+  it('submitImport maps bank_statement_unparseable to the FinTS file error, otherwise generic', () => {
     const { cmp, http } = build({ expenses: page([PARENT], 1) });
     const { error } = toastSpies(cmp);
-    const file = new File(['?'], 'kaputt.bin');
-    cmp.onSubFile(PARENT, fileEvent(file));
+    cmp.openImportDialog();
+    cmp.pickImportTarget(PARENT);
+    cmp.onImportFile(fileEvent(new File(['?'], 'kaputt.bin')));
+    cmp.submitImport();
     http
       .expectOne((r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings/import'))
       .flush({ code: 'bank_statement_unparseable' }, { status: 422, statusText: 'Unprocessable' });
-    expect(cmp.isSubImporting('parent-1')).toBe(false);
+    expect(cmp.importBusy()).toBe(false);
+    // dialog stays open so the user can fix the file
+    expect(cmp.importOpen()).toBe(true);
     expect(error).toHaveBeenCalledWith('Datei ist weder gültiges CAMT.053 noch MT940.');
 
-    cmp.onSubFile(PARENT, fileEvent(file));
+    cmp.submitImport();
     http
       .expectOne((r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings/import'))
       .flush(null, { status: 500, statusText: 'Server Error' });
@@ -1716,7 +1759,8 @@ describe('ExpensesComponent (batch/bulk #expenses-ux)', () => {
 
   it('runBulk delete removes the selected rows, refreshes and toasts', () => {
     const e2 = { ...EXPENSE, id: 'e-2' };
-    const { cmp, http } = build({ expenses: page([EXPENSE, e2], 2) });
+    const e3 = { ...EXPENSE, id: 'e-3' };
+    const { cmp, http } = build({ expenses: page([EXPENSE, e2, e3], 3) });
     const { success } = toastSpies(cmp);
     cmp.toggleSelect('e-1', true);
     cmp.toggleSelect('e-2', true);
@@ -1885,11 +1929,12 @@ describe('ExpensesComponent (batch/bulk #expenses-ux)', () => {
     expect(nav).toHaveBeenLastCalledWith(
       [],
       expect.objectContaining({
-        queryParams: { budget: null, account: null, kind: null, q: null },
+        queryParams: { id: null, budget: null, account: null, kind: null, q: null },
         queryParamsHandling: 'merge',
         replaceUrl: true,
       }),
     );
+    cmp.expenseId.set('e-9');
     cmp.budgetId.set('b-1');
     cmp.accountId.set('a-2');
     cmp.kind.set('income');
@@ -1898,10 +1943,26 @@ describe('ExpensesComponent (batch/bulk #expenses-ux)', () => {
     expect(nav).toHaveBeenLastCalledWith(
       [],
       expect.objectContaining({
-        queryParams: { budget: 'b-1', account: 'a-2', kind: 'income', q: 'flyer' },
+        queryParams: { id: 'e-9', budget: 'b-1', account: 'a-2', kind: 'income', q: 'flyer' },
       }),
     );
     nav.mockRestore();
+  });
+
+  it('blocks bulk delete for a multi-row select-all, but not for a single row', () => {
+    const e2 = { ...EXPENSE, id: 'e-2' };
+    const { cmp } = build({ expenses: page([EXPENSE, e2], 2) });
+    cmp.toggleSelectAll(true);
+    expect(cmp.bulkDeleteBlocked()).toBe(true);
+    cmp.askBulk('delete'); // blocked → dialog stays closed
+    expect(cmp.bulkConfirm()).toBeNull();
+    cmp.askBulk('export'); // non-destructive actions stay available
+    expect(cmp.bulkConfirm()).toBe('export');
+    cmp.bulkConfirm.set(null);
+    cmp.toggleSelect('e-2', false); // partial selection → delete allowed again
+    expect(cmp.bulkDeleteBlocked()).toBe(false);
+    cmp.askBulk('delete');
+    expect(cmp.bulkConfirm()).toBe('delete');
   });
 });
 
@@ -1959,6 +2020,18 @@ describe('ExpensesComponent (query-param adoption #expenses-ux)', () => {
     ]);
     expect(cmp.kind()).toBe(''); // invalid value not applied
     expect(cmp.budgetId()).toBe('b-2');
+  });
+
+  it('adopts the exact-booking id: hidden filter, counted as active + resettable', () => {
+    const { cmp, http } = buildWithQuery([['id', 'e-42']]);
+    expect(cmp.expenseId()).toBe('e-42');
+    // hidden filter still counts, so the filter-bar reset button can clear it
+    expect(cmp.activeFilterCount()).toBe(1);
+    cmp.resetFilters();
+    expect(cmp.expenseId()).toBe('');
+    const req = http.expectOne((r) => r.url.endsWith('/expenses') && r.method === 'GET');
+    expect(req.request.params.has('id')).toBe(false);
+    req.flush(page([]));
   });
 });
 
