@@ -221,6 +221,28 @@ describe('ApplicationsDetailComponent', () => {
     http.verify();
   });
 
+  it('sends on Enter, keeps typing on Shift+Enter', async () => {
+    const { http, detectChanges } = await setup();
+    flushAll(http);
+    detectChanges();
+
+    const input = screen.getByLabelText('Kommentar hinzufügen');
+    // Shift+Enter: no request (newline stays local).
+    await userEvent.type(input, 'Hallo{Shift>}{Enter}{/Shift}');
+    http.expectNone(url('/comments'));
+    // Plain Enter submits.
+    await userEvent.type(input, '{Enter}');
+    const post = http.expectOne(url('/comments'));
+    expect(post.request.method).toBe('POST');
+    post.flush(
+      { id: 'c9', author: null, authorKind: 'principal', body: 'Hallo', visibility: 'public', at: '2026-06-05T13:00:00Z', isOwn: true },
+      { status: 201, statusText: 'Created' },
+    );
+    detectChanges();
+    flushAttachments(http);
+    http.verify();
+  });
+
   it('labels a present-but-empty diff as "no field changes"', async () => {
     const { http, detectChanges } = await setup();
     http.expectOne(url('')).flush(appWire());
