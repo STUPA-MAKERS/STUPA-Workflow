@@ -72,7 +72,7 @@
   } @else if (items().length === 0) {
     <div class="empty-state">{{ 'invoices.empty' | t }}</div>
   } @else {
-    <div class="inv__tableWrap">
+    <div class="inv__tableWrap" appHScrollSync>
       <table class="inv__table">
         <thead>
           <tr>
@@ -85,7 +85,7 @@
             <th scope="col" class="inv__num">{{ 'invoices.col.gross' | t }}</th>
             <th scope="col">{{ 'invoices.col.status' | t }}</th>
             <th scope="col">{{ 'invoices.col.file' | t }}</th>
-            @if (canManage()) { <th scope="col" class="inv__num"></th> }
+            @if (canManage()) { <th scope="col" class="inv__num inv__stickyCol">{{ 'table.actions' | t }}</th> }
           </tr>
         </thead>
         <tbody>
@@ -109,7 +109,7 @@
                 } @else { — }
               </td>
               @if (canManage()) {
-                <td class="inv__num">
+                <td class="inv__num inv__stickyCol">
                   <span class="inv__actions">
                     <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'action.edit' | t" [title]="'action.edit' | t" (click)="openEdit(i)"><app-icon name="edit" /></app-button>
                     <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'action.delete' | t" [title]="'action.delete' | t" (click)="askDelete(i)"><app-icon name="delete" /></app-button>

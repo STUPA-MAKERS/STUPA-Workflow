@@ -166,6 +166,8 @@ export const de = {
   'action.confirm': 'Bestätigen',
   'action.more': 'mehr',
   'action.less': 'weniger',
+  // Spaltenkopf der (sticky) Aktions-Spalte in Tabellen (#expenses-ux2)
+  'table.actions': 'Aktionen',
 
   // Ausgaben/Einnahmen (#25)
   'expenses.title': 'Buchungen',
@@ -298,6 +300,8 @@ export const de = {
   'expenses.sub.importTarget': 'Ziel-Buchung',
   'expenses.sub.importTargetPlaceholder': 'Buchung suchen …',
   'expenses.sub.importFile': 'Datei (CAMT.053/MT940)',
+  'expenses.sub.importChooseFile': 'Datei wählen …',
+  'expenses.sub.importNoFile': 'Keine Datei gewählt',
   'expenses.sub.importSubmit': 'Importieren',
   'expenses.field.invoice': 'Rechnung',
   'expenses.field.invoicePlaceholder': 'Keine Rechnung',
@@ -2386,6 +2390,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'action.confirm': 'Confirm',
   'action.more': 'more',
   'action.less': 'less',
+  // Column header of the (sticky) actions column in tables (#expenses-ux2)
+  'table.actions': 'Actions',
   'action.close': 'Close',
 
   // Expenses/Income (#25)
@@ -2518,6 +2524,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'expenses.sub.importTarget': 'Target booking',
   'expenses.sub.importTargetPlaceholder': 'Search booking …',
   'expenses.sub.importFile': 'File (CAMT.053/MT940)',
+  'expenses.sub.importChooseFile': 'Choose file …',
+  'expenses.sub.importNoFile': 'No file chosen',
   'expenses.sub.importSubmit': 'Import',
   'expenses.field.invoice': 'Invoice',
   'expenses.field.invoicePlaceholder': 'No invoice',

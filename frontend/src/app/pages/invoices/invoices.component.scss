@@ -62,6 +62,27 @@ input.inv__input { height: var(--control-height); }
 }
 .inv__fileLink:hover { text-decoration: underline; }
 .inv__actions { display: inline-flex; gap: var(--space-1); justify-content: flex-end; }
+/* --- Sticky Aktions-Spalte (#expenses-ux2) — analog Buchungen/Konten ---
+   Rechteste Spalte angepinnt; nur Desktop (mobil greift der Karten-Reflow unten). */
+@media (min-width: 769px) {
+  .inv__table th.inv__stickyCol,
+  .inv__table td.inv__stickyCol {
+    position: sticky;
+    right: 0;
+    border-inline-start: var(--border-width) solid var(--color-border);
+  }
+  .inv__table td.inv__stickyCol {
+    background: var(--color-surface);
+    z-index: 1;
+  }
+  .inv__table th.inv__stickyCol {
+    background: var(--color-surface-sunken);
+    z-index: 2;
+  }
+  .inv__table tbody tr:hover td.inv__stickyCol {
+    background: var(--color-surface-sunken);
+  }
+}
 /* --- Drop-Overlay --- */
 .inv__dropOverlay {
   position: absolute;

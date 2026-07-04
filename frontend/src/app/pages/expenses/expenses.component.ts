@@ -213,9 +213,11 @@ export class ExpensesComponent implements OnDestroy {
 
   constructor() {
     // Adopt filters from the URL (shareable + survives a real reload; target of the
-    // Budget/Konten cross-links). The list state already fired an initial reload in its
-    // own constructor — re-run it only if the URL actually carried filters.
-    if (this.applyQueryParams()) this.list.reload();
+    // Budget/Konten cross-links), THEN load exactly once. The state fires no request
+    // of its own — two racing reloads used to let the unfiltered response overwrite
+    // the filtered one when it resolved last (#expenses-ux2).
+    this.applyQueryParams();
+    this.list.reload();
 
     // Mirror active filters back into the URL on every change.
     effect(() => {

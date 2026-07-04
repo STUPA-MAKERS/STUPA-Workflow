@@ -91,7 +91,9 @@ export class ExpensesListState {
       next: (accs) => this.accounts.set(accs),
       error: () => this.accounts.set([]),
     });
-    this.reload();
+    // NO initial reload here: the component adopts the URL filters first and then
+    // fires exactly one reload — a second, unfiltered request could otherwise
+    // resolve late and overwrite the filtered list (#expenses-ux2).
   }
 
   setKind(k: '' | ExpenseKind): void {
@@ -151,10 +153,13 @@ export class ExpensesListState {
   }
 
   reload(): void {
+    // New filter state → older in-flight responses are stale from here on.
+    this.fetchEpoch++;
     this.nextOffset = 0;
     this.items.set([]);
     this.total.set(0);
     this.loading.set(true);
+    this.loadingMore.set(false);
     this.fetch(true);
   }
 
@@ -181,31 +186,39 @@ export class ExpensesListState {
     };
   }
 
+  /** Monotone request generation: a response whose epoch no longer matches was
+   *  fired for an outdated filter state and must not touch the list (#expenses-ux2). */
+  private fetchEpoch = 0;
+
   /** Post-mutation: refetch the currently-loaded window (offset 0, one request) and
    *  atomic-replace the list — no clear, no `loading` flip → the table stays mounted and
    *  scroll position + all infinite-scroll pages survive (#expenses-ux). */
   refresh(): void {
     if (this.refreshing()) return;
+    const epoch = this.fetchEpoch;
     const windowLimit = Math.max(this.PAGE, Math.ceil(this.items().length / this.PAGE) * this.PAGE);
     this.refreshing.set(true);
     this.api
       .listExpenses({ ...this.filterParams(), limit: windowLimit, offset: 0 })
       .subscribe({
         next: (page) => {
+          this.refreshing.set(false);
+          if (epoch !== this.fetchEpoch) return; // a reload ran meanwhile → stale
           this.total.set(page.total);
           this.items.set(page.items);
           this.nextOffset = page.offset + page.items.length;
-          this.refreshing.set(false);
         },
         error: () => this.refreshing.set(false),
       });
   }
 
   private fetch(initial: boolean): void {
+    const epoch = this.fetchEpoch;
     this.api
       .listExpenses({ ...this.filterParams(), limit: this.PAGE, offset: this.nextOffset })
       .subscribe({
         next: (page) => {
+          if (epoch !== this.fetchEpoch) return; // fired for an older filter state
           this.total.set(page.total);
           this.items.update((cur) => (initial ? page.items : [...cur, ...page.items]));
           this.nextOffset = page.offset + page.items.length;
@@ -213,6 +226,7 @@ export class ExpensesListState {
           this.loadingMore.set(false);
         },
         error: () => {
+          if (epoch !== this.fetchEpoch) return;
           this.loading.set(false);
           this.loadingMore.set(false);
         },
