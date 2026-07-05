@@ -397,6 +397,22 @@ async def test_list_lines_paged_excludes_ignored(monkeypatch: pytest.MonkeyPatch
     assert page.items == []
 
 
+@pytest.mark.asyncio
+async def test_get_line_includes_raw_payload(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Detail-Sicht liefert rawPayload + idempotencyKey (Diagnose: Quellformat/Batch)."""
+    session = _Session()
+    svc = _service(session, monkeypatch)
+    raw = {"batch": "true", "batch_total": "-500.00", "purpose": "DATEI-NR. 1"}
+    line = _line(idempotency_key="idem-1", raw_payload=dict(raw))
+    session.put(line)
+    detail = await svc.get_line(line.id)
+    assert detail.raw_payload == raw
+    assert detail.idempotency_key == "idem-1"
+    assert detail.amount == Decimal("-50.00")
+    with pytest.raises(NotFoundError):
+        await svc.get_line(uuid.uuid4())
+
+
 # --------------------------------------------------------------- ignore
 @pytest.mark.asyncio
 async def test_ignore_line(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -843,7 +859,7 @@ async def test_claim_session_roundtrip_and_expiry(monkeypatch: pytest.MonkeyPatc
     acc_id = uuid.uuid4()
     out = fc.FintsOutcome(
         status="needs_tan", tan_mechanism="962", client_data=b"c", dialog_data=b"d", tan_data=b"t",
-        challenge="x", decoupled=True,
+        challenge="x", decoupled=True, account_scope=("DE111", "97157"),
     )
     await svc._store_session(acc_id, out, token=token)
     payload = session.added[-1].payload_encrypted
@@ -853,6 +869,8 @@ async def test_claim_session_roundtrip_and_expiry(monkeypatch: pytest.MonkeyPatc
     loaded = await svc._claim_session(token, acc_id)
     assert loaded.client_data == b"c"
     assert loaded.decoupled is True
+    # Konto-Scope überlebt die Sitzung: der TAN-Resume filtert das CAMT damit.
+    assert loaded.account_scope == ("DE111", "97157")
     # abgelaufen → ValidationProblem (kein 500)
     past = datetime.now(UTC) - timedelta(seconds=1)
     session.execute_q.append(_Result([(payload, past)]))

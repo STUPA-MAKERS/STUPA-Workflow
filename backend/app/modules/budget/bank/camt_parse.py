@@ -211,11 +211,16 @@ def _split_batch(
         total += amount
     if total != entry.amount:
         return None
+    # The entry's AddtlNtryInf (e.g. "SAMMELUEBERWEISUNG DATEI-NR. … ANZAHL …")
+    # is lost on split (each line carries its own Ustrd purpose) — keep it as
+    # metadata so staging can match the old total line by its file number.
+    info = clean(_find_text_local(ntry, "AddtlNtryInf"))
     batch_meta = {
         "batch": "true",
         "batch_count": str(len(tx_details)),
         "batch_total": str(entry.amount),
         **({"batch_ref": entry.bank_ref} if entry.bank_ref else {}),
+        **({"batch_info": info} if info else {}),
     }
     for line in lines:
         line.raw.update(batch_meta)

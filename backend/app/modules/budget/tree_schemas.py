@@ -553,6 +553,15 @@ class StatementLineOut(_CamelModel):
     created_at: datetime = Field(alias="createdAt")
 
 
+class StatementLineDetail(StatementLineOut):
+    """Detail view of a staged line: additionally the raw parser payload
+    (source-format fields, batch metadata) and the idempotency key — for
+    diagnosing import/dedup behavior. Same read permission as the list."""
+
+    raw_payload: dict = Field(default_factory=dict, alias="rawPayload")
+    idempotency_key: str = Field(alias="idempotencyKey")
+
+
 class BankSyncResult(_CamelModel):
     """Result of one FinTS sync step.
 
@@ -661,6 +670,7 @@ __all__ = [
     "ConfirmLineRequest",
     "FintsCredentialIn",
     "FintsCredentialStatus",
+    "StatementLineDetail",
     "StatementLineOut",
     "TransferCreate",
     "TransferOut",

@@ -191,6 +191,50 @@ async def test_stage_supersedes_stale_batch_total_line(
     assert (imported, duplicates, superseded) == (2, 0, 1)
 
 
+def test_batch_file_number_extraction() -> None:
+    assert (
+        staging._batch_file_number("SAMMELUEBERWEISUNG DATEI-NR. 0000794247 ANZAHL 00000002")
+        == "794247"
+    )
+    assert staging._batch_file_number("DATEI-NR. 0000802442") == "802442"
+    assert staging._batch_file_number("Miete Juni") is None
+    assert staging._batch_file_number(None) is None
+
+
+@pytest.mark.asyncio
+async def test_stage_supersede_scoped_by_file_number(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Zwei Sammler am selben Tag mit gleichem Betrag: nur die Gesamt-Zeile MIT der
+    Datei-Nr. des eingehenden Splits wird ersetzt — der fremde Sammler bleibt."""
+    session = _Session()
+    svc = _svc(session, monkeypatch)
+    batch_raw = {
+        "batch": "true",
+        "batch_total": "-500.00",
+        "batch_count": "2",
+        "batch_info": "SAMMELUEBERWEISUNG DATEI-NR. 0000794247 ANZAHL 00000002",
+    }
+    lines = [
+        _line(amount=Decimal("-180.00"), bank_ref="S1", raw=dict(batch_raw)),
+        _line(amount=Decimal("-320.00"), bank_ref="S2", raw=dict(batch_raw)),
+    ]
+    session.execute_q.append(_Result([]))  # Fingerprints: leer
+    for _ in lines:  # je Zeile: Vorschlag leer + Insert ok
+        session.execute_q.append(_Result([]))
+        session.execute_q.append(_Result([uuid.uuid4()]))
+    session.execute_q.append(
+        _Result(
+            [
+                (uuid.uuid4(), "SAMMELUEBERWEISUNG DATEI-NR. 0000794247 ANZAHL 00000002"),
+                (uuid.uuid4(), "SAMMELUEBERWEISUNG DATEI-NR. 0000111111 ANZAHL 00000002"),
+            ]
+        )
+    )  # Supersede-Kandidaten: gleicher Tag + Betrag, zwei verschiedene Sammler
+    imported, _, superseded = await svc._stage_lines(_account(), lines)
+    assert (imported, superseded) == (2, 1)
+
+
 @pytest.mark.asyncio
 async def test_stage_ignores_unparseable_batch_total(
     monkeypatch: pytest.MonkeyPatch,

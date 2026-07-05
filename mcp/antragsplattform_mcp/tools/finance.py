@@ -215,6 +215,15 @@ async def list_statement_lines(
 
 
 @group.tool
+async def get_statement_line(line_id: str) -> dict:
+    """One staged transaction incl. ``rawPayload`` (source-format parser fields, batch
+    metadata) and ``idempotencyKey`` — diagnostic detail view, e.g. to tell whether a line
+    was staged from MT940 or CAMT and whether a Sammelbuchung carried sub-transactions.
+    Requires budget.view/.book."""
+    return await api().get(f"/statement-lines/{line_id}")
+
+
+@group.tool
 async def confirm_statement_line(line_id: str, confirm: S.ConfirmLineRequest) -> dict:
     """Book a staged transaction into a booking: new booking on ``budgetId`` OR attach to an
     existing ``matchExpenseId`` (kind derives from the sign). Requires budget.book."""

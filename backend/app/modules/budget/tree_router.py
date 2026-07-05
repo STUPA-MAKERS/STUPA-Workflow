@@ -65,6 +65,7 @@ from app.modules.budget.tree_schemas import (
     InvoiceStatus,
     InvoiceUpdate,
     MoveFiscalYearRequest,
+    StatementLineDetail,
     StatementLineOut,
     SubBookingCreate,
     TransferCreate,
@@ -901,6 +902,20 @@ async def list_statement_lines(
         limit=limit,
         offset=offset,
     )
+
+
+@router.get(
+    "/statement-lines/{line_id}",
+    response_model=StatementLineDetail,
+    dependencies=[
+        Depends(require_any_permission("budget.view", "budget.structure", "budget.book"))
+    ],
+    responses=_errors(401, 403, 404),
+)
+async def get_statement_line(line_id: UUID, service: BankServiceDep) -> StatementLineDetail:
+    """One staged transaction incl. raw parser payload + idempotency key —
+    diagnostic detail view (source format, batch metadata)."""
+    return await service.get_line(line_id)
 
 
 @router.post(

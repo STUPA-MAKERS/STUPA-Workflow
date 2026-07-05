@@ -1,4 +1,4 @@
-"""Filtered, paginated list of staged statement lines."""
+"""Filtered, paginated list of staged statement lines (plus the raw detail view)."""
 
 from __future__ import annotations
 
@@ -8,7 +8,8 @@ from sqlalchemy import and_, func, or_, select
 
 from app.modules.budget.bank.service_base import BankServiceBase
 from app.modules.budget.tree_models import BankAllocation, BankStatementLine
-from app.modules.budget.tree_schemas import StatementLineOut
+from app.modules.budget.tree_schemas import StatementLineDetail, StatementLineOut
+from app.shared.errors import NotFoundError
 from app.shared.paging import Page
 
 
@@ -59,12 +60,17 @@ class ListingOps(BankServiceBase):
         if date_to:
             filters.append(eff_date <= date_to)
         if q and q.strip():
-            like = f"%{q.strip()}%"
+            # Escape LIKE metacharacters — a literal "%"/"_" in the search term
+            # must not act as a wildcard.
+            term = (
+                q.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            )
+            like = f"%{term}%"
             filters.append(
                 or_(
-                    BankStatementLine.counterparty_name.ilike(like),
-                    BankStatementLine.counterparty_iban.ilike(like),
-                    BankStatementLine.purpose.ilike(like),
+                    BankStatementLine.counterparty_name.ilike(like, escape="\\"),
+                    BankStatementLine.counterparty_iban.ilike(like, escape="\\"),
+                    BankStatementLine.purpose.ilike(like, escape="\\"),
                 )
             )
         where = and_(*filters) if filters else None
@@ -104,6 +110,32 @@ class ListingOps(BankServiceBase):
             for r in rows
         ]
         return Page(items=items, total=total or 0, limit=limit, offset=offset)
+
+    async def get_line(self, line_id: uuid.UUID) -> StatementLineDetail:
+        """One staged line INCLUDING its raw payload + idempotency key.
+
+        Diagnostic view (e.g. "which source format staged this batch line?") —
+        same read permissions as the list; the raw payload is bank data the
+        caller could already see via list/export."""
+        line = await self.session.get(BankStatementLine, line_id)
+        if line is None:
+            raise NotFoundError(f"statement line {line_id} not found")
+        paths = await self._path_keys(
+            {line.suggested_budget_id} if line.suggested_budget_id else set()
+        )
+        matched = await self._matched_expense_ids(
+            [line.id] if line.match_state == "matched" else []
+        )
+        base = self._line_out(
+            line,
+            paths.get(line.suggested_budget_id) if line.suggested_budget_id else None,
+            matched_expense_id=matched.get(line.id),
+        )
+        return StatementLineDetail(
+            **base.model_dump(by_alias=True),
+            rawPayload=dict(line.raw_payload or {}),
+            idempotencyKey=line.idempotency_key,
+        )
 
     async def _matched_expense_ids(
         self, line_ids: list[uuid.UUID]
