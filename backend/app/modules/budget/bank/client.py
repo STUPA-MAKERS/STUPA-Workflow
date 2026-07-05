@@ -153,6 +153,11 @@ class FintsOutcome:
     # system_id) — then ``submit_tan`` must fetch accounts + transactions after
     # the confirmation (with a data TAN, ``send_tan`` delivers them directly).
     tan_for_login: bool = False
+    # Account scope of the paused transactions fetch (selected SEPA account's
+    # IBAN/number): ``submit_tan`` re-uses it to scope the resumed CAMT result —
+    # the SEPAAccount is not re-resolved on resume, and the configured IBAN
+    # alone can be empty (older Sparkasse accounts without IBAN).
+    account_scope: tuple[str, ...] = ()
 
 
 @dataclass(slots=True)
@@ -316,6 +321,7 @@ def _needs_tan(
     mechanism: str | None,
     *,
     for_login: bool = False,
+    account_scope: Collection[str] = (),
 ) -> FintsOutcome:  # pragma: no cover
     """Pause the dialog and collect everything needed for the later resume."""
     dialog_data = client.pause_dialog()
@@ -330,6 +336,7 @@ def _needs_tan(
         challenge_image=_matrix_data_url(response),
         decoupled=bool(getattr(response, "decoupled", False)),
         tan_for_login=for_login,
+        account_scope=tuple(account_scope),
     )
 
 
@@ -431,9 +438,12 @@ def _fetch(
     account = _select_account(acct_list, creds.account_iban)
     # Fetch window: from ``start_date`` (capped by the service) until today.
     start = creds.start_date or date.today()
-    result = _fetch_lines(client, account, start, _account_scope(account, creds))
+    scope = _account_scope(account, creds)
+    result = _fetch_lines(client, account, start, scope)
     if isinstance(result, NeedTANResponse):
-        return _needs_tan(client, result, mechanism)
+        # Keep the resolved scope for the resume: ``submit_tan`` parses the
+        # paused job's result without re-selecting the SEPA account.
+        return _needs_tan(client, result, mechanism, account_scope=scope)
     return FintsOutcome(
         status="done",
         tan_mechanism=mechanism,
@@ -552,11 +562,13 @@ def submit_tan(  # pragma: no cover
                 return outcome
             # ``send_tan`` returns the paused job's result — a CAMT tuple or MT940
             # transactions, depending on which fetch demanded the TAN. Scope the
-            # CAMT path to the configured account IBAN (the selected SEPAAccount is
-            # not re-resolved on resume).
-            lines = lines_from_fetch_result(
-                result, [creds.account_iban] if creds.account_iban else []
+            # CAMT path to the account scope resolved at ``start_sync`` (the
+            # selected SEPAAccount is not re-resolved on resume); fall back to
+            # the configured IBAN for sessions persisted before the scope existed.
+            scope = list(pending.account_scope) or (
+                [creds.account_iban] if creds.account_iban else []
             )
+            lines = lines_from_fetch_result(result, scope)
         return FintsOutcome(
             status="done",
             tan_mechanism=pending.tan_mechanism,

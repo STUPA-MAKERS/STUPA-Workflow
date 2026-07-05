@@ -68,6 +68,9 @@ def test_batch_entry_splits_into_sub_transactions() -> None:
         assert line.raw["batch_count"] == "2"
         assert line.raw["batch_total"] == "-500.00"
         assert line.raw["batch_ref"] == "ENTRYREF9"
+        # Eintrags-Info (AddtlNtryInf) bleibt als Metadatum erhalten — das Staging
+        # ersetzt damit die alte Gesamt-Zeile gezielt per Datei-Nr.
+        assert line.raw["batch_info"] == "SAMMELUEBERWEISUNG DATEI-NR. 0000794247 ANZAHL 00000002"
         assert line.raw["purpose"] == line.purpose
 
 

@@ -61,7 +61,7 @@ Flow: `list_transitions`, `fire_transition`.
 Votes: `get_vote`, `create_application_vote`, `open_vote`, `close_vote`, `cancel_vote`, `create_meeting_vote`, `delete_meeting_vote` (no `cast_ballot` tool — casting a ballot is human-only).
 Budget: `list_budgets`, `get_budget_applications`, `book_expense`, `list_expenses`, accounts (`list_accounts`/`list_account_options`/`create_account`/`update_account` incl. FinTS endpoint+BLZ).
 Invoices: `list_invoices`, `get_invoice`, `create_invoice`, `update_invoice`, `delete_invoice`, `parse_invoice` (ZUGFeRD/Factur-X PDF → fields + fileToken), `upload_invoice_file`.
-Bank reconcile (#fints): `get_/set_/delete_fints_credential`, `fints_sync` (may return `needs_tan` — human approves the TAN), `fints_submit_tan`, `import_statement_file` (CAMT.053/MT940), `list_statement_lines`, `confirm_statement_line`, `ignore_statement_line` (+ optional audit reason), `reactivate_statement_line`.
+Bank reconcile (#fints): `get_/set_/delete_fints_credential`, `fints_sync` (may return `needs_tan` — human approves the TAN), `fints_submit_tan`, `import_statement_file` (CAMT.053/MT940), `list_statement_lines`, `get_statement_line` (incl. `rawPayload` for import diagnostics), `confirm_statement_line`, `ignore_statement_line` (+ optional audit reason), `reactivate_statement_line`.
 Meetings: `list_meetings`, `get_meeting`.
 
 ## Token cache

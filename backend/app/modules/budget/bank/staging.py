@@ -15,6 +15,7 @@ bookings also replace their old unbooked total line
 
 from __future__ import annotations
 
+import re
 import uuid
 from dataclasses import dataclass
 from datetime import date
@@ -203,8 +204,14 @@ class StagingOps(BankServiceBase):
         ("DATEI-NR. … ANZAHL …", total amount). When the single transactions of
         the same booking arrive (same value date, parts = total), both together
         would be double. Only unbooked (unmatched/suggested) total lines whose
-        purpose carries the batch pattern are replaced; matched/ignored stay."""
-        totals: set[tuple[date | None, Decimal]] = set()
+        purpose carries the batch pattern are replaced; matched/ignored stay.
+
+        Value date + amount alone are ambiguous (two batches, same day, same
+        total): when the incoming split carries the entry's file number
+        (``batch_info``, from ``AddtlNtryInf``), only total lines with the SAME
+        file number are removed; without one, any batch-pattern line matches
+        (previous behavior — banks without a Datei-Nr. purpose)."""
+        totals: dict[tuple[date | None, Decimal], set[str | None]] = {}
         for line in lines:
             if line.raw.get("batch") != "true":
                 continue
@@ -212,11 +219,12 @@ class StagingOps(BankServiceBase):
                 total = Decimal(line.raw.get("batch_total", ""))
             except InvalidOperation:
                 continue
-            totals.add((line.value_date, total))
+            file_no = _batch_file_number(line.raw.get("batch_info"))
+            totals.setdefault((line.value_date, total), set()).add(file_no)
         if not totals:
             return 0
         superseded = 0
-        for value_date, total in totals:
+        for (value_date, total), file_numbers in totals.items():
             candidates = (
                 await self.session.execute(
                     select(BankStatementLine.id, BankStatementLine.purpose).where(
@@ -231,6 +239,10 @@ class StagingOps(BankServiceBase):
                 line_id
                 for line_id, purpose in candidates
                 if "DATEINR" in dedup.canonical_purpose_key(purpose)
+                and (
+                    None in file_numbers
+                    or _batch_file_number(purpose) in file_numbers
+                )
             ]
             if not stale:
                 continue
@@ -297,6 +309,18 @@ class StagingOps(BankServiceBase):
                 CounterpartyMemory.counterparty_iban == counterparty_iban
             )
         )
+
+
+# File number in a canonicalized batch purpose/info ("DATEI-NR. 0000794247 …" ->
+# canonical "DATEINR0000794247…"); leading zeros stripped for a stable compare.
+_BATCH_FILE_NO_RE = re.compile(r"DATEINR0*(\d+)")
+
+
+def _batch_file_number(text: str | None) -> str | None:
+    """Extract the Sparkasse batch file number from a purpose/``batch_info`` text
+    (``None`` when the text carries none)."""
+    match = _BATCH_FILE_NO_RE.search(dedup.canonical_purpose_key(text))
+    return match.group(1) if match else None
 
 
 def _line_fingerprint(line: statement.StatementLine) -> _Fingerprint:

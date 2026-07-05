@@ -286,6 +286,7 @@ class SyncOps(StagingOps):
             "challenge_html": outcome.challenge_html,
             "decoupled": outcome.decoupled,
             "tan_for_login": outcome.tan_for_login,
+            "account_scope": list(outcome.account_scope),
         }
         return encrypt_secret(json.dumps(payload), key=self._require_enabled())
 
@@ -353,4 +354,5 @@ class SyncOps(StagingOps):
             challenge_html=data.get("challenge_html"),
             decoupled=bool(data.get("decoupled")),
             tan_for_login=bool(data.get("tan_for_login")),
+            account_scope=tuple(data.get("account_scope") or ()),
         )
