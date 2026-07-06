@@ -155,6 +155,12 @@
                   </li>
                 }
               </ul>
+              @if (p.noOffers) {
+                <p class="m-0 text-sm text-muted">
+                  <app-badge variant="warning">{{ 'apply.positions.noOffersBadge' | t }}</app-badge>
+                  {{ p.noOffersReason }}
+                </p>
+              }
             </div>
           }
           <p class="det__pos-total"><strong>{{ 'apply.positions.total' | t }}: {{ money(positionsTotal(pf.positions)) }}</strong></p>

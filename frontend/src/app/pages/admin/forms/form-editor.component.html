@@ -200,6 +200,11 @@
                         <label class="fe__lbl">{{ 'admin.form.minPositions' | t }}
                           <input type="number" min="1" [ngModel]="field.validation?.minPositions" (ngModelChange)="setVal({ gi: gi, qi: qi }, 'minPositions', $event)" placeholder="1" /></label>
                       </div>
+                      <app-checkbox
+                        [ngModel]="field.validation?.allowNoOffers !== false"
+                        (ngModelChange)="setAllowNoOffers({ gi: gi, qi: qi }, $event)"
+                      >{{ 'admin.form.allowNoOffers' | t }}</app-checkbox>
+                      <p class="fe__hint">{{ 'admin.form.allowNoOffersHint' | t }}</p>
                     </fieldset>
                   }
 

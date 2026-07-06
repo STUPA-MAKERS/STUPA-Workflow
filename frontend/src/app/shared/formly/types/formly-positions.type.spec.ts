@@ -469,3 +469,132 @@ describe('FormlyPositionsType — inline error helpers', () => {
     expect(prot(cmp).cardError(validPos)).toBe('');
   });
 });
+
+describe('FormlyPositionsType — comparison-offer opt-out (noOffers)', () => {
+  it('allowNoOffers defaults to true', async () => {
+    const { cmp } = await setup();
+    expect(cmp.allowNoOffers).toBe(true);
+  });
+
+  it('allowNoOffers honours a false prop', async () => {
+    const { cmp } = await setup({ props: { allowNoOffers: false } });
+    expect(cmp.allowNoOffers).toBe(false);
+  });
+
+  it('requiredOffers is 1 for an opted-out position, minOffers otherwise', async () => {
+    const { cmp } = await setup({ props: { minOffers: 3 } });
+    expect(prot(cmp).requiredOffers({ label: 'P', offers: [] })).toBe(3);
+    expect(prot(cmp).requiredOffers({ label: 'P', offers: [], noOffers: true })).toBe(1);
+  });
+
+  it('requiredOffers ignores noOffers when the opt-out is disallowed', async () => {
+    const { cmp } = await setup({ props: { minOffers: 3, allowNoOffers: false } });
+    expect(prot(cmp).requiredOffers({ label: 'P', offers: [], noOffers: true })).toBe(3);
+  });
+
+  it('setNoOffers(true) drops blank offers, keeps content and a preferred flag', async () => {
+    const { cmp, control } = await setup({
+      props: { minOffers: 3 },
+      value: [
+        {
+          label: 'P',
+          offers: [
+            { label: '', value: null, preferred: true },
+            { label: 'Einziger Anbieter', value: 500, preferred: false },
+            { label: '', value: null, preferred: false },
+          ],
+        },
+      ],
+    });
+    cmp.setNoOffers(0, true);
+    const pos = (control.value as { offers: Offer[]; noOffers?: boolean }[])[0];
+    expect(pos.noOffers).toBe(true);
+    expect(pos.offers).toEqual([{ label: 'Einziger Anbieter', value: 500, preferred: true }]);
+  });
+
+  it('setNoOffers(true) on an all-blank position leaves one blank preferred offer', async () => {
+    const { cmp, control } = await setup({
+      props: { minOffers: 3 },
+      value: [
+        {
+          label: 'P',
+          offers: [
+            { label: '', value: null, preferred: true },
+            { label: '', value: null, preferred: false },
+          ],
+        },
+      ],
+    });
+    cmp.setNoOffers(0, true);
+    const pos = (control.value as { offers: Offer[] }[])[0];
+    expect(pos.offers).toEqual([{ label: '', value: null, preferred: true }]);
+  });
+
+  it('setNoOffers(false) clears the reason and pads offers back to minOffers', async () => {
+    const { cmp, control } = await setup({
+      props: { minOffers: 3 },
+      value: [
+        {
+          label: 'P',
+          offers: [{ label: 'A', value: 500, preferred: true }],
+          noOffers: true,
+          noOffersReason: 'Einziger Anbieter',
+        },
+      ],
+    });
+    cmp.setNoOffers(0, false);
+    const pos = (control.value as { offers: Offer[]; noOffers?: boolean; noOffersReason?: string }[])[0];
+    expect(pos.noOffers).toBe(false);
+    expect(pos.noOffersReason).toBe('');
+    expect(pos.offers).toHaveLength(3);
+  });
+
+  it('an opted-out position with one offer and a reason validates', async () => {
+    const { cmp, control } = await setup({
+      props: { minOffers: 3, minPositions: 1 },
+      value: [
+        {
+          label: 'P',
+          offers: [{ label: 'A', value: 500, preferred: true }],
+          noOffers: true,
+          noOffersReason: 'tmp',
+        },
+      ],
+    });
+    cmp.setNoOffersReason(0, 'Einziger Anbieter in der Region.');
+    expect(control.errors).toBeNull();
+  });
+
+  it('an opted-out position without a reason is invalid', async () => {
+    const { cmp, control } = await setup({
+      props: { minOffers: 3, minPositions: 1 },
+      value: [
+        {
+          label: 'P',
+          offers: [{ label: 'A', value: 500, preferred: true }],
+          noOffers: true,
+          noOffersReason: 'tmp',
+        },
+      ],
+    });
+    cmp.setNoOffersReason(0, '   ');
+    expect(control.errors).toEqual({ positions: true });
+  });
+
+  it('reasonInvalid and the cardError message fire under showError', async () => {
+    const { cmp, control } = await setup({ props: { minOffers: 1 }, showError: true });
+    control.setErrors({ positions: true });
+    control.markAsTouched();
+    const p = {
+      label: 'P',
+      offers: [{ label: 'A', value: 5, preferred: true }],
+      noOffers: true,
+      noOffersReason: '',
+    };
+    expect(prot(cmp).reasonInvalid(p)).toBe(true);
+    expect(prot(cmp).cardError(p)).toBe(
+      'Bitte begründe, warum keine Vergleichsangebote möglich sind.',
+    );
+    expect(prot(cmp).reasonInvalid({ ...p, noOffersReason: 'Grund' })).toBe(false);
+  });
+});

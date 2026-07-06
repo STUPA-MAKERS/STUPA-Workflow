@@ -50,6 +50,7 @@ import {
 import { SimplifyPathPipe } from '@shared/budget-path';
 import { downloadBlob } from '@shared/download.util';
 import { HScrollSyncDirective } from '@shared/h-scroll-sync.directive';
+import { PressSelectDirective } from '@shared/press-select.directive';
 import { ExpenseDialogsState } from './expense-dialogs.state';
 import { ExpenseSubBookingsState } from './expense-sub-bookings.state';
 import { ExpensesListState, type ExpenseSortField } from './expenses-list.state';
@@ -82,6 +83,7 @@ import { ExpensesListState, type ExpenseSortField } from './expenses-list.state'
     CheckboxComponent,
     CostCentreTreeComponent,
     HScrollSyncDirective,
+    PressSelectDirective,
     RouterLink,
   ],
   templateUrl: './expenses.component.html',

@@ -46,6 +46,7 @@ import { FintsSyncState } from './fints-sync.state';
 import { KontenLinesState, type StatementSortField } from './konten-lines.state';
 import { KontenReconcileState } from './konten-reconcile.state';
 import { HScrollSyncDirective } from '@shared/h-scroll-sync.directive';
+import { PressSelectDirective } from '@shared/press-select.directive';
 
 /**
  * Accounts tab: per bank account all fetched transactions + balance; each line
@@ -72,6 +73,7 @@ import { HScrollSyncDirective } from '@shared/h-scroll-sync.directive';
     SelectComponent,
     CheckboxComponent,
     HScrollSyncDirective,
+    PressSelectDirective,
     RouterLink,
   ],
   templateUrl: './konten.component.html',
@@ -432,6 +434,7 @@ export class KontenComponent implements OnDestroy {
   toggleSelectAll(checked: boolean): void {
     this.selected.set(checked ? new Set(this.lines().map((l) => l.id)) : new Set());
   }
+
 
   askBulk(kind: 'unlink' | 'ignore'): void {
     const n = kind === 'unlink' ? this.selectedMatched() : this.selectedIgnorable();

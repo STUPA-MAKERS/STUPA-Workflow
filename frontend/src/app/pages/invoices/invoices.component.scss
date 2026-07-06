@@ -59,6 +59,14 @@ input.inv__input { height: var(--control-height); }
   cursor: pointer;
   color: var(--color-primary);
   font: inherit;
+  /* Long unbroken filenames must wrap instead of clipping out of the card. */
+  max-width: 100%;
+  min-width: 0;
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+.inv__fileLink app-icon {
+  flex: 0 0 auto;
 }
 .inv__fileLink:hover { text-decoration: underline; }
 .inv__actions { display: inline-flex; gap: var(--space-1); justify-content: flex-end; }
@@ -150,6 +158,16 @@ input.inv__input { height: var(--control-height); }
     order: 1;
     font-size: var(--fs-xs);
     color: var(--color-text-muted);
+  }
+  /* File link on its own full-width row so long names wrap inside the card. */
+  .inv__cellFile {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  .inv__cellNumber {
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
   .inv__actions { margin-left: auto; }
   .inv__num:has(.inv__actions) { order: 2; flex: 1 1 100%; }

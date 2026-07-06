@@ -244,6 +244,16 @@ def test_download_streams_bytes_with_disposition(app: FastAPI, client: TestClien
     assert 'attachment; filename="doc.pdf"' in r.headers["content-disposition"]
 
 
+def test_download_inline_renders_in_browser(app: FastAPI, client: TestClient) -> None:
+    # ?inline=1 → Content-Disposition inline (Vorschau-Dialog), nur für die
+    # nicht-skriptbare Allowlist (PDF/PNG/JPEG = Upload-Allowlist).
+    _as(app, "application.read")
+    r = client.get(f"/api/attachments/{ATT_ID}/download?inline=1")
+    assert r.status_code == 200
+    assert 'inline; filename="doc.pdf"' in r.headers["content-disposition"]
+    assert r.headers["x-content-type-options"] == "nosniff"
+
+
 def test_download_cross_tenant_is_404(app: FastAPI, client: TestClient) -> None:
     _as(app)  # keine Permissions → kein Lesezugriff → 404 (kein Existenz-Orakel)
     r = client.get(f"/api/attachments/{ATT_ID}/download")

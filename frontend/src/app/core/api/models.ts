@@ -575,6 +575,9 @@ export interface FieldValidation {
   /** `positions`: min comparison offers per position / min number of positions. */
   minOffers?: number;
   minPositions?: number;
+  /** `positions`: allow the per-position opt-out of comparison offers
+   *  (checkbox + mandatory reason → only one offer needed). Unset = allowed. */
+  allowNoOffers?: boolean;
 }
 
 /** A field definition of the effective form (camelCase like the OpenAPI by_alias). */

@@ -25,3 +25,13 @@
     max-width: 64rem;
   }
 }
+
+// Mobile: the page itself must NEVER scroll horizontally — an overflowing element
+// (long link, wide table cell) may only scroll inside its own overflow container.
+// `clip` instead of `hidden`: no new scroll container, `position: sticky` keeps working.
+@media (max-width: 768px) {
+  html,
+  body {
+    overflow-x: clip;
+  }
+}

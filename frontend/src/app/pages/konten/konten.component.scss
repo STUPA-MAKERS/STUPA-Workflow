@@ -405,6 +405,10 @@ input.exp__input {
   .exp__table tbody tr:hover td.exp__stickyCol {
     background: var(--color-surface-sunken);
   }
+  .exp__table tbody tr.exp__tr--selected td.exp__stickyCol,
+  .exp__table tbody tr.exp__tr--selected:hover td.exp__stickyCol {
+    background: color-mix(in srgb, var(--color-primary) 14%, var(--color-surface));
+  }
 }
 
 /* --- Batch / Sammel-Aktionen: schwebende Bottom-Bar (#expenses-ux2) ---
@@ -430,6 +434,20 @@ input.exp__input {
 }
 .exp__bulkcount {
   font-weight: var(--fw-semibold);
+  white-space: nowrap;
+}
+/* Mobile: one row that scrolls horizontally inside the bar — never stacked. */
+@media (max-width: 768px) {
+  .exp__bulkbar {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    width: calc(100vw - 2 * var(--space-4));
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .exp__bulkbar > * {
+    flex: 0 0 auto;
+  }
 }
 /* Platz am Listenende, damit die schwebende Bar die letzten Zeilen/den
    Nachlade-Button nicht verdeckt. */
@@ -441,6 +459,19 @@ input.exp__input {
   white-space: nowrap;
   text-align: center;
 }
+/* Selected line/card: tinted surface instead of (mobile: hidden) checkboxes. */
+.exp__table tbody tr.exp__tr--selected,
+.exp__table tbody tr.exp__tr--selected:hover {
+  background: color-mix(in srgb, var(--color-primary) 14%, var(--color-surface));
+}
 @media (max-width: 768px) {
-  .exp__check { order: -4; flex: 0 0 auto; }
+  /* Press & hold enters select mode; the checkbox column disappears on touch. */
+  .exp__check { display: none; }
+  .exp__table tbody tr {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .exp__table tbody tr.exp__tr--selected {
+    border-color: var(--color-primary);
+  }
 }

@@ -146,7 +146,15 @@
           </thead>
           <tbody>
             @for (e of items(); track e.id) {
-              <tr [class.exp__tr--income]="e.kind === 'income'" [attr.title]="e.actor ? ('expenses.bookedBy' | t: { actor: e.actorName ?? e.actor }) : null">
+              <tr
+                appPressSelect
+                [class.exp__tr--income]="e.kind === 'income'"
+                [class.exp__tr--selected]="isSelected(e.id)"
+                [appPressSelectEnabled]="canManage()"
+                [appPressSelectActive]="selectedCount() > 0"
+                (appPressSelectToggle)="toggleSelect(e.id, !isSelected(e.id))"
+                [attr.title]="e.actor ? ('expenses.bookedBy' | t: { actor: e.actorName ?? e.actor }) : null"
+              >
                 @if (canManage()) {
                   <td class="exp__check">
                     <app-checkbox [ngModel]="isSelected(e.id)" (ngModelChange)="toggleSelect(e.id, $event)" [attr.aria-label]="e.description" />
