@@ -610,6 +610,17 @@ describe('FormEditorComponent — validation setters & JsonLogic', () => {
     expect(c.groups()[0].fields[0].validation).toEqual({ pattern: '^a+$' });
   });
 
+  it('setAllowNoOffers stores only the false value and clears on allow', async () => {
+    const { c } = await setup(
+      draft([{ key: 'q', type: 'positions', label: { de: 'A', en: '' } }]),
+    );
+    c.setAllowNoOffers({ gi: 0, qi: 0 }, false);
+    expect(c.groups()[0].fields[0].validation).toEqual({ allowNoOffers: false });
+    // Allowed is the default → the key is removed instead of storing true.
+    c.setAllowNoOffers({ gi: 0, qi: 0 }, true);
+    expect(c.groups()[0].fields[0].validation).toEqual({});
+  });
+
   it('parses valid JsonLogic into the field and reflects the raw input', async () => {
     const { c } = await setup(draft([{ key: 'q', type: 'text', label: { de: 'A', en: '' } }]));
     c.onLogicInput({ gi: 0, qi: 0 }, 'visibleIf', '{"var":"x"}');

@@ -136,4 +136,25 @@ describe('PressSelectDirective', () => {
     card.dispatchEvent(ev);
     expect(ev.defaultPrevented).toBe(true);
   });
+
+  it('leaves the context menu alone on fine-pointer devices', async () => {
+    const { card } = await setup({ coarse: false });
+    const ev = pointer('contextmenu');
+    card.dispatchEvent(ev);
+    expect(ev.defaultPrevented).toBe(false);
+  });
+
+  it('fires a haptic tick when the device supports vibration', async () => {
+    const vibrate = jest.fn();
+    Object.defineProperty(navigator, 'vibrate', { value: vibrate, configurable: true });
+    try {
+      const { host, card } = await setup();
+      card.dispatchEvent(pointer('pointerdown'));
+      jest.advanceTimersByTime(450);
+      expect(host.toggles).toBe(1);
+      expect(vibrate).toHaveBeenCalledWith(10);
+    } finally {
+      delete (navigator as { vibrate?: unknown }).vibrate;
+    }
+  });
 });

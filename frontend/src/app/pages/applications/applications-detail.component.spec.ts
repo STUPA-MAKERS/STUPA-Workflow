@@ -777,6 +777,29 @@ describe('ApplicationsDetailComponent', () => {
     expect(byKey.get('agree')).toBe('Nein');
   });
 
+  it('resolves gremium_select/budget_select answers to their option labels', async () => {
+    const fields: FormFieldDef[] = [
+      {
+        key: 'gremium',
+        type: 'gremium_select',
+        label: { de: 'Fachschaft / Referat' },
+        options: [{ value: 'c1cee422-4627-5387-bff7-6355a30170bc', label: { de: 'Fachschaft TEX' } }],
+      },
+      {
+        key: 'kst',
+        type: 'budget_select',
+        label: { de: 'Kostenstelle' },
+        options: [{ value: 'b-1', label: { de: 'AStA (STUPA.ASTA)' } }],
+      },
+    ];
+    const data = { gremium: 'c1cee422-4627-5387-bff7-6355a30170bc', kst: 'unknown-id' };
+    const { cmp } = await setupWithFields(fields, data);
+    const byKey = new Map(cmp.dataEntries(cmp.app() as Application).map((e) => [e.key, e.value]));
+    expect(byKey.get('gremium')).toBe('Fachschaft TEX');
+    // unknown option (e.g. deleted budget) falls back to the raw value
+    expect(byKey.get('kst')).toBe('unknown-id');
+  });
+
   it('renders raw data rows for keys without a field definition (excluding title)', async () => {
     const { cmp } = await setupWithFields(
       [{ key: 'known', type: 'text', label: { de: 'Bekannt' } }],
@@ -829,6 +852,29 @@ describe('ApplicationsDetailComponent', () => {
     expect(cmp.money(100)).toContain('100,00');
     expect(cmp.money(null)).toContain('0,00');
     expect(cmp.money(NaN)).toContain('0,00');
+  });
+
+  it('maps the comparison-offer opt-out (noOffers + reason) into the positions block', async () => {
+    const fields: FormFieldDef[] = [
+      { key: 'kosten', type: 'positions', label: { de: 'Kostenaufstellung' } },
+    ];
+    const data = {
+      kosten: [
+        {
+          label: 'Spezialteil',
+          offers: [{ label: 'Einziger Anbieter', value: 99, preferred: true }],
+          noOffers: true,
+          noOffersReason: 'Einziger Anbieter in der Region.',
+        },
+        { label: 'Normal', offers: [{ label: 'A', value: 1, preferred: true }] },
+      ],
+    };
+    const { cmp } = await setupWithFields(fields, data);
+    const [block] = cmp.positionEntries(cmp.app() as Application);
+    expect(block.positions[0].noOffers).toBe(true);
+    expect(block.positions[0].noOffersReason).toBe('Einziger Anbieter in der Region.');
+    expect(block.positions[1].noOffers).toBe(false);
+    expect(block.positions[1].noOffersReason).toBe('');
   });
 
   it('skips positions blocks when the value is not an array', async () => {
