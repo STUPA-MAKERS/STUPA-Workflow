@@ -289,7 +289,17 @@ export class AttachmentsPanelComponent {
     this.api.attachmentUrl(att.id).subscribe({
       next: (signed) => {
         this.previewLoadingId.set(null);
-        this.previewUrl.set(signed.url);
+        // `inline=1`: the download route answers with `Content-Disposition: inline`
+        // so the iframe/img renders instead of triggering a file download.
+        const sep = signed.url.includes('?') ? '&' : '?';
+        const url = `${signed.url}${sep}inline=1`;
+        // Mobile browsers (Android Chrome) cannot render PDFs in an iframe —
+        // hand PDFs to the system viewer there instead of an empty dialog.
+        if (att.mime === 'application/pdf' && this.coarsePointer()) {
+          this.openUrl(url);
+          return;
+        }
+        this.previewUrl.set(url);
         this.previewing.set(att);
       },
       error: (err: { status?: number }) => {
@@ -357,5 +367,10 @@ export class AttachmentsPanelComponent {
   /** Open the signed URL (own method → stubbable in tests). */
   protected openUrl(url: string): void {
     window.open(url, '_blank', 'noopener');
+  }
+
+  /** Touch-first device (no iframe PDF viewer) — own method → stubbable in tests. */
+  protected coarsePointer(): boolean {
+    return window.matchMedia('(pointer: coarse)').matches;
   }
 }

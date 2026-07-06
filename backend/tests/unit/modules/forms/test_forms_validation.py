@@ -233,6 +233,44 @@ def test_positions_engine_max_offers_ceiling() -> None:
     assert any("more than 2 comparison offer" in e.msg for e in errors)
 
 
+def test_positions_no_offers_opt_out_with_reason_needs_one_offer() -> None:
+    # Opt-out (default allowed): one offer + reason is enough despite minOffers 3.
+    field = _positions_field(validation={"minOffers": 3})
+    value = [
+        _position("Spezialgerät", ("Einziger Anbieter", 500, True))
+        | {"noOffers": True, "noOffersReason": "Einziger Anbieter in der Region."}
+    ]
+    errors: list[FieldError] = []
+    _validate_value(field, value, errors)
+    assert errors == []
+
+
+def test_positions_no_offers_requires_reason() -> None:
+    field = _positions_field(validation={"minOffers": 3})
+    value = [_position("P", ("A", 500, True)) | {"noOffers": True, "noOffersReason": "  "}]
+    errors: list[FieldError] = []
+    _validate_value(field, value, errors)
+    assert any("needs a reason" in e.msg for e in errors)
+
+
+def test_positions_no_offers_still_requires_one_offer() -> None:
+    field = _positions_field(validation={"minOffers": 3})
+    value = [{"label": "P", "offers": [], "noOffers": True, "noOffersReason": "Begründung"}]
+    errors: list[FieldError] = []
+    _validate_value(field, value, errors)
+    assert any("at least 1 comparison offer" in e.msg for e in errors)
+
+
+def test_positions_no_offers_rejected_when_disallowed() -> None:
+    field = _positions_field(validation={"minOffers": 3, "allowNoOffers": False})
+    value = [
+        _position("P", ("A", 500, True)) | {"noOffers": True, "noOffersReason": "Begründung"}
+    ]
+    errors: list[FieldError] = []
+    _validate_value(field, value, errors)
+    assert any("not allowed" in e.msg for e in errors)
+
+
 def test_table_default_max_rows_ceiling() -> None:
     # Tabelle ohne maxRows: Default-Decke verhindert unbegrenzte Zeilenzahl.
     f = _field("rows", "table")

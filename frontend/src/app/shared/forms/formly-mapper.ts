@@ -107,6 +107,7 @@ function mapField(
   if (f.type === 'positions') {
     if (f.validation?.minOffers !== undefined) props['minOffers'] = f.validation.minOffers;
     if (f.validation?.minPositions !== undefined) props['minPositions'] = f.validation.minPositions;
+    if (f.validation?.allowNoOffers !== undefined) props['allowNoOffers'] = f.validation.allowNoOffers;
   }
 
   const config: FormlyFieldConfig = { key: f.key, type: FORMLY_TYPE[f.type], props };

@@ -166,6 +166,9 @@ class FieldValidation(_CamelModel):
     # the body cap alone.
     max_positions: int | None = Field(default=None, alias="maxPositions", ge=1)
     max_offers: int | None = Field(default=None, alias="maxOffers", ge=1)
+    # `positions`: allow the per-position opt-out of comparison offers (checkbox +
+    # mandatory reason; the position then needs only one offer). Unset = allowed.
+    allow_no_offers: bool | None = Field(default=None, alias="allowNoOffers")
 
     @field_validator("pattern")
     @classmethod

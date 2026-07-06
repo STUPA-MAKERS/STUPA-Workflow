@@ -14,6 +14,9 @@ interface Offer {
 interface Position {
   label: string;
   offers: Offer[];
+  /** Opt-out of comparison offers (needs a reason; only one offer then). */
+  noOffers?: boolean;
+  noOffersReason?: string;
 }
 
 /**
@@ -81,8 +84,8 @@ interface Position {
                   </td>
                   <td class="pos__actcol">
                     <button type="button" class="pos__icon" (click)="removeOffer(pi, oi)"
-                      [disabled]="p.offers.length <= minOffers"
-                      [attr.title]="p.offers.length <= minOffers ? t('apply.positions.minOffersHint') : null"
+                      [disabled]="p.offers.length <= requiredOffers(p)"
+                      [attr.title]="p.offers.length <= requiredOffers(p) ? t('apply.positions.minOffersHint') : null"
                       [attr.aria-label]="t('apply.positions.remove')">✕</button>
                   </td>
                 </tr>
@@ -90,6 +93,23 @@ interface Position {
             </tbody>
           </table>
           <button type="button" class="pos__add pos__add--sm" (click)="addOffer(pi)">+ {{ t('apply.positions.addOffer') }}</button>
+          @if (allowNoOffers) {
+            <label class="pos__noOffers">
+              <input type="checkbox" [checked]="p.noOffers === true"
+                (change)="setNoOffers(pi, $any($event.target).checked)" />
+              <span>{{ t('apply.positions.noOffers') }}</span>
+            </label>
+            @if (p.noOffers) {
+              <p class="pos__hint">{{ t('apply.positions.noOffersHint') }}</p>
+              <textarea class="pos__reason" rows="2"
+                [value]="p.noOffersReason ?? ''"
+                [class.pos__invalid]="reasonInvalid(p)"
+                [attr.aria-invalid]="reasonInvalid(p) ? 'true' : null"
+                (input)="setNoOffersReason(pi, $any($event.target).value)"
+                [attr.placeholder]="t('apply.positions.noOffersReason')"
+                [attr.aria-label]="t('apply.positions.noOffersReason')"></textarea>
+            }
+          }
           @if (cardError(p); as msg) {
             <p class="pos__field-error" role="alert">{{ msg }}</p>
           }
@@ -150,6 +170,17 @@ interface Position {
       .pos input[type='number']::-webkit-outer-spin-button,
       .pos input[type='number']::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
       .pos__pref input[type='radio'] { width: 1.15rem; height: 1.15rem; min-height: 0; accent-color: var(--color-primary); cursor: pointer; }
+      .pos__noOffers { display: flex; align-items: center; gap: var(--space-2); font-size: var(--fs-sm); cursor: pointer; }
+      .pos__noOffers input[type='checkbox'] { width: 1.15rem; height: 1.15rem; min-height: 0; padding: 0; accent-color: var(--color-primary); cursor: pointer; flex: 0 0 auto; }
+      .pos textarea.pos__reason {
+        padding: var(--space-2) var(--space-3);
+        border: var(--border-width) solid var(--color-border);
+        border-radius: var(--radius-md);
+        background: var(--color-bg); color: inherit; width: 100%;
+        font: inherit; resize: vertical;
+      }
+      .pos textarea.pos__reason:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; }
+      .pos textarea.pos__invalid { border-color: var(--color-danger); }
       .pos__icon { background: transparent; border: 0; cursor: pointer; color: var(--color-text-muted); font-size: var(--fs-md); line-height: 1; padding: var(--space-1); }
       .pos__icon:hover:not(:disabled) { color: var(--color-danger); }
       .pos__icon:disabled { opacity: 0.35; cursor: not-allowed; }
@@ -197,6 +228,14 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
   get minPositions(): number {
     return Number(this.props['minPositions']) || 1;
   }
+  /** Opt-out of comparison offers offered at all (form config; default yes). */
+  get allowNoOffers(): boolean {
+    return this.props['allowNoOffers'] !== false;
+  }
+  /** Offers required for one position — 1 when it opted out, else `minOffers`. */
+  protected requiredOffers(p: Position): number {
+    return this.allowNoOffers && p.noOffers ? 1 : this.minOffers;
+  }
 
   get positions(): Position[] {
     const v = this.formControl.value;
@@ -221,16 +260,20 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
   protected offerValueInvalid(o: Offer): boolean {
     return this.showError && (o.value === null || o.value <= 0);
   }
+  protected reasonInvalid(p: Position): boolean {
+    return this.showError && p.noOffers === true && !(p.noOffersReason ?? '').trim();
+  }
 
   /** Concrete, terse error message per position card (or '' when valid). */
   protected cardError(p: Position): string {
     if (!this.showError) return '';
-    if (p.offers.length < this.minOffers) return this.t('apply.positions.errMinOffers');
+    if (p.offers.length < this.requiredOffers(p)) return this.t('apply.positions.errMinOffers');
     if (p.offers.filter((o) => o.preferred).length !== 1) return this.t('apply.positions.errPreferred');
     if (!p.label.trim()) return this.t('apply.positions.errLabel');
     if (p.offers.some((o) => !o.label.trim() || o.value === null || o.value <= 0)) {
       return this.t('apply.positions.errOffers');
     }
+    if (this.reasonInvalid(p)) return this.t('apply.positions.errNoOffersReason');
     return '';
   }
 
@@ -266,11 +309,12 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
     let ok = positions.length >= this.minPositions;
     for (const p of positions) {
       if (!p.label.trim()) ok = false;
-      if (p.offers.length < this.minOffers) ok = false;
+      if (p.offers.length < this.requiredOffers(p)) ok = false;
       if (p.offers.filter((o) => o.preferred).length !== 1) ok = false;
       for (const o of p.offers) {
         if (!o.label.trim() || o.value === null || o.value <= 0) ok = false;
       }
+      if (p.noOffers === true && !(p.noOffersReason ?? '').trim()) ok = false;
     }
     if (this.props.required && positions.length === 0) ok = false;
     this.formControl.setErrors(ok ? null : { positions: true });
@@ -376,6 +420,34 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
           ? { ...p, offers: p.offers.map((o, k) => ({ ...o, preferred: k === oi })) }
           : p,
       ),
+    );
+  }
+
+  /** Toggle the comparison-offer opt-out. On: drop untouched blank offers (one
+   *  offer input remains, marked preferred). Off: pad back up to `minOffers`. */
+  setNoOffers(pi: number, checked: boolean): void {
+    this.commit(
+      this.positions.map((p, i) => {
+        if (i !== pi) return p;
+        if (checked) {
+          let offers = p.offers.filter((o) => o.label.trim() || o.value !== null);
+          if (!offers.length) offers = [this.blankOffer(true)];
+          if (!offers.some((o) => o.preferred)) {
+            offers = offers.map((o, k) => ({ ...o, preferred: k === 0 }));
+          }
+          return { ...p, noOffers: true, offers };
+        }
+        const pad = Array.from({ length: Math.max(0, this.minOffers - p.offers.length) }, () =>
+          this.blankOffer(),
+        );
+        return { ...p, noOffers: false, noOffersReason: '', offers: [...p.offers, ...pad] };
+      }),
+    );
+  }
+
+  setNoOffersReason(pi: number, reason: string): void {
+    this.commit(
+      this.positions.map((p, i) => (i === pi ? { ...p, noOffersReason: reason } : p)),
     );
   }
 }

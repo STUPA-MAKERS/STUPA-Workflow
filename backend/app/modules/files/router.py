@@ -49,6 +49,10 @@ router = APIRouter(tags=["files"])
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 _CHUNK = 64 * 1024
 
+# Types the browser may render inline (attachment preview). Matches the upload
+# allowlist minus anything scriptable — never HTML/SVG, so no stored-XSS vector.
+_INLINE_MIMES = frozenset({"application/pdf", "image/png", "image/jpeg"})
+
 
 def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
     return {code: _PROBLEM for code in codes}
@@ -208,6 +212,7 @@ async def download_attachment(
     db: DbSession,
     principal: Annotated[Principal | None, Depends(get_current_principal)],
     applicant: Annotated[Applicant | None, Depends(get_current_applicant)],
+    inline: bool = False,
 ) -> StreamingResponse:
     """Stream attachment bytes server-side — MinIO is on the internal Docker network, so a
     presigned S3 URL binds the internal host and is unreachable from the browser. This
@@ -234,13 +239,17 @@ async def download_attachment(
     stream, filename, mime, size = await service.download_stream(
         attachment_id, allow_unconfirmed=access.is_owning_applicant
     )
-    disposition = f'attachment; filename="{_safe_disposition(filename)}"'
+    # ``?inline=1`` renders in the browser (preview dialog) — only for the
+    # non-scriptable allowlist; anything else stays a forced download.
+    kind = "inline" if inline and mime in _INLINE_MIMES else "attachment"
+    disposition = f'{kind}; filename="{_safe_disposition(filename)}"'
     return StreamingResponse(
         stream,
         media_type=mime,
         headers={
             "Content-Disposition": disposition,
             "Content-Length": str(size),
+            "X-Content-Type-Options": "nosniff",
         },
     )
 

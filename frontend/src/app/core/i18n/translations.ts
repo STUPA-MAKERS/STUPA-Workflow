@@ -430,6 +430,13 @@ export const de = {
   'apply.positions.errOffers': 'Jedes Angebot braucht eine Bezeichnung und einen Wert > 0.',
   'apply.positions.invalid':
     'Jede Position braucht eine Bezeichnung, genügend Vergleichsangebote (mit Wert > 0) und genau ein bevorzugtes Angebot.',
+  'apply.positions.noOffers': 'Für diese Position sind keine Vergleichsangebote möglich',
+  'apply.positions.noOffersHint':
+    'Bitte begründe, warum keine Vergleichsangebote eingeholt werden können (z. B. einziger Anbieter). Es genügt dann ein Angebot.',
+  'apply.positions.noOffersReason': 'Begründung, warum keine Vergleichsangebote möglich sind',
+  'apply.positions.errNoOffersReason':
+    'Bitte begründe, warum keine Vergleichsangebote möglich sind.',
+  'apply.positions.noOffersBadge': 'Ohne Vergleichsangebote',
   'apply.nav.back': 'Zurück',
   'apply.nav.discard': 'Entwurf verwerfen',
   'apply.nav.submit': 'Antrag absenden',
@@ -1292,6 +1299,9 @@ export const de = {
     'Antragsteller listen Positionen; jede mit mehreren Vergleichsangeboten. Ein Angebot wird bevorzugt — dessen Wert zählt; die Summe der Positionen ergibt den Betrag.',
   'admin.form.minOffers': 'Min. Vergleichsangebote',
   'admin.form.minPositions': 'Min. Positionen',
+  'admin.form.allowNoOffers': 'Verzicht auf Vergleichsangebote erlauben',
+  'admin.form.allowNoOffersHint':
+    'Antragstellende können pro Position mit Begründung erklären, dass keine Vergleichsangebote möglich sind — dann genügt ein einzelnes Angebot.',
 
   'admin.flow.title': 'Flow-Editor',
   'admin.flow.loadFailed': 'Flow konnte nicht geladen werden (fehlende Berechtigung?).',
@@ -2655,6 +2665,13 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'apply.positions.errOffers': 'Each offer needs a label and a value > 0.',
   'apply.positions.invalid':
     'Each position needs a label, enough comparison offers (value > 0) and exactly one preferred offer.',
+  'apply.positions.noOffers': 'No comparison offers are possible for this position',
+  'apply.positions.noOffersHint':
+    'Please explain why comparison offers cannot be obtained (e.g. sole supplier). A single offer is sufficient then.',
+  'apply.positions.noOffersReason': 'Reason why no comparison offers are possible',
+  'apply.positions.errNoOffersReason':
+    'Please explain why no comparison offers are possible.',
+  'apply.positions.noOffersBadge': 'Without comparison offers',
   'apply.nav.back': 'Back',
   'apply.nav.discard': 'Discard draft',
   'apply.nav.submit': 'Submit application',
@@ -3505,6 +3522,9 @@ export const en: Partial<Record<TranslationKey, string>> = {
     'Applicants list positions, each with several comparison offers. One offer is marked preferred — its value counts; the sum of positions is the amount.',
   'admin.form.minOffers': 'Min. comparison offers',
   'admin.form.minPositions': 'Min. positions',
+  'admin.form.allowNoOffers': 'Allow opting out of comparison offers',
+  'admin.form.allowNoOffersHint':
+    'Applicants can declare per position — with a reason — that comparison offers are not possible; a single offer is sufficient then.',
 
   'admin.flow.title': 'Flow editor',
   'admin.flow.loadFailed': 'Could not load flow (missing permission?).',

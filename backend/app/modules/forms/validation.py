@@ -528,12 +528,19 @@ def _offer_value(offer: Mapping[str, Any]) -> Decimal | None:
 
 def _validate_positions(field: FormFieldDef, value: Any, errors: list[FieldError]) -> None:
     """Validate cost positions: >= minPositions positions, each >= minOffers offers,
-    exactly one preferred offer, all values finite numbers > 0 (position 0-indexed)."""
+    exactly one preferred offer, all values finite numbers > 0 (position 0-indexed).
+
+    A position may opt out of comparison offers (``noOffers: true`` + mandatory
+    ``noOffersReason``) when the field allows it (``allowNoOffers``, default on) —
+    it then needs exactly one offer instead of ``minOffers``."""
     if not isinstance(value, list):
         _err(errors, field.key, "must be a list of positions")
         return
     v = field.validation
     min_offers = (v.min_offers if v and v.min_offers else None) or _DEFAULT_MIN_OFFERS
+    allow_no_offers = (
+        v.allow_no_offers if (v is not None and v.allow_no_offers is not None) else True
+    )
     min_positions = (
         v.min_positions if v and v.min_positions else None
     ) or _DEFAULT_MIN_POSITIONS
@@ -563,12 +570,20 @@ def _validate_positions(field: FormFieldDef, value: Any, errors: list[FieldError
             continue
         if not isinstance(pos.get("label"), str) or not pos["label"].strip():
             _err(errors, where, "position needs a label")
+        no_offers = pos.get("noOffers") is True
+        if no_offers:
+            if not allow_no_offers:
+                _err(errors, where, "opting out of comparison offers is not allowed here")
+            reason = pos.get("noOffersReason")
+            if not isinstance(reason, str) or not reason.strip():
+                _err(errors, where, "opting out of comparison offers needs a reason")
         offers = pos.get("offers")
         if not isinstance(offers, list):
             _err(errors, where, "offers must be a list")
             continue
-        if len(offers) < min_offers:
-            _err(errors, where, f"needs at least {min_offers} comparison offer(s)")
+        required_offers = 1 if no_offers else min_offers
+        if len(offers) < required_offers:
+            _err(errors, where, f"needs at least {required_offers} comparison offer(s)")
         if len(offers) > max_offers:
             _err(errors, where, f"has more than {max_offers} comparison offer(s)")
         preferred_count = 0

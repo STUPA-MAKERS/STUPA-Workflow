@@ -53,6 +53,9 @@ interface DetailOffer {
 interface DetailPosition {
   label: string;
   offers: DetailOffer[];
+  /** Opt-out of comparison offers (with the applicant's reason). */
+  noOffers?: boolean;
+  noOffersReason?: string;
 }
 
 /**
@@ -400,7 +403,9 @@ export class ApplicationsDetailComponent {
     if (field.type === 'checkbox' && typeof value === 'boolean') {
       return this.i18n.translate(value ? 'common.yes' : 'common.no');
     }
-    if (field.type === 'select') {
+    // Dynamic pickers (gremium/budget) carry server-supplied options in the
+    // effective form — resolve them to names like a plain select.
+    if (field.type === 'select' || field.type === 'gremium_select' || field.type === 'budget_select') {
       const opt = field.options?.find((o) => o.value === value);
       return opt ? resolveI18n(opt.label, lang) : formatFieldValue(value);
     }
@@ -437,6 +442,8 @@ export class ApplicationsDetailComponent {
       const positions = (raw as DetailPosition[]).map((p) => ({
         label: p.label ?? '',
         offers: Array.isArray(p.offers) ? p.offers : [],
+        noOffers: p.noOffers === true,
+        noOffersReason: typeof p.noOffersReason === 'string' ? p.noOffersReason : '',
       }));
       out.push({ key: f.key, label: resolveI18n(f.label, lang), positions });
     }

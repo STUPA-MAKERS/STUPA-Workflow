@@ -140,7 +140,14 @@
           </thead>
           <tbody>
             @for (line of lines(); track line.id) {
-              <tr [class.exp__tr--income]="line.kind === 'income'">
+              <tr
+                appPressSelect
+                [class.exp__tr--income]="line.kind === 'income'"
+                [class.exp__tr--selected]="isSelected(line.id)"
+                [appPressSelectEnabled]="canBook() || canIgnore()"
+                [appPressSelectActive]="selectedCount() > 0"
+                (appPressSelectToggle)="toggleSelect(line.id, !isSelected(line.id))"
+              >
                 @if (canBook() || canIgnore()) {
                   <td class="exp__check">
                     <app-checkbox [ngModel]="isSelected(line.id)" (ngModelChange)="toggleSelect(line.id, $event)" [attr.aria-label]="line.purpose || line.counterpartyName || ''" />

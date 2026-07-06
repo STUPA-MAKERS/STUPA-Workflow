@@ -698,6 +698,8 @@ describe('AttachmentsPanelComponent', () => {
     expect(cmp.previewing()?.id).toBe('att-1');
     expect(cmp.previewIsImage()).toBe(false);
     expect(cmp.previewFrameUrl()).not.toBeNull();
+    // inline=1 keeps Content-Disposition inline (renders instead of downloading).
+    expect(cmp.previewUrl()).toBe('/api/attachments/att-1/download?sig=ok&inline=1');
     expect(screen.getByTitle('plan.pdf')).toBeInTheDocument(); // iframe
 
     cmp.closePreview();
@@ -724,6 +726,27 @@ describe('AttachmentsPanelComponent', () => {
 
     expect(fixture.componentInstance.previewIsImage()).toBe(true);
     expect(screen.getByAltText('foto.png')).toBeInTheDocument();
+    http.verify();
+  });
+
+  it('opens PDFs in the system viewer on coarse-pointer devices (no dialog)', async () => {
+    const { http, detectChanges, fixture } = await setup();
+    await uploadFile();
+    http.expectOne(uploadUrl).flush(wire({ scanned: true }), { status: 201, statusText: 'Created' });
+    detectChanges();
+    const cmp = fixture.componentInstance;
+    jest
+      .spyOn(cmp as unknown as { coarsePointer: () => boolean }, 'coarsePointer')
+      .mockReturnValue(true);
+    const open = jest
+      .spyOn(cmp as unknown as { openUrl: (u: string) => void }, 'openUrl')
+      .mockImplementation(() => {});
+
+    cmp.openPreview(cmp.attachments()[0]);
+    http.expectOne(dlUrl('att-1')).flush({ url: '/api/attachments/att-1/download', expiresIn: 120 });
+
+    expect(open).toHaveBeenCalledWith('/api/attachments/att-1/download?inline=1');
+    expect(cmp.previewing()).toBeNull(); // system viewer instead of the dialog
     http.verify();
   });
 

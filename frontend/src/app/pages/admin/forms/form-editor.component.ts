@@ -441,6 +441,16 @@ export class FormEditorComponent {
     });
   }
 
+  /** Opt-out of comparison offers: allowed is the default → only `false` is stored. */
+  protected setAllowNoOffers(pos: QPos, allowed: boolean): void {
+    this.patchQuestion(pos, (f) => {
+      const validation: Record<string, unknown> = { ...(f.validation ?? {}) };
+      if (allowed) delete validation['allowNoOffers'];
+      else validation['allowNoOffers'] = false;
+      return { ...f, validation: validation as FormFieldDef['validation'] };
+    });
+  }
+
   protected onLogicInput(pos: QPos, kind: 'visibleIf' | 'compute', raw: string): void {
     const k = `${pos.gi}:${pos.qi}`;
     this.rawLogic.update((m) => ({ ...m, [k]: { ...m[k], [kind]: raw } }));
