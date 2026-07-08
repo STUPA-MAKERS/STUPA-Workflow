@@ -21,6 +21,10 @@
       python = pkgs.python313;
       nodejs = pkgs.nodejs_22;
 
+      # Drop into the user's interactive zsh (loads ~/.zshrc); guarded so
+      # `nix develop -c <cmd>` and non-interactive uses still run in bash.
+      zshExec = ''[[ $- == *i* ]] && exec ${pkgs.zsh}/bin/zsh'';
+
       # Shared Python dev tooling. Project dependencies themselves are installed
       # per component with uv/pip into a virtualenv (see the shellHooks) rather
       # than resolved through Nix — several backend deps (fints, pycheval,
@@ -73,6 +77,7 @@
           shellHook = ''
             echo "STUPA-Workflow ${name} dev shell — python ${python.version}, uv, ruff, basedpyright"
             ${hint}
+            ${zshExec}
           '';
         };
     in
@@ -93,6 +98,7 @@
           shellHook = ''
             echo "STUPA-Workflow dev shell — node $(node --version), python ${python.version}, uv"
             echo "Per-component shells: nix develop .#backend | .#frontend | .#mcp | .#admin-cli | .#pytex"
+            ${zshExec}
           '';
         };
 
@@ -101,6 +107,7 @@
           shellHook = ''
             echo "STUPA-Workflow frontend dev shell — node $(node --version)"
             echo "npm ci && npm start  (needs the ui-kit git submodule: git submodule update --init)"
+            ${zshExec}
           '';
         };
 
