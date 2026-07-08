@@ -1,0 +1,45 @@
+{
+  "nodes": {
+    "nixpkgs": {
+      "locked": {
+        "lastModified": 1782847189,
+        "narHash": "sha256-twXPFqFsrrY5r28Zh7Homgcp2gUMBgQ6WDS98Q/3xFI=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "b6018f87da91d19d0ab4cf979885689b469cdd41",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixos-25.11",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "root": {
+      "inputs": {
+        "nixpkgs": "nixpkgs",
+        "ui-kit": "ui-kit"
+      }
+    },
+    "ui-kit": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1783356749,
+        "narHash": "sha256-UAGZ53g/qsjfGqK/5j3klEMGJxAY0JqBx92bzDVKEMU=",
+        "owner": "STUPA-MAKERS",
+        "repo": "ui-kit",
+        "rev": "17667747b7853eb67d3c512178e6be805f3370a0",
+        "type": "github"
+      },
+      "original": {
+        "owner": "STUPA-MAKERS",
+        "repo": "ui-kit",
+        "rev": "17667747b7853eb67d3c512178e6be805f3370a0",
+        "type": "github"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}
