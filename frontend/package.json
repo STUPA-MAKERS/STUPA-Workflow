@@ -38,7 +38,7 @@
     "@angular/router": "^20.3.25",
     "@angular/service-worker": "^20.3.25",
     "@fontsource/archivo": "^5.2.0",
-    "@fortawesome/fontawesome-free": "^7.3.0",
+    "@fortawesome/fontawesome-free": "^7.3.1",
     "@ngx-formly/core": "^7.0.0",
     "@tiptap/core": "^3.27.1",
     "@tiptap/pm": "^3.27.1",
