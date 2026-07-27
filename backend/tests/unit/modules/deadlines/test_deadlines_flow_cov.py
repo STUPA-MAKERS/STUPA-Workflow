@@ -1,12 +1,15 @@
-"""Branch-vollständige Unit-Suite (CI-Gate) für drei kritische Module ohne DB:
+"""Branch-complete unit suite (CI gate) for three critical modules, without a DB.
 
-* ``app.modules.deadlines.service``  — Policy-CRUD, ``resolve_due_at``, ``transition_ref``,
-  Scans/Locks/Marker.
-* ``app.modules.deadlines.router``   — Admin-CRUD der Policy-Registry (real verdrahtet
-  über einen Fake-``get_session``, sodass ``get_service`` + der echte Service mitlaufen).
-* ``app.modules.flow.context``       — Guard-Kontext-Aufbau (``build_context`` + Helfer).
+It covers:
 
-Alle Tests sind deterministisch (Ergebnis-Queue-Fake, keine Docker/Redis/Postgres)."""
+* `app.modules.deadlines.service` — policy CRUD, `resolve_due_at`, `transition_ref`,
+  scans, locks and markers.
+* `app.modules.deadlines.router` — admin CRUD of the policy registry. A fake
+  `get_session` wires the route for real, so `get_service` and the real service run.
+* `app.modules.flow.context` — guard context assembly (`build_context` and helpers).
+
+Every test is deterministic. The result-queue fake needs no Docker, Redis or Postgres.
+"""
 
 from __future__ import annotations
 
@@ -47,14 +50,12 @@ NOW = datetime(2026, 6, 7, 12, 0, tzinfo=UTC)
 LEAD = timedelta(hours=24)
 
 
-# =========================================================================== #
-# service.py — transition_ref (alle Zweige)
-# =========================================================================== #
+# Tests of app.modules.deadlines.service.
 def test_transition_ref_camel_and_snake_and_hex() -> None:
     tid = uuid4()
     assert transition_ref({"transitionId": str(tid)}) == tid
     assert transition_ref({"transition_id": str(tid)}) == tid
-    # Bereits-UUID-Hex-String wird akzeptiert.
+    # The parser also accepts a plain UUID hex string.
     assert transition_ref({"transitionId": UUID(str(tid)).hex}) == tid
 
 
@@ -66,9 +67,6 @@ def test_transition_ref_invalid_is_none(value: Any) -> None:
     assert transition_ref(value) is None
 
 
-# =========================================================================== #
-# service.py — resolve_due_at (jede kind-Verzweigung + fehlende Bezugswerte)
-# =========================================================================== #
 def _policy(kind: str, **kw: object) -> DeadlinePolicy:
     return DeadlinePolicy(key="k", label={"de": "X"}, kind=kind, **kw)
 
@@ -90,7 +88,7 @@ def test_resolve_relative_changed_with_and_without_ref() -> None:
 
 
 def test_resolve_offset_days_none_defaults_to_zero() -> None:
-    # offset_days=None → days=0 (``offset_days or 0``).
+    # An offset_days of None gives days=0 through `offset_days or 0`.
     p = _policy("relative_submitted", offset_days=None)
     assert resolve_due_at(p, submitted_at=NOW) == NOW
 
@@ -103,7 +101,6 @@ def test_resolve_absolute_without_date_is_none() -> None:
     assert resolve_due_at(_policy("absolute", absolute_at=None)) is None
 
 
-# --- at_time / timezone wall-clock snap (DST-correct) --------------------- #
 _JUN = datetime(2026, 6, 9, 0, 0, tzinfo=UTC)  # Berlin summer time (UTC+2)
 _JAN = datetime(2026, 1, 15, 0, 0, tzinfo=UTC)  # Berlin winter time (UTC+1)
 
@@ -114,7 +111,7 @@ def test_resolve_absolute_snaps_to_at_time_summer() -> None:
 
 
 def test_resolve_absolute_snaps_to_at_time_winter_dst() -> None:
-    # Same at_time, different UTC offset (CET vs CEST) → proves DST handling.
+    # The same at_time with a different UTC offset (CET vs CEST) proves the DST handling.
     p = _policy("absolute", absolute_at=_JAN, at_time="23:59", timezone="Europe/Berlin")
     assert resolve_due_at(p) == datetime(2026, 1, 15, 22, 59, tzinfo=UTC)
 
@@ -132,7 +129,7 @@ def test_resolve_malformed_at_time_falls_back_to_raw() -> None:
 
 
 def test_resolve_unknown_timezone_falls_back_to_local_default() -> None:
-    # Invalid tz → _zone loops to the configured local default (Europe/Berlin).
+    # An invalid tz makes _zone use the configured local default (Europe/Berlin).
     p = _policy("absolute", absolute_at=_JUN, at_time="12:00", timezone="Bogus/Zone")
     assert resolve_due_at(p) == datetime(2026, 6, 9, 10, 0, tzinfo=UTC)
 
@@ -142,7 +139,6 @@ def test_resolve_none_timezone_uses_local_default() -> None:
     assert resolve_due_at(p) == datetime(2026, 6, 9, 10, 0, tzinfo=UTC)
 
 
-# --- recurring (rolling window) ------------------------------------------ #
 def _recurring(dates: object, **kw: object) -> DeadlinePolicy:
     return _policy("recurring", dates=dates, **kw)
 
@@ -184,9 +180,6 @@ def test_resolve_recurring_skips_invalid_entries() -> None:
     assert resolve_due_at(p, now=now) == datetime(2026, 6, 30, 22, 0, tzinfo=UTC)
 
 
-# =========================================================================== #
-# service.py — DeadlineService Scans/Locks/Create/Marker
-# =========================================================================== #
 async def test_due_action_deadline_ids() -> None:
     ids = [uuid4(), uuid4()]
     svc = DeadlineService(fake_session(result(*ids)))
@@ -260,9 +253,6 @@ async def test_mark_reminded_sets_timestamp_and_commits() -> None:
     assert session.committed == 1
 
 
-# =========================================================================== #
-# service.py — DeadlinePolicyService (direkte Unit-Aufrufe, alle Branches)
-# =========================================================================== #
 async def test_policy_list_returns_rows() -> None:
     p = _policy("absolute", absolute_at=NOW)
     rows = await DeadlinePolicyService(fake_session(result(p))).list()
@@ -283,14 +273,14 @@ async def test_policy_get_by_key_hit_and_miss() -> None:
 
 
 async def test_policy_create_absolute_keeps_only_absolute_at() -> None:
-    # get_by_key → None (frei), dann add/flush/commit/refresh.
+    # get_by_key returns None, so the key is free. Then come add, flush, commit and refresh.
     session = fake_session(result())
     created = await DeadlinePolicyService(session).create(
         key="sem",
         label={"de": "S"},
         kind="absolute",
         absolute_at=NOW,
-        offset_days=99,  # bei absolute verworfen → None
+        offset_days=99,  # dropped for an absolute policy, so None
     )
     assert created.absolute_at == NOW
     assert created.offset_days is None
@@ -303,7 +293,7 @@ async def test_policy_create_relative_keeps_only_offset_days() -> None:
         key="rel",
         label={"de": "R"},
         kind="relative_submitted",
-        absolute_at=NOW,  # bei relativ verworfen → None
+        absolute_at=NOW,  # dropped for a relative policy, so None
         offset_days=14,
     )
     assert created.offset_days == 14
@@ -312,7 +302,7 @@ async def test_policy_create_relative_keeps_only_offset_days() -> None:
 
 async def test_policy_create_duplicate_key_raises() -> None:
     existing = _policy("absolute", absolute_at=NOW)
-    session = fake_session(result(existing))  # get_by_key trifft
+    session = fake_session(result(existing))  # get_by_key hits
     with pytest.raises(DeadlinePolicyError, match="already exists"):
         await DeadlinePolicyService(session).create(
             key="k", label={"de": "X"}, kind="absolute", absolute_at=NOW, offset_days=None
@@ -321,7 +311,7 @@ async def test_policy_create_duplicate_key_raises() -> None:
 
 
 async def test_policy_update_absolute_with_new_value() -> None:
-    # kind→absolute (neuer kind), absolute_at gesetzt → übernommen, offset_days geleert.
+    # A new kind of absolute with absolute_at set keeps the date and clears offset_days.
     policy = _policy("relative_submitted", offset_days=5)
     later = NOW + timedelta(days=1)
     out = await DeadlinePolicyService(fake_session()).update(
@@ -334,13 +324,14 @@ async def test_policy_update_absolute_with_new_value() -> None:
 
 
 async def test_policy_update_absolute_without_new_value_keeps_old() -> None:
-    # effective_kind aus policy (kind=None), absolute_at=None → alter Wert bleibt; offset geleert.
+    # effective_kind comes from the policy, because kind is None. With absolute_at None
+    # the old date stays and the offset is cleared.
     policy = _policy("absolute", absolute_at=NOW, offset_days=3)
     out = await DeadlinePolicyService(fake_session()).update(policy)
     assert out.absolute_at == NOW
     assert out.offset_days is None
-    assert out.label == {"de": "X"}  # label None → unverändert
-    assert out.kind == "absolute"  # kind None → unverändert
+    assert out.label == {"de": "X"}  # label None leaves it unchanged
+    assert out.kind == "absolute"  # kind None leaves it unchanged
 
 
 async def test_policy_update_relative_with_new_offset() -> None:
@@ -354,7 +345,8 @@ async def test_policy_update_relative_with_new_offset() -> None:
 
 
 async def test_policy_update_relative_without_new_offset_keeps_old() -> None:
-    # effective_kind relativ aus policy, offset_days=None → alter offset bleibt; absolute geleert.
+    # effective_kind is relative and comes from the policy. With offset_days None the old
+    # offset stays and absolute_at is cleared.
     policy = _policy("relative_submitted", offset_days=8, absolute_at=NOW)
     out = await DeadlinePolicyService(fake_session()).update(policy)
     assert out.offset_days == 8
@@ -369,12 +361,12 @@ async def test_policy_delete_removes_and_commits() -> None:
     assert session.committed == 1
 
 
-# =========================================================================== #
-# router.py — voll verdrahtet über echten Service (Fake-get_session)
-# =========================================================================== #
+# Tests of app.modules.deadlines.router, wired to the real service.
 class _RouterFakeSession:
-    """Minimaler AsyncSession-Stub für die Router-Tests: bedient genau die
-    ``DeadlinePolicyService``-Aufrufe der jeweiligen Route."""
+    """Minimal AsyncSession stub for the router tests.
+
+    It serves exactly the `DeadlinePolicyService` calls of the route under test.
+    """
 
     def __init__(self, *, execute_results: list[Any] | None = None) -> None:
         self._execute = list(execute_results or [])
@@ -459,7 +451,8 @@ def test_router_list_forbidden_without_perm() -> None:
 
 
 def test_router_create_ok_runs_real_service() -> None:
-    # get_by_key → leeres execute-Ergebnis (frei), dann add/flush/commit/refresh.
+    # get_by_key gets an empty execute result, so the key is free. Then come add, flush,
+    # commit and refresh.
     session = _RouterFakeSession(execute_results=[result()])
     app = _make_app(session)
     _as_admin(app)
@@ -482,7 +475,7 @@ def test_router_create_ok_runs_real_service() -> None:
 def test_router_create_duplicate_key_conflict_409() -> None:
     existing = _policy("absolute", absolute_at=NOW)
     existing.id = uuid4()
-    session = _RouterFakeSession(execute_results=[result(existing)])  # get_by_key trifft
+    session = _RouterFakeSession(execute_results=[result(existing)])  # get_by_key hits
     app = _make_app(session)
     _as_admin(app)
     res = TestClient(app).post(
@@ -494,7 +487,7 @@ def test_router_create_duplicate_key_conflict_409() -> None:
 
 
 def test_router_create_forbidden_for_flow_editor() -> None:
-    # Schreiben bleibt admin.deadlines — flow.configure darf NICHT erstellen.
+    # A write still needs admin.deadlines. A holder of flow.configure cannot create.
     session = _RouterFakeSession(execute_results=[result()])
     app = _make_app(session)
     _as_flow_editor(app)
@@ -523,7 +516,7 @@ def test_router_update_ok_runs_real_service() -> None:
 
 def test_router_update_not_found_404() -> None:
     session = _RouterFakeSession()
-    session.get_obj = None  # service.get → None
+    session.get_obj = None  # service.get returns None
     app = _make_app(session)
     _as_admin(app)
     res = TestClient(app).patch(
@@ -555,9 +548,7 @@ def test_router_delete_not_found_404() -> None:
     assert res.status_code == 404
 
 
-# =========================================================================== #
-# context.py — _compare_type
-# =========================================================================== #
+# Tests of app.modules.flow.context.
 @pytest.mark.parametrize(
     ("field_type", "expected"),
     [
@@ -566,23 +557,20 @@ def test_router_delete_not_found_404() -> None:
         ("date", "date"),
         ("checkbox", "bool"),
         ("boolean", "bool"),
-        ("text", "text"),  # Default
-        ("freitext-unknown", "text"),  # unbekannt → Default
+        ("text", "text"),  # default
+        ("freitext-unknown", "text"),  # unknown maps to the default
     ],
 )
 def test_compare_type_mapping(field_type: str, expected: str) -> None:
     assert _compare_type(field_type) == expected
 
 
-# =========================================================================== #
-# context.py — _committees_for_sub
-# =========================================================================== #
 async def test_committees_for_sub_empty_sub_short_circuits() -> None:
-    # not sub → frozenset() ohne DB-Zugriff.
+    # A falsy sub returns frozenset() without a DB read.
     session = fake_session()
     assert await _committees_for_sub(session, None) == frozenset()
     assert await _committees_for_sub(session, "") == frozenset()
-    assert session.statements == []  # kein execute
+    assert session.statements == []  # no execute
 
 
 async def test_committees_for_sub_maps_rows_to_str() -> None:
@@ -592,9 +580,6 @@ async def test_committees_for_sub_maps_rows_to_str() -> None:
     assert out == frozenset({str(g1), str(g2)})
 
 
-# =========================================================================== #
-# context.py — _budget_fits (fail-closed + voller Pfad, beide Seiten)
-# =========================================================================== #
 def _app_for_budget(*, budget_id: Any, fiscal: Any, amount: Any) -> SimpleNamespace:
     return SimpleNamespace(budget_id=budget_id, fiscal_year_id=fiscal, amount=amount)
 
@@ -619,7 +604,7 @@ async def test_budget_fits_fail_closed_when_amount_missing() -> None:
 
 async def test_budget_fits_true_when_amount_within_available() -> None:
     session = fake_session()
-    # scalar-Queue: (1) allocated, (2) flow.
+    # scalar queue: the allocated sum, then the flow sum.
     session.scalar_results = [Decimal("100"), Decimal("-20")]  # available = 80
     app = _app_for_budget(budget_id=uuid4(), fiscal=uuid4(), amount=Decimal("80"))
     assert await _budget_fits(session, cast("Any", app)) is True
@@ -633,8 +618,8 @@ async def test_budget_fits_false_when_amount_exceeds_available() -> None:
 
 
 async def test_budget_fits_handles_none_allocated_and_flow() -> None:
-    # allocated None → Decimal("0"); flow None → Decimal("0"); available = 0.
-    session = fake_session()  # scalar_results leer → beide None
+    # An allocated of None and a flow of None both become Decimal("0"), so available is 0.
+    session = fake_session()  # empty scalar_results, so both are None
     app = _app_for_budget(budget_id=uuid4(), fiscal=uuid4(), amount=Decimal("0"))
     assert await _budget_fits(session, cast("Any", app)) is True  # 0 <= 0
     session2 = fake_session()
@@ -642,9 +627,6 @@ async def test_budget_fits_handles_none_allocated_and_flow() -> None:
     assert await _budget_fits(session2, cast("Any", app2)) is False  # 0.01 <= 0 → False
 
 
-# =========================================================================== #
-# context.py — _field_types
-# =========================================================================== #
 async def test_field_types_maps_and_adds_amount() -> None:
     rows = [("betrag", "currency"), ("titel", "text"), ("anzahl", "number"), ("ok", "checkbox")]
     session = fake_session(result(*rows))
@@ -655,13 +637,10 @@ async def test_field_types_maps_and_adds_amount() -> None:
         "titel": "text",
         "anzahl": "number",
         "ok": "bool",
-        "amount": "currency",  # Built-in immer ergänzt
+        "amount": "currency",  # the built-in is always added
     }
 
 
-# =========================================================================== #
-# context.py — build_context (beide Seiten jedes if)
-# =========================================================================== #
 def _ctx_app(
     *,
     data: Any,
@@ -684,9 +663,11 @@ def _ctx_app(
 
 @pytest.fixture(autouse=True)
 def _ctx_extras_stub(monkeypatch: pytest.MonkeyPatch) -> None:
-    """DB-frei: die neuen Kontext-Helfer ``_application_type_key`` + ``_has_attachment``
-    stubben (ihre realen Rümpfe deckt ``test_flow_context`` direkt ab). No-op für die
-    Nicht-Kontext-Tests dieser Datei."""
+    """Stub the context helpers `_application_type_key` and `_has_attachment`.
+
+    The stubs keep the tests free of a DB. `test_flow_context` covers the real bodies.
+    This fixture does nothing for the tests in this file that build no context.
+    """
 
     async def _atk(_session: object, _app: object) -> str | None:
         return None
@@ -706,7 +687,7 @@ def _principal(**over: object) -> Principal:
 
 @pytest.fixture
 def _no_committees(monkeypatch: pytest.MonkeyPatch) -> None:
-    """``_committees_for_sub`` ohne DB: liefert deterministisch frozenset()."""
+    """Make `_committees_for_sub` return frozenset() without a DB."""
 
     async def _cs(_session: object, _sub: str | None) -> frozenset[str]:
         return frozenset()
@@ -732,7 +713,8 @@ def _budget_no_fit(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.mark.usefixtures("_no_committees", "_no_field_types", "_budget_no_fit")
 async def test_build_context_manual_actor_is_creator() -> None:
-    # manual=True, created_by==principal.sub → actor_is_applicant True; roles aus principal.
+    # With manual=True and created_by == principal.sub, actor_is_applicant is True. The
+    # roles come from the principal.
     app = _ctx_app(
         data={"_applicantRoles": ["member"], "feld": 1},
         created_by="actor-1",
@@ -754,7 +736,7 @@ async def test_build_context_manual_actor_is_creator() -> None:
 
 @pytest.mark.usefixtures("_no_committees", "_no_field_types", "_budget_no_fit")
 async def test_build_context_manual_as_applicant_magic_link() -> None:
-    # as_applicant=True, created_by != sub → actor_is_applicant True über Magic-Link.
+    # With as_applicant=True and created_by != sub, the magic link sets actor_is_applicant.
     app = _ctx_app(data={}, created_by="someone-else")
     ctx = await build_context(
         fake_session(), cast("Any", app), _principal(), manual=True, as_applicant=True
@@ -764,7 +746,7 @@ async def test_build_context_manual_as_applicant_magic_link() -> None:
 
 @pytest.mark.usefixtures("_no_committees", "_no_field_types", "_budget_no_fit")
 async def test_build_context_manual_not_applicant() -> None:
-    # manual=True, kein Magic-Link, created_by != sub → actor_is_applicant False.
+    # With manual=True, no magic link and created_by != sub, actor_is_applicant is False.
     app = _ctx_app(data={}, created_by="someone-else")
     ctx = await build_context(
         fake_session(), cast("Any", app), _principal(), manual=True
@@ -774,7 +756,7 @@ async def test_build_context_manual_not_applicant() -> None:
 
 @pytest.mark.usefixtures("_no_committees", "_no_field_types", "_budget_no_fit")
 async def test_build_context_manual_created_by_none() -> None:
-    # created_by None → die created_by-Klausel ist False → actor_is_applicant False.
+    # created_by None makes the created_by clause False, so actor_is_applicant is False.
     app = _ctx_app(data={}, created_by=None)
     ctx = await build_context(
         fake_session(), cast("Any", app), _principal(), manual=True
@@ -784,7 +766,8 @@ async def test_build_context_manual_created_by_none() -> None:
 
 @pytest.mark.usefixtures("_no_committees", "_no_field_types", "_budget_no_fit")
 async def test_build_context_automatic_strips_actor_signals() -> None:
-    # manual=False → roles + actor_committees leer; actor_is_applicant False (manual-Gate).
+    # With manual=False the roles and actor_committees stay empty. The manual gate also
+    # makes actor_is_applicant False.
     app = _ctx_app(data={"_applicantRoles": ["x"]}, created_by="actor-1", budget_id=None)
     ctx = await build_context(
         fake_session(), cast("Any", app), _principal(), manual=False, as_applicant=True
@@ -792,13 +775,14 @@ async def test_build_context_automatic_strips_actor_signals() -> None:
     assert ctx.manual is False
     assert ctx.roles == frozenset()
     assert ctx.actor_committees == frozenset()
-    assert ctx.actor_is_applicant is False  # manual=False blockt
-    assert ctx.budget_id is None  # budget_id None → None
+    assert ctx.actor_is_applicant is False  # the manual gate blocks it
+    assert ctx.budget_id is None  # budget_id None stays None
 
 
 @pytest.mark.usefixtures("_no_committees", "_no_field_types", "_budget_no_fit")
 async def test_build_context_data_not_dict_and_roles_not_list() -> None:
-    # app.data ist KEIN dict → field_values startet leer; raw_roles None → applicant_roles leer.
+    # app.data is not a dict, so field_values starts empty. A raw_roles of None leaves
+    # applicant_roles empty.
     app = _ctx_app(data=None, created_by="actor-1")
     ctx = await build_context(
         fake_session(), cast("Any", app), _principal(), manual=True
@@ -809,7 +793,8 @@ async def test_build_context_data_not_dict_and_roles_not_list() -> None:
 
 @pytest.mark.usefixtures("_no_committees", "_no_field_types", "_budget_no_fit")
 async def test_build_context_applicant_roles_present_but_not_list() -> None:
-    # _applicantRoles vorhanden, aber kein list → applicant_roles leer (isinstance-False-Zweig).
+    # _applicantRoles is present but is not a list, so applicant_roles stays empty. This
+    # is the isinstance False branch.
     app = _ctx_app(data={"_applicantRoles": "not-a-list"}, created_by="actor-1")
     ctx = await build_context(
         fake_session(), cast("Any", app), _principal(), manual=True

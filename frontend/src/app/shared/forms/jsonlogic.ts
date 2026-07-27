@@ -1,14 +1,16 @@
 /**
- * FE port of the JsonLogic subset (backend `app/shared/jsonlogic.py`). Form fields'
- * `visibleIf`/`compute` use this subset.
+ * Frontend port of the JsonLogic subset of the backend `app/shared/jsonlogic.py`. The
+ * `visibleIf` and `compute` rules of a form field use this subset.
  *
- * **No `eval`** — a declarative tree with whitelisted operators. Semantics mirror
- * the backend (the server stays the single source of truth and re-validates
- * authoritatively):
- * - a literal (non-object) → returned unchanged.
- * - an operation = object with **exactly one** key = the operator.
- * - `and`/`or` do **not** short-circuit (all operands are evaluated) — identical to
- *   the backend behaviour.
+ * This module never calls `eval`. It walks a declarative tree with whitelisted operators.
+ * The semantics match the backend. The server stays the single source of truth and
+ * validates the data again.
+ *
+ * The rules are:
+ * - A literal, that is a non-object value, comes back unchanged.
+ * - An operation is an object with exactly one key. That key is the operator.
+ * - `and` and `or` do not short-circuit. The evaluator reads every operand. The backend
+ *   behaves the same way.
  *
  * Whitelist: `== != > >= < <= and or not var + - * / in`.
  */
@@ -79,7 +81,7 @@ function num(value: unknown): number {
   return value;
 }
 
-/** Evaluate a JsonLogic expression against `ctx`. Pure, no side effects. */
+/** Evaluate a JsonLogic expression against `ctx`. The function is pure, with no side effects. */
 export function evalJsonLogic(expr: unknown, ctx: Record<string, unknown> = {}): unknown {
   if (!isRecord(expr)) return expr;
   const keys = Object.keys(expr);
@@ -155,9 +157,11 @@ function requireArity(op: string, args: unknown[], n: number): void {
 }
 
 /**
- * Evaluate `visibleIf`. No expression ⇒ visible. Eval error ⇒ **conservatively
- * visible** (identical to the backend `_is_visible`: better to validate than to
- * silently skip).
+ * Evaluate the `visibleIf` rule of a form field.
+ *
+ * A field without an expression is visible. If the evaluation fails, the field stays
+ * visible. The backend `_is_visible` does the same. It is safer to validate a field than
+ * to skip it without a signal.
  */
 export function isFieldVisible(
   visibleIf: Record<string, unknown> | null | undefined,

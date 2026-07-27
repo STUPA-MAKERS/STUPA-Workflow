@@ -1,24 +1,24 @@
-# CI-Gate (testing.md §4) — FLACHER FAN-OUT: alle Prüf-Jobs starten parallel,
-# die Wanduhr-Zeit ist der langsamste Einzeljob (~6-7 min) statt einer seriellen
-# Kette (~17-20 min). Rotes PR blockiert (Branch-Protection, s. CONTRIBUTING.md).
+# CI gate (testing.md §4). Flat fan-out: all check jobs start in parallel. The
+# wall-clock time is the slowest single job (~6-7 min) and not a serial chain
+# (~17-20 min). A red pull request blocks (branch protection, see CONTRIBUTING.md).
 #
-# Bewusste Diät (2026-07, mit Frederik abgestimmt):
-# - Schemathesis mit `--max-examples 10` (vorher unbegrenzt: bis zu 30 min) —
-#   Schema-Drift + 5xx werden weiter gefunden, nur ohne Tiefenbohrung.
-# - image-build-smoke nur noch auf main-Pushes (Dockerfile ändert sich selten;
-#   deploy baut das Image ohnehin).
-# - pip-audit in eigenem Workflow (deps-audit.yml): wöchentlich + main-Pushes.
-# - pip-Cache in allen Backend-Jobs (setup-python) — spart ~45 s pro Job.
-# - e2e / restore-smoke / real-stack-smoke bleiben opt-in (Label/Dispatch/Var).
+# Deliberate slimming (2026-07):
+# - Schemathesis runs with `--max-examples 10` (before: unlimited, up to 30 min).
+#   It still finds schema drift and 5xx, only without a deep search.
+# - image-build-smoke runs on main pushes only. The Dockerfile changes rarely and
+#   deploy builds the image anyway.
+# - pip-audit moved to its own workflow (deps-audit.yml): weekly plus main pushes.
+# - All backend jobs cache pip (setup-python). This saves about 45 s per job.
+# - e2e, restore-smoke and real-stack-smoke stay opt-in (label, dispatch or variable).
 name: ci
 
 on:
   push:
     branches: [main]
   pull_request:
-  # Opt-in trigger for the e2e job (see its `if:` gate): run manually via
-  # Actions → Run workflow. Without this trigger the workflow_dispatch opt-in
-  # documented on the e2e job would be unreachable.
+  # Opt-in trigger for the e2e job (see its `if:` gate). Start it by hand with
+  # Actions → Run workflow. Without this trigger the workflow_dispatch opt-in of
+  # the e2e job stays unreachable.
   workflow_dispatch:
 
 permissions:
@@ -30,15 +30,15 @@ concurrency:
 
 env:
   PYTHON_VERSION: "3.13"
-  # clamd<=1.0.1 und text-unidecode bauen über d2to1 (importiert
-  # setuptools.dist._get_unpatched, ab setuptools>=71 entfernt) → sdist-Build bricht.
-  # Beide liefern Wheels; hart erzwingen (gezielt, alles andere darf weiter aus Quelle
-  # bauen), damit ein Resolver-Backtrack auf eine sdist-only-Version nicht erneut bricht.
+  # clamd<=1.0.1 and text-unidecode build through d2to1. d2to1 imports
+  # setuptools.dist._get_unpatched, which setuptools>=71 removed, so the sdist build
+  # breaks. Both projects ship wheels. Force the wheel for these two packages only.
+  # Everything else still builds from source. The force also stops a resolver
+  # backtrack onto an sdist-only version from breaking the build again.
   PIP_ONLY_BINARY: "clamd,text-unidecode"
   PIP_PREFER_BINARY: "1"
 
 jobs:
-  # ---- Wegweiser: existiert ein Frontend-Projekt? -------------------------- #
   detect:
     runs-on: ubuntu-latest
     outputs:
@@ -53,7 +53,6 @@ jobs:
             echo "frontend=false" >> "$GITHUB_OUTPUT"
           fi
 
-  # ---- Lint/Format ---------------------------------------------------------- #
   be-lint:
     runs-on: ubuntu-latest
     defaults:
@@ -69,10 +68,9 @@ jobs:
       - run: pip install -e '.[dev]'
       - name: Ruff lint
         run: ruff check .
-      # Hinweis: `ruff format --check` läuft lokal via pre-commit (.pre-commit-config.yaml);
-      # in CI nur Lint, solange Bestands-Skelett (T-02) noch nicht durchformatiert ist.
+      # `ruff format --check` runs locally through pre-commit (.pre-commit-config.yaml).
+      # CI runs the lint only, because the T-02 skeleton is not fully formatted yet.
 
-  # ---- Typecheck ------------------------------------------------------------ #
   be-typecheck:
     runs-on: ubuntu-latest
     defaults:
@@ -89,7 +87,6 @@ jobs:
       - name: basedpyright
         run: basedpyright
 
-  # ---- BE-Unit (+ Coverage-XML als Artefakt) -------------------------------- #
   be-unit:
     runs-on: ubuntu-latest
     defaults:
@@ -104,7 +101,8 @@ jobs:
           cache-dependency-path: backend/pyproject.toml
       - run: pip install -e '.[dev]'
       - name: Pytest (Unit) + Coverage
-        # fail_under (pyproject [tool.coverage.report]) bricht hier bereits.
+        # The fail_under setting (pyproject [tool.coverage.report]) breaks the build
+        # here already.
         run: pytest --cov --cov-report=xml --cov-report=term-missing
       - uses: actions/upload-artifact@v7
         with:
@@ -112,7 +110,7 @@ jobs:
           path: backend/coverage.xml
           retention-days: 7
 
-  # ---- BE-Integration (testcontainers: PG/Redis) ----------------------------- #
+  # The integration suite starts Postgres and Redis through testcontainers.
   be-integration:
     runs-on: ubuntu-latest
     defaults:
@@ -129,15 +127,15 @@ jobs:
       - name: Pytest (Integration, Docker)
         run: pytest -m integration
 
-  # ---- Contract (Schemathesis vs OpenAPI) ------------------------------------ #
   be-contract:
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: backend
-    # Echte Postgres-Instanz: ab T-10 berühren Endpunkte (auth) die DB; ohne DB
-    # würden sie 5xx liefern und `not_a_server_error` brechen. OIDC bleibt bewusst
-    # unkonfiguriert → /auth/login|callback antworten 404 (kein externer Keycloak nötig).
+    # This job needs a real Postgres instance. Since T-10 the auth endpoints touch
+    # the DB. Without a DB they answer 5xx and break `not_a_server_error`. OIDC stays
+    # unconfigured on purpose. /auth/login and /auth/callback then answer 404, so the
+    # job runs without an external Keycloak.
     services:
       postgres:
         image: postgres:16-alpine
@@ -171,17 +169,18 @@ jobs:
             curl -sf http://127.0.0.1:8000/api/health && break || sleep 1
           done
       - name: Schemathesis
-        # Volle Contract-Checks mit zwei bewussten Ausnahmen:
-        # - `unsupported_method`: erzwingt RFC-9110 `Allow`-Header am 405 — gehört in
-        #   den Error-Contract-Handler (T-02), nicht hierher.
-        # - `positive_data_acceptance`: erwartet 2xx für schema-valide Eingaben. Für
-        #   Auth-Endpunkte (T-10) ist schema-valide ≠ semantisch gültig: ein wohl-
-        #   geformter, aber nicht existierender Magic-Link-Token liefert korrekt 410,
-        #   ein zufälliger OIDC-`code`/`state` 400/404. Diese 4xx sind erwünscht.
+        # Full contract checks with two deliberate exceptions:
+        # - `unsupported_method` demands the RFC-9110 `Allow` header on a 405. That
+        #   belongs in the error-contract handler (T-02), not here.
+        # - `positive_data_acceptance` expects 2xx for schema-valid input. For the
+        #   auth endpoints (T-10) schema-valid is not the same as semantically valid.
+        #   A well-formed but unknown magic-link token correctly gives 410. A random
+        #   OIDC `code` or `state` gives 400 or 404. These 4xx answers are wanted.
         #
-        # `--seed` fix + schemathesis/hypothesis gepinnt (pyproject): deterministisch.
-        # `--max-examples 10` (CI-Diät 2026-07): unbegrenzt lief der Job bis zu 30 min;
-        # 10 Beispiele pro Operation finden Schema-Drift und 5xx weiterhin zuverlässig.
+        # A fixed `--seed` plus pinned schemathesis and hypothesis (pyproject) keep the
+        # run deterministic. `--max-examples 10` comes from the CI slimming (2026-07).
+        # Unlimited examples ran the job up to 30 min. Ten examples per operation still
+        # find schema drift and 5xx reliably.
         run: >
           schemathesis run http://127.0.0.1:8000/openapi.json
           --checks all
@@ -189,7 +188,6 @@ jobs:
           --max-examples 10
           --seed 1337
 
-  # ---- FE-Unit/Komponente (Jest + ATL) --------------------------------------- #
   fe-unit:
     runs-on: ubuntu-latest
     needs: detect
@@ -213,22 +211,24 @@ jobs:
       - name: tsc
         run: npx tsc --noEmit
       - name: Jest + Coverage (Gate 80 %)
-        # Schwelle in jest.config (coverageThreshold global 80). Rot ⇒ Build bricht.
+        # The threshold sits in jest.config (coverageThreshold global 80). A miss
+        # breaks the build.
         run: npm test -- --coverage --watch=false
       - name: Build
         run: npm run build
 
-  # ---- E2E (Playwright vs echtem Compose-Stack) — opt-in (T-40) -------------- #
-  # Deterministische Kern-Journeys gegen den ECHTEN Stack (Mock seit #101 AUS) +
-  # mailpit-SMTP-Sink + Seed-Service. KEIN Keycloak/pytex/ClamAV auf dem Gate-Pfad.
-  # scripts/e2e.sh fährt hoch, seedet, läuft Playwright, räumt ab (down -v).
+  # Playwright end-to-end tests against the real compose stack. Opt-in (T-40).
+  # Deterministic core journeys run against the REAL stack. The mock is off since
+  # #101. A mailpit SMTP sink and a seed service support the run. Keycloak, pytex and
+  # ClamAV stay off the gate path. scripts/e2e.sh starts the stack, seeds it, runs
+  # Playwright and cleans up with `down -v`.
   e2e:
     runs-on: ubuntu-latest
     needs: [detect, be-unit, fe-unit]
-    # Opt-in (nicht gelöscht, weiter lauffähig):
-    #   - manuell:   Actions → Run workflow (workflow_dispatch)
-    #   - pro PR:    Label `run-e2e` setzen
-    #   - dauerhaft: Repo-Variable RUN_E2E=true
+    # Three ways to opt in:
+    #   - by hand:   Actions → Run workflow (workflow_dispatch)
+    #   - per PR:    set the label `run-e2e`
+    #   - permanent: repo variable RUN_E2E=true
     if: >-
       needs.detect.outputs.frontend == 'true'
       && (
@@ -261,9 +261,9 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
-  # ---- Coverage-Gate ---------------------------------------------------------- #
-  # Gesamt-Gate bricht bereits in be-unit. Hier zusätzlich das strengere Gate für
-  # kritische Module (100 % Branch, testing.md §1) — braucht nur das be-unit-Artefakt.
+  # The overall gate already breaks in be-unit. This job adds the stricter gate for
+  # the critical modules (100 % branch, testing.md §1). It needs only the be-unit
+  # artifact.
   coverage-gate:
     runs-on: ubuntu-latest
     needs: be-unit
@@ -278,14 +278,14 @@ jobs:
           path: backend
       - name: Kritische Module 100 % Branch
         working-directory: backend
-        # BLOCKIEREND: auth, voting, flow, budget, webhooks und audit erreichen jetzt
-        # 100 % Branch in der reinen Unit-Suite (DB-lose Fakes). Das Gate hält diesen
-        # Stand — fällt ein kritisches Modul unter 100 % Branch, bricht der Build.
+        # BLOCKING: auth, voting, flow, budget, webhooks and audit now reach 100 %
+        # branch in the pure unit suite (fakes without a DB). The gate holds that
+        # state. If a critical module drops below 100 % branch, the build breaks.
         run: python -m scripts.coverage_critical coverage.xml pyproject.toml
 
-  # ---- Image-Build + Smoke — nur main (CI-Diät 2026-07) ----------------------- #
-  # Dockerfile ändert sich selten; deploy baut das Image ohnehin. Auf PRs neutral
-  # (skipped), auf main-Pushes + manuell weiter blockierend.
+  # Image build plus smoke test, on main only (CI slimming 2026-07). The Dockerfile
+  # changes rarely and deploy builds the image anyway. On a pull request the job
+  # stays neutral (skipped). On main pushes and manual runs it still blocks.
   image-build-smoke:
     runs-on: ubuntu-latest
     needs: coverage-gate
@@ -311,7 +311,6 @@ jobs:
           docker rm -f api-smoke
           [ "${ok:-0}" = "1" ] || { echo "Smoke fehlgeschlagen"; exit 1; }
 
-  # ---- pytex (T-21, beibehalten) --------------------------------------------- #
   pytex:
     runs-on: ubuntu-latest
     defaults:
@@ -331,10 +330,9 @@ jobs:
       - name: basedpyright
         run: basedpyright
       - name: Pytest
-        # Unit suite only; real-render tests are opt-in (RUN_PYTEX_INTEGRATION).
+        # Unit suite only. The real-render tests are opt-in (RUN_PYTEX_INTEGRATION).
         run: pytest
 
-  # ---- Compose-Validierung (T-01, beibehalten) -------------------------------- #
   compose:
     runs-on: ubuntu-latest
     steps:
@@ -345,13 +343,13 @@ jobs:
           cp .env.example .env
           docker compose config -q
 
-  # ---- Restore-Smoke (T-42) --------------------------------------------------- #
-  # Beweist die Backup->Restore-Runde gegen einen Wegwerf-Stack (DB + MinIO).
-  # Opt-in wie e2e: baut das backup-Image + lädt mc -> zu schwer/langsam für jeden
-  # PR. Standardlauf erscheint sauber als *skipped* (neutral), blockiert nicht:
-  #   - manuell:   Actions → Run workflow (workflow_dispatch)
-  #   - pro PR:    Label `run-restore-smoke` setzen
-  #   - dauerhaft: Repo-Variable RUN_RESTORE_SMOKE=true
+  # Restore smoke test (T-42). It proves the backup-to-restore round against a
+  # throwaway stack (DB + MinIO). Opt-in like e2e, because it builds the backup image
+  # and downloads mc. That is too heavy and too slow for every pull request. A default
+  # run shows up as *skipped* (neutral) and does not block. Three ways to opt in:
+  #   - by hand:   Actions → Run workflow (workflow_dispatch)
+  #   - per PR:    set the label `run-restore-smoke`
+  #   - permanent: repo variable RUN_RESTORE_SMOKE=true
   restore-smoke:
     runs-on: ubuntu-latest
     if: >-
@@ -363,15 +361,16 @@ jobs:
       - name: Restore-Smoke (backup -> wipe -> restore -> verify)
         run: scripts/restore-smoke.sh
 
-  # ---- Real-Stack-Smoke (Prozess-Fix) ------------------------------------------ #
-  # Fährt den VOLLEN Compose-Stack hoch (Mock AUS, Bootstrap-Admin gesetzt) und
-  # prüft die Kernflüsse rein über HTTP/WS (API up, /api/health, public/auth-Pfade,
-  # WS-Handshake). Gedacht, um eine Welle bewusst gegen den echten Stack zu testen.
-  # Opt-in wie e2e/restore-smoke: voller Build + ClamAV-Load -> zu schwer für jeden
-  # PR. Standardlauf erscheint sauber als *skipped* (neutral), blockiert nicht:
-  #   - manuell:   Actions → Run workflow (workflow_dispatch)
-  #   - pro PR:    Label `run-real-stack-smoke` setzen
-  #   - dauerhaft: Repo-Variable RUN_REAL_STACK_SMOKE=true
+  # Real-stack smoke test (process fix). It starts the FULL compose stack with the
+  # mock off and a bootstrap admin set. It then checks the core flows over HTTP and
+  # WS only: API up, /api/health, the public and auth paths, and the WS handshake.
+  # Use it to test a whole wave of work against the real stack. Opt-in like e2e and
+  # restore-smoke, because a full build plus the ClamAV load is too heavy for every
+  # pull request. A default run shows up as *skipped* (neutral) and does not block.
+  # Three ways to opt in:
+  #   - by hand:   Actions → Run workflow (workflow_dispatch)
+  #   - per PR:    set the label `run-real-stack-smoke`
+  #   - permanent: repo variable RUN_REAL_STACK_SMOKE=true
   real-stack-smoke:
     runs-on: ubuntu-latest
     if: >-

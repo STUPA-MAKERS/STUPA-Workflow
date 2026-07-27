@@ -1,8 +1,8 @@
-"""Deadline-Policy-Registry: reine ``resolve_due_at``-Logik + Router-Verdrahtung.
+"""Deadline policy registry: the pure `resolve_due_at` logic plus the router wiring.
 
-Die DB-Schicht (``DeadlinePolicyService``) wird per ``dependency_overrides`` durch
-ein Fake ersetzt; Auth über ``get_current_principal``. ``resolve_due_at`` ist pur
-und ohne DB getestet.
+A `dependency_overrides` entry replaces the DB layer `DeadlinePolicyService` with a
+fake. Auth comes from `get_current_principal`. The tests call `resolve_due_at` without
+a DB, because it is a pure function.
 """
 
 from __future__ import annotations
@@ -21,9 +21,6 @@ from app.modules.deadlines.models import DeadlinePolicy
 from app.modules.deadlines.router import get_service
 from app.modules.deadlines.service import resolve_due_at
 
-# --------------------------------------------------------------------------- #
-# resolve_due_at (pur)
-# --------------------------------------------------------------------------- #
 _NOW = datetime(2026, 6, 9, 12, 0, tzinfo=UTC)
 
 
@@ -51,9 +48,6 @@ def test_resolve_relative_without_reference_is_none() -> None:
     assert resolve_due_at(p, submitted_at=None) is None
 
 
-# --------------------------------------------------------------------------- #
-# Router-Verdrahtung
-# --------------------------------------------------------------------------- #
 class _FakeService:
     def __init__(self) -> None:
         self.created: dict | None = None
@@ -114,8 +108,11 @@ def test_list_ok(app: FastAPI, app_client: TestClient) -> None:
 
 
 def test_list_readable_by_flow_configure(app: FastAPI, app_client: TestClient) -> None:
-    """#5-2: Der Flow-Editor (flow.configure) liest die Frist-Policies als Auswahl für
-    Fristen-Guards/Aktionen — Lesen ohne admin.types erlaubt. Schreiben bleibt admin.types."""
+    """Let a holder of `flow.configure` read the deadline policies (#5-2).
+
+    The flow editor lists the policies as options for deadline guards and actions.
+    A read needs no `admin.types`. A write still needs `admin.types`.
+    """
     app.dependency_overrides[get_current_principal] = lambda: Principal(
         sub="f", permissions={"flow.configure"}
     )
@@ -189,9 +186,7 @@ def test_create_invalid_timezone_is_422(app: FastAPI, app_client: TestClient) ->
     assert res.status_code == 422
 
 
-# --------------------------------------------------------------------------- #
-# Flow-Enforcement: schedule_state_deadline + guard scanner
-# --------------------------------------------------------------------------- #
+# Flow enforcement: schedule_state_deadline and the guard scanner.
 from types import SimpleNamespace  # noqa: E402
 
 from app.modules.flow.service import (  # noqa: E402
@@ -206,8 +201,8 @@ def test_guard_scanner_detects_deadline_passed_nested() -> None:
     assert _guard_fires_on_deadline({"deadlinePassed": False}) is False
     assert _guard_fires_on_deadline({"and": [{"manual": True}, {"deadlinePassed": True}]}) is True
     assert _guard_fires_on_deadline({"or": [{"roleIs": "x"}, {"manual": True}]}) is False
-    # Negations-Polarität: not(deadlinePassed=true) feuert gerade NICHT bei Ablauf;
-    # not(deadlinePassed=false) dagegen schon. Doppelte Negation hebt sich auf.
+    # Negation polarity: not(deadlinePassed=true) does not fire when the deadline passes,
+    # and not(deadlinePassed=false) does fire. A double negation cancels out.
     assert _guard_fires_on_deadline({"not": {"deadlinePassed": True}}) is False
     assert _guard_fires_on_deadline({"not": {"deadlinePassed": False}}) is True
     assert _guard_fires_on_deadline({"not": {"not": {"deadlinePassed": True}}}) is True
@@ -220,8 +215,8 @@ async def test_schedule_state_deadline_creates_row_for_policy() -> None:
     policy = _policy("relative_submitted", offset_days=10)
     policy.id = uuid4()
     transition = SimpleNamespace(id=trans_id, guard={"deadlinePassed": True})
-    # execute-Queue: (1) delete alter Flow-Fristen, (2) get_by_key→policy,
-    # (3) outgoing transitions
+    # execute queue: delete the old flow deadlines, then get_by_key for the policy, then
+    # the outgoing transitions.
     session = fake_session(result(), result(policy), result(transition))
     app = SimpleNamespace(id=uuid4(), flow_version_id=flow_id, created_at=_NOW, updated_at=_NOW)
     state = SimpleNamespace(id=state_id, config={"deadlinePolicyKey": "k"})

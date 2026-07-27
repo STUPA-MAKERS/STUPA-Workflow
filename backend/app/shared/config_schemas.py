@@ -1,14 +1,14 @@
-"""Config schemas — single source of truth.
+"""Config schemas — the single source of truth.
 
 Pydantic models for form definition, flow graph, voting rules, notification rules,
 webhook config, comparison offers and budget-pot extra fields. The server always
-validates authoritatively; the FE gets the JSON-Schema export for editors and
-client-side validation (`export_json_schemas`).
+validates authoritatively. The frontend gets the JSON-Schema export for its editors
+and for client-side validation (`export_json_schemas`).
 
-Guards/actions/`visibleIf`/`compute` reference the whitelist evaluators in
-`jsonlogic` and `guards` — NO `eval`. Flow graphs are checked with
-`validate_flow_graph` (one initial state, all reachable, known operators/action
-types).
+Guards, actions, `visibleIf` and `compute` reference the whitelist evaluators in
+`jsonlogic` and `guards`. There is NO `eval`. `validate_flow_graph` checks a flow
+graph: one initial state, all states reachable, known operators and known action
+types.
 """
 
 from __future__ import annotations
@@ -24,22 +24,26 @@ from app.shared.guards import GuardError, validate_action, validate_guard
 from app.shared.i18n import I18nMap
 from app.shared.jsonlogic import JsonLogicError, validate_jsonlogic
 
-# Field/state keys: lowercase, snake-ish.
+# Field and state keys: lowercase, snake case.
 KEY_PATTERN = r"^[a-z][a-z0-9_]*$"
 
-# Max length of a field-validation pattern (save gate, ReDoS). Admin-authored regexes
-# run synchronously against possibly anonymous input at response time; the bound
-# limits their complexity.
+# Max length of a field-validation pattern (save gate, ReDoS). An admin-authored regex
+# runs synchronously against possibly anonymous input at response time. This bound
+# limits its complexity.
 _MAX_PATTERN_LEN = 200
 
 
 def _redos_prone(pattern: str) -> bool:
-    """Conservative ReDoS detector: ``True`` for an unbounded quantifier
-    (``*``/``+``/``{n,}``) whose body itself contains an unbounded quantifier
-    (``(a+)+``, ``(a*)*``, ``([ab]+)+`` …) — the classic catastrophic-backtracking
-    form. Best-effort via the internal ``re`` parser; if absent, only the length
-    bound applies. Does not catch every ReDoS variant (e.g. ``(a|a)*``) but rules out
-    the most common class at save time."""
+    """Detect a pattern that is prone to ReDoS.
+
+    The function returns ``True`` for an unbounded quantifier (``*``, ``+`` or
+    ``{n,}``) whose body itself contains an unbounded quantifier. Examples are
+    ``(a+)+``, ``(a*)*`` and ``([ab]+)+``. That is the classic catastrophic-backtracking
+    form. The detector is best effort and uses the internal ``re`` parser. If that
+    parser is absent, only the length bound applies. The detector misses some ReDoS
+    variants, for example ``(a|a)*``. It still rules out the most common class at save
+    time.
+    """
     try:
         from re import _parser as sre_parse  # type: ignore[attr-defined]
 
@@ -91,9 +95,9 @@ FieldType = Literal[
     "date",
     "select",
     "multiselect",
-    # Committee/cost-centre pickers: a `select` whose options the server injects at
-    # render time from the current committees resp. budget tree (effective_form) —
-    # not hand-maintained in the form. Stored value = UUID.
+    # Gremium and cost-center pickers: a `select` whose options the server injects at
+    # render time from the current Gremien or from the budget tree (effective_form).
+    # The form does not hold them. The stored value is a UUID.
     "gremium_select",
     "budget_select",
     # Typed inputs with built-in validation (instead of a hand-maintained `pattern`).
@@ -106,8 +110,9 @@ FieldType = Literal[
     "table",
     "markdown",
     "computed",
-    # Cost positions: list of positions, each with >= minOffers comparison offers;
-    # exactly one preferred -> its value = position value; sum of positions = amount.
+    # Cost positions: a list of positions. Each position needs at least minOffers
+    # comparison offers. Exactly one offer is the preferred one, and its value is the
+    # position value. The sum of the positions is the amount.
     "positions",
     # Section marker (multi-step forms): carries only a label and splits the following
     # fields into a new step. No answer value, no validation.
@@ -138,12 +143,10 @@ class _CamelModel(BaseModel):
 
 
 class FlowValidationError(Exception):
-    """Flow graph violates a structural rule (initial/reachability/ref/op/action)."""
+    """The flow graph violates a structural rule (initial, reachability, ref, op, action)."""
 
 
-# --------------------------------------------------------------------------- #
 # Form definition
-# --------------------------------------------------------------------------- #
 class FieldOption(_CamelModel):
     value: str
     label: I18nMap
@@ -161,25 +164,30 @@ class FieldValidation(_CamelModel):
     # `positions`: minimum comparison offers per position / minimum positions.
     min_offers: int | None = Field(default=None, alias="minOffers", ge=1)
     min_positions: int | None = Field(default=None, alias="minPositions", ge=1)
-    # `positions`: max positions / offers per position. Even without a builder value the
-    # engine applies a default cap so validation/`positions_total` are not bounded by
-    # the body cap alone.
+    # `positions`: max positions and max offers per position. Even without a builder
+    # value the engine applies a default cap. The body cap is then not the only bound
+    # on validation and on `positions_total`.
     max_positions: int | None = Field(default=None, alias="maxPositions", ge=1)
     max_offers: int | None = Field(default=None, alias="maxOffers", ge=1)
-    # `positions`: allow the per-position opt-out of comparison offers (checkbox +
-    # mandatory reason; the position then needs only one offer). Unset = allowed.
+    # `positions`: allow the per-position opt-out of comparison offers. The opt-out is a
+    # checkbox with a mandatory reason. The position then needs only one offer. Unset
+    # means allowed.
     allow_no_offers: bool | None = Field(default=None, alias="allowNoOffers")
 
     @field_validator("pattern")
     @classmethod
     def _check_pattern(cls, v: str | None) -> str | None:
-        """Harden the pattern against ReDoS at save time: cap the length and reject
-        catastrophic-backtracking forms — otherwise the pattern runs synchronously
-        against (possibly anonymous) answer input without a timeout.
+        """Harden the pattern against ReDoS at save time.
 
-        Compilability is still checked by ``validate_definition`` (form save) and at
-        answer runtime (defensive 422) — NOT here, so already-stored forms stay
-        loadable and the existing layers' contract is preserved."""
+        The check caps the length and rejects the catastrophic-backtracking forms.
+        Without it the pattern runs synchronously against answer input, which can be
+        anonymous, and without a timeout.
+
+        ``validate_definition`` (form save) and the answer runtime (defensive 422) still
+        check that the pattern compiles. This validator does NOT check that. An
+        already-stored form therefore stays loadable, and the contract of the existing
+        layers stays intact.
+        """
         if v is None:
             return v
         if len(v) > _MAX_PATTERN_LEN:
@@ -227,9 +235,7 @@ class FormFieldDef(_CamelModel):
         return self
 
 
-# --------------------------------------------------------------------------- #
 # Flow graph
-# --------------------------------------------------------------------------- #
 StateKind = Literal["normal", "vote"]
 TransitionBranch = Literal["pass", "fail"]
 
@@ -240,9 +246,8 @@ class StateDef(_CamelModel):
     color: str | None = None
     edit_allowed: bool = Field(default=True, alias="editAllowed")
     is_initial: bool = Field(default=False, alias="isInitial")
-    # Terminal state: terminal applications are retainable/anonymizable.
+    # Terminal state: retention and anonymization apply to a terminal application.
     is_terminal: bool = Field(default=False, alias="isTerminal")
-    # State kind + config (vote/approval/decision).
     kind: StateKind = "normal"
     config: dict[str, Any] = Field(default_factory=dict)
 
@@ -251,17 +256,18 @@ class TransitionDef(_CamelModel):
     from_: str = Field(alias="from")
     to: str
     label: I18nMap | None = None
-    # Optional color: editor arrow + decision button in the application.
+    # Optional color for the editor arrow and for the decision button in the
+    # application.
     color: str | None = None
     guard: dict[str, Any] | None = None
     actions: list[dict[str, Any]] = Field(default_factory=list)
     order: int | None = None
-    # Automatic transition: fired by the worker once the guard is satisfied.
+    # The worker fires an automatic transition once the guard holds.
     automatic: bool = False
-    # Result branch for vote/approval states: pass/fail.
+    # Result branch of a vote state: pass or fail.
     branch: TransitionBranch | None = None
-    # "Requires action": does the firable transition count as an open actor task
-    # (Tasks tab)? ``False`` = purely optional action.
+    # Does a firable transition count as an open task for the actor (Tasks tab)?
+    # ``False`` marks a purely optional action.
     requires_action: bool = Field(default=True, alias="requiresAction")
 
 
@@ -272,11 +278,15 @@ class FlowGraph(_CamelModel):
 
 
 def validate_flow_graph(graph: FlowGraph) -> None:
-    """Structurally check a flow graph. Raises `FlowValidationError`.
+    """Check the structure of a flow graph.
 
-    Rules: >= 1 state, exactly one initial state, no duplicate state keys, no dangling
-    `from`/`to` refs, all states reachable from initial, guards only with whitelisted
-    operators, actions only with known types.
+    The graph needs at least one state and exactly one initial state. The state keys
+    must be unique. Every `from` and `to` reference must name a known state. Every
+    state must be reachable from the initial state. A guard may use only whitelisted
+    operators. An action must have a known type.
+
+    Raises:
+        FlowValidationError: The graph violates one of these rules.
     """
     states = graph.states
     if not states:
@@ -300,15 +310,15 @@ def validate_flow_graph(graph: FlowGraph) -> None:
             raise FlowValidationError(f"transition references unknown from-state: {t.from_!r}")
         if t.to not in key_set:
             raise FlowValidationError(f"transition references unknown to-state: {t.to!r}")
-        # Self-loops are unsupported: the engine's optimistic locking
-        # (``WHERE current_state_id = from_state``) cannot detect concurrent double
-        # firings of a from==to transition (duplicate events/actions).
+        # The engine does not support a self-loop. Its optimistic locking
+        # (``WHERE current_state_id = from_state``) cannot detect a concurrent double
+        # firing of a from==to transition, which duplicates events and actions.
         if t.from_ == t.to:
             raise FlowValidationError(
                 f"transition {t.from_!r} -> {t.to!r}: self-loops are not supported"
             )
         try:
-            # Actor gates (roleIs/isInCommittee) only on manual transitions.
+            # Allow the actor gates (roleIs, isInCommittee) only on a manual transition.
             validate_guard(t.guard, allow_actor_ops=not t.automatic)
             for action in t.actions:
                 validate_action(action)
@@ -326,9 +336,11 @@ def validate_flow_graph(graph: FlowGraph) -> None:
 
 
 def _validate_state_kinds(graph: FlowGraph, key_set: set[str]) -> None:
-    """Structurally check ``vote`` states (only normal + vote exist).
+    """Check the structure of the ``vote`` states.
 
-    ``vote`` — ``config.gremiumId`` required; exactly 2 outgoing ``pass``/``fail``.
+    Only the kinds ``normal`` and ``vote`` exist. A ``vote`` state needs
+    ``config.gremiumId``. It also needs exactly two outgoing transitions, one with
+    branch ``pass`` and one with branch ``fail``.
     """
     outgoing: dict[str, list[TransitionDef]] = {k: [] for k in key_set}
     for t in graph.transitions:
@@ -345,10 +357,9 @@ def _validate_state_kinds(graph: FlowGraph, key_set: set[str]) -> None:
                     f"vote state {s.key!r} needs exactly two outgoing transitions "
                     "with branch 'pass' and 'fail'"
                 )
-            # A vote state is decided ONLY by the vote (pass/fail) or a deliberate
-            # manual abort. An automatic non-branch exit would be fired by the worker
-            # as soon as its guard holds — the application would be "approved" without
-            # any vote ever happening.
+            # Only the vote (pass/fail) or a deliberate manual abort may decide a vote
+            # state. The worker fires an automatic non-branch exit as soon as its guard
+            # holds. The application would then be "approved" without any vote.
             for t in outgoing[s.key]:
                 if t.automatic and not t.branch:
                     raise FlowValidationError(
@@ -357,8 +368,9 @@ def _validate_state_kinds(graph: FlowGraph, key_set: set[str]) -> None:
                         "manual exit may leave it"
                     )
         elif branches:
-            # Branch transitions are fired only by the vote outcome — on a normal state
-            # they would be reachable neither manually nor automatically (dead edges).
+            # Only the vote outcome fires a branch transition. On a normal state such a
+            # transition is reachable neither manually nor automatically. It is a dead
+            # edge.
             raise FlowValidationError(
                 f"state {s.key!r} (kind={s.kind!r}) must not have branch transitions"
             )
@@ -386,14 +398,15 @@ def _assert_all_reachable(
 def _assert_no_automatic_cycle(
     key_set: set[str], transitions: list[TransitionDef]
 ) -> None:
-    """The automatic subgraph must have no cycle.
+    """Assert that the automatic subgraph has no cycle.
 
-    A guard-less ``automatic`` transition fires immediately on the minute cron. Two
-    normal states A,B each with an automatic transition to the other pass the
-    reachability check but would ping-pong forever per cron run — one StatusEvent +
-    audit row + mail send per hop (mail bomb / audit bloat). Self-loops are already
-    caught by the from==to rule; here we catch cycles over >= 2 states. DFS over the
-    automatic edges, back-edge -> cycle.
+    A guard-less ``automatic`` transition fires at once on the minute cron. Take two
+    normal states A and B, each with an automatic transition to the other. They pass
+    the reachability check, but they ping-pong forever on every cron run. Each hop
+    writes one StatusEvent, one audit row and one mail send. That is a mail bomb and
+    audit bloat. The from==to rule already catches a self-loop. This check catches a
+    cycle over two or more states. It runs a DFS over the automatic edges and reports a
+    back edge as a cycle.
     """
     auto_adj: dict[str, list[str]] = {k: [] for k in key_set}
     for t in transitions:
@@ -423,9 +436,7 @@ def _assert_no_automatic_cycle(
             _visit(key, [])
 
 
-# --------------------------------------------------------------------------- #
 # Voting rules
-# --------------------------------------------------------------------------- #
 class Quorum(_CamelModel):
     type: Literal["count", "percent"]
     value: float = Field(ge=0)
@@ -448,9 +459,7 @@ class VoteConfig(_CamelModel):
         return v
 
 
-# --------------------------------------------------------------------------- #
 # Notification rule
-# --------------------------------------------------------------------------- #
 class Recipient(_CamelModel):
     kind: Literal["group", "role", "applicant"]
     ref: str | None = None
@@ -472,9 +481,6 @@ class NotificationRule(_CamelModel):
     enabled: bool = True
 
 
-# --------------------------------------------------------------------------- #
-# Webhook config
-# --------------------------------------------------------------------------- #
 class WebhookConfig(_CamelModel):
     name: str
     url: HttpUrl
@@ -482,9 +488,6 @@ class WebhookConfig(_CamelModel):
     active: bool = True
 
 
-# --------------------------------------------------------------------------- #
-# Comparison-offers rule
-# --------------------------------------------------------------------------- #
 class ComparisonOffers(_CamelModel):
     required: bool = False
     min_count: int = Field(default=2, alias="minCount", ge=0)
@@ -492,20 +495,19 @@ class ComparisonOffers(_CamelModel):
     as_: Literal["file", "field", "both"] = Field(default="file", alias="as")
 
 
-# --------------------------------------------------------------------------- #
-# Budget-pot extra field
-# --------------------------------------------------------------------------- #
+# A budget pot can add this extra field to the effective form.
 class BudgetField(_CamelModel):
     field: FormFieldDef
     order: int = 0
 
 
-# --------------------------------------------------------------------------- #
-# JSON-Schema export (for FE editors / client validation)
-# --------------------------------------------------------------------------- #
+# JSON-Schema export for the frontend editors and for client-side validation
 def _exported_models() -> dict[str, type[BaseModel]]:
-    """Exported config models. ``Branding`` is imported lazily to avoid the
-    shared <-> admin import cycle."""
+    """Return the config models to export.
+
+    The function imports ``Branding`` lazily. This breaks the import cycle between
+    ``shared`` and ``admin``.
+    """
     from app.modules.admin.branding import Branding
 
     return {

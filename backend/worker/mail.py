@@ -1,10 +1,11 @@
 """arq worker task: mail dispatch.
 
-``send_mail`` rebuilds the ``MailMessage`` from the queue payload and sends it via
-the ``MailSender`` in ``ctx`` (SMTP in prod, capturing in dev/test). On error ->
-``arq.Retry`` with linear backoff up to ``mail_max_tries``; then dead (logged, no
-endless requeue). The ``_job_id`` (= idempotency_key) at enqueue prevents duplicate
-jobs for an already running/completed send.
+`send_mail` rebuilds the `MailMessage` from the queue payload and sends it with the
+`MailSender` in `ctx`. Production uses SMTP. Dev and test capture the mail. On an
+error the task raises `arq.Retry` with a linear backoff up to `mail_max_tries`. After
+that the job is dead: the worker logs it and never requeues it again. The `_job_id`
+at enqueue equals the idempotency key. It stops a duplicate job for a send that
+already runs or already finished.
 """
 
 from __future__ import annotations
@@ -26,7 +27,10 @@ logger = logging.getLogger("app.mail")
 
 
 def build_sender(settings: Settings) -> MailSender:
-    """SMTP sender when ``smtp_host`` is set, else capturing (dev/test, no real send)."""
+    """Return the SMTP sender when SMTP is configured, else a capturing sender.
+
+    The capturing sender serves dev and test. It sends no real mail.
+    """
     if settings.smtp_enabled:
         return SmtpMailSender(settings)
     logger.warning("SMTP not configured — mails are captured/dropped (no real send)")
@@ -40,7 +44,14 @@ async def on_startup(ctx: dict[str, Any]) -> None:
 
 
 async def send_mail(ctx: dict[str, Any], payload: dict[str, object]) -> str:
-    """Send one mail. Retry on error up to ``mail_max_tries``, then dead."""
+    """Send one mail.
+
+    On an error the task retries with a linear backoff up to `mail_max_tries`. After
+    the last try the job is dead and the worker logs it.
+
+    Returns:
+        `"sent"` after delivery, or `"dead"` after the last failed try.
+    """
     settings: Settings = ctx["settings"]
     sender: MailSender = ctx["mail_sender"]
     msg = MailMessage.from_payload(payload)

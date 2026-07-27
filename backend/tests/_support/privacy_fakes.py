@@ -1,10 +1,11 @@
-"""Test-Fakes für die Privacy-Services (Unit-Suite ohne DB).
+"""Test fakes for the privacy services (unit suite without a database).
 
-Trennt die Session-Zugriffe in benannte Queues (``gets``/``execute``/``scalar``/
-``scalars``), damit die DSGVO-Services (Principal-Erasure, Erasure-Queue, Auskunft,
-Settings) deterministisch und ohne Docker geprüft werden. Reihenfolge je Channel =
-Reihenfolge der Service-Aufrufe; leere Queue liefert einen neutralen Default
-(leeres Result / ``None``), passend zum ``audit_record``-Advisory-Lock + Genesis.
+The fake session splits the session calls into named queues: `gets`, `execute`,
+`scalar` and `scalars`. The GDPR services (principal erasure, erasure queue, data
+export, settings) then run deterministically and without Docker. Each channel returns
+its items in the order of the service calls. An empty queue returns a neutral default:
+an empty result or `None`. This default fits the `audit_record` advisory lock and the
+genesis row.
 """
 
 from __future__ import annotations
@@ -14,7 +15,7 @@ from typing import Any
 
 
 class FakeResult:
-    """Minimaler ``Result``-Ersatz (``scalar_one_or_none``/``scalars``/``all``)."""
+    """Minimal replacement for `Result` with `scalar_one_or_none`, `scalars` and `all`."""
 
     def __init__(self, items: Iterable[Any] = ()) -> None:
         self._items = list(items)
@@ -33,12 +34,13 @@ class FakeResult:
 
 
 class FakeSession:
-    """``AsyncSession``-Stub mit getrennten Channels.
+    """Stub for `AsyncSession` with separate channels.
 
-    * ``gets``    — Queue für ``get(model, id)`` (in Reihenfolge).
-    * ``execute`` — Queue für ``execute(stmt)`` → ``FakeResult`` (Default: leer).
-    * ``scalar``  — Queue für ``scalar(stmt)`` → Skalar (Default: ``None``).
-    * ``scalars`` — Queue für ``scalars(stmt)`` → ``FakeResult`` (Default: leer).
+    Args:
+        gets: Queue for `get(model, id)`, in call order.
+        execute: Queue of results for `execute(stmt)`. The default is an empty result.
+        scalar: Queue of scalars for `scalar(stmt)`. The default is `None`.
+        scalars: Queue of results for `scalars(stmt)`. The default is an empty result.
     """
 
     def __init__(
@@ -92,6 +94,10 @@ def result(*items: Any) -> FakeResult:
 
 
 def fake_session(**channels: Any) -> Any:
-    """``FakeSession`` als ``Any`` — direkt an Services übergebbar, ohne dass der
-    Typecheck den ``AsyncSession``-Parameter beanstandet (Pattern wie audit_fakes)."""
+    """Return a `FakeSession` typed as `Any`.
+
+    The `Any` return type lets the caller pass the fake straight to a service. The type
+    checker then accepts it for the `AsyncSession` parameter. This follows the pattern of
+    `audit_fakes`.
+    """
     return FakeSession(**channels)

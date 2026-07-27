@@ -18,11 +18,10 @@ const PRINCIPALS: AdminPrincipal[] = [
   { id: 'p-3', sub: 'kc|noname', email: null, displayName: '', lastLogin: null, assignments: [] },
 ];
 const MEMBERSHIPS: GremiumMembership[] = [
-  // resolvable principal + role, with both dates
   { id: 'm-1', principalId: 'p-1', gremiumId: 'g-1', gremiumRoleId: 'gr-1', validFrom: '2026-01-01T00:00:00Z', validUntil: '2026-12-31T00:00:00Z' },
-  // unknown principal + unknown role → raw-id fallbacks; no dates
+  // unknown principal and unknown role force the raw-id fallbacks
   { id: 'm-2', principalId: 'ghost', gremiumId: 'g-1', gremiumRoleId: 'gr-x', validFrom: null, validUntil: null },
-  // principal with empty displayName + null email → sub; only validFrom
+  // empty displayName and null email fall back to sub
   { id: 'm-3', principalId: 'p-3', gremiumId: 'g-1', gremiumRoleId: 'gr-2', validFrom: '2026-02-01T00:00:00Z', validUntil: null },
   // duplicate principal (p-1) to exercise memberOptions dedup
   { id: 'm-4', principalId: 'p-1', gremiumId: 'g-1', gremiumRoleId: 'gr-2', validFrom: null, validUntil: '2026-06-30T00:00:00Z' },
@@ -99,7 +98,7 @@ describe('GremiumMembersComponent (#18/#62)', () => {
     const m2 = members.find((m: { assignmentId: string }) => m.assignmentId === 'm-2');
     expect(m2).toMatchObject({ name: 'ghost', email: null, roleLabel: 'gr-x', term: '—' });
 
-    // empty displayName + null email → sub; only validFrom → "from – …"
+    // empty displayName and null email fall back to sub. Only validFrom gives "from – …".
     const m3 = members.find((m: { assignmentId: string }) => m.assignmentId === 'm-3');
     expect(m3).toMatchObject({ name: 'kc|noname', email: null, term: '2026-02-01 – …' });
 
@@ -119,9 +118,8 @@ describe('GremiumMembersComponent (#18/#62)', () => {
     const opts = c.memberOptions();
     expect(opts[0]).toEqual({ value: '', label: 'Alle Mitglieder' });
     const values = opts.map((o: { value: string }) => o.value);
-    // p-1 appears once despite two memberships; ghost id falls back to itself
+    // p-1 appears once despite two memberships. The unknown id falls back to itself.
     expect(values).toEqual(['', 'p-1', 'ghost', 'p-3']);
-    // ghost (unknown principal) → label is the raw id
     expect(opts.find((o: { value: string }) => o.value === 'ghost').label).toBe('ghost');
     // p-3 empty displayName + null email → sub label
     expect(opts.find((o: { value: string }) => o.value === 'p-3').label).toBe('kc|noname');
@@ -152,7 +150,6 @@ describe('GremiumMembersComponent (#18/#62)', () => {
     expect(c.substitutes()).toEqual([]);
   });
 
-  // --- Add member dialog ----------------------------------------------------
   it('openAdd resets dialog state', async () => {
     const { c } = await setup();
     c.query.set('x');
@@ -277,7 +274,6 @@ describe('GremiumMembersComponent (#18/#62)', () => {
     expect(toast.error).toHaveBeenCalled();
   });
 
-  // --- Substitute pool ------------------------------------------------------
   it('openAddSub resets the substitute dialog state', async () => {
     const { c } = await setup();
     c.subQuery.set('x');

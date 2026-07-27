@@ -6,10 +6,11 @@ import { BudgetTreeComponent } from './budget-tree.component';
 import { BudgetTreeApi, type BudgetTreeNode, type FiscalYear } from './budget-tree.api';
 
 /**
- * Regression: the reload() fan-out (one listFiscalYears per top-budget) must not
- * let an in-flight response from a previous reload/loadFiscalYears resolve after
- * a newer one and overwrite fiscalYears/selectedFyId with stale data. The
- * component bumps a reloadSeq and drops late responses.
+ * Regression test for the reload() fan-out. The fan-out calls listFiscalYears once
+ * per top budget. A response of an earlier reload() or loadFiscalYears() must not
+ * resolve after a newer one. Such a late response would overwrite fiscalYears and
+ * selectedFyId with stale data. The component raises a reloadSeq and drops late
+ * responses.
  */
 
 function fullNode(over: Partial<BudgetTreeNode>): BudgetTreeNode {
@@ -110,7 +111,7 @@ describe('BudgetTreeComponent reload race guard (AUD-039)', () => {
     expect(c.selectedFyId()).toBe('fy-fresh');
     expect(c.fiscalYears().map((f: FiscalYear) => f.id)).toEqual(['fy-fresh']);
 
-    // The stale response resolves late — it must be ignored, not clobber state.
+    // The stale response resolves late. The component must ignore it and keep the state.
     stale.next([fy('fy-stale')]);
     expect(c.selectedFyId()).toBe('fy-fresh');
     expect(c.fiscalYears().map((f: FiscalYear) => f.id)).toEqual(['fy-fresh']);
@@ -128,7 +129,7 @@ describe('BudgetTreeComponent reload race guard (AUD-039)', () => {
     selectFy.next([fy('fy-selected')]);
     expect(c.selectedFyId()).toBe('fy-selected');
 
-    // The earlier reload fan-out response arrives late and must be discarded.
+    // The earlier reload fan-out response arrives late. The component must drop it.
     reloadFy.next([fy('fy-old')]);
     expect(c.selectedFyId()).toBe('fy-selected');
     expect(c.fiscalYears().map((f: FiscalYear) => f.id)).toEqual(['fy-selected']);
@@ -140,17 +141,17 @@ describe('BudgetTreeComponent reload race guard (AUD-039)', () => {
     expect(api.fyCalls).toHaveLength(1);
     const reloadFy = api.fyCalls[0];
 
-    // The left tree already knows the budget's HHJ → user clicks a year there.
-    // onYearPicked() sets the selection synchronously AND bumps reloadSeq so the
-    // in-flight reload fan-out below can no longer clobber it.
+    // The left tree already knows the fiscal years of the budget. The user clicks a
+    // year there. The handler sets the selection at once AND raises reloadSeq. The
+    // reload fan-out that still runs below can then no longer clobber the selection.
     c.fiscalYearsByBudget.set({ 'b-vs': [fy('fy-picked')] });
     c.onYearPicked({ budgetId: 'b-vs', fiscalYearId: 'fy-picked' });
     expect(c.selectedTopId()).toBe('b-vs');
     expect(c.selectedFyId()).toBe('fy-picked');
     expect(c.fiscalYears().map((f: FiscalYear) => f.id)).toEqual(['fy-picked']);
 
-    // The stale reload fan-out resolves afterward (top.id === sel.budgetId) and
-    // must NOT overwrite the user's pick.
+    // The stale reload fan-out resolves afterward with top.id === sel.budgetId. It
+    // must NOT overwrite the pick of the user.
     reloadFy.next([fy('fy-stale')]);
     expect(c.selectedFyId()).toBe('fy-picked');
     expect(c.fiscalYears().map((f: FiscalYear) => f.id)).toEqual(['fy-picked']);

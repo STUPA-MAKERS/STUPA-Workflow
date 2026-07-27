@@ -10,9 +10,9 @@
   color: var(--color-text);
   font: inherit;
 }
-/* Text inputs fill their (grid) cell and may shrink below it — without
-   min-width:0 the intrinsic field width forces the 1fr grid to overflow,
-   causing horizontal scroll in the dialog. */
+/* Text inputs fill their grid cell and must shrink below it. Without min-width: 0,
+   the intrinsic field width makes the 1fr grid overflow. Then the dialog scrolls
+   horizontally. */
 .inv__input { width: 100%; min-width: 0; box-sizing: border-box; }
 input.inv__input { height: var(--control-height); }
 .inv__search { min-width: 14rem; height: 2.25rem; }
@@ -70,8 +70,8 @@ input.inv__input { height: var(--control-height); }
 }
 .inv__fileLink:hover { text-decoration: underline; }
 .inv__actions { display: inline-flex; gap: var(--space-1); justify-content: flex-end; }
-/* --- Sticky Aktions-Spalte (#expenses-ux2) — analog Buchungen/Konten ---
-   Rechteste Spalte angepinnt; nur Desktop (mobil greift der Karten-Reflow unten). */
+/* Sticky actions column, like the bookings and account tables. See #expenses-ux2. It
+   pins the rightmost column on desktop only. On mobile, the card reflow below wins. */
 @media (min-width: 769px) {
   .inv__table th.inv__stickyCol,
   .inv__table td.inv__stickyCol {
@@ -91,7 +91,6 @@ input.inv__input { height: var(--control-height); }
     background: var(--color-surface-sunken);
   }
 }
-/* --- Drop-Overlay --- */
 .inv__dropOverlay {
   position: absolute;
   inset: 0;
@@ -112,7 +111,7 @@ input.inv__input { height: var(--control-height); }
   color: var(--color-primary);
   font-weight: var(--fw-semibold);
 }
-/* --- Dialog --- */
+/* Fields and layout of the create and edit dialogs. */
 .inv__field { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
 .inv__grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); align-items: end; }
 .inv__grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--space-3); align-items: end; }
@@ -131,7 +130,7 @@ input.inv__input { height: var(--control-height); }
   border-radius: var(--radius-sm);
 }
 .inv__fileChipRemove:hover { color: var(--color-danger); }
-/* Mobile (≤768px): table rows as cards (pure CSS) — like bookings. */
+/* On mobile, show the table rows as cards with CSS only, like the bookings table. */
 @media (max-width: 768px) {
   .inv__search { flex: 1 1 100%; min-width: 0; }
   .inv__tableWrap { overflow-x: visible; border: none; border-radius: 0; background: transparent; }
@@ -159,7 +158,7 @@ input.inv__input { height: var(--control-height); }
     font-size: var(--fs-xs);
     color: var(--color-text-muted);
   }
-  /* File link on its own full-width row so long names wrap inside the card. */
+  /* The file link sits on its own full-width row. Long names then wrap inside the card. */
   .inv__cellFile {
     flex: 1 1 100%;
     min-width: 0;

@@ -1,9 +1,9 @@
-"""The scrolling log: its model, hover/detail state, and render callbacks.
+"""The scrolling log: its model, hover and detail state, and render callbacks.
 
-Owns the log deque and the transient hover/pop-out/scroll state, and produces
-the fragments the layout renders for the log, the completion menu and the
-record pop-out. Domain rows (from :mod:`views`) are appended with a mouse
-handler that highlights them on hover and pops out their detail on click.
+This module owns the log deque and the transient hover, pop-out and scroll state.
+It produces the fragments the layout renders for the log, the completion menu and
+the record pop-out. The log panel appends a domain row from `views` with a mouse
+handler. That handler highlights the row on hover and pops out its detail on click.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from .models import LogEntry
 from .protocols import AppContext, MouseHandler
 from .theme import DETAIL_HIGHLIGHT, HOVER_HIGHLIGHT
 
-# Visible rows of the completion menu; matches the window height in the layout.
+# Visible rows of the completion menu. This matches the window height in the layout.
 _COMPLETION_ROWS = 12
 
 
@@ -36,16 +36,16 @@ class LogPanel:
         self._detail: LogEntry | None = None
 
     def append(self, entry: LogEntry) -> None:
-        """Append *entry* and keep the scroll anchored if scrolled back."""
+        """Append an entry and keep the scroll anchored when the user scrolled back."""
         self._log.append(entry)
         if self._scroll > 0:
             self._scroll = min(self._scroll + 1, len(self._log) - 1)
         self._context.invalidate()
 
     def append_record(self, row: views.Row) -> None:
-        """Append a domain row, wiring its hover/click handler to every fragment.
+        """Append a domain row and attach its hover and click handler to every fragment.
 
-        Rows without a detail view (e.g. day separators) stay plain text.
+        A row without a detail view stays plain text. A day separator is one example.
         """
         line, detail, title = row
         if not detail:
@@ -57,13 +57,13 @@ class LogPanel:
         self.append(entry)
 
     def pop_out(self, detail: StyleAndTextTuples, title: str) -> None:
-        """Open the record pop-out directly (for /user … show and friends)."""
+        """Open the record pop-out directly, for commands such as `/user … show`."""
         self._detail = LogEntry(detail=detail, detail_title=title)
         self._hover = None
         self._context.invalidate()
 
     def clear(self) -> None:
-        """Drop every log line and reset the scroll + pop-out."""
+        """Drop every log line and reset the scroll and the pop-out."""
         self._log.clear()
         self._scroll = 0
         self._hover = None
@@ -90,16 +90,17 @@ class LogPanel:
         return handler
 
     def set_hover(self, entry: LogEntry | None) -> None:
-        """Set (or clear) the hovered entry, repainting only on a change."""
+        """Set or clear the hovered entry and repaint only on a change."""
         if self._hover is not entry:
             self._hover = entry
             self._context.invalidate()
 
     def hover_clear(self, mouse_event: MouseEvent) -> object:
-        """Clear hover on move, close the pop-out on click, scroll on wheel.
+        """Clear the hover on move, close the pop-out on click, scroll on wheel.
 
-        Attached to plain log lines and the empty padding above them, so the
-        wheel still scrolls while the cursor is over a non-record line.
+        Plain log lines and the empty padding above them use this handler. The
+        wheel then still scrolls while the cursor is over a line that is not a
+        record.
         """
         event_type = mouse_event.event_type
         if event_type == MouseEventType.MOUSE_MOVE:
@@ -117,7 +118,7 @@ class LogPanel:
         return NotImplemented
 
     def detail_close_click(self, mouse_event: MouseEvent) -> object:
-        """Close the pop-out when its "esc to close" line is clicked."""
+        """Close the pop-out when the user clicks its "esc to close" line."""
         if mouse_event.event_type == MouseEventType.MOUSE_UP:
             self.close_detail()
             return None
@@ -126,13 +127,17 @@ class LogPanel:
         return NotImplemented
 
     def close_detail(self) -> None:
-        """Dismiss the popped-out record panel, if open."""
+        """Dismiss the popped-out record panel when it is open."""
         if self._detail is not None:
             self._detail = None
             self._context.invalidate()
 
     def scroll_log(self, delta: int) -> None:
-        """Scroll the log by *delta* lines (positive scrolls towards older)."""
+        """Scroll the log by a number of lines.
+
+        Args:
+            delta: Lines to scroll. A positive value moves toward older lines.
+        """
         self._scroll = max(0, min(self._scroll + delta, max(0, len(self._log) - 1)))
         self._context.invalidate()
 
@@ -143,7 +148,7 @@ class LogPanel:
             self._context.invalidate()
 
     def scrolled_up(self) -> bool:
-        """Whether the log is scrolled away from the newest line."""
+        """Return True when the log is scrolled away from the newest line."""
         return self._scroll > 0
 
     def showing_detail(self) -> bool:
@@ -153,7 +158,7 @@ class LogPanel:
         return self._detail.detail_title if self._detail else ""
 
     def log_height(self) -> int:
-        """Number of log lines that fit above the input and status."""
+        """Return the number of log lines that fit above the input and the status."""
         try:
             rows = get_app().output.get_size().rows
         except Exception:  # noqa: BLE001 — fall back when no app is running yet
@@ -191,8 +196,8 @@ class LogPanel:
                     views.highlight(entry.fragments, HOVER_HIGHLIGHT, width)
                 )
             elif entry.detail is None:
-                # Plain rows get the hover-clearing handler across the full width
-                # so a stale hover highlight never sticks.
+                # Plain rows get the hover-clearing handler across the full width.
+                # A stale hover highlight then never sticks.
                 fragments.extend(
                     views.repaint(entry.fragments, width, handler=self.hover_clear)
                 )
@@ -209,8 +214,8 @@ class LogPanel:
         selected = state.complete_index
         rows = _COMPLETION_ROWS
 
-        # Scroll only when the selected item leaves the visible window, so the
-        # menu can hold more entries than fit and the cursor stays on screen.
+        # Scroll only when the selected item leaves the visible window. The menu
+        # can then hold more entries than fit, and the cursor stays on screen.
         if selected is not None:
             if selected < self._completion_scroll:
                 self._completion_scroll = selected

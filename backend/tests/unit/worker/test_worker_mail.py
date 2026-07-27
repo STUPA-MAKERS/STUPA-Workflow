@@ -1,4 +1,4 @@
-"""Worker-Task `send_mail` (T-18): Versand, Retry, dauerhafter Fehler, Sender-Auswahl."""
+"""Worker task `send_mail` (T-18): send, retry, permanent failure and sender choice."""
 
 from __future__ import annotations
 
@@ -60,7 +60,7 @@ async def test_on_startup_populates_ctx() -> None:
 
 
 def test_mail_message_attachment_roundtrip() -> None:
-    """#protocol-mail-pdf: Anhänge überleben die Queue (base64-Payload)."""
+    """Attachments survive the queue as a base64 payload (#protocol-mail-pdf)."""
     from app.modules.notifications.mail import MailAttachment, MailMessage
 
     msg = MailMessage(

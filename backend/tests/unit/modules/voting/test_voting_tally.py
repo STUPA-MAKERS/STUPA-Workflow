@@ -1,5 +1,8 @@
-"""Reine result()-/tally()-Matrix (T-15 AK: jede Mehrheitsregel × Quorum
-erreicht/verfehlt × Patt). Keine DB, keine Zeit — voll deterministisch."""
+"""Pure result() and tally() matrix for the T-15 acceptance criteria.
+
+The matrix covers every majority rule against a met quorum, a missed quorum and a
+tie. The tests use no database and no clock, so they stay deterministic.
+"""
 
 from __future__ import annotations
 
@@ -39,9 +42,6 @@ def _config(
     )
 
 
-# --------------------------------------------------------------------------- #
-# tally()
-# --------------------------------------------------------------------------- #
 def test_tally_counts_known_options_ignores_unknown_and_null() -> None:
     counts = tally(OPTIONS, [YES, YES, NO, ABSTAIN, "garbage", None])
     assert counts == {YES: 2, NO: 1, ABSTAIN: 1}
@@ -51,9 +51,6 @@ def test_tally_empty() -> None:
     assert tally(OPTIONS, []) == {YES: 0, NO: 0, ABSTAIN: 0}
 
 
-# --------------------------------------------------------------------------- #
-# leading()
-# --------------------------------------------------------------------------- #
 def test_leading_single_winner() -> None:
     assert leading({YES: 3, NO: 1}) == YES
 
@@ -70,26 +67,25 @@ def test_leading_none_on_top_tie() -> None:
     assert leading({YES: 2, NO: 2}) is None
 
 
-# --------------------------------------------------------------------------- #
-# Mehrheitsregel × Patt (Quorum erfüllt, kein Quorum gesetzt)
-# --------------------------------------------------------------------------- #
+# No quorum is set, so every case here meets the quorum.
 @pytest.mark.parametrize(
     ("rule", "counts", "expected"),
     [
-        # simple: Ja > Nein / Ja < Nein / Patt
+        # simple: yes > no / yes < no / tie
         ("simple", {YES: 3, NO: 1}, "passed"),
         ("simple", {YES: 1, NO: 3}, "rejected"),
         ("simple", {YES: 2, NO: 2}, "tie"),
-        # absolute: 2·yes vs alle abgegebenen (Enthaltung verschiebt die Schwelle)
+        # absolute: twice the yes count against all cast ballots. An abstention
+        # moves the threshold.
         ("absolute", {YES: 3, NO: 1, ABSTAIN: 0}, "passed"),  # 6>4
         ("absolute", {YES: 3, NO: 1, ABSTAIN: 2}, "tie"),     # 6==6
         ("absolute", {YES: 3, NO: 1, ABSTAIN: 3}, "rejected"),  # 6<7
-        # two_thirds (≥⅔, R5.1): exakt ⅔ angenommen, Sperrminorität → Patt
+        # Rule two_thirds (≥⅔, R5.1): exactly ⅔ passes. A blocking minority gives a tie.
         ("two_thirds", {YES: 3, NO: 1}, "passed"),   # 9≥8
-        ("two_thirds", {YES: 2, NO: 1}, "passed"),   # 6≥6 (genau ⅔ → angenommen)
-        ("two_thirds", {YES: 1, NO: 2}, "rejected"),  # Nein erreicht ⅔
-        ("two_thirds", {YES: 3, NO: 2}, "tie"),      # keine Seite ⅔ (60%)
-        ("two_thirds", {YES: 0, NO: 0}, "tie"),      # keine Ja/Nein-Stimme
+        ("two_thirds", {YES: 2, NO: 1}, "passed"),   # 6≥6 (exactly ⅔ → passed)
+        ("two_thirds", {YES: 1, NO: 2}, "rejected"),  # no reaches ⅔
+        ("two_thirds", {YES: 3, NO: 2}, "tie"),      # neither side reaches ⅔ (60%)
+        ("two_thirds", {YES: 0, NO: 0}, "tie"),      # no yes or no ballot
     ],
 )
 def test_majority_rules(rule: str, counts: dict[str, int], expected: str) -> None:
@@ -98,9 +94,6 @@ def test_majority_rules(rule: str, counts: dict[str, int], expected: str) -> Non
     assert out.quorum_met is True
 
 
-# --------------------------------------------------------------------------- #
-# tieBreak
-# --------------------------------------------------------------------------- #
 @pytest.mark.parametrize(
     ("tie_break", "expected"),
     [("passed", "passed"), ("rejected", "rejected"), ("tie", "tie")],
@@ -110,9 +103,6 @@ def test_tie_break_resolution(tie_break: str, expected: str) -> None:
     assert out.result == expected
 
 
-# --------------------------------------------------------------------------- #
-# Quorum erreicht/verfehlt
-# --------------------------------------------------------------------------- #
 def test_count_quorum_met_passes() -> None:
     out = result(
         _config(quorum={"type": "count", "value": 3}), {YES: 3, NO: 1}, eligible=10
@@ -130,7 +120,7 @@ def test_count_quorum_missed_rejects_despite_majority() -> None:
 
 
 def test_percent_quorum_met() -> None:
-    # 5 abgegeben / 10 berechtigt = 50% ≥ 50%
+    # 5 cast of 10 eligible = 50% ≥ 50%
     out = result(
         _config(quorum={"type": "percent", "value": 50}),
         {YES: 4, NO: 1},
@@ -140,7 +130,7 @@ def test_percent_quorum_met() -> None:
 
 
 def test_percent_quorum_missed() -> None:
-    # 4 abgegeben / 10 = 40% < 50%
+    # 4 cast of 10 = 40% < 50%
     out = result(
         _config(quorum={"type": "percent", "value": 50}),
         {YES: 3, NO: 1},
@@ -159,11 +149,8 @@ def test_percent_quorum_no_eligible_fails_closed() -> None:
     assert out.quorum_met is False
 
 
-# --------------------------------------------------------------------------- #
-# abstainCountsQuorum
-# --------------------------------------------------------------------------- #
 def test_abstain_counts_toward_quorum_by_default() -> None:
-    # 2 Ja + 3 Enthaltung = 5 Beteiligung ≥ 5
+    # 2 yes + 3 abstain = 5 participants ≥ 5
     out = result(
         _config(quorum={"type": "count", "value": 5}),
         {YES: 2, NO: 0, ABSTAIN: 3},
@@ -173,7 +160,7 @@ def test_abstain_counts_toward_quorum_by_default() -> None:
 
 
 def test_abstain_excluded_from_quorum_when_disabled() -> None:
-    # gleiche Stimmen, aber Enthaltung zählt nicht → 2 < 5
+    # the same ballots, but the abstentions do not count → 2 < 5
     out = result(
         _config(quorum={"type": "count", "value": 5}, abstain_counts_quorum=False),
         {YES: 2, NO: 0, ABSTAIN: 3},
@@ -182,9 +169,6 @@ def test_abstain_excluded_from_quorum_when_disabled() -> None:
     assert out.quorum_met is False
 
 
-# --------------------------------------------------------------------------- #
-# Outcome trägt leading auch bei verfehltem Quorum
-# --------------------------------------------------------------------------- #
 def test_outcome_reports_leading_on_quorum_miss() -> None:
     out = result(
         _config(quorum={"type": "count", "value": 99}), {YES: 3, NO: 1}, eligible=10

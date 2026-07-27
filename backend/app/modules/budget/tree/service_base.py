@@ -1,8 +1,9 @@
-"""Shared base of the :class:`~.service.BudgetTreeService` ops classes.
+"""Shared base of the `service.BudgetTreeService` ops classes.
 
-Constructor plus the lookup/audit helpers that several concerns (nodes, fiscal
-years, allocations, bookings, transfers, revert) need. Decision logic lives in
-:mod:`app.modules.budget.tree_rules`; errors surface as problem+json.
+It holds the constructor plus the lookup and audit helpers that several concerns
+need: nodes, fiscal years, allocations, bookings, transfers and revert. The
+decision logic lives in `app.modules.budget.tree_rules`. Errors surface as
+problem+json.
 """
 
 from __future__ import annotations
@@ -31,16 +32,15 @@ _ZERO = Decimal("0")
 
 
 def _json_safe(value: object) -> object:
-    """Make an audit/revert prior-state value JSON-serializable.
+    """Make a prior-state value for audit and revert JSON-serializable.
 
-    Money/date/id values (``Decimal``/``date``/``datetime``/``UUID``) are stored
-    as strings so the prior state kept in the audit ``data`` survives losslessly
-    for audit-log revert; Pydantic coerces the strings back into typed patch
-    fields on revert.
+    The function stores money, date and id values as strings. `Decimal`, `date`,
+    `datetime` and `UUID` therefore survive in the audit `data` without loss. On
+    revert Pydantic coerces the strings back into typed patch fields.
     """
     if isinstance(value, Decimal):
         return str(value)
-    if isinstance(value, date):  # also covers ``datetime`` (subclass)
+    if isinstance(value, date):  # also covers datetime, a subclass of date
         return value.isoformat()
     if isinstance(value, UUID):
         return str(value)
@@ -48,7 +48,7 @@ def _json_safe(value: object) -> object:
 
 
 class BudgetTreeServiceBase:
-    """DB-backed cost-centre tree operations (bound to one session) — shared base."""
+    """Shared base for cost-center tree operations, bound to one session."""
 
     def __init__(
         self,
@@ -59,12 +59,12 @@ class BudgetTreeServiceBase:
         actor: str | None = None,
     ) -> None:
         self.session = session
-        # Storage/settings are only needed for the invoice import; the other
-        # budget endpoints do not wire them (they stay ``None``).
+        # Only the invoice import needs storage and settings. The other budget
+        # endpoints do not wire them and leave them as None.
         self.storage = storage
         self.settings = settings or get_settings()
-        # Principal ``sub`` for the audit trail of money mutations. The router
-        # sets it; direct (test) instances without an actor log ``actor=None``.
+        # Principal sub for the audit trail of money mutations. The router sets
+        # it. A direct instance without an actor, as in tests, logs actor=None.
         self.actor = actor
 
     async def _audit(
@@ -75,9 +75,12 @@ class BudgetTreeServiceBase:
         target_id: str,
         data: dict | None = None,
     ) -> None:
-        """Write the audit entry inside the running transaction (before the
-        mutation commits) so mutation + audit commit atomically. ``data``
-        carries only id references/amounts (no PII)."""
+        """Write the audit entry inside the running transaction.
+
+        The entry goes in before the mutation commits, so the mutation and the
+        audit entry commit atomically. `data` takes id references and amounts
+        only. It must carry no PII.
+        """
         await audit_record(
             self.session,
             actor=self.actor,
@@ -87,7 +90,6 @@ class BudgetTreeServiceBase:
             data=data or {},
         )
 
-    # --------------------------------------------------------------- low-level
     async def _get_node(self, budget_id: UUID) -> Budget:
         node = (
             await self.session.execute(select(Budget).where(Budget.id == budget_id))
@@ -105,7 +107,10 @@ class BudgetTreeServiceBase:
         return fy
 
     async def _top_level(self, node: Budget) -> Budget:
-        """Top-level budget of a node (first path segment, ``parent_id IS NULL``)."""
+        """Return the top-level budget of a node.
+
+        It is the first path segment and holds `parent_id IS NULL`.
+        """
         top_path = node.path_key.split(_SEP, 1)[0]
         top = (
             await self.session.execute(
@@ -131,10 +136,14 @@ class BudgetTreeServiceBase:
 
     @staticmethod
     def _fiscal_year_bounds(year: int, start_month: int, start_day: int) -> tuple[date, date]:
-        """Derive fiscal-year bounds; an impossible start date yields 422, not 500.
+        """Derive the start and the end date of a fiscal year.
 
-        Schemas already cap ``fiscalStartDay`` at ``1..28`` — this wrapper is the
-        defensive path for legacy rows / direct service calls.
+        The schemas already cap `fiscalStartDay` at 1 to 28. This wrapper is the
+        defensive path for old rows and for direct service calls.
+
+        Raises:
+            ValidationProblem: The start date does not exist. The caller gets
+                422 instead of 500.
         """
         try:
             return tree_rules.fiscal_year_bounds(year, start_month, start_day)
@@ -145,9 +154,17 @@ class BudgetTreeServiceBase:
             ) from exc
 
     async def _resolve_fiscal_year(self, node: Budget, fiscal_year_id: UUID | None) -> UUID:
-        """Resolve the fiscal year of a node operation (booking/transfer/assign):
-        explicit (must belong to the top-level budget) or — if open — the single
-        active fiscal year of the top-level budget (else 422). Never ``None``."""
+        """Resolve the fiscal year of a node operation.
+
+        A booking, a transfer and an assignment all use this. An explicit fiscal
+        year must belong to the top-level budget. Without one the method takes
+        the single active fiscal year of the top-level budget. The result is
+        never `None`.
+
+        Raises:
+            ValidationProblem: The fiscal year belongs to another top-level
+                budget, or no single active fiscal year exists (422).
+        """
         top = await self._top_level(node)
         if fiscal_year_id is not None:
             fy = await self._get_fiscal_year(fiscal_year_id)

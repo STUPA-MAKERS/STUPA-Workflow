@@ -1,6 +1,6 @@
-"""Unit-Tests MIME-Sniffing + Allowlist (T-13, security.md §6).
+"""Unit tests for MIME sniffing and the allowlist (T-13, security.md section 6).
 
-`libmagic` wird über ein Fake-`magic`-Modul ersetzt (kein System-libmagic im Unit-Lauf).
+A fake `magic` module replaces `libmagic`. The unit run needs no system libmagic.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from app.modules.files.mime import (
 
 
 def _ooxml_zip(top_dir: str) -> bytes:
-    """Minimales, gültiges OOXML-Paket: ``[Content_Types].xml`` + Format-Verzeichnis."""
+    """Build a minimal valid OOXML package: `[Content_Types].xml` and a format directory."""
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as zf:
         zf.writestr("[Content_Types].xml", "<Types/>")
@@ -33,7 +33,7 @@ def _ooxml_zip(top_dir: str) -> bytes:
 
 @pytest.fixture
 def fake_magic(monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
-    """Installiert ein Fake-`magic`-Modul; Rückgabe = veränderbarer Sniff-Wert."""
+    """Install a fake `magic` module and return the mutable sniff state."""
     state = {"mime": "application/pdf"}
     module = types.ModuleType("magic")
     module.from_buffer = lambda data, mime: state["mime"]  # type: ignore[attr-defined]
@@ -89,8 +89,8 @@ def test_validate_png_ok(fake_magic: dict[str, str]) -> None:
 
 
 def test_validate_docx_zip_sniff_ok(fake_magic: dict[str, str]) -> None:
-    # OOXML snifft teils als application/zip → für .docx zulässig, wenn der
-    # Container die OOXML-Struktur trägt.
+    # OOXML sometimes sniffs as application/zip. That is valid for .docx when the
+    # container carries the OOXML structure.
     fake_magic["mime"] = "application/zip"
     assert validate_upload("brief.docx", _ooxml_zip("word/")) == "application/zip"
 
@@ -102,7 +102,7 @@ def test_validate_xlsx_pptx_zip_sniff_ok(fake_magic: dict[str, str]) -> None:
 
 
 def test_validate_arbitrary_zip_as_docx_rejected(fake_magic: dict[str, str]) -> None:
-    # Beliebiges ZIP ohne OOXML-Struktur, als .docx getarnt → abgelehnt (AUD-021).
+    # Any ZIP without OOXML structure, disguised as .docx, is rejected (AUD-021).
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as zf:
         zf.writestr("evil.sh", "rm -rf /")
@@ -112,14 +112,14 @@ def test_validate_arbitrary_zip_as_docx_rejected(fake_magic: dict[str, str]) -> 
 
 
 def test_validate_zip_wrong_format_dir_rejected(fake_magic: dict[str, str]) -> None:
-    # Word-Struktur, aber als .xlsx deklariert → falsches Top-Level-Verzeichnis.
+    # Word structure but declared as .xlsx: the top-level directory is wrong.
     fake_magic["mime"] = "application/zip"
     with pytest.raises(MimeRejected):
         validate_upload("tab.xlsx", _ooxml_zip("word/"))
 
 
 def test_validate_corrupt_zip_as_docx_rejected(fake_magic: dict[str, str]) -> None:
-    # Nur Magic-Header, kein lesbares ZIP → abgelehnt.
+    # Only the magic header and no readable ZIP, so the file is rejected.
     fake_magic["mime"] = "application/zip"
     with pytest.raises(MimeRejected):
         validate_upload("brief.docx", b"PK\x03\x04")
@@ -132,7 +132,7 @@ def test_validate_disallowed_type_rejected(fake_magic: dict[str, str]) -> None:
 
 
 def test_validate_mismatch_ext_rejected(fake_magic: dict[str, str]) -> None:
-    # Inhalt PDF, aber als .png deklariert → Sniff ≠ Endung.
+    # PDF content declared as .png: the sniff result differs from the extension.
     fake_magic["mime"] = "application/pdf"
     with pytest.raises(MimeRejected):
         validate_upload("photo.png", b"%PDF")

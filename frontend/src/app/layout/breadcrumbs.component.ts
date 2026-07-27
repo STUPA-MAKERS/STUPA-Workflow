@@ -11,11 +11,14 @@ interface Crumb {
 }
 
 /**
- * Route-driven breadcrumbs. Resolves the current page (deepest route node with
- * ``data.title``) and — where a route has flat siblings instead of real child
- * routes — prepends the parents declared via ``data.parent`` (a list of paths).
- * No "Home"/dashboard prefix. Shown only when there is a parent level (otherwise
- * the H1 is enough). Styled like the budget crumbs: pill links, ``›`` separators.
+ * Route-driven breadcrumbs.
+ *
+ * The component takes the current page from the deepest route node with
+ * `data.title`. Where a route has flat siblings instead of real child routes, it
+ * prepends the parents declared in `data.parent`, a list of paths. There is no
+ * "Home" or dashboard prefix. The bar appears only when a parent level exists,
+ * because the H1 is otherwise enough. The style follows the budget crumbs: pill
+ * links and `›` separators.
  */
 @Component({
   selector: 'app-breadcrumbs',
@@ -31,7 +34,7 @@ export class BreadcrumbsComponent {
 
   readonly crumbs = signal<Crumb[]>([]);
 
-  /** Path → i18n title key, from the route config (for parent resolution). */
+  /** Path to i18n title key, taken from the route config to resolve parents. */
   private titleByPath: Map<string, TranslationKey> | null = null;
 
   constructor() {
@@ -72,7 +75,7 @@ export class BreadcrumbsComponent {
     return out;
   }
 
-  /** Look up the title key of a (static) route by its full path. */
+  /** Return the title key of a static route, found by its full path. */
   private titleForPath(path: string): TranslationKey | undefined {
     if (!this.titleByPath) {
       const map = new Map<string, TranslationKey>();

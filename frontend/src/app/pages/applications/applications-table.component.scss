@@ -25,7 +25,7 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
   font-size: var(--fs-xs);
-  /* Darker header like the tasks table (shared DataTable). */
+  /* Darker header, like the tasks table (the shared DataTable). */
   background: var(--color-surface-sunken);
 }
 .atbl__num {
@@ -65,7 +65,7 @@
   color: var(--color-text-muted);
   font-weight: var(--fw-normal);
 }
-/* Mobile (≤768px): stack rows as cards (pure CSS, no markup diff). */
+/* Mobile (max 768px): stack the rows as cards. Pure CSS, the markup does not change. */
 @media (max-width: 768px) {
   .atbl__wrap {
     overflow-x: visible;
@@ -80,8 +80,8 @@
   .atbl thead {
     display: none;
   }
-  /* Fixed card grid so every card wraps identically:
-     title / type / badge+amount / date — amounts always end-aligned. */
+  /* A fixed card grid makes every card wrap the same way: title, type,
+     badge with amount, then date. Amounts always stay end-aligned. */
   .atbl tbody tr {
     display: grid;
     grid-template-columns: 1fr auto;
@@ -104,13 +104,12 @@
   .atbl tbody tr:last-child td {
     border-bottom: none;
   }
-  /* Title, type and date span the full card width; badge + amount share a row. */
+  /* Title, type and date span the full card width. Badge and amount share a row. */
   .atbl td:first-child,
   .atbl td:nth-child(2),
   .atbl td:last-child {
     grid-column: 1 / -1;
   }
-  /* Type + date as muted meta info. */
   .atbl td:nth-child(2),
   .atbl td:last-child {
     color: var(--color-text-muted);

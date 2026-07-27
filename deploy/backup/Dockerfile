@@ -1,12 +1,12 @@
-# Backup-/Restore-Image (T-42): pg16-Client + MinIO-Client (mc) + age.
-# Schlank auf Alpine; pg_dump/pg_restore-Version muss zur DB (postgres:16) passen.
+# Backup and restore image (T-42): pg16 client, MinIO client (mc) and age.
+# The pg_dump and pg_restore version must match the database (postgres:16).
 FROM postgres:16-alpine
 
-# bash für die Skripte, age für Verschlüsselung, rsync für optionalen off-host-Push.
-# busybox-crond ist im Basis-Image (alpine) bereits vorhanden.
+# bash runs the scripts, age encrypts the artifact, and rsync serves the off-host push.
+# The alpine base image already contains busybox crond.
 RUN apk add --no-cache bash age rsync curl
 
-# MinIO-Client pinnen (reproduzierbar). Architektur über uname auflösen.
+# Pin the MinIO client so that the build stays reproducible.
 ARG MC_VERSION=RELEASE.2025-04-16T18-13-26Z
 RUN set -eux; \
     case "$(uname -m)" in \

@@ -11,8 +11,8 @@
   gap: var(--space-2);
   width: 100%;
 }
-/* Detail view only: center title/meta on body width like toolbar + shell
-   center column. The list view keeps the title left-aligned. */
+/* Detail view only: center the title and meta on body width, like the toolbar
+   and the center column of the shell. The list view keeps the title left. */
 .mtg__head--detail {
   max-width: var(--layout-max-width);
   margin-inline: auto;
@@ -33,7 +33,7 @@
 .mtg__headFilter {
   min-width: 12rem;
 }
-/* Header live search: same height as the filter/button next to it. */
+/* Header live search: the same height as the filter and the button next to it. */
 .mtg__headSearch {
   padding: var(--space-2) var(--space-3);
   border: var(--border-width) solid var(--color-border);
@@ -142,7 +142,7 @@
   white-space: nowrap;
   font-size: var(--fs-sm);
 }
-/* Non-public badge: right-aligned (tocTitle flex:1 pushes it) and never squeezed. */
+/* Non-public badge: right-aligned by the flex:1 of tocTitle, and never squeezed. */
 .mtg__tocNpBadge {
   flex-shrink: 0;
   margin-inline-start: auto;
@@ -228,8 +228,8 @@
 .mtg__toolbarSpacer {
   margin-left: auto;
 }
-/* Breakout grid: agenda in the left margin, attendance right, protocol body
-   centered on body width. */
+/* Breakout grid: the agenda sits in the left margin, attendance on the right and
+   the protocol body centered on body width. */
 .mtg__shell {
   display: grid;
   grid-template-columns:
@@ -261,7 +261,7 @@
   justify-self: start;
   max-width: 18rem;
 }
-/* Narrower: attendance below the body, agenda stays left. */
+/* Narrower: attendance moves below the body, the agenda stays on the left. */
 @media (max-width: 60rem) {
   .mtg__shell {
     grid-template-columns: minmax(10rem, 16rem) minmax(0, 1fr);
@@ -302,7 +302,6 @@
   gap: var(--space-1);
   justify-content: flex-end;
 }
-/* --- Timeline --- */
 .mtg__timeline {
   /* Fade top/bottom into the page background. */
   --fade: linear-gradient(
@@ -313,9 +312,9 @@
     transparent
   );
   position: relative;
-  /* Height is set by JS (measureTimeline) to exactly the free viewport rest
-     so the page itself does not scroll — a static calc() cannot account for
-     the footer below main. The floor is a fallback. */
+  /* measureTimeline sets the height in JS to the free rest of the viewport, so
+     the page itself does not scroll. A static calc() cannot account for the
+     footer below main. The min-height below is only a fallback. */
   min-height: 12rem;
   overflow-y: auto;
   display: flex;
@@ -433,9 +432,9 @@
   padding-left: var(--space-6);
   margin: var(--space-1) 0;
 }
-/* Rail segment through the "now" marker: the container line breaks visually
-   above it (z-index stacking context); this segment continues it at the same
-   x-position and bridges the margins/gaps above and below. */
+/* Rail segment through the "now" marker. The container line breaks visually above
+   it, because of the z-index stacking context. This segment continues the line at
+   the same x-position. It also bridges the margins and gaps above and below. */
 .mtg__tlNow::before {
   content: '';
   position: absolute;
@@ -463,8 +462,9 @@
 .mtg__tlNoUp {
   padding-left: var(--space-6);
 }
-/* Mobile (≤48rem): 3-column shell stacked vertically — active TOP first, then
-   attendance/votes, then agenda. Sticky panes release. Desktop unchanged. */
+/* Mobile (≤48rem): the 3-column shell stacks vertically. The active TOP comes
+   first, then attendance and votes, then the agenda. Sticky panes release. The
+   desktop layout does not change. */
 @media (max-width: 48rem) {
   .mtg__shell {
     grid-template-columns: 1fr;

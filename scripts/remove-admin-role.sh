@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 # Remove all admin role assignments from a principal, directly in the prod DB.
 #
-# Usage (on the prod host, from the repo root):
+# Usage. Run this on the prod host, from the repo root:
 #   ./scripts/remove-admin-role.sh <principal-uuid>
 #
-# Runs psql inside the compose postgres service. Shows the matching rows and
-# asks for confirmation before deleting. Note: this bypasses the API layer,
-# so no audit_log entry is written and the "admins cannot remove their own
-# admin role" guard does not apply — double-check the target.
+# The script runs psql in the compose postgres service. It shows the matching rows and
+# asks for confirmation before it deletes them.
+#
+# WARNING: the script bypasses the API layer. It writes no audit_log entry. The guard
+# that stops an admin from removing the own admin role does not apply. Check the target
+# twice.
 set -euo pipefail
 
 PRINCIPAL_ID="${1:?usage: $0 <principal-uuid>}"

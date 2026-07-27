@@ -54,7 +54,6 @@
   gap: var(--space-1);
   flex: 1;
 }
-/* Mobil (≤768px): Amtszeit-Datepicker untereinander statt nebeneinander. */
 @media (max-width: 768px) {
   .gm__term {
     flex-direction: column;

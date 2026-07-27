@@ -1,7 +1,7 @@
-"""TDD: BudgetTreeService (CR #76/#78) ohne DB — Fake-Session deckt jeden Branch (100 %).
+"""BudgetTreeService (CR #76/#78) without a DB. A fake session covers every branch (100 %).
 
-Die Reihenfolge der ``execute``-Ergebnisse spiegelt den Service-Ablauf (FIFO-Queue
-je ``execute``, s. ``tests/auth_fakes.FakeSession``).
+The order of the `execute` results mirrors the service flow. Each `execute` pops one entry
+from a FIFO queue. See `tests/auth_fakes.FakeSession`.
 """
 
 from __future__ import annotations
@@ -70,7 +70,6 @@ def _app(*, id=None, budget_id=None, fiscal_year_id=None, amount=None):  # noqa:
     return a
 
 
-# ------------------------------------------------------------------ create_node
 async def test_create_node_invalid_key() -> None:
     svc = BudgetTreeService(fake_session())
     with pytest.raises(ValidationProblem):
@@ -78,15 +77,15 @@ async def test_create_node_invalid_key() -> None:
 
 
 async def test_create_top_level_without_gremium_ok() -> None:
-    # #22: Budgets sind nicht an ein Gremium gebunden — Top-Level ohne gremiumId ok.
-    sess = fake_session(result())  # nur Sibling-Check (kein Gremium-Lookup)
+    # #22: a budget does not belong to a Gremium. A top-level node needs no gremiumId.
+    sess = fake_session(result())  # only the sibling check, no Gremium lookup
     svc = BudgetTreeService(sess)
     out = await svc.create_node(BudgetNodeCreate(key="VS", name="VS-Mittel"))
     assert out.path_key == "VS" and out.gremium_id is None
 
 
 async def test_create_top_level_gremium_not_found() -> None:
-    svc = BudgetTreeService(fake_session(result()))  # gremium lookup → None
+    svc = BudgetTreeService(fake_session(result()))  # gremium lookup returns None
     with pytest.raises(NotFoundError):
         await svc.create_node(
             BudgetNodeCreate(key="VS", name="x", gremiumId=uuid.uuid4())
@@ -129,7 +128,6 @@ async def test_create_node_duplicate_key() -> None:
         await svc.create_node(BudgetNodeCreate(key="800", name="x", parentId=parent.id))
 
 
-# ------------------------------------------------------------------ update/delete
 async def test_update_node() -> None:
     node = _budget()
     sess = fake_session(result(node))
@@ -145,7 +143,7 @@ async def test_update_node_not_found() -> None:
 
 
 async def test_update_node_stichtag_rederives_fiscal_years() -> None:
-    # Stichtag-Wechsel am Top-Budget leitet Start/Ende bestehender HHJ neu ab.
+    # A new cut-off date on the top budget re-derives start and end of every fiscal year.
     top = _budget(path_key="VS", fiscal_start_month=1, fiscal_start_day=1)
     fy = _fy(budget_id=top.id, year=2026)
     sess = fake_session(result(top), result(fy))  # _get_node, _fiscal_years_of
@@ -156,17 +154,17 @@ async def test_update_node_stichtag_rederives_fiscal_years() -> None:
 
 
 async def test_update_node_stichtag_unchanged_skips_rederive() -> None:
-    # Gleicher Stichtag-Wert → kein HHJ-Rederive (nur Name-Update).
+    # The same cut-off value skips the fiscal year re-derive. Only the name changes.
     top = _budget(path_key="VS", fiscal_start_month=1, fiscal_start_day=1)
-    sess = fake_session(result(top))  # nur _get_node
+    sess = fake_session(result(top))  # only _get_node
     svc = BudgetTreeService(sess)
     out = await svc.update_node(top.id, BudgetNodeUpdate(name="Neu", fiscalStartMonth=1))
     assert out.name == "Neu" and out.fiscal_start_month == 1
 
 
 async def test_delete_node_ok() -> None:
-    # node, no child, no booking, no assigned application → allocations (if any)
-    # cascade away with the node; deletion proceeds.
+    # The queue holds the node, no child, no booking and no assigned application. Any
+    # allocation cascades away with the node, so the delete proceeds.
     node = _budget()
     sess = fake_session(result(node), result(), result(), result())
     svc = BudgetTreeService(sess)
@@ -217,10 +215,11 @@ async def test_delete_node_not_found() -> None:
         await svc.delete_node(uuid.uuid4())
 
 
-# ------------------------------------------------------------------ fiscal years
 async def test_list_fiscal_years_resolves_top_ancestor() -> None:
-    """#budget-scope: Nicht-Top-Level löst auf den Top-Level-Vorfahren auf —
-    gescopte Roots sind oft Unter-Kostenstellen."""
+    """#budget-scope: a node below the top level resolves to its top-level ancestor.
+
+    A scoped root is often a sub cost center.
+    """
     top = _budget(path_key="VS")
     child = _budget(parent_id=top.id, path_key="VS-800")
     fy = _fy(budget_id=top.id)
@@ -250,7 +249,8 @@ async def test_create_fiscal_year_ok() -> None:
 
 
 async def test_create_fiscal_year_offset_stichtag_display() -> None:
-    # Stichtag 01.07. → Periode 01.07.2026–30.06.2027 → Anzeige '2026/27'.
+    # A cut-off date of 01.07. gives the period 01.07.2026 to 30.06.2027 and the label
+    # '2026/27'.
     top = _budget(path_key="VS", fiscal_start_month=7, fiscal_start_day=1)
     sess = fake_session(result(top), result())
     svc = BudgetTreeService(sess)
@@ -271,7 +271,8 @@ async def test_create_fiscal_year_duplicate_year() -> None:
 async def test_update_fiscal_year_active_only() -> None:
     top = _budget(path_key="VS")
     fy = _fy(id=uuid.uuid4(), budget_id=top.id, active=True)
-    # _require_top_level(top), _get_fiscal_year(fy) — kein _fiscal_years_of (Jahr unverändert).
+    # The queue holds _require_top_level and _get_fiscal_year. The year does not change,
+    # so _fiscal_years_of does not run.
     sess = fake_session(result(top), result(fy))
     svc = BudgetTreeService(sess)
     out = await svc.update_fiscal_year(top.id, fy.id, FiscalYearUpdate(active=False))
@@ -299,11 +300,10 @@ async def test_update_fiscal_year_duplicate_year() -> None:
         await svc.update_fiscal_year(top.id, fy.id, FiscalYearUpdate(year=2027))
 
 
-# ------------------------------------------------------------------ allocation
 async def test_set_allocation_fy_mismatch() -> None:
     node = _budget(path_key="VS")
     top = node
-    fy = _fy(budget_id=uuid.uuid4())  # gehört zu fremdem Top-Budget
+    fy = _fy(budget_id=uuid.uuid4())  # belongs to another top budget
     sess = fake_session(result(node), result(fy), result(top))
     svc = BudgetTreeService(sess)
     with pytest.raises(ValidationProblem):
@@ -325,7 +325,7 @@ async def test_set_allocation_child_exceeds_parent() -> None:
     child = _budget(parent_id=parent.id, path_key="VS-800", key="800")
     top = parent
     fy = _fy(budget_id=top.id)
-    sibling_rows = result((uuid.uuid4(), Decimal("600")))  # andere Kinder = 600
+    sibling_rows = result((uuid.uuid4(), Decimal("600")))  # other children hold 600
     parent_alloc = _alloc(budget_id=parent.id, fy_id=fy.id, allocated="1000")
     # node, fy, top, _lock(self), _lock(parent), siblings, parent_alloc
     # → 600+500=1100>1000 → exceeds
@@ -355,13 +355,13 @@ async def test_set_allocation_child_ok_update_existing() -> None:
     svc = BudgetTreeService(sess)
     out = await svc.set_allocation(child.id, fy.id, AllocationSet(allocated=Decimal("300")))
     assert out.allocated == Decimal("300")
-    assert self_alloc.allocated == Decimal("300")  # bestehende Zeile aktualisiert
+    assert self_alloc.allocated == Decimal("300")  # the service updates the existing row
 
 
 async def test_set_allocation_below_children() -> None:
     top = _budget(path_key="VS")
     fy = _fy(budget_id=top.id)
-    own_children = result((uuid.uuid4(), Decimal("700")))  # bereits 700 verteilt
+    own_children = result((uuid.uuid4(), Decimal("700")))  # 700 already distributed
     # node, fy, top, _lock(self), own_children
     sess = fake_session(result(top), result(fy), result(top), result(), own_children)
     svc = BudgetTreeService(sess)
@@ -387,7 +387,7 @@ async def test_set_allocation_top_not_found() -> None:
 
 
 async def test_children_alloc_sum_excludes_self() -> None:
-    # Geschwister-Summe ignoriert die Zeile des Knotens selbst (exclude_id-Zweig).
+    # The sibling sum ignores the row of the node itself. This covers the exclude_id branch.
     parent = _budget(path_key="VS")
     child = _budget(parent_id=parent.id, path_key="VS-800", key="800")
     top = parent
@@ -401,7 +401,8 @@ async def test_children_alloc_sum_excludes_self() -> None:
     )
     svc = BudgetTreeService(sess)
     out = await svc.set_allocation(child.id, fy.id, AllocationSet(allocated=Decimal("300")))
-    # nur 100 (Geschwister) + 300 = 400 ≤ 1000; die 999-Zeile des Knotens wird übersprungen.
+    # Only 100 from the siblings plus 300 gives 400, which stays under 1000. The service
+    # skips the 999 row of the node.
     assert out.allocated == Decimal("300")
 
 
@@ -410,7 +411,7 @@ async def test_set_allocation_child_no_parent_alloc() -> None:
     child = _budget(parent_id=parent.id, path_key="VS-800", key="800")
     top = parent
     fy = _fy(budget_id=top.id)
-    sibling_rows = result()  # keine anderen Kinder
+    sibling_rows = result()  # no other children
     # node, fy, top, _lock(self), _lock(parent), siblings, parent_alloc(None)
     # → exceeds (0+1 > 0) → 422
     sess = fake_session(
@@ -421,7 +422,6 @@ async def test_set_allocation_child_no_parent_alloc() -> None:
         await svc.set_allocation(child.id, fy.id, AllocationSet(allocated=Decimal("1")))
 
 
-# ------------------------------------------------------------------ assignment
 async def test_assign_budget_clear() -> None:
     app = _app(budget_id=uuid.uuid4(), fiscal_year_id=uuid.uuid4())
     sess = fake_session(result(app))
@@ -464,7 +464,8 @@ async def test_assign_budget_explicit_fiscal_year() -> None:
 
 
 async def test_assign_budget_ambiguous_requires_fiscal_year() -> None:
-    # 2+ aktive HHJ und kein explizites fiscalYearId → 422 statt still NULL (R7.1e).
+    # Two or more active fiscal years without an explicit fiscalYearId give 422 instead of
+    # a silent NULL (R7.1e).
     top = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     node = _budget(id=uuid.uuid4(), path_key="VS-800", key="800")
     fy1 = _fy(id=uuid.uuid4(), budget_id=top.id)
@@ -498,7 +499,7 @@ async def test_move_fiscal_year_no_budget() -> None:
 async def test_move_fiscal_year_wrong_top() -> None:
     top = _budget(path_key="VS")
     node = top
-    fy = _fy(budget_id=uuid.uuid4())  # fremdes Top-Budget
+    fy = _fy(budget_id=uuid.uuid4())  # another top budget
     app = _app(budget_id=node.id)
     sess = fake_session(result(app), result(node), result(top), result(fy))
     svc = BudgetTreeService(sess)
@@ -506,12 +507,11 @@ async def test_move_fiscal_year_wrong_top() -> None:
         await svc.move_fiscal_year(app.id, MoveFiscalYearRequest(fiscalYearId=fy.id))
 
 
-# ------------------------------------------------------------------ tree view
 async def test_get_tree_assembles() -> None:
     g = uuid.uuid4()
     fy_id = uuid.uuid4()
     top = _budget(id=uuid.uuid4(), path_key="VS", gremium_id=g, key="VS")
-    top.accepted_state_keys = ["approved"]  # angenommene States → gebunden
+    top.accepted_state_keys = ["approved"]  # accepted states count as bound
     top.denied_state_keys = ["rejected"]
     alloc = _alloc(budget_id=top.id, fy_id=fy_id, allocated="1000")
     sess = fake_session(
@@ -529,16 +529,15 @@ async def test_get_tree_assembles() -> None:
     assert len(tree) == 1
     view = tree[0].by_fiscal_year[0]
     assert view.allocated == Decimal("1000")
-    assert view.bound == Decimal("250")        # nur 'approved'
+    assert view.bound == Decimal("250")        # only 'approved'
     assert view.expended == Decimal("0")
     assert view.committed == Decimal("250")    # bound + expended
-    assert view.requested == Decimal("120")    # 'submitted', nicht 'rejected'
+    assert view.requested == Decimal("120")    # 'submitted', not 'rejected'
     assert view.available == Decimal("750")
 
 
-# ------------------------------------------------------------------- expenses
 async def test_get_tree_rolls_up_standalone_expenses() -> None:
-    """Eigenständige Ausgaben (#25) zählen als **ausgegeben** (expended), nicht gebunden."""
+    """Standalone expenses (#25) count as expended, not as bound."""
     g = uuid.uuid4()
     fy_id = uuid.uuid4()
     top = _budget(id=uuid.uuid4(), path_key="VS", gremium_id=g, key="VS")
@@ -558,7 +557,7 @@ async def test_get_tree_rolls_up_standalone_expenses() -> None:
 
 
 async def test_get_tree_income_increases_available() -> None:
-    """Einnahmen (#25) erhöhen das verfügbare Budget (available)."""
+    """Income (#25) raises the available budget."""
     fy_id = uuid.uuid4()
     top = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     alloc = _alloc(budget_id=top.id, fy_id=fy_id, allocated="1000")
@@ -576,7 +575,7 @@ async def test_get_tree_income_increases_available() -> None:
 
 
 async def test_get_tree_linked_expense_replaces_bound() -> None:
-    """Eine an einen Antrag gebundene Ausgabe ersetzt dessen Bindung anteilig (#25)."""
+    """An expense linked to an application replaces that binding in proportion (#25)."""
     fy_id = uuid.uuid4()
     app_id = uuid.uuid4()
     top = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
@@ -590,9 +589,9 @@ async def test_get_tree_linked_expense_replaces_bound() -> None:
     )
     svc = BudgetTreeService(sess)
     view = (await svc.get_tree())[0].by_fiscal_year[0]
-    assert view.bound == Decimal("150")        # 250 − 100 noch gebunden
+    assert view.bound == Decimal("150")        # 250 − 100 stays bound
     assert view.expended == Decimal("100")
-    assert view.committed == Decimal("250")    # bound + expended = ursprüngliche Bindung
+    assert view.committed == Decimal("250")    # bound + expended = the original binding
     assert view.available == Decimal("750")    # 1000 − 150 − 100
 
 
@@ -608,7 +607,7 @@ async def test_resolve_fiscal_year_explicit_ok() -> None:
 async def test_resolve_fiscal_year_wrong_top() -> None:
     top = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     node = _budget(id=uuid.uuid4(), path_key="VS-800", key="800")
-    fy = _fy(id=uuid.uuid4(), budget_id=uuid.uuid4())  # gehört zu anderem Top-Budget
+    fy = _fy(id=uuid.uuid4(), budget_id=uuid.uuid4())  # belongs to another top budget
     sess = fake_session(result(top), result(fy))
     svc = BudgetTreeService(sess)
     with pytest.raises(ValidationProblem):
@@ -633,7 +632,7 @@ async def test_delete_expense_not_found() -> None:
 
 
 def test_expense_out_maps_metadata_fields() -> None:
-    """#1-1/#1-2/#3/#4: Die Zusatz-Metadaten landen camelCase im Output-DTO."""
+    """#1-1, #1-2, #3 and #4: the extra metadata reaches the output DTO in camelCase."""
     e = BudgetExpense(
         id=uuid.uuid4(),
         budget_id=uuid.uuid4(),

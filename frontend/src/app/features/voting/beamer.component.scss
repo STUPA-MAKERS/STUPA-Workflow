@@ -1,5 +1,6 @@
-// Beamer/projector: maximum contrast via the semantic tokens (Text 900 on Bg 50
-// in light, Text 50 on Bg 950 in dark) + large type for readability at distance.
+// Beamer/projector: maximum contrast through the semantic tokens (Text 900 on
+// Bg 50 in light, Text 50 on Bg 950 in dark) plus large type. This keeps the
+// screen readable at a distance.
 :host {
   display: block;
   min-height: calc(100vh - var(--layout-header-height));

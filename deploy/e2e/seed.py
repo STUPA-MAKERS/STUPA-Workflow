@@ -1,26 +1,27 @@
-"""E2E-Seed (T-40) — deterministische Fixtures gegen den *echten* Compose-Stack.
+"""E2E seed (T-40): deterministic fixtures against the *real* compose stack.
 
-Läuft als One-Shot-Service ``seed`` (Backend-Image) NACH ``migrate`` und sobald
-``api`` healthy ist. Schreibt nichts an Produktions-/Migrations-Code; nutzt nur die
-App-Module gegen die frische, per ``alembic upgrade head`` migrierte DB.
+The one-shot service ``seed`` runs this module on the backend image. It starts after
+``migrate`` and as soon as ``api`` is healthy. It writes no production code and no
+migration code. It uses the app modules only, against the fresh DB that
+``alembic upgrade head`` migrated.
 
-Was geseedet wird (idempotent — jeder Lauf gegen eine frische ``down -v``-DB):
+The seed is idempotent for every run against a fresh ``down -v`` DB. It creates:
 
-* **Aktive Form-Version** + **aktive Flow-Version** für den von ``0018`` geseedeten
-  Default-Antragstyp ``foerderantrag``. Ohne sie schlägt ``POST /applications``
-  fehl (`get_effective_form` / `_initial_state`), d. h. *jedes* E2E-Szenario hängt
-  daran. Flow: ``entwurf`` (initial, editierbar) → ``pruefung`` (gesperrt) →
+* An **active form version** and an **active flow version** for the default application
+  type ``foerderantrag`` that migration ``0018`` seeds. Without them ``POST /applications``
+  fails in `get_effective_form` and `_initial_state`, so *every* E2E scenario depends on
+  them. Flow: ``entwurf`` (initial, editable) -> ``pruefung`` (locked) ->
   ``angenommen`` / ``abgelehnt``.
-* **Admin-Principal + admin-RoleAssignment + AuthSession**. Der Bootstrap-Admin
-  greift nur via OIDC-Login (service.py) — im gating-Stack läuft *kein* Keycloak.
-  Deshalb mintet dieses Skript mit der App-eigenen ``create_principal_session``
-  (kennt ``SESSION_SECRET``) eine gültige Server-Session und gibt das signierte
-  ``ap_session``-Cookie aus. Das ist KEIN Prod-Backdoor: nur ein Test-Seed nutzt
-  die normale Signier-Funktion (analog Djangos ``force_login``).
-* Ein **Budget-Topf** für die ``/budget/pots``-Sicht.
+* An **admin Principal**, an **admin RoleAssignment** and an **AuthSession**. The
+  bootstrap admin works through the OIDC login only (service.py), and the gating stack
+  runs *no* Keycloak. This script therefore mints a valid server session with the app
+  function ``create_principal_session``, which knows ``SESSION_SECRET``, and writes the
+  ``ap_session`` cookie. This is NO production backdoor. Only a test seed calls the
+  normal signing function, in the same way as the ``force_login`` of Django.
+* A **budget pot** for the ``/budget/pots`` view.
 
-Ausgabe: ``${E2E_ARTIFACTS}/e2e.json`` (bind-gemountet) mit Cookie-Name/-Wert,
-Type-/Gremium-/Pot-IDs und Flow-State-Keys — von Playwrights ``global-setup`` gelesen.
+Output: ``${E2E_ARTIFACTS}/e2e.json`` (bind-mounted) with the cookie name and value, the
+type, Gremium and pot IDs, and the flow state keys. Playwright ``global-setup`` reads it.
 """
 
 from __future__ import annotations
@@ -56,7 +57,7 @@ def _i18n(de: str, en: str) -> dict[str, str]:
 
 
 async def _default_type(session) -> ApplicationType:
-    """Den 0018-Default-Antragstyp ``foerderantrag`` holen (Fallback: erster Typ)."""
+    """Get the default application type ``foerderantrag``, or the oldest type as fallback."""
     row = (
         await session.execute(select(ApplicationType).where(ApplicationType.key == "foerderantrag"))
     ).scalar_one_or_none()
@@ -70,7 +71,7 @@ async def _default_type(session) -> ApplicationType:
 
 
 async def _ensure_form(session, type_id: uuid.UUID) -> None:
-    """Aktive Form-Version anlegen (nur falls noch keine aktiv ist)."""
+    """Create the active form version, but only when no version is active yet."""
     existing = (
         await session.execute(
             select(ApplicationType.active_form_version_id).where(ApplicationType.id == type_id)
@@ -104,7 +105,7 @@ async def _ensure_form(session, type_id: uuid.UUID) -> None:
 
 
 async def _ensure_flow(session, type_id: uuid.UUID) -> None:
-    """Aktive Flow-Version + States + Transitions anlegen (nur falls keine aktiv)."""
+    """Create the active flow version with its states and transitions, if none is active."""
     active = (
         await session.execute(
             select(ApplicationType.active_flow_version_id).where(ApplicationType.id == type_id)
@@ -175,7 +176,11 @@ async def _ensure_budget_pot(session, gremium_id: uuid.UUID) -> uuid.UUID:
 
 
 async def _ensure_admin_session(session, settings) -> str:
-    """Admin-Principal + RoleAssignment sicherstellen, frische Session minten."""
+    """Make sure the admin Principal and its RoleAssignment exist, then mint a session.
+
+    Returns:
+        The signed session cookie value.
+    """
     principal = (
         await session.execute(select(Principal).where(Principal.sub == ADMIN_SUB))
     ).scalar_one_or_none()
@@ -184,7 +189,7 @@ async def _ensure_admin_session(session, settings) -> str:
         session.add(principal)
         await session.flush()
 
-    # admin-Rolle existiert via 0003; defensiv prüfen.
+    # Migration 0003 creates the admin role. Check for it defensively.
     role = (
         await session.execute(select(Role).where(Role.id == ADMIN_ROLE_ID))
     ).scalar_one_or_none()

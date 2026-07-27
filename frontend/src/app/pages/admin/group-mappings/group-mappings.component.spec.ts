@@ -60,7 +60,7 @@ describe('GroupMappingsComponent', () => {
     expect(screen.getByText('— (global)')).toBeInTheDocument();
 
     const rows = c.rows();
-    // unknown role id resolves to the raw id, unknown gremium id resolves to raw id
+    // an unknown role id and an unknown gremium id both resolve to the raw id
     const ghost = rows.find((r: { id: string }) => r.id === 'm3');
     expect(ghost.roleLabel).toBe('unknown-role');
     expect(ghost.gremiumLabel).toBe('unknown-gremium');

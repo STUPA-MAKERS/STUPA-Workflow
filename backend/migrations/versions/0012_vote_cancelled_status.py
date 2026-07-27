@@ -1,10 +1,11 @@
-"""Vote: Status ``cancelled`` (Wahl abbrechen via manueller Transition, #abort-vote).
+"""Vote: the `cancelled` status (cancel a vote by a manual transition, #abort-vote).
 
-Verlässt ein Antrag seinen ``vote``-State über eine **manuelle** Transition
-(z. B. »Wahl abbrechen«), werden seine offenen Abstimmungen storniert statt
-für immer offen zu hängen (``close`` fände keinen Branch mehr → 409). Der
-CheckConstraint ``vote_status`` muss den neuen Endzustand erlauben.
-Idempotent (DROP IF EXISTS + Neuanlage).
+An application can leave its `vote` state through a **manual** transition, for
+example "cancel vote". The platform then cancels the open votes of that
+application. Without this status the votes stay open forever, because `close`
+finds no branch and fails with 409. The `vote_status` check constraint must
+allow the new end status. The migration is idempotent. It drops the constraint
+if it exists and creates it again.
 """
 
 from __future__ import annotations
@@ -28,8 +29,8 @@ _UPGRADE: tuple[str, ...] = (
 )
 
 _DOWNGRADE: tuple[str, ...] = (
-    # Stornierte Votes als geschlossen (ohne Ergebnis) behandeln, sonst verletzt
-    # die Zeile den wiederhergestellten (engeren) Constraint.
+    # Treat a cancelled vote as closed with no result. Otherwise the row breaks
+    # the restored, narrower constraint.
     "UPDATE vote SET status = 'closed' WHERE status = 'cancelled'",
     "ALTER TABLE vote DROP CONSTRAINT IF EXISTS vote_status",
     (

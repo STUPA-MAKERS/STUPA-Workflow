@@ -1,4 +1,4 @@
-"""TDD: pure JsonLogic-Subset-Evaluator (data-model §5.1). Branch-Coverage-Ziel 100 %."""
+"""Pure evaluator for the JsonLogic subset (data-model §5.1). Branch coverage 100 %."""
 
 import pytest
 

@@ -1,9 +1,10 @@
-"""OIDC / Keycloak: authorization code + PKCE, confidential client.
+"""OIDC login against Keycloak: authorization code plus PKCE, confidential client.
 
-Endpoints are derived from the realm `issuer` per Keycloak convention (no
-discovery roundtrip at startup). Token exchange via `httpx`; the `id_token` is
-signature-verified against the JWKS (RS256) incl. `aud`/`iss`/`nonce`. All
-network/verify failures raise `OidcError` — the service maps them to 400/503.
+The module derives the endpoints from the realm `issuer` by the Keycloak convention. It
+runs no discovery roundtrip at startup. It exchanges the code over `httpx`. It verifies the
+signature of the `id_token` against the JWKS with RS256 and checks `aud`, `iss` and
+`nonce`. Every network failure and every verification failure raises `OidcError`. The
+service maps that error to a 400 or a 503.
 """
 
 from __future__ import annotations
@@ -28,7 +29,7 @@ _HTTP_TIMEOUT = 10.0
 
 
 class OidcError(RuntimeError):
-    """OIDC flow failed (network, token exchange, signature, claims)."""
+    """The OIDC flow failed at the network, the token exchange, the signature or a claim."""
 
 
 @dataclass(slots=True)
@@ -37,15 +38,15 @@ class OidcClaims:
     email: str | None
     name: str | None
     groups: list[str] = field(default_factory=list)
-    # `email_verified` (standard OIDC claim). Only a verified claim may count for
-    # the email bootstrap — otherwise, on an IdP with self-registration and no
-    # mail verification, any account could mint a token with `email` set to a
-    # bootstrap-admin address and become admin on first login.
+    # `email_verified` is the standard OIDC claim. Only a verified claim may count for the
+    # email bootstrap. Otherwise, on an IdP with self-registration and no mail
+    # verification, any account could get a token with `email` set to a bootstrap-admin
+    # address and become admin on the first login.
     email_verified: bool = False
 
 
 def generate_pkce() -> tuple[str, str]:
-    """Generate (`code_verifier`, `code_challenge`) — S256, unpadded (RFC 7636)."""
+    """Generate the `code_verifier` and the `code_challenge` (S256, unpadded, RFC 7636)."""
     verifier = secrets.token_urlsafe(_VERIFIER_BYTES)
     digest = hashlib.sha256(verifier.encode("ascii")).digest()
     challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
@@ -65,7 +66,7 @@ def _endpoint(issuer: str, suffix: str) -> str:
 
 
 def authorization_url(settings: Settings, *, state: str, challenge: str, nonce: str) -> str:
-    """Build the Keycloak authorize URL (auth code + PKCE)."""
+    """Build the Keycloak authorize URL for the authorization code flow with PKCE."""
     params = {
         "client_id": settings.oidc_client_id or "",
         "response_type": "code",
@@ -80,7 +81,14 @@ def authorization_url(settings: Settings, *, state: str, challenge: str, nonce: 
 
 
 async def exchange_code(settings: Settings, *, code: str, verifier: str) -> dict[str, str]:
-    """Exchange the authorization code for a token set (confidential client + PKCE verifier)."""
+    """Exchange the authorization code for a token set.
+
+    The request carries the credentials of the confidential client and the PKCE verifier.
+
+    Raises:
+        OidcError: The token endpoint is unreachable, the exchange fails, or the response
+            carries no `id_token`.
+    """
     data = {
         "grant_type": "authorization_code",
         "code": code,
@@ -102,9 +110,9 @@ async def exchange_code(settings: Settings, *, code: str, verifier: str) -> dict
     return payload
 
 
-# JWKS cache per issuer: (expiry monotonic time, keys). The TTL bounds IdP load
-# and DoS amplification; an unknown `kid` forces one reload (key rotation),
-# after that it is an error.
+# JWKS cache per issuer, as a pair of monotonic expiry time and keys. The TTL bounds the
+# load on the IdP and the DoS amplification. An unknown `kid` forces one reload for a key
+# rotation. A second miss is an error.
 _JWKS_TTL_SECONDS = 300.0
 _jwks_cache: dict[str, tuple[float, list[dict[str, Any]]]] = {}
 
@@ -137,7 +145,7 @@ def _find_key(keys: list[dict[str, Any]], kid: object) -> dict[str, Any] | None:
 
 
 async def _signing_key(settings: Settings, id_token: str) -> Any:
-    """Find the matching JWKS key (`kid`) as a PyJWT key object — TTL-cached."""
+    """Return the TTL-cached JWKS key that matches the `kid` of the `id_token`."""
     try:
         header = jwt.get_unverified_header(id_token)
     except jwt.PyJWTError as exc:
@@ -147,7 +155,7 @@ async def _signing_key(settings: Settings, id_token: str) -> Any:
     keys = await _get_jwks(issuer, force=False)
     jwk = _find_key(keys, kid)
     if jwk is None:
-        # Cache may be stale (rotation) -> force one reload.
+        # The cache can be stale after a key rotation, so force one reload.
         keys = await _get_jwks(issuer, force=True)
         jwk = _find_key(keys, kid)
     if jwk is None:
@@ -156,7 +164,13 @@ async def _signing_key(settings: Settings, id_token: str) -> Any:
 
 
 async def verify_id_token(settings: Settings, *, id_token: str, nonce: str) -> OidcClaims:
-    """Verify the `id_token` signature and claims (aud/iss/exp/nonce) into `OidcClaims`."""
+    """Verify the signature and the claims of the `id_token`.
+
+    The function checks `aud`, `iss`, `exp` and `nonce`.
+
+    Raises:
+        OidcError: The token is malformed or invalid, or the nonce does not match.
+    """
     key = await _signing_key(settings, id_token)
     try:
         claims = jwt.decode(
@@ -184,7 +198,14 @@ async def verify_id_token(settings: Settings, *, id_token: str, nonce: str) -> O
 
 
 def end_session_url(settings: Settings, *, id_token: str | None) -> str | None:
-    """Build the Keycloak logout URL (optional id_token_hint + post_logout_redirect)."""
+    """Build the Keycloak logout URL.
+
+    The URL carries an optional `id_token_hint` and an optional
+    `post_logout_redirect_uri`.
+
+    Returns:
+        The logout URL, or `None` when no OIDC issuer is configured.
+    """
     if not settings.oidc_issuer:
         return None
     params: dict[str, str] = {}

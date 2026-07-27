@@ -1,16 +1,19 @@
 """Protocol API router.
 
-Endpoints are authorized server-side per gremium (fail-closed). Every endpoint
-gates authentication via ``require_principal()`` and delegates authorization to
-:class:`MeetingService` (through ``ProtocolService`` helpers) — the same scope
-rules as the live stack (``/api/meetings/…``). Global-permission gating alone
-would lock out per-gremium protokollants; ``resolve_principal`` deliberately
-does NOT merge gremium-role permissions into ``principal.permissions``, hence
-the delegation to the service.
+The server authorizes every endpoint per gremium and fails closed. Each
+endpoint gates authentication with `require_principal()` and delegates the
+authorization to `MeetingService`, through the helpers of `ProtocolService`.
+These are the same scope rules as the live stack under `/api/meetings/…`.
 
-The service is wired with the shared render infrastructure (object storage +
-arq mail pool from app state; pytex client from settings). Errors are declared
-as ``ProblemDetail`` (problem+json).
+A gate on global permissions alone would lock out a secretary who holds the
+permission through a gremium role. `resolve_principal` deliberately does NOT
+merge gremium-role permissions into `principal.permissions`, so the router
+delegates to the service.
+
+The router wires the service with the shared render infrastructure. Object
+storage and the arq mail pool come from the app state. The pytex client comes
+from the settings. The endpoints declare their errors as `ProblemDetail`
+(problem+json).
 """
 
 from __future__ import annotations
@@ -46,7 +49,7 @@ def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
 
 
 def _mail_queue(request: Request) -> MailQueue | None:
-    """Build the arq mail queue from the app-state pool (``None`` without Redis)."""
+    """Build the arq mail queue from the app-state pool, or `None` without Redis."""
     pool = getattr(request.app.state, "arq_pool", None)
     return ArqMailQueue(pool) if pool is not None else None
 
@@ -54,7 +57,7 @@ def _mail_queue(request: Request) -> MailQueue | None:
 def get_protocol_service(
     session: DbSession, request: Request, settings: SettingsDep
 ) -> ProtocolService:
-    """Wire the service with render infra (storage/mail from state, pytex from settings)."""
+    """Wire the service: storage and mail from the app state, pytex from settings."""
     storage: ObjectStorage | None = getattr(request.app.state, "object_storage", None)
     return ProtocolService(
         session,
@@ -66,8 +69,8 @@ def get_protocol_service(
 
 
 ServiceDep = Annotated[ProtocolService, Depends(get_protocol_service)]
-# Endpoints only require authentication here; fine-grained per-gremium
-# authorization is checked per endpoint via ProtocolService → MeetingService.
+# This dependency only requires authentication. Each endpoint checks the
+# per-gremium authorization through ProtocolService and MeetingService.
 PrincipalDep = Annotated[Principal, Depends(require_principal())]
 
 
@@ -79,7 +82,7 @@ PrincipalDep = Annotated[Principal, Depends(require_principal())]
 async def create_or_load_protocol(
     meeting_id: UUID, service: ServiceDep, principal: PrincipalDep
 ) -> ProtocolOut:
-    """Create or load the meeting's protocol (idempotent, 1:1 to the meeting)."""
+    """Create or load the protocol of the meeting, one per meeting and idempotent."""
     await service.authorize_write_meeting(meeting_id, principal)
     return await service.get_or_create(meeting_id, author=principal.sub)
 
@@ -92,11 +95,12 @@ async def create_or_load_protocol(
 async def get_protocol(
     meeting_id: UUID, service: ServiceDep, principal: PrincipalDep
 ) -> ProtocolOut:
-    """Read the meeting's protocol (404 without one) — reload/poll path.
+    """Read the protocol of the meeting, or 404 when none exists.
 
-    Read scope = meeting view (``assert_can_read``): gremium members/pool
-    substitutes, delegation recipients, plus global
-    ``meeting.view_all``/``meeting.manage``/admin."""
+    This is the reload and poll path. The read scope is the meeting view
+    (`assert_can_read`): gremium members, pool substitutes, delegation
+    recipients, plus the global `meeting.view_all`, `meeting.manage` and admin.
+    """
     await service.authorize_read_meeting(meeting_id, principal)
     return await service.get_by_meeting(meeting_id)
 
@@ -112,7 +116,7 @@ async def update_protocol(
     service: ServiceDep,
     principal: PrincipalDep,
 ) -> ProtocolOut:
-    """Update the editor body. 409 if the protocol is already final."""
+    """Update the editor body. The endpoint returns 409 when the protocol is final."""
     await service.authorize_write(protocol_id, principal)
     return await service.update_markdown(protocol_id, payload.markdown)
 
@@ -128,7 +132,7 @@ async def embed_votes(
     service: ServiceDep,
     principal: PrincipalDep,
 ) -> ProtocolOut:
-    """Embed votes as Markdown snippets (idempotent)."""
+    """Embed votes as Markdown snippets. The operation is idempotent."""
     await service.authorize_write(protocol_id, principal)
     return await service.embed_votes(protocol_id, payload.vote_ids)
 
@@ -141,16 +145,17 @@ async def embed_votes(
 async def finalize_protocol(
     protocol_id: UUID, service: ServiceDep, request: Request, principal: PrincipalDep
 ) -> ProtocolOut:
-    """Start finalization: ``status=rendering`` + a ``render_protocol`` worker job.
+    """Start the finalization: set `status=rendering` and enqueue `render_protocol`.
 
-    Requires write access AND ``protocol.finalize`` (global or as gremium role) —
-    stricter than draft writing.
+    The caller needs write access AND `protocol.finalize`, either global or as
+    a gremium role. This is stricter than a write to the draft.
 
-    Non-blocking (pytex render runs in the arq worker); the worker sets
-    ``final`` and sends the mail, a permanent failure falls back to ``draft``.
-    Without Redis the request renders synchronously as fallback — never stuck
-    in ``rendering``. Idempotent: ``rendering``/``final`` is returned unchanged
-    (no double render/send)."""
+    The call does not block, because the pytex render runs in the arq worker.
+    The worker sets `final` and sends the mail. A permanent failure falls back
+    to `draft`. Without Redis the request renders synchronously as a fallback,
+    so a protocol never stays stuck in `rendering`. The call is idempotent: it
+    returns `rendering` or `final` unchanged and never renders or sends twice.
+    """
     await service.authorize_finalize(protocol_id, principal)
     out, needs_render = await service.start_finalize(protocol_id)
     if not needs_render:
@@ -158,8 +163,8 @@ async def finalize_protocol(
     pool = getattr(request.app.state, "arq_pool", None)
     queue = protocol_render_queue_from_pool(pool)
     if queue is None:
-        # Sync fallback without Redis: on error roll back to ``draft``
-        # (re-finalizable), then re-raise unchanged as problem+json.
+        # Sync fallback without Redis: on an error roll back to `draft`, which
+        # allows a new finalize, then re-raise unchanged as problem+json.
         try:
             return await service.finalize(protocol_id, now=datetime.now(UTC))
         except Exception:
@@ -167,8 +172,8 @@ async def finalize_protocol(
             await service.revert_to_draft(protocol_id)
             raise
     await queue.enqueue(protocol_id)
-    # Inform followers immediately ("rendering" tag) via meeting_state broadcast;
-    # the worker broadcasts again once final/rolled back.
+    # Tell the followers at once through the meeting_state broadcast, with the
+    # "rendering" tag. The worker broadcasts again after final or a rollback.
     broker = getattr(request.app.state, "broker", None)
     if broker is not None:
         await MeetingService(service.session, BrokerPublisher(broker)).broadcast_state(
@@ -185,13 +190,15 @@ async def finalize_protocol(
 async def get_protocol_pdf(
     protocol_id: UUID, service: ServiceDep, principal: PrincipalDep
 ) -> Response:
-    """Stream the protocol PDF inline (MinIO is internal, no browser access).
+    """Stream the protocol PDF inline, because MinIO has no browser access.
 
-    Server-side storage fetch instead of a presigned URL: MinIO is only
-    reachable on the internal Docker network, so an S3v4-signed URL would bind
-    the internal host and be unreachable from the browser.
+    The endpoint fetches from storage server-side instead of a presigned URL.
+    MinIO is reachable only on the internal Docker network. An S3v4-signed URL
+    would bind the internal host and stay unreachable from the browser.
 
-    Read scope = meeting view (``assert_can_read``), like the protocol GET."""
+    The read scope is the meeting view (`assert_can_read`), like the protocol
+    GET.
+    """
     await service.authorize_read(protocol_id, principal)
     data = await service.get_pdf_bytes(protocol_id)
     return Response(
@@ -209,10 +216,12 @@ async def get_protocol_pdf(
 async def get_protocol_public_pdf(
     protocol_id: UUID, service: ServiceDep, principal: PrincipalDep
 ) -> Response:
-    """Stream the redacted public protocol variant.
+    """Stream the redacted public variant of the protocol.
 
-    Only exists when the meeting had at least one non-public agenda item;
-    otherwise 404. Same read authorization as the internal PDF."""
+    The variant exists only when the meeting had at least one non-public agenda
+    item. Otherwise the endpoint returns 404. The read authorization is the
+    same as for the internal PDF.
+    """
     await service.authorize_read(protocol_id, principal)
     data = await service.get_public_pdf_bytes(protocol_id)
     return Response(

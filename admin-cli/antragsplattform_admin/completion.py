@@ -1,9 +1,9 @@
 """Command completion and the input lexer.
 
-:class:`CommandCompleter` prefix-matches the raw ``/token`` (so ``/au`` offers
-``/audit``) and, past the command word, asks the orchestrator for argument
-options (user emails, role keys, actions, audit filter keys).
-:class:`CommandLexer` paints the leading slash-command coral as it is typed.
+`CommandCompleter` prefix-matches the raw `/token`, so `/au` offers `/audit`. Past the
+command word it asks the orchestrator for the argument options: user emails, role keys,
+actions and audit filter keys. `CommandLexer` paints the leading slash-command coral as
+you type it.
 """
 
 from __future__ import annotations
@@ -44,8 +44,8 @@ class CommandLexer(Lexer):
 class CommandCompleter(Completer):
     """Prefix-completes slash-commands and their arguments.
 
-    Unlike ``NestedCompleter`` it matches on the raw token (``/`` included), so
-    a partially-typed command completes rather than only the empty ``/``.
+    Unlike `NestedCompleter`, this completer matches the raw token, the `/` included.
+    A partially typed command therefore completes, not only the empty `/`.
     """
 
     def __init__(self, host: CompleterHost) -> None:

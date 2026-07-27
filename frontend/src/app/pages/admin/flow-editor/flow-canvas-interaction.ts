@@ -1,7 +1,9 @@
 /**
- * Pointer/zoom/pan state machine of the flow canvas. Owns the transient drag,
- * connect and pan handles; graph/selection state is reached through the host
- * context so the component keeps a single source of truth.
+ * Pointer, zoom and pan state machine of the flow canvas.
+ *
+ * This class owns the transient drag, connect and pan handles. It reaches graph and
+ * selection state through the host context. The component stays the single source of
+ * truth.
  */
 import type { WritableSignal } from '@angular/core';
 import type { FlowGraph, TransitionBranch, TransitionDef } from '../admin.models';
@@ -45,15 +47,15 @@ export class FlowCanvasInteraction {
   private connectFrom: string | null = null;
   /** Branch (pass/fail) when dragging from a branch dot. */
   private connectBranch: string | null = null;
-  /** Guard of the source dot — inherited by the new transition. */
+  /** Guard of the source dot. The new transition inherits it. */
   private connectGuard: TransitionDef['guard'] | null = null;
-  /** World point under the cursor at pan start (stays fixed "under the finger"). */
+  /** World point under the cursor at pan start. It stays fixed under the finger. */
   private panGrab: Point | null = null;
 
   constructor(private readonly host: FlowCanvasHost) {}
 
-  /** Grab a node → move it, or (click without movement) select it.
-   *  Shift-click toggles the multi-selection for "create group". */
+  /** Grab a node to move it. A click without movement selects the node instead.
+   *  Shift-click toggles the multi-selection that "create group" reads. */
   nodePointerDown(event: PointerEvent, key: string): void {
     event.stopPropagation();
     if (event.shiftKey) {
@@ -69,8 +71,8 @@ export class FlowCanvasInteraction {
     (event.target as Element).setPointerCapture?.(event.pointerId);
   }
 
-  /** Grab a group box: dragging moves all deep members, a plain click OPENS
-   *  the group (drill-down), shift-click toggles the multi-selection. */
+  /** Grab a group box. A drag moves all deep members. A plain click OPENS the
+   *  group (drill-down). Shift-click toggles the multi-selection. */
   groupPointerDown(event: PointerEvent, id: string): void {
     event.stopPropagation();
     if (event.shiftKey) {
@@ -85,8 +87,8 @@ export class FlowCanvasInteraction {
     (event.target as Element).setPointerCapture?.(event.pointerId);
   }
 
-  /** Start drawing a new edge from a connector dot; a branch/guard dot
-   *  transfers its branch/guard onto the new transition. */
+  /** Start to draw a new edge from a connector dot. A branch dot or a guard dot
+   *  copies its branch or guard onto the new transition. */
   connectPointerDown(
     event: PointerEvent,
     key: string,
@@ -147,7 +149,7 @@ export class FlowCanvasInteraction {
       return;
     }
     if (this.drag) {
-      // Click without movement = select; movement only commits the position.
+      // A click without movement selects. A drag only commits the new position.
       if (!this.drag.moved) this.host.selection.set({ kind: 'state', key: this.drag.key });
       this.drag = null;
       return;
@@ -179,7 +181,7 @@ export class FlowCanvasInteraction {
     }
   }
 
-  /** Pointerdown on empty canvas: clear selection + start panning. */
+  /** Pointer down on the empty canvas. Nodes and group boxes stop propagation first. */
   canvasPointerDown(event: PointerEvent): void {
     this.clearSelection();
     this.panGrab = this.toSvg(event);
@@ -193,7 +195,7 @@ export class FlowCanvasInteraction {
     }
   }
 
-  /** Wheel: zoom around the cursor (the world point under it stays fixed). */
+  /** Zoom around the cursor. The world point under the cursor stays fixed. */
   wheel(event: WheelEvent): void {
     event.preventDefault();
     const v = this.ensureView();
@@ -212,12 +214,12 @@ export class FlowCanvasInteraction {
     this.applyZoom(v, 1.2, { x: v.x + v.w / 2, y: v.y + v.h / 2 });
   }
 
-  /** Reset zoom/fit (whole content). */
+  /** Reset the zoom so the view fits the whole content again. */
   resetView(): void {
     this.host.view.set(null);
   }
 
-  /** Current view, initialised to "whole content" on first zoom/pan. */
+  /** Current view. The first zoom or pan initializes it to the whole content. */
   private ensureView(): ViewRect {
     const v = this.host.view();
     if (v) return v;
@@ -239,7 +241,7 @@ export class FlowCanvasInteraction {
     this.host.view.set({ x, y, w, h });
   }
 
-  /** Client coordinates → SVG user space (drag/connect/zoom math). */
+  /** Map client coordinates to SVG user space for the drag, connect and zoom math. */
   private toSvg(event: MouseEvent): Point {
     const svg = this.host.svg();
     if (!svg) return { x: event.clientX, y: event.clientY };
@@ -252,8 +254,8 @@ export class FlowCanvasInteraction {
     return { x: local.x, y: local.y };
   }
 
-  /** State whose node rect contains the point (connect target). Only nodes of
-   *  the current level — connecting into a group happens via drill-down. */
+  /** State whose node rect contains the point, that is, the connect target. Only
+   *  nodes of the current level count. To connect into a group, drill down first. */
   private nodeAt(p: Point): string | null {
     for (const n of this.host.nodes()) {
       if (p.x >= n.x && p.x <= n.x + NODE_W && p.y >= n.y && p.y <= n.y + n.h) {

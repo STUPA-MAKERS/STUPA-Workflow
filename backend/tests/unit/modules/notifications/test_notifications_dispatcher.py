@@ -1,4 +1,4 @@
-"""Tests des Flow-Action-Dispatchers `notify` (T-18) — Service gefaked."""
+"""Tests of the `notify` flow action dispatcher (T-18) with a fake service."""
 
 from __future__ import annotations
 
@@ -84,7 +84,7 @@ async def test_dispatch_skips_non_notify(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.setattr(mod, "NotificationService", FakeService)
     disp = NotificationActionDispatcher(_sessionmaker(FakeSession()), None, SETTINGS)
     await disp.dispatch([_action("webhook"), _action("budgetReserve")])
-    assert called == []  # Service nie instanziiert/aufgerufen
+    assert called == []  # the dispatcher never built or called the service
 
 
 async def test_dispatch_notify_merges_context(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -117,7 +117,7 @@ def test_build_notify_dispatcher_uses_settings() -> None:
 async def test_dispatch_task_notify_sends_kind_mail(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """`taskNotify` (#4-3): Empfänger zur Versandzeit, Versand via send_kind_mail."""
+    """`taskNotify` (#4-3) resolves the recipients at send time and uses send_kind_mail."""
     captured: dict[str, object] = {}
 
     class FakeService:
@@ -145,7 +145,7 @@ async def test_dispatch_task_notify_sends_kind_mail(
     monkeypatch.setattr(recipients_mod, "state_actionable", fake_state_actionable)
     session = FakeSession(
         executes=[[({"title": "Beamer"}, uuid.uuid4())]],
-        scalar=[None],  # State-Lookup — kein Treffer nötig
+        scalar=[None],  # the state lookup needs no hit
     )
     disp = NotificationActionDispatcher(_sessionmaker(session), None, SETTINGS)
     action = _action("taskNotify")
@@ -162,7 +162,7 @@ async def test_dispatch_task_notify_sends_kind_mail(
 async def test_dispatch_task_notify_skips_non_actionable_state(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """#9: Kein actionabler Übergang am neuen State → KEINE Task-Mail."""
+    """#9: the new state has no actionable transition, so no task mail goes out."""
     captured: dict[str, object] = {}
 
     class FakeService:
@@ -187,4 +187,4 @@ async def test_dispatch_task_notify_skips_non_actionable_state(
     disp = NotificationActionDispatcher(_sessionmaker(session), None, SETTINGS)
     await disp.dispatch([_action("taskNotify")])
 
-    assert "recipients" not in captured  # Versand übersprungen
+    assert "recipients" not in captured  # the dispatcher skipped the send

@@ -1,11 +1,13 @@
-"""Flow action dispatcher handling ``notify`` and ``taskNotify`` actions.
+"""Flow action dispatcher for the `notify` and `taskNotify` actions.
 
-The flow engine calls ``ActionDispatcher.dispatch(actions)`` after commit. This
-dispatcher renders the mail(s) and enqueues them via the mail queue (the worker
-sends); other action types are only logged here — not dropped, not enqueued.
+The flow engine calls `ActionDispatcher.dispatch(actions)` after commit. This
+dispatcher renders the mails and puts them on the mail queue. The worker sends
+them. Every other action type only gets a log line here. This dispatcher does
+not drop such an action and does not enqueue it.
 
-``DispatchedAction.idempotency_key`` is stable over (application, status event,
-position, type), so a worker retry never causes a duplicate send.
+`DispatchedAction.idempotency_key` is stable over the application, the status
+event, the position and the type. A worker retry therefore never sends a
+duplicate.
 """
 
 from __future__ import annotations
@@ -31,7 +33,10 @@ logger = logging.getLogger("app.notifications")
 
 @dataclass(slots=True)
 class NotificationActionDispatcher:
-    """``ActionDispatcher`` implementation for ``notify`` (no-op log otherwise)."""
+    """`ActionDispatcher` implementation for the notify actions.
+
+    Every other action type only produces a log line.
+    """
 
     sessionmaker: async_sessionmaker[AsyncSession]
     queue: MailQueue | None
@@ -70,8 +75,8 @@ class NotificationActionDispatcher:
             }
             raw_lang = action.params.get("lang")
             lang = str(raw_lang) if raw_lang else None
-            # Default/status templates reference ``{{ status }}``; without a value
-            # StrictUndefined would fail the render.
+            # Default and status templates reference `{{ status }}`. Without a
+            # value StrictUndefined makes the render fail.
             if current_state_id is not None:
                 label_i18n = await session.scalar(
                     select(State.label_i18n).where(State.id == current_state_id)
@@ -98,9 +103,10 @@ class NotificationActionDispatcher:
 
 
     async def _dispatch_task(self, action: DispatchedAction) -> None:
-        """Send a task mail: the application reached an actionable state.
+        """Send a task mail because the application reached an actionable state.
 
-        Recipients are resolved at send time (task semantics)."""
+        The dispatcher resolves the recipients at send time (task semantics).
+        """
         from app.modules.notifications.recipients import (
             actionable_principal_emails,
             state_actionable,
@@ -123,9 +129,9 @@ class NotificationActionDispatcher:
                 if state_id is not None
                 else None
             )
-            # Task mail only if the new state is actually actionable (vote state or
-            # a manual transition with requiresAction) — otherwise "you can act"
-            # would be wrong for pass-through/end states.
+            # Send the task mail only when the new state is actionable: a vote
+            # state, or a manual transition with requiresAction. For a
+            # pass-through state or an end state "you can act" would be wrong.
             if not await state_actionable(session, state):
                 return
             recipients = await actionable_principal_emails(
@@ -182,7 +188,7 @@ _BUILTIN_TASK_BODY = {
 
 
 def build_notify_dispatcher(pool: object) -> NotificationActionDispatcher:
-    """Build the dispatcher from the (optional) arq pool — app wiring."""
+    """Build the dispatcher from the optional arq pool (app wiring)."""
     return NotificationActionDispatcher(
         get_sessionmaker(),
         mail_queue_from_pool(pool),  # type: ignore[arg-type]

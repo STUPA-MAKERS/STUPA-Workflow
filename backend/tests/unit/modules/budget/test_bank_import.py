@@ -1,4 +1,4 @@
-"""Kontoauszug-Parser (#fints): MT940 + CAMT.053 + Idempotenz. Reine Unit-Tests."""
+"""Bank statement parser (#fints): MT940, CAMT.053 and idempotency. Pure unit tests."""
 
 from __future__ import annotations
 
@@ -54,8 +54,8 @@ def test_parse_mt940_signs_and_fields() -> None:
     lines = mt940_parse.parse_mt940(_MT940)
     assert len(lines) == 2
     debit, credit = lines
-    assert debit.amount == Decimal("-50.00")  # Soll → negativ
-    assert credit.amount == Decimal("200.00")  # Haben → positiv
+    assert debit.amount == Decimal("-50.00")  # debit → negative
+    assert credit.amount == Decimal("200.00")  # credit → positive
     assert debit.value_date == date(2024, 1, 2)
     assert "Miete Mai" in (debit.purpose or "")
     assert debit.counterparty_name == "MUSTERMANN GMBH"
@@ -67,7 +67,7 @@ def test_parse_camt_credit_debit_counterparty_and_notprovided() -> None:
     debit, credit = lines
     assert debit.amount == Decimal("-50.00")
     assert debit.counterparty_iban == "DE89370400440532013000"
-    assert debit.end_to_end_id is None  # NOTPROVIDED → leer
+    assert debit.end_to_end_id is None  # NOTPROVIDED → empty
     assert credit.amount == Decimal("200.00")
     assert credit.counterparty_name == "ERIKA MUSTERFRAU"
     assert credit.end_to_end_id == "E2E-7788"
@@ -77,7 +77,7 @@ def test_parse_camt_credit_debit_counterparty_and_notprovided() -> None:
 def test_parse_statement_dispatch() -> None:
     assert len(statement.parse_statement(_CAMT, filename="x.xml")) == 2
     assert len(statement.parse_statement(_MT940, filename="x.sta")) == 2
-    # XML ohne Endung wird am Inhalt erkannt.
+    # The parser detects XML without a file extension by its content.
     assert len(statement.parse_statement(_CAMT)) == 2
 
 
@@ -96,7 +96,7 @@ def test_assign_keys_uses_bank_ref_when_present() -> None:
     lines = camt_parse.parse_camt(_CAMT)
     dedup.assign_keys("DE-ACCT", lines)
     assert all(line.idempotency_key for line in lines)
-    # Re-Parse + Re-Key → gleiche Schlüssel (idempotent).
+    # Parse and key a second time → the same keys (idempotent).
     again = camt_parse.parse_camt(_CAMT)
     dedup.assign_keys("DE-ACCT", again)
     assert [line.idempotency_key for line in lines] == [line.idempotency_key for line in again]
@@ -110,7 +110,7 @@ def test_assign_keys_disambiguates_identical_lines_without_ref() -> None:
         amount=Decimal("-5.00"), value_date=date(2024, 5, 1), purpose="Kaffee"
     )
     dedup.assign_keys("scope", [a, b])
-    assert a.idempotency_key != b.idempotency_key  # Intraday-Sequenz trennt Dubletten
+    assert a.idempotency_key != b.idempotency_key  # the intraday sequence splits twins
 
 
 def test_amount_out_of_range_rejected() -> None:
@@ -122,7 +122,6 @@ def test_amount_out_of_range_rejected() -> None:
         camt_parse.parse_camt(huge)
 
 
-# --------------------------------------------------- review round 4 (#fints-review)
 class _Amt:
     def __init__(self, amount: str, currency: str = "EUR") -> None:
         self.amount = Decimal(amount)
@@ -135,7 +134,7 @@ class _Tx:
 
 
 def test_mt940_sign_from_status() -> None:
-    """Vorzeichen explizit aus dem Status — inkl. Storno-Marker RC/RD (#fints-review)."""
+    """Take the sign from the status, including the RC and RD reversal markers."""
     def amt(status: str, value: str = "50.00") -> Decimal:
         return mt940_parse.lines_from_mt940_transactions(
             [_Tx({"amount": _Amt(value), "status": status})]
@@ -143,18 +142,21 @@ def test_mt940_sign_from_status() -> None:
 
     assert amt("D") == Decimal("-50.00")
     assert amt("C") == Decimal("50.00")
-    # RC = Storno einer Gutschrift = Abgang → negativ (der eigentliche Bug-Fix).
+    # An RC status reverses a credit, so the money goes out → negative (the real bug fix).
     assert amt("RC") == Decimal("-50.00")
-    # RD = Storno einer Lastschrift = Eingang → positiv.
+    # An RD status reverses a debit, so the money comes in → positive.
     assert amt("RD") == Decimal("50.00")
-    # Unbekannter/leerer Status → Vorzeichen der Lib beibehalten (hier negativ vorgegeben).
+    # An unknown or empty status keeps the sign of the library (negative here).
     neg = mt940_parse.lines_from_mt940_transactions([_Tx({"amount": _Amt("-7.00")})])[0]
     assert neg.amount == Decimal("-7.00")
 
 
 def test_mt940_booking_time_lands_in_raw() -> None:
-    """Sparkassen-``DATUM … UHR``-Zusatz: Zweck wird bereinigt, die Uhrzeit wandert nach
-    ``raw['booking_time']`` (speist die ``Buchung:``-Zeile der Anmerkung, #fints)."""
+    """Move the Sparkasse `DATUM ... UHR` suffix out of the purpose.
+
+    The parser cleans the purpose and writes the time to `raw['booking_time']`. The
+    `Buchung:` line of the booking note reads that value (#fints).
+    """
     line = mt940_parse.lines_from_mt940_transactions(
         [_Tx({
             "amount": _Amt("50.00"),
@@ -167,23 +169,23 @@ def test_mt940_booking_time_lands_in_raw() -> None:
 
 
 def test_balance_from_mt940_out_of_range_amount() -> None:
-    """Saldo außerhalb des gültigen Betragsbereichs → verworfen (None), kein Crash."""
+    """A balance outside the valid amount range gives None instead of a crash."""
     bal = SimpleNamespace(amount=_Amt("99999999999.00"), date=None)
     assert mt940_parse.balance_from_mt940(bal) is None
 
 
 def test_mt940_closing_balance_non_dict_data() -> None:
-    """``transactions.data`` kein Dict (unerwartete Lib-Struktur) → kein Saldo."""
+    """A non-dict `transactions.data` (unexpected library shape) gives no balance."""
     assert mt940_parse.mt940_closing_balance(SimpleNamespace(data=["kein", "dict"])) is None
 
 
 def test_camt_closing_balance_unparseable_xml() -> None:
-    """Kaputtes XML im Saldo-Pfad → None (der Zeilen-Parser meldet den Fehler separat)."""
+    """Broken XML in the balance path gives None. The line parser reports the error."""
     assert camt_parse.camt_closing_balance(b"<<<not xml") is None
 
 
 def test_camt_closing_balance_non_decimal_amount() -> None:
-    """CLBD mit nicht-numerischem <Amt>-Text → kein Saldo (Zeilen bleiben geparst)."""
+    """A CLBD with a non-numeric <Amt> text gives no balance. The lines stay parsed."""
     xml = b"""<?xml version="1.0"?>
 <Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.02"><Stmt>
  <Bal><Tp><CdOrPrtry><Cd>CLBD</Cd></CdOrPrtry></Tp><Amt Ccy="EUR">abc</Amt>
@@ -196,13 +198,15 @@ def test_camt_closing_balance_non_decimal_amount() -> None:
 
 
 def test_iban_mod97_rejects_non_base36_chars() -> None:
-    """Nicht-Base36-Zeichen im Kandidaten (Umlaute o. Ä.) → keine gültige IBAN (False)."""
+    """A candidate with non-base36 characters, such as umlauts, is not a valid IBAN."""
     assert normalize._iban_mod97_ok("DE12ÄÖÜ4050000010008395") is False
 
 
 def test_split_leading_iban_full_length_bad_checksum() -> None:
-    """Volle DE-IBAN-Länge, aber mod-97-Prüfsumme falsch (DE00… ist nie gültig) →
-    kein Split, der Name bleibt unangetastet."""
+    """A full DE IBAN length with a wrong mod-97 checksum gives no split.
+
+    A DE00 prefix is never valid, so the name stays untouched.
+    """
     assert normalize.split_leading_iban("DE00120300001076878808Quentin Walz", None) == (
         "DE00120300001076878808Quentin Walz",
         None,
@@ -210,7 +214,11 @@ def test_split_leading_iban_full_length_bad_checksum() -> None:
 
 
 def test_camt_direction_edges() -> None:
-    """Fehlender Indikator → übersprungen; RvslInd kehrt um; negativer <Amt> → abs."""
+    """Cover the direction edges of a CAMT entry.
+
+    The parser skips an entry without an indicator. RvslInd turns the sign around. A
+    negative <Amt> becomes its absolute value.
+    """
     xml = b"""<?xml version="1.0"?>
 <Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.02"><Stmt>
  <Ntry><Amt Ccy="EUR">10.00</Amt></Ntry>
@@ -218,14 +226,14 @@ def test_camt_direction_edges() -> None:
  <Ntry><Amt Ccy="EUR">-30.00</Amt><CdtDbtInd>DBIT</CdtDbtInd></Ntry>
 </Stmt></Document>"""
     lines = camt_parse.parse_camt(xml)
-    assert len(lines) == 2  # erster (ohne CdtDbtInd) übersprungen
-    assert lines[0].amount == Decimal("-20.00")  # Storno einer Gutschrift = Abgang
+    assert len(lines) == 2  # the first entry has no CdtDbtInd and is skipped
+    assert lines[0].amount == Decimal("-20.00")  # a reversed credit pays out
     assert lines[0].raw.get("reversal") == "true"
-    assert lines[1].amount == Decimal("-30.00")  # negativer <Amt> → abs, dann DBIT
+    assert lines[1].amount == Decimal("-30.00")  # negative <Amt> → abs, then DBIT
 
 
 def test_parse_statement_full_mt940_balance() -> None:
-    """MT940-Schlusssaldo (:62F:) wird mitgeliefert (#fints-konten)."""
+    """The parser also delivers the MT940 closing balance (:62F:) (#fints-konten)."""
     lines, bal = statement.parse_statement_full(_MT940)
     assert len(lines) == 2
     assert bal is not None
@@ -235,7 +243,7 @@ def test_parse_statement_full_mt940_balance() -> None:
 
 
 def test_camt_closing_balance_clbd_signed() -> None:
-    """CAMT-Schlusssaldo aus CLBD; Vorzeichen aus CdtDbtInd (DBIT → negativ)."""
+    """Read the CAMT closing balance from CLBD. CdtDbtInd sets the sign (DBIT → minus)."""
     xml = b"""<?xml version="1.0"?>
 <Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.02"><Stmt>
  <Bal><Tp><CdOrPrtry><Cd>CLBD</Cd></CdOrPrtry></Tp><Amt Ccy="EUR">2500.00</Amt>
@@ -244,23 +252,23 @@ def test_camt_closing_balance_clbd_signed() -> None:
 </Stmt></Document>"""
     _lines, bal = statement.parse_statement_full(xml)
     assert bal is not None
-    assert bal.amount == Decimal("-2500.00")  # DBIT → Soll-Saldo
+    assert bal.amount == Decimal("-2500.00")  # DBIT → debit balance
     assert bal.as_of == date(2026, 6, 30)
 
 
 def test_camt_no_balance() -> None:
-    """Ohne <Bal>-Element → kein Saldo (Liste trotzdem geparst)."""
+    """Without a <Bal> element there is no balance. The lines still parse."""
     lines, bal = statement.parse_statement_full(_CAMT)
     assert len(lines) == 2
     assert bal is None
 
 
 def test_balance_from_mt940_handles_missing() -> None:
-    assert mt940_parse.balance_from_mt940(object()) is None  # kein .amount
+    assert mt940_parse.balance_from_mt940(object()) is None  # no .amount
 
 
 def test_normalize_purpose_unglues_subfields() -> None:
-    """Verklebte ?86-Subfelder werden wieder getrennt (#fints)."""
+    """Split ?86 subfields that ran together (#fints)."""
     assert normalize.normalize_purpose("DATEI-NR. 0000794247ANZAHL 00000002") == (
         "DATEI-NR. 0000794247 ANZAHL 00000002"
     )
@@ -272,7 +280,7 @@ def test_normalize_purpose_unglues_subfields() -> None:
 
 
 def test_normalize_then_split_strips_datum_suffix() -> None:
-    """Auch ohne Leerzeichen vor ``DATUM`` wird der Zeit-Zusatz gelöst."""
+    """Detach the time suffix even without a space before `DATUM`."""
     purpose, time = normalize.split_booking_time(
         normalize.normalize_purpose("Asta-Aufwandsentschädigung 05/2026DATUM 09.06.2026, 15.54 UHR")
     )
@@ -281,24 +289,27 @@ def test_normalize_then_split_strips_datum_suffix() -> None:
 
 
 def test_canonical_purpose_key_ignores_spacing_and_punct() -> None:
-    """Kanonischer Schlüssel ist gegen Leerzeichen/Interpunktion invariant (#fints-dedup)."""
+    """The canonical key stays the same across spacing and punctuation (#fints-dedup)."""
     assert dedup.canonical_purpose_key("DATEI-NR. 0000794247ANZAHL 00000002") == (
         dedup.canonical_purpose_key("DATEI-NR. 0000794247 ANZAHL 00000002")
     )
 
 
 def test_assign_keys_from_raw_stable_across_parser_versions() -> None:
-    """Schlüssel kommt aus den ROHDATEN (#fints-raw): identisches ``raw`` → GLEICHER Schlüssel,
-    egal wie die abgeleiteten ``purpose``/``counterparty_*`` aussehen (alte vs. neue Parser-
-    Version). Sonst dupliziert ein Re-Import die bereits gebuchte Zeile."""
+    """Build the key from the RAW data (#fints-raw).
+
+    Identical `raw` gives the SAME key, whatever the derived `purpose` and
+    `counterparty_*` look like. This holds for an old and a new parser version. Without
+    it, a re-import duplicates a line that the platform already booked.
+    """
     raw = {"purpose": "oikos Spende", "applicant_name": "oikos Bayreuth e.V.",
            "applicant_iban": "DE85780608960006017410"}
-    old = statement.StatementLine(  # alt geparst: IBAN im Namen verklebt, abweichender Zweck
+    old = statement.StatementLine(  # old parse: IBAN glued into the name, other purpose
         amount=Decimal("-1377.27"), value_date=date(2026, 6, 26),
         counterparty_name="DE85780608960006017410oikos Bayreuth e.V.",
         counterparty_iban=None, purpose="oikos SpendeDATUM 01.01.2026, 10.00 UHR", raw=dict(raw),
     )
-    new = statement.StatementLine(  # neu geparst: sauber — aber GLEICHES raw
+    new = statement.StatementLine(  # new parse: clean, but the SAME raw
         amount=Decimal("-1377.27"), value_date=date(2026, 6, 26),
         counterparty_name="oikos Bayreuth e.V.",
         counterparty_iban="DE85780608960006017410", purpose="oikos Spende", raw=dict(raw),
@@ -309,8 +320,10 @@ def test_assign_keys_from_raw_stable_across_parser_versions() -> None:
 
 
 def test_assign_keys_distinct_for_different_raw_counterparty() -> None:
-    """Echte Einzelzahlungen (anderer Roh-Auftraggeber) → UNTERSCHIEDLICHE Schlüssel (kein
-    fälschliches Zusammenfassen, #fints-raw)."""
+    """Real single payments with another raw originator get DIFFERENT keys.
+
+    The code must not merge them by mistake (#fints-raw).
+    """
     a = statement.StatementLine(amount=Decimal("-80.00"), value_date=date(2026, 5, 26),
                          purpose="Aufwand", raw={"purpose": "Aufwand", "applicant_name": "Alice"})
     b = statement.StatementLine(amount=Decimal("-80.00"), value_date=date(2026, 5, 26),
@@ -320,8 +333,11 @@ def test_assign_keys_distinct_for_different_raw_counterparty() -> None:
 
 
 def test_resolve_from_raw_helpers() -> None:
-    """resolve_* arbeiten auf den Rohdaten; Nicht-Dict/fehlende Felder → Fallback-Signale."""
-    # MT940-Roh → sauberes Gegenkonto (KRZL verworfen) + entklebter/ge-stripter Zweck
+    """The resolve_* helpers work on the raw data.
+
+    A non-dict value or a missing field returns a fallback signal.
+    """
+    # MT940 raw → clean counterparty (KRZL dropped) plus an unglued, stripped purpose
     name, iban = normalize.resolve_counterparty(
         {"applicant_name": "KRZL", "gvc_applicant_iban": "DE79640500000100083958"}, credit=False
     )
@@ -329,7 +345,7 @@ def test_resolve_from_raw_helpers() -> None:
     assert normalize.resolve_purpose(
         {"purpose": "Re 0000794247ANZAHL 2"}
     ) == "Re 0000794247 ANZAHL 2"
-    # CAMT-Roh / kein Dict / kein purpose → None-Signale (Aufrufer nutzt die Spalte)
+    # CAMT raw, no dict or no purpose → None signals (the caller uses the column)
     assert normalize.resolve_counterparty(None, credit=True) == (None, None)
     assert normalize.resolve_counterparty({"creditDebit": "CRDT"}, credit=True) == (None, None)
     assert normalize.resolve_purpose(None) is None
@@ -337,8 +353,11 @@ def test_resolve_from_raw_helpers() -> None:
 
 
 def test_mt940_counterparty_drops_krzl_glued_to_iban() -> None:
-    """Reale Sammelbuchung: ``applicant_name`` = „<IBAN>KRZL" (kein eigenes ?31). Erst IBAN lösen,
-    DANN „KRZL" verwerfen → (None, IBAN), nicht „KRZL" (#fints-raw)."""
+    """A real batch booking puts "<IBAN>KRZL" into `applicant_name` and has no own ?31.
+
+    The parser first splits the IBAN and only then drops "KRZL". The result is
+    (None, IBAN), not "KRZL" (#fints-raw).
+    """
     name, iban = normalize.mt940_counterparty(
         {"applicant_name": "DE79640500000100083958KRZL"}, credit=False
     )
@@ -347,7 +366,7 @@ def test_mt940_counterparty_drops_krzl_glued_to_iban() -> None:
 
 
 def test_mt940_counterparty_drops_krzl_placeholder() -> None:
-    """„KRZL"-Platzhalter (Sammel-/Dateibuchung) wird nicht als Gegenkonto übernommen."""
+    """The "KRZL" placeholder of a batch or file booking never becomes the counterparty."""
     name, iban = normalize.mt940_counterparty(
         {"applicant_name": "KRZL", "gvc_applicant_iban": "DE79640500000100083958"},
         credit=False,
@@ -357,7 +376,7 @@ def test_mt940_counterparty_drops_krzl_placeholder() -> None:
 
 
 def test_camt_balance_clav_fallback_and_skips_codeless() -> None:
-    """Ohne CLBD → Fallback auf CLAV; <Bal> ohne Code wird übersprungen."""
+    """Without CLBD the parser falls back to CLAV. It skips a <Bal> without a code."""
     xml = b"""<?xml version="1.0"?>
 <Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.02"><Stmt>
  <Bal><Amt Ccy="EUR">1.00</Amt></Bal>
@@ -371,7 +390,7 @@ def test_camt_balance_clav_fallback_and_skips_codeless() -> None:
 
 
 def test_camt_balance_unparseable_amount_ignored() -> None:
-    """CLBD ohne brauchbaren Betrag → kein Saldo (Liste bleibt geparst)."""
+    """A CLBD without a usable amount gives no balance. The lines stay parsed."""
     xml = b"""<?xml version="1.0"?>
 <Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.02"><Stmt>
  <Bal><Tp><CdOrPrtry><Cd>CLBD</Cd></CdOrPrtry></Tp></Bal>
@@ -391,49 +410,53 @@ def test_camt_sub_cent_rejected() -> None:
 
 
 def test_split_leading_iban() -> None:
-    """Gegen-IBAN + Name in einem Feld trennen (#fints)."""
-    # IBAN-Feld leer, Name = IBAN+Name ohne Trenner → abgespalten (volle, gültige DE-IBAN).
+    """Split a counterparty IBAN and a name that share one field (#fints)."""
+    # Empty IBAN field, name starts with a full valid DE IBAN → the parser splits it.
     assert normalize.split_leading_iban("DE70120300001076878808Quentin Walz", None) == (
         "Quentin Walz",
         "DE70120300001076878808",
     )
-    # NL-IBAN mit Buchstaben in der BBAN (CITI) — die alte „nur Ziffern"-Heuristik scheiterte
-    # hier; Längen-Tabelle + Prüfsumme trennt korrekt (#fints).
+    # An NL IBAN carries letters in the BBAN (CITI). The old digits-only heuristic failed
+    # here. The length table plus the checksum splits it correctly (#fints).
     assert normalize.split_leading_iban("NL70CITI2032329018Stichting Mollie Payments", None) == (
         "Stichting Mollie Payments",
         "NL70CITI2032329018",
     )
-    # Name = nur IBAN (kein Name) → Name None, IBAN gesetzt.
+    # The name field holds only an IBAN → the name is None and the IBAN is set.
     assert normalize.split_leading_iban("DE89370400440532013000", None) == (
         None,
         "DE89370400440532013000",
     )
-    # Ungültige Prüfsumme / zu kurz → NICHT als IBAN gedeutet, Name bleibt unangetastet.
+    # A wrong checksum or a short value is NOT read as an IBAN. The name stays untouched.
     assert normalize.split_leading_iban("DE85780608960006017", None) == (
         "DE85780608960006017",
         None,
     )
-    # Referenz, die nur wie eine IBAN aussieht (kein gültiger Ländercode) → kein Split.
+    # A reference that only looks like an IBAN (no valid country code) → no split.
     assert normalize.split_leading_iban("RF1234567890Acme", None) == ("RF1234567890Acme", None)
-    # IBAN-Feld da und im Namen wiederholt → Präfix entfernen.
+    # The IBAN field is set and repeats in the name → strip the prefix.
     assert normalize.split_leading_iban("DE111Heldenwerbung", "DE111") == (
         "Heldenwerbung",
         "DE111",
     )
-    # Saubere getrennte Felder bleiben unverändert.
+    # Clean separate fields stay unchanged.
     assert normalize.split_leading_iban("Quentin Walz", "DE70120300001076878808") == (
         "Quentin Walz",
         "DE70120300001076878808",
     )
-    # Kein Name → (None, IBAN); reiner Name ohne IBAN bleibt unverändert.
+    # No name → (None, IBAN). A plain name without an IBAN stays unchanged.
     assert normalize.split_leading_iban(None, "DE111") == (None, "DE111")
     assert normalize.split_leading_iban("Plain Name", None) == ("Plain Name", None)
 
 
 def test_mt940_counterparty_prefers_sepa_fields() -> None:
-    """Gehalts-/SEPA-Umsätze: echten Gegenpart aus ABWE+/ABWA+ + IBAN+ ziehen, nicht aus dem
-    Kürzel in ?32 (#fints)."""
-    # Ausgang (Gehalt): ?32 nur Kürzel, ?31 leer; echter Empfänger in ABWE+, IBAN in IBAN+.
+    """Take the real counterparty of a salary or SEPA transaction from the SEPA fields.
+
+    The parser reads ABWE+, ABWA+ and IBAN+. It does not use the short code in ?32
+    (#fints).
+    """
+    # Outgoing salary: ?32 holds only a short code and ?31 is empty. The real recipient
+    # sits in ABWE+ and the IBAN in IBAN+.
     salary = {
         "applicant_name": "KRZL",
         "applicant_iban": None,
@@ -444,10 +467,10 @@ def test_mt940_counterparty_prefers_sepa_fields() -> None:
         "Max Mustermann",
         "DE70120300001076878808",
     )
-    # Eingang: abweichender Auftraggeber (ABWA+) wird bevorzugt.
+    # Incoming: the deviating originator (ABWA+) wins.
     incoming = {"applicant_name": "KRZL", "deviate_applicant": "ACME GmbH"}
     assert normalize.mt940_counterparty(incoming, credit=True) == ("ACME GmbH", None)
-    # Ohne abweichende Felder: Fallback auf ?32 (+ ?31 vor IBAN+).
+    # Without the deviating fields: fall back to ?32, and to ?31 before IBAN+.
     plain = {
         "applicant_name": "Quentin Walz",
         "applicant_iban": "DE89370400440532013000",
@@ -457,21 +480,21 @@ def test_mt940_counterparty_prefers_sepa_fields() -> None:
         "Quentin Walz",
         "DE89370400440532013000",
     )
-    # Komplett leer → (None, None).
+    # Fully empty → (None, None).
     assert normalize.mt940_counterparty({}, credit=False) == (None, None)
 
 
 def test_split_booking_time() -> None:
-    """Sparkassen-Suffix „… DATUM dd.mm.yyyy, hh.mm UHR" vom Zweck lösen (#fints)."""
+    """Detach the Sparkasse suffix "... DATUM dd.mm.yyyy, hh.mm UHR" from the purpose."""
     assert normalize.split_booking_time(
         "AStA-Aufwandsentschädigung 03/26DATUM 03.04.2026, 09.15 UHR"
     ) == ("AStA-Aufwandsentschädigung 03/26", "09:15")
-    # Uhrzeit mit Doppelpunkt + Kleinschreibung ebenfalls erkannt.
+    # A time with a colon and lowercase text also matches.
     assert normalize.split_booking_time("Miete Mai datum 01.05.2026 08:00 uhr") == (
         "Miete Mai",
         "08:00",
     )
-    # Ohne Suffix unverändert; None bleibt None.
+    # Without the suffix nothing changes. None stays None.
     assert normalize.split_booking_time("Mitgliedsbeitrag 2024") == ("Mitgliedsbeitrag 2024", None)
     assert normalize.split_booking_time(None) == (None, None)
 
@@ -507,7 +530,7 @@ def test_build_booking_note() -> None:
         "Zweck: AStA-Aufwandsentschädigung 03/26\n"
         "Buchung: 03.04.2026, 09:15 Uhr"
     )
-    # income → „Absender"; ohne Uhrzeit nur Datum.
+    # income → "Absender". Without a time, only the date shows.
     income = normalize.build_booking_note(
         name="oikos Bayreuth e.V.",
         iban=None,

@@ -1,23 +1,23 @@
 /**
- * Tailwind-Konfiguration (#tailwind). Ziel: **additive Utilities ohne jede optische
- * Änderung**. Dafür:
+ * Tailwind configuration (#tailwind). The goal is additive utilities with no visual change.
  *
- * 1. `preflight: false` — kein Base-Reset (würde h1/button/ul/… global verändern).
- * 2. Alle Skalen (Spacing/Farben/Radien/Schrift/Schatten/z-Index) sind **Aliase auf
- *    die bestehenden Design-Tokens** (`var(--…)` aus `src/styles/tokens.scss`). So
- *    erzeugt z. B. `gap-5` exakt `var(--space-5)` (1.5rem) — identisch zur bisherigen
- *    SCSS-Regel. Migration `var(--space-5)` → `gap-5` ist damit pixelgenau.
+ * 1. `preflight: false` turns off the base reset. The reset would change h1, button, ul and
+ *    other elements globally.
+ * 2. All scales (spacing, colors, radii, font, shadow, z-index) alias the existing design
+ *    tokens from `src/styles/tokens.scss`. So `gap-5` gives exactly `var(--space-5)`, which
+ *    is 1.5rem and identical to the previous SCSS rule. A migration from `var(--space-5)` to
+ *    `gap-5` therefore stays pixel exact.
  *
- * Die Projekt-Spacing-Skala weicht oberhalb von 4 von Tailwind-Defaults ab
- * (`--space-5` = 1.5rem statt 1.25rem) — deshalb wird sie **explizit** gemappt.
+ * Above step 4 the project spacing scale differs from the Tailwind defaults. `--space-5` is
+ * 1.5rem, not 1.25rem. For this reason the config maps the scale explicitly.
  *
  * @type {import('tailwindcss').Config}
  */
 const sp = (n) => `var(--space-${n})`;
 
 module.exports = {
-  // HTML + inline-/externe Komponenten-Templates scannen — inkl. der ausgelagerten
-  // UI-Kit-Library (Submodule), damit deren Utility-Klassen mitgeneriert werden.
+  // Scan the HTML and the inline or external component templates. The list includes the
+  // separate UI-kit library (a submodule) so that Tailwind also generates its utility classes.
   content: [
     './src/**/*.{html,ts}',
     './vendor/ui-kit/src/**/*.{html,ts}',
@@ -27,8 +27,8 @@ module.exports = {
     preflight: false,
   },
   theme: {
-    // Vollständig ersetzen (nicht extend), damit NUR Token-Werte existieren — keine
-    // versehentlichen Tailwind-Defaults, die vom Design-System abweichen.
+    // Replace the theme completely instead of extending it. Only token values must exist.
+    // Accidental Tailwind defaults would differ from the design system.
     spacing: {
       0: '0',
       px: '1px',
@@ -90,8 +90,8 @@ module.exports = {
       dialog: 'var(--z-dialog)',
       toast: 'var(--z-toast)',
     },
-    // Farben = Semantik-Tokens. Namen so gewählt, dass `bg-surface`, `text-muted`,
-    // `border-line`, `text-primary` … lesbar sind.
+    // Semantic tokens. The names keep `bg-surface`, `text-muted`, `border-line` and
+    // `text-primary` readable.
     colors: {
       transparent: 'transparent',
       current: 'currentColor',

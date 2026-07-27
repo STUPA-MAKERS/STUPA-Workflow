@@ -1,7 +1,8 @@
-"""Negativ-Probe für das kritische Coverage-Gate (Akzeptanzkriterium T-04).
+"""Negative check for the critical coverage gate (acceptance criterion T-04).
 
-Beweist, dass das Gate aus `scripts.coverage_critical` bei < 100 % Branch eines
-kritischen Moduls *blockiert* (Exit 1) und bei 100 % bzw. fehlendem Modul *durchlässt*.
+The gate lives in `scripts.coverage_critical`. It blocks with exit code 1 when a
+critical module has a branch rate below 100 percent. It passes at 100 percent. It also
+passes when the report holds no critical module.
 """
 
 from __future__ import annotations
@@ -42,7 +43,6 @@ def test_passes_when_critical_module_full_branch(tmp_path: Path) -> None:
 
 
 def test_absent_module_does_not_block(tmp_path: Path) -> None:
-    # Nur ein Nicht-Kritisches-Modul im Report → kritische Module ruhen.
     classes = parse_classes(_write_xml(tmp_path, {"app/main.py": 0.0}))
     assert check(classes, MODULES, 1.0) == []
 
@@ -59,7 +59,7 @@ def test_main_exit_codes(tmp_path: Path) -> None:
 
     assert main([str(bad), str(pyproject)]) == 1
     assert main([str(good), str(pyproject)]) == 0
-    assert main([str(empty), str(pyproject)]) == 0  # Module fehlen → Gate ruht.
+    assert main([str(empty), str(pyproject)]) == 0  # No critical module, so the gate passes.
 
 
 def test_main_missing_xml_fails(tmp_path: Path) -> None:

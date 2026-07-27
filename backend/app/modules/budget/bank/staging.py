@@ -1,16 +1,16 @@
 """File import plus idempotent staging of statement lines.
 
-Both sources (FinTS fetch, file import) end up here: lines get idempotency keys,
-are deduped across formats, inserted via ``ON CONFLICT DO NOTHING`` and given a
-booking suggestion.
+Both sources end up here: the FinTS fetch and the file import. Each line gets an
+idempotency key. The code dedupes the lines across formats, inserts them with
+``ON CONFLICT DO NOTHING`` and adds a booking suggestion.
 
-Format switch MT940 <-> CAMT: the two formats' idempotency keys are incompatible
-(different bank reference, different raw fields). So the switch to CAMT does not
-re-import the fetch window as duplicates, :meth:`StagingOps._consume_fingerprint`
-additionally compares incoming lines by content (value date + amount + E2E ref,
-or canonical purpose + counterparty IBAN) against the existing rows. Split batch
-bookings also replace their old unbooked total line
-(:meth:`StagingOps._supersede_batch_totals`).
+The idempotency keys of MT940 and CAMT are incompatible, because the bank
+reference and the raw fields differ. A switch to CAMT must not re-import the
+fetch window as duplicates. ``StagingOps._consume_fingerprint`` therefore also
+compares the incoming lines by content against the existing rows. The content is
+the value date, the amount and the E2E reference, or the canonical purpose and
+the counterparty IBAN. A split batch booking also replaces its old unbooked total
+line through ``StagingOps._supersede_batch_totals``.
 """
 
 from __future__ import annotations
@@ -81,20 +81,23 @@ class StagingOps(BankServiceBase):
         await self.session.commit()
         return BankImportResult(accountId=acc.id, imported=imported, duplicates=duplicates)
 
-    # ---------------------------------------------------------------- staging
     async def _stage_lines(
         self, acc: Account, lines: list[statement.StatementLine]
     ) -> tuple[int, int, int]:
         """Insert lines idempotently (``ON CONFLICT DO NOTHING``) and set suggestions.
 
-        Returns ``(imported, duplicates, superseded_batch_lines)``."""
+        Returns:
+            The imported count, the duplicate count and the number of superseded
+            batch lines.
+        """
         if len(lines) > MAX_STATEMENT_LINES:
             raise ValidationProblem(
                 f"Statement has too many transactions (>{MAX_STATEMENT_LINES}).",
                 code="bank_statement_too_large",
             )
-        # EUR-only ledger (DB CHECK): do NOT silently reinterpret foreign
-        # currencies as EUR — reject clearly, or cent amounts would be misattributed.
+        # The ledger holds EUR only (DB CHECK). Do NOT reinterpret a foreign
+        # currency as EUR without a word. Reject it clearly, or cent amounts land
+        # on the wrong booking.
         non_eur = next((line.currency for line in lines if line.currency != "EUR"), None)
         if non_eur is not None:
             raise ValidationProblem(
@@ -107,8 +110,8 @@ class StagingOps(BankServiceBase):
         imported = 0
         for line in lines:
             # Cross-format content duplicate (MT940 <-> CAMT): the same transaction
-            # from the other format has a different idempotency key and would slip
-            # past the ON CONFLICT.
+            # in the other format carries a different idempotency key and would
+            # slip past the ON CONFLICT.
             if self._consume_fingerprint(known, _line_fingerprint(line)):
                 continue
             suggested_budget, suggested_expense = await self._suggest(line)
@@ -141,13 +144,16 @@ class StagingOps(BankServiceBase):
         superseded = await self._supersede_batch_totals(acc.id, lines)
         return imported, len(lines) - imported, superseded
 
-    # ------------------------------------------------------ cross-format dedup
+    # cross-format dedup
     async def _existing_fingerprints(
         self, account_id: uuid.UUID, lines: list[statement.StatementLine]
     ) -> dict[tuple[str, str], int]:
-        """Content fingerprints of already-staged lines within the incoming lines'
-        value-date window — as a multiset (several identical payments on the same
-        day stay importable multiple times)."""
+        """Collect the content fingerprints of the already-staged lines.
+
+        The query covers the value-date window of the incoming lines. The result
+        is a multiset, so several identical payments on the same day stay
+        importable several times.
+        """
         dates = [line.value_date for line in lines if line.value_date is not None]
         if not dates:
             return {}
@@ -183,11 +189,16 @@ class StagingOps(BankServiceBase):
     def _consume_fingerprint(
         known: dict[tuple[str, str], int], fp: _Fingerprint
     ) -> bool:
-        """Consume one existing match (multiset) — ``True`` = duplicate.
+        """Consume one existing match from the multiset.
 
-        Match means: same value date + amount AND same (non-empty) E2E reference —
-        or, without E2E, same (non-empty) canonical purpose + counterparty IBAN.
-        Two identical same-day payments consume two entries and stay separate."""
+        A match needs the same value date and amount. It also needs the same
+        non-empty E2E reference. Without an E2E reference it needs the same
+        non-empty canonical purpose and counterparty IBAN. Two identical same-day
+        payments consume two entries and stay separate.
+
+        Returns:
+            ``True`` when the line is a duplicate.
+        """
         for key in _fingerprint_keys(fp):
             count = known.get(key, 0)
             if count > 0:
@@ -201,16 +212,22 @@ class StagingOps(BankServiceBase):
         """Remove old total lines of split batch bookings.
 
         Before the CAMT switch, the MT940 fetch staged a batch booking as ONE line
-        ("DATEI-NR. … ANZAHL …", total amount). When the single transactions of
-        the same booking arrive (same value date, parts = total), both together
-        would be double. Only unbooked (unmatched/suggested) total lines whose
-        purpose carries the batch pattern are replaced; matched/ignored stay.
+        ("DATEI-NR. … ANZAHL …", total amount). The single transactions of the same
+        booking then arrive with the same value date, and their parts add up to the
+        total. Both together would double the amount. The method replaces only
+        unbooked total lines (unmatched or suggested) whose purpose carries the
+        batch pattern. A matched or ignored line stays.
 
-        Value date + amount alone are ambiguous (two batches, same day, same
-        total): when the incoming split carries the entry's file number
-        (``batch_info``, from ``AddtlNtryInf``), only total lines with the SAME
-        file number are removed; without one, any batch-pattern line matches
-        (previous behavior — banks without a Datei-Nr. purpose)."""
+        Value date and amount alone are ambiguous, because two batches can share
+        the same day and the same total. The incoming split can carry the file
+        number of the entry (``batch_info``, from ``AddtlNtryInf``). The method
+        then removes only total lines with the SAME file number. Without a file
+        number, any batch-pattern line matches. That is the previous behavior for
+        banks without a Datei-Nr. purpose.
+
+        Returns:
+            The number of removed total lines.
+        """
         totals: dict[tuple[date | None, Decimal], set[str | None]] = {}
         for line in lines:
             if line.raw.get("batch") != "true":
@@ -252,14 +269,13 @@ class StagingOps(BankServiceBase):
             superseded += len(stale)
         return superseded
 
-    # ------------------------------------------------------------- suggestion
     async def _suggest(
         self, line: statement.StatementLine
     ) -> tuple[uuid.UUID | None, uuid.UUID | None]:
-        """Determine the suggestion (cost centre, existing booking) for a line."""
+        """Determine the suggestion for a line: cost center and existing booking."""
         kind = "income" if line.amount > 0 else "expense"
         amount = abs(line.amount)
-        # Candidates: same amount + kind, not yet allocated.
+        # Candidates: same amount and kind, not yet allocated.
         allocated = select(BankAllocation.expense_id)
         rows = (
             await self.session.execute(
@@ -268,11 +284,11 @@ class StagingOps(BankServiceBase):
                     BudgetExpense.amount == amount,
                     BudgetExpense.kind == kind,
                     BudgetExpense.id.not_in(allocated),
-                    # Only top-level bookings as reconcile candidates: a sub-booking
-                    # must not be allocated to a statement line on its own.
+                    # Only top-level bookings are reconcile candidates. A
+                    # sub-booking must not get its own statement-line allocation.
                     BudgetExpense.parent_expense_id.is_(None),
                 )
-                # Deterministic candidate order: without ORDER BY the DB row order
+                # Deterministic candidate order. Without ORDER BY the DB row order
                 # would decide between equally scored hits.
                 .order_by(BudgetExpense.created_at, BudgetExpense.id)
                 .limit(50)
@@ -297,7 +313,7 @@ class StagingOps(BankServiceBase):
         )
         if result.expense_id is not None:
             return result.budget_id, result.expense_id  # type: ignore[return-value]
-        # No booking hit — suggest a cost centre from the counterparty-IBAN memory.
+        # No booking hit: suggest a cost center from the counterparty-IBAN memory.
         budget_id = await self._memory_budget(line.counterparty_iban)
         return budget_id, None
 
@@ -311,14 +327,18 @@ class StagingOps(BankServiceBase):
         )
 
 
-# File number in a canonicalized batch purpose/info ("DATEI-NR. 0000794247 …" ->
-# canonical "DATEINR0000794247…"); leading zeros stripped for a stable compare.
+# File number in a canonicalized batch purpose or info ("DATEI-NR. 0000794247 …"
+# becomes "DATEINR0000794247…"). The code strips the leading zeros for a stable
+# compare.
 _BATCH_FILE_NO_RE = re.compile(r"DATEINR0*(\d+)")
 
 
 def _batch_file_number(text: str | None) -> str | None:
-    """Extract the Sparkasse batch file number from a purpose/``batch_info`` text
-    (``None`` when the text carries none)."""
+    """Extract the Sparkasse batch file number from a purpose or ``batch_info`` text.
+
+    Returns:
+        The file number, or ``None`` when the text carries none.
+    """
     match = _BATCH_FILE_NO_RE.search(dedup.canonical_purpose_key(text))
     return match.group(1) if match else None
 
@@ -334,10 +354,13 @@ def _line_fingerprint(line: statement.StatementLine) -> _Fingerprint:
 
 
 def _fingerprint_keys(fp: _Fingerprint) -> list[tuple[str, str]]:
-    """Comparison keys of a fingerprint: E2E-based and/or purpose+IBAN-based.
+    """Build the comparison keys of a fingerprint.
 
-    Both require value date + amount; without a value date (pending transactions)
-    NO content comparison happens (too fuzzy) — only the idempotency key applies."""
+    A key rests on the E2E reference, on the purpose plus the IBAN, or on both.
+    Both forms need the value date and the amount. Without a value date, as with a
+    pending transaction, NO content comparison happens, because it stays too fuzzy.
+    Only the idempotency key applies then.
+    """
     if fp.value_date is None:
         return []
     base = f"{fp.value_date.isoformat()}|{fp.amount}"

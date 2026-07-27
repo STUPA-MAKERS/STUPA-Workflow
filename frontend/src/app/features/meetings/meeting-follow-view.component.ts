@@ -31,7 +31,7 @@ import {
   voteStatusVariant,
 } from './meetings-display.util';
 
-/** Member live-follow view: read the protocol, cast on open votes. */
+/** Live follow view for a member. The member reads the protocol and casts open votes. */
 @Component({
   selector: 'app-meeting-follow-view',
   standalone: true,
@@ -57,7 +57,7 @@ export class MeetingFollowViewComponent {
   readonly attendance = input.required<Attendance[]>();
   readonly savingAttendance = input.required<boolean>();
   readonly casting = input.required<Uuid | null>();
-  /** Own choice per vote id (highlights the picked option). */
+  /** The own choice per vote id. The view highlights the option that the user picked. */
   readonly choices = input.required<Record<string, string>>();
 
   readonly castVote = output<{ voteId: Uuid; choice: string }>();

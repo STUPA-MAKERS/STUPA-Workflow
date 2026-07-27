@@ -1,9 +1,9 @@
 """Tests for the token-cache directory permission hardening (AUD-024).
 
-``Config.token_path`` must enforce mode 0o700 on the cache root even when the
-directory already exists with broader permissions — ``mkdir(mode=...)`` alone
-only applies on creation and is umask-masked, so a pre-existing world-listable
-dir would otherwise leak the per-URL token filenames.
+`Config.token_path` must enforce mode 0o700 on the cache root. It must do so even when
+the directory already exists with wider permissions. A `mkdir(mode=...)` alone applies
+only at creation and the umask masks it. A world-listable directory that already exists
+would therefore leak the per-URL token file names.
 """
 
 from __future__ import annotations

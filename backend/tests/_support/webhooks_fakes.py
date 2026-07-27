@@ -1,9 +1,11 @@
-"""Test-Fakes für die Webhook-Unit-Tests (kein echtes DB/Redis/Netz).
+"""Test fakes for the webhook unit tests.
 
-``FakeSession`` bedient die vom :class:`WebhookService` genutzten Methoden: ``add``,
-``flush``, ``commit``, ``get`` (In-Memory-Store) sowie ``scalars`` (FIFO-Queue je
-Query — der Test kontrolliert jede Antwort). ``FakeWebhookQueue`` sammelt enqueuete
-Delivery-Ids.
+These fakes need no real database, no Redis, and no network.
+
+`FakeSession` supplies the methods that `WebhookService` uses: `add`, `flush`, `commit`,
+`get` (an in-memory store) and `scalars`. Each `scalars` call pops the next result from a
+FIFO queue, so the test controls every answer. `FakeWebhookQueue` collects the enqueued
+delivery ids.
 """
 
 from __future__ import annotations
@@ -21,7 +23,7 @@ class FakeResult:
 
 
 class _Nested:
-    """Savepoint-Fake: bei Exception werden seit __aenter__ neue ``add``s verworfen."""
+    """Savepoint fake that drops each `add` made after `__aenter__` when an error occurs."""
 
     def __init__(self, session: FakeSession) -> None:
         self.session = session
@@ -38,7 +40,7 @@ class _Nested:
                 if oid is not None:
                     self.session.store.pop(oid, None)
             del self.session.added[self.mark :]
-        return False  # Exception weiterreichen (Service fängt IntegrityError)
+        return False  # Let the error propagate. The service catches IntegrityError.
 
 
 class FakeSession:
@@ -83,7 +85,10 @@ class FakeSession:
 
 
 class FakeWebhookQueue:
-    """Sammelt enqueuete Delivery-Ids (keine Dedup — Test prüft Aufrufe direkt)."""
+    """Collects the enqueued delivery ids.
+
+    This fake does not deduplicate. The test checks the calls directly.
+    """
 
     def __init__(self) -> None:
         self.enqueued: list[uuid.UUID] = []

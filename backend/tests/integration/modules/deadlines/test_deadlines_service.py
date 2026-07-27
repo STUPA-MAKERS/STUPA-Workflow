@@ -1,17 +1,18 @@
-"""Integration (echte Postgres, testcontainers): Deadlines/Cron (T-44, flows §9.4).
+"""Integration (real Postgres, testcontainers): deadlines and cron (T-44, flows §9.4).
 
-Beweist gegen ein echtes Schema + den arq-Task ``process_deadlines``:
+These tests run against a real schema and the arq task `process_deadlines`. They prove:
 
-* **Auto-Übergang / Wiedervorlage** — abgelaufene Frist feuert den referenzierten
-  Übergang (Guard ``deadlinePassed``) → Status + ``status_event`` (Historie); danach
-  ``action_on_pass=NULL`` → **kein** zweites Feuern (Idempotenz, parallele Worker).
-* **Vote-Auto-Close** — offener Vote mit abgelaufenem ``closes_at`` wird ausgezählt
-  und feuert den Ergebnis-Branch (``voteResult``).
-* **Erinnerung** — Frist im Lead-Fenster sendet genau **eine** ``deadline_approaching``-
-  Mail; ein zweiter Lauf bleibt stumm (``reminded_at``).
+* **Auto transition / requeue** — an expired deadline fires the referenced transition.
+  The guard is `deadlinePassed`. The task writes the status and a `status_event` history
+  row. `action_on_pass` then becomes NULL, so a second run does **not** fire again.
+  Parallel workers stay idempotent.
+* **Vote auto-close** — the task counts an open vote with an expired `closes_at`. It
+  then fires the result branch (`voteResult`).
+* **Reminder** — a deadline inside the lead window sends exactly **one**
+  `deadline_approaching` mail. A second run stays silent because `reminded_at` is set.
 
-Die ``SKIP LOCKED``-Selektion + partiellen Indizes liegen real vor (Migration 0014);
-``now`` ist zeitzonenbewusst (UTC), Fristen werden relativ zur Echtzeit gesetzt.
+The `SKIP LOCKED` selection and the partial indexes exist for real (migration 0014).
+`now` is time-zone aware (UTC). The tests set the deadlines relative to real time.
 """
 
 from __future__ import annotations
@@ -45,7 +46,7 @@ pytestmark = pytest.mark.integration
 
 
 class _Recorder:
-    """Flow-Dispatcher-Fake — vermeidet Redis für cron-gefeuerte Actions."""
+    """Fake flow dispatcher that keeps Redis out of the cron-fired actions."""
 
     def __init__(self) -> None:
         self.actions: list[DispatchedAction] = []
@@ -63,9 +64,6 @@ async def maker(
     await eng.dispose()
 
 
-# --------------------------------------------------------------------------- #
-# Seeding
-# --------------------------------------------------------------------------- #
 async def _seed_flow(session: AsyncSession) -> tuple[ApplicationType, dict[str, State]]:
     gremium = Gremium(name="G", slug=f"g-{uuid.uuid4()}")
     session.add(gremium)
@@ -102,7 +100,7 @@ async def _seed_flow(session: AsyncSession) -> tuple[ApplicationType, dict[str, 
     session.add_all(list(states.values()))
     await session.flush()
     session.add_all([
-        # Wiedervorlage/Requeue: vertagt → active bei abgelaufener Frist.
+        # Requeue: vertagt moves to active when the deadline expires.
         Transition(flow_version_id=flow.id, from_state_id=states["vertagt"].id,
                    to_state_id=states["active"].id, label_i18n={},
                    guard={"deadlinePassed": True}, actions=[], order=0),
@@ -142,9 +140,6 @@ def _ctx(maker: async_sessionmaker[AsyncSession], queue: object | None = None) -
     return ctx
 
 
-# --------------------------------------------------------------------------- #
-# Auto-transition / requeue + idempotency
-# --------------------------------------------------------------------------- #
 async def test_requeue_auto_transition_sets_status_and_history(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
@@ -166,23 +161,23 @@ async def test_requeue_auto_transition_sets_status_and_history(
     async with maker() as s:
         moved = await s.get(Application, app.id)
         assert moved is not None
-        assert moved.current_state_id == states["active"].id  # Status gesetzt
-        # Genau ein Requeue-Übergang in der Historie (neben dem Anlege-Event).
+        assert moved.current_state_id == states["active"].id
+        # Exactly one requeue transition in the history, next to the creation event.
         requeue_events = (await s.execute(
             select(StatusEvent).where(
                 StatusEvent.application_id == app.id,
                 StatusEvent.to_state_id == states["active"].id,
             )
         )).scalars().all()
-        assert len(requeue_events) == 1  # Historie geschrieben
+        assert len(requeue_events) == 1
         total_first = (await s.execute(
             select(func.count()).select_from(StatusEvent)
             .where(StatusEvent.application_id == app.id)
         )).scalar_one()
         deadline = (await s.execute(select(Deadline))).scalars().one()
-        assert deadline.action_on_pass is None  # konsumiert
+        assert deadline.action_on_pass is None  # consumed
 
-    # Zweiter Lauf (paralleler/erneuter Worker): kein zweites Feuern.
+    # A second run, from a parallel or a repeated worker, does not fire again.
     out2 = await process_deadlines(_ctx(maker))
     assert "actions=0" in out2
     async with maker() as s:
@@ -190,12 +185,9 @@ async def test_requeue_auto_transition_sets_status_and_history(
             select(func.count()).select_from(StatusEvent)
             .where(StatusEvent.application_id == app.id)
         )).scalar_one()
-        assert total_second == total_first  # idempotent — keine Doppelausführung
+        assert total_second == total_first  # idempotent, no double run
 
 
-# --------------------------------------------------------------------------- #
-# Vote auto-close
-# --------------------------------------------------------------------------- #
 async def test_vote_auto_close_fires_branch(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
@@ -226,24 +218,24 @@ async def test_vote_auto_close_fires_branch(
         assert closed.result == "passed"
         moved = await s.get(Application, app.id)
         assert moved is not None
-        assert moved.current_state_id == states["approved"].id  # Ergebnis-Branch gefeuert
+        assert moved.current_state_id == states["approved"].id  # the result branch fired
 
 
-# --------------------------------------------------------------------------- #
-# Scan-Obergrenze pro Tick — ältester Rückstau zuerst (AUD-046)
-# --------------------------------------------------------------------------- #
 async def test_due_scans_are_bounded_oldest_first(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
-    """Bei einem Rückstau > ``limit`` liefert jeder Scan höchstens ``limit`` IDs,
-    **älteste ``due_at`` zuerst** — sonst zieht ein Tick die ganze Kohorte sequenziell
-    über die 1-Minuten-Kadenz (AUD-046). Restliche Zeilen bleiben fällig (kein Verlust)."""
+    """Every scan returns at most `limit` ids, oldest `due_at` first.
+
+    With a backlog above `limit` a single tick would otherwise pull the whole cohort
+    sequentially over the one-minute cadence (AUD-046). The remaining rows stay due, so
+    nothing is lost.
+    """
     base = datetime.now(UTC) - timedelta(hours=10)
     async with maker() as s:
         app_type, states = await _seed_flow(s)
         app = await _make_app(s, app_type, states["active"])
         svc = DeadlineService(s)
-        # 5 fällige Auto-Fristen + 5 fällige Erinnerungs-Fristen, aufsteigend ältester→neuer.
+        # Five due auto deadlines and five due reminder deadlines, oldest first.
         for i in range(5):
             await svc.create(
                 kind="requeue", due_at=base + timedelta(minutes=i),
@@ -257,35 +249,33 @@ async def test_due_scans_are_bounded_oldest_first(
     async with maker() as s:
         svc = DeadlineService(s)
         now = datetime.now(UTC)
-        # Aktions-Scan auf 3 begrenzt → die 3 ältesten action_on_pass-Fristen.
+        # The action scan is capped at 3 and returns the three oldest action_on_pass rows.
         action_ids = await svc.due_action_deadline_ids(now, limit=3)
         assert len(action_ids) == 3
         rows = (await s.execute(
             select(Deadline).where(Deadline.id.in_(action_ids))
         )).scalars().all()
         due = sorted(r.due_at for r in rows)
-        assert due == [base + timedelta(minutes=i) for i in range(3)]  # ältester zuerst
+        assert due == [base + timedelta(minutes=i) for i in range(3)]  # oldest first
 
-        # Erinnerungs-Scan (alle 10 Fristen sind reminded_at IS NULL) auf 4 begrenzt.
+        # The reminder scan is capped at 4. All ten deadlines have reminded_at IS NULL.
         reminder_ids = await svc.due_reminder_ids(now, timedelta(hours=24), limit=4)
         assert len(reminder_ids) == 4
 
-        # Ohne Limit-Argument greift die Default-Obergrenze (>> Rückstau hier) → alle 10.
+        # Without a limit argument the default cap applies. It lies far above this
+        # backlog, so all ten rows come back.
         assert len(await svc.due_reminder_ids(now, timedelta(hours=24))) == 10
 
 
-# --------------------------------------------------------------------------- #
-# Reminder — exactly once
-# --------------------------------------------------------------------------- #
 async def test_reminder_sent_exactly_once(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
     async with maker() as s:
         app_type, states = await _seed_flow(s)
         app = await _make_app(s, app_type, states["active"])
-        # Das ``deadline_approaching``-Mail-Template wird inzwischen vom Seed
-        # (Migration 0002) angelegt — kein eigenes Insert mehr (sonst UNIQUE-Konflikt
-        # auf ``mail_template.key``).
+        # The seed of migration 0002 creates the `deadline_approaching` mail template.
+        # Do not insert it here again. A second insert breaks the UNIQUE constraint on
+        # `mail_template.key`.
         await DeadlineService(s).create(
             kind="vote", due_at=datetime.now(UTC) + timedelta(minutes=30),
             application_id=app.id,
@@ -302,26 +292,26 @@ async def test_reminder_sent_exactly_once(
         deadline = (await s.execute(select(Deadline))).scalars().one()
         assert deadline.reminded_at is not None
 
-    # Zweiter Lauf: keine zweite Mail (reminded_at gesetzt).
+    # A second run sends no second mail because reminded_at is set.
     out2 = await process_deadlines(_ctx(maker, queue))
     assert "reminders=0" in out2
     assert len(sender.sent) == 1
 
 
-# --------------------------------------------------------------------------- #
-# Reminder — verspätet nachgeholt nach >Lead-Ausfall (AUD-037)
-# --------------------------------------------------------------------------- #
 async def test_reminder_sent_late_for_already_passed_deadline(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
-    """Eine bereits **abgelaufene**, noch nicht erinnerte Frist (z. B. der Cron war
-    länger als das Lead-Fenster aus) wird genau einmal — verspätet — erinnert und
-    ``reminded_at`` gesetzt, statt für immer im Scan-Index zu lecken (AUD-037)."""
+    """An expired deadline without a reminder still gets exactly one late reminder.
+
+    The cron can stay down longer than the lead window. The task then sends the reminder
+    late and sets `reminded_at`. The row leaves the scan index instead of leaking there
+    forever (AUD-037).
+    """
     async with maker() as s:
         app_type, states = await _seed_flow(s)
         app = await _make_app(s, app_type, states["active"])
-        # due_at liegt in der Vergangenheit (Frist schon abgelaufen) → unter der alten
-        # zweiseitigen Bedingung (due_at > now) wäre sie nie mehr gegriffen worden.
+        # due_at lies in the past, so the deadline already expired. The old two-sided
+        # condition of due_at > now would never catch such a row again.
         await DeadlineService(s).create(
             kind="vote", due_at=datetime.now(UTC) - timedelta(hours=48),
             application_id=app.id,
@@ -330,15 +320,15 @@ async def test_reminder_sent_late_for_already_passed_deadline(
     sender = CapturingMailSender()
     queue = DirectMailQueue(sender)
     out = await process_deadlines(_ctx(maker, queue))
-    assert "reminders=1" in out  # verspätet, aber versandt
+    assert "reminders=1" in out  # late, but sent
     assert len(sender.sent) == 1
     assert "a@example.org" in sender.sent[0].to
 
     async with maker() as s:
         deadline = (await s.execute(select(Deadline))).scalars().one()
-        assert deadline.reminded_at is not None  # Zeile verlässt den Scan-Index
+        assert deadline.reminded_at is not None  # the row leaves the scan index
 
-    # Zweiter Lauf: keine zweite (späte) Mail — genau-einmal-Semantik bleibt erhalten.
+    # A second run sends no second late mail. The exactly-once rule holds.
     out2 = await process_deadlines(_ctx(maker, queue))
     assert "reminders=0" in out2
     assert len(sender.sent) == 1

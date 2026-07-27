@@ -1,7 +1,8 @@
-"""Integration: atomare Single-Use-Einlösung des Magic-Links (security.md §1).
+"""Integration: the magic link stays single use even under concurrency (security.md §1).
 
-Zwei nebenläufige `verify_magic_link` mit demselben Token gegen echtes Postgres:
-genau einer gewinnt (Applicant-Session), der andere bekommt 410 (Replay-Schutz).
+Two concurrent `verify_magic_link` calls use the same token against a real Postgres.
+Exactly one call wins and gets an applicant session. The other call gets 410, which is
+the replay protection.
 """
 
 from __future__ import annotations
@@ -83,4 +84,4 @@ async def test_concurrent_single_use_only_one_wins(
     finally:
         await aengine.dispose()
 
-    assert outcomes == ["gone", "ok"]  # exakt einer gewinnt
+    assert outcomes == ["gone", "ok"]

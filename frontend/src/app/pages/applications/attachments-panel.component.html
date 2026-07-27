@@ -120,7 +120,7 @@
   }
 </app-card>
 
-  <!-- Drop overlay (styled like the invoices page): shown while a file hovers
+  <!-- Drop overlay, styled like the invoices page. It shows while a file hovers
        over the panel. -->
   @if (dragActive()) {
     <div class="att__dropOverlay" aria-hidden="true">
@@ -132,7 +132,7 @@
   }
 </div>
 
-<!-- Große Inline-Vorschau (Bild/PDF) — ohne Download. -->
+<!-- Large inline preview of an image or a PDF. It needs no download. -->
 <app-dialog
   class="att__previewDlg"
   size="lg"

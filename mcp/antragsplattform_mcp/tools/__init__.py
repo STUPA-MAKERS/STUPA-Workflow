@@ -1,8 +1,7 @@
 """Tool-group modules for the antragsplattform MCP server.
 
-Each module holds one domain group of ``@group.tool`` functions and a
-``register(mcp)`` entry. Registration order is fixed to keep the served tool
-list stable for agents.
+Each module holds one domain group of `@group.tool` functions and a `register(mcp)`
+entry. The module order is fixed. It keeps the served tool list stable for agents.
 """
 
 from __future__ import annotations

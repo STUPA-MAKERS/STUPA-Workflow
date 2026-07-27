@@ -10,8 +10,8 @@ import {
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 
-/** A pie slice: label, value (in currency units), colour.
- *  `id` (cost-centre id) makes the slice clickable (drilldown). */
+/** A pie slice: label, value in currency units and color.
+ *  An `id`, which is a cost center id, makes the slice clickable for a drilldown. */
 export interface PieSlice {
   label: string;
   value: number;
@@ -34,9 +34,11 @@ const CY = SIZE / 2;
 const GROW = 7; // radial growth on hover
 
 /**
- * Interactive donut chart: distribution across pie slices. Short title **above**,
- * **no** box. Hover highlights a slice and makes it **grow radially** (animated);
- * a tooltip shows label, amount, percent. Pure SVG, no third-party lib.
+ * Interactive donut chart of the distribution across the pie slices.
+ *
+ * The short title stands above the chart and there is no box. Hover highlights a
+ * slice and grows it radially with an animation. A tooltip shows the label, the
+ * amount and the percent. The chart is pure SVG and uses no third-party library.
  */
 @Component({
   selector: 'app-budget-pie',
@@ -134,7 +136,7 @@ export class BudgetPieComponent {
 
   readonly title = input<string>('');
   readonly slices = input<PieSlice[]>([]);
-  /** Click on a slice with an `id` -> cost-centre id (drilldown in the tab). */
+  /** Click on a slice with an `id`: emits the cost center id for the drilldown. */
   readonly sliceClick = output<string>();
 
   protected readonly SIZE = SIZE;
@@ -192,8 +194,8 @@ export class BudgetPieComponent {
 
 /** SVG path of a donut segment between two angles (radians). */
 function donutArc(start: number, end: number): string {
-  // Full circle (a single 100% slice): start==end -> a single arc draws nothing.
-  // Instead draw the whole ring (outer circle CW, hole CCW).
+  // Full circle (a single 100% slice): start == end, so one arc draws nothing.
+  // Draw the whole ring instead: outer circle CW, hole CCW.
   if (end - start >= Math.PI * 2 - 1e-6) {
     return [
       `M ${CX - R} ${CY}`,

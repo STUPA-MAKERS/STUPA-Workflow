@@ -64,7 +64,7 @@ describe('AccountsComponent', () => {
     expect(api.listAccounts).toHaveBeenCalled();
     expect(screen.getByText('Hauptkonto')).toBeInTheDocument();
     expect(screen.getByText('DE111')).toBeInTheDocument();
-    // empty IBAN → em dash.
+    // An empty IBAN renders as an em dash.
     expect(screen.getByText('—')).toBeInTheDocument();
   });
 
@@ -103,7 +103,6 @@ describe('AccountsComponent', () => {
     expect(cmp.dialogOpen()).toBe(true);
   });
 
-  // -------------------------------------------------------------------- save
   it('does not save when the name is blank', async () => {
     const { cmp, api } = await setup();
     cmp.openCreate();
@@ -172,7 +171,6 @@ describe('AccountsComponent', () => {
     expect(cmp.dialogOpen()).toBe(true);
   });
 
-  // ------------------------------------------------------------------ delete
   it('does nothing when deleting with no account selected', async () => {
     const { cmp, api } = await setup();
     cmp.doDelete();
@@ -206,7 +204,7 @@ describe('AccountsComponent', () => {
     cmp.doDelete();
     expect(toast.error).toHaveBeenCalled();
     expect(cmp.saving()).toBe(false);
-    // dialog stays open so the user can retry.
+    // The dialog stays open so the user can retry.
     expect(cmp.confirmDelete()).not.toBeNull();
   });
 

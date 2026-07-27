@@ -25,7 +25,6 @@ describe('BudgetPieComponent (#budget-redesign)', () => {
     expect(screen.getByText('Verteilung')).toBeTruthy();
     const paths = view.container.querySelectorAll('path.pie__slice');
     expect(paths.length).toBe(2);
-    // SVG has the title as accessible label.
     expect(view.container.querySelector('svg.pie__svg')?.getAttribute('aria-label')).toBe(
       'Verteilung',
     );
@@ -44,7 +43,7 @@ describe('BudgetPieComponent (#budget-redesign)', () => {
         { label: 'Zero', value: 0, color: '#444' },
       ],
     });
-    // total() = max(0,-10)+max(0,0) = 0 → empty branch.
+    // Here total() is max(0,-10) + max(0,0) = 0, which takes the empty branch.
     expect(view.fixture.componentInstance as unknown as PieInternals).toBeTruthy();
     expect(view.container.querySelector('p.pie__empty')).toBeTruthy();
   });

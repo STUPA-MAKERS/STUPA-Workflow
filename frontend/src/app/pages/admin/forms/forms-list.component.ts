@@ -21,7 +21,7 @@ import {
 import { AdminApiService } from '../admin-api.service';
 import { type ApplicationTypeFull, type Gremium, slugify } from '../admin.models';
 
-/** Edit state of the create dialog (title DE/EN + gremium + budget). */
+/** Edit state of the create dialog: title in DE and EN, Gremium, and budget flag. */
 interface NewForm {
   nameDe: string;
   nameEn: string;
@@ -34,11 +34,12 @@ function emptyForm(): NewForm {
 }
 
 /**
- * Form/application-type overview (Nextcloud-Forms style). Lists all application
- * types as a table; **create via a dialog** (title DE/EN, responsible gremium,
- * budget flag). The key is generated automatically from the DE title. The edit
- * icon leads to the **subpage** per form (`/admin/forms/:id`), where the questions
- * are maintained in Nextcloud-Forms style.
+ * Overview of the forms and application types, in Nextcloud-Forms style.
+ *
+ * The table lists all application types. A dialog creates a new one. The dialog asks for
+ * the title in DE and EN, the responsible Gremium, and the budget flag. The key comes from
+ * the DE title automatically. The edit icon opens the subpage of the form
+ * (`/admin/forms/:id`). The user maintains the questions there.
  */
 @Component({
   selector: 'app-forms-list',
@@ -67,7 +68,7 @@ export class FormsListComponent {
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
 
-  /** Deleting application types needs its own permission (UX gate; server authoritative). */
+  /** Delete needs its own permission. This gate is UX only. The server is authoritative. */
   protected readonly canDelete = computed(() => this.auth.can('admin.types_delete'));
   protected readonly confirmDelete = signal<ApplicationTypeFull | null>(null);
   protected readonly deleting = signal(false);
@@ -84,8 +85,9 @@ export class FormsListComponent {
 
   constructor() {
     this.reload();
-    // Authed /gremien (dropdown source) instead of admin/gremien — a form manager
-    // (form.configure) needs no admin.gremien to fill the gremium column/selector.
+    // Read the dropdown source from the authenticated /gremien, and not from admin/gremien.
+    // A form manager with form.configure then fills the Gremium column and the selector
+    // without the admin.gremien permission.
     this.api.listGremienOptions().subscribe({
       next: (g) => this.gremien.set(g),
       error: () => this.gremien.set([]),
@@ -160,7 +162,7 @@ export class FormsListComponent {
       },
       error: () => {
         this.deleting.set(false);
-        // 409 = applications of this type still exist; otherwise generic error.
+        // A 409 means applications of this type still exist. Other errors stay generic.
         this.toast.error(this.i18n.translate('admin.forms.deleteFailed'));
       },
     });

@@ -1,10 +1,10 @@
 """Shared types and structural interfaces for the admin CLI.
 
-The CLI is split into rendering, completion, form and layout modules that must
-not import the orchestrator directly. They depend on these protocols instead,
-keeping the import graph acyclic: the completer reads a :class:`CompleterHost`,
-the form/log components speak to an :class:`AppContext`, and the layout / key
-bindings drive an :class:`AppView`.
+The CLI splits into rendering, completion, form and layout modules. These modules
+must not import the orchestrator directly. They depend on these protocols instead,
+which keeps the import graph acyclic. The completer reads a `CompleterHost`. The
+form and log components speak to an `AppContext`. The layout and the key bindings
+drive an `AppView`.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from .models import Choices, Form
 
 # A handler runs a parsed slash-command from its positional arguments.
 Handler = Callable[[list[str]], None]
-# An option provider returns completions for the token currently being typed.
+# An option provider returns the completions for the token that the user types.
 Options = Callable[[list[str]], list[str]]
 # A prompt_toolkit per-fragment mouse handler.
 MouseHandler = Callable[[MouseEvent], object]
@@ -30,11 +30,11 @@ class CompleterHost(Protocol):
     """What the command completer reads from the orchestrator."""
 
     def command_names(self) -> list[str]:
-        """Every slash-command the CLI offers."""
+        """Return every slash-command that the CLI offers."""
         ...
 
     def argument_options(self, parts: list[str]) -> list[str]:
-        """Completions for the argument token currently being typed."""
+        """Return the completions for the argument token that the user types."""
         ...
 
 

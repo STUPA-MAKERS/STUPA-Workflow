@@ -1,17 +1,18 @@
-"""Protocol-Status-CHECK normalisieren (Fix: ``rendering`` wird abgelehnt).
+"""Normalize the protocol status CHECK (fix: `rendering` gets rejected).
 
-Bug: Migration 0001 (``create_all``) legte den CHECK über die Namens-Konvention als
-``ck_protocol_protocol_status`` mit dem damaligen Wertebereich (``draft``/``final``) an.
-Migration 0011 versuchte ihn per ``DROP CONSTRAINT IF EXISTS protocol_status`` zu
-ersetzen — traf aber den konventions-benannten Constraint NICHT und legte einen
-zweiten (``protocol_status``) an. Auf so gebauten DBs überlebt der alte
-``ck_protocol_protocol_status``-CHECK ohne ``rendering`` → ``finalize`` (Status →
-``rendering``) wirft 500 (CheckViolation).
+Bug: migration 0001 (`create_all`) created the CHECK under the naming
+convention as `ck_protocol_protocol_status`, with the value range of that time
+(`draft` and `final`). Migration 0011 tried to replace it with `DROP CONSTRAINT
+IF EXISTS protocol_status`. That statement missed the constraint with the
+convention name and added a second one named `protocol_status`. On a database
+built this way, the old `ck_protocol_protocol_status` CHECK survives without
+`rendering`. `finalize` then sets the status to `rendering` and throws a 500
+(CheckViolation).
 
-Fix: beide möglichen Constraint-Namen droppen und EINEN Constraint unter dem
-Konventions-Namen ``ck_protocol_protocol_status`` mit dem vollen Wertebereich neu
-anlegen — damit ``create_all`` (frisches Schema) und Migrationen denselben Namen +
-dieselbe Bedingung führen. Idempotent.
+Fix: drop both possible constraint names and create ONE constraint under the
+convention name `ck_protocol_protocol_status` with the full value range. A
+fresh schema from `create_all` and the migrations then carry the same name and
+the same condition. The statements are idempotent.
 """
 
 from __future__ import annotations
@@ -36,7 +37,7 @@ _UPGRADE: tuple[str, ...] = (
 )
 
 _DOWNGRADE: tuple[str, ...] = (
-    # Symmetrisch: Constraint behalten, aber wieder unter dem 0011-Namen führen.
+    # Symmetric: keep the constraint, but put it back under the 0011 name.
     "ALTER TABLE protocol DROP CONSTRAINT IF EXISTS ck_protocol_protocol_status",
     (
         "ALTER TABLE protocol ADD CONSTRAINT protocol_status "

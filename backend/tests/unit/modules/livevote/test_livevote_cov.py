@@ -1,10 +1,11 @@
-"""Abdeckungs-Tests für das Live-Vote/Meeting-Modul (service/agenda/attendance/router).
+"""Coverage tests for the live-vote and meeting module.
 
-Treibt die vier Service-/Router-Dateien gegen DB-lose Fakes auf ~100 % Zeilen-/
-Branch-Abdeckung: alle Cursor-/Such-/RBAC-/Tally-/Anwesenheits-/Tagesordnungs-Pfade
-sowie der REST-Router (Auth fail-closed, problem+json, Hintergrund-Mail, Vote-/
-Agenda-Steuerung). WS-Pfade liegen in der bestehenden WS-Suite; hier nur die
-``_authorize``-/``_serve``-Verzweigungen über schlanke WS-Doubles.
+The tests drive the four service and router files against DB-free fakes to about
+100 % line and branch coverage. They cover every cursor, search, RBAC, tally,
+attendance and agenda item path. They also cover the REST router: fail-closed auth,
+problem+json, the background mail, and the vote and agenda control. The WS paths stay
+in the existing WS suite. This file covers only the ``_authorize`` and ``_serve``
+branches through slim WS doubles.
 """
 
 from __future__ import annotations
@@ -61,13 +62,11 @@ from app.shared.errors import (
     NotFoundError,
 )
 
-# pytest-asyncio läuft im ``auto``-Modus (pyproject) — async-Tests brauchen keinen
-# expliziten Marker; sync TestClient-Tests bleiben unmarkiert.
+# pytest-asyncio runs in ``auto`` mode (pyproject). An async test needs no explicit
+# marker. A sync TestClient test stays unmarked.
 
 
-# --------------------------------------------------------------------------- #
 # Fakes
-# --------------------------------------------------------------------------- #
 class _Scalars:
     def __init__(self, rows: list[Any]) -> None:
         self._rows = rows
@@ -77,8 +76,10 @@ class _Scalars:
 
 
 class _Result:
-    """Ergebnis-Double: ``scalar_one_or_none`` / ``scalars().all()`` / ``all()`` /
-    ``first()`` aus einer Zeilen-Liste."""
+    """Result double that serves a row list.
+
+    It supports ``scalar_one_or_none``, ``scalars().all()``, ``all()`` and ``first()``.
+    """
 
     def __init__(self, rows: list[Any]) -> None:
         self._rows = rows
@@ -106,12 +107,12 @@ class _Bind:
 
 
 class _QueueSession:
-    """``AsyncSession``-Double mit getrennten FIFO-Queues je Zugriffsart.
+    """``AsyncSession`` double with one FIFO queue per access kind.
 
-    * ``execute(stmt)`` → nächstes ``_Result`` aus ``executes`` (Default leer)
-    * ``scalars(stmt)`` → nächstes ``_Scalars`` aus ``scalars_q`` (Default leer)
-    * ``scalar(stmt)`` → nächster Wert aus ``scalar_q`` (Default ``None``)
-    * ``get(model, id)`` → nächster Wert aus ``get_q`` (Default ``None``)
+    ``execute(stmt)`` gives the next ``_Result`` from ``executes``, empty by default.
+    ``scalars(stmt)`` gives the next ``_Scalars`` from ``scalars_q``, empty by default.
+    ``scalar(stmt)`` gives the next value from ``scalar_q``, ``None`` by default.
+    ``get(model, id)`` gives the next value from ``get_q``, ``None`` by default.
     """
 
     def __init__(
@@ -187,9 +188,7 @@ def _meeting(*, status: str = "planned", gremium_id: UUID | None = None) -> Meet
     return m
 
 
-# =========================================================================== #
-# service.py — Cursor-Helfer
-# =========================================================================== #
+# service.py: cursor helpers
 def test_encode_decode_cursor_roundtrip() -> None:
     ts = datetime(2026, 6, 16, 18, 30)
     mid = uuid4()
@@ -217,7 +216,7 @@ def test_decode_offset_empty_is_zero() -> None:
 
 
 def test_decode_offset_wrong_tag_raises() -> None:
-    bad = _encode_cursor(datetime(2026, 6, 16), uuid4())  # kein "o|"-Tag
+    bad = _encode_cursor(datetime(2026, 6, 16), uuid4())  # carries no "o|" tag
     with pytest.raises(BadRequestError):
         _decode_offset(bad)
 
@@ -235,9 +234,7 @@ def test_decode_offset_garbage_raises() -> None:
         _decode_offset("###not-base64###")
 
 
-# =========================================================================== #
-# service.py — _to_out (Defaults / votes-None)
-# =========================================================================== #
+# service.py: _to_out defaults with votes None
 def test_to_out_defaults_votes_none() -> None:
     m = _meeting()
     out = MeetingService._to_out(m)
@@ -246,9 +243,7 @@ def test_to_out_defaults_votes_none() -> None:
     assert out.can_control is False
 
 
-# =========================================================================== #
-# service.py — RBAC-Helfer
-# =========================================================================== #
+# service.py: RBAC helpers
 async def test_can_manage_global_permission_shortcuts() -> None:
     svc = MeetingService(_QueueSession())  # type: ignore[arg-type]
     assert await svc.can_manage(uuid4(), _principal("meeting.manage")) is True
@@ -268,10 +263,10 @@ async def test_can_manage_via_gremium_permission(monkeypatch: pytest.MonkeyPatch
 
 async def test_is_protokollant_none_and_match() -> None:
     m = _meeting()
-    # protokollant_id None → False, ohne DB-Query.
+    # A protokollant_id of None gives False without a DB query.
     svc = MeetingService(_QueueSession())  # type: ignore[arg-type]
     assert await svc._is_protokollant(m, _principal()) is False
-    # gesetzt + _principal_id matcht.
+    # The id is set and _principal_id matches it.
     pid = uuid4()
     m.protokollant_id = pid
     svc2 = MeetingService(_QueueSession(executes=[res(pid)]))  # type: ignore[arg-type]
@@ -280,11 +275,11 @@ async def test_is_protokollant_none_and_match() -> None:
 
 async def test_can_write_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     m = _meeting()
-    # 1) via can_manage (Admin) → True ohne Query.
+    # 1) can_manage as an admin gives True without a query.
     svc = MeetingService(_QueueSession())  # type: ignore[arg-type]
     assert await svc.can_write(m, _admin()) is True
 
-    # 2) nicht manage, aber Protokollant.
+    # 2) No manage permission, but the principal is the protokollant.
     async def _no_perm(_s, _sub, _perm, now=None):  # noqa: ANN001, ANN202
         return set()
 
@@ -293,7 +288,7 @@ async def test_can_write_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     svc2 = MeetingService(_QueueSession(executes=[res(m.protokollant_id)]))  # type: ignore[arg-type]
     assert await svc2.can_write(m, _principal()) is True
 
-    # 3) nicht manage, nicht Protokollant, aber protocol.write-Rolle.
+    # 3) No manage permission and no protokollant, but a protocol.write role.
     gid = m.gremium_id
 
     async def _write(_s, _sub, perm, now=None):  # noqa: ANN001, ANN202
@@ -314,12 +309,12 @@ async def test_can_manage_votes_paths(monkeypatch: pytest.MonkeyPatch) -> None:
         return set()
 
     monkeypatch.setattr(permissions_mod, "gremium_ids_with_permission", _none)
-    # Protokollant-Zweig.
+    # The protokollant branch.
     m.protokollant_id = uuid4()
     svc2 = MeetingService(_QueueSession(executes=[res(m.protokollant_id)]))  # type: ignore[arg-type]
     assert await svc2.can_manage_votes(m, _principal()) is True
 
-    # vote.manage-Rolle-Zweig.
+    # The vote.manage role branch.
     gid = m.gremium_id
 
     async def _vm(_s, _sub, perm, now=None):  # noqa: ANN001, ANN202
@@ -355,7 +350,7 @@ async def test_can_vote_via_delegation(monkeypatch: pytest.MonkeyPatch) -> None:
         return set()
 
     monkeypatch.setattr(permissions_mod, "gremium_ids_with_permission", _none)
-    # _delegated_meeting_ids(voting_only=True) liefert die Sitzung.
+    # The call _delegated_meeting_ids(voting_only=True) returns the meeting.
     svc = MeetingService(_QueueSession(executes=[res(m.id)]))  # type: ignore[arg-type]
     assert await svc.can_vote(m, _principal()) is True
 
@@ -413,7 +408,7 @@ async def test_is_participant_delegation(monkeypatch: pytest.MonkeyPatch) -> Non
         return set()
 
     monkeypatch.setattr(permissions_mod, "gremium_member_ids", _none)
-    # is_member False (kein view_all) → _delegated_meeting_ids liefert mid.
+    # is_member is False and view_all is absent, so _delegated_meeting_ids returns mid.
     svc = MeetingService(_QueueSession(executes=[res(mid)]))  # type: ignore[arg-type]
     assert await svc.is_participant(mid, uuid4(), _principal()) is True
 
@@ -440,7 +435,7 @@ async def test_visible_gremium_ids_member_union_pool(
         return {mg}
 
     monkeypatch.setattr(permissions_mod, "gremium_member_ids", _members)
-    # _substitute_pool_gremium_ids → pg.
+    # The call _substitute_pool_gremium_ids returns pg.
     svc = MeetingService(_QueueSession(executes=[res(pg)]))  # type: ignore[arg-type]
     assert await svc._visible_gremium_ids(_principal()) == {mg, pg}
 
@@ -464,11 +459,11 @@ async def test_name_for_none_and_value() -> None:
     row = SimpleNamespace(display_name="Alice", email="a@x")
     sess = _QueueSession(get_q=[row])
     assert await MeetingService._name_for(sess, uuid4()) == "Alice"  # type: ignore[arg-type]
-    # display_name None → email-Fallback.
+    # A display_name of None falls back to the email.
     row2 = SimpleNamespace(display_name=None, email="b@x")
     sess2 = _QueueSession(get_q=[row2])
     assert await MeetingService._name_for(sess2, uuid4()) == "b@x"  # type: ignore[arg-type]
-    # row None → None.
+    # A row of None gives None.
     assert await MeetingService._name_for(_QueueSession(), uuid4()) is None  # type: ignore[arg-type]
 
 
@@ -491,9 +486,7 @@ async def test_emit_without_principal() -> None:
     assert out.gremium_id == m.gremium_id
 
 
-# =========================================================================== #
-# service.py — _votes_for / _present_by_meeting / _vote_tallies
-# =========================================================================== #
+# service.py: _votes_for, _present_by_meeting and _vote_tallies
 def _vote_row(
     *,
     meeting_id: UUID | None,
@@ -535,8 +528,8 @@ async def test_absent_delegated_by_meeting_empty() -> None:
 
 
 async def test_absent_delegated_by_meeting_groups_rows() -> None:
-    # FIX 2: liefert {(meeting, str(gremium)): Anzahl} für aktive Stimm-Delegationen
-    # abwesender Delegierender.
+    # FIX 2: returns {(meeting, str(gremium)): count} for the active vote delegations
+    # of absent delegators.
     mid, gid = uuid4(), uuid4()
     sess = _QueueSession(executes=[res((mid, gid, 2))])
     svc = MeetingService(sess)  # type: ignore[arg-type]
@@ -552,9 +545,9 @@ async def test_vote_tallies_empty() -> None:
 async def test_votes_for_closed_revealed() -> None:
     mid = uuid4()
     vrow = _vote_row(meeting_id=mid, status="closed", result="passed", eligible=2)
-    # execute()-Reihenfolge: _votes_for selektiert Votes (scalars().all()), dann
-    # _vote_tallies (open ballots, secret ballots — je execute().all()), zuletzt
-    # _present_by_meeting (execute().all()).
+    # The execute() order is: _votes_for selects the votes with scalars().all(). Then
+    # _vote_tallies reads the open ballots and the secret ballots, each through one
+    # call of execute().all(). Last comes _present_by_meeting with execute().all().
     sess = _QueueSession(
         executes=[
             res(vrow),  # votes
@@ -579,7 +572,7 @@ async def test_votes_for_secret_open_hidden() -> None:
     sess = _QueueSession(
         executes=[
             res(vrow),  # votes
-            res(),  # open ballots (leer; secret)
+            res(),  # open ballots, empty because the vote is secret
             res((vrow.id, "yes")),  # secret ballots
             res((mid, 3)),  # present
         ]
@@ -587,7 +580,7 @@ async def test_votes_for_secret_open_hidden() -> None:
     svc = MeetingService(sess)  # type: ignore[arg-type]
     out = await svc._votes_for([mid])
     item = out[mid][0]
-    assert item.revealed is False  # geheim + offen → verdeckt
+    assert item.revealed is False  # secret and open, so the tally stays hidden
     assert item.counts == {}
     assert item.leading is None
     assert item.voted == 1
@@ -612,8 +605,9 @@ async def test_votes_for_open_all_voted_revealed() -> None:
 
 
 async def test_votes_for_open_proxy_denominator_hides_until_proxy_votes() -> None:
-    # FIX 2: 2 Anwesende + 1 Stimm-Delegation eines Abwesenden → expected=3. Mit nur
-    # 2 Stimmen (Anwesende) ist die Proxy-Stimme noch offen → verdeckt.
+    # FIX 2: two present members plus one vote delegation of an absent member give
+    # an expected count of 3. The two votes of the present members leave the proxy
+    # vote open, so the tally stays hidden.
     mid = uuid4()
     gid = uuid4()
     vrow = _vote_row(meeting_id=mid, status="open", secret=False, eligible=5)
@@ -624,13 +618,13 @@ async def test_votes_for_open_proxy_denominator_hides_until_proxy_votes() -> Non
             res((vrow.id, "yes"), (vrow.id, "yes")),  # open ballots: 2
             res(),  # secret ballots
             res((mid, 2)),  # present=2
-            res((mid, gid, 1)),  # 1 Proxy-Stimme abwesender Delegierender → expected=3
+            res((mid, gid, 1)),  # one proxy vote of an absent delegator, so expected=3
         ]
     )
     svc = MeetingService(sess)  # type: ignore[arg-type]
     out = await svc._votes_for([mid])
     item = out[mid][0]
-    assert item.revealed is False  # 2 < expected 3 → verdeckt
+    assert item.revealed is False  # 2 is below the expected 3, so the tally stays hidden
     assert item.counts == {}
 
 
@@ -653,7 +647,7 @@ async def test_votes_for_open_not_all_voted_hidden() -> None:
 
 
 async def test_votes_for_skips_unbound_vote() -> None:
-    # v.meeting_id None → wird in _votes_for übersprungen (continue).
+    # A vote with meeting_id None hits the continue branch of _votes_for.
     vrow = _vote_row(meeting_id=None)
     sess = _QueueSession(
         executes=[
@@ -664,15 +658,16 @@ async def test_votes_for_skips_unbound_vote() -> None:
         ]
     )
     svc = MeetingService(sess)  # type: ignore[arg-type]
-    # _votes_for([some id]) — present_by_meeting wird mit der ID aufgerufen, aber
-    # der Vote selbst hat meeting_id None und wird übersprungen.
+    # The call passes the id on to present_by_meeting. The vote itself carries
+    # meeting_id None, so the loop skips it.
     out = await svc._votes_for([uuid4()])
     assert out == {}
 
 
 async def test_votes_for_config_not_dict() -> None:
-    # v.config kein dict (hier eine VoteConfig-Instanz) → cfg-Zweig ``else {}`` in
-    # _votes_for greift (opts leer, secret False); _vote_tallies validiert es trotzdem.
+    # A v.config that is no dict, here a VoteConfig instance, takes the ``else {}``
+    # branch in _votes_for. opts stays empty and secret stays False. _vote_tallies
+    # still validates the config.
     from app.shared.config_schemas import VoteConfig
 
     mid = uuid4()
@@ -691,12 +686,12 @@ async def test_votes_for_config_not_dict() -> None:
     svc = MeetingService(sess)  # type: ignore[arg-type]
     out = await svc._votes_for([mid])
     item = out[mid][0]
-    # cfg.get("options") aus der (Nicht-dict-)VoteConfig → leere Liste.
+    # The call cfg.get("options") on the non-dict VoteConfig gives an empty list.
     assert item.options == []
 
 
 async def test_vote_tallies_failed_reason_set() -> None:
-    # status=closed + result gesetzt → failed_reason berechnet.
+    # A closed status with a result makes the service compute failed_reason.
     mid = uuid4()
     vrow = _vote_row(meeting_id=mid, status="closed", result="rejected", eligible=10)
     sess = _QueueSession(
@@ -712,9 +707,7 @@ async def test_vote_tallies_failed_reason_set() -> None:
     assert reason in ("quorum", "majority")
 
 
-# =========================================================================== #
-# service.py — list / list_filter_gremien / list_timeline / _search_timeline
-# =========================================================================== #
+# service.py: list, list_filter_gremien, list_timeline and _search_timeline
 async def test_list_admin_no_filter() -> None:
     m = _meeting()
     sess = _QueueSession(
@@ -778,15 +771,15 @@ async def test_decorate_non_admin_protokollant_flag(
         return set()
 
     monkeypatch.setattr(listing_mod, "gremium_ids_with_permission", _none)
-    # Die vier Perm-Queries laufen über das gemockte ``gremium_ids_with_permission``
-    # und verbrauchen KEINE execute()-Ergebnisse. Übrige execute()-Reihenfolge:
-    # proto, gremium-names, protokollant-names, _principal_id, _votes_for(votes).
+    # The four permission queries run through the mocked ``gremium_ids_with_permission``
+    # and consume NO execute() result. The remaining execute() order is: proto rows,
+    # gremium names, protokollant names, _principal_id, and the votes of _votes_for.
     sess = _QueueSession(
         executes=[
             res(),  # proto rows
             res((m.gremium_id, "G")),  # gremium names
             res((my, "Bob", "bob@x")),  # protokollant names
-            res(my),  # _principal_id → matcht protokollant
+            res(my),  # _principal_id matches the protokollant
             res(),  # _votes_for: votes
         ]
     )
@@ -831,7 +824,7 @@ async def test_list_timeline_upcoming_pagination() -> None:
     m1, m2 = _meeting(status="live"), _meeting(status="planned")
     ts1 = datetime(2026, 6, 16, 9, 0)
     ts2 = datetime(2026, 6, 17, 9, 0)
-    # limit=1 → 2 Zeilen geladen (has_more True), nur 1 zurück.
+    # A limit of 1 loads 2 rows, so has_more turns True and the page returns 1 row.
     sess = _QueueSession(
         executes=[
             res((m1, ts1), (m2, ts2)),  # timeline rows (limit+1)
@@ -893,7 +886,8 @@ async def test_list_timeline_empty_rows_no_cursor() -> None:
 
 
 async def test_list_timeline_past_without_cursor() -> None:
-    # past-Richtung OHNE Cursor → ``if cur is not None``-False-Zweig (650->653).
+    # The past direction without a cursor takes the False branch of
+    # ``if cur is not None`` (650->653).
     m = _meeting(status="closed")
     ts = datetime(2026, 6, 10, 9, 0)
     sess = _QueueSession(
@@ -959,9 +953,7 @@ async def test_search_timeline_pagination_and_gremium(
     assert page.next_cursor is not None
 
 
-# =========================================================================== #
-# service.py — create / _resolve_protokollant
-# =========================================================================== #
+# service.py: create and _resolve_protokollant
 async def test_create_forbidden(monkeypatch: pytest.MonkeyPatch) -> None:
     async def _none(_s, _sub, _perm, now=None):  # noqa: ANN001, ANN202
         return set()
@@ -1031,9 +1023,7 @@ async def test_resolve_protokollant_ok(monkeypatch: pytest.MonkeyPatch) -> None:
     assert await svc._resolve_protokollant(gid, pid) == pid
 
 
-# =========================================================================== #
-# service.py — patch (alle Verzweigungen)
-# =========================================================================== #
+# service.py: patch with all its branches
 async def test_patch_wants_manage_forbidden(monkeypatch: pytest.MonkeyPatch) -> None:
     m = _meeting()
 
@@ -1061,8 +1051,9 @@ async def test_patch_wants_write_forbidden(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setattr(permissions_mod, "gremium_member_ids", _nomember)
     from app.modules.livevote.schemas import MeetingPatch
 
-    # _get(meeting), then can_write: can_manage (perm none), _is_protokollant
-    # (protokollant_id None → no query), protocol.write perm (none).
+    # The order is _get(meeting), then can_write. can_manage finds no permission.
+    # _is_protokollant runs no query because protokollant_id is None. The
+    # protocol.write permission is absent too.
     svc = MeetingService(_QueueSession(executes=[res(m)]))  # type: ignore[arg-type]
     with pytest.raises(ForbiddenError):
         await svc.patch(m.id, MeetingPatch(status="closed"), _principal())
@@ -1131,8 +1122,9 @@ async def test_patch_protokollant_resolved(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setattr(lifecycle_mod, "gremium_member_ids", _member)
     from app.modules.livevote.schemas import MeetingPatch
 
-    # _get; _resolve_protokollant get → row; _emit name/gremium/can_* (admin shortcut);
-    # _votes_for empty.
+    # The order is _get, then the get of _resolve_protokollant gives the row, then
+    # _emit reads name, gremium and the can_* flags over the admin shortcut.
+    # _votes_for stays empty.
     sess = _QueueSession(
         executes=[res(m)],
         get_q=[SimpleNamespace(sub="x")],
@@ -1166,7 +1158,8 @@ async def test_patch_going_live_ok_with_publisher() -> None:
             self.states.append(out)
 
     pub = _Pub()
-    # _get; _emit (name get → None, gremium get → None) + _votes_for empty.
+    # The order is _get, then _emit where the name get and the gremium get both give
+    # None. _votes_for stays empty.
     sess = _QueueSession(executes=[res(m)])
     svc = MeetingService(sess, pub)  # type: ignore[arg-type]
     out = await svc.patch(m.id, MeetingPatch(status="live", activeApplicationId=uuid4()), _admin())
@@ -1198,7 +1191,7 @@ async def test_patch_set_times_and_end() -> None:
 
 
 async def test_patch_set_date() -> None:
-    # Datum-Patch auf eine geplante Sitzung (greift Zeile 866: meeting.date = payload.date).
+    # A date patch on a planned meeting. It covers line 866 of the service.
     m = _meeting()
     from app.modules.livevote.schemas import MeetingPatch
 
@@ -1208,9 +1201,7 @@ async def test_patch_set_date() -> None:
     assert out.date == date(2026, 7, 1)
 
 
-# =========================================================================== #
-# service.py — broadcast_state / open_vote / agenda_item_has_vote / misc
-# =========================================================================== #
+# service.py: broadcast_state, open_vote, agenda_item_has_vote and other helpers
 async def test_broadcast_state_with_publisher() -> None:
     m = _meeting()
 
@@ -1232,7 +1223,7 @@ async def test_broadcast_state_no_publisher() -> None:
     m = _meeting()
     sess = _QueueSession(executes=[res(m)])
     svc = MeetingService(sess)  # type: ignore[arg-type]
-    await svc.broadcast_state(m.id, _admin())  # kein Fehler, kein Broadcast
+    await svc.broadcast_state(m.id, _admin())  # no error and no broadcast
 
 
 async def test_protocol_final_true_false() -> None:
@@ -1258,9 +1249,9 @@ async def test_agenda_item_has_vote() -> None:
 
 
 async def test_agenda_item_has_vote_excludes_cancelled() -> None:
-    # FIX 1 (#cancel-reopen): das Guard-Statement MUSS abgebrochene Votes
-    # ausblenden (status != 'cancelled') — sonst blockt ein einmal abgebrochener
-    # Antrags-Vote das Neu-Eröffnen für immer.
+    # FIX 1 (#cancel-reopen): the guard statement MUST hide cancelled votes with
+    # status != 'cancelled'. Without that filter one cancelled application vote
+    # blocks the reopen forever.
     sess = _QueueSession(executes=[res()])
     svc = MeetingService(sess)  # type: ignore[arg-type]
     await svc.agenda_item_has_vote(uuid4())
@@ -1287,8 +1278,8 @@ async def test_vote_eligible_count() -> None:
     rows = res(
         (p1, ["vote.cast"]),
         (p2, ["vote.cast"]),
-        (p1, ["vote.cast"]),  # Duplikat → set dedupliziert
-        (uuid4(), None),  # ohne vote.cast (perms None) → nicht gezählt
+        (p1, ["vote.cast"]),  # a duplicate that the set drops
+        (uuid4(), None),  # no vote.cast because perms is None, so it does not count
     )
     svc = MeetingService(_QueueSession(executes=[rows]))  # type: ignore[arg-type]
     assert await svc.vote_eligible_count(uuid4()) == 2
@@ -1301,16 +1292,14 @@ async def test_assert_can_read_delegation_branch(monkeypatch: pytest.MonkeyPatch
         return set()
 
     monkeypatch.setattr(permissions_mod, "gremium_member_ids", _none)
-    # _get → m; _substitute_pool → empty; visible doesn't contain gremium;
-    # _delegated_meeting_ids → m.id (allowed).
+    # _get gives m. _substitute_pool is empty, so visible holds no gremium.
+    # _delegated_meeting_ids gives m.id, which allows the read.
     sess = _QueueSession(executes=[res(m), res(), res(m.id)])
     svc = MeetingService(sess)  # type: ignore[arg-type]
-    await svc.assert_can_read(m.id, _principal())  # kein Fehler
+    await svc.assert_can_read(m.id, _principal())  # no error
 
 
-# =========================================================================== #
 # agenda_service.py
-# =========================================================================== #
 def test_title_of_variants() -> None:
     assert _title_of(None) is None
     assert _title_of({}) is None
@@ -1440,7 +1429,7 @@ async def test_agenda_list_app_without_state() -> None:
 
 
 async def test_agenda_list_app_missing() -> None:
-    # item references an application_id, but apps dict empty → app None branch.
+    # The item references an application_id, but the apps dict is empty, so app is None.
     m = _meeting()
     item = _agenda_item(application_id=uuid4())
     sess = _QueueSession(
@@ -1452,7 +1441,7 @@ async def test_agenda_list_app_missing() -> None:
     )
     svc = AgendaService(sess)  # type: ignore[arg-type]
     out = await svc.list(m.id)
-    assert out[0].title is None  # app None → r.title (None)
+    assert out[0].title is None  # app is None, so the title falls back to r.title
 
 
 async def test_set_body_not_found() -> None:
@@ -1485,7 +1474,7 @@ async def test_set_body_title_ignored_for_application_top() -> None:
     )
     svc = AgendaService(sess)  # type: ignore[arg-type]
     await svc.set_body(m.id, item.id, title="ignored")
-    assert item.title == "orig"  # Antrag-TOP erbt Titel → title nicht gesetzt
+    assert item.title == "orig"  # an application agenda item inherits its title
 
 
 async def test_reorder() -> None:
@@ -1500,7 +1489,7 @@ async def test_reorder() -> None:
         ],
     )
     svc = AgendaService(sess)  # type: ignore[arg-type]
-    # b zuerst, dann a, dann eine unbekannte ID (None-Zweig).
+    # First b, then a, then an unknown id for the None branch.
     await svc.reorder(m.id, [b.id, a.id, uuid4()])
     assert b.position == 0
     assert a.position == 1
@@ -1532,7 +1521,7 @@ async def test_assignable_filters_existing_and_maps() -> None:
             [app_in, app_existing, app_nostate],  # candidate apps
         ],
     )
-    # NOTE: existing uses session.scalars(...).all(); assignable apps uses scalars too.
+    # NOTE: existing uses session.scalars(...).all(). The assignable apps use scalars.
     sess2 = _QueueSession(
         executes=[res(m)],
         scalars_q=[
@@ -1545,8 +1534,8 @@ async def test_assignable_filters_existing_and_maps() -> None:
     out = await svc.assignable(m.id)
     titles = [o.title for o in out]
     assert "Neu" in titles
-    assert "Schon dran" not in titles  # bereits auf der TO
-    # app_nostate has current_state_id None → state None branch.
+    assert "Schon dran" not in titles  # already on the agenda
+    # app_nostate carries current_state_id None, which takes the state None branch.
     assert "Keiner" in titles
     _ = sess
 
@@ -1587,7 +1576,7 @@ async def test_add_application_not_in_vote_state() -> None:
     app = _app_row(state_id=uuid4())
     sess = _QueueSession(
         executes=[res(m)],
-        scalars_q=[[]],  # _vote_states empty → app.current_state_id not in {} → conflict
+        scalars_q=[[]],  # _vote_states is empty, so current_state_id misses and it conflicts
         get_q=[app],
     )
     svc = AgendaService(sess)  # type: ignore[arg-type]
@@ -1603,7 +1592,7 @@ async def test_add_application_new() -> None:
     sess = _QueueSession(
         executes=[
             res(m),  # _meeting
-            res(),  # existing lookup → None
+            res(),  # the existing lookup gives None
             res(None),  # _next_position
             res(m),  # list()._meeting
         ],
@@ -1627,7 +1616,7 @@ async def test_add_application_already_present() -> None:
     sess = _QueueSession(
         executes=[
             res(m),  # _meeting
-            res(uuid4()),  # existing lookup → present → no add
+            res(uuid4()),  # the existing lookup finds the item, so no add follows
             res(m),  # list()._meeting
         ],
         scalars_q=[
@@ -1638,7 +1627,7 @@ async def test_add_application_already_present() -> None:
     )
     svc = AgendaService(sess)  # type: ignore[arg-type]
     await svc.add(m.id, application_id=app.id)
-    assert sess.added == []  # nichts hinzugefügt
+    assert sess.added == []  # nothing added
     assert sess.committed == 0
 
 
@@ -1654,7 +1643,7 @@ async def test_remove_existing_and_missing() -> None:
     assert sess.deleted == [item]
     assert sess.committed == 1
 
-    # missing → no delete/commit.
+    # A missing item causes no delete and no commit.
     sess2 = _QueueSession(
         executes=[res(), res(m)],
         scalars_q=[[]],
@@ -1665,9 +1654,7 @@ async def test_remove_existing_and_missing() -> None:
     assert sess2.committed == 0
 
 
-# =========================================================================== #
 # attendance_service.py
-# =========================================================================== #
 def _member(*, sub: str = "sub-1", display_name: str = "Alice") -> Any:
     from types import SimpleNamespace
 
@@ -1710,7 +1697,7 @@ async def test_roster_maps_records_and_self() -> None:
     by_pid = {o.principal_id: o for o in out}
     assert by_pid[member.id].status == "present"
     assert by_pid[member.id].is_self is True
-    assert by_pid[other.id].status is None  # kein Record
+    assert by_pid[other.id].status is None  # no attendance record exists
     assert by_pid[other.id].is_self is False
 
 
@@ -1735,7 +1722,7 @@ async def test_set_self_inserts_new() -> None:
         executes=[
             res(meeting),  # _meeting
             res(member),  # _current_members (set_self)
-            res(),  # _upsert existing → None → insert
+            res(),  # _upsert finds no existing row, so it inserts
             res(meeting),  # roster _meeting
             res(member),  # roster _current_members
             res(),  # roster records
@@ -1761,10 +1748,10 @@ async def test_set_self_updates_existing() -> None:
             res(existing),  # _upsert existing
             res(meeting),  # roster _meeting
             res(member),  # roster members
-            res(existing),  # roster records (has principal_id? no—just for mapping)
+            res(existing),  # roster records, used only for the mapping
         ]
     )
-    # existing has no principal_id; give it one for roster mapping safety.
+    # existing carries no principal_id. Add one so the roster mapping works.
     existing.principal_id = member.id
     svc = AttendanceService(sess)  # type: ignore[arg-type]
     await svc.set_self(meeting.id, "present", "me")
@@ -1793,7 +1780,7 @@ async def test_set_for_ok() -> None:
         executes=[
             res(meeting),  # _meeting
             res(member),  # _current_members
-            res(),  # _upsert existing → None → insert
+            res(),  # _upsert finds no existing row, so it inserts
             res(meeting),  # roster _meeting
             res(member),  # roster members
             res(),  # roster records
@@ -1806,21 +1793,20 @@ async def test_set_for_ok() -> None:
     assert out[0].principal_id == member.id
 
 
-# =========================================================================== #
-# router.py — DI-Factories
-# =========================================================================== #
+# router.py: the DI factories
 def test_router_di_factories() -> None:
     from types import SimpleNamespace
 
     fake_app = SimpleNamespace(state=SimpleNamespace())
     req = SimpleNamespace(app=fake_app)
     ws = SimpleNamespace(app=fake_app)
-    # ohne broker/locker auf state → Fallbacks (Singletons im Router-Modul).
+    # Without a broker or a locker on state, the factories fall back to the router
+    # singletons.
     assert get_broker_rest(req) is router_mod._FALLBACK_BROKER  # type: ignore[arg-type]
     assert get_broker_ws(ws) is router_mod._FALLBACK_BROKER  # type: ignore[arg-type]
     assert get_locker_ws(ws) is router_mod._FALLBACK_LOCKER  # type: ignore[arg-type]
 
-    # mit broker auf state → genau dieser.
+    # With a broker on state, the factory returns exactly that broker.
     broker = InMemoryBroker()
     locker = InMemoryLocker()
     fake_app2 = SimpleNamespace(state=SimpleNamespace(broker=broker, locker=locker))
@@ -1839,9 +1825,7 @@ def test_router_di_factories() -> None:
     assert get_voting_service_ws(sess) is not None  # type: ignore[arg-type]
 
 
-# =========================================================================== #
-# router.py — REST via TestClient (Service-Fakes über dependency_overrides)
-# =========================================================================== #
+# router.py: REST through TestClient with service fakes in dependency_overrides
 def _meeting_out(
     *,
     status: str = "live",
@@ -1863,7 +1847,7 @@ def _meeting_out(
 
 
 class _FakeMeetingService:
-    """MeetingService-Double für die Router-Tests (nur die genutzten Methoden)."""
+    """MeetingService double for the router tests with only the used methods."""
 
     def __init__(self) -> None:
         self.session = _QueueSession()
@@ -2048,7 +2032,6 @@ def _login(app: FastAPI, *perms: str, roles: list[str] | None = None) -> None:
     )
 
 
-# ---- create_meeting --------------------------------------------------------
 def test_create_meeting_requires_auth(client: TestClient) -> None:
     assert client.post("/api/meetings", json={}).status_code == 401
 
@@ -2066,7 +2049,6 @@ def test_create_meeting_ok_schedules_mail(app: FastAPI, client: TestClient) -> N
     assert r.json()["status"] == "planned"
 
 
-# ---- list_meeting_members --------------------------------------------------
 def test_list_meeting_members_forbidden(app: FastAPI, client: TestClient, fakes) -> None:
     fakes["meeting"]._can_manage = False
     _login(app, "x")
@@ -2082,7 +2064,6 @@ def test_list_meeting_members_ok(app: FastAPI, client: TestClient) -> None:
     assert len(r.json()) == 1
 
 
-# ---- list / timeline / filter-gremien --------------------------------------
 def test_list_meetings_ok(app: FastAPI, client: TestClient) -> None:
     _login(app)
     r = client.get("/api/meetings")
@@ -2104,7 +2085,6 @@ def test_list_meeting_filter_gremien_ok(app: FastAPI, client: TestClient) -> Non
     assert r.json()[0]["name"] == "StuPa"
 
 
-# ---- get / delete ----------------------------------------------------------
 def test_get_meeting_ok(app: FastAPI, client: TestClient) -> None:
     _login(app)
     r = client.get(f"/api/meetings/{uuid4()}")
@@ -2119,9 +2099,9 @@ def test_delete_meeting_ok(app: FastAPI, client: TestClient, fakes) -> None:
     assert fakes["meeting"].deleted == [mid]
 
 
-# ---- patch -----------------------------------------------------------------
 def test_patch_meeting_non_live(app: FastAPI, client: TestClient, fakes) -> None:
-    # patch returns status "live" by default; force a non-live to skip protocol branch.
+    # patch returns the status "live" by default. A non-live status skips the protocol
+    # branch.
     fakes["meeting"]._meeting_out = _meeting_out(status="planned")
     _login(app)
     r = client.patch(f"/api/meetings/{uuid4()}", json={"status": "planned"})
@@ -2132,7 +2112,7 @@ def test_patch_meeting_non_live(app: FastAPI, client: TestClient, fakes) -> None
 def test_patch_meeting_going_live_creates_protocol(
     app: FastAPI, client: TestClient, fakes, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # patch returns live; the router then creates the protocol and re-reads.
+    # patch returns live. The router then creates the protocol and re-reads it.
     fakes["meeting"]._meeting_out = _meeting_out(status="live")
 
     class _FakeProtocolService:
@@ -2151,7 +2131,6 @@ def test_patch_meeting_going_live_creates_protocol(
     assert r.json()["status"] == "live"
 
 
-# ---- attendance ------------------------------------------------------------
 def test_list_attendance_ok(app: FastAPI, client: TestClient, fakes) -> None:
     _login(app)
     r = client.get(f"/api/meetings/{uuid4()}/attendance")
@@ -2185,7 +2164,6 @@ def test_set_member_attendance_ok(app: FastAPI, client: TestClient, fakes) -> No
     assert "set_for" in fakes["attendance"].calls
 
 
-# ---- agenda ----------------------------------------------------------------
 def test_list_agenda_ok(app: FastAPI, client: TestClient, fakes) -> None:
     _login(app)
     r = client.get(f"/api/meetings/{uuid4()}/agenda")
@@ -2276,7 +2254,6 @@ def test_set_agenda_body_ok_broadcasts(app: FastAPI, client: TestClient, fakes) 
     assert fakes["meeting"].broadcasts == 1
 
 
-# ---- open_meeting_vote -----------------------------------------------------
 def test_open_vote_forbidden(app: FastAPI, client: TestClient, fakes) -> None:
     fakes["meeting"]._meeting_out = _meeting_out(can_manage_votes=False)
     _login(app)
@@ -2296,7 +2273,7 @@ def test_open_vote_not_live_conflict(app: FastAPI, client: TestClient, fakes) ->
 
 
 def test_open_vote_freetext_top_ok(app: FastAPI, client: TestClient, fakes) -> None:
-    # item.application_id None → freetext, skip the application_id branches.
+    # An item.application_id of None marks free text and skips the application branches.
     fakes["meeting"]._meeting_out = _meeting_out(status="live", can_manage_votes=True)
     _login(app)
     r = client.post(
@@ -2312,9 +2289,9 @@ def test_open_vote_application_top_with_quorum_and_eligible(
 ) -> None:
     from types import SimpleNamespace
 
-    # application TOP with explicit quorum_percent. AUD-042: a client-supplied
-    # ``eligibleCount`` MUST be ignored — the quorum denominator is always derived
-    # from the real roster (the fake's vote_eligible_count returns 7).
+    # An application agenda item with an explicit quorum_percent. AUD-042: the router
+    # MUST ignore a client-supplied ``eligibleCount``. The quorum denominator always
+    # comes from the real roster. The fake vote_eligible_count returns 7.
     fakes["agenda"].item_row = SimpleNamespace(id=uuid4(), application_id=uuid4())
     fakes["meeting"]._meeting_out = _meeting_out(status="live", can_manage_votes=True)
     _login(app)
@@ -2323,7 +2300,7 @@ def test_open_vote_application_top_with_quorum_and_eligible(
         json={
             "agendaItemId": str(uuid4()),
             "quorumPercent": 50,
-            "eligibleCount": 9,  # attacker override — must be ignored
+            "eligibleCount": 9,  # attacker override, the router must ignore it
         },
     )
     assert r.status_code == 200
@@ -2385,7 +2362,6 @@ def test_open_vote_default_quorum_from_gremium(
     assert r.status_code == 200
 
 
-# ---- delete_meeting_vote ---------------------------------------------------
 def test_delete_meeting_vote_forbidden(app: FastAPI, client: TestClient, fakes) -> None:
     fakes["meeting"]._meeting_out = _meeting_out(can_manage_votes=False)
     _login(app)
@@ -2402,9 +2378,7 @@ def test_delete_meeting_vote_ok(app: FastAPI, client: TestClient, fakes) -> None
     assert fakes["voting"].deleted and fakes["voting"].deleted[0][0] == vid
 
 
-# =========================================================================== #
-# router.py — WebSocket _authorize / _serve (ohne echte WS-Verbindung)
-# =========================================================================== #
+# router.py: WebSocket _authorize and _serve without a real WS connection
 class _FakeWS:
     def __init__(self) -> None:
         self.closed_code: int | None = None
@@ -2491,7 +2465,8 @@ async def test_authorize_voter_ok() -> None:
 
 
 async def test_serve_returns_early_on_unauthorized() -> None:
-    # _authorize returns None (unauthenticated) → _serve returns without accept().
+    # _authorize returns None for an unauthenticated client, so _serve returns before
+    # it calls accept().
     ws = _FakeWS()
     await _serve(
         ws,  # type: ignore[arg-type]
@@ -2530,9 +2505,7 @@ async def test_serve_accepts_and_runs(monkeypatch: pytest.MonkeyPatch) -> None:
     assert ws.accepted is True
 
 
-# =========================================================================== #
-# router.py — get_ws_principal + WS-Routen (meeting_socket/beamer_socket)
-# =========================================================================== #
+# router.py: get_ws_principal and the WS routes meeting_socket and beamer_socket
 async def test_get_ws_principal_delegates(monkeypatch: pytest.MonkeyPatch) -> None:
     from app.modules.livevote.router import get_ws_principal
 
@@ -2566,10 +2539,8 @@ async def test_meeting_and_beamer_socket_call_serve(
     assert calls == [False, True]
 
 
-# =========================================================================== #
-# service.py — Restabdeckung: Publisher / channel / assert_can_read / get /
-#              timeline-cursor / delete
-# =========================================================================== #
+# service.py, remaining coverage: publisher, channel, assert_can_read, get,
+# timeline cursor and delete
 def _capture_broker() -> Any:
     class _Cap:
         def __init__(self) -> None:
@@ -2665,7 +2636,8 @@ async def test_broker_publisher_skips_unbound_votes() -> None:
 
 
 async def test_assert_can_read_visible_returns() -> None:
-    # _visible_gremium_ids None (admin) → frühes return ohne Delegations-Query.
+    # _visible_gremium_ids gives None for an admin, so the method returns early and
+    # runs no delegation query.
     m = _meeting()
     svc = MeetingService(_QueueSession(executes=[res(m)]))  # type: ignore[arg-type]
     await svc.assert_can_read(m.id, _admin())
@@ -2678,7 +2650,8 @@ async def test_assert_can_read_forbidden(monkeypatch: pytest.MonkeyPatch) -> Non
         return set()
 
     monkeypatch.setattr(permissions_mod, "gremium_member_ids", _none)
-    # _get → m; _substitute_pool → empty (visible {}); _delegated → empty → 403.
+    # _get gives m. _substitute_pool is empty, so visible is empty too. _delegated is
+    # empty as well, so the call raises 403.
     svc = MeetingService(_QueueSession(executes=[res(m), res(), res()]))  # type: ignore[arg-type]
     with pytest.raises(ForbiddenError):
         await svc.assert_can_read(m.id, _principal())
@@ -2747,7 +2720,8 @@ async def test_delete_finalized_requires_permission(
 
     monkeypatch.setattr(MeetingService, "_protocol_final", _final)
     svc = MeetingService(_QueueSession(executes=[res(m)]))  # type: ignore[arg-type]
-    # Admin darf zwar verwalten, aber finalisiert → braucht meeting.delete_finalized.
+    # The admin may manage the meeting. A finalized protocol still needs the
+    # meeting.delete_finalized permission.
     with pytest.raises(ForbiddenError):
         await svc.delete(m.id, _principal("meeting.manage", sub="mgr"))
 
@@ -2772,14 +2746,12 @@ async def test_delete_ok_audits(monkeypatch: pytest.MonkeyPatch) -> None:
     assert calls[0]["data"]["finalizedProtocol"] is False
 
 
-# =========================================================================== #
-# attendance_service.py — _ensure_not_closed Raise-Branch
-# =========================================================================== #
+# attendance_service.py: the raise branch of _ensure_not_closed
 async def test_attendance_ensure_not_closed_raises() -> None:
     closed = _meeting(status="closed")
     with pytest.raises(ConflictError):
         AttendanceService._ensure_not_closed(closed)
-    # Offene Sitzung → kein Fehler.
+    # An open meeting raises no error.
     AttendanceService._ensure_not_closed(_meeting(status="live"))
 
 

@@ -11,13 +11,13 @@ from app.shared.altcha import AltchaSolutionStr
 
 
 class MagicLinkRequest(BaseModel):
-    """`POST /auth/magic-link` — anti-enumeration: the response is always 202."""
+    """Body of `POST /auth/magic-link`. The response is always 202 to block enumeration."""
 
     email: EmailStr
     application_id: UUID | None = None
-    # ALTCHA PoW solution. Structurally validated by the schema (malformed -> 422);
-    # cryptographic verification runs via `require_altcha`. Without a secret
-    # (dev/test) only the structural check remains.
+    # ALTCHA proof-of-work solution. The schema checks only the structure, so a
+    # malformed value gives 422. `require_altcha` runs the cryptographic check.
+    # Without a secret (dev and test) only the structural check remains.
     altcha: AltchaSolutionStr | None = None
 
 
@@ -26,22 +26,28 @@ class MagicLinkVerifyRequest(BaseModel):
 
 
 class MagicLinkVerifyOut(BaseModel):
-    """Applicant session travels only in the HttpOnly cookie, never in the body —
-    no token reachable from JS (XSS protection)."""
+    """Result of a magic-link verify.
+
+    The applicant session travels only in the HttpOnly cookie, never in the body.
+    JavaScript cannot read the token, which protects against XSS.
+    """
 
     application_id: UUID
     scope: Literal["edit", "view"]
 
 
 class LogoutOut(BaseModel):
-    """RP-initiated logout: `logout_url` (if OIDC) ends the Keycloak SSO session;
-    the frontend redirects the browser there. `null` for a purely local logout."""
+    """Result of an RP-initiated logout.
+
+    With OIDC, `logout_url` ends the Keycloak SSO session. The frontend must redirect
+    the browser there. A purely local logout gives `null`.
+    """
 
     logout_url: str | None = None
 
 
 class GremiumRef(BaseModel):
-    """Slim gremium reference for the "my gremien" view."""
+    """Slim Gremium reference for the "my Gremien" view."""
 
     id: UUID
     name: str
@@ -55,15 +61,17 @@ class MeOut(BaseModel):
     roles: list[str]
     permissions: list[str]
     groups: list[str]
-    # Gremien the principal is a member of (valid role assignment) — basis of
-    # the user-facing "my gremien" view.
+    # Gremien the principal is a member of (valid role assignment). This is the base of
+    # the user-facing "my Gremien" view.
     gremien: list[GremiumRef] = []
-    # Gremien the principal MANAGES via their gremium role (``session.manage``) —
-    # frontend gating for "create meeting" without global ``meeting.manage``.
+    # Gremien the principal MANAGES through a gremium role (`session.manage`). The
+    # frontend uses this to show "create meeting" without global `meeting.manage`.
     session_manage_gremien: list[UUID] = []
-    # At least one cost centre has a member gremium as visibility root —
-    # frontend gating of the budget tab without a global ``budget.*`` permission.
+    # True if at least one cost center has a Gremium of the principal as visibility
+    # root. The frontend uses this to show the budget tab without a global `budget.*`
+    # permission.
     has_scoped_budget_view: bool = False
-    # Principal is in at least one substitute pool — frontend gating so pool
-    # substitutes see the meeting timeline (live channel needs a concrete delegation).
+    # True if the principal is in at least one substitute pool. The frontend uses this
+    # to show the meeting timeline to pool substitutes. The live channel still needs a
+    # concrete delegation.
     in_substitute_pool: bool = False

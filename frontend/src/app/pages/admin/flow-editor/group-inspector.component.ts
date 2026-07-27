@@ -4,7 +4,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { ButtonComponent } from '@stupa-makers/ui-kit';
 import type { FlowGroup } from '../admin.models';
 
-/** Inspector panel for the currently opened (drilled-into) group. */
+/** Inspector panel for the group that is currently open (drilled into). */
 @Component({
   selector: 'app-group-inspector',
   standalone: true,

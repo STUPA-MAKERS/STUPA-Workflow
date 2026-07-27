@@ -4,16 +4,15 @@
   gap: var(--space-6);
 }
 
-/* Flex/grid items default to min-width:auto, so a long, non-breaking application
-   title (e.g. "Anschaffung Powerstation (~1 kWh) + Solarpanel") forces a panel
-   wider than the viewport on mobile. Clamp the item chain to 0 so the nowrap
-   .dash__row-title ellipsizes instead of overflowing the page. */
+/* Flex and grid items default to min-width: auto. A long application title without
+   a line break can make a panel wider than the viewport on mobile. This rule clamps
+   the item chain to 0, so the nowrap .dash__row-title class shows an ellipsis
+   instead of overflowing. */
 :host > *,
 .dash__panels > * {
   min-width: 0;
 }
 
-/* --- Primary CTA --------------------------------------------------------- */
 .dash__cta {
   display: flex;
   align-items: center;
@@ -52,7 +51,6 @@
   white-space: nowrap;
 }
 
-/* --- Antrags-Panels ------------------------------------------------------ */
 .dash__panels {
   display: grid;
   grid-template-columns: 1fr;
@@ -96,7 +94,6 @@
 .dash__row:last-child {
   border-bottom: none;
 }
-// Tap on a row (link/CTA activates the whole row via the :active chain).
 .dash__row:active {
   background: var(--color-surface-sunken);
   border-radius: var(--radius-md);
@@ -158,7 +155,6 @@
   text-decoration: underline;
 }
 
-/* --- Schnellzugriffe ----------------------------------------------------- */
 .dash__quick-h {
   margin: 0 0 var(--space-4);
   font-size: var(--fs-md);
@@ -185,7 +181,6 @@
   font-size: var(--fs-sm);
 }
 
-/* Compact meeting tile: flat anchor (no app-card), badge top-right. */
 .dash__session {
   position: relative;
   display: flex;
@@ -228,12 +223,11 @@
   font-variant-numeric: tabular-nums;
 }
 .dash__session .dash__link {
-  /* "Join live" bottom-left in the tile. */
+  /* Push the link to the bottom left of the tile. */
   margin-top: auto;
   align-self: start;
 }
 
-/* Mobile (≤768px): list rows may wrap, CTA more compact. */
 @media (max-width: 768px) {
   .dash__cta {
     padding: var(--space-4) var(--space-5);
@@ -247,7 +241,7 @@
   .dash__row-meta {
     flex-wrap: wrap;
   }
-  /* Quick-access tiles single-column — full tap targets. */
+  /* One column so each tile is a full-width tap target. */
   .dash__grid {
     grid-template-columns: 1fr;
   }

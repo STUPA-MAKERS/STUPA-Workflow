@@ -4,8 +4,8 @@ import { homeRedirectGuard } from '@core/auth/home-redirect.guard';
 import { ShellComponent } from './layout/shell.component';
 
 /**
- * Routing skeleton. OIDC areas are protected by `authGuard`; individual areas
- * additionally require an RBAC permission (`data.permission`).
+ * Routing skeleton. `authGuard` protects the OIDC areas. Some areas also need an RBAC
+ * permission (`data.permission`).
  */
 export const routes: Routes = [
   {
@@ -14,7 +14,8 @@ export const routes: Routes = [
     children: [
       {
         path: '',
-        // Authenticated → /dashboard; public landing page only for applicants.
+        // An authenticated user goes to /dashboard. Only an applicant sees the public
+        // landing page.
         canActivate: [homeRedirectGuard],
         loadComponent: () => import('./pages/home.component').then((m) => m.HomeComponent),
       },
@@ -41,8 +42,9 @@ export const routes: Routes = [
           ),
       },
       {
-        // Magic-link target: {public_base_url}/antrag/{id}#t={token}. Public
-        // (applicant token instead of login); the component resolves fragment + :id.
+        // Magic-link target: {public_base_url}/antrag/{id}#t={token}. The route is public
+        // and uses an applicant token instead of a login. The component resolves the
+        // fragment and :id.
         path: 'antrag/:id',
         data: { title: 'status.heading' },
         loadComponent: () =>
@@ -59,8 +61,8 @@ export const routes: Routes = [
       },
       {
         path: 'applications',
-        // No permission gate: without ``application.read`` you see your own
-        // applications (server filters on ``created_by``).
+        // No permission gate: without `application.read` you see only your own
+        // applications. The server filters on `created_by`.
         data: { title: 'nav.applications', wide: true },
         canActivate: [authGuard],
         loadComponent: () =>
@@ -70,15 +72,16 @@ export const routes: Routes = [
       },
       {
         path: 'tasks',
-        // No permission gate: shows at least your own applications in an editable state.
+        // No permission gate: the tab shows at least your own applications in an editable
+        // state.
         data: { title: 'nav.tasks' },
         canActivate: [authGuard],
         loadComponent: () => import('./pages/tasks/tasks.component').then((m) => m.TasksComponent),
       },
       {
         path: 'applications/:id',
-        // No permission gate: creators can reach their own application; the server
-        // authorizes (``application.read``/owner/magic-link).
+        // No permission gate: a creator can reach their own application. The server
+        // authorizes through `application.read`, owner, or magic-link.
         data: { title: 'applications.detail.crumb', parent: ['applications'], wide: true },
         canActivate: [authGuard],
         loadComponent: () =>
@@ -94,7 +97,7 @@ export const routes: Routes = [
           import('./features/voting/live-vote.component').then((m) => m.LiveVoteComponent),
       },
       {
-        // Beamer/projector view (read-only). Declared before `vote/:id`.
+        // Read-only beamer view for the projector. Declared before `vote/:id`.
         path: 'voting/beamer',
         data: { title: 'voting.beamer.heading', permission: 'meeting.manage' },
         canActivate: [authGuard],
@@ -117,8 +120,8 @@ export const routes: Routes = [
       },
       {
         path: 'voting/vote/:id',
-        // Delegation recipients may reach the ballot without vote.cast — the server
-        // decides voting rights (delegation check).
+        // A delegation recipient can reach the ballot without vote.cast. The server
+        // decides the voting rights with the delegation check.
         data: {
           title: 'voting.cast.heading',
           permission: ['vote.cast', 'vote.manage'],
@@ -130,7 +133,8 @@ export const routes: Routes = [
       },
       {
         path: 'meetings',
-        // Committee members can reach their meetings even without manage/protocol.write.
+        // A Gremium member can reach their own meetings without meeting.manage or
+        // protocol.write.
         data: {
           title: 'nav.meetings',
           permission: ['meeting.manage', 'protocol.write'],
@@ -142,8 +146,8 @@ export const routes: Routes = [
       },
       {
         path: 'meetings/:id',
-        // `allowAuthenticated`: delegation recipients may be neither member nor
-        // permitted — the server scopes the meeting view.
+        // `allowAuthenticated`: a delegation recipient can be neither a member nor
+        // permitted. The server scopes the meeting view.
         data: {
           title: 'meetings.detailCrumb',
           parent: ['meetings'],
@@ -158,7 +162,7 @@ export const routes: Routes = [
       },
       {
         path: 'budget',
-        // Gremien with an assigned cost centre see the tab scoped.
+        // A Gremium with an assigned cost center sees a scoped tab.
         data: { title: 'nav.budget', permission: ['budget.view', 'budget.structure', 'budget.book'], allowScopedBudgetView: true, wide: true },
         canActivate: [authGuard],
         loadComponent: () =>
@@ -175,15 +179,16 @@ export const routes: Routes = [
       },
       {
         path: 'invoices',
-        // Narrow body like the tasks tab: no `wide` → default container width.
+        // Narrow body like the tasks tab: no `wide` keeps the default container width.
         data: { title: 'nav.invoices', permission: ['budget.view', 'budget.structure', 'budget.book'] },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/invoices/invoices.component').then((m) => m.InvoicesComponent),
       },
       {
-        // Account reconciliation: transactions ↔ bookings per account + balance.
-        // English path (/accounts) for consistency with /expenses, /invoices, /budget.
+        // Account reconciliation: transactions against bookings per account, plus the
+        // balance. The path stays English (/accounts) to match /expenses, /invoices and
+        // /budget.
         path: 'accounts',
         data: { title: 'nav.konten', permission: ['budget.view', 'budget.structure', 'budget.book'], wide: true },
         canActivate: [authGuard],
@@ -191,7 +196,6 @@ export const routes: Routes = [
           import('./pages/konten/konten.component').then((m) => m.KontenComponent),
       },
       {
-        // Cost-centre tree in the admin area.
         path: 'admin/budget-pots',
         data: { title: 'budget.tree.title', permission: 'budget.structure', parent: ['admin'], wide: true },
         canActivate: [authGuard],
@@ -199,7 +203,7 @@ export const routes: Routes = [
           import('./pages/budget/budget-tree.component').then((m) => m.BudgetTreeComponent),
       },
       {
-        // Accounts (name + IBAN) in the admin area — not bound to cost centres.
+        // Accounts hold a name and an IBAN. They are not bound to a cost center.
         path: 'admin/accounts',
         data: { title: 'admin.accounts.title', permission: 'account.manage', parent: ['admin'] },
         canActivate: [authGuard],
@@ -232,7 +236,7 @@ export const routes: Routes = [
           import('./pages/admin/roles/roles.component').then((m) => m.AdminRolesComponent),
       },
       {
-        // OIDC group → role mappings.
+        // Maps an OIDC group to a role.
         path: 'admin/group-mappings',
         data: { title: 'admin.groupMappings.title', permission: 'admin.group_mappings', parent: ['admin'] },
         canActivate: [authGuard],
@@ -349,7 +353,7 @@ export const routes: Routes = [
           ),
       },
       {
-        // Platform notifications: task reminders.
+        // Platform-wide notification settings, such as the task reminders.
         path: 'admin/notifications',
         data: {
           title: 'admin.notifications.title',
@@ -363,7 +367,7 @@ export const routes: Routes = [
           ),
       },
       {
-        // OAuth consent: after login, choose scope + token lifetime.
+        // OAuth consent: after the login the user picks the scope and the token lifetime.
         path: 'oauth/consent',
         data: { title: 'account.consent.title' },
         canActivate: [authGuard],
@@ -371,7 +375,7 @@ export const routes: Routes = [
           import('./pages/account/consent.component').then((m) => m.OAuthConsentComponent),
       },
       {
-        // Account → API access: manage your own OAuth grants + download the MCP package.
+        // API access: manage your own OAuth grants and download the MCP package.
         path: 'account/grants',
         data: { title: 'account.grants.title' },
         canActivate: [authGuard],
@@ -379,7 +383,7 @@ export const routes: Routes = [
           import('./pages/account/grants.component').then((m) => m.AccountGrantsComponent),
       },
       {
-        // Account → notifications: your own mail switches (opt-out).
+        // Your own mail switches. Each switch is an opt-out.
         path: 'account/notifications',
         data: { title: 'account.notifications.title' },
         canActivate: [authGuard],
@@ -389,7 +393,7 @@ export const routes: Routes = [
           ),
       },
       {
-        // Account → calendar subscription: personal iCal feed URL for your meetings.
+        // Calendar subscription: the personal iCal feed URL for your meetings.
         path: 'account/calendar',
         data: { title: 'account.calendar.title' },
         canActivate: [authGuard],

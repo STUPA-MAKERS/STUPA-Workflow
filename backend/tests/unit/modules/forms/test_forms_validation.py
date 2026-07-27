@@ -1,8 +1,9 @@
-"""TDD: reine Form-Engine T-11 (validate_definition/effective_form/validate_answers).
+"""Pure form engine T-11 (validate_definition, effective_form, validate_answers).
 
-Akzeptanzkriterien: jeder Feldtyp valid/invalid; required; visibleIf (sichtbar⇒
-Pflicht); compute korrekt; unbekannter Typ → Fehler; effective_form-Sektionen;
-promoted-Extraktion.
+Acceptance criteria: every field type passes and fails as expected. Required fields
+apply. A visible visibleIf field becomes mandatory. compute derives the right value.
+An unknown type raises an error. effective_form builds the sections. extract_promoted
+reads the promoted values.
 """
 
 from __future__ import annotations
@@ -45,9 +46,6 @@ def _errkeys(exc: AnswerValidationError) -> set[str]:
     return {e.field for e in exc.errors}
 
 
-# --------------------------------------------------------------------------- #
-# validate_definition
-# --------------------------------------------------------------------------- #
 def test_validate_definition_ok() -> None:
     validate_definition([_field("title", "text"), _field("amount", "currency")])
 
@@ -71,23 +69,20 @@ def test_validate_definition_promoted_numeric_ok() -> None:
 
 
 def test_validate_definition_rejects_bad_pattern() -> None:
-    # S1: defektes Regex-Pattern würde sonst erst zur Antwort-Laufzeit als 500 knallen.
+    # S1: without this gate, a broken regex pattern causes a 500 at answer time.
     with pytest.raises(FormDefinitionError, match="invalid validation pattern"):
         validate_definition([_field("t", "text", validation={"pattern": "["})])
 
 
 def test_validate_definition_rejects_bad_jsonlogic() -> None:
-    # FormFieldDef validiert JsonLogic beim Bau; hier nach dem Bau verbogen, um den
-    # defensiven Speicher-Gate-Zweig in validate_definition zu prüfen.
+    # FormFieldDef validates JsonLogic at build time. This test bends the field after
+    # the build to reach the defensive storage gate in validate_definition.
     f = _field("t", "text")
     f.visible_if = {"system": ["rm", "-rf"]}
     with pytest.raises(FormDefinitionError, match="invalid expression"):
         validate_definition([f])
 
 
-# --------------------------------------------------------------------------- #
-# effective_form
-# --------------------------------------------------------------------------- #
 def test_effective_form_main_only_without_pot() -> None:
     sections = effective_form([_field("title", "text")])
     assert sections == [FormSection(key="main", fields=[_field("title", "text")])]
@@ -125,7 +120,6 @@ def test_effective_form_splits_at_section_markers() -> None:
             _field("b", "currency"),
         ]
     )
-    # main (title + a) then a labelled "step2" section (b); markers are NOT fields.
     assert [s.key for s in sections] == ["main", "step2"]
     assert [f.key for f in sections[0].fields] == ["title", "a"]
     assert [f.key for f in sections[1].fields] == ["b"]
@@ -140,15 +134,14 @@ def test_effective_form_leading_section_titles_first_section() -> None:
             _field("a", "text"),
         ]
     )
-    # A leading marker titles the first section instead of creating an empty one.
     assert [s.key for s in sections] == ["intro"]
     assert sections[0].label == {"de": "Start"}
-    # title is auto-injected (no title field present) → intro section holds title + a.
+    # No title field is present, so the engine injects one into the intro section.
     assert [f.key for f in sections[0].fields] == [SYSTEM_TITLE_KEY, "a"]
 
 
 def test_validate_answers_ignores_section_markers() -> None:
-    # A section marker is never "required" and contributes no answer value.
+    # A section marker is never required and it carries no answer value.
     result = validate_answers(
         [_field("s", "section", label={"de": "X"}), _field("name", "text")],
         {"name": "ok"},
@@ -156,9 +149,6 @@ def test_validate_answers_ignores_section_markers() -> None:
     assert result == {"name": "ok"}
 
 
-# --------------------------------------------------------------------------- #
-# positions (Kostenpositionen + Vergleichsangebote)
-# --------------------------------------------------------------------------- #
 def _positions_field(**kw: Any) -> FormFieldDef:
     return _field("positions", "positions", **kw)
 
@@ -185,7 +175,7 @@ def test_positions_too_few_offers_and_no_preferred() -> None:
 
 
 def test_positions_default_min_offers_is_three() -> None:
-    field = _positions_field()  # keine validation → Default 3
+    field = _positions_field()  # no validation block, so minOffers falls back to 3
     value = [_position("P", ("A", 1, True), ("B", 2, False))]
     errors: list[FieldError] = []
     _validate_value(field, value, errors)
@@ -209,7 +199,7 @@ def test_positions_min_positions() -> None:
 
 
 def test_positions_engine_max_positions_ceiling() -> None:
-    # Auch ohne maxPositions greift die Engine-Decke (#sec-audit AUD-047).
+    # The engine ceiling applies even without maxPositions (#sec-audit AUD-047).
     field = _positions_field(validation={"minOffers": 1, "maxPositions": 2})
     value = [_position(f"P{i}", ("A", 5, True)) for i in range(3)]
     errors: list[FieldError] = []
@@ -218,7 +208,7 @@ def test_positions_engine_max_positions_ceiling() -> None:
 
 
 def test_positions_engine_default_max_positions() -> None:
-    field = _positions_field(validation={"minOffers": 1})  # keine maxPositions → Default-Decke
+    field = _positions_field(validation={"minOffers": 1})  # no maxPositions, so the cap applies
     value = [_position(f"P{i}", ("A", 5, True)) for i in range(201)]
     errors: list[FieldError] = []
     _validate_value(field, value, errors)
@@ -234,7 +224,7 @@ def test_positions_engine_max_offers_ceiling() -> None:
 
 
 def test_positions_no_offers_opt_out_with_reason_needs_one_offer() -> None:
-    # Opt-out (default allowed): one offer + reason is enough despite minOffers 3.
+    # The engine allows the opt-out by default. One offer plus a reason beats minOffers 3.
     field = _positions_field(validation={"minOffers": 3})
     value = [
         _position("Spezialgerät", ("Einziger Anbieter", 500, True))
@@ -272,26 +262,25 @@ def test_positions_no_offers_rejected_when_disallowed() -> None:
 
 
 def test_table_default_max_rows_ceiling() -> None:
-    # Tabelle ohne maxRows: Default-Decke verhindert unbegrenzte Zeilenzahl.
+    # A table without maxRows keeps the default cap on the row count.
     f = _field("rows", "table")
     with pytest.raises(AnswerValidationError):
         validate_answers([f], {"rows": [{"i": n} for n in range(1001)]})
 
 
 def test_table_explicit_max_rows_zero_rejects_any_row() -> None:
-    # AUD-047-Regression: ein explizit konfiguriertes maxRows=0 (ge=0 ⇒ gültig) MUSS
-    # jede Zeile ablehnen und darf NICHT durch falsy-`or` auf die Default-Decke
-    # (1000) zurückfallen.
+    # AUD-047 regression: an explicit maxRows=0 is valid (ge=0) and must reject every
+    # row. A falsy `or` must not fall back to the default cap of 1000.
     f = _field("rows", "table", validation={"maxRows": 0})
     with pytest.raises(AnswerValidationError) as exc:
         validate_answers([f], {"rows": [{"a": 1}, {"b": 2}, {"c": 3}]})
     assert "rows" in _errkeys(exc.value)
-    # Eine leere Tabelle bleibt bei maxRows=0 gültig (0 Zeilen ≤ 0).
+    # An empty table stays valid at maxRows=0 because 0 rows is not more than 0.
     assert validate_answers([f], {"rows": []}) == {"rows": []}
 
 
 def test_table_configured_max_rows_capped_at_engine_ceiling() -> None:
-    # Ein vom Builder gesetzter Wert über der Engine-Decke kann diese nicht aushebeln.
+    # A builder value above the engine cap cannot lift that cap.
     f = _field("rows", "table", validation={"maxRows": 100000})
     with pytest.raises(AnswerValidationError):
         validate_answers([f], {"rows": [{"i": n} for n in range(1001)]})
@@ -317,9 +306,6 @@ def test_extract_promoted_positions_feeds_amount() -> None:
     assert extract_promoted(fields, data) == {"amount": Decimal("650")}
 
 
-# --------------------------------------------------------------------------- #
-# validate_answers — required + presence
-# --------------------------------------------------------------------------- #
 def test_required_missing_field_errors() -> None:
     with pytest.raises(AnswerValidationError) as ei:
         validate_answers([_field("title", "text", required=True)], {})
@@ -343,39 +329,33 @@ def test_collects_all_errors() -> None:
     assert _errkeys(ei.value) == {"a", "b"}
 
 
-# --------------------------------------------------------------------------- #
-# validate_answers — pro Feldtyp valid/invalid
-# --------------------------------------------------------------------------- #
 def test_text_valid_and_constraints() -> None:
     f = _field("t", "text", validation={"minLen": 2, "maxLen": 4, "pattern": "[a-z]+"})
     assert validate_answers([f], {"t": "abc"}) == {"t": "abc"}
-    # nur Längen-Constraints (kein pattern) → durchläuft ohne Fehler
     len_only = _field("t", "text", validation={"minLen": 2, "maxLen": 4})
     assert validate_answers([len_only], {"t": "abc"}) == {"t": "abc"}
     with pytest.raises(AnswerValidationError):
-        validate_answers([f], {"t": "a"})  # too short
+        validate_answers([f], {"t": "a"})
     with pytest.raises(AnswerValidationError):
-        validate_answers([f], {"t": "abcde"})  # too long
+        validate_answers([f], {"t": "abcde"})
     with pytest.raises(AnswerValidationError):
-        validate_answers([f], {"t": "AB"})  # pattern (also too short, both error)
+        validate_answers([f], {"t": "AB"})
     with pytest.raises(AnswerValidationError):
-        validate_answers([_field("t", "text")], {"t": 123})  # not a string
+        validate_answers([_field("t", "text")], {"t": 123})
 
 
 def test_text_runtime_bad_pattern_is_422_not_500() -> None:
-    # Defense-in-depth: ein (über validate_definition normalerweise abgewiesenes)
-    # defektes Pattern darf zur Laufzeit kein 500 erzeugen.
+    # Defense in depth: validate_definition normally rejects a broken pattern. At
+    # runtime a broken pattern must not cause a 500.
     f = _field("t", "text", validation={"pattern": "["})
     with pytest.raises(AnswerValidationError) as ei:
         validate_answers([f], {"t": "x"})
     assert ei.value.errors[0].msg == "field has an invalid validation pattern"
 
 
-# --------------------------------------------------------------------------- #
-# ReDoS-Härtung: Längenobergrenze + Wand-Timeout (security.md)
-# --------------------------------------------------------------------------- #
+# ReDoS hardening: input length cap plus wall-clock timeout (security.md)
 def test_pattern_value_over_length_cap_is_rejected() -> None:
-    # Wert über _PATTERN_MAX_INPUT_LEN → unbedingt »passt nicht« (kein Match-Versuch).
+    # A value above _PATTERN_MAX_INPUT_LEN never matches. The engine skips the match.
     from app.modules.forms.validation import _PATTERN_MAX_INPUT_LEN
 
     f = _field("t", "text", validation={"pattern": ".*"})
@@ -386,7 +366,7 @@ def test_pattern_value_over_length_cap_is_rejected() -> None:
 
 
 def test_pattern_value_at_length_cap_still_matches() -> None:
-    # Wert exakt am Limit → regulär gematcht (kein Cap-Abbruch).
+    # A value exactly at the limit runs the normal match. The cap does not cut in.
     from app.modules.forms.validation import _PATTERN_MAX_INPUT_LEN
 
     f = _field("t", "text", validation={"pattern": "a*"})
@@ -395,7 +375,8 @@ def test_pattern_value_at_length_cap_still_matches() -> None:
 
 
 def test_pattern_match_timeout_is_422(monkeypatch: pytest.MonkeyPatch) -> None:
-    # Wand-Timeout (ReDoS) → Feldfehler statt Event-Loop-Hänger/500.
+    # A wall-clock timeout (ReDoS) gives a field error. It never stalls the event
+    # loop and it never gives a 500.
     from concurrent.futures import TimeoutError as FutureTimeout
 
     from app.modules.forms import validation as val_mod
@@ -423,9 +404,9 @@ def test_number_valid_and_range() -> None:
     with pytest.raises(AnswerValidationError):
         validate_answers([f], {"n": 11})
     with pytest.raises(AnswerValidationError):
-        validate_answers([_field("n", "number")], {"n": True})  # bool not number
+        validate_answers([_field("n", "number")], {"n": True})  # a bool is not a number
     with pytest.raises(AnswerValidationError):
-        validate_answers([_field("n", "number")], {"n": "x"})  # unparseable
+        validate_answers([_field("n", "number")], {"n": "x"})
 
 
 def test_currency_valid() -> None:
@@ -438,13 +419,13 @@ def test_currency_valid() -> None:
 @pytest.mark.parametrize("ftype", ["number", "currency"])
 @pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf"), "NaN", "Infinity"])
 def test_number_currency_non_finite_is_422_not_500(ftype: str, bad: object) -> None:
-    # B1: Decimal("NaN") konstruiert ohne Fehler, würde aber bei min/max-Vergleich
-    # decimal.InvalidOperation werfen → 500. Muss als 422-Feldfehler enden.
+    # B1: Decimal("NaN") builds without an error. A min or max compare then raises
+    # decimal.InvalidOperation and gives a 500. This must end as a 422 field error.
     plain = _field("n", ftype)
     with pytest.raises(AnswerValidationError) as ei:
         validate_answers([plain], {"n": bad})
     assert ei.value.errors[0].msg == "must be a finite number"
-    # auch mit Range-Constraints (der eigentliche Krach-Pfad)
+    # Also test the range constraints, because that is the path that really breaks.
     ranged = _field("n", ftype, validation={"min": 0, "max": 10})
     with pytest.raises(AnswerValidationError):
         validate_answers([ranged], {"n": bad})
@@ -468,8 +449,8 @@ def test_select_valid_invalid() -> None:
 
 @pytest.mark.parametrize("bad", [1, True, 1.0, ["a"], {"a": 1}])
 def test_select_non_string_is_422_not_500(bad: object) -> None:
-    # FieldOption.value ist str; Nicht-Strings (auch unhashbare wie dict/list)
-    # müssen sauber als "ungültige Option" abgelehnt werden, nie ein 500.
+    # FieldOption.value is a str. A non-string value, also an unhashable dict or
+    # list, must end as an invalid option and never as a 500.
     f = _field("s", "select", options=[{"value": "a", "label": {"de": "A"}}])
     with pytest.raises(AnswerValidationError):
         validate_answers([f], {"s": bad})
@@ -489,8 +470,8 @@ def test_multiselect_valid_invalid() -> None:
 
 
 def test_multiselect_unhashable_element_is_422_not_500() -> None:
-    # Ein unhashbares Element (dict/list) darf keinen TypeError beim
-    # Membership-Test auslösen, sondern muss als ungültige Option enden.
+    # An unhashable element such as a dict or a list must not raise a TypeError in
+    # the membership test. It must end as an invalid option.
     f = _field("m", "multiselect", options=[{"value": "a", "label": {"de": "A"}}])
     with pytest.raises(AnswerValidationError):
         validate_answers([f], {"m": ["a", {"nested": 1}]})
@@ -503,7 +484,7 @@ def test_dynamic_select_uuid_valid_invalid(ftype: str) -> None:
     f = _field("ziel", ftype)
     good = "00000000-0000-0000-0000-0000000060e1"
     assert validate_answers([f], {"ziel": good}) == {"ziel": good}
-    # (Ein leerer String gilt als »nicht vorhanden« und wird — nicht-Pflicht — übersprungen.)
+    # An empty string counts as absent. The engine skips it because the field is optional.
     for bad in ("not-a-uuid", 42):
         with pytest.raises(AnswerValidationError):
             validate_answers([f], {"ziel": bad})
@@ -519,7 +500,7 @@ def test_email_field_valid_invalid() -> None:
 
 def test_iban_field_checksum() -> None:
     f = _field("iban", "iban")
-    # Gültige Test-IBAN (Mod-97) — Leerzeichen erlaubt.
+    # A valid test IBAN (mod 97). The engine accepts spaces.
     assert validate_answers([f], {"iban": "DE89 3704 0044 0532 0130 00"}) == {
         "iban": "DE89 3704 0044 0532 0130 00"
     }
@@ -534,10 +515,10 @@ def test_daterange_field_valid_invalid() -> None:
     assert validate_answers([f], {"zr": ok}) == {"zr": ok}
     for bad in (
         "not-a-dict",
-        {"from": "2026-01-01"},  # 'to' fehlt
-        {"from": "2026-01-05", "to": "2026-01-01"},  # from > to
-        {"from": "nope", "to": "2026-01-01"},  # kein ISO
-        {"from": 1, "to": 2},  # keine Strings
+        {"from": "2026-01-01"},
+        {"from": "2026-01-05", "to": "2026-01-01"},
+        {"from": "nope", "to": "2026-01-01"},
+        {"from": 1, "to": 2},
     ):
         with pytest.raises(AnswerValidationError):
             validate_answers([f], {"zr": bad})
@@ -563,11 +544,11 @@ def test_table_valid_invalid() -> None:
     ok = {"rows": [{"item": "a"}, {"item": "b"}]}
     assert validate_answers([f], ok) == ok
     with pytest.raises(AnswerValidationError):
-        validate_answers([f], {"rows": [{"a": 1}, {"b": 2}, {"c": 3}]})  # > maxRows
+        validate_answers([f], {"rows": [{"a": 1}, {"b": 2}, {"c": 3}]})
     with pytest.raises(AnswerValidationError):
-        validate_answers([f], {"rows": "nope"})  # not a list
+        validate_answers([f], {"rows": "nope"})
     with pytest.raises(AnswerValidationError):
-        validate_answers([f], {"rows": ["nope"]})  # row not object
+        validate_answers([f], {"rows": ["nope"]})
 
 
 def test_markdown_valid() -> None:
@@ -575,16 +556,13 @@ def test_markdown_valid() -> None:
 
 
 def test_unknown_type_errors() -> None:
-    # FormFieldDef.type ist Literal — unbekannter Typ wird über den internen
-    # Dispatcher mit einem Pseudo-Feld geprüft (defensiver else-Zweig).
+    # FormFieldDef.type is a Literal. This test drives the internal dispatcher with a
+    # fake field to reach the defensive else branch.
     errors: list[FieldError] = []
     _validate_value(SimpleNamespace(key="x", type="bogus"), "v", errors)  # type: ignore[arg-type]
     assert errors and "unknown field type" in errors[0].msg
 
 
-# --------------------------------------------------------------------------- #
-# visibleIf — sichtbar ⇒ Pflicht
-# --------------------------------------------------------------------------- #
 def test_visible_if_hidden_skips_required() -> None:
     f = _field(
         "iban",
@@ -592,7 +570,6 @@ def test_visible_if_hidden_skips_required() -> None:
         required=True,
         visibleIf={"==": [{"var": "has_budget"}, True]},
     )
-    # nicht sichtbar (has_budget False) → required nicht erzwungen
     assert validate_answers([f], {}, context={"has_budget": False}) == {}
 
 
@@ -609,8 +586,8 @@ def test_visible_if_visible_enforces_required() -> None:
 
 
 def test_visible_if_eval_error_is_conservatively_visible() -> None:
-    # T-05 and/or ohne Kurzschluss: {">":[var y,0]} wirft bei fehlendem y →
-    # konservativ sichtbar ⇒ required greift.
+    # T-05: and/or do not short-circuit. {">": [var y, 0]} raises when y is missing.
+    # The field then counts as visible, so required applies.
     f = _field(
         "x",
         "text",
@@ -621,9 +598,6 @@ def test_visible_if_eval_error_is_conservatively_visible() -> None:
         validate_answers([f], {}, context={"flag": False})
 
 
-# --------------------------------------------------------------------------- #
-# compute — abgeleitete Felder
-# --------------------------------------------------------------------------- #
 def test_compute_derives_value() -> None:
     fields = [
         _field("qty", "number"),
@@ -647,17 +621,14 @@ def test_compute_value_visible_in_visible_if() -> None:
         _field("total", "computed", compute={"+": [{"var": "qty"}, 1]}),
         _field("note", "text", required=True, visibleIf={">": [{"var": "total"}, 5]}),
     ]
-    # total = 5 → note hidden, kein Pflichtfehler
+    # total is 5, so note stays hidden and no required error appears.
     assert "note" not in validate_answers(fields, {"qty": 4})
-    # total = 11 → note sichtbar ⇒ Pflicht
+    # total is 11, so note becomes visible and required applies.
     with pytest.raises(AnswerValidationError) as ei:
         validate_answers(fields, {"qty": 10})
     assert _errkeys(ei.value) == {"note"}
 
 
-# --------------------------------------------------------------------------- #
-# extract_promoted
-# --------------------------------------------------------------------------- #
 def test_extract_promoted_numeric_to_decimal() -> None:
     fields = [_field("amount", "currency", isPromoted=True, promoteTarget="amount")]
     assert extract_promoted(fields, {"amount": "250.00"}) == {"amount": Decimal("250.00")}
@@ -683,6 +654,6 @@ def test_extract_promoted_unparseable_numeric_skipped() -> None:
 
 @pytest.mark.parametrize("bad", [float("nan"), float("inf"), "NaN", "Infinity"])
 def test_extract_promoted_non_finite_skipped(bad: object) -> None:
-    # B1: niemals Decimal('NaN')/Decimal('Infinity') als amount weiterreichen.
+    # B1: never pass a Decimal NaN or a Decimal Infinity on as an amount.
     fields = [_field("amount", "currency", isPromoted=True, promoteTarget="amount")]
     assert extract_promoted(fields, {"amount": bad}) == {}

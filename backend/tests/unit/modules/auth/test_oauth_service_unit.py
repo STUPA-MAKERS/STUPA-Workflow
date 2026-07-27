@@ -1,7 +1,8 @@
-"""Unit: OAuth-Service-Fehlerzweige (``exchange_code``/``refresh_tokens``) ohne DB.
+"""Unit tests of the OAuth service error branches without a database.
 
-Der Happy-Path liegt in der Integration (``test_oauth_flow``); hier nur die
-``invalid_grant``-Zweige (abgelaufener Code, Client-Mismatch, abgelaufener Refresh).
+The tests cover `exchange_code` and `refresh_tokens`. The success path lives in the
+integration test `test_oauth_flow`. This module covers only the `invalid_grant`
+branches: an expired code, a client mismatch and an expired refresh token.
 """
 
 from __future__ import annotations
@@ -39,8 +40,11 @@ async def test_exchange_code_expired_rejected() -> None:
 async def test_exchange_code_atomic_claim_lost_rejected(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Code passiert die Validierung, aber das atomare ``UPDATE ... RETURNING`` liefert
-    0 Zeilen (nebenläufig bereits verbraucht, AUD-003) → ``invalid_grant``."""
+    """Reject a code that passes validation but loses the atomic claim.
+
+    The atomic `UPDATE ... RETURNING` returns zero rows, because a concurrent request
+    already used the code (AUD-003). The service raises `invalid_grant`.
+    """
     monkeypatch.setattr(oauth, "verify_pkce_s256", lambda *_: True)
     row = SimpleNamespace(
         id=uuid4(),
@@ -50,7 +54,7 @@ async def test_exchange_code_atomic_claim_lost_rejected(
         redirect_uri="r",
         code_challenge="chal",
     )
-    # 1) SELECT liefert die gültige Code-Zeile, 2) UPDATE...RETURNING liefert nichts.
+    # 1) SELECT returns the valid code row, 2) UPDATE ... RETURNING returns nothing.
     db = fake_session(result(row), result())
     with pytest.raises(oauth.OAuthError) as exc:
         await oauth_service.exchange_code(
@@ -68,8 +72,11 @@ async def test_exchange_code_atomic_claim_lost_rejected(
 
 
 async def test_refresh_tokens_atomic_rotate_lost_rejected() -> None:
-    """Refresh passiert die Validierung, aber das atomare Rotations-``UPDATE`` liefert
-    0 Zeilen (nebenläufig bereits rotiert, AUD-020) → ``invalid_grant``."""
+    """Reject a refresh token that passes validation but loses the atomic rotation.
+
+    The rotation `UPDATE` returns zero rows, because a concurrent request already
+    rotated the token (AUD-020). The service raises `invalid_grant`.
+    """
     row = SimpleNamespace(
         id=uuid4(),
         revoked_at=None,
@@ -78,7 +85,7 @@ async def test_refresh_tokens_atomic_rotate_lost_rejected() -> None:
         principal_id=uuid4(),
     )
     principal = SimpleNamespace(active=True)
-    # 1) SELECT Token, 2) SELECT Principal (aktiv), 3) UPDATE...RETURNING → nichts.
+    # 1) SELECT token, 2) SELECT principal (active), 3) UPDATE ... RETURNING gives nothing.
     db = fake_session(result(row), result(principal), result())
     with pytest.raises(oauth.OAuthError) as exc:
         await oauth_service.refresh_tokens(

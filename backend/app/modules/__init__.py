@@ -1,4 +1,4 @@
 """Domain modules (auth, applications, forms, flow, ...).
 
-Each module exports a `router` mounted under /api by main.create_app.
+Each module exports a `router`. `main.create_app` mounts each router under /api.
 """

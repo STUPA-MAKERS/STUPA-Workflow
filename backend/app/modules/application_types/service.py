@@ -1,7 +1,8 @@
 """Application-types service (DB layer).
 
-Publicly only offerable types are listed (an active form version exists);
-``form.configure`` additionally reveals inactive types and admin fields.
+The public list holds the offerable types only. A type is offerable when it has
+an active form version. `form.configure` also reveals the inactive types and the
+admin fields.
 """
 
 from __future__ import annotations
@@ -18,7 +19,7 @@ from app.shared.paging import Page
 
 
 class ApplicationTypesService:
-    """DB-backed application-type queries bound to an ``AsyncSession``."""
+    """DB-backed application-type queries bound to an `AsyncSession`."""
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -32,7 +33,7 @@ class ApplicationTypesService:
         include_inactive: bool = False,
         admin: bool = False,
     ) -> Page[ApplicationTypeListItem]:
-        """List application types, paged (public: offerable types only)."""
+        """List the application types as a page (public view: offerable types only)."""
         stmt: Select[tuple[ApplicationType]] = select(ApplicationType)
         if not include_inactive:
             stmt = stmt.where(ApplicationType.active_form_version_id.is_not(None))
@@ -49,7 +50,7 @@ class ApplicationTypesService:
 
     @staticmethod
     def _to_item(row: ApplicationType, *, lang: str, admin: bool) -> ApplicationTypeListItem:
-        """Map an ORM row to the list DTO with resolved i18n name."""
+        """Map an ORM row to the list item with the resolved i18n name."""
         active_form_version_id: UUID | None = row.active_form_version_id
         return ApplicationTypeListItem(
             id=row.id,

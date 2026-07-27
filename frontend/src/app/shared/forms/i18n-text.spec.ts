@@ -20,20 +20,21 @@ describe('resolveI18n', () => {
   });
 
   it('coalesces a present-but-nullish requested-language value to empty string', () => {
-    // key exists (so `lang in map`) but value is null/undefined → '' via ?? guard.
+    // The key exists (so `lang in map`), but the value is nullish, so the ?? guard gives ''.
     const nullish = { en: undefined } as unknown as Record<string, string>;
     expect(resolveI18n(nullish, 'en')).toBe('');
   });
 
   it('coalesces a present-but-nullish de fallback value to empty string', () => {
     const nullish = { de: undefined, fr: 'Titre' } as unknown as Record<string, string>;
-    // requested 'en' missing → de present but nullish → '' (does NOT fall through to fr).
+    // The requested 'en' is missing and de is present but nullish. The result is '',
+    // and the lookup does NOT fall through to fr.
     expect(resolveI18n(nullish, 'en')).toBe('');
   });
 
   it('coalesces a nullish first value to empty string', () => {
     const nullish = { fr: undefined } as unknown as Record<string, string>;
-    // requested 'en' missing, no 'de' → first value is nullish → '' via final ??.
+    // The requested 'en' and 'de' are missing, so the nullish first value hits the final ??.
     expect(resolveI18n(nullish, 'en')).toBe('');
   });
 });

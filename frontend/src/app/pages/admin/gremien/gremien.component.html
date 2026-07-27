@@ -33,7 +33,6 @@
   }
 </section>
 
-<!-- Create/edit dialog. -->
 <app-dialog
   [open]="dialogOpen()"
   [title]="(editingId() ? 'admin.gremien.edit' : 'admin.gremien.create') | t"
@@ -108,7 +107,7 @@
       />
       <p class="text-xs text-muted m-0">{{ 'admin.gremien.quorumHint' | t }}</p>
     </div>
-    <!-- Extra protocol recipients: receive finalized protocols in addition to the
+    <!-- Extra protocol recipients. They get the finalized protocol, together with the
          active members. -->
     <div class="flex flex-col gap-2">
       <label class="text-sm font-medium" for="grem-mail">{{ 'admin.gremien.mailRecipients' | t }}</label>
@@ -132,7 +131,6 @@
   </div>
 </app-dialog>
 
-<!-- Delete with confirmation. -->
 <app-dialog
   [open]="confirmDelete() !== null"
   [title]="'admin.gremien.deleteTitle' | t"

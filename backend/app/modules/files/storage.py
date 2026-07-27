@@ -1,17 +1,18 @@
-"""Object-storage abstraction (MinIO/S3) + signed URLs.
+"""Object storage abstraction over MinIO/S3, plus signed URLs.
 
-The service knows only the :class:`ObjectStorage` protocol — never the concrete client.
-``MinioStorage`` wraps the (synchronous) ``minio`` client and hands blocking calls to a
-thread pool via ``asyncio.to_thread`` (no blocking of the event loop). There is no direct
-bucket access from outside.
+The service knows only the ``ObjectStorage`` protocol, never the concrete client.
+``MinioStorage`` wraps the synchronous ``minio`` client. It hands every blocking call to
+a thread pool with ``asyncio.to_thread``, so the event loop never blocks. Nothing outside
+reaches the bucket directly.
 
-``presigned_get_url`` returns a short-lived S3v4-signed GET URL and is used internally
-(PDF module). Attachment downloads of the files API do NOT go through a signed URL but
-server-side via the authz-gated ``/api/attachments/{id}/download`` route — MinIO is on
-the internal Docker network without port publish, so a signed URL would be unreachable
-from the browser.
+``presigned_get_url`` returns a short-lived S3v4-signed GET URL. Only internal callers
+use it, such as the PDF module. An attachment download of the files API does NOT use a
+signed URL. It streams from the server over the ``/api/attachments/{id}/download`` route
+that the authorization layer gates. MinIO runs on the internal Docker network and
+publishes no port, so the browser could not reach a signed URL.
 
-``minio`` is imported lazily: without the upload path (contract CI) the lib never loads.
+The module imports ``minio`` lazily. Without the upload path (contract CI) the library
+never loads.
 """
 
 from __future__ import annotations
@@ -28,17 +29,17 @@ from app.settings import Settings
 if TYPE_CHECKING:
     from minio import Minio
 
-# Default chunk size for the streamed download: the object is read from MinIO in
-# chunks, not buffered fully into memory.
+# Default chunk size of the streamed download. The reader never holds the whole object
+# in memory.
 STREAM_CHUNK_BYTES = 64 * 1024
 
 
 class StorageError(RuntimeError):
-    """Object storage unreachable / operation failed."""
+    """The object storage is unreachable or the operation failed."""
 
 
 class ObjectStorage(Protocol):
-    """Storage interface used by the service (put/get/remove/signed URL)."""
+    """Storage interface that the service uses: put, get, remove and signed URL."""
 
     async def put(self, key: str, data: bytes, content_type: str) -> None: ...
 
@@ -57,7 +58,10 @@ class ObjectStorage(Protocol):
 
 @dataclass(slots=True)
 class MinioStorage:
-    """MinIO/S3 backend. Creates the bucket on demand (idempotent)."""
+    """MinIO/S3 backend.
+
+    The backend creates the bucket on demand. The creation is idempotent.
+    """
 
     client: Minio
     bucket: str
@@ -99,12 +103,14 @@ class MinioStorage:
     async def get_stream(
         self, key: str, *, chunk_size: int = STREAM_CHUNK_BYTES
     ) -> AsyncIterator[bytes]:
-        """Stream the object from MinIO chunk-wise instead of reading it fully into RAM.
-        The (synchronous) connection is read in a thread pool (no event-loop blocking) and
-        reliably closed/released in ``finally`` — even on client abort (``GeneratorExit``)
-        or read error."""
-        # Open the connection eagerly so a transient storage error at connect surfaces as
-        # a StorageError BEFORE the response starts (→ 503), not mid-stream.
+        """Stream the object from MinIO chunk by chunk instead of reading it into RAM.
+
+        A thread pool reads the synchronous connection, so the event loop never blocks.
+        The ``finally`` block always closes and releases the connection, also on a client
+        abort (``GeneratorExit``) and on a read error.
+        """
+        # Open the connection eagerly. A transient storage error at connect then surfaces
+        # as a StorageError BEFORE the response starts, that is 503, not mid-stream.
         try:
             response = await asyncio.to_thread(
                 self.client.get_object, self.bucket, key
@@ -134,8 +140,8 @@ class MinioStorage:
     def presigned_get_url(
         self, key: str, *, expires_seconds: int, download_name: str | None = None
     ) -> str:
-        # `Content-Disposition: attachment` forces download instead of inline render (no
-        # execution). nginx additionally sets `nosniff`.
+        # `Content-Disposition: attachment` forces a download instead of an inline
+        # render, so nothing executes. nginx also sets `nosniff`.
         extra: dict[str, str] | None = None
         if download_name is not None:
             disposition = f'attachment; filename="{_safe_disposition(download_name)}"'
@@ -152,14 +158,19 @@ class MinioStorage:
 
 
 def _safe_disposition(name: str) -> str:
-    """Strip quotes/control characters from the filename (avoid header injection)."""
+    """Strip quotes and control characters from the filename to block header injection."""
     return "".join(c for c in name if c.isprintable() and c not in '"\\\r\n')
 
 
 def build_object_storage(settings: Settings) -> ObjectStorage | None:
-    """Build MinIO storage from the settings — ``None`` when storage is off.
+    """Build the MinIO storage from the settings.
 
-    Without ``minio_endpoint`` (DEV/contract CI) uploads stay disabled (503)."""
+    Without ``minio_endpoint`` (development or contract CI) uploads stay off and give
+    503.
+
+    Returns:
+        The storage, or ``None`` when storage is off.
+    """
     if not settings.storage_enabled:
         return None
     from minio import Minio

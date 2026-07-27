@@ -19,11 +19,11 @@ import { AdminApiService } from '../admin-api.service';
 import type { ErasureRequest } from '../admin.models';
 
 /**
- * Admin → privacy (permission `privacy.manage`): GDPR administration.
+ * Admin privacy page (permission `privacy.manage`) for GDPR administration.
  *
- * Four areas: erasure-request queue (execute/reject), principal erasure
- * (Art. 17), access export (Art. 15, XLSX) and the global retention default
- * (Art. 5(1)(e)). Mutations are audited server-side.
+ * The page has four areas. The erasure-request queue executes or rejects a request.
+ * Principal erasure covers Art. 17. The access export covers Art. 15 and returns XLSX.
+ * The global retention default covers Art. 5(1)(e). The server audits every mutation.
  */
 @Component({
   selector: 'app-admin-privacy',

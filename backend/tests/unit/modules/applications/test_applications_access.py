@@ -1,4 +1,7 @@
-"""Unit: Zugriffsauflösung A/P für Antrags-Endpunkte (T-12, api.md §1)."""
+"""Unit tests for applicant and principal access resolution on application endpoints.
+
+See T-12 and api.md section 1.
+"""
 
 from __future__ import annotations
 
@@ -19,7 +22,7 @@ def _principal(*perms: str, sub: str = "p") -> Principal:
 
 
 class _EmptyResult:
-    """Leeres ``Result``: deckt ``.scalars().all()``-Ketten der Fallback-Queries ab."""
+    """Empty `Result` that covers the `.scalars().all()` chains of the fallback queries."""
 
     def scalars(self) -> _EmptyResult:
         return self
@@ -32,8 +35,11 @@ class _EmptyResult:
 
 
 class _FakeDb:
-    """Minimaler Session-Stub: ``scalar`` liefert das gesetzte ``created_by``;
-    ``execute`` (Gremium-Mitgliedschafts-Fallback, #vote-read) liefert leer."""
+    """Minimal session stub.
+
+    `scalar` returns the configured `created_by`. `execute` returns an empty result for
+    the Gremium membership fallback (#vote-read).
+    """
 
     def __init__(self, created_by: str | None = None) -> None:
         self._created_by = created_by
@@ -46,7 +52,10 @@ class _FakeDb:
 
 
 def _db(created_by: str | None = None) -> AsyncSession:
-    """``_FakeDb`` als ``AsyncSession`` getarnt — nur ``scalar`` wird aufgerufen."""
+    """Return a `_FakeDb` disguised as an `AsyncSession`.
+
+    The code under test calls only `scalar`.
+    """
     return cast(AsyncSession, _FakeDb(created_by))
 
 
@@ -65,7 +74,7 @@ def test_read_principal_without_permission_403() -> None:
 
 
 def test_read_creator_without_permission_ok() -> None:
-    """Eingeloggte:r Ersteller:in liest den eigenen Antrag ohne Permission (#24)."""
+    """A logged-in creator can read their own application without a permission (#24)."""
     app_id = uuid4()
     access = asyncio.run(
         require_app_read(app_id, _db(created_by="p"), _principal(sub="p"), None)
@@ -105,7 +114,7 @@ def test_edit_requires_manage_permission() -> None:
 
 
 def test_edit_creator_without_permission_ok() -> None:
-    """Ersteller:in darf den eigenen Antrag bearbeiten ohne ``application.manage`` (#24)."""
+    """A creator can edit their own application without `application.manage` (#24)."""
     app_id = uuid4()
     access = asyncio.run(
         require_app_edit(app_id, _db(created_by="p"), _principal(sub="p"), None)

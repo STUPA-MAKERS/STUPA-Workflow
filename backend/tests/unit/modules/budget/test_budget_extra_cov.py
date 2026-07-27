@@ -1,10 +1,10 @@
-"""Zusatz-Coverage Budget-Baum (#76/#78): Router-Endpunkte, Schema-Validatoren und
-ZUGFeRD-Import-Hilfsfunktionen, die die bestehenden Suiten nicht berühren.
+"""Extra coverage for the budget tree (#76/#78).
 
-Reine Unit-Tests ohne DB/MinIO/Netz: der Router läuft mit einem vollständigen
-Service-Fake (``dependency_overrides``); ``invoice_import`` wird größtenteils direkt
-über seine reinen Funktionen + ``SimpleNamespace``-Stubs angesteuert (kein PDF nötig
-außer für ``_extract_cii_xml``-Grenzfälle, dort echte ``pypdf``-PDFs).
+The tests cover the router endpoints, the schema validators and the ZUGFeRD import helpers
+that the existing suites do not reach. They are pure unit tests without a DB, MinIO or
+network. The router runs against a full service fake through `dependency_overrides`. Most
+of `invoice_import` runs through its pure functions and `SimpleNamespace` stubs. Only the
+`_extract_cii_xml` edge cases need real `pypdf` PDFs.
 """
 
 from __future__ import annotations
@@ -65,7 +65,6 @@ from app.modules.budget.tree_schemas import (
 )
 from app.settings import load_settings
 
-# --------------------------------------------------------------------- ids
 _BID = uuid.uuid4()
 _GID = uuid.uuid4()
 _FYID = uuid.uuid4()
@@ -84,7 +83,7 @@ _ALL_PERMS = (
 )
 
 
-# --------------------------------------------------------- DTO factories
+# DTO factories
 def _expense_out() -> ExpenseOut:
     return ExpenseOut(
         id=_EID,
@@ -148,7 +147,6 @@ def _tree_node() -> BudgetTreeNodeOut:
     )
 
 
-# --------------------------------------------------------- audit fake session
 class _FakeAuditResult:
     def scalar_one_or_none(self) -> None:
         return None
@@ -172,16 +170,14 @@ class _FakeAuditSession:
         self.committed = True
 
 
-# --------------------------------------------------------- full service fake
 class _FakeService:
-    """Vollständiger Service-Fake — deckt jede vom Router gerufene Methode ab."""
+    """A full service fake that covers every method the router calls."""
 
     def __init__(self) -> None:
         self.calls: dict[str, Any] = {}
         self.session = _FakeAuditSession()
         self.can_view = True
 
-    # ----- tree / nodes
     async def get_tree(
         self, *, gremium_id: Any = None, visible_gremium_ids: Any = None
     ) -> list[BudgetTreeNodeOut]:
@@ -270,7 +266,6 @@ class _FakeService:
     async def fiscal_year_label_map(self) -> dict[uuid.UUID, str]:
         return {_FYID: "2026"}
 
-    # ----- applications scoped to node
     async def list_applications(
         self, budget_id: uuid.UUID, fiscal_year_id: Any
     ) -> list[BudgetApplicationOut]:
@@ -292,7 +287,6 @@ class _FakeService:
         self.calls["list_fy"] = budget_id
         return []
 
-    # ----- expenses
     async def book_expense(self, payload: Any, *, actor: str) -> ExpenseOut:
         self.calls["book_expense"] = (payload, actor)
         return _expense_out()
@@ -307,14 +301,12 @@ class _FakeService:
         self.calls["list_expenses_paged"] = kwargs
         return Page(items=[_expense_out()], total=1, limit=kwargs.get("limit", 50), offset=0)
 
-    # ----- transfers
     async def create_transfer(self, payload: Any, *, actor: str) -> TransferOut:
         self.calls["create_transfer"] = (payload, actor)
         return TransferOut(
             transferId=uuid.uuid4(), expenseId=uuid.uuid4(), incomeId=uuid.uuid4()
         )
 
-    # ----- invoices
     async def get_invoice(self, invoice_id: uuid.UUID) -> InvoiceOut:
         self.calls["get_invoice"] = invoice_id
         return _invoice_out()
@@ -345,11 +337,10 @@ class _FakeService:
 
     async def invoice_file_bytes(self, invoice_id: uuid.UUID) -> tuple[bytes, str, str]:
         self.calls["invoice_file_bytes"] = invoice_id
-        # Bewusst ein vom Client untergeschobener HTML-Mime: der Router darf ihm NICHT
-        # vertrauen, sondern liefert hart als application/pdf-Attachment aus (#sec-audit).
+        # This returns an HTML MIME type that a client could inject. The router must not
+        # trust it. The router always sends application/pdf as an attachment (#sec-audit).
         return (b"<html>polyglot</html>", "text/html", 'we"ird\r\nname.pdf')
 
-    # ----- accounts
     async def list_accounts(self) -> list[AccountOut]:
         self.calls["list_accounts"] = True
         return [AccountOut(id=uuid.uuid4(), name="Hauptkonto", iban="DE00", active=True)]
@@ -366,7 +357,6 @@ class _FakeService:
         self.calls["delete_account"] = account_id
 
 
-# --------------------------------------------------------- client helpers
 @pytest.fixture
 def fake() -> _FakeService:
     return _FakeService()
@@ -382,11 +372,9 @@ def _client(fake: _FakeService, perms: tuple[str, ...] = _ALL_PERMS) -> TestClie
     return TestClient(app)
 
 
-# =====================================================================
-# ROUTER: service factory + tree full-view
-# =====================================================================
+# Router: service factory and full tree view
 def test_get_budget_tree_service_factory_with_storage() -> None:
-    """Factory liest ``object_storage`` aus dem App-State und reicht ``sub`` als actor."""
+    """The factory reads `object_storage` from the app state and passes `sub` as the actor."""
     sentinel = object()
     request = SimpleNamespace(
         app=SimpleNamespace(state=SimpleNamespace(object_storage=sentinel))
@@ -404,7 +392,7 @@ def test_get_budget_tree_service_factory_with_storage() -> None:
 
 
 def test_list_tree_full_view(fake: _FakeService) -> None:
-    """Voll-Sicht ⇒ get_tree ohne visible_gremium_ids (Scope None)."""
+    """A full view calls get_tree without visible_gremium_ids, so the scope stays None."""
     resp = _client(fake, ("budget.view",)).get("/api/budgets", params={"gremium": str(_GID)})
     assert resp.status_code == 200
     assert resp.json()[0]["pathKey"] == "VS"
@@ -415,7 +403,7 @@ def test_list_tree_full_view(fake: _FakeService) -> None:
 def test_list_tree_gremium_scoped(
     fake: _FakeService, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Ohne Voll-Sicht ⇒ Mitglieds-Gremien werden als visible_gremium_ids gereicht."""
+    """Without a full view the router passes the member Gremien as visible_gremium_ids."""
     import app.modules.admin.gremium_roles as gr
 
     async def _members(session: Any, sub: Any, now: Any = None) -> set[uuid.UUID]:
@@ -427,9 +415,7 @@ def test_list_tree_gremium_scoped(
     assert fake.calls["scope"] == {_GID}
 
 
-# =====================================================================
-# ROUTER: basic node / fiscal-year / allocation / assign CRUD
-# =====================================================================
+# Router: node, fiscal year, allocation and assign CRUD
 def test_create_node(fake: _FakeService) -> None:
     resp = _client(fake).post(
         "/api/budgets", json={"key": "VS", "name": "VS-Mittel", "gremiumId": str(_GID)}
@@ -539,25 +525,23 @@ def test_create_invoice(fake: _FakeService) -> None:
     assert fake.calls["create_invoice"][1] == "admin"
 
 
-# =====================================================================
-# ROUTER: node-scoped read (`_require_node_view`) — full-view + scope branches
-# =====================================================================
+# Router: node-scoped read through `_require_node_view`, full view and scope branches
 def test_list_applications_full_view(fake: _FakeService) -> None:
-    """Voll-Sicht (budget.view) ⇒ ``_require_node_view`` kehrt sofort zurück."""
+    """A full view (budget.view) makes `_require_node_view` return at once."""
     resp = _client(fake, ("budget.view",)).get(
         f"/api/budgets/{_BID}/applications", params={"fiscalYear": str(_FYID)}
     )
     assert resp.status_code == 200
     assert resp.json()[0]["applicationId"] == str(_AID)
     assert fake.calls["list_applications"] == (_BID, _FYID)
-    # Voll-Sicht überspringt den Gremium-Scope-Check.
+    # The full view skips the Gremium scope check.
     assert "can_view" not in fake.calls
 
 
 def test_list_applications_scoped_allowed(
     fake: _FakeService, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Ohne Voll-Sicht: Mitglieds-Gremien werden geladen + ``can_view_node`` erlaubt."""
+    """Without a full view the router loads the member Gremien and `can_view_node` allows."""
     import app.modules.admin.gremium_roles as gr
 
     async def _members(session: Any, sub: Any, now: Any = None) -> set[uuid.UUID]:
@@ -573,7 +557,7 @@ def test_list_applications_scoped_allowed(
 def test_list_expenses_scoped_denied(
     fake: _FakeService, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Ohne Voll-Sicht + ``can_view_node`` False ⇒ 403 (ForbiddenError)."""
+    """Without a full view and with `can_view_node` False the router gives 403."""
     import app.modules.admin.gremium_roles as gr
 
     async def _members(session: Any, sub: Any, now: Any = None) -> set[uuid.UUID]:
@@ -616,9 +600,7 @@ def test_list_fiscal_years_scoped_allowed(
     assert fake.calls["list_fy"] == _BID
 
 
-# =====================================================================
-# ROUTER: _find_subtree (recursion) via export with `node` filter
-# =====================================================================
+# Router: `_find_subtree` recursion through the export with a `node` filter
 def test_find_subtree_direct() -> None:
     leaf = _tree_node()
     other = BudgetTreeNodeOut(
@@ -632,16 +614,14 @@ def test_find_subtree_direct() -> None:
         active=True,
         children=[leaf],
     )
-    # Treffer in der Wurzel.
     assert _find_subtree([other], other.id) is other
-    # Treffer in einem Kind (Rekursion).
+    # a hit in a child exercises the recursion
     assert _find_subtree([other], leaf.id) is leaf
-    # Kein Treffer ⇒ None.
     assert _find_subtree([other], uuid.uuid4()) is None
 
 
 def test_export_without_node_filter(fake: _FakeService) -> None:
-    """Kein ``node`` ⇒ ``node_id is None``: Export des vollen (gefilterten) Baums."""
+    """Without `node` the router sets `node_id` to None and exports the whole filtered tree."""
     resp = _client(fake, ("budget.export",)).get(
         "/api/budget/export.xlsx", params={"gremium": str(_GID)}
     )
@@ -665,7 +645,7 @@ def test_export_with_node_filter_found(fake: _FakeService) -> None:
 
 
 def test_export_with_node_filter_missing(fake: _FakeService) -> None:
-    """``node`` ohne Treffer ⇒ leerer Export (kein 500)."""
+    """A `node` without a match gives an empty export, not a 500."""
     other_node = uuid.uuid4()
     resp = _client(fake, ("budget.export",)).get(
         "/api/budget/export.xlsx", params={"node": str(other_node)}
@@ -674,9 +654,7 @@ def test_export_with_node_filter_missing(fake: _FakeService) -> None:
     assert resp.content[:2] == b"PK"
 
 
-# =====================================================================
-# ROUTER: expenses (flat book / update) + transfers
-# =====================================================================
+# Router: expenses (flat book and update) plus transfers
 def test_book_expense_flat(fake: _FakeService) -> None:
     resp = _client(fake).post(
         "/api/expenses",
@@ -732,18 +710,18 @@ def test_export_expenses_xlsx(fake: _FakeService) -> None:
     assert entry.target_id == "buchungen.xlsx"
     assert entry.data["rows"] == 1
     assert fake.session.committed is True
-    # list_expenses_paged wird mit limit=10_000 aufgerufen.
+    # The router calls list_expenses_paged with limit 10_000.
     assert fake.calls["list_expenses_paged"]["limit"] == 10_000
 
 
 def test_export_expenses_ids_filter(fake: _FakeService) -> None:
-    """``ids`` schränkt den Export auf die gewählten Buchungen ein (#expenses-ux)."""
+    """`ids` limits the export to the selected bookings (#expenses-ux)."""
     client = _client(fake, ("budget.export",))
-    # Passende ID → Buchung bleibt (1 Zeile).
+    # a matching id keeps the booking, so the export has one row
     resp = client.get("/api/expenses/export.xlsx", params={"ids": str(_EID)})
     assert resp.status_code == 200
     assert fake.session.entries[-1].data["rows"] == 1
-    # Fremde ID → keine Zeile im Export.
+    # a foreign id leaves no row in the export
     resp = client.get("/api/expenses/export.xlsx", params={"ids": str(uuid.uuid4())})
     assert resp.status_code == 200
     assert fake.session.entries[-1].data["rows"] == 0
@@ -755,25 +733,25 @@ def test_export_expenses_requires_permission(fake: _FakeService) -> None:
 
 
 def test_list_expenses_paged_sort_passthrough(fake: _FakeService) -> None:
-    """``sort`` wird unverändert an den Service durchgereicht — inkl. Datums-Spalten.
+    """The router passes `sort` to the service unchanged, including the date columns.
 
-    Früher kollabierte der Router invoiceDate/paymentDate fälschlich auf createdAt → die
-    Datums-Sortierung im Buchungen-Tab war wirkungslos (Regressionstest)."""
+    An earlier version wrongly collapsed invoiceDate and paymentDate onto createdAt. The
+    date sort in the bookings tab then had no effect. This is the regression test.
+    """
     _client(fake).get("/api/expenses?sort=amount&order=desc")
     assert fake.calls["list_expenses_paged"]["sort"] == "amount"
     _client(fake).get("/api/expenses?sort=invoiceDate")
     assert fake.calls["list_expenses_paged"]["sort"] == "invoiceDate"
     _client(fake).get("/api/expenses?sort=paymentDate&order=asc")
     assert fake.calls["list_expenses_paged"]["sort"] == "paymentDate"
-    # account + unallocated filter (Link-Kandidaten im Konten-Tab, #fints-konten).
+    # The account and unallocated filters find the link candidates in the accounts tab
+    # (#fints-konten).
     _client(fake).get(f"/api/expenses?account={_BID}&unallocated=true")
     assert fake.calls["list_expenses_paged"]["account_id"] == _BID
     assert fake.calls["list_expenses_paged"]["unallocated"] is True
 
 
-# =====================================================================
-# ROUTER: invoices CRUD + file endpoints
-# =====================================================================
+# Router: invoice CRUD and file endpoints
 def test_get_invoice(fake: _FakeService) -> None:
     resp = _client(fake, ("budget.view",)).get(f"/api/invoices/{_IID}")
     assert resp.status_code == 200
@@ -850,19 +828,18 @@ def test_get_invoice_file_sanitises_filename(fake: _FakeService) -> None:
     resp = _client(fake, ("budget.view",)).get(f"/api/invoices/{_IID}/file")
     assert resp.status_code == 200
     cd = resp.headers["content-disposition"]
-    # Sicherheits-Härtung (#sec-audit): Client-Mime ignoriert → hart application/pdf,
-    # und Content-Disposition: attachment (kein Inline-Render des HTML-Polyglots).
+    # Security hardening (#sec-audit): the router ignores the client MIME type and always
+    # sends application/pdf with Content-Disposition attachment. The HTML polyglot must
+    # never render inline.
     assert resp.headers["content-type"] == "application/pdf"
     assert cd.startswith("attachment;")
-    # Quotes/Backslash/CR/LF aus dem Dateinamen entfernt.
+    # The router removes quotes, backslashes, CR and LF from the file name.
     assert '"' not in cd.split('filename="', 1)[1].rstrip().rstrip('"')
     assert "\r" not in cd and "\n" not in cd
     assert fake.calls["invoice_file_bytes"] == _IID
 
 
-# =====================================================================
-# ROUTER: accounts CRUD
-# =====================================================================
+# Router: account CRUD
 def test_list_accounts(fake: _FakeService) -> None:
     resp = _client(fake, ("account.manage",)).get("/api/accounts")
     assert resp.status_code == 200
@@ -893,17 +870,15 @@ def test_delete_account(fake: _FakeService) -> None:
     assert fake.calls["delete_account"] == aid
 
 
-# =====================================================================
-# SCHEMAS: model_validators (both sides of every branch)
-# =====================================================================
+# Schemas: model validators, both sides of every branch
 def test_expense_create_income_not_linkable() -> None:
-    # income + application_id ⇒ ValueError.
+    # income plus application_id raises ValueError
     with pytest.raises(ValueError, match="income cannot be linked"):
         ExpenseCreate(amount=Decimal("1"), description="x", kind="income", applicationId=_AID)
-    # income ohne application_id ⇒ ok (Validator-Rückgabe self).
+    # income without application_id passes and the validator returns self
     ok = ExpenseCreate(amount=Decimal("1"), description="x", kind="income")
     assert ok.kind == "income"
-    # expense + application_id ⇒ ok (erste Bedingung false).
+    # expense plus application_id passes because the first condition is false
     ok2 = ExpenseCreate(amount=Decimal("1"), description="x", applicationId=_AID)
     assert ok2.application_id == _AID
 
@@ -942,9 +917,7 @@ def test_transfer_create_distinct() -> None:
     assert ok.from_budget_id != ok.to_budget_id
 
 
-# =====================================================================
-# INVOICE_IMPORT: pure helpers (all branches)
-# =====================================================================
+# invoice_import: pure helpers, all branches
 def test_amount_helper() -> None:
     assert _amount(None) is None
     assert _amount(SimpleNamespace(amount=Decimal("5"))) == Decimal("5")
@@ -984,21 +957,19 @@ def test_cii_decimal_helper() -> None:
 
 
 def test_find_text_helper() -> None:
-    # el is None ⇒ None.
     assert _find_text(None, "x") is None
     root = ET.fromstring("<r><a>  </a><b>hi</b></r>")
-    # found is None (kein passendes Element) ⇒ None.
+    # no matching element, so found is None
     assert _find_text(root, "missing") is None
-    # found.text only whitespace ⇒ None (text or None branch).
+    # found.text holds only whitespace, which covers the "text or None" branch
     assert _find_text(root, "a") is None
-    # echter Text.
     assert _find_text(root, "b") == "hi"
-    # Element ohne Text-Inhalt (self-closing) ⇒ found.text None ⇒ None.
+    # a self-closing element has no text, so found.text is None
     root2 = ET.fromstring("<r><c/></r>")
     assert _find_text(root2, "c") is None
 
 
-# --- _map branches via SimpleNamespace stubs --------------------------------
+# _map branches through SimpleNamespace stubs
 def test_map_non_eur_currency() -> None:
     inv = SimpleNamespace(currency_code="USD")
     with pytest.raises(UnsupportedInvoiceCurrencyError) as ei:
@@ -1013,13 +984,14 @@ def test_map_missing_gross_is_not_zugferd() -> None:
 
 
 def test_map_minimal_no_tax_no_terms_no_seller() -> None:
-    """currency None→EUR default, leere taxes ⇒ tax None, terms/seller None."""
+    """A None currency defaults to EUR. Empty taxes give tax None. Terms and seller stay None."""
     inv = SimpleNamespace(
-        currency_code=None,  # → "EUR"
+        currency_code=None,  # becomes "EUR"
         grand_total_amount=SimpleNamespace(amount=Decimal("50.00")),
         invoice_number="R-9",
         invoice_date=date(2026, 1, 1),
-        # tax_total_amounts/payment_terms/seller/tax_basis_total_amount fehlen ⇒ getattr None
+        # tax_total_amounts, payment_terms, seller and tax_basis_total_amount are absent,
+        # so getattr returns None
     )
     parsed = _map(inv)  # type: ignore[arg-type]
     assert parsed.gross_amount == Decimal("50.00")
@@ -1048,7 +1020,7 @@ def test_map_with_tax_terms_seller() -> None:
     assert parsed.net_amount == Decimal("100.00")
 
 
-# --- parse_zugferd_pdf: FacturXError → tolerant CII fallback ----------------
+# parse_zugferd_pdf: a FacturXError falls back to the tolerant CII parser
 _VALID_CII = """<?xml version="1.0" encoding="UTF-8"?>
 <rsm:CrossIndustryInvoice
     xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100"
@@ -1089,7 +1061,7 @@ def _pdf_with_xml(name: str, xml: str | bytes) -> bytes:
 def test_parse_zugferd_pdf_facturx_error_falls_back(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """pycheval lehnt das XML ab (FacturXError) ⇒ toleranter Header-Fallback greift."""
+    """The `pycheval` parser refuses the XML with a FacturXError, so the fallback runs."""
     import pycheval
 
     pdf = _pdf_with_xml("factur-x.xml", _VALID_CII)
@@ -1106,7 +1078,7 @@ def test_parse_zugferd_pdf_facturx_error_falls_back(
 
 
 def test_parse_zugferd_pdf_success_path(monkeypatch: pytest.MonkeyPatch) -> None:
-    """pycheval akzeptiert ⇒ ``_map``-Pfad (kein Fallback)."""
+    """The `pycheval` parser accepts the XML, so the `_map` path runs and no fallback happens."""
     import pycheval
 
     pdf = _pdf_with_xml("factur-x.xml", _VALID_CII)
@@ -1121,7 +1093,7 @@ def test_parse_zugferd_pdf_success_path(monkeypatch: pytest.MonkeyPatch) -> None
     assert parsed.number == "MAPPED"
 
 
-# --- _extract_cii_xml: size / decode / content-error branches ---------------
+# _extract_cii_xml: size, decode and content-error branches
 def test_extract_unreadable_pdf() -> None:
     with pytest.raises(NotZugferdError, match="unreadable PDF"):
         _extract_cii_xml(b"not a pdf at all")
@@ -1143,10 +1115,10 @@ def test_extract_no_xml_attachment() -> None:
 
 
 def test_extract_declared_size_too_large(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Deklarierte ``/Size`` > Limit ⇒ NotZugferdError (line 118)."""
+    """A declared `/Size` above the limit gives NotZugferdError (line 118)."""
     pdf = _pdf_with_xml("factur-x.xml", _VALID_CII)
     real_reader = getattr(imp, "PdfReader", None)
-    assert real_reader is None  # PdfReader ist lazy-importiert
+    assert real_reader is None  # the module imports PdfReader lazily
 
     from pypdf import PdfReader as _RealReader
 
@@ -1166,12 +1138,12 @@ def test_extract_declared_size_too_large(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.setattr("pypdf.PdfReader", _FakeReader)
     with pytest.raises(NotZugferdError, match="too large"):
         _extract_cii_xml(pdf)
-    # Realer Reader bleibt unangetastet (sanity).
+    # The real reader stays untouched.
     assert _RealReader is not _FakeReader
 
 
 def test_extract_content_decompress_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    """``chosen.content`` wirft ⇒ NotZugferdError 'unreadable embedded XML' (121-122)."""
+    """A raise from `chosen.content` gives NotZugferdError "unreadable embedded XML"."""
 
     class _Emb:
         name = "factur-x.xml"
@@ -1195,7 +1167,7 @@ def test_extract_content_decompress_error(monkeypatch: pytest.MonkeyPatch) -> No
 
 
 def test_extract_payload_too_large(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Tatsächliche Payload > Limit ⇒ NotZugferdError (line 124)."""
+    """A payload above the limit gives NotZugferdError (line 124)."""
     big = b"<x>" + b"a" * (imp._MAX_EMBEDDED_XML_BYTES + 1) + b"</x>"
 
     class _Emb:
@@ -1217,7 +1189,7 @@ def test_extract_payload_too_large(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_extract_invalid_utf8_uses_replace(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Ungültiges UTF-8 ⇒ decode('utf-8','replace') (line 128-129)."""
+    """Invalid UTF-8 makes the code decode with the replace handler (lines 128-129)."""
     bad = b"\xff\xfe<x/>"
 
     class _Emb:
@@ -1239,9 +1211,9 @@ def test_extract_invalid_utf8_uses_replace(monkeypatch: pytest.MonkeyPatch) -> N
     assert "�" in out  # replacement char
 
 
-# --- _parse_cii_header: tx/settlement/summation None branches ---------------
+# _parse_cii_header: tx, settlement and summation None branches
 def test_parse_cii_header_minimal_gross_only() -> None:
-    """Nur Gross vorhanden; tx/agreement/settlement-Unterpfade ohne Werte ⇒ Defaults."""
+    """Only the gross amount exists. The tx, agreement and settlement subpaths give defaults."""
     xml = (
         '<rsm:CrossIndustryInvoice '
         'xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100" '
@@ -1268,7 +1240,7 @@ def test_parse_cii_header_minimal_gross_only() -> None:
 
 
 def test_parse_cii_header_no_settlement_no_gross_is_not_zugferd() -> None:
-    """tx vorhanden, aber keine settlement/summation ⇒ gross None ⇒ NotZugferdError."""
+    """A tx without settlement or summation leaves gross None and gives NotZugferdError."""
     xml = (
         '<rsm:CrossIndustryInvoice '
         'xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100" '
@@ -1282,7 +1254,7 @@ def test_parse_cii_header_no_settlement_no_gross_is_not_zugferd() -> None:
 
 
 def test_parse_cii_header_no_tx_no_gross_is_not_zugferd() -> None:
-    """Kein SupplyChainTradeTransaction ⇒ tx None ⇒ settlement None ⇒ NotZugferd."""
+    """A missing SupplyChainTradeTransaction leaves tx and settlement None. NotZugferd follows."""
     xml = (
         '<rsm:CrossIndustryInvoice '
         'xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100"/>'
@@ -1292,13 +1264,13 @@ def test_parse_cii_header_no_tx_no_gross_is_not_zugferd() -> None:
 
 
 def test_parse_cii_header_unparseable_xml() -> None:
-    """Kaputtes XML ⇒ ET.ParseError ⇒ NotZugferdError (line 267-268)."""
+    """Broken XML raises ET.ParseError and gives NotZugferdError (lines 267-268)."""
     with pytest.raises(NotZugferdError, match="unparseable CII XML"):
         _parse_cii_header(b"<rsm:CrossIndustryInvoice>not closed")
 
 
 def test_parse_cii_header_non_eur_currency() -> None:
-    """Währung ≠ EUR ⇒ UnsupportedInvoiceCurrencyError (line 285)."""
+    """A currency other than EUR gives UnsupportedInvoiceCurrencyError (line 285)."""
     xml = _VALID_CII.replace(
         "<ram:InvoiceCurrencyCode>EUR</ram:InvoiceCurrencyCode>",
         "<ram:InvoiceCurrencyCode>USD</ram:InvoiceCurrencyCode>",
@@ -1309,7 +1281,7 @@ def test_parse_cii_header_non_eur_currency() -> None:
 
 
 def test_parse_cii_header_bytes_input() -> None:
-    """Bytes-Eingang wird unverändert geparst (isinstance str-Zweig false)."""
+    """A bytes input parses unchanged. The isinstance str branch stays false."""
     xml = (
         b'<rsm:CrossIndustryInvoice '
         b'xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100" '

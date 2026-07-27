@@ -1,6 +1,7 @@
-"""Form versioning: form_version, form_field.
+"""Form versioning tables: form_version and form_field.
 
-Tables only. Validation/effective_form live in the validation module.
+This module holds the tables only. The validation and the effective-form merge live in
+the validation module.
 """
 
 from __future__ import annotations
@@ -23,7 +24,10 @@ from app.db import Base, CreatedAtMixin, UUIDPkMixin
 
 
 class FormVersion(UUIDPkMixin, CreatedAtMixin, Base):
-    """One form version per application type. At most one `active` per type (partial unique)."""
+    """One form version of an application type.
+
+    A partial unique index allows at most one `active` version per type.
+    """
 
     __tablename__ = "form_version"
 
@@ -33,7 +37,7 @@ class FormVersion(UUIDPkMixin, CreatedAtMixin, Base):
     version: Mapped[int] = mapped_column(Integer)
     active: Mapped[bool] = mapped_column(Boolean, server_default="false")
     created_by: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
-    # Form description (multilingual Markdown); optional.
+    # Multilingual Markdown description of the form.
     description_i18n: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
     __table_args__ = (
@@ -48,7 +52,10 @@ class FormVersion(UUIDPkMixin, CreatedAtMixin, Base):
 
 
 class FormField(UUIDPkMixin, Base):
-    """Field definition of a form version (= FormFieldDef)."""
+    """One field definition of a form version.
+
+    The row maps to the `FormFieldDef` config schema.
+    """
 
     __tablename__ = "form_field"
 

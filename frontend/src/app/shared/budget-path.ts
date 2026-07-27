@@ -1,12 +1,13 @@
 import { Pipe, type PipeTransform } from '@angular/core';
 
 /**
- * Simplify a path key for display: collapse numeric prefix chains. When a segment
- * is a prefix of the next (8→81→810), only the longest is kept. The top-level
- * segment is always kept. ``VSM-8-81-810-330 → VSM-810-330``.
+ * Simplify a path key for display and collapse numeric prefix chains.
  *
- * Shared so every cost-centre path renders identically app-wide (budget tree,
- * bookings, application-detail badge, dropdowns …).
+ * When a segment is a prefix of the next one (8→81→810), only the longest segment stays.
+ * The top-level segment always stays: `VSM-8-81-810-330` becomes `VSM-810-330`.
+ *
+ * Every view uses this function, so a cost center path looks the same across the app
+ * (budget tree, bookings, application-detail badge, dropdowns).
  */
 export function simplifyPathKey(pathKey: string): string {
   const seg = pathKey.split('-');

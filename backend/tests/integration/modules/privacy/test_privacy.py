@@ -1,15 +1,16 @@
-"""Integration (echte Postgres, testcontainers): DSGVO/Privacy-Services (#PII-Re-Add).
+"""Integration test for the GDPR privacy services (#PII-Re-Add).
 
-Beweist gegen ein echtes Schema (data-model §1, security.md §4):
-Principal-Erasure (Art. 17), Löschantrags-Queue (open→executed|rejected),
-Anonymisierung räumt Magic-Links + Anhänge ab, der Aufbewahrungs-Cron
-(``process_retention``) anonymisiert fällige terminale Anträge + purged
-abgelaufene Auth-Artefakte (Budget-Zeilen bleiben unangetastet) und die
-DSGVO-Auskunft (Art. 15) trägt alle PII zu einer E-Mail zusammen.
+The tests run against a real schema with Postgres in testcontainers (data-model
+section 1, security.md section 4). They cover principal erasure (Art. 17), the erasure
+request queue (open to executed or rejected) and the anonymization, which also clears
+magic links and attachments. They cover the retention cron (``process_retention``),
+which anonymizes due terminal applications and purges expired auth artifacts. The
+budget rows stay untouched. The last part covers the GDPR data export (Art. 15), which
+collects all PII for one email address.
 
-Die Type-/App-Seed-Helfer stammen aus dem applications-Service-Integrationstest.
-(das ``note``-Feld ist dort bereits ``isPII``); sie werden hier wiederverwendet, nicht
-dupliziert.
+The type and application seed helpers come from the applications service integration
+test, where the ``note`` field is already ``isPII``. This module reuses them instead of
+a copy.
 """
 
 from __future__ import annotations
@@ -53,7 +54,7 @@ pytestmark = pytest.mark.integration
 
 @pytest.fixture
 async def session(migrated: tuple[str, str], engine: Engine) -> AsyncIterator[AsyncSession]:
-    clear_privacy_tables(engine)  # principal/auth_session/erasure_request/settings isolieren
+    clear_privacy_tables(engine)  # isolate principal, auth_session, erasure_request, settings
     eng = create_async_engine(migrated[1])
     maker = async_sessionmaker(eng, expire_on_commit=False)
     async with maker() as s:
@@ -88,9 +89,6 @@ async def _audit_actions_for(
     return set(rows)
 
 
-# --------------------------------------------------------------------------- #
-# 1 — PrincipalService.erase
-# --------------------------------------------------------------------------- #
 async def test_principal_erase_clears_pii_keeps_sub(session: AsyncSession) -> None:
     principal = await _seed_principal(session)
     other = await _seed_principal(session, email="keep@example.org")
@@ -117,27 +115,24 @@ async def test_principal_erase_clears_pii_keeps_sub(session: AsyncSession) -> No
     assert principal.oidc_groups is None
     assert principal.calendar_token is None
     assert principal.active is False
-    assert principal.sub == original_sub  # Pseudonym bleibt
+    assert principal.sub == original_sub  # the pseudonym stays
 
     own = (
         await session.scalars(
             select(AuthSession).where(AuthSession.principal_id == principal.id)
         )
     ).all()
-    assert own == []  # eigene Sessions verworfen
+    assert own == []  # erase() dropped the sessions of the principal
     survivor = (
         await session.scalars(
             select(AuthSession).where(AuthSession.principal_id == other.id)
         )
     ).all()
-    assert len(survivor) == 1  # fremde Session bleibt
+    assert len(survivor) == 1  # the session of the other principal stays
 
     assert "principal_erased" in await _audit_actions_for(session, str(principal.id))
 
 
-# --------------------------------------------------------------------------- #
-# 2 — Erasure-Lifecycle: Antragsteller → execute (Anonymisierung)
-# --------------------------------------------------------------------------- #
 async def test_erasure_applicant_execute(session: AsyncSession) -> None:
     app_type, _, _ = await _seed_type(session)
     svc = ApplicationsService(session)
@@ -148,8 +143,8 @@ async def test_erasure_applicant_execute(session: AsyncSession) -> None:
         subject_type="applicant", application_id=app.id, requested_by="x"
     )
     assert req.status == "open"
-    # EmailStr lowercased nur die Domain; der Local-Part bleibt wie eingegeben.
-    assert req.email == "Antrag@example.org"  # aus dem Applicant nachgezogen
+    # EmailStr lowercases only the domain. The local part stays as entered.
+    assert req.email == "Antrag@example.org"  # copied from the Applicant row
     assert "erasure_requested" in await _audit_actions_for(session, str(req.id))
 
     executed = await erasure.execute(req.id, actor="admin")
@@ -165,19 +160,22 @@ async def test_erasure_applicant_execute(session: AsyncSession) -> None:
 
     refreshed = await session.get(Application, app.id)
     assert refreshed is not None
-    assert refreshed.data.get("note") is None  # PII gescrubbt
+    assert refreshed.data.get("note") is None  # the anonymization cleared the PII
 
     assert "anonymization" in await _audit_actions_for(session, str(app.id))
     assert "erasure_executed" in await _audit_actions_for(session, str(req.id))
 
-    # zweites Ausführen → ConflictError (nicht mehr 'open')
+    # A second execute raises ConflictError, because the request is no longer 'open'.
     with pytest.raises(ConflictError):
         await erasure.execute(req.id, actor="admin")
 
 
 async def test_anonymize_revokes_applicant_sessions(session: AsyncSession) -> None:
-    """Kill-Switch (ISSUE_TOKEN): Anonymisierung widerruft offene Applicant-Sessions —
-    ein vor der Löschung ausgegebener Magic-Link-Token greift danach nicht mehr."""
+    """Kill switch (ISSUE_TOKEN): the anonymization revokes open applicant sessions.
+
+    A magic-link token that the platform issued before the erasure does not work after
+    it.
+    """
     app_type, _, _ = await _seed_type(session)
     svc = ApplicationsService(session)
     app, _ = await svc.create(_create_payload(app_type.id))
@@ -197,13 +195,10 @@ async def test_anonymize_revokes_applicant_sessions(session: AsyncSession) -> No
             select(ApplicantSession).where(ApplicantSession.application_id == app.id)
         )
     ).scalars().all()
-    assert rows  # Zeile bleibt (Audit), ist aber widerrufen
+    assert rows  # the row stays for the audit, but it is revoked
     assert all(r.revoked_at is not None for r in rows)
 
 
-# --------------------------------------------------------------------------- #
-# 3 — Erasure-Lifecycle: Principal → reject (Subjekt bleibt unangetastet)
-# --------------------------------------------------------------------------- #
 async def test_erasure_principal_reject(session: AsyncSession) -> None:
     principal = await _seed_principal(session, email="bleibt@example.org")
     await session.commit()
@@ -219,13 +214,10 @@ async def test_erasure_principal_reject(session: AsyncSession) -> None:
     assert "erasure_rejected" in await _audit_actions_for(session, str(req.id))
 
     await session.refresh(principal)
-    assert principal.email == "bleibt@example.org"  # NICHT gelöscht
+    assert principal.email == "bleibt@example.org"  # NOT erased
     assert principal.active is True
 
 
-# --------------------------------------------------------------------------- #
-# 4 — anonymize entfernt Magic-Links + Anhänge
-# --------------------------------------------------------------------------- #
 async def test_anonymize_drops_magic_links_and_attachments(session: AsyncSession) -> None:
     app_type, _, _ = await _seed_type(session)
     svc = ApplicationsService(session)
@@ -266,31 +258,28 @@ async def test_anonymize_drops_magic_links_and_attachments(session: AsyncSession
     assert attachments == 0
 
 
-# --------------------------------------------------------------------------- #
-# 5 — Aufbewahrungs-Cron (process_retention)
-# --------------------------------------------------------------------------- #
 async def test_retention_cron(migrated: tuple[str, str], session: AsyncSession) -> None:
     from worker.retention import process_retention
 
     app_type, draft, _ = await _seed_type(session)
-    # `draft` ist initial+editierbar; einen terminalen Status ergänzen.
-    draft.is_terminal = True  # initial-State zugleich terminal — reicht für den Sweep
+    # `draft` is initial and editable. Mark it terminal as well.
+    draft.is_terminal = True  # an initial state that is also terminal drives the sweep
     await session.commit()
 
     svc = ApplicationsService(session)
 
-    # (a) terminaler Antrag, lange her → fällig → wird anonymisiert.
+    # (a) terminal application, long ago, therefore due, therefore anonymized.
     due_app, _ = await svc.create(_create_payload(app_type.id))
-    # (b) terminaler Antrag, frisch → NICHT fällig.
+    # (b) terminal application, fresh, therefore NOT due.
     fresh_terminal, _ = await svc.create(_create_payload(app_type.id))
 
-    # `updated_at` hat onupdate=now → per explizitem UPDATE (über die Session) backdaten.
+    # `updated_at` has onupdate=now. Backdate it with an explicit UPDATE on the session.
     old = datetime.now(UTC) - timedelta(days=3 * 365)
     await session.execute(
         update(Application).where(Application.id == due_app.id).values(updated_at=old)
     )
 
-    # (c) abgelaufene Auth-Session + benutzter Magic-Link → werden gepurged.
+    # (c) an expired auth session and a used magic link. The sweep purges both.
     principal = await _seed_principal(session)
     expired_session = AuthSession(
         sid=f"sid-{uuid.uuid4()}",
@@ -308,7 +297,7 @@ async def test_retention_cron(migrated: tuple[str, str], session: AsyncSession) 
         )
     )
 
-    # (d) Budget-Zeile (Finanz-Aufbewahrung) → MUSS unangetastet bleiben.
+    # (d) a budget row under financial retention. It MUST stay untouched.
     budget = Budget(
         key=f"b-{uuid.uuid4()}",
         path_key=f"VS-{uuid.uuid4()}",
@@ -316,8 +305,8 @@ async def test_retention_cron(migrated: tuple[str, str], session: AsyncSession) 
     )
     session.add(budget)
     await session.commit()
-    # IDs jetzt festhalten — nach ``expire_all()`` würde ein Attribut-Zugriff auf die
-    # ORM-Objekte eine (unzulässige) Lazy-IO außerhalb des Greenlet-Kontexts auslösen.
+    # Hold the ids now. After ``expire_all()`` an attribute access on the ORM objects
+    # would start a lazy IO outside the greenlet context, which is not allowed.
     budget_id = budget.id
     expired_session_id = expired_session.id
     due_app_id = due_app.id
@@ -329,11 +318,11 @@ async def test_retention_cron(migrated: tuple[str, str], session: AsyncSession) 
     summary = await process_retention({"retention_sessionmaker": maker})
     assert isinstance(summary, str)
 
-    # Der Worker schrieb über eine eigene Engine — die Identity-Map dieser Session
-    # hält veraltete Kopien; verwerfen, damit alle Reads frisch aus der DB kommen.
+    # The worker wrote through its own engine. The identity map of this session holds
+    # stale copies. Drop them so that every read comes fresh from the database.
     session.expire_all()
 
-    # fälliger Antrag anonymisiert …
+    # the sweep anonymized the due application ...
     due_applicant = (
         await session.execute(
             select(Applicant).where(Applicant.application_id == due_app_id)
@@ -342,7 +331,7 @@ async def test_retention_cron(migrated: tuple[str, str], session: AsyncSession) 
     assert due_applicant.anonymized_at is not None
     assert due_applicant.email is None
 
-    # … frischer terminaler Antrag NICHT.
+    # ... but not the fresh terminal application.
     fresh_applicant = (
         await session.execute(
             select(Applicant).where(Applicant.application_id == fresh_terminal_id)
@@ -350,7 +339,7 @@ async def test_retention_cron(migrated: tuple[str, str], session: AsyncSession) 
     ).scalar_one()
     assert fresh_applicant.anonymized_at is None
 
-    # abgelaufene Session + benutzter Magic-Link weg.
+    # the expired session and the used magic link are gone
     surviving_session = await session.scalar(
         select(func.count())
         .select_from(AuthSession)
@@ -364,13 +353,10 @@ async def test_retention_cron(migrated: tuple[str, str], session: AsyncSession) 
     )
     assert remaining_links == 0
 
-    # Budget unangetastet.
+    # the budget row stays
     assert await session.get(Budget, budget_id) is not None
 
 
-# --------------------------------------------------------------------------- #
-# 6 — DSGVO-Auskunft (Art. 15)
-# --------------------------------------------------------------------------- #
 async def test_auskunft_collect_and_workbook(session: AsyncSession) -> None:
     app_type, _, _ = await _seed_type(session)
     svc = ApplicationsService(session)
@@ -392,16 +378,14 @@ async def test_auskunft_collect_and_workbook(session: AsyncSession) -> None:
     versions = [v for v in result["versions"] if v["applicationId"] == app.id]
     assert {v["version"] for v in versions} == {1, 2}
 
-    assert result["principal"] is None  # kein Login-Subjekt zu dieser Mail
+    assert result["principal"] is None  # no login subject for this email
 
     blob = build_auskunft_workbook(**result)
     assert isinstance(blob, bytes)
     assert len(blob) > 0
 
 
-# --------------------------------------------------------------------------- #
-# 6b — Auskunft ohne Treffer (kein Applicant): leere Reihen, aber valide Mappe
-# --------------------------------------------------------------------------- #
+# no match at all: the workbook still comes out valid, only with empty rows
 async def test_auskunft_collect_no_match(session: AsyncSession) -> None:
     result = await AuskunftService(session).collect("niemand@example.org")
     assert result["applications"] == []
@@ -412,20 +396,14 @@ async def test_auskunft_collect_no_match(session: AsyncSession) -> None:
     assert len(blob) > 0
 
 
-# --------------------------------------------------------------------------- #
-# 6c — PrincipalService.erase auf einen unbekannten Principal → NotFoundError
-# --------------------------------------------------------------------------- #
 async def test_principal_erase_unknown_raises(session: AsyncSession) -> None:
     with pytest.raises(NotFoundError):
         await PrincipalService(session).erase(uuid.uuid4(), actor="admin")
 
 
-# --------------------------------------------------------------------------- #
-# 6d — execute auf einen Antrag ohne auflösbares Subjekt → ConflictError
-# --------------------------------------------------------------------------- #
 async def test_erasure_execute_no_resolvable_subject(session: AsyncSession) -> None:
-    # Per ON-DELETE-SET-NULL kann ein offener Antrag ohne FK-Subjekt zurückbleiben;
-    # hier direkt eingefügt (am ``create``-Validator vorbei), um den Pfad zu treffen.
+    # ON DELETE SET NULL can leave an open request without an FK subject. The row goes
+    # in directly, past the ``create`` validator, to reach that path.
     orphan = ErasureRequest(subject_type="applicant", application_id=None, status="open")
     session.add(orphan)
     await session.commit()
@@ -433,11 +411,8 @@ async def test_erasure_execute_no_resolvable_subject(session: AsyncSession) -> N
         await ErasureRequestService(session).execute(orphan.id, actor="admin")
 
 
-# --------------------------------------------------------------------------- #
-# 7 — PrivacySettingsService: Re-Seed bei fehlender Single-Row + Round-Trip
-# --------------------------------------------------------------------------- #
 async def test_settings_get_recreates_missing_singleton(session: AsyncSession) -> None:
-    # Defensiver Pfad: die Seed-Zeile (id=1) fehlt → get() legt sie neu an.
+    # Defensive path: the seed row with id=1 is missing, so get() creates it again.
     await session.execute(delete(PrivacySettings).where(PrivacySettings.id == 1))
     await session.commit()
     assert await session.get(PrivacySettings, 1) is None
@@ -445,20 +420,17 @@ async def test_settings_get_recreates_missing_singleton(session: AsyncSession) -
     svc = PrivacySettingsService(session)
     settings = await svc.get()
     assert settings.id == 1
-    # Default-Aufbewahrung (server_default 24) liegt an.
+    # the default retention comes from server_default 24
     assert settings.default_retention_months == 24
 
     updated = await svc.update(default_retention_months=6)
     assert updated.default_retention_months == 6
 
-    # frisch aus der DB (eigene Session-Abfrage, kein expired-Attr-Zugriff).
+    # fresh from the database through an own query and without an expired attribute
     await session.refresh(settings)
     assert settings.default_retention_months == 6
 
 
-# --------------------------------------------------------------------------- #
-# 8 — ErasureRequestService.execute für ein PRINCIPAL-Subjekt
-# --------------------------------------------------------------------------- #
 async def test_erasure_principal_execute(session: AsyncSession) -> None:
     principal = await _seed_principal(session, email="weg@example.org")
     await session.commit()
@@ -481,31 +453,26 @@ async def test_erasure_principal_execute(session: AsyncSession) -> None:
     assert "principal_erased" in await _audit_actions_for(session, str(pid))
 
 
-# --------------------------------------------------------------------------- #
-# 9 — ErasureRequestService.create: Validierung der Subjekt-IDs
-# --------------------------------------------------------------------------- #
 async def test_erasure_create_validation(session: AsyncSession) -> None:
     erasure = ErasureRequestService(session)
     with pytest.raises(ValidationProblem):
-        await erasure.create(subject_type="applicant")  # ohne application_id
+        await erasure.create(subject_type="applicant")  # without application_id
     with pytest.raises(ValidationProblem):
-        await erasure.create(subject_type="principal")  # ohne principal_id
+        await erasure.create(subject_type="principal")  # without principal_id
 
 
-# --------------------------------------------------------------------------- #
-# 10 — AuskunftService.collect: Treffer in BEIDEN Quellen (Applicant + Principal)
-# --------------------------------------------------------------------------- #
+# a hit in BOTH sources: an Applicant row and a Principal row
 async def test_auskunft_collect_applicant_and_principal(session: AsyncSession) -> None:
     app_type, _, _ = await _seed_type(session)
     svc = ApplicationsService(session)
     app, email = await svc.create(_create_payload(app_type.id))
-    # zweite Version → Versionshistorie len>=2
+    # a second version makes the version history at least two entries long
     await svc.patch(
         app.id,
         {"title": "v2", "cost": "200.00", "note": "neu"},
         changed_by="applicant",
     )
-    # Login-Subjekt MIT derselben E-Mail → principal-Zweig nicht None.
+    # a login subject with the SAME email keeps the principal branch non-None
     await _seed_principal(session, email=email)
     await session.commit()
 

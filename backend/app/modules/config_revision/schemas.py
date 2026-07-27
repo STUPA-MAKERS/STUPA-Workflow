@@ -1,7 +1,7 @@
-"""API schemas for the config_revision module.
+"""API schemas for the ``config_revision`` module.
 
-Read views for the version sidebar and the field diff (same ``DataDiff`` shape
-as the application detail).
+These are the read views for the version sidebar and the field diff. The diff uses
+the same ``DataDiff`` shape as the application detail.
 """
 
 from __future__ import annotations
@@ -27,10 +27,10 @@ class ConfigRevisionOut(_CamelModel):
     entity_id: str = Field(alias="entityId")
     version: int
     at: datetime
-    # Trigger ``sub`` plus resolved display name (as in the audit log).
+    # OIDC ``sub`` of the actor plus the resolved display name, as in the audit log.
     created_by: str | None = Field(default=None, alias="createdBy")
     created_by_name: str | None = Field(default=None, alias="createdByName")
-    # Newest state of the entity (= currently live).
+    # True for the newest state of the entity, which is the live one.
     is_current: bool = Field(default=False, alias="isCurrent")
 
     @classmethod

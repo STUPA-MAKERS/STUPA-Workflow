@@ -1,8 +1,8 @@
-"""Tests for the API-path hardening in :mod:`antragsplattform_mcp.client`.
+"""Tests for the API-path hardening in `antragsplattform_mcp.client`.
 
-Covers AUD-022: caller-supplied ids interpolated into request paths must not be
-able to perform path traversal (``../admin/audit``) or smuggle a query string
-(``x?y=1``), while legitimate routes / UUID ids pass through untouched.
+These tests cover AUD-022. A caller-supplied id goes into the request path. Such an id
+must not traverse the path with `../admin/audit`. It must not smuggle a query string
+with `x?y=1` either. A legitimate route and a UUID id must pass through untouched.
 """
 
 from __future__ import annotations

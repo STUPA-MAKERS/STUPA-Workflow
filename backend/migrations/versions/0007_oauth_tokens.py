@@ -1,8 +1,8 @@
-"""OAuth2-AS-Tabellen für den MCP-Login: Authorization-Codes + Access/Refresh-Token.
+"""OAuth2 server tables for the MCP login: authorization codes and access/refresh tokens.
 
-Idempotent: frische DBs erhalten die Tabellen bereits aus dem ``create_all``-Baseline
-(0001), migrierte DBs tragen sie via ``CREATE TABLE IF NOT EXISTS`` nach. Token/Codes
-werden nur als SHA-256-Hash gespeichert (Klartext nie persistiert).
+Idempotent. A fresh database already gets the tables from the `create_all` baseline
+(0001). A migrated database gets them through `CREATE TABLE IF NOT EXISTS`. The tables
+hold a token or a code only as a SHA-256 hash. The clear text is never stored.
 """
 
 from __future__ import annotations

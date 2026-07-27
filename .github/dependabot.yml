@@ -1,10 +1,9 @@
-# Dependabot — automatische Dependency-Updates + Security-Advisory-PRs.
-# Spiegelt die CI-Audit-Gates (be-deps-audit / fe-deps-audit): neue CVEs sollen
-# nicht still liegen bleiben, sondern als PR auftauchen. security-updates laufen
-# unabhängig vom wöchentlichen version-update-Fenster.
+# Dependabot opens dependency updates and security-advisory pull requests.
+# It mirrors the CI audit gates (be-deps-audit / fe-deps-audit). A new CVE must not
+# stay unseen. Dependabot raises a pull request for it. Security updates run
+# independently of the weekly version-update window.
 version: 2
 updates:
-  # Frontend-SPA (npm).
   - package-ecosystem: npm
     directory: /frontend
     schedule:
@@ -15,9 +14,10 @@ updates:
         patterns:
           - "@angular/*"
           - "@angular-eslint/*"
-    # Angular-22-gekoppelte Majors bewusst ausgeblendet (2026-07): das Upgrade ist ein
-    # eigenes Projekt (inkl. @stupa-makers/ui-kit-Release, peers ^20.0.0) — bis dahin
-    # erzeugen diese PRs nur Rot. Bei der Angular-22-Migration Einträge entfernen.
+    # Majors that couple to Angular 22 stay excluded (2026-07). That upgrade is a
+    # project of its own. It needs a @stupa-makers/ui-kit release, because the peers
+    # there are ^20.0.0. Until then these pull requests only turn the build red.
+    # Remove these entries during the Angular 22 migration.
     ignore:
       - dependency-name: "@angular/*"
         update-types: ["version-update:semver-major"]
@@ -33,36 +33,32 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "@eslint/js"
         update-types: ["version-update:semver-major"]
-      # @types/node folgt der CI-/Runtime-Node-Major (setup-node: 22) — Majors darüber
-      # hinaus sind falsch, bis Node selbst angehoben wird.
+      # @types/node follows the CI and runtime Node major (setup-node: 22). A higher
+      # major is wrong until Node itself moves up.
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
-      # Tailwind 4 = neues Config-Modell (CSS-first); Migration separat planen.
+      # Tailwind 4 brings a new CSS-first config model. Plan that migration separately.
       - dependency-name: "tailwindcss"
         update-types: ["version-update:semver-major"]
 
-  # Backend (pip / pyproject).
   - package-ecosystem: pip
     directory: /backend
     schedule:
       interval: weekly
     open-pull-requests-limit: 10
 
-  # MCP-Server (pip / pyproject).
   - package-ecosystem: pip
     directory: /mcp
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
 
-  # pytex-Render-Microservice (pip / pyproject).
   - package-ecosystem: pip
     directory: /pytex
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
 
-  # GitHub-Actions selbst aktuell halten (z.B. setup-node/checkout).
   - package-ecosystem: github-actions
     directory: /
     schedule:

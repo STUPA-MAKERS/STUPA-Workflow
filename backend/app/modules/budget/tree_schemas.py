@@ -1,8 +1,8 @@
 """API schemas of the budget tree.
 
-camelCase aliases via :class:`_CamelModel`; money as ``Decimal``
-(numeric(12,2)); dates as ``date``. ``pathKey`` is server-maintained — not
-accepted in requests, out DTOs only.
+`_CamelModel` supplies the camelCase aliases. Money uses `Decimal`
+(numeric(12,2)) and a date uses `date`. The server maintains `pathKey`. A
+request never accepts it. It appears in out DTOs only.
 """
 
 from __future__ import annotations
@@ -16,17 +16,19 @@ from pydantic import Field, model_validator
 
 from app.modules.budget.schemas import _CamelModel
 
-# Money cap = DB column ``numeric(12, 2)``. Applied as ``le`` on input fields so
-# an oversized amount yields a clean 422 instead of a numeric-overflow 500.
+# Money cap that matches the DB column `numeric(12, 2)`. An input field applies
+# it as `le`, so an oversized amount gives a clean 422 instead of a
+# numeric-overflow 500.
 _MAX_AMOUNT = Decimal("9999999999.99")
 
 
-# --------------------------------------------------------------------- nodes
 class BudgetNodeCreate(_CamelModel):
-    """Create a cost centre. ``parentId=null`` = top level (``gremiumId`` required).
+    """Create a cost center.
 
-    ``fiscalStartMonth``/``fiscalStartDay`` = fiscal cutoff (top-level only;
-    default Jan 1)."""
+    `parentId=null` means top level, and `gremiumId` is then required.
+    `fiscalStartMonth` and `fiscalStartDay` set the fiscal cutoff. They apply at
+    the top level only and default to Jan 1.
+    """
 
     key: str = Field(min_length=1, max_length=64)
     name: str = Field(min_length=1, max_length=200)
@@ -36,16 +38,18 @@ class BudgetNodeCreate(_CamelModel):
     active: bool = True
     color: str | None = None
     fiscal_start_month: int = Field(default=1, ge=1, le=12, alias="fiscalStartMonth")
-    # 1..28: the cutoff must exist in EVERY month; days 29-31 would raise a
-    # ``date(...)`` ValueError -> 500 that leaves the budget unusable.
+    # 1..28: the cutoff must exist in EVERY month. Days 29 to 31 would raise a
+    # `date(...)` ValueError. The 500 that follows leaves the budget unusable.
     fiscal_start_day: int = Field(default=1, ge=1, le=28, alias="fiscalStartDay")
 
 
 class BudgetNodeUpdate(_CamelModel):
-    """Partially update a cost centre (key/parent immutable for path stability).
+    """Partially update a cost center.
 
-    ``None`` = unchanged. ``color=""`` clears the color. ``acceptedStateKeys``/
-    ``deniedStateKeys``/``fiscalStart*`` only make sense at the top level."""
+    The key and the parent stay immutable to keep the path stable. `None` means
+    unchanged. `color=""` clears the color. `acceptedStateKeys`,
+    `deniedStateKeys` and `fiscalStart*` make sense at the top level only.
+    """
 
     key: str | None = Field(default=None, min_length=1, max_length=64)
     name: str | None = Field(default=None, min_length=1, max_length=200)
@@ -54,10 +58,10 @@ class BudgetNodeUpdate(_CamelModel):
     accepted_state_keys: list[str] | None = Field(default=None, alias="acceptedStateKeys")
     denied_state_keys: list[str] | None = Field(default=None, alias="deniedStateKeys")
     hidden_in_budget: bool | None = Field(default=None, alias="hiddenInBudget")
-    # Visibility gremium — ``None`` in the payload clears the assignment.
+    # Visibility Gremium. `None` in the payload clears the assignment.
     view_gremium_id: UUID | None = Field(default=None, alias="viewGremiumId")
     fiscal_start_month: int | None = Field(default=None, ge=1, le=12, alias="fiscalStartMonth")
-    # 1..28: see ``BudgetNodeCreate`` — the cutoff must exist in every month.
+    # 1..28: see `BudgetNodeCreate`. The cutoff must exist in every month.
     fiscal_start_day: int | None = Field(default=None, ge=1, le=28, alias="fiscalStartDay")
 
 
@@ -84,17 +88,17 @@ class BudgetNodeOut(_CamelModel):
 class AllocationView(_CamelModel):
     """Budget view of a node in ONE fiscal year.
 
-    ``committed`` = ``bound + expended`` (total consumption, backward compat).
-    ``available = allocated - bound - expended + income``.
+    `committed` is `bound + expended`, the total consumption. It stays for
+    backward compatibility. `available = allocated - bound - expended + income`.
     """
 
     fiscal_year_id: UUID = Field(alias="fiscalYearId")
     allocated: Decimal
-    # Bound: accepted applications, reduced pro rata by expenses bound to them.
+    # Bound: accepted applications, reduced pro rata by the expenses bound to them.
     bound: Decimal = Decimal("0")
-    # Expended: actual expenses (kind='expense').
+    # Expended: actual expenses, kind='expense'.
     expended: Decimal = Decimal("0")
-    # Income (kind='income') — raises the available budget.
+    # Income, kind='income'. It raises the available budget.
     income: Decimal = Decimal("0")
     committed: Decimal
     requested: Decimal = Decimal("0")
@@ -102,7 +106,7 @@ class AllocationView(_CamelModel):
 
 
 class BudgetTreeNodeOut(_CamelModel):
-    """Tree node + per-fiscal-year sums + children (recursive) — ``GET /budgets``."""
+    """Tree node with per-fiscal-year sums and recursive children for `GET /budgets`."""
 
     id: UUID
     parent_id: UUID | None = Field(alias="parentId")
@@ -123,23 +127,31 @@ class BudgetTreeNodeOut(_CamelModel):
     children: list[BudgetTreeNodeOut] = Field(default_factory=list)
 
 
-# ---------------------------------------------------------------- fiscal years
 class FiscalYearCreate(_CamelModel):
-    """Create a fiscal year — the year only (start/end derive from the budget cutoff)."""
+    """Create a fiscal year from the year alone.
+
+    The start and the end derive from the budget cutoff.
+    """
 
     year: int = Field(ge=1900, le=2200)
     active: bool = True
 
 
 class FiscalYearUpdate(_CamelModel):
-    """Update a fiscal year (year and/or active flag; disjointness re-checked)."""
+    """Update the year or the active flag of a fiscal year.
+
+    The service checks again that the fiscal years stay disjoint.
+    """
 
     year: int | None = Field(default=None, ge=1900, le=2200)
     active: bool | None = None
 
 
 class FiscalYearOut(_CamelModel):
-    """Fiscal-year base data. ``display`` = ``YYYY`` (Jan-1 cutoff) or ``YYYY/YY``."""
+    """Fiscal-year base data.
+
+    `display` is `YYYY` for a Jan 1 cutoff, else `YYYY/YY`.
+    """
 
     id: UUID
     budget_id: UUID = Field(alias="budgetId")
@@ -150,9 +162,8 @@ class FiscalYearOut(_CamelModel):
     active: bool
 
 
-# ----------------------------------------------------------------- allocation
 class AllocationSet(_CamelModel):
-    """Set the top-down allocation (``PUT .../allocations/{fiscalYearId}``)."""
+    """Set the top-down allocation with `PUT .../allocations/{fiscalYearId}`."""
 
     allocated: Decimal = Field(ge=0, allow_inf_nan=False)
 
@@ -165,14 +176,14 @@ class AllocationOut(_CamelModel):
     allocated: Decimal
 
 
-# ------------------------------------------------------------------- assign
 class AssignBudgetRequest(_CamelModel):
-    """Assign an application to a cost centre; also sets the fiscal year.
+    """Assign an application to a cost center and set the fiscal year.
 
-    ``budgetId=null`` clears the assignment (``fiscalYearId`` -> null too).
-    ``fiscalYearId`` is optional: if set, it must belong to the cost centre's
-    top budget; if omitted, the service derives the single active fiscal year
-    or requires an explicit choice (422 — as with expenses).
+    `budgetId=null` clears the assignment and sets `fiscalYearId` to null too.
+    `fiscalYearId` is optional. A given value must belong to the top budget of
+    the cost center. Without a value the service derives the single active
+    fiscal year. It otherwise demands an explicit choice with a 422, as with
+    expenses.
     """
 
     budget_id: UUID | None = Field(default=None, alias="budgetId")
@@ -186,7 +197,7 @@ class MoveFiscalYearRequest(_CamelModel):
 
 
 class AssignBudgetOut(_CamelModel):
-    """Result of a cost-centre/fiscal-year assignment."""
+    """Result of a cost center and fiscal year assignment."""
 
     application_id: UUID = Field(alias="applicationId")
     budget_id: UUID | None = Field(alias="budgetId")
@@ -194,9 +205,10 @@ class AssignBudgetOut(_CamelModel):
 
 
 class BudgetApplicationOut(_CamelModel):
-    """Application in a cost centre (+ subtree) — for the budget drilldown list.
+    """Application in a cost center and its subtree, for the budget drilldown list.
 
-    Money as ``Decimal``; ``stage`` from the ``budget_entry`` (or None)."""
+    Money uses `Decimal`. `stage` comes from the `budget_entry` and can be None.
+    """
 
     application_id: UUID = Field(alias="applicationId")
     title: str | None = None
@@ -213,21 +225,21 @@ class BudgetApplicationOut(_CamelModel):
     created_at: datetime = Field(alias="createdAt")
 
 
-# ------------------------------------------------------------------- expense
 ExpenseKind = Literal["expense", "income"]
-# Payment method: bank transfer | cash | direct debit | card | PayPal.
+# Payment method: bank transfer, cash, direct debit, card, PayPal.
 PaymentMethod = Literal["ueberweisung", "bar", "lastschrift", "karte", "paypal"]
 
 
 class ExpenseCreate(_CamelModel):
-    """Book an expense/income against a cost centre + fiscal year, optionally app-bound.
+    """Book an expense or income against a cost center and a fiscal year.
 
-    ``budgetId`` is required for standalone bookings; for bound ones the cost
-    centre is inherited from the application and ``budgetId``/``fiscalYearId``
-    are ignored. ``applicationId`` binds the booking (replaces its binding pro
-    rata), allowed for ``kind='expense'`` only. ``fiscalYearId`` is optional
-    for standalone expenses: if missing, the single active fiscal year of the
-    top budget is chosen (ambiguous/none -> 422).
+    `budgetId` is required for a standalone booking. A bound booking inherits
+    the cost center from the application, and the server then ignores
+    `budgetId` and `fiscalYearId`. `applicationId` binds the booking and
+    replaces its binding pro rata. It is allowed for `kind='expense'` only.
+    `fiscalYearId` is optional for a standalone expense. Without it the server
+    picks the single active fiscal year of the top budget. An ambiguous or
+    missing year gives a 422.
     """
 
     amount: Decimal = Field(gt=0, le=_MAX_AMOUNT, allow_inf_nan=False)
@@ -236,9 +248,8 @@ class ExpenseCreate(_CamelModel):
     budget_id: UUID | None = Field(default=None, alias="budgetId")
     fiscal_year_id: UUID | None = Field(default=None, alias="fiscalYearId")
     application_id: UUID | None = Field(default=None, alias="applicationId")
-    # No ``accountId``: the account is not a manual booking field, only bank
-    # reconciliation sets it.
-    # Optional metadata.
+    # No `accountId` here. The account is not a manual booking field. Only the
+    # bank reconciliation sets it.
     invoice_date: date | None = Field(default=None, alias="invoiceDate")
     payment_date: date | None = Field(default=None, alias="paymentDate")
     correspondent: str | None = Field(default=None)
@@ -256,8 +267,12 @@ class ExpenseCreate(_CamelModel):
 
 
 class SubBookingCreate(_CamelModel):
-    """Create a sub-booking manually: account/cost centre/fiscal year/kind are
-    inherited from the parent — only own values here (amount, description, metadata)."""
+    """Create a sub-booking by hand.
+
+    The sub-booking inherits the account, the cost center, the fiscal year and
+    the kind from the parent. This schema carries the own values only: amount,
+    description and metadata.
+    """
 
     amount: Decimal = Field(gt=0, le=_MAX_AMOUNT, allow_inf_nan=False)
     description: str = Field(min_length=1)
@@ -271,10 +286,14 @@ class SubBookingCreate(_CamelModel):
 
 
 class ExpenseUpdate(_CamelModel):
-    """Update a booked expense/income. Amount, description, cost centre and the
-    optional metadata are editable; fiscal year and application binding stay
-    fixed (booking stability). Only set fields are written; explicit ``null``
-    clears an optional field (except ``budgetId`` — required FK)."""
+    """Update a booked expense or income.
+
+    The amount, the description, the cost center and the optional metadata are
+    editable. The fiscal year and the application binding stay fixed to keep
+    the booking stable. The server writes the set fields only. An explicit
+    `null` clears an optional field. `budgetId` is the exception, because the
+    FK is required.
+    """
 
     amount: Decimal | None = Field(default=None, gt=0, le=_MAX_AMOUNT, allow_inf_nan=False)
     description: str | None = Field(default=None, min_length=1)
@@ -296,7 +315,7 @@ class ExpenseUpdate(_CamelModel):
 
 
 class ExpenseOut(_CamelModel):
-    """Booked expense/income (base data)."""
+    """Base data of a booked expense or income."""
 
     id: UUID
     budget_id: UUID = Field(alias="budgetId")
@@ -311,8 +330,9 @@ class ExpenseOut(_CamelModel):
     account_id: UUID | None = Field(default=None, alias="accountId")
     account_name: str | None = Field(default=None, alias="accountName")
     transfer_id: UUID | None = Field(default=None, alias="transferId")
-    # ``actor`` = principal ``sub`` (raw identity, audit). ``actorName`` is the
-    # server-resolved display name — never show the raw id in the UI.
+    # `actor` is the principal `sub`, the raw identity for the audit log.
+    # `actorName` is the display name the server resolves. Never show the raw
+    # id in the UI.
     actor: str | None = None
     actor_name: str | None = Field(default=None, alias="actorName")
     invoice_date: date | None = Field(default=None, alias="invoiceDate")
@@ -324,20 +344,22 @@ class ExpenseOut(_CamelModel):
     category: str | None = None
     invoice_id: UUID | None = Field(default=None, alias="invoiceId")
     invoice_number: str | None = Field(default=None, alias="invoiceNumber")
-    # Sub-bookings: ``parentExpenseId`` set -> this booking IS a sub-booking.
-    # ``childCount`` > 0 -> the booking HAS sub-bookings (expandable; its
-    # ``amount`` = sum of the children and is then read-only).
+    # A set `parentExpenseId` means this booking IS a sub-booking. A
+    # `childCount` above 0 means the booking HAS sub-bookings. The UI can
+    # expand them. The `amount` is then the sum of the children and read-only.
     parent_expense_id: UUID | None = Field(default=None, alias="parentExpenseId")
     child_count: int = Field(default=0, alias="childCount")
     created_at: datetime = Field(alias="createdAt")
 
 
-# -------------------------------------------------------------------- invoices
 InvoiceStatus = Literal["open", "paid"]
 
 
 class InvoiceCreate(_CamelModel):
-    """Create an invoice. ``grossAmount`` required; everything else optional."""
+    """Create an invoice.
+
+    `grossAmount` is required. Every other field is optional.
+    """
 
     number: str | None = None
     issue_date: date | None = Field(default=None, alias="issueDate")
@@ -348,17 +370,20 @@ class InvoiceCreate(_CamelModel):
     gross_amount: Decimal = Field(alias="grossAmount", ge=0, le=_MAX_AMOUNT)
     note: str | None = None
     status: InvoiceStatus = "open"
-    # Optional receipt from the ZUGFeRD import: handle to the original PDF
-    # already stored in MinIO (``/invoices/parse`` returns the token).
+    # Optional receipt from the ZUGFeRD import. The token is a handle to the
+    # original PDF already stored in MinIO. `/invoices/parse` returns it.
     file_token: str | None = Field(default=None, alias="fileToken")
     file_name: str | None = Field(default=None, alias="fileName")
     file_mime: str | None = Field(default=None, alias="fileMime")
 
 
 class InvoiceParseResult(_CamelModel):
-    """Result of ``POST /invoices/parse``: parsed header data + handle to the
-    stored original PDF. The UI pre-fills the entry dialog; ``fileToken`` is
-    passed back to ``POST /invoices`` on confirm."""
+    """Result of `POST /invoices/parse`.
+
+    The result holds the parsed header data and a handle to the stored original
+    PDF. The UI pre-fills the entry dialog. On confirm the UI passes
+    `fileToken` back to `POST /invoices`.
+    """
 
     number: str | None = None
     issue_date: date | None = Field(default=None, alias="issueDate")
@@ -372,14 +397,17 @@ class InvoiceParseResult(_CamelModel):
     file_name: str = Field(alias="fileName")
     file_mime: str = Field(alias="fileMime")
     # Possible duplicate: an invoice with the same number already exists. The
-    # UI warns before confirming but does not block the import.
+    # UI warns before the confirm but does not block the import.
     duplicate: bool = False
 
 
 class InvoiceFileResult(_CamelModel):
-    """Result of ``POST /invoices/file``: handle to the just-stored original
-    PDF — also for non-ZUGFeRD receipts. Passed back to ``POST /invoices`` like
-    ``InvoiceParseResult.fileToken``."""
+    """Result of `POST /invoices/file`.
+
+    The result is a handle to the original PDF the server just stored. It also
+    covers a receipt that is not ZUGFeRD. The client passes it back to
+    `POST /invoices` like `InvoiceParseResult.fileToken`.
+    """
 
     file_token: str = Field(alias="fileToken")
     file_name: str = Field(alias="fileName")
@@ -387,7 +415,10 @@ class InvoiceFileResult(_CamelModel):
 
 
 class InvoiceUpdate(_CamelModel):
-    """Partially update an invoice. Only set fields are written."""
+    """Partially update an invoice.
+
+    The server writes the set fields only.
+    """
 
     number: str | None = None
     issue_date: date | None = Field(default=None, alias="issueDate")
@@ -407,7 +438,7 @@ class InvoiceUpdate(_CamelModel):
 
 
 class InvoiceOut(_CamelModel):
-    """Invoice (base data + file flag)."""
+    """Invoice base data plus the file flag."""
 
     id: UUID
     number: str | None = None
@@ -426,13 +457,14 @@ class InvoiceOut(_CamelModel):
     created_at: datetime = Field(alias="createdAt")
 
 
-# -------------------------------------------------------------------- accounts
 class AccountCreate(_CamelModel):
-    """Create an account — name + IBAN (free text). Not bound to cost centres.
+    """Create an account from a name and an IBAN as free text.
 
-    The FinTS bank connection (``fintsEndpoint`` + ``fintsBlz``) is optional and
-    shared by all bookers. Personal credentials (login/PIN) are set by each
-    booker in the booking tab, not here."""
+    An account is not bound to a cost center. The FinTS bank connection
+    (`fintsEndpoint` and `fintsBlz`) is optional, and all bookers share it.
+    Each booker sets the personal credentials (login and PIN) in the booking
+    tab, not here.
+    """
 
     name: str = Field(min_length=1, max_length=200)
     iban: str = Field(default="", max_length=64)
@@ -442,8 +474,12 @@ class AccountCreate(_CamelModel):
 
 
 class AccountUpdate(_CamelModel):
-    """Partially update an account. FinTS connection fields: ``null``/``""``
-    clears, a set value overwrites (login/PIN are not part of account data)."""
+    """Partially update an account.
+
+    For a FinTS connection field, `null` or an empty string clears the value. A
+    set value overwrites it. The login and the PIN are not part of the account
+    data.
+    """
 
     name: str | None = Field(default=None, min_length=1, max_length=200)
     iban: str | None = Field(default=None, max_length=64)
@@ -459,10 +495,11 @@ class AccountUpdate(_CamelModel):
 
 
 class AccountOut(_CamelModel):
-    """Account base data incl. FinTS bank connection (endpoint + BLZ).
+    """Account base data with the FinTS bank connection (endpoint and BLZ).
 
-    ``fintsConfigured`` = connection complete (account is FinTS-capable);
-    personal logins/PINs never appear here."""
+    `fintsConfigured` means the connection is complete and the account is
+    FinTS-capable. A personal login or PIN never appears here.
+    """
 
     id: UUID
     name: str
@@ -470,28 +507,29 @@ class AccountOut(_CamelModel):
     active: bool
     fints_endpoint: str | None = Field(default=None, alias="fintsEndpoint")
     fints_blz: str | None = Field(default=None, alias="fintsBlz")
-    # True once endpoint + BLZ are present: the account is FinTS-syncable (as
-    # soon as a booker stores personal credentials).
+    # True once the endpoint and the BLZ are present. The account is then
+    # FinTS-syncable, as soon as a booker stores personal credentials.
     fints_configured: bool = Field(default=False, alias="fintsConfigured")
-    # Last known bank balance + as-of time; null = never synced.
+    # Last known bank balance and its as-of time. Null means never synced.
     fints_last_balance: Decimal | None = Field(default=None, alias="fintsLastBalance")
     fints_balance_at: datetime | None = Field(default=None, alias="fintsBalanceAt")
 
 
 class AccountOption(_CamelModel):
-    """Minimal account choice (id + name, NO IBAN) for booking dropdowns —
-    readable for bookers without account-data rights.
+    """Minimal account choice for booking dropdowns: id and name, NO IBAN.
 
-    ``fintsConfigured`` (not a secret) = account is FinTS-capable;
-    ``fintsHasCredential`` = the requesting booker already stored own
-    credentials — otherwise they must connect on first sync."""
+    A booker without the account-data permission can read this. `fintsConfigured`
+    is not a secret and means the account is FinTS-capable.
+    `fintsHasCredential` means the requesting booker already stored own
+    credentials. Without them the booker must connect on the first sync.
+    """
 
     id: UUID
     name: str
     fints_configured: bool = Field(default=False, alias="fintsConfigured")
     fints_has_credential: bool = Field(default=False, alias="fintsHasCredential")
     fints_last_sync_at: datetime | None = Field(default=None, alias="fintsLastSyncAt")
-    # Last bank balance + as-of time for the accounts tab.
+    # Last bank balance and its as-of time for the accounts tab.
     fints_last_balance: Decimal | None = Field(default=None, alias="fintsLastBalance")
     fints_balance_at: datetime | None = Field(default=None, alias="fintsBalanceAt")
 
@@ -499,8 +537,10 @@ class AccountOption(_CamelModel):
 class FintsCredentialIn(_CamelModel):
     """Personal FinTS credentials of the booker for an account.
 
-    ``fintsPin`` is write-only (stored encrypted, never returned). Set on first
-    connect in the booking tab, replaced on change."""
+    `fintsPin` is write-only. The server stores it encrypted and never returns
+    it. The booker sets the credentials on the first connect in the booking
+    tab and replaces them on a change.
+    """
 
     fints_login: str = Field(alias="fintsLogin", min_length=1, max_length=200)
     fints_pin: str = Field(alias="fintsPin", min_length=1, max_length=200)
@@ -509,27 +549,32 @@ class FintsCredentialIn(_CamelModel):
 class FintsCredentialStatus(_CamelModel):
     """Connection status of a booker for an account.
 
-    ``configured`` = account is FinTS-capable (endpoint + BLZ). ``hasCredential``
-    = the requesting booker stored own credentials; ``login`` is their username
-    (not a secret), the PIN never appears."""
+    `configured` means the account is FinTS-capable, so the endpoint and the
+    BLZ are set. `hasCredential` means the requesting booker stored own
+    credentials. `login` is the username of that booker and is not a secret.
+    The PIN never appears.
+    """
 
     configured: bool = False
     has_credential: bool = Field(default=False, alias="hasCredential")
     fints_login: str | None = Field(default=None, alias="fintsLogin")
     fints_last_sync_at: datetime | None = Field(default=None, alias="fintsLastSyncAt")
-    # Cooldown after a bank lock/signature rejection: the server refuses syncs
-    # until then; the UI disables the fetch button and warns against retries.
+    # Cooldown after a bank lock or a signature rejection. The server refuses a
+    # sync until this time. The UI disables the fetch button and warns against
+    # a retry.
     fints_locked_until: datetime | None = Field(default=None, alias="fintsLockedUntil")
 
 
-# ------------------------------------------------------- bank statement
 BankLineState = Literal["unmatched", "suggested", "matched", "ignored"]
 BankSyncStatus = Literal["done", "needs_tan"]
 
 
 class StatementLineOut(_CamelModel):
-    """Staged bank transaction. ``amount`` is signed (> 0 inflow, < 0 outflow);
-    ``kind`` is the booking kind derived from it."""
+    """Staged bank transaction.
+
+    `amount` is signed: above 0 is an inflow and below 0 is an outflow. `kind`
+    is the booking kind derived from that sign.
+    """
 
     id: UUID
     account_id: UUID = Field(alias="accountId")
@@ -547,16 +592,21 @@ class StatementLineOut(_CamelModel):
     suggested_budget_id: UUID | None = Field(default=None, alias="suggestedBudgetId")
     suggested_path_key: str | None = Field(default=None, alias="suggestedPathKey")
     suggested_expense_id: UUID | None = Field(default=None, alias="suggestedExpenseId")
-    # Booking of a ``matched`` line (from ``bank_allocation``; the oldest one for
-    # split payments) — deep-link target for "view booking" (#expenses-ux).
+    # Booking of a `matched` line, taken from `bank_allocation`. A split payment
+    # uses the oldest one. This is the deep-link target for "view booking"
+    # (#expenses-ux).
     matched_expense_id: UUID | None = Field(default=None, alias="matchedExpenseId")
     created_at: datetime = Field(alias="createdAt")
 
 
 class StatementLineDetail(StatementLineOut):
-    """Detail view of a staged line: additionally the raw parser payload
-    (source-format fields, batch metadata) and the idempotency key — for
-    diagnosing import/dedup behavior. Same read permission as the list."""
+    """Detail view of a staged line.
+
+    The detail adds the raw parser payload with the source-format fields and
+    the batch metadata, plus the idempotency key. Both help to diagnose the
+    import and the dedup behavior. The read permission is the same as for the
+    list.
+    """
 
     raw_payload: dict = Field(default_factory=dict, alias="rawPayload")
     idempotency_key: str = Field(alias="idempotencyKey")
@@ -565,33 +615,37 @@ class StatementLineDetail(StatementLineOut):
 class BankSyncResult(_CamelModel):
     """Result of one FinTS sync step.
 
-    ``status='done'`` -> ``imported``/``duplicates`` set. ``status='needs_tan'``
-    -> ``sessionToken`` + ``challenge`` signal a TAN is needed (for
-    ``decoupled``, approving in the banking app + polling ``POST .../tan``
-    without a code suffices)."""
+    `status='done'` sets `imported` and `duplicates`. `status='needs_tan'` sets
+    `sessionToken` and `challenge` to signal that the bank wants a TAN. For a
+    `decoupled` challenge the booker approves in the banking app. The client
+    then polls `POST .../tan` without a code.
+    """
 
     status: BankSyncStatus
     account_id: UUID = Field(alias="accountId")
     imported: int = 0
     duplicates: int = 0
-    # needs_tan:
+    # The fields below are set for `status='needs_tan'` only.
     session_token: UUID | None = Field(default=None, alias="sessionToken")
     challenge: str | None = None
     challenge_html: str | None = Field(default=None, alias="challengeHtml")
-    # Optical challenge (photoTAN/QR-TAN) as a data URL for direct display.
+    # Optical challenge (photoTAN or QR-TAN) as a data URL for direct display.
     challenge_image: str | None = Field(default=None, alias="challengeImage")
     decoupled: bool = False
 
 
 class BankTanRequest(_CamelModel):
-    """TAN to resume a pending sync session. Leave empty for decoupled pushTAN
-    (pure poll: "approved in the app?")."""
+    """TAN to resume a pending sync session.
+
+    Leave the field empty for a decoupled pushTAN. The call is then a pure poll
+    that asks whether the booker approved in the app.
+    """
 
     tan: str = Field(default="", max_length=100)
 
 
 class BankImportResult(_CamelModel):
-    """Result of a file import (CAMT.053/MT940)."""
+    """Result of a file import (CAMT.053 or MT940)."""
 
     account_id: UUID = Field(alias="accountId")
     imported: int = 0
@@ -601,10 +655,12 @@ class BankImportResult(_CamelModel):
 class ConfirmLineRequest(_CamelModel):
     """Confirm a transaction into a booking.
 
-    Either ``matchExpenseId`` (attach to an EXISTING booking) or ``budgetId``
-    (create a new booking against that cost centre — kind from the sign).
-    ``fiscalYearId`` optional (else the single active fiscal year);
-    ``description`` overrides the default (purpose text)."""
+    Give either `matchExpenseId` to attach the line to an EXISTING booking or
+    `budgetId` to create a new booking against that cost center. The sign of
+    the amount then sets the kind. `fiscalYearId` is optional. Without it the
+    server takes the single active fiscal year. `description` overrides the
+    default, which is the purpose text.
+    """
 
     budget_id: UUID | None = Field(default=None, alias="budgetId")
     fiscal_year_id: UUID | None = Field(default=None, alias="fiscalYearId")
@@ -621,18 +677,22 @@ class ConfirmLineRequest(_CamelModel):
 
 
 class IgnoreLineRequest(_CamelModel):
-    """Ignore a staged transaction. ``reason`` is optional free text kept in the
-    audit log (bank_line_ignore) only — not stored on the line."""
+    """Ignore a staged transaction.
+
+    `reason` is optional free text. The platform keeps it in the audit log
+    (bank_line_ignore) only and does not store it on the line.
+    """
 
     reason: str | None = Field(default=None, max_length=500)
 
 
-# ------------------------------------------------------------------- transfer
 class TransferCreate(_CamelModel):
-    """Transfer cost centre -> cost centre (same fiscal year).
+    """Transfer from one cost center to another in the same fiscal year.
 
-    Creates an expense on ``fromBudgetId`` and an income on ``toBudgetId``
-    (same amount/fiscal year), linked via a ``transferId``."""
+    The service creates an expense on `fromBudgetId` and an income on
+    `toBudgetId` with the same amount and fiscal year. A `transferId` links
+    both bookings.
+    """
 
     from_budget_id: UUID = Field(alias="fromBudgetId")
     to_budget_id: UUID = Field(alias="toBudgetId")
@@ -648,7 +708,7 @@ class TransferCreate(_CamelModel):
 
 
 class TransferOut(_CamelModel):
-    """Result of a transfer (both booking ids)."""
+    """Result of a transfer with both booking ids."""
 
     transfer_id: UUID = Field(alias="transferId")
     expense_id: UUID = Field(alias="expenseId")

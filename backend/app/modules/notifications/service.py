@@ -1,13 +1,15 @@
 """Notifications service: template CRUD, the `notify` action, magic link.
 
-Wires the building blocks (resolver, templating, queue) to DB + settings:
+The service wires the building blocks (resolver, templating, queue) to the DB and the
+settings:
 
-* CRUD for `mail_template` (+ preview).
-* :meth:`handle_notify_action` — the `notify` flow-action handler.
-* :meth:`send_magic_link` — renders and sends the magic-link mail.
+`mail_template`: CRUD and preview.
+`handle_notify_action`: the handler of the `notify` flow action.
+`send_magic_link`: renders and sends the magic-link mail.
 
-Sending is never synchronous in the API: the service only enqueues; the arq
-worker sends. If the queue is missing (no Redis) it logs and skips (no block).
+The API never sends a mail synchronously. The service only enqueues and the arq worker
+sends. When the queue is missing (no Redis) the service logs the drop and skips it. It
+never blocks the request.
 """
 
 from __future__ import annotations
@@ -51,7 +53,7 @@ logger = logging.getLogger("app.notifications")
 
 MAGIC_LINK_TEMPLATE_KEY = "magic_link"
 
-# Builtin fallback used when no `magic_link` template exists in the DB.
+# The sender uses this builtin fallback when the DB has no `magic_link` template.
 _BUILTIN_MAGIC_LINK_SUBJECT = {
     "de": "Ihr Zugangslink zur Antragsplattform",
     "en": "Your access link for the application platform",
@@ -66,16 +68,18 @@ _BUILTIN_MAGIC_LINK_BODY = {
 }
 
 # Default template for a ``notify`` action without an explicit ``templateKey``.
-# If the template is absent the var-free builtin fallback applies (StrictUndefined-safe).
+# When the template is absent, the variable-free builtin fallback applies. That
+# fallback is safe under StrictUndefined.
 DEFAULT_NOTIFY_TEMPLATE_KEY = "status_update"
-# Committee-facing default for non-applicant recipients of a `notify` action
-# without an explicit templateKey — applicants keep `status_update`.
+# Team-facing default for the non-applicant recipients of a `notify` action without an
+# explicit templateKey. Applicants keep `status_update`.
 TEAM_NOTIFY_TEMPLATE_KEY = "status_update_team"
 _BUILTIN_NOTIFY_SUBJECT = {
     "de": "Aktualisierung zu Ihrem Antrag",
     "en": "Update on your application",
 }
-# Mentions application title + new status when the dispatcher provides them.
+# The body names the application title and the new status when the dispatcher
+# supplies them.
 _BUILTIN_NOTIFY_BODY = {
     "de": "Hallo,\n\nes gibt eine Aktualisierung zu Ihrem Antrag"
     "{% if applicationTitle %} „{{ applicationTitle }}“{% endif %}."
@@ -101,7 +105,6 @@ class NotificationService:
         self.settings = settings or get_settings()
         self.resolver = RecipientResolver(session)
 
-    # --- templates ---
     async def create_template(self, payload: MailTemplateCreate) -> MailTemplateOut:
         existing = await self._get_template_by_key(payload.key)
         if existing is not None:
@@ -117,8 +120,9 @@ class NotificationService:
         try:
             await self.session.commit()
         except IntegrityError as exc:
-            # Concurrent insert of the same key (UNIQUE mail_template.key) won
-            # between read and commit: return 409 rather than 500; client retries.
+            # A concurrent insert of the same key (UNIQUE mail_template.key) won
+            # between the read and the commit. Return 409 and not 500. The client
+            # retries.
             await self.session.rollback()
             raise ConflictError(
                 f"mail template {payload.key!r} already exists", code="conflict"
@@ -126,10 +130,11 @@ class NotificationService:
         return _template_out(tpl)
 
     async def list_templates(self) -> list[MailTemplateOut]:
-        """Every mail kind: DB override if present, else the builtin default.
+        """Return every mail kind, as a DB override or as the builtin default.
 
-        Order follows the catalogue; non-catalogue DB rows (e.g. custom flow
-        ``templateKey``) are appended alphabetically.
+        The order follows the catalogue. The method appends the DB rows that are not
+        in the catalogue (for example a custom flow ``templateKey``) in alphabetical
+        order.
         """
         from app.modules.notifications.templates_catalogue import (
             CATALOGUE_BY_KEY,
@@ -163,8 +168,14 @@ class NotificationService:
         return out
 
     async def upsert_template(self, payload: MailTemplateUpsert) -> MailTemplateOut:
-        """Create/update an override by key. Builtin keys allowed; unknown keys
-        (no catalogue entry, no existing row) → 422."""
+        """Create or update an override by key.
+
+        A builtin key is allowed.
+
+        Raises:
+            ValidationProblem: The key has no catalogue entry and no existing row
+                (HTTP 422).
+        """
         from app.modules.notifications.templates_catalogue import CATALOGUE_BY_KEY
 
         existing = await self._get_template_by_key(payload.key)
@@ -191,8 +202,9 @@ class NotificationService:
         try:
             await self.session.commit()
         except IntegrityError as exc:
-            # Concurrent insert of the same key (UNIQUE mail_template.key) won
-            # between read and commit: return 409 rather than 500; client retries.
+            # A concurrent insert of the same key (UNIQUE mail_template.key) won
+            # between the read and the commit. Return 409 and not 500. The client
+            # retries.
             await self.session.rollback()
             if inserting:
                 raise ConflictError(
@@ -203,7 +215,7 @@ class NotificationService:
         return _template_out(existing, source="override")
 
     async def reset_template(self, key: str) -> MailTemplateOut:
-        """Delete the override, restoring the builtin default."""
+        """Delete the override and restore the builtin default."""
         from app.modules.notifications.templates_catalogue import CATALOGUE_BY_KEY
 
         spec = CATALOGUE_BY_KEY.get(key)
@@ -283,9 +295,12 @@ class NotificationService:
             lang=rendered.lang,
         )
 
-    # --- settings ---
     async def get_notification_settings(self) -> NotificationSettings:
-        """Read platform config (single row; create defaults if missing)."""
+        """Read the platform config.
+
+        The config is a single row. The method creates it with the defaults when the
+        row is missing.
+        """
         row = await self.session.get(NotificationSettings, 1)
         if row is None:
             row = NotificationSettings(id=1)
@@ -302,7 +317,7 @@ class NotificationService:
         task_reminder_after_days: int | None = None,
         task_reminder_repeat_days: int | None = None,
     ) -> NotificationSettings:
-        """Update platform config (partial) and audit as CONFIG_CHANGE."""
+        """Update the platform config partially and audit it as CONFIG_CHANGE."""
         from app.modules.audit.actions import AuditAction
         from app.modules.audit.service import record as audit_record
 
@@ -329,9 +344,11 @@ class NotificationService:
         await self.session.refresh(row)
         return row
 
-    # --- preferences ---
     async def get_preferences(self, principal_sub: str) -> list[tuple[str, bool]]:
-        """Effective switches for the user — full catalogue, deviations merged."""
+        """Return the effective switches of the user.
+
+        The result holds the full catalogue with the stored deviations merged in.
+        """
         principal_id = await self._principal_id(principal_sub)
         stored: dict[str, bool] = {}
         if principal_id is not None:
@@ -348,7 +365,10 @@ class NotificationService:
     async def set_preferences(
         self, principal_sub: str, items: list[tuple[str, bool]]
     ) -> list[tuple[str, bool]]:
-        """Bulk-upsert own switches; only deviations are stored."""
+        """Upsert the own switches in bulk.
+
+        The method stores only the deviations from the default.
+        """
         unknown = sorted({k for k, _ in items} - set(NOTIFICATION_KINDS))
         if unknown:
             raise ValidationProblem(
@@ -395,10 +415,14 @@ class NotificationService:
         idempotency_parts: tuple[str, ...],
         lang: str | None = None,
     ) -> bool:
-        """Generic send of one notification kind.
+        """Send one notification kind.
 
-        Filters opted-out recipients, prefers the DB template ``template_key``
-        (builtin fallback), and wraps the mail in the layout.
+        The method drops the recipients that opted out. It prefers the DB template
+        ``template_key`` and falls back to the builtin. It wraps the mail in the
+        layout.
+
+        Returns:
+            True when the method enqueued a mail.
         """
         recipients = await filter_recipients_by_preference(
             self.session, recipients, kind
@@ -423,7 +447,7 @@ class NotificationService:
                 lang=lang or self.settings.mail_default_lang,
                 default_lang=self.settings.mail_default_lang,
             )
-        except TemplateRenderError as exc:  # defensive — builtins cover their own vars
+        except TemplateRenderError as exc:  # defensive: builtins cover their own vars
             logger.warning("builtin template %r render failed: %s", template_key, exc)
             return False
         msg = MailMessage(
@@ -435,7 +459,6 @@ class NotificationService:
         )
         return await self._enqueue(msg)
 
-    # --- dispatch ---
     async def handle_notify_action(
         self,
         action: dict[str, Any],
@@ -446,14 +469,17 @@ class NotificationService:
         lang: str | None = None,
         idempotency_base: str | None = None,
     ) -> int:
-        """The `notify` flow-action handler.
+        """Handle the `notify` flow action.
 
         Ad-hoc mode: ``{"type":"notify","templateKey":"...","recipients":[...]}``.
+
+        Returns:
+            The number of enqueued sends.
         """
         specs = _as_specs(action.get("recipients", []))
-        # Builtin/status templates reference title + status; not every caller
-        # (deadline worker, legacy flows) supplies them, so default to empty
-        # strings and keep StrictUndefined from failing the send.
+        # The builtin and status templates reference the title and the status. Not
+        # every caller (deadline worker, legacy flows) supplies them. Default to empty
+        # strings so StrictUndefined does not fail the send.
         context = dict(context or {})
         context.setdefault("applicationTitle", "")
         context.setdefault("status", "")
@@ -467,10 +493,10 @@ class NotificationService:
                 lang=lang,
                 idempotency_base=idempotency_base,
             )
-        # No explicit templateKey (the flow editor often stores the action with
-        # recipients only): applicants get the applicant-facing default, every
-        # other recipient kind the committee-facing wording. The template key is
-        # part of the idempotency parts, so the two sends get distinct keys.
+        # No explicit templateKey. The flow editor often stores the action with
+        # recipients only. Applicants get the applicant-facing default and every other
+        # recipient kind gets the team-facing wording. The template key is part of the
+        # idempotency parts, so the two sends get distinct keys.
         applicant_specs = [s for s in specs if s.get("kind") == "applicant"]
         team_specs = [s for s in specs if s.get("kind") != "applicant"]
         count = 0
@@ -501,15 +527,14 @@ class NotificationService:
         idempotency_base: str | None,
     ) -> int:
         """Resolve, filter and enqueue one `notify` send for ``template_key``."""
-        # Derive the real notification kind from the catalogue: it drives both
-        # the opt-out filter and the footer reason. Unknown/DB-only keys →
-        # default `status_update`.
+        # Derive the real notification kind from the catalogue. It drives both the
+        # opt-out filter and the footer reason. A key that is unknown or DB-only falls
+        # back to `status_update`.
         from app.modules.notifications.templates_catalogue import CATALOGUE_BY_KEY
 
         spec = CATALOGUE_BY_KEY.get(template_key)
         reason = spec.kind if spec is not None else DEFAULT_NOTIFY_TEMPLATE_KEY
         recipients = await self.resolver.resolve(specs, application_id=application_id)
-        # Respect opted-out notification kinds.
         recipients = await filter_recipients_by_preference(
             self.session, recipients, reason
         )
@@ -530,8 +555,9 @@ class NotificationService:
                 reason=reason,
             )
             return int(ok)
-        # Template absent in the DB → builtin fallback. Catalogue keys (e.g.
-        # ``deadline_approaching``) use their own default, else status_update.
+        # The DB holds no template, so use the builtin fallback. A catalogue key (for
+        # example ``deadline_approaching``) uses its own default. Every other key uses
+        # status_update.
         rendered = render_mail(
             subject_i18n=spec.subject_i18n if spec else _BUILTIN_NOTIFY_SUBJECT,
             body_i18n=spec.body_i18n if spec else _BUILTIN_NOTIFY_BODY,
@@ -570,7 +596,6 @@ class NotificationService:
         )
         await self._enqueue(msg)
 
-    # --- internal ---
     async def _get_template_by_key(self, key: str) -> MailTemplate | None:
         return (
             await self.session.scalars(
@@ -591,11 +616,12 @@ class NotificationService:
         )
 
     def _layout_html(self, rendered: RenderedMail, reason: str) -> str:
-        """HTML alternative wrapped in the branded layout.
+        """Wrap the mail content in the branded HTML layout.
 
-        Template HTML (rendered autoescaped) is used as content; when absent the
-        text body is escaped and wrapped, so every mail has a consistent HTML
-        version including the footer ("why am I receiving this").
+        The method uses the template HTML as content. Jinja2 renders that HTML with
+        autoescape. When the template has no HTML, the method escapes the text body and
+        wraps it. Every mail therefore has one consistent HTML version with the footer
+        that says why the reader gets it.
         """
         inner = rendered.html or text_to_html(rendered.text)
         return render_layout(
@@ -617,7 +643,12 @@ class NotificationService:
         idempotency_parts: tuple[str, ...],
         reason: str = "generic",
     ) -> bool:
-        """Render and enqueue. `False` when nothing is sent (no recipients / render error)."""
+        """Render the template and enqueue the mail.
+
+        Returns:
+            False when the method sends nothing, because of missing recipients or a
+            render error.
+        """
         if not recipients:
             return False
         try:
@@ -648,11 +679,11 @@ class NotificationService:
 async def filter_recipients_by_preference(
     session: AsyncSession, recipients: list[str], kind: str
 ) -> list[str]:
-    """Drop recipients who opted out of ``kind``.
+    """Drop the recipients that opted out of ``kind``.
 
-    Matched by principal mail (CITEXT, case-insensitive). Addresses without an
-    account (anonymous applicants, mailing lists) have no preference and stay.
-    Unknown kinds never filter (fail-open on send).
+    The match runs on the principal mail (CITEXT, case-insensitive). An address without
+    an account (anonymous applicant, mailing list) has no preference and stays. An
+    unknown kind never filters. The send stays fail-open.
     """
     if not recipients or kind not in NOTIFICATION_KINDS:
         return recipients
@@ -677,12 +708,12 @@ async def filter_recipients_by_preference(
 
 
 def _idem_parts(base: str | None, *parts: str) -> tuple[str, ...]:
-    """Idempotency parts with an optional base (e.g. flow-action key)."""
+    """Build the idempotency parts with an optional base (for example a flow-action key)."""
     return (base, *parts) if base else parts
 
 
 def _as_specs(raw: list[Any]) -> list[dict[str, Any]]:
-    """Raw recipient data (JSONB list) → list of dicts (defensive)."""
+    """Keep only the dict entries of the raw recipient data (JSONB list)."""
     return [r for r in raw if isinstance(r, dict)]
 
 

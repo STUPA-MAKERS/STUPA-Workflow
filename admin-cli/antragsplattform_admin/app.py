@@ -1,16 +1,16 @@
 """The orchestrator that owns the DB connection and wires the UI together.
 
-:class:`AdminCLI` drives the slash-commands (users / roles / OIDC mappings /
-audit log), holds the inline selector, and satisfies the protocols the pieces
-depend on: :class:`~antragsplattform_admin.protocols.CompleterHost` for the
-completer, :class:`AppContext` for the log / form components, and
-:class:`AppView` for the layout and key bindings. The log model and rendering
-live in :class:`~antragsplattform_admin.log_panel.LogPanel`, domain-row
-formatting in :mod:`~antragsplattform_admin.views`, the form dialog in
-:class:`~antragsplattform_admin.form.FormController`; this coordinates them.
+`AdminCLI` drives the slash-commands for users, roles, OIDC mappings and the audit
+log. It also holds the inline selector. It satisfies three protocols.
+`protocols.CompleterHost` serves the completer. `AppContext` serves the log and the
+form components. `AppView` serves the layout and the key bindings.
 
-DB writes bypass the API → no audit entry, no RBAC guards (rows are tagged
-``granted_by = 'admin-cli'``); every mutation asks for confirmation.
+The log model and its rendering live in `log_panel.LogPanel`. The domain-row
+formatting lives in `views`. The form dialog lives in `form.FormController`. This
+module coordinates them.
+
+DB writes bypass the API. They write no audit entry and apply no RBAC guard. Rows
+carry `granted_by = 'admin-cli'`. Every mutation asks for confirmation.
 """
 
 from __future__ import annotations
@@ -45,7 +45,7 @@ from .panels import selector_fragments as render_selector
 from .permissions import FORBIDDEN_PERMISSIONS, PERMISSION_CATALOGUE
 from .protocols import Handler, MouseHandler
 
-# Options shown at once in the inline selector; matches the selector panel height.
+# Options shown at once in the inline selector. This matches the selector panel height.
 _SELECTOR_ROWS = 12
 # Audit entries fetched per page (/audit and each /more).
 _AUDIT_PAGE = 50
@@ -63,8 +63,8 @@ class AdminCLI:
         self._users_cache: list[dict[str, Any]] = []
         self._roles_cache: list[dict[str, Any]] = []
         self._mappings_cache: list[dict[str, Any]] = []
-        # audit paging state: active filters, the oldest id already shown, and
-        # the last rendered date (so /more does not repeat the day heading)
+        # Audit paging state: the active filters, the oldest id already shown and the
+        # last rendered date. The date keeps /more from repeating the day heading.
         self._audit_filters: dict[str, str] = {}
         self._audit_oldest: int | None = None
         self._audit_last_date = ""
@@ -80,7 +80,7 @@ class AdminCLI:
         self._form = FormController(self)
         self._app: Application = layout.build_app(self)
 
-    # ------------------------------------------------------------------ AppContext
+    # The AppContext protocol.
     @property
     def buffer(self) -> Buffer:
         return self._buffer
@@ -101,7 +101,7 @@ class AdminCLI:
         """Request a repaint via the concrete app."""
         self._app.invalidate()
 
-    # ------------------------------------------------------------------ AppView
+    # The AppView protocol.
     @property
     def logs(self) -> LogPanel:
         """The log panel as rendered by the layout."""
@@ -113,7 +113,7 @@ class AdminCLI:
         return self._form
 
     def open_form(self, form: Form) -> None:
-        """Open *form* in the shared form dialog."""
+        """Open `form` in the shared form dialog."""
         self._form.open(form)
 
     def line_prefix(self, line_number: int, wrap_count: int) -> StyleAndTextTuples:
@@ -188,7 +188,6 @@ class AdminCLI:
 
         return handler
 
-    # ------------------------------------------------------------------ selector
     def choose(
         self,
         title: str,
@@ -197,7 +196,7 @@ class AdminCLI:
         *,
         searchable: bool = False,
     ) -> None:
-        """Open an inline selector, calling *on_choose* with the picked key or ``None``."""
+        """Open an inline selector and call `on_choose` with the picked key or `None`."""
         if not values:
             self.error(f"{title.lower()}: nothing to select")
             self._guard(lambda: on_choose(None))
@@ -208,7 +207,7 @@ class AdminCLI:
         self.invalidate()
 
     def confirm(self, question: str, on_yes: Callable[[], None]) -> None:
-        """Ask an explicit yes/no through the selector; No is the default."""
+        """Ask an explicit yes or no through the selector. No is the default."""
         self.choose(
             question,
             [("no", "no — cancel"), ("yes", "yes — do it")],
@@ -220,8 +219,8 @@ class AdminCLI:
         if selector is None:
             return []
         count = len(selector.visible())
-        # Keep the scroll window following the cursor so long lists stay
-        # navigable instead of overflowing the panel.
+        # Keep the scroll window on the cursor. A long list then stays navigable
+        # and does not overflow the panel.
         selector.cursor = min(selector.cursor, max(0, count - 1))
         if selector.cursor < selector.scroll:
             selector.scroll = selector.cursor
@@ -309,7 +308,7 @@ class AdminCLI:
 
         return handler
 
-    # ------------------------------------------------------------------ CompleterHost
+    # The CompleterHost protocol.
     def command_names(self) -> list[str]:
         return list(BASE_COMMANDS)
 
@@ -317,8 +316,8 @@ class AdminCLI:
         command = parts[0]
         if command == "/user":
             if len(parts) == 2:
-                # Single-token handles only (email, else sub) — a display name
-                # with spaces would not survive the whitespace-split parser.
+                # Single-token handles only: the email, else the sub. A display
+                # name with spaces would not survive the whitespace-split parser.
                 return [
                     handle
                     for r in self._users_cache
@@ -341,9 +340,8 @@ class AdminCLI:
             return list(AUDIT_KEYS)
         return []
 
-    # ------------------------------------------------------------------ plumbing
     def _guard(self, action: Callable[[], object]) -> None:
-        """Run *action*, surfacing any exception in the log instead of crashing."""
+        """Run `action` and show any exception in the log instead of a crash."""
         try:
             _ = action()
         except DbError as error:
@@ -433,7 +431,6 @@ class AdminCLI:
         except DbError as exc:
             self.error(f"cache refresh failed: {exc}")
 
-    # ------------------------------------------------------------------ /connect /status
     def _cmd_connect(self, _args: list[str]) -> None:
         fresh, notes = connect_auto(self.cfg)
         for note in notes:
@@ -467,7 +464,6 @@ class AdminCLI:
         for line in HELP_LINES:
             self.info(line)
 
-    # ------------------------------------------------------------------ /users /user
     def _cmd_users(self, args: list[str]) -> None:
         db = self._require_db()
         if db is None:
@@ -485,13 +481,13 @@ class AdminCLI:
     def _resolve_user(
         self, term: str | None, then: Callable[[dict[str, Any]], None]
     ) -> None:
-        """Find one principal by *term* (or via a searchable selector)."""
+        """Find one principal by `term`, or through a searchable selector."""
         db = self._require_db()
         if db is None:
             return
         rows = ops.list_users(db, term)
         if term and len(rows) == 1:
-            # Substring match — say who it resolved to before acting on it.
+            # Substring match. Name the user it resolved to before the action runs.
             self.info(f"user → {views.user_name(rows[0])}")
             then(rows[0])
             return
@@ -511,8 +507,8 @@ class AdminCLI:
         )
 
     def _cmd_user(self, args: list[str]) -> None:
-        # Last token is the action when it names one; everything before is the
-        # search term (display names may contain spaces).
+        # The last token is the action when it names one. Everything before it is
+        # the search term. A display name can contain spaces.
         action: str | None = None
         if args and args[-1].lower() in USER_ACTIONS:
             action = args[-1].lower()
@@ -657,7 +653,6 @@ class AdminCLI:
             ),
         )
 
-    # ------------------------------------------------------------------ /roles /role
     def _cmd_roles(self, _args: list[str]) -> None:
         db = self._require_db()
         if db is None:
@@ -842,7 +837,6 @@ class AdminCLI:
             )
         )
 
-    # ------------------------------------------------------------------ /mappings /mapping
     def _cmd_mappings(self, _args: list[str]) -> None:
         db = self._require_db()
         if db is None:
@@ -993,7 +987,6 @@ class AdminCLI:
             )
         )
 
-    # ------------------------------------------------------------------ /audit /more
     def _cmd_audit(self, args: list[str]) -> None:
         db = self._require_db()
         if db is None:
@@ -1059,7 +1052,6 @@ class AdminCLI:
         )
         self._log_panel.append(more)
 
-    # ------------------------------------------------------------------ lifecycle
     def run(self) -> None:
         """Show the startup summary and run the UI until the user quits."""
         self.info(f"antragsplattform admin v{__version__} — /help for commands")
@@ -1116,7 +1108,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         cli.run()
     finally:
-        # /connect may have swapped the backend — close whatever the UI holds now.
+        # /connect may have swapped the backend. Close whatever the UI holds now.
         if cli.db is not None:
             cli.db.close()
     return 0

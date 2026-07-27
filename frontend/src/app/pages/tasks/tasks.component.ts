@@ -12,9 +12,9 @@ import {
 } from '@stupa-makers/ui-kit';
 
 /**
- * Tasks: applications with a pending decision for the user's own role (vote states
- * in which the user may vote). Tabular; clicking a row opens the detail view
- * (which is where voting / the transition happens).
+ * Tasks: applications that wait for a decision from the role of the user. These are the
+ * vote states in which the user may vote. A click on a row opens the detail view. The
+ * vote and the transition happen there.
  */
 @Component({
   selector: 'app-tasks',
@@ -55,8 +55,8 @@ export class TasksComponent {
   }
 
   /**
-   * Waiting time as a relative value (e.g. "5 days ago") — for the task queue the
-   * age matters, not the exact date. Based on ``createdAt``.
+   * Waiting time as a relative value, for example "5 days ago". The task queue needs
+   * the age, not the exact date. The value comes from `createdAt`.
    */
   protected waitingSince(createdAt: string | null): string {
     if (!createdAt) return '—';

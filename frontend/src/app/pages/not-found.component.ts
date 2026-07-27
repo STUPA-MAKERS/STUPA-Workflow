@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 
-/** 404-Seite. */
+/** 404 page. */
 @Component({
   selector: 'app-not-found',
   standalone: true,

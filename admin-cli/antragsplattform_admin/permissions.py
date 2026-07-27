@@ -1,15 +1,15 @@
-"""Vendored copy of the backend permission catalogue.
+"""Vendored copy of the backend permission catalog.
 
-The authoritative truth about *assigned* permissions stays in ``role_permission`` (DB); this is
-the catalogue of *selectable* keys the role-editor offers. Kept in sync by hand with
-``backend/app/shared/permissions.py`` — if the backend gains a permission key, add it here too
-(the editor also shows any key already present in the DB, even if missing from this list, so it
-degrades gracefully).
+The ``role_permission`` table holds the authoritative set of assigned permissions.
+This module only lists the selectable keys that the role editor offers. Keep the
+list in sync by hand with ``backend/app/shared/permissions.py``. When the backend
+gains a permission key, add the key here too. The editor also shows a key that the
+database already holds, even when this list misses it.
 """
 
 from __future__ import annotations
 
-# Mirror of backend/app/shared/permissions.py:PERMISSION_CATALOGUE (keep in sync).
+# Mirror of backend/app/shared/permissions.py:PERMISSION_CATALOGUE. Keep it in sync.
 PERMISSION_CATALOGUE: tuple[str, ...] = (
     "application.read",
     "application.read_all",
@@ -50,6 +50,7 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "mcp.use",
 )
 
-# vote.cast is never grantable through the API (human-only). The CLI hits the DB directly so it
-# *could* set it — we still surface a warning in the editor; not technically blocked here.
+# The API never grants vote.cast, because voting is human-only. The CLI writes to the
+# database directly, so it can still set the key. The editor shows a warning. This module
+# does not block the key.
 FORBIDDEN_PERMISSIONS: frozenset[str] = frozenset({"vote.cast"})

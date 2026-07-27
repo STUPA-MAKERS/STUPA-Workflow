@@ -18,7 +18,7 @@ async function setup(prefs: NotificationPreference[] = PREFS) {
   const view = await render(AccountNotificationsComponent, {
     providers: [{ provide: ApiClient, useValue: api }],
   });
-  // ngModel writes to the checkbox asynchronously — wait for stability.
+  // ngModel writes to the checkbox asynchronously. Wait for stability.
   await view.fixture.whenStable();
   view.fixture.detectChanges();
   return { ...view, setNotificationPreferences };

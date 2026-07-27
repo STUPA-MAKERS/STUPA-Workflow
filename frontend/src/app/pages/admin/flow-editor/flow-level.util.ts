@@ -1,6 +1,6 @@
 /**
- * Drill-down helpers for the group hierarchy of a flow graph. Groups are a
- * pure layout concept (`layout.groups`) — the flow engine never sees them.
+ * Drill-down helpers for the group hierarchy of a flow graph. A group is a pure layout
+ * concept in `layout.groups`. The flow engine never sees a group.
  */
 import type { FlowGraph, FlowGroup } from '../admin.models';
 import type { EdgeEnds, EndRef } from './flow-editor.models';
@@ -21,7 +21,7 @@ export function buildParentGroupId(groups: readonly FlowGroup[]): Map<string, st
   return map;
 }
 
-/** Direct owner of a state (group id) — absent ⇒ top level. */
+/** Direct owner of a state (group id). An absent entry means the top level. */
 export function buildStateOwnerId(groups: readonly FlowGroup[]): Map<string, string> {
   const map = new Map<string, string>();
   for (const g of groups) {
@@ -35,7 +35,7 @@ export function deepStateKeys(groupById: Map<string, FlowGroup>, groupId: string
   const out: string[] = [];
   const seen = new Set<string>();
   const walk = (id: string): void => {
-    if (seen.has(id)) return; // cycle guard — normalized graphs never cycle
+    if (seen.has(id)) return; // Cycle guard. A normalized graph never cycles.
     seen.add(id);
     const g = groupById.get(id);
     if (!g) return;
@@ -70,8 +70,8 @@ export function resolveAt(
 }
 
 /**
- * Representative of an EXTERNAL state for the proxy columns: what one would
- * see of it on the closest enclosing level (the state itself or its group).
+ * Representative of an external state for the proxy columns. It is what the user sees
+ * of that state on the closest enclosing level: the state itself or its group.
  */
 export function proxyRefFor(
   stateOwnerId: Map<string, string>,

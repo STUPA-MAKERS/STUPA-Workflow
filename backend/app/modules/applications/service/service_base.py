@@ -1,8 +1,8 @@
-"""Shared base of the :class:`~.service.ApplicationsService` ops classes.
+"""Shared base of the `service.ApplicationsService` ops classes.
 
-Constructor plus the lookup/serialization helpers used by several concerns
-(create, edits, reads, listing, comments, anonymization), and the pure
-module-level field/data helpers.
+This module holds the constructor and the lookup and serialization helpers that
+several concerns share: create, edits, reads, listing, comments and anonymization. It
+also holds the pure module-level field and data helpers.
 """
 
 from __future__ import annotations
@@ -24,12 +24,15 @@ from app.shared.errors import NotFoundError
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
-# Promoted target synchronized into ``application.amount`` (numeric).
+# Promoted target that the service synchronizes into the numeric `application.amount`.
 _AMOUNT_TARGET = "amount"
 
 
 def _field_from_row(row: Any) -> FormFieldDef:  # noqa: ANN401 — form_field row
-    """``form_field`` row → ``FormFieldDef`` (camelCase input, as in forms.service)."""
+    """Convert a `form_field` row to a `FormFieldDef`.
+
+    The mapping uses camelCase input keys, as `forms.service` does.
+    """
     return FormFieldDef.model_validate(
         {
             "key": row.key,
@@ -49,7 +52,7 @@ def _field_from_row(row: Any) -> FormFieldDef:  # noqa: ANN401 — form_field ro
 
 
 def _title_of(data: dict[str, Any] | None) -> str | None:
-    """Application title from the data (system ``title`` field), for list views."""
+    """Read the application title from the `title` system field, for the list views."""
     if not data:
         return None
     value = data.get("title")
@@ -63,9 +66,9 @@ def _state_out(state: State | None, color_override: str | None = None) -> StateO
         id=state.id,
         key=state.key,
         label=state.label_i18n,
-        # Existing applications point at old state rows (color=NULL) after the global
-        # flow was re-saved; the color is resolved from the active global flow (same
-        # state key), with the stored row as fallback.
+        # After a re-save of the global flow, an existing application points at an old
+        # state row with color=NULL. The color therefore comes from the active global
+        # flow through the same state key, with the stored row as fallback.
         color=color_override if color_override is not None else state.color,
         editAllowed=state.edit_allowed,
         kind=state.kind,
@@ -73,18 +76,22 @@ def _state_out(state: State | None, color_override: str | None = None) -> StateO
 
 
 def _whitelist(fields: list[FormFieldDef], data: dict[str, Any]) -> dict[str, Any]:
-    """Strictly reduce ``data`` to the known field keys of the effective form.
+    """Reduce `data` strictly to the known field keys of the effective form.
 
-    Unknown keys are discarded (not persisted): the public POST could otherwise
-    store arbitrary GIN-indexed junk blobs (DoS/amplification surface)."""
+    The function drops an unknown key, so the database never stores it. Without this
+    rule the public POST could store any junk blob in a GIN-indexed column. That is a
+    denial-of-service and amplification surface.
+    """
     known = {f.key for f in fields}
     return {k: v for k, v in data.items() if k in known}
 
 
 def _scrub_diff(diff: dict[str, Any], pii_keys: set[str]) -> dict[str, Any]:
-    """Drop PII field keys from a stored ``DataDiff`` (added/removed/changed).
+    """Drop the PII field keys from a stored `DataDiff`.
 
-    Diff values carry old/new plaintext field values → blanked on anonymization."""
+    The function covers the added, removed and changed buckets. A diff value carries
+    the old and the new plaintext field value, so anonymization must blank it.
+    """
     return {
         bucket: {k: v for k, v in (entries or {}).items() if k not in pii_keys}
         for bucket, entries in diff.items()
@@ -94,7 +101,10 @@ def _scrub_diff(diff: dict[str, Any], pii_keys: set[str]) -> dict[str, Any]:
 def _amount_currency(
     fields: list[FormFieldDef], data: dict[str, Any]
 ) -> tuple[Decimal | None, str | None]:
-    """Extract the promoted ``amount`` from ``data``; currency defaults to EUR."""
+    """Extract the promoted `amount` from `data`.
+
+    The currency defaults to EUR.
+    """
     promoted = extract_promoted(fields, data)
     raw = promoted.get(_AMOUNT_TARGET)
     if raw is None:
@@ -104,7 +114,7 @@ def _amount_currency(
 
 
 class ApplicationsServiceBase:
-    """DB-backed application operations (bound to one session) — shared base."""
+    """Shared base for the DB-backed application operations, bound to one session."""
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -115,10 +125,10 @@ class ApplicationsServiceBase:
         app = await self.session.get(Application, application_id)
         if app is None:
             raise NotFoundError(f"application {application_id} not found")
-        # Unconfirmed guest submissions stay invisible until magic-link confirmation.
-        # Principal/committee item routes pass allow_unconfirmed=False and get 404
-        # (not 403) to avoid an existence oracle; the owning applicant (magic link)
-        # reads with the default.
+        # An unconfirmed guest submission stays invisible until the magic link confirms
+        # it. The principal and Gremium item routes pass allow_unconfirmed=False and get
+        # 404 instead of 403, which prevents an existence oracle. The owning applicant
+        # reads through the magic link with the default.
         if not allow_unconfirmed and app.email_confirmed_at is None:
             raise NotFoundError(f"application {application_id} not found")
         return app
@@ -129,12 +139,14 @@ class ApplicationsServiceBase:
         return await self.session.get(State, state_id)
 
     async def _resolve_state_colors(self) -> dict[str, str | None]:
-        """``{state_key: color}`` from the active global flow, cached per instance.
+        """Map each state key to its color from the active global flow.
 
-        Re-saving the global flow creates a NEW FlowVersion with NEW state rows;
-        existing applications keep pointing at old rows (``color=NULL``). Colors are
-        therefore resolved by state key against the active flow, with the stored
-        ``state.color`` as fallback (see :func:`_state_out`)."""
+        The result is cached per instance. A re-save of the global flow creates a new
+        FlowVersion with new state rows. An existing application keeps a pointer to an
+        old row, where the color is NULL. The service therefore resolves the color by
+        state key against the active flow, with the stored `state.color` as fallback.
+        See `_state_out`.
+        """
         cached = getattr(self, "_state_color_map", None)
         if cached is not None:
             return cached
@@ -150,7 +162,7 @@ class ApplicationsServiceBase:
         return color_map
 
     async def _state_out_resolved(self, state: State | None) -> StateOut | None:
-        """:func:`_state_out` with the color resolved from the active global flow."""
+        """Call `_state_out` with the color resolved from the active global flow."""
         if state is None:
             return None
         colors = await self._resolve_state_colors()
@@ -165,7 +177,7 @@ class ApplicationsServiceBase:
         return version or 0
 
     async def _pinned_fields(self, app: Application) -> list[FormFieldDef]:
-        """Fields of the application's **pinned** form version (+ pot fields)."""
+        """Return the fields of the pinned form version plus the budget-pot fields."""
         from app.modules.forms.models import FormField
 
         rows = (
@@ -188,11 +200,12 @@ class ApplicationsServiceBase:
         return fields
 
     async def _pii_keys_for_type(self, type_id: UUID) -> set[str]:
-        """``isPII`` field keys across ALL form versions of a type (for anonymization).
+        """Collect the `isPII` field keys across all form versions of a type.
 
-        An application is pinned to its ``form_version_id``; a field marked PII only
-        in a later version is unknown to the pinned row. GDPR erasure follows the
-        current intent — hence the union."""
+        Anonymization uses this set. An application is pinned to its `form_version_id`.
+        A field that only a later version marks as PII is unknown to the pinned row.
+        GDPR erasure follows the current intent, so the function takes the union.
+        """
         from app.modules.forms.models import FormField, FormVersion
 
         rows = await self.session.scalars(
@@ -249,7 +262,7 @@ class ApplicationsServiceBase:
         )
 
     async def _author_names(self, subs: set[str]) -> dict[str, str]:
-        """Author ``principal.sub`` → display name (display_name/email/sub)."""
+        """Map an author `principal.sub` to `display_name`, `email` or the `sub`."""
         from app.modules.auth.models import Principal as PrincipalRow
 
         wanted = {s for s in subs if s}

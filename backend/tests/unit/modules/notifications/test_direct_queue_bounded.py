@@ -1,4 +1,4 @@
-"""DirectMailQueue: gebundener In-Memory-Dedup-Cache (AUD-074)."""
+"""DirectMailQueue: the in-memory dedup cache stays bounded (AUD-074)."""
 
 from __future__ import annotations
 
@@ -27,11 +27,8 @@ async def test_seen_cache_is_bounded() -> None:
     q = DirectMailQueue(sender, max_seen=3)
     for i in range(10):
         await q.enqueue(_msg(f"k{i}"))
-    # Alle 10 distinkten Keys werden versendet ...
     assert len(sender.sent) == 10
-    # ... aber der Cache wächst nicht unbegrenzt.
     assert len(q._seen) == 3
-    # Nur die jüngsten Keys bleiben.
     assert list(q._seen) == ["k7", "k8", "k9"]
 
 
@@ -39,7 +36,7 @@ async def test_recent_key_still_deduped() -> None:
     sender = _CountingSender()
     q = DirectMailQueue(sender, max_seen=3)
     await q.enqueue(_msg("k0"))
-    await q.enqueue(_msg("k0"))  # gleicher Key, noch im Cache -> dedupliziert
+    await q.enqueue(_msg("k0"))  # the same key is still in the cache, so it is dropped
     assert len(sender.sent) == 1
     assert list(q._seen) == ["k0"]
 
@@ -49,6 +46,6 @@ async def test_evicted_key_resends() -> None:
     q = DirectMailQueue(sender, max_seen=2)
     await q.enqueue(_msg("k0"))
     await q.enqueue(_msg("k1"))
-    await q.enqueue(_msg("k2"))  # verdrängt k0
-    await q.enqueue(_msg("k0"))  # k0 nicht mehr im Cache -> erneut versendet
+    await q.enqueue(_msg("k2"))  # evicts k0
+    await q.enqueue(_msg("k0"))  # k0 left the cache, so the queue sends it again
     assert len(sender.sent) == 4

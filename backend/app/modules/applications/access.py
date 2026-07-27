@@ -1,12 +1,13 @@
 """Access resolution for application endpoints.
 
-Application routes are reachable either by a principal (session + permission)
-or by the applicant (magic-link token bound to exactly one ``application_id``
-plus scope). These dependencies unify both identities into an :class:`Access`
-object and enforce 401 (no identity) / 403 (insufficient rights).
+A principal reaches an application route with a session and a permission. An
+applicant reaches it with a magic-link token. The token binds to exactly one
+``application_id`` and one scope. These dependencies merge both identities into
+one `Access` object. They raise 401 without an identity and 403 without
+sufficient rights.
 
-Internal-comment visibility hangs solely on :attr:`Access.can_see_internal`
-(principals only) — applicants see ``public`` comments exclusively.
+`Access.can_see_internal` alone controls internal-comment visibility. Only a
+principal gets it. An applicant sees ``public`` comments only.
 """
 
 from __future__ import annotations
@@ -26,15 +27,15 @@ from app.shared.errors import ForbiddenError, UnauthorizedError
 
 READ_PERMISSION = "application.read"
 MANAGE_PERMISSION = "application.manage"
-# Global special rights: read any application, or edit in any flow state
-# (the latter also lifts the state edit lock in the service).
+# Global rights: read any application, or edit an application in any flow state.
+# The edit right also lifts the state edit lock in the service.
 READ_ALL_PERMISSION = "application.read_all"
 EDIT_ANY_PERMISSION = "application.edit_any"
 
 
 @dataclass(slots=True)
 class Access:
-    """Resolved access to exactly one application (principal OR applicant)."""
+    """Resolved access to exactly one application, by a principal or an applicant."""
 
     application_id: UUID
     principal: Principal | None
@@ -42,16 +43,20 @@ class Access:
 
     @property
     def can_see_internal(self) -> bool:
-        """Only principals see internal comments/PII; applicants never do."""
+        """Tell whether the caller sees internal comments and PII.
+
+        Only a principal does.
+        """
         return self.principal is not None
 
     @property
     def is_owning_applicant(self) -> bool:
-        """Magic-link applicant of the own application (no principal).
+        """Tell whether the caller is the magic-link applicant of this application.
 
-        Only this access may read an unconfirmed guest submission
-        (``email_confirmed_at IS NULL``) via the item route — principals/committee
-        may not, mirroring the invisible-in-lists semantics."""
+        Only this access reads an unconfirmed guest submission
+        (``email_confirmed_at IS NULL``) through the item route. A principal and
+        the committee scope may not. This mirrors the invisible-in-lists rule.
+        """
         return self.applicant is not None
 
     @property
@@ -72,10 +77,17 @@ def resolve_access(
     perm: str,
     scope: ApplicantScope,
 ) -> Access:
-    """Check principal permission OR applicant scope against the application.
+    """Check the principal permission or the applicant scope for the application.
 
-    Public so adjacent modules (e.g. files, whose path only carries the
-    ``attachment_id``) reuse the same access path instead of duplicating it."""
+    This function stays public so that adjacent modules reuse the same access
+    path. The files module is one example. Its route path carries only the
+    ``attachment_id``.
+
+    Raises:
+        ForbiddenError: The principal lacks ``perm``, or the magic link does not
+            cover this application.
+        UnauthorizedError: The request carries neither a principal nor an applicant.
+    """
     if principal is not None:
         if principal.has(perm):
             return Access(application_id, principal, None)
@@ -90,7 +102,7 @@ def resolve_access(
 
 
 async def _is_creator(db: AsyncSession, application_id: UUID, principal: Principal) -> bool:
-    """Check whether this principal is the logged-in creator of the application."""
+    """Check whether this principal created the application while logged in."""
     created_by = await db.scalar(
         select(Application.created_by).where(Application.id == application_id)
     )
@@ -100,24 +112,29 @@ async def _is_creator(db: AsyncSession, application_id: UUID, principal: Princip
 async def _committee_can_read(
     db: AsyncSession, application_id: UUID, principal: Principal
 ) -> bool:
-    """Check committee read access (read-only, no write/transition rights).
+    """Check the committee read scope for one application.
 
-    True if the application sits in a cost centre (node or ancestor) whose
-    ``view_gremium_id`` belongs to one of the member's gremien, is currently in
-    a ``vote`` state whose ``config.gremiumId`` matches, or was voted on in a
-    meeting of one of their gremien.
+    The scope grants read access only. It never grants write or transition
+    rights. The scope opens in three cases:
 
-    Mirrors ``ApplicationsService._committee_read_clauses`` (list query): both
-    MUST cover the same paths so a listed application is openable in detail and
-    vice versa."""
+    1. The application sits in a cost center whose ``view_gremium_id`` is one of
+       the Gremien of the principal. The node or an ancestor may carry the value.
+    2. The application is in a ``vote`` state whose ``config.gremiumId`` matches
+       one of those Gremien.
+    3. A meeting of one of those Gremien voted on the application.
+
+    This mirrors ``ApplicationsService._committee_read_clauses``, the list query.
+    Both must cover the same paths. A listed application must open in the detail
+    view, and a readable application must appear in the list.
+    """
     from app.modules.admin.gremium_roles import gremium_member_ids
 
     gremien = await gremium_member_ids(db, principal.sub)
     if not gremien:
         return False
 
-    # (a) Cost centre (node/ancestor) with a view gremium — reuses the budget
-    #     tree's canonical ancestor logic instead of duplicating the prefix query.
+    # Case 1 reuses the canonical ancestor logic of the budget tree instead of a
+    # second prefix query.
     budget_id = await db.scalar(
         select(Application.budget_id).where(Application.id == application_id)
     )
@@ -127,8 +144,8 @@ async def _committee_can_read(
         if await BudgetTreeService(db).can_view_node(budget_id, gremien):
             return True
 
-    # (b) Current ``vote`` state for one of the gremien (``config.gremiumId``).
-    #     JSONB evaluated in Python (dialect-neutral, like ``ApplicationsService.list_tasks``).
+    # Case 2 evaluates the JSONB config in Python. This stays dialect-neutral,
+    # like ``ApplicationsService.list_tasks``.
     from app.modules.flow.models import State
 
     row = (
@@ -144,7 +161,7 @@ async def _committee_can_read(
         if isinstance(gid, str) and gid and UUID(gid) in gremien:
             return True
 
-    # (c) Historical: voted on in a meeting of a member gremium.
+    # Case 3 covers the history: a meeting of a member Gremium voted on it.
     from app.modules.livevote.models import Meeting
     from app.modules.voting.models import Vote
 
@@ -166,8 +183,11 @@ async def _resolve_with_creator(
     perm: str,
     scope: ApplicantScope,
 ) -> Access:
-    """Like :func:`resolve_access`, but also admits the logged-in creator
-    (``created_by == principal.sub``) without ``perm`` — for their own application."""
+    """Resolve access like `resolve_access`, and also admit the creator.
+
+    A logged-in principal with ``created_by == principal.sub`` reaches the own
+    application without ``perm``.
+    """
     try:
         return resolve_access(application_id, principal, applicant, perm=perm, scope=scope)
     except ForbiddenError:
@@ -182,11 +202,13 @@ async def require_app_read(
     principal: Annotated[Principal | None, Depends(get_current_principal)],
     applicant: Annotated[Applicant | None, Depends(get_current_applicant)],
 ) -> Access:
-    """Read access: principal with ``application.read``, ``view`` applicant,
-    logged-in creator, or committee member in read scope.
+    """Grant read access to one application.
 
-    ``application.read_all`` grants global read access regardless of
-    gremium/ownership."""
+    Four identities pass: a principal with ``application.read``, an applicant
+    with ``view`` scope, the logged-in creator, and a committee member in read
+    scope. ``application.read_all`` grants global read access. That permission
+    ignores the Gremium and the ownership.
+    """
     if principal is not None and principal.has(READ_ALL_PERMISSION):
         return Access(application_id, principal, None)
     try:
@@ -207,12 +229,15 @@ async def require_app_edit(
     principal: Annotated[Principal | None, Depends(get_current_principal)],
     applicant: Annotated[Applicant | None, Depends(get_current_applicant)],
 ) -> Access:
-    """Write access: principal with ``application.manage``, ``edit`` applicant,
-    or the logged-in creator of the own application.
+    """Grant write access to one application.
 
-    The edit lock (``state.editAllowed``) is additionally checked in the service
-    (409) regardless of identity; ``application.edit_any`` grants write access
-    and lifts that lock."""
+    Three identities pass: a principal with ``application.manage``, an applicant
+    with ``edit`` scope, and the logged-in creator of the own application.
+
+    The service also checks the edit lock (``state.editAllowed``) for every
+    identity and answers 409 when the state locks the application.
+    ``application.edit_any`` grants write access and lifts that lock.
+    """
     if principal is not None and principal.has(EDIT_ANY_PERMISSION):
         return Access(application_id, principal, None)
     return await _resolve_with_creator(

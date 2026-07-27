@@ -1,7 +1,7 @@
 /**
- * jsdom ≥26 (Jest 30) makes `window.location` fully immutable — neither
- * `defineProperty` nor `spyOn` work. App code therefore injects the `LOCATION`
- * token (`@core/browser/location.token`); specs mock it via DI:
+ * jsdom ≥26 (Jest 30) makes `window.location` fully immutable. Neither
+ * `defineProperty` nor `spyOn` works on it. The app code therefore injects the
+ * `LOCATION` token (`@core/browser/location.token`). A spec mocks that token through DI:
  * `TestBed.configureTestingModule({ providers: [provideLocationMock(loc)] })`.
  */
 import type { Provider } from '@angular/core';
@@ -20,7 +20,6 @@ export interface LocationMock {
   host: string;
 }
 
-/** A fresh location double with Jest mocks; fields adjustable via *overrides*. */
 export function createLocationMock(overrides: Partial<LocationMock> = {}): LocationMock {
   return {
     assign: jest.fn<void, [string]>(),
@@ -37,7 +36,6 @@ export function createLocationMock(overrides: Partial<LocationMock> = {}): Locat
   };
 }
 
-/** TestBed provider that sets the `LOCATION` token to *mock*. */
 export function provideLocationMock(mock: LocationMock): Provider {
   return { provide: LOCATION, useValue: mock as unknown as Location };
 }

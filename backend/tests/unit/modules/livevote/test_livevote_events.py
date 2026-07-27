@@ -1,8 +1,8 @@
-"""WS-Nachrichten-Schema-Test (T-16 DoD, api.md §4).
+"""WS message schema test (T-16 DoD, api.md §4).
 
-Stellt den WS-Contract fest, gegen den das FE (T-32/T-33) baut: Feldnamen (camelCase),
-Discriminator ``type`` und — sicherheitskritisch — dass Tally-/Closed-Events **nur**
-Aggregate tragen (requirements N1a, keine Wähler-Identität).
+The tests pin the WS contract that the frontend (T-32, T-33) builds against: camelCase
+field names and the ``type`` discriminator. The security-critical part: a tally event
+and a closed event carry **only** aggregates (requirements N1a, no voter identity).
 """
 
 from __future__ import annotations
@@ -42,8 +42,8 @@ def _vote_out(*, secret: bool, status: str) -> VoteOut:
             eligible=12,
             voted=8,
             present=10,
-            # from_vote gated nur über ``revealed``; die anwesenheits-basierte
-            # Reveal-Entscheidung trifft der Service. Geschlossen oder nicht-geheim ⇒ sichtbar.
+            # The from_vote gate uses only ``revealed``. The service makes the
+            # attendance-based reveal decision. A closed vote or a public vote shows.
             revealed=status == "closed" or not secret,
             quorumMet=True,
             leading="yes",
@@ -59,7 +59,7 @@ def test_meeting_state_event_camel_and_optional_active() -> None:
         "activeApplicationId": str(aid),
         "status": "live",
     }
-    # Ohne aktiven Antrag bleibt das Feld null (Beamer zeigt nichts an).
+    # Without an active application the field stays null and the beamer shows nothing.
     assert MeetingStateEvent(status="planned").dump()["activeApplicationId"] is None
 
 
@@ -89,27 +89,27 @@ def test_vote_tally_event_is_aggregate_only_no_voter_identity() -> None:
     assert dumped["counts"] == {"yes": 5, "no": 2, "abstain": 1}
     assert dumped["quorumMet"] is True
     assert dumped["leading"] == "yes"
-    # Niemals Wähler-Identitäten im Tally (requirements N1a).
+    # A tally never carries a voter identity (requirements N1a).
     keys = set(dumped)
     assert not (keys & {"voter", "voterSub", "voters", "ballots", "names"})
 
 
 def test_tally_from_open_secret_vote_hides_counts_shows_participation() -> None:
-    # Sicherheits-Kern (fix/secret-live-tally): ein OFFENER geheimer Vote darf über den
-    # WS-/Beamer-Feed KEINEN Zwischenstand je Option preisgeben — nur die Teilnahme.
+    # Security core (fix/secret-live-tally): an OPEN secret vote must not show a per
+    # option interim count over the WS feed or the beamer feed. It shows the turnout.
     dumped = VoteTallyEvent.from_vote(_vote_out(secret=True, status="open")).dump()
     assert dumped["type"] == "vote_tally"
     assert dumped["secret"] is True
-    assert dumped["counts"] == {}              # kein Zwischenstand je Option
-    assert dumped["leading"] is None           # auch nicht die führende Option
-    assert dumped["cast"] == 8                 # nur Teilnahme: 5 + 3 von 12
+    assert dumped["counts"] == {}
+    assert dumped["leading"] is None
+    assert dumped["cast"] == 8                 # turnout only: 5 + 3 of 12
     assert dumped["eligible"] == 12
-    # Roh-Choice-Counts (5/3) dürfen unter KEINEM Schlüssel durchsickern.
+    # The raw choice counts (5 and 3) must not leak under ANY key.
     assert {3, 5}.isdisjoint(v for v in dumped.values() if type(v) is int)
 
 
 def test_tally_from_closed_secret_vote_reveals_aggregates() -> None:
-    # Nach Close erscheinen die vollen Aggregate (Regel »Counts erst bei Close«).
+    # After the close the full aggregates appear. The rule: counts only at the close.
     dumped = VoteTallyEvent.from_vote(_vote_out(secret=True, status="closed")).dump()
     assert dumped["counts"] == {"yes": 5, "no": 3}
     assert dumped["leading"] == "yes"
@@ -117,7 +117,7 @@ def test_tally_from_closed_secret_vote_reveals_aggregates() -> None:
 
 
 def test_tally_from_open_public_vote_shows_live_counts() -> None:
-    # Nicht-geheime Votes behalten den Live-Zwischenstand (öffentliche Balken).
+    # A public vote keeps the live interim count for the public bars.
     dumped = VoteTallyEvent.from_vote(_vote_out(secret=False, status="open")).dump()
     assert dumped["secret"] is False
     assert dumped["counts"] == {"yes": 5, "no": 3}

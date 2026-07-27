@@ -11,8 +11,9 @@ import {
 export type StatementSortField = 'date' | 'amount';
 
 /**
- * Accounts (left list) + server-side filtered/sorted/paged statement lines.
- * Plain state module — construct in an injection context.
+ * This class holds accounts in the left list plus the statement lines. The server
+ * filters, sorts, and pages the lines. This is a plain state module. Construct it in
+ * an injection context.
  */
 export class KontenLinesState {
   private readonly api = inject(BudgetTreeApi);
@@ -32,7 +33,8 @@ export class KontenLinesState {
 
   readonly lines = signal<StatementLine[]>([]);
   readonly loadingLines = signal(false);
-  /** Post-mutation refresh in flight: the list stays visible, only `aria-busy` (#expenses-ux). */
+  /** True while a refresh after a mutation runs. The list stays visible. The view only
+   *  sets `aria-busy`. See #expenses-ux. */
   readonly refreshing = signal(false);
   readonly loadingMore = signal(false);
   readonly total = signal(0);
@@ -56,7 +58,7 @@ export class KontenLinesState {
     this.refreshAccounts();
   }
 
-  /** Reload the account list (incl. balance) while keeping the selection. */
+  /** Reload the account list with the balance and keep the selection. */
   refreshAccounts(): void {
     this.api.listAccountOptions().subscribe({
       next: (accs) => {
@@ -82,10 +84,11 @@ export class KontenLinesState {
     this.fetch(false);
   }
 
-  /** Active filters as the shared query part for {@link fetch} and {@link refresh}.
-   *  'linked'/'open' map to the linked flag (matched vs unmatched+suggested, excludes
-   *  ignored); 'ignored' filters the explicit state; '' = Alle, which shows matched +
-   *  open but hides set-aside (ignored) lines. */
+  /** The active filters build the shared query part for {@link fetch} and {@link refresh}.
+   *  `linked` maps to `linked: true`, for matched lines. `open` maps to `linked: false`,
+   *  for unmatched lines. Both exclude ignored lines. `ignored` filters on the explicit
+   *  ignored state. An empty value means all. It shows matched and open lines, but it
+   *  hides ignored (set-aside) lines. */
   private lineQuery() {
     const fs = this.filterState();
     const linked = fs === 'linked' ? true : fs === 'open' ? false : undefined;
@@ -103,9 +106,10 @@ export class KontenLinesState {
     };
   }
 
-  /** Post-mutation: refetch the currently-loaded window (offset 0, one request) and
-   *  atomic-replace the list — no clear, no `loadingLines` flip → the table stays mounted
-   *  and scroll position survives (#expenses-ux). */
+  /** After a mutation, refetch the loaded window with one request at offset 0. Replace
+   *  the list in one step. It does not clear the list and does not flip
+   *  `loadingLines`. So the table stays mounted, and the scroll position survives.
+   *  See #expenses-ux. */
   refresh(): void {
     if (!this.accountId() || this.refreshing()) return;
     const windowLimit = Math.max(this.PAGE, Math.ceil(this.lines().length / this.PAGE) * this.PAGE);

@@ -1,8 +1,8 @@
-"""Metadata-Introspektion der T-10-Tabellen (magic_link, auth_session) — ohne DB."""
+"""Metadata introspection of the T-10 tables magic_link and auth_session, without a DB."""
 
 from __future__ import annotations
 
-import app.models  # noqa: F401  — befüllt Base.metadata
+import app.models  # noqa: F401  — fills Base.metadata
 from app.db import Base
 
 

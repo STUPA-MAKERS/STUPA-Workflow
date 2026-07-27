@@ -1,9 +1,11 @@
-"""Unit: VotingService Schreib-/Lifecycle-Autorisierung (AUD-027) ohne DB.
+"""Unit tests for the VotingService write and lifecycle authorization (AUD-027).
 
-Deckt alle Zweige von ``_vote_gremium_id`` / ``assert_can_manage_group`` /
-``assert_can_manage`` / ``assert_can_manage_vote`` ab (kritisches Modul → 100 %
-Branch): Admin, globale ``vote.manage``, per-Gremium-Rolle (erlaubt/verweigert),
-nicht auflösbares Gremium, Sitzungs-gebundene Auflösung über ``meeting_id``.
+The suite runs without a database. It covers every branch of `_vote_gremium_id`,
+`assert_can_manage_group`, `assert_can_manage` and `assert_can_manage_vote`, because
+this module is critical and needs 100 % branch coverage. The cases are the admin role,
+the global `vote.manage` permission and a per-Gremium role that allows or denies. They
+also cover a Gremium that does not resolve and the meeting-bound resolution through
+`meeting_id`.
 """
 
 from __future__ import annotations
@@ -30,21 +32,23 @@ def _patch_permitted(
 
 
 async def test_manage_admin_ok() -> None:
-    """``admin``-Rolle darf jede Abstimmung verwalten (erster Zweig)."""
+    """The `admin` role may manage every vote (first branch)."""
     principal = Principal(sub="a", roles=["admin"])
     await VotingService(fake_session()).assert_can_manage_group("stupa", None, principal)
 
 
 async def test_manage_global_vote_manage_ok() -> None:
-    """Globale ``vote.manage``-Permission genügt (zweiter Zweig)."""
+    """The global `vote.manage` permission is enough (second branch)."""
     principal = Principal(sub="m", permissions={"vote.manage"})
     await VotingService(fake_session()).assert_can_manage_group("stupa", None, principal)
 
 
 async def test_manage_gremium_role_ok(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Per-Gremium-Rolle mit ``vote.manage`` für DAS Gremium des Votes → erlaubt.
+    """A per-Gremium role with `vote.manage` for the Gremium of the vote allows it.
 
-    Gremium aus ``eligible_group`` (UUID-als-Text) aufgelöst, ohne ``meeting_id``."""
+    The service resolves the Gremium from `eligible_group`, a UUID as text, without a
+    `meeting_id`.
+    """
     gid = uuid4()
     _patch_permitted(monkeypatch, {gid})
     principal = Principal(sub="g")
@@ -52,7 +56,7 @@ async def test_manage_gremium_role_ok(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 async def test_manage_gremium_role_denied(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Auflösbares Gremium, aber der Principal hält dort kein ``vote.manage`` → 403."""
+    """The Gremium resolves, but the principal holds no `vote.manage` there, so 403."""
     gid = uuid4()
     _patch_permitted(monkeypatch, set())
     principal = Principal(sub="g")
@@ -63,7 +67,7 @@ async def test_manage_gremium_role_denied(monkeypatch: pytest.MonkeyPatch) -> No
 
 
 async def test_manage_unresolvable_group_denied() -> None:
-    """Freier Gruppen-Key (keine UUID, keine Sitzung) → kein Gremium → 403."""
+    """A free group key without a UUID and without a meeting resolves no Gremium: 403."""
     principal = Principal(sub="x")
     with pytest.raises(ForbiddenError):
         await VotingService(fake_session()).assert_can_manage_group(
@@ -74,7 +78,7 @@ async def test_manage_unresolvable_group_denied() -> None:
 async def test_manage_resolves_gremium_via_meeting(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Sitzungs-gebundener Vote erbt das Gremium der Sitzung (``meeting_id``-Zweig)."""
+    """A meeting-bound vote inherits the Gremium of the meeting (`meeting_id` branch)."""
     gid = uuid4()
     _patch_permitted(monkeypatch, {gid})
     db = fake_session()
@@ -86,17 +90,17 @@ async def test_manage_resolves_gremium_via_meeting(
 async def test_manage_meeting_without_gremium_falls_back_to_group(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """``meeting_id`` ohne auflösbares Gremium → Fallback auf ``eligible_group``-UUID."""
+    """A `meeting_id` without a resolvable Gremium falls back to the `eligible_group`."""
     gid = uuid4()
     _patch_permitted(monkeypatch, {gid})
     db = fake_session()
-    db.scalar_results = [None]  # Meeting-Lookup liefert nichts
+    db.scalar_results = [None]  # the meeting lookup returns nothing
     principal = Principal(sub="g")
     await VotingService(db).assert_can_manage_group(str(gid), uuid4(), principal)
 
 
 async def test_assert_can_manage_loaded_vote_delegates() -> None:
-    """``assert_can_manage`` delegiert an die Group-Variante (Admin-Kurzschluss)."""
+    """`assert_can_manage` delegates to the group variant (admin short circuit)."""
     vote = SimpleNamespace(eligible_group="stupa", meeting_id=None)
     principal = Principal(sub="a", roles=["admin"])
     await VotingService(fake_session()).assert_can_manage(
@@ -106,7 +110,7 @@ async def test_assert_can_manage_loaded_vote_delegates() -> None:
 
 
 async def test_assert_can_manage_vote_loads_then_checks() -> None:
-    """``assert_can_manage_vote`` lädt den Vote (404 sonst) und prüft dann."""
+    """`assert_can_manage_vote` loads the vote, raises 404 if it is gone, then checks."""
     vote = SimpleNamespace(id=uuid4(), eligible_group="stupa", meeting_id=None)
     principal = Principal(sub="a", roles=["admin"])
     await VotingService(fake_session(result(vote))).assert_can_manage_vote(

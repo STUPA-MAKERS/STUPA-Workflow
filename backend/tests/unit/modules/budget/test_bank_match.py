@@ -1,4 +1,4 @@
-"""Umsatz↔Buchung-Matcher (#fints): Bewertungs-Kaskade. Reine Unit-Tests."""
+"""Transaction-to-booking matcher (#fints): the scoring cascade. Pure unit tests."""
 
 from __future__ import annotations
 
@@ -66,7 +66,7 @@ def test_no_amount_match_returns_empty() -> None:
 
 
 def test_missing_dates_weak_partial() -> None:
-    # Betrag + E2E-Referenz reichen über die Schwelle, auch ohne Datum.
+    # The amount plus the E2E reference passes the threshold, even without a date.
     cands = [_cand("1", "50.00", None, "E2E1")]
     r = bm.best_match(
         line_amount=Decimal("50.00"),
@@ -95,8 +95,9 @@ def test_best_of_several() -> None:
 
 
 def test_ambiguous_tie_returns_empty() -> None:
-    # Zwei gleichwertige Treffer (gleicher Betrag + gleiches Datum, keine Referenz) →
-    # mehrdeutig → kein Vorschlag, sonst entschiede die DB-Reihenfolge (#fints-review).
+    # Two equal hits (same amount, same date, no reference) stay ambiguous. The matcher
+    # makes no suggestion, because the database order would otherwise decide
+    # (#fints-review).
     cands = [
         _cand("a", "50.00", date(2024, 1, 2), None),
         _cand("b", "50.00", date(2024, 1, 2), None),

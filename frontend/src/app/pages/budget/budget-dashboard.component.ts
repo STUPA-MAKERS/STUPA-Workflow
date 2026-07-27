@@ -40,11 +40,10 @@ interface UsageRow {
   depth: number;
   allocated: number;
   committed: number;
-  /** Bound: accepted applications minus committed expenses. */
+  /** Bound: the accepted applications minus the committed expenses. */
   bound: number;
-  /** Expended: actual expenses. */
+  /** Expended: the actual expenses. */
   expended: number;
-  /** Income. */
   income: number;
   requested: number;
   available: number;
@@ -53,13 +52,13 @@ interface UsageRow {
 }
 
 /**
- * Budget statistics as a drilldown over the cost-centre tree.
+ * Budget statistics as a drilldown over the cost center tree.
  *
- * Left: budget-to-fiscal-year navigation tree. Middle: breadcrumbs (depth > 0)
- * plus the usage table of the selected cost-centre (allocated, committed,
- * requested, available) plus applications. Right: two stacked pie charts
- * (allocation, committed) over the direct sub cost-centres. Selection lives in
- * the query params (shareable).
+ * Left: the budget to fiscal year navigation tree. Middle: the breadcrumbs
+ * (depth > 0), the usage table of the selected cost center (allocated, committed,
+ * requested, available) and the applications. Right: stacked pie charts over the
+ * direct sub cost centers. The query params hold the selection, so the view is
+ * shareable as a link.
  */
 @Component({
   selector: 'app-budget-dashboard',
@@ -104,8 +103,8 @@ export class BudgetDashboardComponent {
   readonly selectedKsId = signal('');
   readonly selectedFyId = signal('');
 
-  /** Mobile (<=768px): the left tree picker is collapsible — desktop ignores this
-   *  flag, where CSS hides the toggle and always shows the tree. */
+  /** Mobile (<=768px): the left tree picker collapses. Desktop ignores this flag,
+   *  because CSS hides the toggle there and always shows the tree. */
   readonly navOpen = signal(false);
 
   /** Mobile toggle label: selected budget + fiscal year, else a generic title. */
@@ -122,9 +121,9 @@ export class BudgetDashboardComponent {
     this.navOpen.update((v) => !v);
   }
 
-  /** Tree without hidden cost-centres: `hiddenInBudget` removes the node + subtree
-   *  from ALL views of the budget tab — display only, the values still count in the
-   *  parent rollups. */
+  /** Tree without the hidden cost centers. `hiddenInBudget` removes the node and
+   *  its subtree from ALL views of the budget tab. This changes the display only.
+   *  The values still count in the parent rollups. */
   private readonly visibleTree = computed<BudgetTreeNode[]>(() => {
     const prune = (nodes: BudgetTreeNode[]): BudgetTreeNode[] =>
       nodes
@@ -133,10 +132,10 @@ export class BudgetDashboardComponent {
     return prune(this.tree());
   });
 
-  /** Roots for the left tree — the forest roots of the server response: in full
-   *  view the top budgets, in gremium scope the assigned (sub) cost-centres. Only
-   *  roots **with** a fiscal year; the fiscal-year endpoint resolves sub
-   *  cost-centres to their top-level ancestor. */
+  /** Roots for the left tree: the forest roots of the server response. The full
+   *  view gives the top budgets. A gremium scope gives the assigned sub cost
+   *  centers. Only roots WITH a fiscal year appear. The fiscal-year endpoint
+   *  resolves a sub cost center to its top-level ancestor. */
   readonly tops = computed(() => {
     const fy = this.fiscalYearsByBudget();
     return this.visibleTree().filter((n) => (fy[n.id]?.length ?? 0) > 0);
@@ -156,7 +155,7 @@ export class BudgetDashboardComponent {
 
   private readonly selectedKs = computed(() => this.nodeById().get(this.selectedKsId()) ?? null);
 
-  /** Breadcrumbs from the top budget to the current cost-centre. */
+  /** Breadcrumbs from the top budget to the current cost center. */
   readonly breadcrumbs = computed<BudgetTreeNode[]>(() => {
     const map = this.nodeById();
     let node = this.selectedKs();
@@ -185,7 +184,7 @@ export class BudgetDashboardComponent {
     return a ? Number(a.expended) : 0;
   }
 
-  /** Usage rows: selected cost-centre + subtree, flattened. */
+  /** Usage rows: the selected cost center and its subtree, flattened. */
   readonly usageRows = computed<UsageRow[]>(() => {
     const ks = this.selectedKs();
     if (!ks) return [];
@@ -229,7 +228,7 @@ export class BudgetDashboardComponent {
     { key: 'expended', label: this.i18n.translate('budget.tree.col.expended'), align: 'end' },
     { key: 'available', label: this.i18n.translate('budget.tree.col.available'), align: 'end' },
   ]);
-  /** Application rows for the shared table (styled like ``/applications``). */
+  /** Application rows for the shared table, styled like `/applications`. */
   readonly appRows = computed<ApplicationRow[]>(() =>
     this.applications().map((a) => ({
       id: a.applicationId,
@@ -247,18 +246,18 @@ export class BudgetDashboardComponent {
     })),
   );
 
-  /** Application title with a fallback (short id) when no title is set. */
+  /** Application title. It falls back to the short id when no title is set. */
   titleOf(app: BudgetApplication): string {
     return app.title?.trim() || `${this.shortId(app.applicationId)}…`;
   }
 
-  /** Resolve an i18n label map in the active locale (fallback de/en/first). */
+  /** Resolve an i18n label map in the active locale. It falls back to de, then en,
+   *  then the first entry. */
   private resolveLabel(map: Record<string, string>): string {
     return map[this.i18n.locale()] || map['de'] || map['en'] || Object.values(map)[0] || '';
   }
   readonly usageRowId = (r: unknown): string => (r as UsageRow).node.id;
 
-  // --- Pie data: direct sub cost-centres + own share ------------------------
   private color(node: BudgetTreeNode, idx: number): string {
     return node.color ?? PALETTE[idx % PALETTE.length];
   }
@@ -271,8 +270,8 @@ export class BudgetDashboardComponent {
       color: this.color(c, i),
       id: c.id,
     }));
-    // Own share of the node (not distributed to children) — as its own segment
-    // with the **name** and **colour** of the open cost-centre.
+    // Own share of the node, the part not distributed to the children. It becomes
+    // its own segment with the name and the color of the open cost center.
     const own = metric(ks) - slices.reduce((s, x) => s + x.value, 0);
     if (own > 0.005) {
       slices.push({
@@ -288,14 +287,13 @@ export class BudgetDashboardComponent {
   readonly availablePie = computed<PieSlice[]>(() => this.pie((n) => this.availableOf(n)));
   readonly expendedPie = computed<PieSlice[]>(() => this.pie((n) => this.expendedOf(n)));
 
-  // --- Overview (sunburst overlay) --------------------------------------------
   readonly overviewOpen = signal(false);
   readonly overviewMetric = signal<SunburstMetric>('allocated');
   readonly overviewMetrics: SunburstMetric[] = ['allocated', 'available', 'expended'];
-  /** Root of the sunburst = currently selected cost-centre. */
+  /** Root of the sunburst: the cost center that is selected now. */
   readonly overviewRoot = computed(() => this.selectedKs());
 
-  /** Subtree sum of a metric (same calculation as the sunburst). */
+  /** Subtree sum of a metric. It uses the same calculation as the sunburst. */
   private metricTotal(node: BudgetTreeNode, metric: SunburstMetric): number {
     const valueOf = (n: BudgetTreeNode): number => {
       const a = n.byFiscalYear.find((x) => x.fiscalYearId === this.selectedFyId());
@@ -316,14 +314,13 @@ export class BudgetDashboardComponent {
     return this.overviewMetrics.filter((m) => this.metricTotal(root, m) > 0);
   });
 
-  /** Selected metric, falling back to a visible one if its data is gone. */
+  /** Selected metric. It falls back to a visible metric when its data is gone. */
   readonly activeOverviewMetric = computed<SunburstMetric>(() => {
     const visible = this.visibleOverviewMetrics();
     const current = this.overviewMetric();
     return visible.includes(current) ? current : (visible[0] ?? 'allocated');
   });
 
-  /** Sunburst segment click: open the cost-centre + close the overlay. */
   onOverviewPick(id: string): void {
     this.overviewOpen.set(false);
     this.selectKs(id);
@@ -337,22 +334,22 @@ export class BudgetDashboardComponent {
     this.load();
   }
 
-  // --- Display helpers ------------------------------------------------------
   money(value: string | number | null | undefined, currency = 'EUR'): string {
     const n = value == null || value === '' ? 0 : Number(value);
     return new Intl.NumberFormat(this.i18n.locale(), { style: 'currency', currency }).format(n);
   }
   /** Row total budget = available + bound + expended (= allocated + income).
-   *  Reference value for usage so income-funded cost-centres don't exceed 100%. */
+   *  This is the reference value for the usage bar. Income-funded cost centers
+   *  then stay at or below 100%. */
   private usageTotal(row: UsageRow): number {
     return row.available + row.committed;
   }
-  /** Bound share of the total budget — light grey. */
+  /** Bound share of the total budget, drawn in light gray. */
   boundPct(row: UsageRow): number {
     const total = this.usageTotal(row);
     return total > 0 ? Math.max(0, Math.min(100, (row.bound / total) * 100)) : 0;
   }
-  /** Expended share of the total budget — primary. */
+  /** Expended share of the total budget, drawn in the primary color. */
   expendedPct(row: UsageRow): number {
     const total = this.usageTotal(row);
     return total > 0 ? Math.max(0, Math.min(100, (row.expended / total) * 100)) : 0;
@@ -365,7 +362,6 @@ export class BudgetDashboardComponent {
     return this.i18n.translate(`budget.stage.${stage}` as TranslationKey);
   }
 
-  // --- Loading --------------------------------------------------------------
   private load(): void {
     this.loading.set(true);
     this.error.set(false);
@@ -373,10 +369,11 @@ export class BudgetDashboardComponent {
       next: (tree) => {
         this.tree.set(tree);
         this.loading.set(false);
-        // Forest roots (may be sub cost-centres); hidden ones aren't selectable
-        // in the tab.
+        // Forest roots. They can be sub cost centers. A hidden root is not
+        // selectable in the tab.
         const tops = tree.filter((n) => !n.hiddenInBudget);
-        // Load fiscal years of all top budgets (left tree) — parallel, fault-tolerant.
+        // Load the fiscal years of all top budgets for the left tree. The requests
+        // run in parallel and a failure of one does not stop the others.
         for (const top of tops) {
           this.api.listFiscalYears(top.id as Uuid).subscribe({
             next: (fys) => {
@@ -399,7 +396,8 @@ export class BudgetDashboardComponent {
     });
   }
 
-  /** Restore the initial selection from the query params, else first budget/fiscal year. */
+  /** Restore the first selection from the query params. Else take the first budget
+   *  and its first fiscal year. */
   private restored = false;
   private restoreOrDefault(tops: BudgetTreeNode[]): void {
     if (this.restored || !tops.length) return;
@@ -407,7 +405,7 @@ export class BudgetDashboardComponent {
     const withFy = tops.filter(
       (t) => (this.fiscalYearsByBudget()[t.id]?.length ?? 0) > 0,
     );
-    if (!withFy.length) return; // none with a fiscal year loaded yet -> later
+    if (!withFy.length) return; // no fiscal year loaded yet, try again later
     const qp = this.route.snapshot.queryParamMap;
     const qpBudget = qp.get('budget');
     const budgetId =
@@ -417,7 +415,7 @@ export class BudgetDashboardComponent {
         ? qpBudget
         : withFy[0].id;
     const fys = this.fiscalYearsByBudget()[budgetId];
-    if (fys === undefined) return; // not loaded yet -> later
+    if (fys === undefined) return; // not loaded yet, try again later
     this.restored = true;
     const ksId = qp.get('ks') && this.nodeById().get(qp.get('ks')!) ? qp.get('ks')! : budgetId;
     const fyId = qp.get('fy') && fys.some((f) => f.id === qp.get('fy')) ? qp.get('fy')! : (fys[0]?.id ?? '');
@@ -453,7 +451,8 @@ export class BudgetDashboardComponent {
     this.selectedBudgetId.set(sel.budgetId);
     this.selectedKsId.set(sel.budgetId);
     this.selectedFyId.set(sel.fiscalYearId);
-    // Mobile: collapse the picker again after picking a year (desktop unaffected).
+    // Mobile: collapse the picker again after the user picks a year. Desktop keeps
+    // the tree open.
     this.navOpen.set(false);
     this.syncUrl();
     this.reloadApplications();
@@ -481,7 +480,6 @@ export class BudgetDashboardComponent {
     });
   }
 
-  // --- Export ---------------------------------------------------------------
   onExport(): void {
     if (this.exporting()) return;
     this.exporting.set(true);

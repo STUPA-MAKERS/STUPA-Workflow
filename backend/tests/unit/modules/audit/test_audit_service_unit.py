@@ -1,7 +1,8 @@
 """TDD: AuditService — append-only record, verify_chain, query (T-23).
 
-Unit-Suite ohne DB: ``execute`` über Ergebnis-Queue-Fake (``tests._support.audit_fakes``);
-der Advisory-Lock-Aufruf konsumiert das erste Ergebnis (no-op im Fake).
+The suite runs without a database. `execute` goes to the result-queue fake in
+`tests._support.audit_fakes`. The advisory-lock call consumes the first result. That call
+is a no-op in the fake.
 """
 
 from __future__ import annotations
@@ -49,9 +50,8 @@ def _entry(
     )
 
 
-# --------------------------------------------------------------------------- record
 async def test_record_genesis_has_no_prev() -> None:
-    db = fake_session(result(), result())  # lock + leere prev-Abfrage
+    db = fake_session(result(), result())  # lock, then an empty prev query
     entry = await AuditService(db).record(
         actor="admin-1", action=AuditAction.LOGIN, at=_AT
     )
@@ -113,7 +113,6 @@ async def test_record_hook_function() -> None:
     assert db.added == [entry]
 
 
-# ----------------------------------------------------------------- verify_chain
 async def test_verify_chain_valid() -> None:
     e1 = _entry(1, actor="a", action="login")
     e2 = _entry(2, actor="b", action="export", prev=e1.hash)
@@ -134,7 +133,7 @@ async def test_verify_chain_empty_is_valid() -> None:
 async def test_verify_chain_detects_tampered_field() -> None:
     e1 = _entry(1, action="login")
     e2 = _entry(2, action="export", prev=e1.hash)
-    e2.data = {"tampered": True}  # Hash passt nicht mehr zu den Feldern
+    e2.data = {"tampered": True}  # the hash no longer matches the fields
     db = fake_session(result(e1, e2))
     res = await AuditService(db).verify_chain()
     assert res.valid is False
@@ -145,7 +144,7 @@ async def test_verify_chain_detects_tampered_field() -> None:
 
 async def test_verify_chain_detects_broken_link() -> None:
     e1 = _entry(1, action="login")
-    e2 = _entry(2, action="export", prev=b"\x00" * 32)  # falscher prev_hash (Lücke)
+    e2 = _entry(2, action="export", prev=b"\x00" * 32)  # wrong prev_hash, a gap in the chain
     db = fake_session(result(e1, e2))
     res = await AuditService(db).verify_chain()
     assert res.valid is False
@@ -155,7 +154,7 @@ async def test_verify_chain_detects_broken_link() -> None:
 
 async def test_verify_chain_detects_tampered_genesis() -> None:
     e1 = _entry(1, action="login")
-    e1.action = "role_change"  # Genesis-Feld verändert → Hash stimmt nicht
+    e1.action = "role_change"  # a changed genesis field breaks the hash
     db = fake_session(result(e1))
     res = await AuditService(db).verify_chain()
     assert res.valid is False
@@ -163,7 +162,6 @@ async def test_verify_chain_detects_tampered_genesis() -> None:
     assert res.broken_at == 1
 
 
-# ------------------------------------------------------------------------ query
 async def test_query_no_filters() -> None:
     rows = [_entry(2, action="export"), _entry(1, action="login")]
     db = fake_session(result(5), result(*rows))

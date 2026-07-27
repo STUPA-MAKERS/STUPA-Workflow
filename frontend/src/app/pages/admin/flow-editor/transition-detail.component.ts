@@ -15,7 +15,7 @@ import {
 import { GuardEditorComponent } from './guard-editor.component';
 import { actionParamOf, recipientNeedsRef, recipientsOf } from './flow-guard.util';
 
-/** Guard + actions pane of the selected transition (below the graph). */
+/** Guard and actions pane of the selected transition. It sits below the graph. */
 @Component({
   selector: 'app-transition-detail',
   standalone: true,

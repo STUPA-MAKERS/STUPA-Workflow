@@ -1,4 +1,4 @@
-"""Unit-Tests ClamAV-Scanner (T-13). `clamd` wird über ein Fake-Modul ersetzt."""
+"""Unit tests for the ClamAV scanner (T-13). A fake module replaces `clamd`."""
 
 from __future__ import annotations
 
@@ -69,7 +69,7 @@ async def test_scan_error_wrapped(fake_clamd: dict[str, Any]) -> None:
 
 
 async def test_scan_empty_result_raises(fake_clamd: dict[str, Any]) -> None:
-    fake_clamd["result"] = {}  # kein "stream"-Key → Protokollfehler
+    fake_clamd["result"] = {}  # no "stream" key, so a protocol error
     with pytest.raises(ScannerError):
         await ClamdScanner(host="clamav").scan(b"x")
 

@@ -6,20 +6,22 @@ import type { Principal } from '../api/models';
 import { LOCATION } from '../browser/location.token';
 
 /**
- * Auth state. Principal from GET /api/auth/me (session cookie, OIDC). RBAC is
- * never FE-authoritative: `can()`/nav gating are pure UX — the server checks
- * every route via `require_principal`. `ensureLoaded()` loads the principal
- * exactly once (memoized) so route guards can decide synchronously.
+ * Auth state. The principal comes from GET /api/auth/me over the OIDC session
+ * cookie. RBAC is never authoritative on the frontend. `can()` and the nav gating
+ * are only UX. The server checks every route through `require_principal`.
+ * `ensureLoaded()` loads the principal exactly once and memoizes it, so a route
+ * guard can decide synchronously.
  *
- * Both sessions (OIDC principal, magic-link applicant) run exclusively over
- * HttpOnly cookies — no token in JS storage, hence no XSS exfiltration path. The
- * auth interceptor sends them via `withCredentials`.
+ * Both sessions, the OIDC principal and the magic-link applicant, run only over
+ * HttpOnly cookies. No token sits in JS storage, so XSS has no path to steal one.
+ * The auth interceptor sends the cookies through `withCredentials`.
  */
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  // Resolve `ApiClient` (→ HttpClient) lazily, not in the field initializer:
-  // otherwise the root `AuthService` pulls HttpClient into every component that
-  // injects it only for `can()`/`roles()`, and their specs fail with NG0201.
+  // Resolve `ApiClient`, and with it `HttpClient`, lazily and not in the field
+  // initializer. Otherwise the root `AuthService` pulls `HttpClient` into every
+  // component that injects it only for `can()` or `roles()`. Their specs then fail
+  // with NG0201.
   private readonly injector = inject(Injector);
   private readonly location = inject(LOCATION);
   private get api(): ApiClient {
@@ -32,37 +34,40 @@ export class AuthService {
   readonly principal = this._principal.asReadonly();
   readonly isAuthenticated = computed(() => this._principal() !== null);
 
-  /** Display name (fallback: email → "—"). */
+  /** Display name. It falls back to the email and then to "—". */
   readonly displayName = computed(() => {
     const p = this._principal();
     return p?.display_name || p?.email || '—';
   });
-  /** Principal id (`sub`) of the logged-in user — e.g. compared with a meeting's
-   *  assigned protokollant. `null` while anonymous. */
+  /** Principal id (`sub`) of the logged-in user. The app compares it with the
+   *  assigned protokollant of a meeting. It is `null` while anonymous. */
   readonly userId = computed(() => this._principal()?.sub ?? null);
   readonly roles = computed(() => this._principal()?.roles ?? []);
-  /** Gremien of the logged-in principal — for the "My gremien" view. */
+  /** Gremien of the logged-in principal. The "My gremien" view uses them. */
   readonly gremien = computed(() => this._principal()?.gremien ?? []);
-  /** Gremien the principal MANAGES via their gremium role (`session.manage`,
-   *  e.g. board/manager) — gates "create meeting" without the global
-   *  `meeting.manage` permission. Pure UX, the server decides. */
+  /** Gremien the principal MANAGES through a gremium role (`session.manage`, for
+   *  example board or manager). It gates "create meeting" without the global
+   *  `meeting.manage` permission. This is only UX. The server decides. */
   readonly sessionManageGremien = computed(
     () => this._principal()?.session_manage_gremien ?? [],
   );
-  /** At least one cost centre is assigned to a member gremium as a visibility
-   *  root — budget tab without global budget.* rights. */
+  /** At least one cost center is assigned to a member gremium as a visibility
+   *  root. The budget tab opens without global budget.* permissions. */
   readonly hasScopedBudgetView = computed(
     () => this._principal()?.has_scoped_budget_view === true,
   );
-  /** Principal is in ≥1 substitute pool — may see the meeting timeline of their
-   *  gremien (live channel only via a concrete delegation). */
+  /** The principal is in at least one substitute pool. The principal may see the
+   *  meeting timeline of their gremien. The live channel still needs a concrete
+   *  delegation. */
   readonly inSubstitutePool = computed(
     () => this._principal()?.in_substitute_pool === true,
   );
 
   /**
-   * Loads the principal exactly once and caches the result (`shareReplay`).
-   * 401/anonymous → `null`. Repeated calls (app init + guards) share the call.
+   * Loads the principal exactly once and caches the result with `shareReplay`.
+   *
+   * A 401 or an anonymous user gives `null`. Repeated calls from the app start and
+   * from the guards share the one call.
    */
   ensureLoaded(): Observable<Principal | null> {
     this.principal$ ??= this.api.me().pipe(
@@ -73,13 +78,13 @@ export class AuthService {
     return this.principal$;
   }
 
-  /** Convenience for guards: `true` once a principal is present. */
+  /** Helper for guards. It gives `true` as soon as a principal exists. */
   ensureAuthenticated(): Observable<boolean> {
     return this.ensureLoaded().pipe(map((p) => p !== null));
   }
 
-  /** Permission check for RBAC guards/nav gating (UX, not authoritative).
-   *  ``admin`` has all rights (like the backend). */
+  /** Permission check for the RBAC guards and the nav gating. It is UX only and
+   *  not authoritative. The `admin` role holds every permission, as in the backend. */
   can(permission: string): boolean {
     const p = this._principal();
     if (!p) return false;
@@ -91,14 +96,16 @@ export class AuthService {
     return permissions.length === 0 || permissions.some((p) => this.can(p));
   }
 
-  /** Starts the OIDC login (full redirect to Keycloak via the backend). */
+  /** Starts the OIDC login. It redirects the whole page to Keycloak via the backend. */
   login(): void {
     this.location.assign('/api/auth/login');
   }
 
   /**
-   * Ends the server session and follows — if the backend supplies one — the
-   * RP-initiated logout URL (Keycloak SSO), otherwise back to the home page.
+   * Ends the server session.
+   *
+   * If the backend supplies an RP-initiated logout URL for the Keycloak SSO, the
+   * browser follows it. Otherwise the browser goes to the home page.
    */
   logout(): void {
     this.api
@@ -112,8 +119,10 @@ export class AuthService {
   }
 
   /**
-   * 401 on a protected request: the session is gone/expired → drop the principal
-   * and log in again. Called by the auth interceptor.
+   * Handles a 401 on a protected request.
+   *
+   * The session is gone or expired. The method drops the principal and starts the
+   * login again. The auth interceptor calls it.
    */
   handleUnauthorized(): void {
     if (this._principal() === null) return;

@@ -1,8 +1,8 @@
 """Pure mutations on the global-flow graph dict (read-modify-write helpers).
 
-Each function takes the graph as returned by ``GET /admin/flow-versions/global``
-(``{states, transitions, layout}``), mutates a **copy**, and returns it. Raising
-``ValueError`` here surfaces as a clean tool error before anything is written.
+Each function takes the graph that `GET /admin/flow-versions/global` returns, that is
+`{states, transitions, layout}`. It mutates a **copy** and returns the copy. A
+`ValueError` from here surfaces as a clean tool error before the server writes anything.
 """
 
 from __future__ import annotations
@@ -176,7 +176,7 @@ def upsert_group(graph: Graph, group: dict[str, Any]) -> Graph:
         raise ValueError(f"unknown group ids in groupIds: {unknown_groups}")
     if not group.get("stateKeys") and not children:
         raise ValueError("group needs at least one state key or sub-group")
-    # A state/group lives in at most one parent — joining removes it elsewhere.
+    # A state or a group lives in at most one parent. A join removes it everywhere else.
     member = set(group["stateKeys"])
     for grp in groups:
         if grp.get("id") != group["id"]:
@@ -203,7 +203,8 @@ def delete_group(graph: Graph, group_id: str) -> Graph:
     groups = _layout(g).get("groups") or []
     if not any(grp.get("id") == group_id for grp in groups):
         raise ValueError(f"unknown group id: {group_id!r}")
-    # Children of the deleted group move up to the top level (reference dropped).
+    # The children of the deleted group move up to the top level. The code drops the
+    # reference to the deleted group.
     remaining = [
         {**grp, "groupIds": [c for c in _group_children(grp) if c != group_id]}
         for grp in groups
@@ -220,7 +221,6 @@ def delete_group(graph: Graph, group_id: str) -> Graph:
     return g
 
 
-# ============================================================ form field ops
 Fields = list[dict[str, Any]]
 
 

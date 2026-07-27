@@ -75,13 +75,13 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-# Module routers are mounted once at module level so repeated `create_app()`
-# calls in tests do not register them twice.
+# This module includes the routers once at import time. Repeated `create_app()`
+# calls in the tests then do not register them twice.
 api_router.include_router(auth_router)
 api_router.include_router(oauth_router)
 api_router.include_router(mcp_router)
-# Mirror OAuth discovery under /api: the RFC location is the root, but /api is
-# always reachable through the edge proxy, giving MCP clients a fallback.
+# Mirror OAuth discovery under /api. The RFC location is the root, but /api always
+# stays reachable through the edge proxy and gives MCP clients a fallback.
 api_router.include_router(oauth_well_known_router)
 api_router.include_router(forms_router)
 api_router.include_router(application_types_router)
@@ -111,8 +111,10 @@ api_router.include_router(site_config_public_router)
 async def _bootstrap_admins_on_startup(settings: Settings) -> None:  # pragma: no cover
     """Grant the admin role to matched existing principals on startup.
 
-    Best-effort: without bootstrap config (the normal case) no DB access happens;
-    errors are logged, never propagated — app startup must not fail here."""
+    The sweep is best effort. Without bootstrap config, which is the normal case, it
+    touches no database. It logs an error and never raises it, because app startup
+    must not fail here.
+    """
     if not (settings.bootstrap_admin_subject_set or settings.bootstrap_admin_email_set):
         return
     from app.modules.auth.bootstrap import ensure_bootstrap_admins
@@ -131,12 +133,12 @@ async def _bootstrap_admins_on_startup(settings: Settings) -> None:  # pragma: n
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
-    # Open the arq pool best-effort (mail + scan jobs); without Redis it is None.
+    # Open the arq pool best effort for mail and scan jobs. Without Redis it is None.
     app.state.arq_pool = await create_mail_pool(settings.redis_url)
-    # Build object storage best-effort; without MinIO it is None and uploads 503.
+    # Build the object storage best effort. Without MinIO it is None and uploads 503.
     app.state.object_storage = build_object_storage(settings)
-    # Live vote: Redis pub/sub broker + cast lock + event publisher. The client is
-    # lazy (connects on first PUBLISH/SUBSCRIBE), so this is cheap.
+    # The Redis client connects lazily on the first PUBLISH or SUBSCRIBE, so this
+    # call is cheap.
     import redis.asyncio as aioredis
 
     livevote_redis = aioredis.from_url(settings.redis_url)
@@ -160,10 +162,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 def _flow_action_dispatcher(request: Request) -> ActionDispatcher:
-    """Build the flow action dispatcher: notify, webhook, addToNextSession/assignBudget.
+    """Build the flow action dispatcher: notify, webhook, addToNextSession, assignBudget.
 
-    Reads the arq pool from app state; without a pool, notify mails and webhook
-    deliveries are logged and kept pending (the API never blocks)."""
+    The dispatcher reads the arq pool from the app state. Without a pool it logs the
+    notify mails and the webhook deliveries and keeps them pending. The API never
+    blocks.
+    """
     pool = getattr(request.app.state, "arq_pool", None)
     return ChainActionDispatcher(
         [
@@ -184,10 +188,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
     )
 
-    # CORS is deliberately not registered (cross-origin off). Order: last added =
-    # outermost. SecurityHeaders outermost (headers also on CSRF/429 responses),
-    # then trace id, then CSRF, then the default write rate limit innermost. All
-    # are BaseHTTPMiddleware, so WebSocket scopes pass through untouched.
+    # CORS stays unregistered on purpose: no cross-origin access. The last middleware
+    # added becomes the outermost one. SecurityHeaders is outermost, so its headers
+    # also reach the CSRF and 429 responses. Next come the trace id, then CSRF, and
+    # innermost the default write rate limit. All of them are BaseHTTPMiddleware, so
+    # a WebSocket scope passes through untouched.
     app.add_middleware(DefaultWriteRateLimitMiddleware, settings=settings)
     app.add_middleware(CsrfMiddleware, settings=settings)
     app.add_middleware(RequestContextMiddleware)

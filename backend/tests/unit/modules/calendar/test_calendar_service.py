@@ -1,4 +1,4 @@
-"""Unit-Tests des Kalender-Service (#ics) — DB-Branches über FakeSession (kein Docker)."""
+"""Unit tests of the calendar service (#ics): DB branches through FakeSession, no Docker."""
 
 from __future__ import annotations
 
@@ -42,7 +42,7 @@ async def test_rotate_missing_principal_returns_none() -> None:
 
 @pytest.mark.parametrize("token", ["", None])
 async def test_principal_by_token_empty(token: str) -> None:
-    # Leerer Token kurzschließt ohne Query.
+    # An empty token short-circuits without a query.
     assert await service.principal_by_calendar_token(fake_session(), token) is None
 
 
@@ -57,7 +57,7 @@ async def test_principal_by_token_miss() -> None:
 
 
 async def test_member_meetings_no_gremien() -> None:
-    # active_gremium_roles liefert nichts → keine Mitglieds-Gremien → leere Liste.
+    # active_gremium_roles returns nothing, so there are no Gremien and the list stays empty.
     assert await service.member_meetings(fake_session(result()), "u1") == []
 
 

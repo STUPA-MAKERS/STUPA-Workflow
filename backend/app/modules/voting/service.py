@@ -1,15 +1,17 @@
 """Voting service: create -> open -> cast -> close.
 
-Race safety - one ballot per voter is enforced in the DB:
-* open (``secret=false``): ``INSERT ... ON CONFLICT (vote_id, voter_sub)`` -
-  ``allowChange`` -> ``DO UPDATE`` (idempotent update), else ``DO NOTHING`` and an
-  empty ``RETURNING`` -> 409 (double vote).
-* secret (``secret=true``): ``voted_marker`` (UNIQUE) records 'has voted'; the
-  ballot lands identity-less in ``secret_ballot``. ``allowChange`` has no effect
-  here (anonymous ballot cannot be re-linked) -> a second cast -> 409.
+Race safety: the DB enforces one ballot per voter.
 
-RBAC fail-closed: ``cast`` requires membership in ``vote.eligible_group`` (on top
-of the ``vote.cast`` permission in the router); otherwise 403.
+* open (``secret=false``): ``INSERT ... ON CONFLICT (vote_id, voter_sub)``. With
+  ``allowChange`` the statement runs ``DO UPDATE`` for an idempotent update. Without
+  it the statement runs ``DO NOTHING`` and returns an empty ``RETURNING`` -> 409
+  (double vote).
+* secret (``secret=true``): ``voted_marker`` (UNIQUE) records 'has voted'. The ballot
+  lands without an identity in ``secret_ballot``. ``allowChange`` has no effect here,
+  because nobody can re-link an anonymous ballot. A second cast gives 409.
+
+RBAC is fail-closed. A ``cast`` needs membership in ``vote.eligible_group`` on top of
+the ``vote.cast`` permission that the router checks. Otherwise the call gets 403.
 """
 
 from __future__ import annotations
@@ -45,31 +47,35 @@ from app.shared.errors import ConflictError, ForbiddenError, NotFoundError, Vali
 
 
 def open_tally_revealed(present: int, voted: int, expected: int) -> bool:
-    """Reveal rule for open, non-secret votes.
+    """Return True when an open, non-secret vote can show its running tally.
 
-    The running count only becomes visible once all expected ballots are in - otherwise
-    the interim tally leaks on the beamer/voter. ``expected`` is the denominator: present
-    members plus active vote delegations whose delegator is ABSENT (the delegate casts a
-    represented ballot that ``voted`` counts). Without that add-on ``voted`` could exceed
-    ``present`` before all present members voted and reveal the tally early. Shared with
-    the live-vote reload path.
+    The running count becomes visible only after all expected ballots are in.
+    Otherwise the interim tally leaks on the beamer and to the voters. ``expected`` is
+    the denominator. It holds the present members plus the active vote delegations
+    whose delegator is ABSENT. The delegate casts a represented ballot, and ``voted``
+    counts that ballot. Without that add-on ``voted`` could exceed ``present`` before
+    all present members voted, and reveal the tally too early. The live-vote reload
+    path uses this rule too.
     """
     return present > 0 and voted >= expected
 
 
 class VotingService:
-    """Service bound to an ``AsyncSession`` (+ optional flow dispatcher)."""
+    """Vote service on one ``AsyncSession`` with an optional flow dispatcher."""
 
     def __init__(self, session: AsyncSession, dispatcher: ActionDispatcher | None = None) -> None:
         self.session = session
         self.dispatcher: ActionDispatcher = dispatcher or NullActionDispatcher()
 
-    # --- helpers ---
     async def _get_vote(self, vote_id: UUID, *, for_update: bool = False) -> Vote:
-        """Load a vote; ``for_update`` locks the row (cast/close serialization).
+        """Load a vote by id.
 
-        Without the lock a last-second ballot could commit between tally and
-        ``status=closed`` and be missing from the recorded result.
+        ``for_update`` locks the row and serializes cast against close. Without the
+        lock a last-second ballot could commit between the tally and ``status=closed``,
+        and then be missing from the recorded result.
+
+        Raises:
+            NotFoundError: No vote has this id.
         """
         stmt = select(Vote).where(Vote.id == vote_id)
         if for_update:
@@ -80,9 +86,13 @@ class VotingService:
         return vote
 
     async def delete(self, vote_id: UUID, *, meeting_id: UUID) -> None:
-        """Delete a meeting-bound vote (ballots cascade via FK).
+        """Delete a meeting-bound vote.
 
-        Only votes of this meeting; the caller (router) checks authorization.
+        The ballots cascade through the foreign key. The method deletes only a vote of
+        this meeting. The caller (router) checks the authorization.
+
+        Raises:
+            NotFoundError: The vote does not belong to this meeting.
         """
         vote = await self._get_vote(vote_id)
         if vote.meeting_id != meeting_id:
@@ -104,7 +114,7 @@ class VotingService:
         return VoteConfig.model_validate(vote.config)
 
     async def _aggregate(self, vote: Vote, config: VoteConfig) -> dict[str, int]:
-        """Count votes per option - open from ``ballot``, secret from ``secret_ballot``."""
+        """Count the votes per option: open from ``ballot``, secret from ``secret_ballot``."""
         if config.secret:
             choices: Sequence[str | None] = (
                 (
@@ -124,7 +134,7 @@ class VotingService:
         return tally_mod.tally(config.options, choices)
 
     async def _present_count(self, vote: Vote) -> int:
-        """Count of present meeting members (reveal denominator). 0 without a meeting."""
+        """Count the present meeting members (reveal denominator), or 0 without a meeting."""
         if vote.meeting_id is None:
             return 0
         from app.modules.livevote.models import MeetingAttendance
@@ -141,12 +151,14 @@ class VotingService:
         ) or 0
 
     async def _absent_delegated_count(self, vote: Vote) -> int:
-        """Active vote delegations in this meeting/gremium whose delegator is NOT present.
+        """Count the active vote delegations whose delegator is NOT present.
 
-        The delegate casts a represented ballot that ``voted`` counts even though the
-        delegator is not among the present, so this add-on to the reveal denominator keeps
-        ``voted`` from exceeding ``present`` and revealing the tally early. ``eligible_group``
-        is the gremium UUID as text; if it does not parse there is no delegation (0).
+        The scope is this meeting and this gremium. The delegate casts a represented
+        ballot, and ``voted`` counts it even though the delegator is absent. This
+        add-on to the reveal denominator stops ``voted`` from exceeding ``present`` and
+        revealing the tally too early. ``eligible_group`` holds the gremium UUID as
+        text. The method returns 0 when that text is not a UUID, because then no
+        delegation exists.
         """
         if vote.meeting_id is None:
             return 0
@@ -181,14 +193,19 @@ class VotingService:
     async def _tally_out(
         self, vote: Vote, config: VoteConfig, counts: dict[str, int], eligible: int
     ) -> TallyOut:
-        """Tally + turnout progress. ``counts``/``leading`` are only visible when
-        ``revealed``: closed, or (not secret and all present have voted). Session-less
-        open non-secret votes stay visible (no 'present' notion). When hidden, only
-        ``voted``/``present`` travel."""
+        """Build the tally and the turnout progress.
+
+        ``counts`` and ``leading`` are visible only when ``revealed``. That happens
+        when the vote is closed, or when the vote is not secret and all present members
+        have voted. An open non-secret vote without a meeting stays visible, because
+        there is no notion of 'present'. When the tally is hidden, only ``voted`` and
+        ``present`` travel.
+        """
         voted = sum(counts.values())
         outcome = tally_mod.result(config, counts, eligible)
-        # Only query the present denominator when it affects the reveal decision
-        # (open vote with a meeting). Closed/session-less needs no query.
+        # Query the present denominator only when it changes the reveal decision, that
+        # is for an open vote with a meeting. A closed vote or a vote without a meeting
+        # needs no query.
         if vote.status == "closed":
             present, revealed = 0, True
         elif config.secret:
@@ -198,8 +215,8 @@ class VotingService:
             present, revealed = 0, True
         else:
             present = await self._present_count(vote)
-            # Expected votes = present + represented votes of absent delegators
-            # (else the interim count leaks too early).
+            # The expected votes are the present members plus the represented votes of
+            # absent delegators. Without them the interim count leaks too early.
             expected = present + await self._absent_delegated_count(vote)
             revealed = open_tally_revealed(present, voted, expected)
         return TallyOut(
@@ -230,7 +247,6 @@ class VotingService:
             tally=tally_out,
         )
 
-    # --- create ---
     async def create(
         self,
         application_id: UUID | None,
@@ -241,9 +257,10 @@ class VotingService:
     ) -> VoteOut:
         """Create a draft vote.
 
-        ``application_id`` is optional: ``None`` = generic resolution question of a
-        free-text TOP (no application, no flow branch on close). ``meeting_id`` binds
-        the vote to a meeting (live vote); ``agenda_item_id`` to the TOP.
+        ``application_id`` is optional. ``None`` marks a generic resolution question of
+        a free-text agenda item. Such a vote has no application and fires no flow
+        branch on close. ``meeting_id`` binds the vote to a meeting (live vote).
+        ``agenda_item_id`` binds it to the agenda item.
         """
         if application_id is not None:
             await self._get_application(application_id)
@@ -269,13 +286,16 @@ class VotingService:
             vote, config, await self._tally_out(vote, config, empty, vote.eligible_count or 0)
         )
 
-    # --- open ---
     async def open(self, vote_id: UUID, *, now: datetime) -> VoteOut:
-        """``draft`` -> ``open``: open the time window.
+        """Move the vote from ``draft`` to ``open`` and open the time window.
 
-        The quorum denominator (``eligible_count``) comes from the authoritative roster
-        and is set at creation - NOT derived from logged-in users (that would be
-        fail-open). If missing, a percent quorum stays fail-closed and unmet.
+        The quorum denominator ``eligible_count`` comes from the authoritative roster.
+        The create call sets it. It does NOT come from the logged-in users, because
+        that would be fail-open. Without it a percent quorum stays fail-closed and
+        never counts as met.
+
+        Raises:
+            ConflictError: The vote is not in ``draft``.
         """
         vote = await self._get_vote(vote_id)
         if vote.status != "draft":
@@ -290,7 +310,6 @@ class VotingService:
             vote, config, await self._tally_out(vote, config, empty, vote.eligible_count or 0)
         )
 
-    # --- cast ---
     async def cast(
         self,
         vote_id: UUID,
@@ -300,21 +319,27 @@ class VotingService:
         now: datetime,
         as_delegation: bool = False,
     ) -> BallotAccepted:
-        """Cast a vote. 409 (closed/double), 403 (not eligible), 422 (unknown option).
+        """Cast a vote.
 
-        ``as_delegation=True`` casts the REPRESENTED vote: it runs under the delegator's
-        ``sub`` - own vote and represented vote are two separate ballots (a transfer, not
-        a duplicate; the per-(vote, voter) unique constraint protects each individually).
+        ``as_delegation=True`` casts the REPRESENTED vote. It runs under the ``sub`` of
+        the delegator. The own vote and the represented vote are two separate ballots.
+        This is a transfer, not a duplicate. The unique constraint on (vote, voter)
+        protects each ballot on its own.
+
+        Raises:
+            ConflictError: 409 - the vote is closed or the voter already voted.
+            ForbiddenError: 403 - the voter is not eligible for this vote.
+            ValidationProblem: 422 - the choice is not a configured option.
         """
-        # Row lock serializes against close(): status check and ballot insert share a
-        # transaction - no ballot lands after the tally.
+        # The row lock serializes this call against close(). The status check and the
+        # ballot insert share one transaction, so no ballot lands after the tally.
         vote = await self._get_vote(vote_id, for_update=True)
         if vote.status != "open":
             raise ConflictError("vote is not open.", code="conflict")
         if vote.closes_at is not None and now >= vote.closes_at:
             raise ConflictError("voting window has closed.", code="conflict")
-        # `blocked` = the caller delegated their voting right for THIS meeting.
-        # `delegator_sub` = a voting right was transferred to them (None = none).
+        # `blocked` means the caller delegated the own voting right for THIS meeting.
+        # `delegator_sub` holds the sub whose voting right the caller received, or None.
         blocked, delegator_sub = await voting_delegation_check(
             self.session, principal.sub, vote.meeting_id, vote.eligible_group, now
         )
@@ -325,8 +350,8 @@ class VotingService:
         else:
             if blocked:
                 raise ForbiddenError("Voting right has been delegated to another member.")
-            # Own vote: global ``vote.cast`` + group membership (the router gates auth
-            # only, so external substitutes get through).
+            # Own vote: global ``vote.cast`` plus group membership. The router gates
+            # only the session, so external substitutes reach this point.
             if not principal.has("vote.cast") or not self._eligible_group_member(
                 principal, vote.eligible_group
             ):
@@ -339,8 +364,8 @@ class VotingService:
                 errors=[{"field": "choice", "msg": "not in vote options"}],
             )
         if as_delegation:
-            # Audit the delegation USE; on a later 409 (double) the session dependency
-            # rolls back the transaction including this entry.
+            # Audit the USE of the delegation. On a later 409 (double vote) the session
+            # dependency rolls back the transaction, and this entry with it.
             await audit_record(
                 self.session,
                 actor=principal.sub,
@@ -357,10 +382,11 @@ class VotingService:
     def _eligible_group_member(principal: Principal, eligible_group: str) -> bool:
         """Check voting eligibility against ``eligible_group``.
 
-        If ``eligible_group`` is a gremium UUID (meeting/application votes), the cast MUST
-        go through the namespaced ``vote:<uuid>`` key that only an active ``vote.cast``
-        membership sets - so a matching OIDC group claim cannot falsely satisfy gremium
-        eligibility. Free (non-UUID) group keys keep the direct OIDC group check.
+        If ``eligible_group`` is a gremium UUID, the cast MUST go through the
+        namespaced ``vote:<uuid>`` key. Meeting votes and application votes use such a
+        UUID. Only an active ``vote.cast`` membership sets that key. A matching OIDC
+        group claim can therefore not satisfy gremium eligibility. A free group key
+        (not a UUID) keeps the direct OIDC group check.
         """
         try:
             UUID(eligible_group)
@@ -373,9 +399,9 @@ class VotingService:
     ) -> BallotAccepted:
         values = {"vote_id": vote_id, "voter_sub": voter_sub, "choice": choice}
         if allow_change:
-            # ``xmax = 0`` distinguishes an INSERT (first vote -> "cast") from the ON
-            # CONFLICT UPDATE (change -> "changed"): a freshly inserted tuple has
-            # deleting txid 0.
+            # ``xmax = 0`` separates an INSERT (first vote -> "cast") from the ON
+            # CONFLICT UPDATE (change -> "changed"). A fresh tuple has a deleting
+            # txid of 0.
             stmt = (
                 pg_insert(Ballot)
                 .values(**values)
@@ -398,16 +424,17 @@ class VotingService:
         )
         inserted = (await self.session.execute(stmt)).first()
         if inserted is None:
-            # ON CONFLICT DO NOTHING wrote nothing -> no rollback needed; the session
-            # dependency (get_session) ends the transaction on the exception.
+            # ON CONFLICT DO NOTHING wrote nothing, so no rollback is needed. The
+            # session dependency ``get_session`` ends the transaction on the exception.
             raise ConflictError("Already voted.", code="conflict")
         await self.session.commit()
         return BallotAccepted(status="cast")
 
     async def _cast_secret(self, vote_id: UUID, voter_sub: str, choice: str) -> BallotAccepted:
-        # `voted_marker` (UNIQUE) is the 'has voted' identity anchor. Only when it
-        # is new is the identity-less ballot written (no choice<->voter link;
-        # allowChange is impossible anonymously -> 409).
+        # `voted_marker` (UNIQUE) is the 'has voted' identity anchor. The code writes
+        # the identity-less ballot only when the marker is new. There is no link from
+        # choice to voter. allowChange cannot work on an anonymous ballot, so a second
+        # cast gives 409.
         marker = (
             pg_insert(VotedMarker)
             .values(vote_id=vote_id, voter_sub=voter_sub)
@@ -421,15 +448,18 @@ class VotingService:
         await self.session.commit()
         return BallotAccepted(status="cast")
 
-    # --- get ---
     async def assert_can_read(self, vote: Vote, principal: Principal) -> None:
-        """Guard read access to a vote (broken-object-level authorization).
+        """Guard read access to a vote (broken object level authorization).
 
-        Meeting-bound votes follow meeting visibility (member/participant/delegation
-        recipient) like ``MeetingService.assert_can_read``; session-less
-        (application/draft) votes require a global read/manage permission. Without this
-        check any logged-in user could read another gremium's tally via
-        ``GET /api/votes/{id}`` - including closed SECRET votes.
+        A meeting-bound vote follows the meeting visibility rules of
+        ``MeetingService.assert_can_read``: member, participant, or delegation
+        recipient. A vote without a meeting (application or draft vote) needs a global
+        read or manage permission. Without this check any logged-in user could read the
+        tally of another gremium through ``GET /api/votes/{id}``, including closed
+        SECRET votes.
+
+        Raises:
+            ForbiddenError: The principal cannot view this vote.
         """
         if "admin" in principal.roles:
             return
@@ -452,16 +482,16 @@ class VotingService:
         await self.assert_can_read(vote, principal)
         return await self.get(vote_id)
 
-    # --- manage-scope ---
     async def _vote_gremium_id(
         self, *, meeting_id: UUID | None, eligible_group: str
     ) -> UUID | None:
-        """Resolve a vote's gremium.
+        """Resolve the gremium of a vote.
 
-        Meeting-bound votes inherit the meeting's gremium; session-less (application)
-        votes carry the gremium as ``eligible_group`` (gremium UUID as text). If
-        ``eligible_group`` is a free group key (not a UUID) there is no resolvable
-        gremium -> ``None`` (then only global ``vote.manage`` / ``admin`` grants access).
+        A meeting-bound vote inherits the gremium of the meeting. A vote without a
+        meeting (application vote) carries the gremium in ``eligible_group`` as the
+        gremium UUID in text form. If ``eligible_group`` is a free group key and not a
+        UUID, no gremium resolves and the method returns ``None``. Only a global
+        ``vote.manage`` or ``admin`` then grants access.
         """
         if meeting_id is not None:
             from app.modules.livevote.models import Meeting
@@ -479,14 +509,19 @@ class VotingService:
     async def assert_can_manage_group(
         self, eligible_group: str, meeting_id: UUID | None, principal: Principal
     ) -> None:
-        """Fail-closed gremium-scope write/lifecycle access (create/open/close/cancel),
-        symmetric to ``assert_can_read``.
+        """Guard the write and lifecycle access to a vote.
 
-        Allowed for admin, holders of the GLOBAL ``vote.manage`` permission, or a gremium
-        role with ``vote.manage`` for the vote's gremium (like
-        ``MeetingService.can_manage_votes``). The latter unblocks legitimate per-gremium
-        managers while stopping an org-wide ``vote.manage`` holder from opening/closing
-        votes of OTHER gremien without membership (cross-tenant mutation).
+        The check is fail-closed and gremium-scoped, symmetric to
+        ``assert_can_read``. It covers create, open, close and cancel. Access goes to
+        an admin or to a holder of the GLOBAL ``vote.manage`` permission. A gremium
+        role with ``vote.manage`` for the gremium of the vote also grants access. The
+        last case works like ``MeetingService.can_manage_votes``. It unblocks a
+        legitimate per-gremium manager. At the same time it stops an org-wide
+        ``vote.manage`` holder from opening or closing votes of OTHER gremien without
+        membership. That would be a cross-tenant mutation.
+
+        Raises:
+            ForbiddenError: The principal cannot manage this vote.
         """
         if "admin" in principal.roles:
             return
@@ -509,28 +544,33 @@ class VotingService:
         await self.assert_can_manage_group(vote.eligible_group, vote.meeting_id, principal)
 
     async def assert_can_manage_vote(self, vote_id: UUID, principal: Principal) -> None:
-        """Load the vote (404 if missing) and check ``assert_can_manage``.
+        """Load the vote and run ``assert_can_manage`` on it.
 
-        Used by the ``/votes/{id}/{open,close,cancel}`` router before the lifecycle call
-        so open/close/cancel are fail-closed gremium-scoped like ``get_scoped``. The
-        internal live-vote/cron path calls the lifecycle methods directly (own gate) and
-        deliberately bypasses this check.
+        The ``/votes/{id}/{open,close,cancel}`` router calls this before the lifecycle
+        call. Open, close and cancel are therefore fail-closed and gremium-scoped like
+        ``get_scoped``. The internal live-vote and cron path calls the lifecycle
+        methods directly with its own gate. It bypasses this check on purpose.
+
+        Raises:
+            NotFoundError: No vote has this id.
+            ForbiddenError: The principal cannot manage this vote.
         """
         vote = await self._get_vote(vote_id)
         await self.assert_can_manage(vote, principal)
 
     async def get(self, vote_id: UUID) -> VoteOut:
-        """Vote state + aggregated tally (secret: only counts, never voters).
+        """Return the vote state and the aggregated tally.
 
-        No scope gate - internal reuse path (e.g. tally broadcast after ``cast``); the
-        public read endpoint uses ``get_scoped``.
+        A secret vote exposes only the counts and never the voters. This method has no
+        scope gate. It is the internal reuse path, for example the tally broadcast
+        after ``cast``. The public read endpoint uses ``get_scoped``.
         """
         vote = await self._get_vote(vote_id)
         config = self._config(vote)
         counts = await self._aggregate(vote, config)
         tally_out = await self._tally_out(vote, config, counts, vote.eligible_count or 0)
         if vote.status == "closed" and vote.result is not None:
-            # Persisted as a text column; values come from tally.result() -> Literal.
+            # The column stores text. The values come from tally.result(), a Literal.
             stored_result = cast("tally_mod.VoteResult", vote.result)
             tally_out = tally_out.model_copy(
                 update={
@@ -540,13 +580,15 @@ class VotingService:
             )
         return self._to_out(vote, config, tally_out)
 
-    # --- cancel ---
     async def cancel(self, vote_id: UUID) -> VoteOut:
-        """``open`` -> ``cancelled``: abort without a result and without a branch.
+        """Move the vote from ``open`` to ``cancelled`` without a result or a branch.
 
-        The application stays in the ``vote`` state - a new vote can be created or a
-        manual exit fired. The only way out when the quorum is not reached (``close`` is
-        then blocked).
+        The application stays in the ``vote`` state. An operator can then create a new
+        vote or fire a manual exit. This is the only way out when the vote does not
+        reach the quorum, because ``close`` is then blocked.
+
+        Raises:
+            ConflictError: The vote is not open.
         """
         vote = await self._get_vote(vote_id, for_update=True)
         if vote.status != "open":
@@ -561,27 +603,33 @@ class VotingService:
             await self._tally_out(vote, config, counts, vote.eligible_count or 0),
         )
 
-    # --- close ---
     async def close(
         self, vote_id: UUID, principal: Principal, *, now: datetime | None = None
     ) -> VoteClosed:
-        """``open`` -> ``closed``: tally -> result -> ``flow.fire(result_branch)``.
+        """Close an open vote, compute the tally and the result, then fire the branch.
 
-        Atomic: closing the vote (``status=closed`` + ``result``) and the ``voteResult``
-        transition commit in one transaction (``fire`` commits the staged vote changes).
-        If ``fire`` fails (guard/race), the session dependency rolls everything back,
-        leaving the vote open and retryable instead of 'closed but branch never fired'.
+        The close calls ``flow.fire(result_branch)``. It is atomic. The vote change
+        (``status=closed`` plus ``result``) and the ``voteResult`` transition commit in
+        one transaction. ``fire`` commits the staged vote changes. If ``fire`` fails on
+        a guard or a race, the session dependency rolls everything back. The vote then
+        stays open and the caller can retry, instead of ending 'closed but branch never
+        fired'.
 
-        Expired quorum vote: a time-bound, quorum-gated vote whose window (``closes_at``)
-        has passed with the quorum unmet has finally failed - no more ballots are
-        possible. On a manual close (``now=None``) the earlier fail-closed 409 applies. If
-        the caller (cron) passes ``now`` and the window has already expired, the vote is
-        closed as terminal QUORUM-MISSED and the ``fail`` branch fires - otherwise the
-        application would hang in the ``vote`` state forever and the cron would re-grab the
-        same unclosable vote each tick.
+        An expired quorum vote is a special case. Such a vote is time-bound and
+        quorum-gated, and its window ``closes_at`` passed with the quorum unmet. It has
+        finally failed, because no more ballots are possible. On a manual close
+        (``now=None``) the earlier fail-closed 409 applies. If the caller (cron) passes
+        ``now`` and the window already expired, the close is different. It marks the
+        vote as terminal QUORUM-MISSED and fires the ``fail`` branch. Without that rule
+        the application would hang in the ``vote`` state forever. The cron would also
+        re-grab the same unclosable vote on each tick.
+
+        Raises:
+            ConflictError: The vote is not open, the quorum is not met, or the flow has
+                no matching branch transition.
         """
-        # Row lock serializes against cast(): no last-second ballot between tally and
-        # ``status=closed``.
+        # The row lock serializes this call against cast(). No last-second ballot can
+        # land between the tally and ``status=closed``.
         vote = await self._get_vote(vote_id, for_update=True)
         if vote.status != "open":
             raise ConflictError(f"vote is {vote.status}, cannot close.", code="conflict")
@@ -590,16 +638,16 @@ class VotingService:
         eligible = vote.eligible_count or 0
         outcome = tally_mod.result(config, counts, eligible)
 
-        # Window expired? Only relevant when the caller passes ``now`` (cron).
+        # The window expiry counts only when the caller (cron) passes ``now``.
         window_expired = (
             now is not None and vote.closes_at is not None and now >= vote.closes_at
         )
 
-        # Quorum: without a met quorum there is normally no valid result - closing is
-        # blocked (409) instead of silently ending as 'rejected'. Escape: collect more
-        # ballots or cancel the vote. Exception: if the cast window has already expired,
-        # no more ballots are possible -> the vote is terminal quorum-missed and closes
-        # via the ``fail`` branch (instead of being blocked forever).
+        # Quorum: without a met quorum there is normally no valid result. The close
+        # gives 409 instead of a silent 'rejected'. The way out is to collect more
+        # ballots or to cancel the vote. Exception: after the cast window expires no
+        # more ballots are possible. The vote is then terminal quorum-missed and closes
+        # through the ``fail`` branch instead of staying blocked forever.
         if not outcome.quorum_met and not window_expired:
             raise ConflictError(
                 "quorum not met — the vote cannot be closed; collect more ballots "
@@ -612,10 +660,10 @@ class VotingService:
             outcome.result if outcome.quorum_met else "rejected"
         )
 
-        # A ``vote`` state has two fixed exits with ``branch`` ``pass``/``fail``.
-        # ``passed`` -> pass, otherwise (``rejected``/``tie``) fail-closed -> fail.
-        # Generic resolution questions (no application) fire NO branch - they only hold
-        # the result for the protocol.
+        # A ``vote`` state has two fixed exits with ``branch`` ``pass`` and ``fail``.
+        # ``passed`` fires pass. ``rejected`` and ``tie`` are fail-closed and fire fail.
+        # A generic resolution question has no application and fires NO branch. It only
+        # holds the result for the protocol.
         branch_name = "pass" if result_value == "passed" else "fail"
         flow = FlowService(self.session, self.dispatcher)
         branch = (
@@ -623,9 +671,10 @@ class VotingService:
             if vote.application_id is not None
             else None
         )
-        # Application-bound vote WITHOUT a matching branch transition (misconfigured flow
-        # / vote on a non-``vote`` state): fail-closed instead of closing silently, else
-        # the result would be fixed but the application would stay in the pre-vote state.
+        # An application-bound vote WITHOUT a matching branch transition is fail-closed.
+        # This happens on a misconfigured flow, or on a vote in a non-``vote`` state.
+        # A silent close would fix the result but leave the application in the pre-vote
+        # state.
         if vote.application_id is not None and branch is None:
             raise ConflictError(
                 f"no '{branch_name}' branch transition for the vote's current state; "
@@ -633,8 +682,9 @@ class VotingService:
                 code="conflict",
             )
 
-        # Stage the vote state - do NOT commit separately: `fire` writes it atomically
-        # with the transition + status_event; without a branch we commit here.
+        # Stage the vote state and do NOT commit it here. `fire` writes it atomically
+        # with the transition and the status_event. Without a branch the code below
+        # commits.
         vote.status = "closed"
         vote.result = result_value
         vote.result_branch_transition_id = branch.id if branch is not None else None

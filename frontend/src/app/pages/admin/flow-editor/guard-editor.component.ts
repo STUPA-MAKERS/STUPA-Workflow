@@ -22,10 +22,10 @@ import {
 type ValueKind = 'none' | 'role' | 'committee' | 'compare' | 'text';
 
 /**
- * Recursive guard editor: builds a boolean condition tree from and/or/not + leaf
- * operators (roleIs/compare/…). Input/output is the nested ``Guard`` JSON that the
- * server (``eval_guard``) already understands. Controlled component: reads ``guard``
- * and emits the new object on every change.
+ * Recursive guard editor. It builds a boolean condition tree from and/or/not and leaf
+ * operators such as roleIs or compare. The input and the output use the nested `Guard`
+ * JSON that the server evaluator `eval_guard` already understands. This is a controlled
+ * component. It reads `guard` and emits a new object on every change.
  */
 @Component({
   selector: 'app-guard-editor',
@@ -41,13 +41,13 @@ export class GuardEditorComponent {
   readonly guard = input<Guard | null>(null);
   readonly roleOptions = input<SelectOption[]>([]);
   readonly gremiumOptions = input<SelectOption[]>([]);
-  /** Automatic transitions may not use actor guards (roleIs/isInCommittee). */
+  /** An automatic transition must not use an actor guard such as roleIs or isInCommittee. */
   readonly automatic = input<boolean>(false);
   readonly guardChange = output<Guard | null>();
 
   protected readonly compareOps = COMPARE_OPS;
 
-  /** Current operator (``''`` = no guard). */
+  /** Current operator. An empty string means no guard. */
   protected readonly op = computed<string>(() => {
     const g = this.guard();
     return g ? Object.keys(g)[0] : '';
@@ -112,7 +112,7 @@ export class GuardEditorComponent {
       return;
     }
     if (op === 'and' || op === 'or') {
-      // Keep existing children if already a combinator; else wrap the current leaf.
+      // Keep the children when the guard is already a combinator. If not, wrap the leaf.
       const existing = this.children();
       const seed = existing.length ? existing : this.guard() ? [this.guard() as Guard] : [];
       this.guardChange.emit({ [op]: seed });

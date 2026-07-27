@@ -1,7 +1,7 @@
 """API schemas for the audit module (read-only views).
 
-``hash``/``prevHash`` are emitted as hex; ``data`` carries only id
-references/metadata by contract.
+The views emit ``hash`` and ``prevHash`` as hex. By contract, ``data`` carries only
+id references and metadata.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from app.modules.audit.models import AuditEntry
 
 
 class _CamelModel(BaseModel):
-    """camelCase aliases in JSON; fields populatable by name."""
+    """Base model that emits camelCase JSON aliases and accepts field names."""
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -26,21 +26,21 @@ class AuditEntryOut(_CamelModel):
     id: int
     at: datetime
     actor: str | None
-    # Actor display name (resolved by the router); None for system/anonymous
-    # operations or an unknown ``sub``.
+    # Actor display name, resolved by the router. None for a system or anonymous
+    # operation, and None for an unknown ``sub``.
     actor_name: str | None = Field(default=None, alias="actorName")
     action: str
     target_type: str | None = Field(alias="targetType")
     target_id: str | None = Field(alias="targetId")
-    # Human-readable target label, batch-resolved by the router; None if the
-    # target is deleted/unknown.
+    # Readable target label, batch-resolved by the router. None when the target
+    # is deleted or unknown.
     target_label: str | None = Field(default=None, alias="targetLabel")
     data: dict[str, Any]
-    # UUID-string -> display name for entity references embedded in ``data``,
-    # batch-resolved by the router; only resolvable ids are included.
+    # UUID string -> display name for the entity references inside ``data``. The
+    # router resolves them in one batch and keeps only the ids it can resolve.
     resolved_ids: dict[str, str] = Field(default_factory=dict, alias="resolvedIds")
-    # Revertable from the audit log (determined by the router); the backend stays
-    # authoritative on the actual revert call (409 when stale).
+    # Revertable from the audit log, as the router determines it. The backend stays
+    # authoritative on the actual revert call and answers 409 when the entry is stale.
     revertable: bool = False
     hash: str
     prev_hash: str | None = Field(alias="prevHash")
@@ -54,7 +54,7 @@ class AuditEntryOut(_CamelModel):
         resolved_ids: dict[str, str] | None = None,
         revertable: bool = False,
     ) -> AuditEntryOut:
-        """Map an ORM row to the out schema (bytea hashes hex-encoded)."""
+        """Map an ORM row to the out schema and hex-encode the bytea hashes."""
         return cls(
             id=entry.id,
             at=entry.at,
@@ -73,10 +73,10 @@ class AuditEntryOut(_CamelModel):
 
 
 class AuditPageOut(_CamelModel):
-    """Cursor-paged audit view (keyset on ``id`` desc, newest first).
+    """Cursor-paged audit view, keyset on ``id`` descending, newest first.
 
-    ``nextCursor`` is the ``id`` for the next call (query ``before``), or ``None``
-    at the end.
+    ``nextCursor`` holds the ``id`` for the next call, which you pass as the query
+    parameter ``before``. At the end of the log it is ``None``.
     """
 
     items: list[AuditEntryOut]

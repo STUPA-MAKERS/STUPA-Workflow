@@ -1,8 +1,8 @@
-"""Integration (echte Postgres): Anonymisierung scrubbt Antragsteller-Kommentare.
+"""Integration (real Postgres): anonymization scrubs the comments of the applicant.
 
-DSGVO Art. 17 (AUD-007): ``ApplicationsService.anonymize`` muss auch Freitext in
-vom Antragsteller verfassten Kommentaren (``author_kind='applicant'``) löschen, da
-dieser personenbezogene Daten enthalten kann. Principal-Kommentare bleiben unberührt.
+DSGVO Art. 17 (AUD-007): `ApplicationsService.anonymize` must also delete the free
+text of comments that the applicant wrote (`author_kind='applicant'`). That text can
+hold personal data. Comments of a principal stay untouched.
 """
 
 from __future__ import annotations
@@ -92,7 +92,7 @@ async def test_anonymize_scrubs_applicant_comment_bodies(session: AsyncSession) 
     svc = ApplicationsService(session)
     app, _ = await svc.create(_create_payload(app_type.id))
 
-    # Antragsteller hinterlegt PII im Kommentar-Freitext.
+    # The applicant puts PII into the free text of the comment.
     await svc.add_comment(
         app.id,
         author=None,
@@ -100,7 +100,7 @@ async def test_anonymize_scrubs_applicant_comment_bodies(session: AsyncSession) 
         body="Erreichbar unter erika@example.org / 0151-1234567",
         visibility="public",
     )
-    # Principal-Kommentar darf erhalten bleiben.
+    # The comment of a principal may stay.
     await svc.add_comment(
         app.id,
         author="admin",
@@ -113,8 +113,8 @@ async def test_anonymize_scrubs_applicant_comment_bodies(session: AsyncSession) 
 
     comments = await svc.list_comments(app.id, include_internal=True)
     bodies = {c.body for c in comments}
-    # Kein Antragsteller-Freitext bleibt übrig …
+    # No free text of the applicant is left.
     assert "Erreichbar unter erika@example.org / 0151-1234567" not in bodies
     assert "[anonymisiert]" in bodies
-    # … Principal-Kommentar bleibt unberührt.
+    # The comment of the principal stays untouched.
     assert "Bearbeitungsnotiz" in bodies

@@ -1,18 +1,18 @@
-"""Flow/status engine.
+"""Flow and status engine.
 
 Operations:
 
-* :meth:`FlowService.available_transitions` — manual transitions from the current
-  state whose guard evaluates ``True`` for the actor (guards are server-side; actor
-  gates fail-closed). Backs the trigger UI in the application detail view.
-* :meth:`FlowService.fire` — execute a transition atomically.
-* :meth:`FlowService.auto_advance` — fire the first automatic transition whose guard
-  holds (cyclically by the worker/cron, ``manual=False``).
-* :meth:`FlowService.fire_branch` — fire the ``pass``/``fail`` exit of a ``vote``
-  state (from the voting module on close).
+* `FlowService.available_transitions` — the manual transitions from the current state
+  whose guard is `True` for the actor. Guards run server-side. Actor gates are
+  fail-closed. This backs the trigger UI in the application detail view.
+* `FlowService.fire` — execute a transition atomically.
+* `FlowService.auto_advance` — fire the first automatic transition whose guard holds.
+  The worker or cron calls it in a cycle with `manual=False`.
+* `FlowService.fire_branch` — fire the `pass` or `fail` exit of a `vote` state. The
+  voting module calls it when it closes a vote.
 
-Edit lock: derived from the target state's ``state.edit_allowed`` — the ``patch`` path
-checks it and returns 409 (handled inline, not dispatched).
+Edit lock: it comes from `state.edit_allowed` of the target state. The `patch` path
+checks the lock and returns 409. The engine handles this inline and dispatches nothing.
 """
 
 from __future__ import annotations
@@ -50,10 +50,13 @@ from app.shared.guards import GuardContext, eval_guard, guard_requires_applicant
 
 
 def _guard_fires_on_deadline(guard: Any, *, negated: bool = False) -> bool:
-    """Whether the guard (recursively through ``and``/``or``/``not``) should fire on an
-    expired deadline — i.e. requires ``deadlinePassed`` true under negation polarity:
-    ``{deadlinePassed: true}`` and ``not(deadlinePassed: false)`` count,
-    ``not(deadlinePassed: true)`` does not."""
+    """Report whether the guard must fire on an expired deadline.
+
+    The check walks `and`, `or` and `not` recursively. The guard qualifies when it needs
+    `deadlinePassed` to be true under the current negation polarity. So
+    `{deadlinePassed: true}` and `not(deadlinePassed: false)` count, but
+    `not(deadlinePassed: true)` does not.
+    """
     if not isinstance(guard, dict):
         return False
     for op, value in guard.items():
@@ -71,7 +74,7 @@ def _guard_fires_on_deadline(guard: Any, *, negated: bool = False) -> bool:
 
 
 class FlowService:
-    """Engine bound to an ``AsyncSession`` + an :class:`ActionDispatcher`."""
+    """Engine bound to an `AsyncSession` and an `ActionDispatcher`."""
 
     def __init__(
         self, session: AsyncSession, dispatcher: ActionDispatcher | None = None
@@ -79,7 +82,6 @@ class FlowService:
         self.session = session
         self.dispatcher: ActionDispatcher = dispatcher or NullActionDispatcher()
 
-    # --- helpers ---
     async def _load_app(self, application_id: UUID) -> Application:
         app = (
             await self.session.execute(
@@ -121,20 +123,21 @@ class FlowService:
             .all()
         )
 
-    # --- deadline scheduling ---
     async def schedule_state_deadline(self, app: Application, state: State) -> None:
-        """On entering a state, materialize its named deadline policy.
+        """Materialize the named deadline policy of a state that the application enters.
 
-        If ``state.config`` carries a ``deadlinePolicyKey``, the policy is resolved
-        (``absolute`` → date; ``relative_submitted`` → ``created_at + X``;
-        ``relative_changed`` → ``updated_at + X``) and a :class:`Deadline` with
-        ``action_on_pass`` pointing at this state's ``deadlinePassed`` transition is
-        created; the cron fires it on expiry. Without such a transition the deadline is a
-        pure marker (``action_on_pass=NULL``) — the basis for ``deadlinePassed`` on
-        manual transitions (:meth:`_deadline_passed`).
+        A `deadlinePolicyKey` in `state.config` selects the policy. The service resolves
+        it: `absolute` gives a fixed date, `relative_submitted` gives `created_at + X`,
+        and `relative_changed` gives `updated_at + X`. It then creates a `Deadline` whose
+        `action_on_pass` points at the `deadlinePassed` transition of this state. The
+        cron fires that transition on expiry. Without such a transition the deadline is a
+        pure marker with `action_on_pass=NULL`. That marker is the basis of
+        `deadlinePassed` on manual transitions (see `_deadline_passed`).
 
-        Flow deadlines of the left state (even consumed ones) are always removed first —
-        no stacking, no stale deadlines after moving into a state without a policy."""
+        The service always removes the flow deadlines of the state that the application
+        leaves, even the consumed ones. Deadlines must not stack. A state without a
+        policy must not keep a stale deadline.
+        """
         await self.session.execute(
             delete(Deadline).where(
                 Deadline.application_id == app.id,
@@ -159,9 +162,9 @@ class FlowService:
         if due_at is None:
             await self.session.commit()
             return
-        # Target = the state's outgoing transition that should fire on an expired
-        # deadline (``deadlinePassed`` polarity incl. negation); with several candidates
-        # deterministically the one with the smallest ``order``.
+        # The target is the outgoing transition of the state that must fire on an expired
+        # deadline, under the `deadlinePassed` polarity including negation. With several
+        # candidates, take the one with the smallest `order` for a deterministic result.
         transitions = (
             await self.session.execute(
                 select(Transition)
@@ -183,25 +186,26 @@ class FlowService:
             ),
         )
 
-    # Minimal context: only the deadline counts as satisfied, nothing else (no roles,
-    # no budget fit, no field values). A candidate whose full guard is already ``True``
-    # here needs nothing beyond the expired deadline and so fires on expiry for sure —
-    # evaluable I/O-free at schedule time.
+    # Minimal context: only the deadline counts as satisfied. There are no roles, no
+    # budget fit and no field values. A candidate whose full guard is already `True` here
+    # needs nothing but the expired deadline, so it fires on expiry for sure. This stays
+    # evaluable without I/O at schedule time.
     _DEADLINE_ONLY_CTX = GuardContext(manual=False, deadline_passed=True)
 
     @classmethod
     def _pick_deadline_transition(
         cls, candidates: list[Transition]
     ) -> Transition | None:
-        """From the ``deadlinePassed`` candidates (by ``order``) pick the first whose
-        full guard is satisfied by the expired deadline alone.
+        """Pick the first `deadlinePassed` candidate that the expired deadline alone opens.
 
-        Picking the first candidate whose guard holds under :data:`_DEADLINE_ONLY_CTX`
-        (only ``deadline_passed=True``, otherwise empty) ensures it fires on expiry: a
-        candidate with an extra AND predicate would not fire, yet the cron would consume
-        the deadline (``ConflictError`` → ``action_on_pass=NULL``) and the application
-        would hang deadline-less. If none holds without an extra condition, pin the first
-        as a pure marker (deadline stays visible)."""
+        The candidates come in `order`. A candidate whose guard holds under
+        `_DEADLINE_ONLY_CTX` (only `deadline_passed=True`, everything else empty) fires
+        on expiry for sure. A candidate with an extra AND predicate would not fire. The
+        cron would still consume the deadline (`ConflictError` leads to
+        `action_on_pass=NULL`) and the application would hang without a deadline. If no
+        candidate holds without an extra condition, pin the first one as a pure marker.
+        The deadline then stays visible.
+        """
         if not candidates:
             return None
         for t in candidates:
@@ -210,13 +214,13 @@ class FlowService:
         return candidates[0]
 
     async def _deadline_passed(self, app: Application) -> bool:
-        """Derive the real ``deadline_passed`` of the current state from the DB.
+        """Derive the real `deadline_passed` of the current state from the database.
 
-        Delegates to :func:`flow_deadline_passed` (deadlines service) — the same
-        derivation the task-mail recipient resolution uses."""
+        The work goes to `flow_deadline_passed` in the deadlines service. The task-mail
+        recipient resolution uses the same derivation.
+        """
         return await flow_deadline_passed(self.session, app.id)
 
-    # --- available_transitions ---
     async def available_transitions(
         self,
         application_id: UUID,
@@ -224,13 +228,15 @@ class FlowService:
         *,
         deadline_passed: bool | None = None,
     ) -> list[TransitionOut]:
-        """Available manual transitions (guards checked) for the actor.
+        """List the manual transitions the actor may fire, with the guards checked.
 
-        Automatic transitions are hidden — the worker fires them, not the user. Result
-        branches (``branch`` set, e.g. the pass/fail exits of a vote/approval state) too:
-        only the vote (``close_vote``) decides them, never a manual action. Actor gates
-        in the guard refine the visibility of the remaining transitions.
-        ``deadline_passed=None`` ⇒ derive from the DB."""
+        The result hides automatic transitions, because the worker fires them and not the
+        user. It also hides result branches, meaning transitions with `branch` set, such
+        as the pass and fail exits of a vote or approval state. Only the vote decides
+        those through `close_vote`, never a manual action. Actor gates in the guard refine
+        which of the remaining transitions stay visible. `deadline_passed=None` means
+        derive the value from the database.
+        """
         app = await self._load_app(application_id)
         if app.current_state_id is None:
             return []
@@ -252,15 +258,17 @@ class FlowService:
             if not t.automatic and not t.branch and eval_guard(t.guard, ctx)
         ]
 
-    # --- applicant transitions ---
     _APPLICANT = Principal(sub="applicant", roles=[], permissions=set())
 
     async def available_applicant_transitions(
         self, application_id: UUID
     ) -> list[TransitionOut]:
-        """Transitions the magic-link applicant may fire: manual, guard satisfied in the
-        applicant context, and explicitly opened via ``actorIsApplicant`` (otherwise
-        none — no implicit applicant access)."""
+        """List the transitions the magic-link applicant may fire.
+
+        A transition qualifies when it is manual, when its guard holds in the applicant
+        context, and when `actorIsApplicant` opens it. Nothing else qualifies. There is
+        no implicit applicant access.
+        """
         app = await self._load_app(application_id)
         if app.current_state_id is None:
             return []
@@ -286,9 +294,12 @@ class FlowService:
     async def fire_as_applicant(
         self, application_id: UUID, transition_id: UUID, *, note: str | None = None
     ) -> TransitionResult:
-        """Fire a transition as the applicant — only ``actorIsApplicant``-opened, manual
-        transitions (403 otherwise). Deliberately bypasses the ``application.manage``
-        gate, but only for transitions the admin intentionally opened."""
+        """Fire a transition as the applicant.
+
+        Only a manual transition that `actorIsApplicant` opens may fire. Every other
+        transition gives 403. This path bypasses the `application.manage` gate on
+        purpose, but only for the transitions that the admin opened.
+        """
         transition = await self._load_transition(transition_id)
         if transition.automatic or not guard_requires_applicant(transition.guard):
             raise ForbiddenError("transition is not open to the applicant")
@@ -296,7 +307,6 @@ class FlowService:
             application_id, transition_id, self._APPLICANT, note=note, as_applicant=True
         )
 
-    # --- auto_advance ---
     async def auto_advance(
         self,
         application_id: UUID,
@@ -306,16 +316,20 @@ class FlowService:
     ) -> TransitionResult | None:
         """Fire the first automatic transition whose guard holds.
 
-        Called cyclically by the worker/cron (``manual=False``). Returns the result if a
-        transition fired, else ``None``. Idempotent via the optimistic locking in
-        :meth:`fire`. ``deadline_passed=None`` ⇒ derive from the DB."""
+        The worker or cron calls this in a cycle with `manual=False`. The optimistic
+        locking in `fire` keeps it idempotent. `deadline_passed=None` means derive the
+        value from the database.
+
+        Returns:
+            The result of the fired transition, or `None` when none fired.
+        """
         app = await self._load_app(application_id)
         if app.current_state_id is None:
             return None
-        # Fail-closed: a vote state is decided only by the vote (or a manual abort) —
-        # automatic exits are NEVER fired here even if a legacy flow still contains them;
-        # the graph validator now rejects them on save. Otherwise the application would be
-        # "immediately approved" without any vote.
+        # Fail-closed: only the vote or a manual abort decides a vote state. This code
+        # never fires an automatic exit from a vote state, even when a legacy flow still
+        # holds one. The graph validator rejects such an exit on save. Otherwise the
+        # application would be approved at once without any vote.
         state = await self._load_state(app.current_state_id)
         if state is not None and state.kind == "vote":
             return None
@@ -336,14 +350,14 @@ class FlowService:
                 )
         return None
 
-    # --- branch firing ---
     async def branch_transition(
         self, application_id: UUID, branch: str
     ) -> Transition | None:
-        """Find the current state's outgoing transition with ``branch``.
+        """Find the outgoing transition of the current state with `branch`.
 
-        ``branch`` is ``pass``/``fail`` of a ``vote`` state; ``None`` if the current
-        state has no such branch exit."""
+        `branch` is `pass` or `fail` of a `vote` state. The result is `None` when the
+        current state has no such branch exit.
+        """
         app = await self._load_app(application_id)
         for t in await self._outgoing(app):
             if t.branch == branch:
@@ -358,9 +372,11 @@ class FlowService:
         *,
         note: str | None = None,
     ) -> TransitionResult:
-        """Fire the ``pass``/``fail`` transition of the current ``vote`` state.
+        """Fire the `pass` or `fail` transition of the current `vote` state.
 
-        404 if no matching branch transition exists."""
+        Raises:
+            NotFoundError: No matching branch transition exists (404).
+        """
         t = await self.branch_transition(application_id, branch)
         if t is None:
             raise NotFoundError(
@@ -371,9 +387,9 @@ class FlowService:
         )
 
     async def _cancel_open_votes(self, application_id: UUID) -> None:
-        """Cancel the application's open votes (``open → cancelled``)."""
-        # Local import: ``voting.service`` imports FlowService — a module-level import
-        # here would be a cycle.
+        """Cancel the open votes of the application (`open` becomes `cancelled`)."""
+        # Local import: `voting.service` imports FlowService. A module-level import here
+        # would create a cycle.
         from app.modules.voting.models import Vote
 
         await self.session.execute(
@@ -382,7 +398,6 @@ class FlowService:
             .values(status="cancelled")
         )
 
-    # --- fire ---
     async def fire(
         self,
         application_id: UUID,
@@ -394,10 +409,16 @@ class FlowService:
         manual: bool = True,
         as_applicant: bool = False,
     ) -> TransitionResult:
-        """Fire a transition. 404 (app/transition), 409 (state conflict/guard/race).
+        """Fire a transition.
 
-        ``deadline_passed=None`` ⇒ derive from the DB (manual paths); the deadline worker
-        passes ``True`` explicitly."""
+        `deadline_passed=None` means derive the value from the database, as the manual
+        paths do. The deadline worker passes `True` on its own.
+
+        Raises:
+            NotFoundError: The application or the transition does not exist (404).
+            ConflictError: The state does not match, the guard fails, or another
+                transition won the race (409).
+        """
         app = await self._load_app(application_id)
         transition = await self._load_transition(transition_id)
 
@@ -408,9 +429,9 @@ class FlowService:
                 "Transition is not available from the current state.",
                 code="conflict",
             )
-        # Branch transitions (pass/fail of a vote state) are fired only by the vote
-        # outcome (fire_branch, manual=False) — never directly by a user, else the vote
-        # outcome could be set bypassing the vote.
+        # Only the vote outcome fires a branch transition, the pass or fail exit of a
+        # vote state. It arrives through fire_branch with manual=False. A user must never
+        # fire one directly, because that would set the vote outcome without a vote.
         if manual and transition.branch is not None:
             raise ConflictError(
                 "Branch transitions are fired by the vote outcome, not manually.",
@@ -426,9 +447,8 @@ class FlowService:
         if not eval_guard(transition.guard, ctx):
             raise ConflictError("Transition guard not satisfied.", code="guard_failed")
 
-        # --- transaction: optimistic locking via the `from`-state condition ---
-        # A concurrent transition has already moved `current_state_id` → rowcount 0 →
-        # 409.
+        # Optimistic locking through the `from`-state condition. A concurrent transition
+        # has already moved `current_state_id`, so rowcount is 0 and the caller gets 409.
         from_state_id = transition.from_state_id
         to_state_id = transition.to_state_id
         result = cast(
@@ -461,17 +481,17 @@ class FlowService:
         await self.session.flush()
         status_event_id = event.id
 
-        # Non-branch exit (manual "cancel vote" or an automatic deadline exit from a vote
-        # state): the application's open votes are cancelled in the same transaction —
-        # else the vote would stay open and its close() would find no branch in the new
-        # state (409, open forever). Vote-outcome branches cancel nothing: close() has
-        # already closed the vote there.
+        # A non-branch exit is a manual vote cancel or an automatic deadline exit from a
+        # vote state. It cancels the open votes of the application in the same
+        # transaction. Otherwise a vote would stay open and its close() would find no
+        # branch in the new state, which gives 409 and an open vote forever. A
+        # vote-outcome branch cancels nothing, because close() already closed the vote.
         if transition.branch is None:
             await self._cancel_open_votes(app.id)
 
         # Audit trail: record the status change append-only in the same transaction as
-        # the state change (atomic). Only id references — no PII/raw note (note can be
-        # free text → only presence).
+        # the state change, so both stay atomic. The entry holds id references only, no
+        # PII and no raw note. A note is free text, so the entry keeps only its presence.
         await AuditService(self.session).record(
             actor=principal.sub,
             action=AuditAction.STATUS_CHANGE,
@@ -488,22 +508,21 @@ class FlowService:
         )
         await self.session.commit()
 
-        # Materialize the new state's deadline: if it carries a named deadline policy,
-        # this creates a due deadline that the cron fires.
+        # Materialize the deadline of the new state. If the state carries a named
+        # deadline policy, this creates a due deadline that the cron fires.
         to_state = await self._load_state(to_state_id)
         if to_state is not None:
             await self.session.refresh(app)
             await self.schedule_state_deadline(app, to_state)
 
-        # --- after commit: dispatch worker actions (idempotent, retryable) ---
+        # After the commit: dispatch the worker actions. They are idempotent and
+        # retryable.
         dispatched = build_dispatched_actions(
             transition.actions,
             application_id=app.id,
             transition_id=transition.id,
             status_event_id=status_event_id,
         )
-        # Implicit auto-mails: status update to the applicant + task mail to those who
-        # may act on the new state.
         dispatched += build_implicit_notifications(
             transition.actions,
             application_id=app.id,
@@ -518,7 +537,6 @@ class FlowService:
             dispatchedActions=[a.type for a in dispatched],
         )
 
-    # --- audit-log revert ---
     async def revert_status(
         self,
         application_id: UUID,
@@ -530,22 +548,28 @@ class FlowService:
     ) -> UUID:
         """Undo an audited status change (audit-log revert).
 
-        Moves the application from ``to_state_id`` (the target of the change being undone)
-        back to ``from_state_id`` — only if it still sits exactly in ``to_state_id``
-        (else 409 ``stale_revert``; this also covers an intervening flow-version switch,
-        since migrated applications then sit in a different state row). Writes a reversed
-        :class:`StatusEvent` (without ``transition``) + a ``status_change`` audit entry
-        (itself revertable = redo) and re-materializes the restored state's deadline. Side
-        effects of the original (cancelled votes, fired webhooks/mails) are deliberately
-        not undone — the revert affects only the state itself."""
+        The method moves the application from `to_state_id`, the target of the change
+        that you undo, back to `from_state_id`. It does so only while the application
+        still sits exactly in `to_state_id`. Otherwise it raises 409 `stale_revert`. That
+        check also covers a flow-version switch in between, because a migrated
+        application then sits in a different state row. The method writes a reversed
+        `StatusEvent` without a transition and a `status_change` audit entry. That entry
+        is itself revertable, which gives a redo. The method also re-materializes the
+        deadline of the restored state. It deliberately undoes no side effect of the
+        original change, such as cancelled votes or fired webhooks and mails. The revert
+        touches only the state.
+
+        Returns:
+            The id of the new status event.
+        """
         app = await self._load_app(application_id)
         if app.current_state_id != to_state_id:
             raise ConflictError(
                 "A newer status change exists; revert that first.",
                 code="stale_revert",
             )
-        # Optimistic locking as in :meth:`fire` — a concurrent transition has already
-        # moved the state → rowcount 0 → 409.
+        # Optimistic locking as in `fire`. A concurrent transition has already moved the
+        # state, so rowcount is 0 and the caller gets 409.
         result = cast(
             "CursorResult[Any]",
             await self.session.execute(
@@ -574,7 +598,7 @@ class FlowService:
         self.session.add(event)
         await self.session.flush()
         status_event_id = event.id
-        # Audit as a (reversed) status_change → the revert is itself revertable (redo).
+        # Audit as a reversed status_change, so the revert is itself revertable (redo).
         await AuditService(self.session).record(
             actor=actor,
             action=AuditAction.STATUS_CHANGE,
@@ -592,21 +616,22 @@ class FlowService:
             },
         )
         await self.session.commit()
-        # Re-materialize the restored state's deadline, like fire().
+        # Re-materialize the deadline of the restored state, as fire() does.
         restored_state = await self._load_state(from_state_id)
         if restored_state is not None:
             await self.session.refresh(app)
             await self.schedule_state_deadline(app, restored_state)
         return status_event_id
 
-    # --- force status (privileged override) ---
     async def list_states(self, application_id: UUID) -> list[StateOut]:
-        """All states of the application's OWN flow version (for the force-status picker).
+        """List all states of the own flow version of the application.
 
-        Scoped to ``app.flow_version_id`` — not the active global flow — so every
-        returned ``id`` is a valid target for :meth:`force_status` (a state row in the
-        same graph the application currently lives in; running applications may sit on an
-        older flow version). Ordered initial-first, then by key for a stable list."""
+        The force-status picker uses this list. The query is scoped to
+        `app.flow_version_id` and not to the active global flow. Every returned `id` is
+        therefore a valid target for `force_status`. It is a state row in the same graph
+        that the application lives in. A running application may sit on an older flow
+        version. The order is initial-first, then by key, which keeps the list stable.
+        """
         app = await self._load_app(application_id)
         states = (
             (
@@ -639,19 +664,23 @@ class FlowService:
         *,
         note: str,
     ) -> TransitionResult:
-        """Force an application directly into ``target_state_id``, bypassing the flow.
+        """Force an application directly into `target_state_id` and bypass the flow.
 
-        The ``application.force_status`` override: no transition, no guard, no
-        ``from_state`` adjacency check. Mirrors the direct state flip of
-        :meth:`revert_status` — optimistic-locked ``UPDATE``, a transition-less
-        :class:`StatusEvent`, a ``status_change`` audit entry marked ``forced`` (itself
-        revertable), open-vote cancellation (so a vote state left by force does not hang
-        open) and deadline re-materialization. Deliberately fires NO applicant/task
-        notifications or webhooks — a manual override is silent.
+        This is the `application.force_status` override. It uses no transition, no guard
+        and no `from_state` adjacency check. It mirrors the direct state flip of
+        `revert_status`: an optimistic-locked `UPDATE`, a `StatusEvent` without a
+        transition, and a `status_change` audit entry marked `forced`. That audit entry
+        is itself revertable. The method also cancels the open votes, so a vote state
+        that you leave by force does not hang open. It then re-materializes the deadline.
+        It deliberately sends no applicant notification and no task notification, and it
+        fires no webhook. A manual override stays silent.
 
-        404 if the target state does not belong to the application's flow; 409 if the
-        application has no current state, is already in the target state, or a concurrent
-        change moved it first."""
+        Raises:
+            NotFoundError: The target state does not belong to the flow of the
+                application (404).
+            ConflictError: The application has no current state, already sits in the
+                target state, or a concurrent change moved it first (409).
+        """
         app = await self._load_app(application_id)
         from_state_id = app.current_state_id
         if from_state_id is None:
@@ -667,8 +696,8 @@ class FlowService:
             raise ConflictError(
                 "Application is already in the target state.", code="conflict"
             )
-        # Optimistic locking as in fire()/revert_status — a concurrent transition has
-        # already moved the state → rowcount 0 → 409.
+        # Optimistic locking as in fire() and revert_status. A concurrent transition has
+        # already moved the state, so rowcount is 0 and the caller gets 409.
         result = cast(
             "CursorResult[Any]",
             await self.session.execute(
@@ -696,11 +725,13 @@ class FlowService:
         self.session.add(event)
         await self.session.flush()
         status_event_id = event.id
-        # Leaving a (possibly vote) state by force: cancel open votes so none hangs open
-        # (its close() would otherwise find no branch in the new state — open forever).
+        # The force leaves a state that may be a vote state. Cancel the open votes so
+        # that none hangs open. Its close() would otherwise find no branch in the new
+        # state and the vote would stay open forever.
         await self._cancel_open_votes(app.id)
-        # Audit as a forced status_change (id-refs only, no PII/raw note). Carries both
-        # from/to state ids, so it is revertable from the audit log (undo a mistake).
+        # Audit as a forced status_change with id references only, no PII and no raw
+        # note. The entry carries both state ids, so the audit log can revert it and undo
+        # a mistake.
         await AuditService(self.session).record(
             actor=principal.sub,
             action=AuditAction.STATUS_CHANGE,
@@ -717,7 +748,7 @@ class FlowService:
             },
         )
         await self.session.commit()
-        # Materialize the new state's deadline, like fire().
+        # Materialize the deadline of the new state, as fire() does.
         to_state = await self._load_state(target_state_id)
         if to_state is not None:
             await self.session.refresh(app)

@@ -1,7 +1,8 @@
 #!/bin/sh
-# Seed des Build-Zeit-Caches (tectonic-Bundle + LaTeX-Pakete, s. warmup.py) in das
-# gemountete /cache-Volume kopieren — nur fehlende Einträge (-n), Bestand gewinnt.
-# Damit rendert der Container auch OHNE Internet (Egress-Sperre in Produktion).
+# Copy the seed of the build-time cache into the mounted /cache volume. The seed holds
+# the tectonic bundle and the LaTeX packages, see warmup.py. Copy missing entries only
+# (-n), so an existing entry wins. The container then renders without internet access.
+# Production needs that, because it blocks egress.
 set -eu
 
 if [ -d /cache-seed ]; then

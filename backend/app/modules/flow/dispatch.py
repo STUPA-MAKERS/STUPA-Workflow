@@ -1,9 +1,9 @@
 """Action dispatch for the flow engine.
 
-Firing a transition produces worker actions that are dispatched only after the
-transaction commits — idempotent and retryable. ``setEditLock`` is not a worker
-action: the edit lock derives from the target state's ``edit_allowed`` and is
-handled inline by the engine.
+A fired transition produces worker actions. The engine dispatches them only after the
+transaction commits, so they stay idempotent and retryable. `setEditLock` is not a
+worker action. The edit lock comes from `edit_allowed` of the target state, and the
+engine handles it inline.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from uuid import UUID
 
 logger = logging.getLogger("app.flow.dispatch")
 
-# Action types handed to the worker; everything else is handled inline.
+# Action types for the worker. The engine handles every other type inline.
 WORKER_ACTION_TYPES: frozenset[str] = frozenset(
     {
         "notify",
@@ -31,8 +31,9 @@ WORKER_ACTION_TYPES: frozenset[str] = frozenset(
 class DispatchedAction:
     """A flow action to hand to the worker.
 
-    ``idempotency_key`` is stable over (application, status event, position,
-    type): a retried worker run with the same key must not double-fire."""
+    `idempotency_key` is stable over the application, the status event, the position
+    and the type. A retried worker run with the same key must not fire twice.
+    """
 
     type: str
     application_id: UUID
@@ -49,15 +50,16 @@ def build_dispatched_actions(
     transition_id: UUID,
     status_event_id: UUID,
 ) -> list[DispatchedAction]:
-    """Map ``transition.actions`` (JSONB) to worker actions, skipping ``setEditLock``.
+    """Map `transition.actions` (JSONB) to worker actions and skip `setEditLock`.
 
-    Unknown types are already rejected at save time (``validate_action``); the
-    strict worker whitelist here keeps inline-handled types from being enqueued."""
+    `validate_action` already rejects unknown types at save time. The strict worker
+    whitelist here keeps the inline-handled types out of the queue.
+    """
     dispatched: list[DispatchedAction] = []
     for index, action in enumerate(actions):
         action_type = action.get("type")
         if action_type not in WORKER_ACTION_TYPES:
-            continue  # setEditLock etc. are inline/no-op, not for the worker.
+            continue
         params = {k: v for k, v in action.items() if k != "type"}
         dispatched.append(
             DispatchedAction(
@@ -79,11 +81,13 @@ def build_implicit_notifications(
     transition_id: UUID,
     status_event_id: UUID,
 ) -> list[DispatchedAction]:
-    """Build implicit auto-mails per status change, on top of configured actions.
+    """Build the implicit auto-mails for a status change, on top of the configured actions.
 
-    ``notify`` to the applicant (skipped if the transition already carries an
-    explicit applicant notify — no double send) plus ``taskNotify`` to everyone
-    who can act on the new state (recipients resolved at send time)."""
+    The first mail is a `notify` to the applicant. It is skipped when the transition
+    already carries an explicit applicant notify, so nobody gets the mail twice. The
+    second mail is a `taskNotify` to everyone who can act on the new state. The
+    recipients of that mail are resolved at send time.
+    """
     applicant_covered = any(
         action.get("type") == "notify"
         and any(
@@ -127,7 +131,7 @@ class ActionDispatcher(Protocol):
 
 
 class NullActionDispatcher:
-    """Default dispatcher: logs actions (without params/secrets) and drops them."""
+    """Default dispatcher: it logs each action without params or secrets, then drops it."""
 
     async def dispatch(self, actions: Sequence[DispatchedAction]) -> None:
         for action in actions:

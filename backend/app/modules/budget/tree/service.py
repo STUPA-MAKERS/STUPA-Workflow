@@ -1,19 +1,19 @@
 """Public facade of the budget tree service.
 
-:class:`BudgetTreeService` combines the concerns — the router (``tree_router``)
-binds to exactly this class. The implementation lives in the ops classes:
+`BudgetTreeService` combines the concerns. The router (`tree_router`) binds to
+exactly this class. The implementation lives in the ops classes:
 
-* :class:`~.nodes.NodeOps` — cost-centre CRUD (via :class:`~.revert.RevertOps`)
-* :class:`~.fiscal_years.FiscalYearOps` — fiscal years on top-level budgets
-* :class:`~.allocations.AllocationOps` — top-down allocations (via ``RevertOps``)
-* :class:`~.applications.AssignmentOps` — application ↔ budget assignment
-* :class:`~.expenses.ExpenseOps` — bookings (via :class:`~.subbookings.SubBookingOps`)
-* :class:`~.subbookings.SubBookingOps` — sub-bookings + statement-file import
-* :class:`~.accounts.AccountOps` — bank accounts + FinTS connection
-* :class:`~.invoices.InvoiceOps` — invoices + ZUGFeRD import
-* :class:`~.transfers.TransferOps` — cost-centre transfers
-* :class:`~.revert.RevertOps` — audit-log revert of budget mutations
-* :class:`~.view.TreeViewOps` — scoped tree view with roll-up
+`nodes.NodeOps` — cost-center CRUD (through `revert.RevertOps`).
+`fiscal_years.FiscalYearOps` — fiscal years on top-level budgets.
+`allocations.AllocationOps` — top-down allocations (through `RevertOps`).
+`applications.AssignmentOps` — application to budget assignment.
+`expenses.ExpenseOps` — bookings (through `subbookings.SubBookingOps`).
+`subbookings.SubBookingOps` — sub-bookings and statement-file import.
+`accounts.AccountOps` — bank accounts and the FinTS connection.
+`invoices.InvoiceOps` — invoices and ZUGFeRD import.
+`transfers.TransferOps` — cost-center transfers.
+`revert.RevertOps` — audit-log revert of budget mutations.
+`view.TreeViewOps` — scoped tree view with roll-up.
 """
 
 from __future__ import annotations
@@ -38,4 +38,4 @@ class BudgetTreeService(
     RevertOps,
     TreeViewOps,
 ):
-    """DB-backed cost-centre tree operations (bound to one session)."""
+    """Cost-center tree operations on the database, bound to one session."""

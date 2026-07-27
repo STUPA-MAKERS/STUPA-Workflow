@@ -24,7 +24,7 @@
 
     <ng-template appRowDetail let-r>
       <div class="flex flex-col gap-4 p-5">
-        <!-- Rename (display name): the key stays immutable. -->
+        <!-- Rename the display name. The key stays immutable. -->
         <div class="roles__nameEdit">
           <app-input class="roles__lbl--key" [label]="'admin.roles.roleKey' | t" [ngModel]="$any(r).key" [disabled]="true" [name]="$any(r).id + '-key'" />
           <app-input [label]="'admin.common.labelDe' | t" [ngModel]="nameDraft($any(r)).de" (ngModelChange)="patchName($any(r), 'de', $event)" [name]="$any(r).id + '-nde'" />
@@ -59,7 +59,6 @@
   </app-data-table>
 </section>
 
-<!-- Confirm delete -->
 <app-dialog [open]="!!confirmRole()" [title]="'admin.roles.deleteRole' | t" [closeLabel]="'admin.gremien.cancel' | t" (closed)="confirmRole.set(null)">
   @if (confirmRole(); as r) {
     <p>{{ 'admin.roles.deleteConfirm' | t: { role: roleLabel(r) } }}</p>
@@ -70,7 +69,6 @@
   </div>
 </app-dialog>
 
-<!-- Create global role (dialog) -->
 <app-dialog [open]="addOpen()" [title]="'admin.roles.addGlobalRole' | t" [closeLabel]="'admin.gremien.cancel' | t" (closed)="addOpen.set(false)">
   <div class="flex flex-col gap-3">
     <app-input [label]="'admin.roles.roleKey' | t" [ngModel]="draft().key" (ngModelChange)="patchDraft('key', $event)" name="roleKey" placeholder="z. B. referent" />

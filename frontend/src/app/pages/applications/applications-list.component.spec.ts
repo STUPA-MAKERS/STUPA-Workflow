@@ -69,7 +69,6 @@ async function setup(opts: { perms?: string[]; flushBudgets?: boolean } = {}) {
   const http = view.fixture.debugElement.injector.get(HttpTestingController);
   const router = view.fixture.debugElement.injector.get(Router);
   const cmp = view.fixture.componentInstance;
-  // The cost-centre tree (left filter) is eagerly loaded in the constructor.
   if (opts.flushBudgets !== false) flushBudgets(http);
   return { ...view, http, router, cmp };
 }
@@ -78,7 +77,7 @@ function flushTypes(http: HttpTestingController) {
   http.expectOne('/api/application-types').flush(TYPES);
 }
 
-/** Cost-centre tree (left filter picker) — eagerly loaded in the constructor. */
+/** The cost center tree (left filter picker) loads eagerly in the constructor. */
 function flushBudgets(http: HttpTestingController) {
   for (const req of http.match((r) => r.url === '/api/budgets')) req.flush([]);
 }
@@ -93,13 +92,12 @@ describe('ApplicationsListComponent', () => {
     detectChanges();
 
     expect(screen.getByRole('heading', { name: 'Anträge', level: 1 })).toBeInTheDocument();
-    // state appears both as the row badge and as a real status filter option
+    // The state appears both as the row badge and as a status filter option.
     const badge = screen.getAllByText('Eingereicht').find((el) => el.tagName !== 'OPTION');
     expect(badge).toBeTruthy();
     expect(screen.getByText(/250/)).toBeInTheDocument();
-    // type name shows as a plain cell (and in the filter <option>)
+    // The type name shows as a plain cell and in the filter option.
     expect(screen.getAllByText('Finanzantrag').length).toBeGreaterThan(0);
-    // the row link now carries the application title and points at the detail route
     const link = screen.getByRole('link', { name: /Mein Antrag/ });
     expect(link).toHaveAttribute('href', '/applications/app-1');
     http.verify();
@@ -113,8 +111,8 @@ describe('ApplicationsListComponent', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Filter' }));
     flushBudgets(http);
 
-    // The status filter is a dropdown (not free text); option label = state name,
-    // option value = the backend state UUID (sent filter value unchanged).
+    // The status filter is a dropdown, not free text. The option label is the state
+    // name. The option value is the backend state UUID, which the filter sends unchanged.
     const option = screen.getByRole('option', { name: 'Eingereicht' }) as HTMLOptionElement;
     expect(option.value).toBe('s1');
     http.verify();
@@ -165,7 +163,7 @@ describe('ApplicationsListComponent', () => {
   it('requests the first page and shows the count + "load more" when more exist', async () => {
     const { http, detectChanges } = await setup();
     flushTypes(http);
-    // 50 total, only 1 loaded so far → infinite-scroll fallback button visible.
+    // 50 in total and only 1 loaded so far, so the infinite-scroll fallback button shows.
     const req = http.expectOne((r) => r.url === '/api/applications');
     expect(req.request.params.get('limit')).toBe('20');
     expect(req.request.params.get('offset')).toBe('0');
@@ -184,7 +182,7 @@ describe('ApplicationsListComponent', () => {
     detectChanges();
 
     await userEvent.click(screen.getByRole('button', { name: 'Mehr laden' }));
-    // Next offset = number of results loaded so far (here 1), filters preserved.
+    // The next offset is the number of results loaded so far (1 here). Filters stay.
     const more = http.expectOne((r) => r.url === '/api/applications');
     expect(more.request.params.get('offset')).toBe('1');
     more.flush(listPage([ITEM2], 50));
@@ -263,7 +261,6 @@ describe('ApplicationsListComponent', () => {
       .expectOne((r) => r.url === '/api/applications')
       .flush(listPage([{ ...ITEM, amount: null }]));
     detectChanges();
-    // amount cell falls back to the "not provided" dash
     expect(screen.getAllByText('—').length).toBeGreaterThan(0);
     http.verify();
   });
@@ -271,7 +268,6 @@ describe('ApplicationsListComponent', () => {
   it('maps every nullable list field to its fallback in the table rows', async () => {
     const { http, cmp } = await setup();
     flushTypes(http);
-    // an item missing title/state/amount/currency/createdAt entirely
     http.expectOne((r) => r.url === '/api/applications').flush(
       listPage([
         {
@@ -285,7 +281,7 @@ describe('ApplicationsListComponent', () => {
       ]),
     );
     const [row] = cmp.tableRows();
-    // titleOf falls back to the i18n "Ohne Titel"
+    // titleOf uses the untitled i18n string as the fallback.
     expect(row.title).toBe('Ohne Titel');
     expect(row.stateLabel).toBeNull();
     expect(row.stateColor).toBeNull();
@@ -299,7 +295,7 @@ describe('ApplicationsListComponent', () => {
     const { http, cmp } = await setup();
     flushTypes(http);
     http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
-    // one real value, one whitespace-only and one null → only the real value counts
+    // One real value, one whitespace-only and one null. Only the real value counts.
     cmp.q.set('beamer');
     cmp.typeId.set('   ');
     cmp.state.set(null as never);
@@ -311,7 +307,7 @@ describe('ApplicationsListComponent', () => {
     const { http, cmp } = await setup();
     flushTypes(http);
     const stateB: StateOutWire = { ...OPEN_STATE, id: 's2', label: { de: 'Genehmigt', en: 'Approved' } };
-    // first page: one with state s1, one without any state at all (state branch skipped)
+    // First page: one item with state s1 and one with no state, which skips the state branch.
     http.expectOne((r) => r.url === '/api/applications').flush(
       listPage([ITEM, { ...ITEM2, state: undefined as never }], 50),
     );
@@ -319,7 +315,7 @@ describe('ApplicationsListComponent', () => {
 
     cmp.loadMore();
     const more = http.expectOne((r) => r.url === '/api/applications');
-    // re-seeing s1 must NOT duplicate; the new s2 is appended (changed=true branch)
+    // A second sighting of s1 must not duplicate. The new s2 appends (changed=true branch).
     more.flush(listPage([{ ...ITEM, id: 'app-3', state: stateB }], 50));
     expect(cmp.stateOptions().map((o) => o.value)).toEqual(['s1', 's2']);
     http.verify();
@@ -359,7 +355,7 @@ describe('ApplicationsListComponent', () => {
       detectChanges();
       expect(cmp.canExport()).toBe(true);
 
-      // The export reads the live query params snapshot — populate them first.
+      // The export reads the live query param snapshot, so fill the params first.
       await router.navigate([], {
         queryParams: {
           q: 'beamer',
@@ -376,7 +372,7 @@ describe('ApplicationsListComponent', () => {
           order: 'asc',
         },
       });
-      // The queryParam change reloads the list — flush that reload request.
+      // The query param change reloads the list. Flush that reload request.
       http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
 
       cmp.onExport();
@@ -413,7 +409,6 @@ describe('ApplicationsListComponent', () => {
 
       cmp.onExport();
       const req = http.expectOne((r) => r.url === '/api/applications/export.xlsx');
-      // neither the invalid sort nor order made it into the query
       expect(req.request.params.get('sort')).toBeNull();
       expect(req.request.params.get('order')).toBeNull();
       req.flush(new Blob(['x']));
@@ -449,16 +444,14 @@ describe('ApplicationsListComponent', () => {
 
   it('falls back to empty lists when the types and budget-tree requests fail', async () => {
     const { http, cmp } = await setup({ flushBudgets: false });
-    // application-types error → types stays []
     http.expectOne('/api/application-types').flush(null, { status: 500, statusText: 'x' });
-    // budget tree error → budgetTree stays []
     for (const req of http.match((r) => r.url === '/api/budgets')) {
       req.flush(null, { status: 500, statusText: 'x' });
     }
     http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
     expect(cmp.types()).toEqual([]);
     expect(cmp.budgetTree()).toEqual([]);
-    // typeName falls back to the raw id when the type is unknown
+    // typeName falls back to the raw id when the type is unknown.
     expect(cmp.typeName('t1' as never)).toBe('t1');
     http.verify();
   });
@@ -476,7 +469,6 @@ describe('ApplicationsListComponent', () => {
     http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
 
     const pruned = cmp.budgetTree();
-    // hidden top-level node removed; visible kept with hidden child removed
     expect(pruned.map((n) => n.id)).toEqual(['visible']);
     expect(pruned[0].children.map((n) => n.id)).toEqual(['visibleChild']);
     http.verify();
@@ -491,7 +483,7 @@ describe('ApplicationsListComponent', () => {
       const navigate = jest.spyOn(router, 'navigate').mockResolvedValue(true);
 
       cmp.onSearch('bea');
-      // a second keystroke before the timer fires must reset the debounce
+      // A second keystroke before the timer fires must reset the debounce.
       cmp.onSearch('beamer');
       expect(navigate).not.toHaveBeenCalled();
       jest.advanceTimersByTime(400);
@@ -514,7 +506,7 @@ describe('ApplicationsListComponent', () => {
       const navigate = jest.spyOn(router, 'navigate').mockResolvedValue(true);
 
       cmp.onSearch('beamer');
-      // navigating away inside the 400ms window must not fire a stray navigate
+      // A destroy inside the 400 ms window must not fire a stray navigate.
       fixture.destroy();
       jest.advanceTimersByTime(400);
       expect(navigate).not.toHaveBeenCalled();
@@ -532,7 +524,7 @@ describe('ApplicationsListComponent', () => {
       const navigate = jest.spyOn(router, 'navigate').mockResolvedValue(true);
       cmp.onSearch('   ');
       jest.advanceTimersByTime(400);
-      // blank search → q:null (the `|| null` branch)
+      // A blank search gives q:null (the `|| null` branch).
       expect(navigate).toHaveBeenCalledWith(
         [],
         expect.objectContaining({ queryParams: { q: null, offset: null } }),
@@ -556,7 +548,7 @@ describe('ApplicationsListComponent', () => {
     );
 
     cmp.selectBudgetNode('');
-    // empty id → budget:null (the `id || null` branch)
+    // An empty id gives budget:null (the `id || null` branch).
     expect(navigate).toHaveBeenLastCalledWith(
       [],
       expect.objectContaining({ queryParams: { budget: null, offset: null } }),
@@ -578,19 +570,17 @@ describe('ApplicationsListComponent', () => {
   it('ignores loadMore while loading, while already loading more, or when nothing is left', async () => {
     const { http, cmp, detectChanges } = await setup();
     flushTypes(http);
-    // exactly all items loaded → hasMore() is false
+    // Every item is loaded, so hasMore() is false.
     http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM], 1));
     detectChanges();
     cmp.loadMore();
     http.expectNone((r) => r.url === '/api/applications');
 
-    // simulate the initial-load guard
     cmp.loading.set(true);
     cmp.loadMore();
     http.expectNone((r) => r.url === '/api/applications');
     cmp.loading.set(false);
 
-    // simulate the already-loading-more guard
     cmp.loadingMore.set(true);
     cmp.loadMore();
     http.expectNone((r) => r.url === '/api/applications');
@@ -600,19 +590,18 @@ describe('ApplicationsListComponent', () => {
   it('discards an out-of-order page from a superseded filter (fetchSeq guard)', async () => {
     const { http, cmp, router } = await setup();
     flushTypes(http);
-    // first (initial) fetch — keep its request pending
+    // Keep the request of the first (initial) fetch pending.
     const first = http.expectOne((r) => r.url === '/api/applications');
 
-    // a real filter change triggers a reload, bumping fetchSeq and issuing a new request
+    // A real filter change reloads, raises fetchSeq and sends a new request.
     await router.navigate([], { queryParams: { q: 'beamer' } });
     const second = http.expectOne((r) => r.url === '/api/applications');
 
-    // the stale first response arrives late — it must be ignored entirely
+    // The stale first response arrives late. The component must ignore it.
     first.flush(listPage([ITEM], 99));
     expect(cmp.items()).toEqual([]);
     expect(cmp.total()).toBe(0);
 
-    // the current response wins
     second.flush(listPage([ITEM2], 1));
     expect(cmp.items().map((i) => i.id)).toEqual(['app-2']);
     expect(cmp.total()).toBe(1);
@@ -626,7 +615,7 @@ describe('ApplicationsListComponent', () => {
     await router.navigate([], { queryParams: { q: 'beamer' } });
     const second = http.expectOne((r) => r.url === '/api/applications');
 
-    // stale error must not flip the error flag
+    // A stale error must not flip the error flag.
     first.flush(null, { status: 500, statusText: 'late' });
     expect(cmp.error()).toBe(false);
 
@@ -672,8 +661,8 @@ describe('ApplicationsListComponent', () => {
     expect(p.get('sort')).toBe('amount');
     expect(p.get('order')).toBe('asc');
     req.flush(listPage([ITEM]));
-    // activeFilterCount counts q/type/state/amountMin/amountMax/createdFrom/createdTo
-    // (budget/gremium/topf are NOT part of the indicator) → 7 active here
+    // activeFilterCount counts q, type, state, amountMin, amountMax, createdFrom and
+    // createdTo. budget, gremium and topf are not part of the indicator, so 7 count here.
     expect(cmp.activeFilterCount()).toBe(7);
     http.verify();
   });
@@ -697,13 +686,13 @@ describe('ApplicationsListComponent', () => {
     try {
       const { http, cmp, detectChanges } = await setup();
       flushTypes(http);
-      // more pages remain → the sentinel (and observer) appear
+      // More pages remain, so the sentinel and the observer appear.
       http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM], 50));
       detectChanges();
       expect(observed.length).toBe(1);
 
       const loadMore = jest.spyOn(cmp, 'loadMore');
-      // a non-intersecting entry is ignored; an intersecting one loads more
+      // The observer skips a non-intersecting entry. An intersecting entry loads more.
       trigger?.([{ isIntersecting: false }]);
       expect(loadMore).not.toHaveBeenCalled();
       trigger?.([{ isIntersecting: true }]);

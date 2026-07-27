@@ -1,11 +1,10 @@
-"""AUD-066: gremium cast eligibility must not be satisfiable by a raw OIDC group
-claim that merely equals a gremium UUID string.
+"""AUD-066: a raw OIDC group claim must not satisfy the gremium cast eligibility.
 
-``resolve_principal`` puts both raw OIDC group claims and gremium-membership keys
-into ``Principal.groups``. The cast gate for a gremium-scoped vote now depends on
-the NAMESPACED ``vote:<gremium_id>`` key (``rbac.vote_group_key``) that only a real
-``vote.cast`` Gremium-membership sets — so a hostile/misconfigured IdP emitting a
-UUID-shaped group name can no longer slip into the cast roster.
+A hostile or misconfigured IdP can emit a group name that equals a gremium UUID string.
+`resolve_principal` puts both raw OIDC group claims and gremium membership keys into
+`Principal.groups`. The cast gate of a gremium-scoped vote now needs the namespaced
+`vote:<gremium_id>` key from `rbac.vote_group_key`. Only a real `vote.cast` Gremium
+membership sets that key, so such a claim can no longer reach the cast roster.
 """
 
 from __future__ import annotations
@@ -32,7 +31,7 @@ def test_uuid_eligible_group_requires_namespaced_membership_key() -> None:
 
 
 def test_bare_uuid_oidc_claim_does_not_satisfy_eligibility() -> None:
-    """AUD-066 core: a raw OIDC group claim equal to the gremium UUID is rejected."""
+    """AUD-066 core: the gate rejects a raw OIDC group claim equal to the gremium UUID."""
     gid = uuid.uuid4()
     attacker = Principal(sub="a", permissions={"vote.cast"}, groups={str(gid)})
     assert VotingService._eligible_group_member(attacker, str(gid)) is False

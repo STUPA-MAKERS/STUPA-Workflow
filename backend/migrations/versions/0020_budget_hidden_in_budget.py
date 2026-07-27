@@ -1,8 +1,8 @@
-"""Budget: ``hidden_in_budget`` (#budget-hide).
+"""Budget: `hidden_in_budget` (#budget-hide).
 
-Reine Anzeige-Einstellung: eine so markierte Kostenstelle (inkl. Unterbaum)
-taucht im Budget-Tab nicht auf; Rollups, Verfügbar-Rechnung und Export bleiben
-unverändert. Idempotent (``IF NOT EXISTS``).
+The flag changes the display only. The budget tab hides a marked cost center and
+its whole subtree. Rollups, the available-amount calculation and the export stay
+unchanged. The migration is idempotent (`IF NOT EXISTS`).
 """
 
 from __future__ import annotations

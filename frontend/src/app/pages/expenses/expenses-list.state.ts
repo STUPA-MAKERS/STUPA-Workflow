@@ -14,9 +14,9 @@ import {
 export type ExpenseSortField = 'createdAt' | 'amount' | 'invoiceDate' | 'paymentDate';
 
 /**
- * Bookings list: server-side filters/sort + offset paging, plus the cost-centre
- * tree and account options backing the filters. Plain state module — construct
- * in an injection context (component field initializer).
+ * Bookings list: server-side filters, sort and offset paging, plus the cost-center
+ * tree and the account options behind the filters. This is a plain state module.
+ * Construct it in an injection context, for example a component field initializer.
  */
 export class ExpensesListState {
   private readonly api = inject(BudgetTreeApi);
@@ -34,7 +34,8 @@ export class ExpensesListState {
   readonly hasMore = computed(() => this.items().length < this.total());
   /** Shared in-flight flag for every mutating dialog (create/edit/delete/sub/transfer). */
   readonly saving = signal(false);
-  /** Post-mutation refresh in flight: the list stays visible, only `aria-busy` (#expenses-ux). */
+  /** A refresh after a mutation is in flight. The list stays visible and only `aria-busy`
+   *  changes (#expenses-ux). */
   readonly refreshing = signal(false);
 
   readonly kind = signal<'' | ExpenseKind>('');
@@ -44,10 +45,11 @@ export class ExpensesListState {
   readonly createdFrom = signal('');
   readonly createdTo = signal('');
   readonly budgetId = signal('');
-  /** Account filter; empty = all accounts. */
+  /** Account filter. An empty value means all accounts. */
   readonly accountId = signal('');
-  /** Exact-booking filter (deep link from Konten). No own control — set only via
-   *  the URL, but it counts as an active filter so the reset button clears it. */
+  /** Exact-booking filter for a deep link from the accounts page. Only the URL sets it,
+   *  and no control shows it. It still counts as an active filter, so the reset button
+   *  clears it. */
   readonly expenseId = signal('');
   readonly sortField = signal<ExpenseSortField>('paymentDate');
   readonly sortOrder = signal<'asc' | 'desc'>('desc');
@@ -85,15 +87,15 @@ export class ExpensesListState {
       next: (tree) => this.budgetTree.set(tree),
       error: () => this.budgetTree.set([]),
     });
-    // Bookers may read account options without account.manage; server returns
+    // Bookers may read account options without account.manage. The server returns
     // active accounts only.
     this.api.listAccountOptions().subscribe({
       next: (accs) => this.accounts.set(accs),
       error: () => this.accounts.set([]),
     });
-    // NO initial reload here: the component adopts the URL filters first and then
-    // fires exactly one reload — a second, unfiltered request could otherwise
-    // resolve late and overwrite the filtered list (#expenses-ux2).
+    // Do not reload here. The component adopts the URL filters first, then fires
+    // exactly one reload. A second, unfiltered request can resolve late and overwrite
+    // the filtered list (#expenses-ux2).
   }
 
   setKind(k: '' | ExpenseKind): void {
@@ -153,7 +155,7 @@ export class ExpensesListState {
   }
 
   reload(): void {
-    // New filter state → older in-flight responses are stale from here on.
+    // The filter state changes here, so every older in-flight response is stale.
     this.fetchEpoch++;
     this.nextOffset = 0;
     this.items.set([]);
@@ -186,13 +188,14 @@ export class ExpensesListState {
     };
   }
 
-  /** Monotone request generation: a response whose epoch no longer matches was
-   *  fired for an outdated filter state and must not touch the list (#expenses-ux2). */
+  /** Monotone request generation. A response whose epoch no longer matches belongs to an
+   *  outdated filter state. Such a response must not touch the list (#expenses-ux2). */
   private fetchEpoch = 0;
 
-  /** Post-mutation: refetch the currently-loaded window (offset 0, one request) and
-   *  atomic-replace the list — no clear, no `loading` flip → the table stays mounted and
-   *  scroll position + all infinite-scroll pages survive (#expenses-ux). */
+  /** Refetch the loaded window after a mutation. One request at offset 0 replaces the
+   *  list. The method never clears the list and never flips `loading`. The table stays
+   *  mounted, and the scroll position and all infinite-scroll pages survive
+   *  (#expenses-ux). */
   refresh(): void {
     if (this.refreshing()) return;
     const epoch = this.fetchEpoch;
@@ -203,7 +206,7 @@ export class ExpensesListState {
       .subscribe({
         next: (page) => {
           this.refreshing.set(false);
-          if (epoch !== this.fetchEpoch) return; // a reload ran meanwhile → stale
+          if (epoch !== this.fetchEpoch) return; // a reload ran meanwhile
           this.total.set(page.total);
           this.items.set(page.items);
           this.nextOffset = page.offset + page.items.length;

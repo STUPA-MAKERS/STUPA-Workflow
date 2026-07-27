@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { ReactiveFormsModule } from '@angular/forms';
 import { FieldType, type FieldTypeConfig } from '@ngx-formly/core';
 
-/** Formly-Feldtyp `textarea` — mehrzeiliges Textfeld (Form-Definition `textarea`). */
+/** Formly field type `textarea`: multi-line text field (form definition `textarea`). */
 @Component({
   selector: 'app-formly-textarea',
   standalone: true,

@@ -7,7 +7,6 @@
   gap: var(--space-2);
   margin-bottom: var(--space-4);
 }
-/* --- Multi-select (bulk delete) --- */
 .att__bulkbar {
   display: flex;
   align-items: center;
@@ -24,7 +23,7 @@
 .att__bulkdel {
   margin-left: auto;
 }
-/* --- Drop overlay (style like the invoices page) --- */
+/* Drop overlay, styled like the invoices page. */
 .att__dropOverlay {
   position: absolute;
   inset: 0;
@@ -73,9 +72,8 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* --- Große Datei-Vorschau (Bild/PDF) --- */
-/* Dialogbreite über die lg-Stufe hinaus: fast Vollbild (ui-kit-Override,
-   ::ng-deep wie bei den Button-Overrides üblich). */
+/* The file preview dialog goes wider than the lg step, almost full screen. It
+   overrides the ui-kit with ::ng-deep, as the button overrides do. */
 .att__previewDlg ::ng-deep .dialog {
   max-width: min(80rem, 96vw);
 }

@@ -1,26 +1,26 @@
-"""baseline: extensions + full schema (create_all) + raw DDL (T-06, squashed)
+"""Baseline: extensions, the full schema through create_all, and raw DDL (T-06, squashed).
 
 Revision ID: 0001_baseline
 Revises:
 Create Date: 2026-06-10 00:00:01
 
-Pre-Alpha-Squash (#initialdata): die zuvor ~48 inkrementellen Revisionen sind zu
-**zwei** Migrationen verdichtet — diesem Schema-Baseline und ``0002_seed`` (Daten).
-Es gibt keine Bestands-DBs (alles zurückgesetzt), daher ist ein sauberer Neustart
-gefahrlos und beseitigt die kaputte Up/Down-Kette (doppelte Spalten aus
-create_all-dann-ALTER).
+Pre-alpha squash (#initialdata): two migrations replace the ~48 incremental revisions
+that came before. This file holds the schema baseline. `0002_seed` holds the data. No
+installed database is left, because every one of them was reset. A clean restart is
+therefore safe. The squash also removes the broken up and down chain that `create_all`
+plus later ALTER statements produced (duplicate columns).
 
-Single-Source: das **gesamte** Schema entsteht aus ``app.db.Base.metadata`` (via
-``app.models`` befüllt) → Modelle und Migration sind garantiert deckungsgleich.
-Ergänzt wird nur, was ``create_all`` nicht abbildet (security.md §4 / data-model §3):
+Single source: `app.db.Base.metadata` (filled through `app.models`) builds the whole
+schema, so the models and the migration always agree. This file adds only what
+`create_all` cannot express (security.md §4 / data-model §3):
 
-* **Extensions** ``pgcrypto`` (``gen_random_uuid()``) + ``citext`` (case-insensitive
-  E-Mail) — vor ``create_all``, da Spalten-Defaults/Typen sie brauchen.
-* **Audit-Append-only**: ``BEFORE UPDATE/DELETE`` (row) + ``BEFORE TRUNCATE``
-  (statement) ⇒ ``RAISE EXCEPTION``; Least-Privilege-Grant an ``audit_writer``.
-* **Materialized Views** ``mv_budget_usage`` (Topf×Stufe), ``mv_status_distribution``
-  (Gremium×State), ``mv_budget_rollup`` (gebundene Summe je Knoten×HHJ) — je mit
-  Unique-Index für ``REFRESH … CONCURRENTLY`` (Worker).
+* Extensions `pgcrypto` (`gen_random_uuid()`) and `citext` (case-insensitive email).
+  They run before `create_all`, because column defaults and types need them.
+* Audit append-only: the `BEFORE UPDATE/DELETE` (row) and `BEFORE TRUNCATE` (statement)
+  triggers run `RAISE EXCEPTION`. A least-privilege grant goes to `audit_writer`.
+* Materialized views `mv_budget_usage` (pot × stage), `mv_status_distribution`
+  (Gremium × state) and `mv_budget_rollup` (committed sum per node × fiscal year).
+  Each view carries a unique index for `REFRESH … CONCURRENTLY` (worker).
 """
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ from collections.abc import Sequence
 
 from alembic import op
 
-import app.models  # noqa: F401  — befüllt Base.metadata
+import app.models  # noqa: F401  — fills Base.metadata
 from app.db import Base
 
 revision: str = "0001_baseline"
@@ -58,7 +58,7 @@ BEGIN
 END $$;
 """
 
-# Topf × Stufe (flaches budget_pot/budget_entry-Modell, T-17).
+# Pot × stage on the flat budget_pot/budget_entry model (T-17).
 _MV_USAGE = """
 CREATE MATERIALIZED VIEW mv_budget_usage AS
 SELECT be.budget_pot_id AS budget_pot_id,
@@ -82,8 +82,9 @@ GROUP BY a.gremium_id, a.current_state_id
 WITH DATA
 """
 
-# Roll-up der gebundenen Summe: jeder genehmigte Antrag zählt zu seiner Kostenstelle
-# (``b.path_key = leaf.path_key``) und allen Vorfahren (``leaf.path_key LIKE b.path_key||'-%'``).
+# Roll-up of the committed sum. An approved application counts for its own cost center
+# (`b.path_key = leaf.path_key`) and for every ancestor
+# (`leaf.path_key LIKE b.path_key||'-%'`).
 _MV_ROLLUP = """
 CREATE MATERIALIZED VIEW mv_budget_rollup AS
 SELECT b.id              AS budget_id,
@@ -106,21 +107,19 @@ WITH DATA
 
 def upgrade() -> None:
     bind = op.get_bind()
-    # 1. Extensions (vor create_all — Defaults/Typen hängen daran).
+    # The extensions must exist before create_all. Column defaults and types need them.
     op.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto")
     op.execute("CREATE EXTENSION IF NOT EXISTS citext")
-    # btree_gist liefert die uuid-/Gleichheits-Operatorklasse für die GIST-EXCLUDE
-    # auf ``gremium_membership`` (``ex_gremium_membership_no_overlap``, #AUD-029).
-    # ``create_all`` emittiert diese Constraint inline aus dem Modell — auf einer
-    # frischen DB MUSS die Extension also schon vor create_all stehen, sonst bricht
-    # das CREATE TABLE mit „data type uuid has no default operator class for gist".
-    # (Bestands-DBs liefen 0001 ohne diese Constraint; dort legt 0038 sie nach.)
+    # btree_gist gives the uuid equality operator class for the GIST EXCLUDE constraint
+    # on `gremium_membership` (`ex_gremium_membership_no_overlap`, #AUD-029).
+    # `create_all` emits that constraint inline from the model. On a fresh database
+    # the extension MUST therefore exist before create_all. If it does not, CREATE TABLE
+    # fails with "data type uuid has no default operator class for gist".
+    # (An installed database ran 0001 without the constraint. There 0038 adds it later.)
     op.execute("CREATE EXTENSION IF NOT EXISTS btree_gist")
 
-    # 2. Volles Schema aus den Modellen (Single-Source).
     Base.metadata.create_all(bind=bind)
 
-    # 3. Audit-Append-only (Trigger + Grant).
     op.execute(_TRIGGER_FN)
     op.execute(
         "CREATE TRIGGER trg_audit_entry_no_update BEFORE UPDATE ON audit_entry "
@@ -136,7 +135,7 @@ def upgrade() -> None:
     )
     op.execute(_GRANT)
 
-    # 4. Materialized Views + Unique-Indizes (CONCURRENTLY-Voraussetzung).
+    # `REFRESH … CONCURRENTLY` needs a unique index on each materialized view.
     op.execute(_MV_USAGE)
     op.execute(
         "CREATE UNIQUE INDEX uq_mv_budget_usage "
@@ -156,7 +155,8 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     bind = op.get_bind()
-    # MVs zuerst (hängen an den Tabellen), dann das Schema, dann Funktion/Extensions.
+    # Drop the materialized views first, because they depend on the tables. Then drop
+    # the schema, then the function and the extensions.
     op.execute("DROP MATERIALIZED VIEW IF EXISTS mv_budget_rollup")
     op.execute("DROP MATERIALIZED VIEW IF EXISTS mv_status_distribution")
     op.execute("DROP MATERIALIZED VIEW IF EXISTS mv_budget_usage")

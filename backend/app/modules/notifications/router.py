@@ -4,8 +4,8 @@
 * ``PUT /api/notifications/preferences`` — bulk update of own switches.
 * ``GET/PUT /api/admin/notification-settings`` — platform config, P(``admin.notifications``).
 
-The preferences endpoints only require a logged-in principal: everyone manages
-their own settings only.
+The preferences endpoints need a logged-in principal only. Each user manages the own
+settings only.
 """
 
 from __future__ import annotations
@@ -57,7 +57,10 @@ PrincipalDep = Annotated[Principal, Depends(require_principal())]
 async def get_preferences(
     service: ServiceDep, principal: PrincipalDep
 ) -> list[NotificationPreferenceOut]:
-    """Read own switches (full catalogue; no entry means enabled)."""
+    """Read the own notification switches.
+
+    The response holds the full catalogue. A kind without an entry is enabled.
+    """
     prefs = await service.get_preferences(principal.sub)
     return [NotificationPreferenceOut(kind=k, enabled=e) for k, e in prefs]
 
@@ -72,7 +75,10 @@ async def put_preferences(
     service: ServiceDep,
     principal: PrincipalDep,
 ) -> list[NotificationPreferenceOut]:
-    """Set own switches (bulk; only deviations are stored)."""
+    """Set the own notification switches in bulk.
+
+    The service stores only the switches that differ from the default.
+    """
     prefs = await service.set_preferences(
         principal.sub, [(p.kind, p.enabled) for p in payload.preferences]
     )
@@ -96,7 +102,7 @@ def _settings_out(row: NotificationSettings) -> NotificationSettingsOut:
 async def get_notification_settings(
     service: ServiceDep, _principal: NotifAdmin
 ) -> NotificationSettingsOut:
-    """Read platform config (task reminders)."""
+    """Read the platform config (task reminders)."""
     return _settings_out(await service.get_notification_settings())
 
 
@@ -110,7 +116,7 @@ async def put_notification_settings(
     service: ServiceDep,
     principal: NotifAdmin,
 ) -> NotificationSettingsOut:
-    """Set platform config (partial update, audited as CONFIG_CHANGE)."""
+    """Set the platform config (partial update, audited as CONFIG_CHANGE)."""
     row = await service.update_notification_settings(
         actor=principal.sub,
         task_reminder_enabled=payload.task_reminder_enabled,
@@ -120,12 +126,11 @@ async def put_notification_settings(
     return _settings_out(row)
 
 
-# --- Mail templates — P(admin.notifications) ---
 @templates_router.get("", response_model=list[MailTemplateOut], responses=_AUTH_ERRORS)
 async def list_mail_templates(
     service: ServiceDep, _principal: NotifAdmin
 ) -> list[MailTemplateOut]:
-    """All mail templates (i18n subject/body/HTML + placeholders)."""
+    """List all mail templates (i18n subject, body and HTML plus placeholders)."""
     return await service.list_templates()
 
 
@@ -163,7 +168,7 @@ async def update_mail_template(
 async def upsert_mail_template(
     payload: MailTemplateUpsert, service: ServiceDep, _principal: NotifAdmin
 ) -> MailTemplateOut:
-    """Create/update an override by key, including builtin keys."""
+    """Create or update an override by key, including a builtin key."""
     return await service.upsert_template(payload)
 
 
@@ -175,7 +180,7 @@ async def upsert_mail_template(
 async def reset_mail_template(
     key: str, service: ServiceDep, _principal: NotifAdmin
 ) -> MailTemplateOut:
-    """Delete the override, restoring the builtin default."""
+    """Delete the override and restore the builtin default."""
     return await service.reset_template(key)
 
 

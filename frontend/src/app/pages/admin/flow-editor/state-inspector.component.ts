@@ -9,13 +9,13 @@ import {
 } from '@stupa-makers/ui-kit';
 import type { StateDef } from '../admin.models';
 
-/** Row of the guard priority stack (label precomputed by the parent). */
+/** Row of the guard priority stack. The parent computes the label. */
 export interface GuardPriorityRow {
   sig: string;
   label: string;
 }
 
-/** Inspector panel for the selected state: key/labels/flags/kind/config. */
+/** Inspector panel for the selected state. It edits key, labels, flags, kind and config. */
 @Component({
   selector: 'app-state-inspector',
   standalone: true,
@@ -29,7 +29,7 @@ export class StateInspectorComponent {
   readonly kindOptions = input.required<SelectOption[]>();
   readonly gremiumOptions = input.required<SelectOption[]>();
   readonly deadlinePolicyOptions = input.required<SelectOption[]>();
-  /** Guard priority rows; the stack is shown for normal states with ≥2 groups. */
+  /** Guard priority rows. The stack appears for normal states with two or more groups. */
   readonly guardGroups = input.required<GuardPriorityRow[]>();
 
   readonly keyChange = output<string>();

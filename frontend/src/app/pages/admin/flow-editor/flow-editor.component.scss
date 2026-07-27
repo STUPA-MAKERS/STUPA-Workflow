@@ -7,7 +7,6 @@
   font-size: var(--fs-sm);
 }
 
-/* --- canvas ---------------------------------------------------------------- */
 .fe__work {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 18rem;
@@ -35,7 +34,7 @@
   display: block;
   width: 100%;
   height: 100%;
-  /* touch-action: none keeps pen/touch panning from fighting the drag logic. */
+  /* touch-action: none stops pen and touch panning from fighting the drag logic. */
   touch-action: none;
   user-select: none;
   cursor: grab;
@@ -49,8 +48,8 @@
 }
 
 .fe__edge {
-  // --edge-color (inline per transition) overrides the default grey; the
-  // selection rule below still wins (higher specificity).
+  // Each transition sets --edge-color inline and overrides the default gray.
+  // The selection rule below still wins through its higher specificity.
   stroke: var(--edge-color, var(--color-text-muted));
   stroke-width: 2;
   fill: none;
@@ -79,7 +78,7 @@
 }
 
 .fe__arrow-head {
-  // The arrow head inherits the referencing path's stroke (context-stroke).
+  // The arrow head inherits the stroke of the path that references it.
   fill: context-stroke;
 }
 
@@ -112,7 +111,6 @@
   stroke-dasharray: 5 3;
 }
 
-/* --- drill-down breadcrumbs -------------------------------------------------- */
 .fe__crumb {
   padding: 0.15rem 0.45rem;
   font: inherit;
@@ -136,7 +134,6 @@
   background: none;
 }
 
-/* --- group boxes + proxies ---------------------------------------------------- */
 .fe__groupbox {
   fill: var(--color-bg-elevated);
   stroke: var(--color-border-strong);
@@ -239,7 +236,6 @@
   user-select: none;
 }
 
-/* --- inspector panel ------------------------------------------------------ */
 .fe__panel {
   display: flex;
   flex-direction: column;
@@ -265,8 +261,7 @@
   color: var(--color-success);
 }
 
-/* Mobile (≤768px): inspector no longer sticky (stacks below the canvas),
-   canvas a bit flatter for portrait phones. */
+/* A phone in portrait mode needs a short canvas and an inspector that does not stick. */
 @media (max-width: 768px) {
   .fe__panel {
     position: static;

@@ -1,9 +1,10 @@
-"""Contract tests for ``POST /render`` with the render backend mocked.
+"""Contract tests for `POST /render` with the render backend mocked.
 
-Covers the success shape (PDF/TeX bytes + headers), the forwarding contract
-(body, variant, kinds reach :class:`BuildRequest` verbatim), and the error map
-(empty/oversize body, bad enums, library errors) — every detail string scrubbed
-of filesystem paths.
+The tests cover the success shape: PDF or TeX bytes plus the headers. They cover
+the forwarding contract too. The body, the variant and the kinds reach
+`BuildRequest` unchanged. The tests also cover the error map: an empty or
+oversize body, a bad enum and every library error. The service scrubs filesystem
+paths out of each detail string.
 """
 
 from __future__ import annotations
@@ -32,9 +33,6 @@ TOP 1.
 """
 
 
-# --- success ---------------------------------------------------------------
-
-
 def test_render_md_to_pdf_returns_pdf_bytes(
     client: TestClient, render: RenderRecorder
 ) -> None:
@@ -46,7 +44,6 @@ def test_render_md_to_pdf_returns_pdf_bytes(
     assert resp.headers["content-type"] == "application/pdf"
     assert resp.content == b"%PDF-1.5 hello"
     assert resp.headers["x-render-duration-seconds"] == "0.123"
-    # forwarding contract: body verbatim, declared kinds honoured.
     assert render.last.source == b"# Hi\n\nWorld."
     assert render.last.input_kind is InputKind.MARKDOWN
     assert render.last.output_kind is OutputKind.PDF
@@ -68,9 +65,6 @@ def test_warnings_header(client: TestClient, render: RenderRecorder) -> None:
     assert resp.headers["x-warnings"] == "2"
 
 
-# --- defaults: app-generated docs are trusted, PDF out ---------------------
-
-
 def test_defaults_trusted_pdf(client: TestClient, render: RenderRecorder) -> None:
     render.returns(make_result())
     resp = client.post("/render", content=b"# Hi")
@@ -80,14 +74,11 @@ def test_defaults_trusted_pdf(client: TestClient, render: RenderRecorder) -> Non
     assert render.last.trust is TrustLevel.TRUSTED
 
 
-# --- variant -----------------------------------------------------------------
-
-
 def test_variant_defaults_to_none_for_frontmatter_autodetect(
     client: TestClient, render: RenderRecorder
 ) -> None:
-    # No ?variant -> None, so the library auto-detects from frontmatter. The
-    # frontmatter bytes must reach the request untouched.
+    # Without ?variant the wrapper sends None, so the library auto-detects from
+    # the frontmatter. The frontmatter bytes must reach the request unchanged.
     render.returns(make_result())
     resp = client.post("/render", content=PROTOCOL_MD)
     assert resp.status_code == 200
@@ -105,9 +96,6 @@ def test_variant_query_is_forwarded(
         assert render.last.variant == name
 
 
-# --- body limits -------------------------------------------------------------
-
-
 def test_empty_body_400(client: TestClient, render: RenderRecorder) -> None:
     resp = client.post("/render", content=b"")
     assert resp.status_code == 400
@@ -118,11 +106,8 @@ def test_oversize_body_413(
     client: TestClient, render: RenderRecorder, monkeypatch
 ) -> None:
     monkeypatch.setattr(app_module, "_MAX_BODY_BYTES", 8)
-    resp = client.post("/render", content=b"123456789")  # 9 > 8
+    resp = client.post("/render", content=b"123456789")
     assert resp.status_code == 413
-
-
-# --- enum parsing ------------------------------------------------------------
 
 
 def test_bad_trust_level_400(client: TestClient, render: RenderRecorder) -> None:
@@ -134,9 +119,6 @@ def test_bad_trust_level_400(client: TestClient, render: RenderRecorder) -> None
 def test_bad_output_kind_400(client: TestClient, render: RenderRecorder) -> None:
     resp = client.post("/render?output_kind=docx", content=b"# Hi")
     assert resp.status_code == 400
-
-
-# --- error mapping (scrubbed) ------------------------------------------------
 
 
 def test_limit_error_413(client: TestClient, render: RenderRecorder) -> None:

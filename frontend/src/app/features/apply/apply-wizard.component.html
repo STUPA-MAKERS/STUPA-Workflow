@@ -32,7 +32,7 @@
         @if (loadingForm()) {
           <p class="text-muted text-sm" role="status">{{ 'apply.form.loading' | t }}</p>
         }
-        <!-- Konfigurierter Info-Text (#18): /admin/branding, Markdown, je Sprache. -->
+        <!-- Configured info text (#18): set per language as markdown in /admin/branding. -->
         @if (applyInfoHtml()) {
           <div class="wizard__info" [innerHTML]="applyInfoHtml()"></div>
         }

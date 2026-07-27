@@ -16,9 +16,11 @@ import {
 import type { GuardLabelContext } from './flow-label.util';
 
 /**
- * Option catalogues for the flow editor's dropdowns and guard/action labels.
- * Component-provided (not root) so its lifetime matches the editor. Load
- * errors are swallowed — the affected dropdown simply stays empty.
+ * Option catalogs for the dropdowns and the guard and action labels of the flow editor.
+ *
+ * The component provides this service, not the root injector. Its lifetime therefore
+ * matches the editor. The service swallows a load error. The affected dropdown then
+ * stays empty.
  */
 @Injectable()
 export class FlowEditorOptionsService {
@@ -27,7 +29,7 @@ export class FlowEditorOptionsService {
   private readonly budgetApi = inject(BudgetTreeApi);
   private readonly i18n = inject(I18nService);
 
-  /** Gremien for vote-state config + committee guards/actions. */
+  /** Gremien for the vote-state config and for the Gremium guards and actions. */
   readonly gremiumOptions = signal<SelectOption[]>([]);
   /** Global roles for roleIs/applicantRoleIs guards. */
   readonly globalRoleOptions = signal<SelectOption[]>([]);
@@ -35,7 +37,7 @@ export class FlowEditorOptionsService {
   readonly webhookOptions = signal<SelectOption[]>([]);
   /** Named deadline policies a state can reference by key. */
   readonly deadlinePolicyOptions = signal<SelectOption[]>([]);
-  /** Cost-centre names (id → "name (key)") to resolve `budgetIs` guard values. */
+  /** Cost-center names (id maps to "name (key)") that resolve `budgetIs` guard values. */
   readonly budgetNameById = signal<ReadonlyMap<string, string>>(new Map());
 
   constructor() {
@@ -90,7 +92,7 @@ export class FlowEditorOptionsService {
       });
   }
 
-  /** Lookup context for guard labels; reads the option signals at call time. */
+  /** Lookup context for guard labels. It reads the option signals at call time. */
   labelContext(): GuardLabelContext {
     return {
       translate: (key) => this.i18n.translate(key),
@@ -108,8 +110,8 @@ export class FlowEditorOptionsService {
     return kinds.map((k) => ({ value: k, label: this.kindLabel(k) }));
   }
 
-  /** Actor gates (roleIs/isInCommittee) only on MANUAL transitions —
-   *  automatic ones get condition operators only. */
+  /** Actor gates (roleIs/isInCommittee) apply to MANUAL transitions only.
+   *  An automatic transition gets the condition operators only. */
   guardOpOptions(automatic: boolean | undefined): SelectOption[] {
     const ops: readonly string[] = automatic
       ? GUARD_CONDITION_OPERATORS

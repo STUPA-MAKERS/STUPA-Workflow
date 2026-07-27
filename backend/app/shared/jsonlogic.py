@@ -1,15 +1,17 @@
-"""Pure JsonLogic-subset evaluator for form ``visibleIf``/``compute``.
+"""Pure evaluator for the JsonLogic subset behind form `visibleIf` and `compute`.
 
-No ``eval``/``exec``: a declarative tree with whitelisted operators. An unknown
-operator raises ``JsonLogicError`` (never silently ignored) so errors surface at
-save time, not at runtime.
+The module never calls `eval` or `exec`. It walks a declarative tree of whitelisted
+operators. An unknown operator raises `JsonLogicError`. The module never ignores such an
+operator, so an error shows at save time and not at runtime.
 
 Expression forms:
-- Literal (non-dict): returned unchanged (number/string/bool/None/list).
-- Operation: dict with exactly one key = operator, value = argument(s).
+- A literal is any value that is not a dict, such as a number, string, bool, `None` or
+  list. The evaluator returns it unchanged.
+- An operation is a dict with exactly one key. The key is the operator and the value
+  holds the arguments.
 
-The whitelist ``JSONLOGIC_OPERATORS`` derives from the ``_EVALUATORS`` dispatch
-table plus ``var`` — a single source of truth.
+The whitelist `JSONLOGIC_OPERATORS` derives from the `_EVALUATORS` dispatch table plus
+`var`. That keeps a single source of truth.
 """
 
 from __future__ import annotations
@@ -18,8 +20,9 @@ import operator
 from collections.abc import Callable
 from typing import Any
 
-# Max expression nesting depth; guards eval and validation against RecursionError
-# on deeply nested input, far beyond any real visibleIf/compute.
+# Maximum nesting depth of an expression. It protects the evaluator and the validator
+# against a RecursionError on deeply nested input. The limit sits far above any real
+# visibleIf or compute expression.
 _MAX_DEPTH = 64
 
 
@@ -33,7 +36,11 @@ def _as_args(value: Any) -> list[Any]:
 
 
 def _resolve_var(path: Any, ctx: dict[str, Any]) -> Any:
-    """``var``: resolve a dotted path in ``ctx``; ``[path, default]`` or missing -> default."""
+    """Resolve the `var` operator: a dotted path in `ctx`.
+
+    The form `[path, default]` sets the fallback. A path that does not resolve returns
+    that fallback, which is `None` when the caller gives none.
+    """
     default: Any = None
     if isinstance(path, list):
         default = path[1] if len(path) > 1 else None
@@ -60,7 +67,10 @@ def _num(value: Any) -> float:
 
 
 def _arity(op: str, n: int) -> Callable[[Callable[[list[Any]], Any]], Callable[[list[Any]], Any]]:
-    """Decorator enforcing exactly ``n`` operands, else ``JsonLogicError``."""
+    """Build a decorator that requires exactly `n` operands.
+
+    The wrapped function raises `JsonLogicError` for any other operand count.
+    """
 
     def wrap(fn: Callable[[list[Any]], Any]) -> Callable[[list[Any]], Any]:
         def run(args: list[Any]) -> Any:
@@ -74,7 +84,7 @@ def _arity(op: str, n: int) -> Callable[[Callable[[list[Any]], Any]], Callable[[
 
 
 def _compare(op: Callable[[float, float], bool]) -> Callable[[list[Any]], bool]:
-    """Binary numeric comparison over ``_num``-coerced operands."""
+    """Build a binary comparison over two operands that `_num` coerces to numbers."""
 
     def run(args: list[Any]) -> bool:
         if len(args) != 2:
@@ -125,9 +135,9 @@ def _eval_multiply(args: list[Any]) -> float:
     return product
 
 
-# Operator -> pure function over the already-evaluated arguments. ``var`` is not here
-# (it resolves a path). ``and``/``or`` are non-short-circuiting: all operands are
-# evaluated up front.
+# Map an operator to a pure function over the already evaluated arguments. `var` is not
+# here, because it resolves a path. `and` and `or` do not short-circuit. The evaluator
+# evaluates every operand first.
 _EVALUATORS: dict[str, Callable[[list[Any]], Any]] = {
     "==": _arity("==", 2)(lambda a: a[0] == a[1]),
     "!=": _arity("!=", 2)(lambda a: a[0] != a[1]),
@@ -145,13 +155,19 @@ _EVALUATORS: dict[str, Callable[[list[Any]], Any]] = {
     "in": _eval_in,
 }
 
-# Whitelist of allowed operators (eval + validation), derived from the dispatch
-# table plus the ``var`` special case — a single source of truth.
+# The whitelist that both the evaluator and the validator use.
 JSONLOGIC_OPERATORS: frozenset[str] = frozenset(_EVALUATORS) | {"var"}
 
 
 def eval_jsonlogic(expr: Any, ctx: dict[str, Any] | None = None, *, _depth: int = 0) -> Any:
-    """Evaluate ``expr`` against ``ctx``. Pure, side-effect free, no ``eval``."""
+    """Evaluate `expr` against `ctx`.
+
+    The function is pure. It has no side effect and never calls `eval`.
+
+    Raises:
+        JsonLogicError: The expression uses an unknown operator, has a wrong structure,
+            or nests deeper than the limit.
+    """
     ctx = ctx or {}
     if not isinstance(expr, dict):
         return expr
@@ -170,10 +186,13 @@ def eval_jsonlogic(expr: Any, ctx: dict[str, Any] | None = None, *, _depth: int 
 
 
 def validate_jsonlogic(expr: Any, *, _depth: int = 0) -> None:
-    """Statically check that only whitelisted operators occur (save-time gate).
+    """Check that the expression uses only whitelisted operators.
 
-    Raises ``JsonLogicError`` on the first unknown operator, structural error, or
-    exceeding the maximum nesting depth.
+    This is the save-time gate. It stops at the first error.
+
+    Raises:
+        JsonLogicError: The expression uses an unknown operator, has a wrong structure,
+            or nests deeper than the limit.
     """
     if not isinstance(expr, dict):
         return

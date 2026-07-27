@@ -1,4 +1,4 @@
-"""TDD: OIDC/Keycloak (security.md §2) — PKCE, Token-Exchange, id_token-Verify."""
+"""TDD: OIDC and Keycloak (security.md §2) — PKCE, token exchange, id_token verify."""
 
 from __future__ import annotations
 
@@ -44,13 +44,10 @@ def _clear_jwks_cache() -> object:
     oidc._jwks_cache.clear()
 
 
-# --------------------------------------------------------------------------- #
-# Pure helpers
-# --------------------------------------------------------------------------- #
 def test_pkce_pair_and_state_nonce() -> None:
     verifier, challenge = oidc.generate_pkce()
     assert verifier and challenge
-    assert "=" not in challenge  # ohne Padding
+    assert "=" not in challenge  # no padding
     assert oidc.generate_state() != oidc.generate_state()
     assert oidc.generate_nonce() != oidc.generate_nonce()
 
@@ -76,9 +73,6 @@ def test_end_session_url_variants() -> None:
     assert "post_logout_redirect_uri=" in full
 
 
-# --------------------------------------------------------------------------- #
-# Token-Exchange
-# --------------------------------------------------------------------------- #
 async def test_exchange_code_ok() -> None:
     with respx.mock:
         respx.post(TOKEN).mock(
@@ -109,9 +103,7 @@ async def test_exchange_code_unreachable() -> None:
             await oidc.exchange_code(_settings(), code="c", verifier="v")
 
 
-# --------------------------------------------------------------------------- #
-# id_token-Verify (echtes RS256)
-# --------------------------------------------------------------------------- #
+# The id_token verify tests sign with a real RS256 key.
 _KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 _KID = "k1"
 
@@ -143,17 +135,17 @@ async def test_verify_id_token_happy() -> None:
     assert claims.sub == "user-1"
     assert claims.email == "e@x.de"
     assert claims.groups == ["stupa", "asta"]
-    assert claims.email_verified is False  # Claim fehlt → defensiv unverifiziert
+    assert claims.email_verified is False  # the claim is missing, so treat it as unverified
 
 
 async def test_verify_id_token_email_verified_claim() -> None:
-    """`email_verified` zählt nur bei striktem ``True`` (#70-E-Mail-Bootstrap)."""
+    """`email_verified` counts only when it is strictly True (#70 email bootstrap)."""
     with respx.mock:
         respx.get(CERTS).mock(return_value=httpx.Response(200, json={"keys": [_jwk()]}))
         verified = await oidc.verify_id_token(
             _settings(), id_token=_id_token(nonce="nc", email_verified=True), nonce="nc"
         )
-        # truthy-aber-nicht-True (z. B. String "true") zählt NICHT
+        # A truthy value that is not True, such as the string "true", does not count.
         unverified = await oidc.verify_id_token(
             _settings(), id_token=_id_token(nonce="nc", email_verified="true"), nonce="nc"
         )
@@ -167,7 +159,7 @@ async def test_verify_id_token_groups_non_list_falls_back() -> None:
         respx.get(CERTS).mock(return_value=httpx.Response(200, json={"keys": [_jwk()]}))
         claims = await oidc.verify_id_token(_settings(), id_token=token, nonce="nc")
     assert claims.groups == []
-    assert claims.name == "pu"  # Fallback auf preferred_username
+    assert claims.name == "pu"  # falls back to preferred_username
 
 
 async def test_verify_id_token_nonce_mismatch() -> None:
@@ -209,9 +201,6 @@ async def test_verify_id_token_wrong_audience() -> None:
             await oidc.verify_id_token(_settings(), id_token=token, nonce="nc")
 
 
-# --------------------------------------------------------------------------- #
-# JWKS-Cache (TTL + Rotation)
-# --------------------------------------------------------------------------- #
 async def test_jwks_cached_across_calls() -> None:
     token = _id_token(nonce="nc")
     with respx.mock:
@@ -220,7 +209,7 @@ async def test_jwks_cached_across_calls() -> None:
         )
         await oidc.verify_id_token(_settings(), id_token=token, nonce="nc")
         await oidc.verify_id_token(_settings(), id_token=token, nonce="nc")
-        assert route.call_count == 1  # zweiter Verify nutzt den Cache
+        assert route.call_count == 1  # the second verify uses the cache
 
 
 async def test_jwks_refetched_after_ttl(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -234,18 +223,18 @@ async def test_jwks_refetched_after_ttl(monkeypatch: pytest.MonkeyPatch) -> None
         await oidc.verify_id_token(_settings(), id_token=token, nonce="nc")
         clock["t"] = 1000.0 + oidc._JWKS_TTL_SECONDS + 1
         await oidc.verify_id_token(_settings(), id_token=token, nonce="nc")
-        assert route.call_count == 2  # TTL abgelaufen → neu geladen
+        assert route.call_count == 2  # the TTL expired, so the JWKS loads again
 
 
 async def test_jwks_force_refetch_on_unknown_kid() -> None:
-    token = _id_token(nonce="nc")  # kid = k1
+    token = _id_token(nonce="nc")  # the kid is k1
     stale = _jwk()
     stale["kid"] = "rotated-away"
     with respx.mock:
         route = respx.get(CERTS).mock(
             side_effect=[
-                httpx.Response(200, json={"keys": [stale]}),  # Cache: ohne k1
-                httpx.Response(200, json={"keys": [_jwk()]}),  # Force-Reload: mit k1
+                httpx.Response(200, json={"keys": [stale]}),  # cache without k1
+                httpx.Response(200, json={"keys": [_jwk()]}),  # forced reload with k1
             ]
         )
         claims = await oidc.verify_id_token(_settings(), id_token=token, nonce="nc")
@@ -253,12 +242,9 @@ async def test_jwks_force_refetch_on_unknown_kid() -> None:
         assert route.call_count == 2
 
 
-# --------------------------------------------------------------------------- #
-# Algo-Confusion / alg=none (Negativtests)
-# --------------------------------------------------------------------------- #
 async def test_verify_id_token_rejects_hs256() -> None:
-    # HS256-signiert (Algo-Confusion: public key als HMAC-Secret) → kein passender
-    # JWKS-Key (kein kid) → abgelehnt.
+    # HS256 signature, the algorithm-confusion attack that uses the public key as the HMAC
+    # secret. The token carries no kid, so no JWKS key matches and the verify fails.
     now = datetime.now(UTC)
     payload = {
         "sub": "u", "aud": CLIENT_ID, "iss": ISSUER,
@@ -272,8 +258,8 @@ async def test_verify_id_token_rejects_hs256() -> None:
 
 
 async def test_verify_id_token_rejects_alg_none() -> None:
-    # Unsigniertes Token mit alg=none + passendem kid → erreicht decode, das nur
-    # RS256 akzeptiert → InvalidAlgorithm → OidcError.
+    # An unsigned token with alg=none and a matching kid reaches decode. Decode accepts
+    # RS256 only, so it raises InvalidAlgorithm, which the module turns into OidcError.
     def _b64(obj: dict[str, object]) -> str:
         return base64.urlsafe_b64encode(json.dumps(obj).encode()).rstrip(b"=").decode()
 

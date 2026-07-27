@@ -1,4 +1,4 @@
-"""Worker-Tests files (T-13): `scan_attachment` Clean/Infected/Retry — alles gefaked."""
+"""Worker tests for files (T-13): `scan_attachment` clean, infected and retry, all faked."""
 
 from __future__ import annotations
 
@@ -148,7 +148,7 @@ async def test_scan_retry_on_scanner_error() -> None:
 async def test_on_startup_populates_ctx_disabled() -> None:
     ctx: dict[str, Any] = {}
     await on_startup(ctx)
-    # ClamAV/MinIO ohne Config → Scanner/Storage None, aber Keys gesetzt.
+    # Without config for ClamAV and MinIO, scanner and storage are None but keys exist.
     assert "settings" in ctx
     assert ctx["scanner"] is None
     assert ctx["object_storage"] is None
@@ -156,10 +156,10 @@ async def test_on_startup_populates_ctx_disabled() -> None:
 
 
 async def test_worker_combined_on_startup() -> None:
-    """`worker.main._on_startup` verdrahtet Mail- (T-18) + Scan-Deps (T-13)."""
+    """`worker.main._on_startup` wires the mail deps (T-18) and the scan deps (T-13)."""
     from worker.main import _on_startup
 
     ctx: dict[str, Any] = {}
     await _on_startup(ctx)
-    assert "mail_sender" in ctx  # aus mail_on_startup
-    assert "object_storage" in ctx  # aus scan_on_startup
+    assert "mail_sender" in ctx  # from mail_on_startup
+    assert "object_storage" in ctx  # from scan_on_startup

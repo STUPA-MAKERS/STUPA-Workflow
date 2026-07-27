@@ -1,11 +1,12 @@
 """arq worker task: ClamAV scan of an attachment.
 
-``scan_attachment`` loads the object from MinIO, scans it via ClamAV and writes the
-result back via :meth:`FilesService.finalize_scan` (``scanned=true``; on a hit the
-object is deleted + audited/quarantined). Transient storage/scanner errors ->
-``arq.Retry`` with linear backoff up to ``scan_max_tries``, then dead (logged, no
-endless requeue). Idempotency comes from the job key (``scan:<id>``); re-running on an
-already-scanned attachment is harmless (overwrites the same result).
+`scan_attachment` loads the object from MinIO and scans it with ClamAV. It writes the
+result back with `FilesService.finalize_scan`, which sets `scanned=true`. On a hit the
+service deletes the object, records an audit entry and quarantines the attachment. A
+transient storage or scanner error raises `arq.Retry` with a linear backoff up to
+`scan_max_tries`. After the last try the job is dead. The worker logs it and never
+requeues it again. Idempotency comes from the job key `scan:<id>`. A second run on an
+already scanned attachment is harmless, because it writes the same result.
 """
 
 from __future__ import annotations
@@ -35,13 +36,20 @@ async def on_startup(ctx: dict[str, Any]) -> None:
 
 
 def _sessionmaker(ctx: dict[str, Any]) -> async_sessionmaker[AsyncSession]:
-    """DB sessionmaker (injectable in tests via ``ctx['files_sessionmaker']``)."""
+    """Return the DB sessionmaker (tests inject one via `ctx['files_sessionmaker']`)."""
     maker = ctx.get("files_sessionmaker")
     return maker if maker is not None else get_sessionmaker()
 
 
 async def scan_attachment(ctx: dict[str, Any], attachment_id: str) -> str:
-    """Scan an attachment + persist the result. Retry on transient error."""
+    """Scan an attachment and store the result.
+
+    A transient error retries with a linear backoff.
+
+    Returns:
+        `"skipped"` without ClamAV or storage, `"gone"` when the attachment is gone,
+        `"clean"` or `"infected"` after a scan, and `"dead"` after the last failed try.
+    """
     settings: Settings = ctx["settings"]
     scanner = ctx.get("scanner")
     storage = ctx.get("object_storage")
@@ -72,7 +80,15 @@ async def scan_attachment(ctx: dict[str, Any], attachment_id: str) -> str:
 def _retry_or_dead(
     ctx: dict[str, Any], settings: Settings, attachment_id: str, exc: Exception
 ) -> str:
-    """Backoff retry up to ``scan_max_tries``; then dead (no endless requeue)."""
+    """Schedule a backoff retry, or give up after the last try.
+
+    Returns:
+        `"dead"` after `scan_max_tries` failed tries. The worker never requeues the job
+        again.
+
+    Raises:
+        Retry: The task still has tries left.
+    """
     job_try = int(ctx.get("job_try", 1))
     if job_try >= settings.scan_max_tries:
         logger.error(

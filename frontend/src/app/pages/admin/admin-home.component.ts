@@ -10,8 +10,9 @@ interface AdminTile {
   title: TranslationKey;
   desc: TranslationKey;
   icon: IconName;
-  /** Visible if the user has at least ONE of these permissions (ANY-of) —
-   *  mirrors the route-guard right. UX only; the backend stays authoritative. */
+  /** Visible if the user holds at least ONE of these permissions (ANY-of). It mirrors
+   *  the route-guard right in `app.routes.ts`. This is UX only. The backend stays
+   *  authoritative. */
   permissions: string[];
 }
 
@@ -30,8 +31,6 @@ interface AdminTile {
 export class AdminHomeComponent {
   private readonly auth = inject(AuthService);
 
-  // Per-tile permissions = route-guard right from app.routes.ts. ANY-of, so that
-  // multi-gated routes (if ever) resolve correctly.
   protected readonly tiles: AdminTile[] = [
     { link: 'users', title: 'admin.home.users', desc: 'admin.home.usersDesc', icon: 'members', permissions: ['admin.users'] },
     { link: 'roles', title: 'admin.home.roles', desc: 'admin.home.rolesDesc', icon: 'roles', permissions: ['admin.roles'] },

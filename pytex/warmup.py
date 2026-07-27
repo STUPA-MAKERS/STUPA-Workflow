@@ -1,10 +1,11 @@
-"""Build-time cache warm-up: fetch the tectonic bundle + CD-variant packages.
+"""Warm up the build cache: fetch the tectonic bundle and the CD-variant packages.
 
-Runs during ``docker build`` (with network) against ``XDG_CACHE_HOME=/cache-seed``;
-the entrypoint copies the seed into the empty ``/cache`` volume on start. Without
-it, tectonic lazily downloads bundle and LaTeX packages per document at runtime,
-which fails behind the egress block. Rendering one realistic document per protocol
-variant pulls the packages the protocol path needs into the cache.
+This script runs during `docker build` with network access. It writes to
+`XDG_CACHE_HOME=/cache-seed`. The entrypoint copies the seed into the empty `/cache`
+volume at start. Without the seed, tectonic downloads the bundle and the LaTeX packages
+per document at runtime. That download fails behind the egress block. The script renders
+one realistic document per protocol variant. This pulls the packages of the protocol path
+into the cache.
 """
 
 from __future__ import annotations
@@ -37,7 +38,7 @@ Text mit **Fett**, *kursiv* und Umlauten: äöüß.
 | A | 1,00 € |
 """
 
-# The first build may take long (bundle download); use a generous limit.
+# The first build downloads the bundle and can take a long time. Use a large limit.
 _LIMITS = BuildLimits(wall_timeout_s=600.0, cpu_timeout_s=600.0)
 
 

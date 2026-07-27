@@ -1,9 +1,11 @@
-"""AUD-048: the dedup pre-check query must be scoped to the concrete candidate
-idempotency keys (``IN``), not load every key ever issued for the event.
+"""AUD-048: scope the dedup pre-check query to the candidate idempotency keys.
 
-``FakeSession`` ignores the statement, so we use a capturing session that records
-the compiled bound parameters of the ``_existing_keys`` query and assert they equal
-exactly the keys derived from the fetched webhooks.
+The query must bind the concrete candidate keys in an `IN` clause. It must not load
+every key ever issued for the event.
+
+`FakeSession` ignores the statement. These tests use a capturing session that records
+the compiled bound parameters of the `_existing_keys` query. They then assert that
+the parameters equal the keys derived from the fetched webhooks.
 """
 
 from __future__ import annotations
@@ -29,7 +31,7 @@ def _hook() -> Webhook:
 
 
 class _CapturingSession(FakeSession):
-    """Records the bound parameters of every ``scalars`` query."""
+    """Record the bound parameters of every `scalars` query."""
 
     def __init__(self, **kw: Any) -> None:
         super().__init__(**kw)
@@ -37,8 +39,8 @@ class _CapturingSession(FakeSession):
 
     async def scalars(self, stmt: Any) -> FakeResult:
         compiled = stmt.compile()
-        # Only record the dedup pre-check query (the one with the IN clause on
-        # idempotency_key); ignore the unrelated webhook-lookup query.
+        # Record only the dedup pre-check query, the one with the IN clause on
+        # idempotency_key. Ignore the unrelated webhook-lookup query.
         if "idempotency_key IN" in str(compiled):
             keys = [
                 v for k, v in compiled.params.items()

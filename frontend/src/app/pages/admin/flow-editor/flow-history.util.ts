@@ -2,8 +2,8 @@ import { signal } from '@angular/core';
 import type { FlowGraph } from '../admin.models';
 
 /**
- * Structural signature (without layout): two graphs are "equal" when they
- * differ only in node positions — such changes are not an undo step.
+ * Structural signature of a graph, without the layout. Two graphs count as equal when
+ * they differ only in node positions. Such a change is not an undo step.
  */
 export function structuralKey(g: FlowGraph): string {
   return JSON.stringify([g.states, g.transitions]);
@@ -28,7 +28,7 @@ export class FlowHistory {
     this.sync();
   }
 
-  /** Pop the previous snapshot; `current` becomes redoable. */
+  /** Pop the previous snapshot. `current` becomes redoable. */
   undo(current: FlowGraph): FlowGraph | undefined {
     const prev = this.undoStack.pop();
     if (prev === undefined) return undefined;

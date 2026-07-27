@@ -1,4 +1,4 @@
-"""TDD: Auth-Orchestrierung (security.md §1/§2)."""
+"""TDD: auth orchestration (security.md §1 and §2)."""
 
 from __future__ import annotations
 
@@ -34,12 +34,9 @@ def _app(state_id: object | None = None) -> Application:
     return app
 
 
-# --------------------------------------------------------------------------- #
-# request_magic_link
-# --------------------------------------------------------------------------- #
 async def test_request_magic_link_no_match_is_silent() -> None:
     settings = _settings()
-    db = fake_session(result())  # kein Antrag
+    db = fake_session(result())  # no application
     sent: list[tuple[str, str]] = []
     await service.request_magic_link(
         db, settings, email="x@y.de", deliver=lambda e, link: sent.append((e, link))
@@ -50,14 +47,14 @@ async def test_request_magic_link_no_match_is_silent() -> None:
 
 async def test_request_magic_link_edit_scope_no_state() -> None:
     settings = _settings()
-    db = fake_session(result(_app()))  # current_state_id None → edit
+    db = fake_session(result(_app()))  # current_state_id is None, so the scope is edit
     sent: list[tuple[str, str]] = []
     await service.request_magic_link(
         db, settings, email="x@y.de", deliver=lambda e, link: sent.append((e, link))
     )
     assert len(db.added) == 1
     link = sent[0][1]
-    assert "/antrag/aid-1#t=" in link  # Token im Fragment, nicht im Query
+    assert "/antrag/aid-1#t=" in link  # the token sits in the fragment, not in the query
     assert db.added[0].scope == "edit"
     assert db.added[0].single_use is False
 
@@ -79,7 +76,7 @@ async def test_request_magic_link_view_scope_when_locked() -> None:
 async def test_request_magic_link_default_deliver_runs() -> None:
     settings = _settings()
     db = fake_session(result(_app()))
-    # Ohne `deliver` → _default_deliver läuft (loggt nur Empfänger-Domain, kein Token).
+    # Without `deliver`, `_default_deliver` runs. It logs the recipient domain, no token.
     await service.request_magic_link(db, settings, email="x@y.de")
     assert len(db.added) == 1
 
@@ -94,7 +91,7 @@ async def test_request_magic_link_edit_scope_when_open_state() -> None:
 
 
 async def test_request_magic_link_awaits_async_deliver() -> None:
-    """Async-Deliver (T-18: Mail-Enqueue) wird awaited (isawaitable-Zweig)."""
+    """The service awaits an async deliver callback (T-18 mail enqueue, isawaitable branch)."""
     settings = _settings()
     db = fake_session(result(_app()))
     sent: list[tuple[str, str]] = []
@@ -106,9 +103,6 @@ async def test_request_magic_link_awaits_async_deliver() -> None:
     assert len(sent) == 1 and "/antrag/aid-1#t=" in sent[0][1]
 
 
-# --------------------------------------------------------------------------- #
-# verify_magic_link
-# --------------------------------------------------------------------------- #
 def _link(token: str, settings: Settings, **kw: object) -> MagicLink:
     row = MagicLink(
         application_id="aid-1",
@@ -150,7 +144,7 @@ async def test_verify_magic_link_already_used(monkeypatch: pytest.MonkeyPatch) -
     settings = _settings()
     monkeypatch.setattr(service, "_now", lambda: NOW)
     row = _link("tok", settings, single_use=True)
-    # Atomare Einlösung: UPDATE trifft 0 Zeilen (schon verbraucht) → 410.
+    # Atomic redemption: the UPDATE hits 0 rows because the link is used, so 410.
     db = fake_session(result(row), result())
     with pytest.raises(GoneError):
         await service.verify_magic_link(db, settings, token="tok")
@@ -160,28 +154,26 @@ async def test_verify_magic_link_single_use_ok(monkeypatch: pytest.MonkeyPatch) 
     settings = _settings()
     monkeypatch.setattr(service, "_now", lambda: NOW)
     row = _link("tok", settings, scope="view", single_use=True)
-    # UPDATE gewinnt (returning id) → diese Verify löst den Token ein.
+    # The UPDATE wins and returns the id, so this verify redeems the token.
     db = fake_session(result(row), result("claimed-id"))
     app_id, scope, token = await service.verify_magic_link(db, settings, token="tok")
     assert app_id == "aid-1"
     assert scope == "view"
-    assert token  # signierter Applicant-Token
+    assert token  # a signed applicant token
 
 
 async def test_verify_magic_link_edit_not_marked_used(monkeypatch: pytest.MonkeyPatch) -> None:
     settings = _settings()
     monkeypatch.setattr(service, "_now", lambda: NOW)
     row = _link("tok", settings, scope="edit", single_use=False)
-    db = fake_session(result(row))  # kein UPDATE bei non-single-use
+    db = fake_session(result(row))  # no UPDATE for a link that is not single use
     _, scope, _ = await service.verify_magic_link(db, settings, token="tok")
     assert scope == "edit"
 
 
-# --------------------------------------------------------------------------- #
-# OIDC
-# --------------------------------------------------------------------------- #
+# The OIDC login path.
 async def test_upsert_principal_new() -> None:
-    db = fake_session(result())  # kein bestehender Principal
+    db = fake_session(result())  # no existing principal
     claims = OidcClaims(sub="s1", email="e@x.de", name="N", groups=["g"])
     row = await service.upsert_principal(db, claims)
     assert row.sub == "s1"
@@ -197,7 +189,7 @@ async def test_upsert_principal_existing() -> None:
     row = await service.upsert_principal(db, claims)
     assert row is existing
     assert row.email == "new@x.de"
-    assert db.added == []  # kein Insert
+    assert db.added == []  # no insert
 
 
 async def test_oidc_callback_happy(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -211,11 +203,11 @@ async def test_oidc_callback_happy(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(service.oidc, "exchange_code", fake_exchange)
     monkeypatch.setattr(service.oidc, "verify_id_token", fake_verify)
-    db = fake_session(result())  # upsert: kein bestehender Principal
+    db = fake_session(result())  # upsert: no existing principal
     cookie, row = await service.oidc_callback(
         db, settings, code="c", verifier="v", nonce="n"
     )
-    assert cookie  # signiertes sid-Cookie
+    assert cookie  # a signed sid cookie
     assert row.sub == "s1"
-    # 1 Principal-Insert + 1 AuthSession-Insert
+    # One principal insert plus one AuthSession insert.
     assert len(db.added) == 2

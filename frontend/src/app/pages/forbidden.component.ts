@@ -3,10 +3,12 @@ import { RouterLink } from '@angular/router';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 
 /**
- * 403 page. Target of the `authGuard` when the loaded principal **really** lacks
- * the permission required for the route — instead of a silent dashboard redirect.
- * So it appears only after a real permission check (the guard loads the principal
- * via `ensureLoaded`), never during loading.
+ * 403 page. The `authGuard` routes here when the loaded principal truly lacks the
+ * route permission, instead of a silent redirect to the dashboard.
+ *
+ * The guard loads the principal with `ensureLoaded` before it checks permissions. So
+ * the page appears only after a real permission check. It never appears while the
+ * load runs.
  */
 @Component({
   selector: 'app-forbidden',

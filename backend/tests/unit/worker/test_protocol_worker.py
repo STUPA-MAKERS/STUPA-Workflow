@@ -1,8 +1,8 @@
-"""Unit-Tests Worker-Task render_protocol (T-22 async): Erfolg, Retry, Rollback.
+"""Worker task `render_protocol` (T-22 async): success, retry and rollback.
 
-Kein Redis im ctx → Mail-Queue ``None`` (Versand übersprungen) und der
-``meeting_state``-Broadcast wird ausgelassen; der Fokus liegt auf dem
-Status-Lebenszyklus ``rendering → final`` bzw. ``rendering → draft`` (Rollback).
+The ctx holds no Redis. The mail queue stays `None` and the worker sends no mail. The
+worker also skips the `meeting_state` broadcast. These tests focus on the status
+lifecycle `rendering → final` and on the rollback `rendering → draft`.
 """
 
 from __future__ import annotations
@@ -42,13 +42,13 @@ def _ctx(
         "object_storage": storage,
         "protocol_sessionmaker": FakeSessionmaker(session),  # type: ignore[arg-type]
         "job_try": job_try,
-        # kein "redis": Mail-Queue None + Broadcast übersprungen (Unit-Fokus Status).
+        # No "redis" key: the mail queue stays None and the worker skips the broadcast.
     }
 
 
 async def test_render_protocol_success_finalizes() -> None:
     proto = _protocol()
-    # execute-Reihenfolge: _get → _assemble_from_agenda (leer) → Broadcast entfällt.
+    # Order of the execute calls: `_get`, then `_assemble_from_agenda` with no agenda.
     session = FakeSession(store={}, results=[result(proto), result()])
     ctx = _ctx(session, pytex=FakePytex(), storage=FakeStorage())
     assert await render_protocol(ctx, str(PID)) == "final"
@@ -63,23 +63,23 @@ async def test_render_protocol_transient_retries() -> None:
     ctx = _ctx(session, pytex=pytex, storage=FakeStorage(), job_try=1)
     with pytest.raises(Retry):
         await render_protocol(ctx, str(PID))
-    assert proto.status == "rendering"  # Retry kommt — kein Rollback
+    assert proto.status == "rendering"  # a retry follows, so no rollback
 
 
 async def test_render_protocol_exhausted_reverts_to_draft() -> None:
     proto = _protocol()
     pytex = FakePytex(error=PytexError("5xx", status=503, retryable=True))
-    # _get (finalize) → _assemble → _get (revert_to_draft)
+    # Order: `_get` for finalize, `_assemble`, then `_get` for revert_to_draft.
     session = FakeSession(
         store={}, results=[result(proto), result(), result(proto)]
     )
     ctx = _ctx(session, pytex=pytex, storage=FakeStorage(), job_try=3)
     assert await render_protocol(ctx, str(PID)) == "dead"
-    assert proto.status == "draft"  # re-finalisierbar, nie in rendering hängen
+    assert proto.status == "draft"  # ready for a new finalize, never stuck in rendering
 
 
 async def test_render_protocol_permanent_error_reverts_to_draft() -> None:
-    """pytex 4xx (Compile-Fehler) = dauerhaft → sofortiger Rollback, kein Retry."""
+    """Roll back at once on a pytex 4xx compile error, because that error is permanent."""
     proto = _protocol()
     pytex = FakePytex(error=PytexError("bad latex", status=400, retryable=False))
     session = FakeSession(
@@ -91,7 +91,7 @@ async def test_render_protocol_permanent_error_reverts_to_draft() -> None:
 
 
 async def test_render_protocol_already_final_is_noop() -> None:
-    """Doppelt enqueueter Job: ``finalize`` ist idempotent — kein zweiter Render."""
+    """Skip the second render for a job that runs twice, because `finalize` is idempotent."""
     proto = _protocol(status="final")
     pytex = FakePytex()
     session = FakeSession(store={}, results=[result(proto)])

@@ -1,9 +1,10 @@
-"""E2E-Contract: PytexClient gegen den **echten** pytex-Container (T-20 Akzeptanz).
+"""E2E contract: PytexClient against the **real** pytex container (T-20 acceptance).
 
-Rendert ein kleines Markdown über ``POST /render`` und erwartet echte PDF-Bytes. Wird
-übersprungen, wenn unter ``PYTEX_URL`` kein Container läuft (lokal ohne Stack); die
-E2E-Stage (T-04, Compose) hat pytex → der Test greift. Der respx-Mock-Pfad
-(``test_pdf_pytex_client``) deckt die Client-Logik bereits unit-seitig ab.
+The test renders a small Markdown document through ``POST /render`` and expects real
+PDF bytes. It skips when no container runs at ``PYTEX_URL``, which is the local case
+without the stack. The E2E stage (T-04, compose) has pytex, so the test applies there.
+The respx mock path (``test_pdf_pytex_client``) already covers the client logic as a
+unit test.
 """
 
 from __future__ import annotations

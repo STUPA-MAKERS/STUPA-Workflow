@@ -10,10 +10,12 @@ import { FormlyPositionsType } from './types/formly-positions.type';
 import { FormlyDateRangeType } from './types/formly-daterange.type';
 
 /**
- * Formly base configuration. Registers the UI-kit-bound field types for the form
- * definition: `input` covers text/number/currency/date (via `props.type`), plus
- * textarea/select/checkbox/multicheckbox and a read-only `display` for
- * `markdown`/`computed`. Mapping in `@shared/forms/formly-mapper`.
+ * Formly base configuration.
+ *
+ * This provider registers the UI-kit-bound field types of the form definition. The
+ * `input` type covers text, number, currency and date through `props.type`. The other
+ * types are textarea, select, checkbox and multicheckbox, plus a read-only `display`
+ * type for `markdown` and `computed`. The mapping lives in `@shared/forms/formly-mapper`.
  */
 export function provideFormly(): Provider {
   return provideFormlyCore({

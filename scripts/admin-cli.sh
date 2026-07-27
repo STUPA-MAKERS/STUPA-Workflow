@@ -1,18 +1,21 @@
 #!/usr/bin/env bash
 # Launch the antragsplattform admin REPL (./admin-cli).
 #
-# Creates/updates a dedicated venv on first run (or when pyproject.toml changes) and starts the
-# installed console script with the right interpreter. Runs from the repo root so the default
-# relative compose file (deploy/docker-compose.yml) resolves.
+# On the first run the script creates a dedicated venv. It rebuilds the venv when
+# pyproject.toml changes. It then starts the installed console script with the correct
+# interpreter.
 #
-# Usage (from the repo root, or anywhere with the postgres port forwarded):
+# Usage. Run this from the repo root, or from anywhere with the postgres port forwarded:
 #   ./scripts/admin-cli.sh                # full-screen command REPL
 #   ./scripts/admin-cli.sh --read-only    # writes disabled
-#   ./scripts/admin-cli.sh --check        # just test DB connectivity
+#   ./scripts/admin-cli.sh --check        # test the DB connection only
 #
-# DB access is resolved automatically: $DATABASE_URL if set; otherwise the DSN from deploy/.env
-# rewritten to localhost:<host port published in the compose file> (127.0.0.1:5433:5432 → 5433,
-# works through `ssh -L 5433:127.0.0.1:5433 <vm>`); otherwise `docker compose exec postgres psql`.
+# The script finds the DB access in this order:
+#   1. $DATABASE_URL, if it is set.
+#   2. The DSN from deploy/.env, rewritten to localhost and the host port that the
+#      compose file publishes. 127.0.0.1:5433:5432 gives 5433. This also works through
+#      `ssh -L 5433:127.0.0.1:5433 <vm>`.
+#   3. `docker compose exec postgres psql`.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -36,6 +39,6 @@ if [[ "$need_install" -eq 1 ]]; then
     touch "$MARKER"
 fi
 
-# Run from repo root so deploy/docker-compose.yml (default COMPOSE_FILE) resolves.
+# Run from the repo root, so deploy/docker-compose.yml (the default COMPOSE_FILE) resolves.
 cd "$REPO_ROOT"
 exec "$VENV/bin/antragsplattform-admin" "$@"

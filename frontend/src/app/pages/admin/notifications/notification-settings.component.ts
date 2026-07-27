@@ -8,10 +8,12 @@ import { AdminApiService } from '../admin-api.service';
 import type { NotificationSettings } from '../admin.models';
 
 /**
- * Admin → Benachrichtigungen (#task-reminder, P `admin.notifications`):
- * Plattform-Config der Aufgaben-Erinnerungen — An/Aus, Schwelle in Tagen,
- * Wiederholungs-Intervall (0 = nur einmal je State-Aufenthalt). Der Worker
- * liest diese Werte je Lauf; Speichern wird als CONFIG_CHANGE auditiert.
+ * Admin notification settings (#task-reminder, permission `admin.notifications`).
+ *
+ * The page holds the platform config of the task reminders: on or off, the threshold in
+ * days and the repeat interval. A repeat interval of 0 sends one reminder per stay in a
+ * state. The worker reads these values on each run. The server audits a save as
+ * CONFIG_CHANGE.
  */
 @Component({
   selector: 'app-notification-settings',

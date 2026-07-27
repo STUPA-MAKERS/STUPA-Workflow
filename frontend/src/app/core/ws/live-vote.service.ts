@@ -12,10 +12,10 @@ import type {
 export type ConnectionState = 'connecting' | 'open' | 'reconnecting' | 'closed';
 
 /**
- * An open live-vote session: holds the connection state and the latest received
- * frames as signals and encapsulates the reconnect/resync logic. On
- * (re)connecting it sends `subscribe` so the server replays the current state —
- * this lets the UI survive a dropped connection without state loss.
+ * An open live-vote session. It holds the connection state and the last received frames
+ * as signals. It also contains the reconnect and resync logic. On each connect it sends
+ * `subscribe`, so the server replays the current state. The UI therefore survives a
+ * dropped connection without a loss of state.
  */
 export class LiveVoteSession {
   readonly connection = signal<ConnectionState>('connecting');
@@ -28,7 +28,7 @@ export class LiveVoteSession {
   private channel: MeetingChannel | null = null;
   private closedByUser = false;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-  /** Consecutive failed attempts with no server response. Caps the reconnect storm. */
+  /** Consecutive failed attempts with no server response. This caps the reconnect storm. */
   private attempts = 0;
   private static readonly MAX_ATTEMPTS = 5;
 
@@ -44,9 +44,9 @@ export class LiveVoteSession {
   private connect(): void {
     this.channel = this.source.connectMeeting(this.meetingId, this.beamer);
     this.channel.messages$.subscribe({
-      // A received message proves the server is actually responding → reset the
-      // failed-attempt counter (otherwise a late drop would wrongly count toward
-      // the reconnect limit of a dead socket).
+      // A received message proves that the server responds, so reset the failed-attempt
+      // counter. If not, a late drop counts wrongly toward the reconnect limit of a
+      // dead socket.
       next: (m) => {
         this.attempts = 0;
         this.handle(m);
@@ -55,7 +55,7 @@ export class LiveVoteSession {
       error: () => this.onClosed(),
     });
     this.connection.set('open');
-    // Resync after (re)connect: request the current state.
+    // Resync after a connect. Ask the server for the current state.
     this.channel.send({ type: 'subscribe' });
   }
 
@@ -65,7 +65,6 @@ export class LiveVoteSession {
         this.meeting.set(m);
         break;
       case 'vote_opened':
-        // New vote → discard the old tally/result/error.
         this.openVote.set(m);
         this.tally.set(null);
         this.result.set(null);
@@ -76,8 +75,8 @@ export class LiveVoteSession {
         break;
       case 'vote_closed': {
         this.result.set(m);
-        // Mirror the final result into the tally so bars/counts stay final (the
-        // close frame carries no eligible/quorum fields).
+        // Mirror the final result into the tally, so the bars and counts stay final.
+        // The close frame carries no eligible or quorum field.
         const prev = this.tally();
         this.tally.set({
           type: 'vote_tally',
@@ -90,7 +89,7 @@ export class LiveVoteSession {
         break;
       }
       case 'vote_cancelled':
-        // Cancellation: the running vote disappears without a result.
+        // A cancellation removes the running vote without a result.
         if (this.openVote()?.voteId === m.voteId) {
           this.openVote.set(null);
           this.tally.set(null);
@@ -103,7 +102,7 @@ export class LiveVoteSession {
     }
   }
 
-  /** Cast a ballot over the live channel (no-op in beamer mode). */
+  /** Cast a ballot over the live channel. In beamer mode this does nothing. */
   cast(choice: string): void {
     const vote = this.openVote();
     if (this.beamer || !vote) return;
@@ -116,8 +115,8 @@ export class LiveVoteSession {
       return;
     }
     this.attempts += 1;
-    // Give up for good instead of endlessly spamming "connection refused" when
-    // the server is unreachable (no backend/no meeting). The UI shows 'closed'.
+    // Give up for good instead of an endless series of "connection refused" errors when
+    // the server is unreachable (no backend or no meeting). The UI then shows 'closed'.
     if (this.attempts >= LiveVoteSession.MAX_ATTEMPTS) {
       this.errorCode.set('connection_failed');
       this.connection.set('closed');
@@ -128,7 +127,7 @@ export class LiveVoteSession {
     this.reconnectTimer = setTimeout(() => this.connect(), delay);
   }
 
-  /** Close the connection for good (component destroy) — no more reconnects. */
+  /** Close the connection for good on component destroy. No reconnect follows. */
   close(): void {
     this.closedByUser = true;
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
@@ -138,8 +137,8 @@ export class LiveVoteSession {
 }
 
 /**
- * Factory for `LiveVoteSession`s. Pulls the `LiveVoteSource` (real WS or mock)
- * from the DI container and passes it to the session.
+ * Factory for a `LiveVoteSession`. It takes the `LiveVoteSource` (the real WebSocket or
+ * the mock) from the DI container and passes it to the session.
  */
 @Injectable({ providedIn: 'root' })
 export class LiveVoteService {

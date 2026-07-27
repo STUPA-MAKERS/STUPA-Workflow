@@ -6,8 +6,12 @@ interface MultiOption {
   label: string;
 }
 
-/** Formly field type `multicheckbox` — multi-select (form definition `multiselect`).
- * The model value is a string array of the selected option values. */
+/**
+ * Formly field type `multicheckbox` for a multi-select field.
+ *
+ * The form definition calls this field `multiselect`. The model value is a string array
+ * of the selected option values.
+ */
 @Component({
   selector: 'app-formly-multicheckbox',
   standalone: true,

@@ -1,13 +1,14 @@
 /**
  * a11y scan of the composite core views (WCAG 2.1 AA).
  *
- * Complements the primitive scan (`shared/ui/a11y.spec.ts`) with the composed
- * views: shell landmarks (anonymous + authenticated), error pages (403/404), the
- * apply wizard (multi-step) and the live-vote view (live regions).
+ * This scan adds the composed views to the primitive scan in `shared/ui/a11y.spec.ts`.
+ * It covers the shell landmarks for anonymous and authenticated users. It also covers
+ * the 403 and 404 error pages, the multi-step apply wizard and the live regions of the
+ * live-vote view.
  *
- * For the shell the `region` rule is active (landmark structure). Components
- * without their own `<main>` are wrapped in `<main>` so content sits inside a
- * landmark.
+ * The shell tests keep the `region` rule active to check the landmark structure. A
+ * component without its own `<main>` gets a `<main>` wrapper, so the content sits inside
+ * a landmark.
  */
 import { Component } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
@@ -142,9 +143,9 @@ describe('Kern-Views a11y (axe)', () => {
     const fakeApi: Partial<ApiClient> = {
       applicationTypes: () => of(TYPES),
       effectiveForm: () => of(EFF),
-      // Anonymous session — AuthService.ensureLoaded() in the wizard constructor.
+      // The wizard constructor calls AuthService.ensureLoaded(). Return an anonymous session.
       me: (() => of(null)) as unknown as ApiClient['me'],
-      // Branding info below the type selection — empty in the test.
+      // The branding info below the type selection stays empty in this test.
       publicSiteConfig: () => of({ version: 1, branding: null }),
     };
 
@@ -239,8 +240,8 @@ describe('Kern-Views a11y (axe)', () => {
   });
 
   describe('Admin-Views (T-43 AC: Admin/Flow-Editor)', () => {
-    // Reads come from admin.mock (USE_MOCK_API) or are faked — the views should
-    // render their full structure (headings/tables/forms).
+    // The reads come from admin.mock (USE_MOCK_API) or from a fake. The views must
+    // render their full structure of headings, tables and forms.
     const adminHttp = [provideHttpClient(), provideHttpClientTesting()];
 
     @Component({
@@ -271,7 +272,6 @@ describe('Kern-Views a11y (axe)', () => {
     })
     class BrandingHost {}
 
-    /** Fake AdminApiService: reads return minimal data, mutations are no-ops. */
     function fakeAdminApi(): Partial<AdminApiService> {
       const role = {
         id: 'r-admin',
@@ -324,7 +324,7 @@ describe('Kern-Views a11y (axe)', () => {
         providers: [
           provideRouter([]),
           { provide: AdminApiService, useValue: fakeAdminApi() },
-          // Cost-centre names for guard labels — an empty tree is enough.
+          // The guard labels need cost center names. An empty tree is enough.
           { provide: BudgetTreeApi, useValue: { tree: () => of([]) } },
         ],
       });

@@ -1,4 +1,4 @@
-"""Unit-Tests MeetingPresence (#live-viewers): Join/Leave, Dedupe, Multi-Tab."""
+"""Unit tests for MeetingPresence (#live-viewers): join, leave, dedupe, multi-tab."""
 
 from __future__ import annotations
 
@@ -22,8 +22,8 @@ def test_same_user_two_tabs_stays_until_last_leaves() -> None:
     p = MeetingPresence()
     c1, _ = p.join(MID, "sub-a", "Alice")
     c2, names = p.join(MID, "sub-a", "Alice")
-    assert names == ["Alice"]  # dedupliziert je Nutzer
-    assert p.leave(MID, c1) == ["Alice"]  # Tab 2 hält sie in der Liste
+    assert names == ["Alice"]  # one entry per user
+    assert p.leave(MID, c1) == ["Alice"]  # the second tab keeps her in the list
     assert p.leave(MID, c2) == []
 
 

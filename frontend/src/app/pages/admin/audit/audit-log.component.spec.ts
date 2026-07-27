@@ -7,8 +7,8 @@ import { AdminApiService } from '../admin-api.service';
 import { AuditLogComponent } from './audit-log.component';
 
 /**
- * Typed view onto the component's protected surface so tests can drive the
- * filter setters / paging helpers directly (they all funnel through `load`).
+ * Typed view on the protected surface of the component. The tests call the filter setters
+ * and the paging helpers directly. All of them go through `load`.
  */
 type Cmp = AuditLogComponent & {
   setAction(v: string): void;
@@ -75,7 +75,6 @@ async function setup(opts: SetupOpts = {}) {
 describe('AuditLogComponent (#45)', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
-  // --- initial load + rendering --------------------------------------------
   it('lists audit entries with cursor paging and human-readable rendering', async () => {
     const { fixture, listAuditLog } = await setup({
       page: { items: [entry(1)], nextCursor: null, hasMore: false },
@@ -154,9 +153,7 @@ describe('AuditLogComponent (#45)', () => {
     });
     screen.getByRole('button', { expanded: false }).click();
     fixture.detectChanges();
-    // data chip: resolved UUID as "<name> · <uuid>".
     expect(screen.getByText('Finanzausschuss · g-1')).toBeInTheDocument();
-    // actor detail: clear name · sub.
     expect(screen.getByText('Root Admin · kc|root')).toBeInTheDocument();
   });
 
@@ -169,7 +166,6 @@ describe('AuditLogComponent (#45)', () => {
     expect(screen.getByText('g-unknown')).toBeInTheDocument();
   });
 
-  // --- actors load (success + error) ---------------------------------------
   it('loads the actor list on init', async () => {
     const { cmp } = await setup({ actors: [{ sub: 'kc|a', name: 'Alice' }] });
     expect((cmp as unknown as { actors(): AuditActor[] }).actors()).toEqual([
@@ -182,7 +178,6 @@ describe('AuditLogComponent (#45)', () => {
     expect((cmp as unknown as { actors(): AuditActor[] }).actors()).toEqual([]);
   });
 
-  // --- filter setters reload with the right query params -------------------
   it('setAction reloads with the action filter', async () => {
     const { cmp, listAuditLog } = await setup();
     listAuditLog.mockClear();
@@ -260,7 +255,6 @@ describe('AuditLogComponent (#45)', () => {
     expect(opts.length).toBeGreaterThan(20);
   });
 
-  // --- cursor paging + loadMore --------------------------------------------
   it('loadMore appends the next page using the before cursor', async () => {
     const second: AuditPage = { items: [entry(2)], nextCursor: null, hasMore: false };
     const listAuditLog = jest
@@ -278,7 +272,8 @@ describe('AuditLogComponent (#45)', () => {
   });
 
   it('loadMore sends before: undefined when the cursor is null but more remain', async () => {
-    // Defensive branch: hasMore true while nextCursor is null → before falls back to undefined.
+    // Defensive branch: hasMore is true while nextCursor is null, so before falls back to
+    // undefined.
     const listAuditLog = jest
       .fn()
       .mockReturnValueOnce(of<AuditPage>({ items: [entry(1)], nextCursor: null, hasMore: true }))
@@ -300,12 +295,12 @@ describe('AuditLogComponent (#45)', () => {
 
   it('skips concurrent loads while a request is in flight', async () => {
     const subj = new Subject<AuditPage>();
-    // First call (constructor reload) hangs; a filter change must not fire a second.
+    // The first call from the constructor reload hangs. A filter change must not fire a second.
     const listAuditLog = jest.fn(() => subj.asObservable());
     const { cmp } = await setup({ listAuditLog });
     expect(cmp.loading()).toBe(true);
     expect(listAuditLog).toHaveBeenCalledTimes(1);
-    // A filter setter triggers reload → load(true), but the loading guard holds.
+    // A filter setter triggers reload and load(true), but the loading guard holds.
     cmp.setAction('login');
     expect(listAuditLog).toHaveBeenCalledTimes(1);
     subj.next({ items: [], nextCursor: null, hasMore: false });
@@ -313,7 +308,6 @@ describe('AuditLogComponent (#45)', () => {
     expect(cmp.loading()).toBe(false);
   });
 
-  // --- error path -----------------------------------------------------------
   it('flags a load error and shows the alert', async () => {
     const { cmp, fixture } = await setup({
       listAuditLog: jest.fn(() => throwError(() => new Error('nope'))),
@@ -324,7 +318,6 @@ describe('AuditLogComponent (#45)', () => {
     expect(screen.getByRole('alert')).toBeInTheDocument();
   });
 
-  // --- toggle / isOpen ------------------------------------------------------
   it('toggle opens then closes a single entry', async () => {
     const { cmp } = await setup();
     expect(cmp.isOpen(1)).toBe(false);
@@ -334,7 +327,6 @@ describe('AuditLogComponent (#45)', () => {
     expect(cmp.isOpen(1)).toBe(false);
   });
 
-  // --- dayLabel branches ----------------------------------------------------
   it('dayLabel returns Today / Yesterday / a full date', async () => {
     const { cmp } = await setup();
     const today = new Date();
@@ -354,7 +346,6 @@ describe('AuditLogComponent (#45)', () => {
     expect(cmp.dayLabel({ date: new Date() })).toBe('Today');
   });
 
-  // --- icon -----------------------------------------------------------------
   it('icon maps known actions and falls back to the audit glyph', async () => {
     const { cmp } = await setup();
     expect(cmp.icon('login')).toBe('key');
@@ -362,21 +353,18 @@ describe('AuditLogComponent (#45)', () => {
     expect(cmp.icon('totally_unknown')).toBe('audit');
   });
 
-  // --- actionLabel ----------------------------------------------------------
   it('actionLabel localizes known actions and echoes unknown ones', async () => {
     const { cmp } = await setup();
     expect(cmp.actionLabel('status_change')).toBe('Statuswechsel');
     expect(cmp.actionLabel('made_up_action')).toBe('made_up_action');
   });
 
-  // --- targetTypeLabel ------------------------------------------------------
   it('targetTypeLabel localizes known types and echoes unknown ones', async () => {
     const { cmp } = await setup();
     expect(cmp.targetTypeLabel('gremium')).toBe('Gremium');
     expect(cmp.targetTypeLabel('made_up_type')).toBe('made_up_type');
   });
 
-  // --- targetLink branches --------------------------------------------------
   it('targetLink resolves a route per target type', async () => {
     const { cmp } = await setup();
     expect(cmp.targetLink(entry(1, { targetType: 'application', targetId: 'a-9' }))).toEqual([
@@ -442,7 +430,6 @@ describe('AuditLogComponent (#45)', () => {
     expect(link.getAttribute('href')).toBe('/applications/a-1');
   });
 
-  // --- message / targetLabel fallbacks --------------------------------------
   it('message falls back to type:id when no resolved label is present', async () => {
     const { cmp } = await setup();
     expect(cmp.message(entry(1, { targetLabel: null }))).toMatch(/principal:p-1/);
@@ -450,7 +437,7 @@ describe('AuditLogComponent (#45)', () => {
 
   it('targetLabel uses just the target type when no id is present', async () => {
     const { cmp } = await setup();
-    // unknown action → fallback msg "{actor}: {action} ({target})." with target = type only
+    // An unknown action uses the fallback message, and the target holds the type only.
     expect(
       cmp.message(entry(1, { action: 'mystery', targetType: 'principal', targetId: null })),
     ).toMatch(/\(principal\)/);
@@ -477,7 +464,6 @@ describe('AuditLogComponent (#45)', () => {
     expect(cmp.message(entry(1, { actorName: null, actor: null }))).toMatch(/System/);
   });
 
-  // --- dataPairs ------------------------------------------------------------
   it('dataPairs stringifies primitives and JSON-encodes objects', async () => {
     const { cmp } = await setup();
     const pairs = cmp.dataPairs(
@@ -494,7 +480,6 @@ describe('AuditLogComponent (#45)', () => {
     expect(cmp.dataPairs(entry(1, { data: null as unknown as Record<string, unknown> }))).toEqual([]);
   });
 
-  // --- groups grouping logic ------------------------------------------------
   it('groups consecutive same-day entries together and splits across days', async () => {
     const { cmp } = await setup({
       page: {
@@ -513,7 +498,6 @@ describe('AuditLogComponent (#45)', () => {
     expect(groups[1].entries.map((e) => e.id)).toEqual([3]);
   });
 
-  // --- IntersectionObserver wiring ------------------------------------------
   it('observes the sentinel and loads more when it intersects', async () => {
     let trigger: ((entries: { isIntersecting: boolean }[]) => void) | null = null;
     const disconnect = jest.fn();
@@ -537,10 +521,8 @@ describe('AuditLogComponent (#45)', () => {
     const { cmp } = await setup({ listAuditLog });
 
     expect(observe).toHaveBeenCalled();
-    // Not intersecting → no extra load.
     trigger?.([{ isIntersecting: false }]);
     expect(listAuditLog).toHaveBeenCalledTimes(1);
-    // Intersecting → loadMore → second page appended.
     trigger?.([{ isIntersecting: true }]);
     expect(listAuditLog).toHaveBeenCalledTimes(2);
     expect(cmp.entries().map((e) => e.id)).toEqual([1, 2]);

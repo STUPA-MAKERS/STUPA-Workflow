@@ -1,8 +1,9 @@
-"""Integration (echte Postgres, testcontainers): FormsService CRUD + Pin + effective.
+"""Integration test for FormsService CRUD, the version pin and the effective form.
 
-Beweist gegen ein echtes Schema: Versionsanlage/-zählung, Aktiv-Eindeutigkeit
-(partial-unique), Pin (laufende Anträge behalten ihre ``form_version_id``) und die
-effektive Form inkl. Topf-Extra-Felder.
+The tests run against a real schema with Postgres in testcontainers. They cover version
+creation and counting and the partial-unique constraint on the active version. They also
+cover the pin: a running application keeps its `form_version_id`. The last tests cover
+the effective form with the extra fields of a budget pot.
 """
 
 from __future__ import annotations
@@ -31,7 +32,10 @@ pytestmark = pytest.mark.integration
 async def session(
     migrated: tuple[str, str], engine: Engine
 ) -> AsyncIterator[AsyncSession]:
-    """Async-Session gegen die migrierte DB; ``engine`` säubert Kern-Tabellen je Test."""
+    """Open an async session against the migrated database.
+
+    The `engine` fixture clears the core tables for each test.
+    """
     eng = create_async_engine(migrated[1])
     maker = async_sessionmaker(eng, expire_on_commit=False)
     async with maker() as s:
@@ -71,7 +75,6 @@ def _fields() -> list[FormFieldDef]:
     ]
 
 
-# --------------------------------------------------------------------------- #
 async def test_create_first_version_activates_type(session: AsyncSession) -> None:
     app_type = await _make_type(session)
     svc = FormsService(session)
@@ -131,7 +134,7 @@ async def test_inactive_version_does_not_touch_active_pointer(
 
 
 async def test_running_application_keeps_pinned_version(session: AsyncSession) -> None:
-    """Pin: eine neue Version lässt die ``form_version_id`` laufender Anträge unberührt."""
+    """Pin: a new version keeps the `form_version_id` of a running application."""
     app_type = await _make_type(session)
     svc = FormsService(session)
     v1 = await svc.create_form_version(
@@ -146,7 +149,7 @@ async def test_running_application_keeps_pinned_version(session: AsyncSession) -
     session.add(application)
     await session.commit()
 
-    # Neue aktive Version anlegen → Pin darf den Antrag nicht umhängen.
+    # Create a new active version. The pin must keep the application on the old one.
     v2 = await svc.create_form_version(
         app_type.id, FormVersionCreate(fields=_fields(), activate=True), "tester")
     pinned = await session.get(Application, application.id)
@@ -161,9 +164,6 @@ async def test_create_version_unknown_type_404(session: AsyncSession) -> None:
             uuid.uuid4(), FormVersionCreate(fields=_fields()), "tester")
 
 
-# --------------------------------------------------------------------------- #
-# effective_form
-# --------------------------------------------------------------------------- #
 async def test_effective_form_main_only(session: AsyncSession) -> None:
     app_type = await _make_type(session)
     svc = FormsService(session)
@@ -172,7 +172,7 @@ async def test_effective_form_main_only(session: AsyncSession) -> None:
     eff = await svc.get_effective_form(app_type.id)
     assert [s.key for s in eff.sections] == ["main"]
     assert {f.key for f in eff.sections[0].fields} == {"title", "amount"}
-    # camelCase-Roundtrip eines promoted-Felds erhalten
+    # the camelCase round trip keeps the flags of a promoted field
     amount = next(f for f in eff.sections[0].fields if f.key == "amount")
     assert amount.is_promoted is True and amount.promote_target == "amount"
 
@@ -207,7 +207,7 @@ async def test_effective_form_with_budget_pot(session: AsyncSession) -> None:
 
 
 async def test_effective_form_pot_without_has_budget_404(session: AsyncSession) -> None:
-    # N1: Typ ohne has_budget darf keinen Topf an die Form hängen.
+    # N1: a type without has_budget must not attach a budget pot to the form.
     app_type = await _make_type(session, has_budget=False)
     svc = FormsService(session)
     await svc.create_form_version(app_type.id, FormVersionCreate(fields=_fields()), "tester")
@@ -218,7 +218,7 @@ async def test_effective_form_pot_without_has_budget_404(session: AsyncSession) 
 
 
 async def test_effective_form_cross_gremium_pot_404(session: AsyncSession) -> None:
-    # N1: ein Topf aus einem fremden Gremium darf nicht durchsickern.
+    # N1: a budget pot of a foreign Gremium must not leak through.
     app_type = await _make_type(session, has_budget=True)
     other = await _make_type(session, has_budget=True)
     svc = FormsService(session)

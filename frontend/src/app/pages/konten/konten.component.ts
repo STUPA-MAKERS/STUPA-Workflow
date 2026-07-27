@@ -49,9 +49,9 @@ import { HScrollSyncDirective } from '@shared/h-scroll-sync.directive';
 import { PressSelectDirective } from '@shared/press-select.directive';
 
 /**
- * Accounts tab: per bank account all fetched transactions + balance; each line
- * is linked to at most one booking. FinTS login/sync/TAN live here. Thin facade
- * over the state modules below; its public surface also drives the specs.
+ * Accounts tab: all fetched transactions and the balance per bank account. Each line
+ * links to at most one booking. FinTS login, sync and TAN live here. This class is a
+ * thin facade over the state modules below. Its public surface also drives the specs.
  */
 @Component({
   selector: 'app-konten',
@@ -81,7 +81,7 @@ import { PressSelectDirective } from '@shared/press-select.directive';
 })
 export class KontenComponent implements OnDestroy {
   private readonly auth = inject(AuthService);
-  // Referenced via the same root instances by the state modules; specs spy here.
+  // The state modules use the same root instances. The specs spy on these fields.
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
@@ -91,15 +91,15 @@ export class KontenComponent implements OnDestroy {
   private readonly sync = new FintsSyncState(this.linesState, this.host);
   private readonly reconcile = new KontenReconcileState(this.linesState);
 
-  /** Sync/import/link/unlink need budget.book; view-only hides them. */
+  /** Sync, import, link and unlink need budget.book. A view-only user does not see them. */
   readonly canBook = computed(() => this.auth.can('budget.book'));
-  /** Ignoring/reactivating a line needs the dedicated audit-sensitive permission. */
+  /** Ignore and reactivate need the dedicated audit-sensitive permission. */
   readonly canIgnore = computed(() => this.auth.can('budget.reconcile_ignore'));
   /** Mobile only: account list behind a collapsible toggle. */
   readonly treeOpen = signal(false);
   readonly sentinel = viewChild<ElementRef<HTMLElement>>('sentinel');
 
-  // --- lines state (KontenLinesState) ----------------------------------------
+  // Lines state (KontenLinesState).
   readonly accounts = this.linesState.accounts;
   readonly accountId = this.linesState.accountId;
   readonly selectedAccount = this.linesState.selectedAccount;
@@ -119,7 +119,7 @@ export class KontenComponent implements OnDestroy {
   readonly activeFilterCount = this.linesState.activeFilterCount;
   readonly refreshing = this.linesState.refreshing;
 
-  // --- batch / bulk actions (#expenses-ux) ---
+  // Bulk actions (#expenses-ux).
   readonly selected = signal<ReadonlySet<Uuid>>(new Set());
   readonly bulkBusy = signal(false);
   readonly selectedCount = computed(() => this.selected().size);
@@ -127,7 +127,7 @@ export class KontenComponent implements OnDestroy {
     const list = this.lines();
     return list.length > 0 && list.every((l) => this.selected().has(l.id));
   });
-  /** Selection subsets by match state → drive which bulk button is active. */
+  /** Selection subsets by match state. They drive which bulk button is active. */
   readonly selectedMatched = computed(
     () =>
       this.lines().filter((l) => this.selected().has(l.id) && l.matchState === 'matched').length,
@@ -142,7 +142,7 @@ export class KontenComponent implements OnDestroy {
   );
   readonly bulkConfirm = signal<null | 'unlink' | 'ignore'>(null);
 
-  // --- FinTS state (FintsSyncState) --------------------------------------------
+  // FinTS state (FintsSyncState).
   readonly credStatus = this.sync.credStatus;
   readonly connectOpen = this.sync.connectOpen;
   readonly credLogin = this.sync.credLogin;
@@ -166,7 +166,7 @@ export class KontenComponent implements OnDestroy {
   readonly otpMode = this.sync.otpMode;
   readonly tanReady = this.sync.tanReady;
 
-  // --- reconcile state (KontenReconcileState) ------------------------------------
+  // Reconcile state (KontenReconcileState).
   readonly costCentreOptions = this.reconcile.costCentreOptions;
   readonly fiscalYearOptions = this.reconcile.fiscalYearOptions;
   readonly importLine = this.reconcile.importLine;
@@ -183,8 +183,8 @@ export class KontenComponent implements OnDestroy {
   readonly ignoreReason = this.reconcile.ignoreReason;
 
   constructor() {
-    // Account picked → load lines + connection status. fetch() reads the filter
-    // signals inside this effect, so filter changes re-trigger it by design.
+    // Account picked: load lines and connection status. fetch() reads the filter
+    // signals inside this effect, so a filter change re-triggers it by design.
     effect(() => {
       const acc = this.accountId();
       if (acc) {
@@ -192,7 +192,8 @@ export class KontenComponent implements OnDestroy {
         this.sync.loadCredStatus(acc);
       }
     });
-    // Keep the bulk selection pruned to rows that still exist (after refresh/reload/account switch).
+    // Prune the bulk selection to rows that still exist after a refresh, a reload or
+    // an account switch.
     effect(() => {
       const ids = new Set(this.lines().map((l) => l.id));
       this.selected.update((cur) =>
@@ -216,7 +217,7 @@ export class KontenComponent implements OnDestroy {
     this.reconcile.dispose();
   }
 
-  // --- display helpers ------------------------------------------------------------
+  // Display helpers.
   /** Unsigned amount (the sign is rendered separately). */
   money(amount: string): string {
     return formatEur(Math.abs(Number(amount)), this.i18n.locale());
@@ -235,7 +236,7 @@ export class KontenComponent implements OnDestroy {
     return splitCounterparty(l);
   }
 
-  /** Colour dot per account, palette rotated by index (like the budget picker). */
+  /** Color dot per account. The palette rotates by index, as in the budget picker. */
   dotColor(index: number): string {
     return PALETTE[((index % PALETTE.length) + PALETTE.length) % PALETTE.length];
   }
@@ -252,7 +253,7 @@ export class KontenComponent implements OnDestroy {
     return ariaSortDir(this.sortField() === field, this.sortOrder());
   }
 
-  // --- account / list delegates ----------------------------------------------------
+  // Account and list delegates.
   selectAccount(id: string): void {
     if (id === this.accountId()) return;
     this.accountId.set(id);
@@ -291,7 +292,7 @@ export class KontenComponent implements OnDestroy {
     this.linesState.onSort(field);
   }
 
-  // --- FinTS delegates ---------------------------------------------------------------
+  // FinTS delegates.
   openConnect(): void {
     this.sync.openConnect();
   }
@@ -344,7 +345,7 @@ export class KontenComponent implements OnDestroy {
     this.sync.refreshOnLock(e);
   }
 
-  // --- reconcile delegates --------------------------------------------------------------
+  // Reconcile delegates.
   candidateLabel(e: Expense): string {
     return this.reconcile.candidateLabel(e);
   }
@@ -405,10 +406,13 @@ export class KontenComponent implements OnDestroy {
     this.reconcile.reactivate(line);
   }
 
-  // --- cross-links (#expenses-ux) ---------------------------------------------------
-  /** Deep-link to a matched line's booking. Exact via the allocation's booking id
-   *  (hidden, resettable ``id`` filter in the Bookings tab); older lines without a
-   *  ``matchedExpenseId`` fall back to account + reference/purpose text search. */
+  // Cross-links (#expenses-ux).
+  /**
+   * Deep-link to the booking of a matched line. The booking id of the allocation gives
+   * the exact link through the hidden, resettable `id` filter in the Bookings tab. An
+   * older line without a `matchedExpenseId` falls back to a text search over the account
+   * plus the reference or the purpose.
+   */
   bookingLink(
     line: StatementLine,
   ): { id: string } | { account: string; q: string | null } {
@@ -419,7 +423,7 @@ export class KontenComponent implements OnDestroy {
     };
   }
 
-  // --- batch (#expenses-ux) ---------------------------------------------------------
+  // Batch selection (#expenses-ux).
   isSelected(id: Uuid): boolean {
     return this.selected().has(id);
   }

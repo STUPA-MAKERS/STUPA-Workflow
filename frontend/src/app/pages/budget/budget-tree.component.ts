@@ -21,20 +21,21 @@ import { BudgetTreeApi, type BudgetTreeNode, type FiscalYear } from './budget-tr
 import { SimplifyPathPipe } from '@shared/budget-path';
 import { BudgetYearTreeComponent, type BudgetYearSelection } from './budget-year-tree.component';
 
-/** A tree row (node + depth for indentation). */
+/** A tree row: a node plus the depth for the indentation. */
 interface Row {
   node: BudgetTreeNode;
   depth: number;
 }
 
 /**
- * Budget/cost-centre tree editor. **Budget-scoped**: pick a budget at the top, then
- * edit its cost-centre subtree (`VS-800-40 – …`) below.
+ * Budget and cost-center tree editor. The page is budget-scoped. Pick a budget at
+ * the top, then edit its cost-center subtree (`VS-800-40 – …`) below.
  *
- * Budgets are **not** bound to a gremium. **Fiscal years are created WITHIN the
- * budget** (own card per selected budget) — no global fiscal-year dropdown.
- * Available = roll-down (allocation), bound = roll-up (assigned applications); the
- * allocation per node is inline-editable per selected fiscal year.
+ * A budget is NOT bound to a Gremium. Fiscal years belong to the budget. Each
+ * selected budget shows them on its own card. There is no global fiscal-year
+ * dropdown. Available rolls down as the allocation. Bound rolls up from the
+ * assigned applications. Each node has an inline-editable allocation for the
+ * selected fiscal year.
  */
 @Component({
   selector: 'app-budget-tree',
@@ -65,8 +66,8 @@ export class BudgetTreeComponent {
   /** Flow-state keys (global flow) for the accepted/denied config. */
   readonly stateOptions = signal<SelectOption[]>([]);
 
-  /** Create a top budget (no gremium — budgets are gremium-independent).
-   *  ``fiscalStartMonth``/``fiscalStartDay`` = fiscal-year cutoff (default 01.01.). */
+  /** Create a top budget. A budget has no Gremium. ``fiscalStartMonth`` and
+   *  ``fiscalStartDay`` hold the fiscal-year cutoff. The default is 01.01. */
   readonly newTop = signal<{
     key: string;
     name: string;
@@ -77,27 +78,27 @@ export class BudgetTreeComponent {
   readonly topOpen = signal(false);
   /** Fiscal-year dialog (opened via the header button). */
   readonly fyOpen = signal(false);
-  /** Cutoff dialog (via the header button, for the selected top budget). */
+  /** Cutoff dialog for the selected top budget (opened via the header button). */
   readonly stichtagOpen = signal(false);
   /** Status config dialog (accepted/denied states of the top budget). */
   readonly stateConfigOpen = signal(false);
   /** Add child node: which parent is expanded + the draft. */
   readonly addingChildOf = signal<Uuid | null>(null);
   readonly childDraft = signal<{ key: string; name: string }>({ key: '', name: '' });
-  /** Set the limit (allocation) per node — via a per-row dialog. */
+  /** Set the limit (allocation) of a node through a per-row dialog. */
   readonly limitNode = signal<BudgetTreeNode | null>(null);
   readonly limitValue = signal('');
-  /** Edit cost-centre (key + name + visibility) — via a per-row dialog. */
+  /** Edit a cost center (key, name, visibility) through a per-row dialog. */
   readonly editNode = signal<BudgetTreeNode | null>(null);
   readonly editKey = signal('');
   readonly editName = signal('');
-  /** Hide in the budget tab — display-only setting. */
+  /** Hide in the budget tab. This setting changes the display only. */
   readonly editHidden = signal(false);
-  /** Visibility gremium: its members see the subtree in the budget tab as a root;
-   *  '' = no assignment. */
+  /** Visibility Gremium. Its members see the subtree in the budget tab as a root.
+   *  An empty string means no assignment. */
   readonly editViewGremium = signal('');
   readonly gremiumOptions = signal<SelectOption[]>([]);
-  /** Create a fiscal year — WITHIN the selected budget (only the year). */
+  /** Create a fiscal year inside the selected budget. It takes only the year. */
   readonly newFy = signal<{ year: number }>({ year: new Date().getFullYear() });
 
   readonly selectedTop = computed<BudgetTreeNode | null>(
@@ -142,7 +143,8 @@ export class BudgetTreeComponent {
         this.gremiumOptions.set(list.map((g) => ({ value: g.id, label: g.name }))),
       error: () => this.gremiumOptions.set([]),
     });
-    // Global flow -> state keys for the accepted/denied config (degrades silently).
+    // The global flow gives the state keys for the accepted/denied config. An error
+    // stays silent.
     this.adminApi.getGlobalFlow().subscribe({
       next: (graph) =>
         this.stateOptions.set(
@@ -155,7 +157,7 @@ export class BudgetTreeComponent {
     });
   }
 
-  /** Currently selected top budget (for colour/state config). */
+  /** Currently selected top budget. The color and state config read it. */
   private readonly currentTop = computed(() => this.selectedTop());
   readonly acceptedKeys = computed(() => new Set(this.currentTop()?.acceptedStateKeys ?? []));
   readonly deniedKeys = computed(() => new Set(this.currentTop()?.deniedStateKeys ?? []));
@@ -166,7 +168,6 @@ export class BudgetTreeComponent {
     return this.deniedKeys().has(key);
   }
 
-  // --- Display helpers ------------------------------------------------------
   money(value: string | number | null | undefined, currency: string): string {
     const n = value == null || value === '' ? 0 : Number(value);
     return new Intl.NumberFormat(this.i18n.locale(), { style: 'currency', currency }).format(n);
@@ -177,9 +178,9 @@ export class BudgetTreeComponent {
     return node.byFiscalYear.find((a) => a.fiscalYearId === fy) ?? null;
   }
 
-  // --- Loading --------------------------------------------------------------
-  /** Monotonically increasing load sequence: discards stale reload() fan-out
-   *  responses arriving after a newer reload() (else they overwrite fiscal year/selection). */
+  /** Load sequence counter. It increases for each load. A response of an older
+   *  reload() fan-out can arrive after a newer reload(). The sequence check drops it.
+   *  Without the check it overwrites the fiscal year and the selection. */
   private reloadSeq = 0;
 
   private reload(): void {
@@ -195,8 +196,8 @@ export class BudgetTreeComponent {
         const topId = keep ? this.selectedTopId() : (tops[0]?.id ?? '');
         this.selectedTopId.set(topId);
         if (!topId) this.fiscalYears.set([]);
-        // Fiscal years of all top budgets for the left tree (fault-tolerant); for the
-        // selected budget also set the right fiscal-year list.
+        // Load the fiscal years of all top budgets for the left tree. An error stays
+        // silent. For the selected budget, also set the fiscal-year list on the right.
         for (const top of tops) {
           this.api.listFiscalYears(top.id as Uuid).subscribe({
             next: (fys) => {
@@ -221,9 +222,9 @@ export class BudgetTreeComponent {
     });
   }
 
-  /** Load the selected budget's fiscal years (they live within the budget). Bumps
-   *  the load sequence so a still-running reload() fan-out doesn't overwrite this
-   *  selection afterwards — and vice versa. */
+  /** Load the fiscal years of the selected budget. They live inside the budget. This
+   *  raises the load sequence. A reload() fan-out that still runs then does not
+   *  overwrite this selection. The reverse also holds. */
   private loadFiscalYears(topId: string): void {
     const seq = ++this.reloadSeq;
     this.api.listFiscalYears(topId as Uuid).subscribe({
@@ -245,9 +246,9 @@ export class BudgetTreeComponent {
     this.loadFiscalYears(id);
   }
 
-  /** Year picked in the left tree -> set budget + fiscal year. Bumps the load
-   *  sequence so a still-running reload() fan-out doesn't overwrite this selection
-   *  afterwards (like loadFiscalYears/selectTop). */
+  /** Handle a year picked in the left tree. Set the budget and the fiscal year. This
+   *  raises the load sequence. A reload() fan-out that still runs then does not
+   *  overwrite this selection, the same as in loadFiscalYears and selectTop. */
   onYearPicked(sel: BudgetYearSelection): void {
     ++this.reloadSeq;
     this.selectedTopId.set(sel.budgetId);
@@ -256,7 +257,7 @@ export class BudgetTreeComponent {
     this.selectedFyId.set(sel.fiscalYearId);
   }
 
-  /** Set/clear a cost-centre's colour (empty = automatic). */
+  /** Set or clear the color of a cost center. An empty value means automatic. */
   saveColor(node: BudgetTreeNode, color: string): void {
     this.api.updateNode(node.id, { color: color || '' }).subscribe({
       next: () => {
@@ -279,7 +280,7 @@ export class BudgetTreeComponent {
       target.delete(key);
     } else {
       target.add(key);
-      other.delete(key); // a state is never accepted AND denied at once
+      other.delete(key); // A state is never accepted and denied at the same time.
     }
     this.api
       .updateNode(top.id, {
@@ -292,7 +293,7 @@ export class BudgetTreeComponent {
       });
   }
 
-  // --- Create/delete node ---------------------------------------------------
+  // Create and delete nodes.
   patchTop<K extends 'key' | 'name'>(key: K, value: string): void {
     this.newTop.update((t) => ({ ...t, [key]: value }));
   }
@@ -335,7 +336,8 @@ export class BudgetTreeComponent {
       });
   }
 
-  /** Change the selected top budget's fiscal-year cutoff (re-derives existing years). */
+  /** Change the fiscal-year cutoff of the selected top budget. The server derives the
+   *  existing years again. */
   saveStichtag(key: 'fiscalStartMonth' | 'fiscalStartDay', value: string): void {
     const top = this.selectedTop();
     if (!top) return;
@@ -402,7 +404,7 @@ export class BudgetTreeComponent {
     });
   }
 
-  // --- Limit / allocation (per-row dialog) ---------------------------------
+  // Per-row dialogs for the node edit and the allocation limit.
   openEditNode(node: BudgetTreeNode): void {
     this.editNode.set(node);
     this.editKey.set(node.key);
@@ -463,7 +465,7 @@ export class BudgetTreeComponent {
     });
   }
 
-  // --- Fiscal years (within the budget) ------------------------------------
+  // Fiscal years, which live inside the budget.
   patchFyYear(value: string): void {
     const year = Math.trunc(Number(value)) || new Date().getFullYear();
     this.newFy.set({ year });

@@ -1,4 +1,4 @@
-"""Ergänzende #fints-Tests: Parser-Helfer + Matcher-Vorschlag + Service-Zweige."""
+"""Extra #fints tests: parser helpers, matcher suggestion and service branches."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ from app.shared.errors import (
     ValidationProblem,
 )
 
-from .test_bank_service import (  # Wiederverwendung
+from .test_bank_service import (  # reuse
     _KEY,
     _PID,
     _account,
@@ -35,7 +35,7 @@ from .test_bank_service import (  # Wiederverwendung
 )
 
 
-# ----------------------------------------------------------- bank_import helpers
+# bank_import helpers
 def test_clean_and_skip_notprovided() -> None:
     assert normalize.clean(None) is None
     assert normalize.clean("  x ") == "x"
@@ -72,7 +72,7 @@ def test_lines_from_mt940_skips_amountless() -> None:
             self.data = data
 
     out = mt940_parse.lines_from_mt940_transactions([_Tx({}), _Tx({"amount": _Amt()})])
-    assert len(out) == 1  # die amount-lose Transaktion wird übersprungen
+    assert len(out) == 1  # the parser skips the transaction without an amount
 
 
 def test_find_local_none() -> None:
@@ -80,13 +80,13 @@ def test_find_local_none() -> None:
 
 
 def test_camt_date_invalid_calendar_date() -> None:
-    # len >= 10, aber kein gültiges Datum → ValueError-Zweig.
+    # Length of 10 or more, but not a valid date → the ValueError branch.
     el = ET.fromstring("<ValDt><Dt>2024-13-45</Dt></ValDt>")
     assert camt_parse._camt_date(el) is None
 
 
 def test_decode_latin1_fallback() -> None:
-    # 0xFF ist kein gültiges UTF-8 → latin-1-Fallback greift.
+    # 0xFF is not valid UTF-8, so the latin-1 fallback applies.
     assert "ÿ" in statement.decode_bytes(b"\xff")
 
 
@@ -109,13 +109,13 @@ def test_parse_statement_mt940_without_filename() -> None:
     assert lines and lines[0].amount == Decimal("1.00")
 
 
-# ----------------------------------------------------------- service branches
+# service branches
 def _svc(session: _Session, monkeypatch: pytest.MonkeyPatch) -> BankService:
     async def _noop(*_a: Any, **_k: Any) -> None:
         return None
 
     monkeypatch.setattr(service_base, "audit_record", _noop)
-    # SSRF-Re-Validierung (DNS) im Unit-Test neutralisieren — separat getestet.
+    # Disable the SSRF revalidation (DNS) in the unit test. A separate test covers it.
     monkeypatch.setattr(fc, "validate_fints_endpoint", lambda _u: None)
     settings = load_settings(fints_enc_key=_KEY)
     return BankService(session, settings=settings, actor="t", principal_id=_PID)  # type: ignore[arg-type]
@@ -145,8 +145,8 @@ async def test_suggest_falls_back_to_memory(monkeypatch: pytest.MonkeyPatch) -> 
     session = _Session()
     svc = _svc(session, monkeypatch)
     mem_budget = uuid.uuid4()
-    session.execute_q.append(_Result([]))  # keine Buchungs-Kandidaten
-    session.scalar_q.append(mem_budget)  # Gegen-IBAN-Gedächtnis
+    session.execute_q.append(_Result([]))  # no booking candidates
+    session.scalar_q.append(mem_budget)  # counterparty IBAN memory
     line = statement.StatementLine(amount=Decimal("10.00"), counterparty_iban="DEXP")
     budget_id, expense_id = await svc._suggest(line)
     assert expense_id is None
@@ -163,7 +163,7 @@ async def test_memory_budget_no_iban(monkeypatch: pytest.MonkeyPatch) -> None:
 async def test_list_lines_with_filters(monkeypatch: pytest.MonkeyPatch) -> None:
     session = _Session()
     svc = _svc(session, monkeypatch)
-    line = _line(amount=Decimal("-9.00"))  # kind expense, kein suggested budget
+    line = _line(amount=Decimal("-9.00"))  # kind expense, no suggested budget
     session.scalar_q.append(1)  # count
     session.scalars_q.append(_Result([line]))
     page = await svc.list_lines_paged(account_id=uuid.uuid4(), state="unmatched")
@@ -174,8 +174,11 @@ async def test_list_lines_with_filters(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.mark.asyncio
 async def test_list_lines_matched_expense_id(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Matched Zeile → ``matchedExpenseId`` aus ``bank_allocation`` (bei Splits gewinnt
-    die älteste Zuordnung); offene Zeilen bleiben ohne (#expenses-ux2)."""
+    """Fill `matchedExpenseId` from `bank_allocation` for a matched line.
+
+    On a split, the oldest allocation wins. An open line keeps no expense id
+    (#expenses-ux2).
+    """
     session = _Session()
     svc = _svc(session, monkeypatch)
     open_line = _line(amount=Decimal("-9.00"))
@@ -183,7 +186,7 @@ async def test_list_lines_matched_expense_id(monkeypatch: pytest.MonkeyPatch) ->
     exp_a, exp_b = uuid.uuid4(), uuid.uuid4()
     session.scalar_q.append(2)  # count
     session.scalars_q.append(_Result([open_line, matched]))
-    # Allokationen (created_at aufsteigend): setdefault ⇒ die erste gewinnt.
+    # Allocations sorted by created_at: setdefault keeps the first one.
     session.execute_q.append(_Result([(matched.id, exp_a), (matched.id, exp_b)]))
     page = await svc.list_lines_paged(account_id=uuid.uuid4(), state=None)
     by_id = {item.id: item for item in page.items}
@@ -215,7 +218,7 @@ async def test_confirm_line_description_override(monkeypatch: pytest.MonkeyPatch
         )
 
     monkeypatch.setattr(BudgetTreeService, "book_expense", _book)
-    # claim gewinnt; kein counterparty_iban → kein _remember_counterparty
+    # The claim wins. Without a counterparty_iban there is no _remember_counterparty.
     session.execute_q.append(_Result([(line.id,)]))
     await svc.confirm_line(
         line.id, ConfirmLineRequest(budgetId=uuid.uuid4(), description="Eigene Notiz")
@@ -278,7 +281,7 @@ async def test_submit_tan_still_needs_tan(monkeypatch: pytest.MonkeyPatch) -> No
     monkeypatch.setattr(fc, "submit_tan", _submit)
     res = await svc.submit_tan(acc.id, token, "")
     assert res.status == "needs_tan"
-    # Token rotiert: das alte ist verbraucht (Anti-Replay), das neue ist frisch.
+    # The token rotates: the old one is used up (anti-replay), the new one is fresh.
     assert res.session_token is not None
     assert res.session_token != token
 
@@ -294,13 +297,13 @@ def test_matcher_far_date_branch() -> None:
         line_amount=Decimal("-50.00"), line_when=date(2024, 6, 1),
         line_ref=None, line_e2e=None, candidate=cand,
     )
-    assert "entfernt" in r.reason  # > _WIDE_DAYS-Zweig
+    assert "entfernt" in r.reason  # the branch above _WIDE_DAYS
 
 
 def test_matcher_wide_window_branch() -> None:
     from app.modules.budget.bank import match as bm
 
-    # delta = 4 Tage: zwischen _TIGHT_DAYS(2) und _WIDE_DAYS(5) → mittlerer Datums-Score.
+    # A delta of 4 days sits between _TIGHT_DAYS(2) and _WIDE_DAYS(5) → middle date score.
     cand = bm.ExpenseCandidate(
         expense_id="e", budget_id="b", amount=Decimal("50.00"), when=date(2024, 1, 6),
         reference=None,
@@ -316,13 +319,13 @@ def test_matcher_wide_window_branch() -> None:
 async def test_claim_session_missing_or_wrong_account(monkeypatch: pytest.MonkeyPatch) -> None:
     session = _Session()
     svc = _svc(session, monkeypatch)
-    # ``DELETE … WHERE id AND account_id RETURNING`` liefert nichts (unbekanntes Token ODER
-    # Konto-Mismatch — die WHERE-Klausel deckt beides) → NotFoundError.
+    # `DELETE ... WHERE id AND account_id RETURNING` returns nothing. An unknown token
+    # and an account mismatch both fail the WHERE clause, so the service raises
+    # NotFoundError.
     with pytest.raises(NotFoundError):
         await svc._claim_session(uuid.uuid4(), uuid.uuid4())
 
 
-# ----------------------------------------------------- review-fix branches (#fints-review)
 def test_decode_state_roundtrip_and_failures() -> None:
     assert BankService._decode_state(None, key=_KEY) is None
     token = encrypt_secret("blob", key=_KEY)
@@ -349,7 +352,7 @@ async def test_sync_account_fints_error_503(monkeypatch: pytest.MonkeyPatch) -> 
 
 @pytest.mark.asyncio
 async def test_sync_account_bank_locked_sets_cooldown(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Bank-Sperre → 409 fints_bank_locked + Cooldown am Credential gesetzt (#fints-review)."""
+    """Set 409 fints_bank_locked plus a credential cooldown on a bank lock (#fints-review)."""
     session = _Session()
     svc = _svc(session, monkeypatch)
     acc = _account()
@@ -365,13 +368,13 @@ async def test_sync_account_bank_locked_sets_cooldown(monkeypatch: pytest.Monkey
     with pytest.raises(ConflictError) as ei:
         await svc.sync_account(acc.id)
     assert ei.value.code == "fints_bank_locked"
-    assert cred.fints_locked_until is not None  # Cooldown gesetzt …
-    assert session.commits >= 1  # … und persistiert
+    assert cred.fints_locked_until is not None  # cooldown set ...
+    assert session.commits >= 1  # ... and persisted
 
 
 @pytest.mark.asyncio
 async def test_sync_account_auth_rejected_code(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Signatur/PIN-Ablehnung → 409 fints_auth_rejected (nicht generischer 503)."""
+    """Map a signature or PIN rejection to 409 fints_auth_rejected, not to a 503."""
     session = _Session()
     svc = _svc(session, monkeypatch)
     acc = _account()
@@ -390,7 +393,7 @@ async def test_sync_account_auth_rejected_code(monkeypatch: pytest.MonkeyPatch) 
 
 @pytest.mark.asyncio
 async def test_sync_account_blocked_while_locked(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Vorab gesperrtes Credential → 409 OHNE Netz-Call (der eigentliche Anti-Hammer-Schutz)."""
+    """A credential that is already locked gives 409 with NO network call (anti-hammer)."""
     session = _Session()
     svc = _svc(session, monkeypatch)
     acc = _account()
@@ -415,7 +418,7 @@ async def test_sync_account_blocked_while_locked(monkeypatch: pytest.MonkeyPatch
 async def test_sync_account_expired_lock_allows_and_clears(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Abgelaufener Cooldown blockt nicht; erfolgreicher Sync räumt ihn weg (#fints-review)."""
+    """An expired cooldown does not block. A good sync clears it (#fints-review)."""
     session = _Session()
     svc = _svc(session, monkeypatch)
     acc = _account()
@@ -426,12 +429,12 @@ async def test_sync_account_expired_lock_allows_and_clears(
 
     monkeypatch.setattr(fc, "start_sync", _done)
     cred = _cred(account_id=acc.id)
-    cred.fints_locked_until = datetime.now(UTC) - timedelta(minutes=1)  # abgelaufen
+    cred.fints_locked_until = datetime.now(UTC) - timedelta(minutes=1)  # expired
     session.scalar_q.append(cred)  # _load_credential
     session.execute_q.append(_Result([]))  # _purge_expired_sessions
     res = await svc.sync_account(acc.id)
     assert res.status == "done"
-    assert cred.fints_locked_until is None  # geräumt
+    assert cred.fints_locked_until is None  # cleared
 
 
 @pytest.mark.asyncio
@@ -460,7 +463,7 @@ async def test_submit_tan_fints_error_503(monkeypatch: pytest.MonkeyPatch) -> No
 
 @pytest.mark.asyncio
 async def test_submit_tan_bank_locked_sets_cooldown(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Bank-Sperre während TAN-Submit → 409 + Cooldown (#fints-review)."""
+    """A bank lock during the TAN submit gives 409 plus a cooldown (#fints-review)."""
     session = _Session()
     svc = _svc(session, monkeypatch)
     acc = _account()
@@ -488,8 +491,11 @@ async def test_submit_tan_bank_locked_sets_cooldown(monkeypatch: pytest.MonkeyPa
 
 @pytest.mark.asyncio
 async def test_tan_session_roundtrip_preserves_login_flag(monkeypatch: pytest.MonkeyPatch) -> None:
-    """``tan_for_login`` übersteht encode→store→claim (#fints login-SCA) — sonst weiß submit_tan
-    nach der Login-TAN nicht, dass es noch Umsätze holen muss."""
+    """Keep `tan_for_login` through encode, store and claim (#fints login-SCA).
+
+    Without the flag, `submit_tan` does not know that it must still fetch the
+    transactions after the login TAN.
+    """
     session = _Session()
     svc = _svc(session, monkeypatch)
     acc = _account()
@@ -527,12 +533,12 @@ async def test_stage_lines_rejects_non_eur(monkeypatch: pytest.MonkeyPatch) -> N
 
 @pytest.mark.asyncio
 async def test_confirm_line_claim_lost(monkeypatch: pytest.MonkeyPatch) -> None:
-    # Nebenläufiger Verlierer: Claim-UPDATE liefert 0 Zeilen → already_matched.
+    # Concurrent loser: the claim UPDATE returns 0 rows → already_matched.
     session = _Session()
     svc = _svc(session, monkeypatch)
     line = _line()
     session.put(line)
-    session.execute_q.append(_Result([]))  # Claim verloren
+    session.execute_q.append(_Result([]))  # claim lost
     with pytest.raises(ValidationProblem):
         await svc.confirm_line(line.id, ConfirmLineRequest(budgetId=uuid.uuid4()))
 
@@ -573,7 +579,7 @@ async def test_confirm_line_already_allocated(monkeypatch: pytest.MonkeyPatch) -
         kind="expense", amount=Decimal("50.00"), currency="EUR", description="x",
     )
     session.put(exp)
-    session.scalar_q.append(uuid.uuid4())  # bereits zugeordnet
+    session.scalar_q.append(uuid.uuid4())  # already allocated
     with pytest.raises(ValidationProblem):
         await svc.confirm_line(line.id, ConfirmLineRequest(matchExpenseId=exp.id))
 
@@ -593,10 +599,10 @@ async def test_confirm_line_booking_failure_reverts_claim(monkeypatch: pytest.Mo
         raise RuntimeError("budget gone")
 
     monkeypatch.setattr(BudgetTreeService, "book_expense", _boom)
-    session.execute_q.append(_Result([(line.id,)]))  # claim gewinnt, dann scheitert das Buchen
+    session.execute_q.append(_Result([(line.id,)]))  # the claim wins, then booking fails
     with pytest.raises(RuntimeError):
         await svc.confirm_line(line.id, ConfirmLineRequest(budgetId=uuid.uuid4()))
-    # Eine Transaktion → ein Rollback nimmt Claim + Buchung gemeinsam zurück.
+    # One transaction: a single rollback undoes the claim and the booking together.
     assert getattr(session, "rollbacks", 0) == 1
 
 

@@ -1,8 +1,8 @@
 """Admin router for the deadline-policy registry.
 
-CRUD under ``/admin/deadline-policies``, gated by ``admin.deadlines``. The flow
-references a policy by ``key``; dates are maintained here without re-versioning
-the flow.
+The router serves CRUD under `/admin/deadline-policies` and needs the
+`admin.deadlines` permission. The flow references a policy by `key`. An admin
+maintains the dates here, without a new version of the flow.
 """
 
 from __future__ import annotations
@@ -25,8 +25,8 @@ router = APIRouter(prefix="/admin/deadline-policies", tags=["deadlines"])
 
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 _CONFIG = Depends(require_principal("admin.deadlines"))
-# Reads are also allowed for the flow editor (flow.configure), which needs the
-# policies as options for deadline guards/actions; writes stay admin.deadlines.
+# The flow editor (`flow.configure`) may also read the policies. It needs them
+# as options for deadline guards and actions. Writes stay with `admin.deadlines`.
 _CONFIG_READ = Depends(require_any_permission("admin.deadlines", "flow.configure"))
 
 

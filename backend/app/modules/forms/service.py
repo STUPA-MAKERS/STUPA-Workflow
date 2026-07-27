@@ -1,11 +1,12 @@
-"""Forms service: form-version CRUD + effective form (DB layer).
+"""Forms service: form-version CRUD and the effective form (DB layer).
 
-Versioning pins: a new form version is created, old versions stay unchanged — running
-applications keep their ``form_version_id``. At most one ``active`` version per type
-(partial-unique): on activation others are deactivated first, then
-``application_type.active_form_version_id`` is updated.
+A version pins the definition. A save creates a new form version and leaves the old
+versions unchanged. A running application keeps its ``form_version_id``. A partial unique
+index allows at most one ``active`` version per type. On activation the service first
+deactivates the other versions. It then updates
+``application_type.active_form_version_id``.
 
-The pure validation/merge logic lives in :mod:`app.modules.forms.validation`.
+The pure validation and merge logic lives in `app.modules.forms.validation`.
 """
 
 from __future__ import annotations
@@ -43,7 +44,7 @@ from app.shared.errors import NotFoundError, ValidationProblem
 
 
 def _row_to_field_def(row: FormField) -> FormFieldDef:
-    """DB ``form_field`` row → ``FormFieldDef`` (camelCase input)."""
+    """Convert a ``form_field`` row into a ``FormFieldDef`` (camelCase input)."""
     return FormFieldDef.model_validate(
         {
             "key": row.key,
@@ -62,18 +63,19 @@ def _row_to_field_def(row: FormField) -> FormFieldDef:
     )
 
 
-# Field types whose options the server injects dynamically (not hand-maintained).
+# Field types whose options the server injects at render time, not the form builder.
 DYNAMIC_OPTION_TYPES: frozenset[str] = frozenset({"gremium_select", "budget_select"})
 
 
 def _inject_dynamic_options(
     fields: list[FormFieldDef], options_by_type: dict[str, list[FieldOption]]
 ) -> list[FormFieldDef]:
-    """Set server-side options on dynamic picker fields.
+    """Set the server-side options on the dynamic picker fields.
 
-    ``options_by_type`` maps field type -> options (``gremium_select`` from the
-    committees, ``budget_select`` from the budget tree). Other fields are left as-is;
-    only the affected ones are copied (immutable ``FormFieldDef``)."""
+    ``options_by_type`` maps a field type to its options. ``gremium_select`` gets the
+    Gremien, ``budget_select`` gets the budget tree. The function keeps every other field
+    as it is. It copies only the affected fields, because ``FormFieldDef`` is immutable.
+    """
     if not any(f.type in options_by_type for f in fields):
         return fields
     return [
@@ -85,7 +87,7 @@ def _inject_dynamic_options(
 
 
 def _field_def_to_row_kwargs(field: FormFieldDef, order: int) -> dict[str, Any]:
-    """``FormFieldDef`` → kwargs for a ``form_field`` row."""
+    """Convert a ``FormFieldDef`` into the kwargs of a ``form_field`` row."""
     return {
         "key": field.key,
         "type": field.type,
@@ -112,7 +114,7 @@ def _field_def_to_row_kwargs(field: FormFieldDef, order: int) -> dict[str, Any]:
 
 
 class FormsService:
-    """DB-backed form operations (bound to an ``AsyncSession``)."""
+    """DB-backed form operations, bound to one ``AsyncSession``."""
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -136,10 +138,14 @@ class FormsService:
     async def _pot_fields(
         self, app_type: ApplicationType, budget_pot_id: UUID
     ) -> list[FormFieldDef]:
-        """Load pot extra fields — only for a pot belonging to the type's gremium.
+        """Load the extra fields of a budget pot of the Gremium of the application type.
 
-        Prevents cross-gremium leaks: a foreign/type-mismatched pot must not be attached
-        to the public effective form. Non-matching pots → 404 (don't reveal existence).
+        The check stops cross-Gremium leaks. A pot of another Gremium, or a pot on a type
+        without a budget, must never reach the public effective form.
+
+        Raises:
+            NotFoundError: The pot does not exist, or it does not match the type. The
+                answer is 404 and does not reveal that the pot exists.
         """
         pot = await self.session.get(BudgetPot, budget_pot_id)
         if pot is None:
@@ -170,8 +176,8 @@ class FormsService:
     ) -> EffectiveFormOut:
         """Return the effective form definition.
 
-        ``form_version_id`` overrides the active version — so a running application can
-        render/edit its pinned form (instead of the now-changed active one).
+        ``form_version_id`` overrides the active version. A running application uses this
+        to render and edit its pinned form instead of the changed active one.
         """
         app_type = await self._get_type(type_id)
         version_id = form_version_id or app_type.active_form_version_id
@@ -184,8 +190,8 @@ class FormsService:
         )
         sections = effective_form(type_fields, pot_fields)
 
-        # Dynamic picker fields get their options injected server-side only here (not
-        # hand-maintained in the form) — one lookup each, only if the type has such a field.
+        # The server injects the options of the dynamic picker fields only here. Each type
+        # costs one lookup, and only when the form holds such a field.
         present = {f.type for s in sections for f in s.fields} & DYNAMIC_OPTION_TYPES
         options_by_type: dict[str, list[FieldOption]] = {}
         if "gremium_select" in present:
@@ -200,7 +206,7 @@ class FormsService:
             sections=[
                 FormSectionOut(
                     key=s.key,
-                    # Marker sections carry their own label; main/budget from the defaults.
+                    # A marker section carries its own label. main and budget use defaults.
                     label=s.label or SECTION_LABELS.get(s.key) or SECTION_LABELS["main"],
                     fields=_inject_dynamic_options(s.fields, options_by_type),
                 )
@@ -209,10 +215,11 @@ class FormsService:
         )
 
     async def _gremium_field_options(self) -> list[FieldOption]:
-        """Current committees as `select` options (id -> name) for `gremium_select`.
+        """Return the current Gremien as `select` options for `gremium_select`.
 
-        The stored answer value is the committee UUID; the label is the name in both
-        languages (committee names are not i18n-split)."""
+        The stored answer value is the UUID of the Gremium. The label is the name in both
+        languages, because a Gremium name has no i18n split.
+        """
         rows = (
             await self.session.execute(select(Gremium.id, Gremium.name).order_by(Gremium.name))
         ).all()
@@ -221,8 +228,10 @@ class FormsService:
         ]
 
     async def _budget_field_options(self) -> list[FieldOption]:
-        """Active cost centres as `select` options (id -> "name (path key)") for
-        `budget_select`. The stored answer value is the budget UUID."""
+        """Return the active cost centers as `select` options for `budget_select`.
+
+        The label is `name (path key)`. The stored answer value is the budget UUID.
+        """
         rows = (
             await self.session.execute(
                 select(Budget.id, Budget.name, Budget.path_key)
@@ -244,12 +253,18 @@ class FormsService:
         action: AuditAction = AuditAction.CONFIG_CHANGE,
         extra_data: dict[str, Any] | None = None,
     ) -> FormVersionOut:
-        """Create a new form version (definition validated; optionally activate).
+        """Create a new form version and validate the definition.
 
-        Old versions stay unchanged; a ``config_revision`` snapshot + linked audit entry
-        is also written. ``action``/``extra_data`` carry the restore/revert path.
+        The service activates the new version when ``payload.activate`` is set. The old
+        versions stay unchanged. The service also writes a ``config_revision`` snapshot
+        and a linked audit entry. ``action`` and ``extra_data`` carry the restore and
+        revert path.
+
+        Raises:
+            ValidationProblem: The form definition is invalid.
+            NotFoundError: The application type does not exist.
         """
-        # Validate input before DB access: broken definition → 422 (not 500).
+        # Validate the input before DB access. A broken definition gives 422, not 500.
         try:
             validate_definition(payload.fields)
         except FormDefinitionError as exc:
@@ -309,11 +324,14 @@ class FormsService:
         )
 
     async def set_form_active(self, type_id: UUID, active: bool) -> FormDraftOut:
-        """Activate/deactivate a type's form.
+        """Activate or deactivate the form of an application type.
 
-        ``active=False`` sets ``active_form_version_id`` to ``NULL`` (type locked for new
-        applications; running applications keep their pinned version). ``True``
-        reactivates the latest version.
+        ``active=False`` sets ``active_form_version_id`` to ``NULL``. The type is then
+        locked for new applications. A running application keeps its pinned version.
+        ``active=True`` reactivates the latest version.
+
+        Raises:
+            ValidationProblem: The type has no form version to activate.
         """
         app_type = await self._get_type(type_id)
         await self.session.execute(
@@ -344,11 +362,12 @@ class FormsService:
         return await self.get_form_draft(type_id)
 
     async def get_form_draft(self, type_id: UUID) -> FormDraftOut:
-        """A type's most recent form version for editing.
+        """Return the most recent form version of an application type for editing.
 
-        Raw field list + description — no pot merge/sections (that is the public
-        ``get_effective_form`` path). If the type has no version yet, an empty definition
-        is returned (editor starts empty).
+        The result holds the raw field list and the description. It has no pot merge and
+        no sections. That is the job of the public ``get_effective_form`` path. If the
+        type has no version yet, the service returns an empty definition and the editor
+        starts empty.
         """
         await self._get_type(type_id)
         version = await self.session.scalar(

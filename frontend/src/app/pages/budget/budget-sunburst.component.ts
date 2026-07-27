@@ -16,7 +16,7 @@ import { PALETTE } from './budget-year-tree.component';
 /** Overview metrics (tab selector in the overlay). */
 export type SunburstMetric = 'allocated' | 'available' | 'expended';
 
-/** An annular segment (one cost-centre at its depth). */
+/** An annular segment: one cost center at its depth. */
 interface SunSeg {
   id: string;
   name: string;
@@ -36,11 +36,12 @@ const R_CENTER = 64;
 const R_MAX = SIZE / 2 - 8;
 
 /**
- * Interactive sunburst: radial rings over the whole cost-centre subtree — the
- * further out, the deeper the level. The centre shows the root (selected
- * cost-centre) with its total value; hover shows a tooltip (name, amount, share),
- * click reports the cost-centre (drilldown in the tab). Pure SVG, no third-party
- * lib.
+ * Interactive sunburst: radial rings over the whole cost center subtree.
+ *
+ * A ring further out shows a deeper level. The center shows the root, which is the
+ * selected cost center, with its total value. Hover shows a tooltip with the name,
+ * the amount and the share. A click reports the cost center for the drilldown in the
+ * tab. The chart is pure SVG and uses no third-party library.
  */
 @Component({
   selector: 'app-budget-sunburst',
@@ -56,7 +57,7 @@ export class BudgetSunburstComponent {
   readonly root = input<BudgetTreeNode | null>(null);
   readonly fyId = input<string>('');
   readonly metric = input<SunburstMetric>('allocated');
-  /** Click on a segment (or the centre) -> cost-centre id. */
+  /** Click on a segment or on the center: emits the cost center id. */
   readonly nodeClick = output<string>();
 
   protected readonly SIZE = SIZE;
@@ -72,8 +73,8 @@ export class BudgetSunburstComponent {
     return a ? Number(a[this.metric()]) : 0;
   }
 
-  /** Subtree value: own (non-distributed) share + sum of children — robust even
-   *  when the metric doesn't cleanly sum up to the parent. */
+  /** Subtree value: the share that the node keeps plus the sum of its children.
+   *  This also works when the metric does not sum up to the parent value. */
   private subtree(node: BudgetTreeNode): number {
     const children = node.children.reduce((s, c) => s + this.subtree(c), 0);
     const own = Math.max(0, this.metricOf(node) - node.children.reduce((s, c) => s + this.metricOf(c), 0));
@@ -110,8 +111,8 @@ export class BudgetSunburstComponent {
         const v = this.subtree(c);
         if (v <= 0) return;
         const childSpan = span * (v / nodeVal);
-        // The cost-centre's set colour wins (like the small pies); without its own
-        // colour the segment inherits the parent branch's colour.
+        // The color set on the cost center wins, as in the small pies. Without an own
+        // color the segment inherits the color of the parent branch.
         const childColor = c.color ?? color ?? PALETTE[i % PALETTE.length];
         const r0 = R_CENTER + (depth - 1) * ringW;
         out.push({

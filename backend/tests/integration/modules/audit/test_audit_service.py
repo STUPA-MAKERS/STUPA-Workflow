@@ -1,10 +1,10 @@
-"""Integration (echte Postgres, testcontainers): Audit-Hash-Kette + Append-only.
+"""Integration (real Postgres, testcontainers): audit hash chain and append-only.
 
-Beweist gegen ein echtes Schema (security.md §4):
-* :meth:`AuditService.record` baut eine verkettete, lückenlose Kette (Advisory-Lock,
-  ``prev_hash``-Verkettung) → :meth:`verify_chain` ``valid``.
-* DB-seitige Append-only-Durchsetzung: UPDATE/DELETE auf ``audit_entry`` → Fehler
-  (Trigger ``audit_entry_append_only``, Migration 0005).
+The tests prove these facts against a real schema (security.md §4). `AuditService.record`
+builds a linked chain with no gap. It holds an advisory lock and links each entry
+through `prev_hash`, so `verify_chain` reports `valid`. The DB itself enforces
+append-only. An UPDATE or a DELETE on `audit_entry` raises an error through the trigger
+`audit_entry_append_only` (migration 0005).
 """
 
 from __future__ import annotations
@@ -92,40 +92,40 @@ async def test_query_cursor_keyset_paginates(session: AsyncSession) -> None:
 
     first, has_more = await svc.query_cursor(limit=2)
     assert len(first) == 2 and has_more is True
-    # neueste zuerst (id desc)
+    # newest first (id desc)
     assert first[0].id > first[1].id
 
     second, has_more2 = await svc.query_cursor(limit=2, before=first[-1].id)
     assert len(second) == 2 and has_more2 is True
-    assert second[0].id < first[-1].id  # echtes Keyset, keine Überlappung
+    assert second[0].id < first[-1].id  # a real keyset, no overlap
 
     third, has_more3 = await svc.query_cursor(limit=2, before=second[-1].id)
-    assert len(third) == 1 and has_more3 is False  # Ende erreicht
+    assert len(third) == 1 and has_more3 is False  # the end of the list
 
 
 async def test_resolve_actor_names_and_list_actors(session: AsyncSession) -> None:
     from app.modules.auth.models import Principal
 
     session.add(Principal(sub="u-1", display_name="User One", email="u1@x.test"))
-    session.add(Principal(sub="u-2", email="u2@x.test"))  # nur email
+    session.add(Principal(sub="u-2", email="u2@x.test"))  # email only
     svc = AuditService(session)
     await svc.record(actor="u-1", action=AuditAction.LOGIN)
     await svc.record(actor="u-2", action=AuditAction.LOGIN)
-    await svc.record(actor=None, action=AuditAction.EXPORT)  # System
+    await svc.record(actor=None, action=AuditAction.EXPORT)  # the system actor
     await session.commit()
 
     names = await svc.resolve_actor_names(["u-1", "u-2", "unknown", None])
     assert names == {"u-1": "User One", "u-2": "u2@x.test"}
 
     actors = await svc.list_actors()
-    # nur nicht-None Akteure, mit aufgelöstem Namen
+    # only actors that are not None, each with a resolved name
     assert ("u-1", "User One") in actors
     assert ("u-2", "u2@x.test") in actors
     assert all(sub is not None for sub, _ in actors)
 
 
 async def test_resolve_data_ids_resolves_embedded_uuids(session: AsyncSession) -> None:
-    """In ``data`` eingebettete UUIDs → Klarname; Unbekannte/Nicht-UUIDs fehlen."""
+    """Resolve UUIDs embedded in `data` to names. Unknown and non-UUID values are absent."""
     import uuid as _uuid
 
     from app.modules.admin.models import Gremium
@@ -135,7 +135,7 @@ async def test_resolve_data_ids_resolves_embedded_uuids(session: AsyncSession) -
     await session.flush()
     unknown = str(_uuid.uuid4())
 
-    # rekursiv (Liste/verschachteltes Dict) + Nicht-UUID-Werte werden ignoriert
+    # The scan runs recursively over lists and nested dicts and skips non-UUID values.
     resolved = await AuditService(session).resolve_data_ids(
         [
             {"gremiumId": str(g.id), "note": "kein-uuid"},
@@ -165,7 +165,10 @@ async def test_delete_is_rejected(session: AsyncSession, engine: Engine) -> None
 
 
 async def test_truncate_is_rejected(session: AsyncSession, engine: Engine) -> None:
-    """TRUNCATE umginge die Row-Trigger → Statement-Trigger lehnt ab (Tamper-Evidence)."""
+    """TRUNCATE would bypass the row triggers.
+
+    A statement trigger rejects it, which keeps the tamper evidence intact.
+    """
     await AuditService(session).record(actor="a", action=AuditAction.LOGIN)
     await session.commit()
 
@@ -177,10 +180,11 @@ async def test_truncate_is_rejected(session: AsyncSession, engine: Engine) -> No
 async def test_concurrent_records_keep_chain_intact(
     migrated: tuple[str, str], engine: Engine
 ) -> None:
-    """Zwei gleichzeitige ``record()`` (eigene Sessions) → lückenlose Kette.
+    """Two parallel `record()` calls in separate sessions keep the chain without a gap.
 
-    Der Transaktions-Advisory-Lock serialisiert die Appends; kein verschränktes
-    ``prev_hash`` (eine der beiden Transaktionen wartet bis zum Commit der anderen)."""
+    The transaction advisory lock serializes the appends. No `prev_hash` interleaves,
+    because one transaction waits for the commit of the other.
+    """
     eng = create_async_engine(migrated[1])
     maker = async_sessionmaker(eng, expire_on_commit=False)
 
@@ -200,7 +204,7 @@ async def test_concurrent_records_keep_chain_intact(
             )
             assert len(entries) == 2
             assert entries[0].prev_hash is None
-            assert entries[1].prev_hash == entries[0].hash  # echte Verkettung
+            assert entries[1].prev_hash == entries[0].hash  # a real link
             assert entries[0].hash != entries[1].hash
             assert (await AuditService(s).verify_chain()).valid is True
     finally:

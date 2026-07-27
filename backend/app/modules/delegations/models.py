@@ -1,13 +1,14 @@
-"""Meeting-delegation tables.
+"""Meeting delegation tables.
 
-:class:`MeetingDelegation` — session-bound representation: exactly one outgoing
-delegation per (meeting, delegator); the gremium is the meeting's.
-``delegate_voting`` additionally transfers the voting right (exclusive transfer,
-no duplicate — the delegator is blocked from voting in that meeting).
+`MeetingDelegation` holds a meeting-bound delegation. Each (meeting, delegator)
+pair has exactly one outgoing delegation. The gremium of the row is the gremium
+of the meeting. `delegate_voting` also transfers the voting right. The transfer
+is exclusive and never a duplicate. The delegator cannot vote in that meeting.
 
-:class:`DelegationSubstitute` — per-gremium substitute pool: pool members may be
-delegated to without the lead-time deadline, even if not gremium members
-themselves. ``member_principal_id IS NULL`` = substitute for every member.
+`DelegationSubstitute` holds the substitute pool of one gremium. A member may
+delegate to a pool member without the lead-time deadline. A pool member does not
+have to be a gremium member. A NULL `member_principal_id` marks a substitute for
+every member.
 """
 
 from __future__ import annotations
@@ -21,15 +22,15 @@ from app.db import Base, CreatedAtMixin, UUIDPkMixin
 
 
 class MeetingDelegation(UUIDPkMixin, CreatedAtMixin, Base):
-    """Representation for a single meeting; voting right optionally transferred."""
+    """Delegation for a single meeting with an optional transfer of the voting right."""
 
     __tablename__ = "meeting_delegation"
 
     meeting_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("meeting.id", ondelete="CASCADE")
     )
-    # Denormalized (= meeting.gremium_id): avoids the join in the hot
-    # voting-right check and in "my delegations" queries.
+    # Denormalized copy of the gremium of the meeting. It removes the join from
+    # the hot voting-right check and from the "my delegations" queries.
     gremium_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("gremium.id", ondelete="CASCADE")
     )
@@ -40,19 +41,20 @@ class MeetingDelegation(UUIDPkMixin, CreatedAtMixin, Base):
         ForeignKey("principal.id", ondelete="CASCADE")
     )
     delegate_voting: Mapped[bool] = mapped_column(Boolean, server_default="false")
-    # Legitimized via the substitute pool (no lead-time deadline on create).
+    # True when the substitute pool legitimizes the delegation. Create then
+    # applies no lead-time deadline.
     via_pool: Mapped[bool] = mapped_column(Boolean, server_default="false")
-    # ``sub`` of the creator (self-service or admin) — audit anchor.
+    # The `sub` of the creator, either self-service or admin. It anchors the audit.
     created_by: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
-        # Exactly one outgoing representation per (meeting, member).
         UniqueConstraint(
             "meeting_id", "delegator_principal_id", name="uq_meeting_delegation_delegator"
         ),
-        # At most one voting-right takeover per (meeting, delegate): a principal
-        # casts exactly one ballot — a second voting delegation to the same
-        # person would silently lapse (transfer, not duplicate).
+        # At most one takeover of the voting right per (meeting, delegate). A
+        # principal casts exactly one ballot. A second voting delegation to the
+        # same person would lapse without a message, because this is a transfer
+        # and not a duplicate.
         Index(
             "uq_meeting_delegation_voting_delegate",
             "meeting_id",
@@ -66,15 +68,18 @@ class MeetingDelegation(UUIDPkMixin, CreatedAtMixin, Base):
 
 
 class DelegationSubstitute(UUIDPkMixin, CreatedAtMixin, Base):
-    """Pool entry: ``substitute`` may represent ``member`` (or every member if
-    ``member_principal_id IS NULL``) without the lead-time deadline."""
+    """Pool entry that lets a substitute represent a member.
+
+    The substitute acts without the lead-time deadline. A NULL
+    `member_principal_id` lets the substitute represent every member.
+    """
 
     __tablename__ = "delegation_substitute"
 
     gremium_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("gremium.id", ondelete="CASCADE")
     )
-    # NULL = gremium-wide substitute (represents every member).
+    # NULL marks a gremium-wide substitute that represents every member.
     member_principal_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("principal.id", ondelete="CASCADE"), nullable=True
     )
@@ -84,8 +89,8 @@ class DelegationSubstitute(UUIDPkMixin, CreatedAtMixin, Base):
     created_by: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
-        # Gremium-wide entries (member IS NULL) are deduplicated via a partial
-        # unique index since UniqueConstraint treats NULLs as distinct.
+        # A partial unique index deduplicates the gremium-wide entries, because
+        # UniqueConstraint treats NULL values as distinct.
         UniqueConstraint(
             "gremium_id",
             "member_principal_id",

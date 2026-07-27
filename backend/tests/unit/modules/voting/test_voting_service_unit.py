@@ -1,8 +1,9 @@
-"""TDD: VotingService (T-15) — Lebenszyklus + RBAC + Race-Branches ohne DB.
+"""VotingService (T-15): lifecycle, RBAC and race branches without a database.
 
-Die echten DB-Constraints (UNIQUE-Doppelstimme, ON CONFLICT) liegen in der
-Integration; hier wird jede Service-Verzweigung über einen Ergebnis-Queue-Fake
-deterministisch getroffen (Branch-Abdeckung)."""
+The real database constraints (UNIQUE double ballot, ON CONFLICT) belong to the
+integration tests. Here a result-queue fake hits every service branch in a
+deterministic way, which gives full branch coverage.
+"""
 
 from __future__ import annotations
 
@@ -67,9 +68,6 @@ def _voter(*, group: str = "stupa", sub: str = "v1") -> Principal:
     return Principal(sub=sub, permissions={"vote.cast"}, groups={group})
 
 
-# --------------------------------------------------------------------------- #
-# create
-# --------------------------------------------------------------------------- #
 async def test_create_ok() -> None:
     app = SimpleNamespace(id=uuid4())
     db = fake_session(result(app))
@@ -86,7 +84,7 @@ async def test_create_ok() -> None:
 
 
 def test_votecreate_percent_quorum_requires_eligible_count() -> None:
-    """Prozent-Quorum ohne maßgebliche Stimmberechtigten-Zahl → 422 (fail-closed)."""
+    """A percent quorum without an eligible count fails closed with 422."""
     with pytest.raises(ValueError, match="eligibleCount"):
         VoteCreate.model_validate(
             {
@@ -118,14 +116,11 @@ async def test_create_unknown_application_404() -> None:
         await VotingService(db).create(uuid4(), payload)
 
 
-# --------------------------------------------------------------------------- #
-# open
-# --------------------------------------------------------------------------- #
 async def test_open_sets_window_keeps_roster_eligible() -> None:
-    # eligible_count stammt aus dem Roster (beim Anlegen gesetzt), NICHT aus
-    # eingeloggten Usern → open zählt nichts nach.
+    # The roster sets eligible_count at create time. It never counts logged-in users,
+    # so open() recounts nothing.
     vote = _vote(status="draft", eligible_count=20)
-    db = fake_session(result(vote))  # nur _get_vote, kein Count-Query
+    db = fake_session(result(vote))  # only _get_vote, no count query
     out = await VotingService(db).open(vote.id, now=NOW)
     assert out.status == "open"
     assert out.opens_at == NOW
@@ -145,9 +140,6 @@ async def test_open_unknown_vote_404() -> None:
         await VotingService(db).open(uuid4(), now=NOW)
 
 
-# --------------------------------------------------------------------------- #
-# cast — guards
-# --------------------------------------------------------------------------- #
 async def test_cast_not_open_409() -> None:
     vote = _vote(status="draft")
     db = fake_session(result(vote))
@@ -170,8 +162,8 @@ async def test_cast_not_in_group_403() -> None:
 
 
 async def test_cast_blocked_when_voting_right_delegated_403() -> None:
-    # #delegation-rework: ausgehende Stimm-Delegation für DIESE Sitzung
-    # (is_delegator=True, delegate_voting=True) → eigene Stimme verboten.
+    # #delegation-rework: an outgoing vote delegation for THIS meeting
+    # (is_delegator=True, delegate_voting=True) forbids an own ballot.
     gid = uuid4()
     vote = _vote(meeting_id=uuid4(), eligible_group=str(gid))
     db = fake_session(result(vote), result((True, True, _voter().sub)))
@@ -183,17 +175,17 @@ async def test_cast_blocked_when_voting_right_delegated_403() -> None:
 
 
 async def test_cast_nonvoting_delegation_does_not_block_member() -> None:
-    # Eine Nicht-Stimm-Delegation (z. B. reine Sitzungs-Vertretung) blockt das
-    # eigene Stimmrecht eines Mitglieds nicht.
+    # A non-voting delegation, for example a pure meeting delegation, does not block
+    # the own voting right of a member.
     gid = uuid4()
     vote = _vote(meeting_id=uuid4(), eligible_group=str(gid))
     db = fake_session(
         result(vote),
-        result((True, False, _voter().sub)),  # ausgehende NICHT-Stimm-Delegation
+        result((True, False, _voter().sub)),  # outgoing NON-voting delegation
         result(SimpleNamespace(inserted=True)),  # ballot insert
     )
-    # Gremium-Vote: Stimmberechtigung über den namespaced Key (AUD-066), den eine
-    # echte vote.cast-Mitgliedschaft setzt — nicht den nackten UUID-String.
+    # Gremium vote: the right to vote comes from the namespaced key (AUD-066) that a
+    # real vote.cast membership sets, not from the bare UUID string.
     out = await VotingService(db).cast(
         vote.id, _voter(group=vote_group_key(gid)), "yes", now=NOW
     )
@@ -202,14 +194,14 @@ async def test_cast_nonvoting_delegation_does_not_block_member() -> None:
 
 
 async def test_cast_exercising_delegated_vote_is_audited() -> None:
-    # Externer Stellvertreter: NICHT in der eligible_group, aber Empfänger einer
-    # Stimm-Delegation der Sitzung → Vertretungs-Stimme (as_delegation=True) unter
-    # dem sub des/der Delegierenden + DELEGATION_USE-Audit.
+    # External substitute: not in eligible_group, but the receiver of a vote delegation
+    # of the meeting. The delegated ballot (as_delegation=True) goes under the sub of
+    # the delegator and writes a DELEGATION_USE audit entry.
     gid = uuid4()
     vote = _vote(meeting_id=uuid4(), eligible_group=str(gid))
     db = fake_session(
         result(vote),
-        result((False, True, "delegator-1")),  # eingehende Stimm-Delegation
+        result((False, True, "delegator-1")),  # incoming vote delegation
         result(),  # audit advisory lock
         result(),  # audit prev-hash
         result(SimpleNamespace(inserted=True)),  # ballot insert (allowChange → xmax)
@@ -223,13 +215,14 @@ async def test_cast_exercising_delegated_vote_is_audited() -> None:
 
 
 async def test_cast_own_vote_unaffected_by_incoming_delegation() -> None:
-    # Mitglied MIT eingehender Delegation: die eigene Stimme läuft normal weiter
-    # (getrennte Abgaben) — ohne as_delegation kein Audit, Ballot unter eigenem sub.
+    # Member WITH an incoming delegation: the own ballot still runs as a separate cast.
+    # Without as_delegation the service writes no audit entry and the ballot uses the
+    # own sub.
     gid = uuid4()
     vote = _vote(meeting_id=uuid4(), eligible_group=str(gid))
     db = fake_session(
         result(vote),
-        result((False, True, "delegator-1")),  # eingehende Stimm-Delegation
+        result((False, True, "delegator-1")),  # incoming vote delegation
         result(SimpleNamespace(inserted=True)),  # ballot insert
     )
     out = await VotingService(db).cast(
@@ -240,7 +233,6 @@ async def test_cast_own_vote_unaffected_by_incoming_delegation() -> None:
 
 
 async def test_cast_as_delegation_without_incoming_403() -> None:
-    # Vertretungs-Stimme ohne eingehende Delegation → 403.
     gid = uuid4()
     vote = _vote(meeting_id=uuid4(), eligible_group=str(gid))
     db = fake_session(result(vote), result())
@@ -251,8 +243,7 @@ async def test_cast_as_delegation_without_incoming_403() -> None:
 
 
 async def test_cast_vote_without_meeting_skips_delegation_check() -> None:
-    # Votes ohne Sitzung kennen keine Delegation — kein Delegations-Query.
-    vote = _vote()  # meeting_id=None
+    vote = _vote()  # meeting_id=None, so the service runs no delegation query
     db = fake_session(result(vote), result(SimpleNamespace(inserted=True)))
     out = await VotingService(db).cast(vote.id, _voter(), "yes", now=NOW)
     assert out.status == "cast"
@@ -265,9 +256,6 @@ async def test_cast_unknown_option_422() -> None:
         await VotingService(db).cast(vote.id, _voter(), "maybe", now=NOW)
 
 
-# --------------------------------------------------------------------------- #
-# cast — open ballot (allowChange on/off)
-# --------------------------------------------------------------------------- #
 async def test_cast_open_first_vote() -> None:
     vote = _vote(config=_config(allowChange=False))
     db = fake_session(result(vote), result(SimpleNamespace(id=uuid4())))
@@ -278,15 +266,16 @@ async def test_cast_open_first_vote() -> None:
 
 async def test_cast_open_double_no_change_409() -> None:
     vote = _vote(config=_config(allowChange=False))
-    db = fake_session(result(vote), result())  # leeres RETURNING → Konflikt
+    db = fake_session(result(vote), result())  # an empty RETURNING means conflict
     with pytest.raises(ConflictError, match="Already voted"):
         await VotingService(db).cast(vote.id, _voter(), "yes", now=NOW)
-    # ON CONFLICT DO NOTHING schrieb nichts → kein Commit (get_session rollt zurück).
+    # ON CONFLICT DO NOTHING wrote nothing, so there is no commit. get_session
+    # rolls the transaction back.
     assert db.committed == 0
 
 
 async def test_cast_open_allowchange_first_vote_is_cast() -> None:
-    # allowChange + Erst-Stimme (INSERT, xmax=0) → "cast", nicht "changed".
+    # allowChange plus a first ballot (INSERT, xmax=0) gives "cast", not "changed".
     vote = _vote(config=_config(allowChange=True))
     db = fake_session(result(vote), result(SimpleNamespace(inserted=True)))
     out = await VotingService(db).cast(vote.id, _voter(), "yes", now=NOW)
@@ -295,7 +284,7 @@ async def test_cast_open_allowchange_first_vote_is_cast() -> None:
 
 
 async def test_cast_open_change_updates() -> None:
-    # allowChange + bestehende Stimme (UPDATE via ON CONFLICT) → "changed".
+    # allowChange plus an existing ballot (UPDATE through ON CONFLICT) gives "changed".
     vote = _vote(config=_config(allowChange=True))
     db = fake_session(result(vote), result(SimpleNamespace(inserted=False)))
     out = await VotingService(db).cast(vote.id, _voter(), "no", now=NOW)
@@ -304,22 +293,20 @@ async def test_cast_open_change_updates() -> None:
 
 
 async def test_cast_open_allowchange_empty_returning_is_changed() -> None:
-    # Defensiv: leeres RETURNING (kein row) → kein Insert erkannt → "changed".
+    # Defensive: an empty RETURNING gives no row. The service sees no insert and
+    # reports "changed".
     vote = _vote(config=_config(allowChange=True))
     db = fake_session(result(vote), result())
     out = await VotingService(db).cast(vote.id, _voter(), "no", now=NOW)
     assert out.status == "changed"
 
 
-# --------------------------------------------------------------------------- #
-# cast — secret ballot
-# --------------------------------------------------------------------------- #
 async def test_cast_secret_first_vote_writes_anonymous() -> None:
     vote = _vote(config=_config(secret=True))
     db = fake_session(result(vote), result(SimpleNamespace(id=uuid4())))
     out = await VotingService(db).cast(vote.id, _voter(), "yes", now=NOW)
     assert out.status == "cast"
-    # secret_ballot ohne Identität hinzugefügt, kein Ballot.
+    # The service adds a secret_ballot without an identity and no ballot.
     assert len(db.added) == 1
     assert type(db.added[0]).__name__ == "SecretBallot"
     assert db.committed == 1
@@ -327,21 +314,18 @@ async def test_cast_secret_first_vote_writes_anonymous() -> None:
 
 async def test_cast_secret_double_409() -> None:
     vote = _vote(config=_config(secret=True))
-    db = fake_session(result(vote), result())  # marker existiert → Konflikt
+    db = fake_session(result(vote), result())  # the marker exists, so conflict
     with pytest.raises(ConflictError, match="Already voted"):
         await VotingService(db).cast(vote.id, _voter(), "yes", now=NOW)
     assert db.committed == 0
 
 
-# --------------------------------------------------------------------------- #
-# get
-# --------------------------------------------------------------------------- #
 async def test_get_open_aggregates_tally() -> None:
     vote = _vote()
     db = fake_session(result(vote), result("yes", "yes", "no"))
     out = await VotingService(db).get(vote.id)
     assert out.tally.counts == {"yes": 2, "no": 1, "abstain": 0}
-    assert out.tally.result is None  # offen → kein Endergebnis
+    assert out.tally.result is None  # still open, so no final result
 
 
 async def test_get_closed_includes_result() -> None:
@@ -353,19 +337,16 @@ async def test_get_closed_includes_result() -> None:
 
 
 async def test_get_secret_hides_counts_until_close() -> None:
-    # Geheim ⇒ keine Choice-Counts vor dem Schließen (nur Teilnahme); #vote-progress.
+    # Secret: no choice counts before the close, only participation (#vote-progress).
     vote = _vote(config=_config(secret=True))
     db = fake_session(result(vote), result("yes", "no", "yes"))
     out = await VotingService(db).get(vote.id)
     assert out.secret is True
     assert out.tally.revealed is False
     assert out.tally.counts == {}
-    assert out.tally.voted == 3  # Teilnahme bleibt sichtbar
+    assert out.tally.voted == 3  # participation stays visible
 
 
-# --------------------------------------------------------------------------- #
-# close — count → result → flow.fire(branch)
-# --------------------------------------------------------------------------- #
 class _FakeFlow:
     available: ClassVar[list[TransitionOut]] = []
     calls: ClassVar[list[str | None]] = []
@@ -423,8 +404,10 @@ async def test_close_fires_matching_branch(_patch_flow: type[_FakeFlow]) -> None
 
 
 async def test_close_prefers_global_flow_branch(_patch_flow: type[_FakeFlow]) -> None:
-    """#28: bei einem ``vote``-State feuert close() den ``pass``-Branch direkt —
-    ohne den Guard-basierten ``available_transitions``-Pfad."""
+    """Fire the `pass` branch directly from a `vote` state (#28).
+
+    The close path never uses the guard-based `available_transitions` path.
+    """
     branch_t = TransitionOut(id=uuid4(), fromStateId=uuid4(), toStateId=uuid4(), label={})
     _patch_flow.branch = branch_t
     vote = _vote()
@@ -432,29 +415,34 @@ async def test_close_prefers_global_flow_branch(_patch_flow: type[_FakeFlow]) ->
     out = await VotingService(db).close(vote.id, _voter())
     assert out.result == "passed"
     assert out.fired_transition_id == branch_t.id
-    assert _patch_flow.branch_calls == ["pass"]  # passed → pass
-    assert _patch_flow.calls == []  # Guard-Pfad NICHT benutzt
+    assert _patch_flow.branch_calls == ["pass"]
+    assert _patch_flow.calls == []  # the guard path stays unused
 
 
 async def test_close_application_vote_without_branch_raises_conflict(
     _patch_flow: type[_FakeFlow],
 ) -> None:
-    """Antragsgebundener Vote ohne passenden Branch-Übergang ⇒ fail-closed (409),
-    NICHT still schließen — sonst stünde das Ergebnis fest, der Antrag bliebe aber
-    ewig im Vor-Vote-State (Vote-Ergebnis und Flow-State driften auseinander)."""
-    _patch_flow.available = []  # kein passender Übergang
-    vote = _vote()  # application_id gesetzt
+    """Fail closed with 409 when an application vote finds no matching branch.
+
+    The service must not close the vote in silence. The result would be final while
+    the application stays forever in the state before the vote. The vote result and
+    the flow state would drift apart.
+    """
+    _patch_flow.available = []  # no matching transition
+    vote = _vote()  # application_id is set
     db = fake_session(result(vote), result("no", "no", "yes"))
     with pytest.raises(ConflictError):
         await VotingService(db).close(vote.id, _voter())
-    assert db.committed == 0  # kein stiller Teil-Commit
+    assert db.committed == 0  # no silent partial commit
 
 
 async def test_close_generic_vote_without_application_just_closes(
     _patch_flow: type[_FakeFlow],
 ) -> None:
-    """Generische Beschlussfrage (ohne Antrag) feuert KEINEN Branch — sie hält nur
-    das Ergebnis fürs Protokoll und committet den Schluss selbst."""
+    """A generic vote without an application fires NO branch.
+
+    The vote only holds the result for the protocol. The close commits itself.
+    """
     _patch_flow.available = []
     vote = _vote(application_id=None)
     db = fake_session(result(vote), result("no", "no", "yes"))
@@ -468,8 +456,11 @@ async def test_close_generic_vote_without_application_just_closes(
 async def test_close_atomic_fire_failure_does_not_commit(
     _patch_flow: type[_FakeFlow],
 ) -> None:
-    """`fire`-Fehler beim Schließen ⇒ KEIN Commit → Vote bleibt offen/wiederholbar
-    (kein »zu, aber Branch nie gefeuert«). Der Vote-Close ist mit `fire` atomar."""
+    """A `fire` error during the close writes NO commit.
+
+    The vote stays open and the caller can repeat the close. There is no state where
+    the vote is closed but the branch never fired. The close is atomic with `fire`.
+    """
     branch_t = TransitionOut(
         id=uuid4(), fromStateId=uuid4(), toStateId=uuid4(), label={}
     )
@@ -479,8 +470,8 @@ async def test_close_atomic_fire_failure_does_not_commit(
     db = fake_session(result(vote), result("yes", "yes"))
     with pytest.raises(ConflictError):
         await VotingService(db).close(vote.id, _voter())
-    # close hat selbst NICHT committet — die Vote-Änderung hängt nur ungespeichert
-    # in der Session; get_session rollt bei der Exception zurück.
+    # The close never committed. The vote change stays unsaved in the session, and
+    # get_session rolls back on the exception.
     assert db.committed == 0
 
 
@@ -498,26 +489,28 @@ async def test_close_unknown_vote_404() -> None:
 
 
 async def test_close_blocked_without_quorum(_patch_flow: type[_FakeFlow]) -> None:
-    """#12: Quorum nicht erfüllt ⇒ 409 statt still »rejected« — der Vote bleibt
-    offen (mehr Stimmen sammeln oder abbrechen)."""
+    """Return 409 when the quorum fails, instead of a silent "rejected" (#12).
+
+    The vote stays open. The caller collects more ballots or cancels the vote.
+    """
     vote = _vote(
         config=_config(quorum={"type": "percent", "value": 50}), eligible_count=10
     )
-    db = fake_session(result(vote), result("yes", "no"))  # 2/10 → Quorum verfehlt
+    db = fake_session(result(vote), result("yes", "no"))  # 2/10, so the quorum fails
     with pytest.raises(ConflictError):
         await VotingService(db).close(vote.id, _voter())
     assert db.committed == 0
     assert vote.status == "open"
 
 
-# --------------------------------------------------------------------------- #
-# close — verfallene Quorum-Abstimmung (#stuck-vote, FIX 3)
-# --------------------------------------------------------------------------- #
 async def test_close_expired_unmet_quorum_fires_fail_branch(
     _patch_flow: type[_FakeFlow],
 ) -> None:
-    """Zeit-Vote mit abgelaufenem Fenster + Quorum verfehlt + ``now`` (Cron) ⇒
-    terminal QUORUM-VERFEHLT: ``fail``-Branch feuert, Vote schließt (kein Dauer-Stuck)."""
+    """Close a timed vote for good when the window expired and the quorum failed.
+
+    The cron passes `now`. The service fires the `fail` branch and closes the vote,
+    so the vote never stays stuck (#stuck-vote).
+    """
     branch_t = TransitionOut(id=uuid4(), fromStateId=uuid4(), toStateId=uuid4(), label={})
     _patch_flow.branch = branch_t
     vote = _vote(
@@ -525,7 +518,7 @@ async def test_close_expired_unmet_quorum_fires_fail_branch(
         eligible_count=10,
         closes_at=NOW - timedelta(minutes=1),
     )
-    db = fake_session(result(vote), result("yes", "no"))  # 2/10 → Quorum verfehlt
+    db = fake_session(result(vote), result("yes", "no"))  # 2/10, so the quorum fails
     out = await VotingService(db).close(vote.id, _voter(), now=NOW)
     assert vote.status == "closed"
     assert out.result == "rejected"
@@ -537,8 +530,10 @@ async def test_close_expired_unmet_quorum_fires_fail_branch(
 async def test_close_expired_unmet_quorum_generic_vote_just_closes(
     _patch_flow: type[_FakeFlow],
 ) -> None:
-    """Verfallene generische Beschlussfrage (ohne Antrag): terminal geschlossen,
-    kein Branch — committet selbst."""
+    """Close an expired generic vote for good and fire no branch.
+
+    The vote has no application. The close commits itself.
+    """
     vote = _vote(
         application_id=None,
         config=_config(quorum={"type": "percent", "value": 50}),
@@ -556,7 +551,7 @@ async def test_close_expired_unmet_quorum_generic_vote_just_closes(
 async def test_close_now_but_window_not_expired_still_blocks(
     _patch_flow: type[_FakeFlow],
 ) -> None:
-    """``now`` gesetzt, aber Fenster noch offen ⇒ kein Verfall: 409 wie gehabt."""
+    """Keep the 409 when `now` is set but the window is still open."""
     vote = _vote(
         config=_config(quorum={"type": "percent", "value": 50}),
         eligible_count=10,
@@ -571,7 +566,7 @@ async def test_close_now_but_window_not_expired_still_blocks(
 async def test_close_now_untimed_vote_still_blocks(
     _patch_flow: type[_FakeFlow],
 ) -> None:
-    """``now`` gesetzt, aber ``closes_at=None`` (kein Fenster) ⇒ kein Verfall: 409."""
+    """Keep the 409 when `now` is set but `closes_at` is None, so no window exists."""
     vote = _vote(
         config=_config(quorum={"type": "percent", "value": 50}),
         eligible_count=10,
@@ -583,9 +578,6 @@ async def test_close_now_untimed_vote_still_blocks(
     assert vote.status == "open"
 
 
-# --------------------------------------------------------------------------- #
-# cancel (#12)
-# --------------------------------------------------------------------------- #
 async def test_cancel_open_vote_sets_cancelled_without_branch() -> None:
     vote = _vote()
     db = fake_session(result(vote), result())
@@ -609,11 +601,9 @@ async def test_cancel_closed_409() -> None:
         await VotingService(db).cancel(vote.id)
 
 
-# --------------------------------------------------------------------------- #
-# create — generische Beschlussfrage (ohne Antrag)
-# --------------------------------------------------------------------------- #
 async def test_create_without_application_skips_lookup() -> None:
-    # application_id=None → KEIN _get_application-Query (Branch 195->197).
+    # With application_id=None the service runs no _get_application query (branch
+    # 195->197).
     db = fake_session()
     payload = VoteCreate.model_validate(
         {"config": VoteConfig.model_validate(
@@ -626,9 +616,6 @@ async def test_create_without_application_skips_lookup() -> None:
     assert db.committed == 1
 
 
-# --------------------------------------------------------------------------- #
-# delete (an Sitzung gebundene Abstimmung)
-# --------------------------------------------------------------------------- #
 async def test_delete_vote_in_meeting_removes_and_commits() -> None:
     mid = uuid4()
     vote = _vote(meeting_id=mid)
@@ -646,11 +633,10 @@ async def test_delete_vote_from_other_meeting_404() -> None:
     assert db.deleted == []
 
 
-# --------------------------------------------------------------------------- #
-# get — Sitzungs-Reveal (anwesend-Nenner, #vote-progress)
-# --------------------------------------------------------------------------- #
+# A meeting vote reveals the counts only when every expected ballot arrived. The
+# denominator comes from the attendance roster (#vote-progress).
 async def test_get_meeting_open_reveals_when_all_present_voted() -> None:
-    vote = _vote(meeting_id=uuid4())  # offen, nicht geheim
+    vote = _vote(meeting_id=uuid4())  # open, not secret
     db = fake_session(result(vote), result("yes", "yes"))
     db.scalar_results = [2]  # present=2, voted=2 → revealed
     out = await VotingService(db).get(vote.id)
@@ -661,7 +647,7 @@ async def test_get_meeting_open_reveals_when_all_present_voted() -> None:
 async def test_get_meeting_open_hidden_until_all_present_voted() -> None:
     vote = _vote(meeting_id=uuid4())
     db = fake_session(result(vote), result("yes", "yes"))
-    db.scalar_results = [3]  # present=3 > voted=2 → verdeckt
+    db.scalar_results = [3]  # present=3 > voted=2 → hidden
     out = await VotingService(db).get(vote.id)
     assert out.tally.revealed is False
     assert out.tally.counts == {}
@@ -676,11 +662,8 @@ async def test_get_meeting_open_without_attendance_stays_hidden() -> None:
     assert out.tally.revealed is False
 
 
-# --------------------------------------------------------------------------- #
-# Reveal-Helper + Vertretungs-Nenner (#vote-progress, FIX 2)
-# --------------------------------------------------------------------------- #
 def test_open_tally_revealed_rule() -> None:
-    # present muss > 0 sein UND voted >= expected.
+    # present must be above 0 AND voted must reach expected (#vote-progress).
     assert open_tally_revealed(present=2, voted=2, expected=2) is True
     assert open_tally_revealed(present=2, voted=3, expected=2) is True
     assert open_tally_revealed(present=2, voted=1, expected=2) is False
@@ -688,9 +671,9 @@ def test_open_tally_revealed_rule() -> None:
 
 
 async def test_get_meeting_open_hidden_until_proxy_voted() -> None:
-    # #vote-progress: 2 Anwesende + 1 Stimm-Delegation eines ABWESENDEN
-    # Delegierenden → expected=3. Erst 2 Stimmen (eigene) → noch nicht alle
-    # erwarteten Stimmen da → verdeckt (Proxy-Stimme fehlt noch).
+    # #vote-progress: 2 present members plus 1 vote delegation of an ABSENT delegator
+    # give expected=3. Only the 2 own ballots arrived, so the proxy ballot is still
+    # missing and the tally stays hidden.
     gid = uuid4()
     vote = _vote(meeting_id=uuid4(), eligible_group=str(gid))
     db = fake_session(result(vote), result("yes", "yes"))
@@ -717,7 +700,8 @@ async def test_absent_delegated_count_no_meeting_is_zero() -> None:
 
 
 async def test_absent_delegated_count_non_uuid_group_is_zero() -> None:
-    # eligible_group ist kein UUID-Text (z. B. »stupa«) → keine Delegations-Query.
+    # An eligible_group that is not UUID text, "stupa" for example, runs no delegation
+    # query.
     vote = _vote(meeting_id=uuid4(), eligible_group="stupa")
     svc = VotingService(fake_session())
     assert await svc._absent_delegated_count(vote) == 0  # pyright: ignore[reportArgumentType]
@@ -735,13 +719,11 @@ async def test_absent_delegated_count_none_scalar_is_zero() -> None:
     gid = uuid4()
     vote = _vote(meeting_id=uuid4(), eligible_group=str(gid))
     db = fake_session()
-    db.scalar_results = [None]  # COUNT → None → 0 (or-Default)
+    db.scalar_results = [None]  # COUNT → None → 0 through the or-default
     assert await VotingService(db)._absent_delegated_count(vote) == 0  # pyright: ignore[reportArgumentType]
 
 
-# --------------------------------------------------------------------------- #
-# assert_can_read / get_scoped (#sec-audit, Object-Level-Authz)
-# --------------------------------------------------------------------------- #
+# Object-level authorization lives in assert_can_read and get_scoped (#sec-audit).
 async def test_assert_can_read_admin_bypasses() -> None:
     svc = VotingService(fake_session())
     admin = Principal(sub="a", roles=["admin"])

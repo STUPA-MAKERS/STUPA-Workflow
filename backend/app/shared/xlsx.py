@@ -1,8 +1,8 @@
-"""Excel export helpers for the budget tree and application list.
+"""Excel export helpers for the budget tree and the application list.
 
-``openpyxl`` is imported lazily (only on the export path) so environments without
-the package still load. Endpoints pass already-filtered data in; this module knows
-no DB, only rows -> bytes.
+The module imports `openpyxl` lazily, only on the export path, so an environment without
+the package still loads. An endpoint passes in data that it filtered already. This module
+knows no database. It turns rows into bytes.
 """
 
 from __future__ import annotations
@@ -27,17 +27,18 @@ def _num(value: Decimal | float | None) -> float | None:
     return float(value) if value is not None else None
 
 
-# Leading characters that can trigger an active formula/DDE when Excel/LibreOffice
-# opens the file — CSV/XLSX formula injection.
+# Leading characters that can start an active formula or a DDE call when Excel or
+# LibreOffice opens the file. This is CSV and XLSX formula injection.
 _FORMULA_PREFIXES: tuple[str, ...] = ("=", "+", "-", "@", "\t", "\r")
 
 
 def _safe(value: Any) -> Any:
     """Neutralize formula injection.
 
-    Strings starting with a dangerous character (``= + - @`` or tab/CR) get a
-    leading apostrophe so spreadsheets treat them as text, not formulas.
-    Non-strings (numbers, ``None``) pass through unchanged.
+    A string that starts with a dangerous character gets a leading apostrophe. The
+    dangerous characters are `=`, `+`, `-`, `@`, tab and CR. A spreadsheet then treats
+    the value as text and not as a formula. A value that is not a string, such as a
+    number or `None`, passes through unchanged.
     """
     if isinstance(value, str) and value[:1] in _FORMULA_PREFIXES:
         return "'" + value
@@ -45,12 +46,12 @@ def _safe(value: Any) -> Any:
 
 
 def _append(worksheet: Any, row: Sequence[Any]) -> None:
-    """``ws.append`` with formula-injection protection on every cell."""
+    """Append a row with `ws.append` and protect every cell against formula injection."""
     worksheet.append([_safe(cell) for cell in row])
 
 
 def _autosize(worksheet: Any, headers: Sequence[str]) -> None:
-    """Roughly fit column widths to the longest cell per column."""
+    """Fit each column width roughly to its longest cell."""
     widths = [len(str(h)) for h in headers]
     for row in worksheet.iter_rows(min_row=2, values_only=True):
         for i, cell in enumerate(row):
@@ -84,10 +85,15 @@ def build_budget_workbook(
     fiscal_year_labels: dict[Any, str],
     fiscal_year_id: Any | None = None,
 ) -> bytes:
-    """Budget tree as ``.xlsx`` bytes — one sheet per fiscal year.
+    """Build the budget tree as `.xlsx` bytes, with one sheet per fiscal year.
 
-    ``roots`` is already reduced to the visible selection (gremium/subtree);
-    ``fiscal_year_id`` optionally filters to a single fiscal year (its sheet only).
+    Args:
+        roots: The tree, already reduced to the visible selection of Gremium or
+            subtree.
+        fiscal_year_labels: Maps a fiscal year id to the sheet title. A year without an
+            entry gets the sheet title `HHJ`.
+        fiscal_year_id: Filter to a single fiscal year and write only its sheet. Pass
+            `None` to write a sheet for every fiscal year.
     """
     from openpyxl import Workbook
 
@@ -102,7 +108,7 @@ def build_budget_workbook(
     ]
     nodes = list(_iter_nodes(roots))
 
-    # Collect fiscal years in tree order (stable), optionally filtered to one.
+    # Collect the fiscal years in tree order, which keeps the sheet order stable.
     fy_order: list[Any] = []
     for _depth, node in nodes:
         for alloc in node.by_fiscal_year:
@@ -112,7 +118,6 @@ def build_budget_workbook(
                 fy_order.append(alloc.fiscal_year_id)
 
     wb = Workbook()
-    # Remove the default sheet; create one per fiscal year.
     default_ws = wb.active
     if default_ws is not None:
         wb.remove(default_ws)
@@ -158,7 +163,10 @@ def build_budget_workbook(
 
 
 def _sheet_title(label: str, used: set[str]) -> str:
-    """Excel-safe, unique sheet name (<=31 chars, without ``[]:*?/\\``)."""
+    r"""Build a unique sheet name that Excel accepts.
+
+    The name holds 31 characters at most and none of the characters `[]:*?/\`.
+    """
     safe = "".join("_" if c in '[]:*?/\\' else c for c in label).strip() or "HHJ"
     safe = safe[:31]
     base = safe
@@ -178,7 +186,7 @@ def build_applications_workbook(
     gremium_names: dict[Any, str],
     locale: str = "de",
 ) -> bytes:
-    """Application list as ``.xlsx`` bytes (order/filter as passed)."""
+    """Build the application list as `.xlsx` bytes, in the order and filter as passed."""
     from openpyxl import Workbook
 
     headers = [
@@ -223,7 +231,10 @@ def build_applications_workbook(
 
 
 def build_expenses_workbook(items: Iterable[Any], locale: str = "de") -> bytes:
-    """Bookings (expenses/income) as ``.xlsx`` bytes (order/filter as passed)."""
+    """Build the bookings, expenses and income, as `.xlsx` bytes.
+
+    The rows keep the order and the filter as passed.
+    """
     from openpyxl import Workbook
 
     kind_label = (
@@ -266,10 +277,11 @@ def build_auskunft_workbook(
     versions: Sequence[Mapping[str, Any]],
     principal: Mapping[str, Any] | None,
 ) -> bytes:
-    """GDPR Auskunft (Art. 15) as ``.xlsx`` bytes — all personal data stored for ``email``.
+    """Build the GDPR subject-access export (Art. 15) as `.xlsx` bytes.
 
-    DB-agnostic: receives already-prepared rows. Three sheets: account (principal),
-    applications (incl. ``data`` as JSON), versions.
+    The workbook holds every personal data record stored for `email`. The function is
+    database-agnostic and takes already-prepared rows. It writes three sheets: the
+    account of the principal, the applications with `data` as JSON, and the versions.
     """
     from openpyxl import Workbook
 

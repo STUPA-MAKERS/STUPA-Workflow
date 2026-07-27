@@ -75,7 +75,6 @@ describe('OAuthConsentComponent (#MCP)', () => {
   it('builds i18n keys for lifetimes and scope label/description', async () => {
     const { cmp } = await setup();
     expect(cmp.lifetimeKey('never')).toBe('account.lifetime.never');
-    // ':' is normalized to '_' for the i18n key.
     expect(cmp.scopeLabelKey('application:read')).toBe('account.scope.application_read.label');
     expect(cmp.scopeDescKey('budget:write')).toBe('account.scope.budget_write.desc');
   });
@@ -102,11 +101,10 @@ describe('OAuthConsentComponent (#MCP)', () => {
     expect(cmp.lifetime()).toBe('never');
   });
 
-  // ----------------------------------------------------------------- approve
   it('approve submits only the enabled scopes and redirects', async () => {
     const api = makeApi();
     const { cmp } = await setup(api);
-    cmp.toggle('budget:write'); // disable the second scope
+    cmp.toggle('budget:write');
     cmp.approve();
     expect(api.submitConsent).toHaveBeenCalledWith({
       approve: true,

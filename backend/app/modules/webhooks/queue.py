@@ -1,8 +1,9 @@
 """Enqueue abstraction (arq) for webhook deliveries.
 
-:class:`ArqWebhookQueue` enqueues a ``deliver_webhook`` job in Redis; the ``_job_id``
-= ``webhook:<delivery_id>``, so duplicate enqueues of the same delivery coalesce.
-Without Redis the queue is ``None`` and callers skip (delivery stays ``pending``).
+`ArqWebhookQueue` puts a `deliver_webhook` job into Redis. The `_job_id` is
+`webhook:<delivery_id>`, so duplicate enqueues of the same delivery coalesce into one
+job. Without Redis the queue is `None`. Callers then skip the enqueue and the delivery
+stays `pending`.
 """
 
 from __future__ import annotations
@@ -21,7 +22,7 @@ WEBHOOK_TASK_NAME = "deliver_webhook"
 
 
 def job_id_for(delivery_id: UUID) -> str:
-    """Stable arq job key per delivery (dedup on enqueue)."""
+    """Return the stable arq job key that dedups repeated enqueues of one delivery."""
     return f"webhook:{delivery_id}"
 
 
@@ -33,9 +34,9 @@ class WebhookQueue(Protocol):
 
 @dataclass(slots=True)
 class ArqWebhookQueue:
-    """arq-backed queue: ``deliver_webhook`` job with an idempotent job id."""
+    """arq-backed queue that enqueues `deliver_webhook` with an idempotent job id."""
 
-    pool: object  # arq.ArqRedis (loosely typed: no arq import in the API surface)
+    pool: object  # arq.ArqRedis, typed loosely to keep the arq import out of the API
 
     async def enqueue(self, delivery_id: UUID) -> None:
         job = await self.pool.enqueue_job(  # type: ignore[attr-defined]
@@ -46,5 +47,5 @@ class ArqWebhookQueue:
 
 
 def webhook_queue_from_pool(pool: ArqRedis | None) -> WebhookQueue | None:
-    """Pool -> :class:`WebhookQueue` (or ``None`` when there is no pool)."""
+    """Wrap the pool in a `WebhookQueue`, or return `None` when there is no pool."""
     return ArqWebhookQueue(pool) if pool is not None else None

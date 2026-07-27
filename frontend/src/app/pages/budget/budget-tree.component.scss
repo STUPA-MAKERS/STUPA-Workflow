@@ -10,7 +10,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-4);
-  /* Centre the header at normal body width (like applications); the tree sits in
+  /* Center the header at normal body width, like applications. The tree sits in
      the left margin outside the body (breakout). */
   width: 100%;
   max-width: var(--layout-max-width);
@@ -27,7 +27,7 @@
   flex: 1 1 14rem;
 }
 
-/* Tree in the left margin (breakout), editor in the centred body — like applications. */
+/* Tree in the left margin (breakout), editor in the centered body, like applications. */
 .bt__layout {
   display: grid;
   grid-template-columns:
@@ -48,10 +48,10 @@
   // past the fold and dragging the sticky element off-screen.
   max-height: 75vh;
   overflow-y: auto;
-  // Inner padding = fade height: the first/last entry starts BELOW the fade, so it
-  // isn't dimmed at rest — the edge only fades once you scroll.
+  // Inner padding = fade height: the first and the last entry start BELOW the fade,
+  // so they are not dimmed at rest. The edge fades only during a scroll.
   padding-block: var(--space-5);
-  // Fade into the background top/bottom (like the meeting timeline).
+  // Fade into the background at the top and the bottom, like the meeting timeline.
   --fade: linear-gradient(
     to bottom,
     transparent,
@@ -302,8 +302,8 @@
   align-items: baseline;
 }
 
-/* --- Mobile (<=768px = 48rem): single column, rows may wrap, actions stay
-   tappable (min. 2.5rem). Desktop unchanged. --- */
+/* Mobile (<=768px = 48rem): single column, rows may wrap, actions stay tappable
+   (min. 2.5rem). The desktop layout does not change. */
 @media (max-width: 48rem) {
   .bt__layout {
     grid-template-columns: 1fr;
@@ -318,7 +318,7 @@
     max-height: none;
     overflow-y: visible;
   }
-  /* Node cell: path + name may wrap instead of truncating. */
+  /* Node cell: the path and the name may wrap instead of truncating. */
   .bt__node {
     flex-wrap: wrap;
   }
@@ -326,7 +326,7 @@
     max-width: 100%;
     white-space: normal;
   }
-  /* Action buttons: sufficient hit area (min. 2.5rem), wrappable. */
+  /* Action buttons: enough hit area (min. 2.5rem) and they may wrap. */
   .bt__col-actions {
     display: flex;
     flex-wrap: wrap;
@@ -338,7 +338,7 @@
     min-width: 2.5rem;
     min-height: 2.5rem;
   }
-  /* Kind-Formular: Felder volle Breite, gestapelt. */
+  /* Child form: the fields take the full width and stack. */
   .bt__child-form .bt__lbl {
     flex: 1 1 100%;
   }
@@ -346,7 +346,7 @@
     width: 100%;
     box-sizing: border-box;
   }
-  /* Flow-State-Tabelle im Dialog: feste Spaltenbreiten lockern (375px-Viewport). */
+  /* Flow-state table in the dialog: relax the fixed column widths (375px viewport). */
   .bt__states th:not(:first-child),
   .bt__states td:not(:first-child) {
     width: auto;

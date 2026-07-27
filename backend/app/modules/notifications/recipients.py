@@ -2,18 +2,17 @@
 
 Recipient kinds:
 
-* ``{"kind":"group","ref":"stupa"}``    — principals in OIDC group ``ref``.
-* ``{"kind":"role","ref":"manager"}``   — principals with an active assignment of role ``ref``.
-* ``{"kind":"gremium","ref":"<id>"}``   — current members of gremium ``ref``.
-* ``{"kind":"applicant"}``              — applicant mail of the triggering application.
-* ``{"kind":"email","ref":"a@b.c"}``    — a fixed literal address.
+``{"kind":"group","ref":"stupa"}``: principals in the OIDC group ``ref``.
+``{"kind":"role","ref":"manager"}``: principals with an active assignment of role ``ref``.
+``{"kind":"gremium","ref":"<id>"}``: current members of Gremium ``ref``.
+``{"kind":"applicant"}``: applicant mail of the application that triggered the rule.
+``{"kind":"email","ref":"a@b.c"}``: one fixed literal address.
 
-Results are deduplicated and sorted; empty addresses are dropped.
+The resolver removes duplicates and sorts the result. It drops empty addresses.
 
-:func:`actionable_principal_emails` returns everyone who can act on an
-application's current state: only principals who can actually fire a
-``requires_action`` transition (guard satisfied) get mail — admins are not
-unconditionally included.
+``actionable_principal_emails`` returns everyone who can act on the current state of an
+application. Only a principal that can really fire a ``requires_action`` transition gets
+mail. The guard must pass. Admins are not included unconditionally.
 """
 
 from __future__ import annotations
@@ -41,13 +40,14 @@ from app.modules.flow.context import build_base_context, with_actor
 from app.modules.flow.models import State, Transition
 from app.shared.guards import GuardContext, GuardError, eval_guard
 
-# Admin role = all-rights bypass; must match ``Principal.has`` ("admin" in roles).
-# Kept as one constant because recipient resolution runs set-based in SQL, not via ``has``.
+# The admin role bypasses every permission check. It must match ``Principal.has``
+# ("admin" in roles). Recipient resolution runs set-based in SQL and not through
+# ``has``, so this key stays one constant.
 ADMIN_ROLE_KEY = "admin"
 
 
 def _active_assignment_window(now: datetime) -> list[ColumnElement[bool]]:
-    """Validity window of a ``RoleAssignment`` at ``now``."""
+    """Return the validity window of a ``RoleAssignment`` at ``now``."""
     return [
         or_(RoleAssignment.valid_from.is_(None), RoleAssignment.valid_from <= now),
         or_(RoleAssignment.valid_until.is_(None), RoleAssignment.valid_until > now),
@@ -57,11 +57,12 @@ def _active_assignment_window(now: datetime) -> list[ColumnElement[bool]]:
 def _permission_conds(
     perm: str, now: datetime, gremium_id: uuid.UUID | None
 ) -> list[ColumnElement[bool]]:
-    """Shared WHERE clauses of the permission-holder queries.
+    """Build the shared WHERE clauses of the permission-holder queries.
 
-    Single place that mirrors ``Principal.has`` (admin bypass + RolePermission
-    join) so every resolver builds the identical candidate set. ``gremium_id``
-    gates on globally valid OR gremium-scoped assignments.
+    This function mirrors ``Principal.has`` in one place. It applies the admin bypass
+    and the RolePermission join, so every resolver builds the identical candidate set.
+    With a ``gremium_id`` the clauses accept a globally valid assignment or an assignment
+    scoped to that Gremium.
     """
     conds: list[ColumnElement[bool]] = [
         Principal.email.is_not(None),
@@ -85,10 +86,11 @@ def principals_with_permission_stmt(
     *,
     gremium_id: uuid.UUID | None = None,
 ) -> Select[tuple[str | None]]:
-    """Emails of active principals holding ``perm`` via a valid role assignment.
+    """Select the mails of active principals that hold ``perm``.
 
-    The admin bypass always counts (:data:`ADMIN_ROLE_KEY`). Built on
-    :func:`_permission_conds` so both resolvers stay consistent with ``Principal.has``.
+    The principal needs a valid role assignment. The admin bypass always counts
+    (``ADMIN_ROLE_KEY``). The statement builds on ``_permission_conds``, so both
+    resolvers stay consistent with ``Principal.has``.
     """
     return (
         select(Principal.email)
@@ -106,12 +108,13 @@ def principal_rows_with_permission_stmt(
     *,
     gremium_id: uuid.UUID | None = None,
 ) -> Select[tuple[uuid.UUID, str, str | None, list | None]]:
-    """Identity rows of the permission holders (same conds as the email stmt).
+    """Select the identity rows of the permission holders.
 
-    Projects ``(id, sub, email, oidc_groups)`` so the caller can resolve the
-    per-principal roles/committees needed for guard evaluation. The admin arm
-    stays in the seed (mirrors ``Principal.has``) — admins are only *candidates*
-    here; a guard still has to fire for them to actually receive mail.
+    The WHERE clauses match the mail statement. The projection
+    ``(id, sub, email, oidc_groups)`` lets the caller resolve the per-principal roles
+    and committees that guard evaluation needs. The admin arm stays in the seed and
+    mirrors ``Principal.has``. Admins are candidates only. A guard must still fire
+    before they receive mail.
     """
     return (
         select(Principal.id, Principal.sub, Principal.email, Principal.oidc_groups)
@@ -125,7 +128,7 @@ def principal_rows_with_permission_stmt(
 
 @dataclass(frozen=True, slots=True)
 class ActionableCandidate:
-    """Permission-holding principal plus the actor facts guards evaluate on."""
+    """A permission-holding principal with the actor facts that guards evaluate."""
 
     principal_id: uuid.UUID
     sub: str
@@ -140,13 +143,13 @@ async def _candidates_with_transition_permission(
     *,
     gremium_id: uuid.UUID | None,
 ) -> list[ActionableCandidate]:
-    """Candidates who may fire transitions at all, with resolved actor facts.
+    """Collect the candidates that may fire transitions, with resolved actor facts.
 
-    Roles follow the RBAC resolution (``resolve_principal``): active role
-    assignments PLUS GroupMapping-derived roles from the principal's OIDC groups
-    (assignment gremium scopes count as group keys). Committees are the active
-    GremiumMembership gremium ids. Uses a constant number of batch queries — no
-    per-candidate round trips.
+    Roles follow the RBAC resolution of ``resolve_principal``. They combine the active
+    role assignments with the GroupMapping roles of the OIDC groups of the principal.
+    An assignment gremium scope counts as a group key. Committees are the gremium ids
+    of the active GremiumMembership rows. The function runs a constant number of batch
+    queries and makes no per-candidate round trip.
     """
     rows = (
         await session.execute(
@@ -181,7 +184,7 @@ async def _candidates_with_transition_permission(
     for pid, role_key, assignment_gremium in assignment_rows:
         roles_by_pid[pid].add(role_key)
         if assignment_gremium is not None:
-            # Gremium scope counts as a group key — parity with resolve_principal.
+            # A gremium scope counts as a group key. This matches resolve_principal.
             groups_by_pid[pid].add(str(assignment_gremium))
 
     all_groups: set[str] = set().union(*groups_by_pid.values())
@@ -238,12 +241,12 @@ def firable_candidates(
     *,
     created_by: str | None,
 ) -> list[ActionableCandidate]:
-    """Keep the candidates for whom at least one transition guard passes (pure).
+    """Keep the candidates for which at least one transition guard passes.
 
-    Mirrors ``list_tasks``/``available_transitions``: a candidate counts iff any
-    of the given transitions fires under their actor context. A ``GuardError``
-    on a single transition counts as not firable (fail-closed) instead of
-    breaking the whole dispatch.
+    The function is pure. It mirrors ``list_tasks`` and ``available_transitions``. A
+    candidate counts if and only if one of the given transitions fires under the actor
+    context of that candidate. A ``GuardError`` on a single transition counts as not
+    firable. This fail-closed rule keeps one bad guard from breaking the whole dispatch.
     """
     out: list[ActionableCandidate] = []
     for candidate in candidates:
@@ -266,7 +269,7 @@ def firable_candidates(
 
 @dataclass(slots=True)
 class RecipientResolver:
-    """Resolves recipient specs against the DB."""
+    """Resolve recipient specs against the DB."""
 
     session: AsyncSession
 
@@ -277,7 +280,7 @@ class RecipientResolver:
         application_id: uuid.UUID | None = None,
         now: datetime | None = None,
     ) -> list[str]:
-        """Resolve all specs into a sorted, deduplicated address list."""
+        """Resolve all specs into a sorted address list without duplicates."""
         now = now or datetime.now(UTC)
         out: set[str] = set()
         for spec in specs:
@@ -297,7 +300,7 @@ class RecipientResolver:
                 out.add(str(ref).strip())
             elif kind == "permission" and ref:
                 out.update(await self._emails_for_permission(str(ref), now))
-            # Unknown/incomplete spec: silently ignore (the rule stays valid).
+            # Ignore an unknown or incomplete spec. The rule stays valid.
         return sorted(e for e in out if e)
 
     async def _emails_for_group(self, group: str) -> list[str]:
@@ -330,7 +333,7 @@ class RecipientResolver:
         return [e for e in rows if e]
 
     async def _emails_for_gremium(self, gremium_ref: str, now: datetime) -> list[str]:
-        """Addresses of gremium members active in their current term window."""
+        """Return the addresses of the gremium members whose term window holds ``now``."""
         try:
             gremium_id = uuid.UUID(gremium_ref)
         except (ValueError, AttributeError):
@@ -355,14 +358,17 @@ class RecipientResolver:
         return [e for e in rows if e]
 
     async def _emails_for_permission(self, perm: str, now: datetime) -> list[str]:
-        """Addresses of active principals holding ``perm`` via a valid role
-        assignment (the ``admin`` role always counts)."""
+        """Return the addresses of active principals that hold ``perm``.
+
+        A valid role assignment must grant the permission. The ``admin`` role always
+        counts.
+        """
         stmt = principals_with_permission_stmt(perm, now)
         rows = (await self.session.scalars(stmt)).all()
         return [e for e in rows if e]
 
     async def _applicant_email(self, application_id: uuid.UUID) -> str | None:
-        # Anonymized applications no longer have a PII mail; do not address them.
+        # An anonymized application has no PII mail any more. Do not address it.
         return await self.session.scalar(
             select(Applicant.email).where(
                 Applicant.application_id == application_id,
@@ -377,14 +383,14 @@ async def actionable_principal_emails(
     application_id: uuid.UUID,
     state: State | None,
 ) -> list[str]:
-    """Addresses of everyone who can act on the application's current state.
+    """Return the addresses of everyone who can act on the current state.
 
-    ``vote`` state → members of the voting gremium (``config.gremiumId``).
-    Otherwise exactly the principals for whom at least one manual
-    ``requires_action`` transition actually fires (guard satisfied), mirroring
-    the task-list semantics (``list_tasks`` → ``available_transitions``).
-    Admins are seeded like every other transition-permission holder but only
-    receive mail when a guard fires for them too.
+    For a ``vote`` state the result holds the members of the voting gremium
+    (``config.gremiumId``). For every other state it holds exactly the principals for
+    which at least one manual ``requires_action`` transition fires. A transition fires
+    only when its guard passes. This mirrors the task-list semantics of ``list_tasks``
+    and ``available_transitions``. The seed holds admins like every other holder of the
+    transition permission. An admin gets mail only when a guard fires for them too.
     """
     if state is not None and state.kind == "vote":
         cfg = state.config if isinstance(state.config, dict) else {}
@@ -400,7 +406,7 @@ async def actionable_principal_emails(
     )
     if app is None or app.current_state_id is None:
         return []
-    # Mirror FlowService._outgoing + the list_tasks predicate: manual,
+    # Mirror FlowService._outgoing and the list_tasks predicate: manual,
     # non-branch transitions that count as an open task.
     transitions = list(
         (
@@ -434,11 +440,12 @@ async def actionable_principal_emails(
 
 
 async def state_actionable(session: AsyncSession, state: State | None) -> bool:
-    """Task definition shared by task mail and the reminder worker.
+    """Report whether a state defines an open task.
 
-    True for a ``vote`` state or at least one manual ``requires_action``
-    transition. States without such transitions are pass-through/terminal:
-    nobody can act, so neither task mail nor reminder fires.
+    Task mail and the reminder worker share this definition. The result is true for a
+    ``vote`` state, or for a state with at least one manual ``requires_action``
+    transition. A state without such a transition is pass-through or terminal. Nobody
+    can act on it, so neither task mail nor a reminder fires.
     """
     if state is None:
         return False

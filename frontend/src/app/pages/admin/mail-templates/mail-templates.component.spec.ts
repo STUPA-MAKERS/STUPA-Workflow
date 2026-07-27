@@ -46,7 +46,7 @@ describe('MailTemplatesComponent', () => {
     await setup();
     expect(await screen.findByRole('button', { name: /magic_link/ })).toBeInTheDocument();
     expect(screen.getByDisplayValue('Anmeldung')).toBeInTheDocument();
-    // placeholder reference is shown.
+    // The placeholder reference lists the "name" token.
     expect(screen.getByText(/name/)).toBeInTheDocument();
   });
 
@@ -74,7 +74,6 @@ describe('MailTemplatesComponent', () => {
     const c = view.fixture.componentInstance as any;
     c.patch('subjectI18n', 'Neuer Betreff');
     expect(c.draft().subjectI18n.de).toBe('Neuer Betreff');
-    // switching language keeps the other value untouched
     c.lang.set('en');
     c.patch('bodyI18n', 'New body');
     expect(c.draft().bodyI18n.en).toBe('New body');
@@ -223,7 +222,7 @@ describe('MailTemplatesComponent', () => {
     const { view } = await setup(api);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = view.fixture.componentInstance as any;
-    // first template auto-selected → save upserts it; the "other" sibling is the else branch
+    // Save upserts the auto-selected first template. The "other" sibling covers the else branch.
     c.save();
     expect(c.templates().find((t: { key: string }) => t.key === 'other')).toEqual(other);
     expect(c.templates().find((t: { key: string }) => t.key === 'magic_link').source).toBe('override');
@@ -239,7 +238,8 @@ describe('MailTemplatesComponent', () => {
     const { view } = await setup(api);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = view.fixture.componentInstance as any;
-    // selected = magic_link, but the upsert returns 'other' → selectedKey !== tpl.key branch
+    // magic_link stays selected while the upsert returns 'other'.
+    // This covers the branch where the selected key differs from the updated key.
     expect(c.selectedKey()).toBe('magic_link');
     c.save();
     expect(c.selectedKey()).toBe('magic_link');

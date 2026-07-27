@@ -1,9 +1,10 @@
-"""Attachments: ``attachment``.
+"""Attachments: the ``attachment`` table.
 
-One row per uploaded file. The binary object lives in MinIO (``storage_key``), never
-in the DB. ``scanned``/``scan_result`` carry the ClamAV result: quarantined (no
-download) until ``scanned``; on a finding the object is deleted (``storage_key`` →
-NULL) and ``scan_result`` holds the signature.
+One row holds one uploaded file. The binary object lives in MinIO under
+``storage_key``, never in the database. ``scanned`` and ``scan_result`` carry the ClamAV
+result. The file stays quarantined and nobody can download it until ``scanned`` is true.
+On a finding the worker deletes the object, sets ``storage_key`` to NULL and writes the
+signature into ``scan_result``.
 """
 
 from __future__ import annotations
@@ -25,16 +26,21 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, UUIDPkMixin
 
-# DB-side upper bound (CHECK(size <= 10485760)).
+# The database enforces this bound with CHECK(size <= 10485760).
 MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
 
 
 class Attachment(UUIDPkMixin, Base):
-    """Application attachment. ``application_id`` CASCADE: deleting the app cleans up.
+    """An attachment of an application.
 
-    ``field_key`` optionally links to a form field. ``scanned`` = ClamAV run finished;
-    ``scan_result`` = NULL/``clean``/signature. ``storage_key`` is set to NULL on a
-    finding (object removed)."""
+    ``application_id`` cascades. A deleted application removes its attachments.
+
+    Attributes:
+        field_key: Optional link to a form field.
+        scanned: True after the ClamAV run finishes.
+        scan_result: NULL, ``clean``, or the signature of the finding.
+        storage_key: NULL after a finding, because the worker removed the object.
+    """
 
     __tablename__ = "attachment"
 

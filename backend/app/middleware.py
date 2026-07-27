@@ -1,15 +1,15 @@
 """HTTP middleware: trace id, security headers, CSRF, default write rate limit.
 
 - `RequestContextMiddleware`: per-request trace id (`request.state` + `X-Trace-Id`).
-- `SecurityHeadersMiddleware`: base hardening headers. The app serves JSON only,
-  so the CSP is a strict `default-src 'none'`; the SPA gets its own CSP at the
-  edge nginx, and HSTS is set by the TLS-terminating proxy.
+- `SecurityHeadersMiddleware`: base hardening headers. The app serves JSON only, so
+  the CSP is a strict `default-src 'none'`. The edge nginx gives the SPA its own
+  CSP. The TLS-terminating proxy sets HSTS.
 - `CsrfMiddleware`: double-submit token for cookie-authenticated write requests.
-  Bearer-token requests are not CSRF-able and are exempt, as are requests without
-  an auth cookie. The token is a non-HttpOnly cookie the frontend mirrors into
-  the `X-CSRF-Token` header.
+  A bearer-token request is not CSRF-able and stays exempt. A request without an
+  auth cookie stays exempt too. The token is a non-HttpOnly cookie that the
+  frontend mirrors into the `X-CSRF-Token` header.
 
-CORS is deliberately off (no CORSMiddleware) — no cross-origin by default.
+The app registers no CORSMiddleware on purpose. Cross-origin access stays off.
 """
 
 from __future__ import annotations
@@ -65,10 +65,11 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 
 def _has_auth_cookie(request: Request, settings: Settings) -> bool:
-    """Return True if the request carries an auth cookie (session/applicant).
+    """Return True when the request carries an auth cookie (session or applicant).
 
-    Only those requests are CSRF-relevant: the browser sends cookies cross-site
-    automatically. Bearer tokens are not CSRF-able and are ignored here."""
+    Only those requests are CSRF-relevant. The browser sends a cookie cross-site
+    on its own. A bearer token is not CSRF-able, so this function ignores it.
+    """
     return bool(
         request.cookies.get(settings.session_cookie_name)
         or request.cookies.get(settings.applicant_cookie_name)
@@ -78,9 +79,11 @@ def _has_auth_cookie(request: Request, settings: Settings) -> bool:
 class CsrfMiddleware(BaseHTTPMiddleware):
     """Double-submit CSRF protection.
 
-    For unsafe methods with an auth cookie and no bearer header, `X-CSRF-Token`
-    must match the CSRF cookie (constant-time compare). Sets the CSRF cookie on
-    any response that lacks it so the frontend can mirror it."""
+    For an unsafe method with an auth cookie and no bearer header, the
+    `X-CSRF-Token` header must match the CSRF cookie. The compare runs in constant
+    time. The middleware sets the CSRF cookie on any response that lacks it, so the
+    frontend can mirror it.
+    """
 
     def __init__(self, app: object, settings: Settings | None = None) -> None:
         super().__init__(app)  # type: ignore[arg-type]
@@ -117,8 +120,9 @@ class CsrfMiddleware(BaseHTTPMiddleware):
 
         response = await call_next(request)
 
-        # Issue the CSRF cookie if missing: non-HttpOnly (frontend must read it),
-        # SameSite=Lax as base protection, Secure matching the auth cookies.
+        # Issue the CSRF cookie when it is missing. It is non-HttpOnly because the
+        # frontend must read it. SameSite=Lax gives base protection. Secure follows
+        # the auth cookies.
         if settings.csrf_enabled and not request.cookies.get(settings.csrf_cookie_name):
             response.set_cookie(
                 settings.csrf_cookie_name,
@@ -135,11 +139,13 @@ class CsrfMiddleware(BaseHTTPMiddleware):
 class DefaultWriteRateLimitMiddleware(BaseHTTPMiddleware):
     """Default rate limit for all write endpoints.
 
-    Applies only to unsafe methods, keyed per IP, with a generous limit — a
-    backstop for endpoints without their own stricter limit. Wired as middleware
-    so it runs uniformly for every HTTP route while WebSocket scopes pass through
-    (BaseHTTPMiddleware forwards non-http). Responds 429 + `Retry-After` as
-    problem+json; with rate limiting disabled the builder yields a no-op limiter."""
+    The limit applies only to unsafe methods. It keys on the client IP and stays
+    generous. It is the backstop for an endpoint without its own stricter limit.
+    The app adds it as middleware, so it runs for every HTTP route. A WebSocket
+    scope passes through, because BaseHTTPMiddleware forwards a non-http scope.
+    The middleware answers 429 with `Retry-After` as problem+json. With rate
+    limiting off, the builder returns a no-op limiter.
+    """
 
     def __init__(
         self,

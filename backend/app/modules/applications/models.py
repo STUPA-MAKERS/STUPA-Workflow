@@ -1,8 +1,8 @@
 """Application tables: application, applicant, submission_version, status_event.
 
-PII lives in `applicant` (split out); `application.data` should stay PII-free.
-Anonymization (not hard delete) is the default erasure path — the `applicant`
-FK CASCADE only fires on an actual application delete.
+The `applicant` table holds the PII. Keep `application.data` free of PII.
+Anonymization is the default erasure path, not a hard delete. The `applicant`
+foreign-key CASCADE fires only on a real application delete.
 """
 
 from __future__ import annotations
@@ -32,8 +32,11 @@ from app.db import Base, CreatedAtMixin, TimestampMixin, UUIDPkMixin
 
 
 class Application(UUIDPkMixin, TimestampMixin, Base):
-    """Application. `data` holds the current field values (JSONB, GIN-indexed);
-    promoted `amount`/`currency` are synced from `data` by the service."""
+    """One application.
+
+    `data` holds the current field values as JSONB with a GIN index. The service
+    syncs the promoted `amount` and `currency` columns from `data`.
+    """
 
     __tablename__ = "application"
 
@@ -49,9 +52,9 @@ class Application(UUIDPkMixin, TimestampMixin, Base):
     budget_pot_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("budget_pot.id"), nullable=True
     )
-    # Cost centre (budget tree, usually a leaf) plus fiscal year. The fiscal year
-    # is set at budget assignment (not at submission) and movable via
-    # `move-fiscal-year`. Both are additive to the flat `budget_pot_id`.
+    # Cost center in the budget tree, most often a leaf, plus the fiscal year.
+    # The budget assignment sets the fiscal year, not the submission.
+    # `move-fiscal-year` moves it. Both columns add to the flat `budget_pot_id`.
     budget_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("budget.id"), nullable=True
     )
@@ -62,13 +65,14 @@ class Application(UUIDPkMixin, TimestampMixin, Base):
     currency: Mapped[str | None] = mapped_column(CHAR(3), nullable=True)
     data: Mapped[dict] = mapped_column(JSONB, server_default="{}")
     lang: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # OIDC ``sub`` of the creating principal; ``None`` for anonymous submissions.
-    # Allows reading/editing/deleting the own application without
+    # OIDC ``sub`` of the creating principal. An anonymous submission stores ``None``.
+    # The creator reads, edits and deletes the own application without
     # ``application.manage``.
     created_by: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # Email-confirmation timestamp (guest submissions): until set, the application
-    # is invisible and discarded after 12 h. Logged-in submissions are confirmed
-    # immediately (OIDC mail is trusted); guests confirm via magic-link verify.
+    # Email-confirmation timestamp for a guest submission. Until it is set, the
+    # application stays invisible, and the platform discards it after 12 h. A
+    # logged-in submission counts as confirmed at once, because the OIDC mail is
+    # trusted. A guest confirms through the magic-link verify route.
     email_confirmed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
@@ -91,8 +95,11 @@ class Application(UUIDPkMixin, TimestampMixin, Base):
 
 
 class Applicant(UUIDPkMixin, Base):
-    """Split-out PII (1:1 with the application). Anonymize = NULL email/name and
-    set `anonymized_at` (the application stays)."""
+    """PII of the applicant, split out 1:1 from the application.
+
+    Anonymization sets `email` and `name` to NULL and writes `anonymized_at`.
+    The application itself stays.
+    """
 
     __tablename__ = "applicant"
 
@@ -150,12 +157,14 @@ class StatusEvent(UUIDPkMixin, Base):
 
 
 class MagicLink(UUIDPkMixin, CreatedAtMixin, Base):
-    """Magic link for applicants.
+    """Magic link for an applicant.
 
-    The DB holds only `sha256(token||pepper)` — the plaintext token exists solely
-    in the mail link. Scope binds to exactly one `application_id` plus
-    `edit|view`; expiry and `single_use` (`used_at`) enforce one-shot/expiry
-    logic (verify answers 410)."""
+    The database holds only `sha256(token||pepper)`. The plaintext token exists
+    only in the mail link. The scope binds the link to exactly one
+    `application_id` and to `edit` or `view`. The expiry and `single_use`
+    (`used_at`) enforce the one-shot rule. The verify route answers 410 for a
+    used or expired link.
+    """
 
     __tablename__ = "magic_link"
 
@@ -172,18 +181,20 @@ class MagicLink(UUIDPkMixin, CreatedAtMixin, Base):
 
     __table_args__ = (
         CheckConstraint("scope IN ('edit','view')", name="magic_link_scope"),
-        # UNIQUE: backs the atomic single-use redemption (UPDATE ... WHERE used_at
-        # IS NULL) and prevents hash-collision ambiguity.
+        # The UNIQUE index backs the atomic single-use redemption
+        # (UPDATE ... WHERE used_at IS NULL). It also prevents an ambiguous hash
+        # collision.
         Index("ix_magic_link_token_hash", "token_hash", unique=True),
     )
 
 
 class Comment(UUIDPkMixin, Base):
-    """Application comment.
+    """Comment on an application.
 
-    `visibility='internal'` is visible to principals only (RBAC); `'public'`
-    also to the applicant (magic link). `author_kind` separates principal from
-    applicant authors."""
+    RBAC shows `visibility='internal'` to a principal only. It shows `'public'`
+    also to the applicant behind the magic link. `author_kind` separates a
+    principal author from an applicant author.
+    """
 
     __tablename__ = "comment"
 

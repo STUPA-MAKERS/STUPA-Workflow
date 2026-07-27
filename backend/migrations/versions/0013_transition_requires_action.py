@@ -1,10 +1,10 @@
-"""Transition: ``requires_action`` (#requires-action, Tasks-Tab-Filter).
+"""Transition: `requires_action` (#requires-action, filter of the tasks tab).
 
-Markiert, ob ein feuerbarer manueller Übergang als **offene Aufgabe** des
-Akteurs zählt (Default ``true`` = bisheriges Verhalten). Sind alle feuerbaren
-Übergänge eines Antrags ``requires_action=false``, taucht er nicht mehr unter
-»Aufgaben« auf — rein optionale Aktionen erzeugen keine Pseudo-Aufgaben.
-Idempotent (``IF NOT EXISTS``).
+The flag marks whether a firable manual transition counts as an **open task** of
+the actor. The default `true` keeps the earlier behavior. An application drops
+out of the tasks tab when every firable transition has `requires_action=false`.
+An optional action therefore creates no pseudo task. The migration is idempotent
+(`IF NOT EXISTS`).
 """
 
 from __future__ import annotations

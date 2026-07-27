@@ -1,12 +1,13 @@
-"""Deadline service: scan + lock + idempotency markers.
+"""Deadline service: scans, locks and idempotency markers.
 
-Pure DB layer for the arq cron (:mod:`worker.deadlines`); the actual effect
-(fire transition, close vote, send reminder) lives in the worker.
+This module is the pure DB layer for the arq cron in `worker.deadlines`. The
+worker holds the effect: it fires a transition, closes a vote or sends a
+reminder.
 
-Concurrency: the ``lock_*`` methods select a single row with ``FOR UPDATE SKIP
-LOCKED`` — a second worker sees ``None`` and skips, so nothing runs twice. The
-persistent marker (``action_on_pass=NULL`` / ``reminded_at``) prevents repeats
-across worker restarts.
+Concurrency: each `lock_*` method selects one row with `FOR UPDATE SKIP LOCKED`.
+A second worker gets `None` and skips the row, so nothing runs twice. The
+persistent marker (`action_on_pass=NULL` or `reminded_at`) stops a repeat across
+worker restarts.
 """
 
 from __future__ import annotations
@@ -23,26 +24,26 @@ from app.modules.deadlines.models import Deadline, DeadlinePolicy
 from app.modules.voting.models import Vote
 from app.settings import get_settings
 
-# Cap per cron tick, oldest first: a large backlog drains over several ticks
-# instead of one tick overrunning the 1-minute cadence. Correctness is unaffected
-# (SKIP LOCKED + idempotency markers) — ungrabbed rows stay due for the next tick.
+# Cap per cron tick, oldest row first. A large backlog then drains over several
+# ticks, and one tick does not overrun the 1-minute cadence. This does not change
+# correctness, because SKIP LOCKED and the idempotency markers protect the run.
+# A row that no worker takes stays due for the next tick.
 DEFAULT_SCAN_LIMIT = 200
 
 _RELATIVE_KINDS = frozenset({"relative_submitted", "relative_changed"})
 
 
 def _is_relative(kind: str) -> bool:
-    """Whether ``kind`` derives its due date from an application timestamp + offset."""
+    """Return whether `kind` adds a day offset to an application timestamp."""
     return kind in _RELATIVE_KINDS
 
 
 class DeadlineService:
-    """Deadline operations bound to an ``AsyncSession``."""
+    """Deadline operations bound to an `AsyncSession`."""
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    # ------------------------------------------------------------------ create
     async def create(
         self,
         *,
@@ -52,7 +53,10 @@ class DeadlineService:
         type_id: UUID | None = None,
         action_on_pass: dict | None = None,
     ) -> Deadline:
-        """Create and persist a deadline (programmatic API, no HTTP endpoint)."""
+        """Create and store a deadline.
+
+        This is a programmatic API. No HTTP route creates a deadline.
+        """
         deadline = Deadline(
             kind=kind,
             due_at=due_at,
@@ -65,12 +69,15 @@ class DeadlineService:
         await self.session.commit()
         return deadline
 
-    # ------------------------------------------------------------------- scans
     async def due_action_deadline_ids(
         self, now: datetime, *, limit: int = DEFAULT_SCAN_LIMIT
     ) -> list[UUID]:
-        """List due auto-deadline ids (``due_at<=now`` and ``action_on_pass`` set),
-        capped at ``limit`` oldest-first."""
+        """List the ids of the due auto-deadlines.
+
+        A deadline is due when `due_at` is at or before `now` and
+        `action_on_pass` is set. The scan returns the oldest rows first and
+        stops at `limit` rows.
+        """
         rows = (
             await self.session.execute(
                 select(Deadline.id)
@@ -87,13 +94,16 @@ class DeadlineService:
     async def due_reminder_ids(
         self, now: datetime, lead: timedelta, *, limit: int = DEFAULT_SCAN_LIMIT
     ) -> list[UUID]:
-        """List ids of upcoming (or already passed) deadlines not yet reminded.
+        """List the ids of deadlines that still need a reminder.
 
-        Deliberately no lower bound (``due_at > now``): if the worker was down
-        longer than the lead window, a two-sided condition would never match the
-        row again — the reminder would never be sent and the row would leak in the
-        partial index. This way exactly one (possibly late) reminder is sent and
-        ``reminded_at`` removes the row from the scan. Capped at ``limit``."""
+        The scan covers deadlines inside the lead window and deadlines that
+        passed already. It has no lower bound (`due_at > now`) on purpose. If
+        the worker was down longer than the lead window, a two-sided condition
+        would never match the row again. The reminder would never go out and the
+        row would leak in the partial index. With one bound the worker sends
+        exactly one reminder, possibly late. `reminded_at` then takes the row
+        out of the scan. The scan stops at `limit` rows.
+        """
         rows = (
             await self.session.execute(
                 select(Deadline.id)
@@ -110,7 +120,7 @@ class DeadlineService:
     async def due_open_vote_ids(
         self, now: datetime, *, limit: int = DEFAULT_SCAN_LIMIT
     ) -> list[UUID]:
-        """List ids of open votes whose window has passed, capped at ``limit``."""
+        """List the ids of open votes whose window has passed, up to `limit` rows."""
         rows = (
             await self.session.execute(
                 select(Vote.id)
@@ -125,12 +135,15 @@ class DeadlineService:
         ).scalars().all()
         return list(rows)
 
-    # ------------------------------------------------------------------- locks
     async def lock_action_deadline(
         self, deadline_id: UUID, now: datetime
     ) -> Deadline | None:
-        """Lock a due auto-deadline (``SKIP LOCKED``); ``None`` if held by another
-        worker or already consumed."""
+        """Lock a due auto-deadline with `SKIP LOCKED`.
+
+        Returns:
+            The locked deadline. It returns `None` when another worker holds the
+            row, or when a worker consumed the row already.
+        """
         return (
             await self.session.execute(
                 select(Deadline)
@@ -146,8 +159,11 @@ class DeadlineService:
     async def lock_reminder(
         self, deadline_id: UUID, now: datetime, lead: timedelta
     ) -> Deadline | None:
-        """Lock a not-yet-reminded deadline (``SKIP LOCKED``). Mirrors
-        :meth:`due_reminder_ids`: no lower bound so late reminders go out once."""
+        """Lock a deadline that still needs a reminder, with `SKIP LOCKED`.
+
+        The condition mirrors `due_reminder_ids`. It has no lower bound, so a
+        late reminder still goes out one time.
+        """
         return (
             await self.session.execute(
                 select(Deadline)
@@ -161,7 +177,7 @@ class DeadlineService:
         ).scalar_one_or_none()
 
     async def lock_open_vote(self, vote_id: UUID, now: datetime) -> Vote | None:
-        """Lock an open, expired vote (``SKIP LOCKED``)."""
+        """Lock an open vote that has expired, with `SKIP LOCKED`."""
         return (
             await self.session.execute(
                 select(Vote)
@@ -175,27 +191,29 @@ class DeadlineService:
             )
         ).scalar_one_or_none()
 
-    # ----------------------------------------------------------------- markers
     async def consume_action(self, deadline: Deadline) -> None:
-        """Mark an auto-deadline as fired (``action_on_pass=NULL``) and commit.
+        """Mark an auto-deadline as fired with `action_on_pass=NULL` and commit.
 
-        Removes the row from the partial scan index — no re-firing."""
+        This takes the row out of the partial scan index. The deadline cannot
+        fire a second time.
+        """
         deadline.action_on_pass = None
         await self.session.commit()
 
     async def mark_reminded(self, deadline: Deadline, now: datetime) -> None:
-        """Mark the reminder as sent (``reminded_at=now``) and commit."""
+        """Mark the reminder as sent with `reminded_at=now` and commit."""
         deadline.reminded_at = now
         await self.session.commit()
 
 
 async def flow_deadline_passed(session: AsyncSession, application_id: UUID) -> bool:
-    """Return whether a (possibly already consumed) flow deadline is due.
+    """Return whether a flow deadline is due, even if it is consumed already.
 
-    Flow deadlines always belong to the application's current state — the flow
-    engine clears them on every state change (``schedule_state_deadline``), so a
-    due row means the *current* state's deadline has passed. Shared by
-    ``FlowService._deadline_passed`` and the task-mail recipient resolution.
+    A flow deadline always belongs to the current state of the application. The
+    flow engine clears the old rows on every state change, in
+    `schedule_state_deadline`. A due row therefore means that the deadline of
+    the *current* state has passed. `FlowService._deadline_passed` and the
+    task-mail recipient resolution share this function.
     """
     row = await session.scalar(
         select(Deadline.id)
@@ -213,7 +231,7 @@ _HHMM_RE = re.compile(r"^(\d{2}):(\d{2})$")
 
 
 def _parse_hhmm(raw: str | None) -> tuple[int, int] | None:
-    """Parse a ``"HH:MM"`` string into ``(hour, minute)`` or ``None`` if invalid."""
+    """Parse a `"HH:MM"` string into `(hour, minute)`, or `None` if it is invalid."""
     m = _HHMM_RE.match(raw or "")
     if m is None:
         return None
@@ -222,10 +240,12 @@ def _parse_hhmm(raw: str | None) -> tuple[int, int] | None:
 
 
 def _zone(name: str | None) -> ZoneInfo:
-    """Resolve an IANA zone name, defaulting to the configured local timezone.
+    """Resolve an IANA zone name and fall back to the configured local timezone.
 
-    An unknown/invalid name (never expected — schemas validate on write) falls
-    back to the local timezone, then UTC, so resolution never raises."""
+    An unknown or invalid name is not expected here, because the schemas
+    validate the name on write. Such a name falls back to the local timezone
+    and then to UTC. This function thus never raises.
+    """
     for candidate in (name, get_settings().local_timezone):
         if candidate:
             try:
@@ -236,11 +256,13 @@ def _zone(name: str | None) -> ZoneInfo:
 
 
 def _snap_to_at_time(policy: DeadlinePolicy, dt: datetime) -> datetime:
-    """Snap ``dt`` to ``policy.at_time`` local wall-clock in ``policy.timezone``.
+    """Snap `dt` to the `policy.at_time` wall clock in `policy.timezone`.
 
-    DST-correct: the date is read in the target zone, combined with ``at_time``
-    there, then converted back to UTC. ``at_time`` unset (or malformed) ⇒ ``dt``
-    is returned unchanged — the historical raw-instant behaviour."""
+    The result is DST-correct. The function reads the date in the target zone,
+    combines it with `at_time` there and converts the result back to UTC. If
+    `at_time` is unset or malformed, the function returns `dt` unchanged. That
+    is the historical raw-instant behavior.
+    """
     hhmm = _parse_hhmm(policy.at_time)
     if hhmm is None:
         return dt
@@ -253,8 +275,11 @@ def _snap_to_at_time(policy: DeadlinePolicy, dt: datetime) -> datetime:
 
 
 def _combine_local_date(policy: DeadlinePolicy, day: date) -> datetime:
-    """Combine a calendar ``day`` with ``policy.at_time`` (or local midnight) in
-    ``policy.timezone`` and return the UTC instant."""
+    """Combine a calendar day with the wall-clock time of the policy.
+
+    The function uses `policy.at_time` in `policy.timezone`. If `at_time` is
+    unset, it uses local midnight. It returns the UTC instant.
+    """
     hhmm = _parse_hhmm(policy.at_time) or (0, 0)
     tz = _zone(policy.timezone)
     return datetime(
@@ -263,9 +288,11 @@ def _combine_local_date(policy: DeadlinePolicy, day: date) -> datetime:
 
 
 def _recurring_due(policy: DeadlinePolicy, now: datetime | None) -> datetime | None:
-    """Earliest of ``policy.dates`` strictly after ``now`` (a rolling window).
+    """Return the earliest of `policy.dates` that lies strictly after `now`.
 
-    ``None`` once every date has passed (or ``now``/``dates`` missing)."""
+    This gives a rolling window. The function returns `None` when every date
+    has passed, or when `now` or `dates` is missing.
+    """
     if now is None or not policy.dates:
         return None
     upcoming: list[datetime] = []
@@ -289,12 +316,16 @@ def resolve_due_at(
     submitted_at: datetime | None = None,
     changed_at: datetime | None = None,
 ) -> datetime | None:
-    """Derive a concrete due date from a policy + application timestamps (pure).
+    """Derive a concrete due date from a policy and the application timestamps.
 
-    ``at_time``/``timezone`` snap the result to a local wall-clock time
-    (DST-correct) when set; ``recurring`` returns the earliest of ``dates`` still
-    ahead of ``now``. A missing reference value (e.g. no ``submitted_at``) or an
-    exhausted ``recurring`` schedule yields ``None``."""
+    The function is pure. If `at_time` and `timezone` are set, the result snaps
+    to a local wall-clock time and stays DST-correct. A `recurring` policy
+    returns the earliest of `dates` that is still ahead of `now`.
+
+    Returns:
+        The due date. It returns `None` when a reference value is missing, for
+        example `submitted_at`, or when a `recurring` schedule has no date left.
+    """
     if policy.kind == "recurring":
         return _recurring_due(policy, now)
     if policy.kind == "absolute":
@@ -310,11 +341,14 @@ def resolve_due_at(
 
 
 class DeadlinePolicyError(Exception):
-    """Violated policy invariant (e.g. duplicate key); mapped to 409/422."""
+    """A policy invariant fails, for example a duplicate key.
+
+    The API maps this error to 409 or 422.
+    """
 
 
 class DeadlinePolicyService:
-    """CRUD for the named deadline policies (admin-maintained registry)."""
+    """CRUD for the named deadline policies. An admin maintains this registry."""
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -383,11 +417,12 @@ class DeadlinePolicyService:
             policy.label = label
         if kind is not None:
             policy.kind = kind
-        # The editor submits the whole form, so the wall-clock anchor is replaced
-        # wholesale (``None`` clears it) rather than treated as a sparse patch.
+        # The editor submits the whole form. The code therefore replaces the
+        # wall-clock anchor completely, and `None` clears it. It is not a sparse
+        # patch.
         policy.at_time = at_time
         policy.timezone = timezone
-        # Set the value field matching the (possibly new) kind; clear the others.
+        # Set the value field that matches the new kind and clear the others.
         effective_kind = kind if kind is not None else policy.kind
         if effective_kind == "absolute":
             if absolute_at is not None:
@@ -413,9 +448,11 @@ class DeadlinePolicyService:
 
 
 def transition_ref(action_on_pass: dict | None) -> UUID | None:
-    """Read the transition UUID from ``action_on_pass``.
+    """Read the transition UUID from `action_on_pass`.
 
-    Defensive: missing/invalid value yields ``None`` (caller skips the row)."""
+    The function is defensive. A missing or invalid value gives `None`, and the
+    caller then skips the row.
+    """
     if not action_on_pass:
         return None
     raw = action_on_pass.get("transitionId") or action_on_pass.get("transition_id")

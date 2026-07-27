@@ -1,12 +1,14 @@
-"""Konten (Bankkonten) + Übertrag-Verknüpfung an Buchungen + account.manage-Recht.
+"""Accounts (bank accounts), the transfer link on bookings, and the account.manage right.
 
-Idempotent: frische DBs erhalten Tabelle/Spalten aus ``create_all`` (Baseline) → dann
-No-op; migrierte DBs tragen nach.
+Idempotent. A fresh database gets the table and the columns from `create_all`
+(baseline), so this migration is a no-op there. A migrated database gets them here.
 
-* ``account`` — Konto (Name + IBAN-Freitext), nicht an Kostenstellen gebunden.
-* ``budget_expense.account_id`` (FK SET NULL) + ``transfer_id`` (verknüpft die beiden
-  Buchungen eines Übertrags).
-* ``account.manage`` an die Rollen ``manager`` + ``finance`` (admin hat ohnehin alles).
+* `account`: a bank account with a name and a free-text IBAN. It is not bound to a
+  cost center.
+* `budget_expense.account_id` (FK SET NULL) and `transfer_id`. `transfer_id` links the
+  two bookings of one transfer.
+* `account.manage` goes to the roles `manager` and `finance`. The `admin` role holds
+  every permission anyway.
 """
 
 from __future__ import annotations
@@ -37,7 +39,6 @@ _UPGRADE: tuple[str, ...] = (
     "ALTER TABLE budget_expense ADD COLUMN IF NOT EXISTS transfer_id uuid",
     "CREATE INDEX IF NOT EXISTS ix_budget_expense_account_id ON budget_expense (account_id)",
     "CREATE INDEX IF NOT EXISTS ix_budget_expense_transfer_id ON budget_expense (transfer_id)",
-    # account.manage an manager + finance (admin bypasst Rechte ohnehin).
     """
     INSERT INTO role_permission (role_id, permission)
     SELECT r.id, 'account.manage' FROM role r WHERE r.key IN ('manager', 'finance')

@@ -1,7 +1,7 @@
 /**
  * Admin config API client (against the admin section of the HTTP API).
  *
- * In mock mode (`USE_MOCK_API`) an in-memory store serves the UIs; in real mode the
+ * In mock mode (`USE_MOCK_API`) an in-memory store serves the UIs. In real mode the
  * exact REST calls go out. Branding/site-config uses the local `/api/admin/site-config`
  * path, which is not part of the API spec.
  */
@@ -88,7 +88,8 @@ export class AdminApiService {
   private readonly base = inject(API_BASE_URL);
   private readonly mock = inject(USE_MOCK_API);
 
-  // In-memory store (mock mode only). Per service instance, enough for UI/tests.
+  // In-memory store for mock mode only. One store per service instance is enough for
+  // the UI and the tests.
   private readonly store = {
     gremien: structuredCopy(MOCK_GREMIEN),
     appTypes: structuredCopy(MOCK_APP_TYPES),
@@ -108,13 +109,11 @@ export class AdminApiService {
     },
   };
 
-  // --- Schemas -------------------------------------------------------------
   configSchemas(): Observable<ConfigSchemas> {
     if (this.mock) return of(MOCK_CONFIG_SCHEMAS);
     return this.http.get<ConfigSchemas>(`${this.base}/admin/config-schemas`);
   }
 
-  // --- Gremien / RBAC ------------------------------------------------------
   /** `quiet` = the gremien page shows its own loading indicator (no overlay). */
   listGremien(opts: { quiet?: boolean } = {}): Observable<Gremium[]> {
     if (this.mock) return of(structuredCopy(this.store.gremien));
@@ -124,9 +123,10 @@ export class AdminApiService {
   }
 
   /**
-   * Gremien master data as a dropdown source — GET `/gremien` (no admin right; any
-   * logged-in principal). Unlike {@link listGremien} (`/admin/gremien`, P `admin.gremien`),
-   * usable for "create meeting"/budget where the actor only has `meeting.manage`/`budget.*`.
+   * Gremien master data as a dropdown source — GET `/gremien`. Any logged-in principal
+   * can call it. No admin right is necessary. Unlike {@link listGremien}
+   * (`/admin/gremien`, P `admin.gremien`), it also works for "create meeting" and for
+   * budget, where the actor only holds `meeting.manage` or `budget.*`.
    */
   listGremienOptions(): Observable<Gremium[]> {
     if (this.mock) return of(structuredCopy(this.store.gremien));
@@ -183,7 +183,6 @@ export class AdminApiService {
     return this.http.get<Role[]>(`${this.base}/admin/roles`);
   }
 
-  // --- OIDC group → role mappings ------------------------------------------
   listGroupMappings(): Observable<GroupMapping[]> {
     return this.http.get<GroupMapping[]>(`${this.base}/admin/group-mappings`);
   }
@@ -197,7 +196,6 @@ export class AdminApiService {
     return this.http.delete<void>(`${this.base}/admin/group-mappings/${id}`);
   }
 
-  // --- Mail templates -------------------------------------------------------
   listMailTemplates(): Observable<MailTemplate[]> {
     return this.http.get<MailTemplate[]>(`${this.base}/admin/mail-templates`);
   }
@@ -218,8 +216,8 @@ export class AdminApiService {
 
   /**
    * Application types (id + name) as a selection source for the form/flow builders.
-   * Uses the public `/application-types` (page); a `form.configure` principal also
-   * gets inactive types there. In mock mode a small stub list.
+   * It uses the public `/application-types` page. A `form.configure` principal also
+   * gets the inactive types there. Mock mode returns a small stub list.
    */
   listApplicationTypes(): Observable<ApplicationTypeOption[]> {
     if (this.mock) return of(structuredCopy(MOCK_APP_TYPE_OPTIONS));
@@ -232,8 +230,8 @@ export class AdminApiService {
   listForms(): Observable<FormOverviewItem[]> {
     if (this.mock) return of(structuredCopy(MOCK_FORMS));
     // `/admin/application-types` returns `ApplicationTypeOut` (nameI18n,
-    // activeFormVersionId …), not the FE view → map instead of raw-casting,
-    // else the table shows an empty name + `status.undefined`.
+    // activeFormVersionId …), not the FE view. Map the rows instead of a raw cast.
+    // After a raw cast the table shows an empty name and `status.undefined`.
     return this.http
       .get<ApplicationTypeOutWire[]>(`${this.base}/admin/application-types`)
       .pipe(
@@ -259,7 +257,7 @@ export class AdminApiService {
     return this.http.patch<Role>(`${this.base}/admin/roles/${roleId}`, { permissions });
   }
 
-  /** Rename a role — display name (`label`); key stays unchanged. */
+  /** Rename a role — change the display name (`label`). The key stays unchanged. */
   renameRole(roleId: Uuid, label: I18nMap): Observable<Role> {
     if (this.mock) {
       const idx = this.store.roles.findIndex((r) => r.id === roleId);
@@ -303,13 +301,12 @@ export class AdminApiService {
     return this.http.delete<void>(`${this.base}/admin/roles/${roleId}`);
   }
 
-  /** Catalogue of selectable permission keys (GET /admin/permissions). */
+  /** Catalog of selectable permission keys (GET /admin/permissions). */
   listPermissions(): Observable<string[]> {
     if (this.mock) return of([...MOCK_PERMISSIONS]);
     return this.http.get<string[]>(`${this.base}/admin/permissions`);
   }
 
-  // --- Users & roles --------------------------------------------------------
   /** List/search users (OIDC principals) — GET /admin/principals?q=. */
   listPrincipals(query?: string): Observable<AdminPrincipal[]> {
     if (this.mock) {
@@ -356,7 +353,6 @@ export class AdminApiService {
     return this.http.delete<void>(`${this.base}/admin/role-assignments/${assignmentId}`);
   }
 
-  // --- Application types / forms --------------------------------------------
   /** Application types as an edit view (id + i18n name + gremium + budget flag). */
   listApplicationTypesFull(): Observable<ApplicationTypeFull[]> {
     if (this.mock) return of(structuredCopy(this.store.appTypes));
@@ -430,8 +426,8 @@ export class AdminApiService {
       .pipe(map(() => void 0));
   }
 
-  /** Delete an application type — dedicated permission ``admin.types_delete``; 409 if
-   *  applications of this type exist. */
+  /** Delete an application type. It needs the dedicated permission `admin.types_delete`.
+   *  The server answers 409 if applications of this type exist. */
   deleteApplicationType(id: Uuid): Observable<void> {
     if (this.mock) {
       this.store.appTypes = this.store.appTypes.filter((t) => t.id !== id);
@@ -454,8 +450,7 @@ export class AdminApiService {
     );
   }
 
-  // --- Form/flow versions ---------------------------------------------------
-  /** POST a new form version (definition validated server-side against JSON schema). */
+  /** POST a new form version. The server validates the definition against a JSON schema. */
   createFormVersion(
     typeId: Uuid,
     fields: FormFieldDef[],
@@ -509,7 +504,6 @@ export class AdminApiService {
     return this.http.post<{ id: Uuid }>(`${this.base}/admin/flow-versions/global`, { graph });
   }
 
-  // --- Webhooks ------------------------------------------------------------
   listWebhooks(): Observable<WebhookConfig[]> {
     if (this.mock) return of(structuredCopy(this.store.webhooks));
     return this.http.get<WebhookConfig[]>(`${this.base}/admin/webhooks`);
@@ -522,7 +516,6 @@ export class AdminApiService {
       : this.http.post<WebhookConfig>(`${this.base}/admin/webhooks`, hook);
   }
 
-  // --- Gremium roles (per gremium) ------------------------------------------
   listGremiumRoles(gremiumId: Uuid): Observable<GremiumRole[]> {
     if (this.mock) return of(structuredCopy(this.store.gremiumRoles.filter((r) => r.gremiumId === gremiumId)));
     return this.http.get<GremiumRole[]>(`${this.base}/admin/gremien/${gremiumId}/roles`);
@@ -565,7 +558,6 @@ export class AdminApiService {
     return this.http.delete<void>(`${this.base}/admin/gremium-roles/${id}`);
   }
 
-  // --- Deadline policies (named deadlines, registry) ------------------------
   listDeadlinePolicies(): Observable<DeadlinePolicy[]> {
     if (this.mock) return of(structuredCopy(this.store.deadlinePolicies));
     return this.http.get<DeadlinePolicy[]>(`${this.base}/admin/deadline-policies`);
@@ -613,8 +605,8 @@ export class AdminApiService {
     return this.http.delete<void>(`${this.base}/admin/gremium-memberships/${id}`);
   }
 
-  // --- Audit log (P(audit.read)) --------------------------------------------
-  /** Keyset-paged audit log. `before` = cursor (id); filter action/actor/time. */
+  // Every audit-log endpoint below needs P(audit.read).
+  /** Keyset-paged audit log. `before` is the cursor (id). Filter by action, actor or time. */
   listAuditLog(
     opts: {
       limit?: number;
@@ -645,8 +637,9 @@ export class AdminApiService {
     return this.http.get<AuditActor[]>(`${this.base}/admin/audit/actors`);
   }
 
-  /** Revert a config change from the audit log (P audit.revert).
-   *  409 = a newer state exists / not revertible; 404 = entry/revision missing. */
+  /** Revert a config change from the audit log (P `audit.revert`).
+   *  Status 409 = a newer state exists or the change is not revertible.
+   *  Status 404 = the entry or the revision is missing. */
   revertAuditEntry(entryId: number): Observable<AuditRevertResult> {
     return this.http.post<AuditRevertResult>(
       `${this.base}/admin/audit/${entryId}/revert`,
@@ -654,7 +647,6 @@ export class AdminApiService {
     );
   }
 
-  // --- Config versions ------------------------------------------------------
   /** Snapshots of a config entity (newest first) — version sidebar. */
   listConfigRevisions(
     entityType: string,
@@ -697,7 +689,7 @@ export class AdminApiService {
     );
   }
 
-  // --- Notification config (P(admin.notifications)) -------------------------
+  // Every notification-config endpoint below needs P(admin.notifications).
   getNotificationSettings(): Observable<NotificationSettings> {
     if (this.mock) {
       return of({ taskReminderEnabled: true, taskReminderAfterDays: 5, taskReminderRepeatDays: 7 });
@@ -716,7 +708,7 @@ export class AdminApiService {
     );
   }
 
-  // --- DSGVO/privacy (P privacy.manage) -------------------------------------
+  // Every DSGVO/privacy endpoint below needs P(privacy.manage).
   listErasures(status?: ErasureStatus): Observable<ErasureRequest[]> {
     if (this.mock) {
       const rows = status
@@ -786,7 +778,6 @@ export class AdminApiService {
     });
   }
 
-  // --- Branding / site-config -----------------------------------------------
   getSiteConfig(): Observable<SiteConfig> {
     if (this.mock) return of(structuredCopy(this.store.site));
     return this.http.get<SiteConfig>(`${this.base}/admin/site-config`);
@@ -813,7 +804,6 @@ export class AdminApiService {
     return this.http.post<SiteConfig>(`${this.base}/admin/site-config/activate`, {});
   }
 
-  // --- internal -------------------------------------------------------------
   private upsert<T extends { id: Uuid }>(list: T[], item: T, prefix: string): T {
     if (item.id) {
       const idx = list.findIndex((x) => x.id === item.id);
@@ -831,7 +821,7 @@ function structuredCopy<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
-/** Stable string hash (deterministic mock ids; no `Math.random`/`Date`). */
+/** Stable string hash for deterministic mock ids. It uses no `Math.random` and no `Date`. */
 function hashString(value: string): number {
   let h = 0;
   for (let i = 0; i < value.length; i++) h = (Math.imul(31, h) + value.charCodeAt(i)) | 0;

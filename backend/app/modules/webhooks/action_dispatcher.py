@@ -1,15 +1,16 @@
-"""Flow action handler for ``webhook``.
+"""Flow action handler for `webhook`.
 
-The flow engine calls ``ActionDispatcher.dispatch(actions)`` after commit. This
-dispatcher handles ``webhook`` actions: it resolves the domain event and fans it out via
-``WebhookService.dispatch_event`` to every subscribed webhook (no separate event system -
-it hooks into the existing action dispatch).
+The flow engine calls `ActionDispatcher.dispatch(actions)` after the commit. This
+dispatcher handles `webhook` actions. It resolves the domain event and fans it out with
+`WebhookService.dispatch_event` to every subscribed webhook. There is no separate event
+system. The dispatcher hooks into the existing action dispatch.
 
-``DispatchedAction.idempotency_key`` is stable over (application, status event, position,
-type) and forms the idempotency basis of the delivery (no double send on worker/flow retry).
+`DispatchedAction.idempotency_key` is stable over the application, the status event, the
+position and the action type. It is the idempotency base of the delivery. A worker retry
+or a flow retry therefore sends nothing twice.
 
-Multiple handlers are chained via ``ChainActionDispatcher`` so one transition can trigger
-``notify``, ``exportPdf`` and ``webhook`` at once (no second event system).
+`ChainActionDispatcher` chains several handlers. One transition can therefore trigger
+`notify`, `exportPdf` and `webhook` at the same time.
 """
 
 from __future__ import annotations
@@ -29,13 +30,12 @@ from app.settings import Settings, get_settings
 
 logger = logging.getLogger("app.webhooks")
 
-# Domain event of a flow-driven webhook delivery.
 _TRANSITION_EVENT = "application.transition"
 
 
 @dataclass(slots=True)
 class WebhookActionDispatcher:
-    """``ActionDispatcher`` implementation for ``webhook`` (otherwise no-op)."""
+    """Handle `webhook` flow actions and ignore every other action type."""
 
     sessionmaker: async_sessionmaker[AsyncSession]
     queue: WebhookQueue | None
@@ -79,7 +79,7 @@ class WebhookActionDispatcher:
 
 
 def build_webhook_dispatcher(pool: object) -> WebhookActionDispatcher:
-    """Build the dispatcher from the (optional) arq pool - app wiring (main.py)."""
+    """Build the dispatcher from the optional arq pool for the app wiring in `main.py`."""
     return WebhookActionDispatcher(
         get_sessionmaker(),
         webhook_queue_from_pool(pool),  # type: ignore[arg-type]

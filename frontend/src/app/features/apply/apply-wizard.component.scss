@@ -51,27 +51,28 @@
 
 :host ::ng-deep formly-form {
   display: grid;
-  /* Spacing between questions comes symmetrically from margin/padding around the
-     divider (see formly-field + formly-field) — NO extra grid-gap, else the spacing
-     stacks at the top (gap + padding-top) and the question looks top-heavy. */
+  /* The margin and padding around the divider give the space between two questions
+     (see formly-field + formly-field). Do not add a grid gap here. A gap stacks with
+     the padding-top and makes the question look top-heavy. */
   gap: 0;
 }
 
 :host ::ng-deep formly-field {
   display: block;
-  /* Grid items have min-width:auto — an over-wide field (e.g. a table) would
-     otherwise stretch the whole column, and thus ALL fields, past the viewport. */
+  /* Grid items default to `min-width: auto`. Without this rule, an over-wide field
+     such as a table stretches the whole column, and thus all fields, past the
+     viewport. */
   min-width: 0;
   max-width: 100%;
-  /* `overflow-x: hidden` would force `overflow-y` to `auto` (CSS spec) and thus
-     clip the focus ring top/bottom. `clip` keeps the Y axis `visible`;
-     `overflow-clip-margin` lets the ring breathe a little sideways. */
+  /* `overflow-x: hidden` would force `overflow-y` to `auto` (CSS spec) and clip the
+     focus ring at the top and the bottom. `clip` keeps the Y axis `visible`.
+     `overflow-clip-margin` gives the ring a little space sideways. */
   overflow-x: clip;
   overflow-clip-margin: var(--space-1);
 }
 
-/* Thin divider between consecutive questions of a step — equal space above and
-   below the divider (margin on top, padding on bottom). */
+/* Thin divider between two questions of a step. The margin on top and the padding
+   below give equal space on both sides of the divider. */
 :host ::ng-deep formly-field + formly-field {
   margin-top: var(--space-5);
   padding-top: var(--space-5);
@@ -128,7 +129,8 @@
   }
 }
 
-/* Mobile: "Next/Submit" as a full tap target (≥2.5rem), options easy to tap. */
+/* Mobile: give "Next" and "Submit" a full tap target (≥2.5rem) and make the options
+   easy to tap. */
 @media (max-width: 40rem) {
   .wizard__nav-right app-button {
     display: flex;

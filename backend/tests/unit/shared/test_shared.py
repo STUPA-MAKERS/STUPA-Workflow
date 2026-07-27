@@ -1,4 +1,4 @@
-"""TDD: shared/paging + shared/i18n Helfer."""
+"""Helpers in shared/paging and shared/i18n."""
 
 from app.shared.i18n import resolve_i18n
 from app.shared.paging import Page, PageParams

@@ -1,10 +1,11 @@
 /**
- * Guard/action builder + validation for the flow editor.
+ * Guard and action builder plus validation for the flow editor.
  *
- * Mirrors `app/shared/guards.py` (`validate_guard`/`validate_action`): purely
- * declarative, **whitelist, no `eval`**. The backend validates authoritatively on
- * save of the flow version; this client check gives immediate UI feedback so the
- * admin does not build a graph the server would reject.
+ * This file mirrors `app/shared/guards.py` (`validate_guard` and
+ * `validate_action`). The check stays purely declarative. It uses a whitelist and
+ * no `eval`. The backend is authoritative and validates again when it saves the
+ * flow version. This client check gives immediate UI feedback. It stops the admin
+ * from building a graph that the server rejects.
  */
 import {
   ACTION_TYPES,
@@ -48,10 +49,13 @@ function children(op: string, value: unknown): Guard[] {
 }
 
 /**
- * Static guard check (save gate, like backend `validate_guard`): exactly one
- * operator, only whitelist operators, correct combinator structure, `compare`
- * shape. `allowActorOps=false` (automatic transitions) forbids
- * `roleIs`/`isInCommittee`. Empty/`null` guard ⇒ no gate ⇒ ok.
+ * Check a guard before a save, like the backend `validate_guard`.
+ *
+ * A guard must hold exactly one operator. The operator must come from the
+ * whitelist. A combinator must have the correct structure. A `compare` must have
+ * the correct shape. Automatic transitions pass `allowActorOps=false`. That
+ * forbids `roleIs` and `isInCommittee`. An empty or `null` guard sets no gate and
+ * passes.
  */
 export function validateGuard(guard: Guard | null | undefined, allowActorOps = true): void {
   if (!guard) return;
@@ -84,7 +88,7 @@ export function validateGuard(guard: Guard | null | undefined, allowActorOps = t
     validateCompare(value);
     return;
   }
-  // Operators that require a non-empty value (otherwise the server rejects).
+  // These operators need a non-empty value. The server rejects an empty one.
   if (
     op === 'roleIs' ||
     op === 'isInCommittee' ||
@@ -170,8 +174,6 @@ export function isGuardValid(guard: Guard | null | undefined, allowActorOps = tr
     return false;
   }
 }
-
-// --- builder helpers --------------------------------------------------------
 
 /** Build a leaf guard, e.g. `buildLeaf('roleIs', 'stupa')` → `{roleIs:'stupa'}`. */
 export function buildLeaf(op: GuardLeafOperator, value: unknown): Guard {

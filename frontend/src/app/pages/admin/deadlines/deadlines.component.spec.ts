@@ -47,7 +47,7 @@ describe('AdminDeadlinesComponent', () => {
     const { api, container } = await setup();
     await userEvent.click(screen.getByRole('button', { name: 'Frist hinzufügen' }));
     const q = (sel: string) => container.querySelector<HTMLElement>(sel)!;
-    // key + relative kind + offset → save enabled.
+    // A key, a relative kind and an offset enable the save.
     await userEvent.type(screen.getByLabelText('Schlüssel'), 'mahnung');
     await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Art' }), 'relative_submitted');
     await userEvent.type(q('input[name="offsetDays"]'), '14');
@@ -81,7 +81,7 @@ describe('AdminDeadlinesComponent', () => {
     const i18n = fixture.debugElement.injector.get(I18nService);
     i18n.setLocale('en');
     expect(c.label({ key: 'k', label: { en: 'EN', de: 'DE' } } as DeadlinePolicy)).toBe('EN');
-    // missing both locale + de → falls back to the key
+    // With no locale label and no de label, the key is the fallback.
     expect(c.label({ key: 'fallback', label: {} } as DeadlinePolicy)).toBe('fallback');
   });
 
@@ -137,13 +137,13 @@ describe('AdminDeadlinesComponent', () => {
     const c = fixture.componentInstance as any;
     expect(c.canSave()).toBe(false); // no draft
     c.openAdd();
-    expect(c.canSave()).toBe(false); // empty key
+    expect(c.canSave()).toBe(false); // an empty key
     c.patch('key', 'k');
-    // absolute kind without a date
+    // an absolute kind without a date
     expect(c.canSave()).toBe(false);
     c.patch('absoluteAt', '2026-01-01');
     expect(c.canSave()).toBe(true);
-    // switch to relative: needs a non-negative offset
+    // Switch to relative, which needs an offset of zero or more.
     c.patch('kind', 'relative_submitted');
     c.patch('offsetDays', null);
     expect(c.canSave()).toBe(false);
@@ -157,7 +157,7 @@ describe('AdminDeadlinesComponent', () => {
     const { fixture, api } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
-    c.openAdd(); // empty key → canSave false
+    c.openAdd(); // an empty key makes canSave false
     c.save();
     expect(api.createDeadlinePolicy).not.toHaveBeenCalled();
   });
@@ -279,7 +279,7 @@ describe('AdminDeadlinesComponent', () => {
     c.addDate();
     c.setDate(0, '2026-07-01');
     c.addDate();
-    c.setDate(1, ''); // blank entry is dropped on save
+    c.setDate(1, ''); // the save drops a blank entry
     c.patch('atTime', '23:59');
     c.save();
     expect(api.createDeadlinePolicy).toHaveBeenCalledWith(

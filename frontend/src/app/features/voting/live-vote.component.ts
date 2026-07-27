@@ -18,10 +18,11 @@ import { ButtonComponent } from '@stupa-makers/ui-kit';
 import { VoteBarsComponent } from './vote-bars.component';
 
 /**
- * Mobile live vote: unlock via WebSocket → cast → result. Thumb-friendly (large
- * touch targets), reconnect banner on connection loss (the session resyncs via
- * `subscribe`). Not eligible (server `error: not_eligible` or missing FE
- * permission) → notice.
+ * Mobile live vote: unlock over WebSocket → cast → result. The layout is
+ * thumb-friendly with large touch targets. A reconnect banner appears on
+ * connection loss, and the session resyncs with `subscribe`. A viewer that
+ * cannot vote gets a notice. That happens when the server sends
+ * `error: not_eligible`, or when the frontend permission is missing.
  */
 @Component({
   selector: 'app-live-vote',

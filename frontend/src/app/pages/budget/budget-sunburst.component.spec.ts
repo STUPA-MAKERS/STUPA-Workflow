@@ -5,7 +5,7 @@ import type { BudgetAllocationView, BudgetTreeNode } from './budget-tree.api';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SunInternals = any;
 
-/** Knoten-Fabrik mit nur den Feldern, die der Sunburst liest. */
+/** Node factory. It sets only the fields that the sunburst reads. */
 function node(
   id: string,
   alloc: Partial<BudgetAllocationView> & { fiscalYearId: string },
@@ -75,12 +75,13 @@ describe('BudgetSunburstComponent (#budget-sunburst)', () => {
   it('metricOf falls back to 0 when the fiscal year is not present', async () => {
     const root = node('root', { fiscalYearId: 'other', allocated: '500' });
     const { c } = await setup({ root, fyId: FY });
-    // Looking for FY but data only on 'other' → 0.
+    // The lookup asks for FY but the data sits on 'other', so the value is 0.
     expect(c.total()).toBe(0);
   });
 
   it('subtree adds own remainder plus children sums and clamps negative own to 0', async () => {
-    // Parent alloc 100; child alloc 120 (> parent) → own clamps to 0, total = child 120.
+    // Parent alloc 100, child alloc 120 (more than the parent). The own share clamps
+    // to 0, so the total is the child value 120.
     const child = node('c1', { fiscalYearId: FY, allocated: '120' });
     const root = node('root', { fiscalYearId: FY, allocated: '100' }, [child]);
     const { c } = await setup({ root });
@@ -168,7 +169,8 @@ describe('BudgetSunburstComponent (#budget-sunburst)', () => {
   });
 
   it('renders a full-circle annular ring when a single child takes the whole span', async () => {
-    // root has exactly one positive child taking 100% → childSpan == 2π → full-circle annular branch.
+    // The root has exactly one positive child that takes 100%. childSpan is then 2π,
+    // which takes the full-circle annular branch.
     const only = node('only', { fiscalYearId: FY, allocated: '100' });
     const root = node('root', { fiscalYearId: FY, allocated: '100' }, [only]);
     const { c, container } = await setup({ root });

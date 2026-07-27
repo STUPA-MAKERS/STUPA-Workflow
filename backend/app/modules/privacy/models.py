@@ -33,8 +33,8 @@ class PrivacySettings(Base):
 class ErasureRequest(UUIDPkMixin, CreatedAtMixin, Base):
     """Erasure request (GDPR Art. 17).
 
-    FK ``ON DELETE SET NULL`` keeps the queue row as proof even after the subject is
-    hard-deleted.
+    The foreign keys use `ON DELETE SET NULL`. The queue row therefore stays as proof
+    after a hard delete of the subject.
     """
 
     __tablename__ = "erasure_request"

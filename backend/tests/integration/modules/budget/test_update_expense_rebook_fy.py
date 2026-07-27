@@ -1,12 +1,12 @@
-"""Integration (echte Postgres, testcontainers): Umbuchen einer Ausgabe über
-Top-Budget-Grenzen muss das beibehaltene HHJ gegen das Top-Level des Zielknotens
-prüfen (#AUD-036).
+"""Integration: a rebook across top-budget borders must check the fiscal year (#AUD-036).
 
-``update_expense`` ließ ``budgetId`` auf einen beliebigen Knoten ändern, behielt aber
-das ``fiscalYearId`` fix — ohne zu prüfen, dass das HHJ zum neuen Top-Budget gehört.
-Ein Cross-Top-Level-Umbuchen hinterließ so eine verwaiste HHJ-Referenz (Phantom-Zeile
-mit allocated=0 / negativem available). Der Fix spiegelt ``book_expense`` /
-``move_fiscal_year``: 422 bei Top-Level-Mismatch.
+The tests run against a real Postgres through testcontainers.
+
+`update_expense` let `budgetId` move to any node but kept `fiscalYearId` fixed. It did
+not check that the fiscal year belongs to the new top budget. A cross-top-level rebook
+then left an orphan fiscal-year reference: a phantom row with allocated 0 and a negative
+available amount. The fix mirrors `book_expense` and `move_fiscal_year`. A top-level
+mismatch gives 422.
 """
 
 from __future__ import annotations
@@ -54,10 +54,10 @@ def _suffix() -> str:
 
 
 async def test_update_expense_rejects_cross_top_level_rebook(session: AsyncSession) -> None:
-    """Umbuchen auf eine Kostenstelle unter einem fremden Top-Budget → 422 (#AUD-036)."""
+    """A rebook to a cost center under a different top budget gives 422 (#AUD-036)."""
     svc = BudgetTreeService(session)
     g = await _gremium(session)
-    # Zwei unabhängige Top-Budgets, jedes mit eigenem HHJ.
+    # Two independent top budgets, each with its own fiscal year.
     top_a = await svc.create_node(
         BudgetNodeCreate(key=f"TA{_suffix()}", name="Top A", gremiumId=g.id)
     )
@@ -80,11 +80,11 @@ async def test_update_expense_rejects_cross_top_level_rebook(session: AsyncSessi
         actor="tester",
     )
 
-    # Umbuchen auf Kostenstelle unter Top B, HHJ (von Top A) bleibt fix → 422.
+    # Rebook to a cost center under top B. The fiscal year of top A stays fixed, so 422.
     with pytest.raises(ValidationProblem):
         await svc.update_expense(booking.id, ExpenseUpdate(budgetId=child_b.id))
 
-    # Buchung bleibt unverändert (kein Teil-Commit der verwaisten HHJ-Referenz).
+    # The booking stays unchanged. No partial commit writes the orphan fiscal-year row.
     await session.rollback()
     row = await session.get(BudgetExpense, booking.id)
     assert row is not None
@@ -93,7 +93,7 @@ async def test_update_expense_rejects_cross_top_level_rebook(session: AsyncSessi
 
 
 async def test_update_expense_same_top_level_rebook_ok(session: AsyncSession) -> None:
-    """Umbuchen innerhalb desselben Top-Budgets bleibt erlaubt (HHJ passt)."""
+    """A rebook inside the same top budget stays allowed because the fiscal year fits."""
     svc = BudgetTreeService(session)
     g = await _gremium(session)
     top = await svc.create_node(BudgetNodeCreate(key=f"TS{_suffix()}", name="Top", gremiumId=g.id))

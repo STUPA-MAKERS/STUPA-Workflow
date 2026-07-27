@@ -1,9 +1,10 @@
-"""Budget-tree domain logic (pure, no DB).
+"""Pure budget-tree domain logic without database access.
 
-All cost-centre tree decisions live here as pure functions — deterministic and
-testable without backing services; the service stays thin I/O wiring.
+All cost center tree decisions live here as pure functions. They are
+deterministic and testable without a backing service. The service layer stays
+thin I/O wiring.
 
-Rule of thumb: allocation flows DOWN (top-down, NO roll-up); consumption flows
+Rule of thumb: allocation flows DOWN (top-down, NO roll-up). Consumption flows
 UP (roll-up of the bound sum from approved applications).
 """
 
@@ -14,49 +15,55 @@ from collections.abc import Iterable, Sequence
 from datetime import date, timedelta
 from decimal import Decimal
 
-# Path segment: alphanumeric (e.g. ``VS``/``800``/``04``). The separator ``-``
-# is reserved for path composition and thus forbidden inside a segment.
+# Path segment: alphanumeric, for example `VS`, `800` or `04`. Path composition
+# reserves the separator `-`, so a segment must not contain it.
 _KEY_RE = re.compile(r"^[A-Za-z0-9]+$")
 _SEP = "-"
 _ZERO = Decimal("0")
-# Length cap per path segment — matches the schemas' ``max_length`` and bounds
-# free text in the ``path_key`` prefix comparisons.
+# Length cap per path segment. It matches `max_length` in the schemas and bounds
+# the free text in the `path_key` prefix comparisons.
 _KEY_MAX = 64
 
 
 def is_valid_key(key: str) -> bool:
-    """Check for a valid path segment: alphanumeric, no ``-``, length-capped."""
+    """Check for a valid path segment: alphanumeric, no `-`, length-capped."""
     return len(key) <= _KEY_MAX and bool(_KEY_RE.match(key))
 
 
 def compose_path_key(parent_path: str | None, key: str) -> str:
-    """Compose the path key: top level -> ``key``; else ``<parent_path>-<key>``."""
+    """Compose the path key.
+
+    A top-level node gets `key`. Any other node gets `<parent_path>-<key>`.
+    """
     if parent_path is None:
         return key
     return f"{parent_path}{_SEP}{key}"
 
 
 def is_descendant_path(ancestor_path: str, node_path: str) -> bool:
-    """Check whether ``node_path`` lies strictly below ``ancestor_path``.
+    """Check whether `node_path` lies strictly below `ancestor_path`.
 
-    Via the path-prefix convention (``VS`` > ``VS-800`` > ``VS-800-04``). The
-    node itself does NOT count as a descendant.
+    The check follows the path-prefix convention (`VS` > `VS-800` > `VS-800-04`).
+    The node itself does NOT count as a descendant.
     """
     return node_path.startswith(ancestor_path + _SEP)
 
 
 def is_self_or_descendant_path(ancestor_path: str, node_path: str) -> bool:
-    """Node itself OR descendant (for roll-up aggregation: a leaf counts to itself)."""
+    """Check for the node itself OR a descendant.
+
+    Roll-up aggregation uses this rule, so a leaf counts toward itself.
+    """
     return node_path == ancestor_path or is_descendant_path(ancestor_path, node_path)
 
 
 def intervals_overlap(
     a_start: date, a_end: date, b_start: date, b_end: date
 ) -> bool:
-    """Check whether two closed date intervals ``[start, end]`` overlap.
+    """Check whether two closed date intervals `[start, end]` overlap.
 
-    Classic overlap test: ``a.start <= b.end AND b.start <= a.end``. Gaps
-    between fiscal years are allowed — only overlap is forbidden.
+    The test is `a.start <= b.end AND b.start <= a.end`. A gap between fiscal
+    years is allowed. Only an overlap is forbidden.
     """
     return a_start <= b_end and b_start <= a_end
 
@@ -66,14 +73,14 @@ def overlaps_any(
     new_end: date,
     existing: Iterable[tuple[date, date]],
 ) -> bool:
-    """Check whether ``[new_start, new_end]`` intersects any existing interval."""
+    """Check whether `[new_start, new_end]` intersects any existing interval."""
     return any(
         intervals_overlap(new_start, new_end, s, e) for s, e in existing
     )
 
 
 def as_amount(value: Decimal | None) -> Decimal:
-    """Return 0 for ``None``, else the amount."""
+    """Return 0 for `None`, else the amount."""
     return value if value is not None else _ZERO
 
 
@@ -82,11 +89,12 @@ def children_allocation_exceeds_parent(
     siblings_sum_excluding: Decimal,
     new_value: Decimal,
 ) -> bool:
-    """Check whether setting a child allocation exceeds the parent budget.
+    """Check whether a new child allocation exceeds the parent budget.
 
-    ``siblings_sum_excluding`` = sum of the OTHER direct children's allocations.
-    A missing parent allocation counts as 0, so any positive child allocation
-    violates (top-down: nothing to distribute without a parent budget).
+    A missing parent allocation counts as 0. Any positive child allocation then
+    breaks the rule, because top-down distribution has nothing to hand out.
+    `siblings_sum_excluding` is the sum of the allocations of the OTHER direct
+    children.
     """
     return siblings_sum_excluding + new_value > as_amount(parent_allocated)
 
@@ -95,8 +103,11 @@ def parent_allocation_below_children(
     new_parent_value: Decimal,
     children_sum: Decimal,
 ) -> bool:
-    """Check whether the new parent allocation drops below the sum already
-    distributed to children (violation -> 422)."""
+    """Check whether the new parent allocation drops below the distributed sum.
+
+    The distributed sum covers the allocations the children already hold. The
+    service maps a violation to 422.
+    """
     return new_parent_value < children_sum
 
 
@@ -104,12 +115,18 @@ def rollup_committed(
     node_paths: Iterable[tuple[object, str]],
     leaf_amounts: Iterable[tuple[str, Decimal | None]],
 ) -> dict[object, Decimal]:
-    """Bound sum per node = roll-up of approved application amounts.
+    """Roll the approved application amounts up into a bound sum per node.
 
-    ``node_paths`` = ``(node_id, path_key)`` of all tree nodes; ``leaf_amounts``
-    = ``(leaf_path_key, amount)`` per bound application. Each application counts
-    to its own cost centre and all ancestors (path prefix). Consumption flows
-    up — allocated stays untouched.
+    Each application counts toward its own cost center and toward every
+    ancestor through the path prefix. Consumption flows up. The allocated
+    amount stays untouched.
+
+    Args:
+        node_paths: `(node_id, path_key)` of every tree node.
+        leaf_amounts: `(leaf_path_key, amount)` per bound application.
+
+    Returns:
+        The bound sum per node id.
     """
     leaves = [(path, as_amount(amount)) for path, amount in leaf_amounts]
     out: dict[object, Decimal] = {}
@@ -128,36 +145,46 @@ def node_available(
     expended: Decimal = _ZERO,
     income: Decimal = _ZERO,
 ) -> Decimal:
-    """Free sum of a node: ``available = allocated - bound - expended + income``.
+    """Compute the free sum of a node.
 
-    Bound = accepted applications (reduced pro rata by expenses bound to them);
-    expended = actual expenses; income increases the available budget. May go
-    negative (overbooking) — deliberately not clamped.
+    The formula is `available = allocated - bound - expended + income`. Bound
+    counts the accepted applications, reduced pro rata by the expenses bound to
+    them. Expended counts the actual expenses. Income raises the available
+    budget. The result can go negative on an overbooking. The code does not
+    clamp it, on purpose.
     """
     return as_amount(allocated) - bound - expended + income
 
 
 def pick_fiscal_year[T](active_ids: Sequence[T]) -> T | None:
-    """Derive the fiscal year on budget assignment: exactly one active year ->
-    that one; else ``None`` (ambiguous/none -> service leaves it open)."""
+    """Derive the fiscal year for a budget assignment.
+
+    Exactly one active year selects that year. Every other case returns `None`,
+    and the service leaves the fiscal year open.
+    """
     return active_ids[0] if len(active_ids) == 1 else None
 
 
 def is_valid_fiscal_start(start_month: int, start_day: int) -> bool:
-    """Check that the fiscal cutoff (day/month) is a valid date in EVERY year.
+    """Check that the fiscal cutoff day and month form a valid date in EVERY year.
 
-    Days 1..28 exist in every month; days 29-31 can be missing depending on the
-    month and would raise ValueError (-> 500) in :func:`fiscal_year_bounds`.
+    Days 1 to 28 exist in every month. Days 29 to 31 are missing in some
+    months. Such a day makes `fiscal_year_bounds` raise ValueError, which ends
+    as a 500.
     """
     return 1 <= start_month <= 12 and 1 <= start_day <= 28
 
 
 def fiscal_year_bounds(year: int, start_month: int, start_day: int) -> tuple[date, date]:
-    """Compute fiscal-year start/end from year + budget cutoff (day/month).
+    """Compute the fiscal-year start and end from the year and the budget cutoff.
 
-    ``start = cutoff(year)``, ``end = cutoff(year+1) - 1 day`` — a gapless,
-    disjoint sequence of consecutive years. Raises ``ValueError`` for an
-    impossible cutoff; the service maps that to 422 instead of a 500."""
+    The rule is `start = cutoff(year)` and `end = cutoff(year + 1) - 1 day`.
+    Consecutive years therefore form a gapless and disjoint sequence.
+
+    Raises:
+        ValueError: The cutoff day and month are impossible. The service maps
+            this to 422 instead of a 500.
+    """
     if not is_valid_fiscal_start(start_month, start_day):
         raise ValueError(
             f"invalid fiscal start day/month: {start_day:02d}.{start_month:02d}"
@@ -168,15 +195,15 @@ def fiscal_year_bounds(year: int, start_month: int, start_day: int) -> tuple[dat
 
 
 def fiscal_year_display(year: int, start_month: int, start_day: int) -> str:
-    """Display a fiscal year: ``YYYY`` for a Jan-1 cutoff, else ``YYYY/YY``."""
+    """Format a fiscal year: `YYYY` for a Jan 1 cutoff, else `YYYY/YY`."""
     if start_month == 1 and start_day == 1:
         return str(year)
     return f"{year}/{(year + 1) % 100:02d}"
 
 
-# Node tuple: (id, parent_id, gremium_id, key, path_key, name, currency, active,
-# color, accepted_state_keys, denied_state_keys, fiscal_start_month, fiscal_start_day,
-# hidden_in_budget, view_gremium_id).
+# Field order of a node tuple: id, parent_id, gremium_id, key, path_key, name,
+# currency, active, color, accepted_state_keys, denied_state_keys,
+# fiscal_start_month, fiscal_start_day, hidden_in_budget, view_gremium_id.
 NodeTuple = tuple[
     object, object | None, object | None, str, str, str, str, bool,
     str | None, list, list, int, int, bool, object | None,
@@ -184,11 +211,12 @@ NodeTuple = tuple[
 
 
 def scope_forest(forest: list[dict], gremium_ids: set[object]) -> list[dict]:
-    """Visibility scope: return subtrees whose root carries a ``view_gremium_id``
-    from ``gremium_ids``, as new tab roots.
+    """Scope the forest to the Gremien that may see it.
 
-    Depth-first over the built forest; a hit takes its WHOLE subtree (nested
-    matches are not duplicated — the outer one wins).
+    The function returns every subtree whose root carries a `view_gremium_id`
+    from `gremium_ids`. Each such subtree becomes a new tab root. The walk goes
+    depth first. A hit takes its WHOLE subtree, so a nested match is not
+    duplicated. The outer match wins.
     """
     if not gremium_ids:
         return []
@@ -214,9 +242,10 @@ def _views_for_node(
     expended_by_node: dict[tuple[object, object], Decimal],
     income_by_node: dict[tuple[object, object], Decimal],
 ) -> list[dict]:
-    """Build ``AllocationView`` dicts of a node per relevant fiscal year.
+    """Build the `AllocationView` dicts of a node, one per relevant fiscal year.
 
-    ``committed`` = bound + expended (total consumption, backward compat).
+    `committed` is `bound + expended`, the total consumption. It stays for
+    backward compatibility.
     """
     fys = {fy for (nid, fy) in alloc_by_node if nid == node_id}
     fys |= {fy for (nid, fy) in bound_by_node if nid == node_id}
@@ -249,7 +278,7 @@ def _rollup_by_fy(
     node_paths: Sequence[tuple[object, str]],
     rows: Sequence[tuple[object, str, Decimal | None]],
 ) -> dict[tuple[object, object], Decimal]:
-    """Roll ``(fy, leaf_path, amount)`` rows up per fiscal year via the path prefix."""
+    """Roll `(fy, leaf_path, amount)` rows up per fiscal year over the path prefix."""
     fy_leaves: dict[object, list[tuple[str, Decimal | None]]] = {}
     for fy_id, leaf_path, amount in rows:
         fy_leaves.setdefault(fy_id, []).append((leaf_path, amount))
@@ -271,14 +300,17 @@ def build_forest(
     *,
     gremium_id: object | None = None,
 ) -> list[dict]:
-    """Pure tree build for ``GET /budgets`` — DTO-ready (snake_case) dicts.
+    """Build the tree for `GET /budgets` as DTO-ready snake_case dicts.
 
-    ``allocations`` = ``(budget_id, fiscal_year_id, allocated)`` (top-down);
-    ``bound_rows``/``requested_rows``/``expended_rows``/``income_rows`` =
-    ``(fiscal_year_id, leaf_path_key, amount)`` per bound/in-flight application,
-    actual expense, and income respectively. ``gremium_id`` optionally filters
-    the roots. Consumption (bound + expended) rolls up, allocation stays at the
-    node, income raises available — reported separately per fiscal year.
+    Consumption (bound plus expended) rolls up. The allocation stays at its own
+    node. Income raises the available sum. The result reports each figure per
+    fiscal year.
+
+    `allocations` holds `(budget_id, fiscal_year_id, allocated)` rows, top-down.
+    `bound_rows` holds `(fiscal_year_id, leaf_path_key, amount)` per bound
+    application. `requested_rows`, `expended_rows` and `income_rows` use the same
+    shape, one per in-flight application, per actual expense and per income.
+    `gremium_id` filters the roots. `None` keeps every root.
     """
     node_paths = [(nid, path) for nid, _, _, _, path, *_ in nodes]
     bound_by_node = _rollup_by_fy(node_paths, bound_rows)

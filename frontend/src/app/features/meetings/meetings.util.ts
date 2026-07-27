@@ -1,12 +1,11 @@
 /**
  * Pure, DI-free helpers for the protocol editor.
  *
- *  - Snippet builders produce markdown references to applications/votes that
- *    the pytex renderer resolves as shortcodes (`:::antrag` / `:::vote`).
- *  - `renderMarkdown` is a minimal, dependency-free Markdown→HTML renderer
- *    for the live preview. It escapes ALL HTML entities FIRST, so no raw HTML
- *    from the editor reaches the output; Angular additionally sanitizes the
- *    `innerHTML`.
+ *  - Snippet builders produce markdown references to applications and votes.
+ *    The pytex renderer resolves them as shortcodes (`:::antrag` / `:::vote`).
+ *  - `renderMarkdown` is a minimal, dependency-free Markdown→HTML renderer for
+ *    the live preview. It escapes ALL HTML entities FIRST, so no raw HTML from
+ *    the editor reaches the output. Angular also sanitizes the `innerHTML`.
  */
 
 import type { MeetingVote } from '@core/api/models';
@@ -42,9 +41,9 @@ export function topSnippet(
 }
 
 /**
- * Markdown snippet embedding a vote result: a readable tally table
- * (option → count) AND the `:::vote` shortcode pytex hangs the canonical
- * evaluation on.
+ * Markdown snippet that embeds a vote result: a readable tally table
+ * (option → count) AND the `:::vote` shortcode. pytex attaches the canonical
+ * evaluation to that shortcode.
  */
 export function voteSnippet(vote: MeetingVote): string {
   const lines: string[] = [`\n:::vote{#${vote.id}}`];
@@ -69,13 +68,13 @@ export function insertAt(text: string, snippet: string, caret: number | null): s
 }
 
 /**
- * Allow only links with a safe scheme (no `javascript:` vector).
+ * Allow only links with a safe scheme. This blocks the `javascript:` vector.
  *
- * Second line of defense: the URL is checked BEFORE interpolation into the
- * `href="…"` attribute for characters that could break out of it. Since
- * `inline()` already HTML-escaped the text, a raw `"`/`<`/`>`/`'` arrives as
- * an entity — both forms are rejected, so even without Angular's innerHTML
- * sanitization no attribute break-out can occur.
+ * Second line of defense: the check looks for characters that can break out of
+ * the `href="…"` attribute. It runs before the interpolation. `inline` already
+ * escaped the text, so a raw `"`, `<`, `>` or `'` arrives as an entity. The
+ * check rejects both forms. No attribute break-out can happen, even without
+ * the Angular innerHTML sanitization.
  */
 function safeUrl(url: string): boolean {
   if (!/^(https?:\/\/|mailto:|\/)/i.test(url)) return false;
@@ -124,8 +123,8 @@ const CALLOUT_TITLES: Record<string, string> = {
 
 /**
  * Render a group of consecutive `>` lines: a GitHub callout
- * (`> [!NOTE]`/`[!TIP]`/…) or otherwise a plain blockquote. Content is
- * rendered inline per line.
+ * (`> [!NOTE]`/`[!TIP]`/…) or otherwise a plain blockquote. The renderer
+ * handles every line inline.
  */
 function renderQuote(lines: string[]): string {
   const marker = /^\[!(\w+)\]\s*(.*)$/.exec(lines[0].trim());
@@ -143,10 +142,10 @@ function renderQuote(lines: string[]): string {
 }
 
 /**
- * Minimal, dependency-free Markdown→HTML renderer for the preview (see file
- * header). Supports headings, bold/italic/code, links, ordered + unordered
- * lists, quotes, pipe tables, horizontal rules and paragraphs — enough for
- * meeting minutes (incl. the `voteSnippet` tally tables).
+ * Minimal, dependency-free Markdown→HTML renderer for the preview. See the file
+ * header. It supports headings, bold, italic, code, links, ordered and unordered
+ * lists, quotes, pipe tables, horizontal rules and paragraphs. That is enough
+ * for meeting minutes, including the `voteSnippet` tally tables.
  */
 export function renderMarkdown(markdown: string): string {
   const lines = (markdown ?? '').replace(/\r\n/g, '\n').split('\n');

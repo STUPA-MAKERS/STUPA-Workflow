@@ -170,7 +170,7 @@ describe('renderMarkdown', () => {
 
   it('rejects a link whose URL contains a double-quote (no attribute break-out, AUD-064)', () => {
     const out = renderMarkdown('[x](https://e"x=)');
-    // The quote-bearing URL must not be turned into an href attribute …
+    // A URL that carries a quote must never become an href attribute …
     expect(out).not.toContain('<a ');
     expect(out).not.toContain('href');
     // … and no raw double-quote may leak into the rendered HTML.

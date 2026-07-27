@@ -1,5 +1,5 @@
-# Pre-Commit-Hooks (T-04). Spiegelt die schnellen CI-Stages lokal.
-#   pip install pre-commit && pre-commit install
+# Pre-commit hooks (T-04). These hooks run the fast CI stages on your machine.
+# To install them, run: pip install pre-commit && pre-commit install
 default_language_version:
   python: python3.13
 

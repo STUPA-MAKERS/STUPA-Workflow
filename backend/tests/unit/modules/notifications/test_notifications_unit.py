@@ -1,5 +1,7 @@
-"""Unit-Tests der reinen Notifications-Bausteine (T-18): events, mail, templating,
-queue, schemas, provider — ohne DB/Redis."""
+"""Unit tests of the pure notification parts (T-18), without a database and without Redis.
+
+The parts are events, mail, templating, queue, schemas and provider.
+"""
 
 from __future__ import annotations
 
@@ -25,7 +27,7 @@ SETTINGS = load_settings(
 )
 
 
-# --------------------------------------------------------------------------- events
+# Tests for events.py
 def test_event_list_and_membership() -> None:
     assert events.is_event("status_changed")
     assert not events.is_event("nope")
@@ -33,7 +35,7 @@ def test_event_list_and_membership() -> None:
     assert len(events.EVENTS) == len(events.EVENT_SET)
 
 
-# --------------------------------------------------------------------------- mail
+# Tests for mail.py
 def test_idempotency_key_deterministic_and_distinct() -> None:
     a = compute_idempotency_key("status_changed", "app1", "rule1")
     b = compute_idempotency_key("status_changed", "app1", "rule1")
@@ -63,7 +65,7 @@ def test_build_email_message_text_and_html() -> None:
     assert email["To"] == "a@x.de"
     assert email["Subject"] == "S"
     assert SETTINGS.mail_from in email["From"]
-    assert email.is_multipart()  # Text + HTML-Alternative
+    assert email.is_multipart()  # text plus an HTML alternative
 
 
 def test_build_email_message_without_from_name() -> None:
@@ -81,7 +83,7 @@ async def test_capturing_sender_collects() -> None:
 
 async def test_smtp_sender_no_recipients_is_noop() -> None:
     sender = SmtpMailSender(SETTINGS)
-    await sender.send(MailMessage(to=(), subject="S", text="b"))  # kein Netzwerk
+    await sender.send(MailMessage(to=(), subject="S", text="b"))  # no network call
 
 
 async def test_smtp_sender_sends_via_aiosmtplib(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -99,7 +101,7 @@ async def test_smtp_sender_sends_via_aiosmtplib(monkeypatch: pytest.MonkeyPatch)
     assert captured["kw"]["hostname"] == "mail.local"  # type: ignore[index]
 
 
-# --------------------------------------------------------------------------- templating
+# Tests for templating.py
 def test_render_mail_uses_requested_lang_and_html() -> None:
     out = render_mail(
         subject_i18n={"de": "Hallo {{ name }}", "en": "Hi {{ name }}"},
@@ -158,7 +160,7 @@ def test_render_mail_subject_strips_crlf_header_injection() -> None:
         context={"x": "ok\r\nBcc: evil@x.de"},
     )
     assert "\n" not in out.subject and "\r" not in out.subject
-    assert "Bcc:" in out.subject  # Inhalt bleibt, nur Umbruch entfernt
+    assert "Bcc:" in out.subject  # the content stays, only the line break goes
 
 
 def test_render_html_autoescape() -> None:
@@ -168,10 +170,10 @@ def test_render_html_autoescape() -> None:
         body_html_i18n={"de": "{{ v }}"},
         context={"v": "<x>"},
     )
-    assert out.html == "&lt;x&gt;"  # autoescape im HTML-Body
+    assert out.html == "&lt;x&gt;"  # autoescape in the HTML body
 
 
-# --------------------------------------------------------------------------- queue
+# Tests for queue.py
 async def test_arq_queue_enqueues_with_idempotent_job_id() -> None:
     calls: list[tuple[str, dict, str | None]] = []
 
@@ -189,11 +191,11 @@ async def test_arq_queue_enqueues_with_idempotent_job_id() -> None:
 async def test_arq_queue_dedup_logs_when_none(caplog: pytest.LogCaptureFixture) -> None:
     class FakePool:
         async def enqueue_job(self, *a, **k):  # noqa: ANN002, ANN003
-            return None  # arq: Job-Id existiert bereits
+            return None  # arq: the job id already exists
 
     q = ArqMailQueue(FakePool())
     await q.enqueue(MailMessage(to=("a@x.de",), subject="s", text="b", idempotency_key="dup"))
-    # kein Fehler; Dedup-Pfad genommen.
+    # No error. The queue took the dedup path.
 
 
 async def test_direct_queue_sends_once_per_key() -> None:
@@ -201,7 +203,7 @@ async def test_direct_queue_sends_once_per_key() -> None:
     q = DirectMailQueue(sender)
     msg = MailMessage(to=("a@x.de",), subject="s", text="b", idempotency_key="k")
     await q.enqueue(msg)
-    await q.enqueue(msg)  # gleicher Key → dedupliziert
+    await q.enqueue(msg)  # the same key is deduplicated
     assert len(sender.sent) == 1
 
 
@@ -214,7 +216,7 @@ async def test_direct_queue_without_key_always_sends() -> None:
     assert len(sender.sent) == 2
 
 
-# --------------------------------------------------------------------------- schemas
+# Tests for schemas.py
 def test_template_out_serializes_camel() -> None:
     from uuid import uuid4
 
@@ -230,7 +232,7 @@ def test_template_out_serializes_camel() -> None:
     assert "subjectI18n" in dumped and "bodyHtmlI18n" in dumped
 
 
-# --------------------------------------------------------------------------- provider
+# Tests for provider.py
 async def test_create_mail_pool_failure_returns_none(monkeypatch: pytest.MonkeyPatch) -> None:
     import arq
 

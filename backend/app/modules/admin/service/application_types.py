@@ -81,8 +81,8 @@ class ApplicationTypeOps(ConfigServiceBase):
             row.has_budget = payload.has_budget
         if payload.comparison_offers is not None:
             row.comparison_offers = payload.comparison_offers.model_dump(by_alias=True)
-        # An explicitly sent retentionMonths (including null = reset to the global
-        # default) is applied — only omitted fields stay unchanged.
+        # Apply retentionMonths whenever the client sends it. A sent null resets
+        # the value to the global default. An omitted field stays unchanged.
         if "retention_months" in payload.model_fields_set:
             row.retention_months = payload.retention_months
         await self._audit(actor, AuditAction.CONFIG_CHANGE, "application_type", row.id)
@@ -90,10 +90,15 @@ class ApplicationTypeOps(ConfigServiceBase):
         return _type_out(row)
 
     async def delete_application_type(self, type_id: UUID, actor: str) -> None:
-        """Delete an application type (form versions cascade via FK).
+        """Delete an application type.
 
-        409 while applications of this type exist — ``application.type_id`` has
-        no ``ON DELETE``, deleting would violate the FK.
+        The form versions cascade through the foreign key. The method raises a
+        409 while applications of this type exist. ``application.type_id`` has
+        no ``ON DELETE``, so the delete would violate the foreign key.
+
+        Raises:
+            ConflictError: Applications of this type still exist.
+            NotFoundError: The application type does not exist.
         """
         row = await self._get_type(type_id)
         row_id = row.id

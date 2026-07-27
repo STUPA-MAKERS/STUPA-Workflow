@@ -7,9 +7,9 @@ import { I18nService } from '@core/i18n/i18n.service';
 @Component({ standalone: true, template: 'page' })
 class StubPage {}
 
-/** Routes carrying title/parent data the breadcrumbs read. */
+/** Routes that carry the title and parent data the breadcrumbs read. */
 const routes = [
-  // Flat sibling whose parent must be resolved from the config by path.
+  // Flat sibling. The component must resolve the parent from the config by path.
   {
     path: 'budget',
     component: StubPage,
@@ -20,21 +20,21 @@ const routes = [
     component: StubPage,
     data: { title: 'nav.expenses' as const, parent: ['budget'] },
   },
-  // Leaf with a parent path that has NO title in the config (skipped).
+  // Leaf with a parent path that has no title in the config. The crumb is skipped.
   {
     path: 'orphan',
     component: StubPage,
     data: { title: 'nav.tasks' as const, parent: ['does/not/exist'] },
   },
-  // Leaf with title but no declared parent → single crumb, nav not rendered.
+  // Leaf with a title but no declared parent. One crumb only, so the nav stays hidden.
   {
     path: 'solo',
     component: StubPage,
     data: { title: 'nav.dashboard' as const },
   },
-  // Route without any title data at all → no crumbs.
+  // Route without any title data. It produces no crumbs.
   { path: 'untitled', component: StubPage },
-  // Nested children to exercise the recursive config walk + title-by-path map.
+  // Nested children for the recursive config walk and the title-by-path map.
   {
     path: 'admin',
     data: { title: 'nav.admin' as const },
@@ -69,7 +69,7 @@ describe('BreadcrumbsComponent', () => {
     const { router, fixture } = await setup();
     await router.navigateByUrl('/solo');
     fixture.detectChanges();
-    // Only one crumb → the H1 suffices, nav is hidden.
+    // With one crumb the H1 is enough, so the nav stays hidden.
     expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).not.toBeInTheDocument();
   });
 
@@ -79,10 +79,8 @@ describe('BreadcrumbsComponent', () => {
     fixture.detectChanges();
 
     expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toBeInTheDocument();
-    // Parent crumb is a link to /budget …
     const parent = screen.getByRole('link', { name: i18n.translate('nav.budget') });
     expect(parent).toHaveAttribute('href', '/budget');
-    // … and the current page is the aria-current span (not a link).
     const current = screen.getByText(i18n.translate('nav.expenses'));
     expect(current).toHaveAttribute('aria-current', 'page');
   });
@@ -91,7 +89,8 @@ describe('BreadcrumbsComponent', () => {
     const { router, fixture, i18n } = await setup();
     await router.navigateByUrl('/orphan');
     fixture.detectChanges();
-    // Parent path "does/not/exist" has no title → no parent crumb → only one crumb → nav hidden.
+    // The parent path "does/not/exist" has no title. No parent crumb appears, so one
+    // crumb remains and the nav stays hidden.
     expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: i18n.translate('nav.tasks') })).not.toBeInTheDocument();
   });

@@ -39,8 +39,11 @@ class FiscalYearOps(BudgetTreeServiceBase):
         return node
 
     async def list_fiscal_years(self, budget_id: UUID) -> list[FiscalYearOut]:
-        """Fiscal years for ANY node: non-top-level resolves to its top-level
-        ancestor (scoped roots are often sub cost-centres)."""
+        """List the fiscal years for any node.
+
+        A node below the top level resolves to its top-level ancestor. A scoped
+        root is often a sub cost center.
+        """
         node = await self._get_node(budget_id)
         top = node
         while top.parent_id is not None:
@@ -51,7 +54,10 @@ class FiscalYearOps(BudgetTreeServiceBase):
         ]
 
     async def fiscal_year_label_map(self) -> dict[UUID, str]:
-        """``fiscal_year_id`` → display (``YYYY``/``YYYY/YY``) across all top budgets."""
+        """Map every `fiscal_year_id` to its display label.
+
+        The map covers all top-level budgets. A label reads `YYYY` or `YYYY/YY`.
+        """
         rows = (
             await self.session.execute(
                 select(
@@ -67,7 +73,7 @@ class FiscalYearOps(BudgetTreeServiceBase):
         }
 
     async def create_fiscal_year(self, budget_id: UUID, payload: FiscalYearCreate) -> FiscalYearOut:
-        """Create a fiscal year — bounds derive from the budget's start date."""
+        """Create a fiscal year. Its bounds derive from the budget start date."""
         top = await self._require_top_level(budget_id)
         start, end = self._fiscal_year_bounds(
             payload.year, top.fiscal_start_month, top.fiscal_start_day
@@ -93,7 +99,7 @@ class FiscalYearOps(BudgetTreeServiceBase):
     async def update_fiscal_year(
         self, budget_id: UUID, fiscal_year_id: UUID, payload: FiscalYearUpdate
     ) -> FiscalYearOut:
-        """Update year and/or active flag; the year stays unique per top budget."""
+        """Update the year or the active flag. A year stays unique per top budget."""
         top = await self._require_top_level(budget_id)
         fy = await self._get_fiscal_year(fiscal_year_id)
         provided = payload.model_dump(exclude_unset=True)

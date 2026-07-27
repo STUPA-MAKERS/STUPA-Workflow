@@ -1,14 +1,16 @@
-"""pytex render service: thin FastAPI wrapper around ``pytex_api.render_blob``.
+"""pytex render service: a thin FastAPI wrapper around `pytex_api.render_blob`.
 
-Exposes ``POST /render`` plus a ``/health`` probe. Blob in / blob out: POST the
-source as the raw request body, pick kinds/trust/variant via query params, get
-``application/pdf`` (or ``text/plain`` ``.tex``) back. Every build runs in a
-per-request temp dir inside the library; no filesystem is exposed to the caller.
+The service exposes `POST /render` and a `/health` probe. Blob in, blob out.
+POST the source as the raw request body. Pick the kinds, the trust level and the
+variant with query params. The service answers with `application/pdf`, or with
+`text/plain` for `.tex`. Every build runs in a per-request temp directory inside
+the library. The caller reaches no filesystem.
 
-The service is internal-only and fed first-party, app-generated documents, so
-the default trust level is ``trusted``; ``variant`` defaults to ``None`` for
-auto-detection from the document's YAML frontmatter. Error details are scrubbed
-of absolute filesystem paths so no internal path or stacktrace leaks to clients.
+The service is internal-only and it renders first-party, app-generated documents
+only, so the default trust level is `trusted`. `variant` defaults to `None`,
+which makes the library auto-detect the variant from the YAML frontmatter of the
+document. The service strips absolute filesystem paths out of every error
+detail. No internal path and no stacktrace leaks to a client.
 """
 
 from __future__ import annotations
@@ -33,32 +35,33 @@ from pytex_api import (
     render_blob_async,
 )
 
-# --- configurable defaults -------------------------------------------------
-# App-generated docs are first-party; default to a real PDF built at full trust.
+# App-generated documents are first-party, so default to a real PDF at full trust.
 _DEFAULT_OUTPUT = os.environ.get("PYTEX_DEFAULT_OUTPUT", "pdf").lower()
 _DEFAULT_TRUST = os.environ.get("PYTEX_DEFAULT_TRUST", "trusted").lower()
-# Hard ceiling on the body we even read, in front of the library's input cap;
-# keeps a giant upload out of memory. The library cap is aligned below.
+# Hard ceiling on the body the service reads at all, in front of the input cap of
+# the library. It keeps a giant upload out of memory. The code aligns the library
+# cap with it below.
 _MAX_BODY_BYTES = int(os.environ.get("PYTEX_MAX_BODY_BYTES", str(4 * 1024 * 1024)))
-# Compile wall-clock/cpu kill (seconds). The library's 30 s default kills the
-# first trusted build mid bundle-download; 120 s lets that warm-up complete,
-# and cached builds finish in a few seconds anyway.
+# Compile wall-clock and cpu kill (seconds). The 30 s default of the library kills
+# the first trusted build during the bundle download. 120 s lets that warm-up
+# finish, and a cached build takes a few seconds anyway.
 _WALL_TIMEOUT_S = float(os.environ.get("PYTEX_WALL_TIMEOUT_S", "120"))
 _CPU_TIMEOUT_S = float(os.environ.get("PYTEX_CPU_TIMEOUT_S", "120"))
 _LIMITS = BuildLimits(
     wall_timeout_s=_WALL_TIMEOUT_S,
     cpu_timeout_s=_CPU_TIMEOUT_S,
-    # Align the library's input cap with the HTTP body cap — otherwise bodies
-    # between 2 MiB (library default) and PYTEX_MAX_BODY_BYTES still 413.
+    # Align the input cap of the library with the HTTP body cap. Otherwise a body
+    # between 2 MiB (the library default) and PYTEX_MAX_BODY_BYTES still gets a 413.
     max_input_bytes=_MAX_BODY_BYTES,
 )
 
-# Protocol title page: pytex only renders its hard-wired frontmatter keys as
-# data rows. Extend the module-level row table here (wrapper patch, not a fork).
+# Protocol title page: pytex renders only its hard-wired frontmatter keys as data
+# rows. The wrapper extends the module-level row table here. This is a patch, not
+# a fork.
 from pytex_markdown.protocol import document as _protocol_document  # noqa: E402
 
-# Fail loud at start-up if a future pytex bump renames this private attribute;
-# the existence check below is only an idempotency guard against re-import.
+# Fail loud at start-up when a future pytex bump renames this private attribute.
+# The existence check below is only an idempotency guard against a re-import.
 assert hasattr(_protocol_document, "_SCALAR_ROWS"), (
     "pytex-preprocessor no longer exposes `_protocol_document._SCALAR_ROWS`; "
     "the protocol title-page patch must be re-validated against the new version"
@@ -74,8 +77,8 @@ for _label, _keys in (
             (_label, _keys),
         )
 
-# Surface the installed renderer version so the service version string cannot
-# drift from what actually ships; "unknown" only if package metadata is absent.
+# Report the installed renderer version, so the service version string cannot
+# drift from what ships. The value is "unknown" only when the metadata is absent.
 try:
     _PYTEX_VERSION = _pkg_version("pytex-preprocessor")
 except PackageNotFoundError:  # pragma: no cover - metadata always present in the image
@@ -83,9 +86,9 @@ except PackageNotFoundError:  # pragma: no cover - metadata always present in th
 
 app = FastAPI(title="pytex render service", version=_PYTEX_VERSION)
 
-# Strip absolute filesystem paths out of any error detail before it reaches the
-# client. Anchored to known container root prefixes only, so legitimate
-# slash-containing detail (e.g. /linewidth, URL segments) survives intact.
+# Strip absolute filesystem paths out of every error detail before it reaches the
+# client. The pattern anchors on the known container root prefixes only. Detail
+# with a legitimate slash (for example /linewidth or a URL segment) stays intact.
 _PATH_RE = re.compile(r"/(?:tmp|app|cache|home|var|usr|root|opt|etc)/[^\s:'\"]*")
 
 
@@ -126,8 +129,9 @@ async def render(
     ),
 ) -> Response:
     """Render the raw request body (Markdown) to a PDF or LaTeX blob."""
-    # Reject oversized uploads from the declared Content-Length before buffering
-    # the body; a missing or malformed header falls through to the post-read guard.
+    # Reject an oversized upload from the declared Content-Length before the
+    # service buffers the body. A missing or malformed header falls through to
+    # the guard after the read.
     declared = request.headers.get("content-length")
     if declared is not None:
         try:
@@ -137,7 +141,7 @@ async def render(
                     status_code=413,
                 )
         except ValueError:
-            pass  # malformed header; defensive fall-through to read + length check
+            pass  # malformed header, fall through to the read and the length check
 
     source = await request.body()
     if not source:
@@ -170,13 +174,12 @@ async def render(
     try:
         result = await render_blob_async(req)
     except LimitError as exc:
-        # Input / output / build-resource cap exceeded.
+        # The build hit the input cap, the output cap or a build-resource cap.
         return JSONResponse({"error": _scrub(str(exc))}, status_code=413)
     except (TrustError, CompileError, ApiError) as exc:
-        # Policy rejection or build failure -> client error, scrubbed.
         return JSONResponse({"error": _scrub(str(exc))}, status_code=400)
     except Exception:
-        # Never leak an internal stacktrace / path.
+        # Never leak an internal stacktrace or path.
         return JSONResponse({"error": "internal render error"}, status_code=500)
 
     headers = {

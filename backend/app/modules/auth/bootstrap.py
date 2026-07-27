@@ -1,13 +1,13 @@
-"""Bootstrap of initial admins.
+"""Bootstrap of the initial admins.
 
-Grants the first admin(s), matched by OIDC ``sub`` or email, the ``admin`` role —
-idempotently, on OIDC login and in a startup sweep. Without this a fresh OIDC
-installation locks itself out: nobody holds ``admin.*``, so nobody can assign
-roles (chicken-and-egg). The assignment is global and unlimited; ``granted_by``
-is marked ``"bootstrap"``. No PII in logs — only the fact of an assignment.
+This module grants the `admin` role to the first admins. It matches them by the OIDC `sub`
+or by email. It runs idempotently on OIDC login and in a startup sweep. Without it a fresh
+OIDC installation locks itself out. Nobody holds `admin.*`, so nobody can assign a role.
+The assignment is global and has no time limit. `granted_by` holds `"bootstrap"`. The logs
+carry no PII. They record only the fact of an assignment.
 
-All DB reads go through ``session.execute`` (no ``get``/``scalar`` helpers) so
-the logic stays fakeable in the unit suite without Docker.
+All database reads go through `session.execute` and use no `get` or `scalar` helper. This
+keeps the logic fakeable in the unit suite without Docker.
 """
 
 from __future__ import annotations
@@ -31,11 +31,11 @@ _MEMBER_ROLE_KEY = "member"
 def _is_bootstrap_principal(
     row: PrincipalRow, settings: Settings, *, email_verified: bool
 ) -> bool:
-    """True if the principal matches by ``sub`` or by *verified* email.
+    """Return `True` if the principal matches by `sub` or by verified email.
 
-    ``sub`` is the forgery-proof IdP identity and always counts. Email counts
-    only with ``email_verified`` — otherwise an IdP with self-registration and
-    no mail verification could issue a token with an arbitrary ``email``.
+    `sub` is the IdP identity that nobody can forge, so it always counts. An email counts
+    only when `email_verified` is true. Otherwise an IdP with self-registration and no mail
+    verification could issue a token with an arbitrary `email` claim.
     """
     if row.sub in settings.bootstrap_admin_subject_set:
         return True
@@ -46,7 +46,7 @@ def _is_bootstrap_principal(
 
 
 async def _admin_role_id(db: AsyncSession) -> object | None:
-    """ID of the ``admin`` role (or ``None`` if the seed/migration is missing)."""
+    """Return the id of the `admin` role, or `None` if the seed or migration is missing."""
     res = await db.execute(select(Role.id).where(Role.key == _ADMIN_ROLE_KEY))
     return res.scalar_one_or_none()
 
@@ -54,7 +54,7 @@ async def _admin_role_id(db: AsyncSession) -> object | None:
 async def _has_admin_assignment(
     db: AsyncSession, principal_id: object, role_id: object
 ) -> bool:
-    """True if the principal already holds the role globally (no gremium scope)."""
+    """Return `True` if the principal already holds the role globally, with no Gremium."""
     res = await db.execute(
         select(RoleAssignment.id).where(
             RoleAssignment.principal_id == principal_id,
@@ -77,12 +77,16 @@ def _new_assignment(principal_id: object, role_id: object) -> RoleAssignment:
 async def ensure_admin_for_principal(
     db: AsyncSession, settings: Settings, row: PrincipalRow, *, email_verified: bool
 ) -> bool:
-    """Login path: idempotently grant this principal the ``admin`` role.
+    """Grant this principal the `admin` role on the login path.
 
-    Applies only if the principal is in the bootstrap lists (by ``sub`` or
-    verified email) and does not yet hold the role globally. ``email_verified``
-    comes from the fresh id_token claim. Returns ``True`` on a new assignment.
-    Does not commit — the caller (OIDC callback) owns the transaction.
+    The call is idempotent. It applies only when the principal is in the bootstrap lists,
+    matched by `sub` or by verified email. It also needs a principal that does not yet hold
+    the role globally. The function does not commit. The caller, the OIDC callback, owns
+    the transaction. The caller passes the `email_verified` claim of the fresh id_token as
+    `email_verified`.
+
+    Returns:
+        `True` when the function adds a new assignment.
     """
     if not _is_bootstrap_principal(row, settings, email_verified=email_verified):
         return False
@@ -103,15 +107,17 @@ async def _role_id(db: AsyncSession, key: str) -> object | None:
 
 
 async def ensure_member_for_principal(db: AsyncSession, row: PrincipalRow) -> bool:
-    """Idempotently grant every principal the global ``member`` role on login.
+    """Grant every principal the global `member` role on login.
 
-    All users always hold the base role ``member`` (global, no gremium scope).
-    Does not commit — the caller owns the transaction."""
+    The call is idempotent. Every user always holds the base role `member`. That role is
+    global and has no Gremium scope. The function does not commit. The caller owns the
+    transaction.
+    """
     role_id = await _role_id(db, _MEMBER_ROLE_KEY)
     if role_id is None:
         logger.warning("bootstrap member: role %r missing (migrations applied?)", _MEMBER_ROLE_KEY)
         return False
-    if await _has_admin_assignment(db, row.id, role_id):  # same query (global, role_id)
+    if await _has_admin_assignment(db, row.id, role_id):  # generic query: global + role_id
         return False
     db.add(_new_assignment(row.id, role_id))
     await db.flush()
@@ -119,12 +125,15 @@ async def ensure_member_for_principal(db: AsyncSession, row: PrincipalRow) -> bo
 
 
 async def ensure_bootstrap_admins(db: AsyncSession, settings: Settings) -> int:
-    """Startup sweep: grant the role to existing principals matched by ``sub`` only.
+    """Grant the `admin` role in a startup sweep to principals matched by `sub`.
 
-    Deliberately ``sub`` only (forgery-proof IdP identity): the stored
-    ``principal.email`` carries no ``email_verified`` flag, so verification
-    cannot be checked at startup — email bootstrap happens exclusively at login
-    with the fresh claim. Returns the number of new assignments. Does not commit.
+    The sweep matches by `sub` only, because `sub` is the IdP identity that nobody can
+    forge. The stored `principal.email` carries no `email_verified` flag, so this code
+    cannot check the verification at startup. The email bootstrap happens only at login,
+    with the fresh claim. The function does not commit.
+
+    Returns:
+        The number of new assignments.
     """
     subjects = settings.bootstrap_admin_subject_set
     if not subjects:

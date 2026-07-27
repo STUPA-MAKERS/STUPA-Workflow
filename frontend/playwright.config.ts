@@ -1,18 +1,18 @@
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * Playwright-E2E (T-40) gegen den *echten* Compose-Stack — NICHT gegen `ng serve`
- * und NICHT gegen die Mock-API (seit #101 AUS). Der Stack wird von `scripts/e2e.sh`
- * hochgefahren (eigener COMPOSE_PROJECT_NAME, `down -v`); diese Config startet
- * KEINEN Webserver, sondern fährt gegen den laufenden `web`-Container.
+ * Playwright E2E tests (T-40) run against the real compose stack. They do not run against
+ * `ng serve` or the mock API. The mock API is off since #101. `scripts/e2e.sh` starts the
+ * stack with its own COMPOSE_PROJECT_NAME and a `down -v`. This config starts no web server.
+ * It uses the `web` container that already runs.
  *
- * Deckt das deterministische, gate-bindende Subset ab; die offenen Szenarien
- * (async Voting, Live-Vote-WS, Protokoll→PDF, OIDC) sind als Follow-up-Issues
- * ausgelagert (siehe e2e/README.md).
+ * The tests cover the deterministic subset that binds the gate. The open scenarios (async
+ * voting, live-vote WebSocket, protocol to PDF, OIDC) moved to follow-up issues. See
+ * e2e/README.md.
  *
- * Determinismus (testing.md §3, „keine Flakes"): `workers: 1` + `fullyParallel:
- * false` — die Szenarien teilen einen geseedeten Antragstyp und eine Admin-Session;
- * serielle Ausführung schließt Zustands-Races aus. Retries begrenzt (CI: 1).
+ * Determinism (testing.md section 3, "no flakes"): `workers: 1` and `fullyParallel: false`.
+ * The scenarios share one seeded application type and one admin session. Serial execution
+ * prevents state races. Retries stay limited to 1 in CI.
  */
 const BASE_URL = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:8080';
 
@@ -30,13 +30,14 @@ export default defineConfig({
     : [['list']],
   use: {
     baseURL: BASE_URL,
-    // Deutsch erzwingen: die i18n-Erkennung (i18n.service.ts) liest navigator.language;
-    // Chromium defaultet auf en-US → die Specs matchen aber die de-Strings.
+    // Force German. The i18n detection in `i18n.service.ts` reads navigator.language, and
+    // Chromium defaults to en-US. The specs match the German strings.
     locale: 'de-DE',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
-    // Stack läuft auf plain HTTP hinter dem Proxy; selbstsignierte Edge-Certs egal.
+    // The stack runs on plain HTTP behind the proxy. Self-signed edge certificates do not
+    // matter.
     ignoreHTTPSErrors: true,
   },
   projects: [

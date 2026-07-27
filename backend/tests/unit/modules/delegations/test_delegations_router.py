@@ -1,8 +1,8 @@
-"""Router-Tests Delegationen (#delegation-rework): Verdrahtung, 401, camelCase, Fehler.
+"""Router tests for delegations (#delegation-rework): wiring, 401, camelCase, errors.
 
-Service ist gefaked (Endpunkt-Verhalten, nicht DB). Beweist: 401 ohne Session,
-Statuscodes (200/201/204), camelCase-Serialisierung (inkl. Kontext/Status/Pool)
-und problem+json bei 403/404/422.
+These tests fake the service, so they cover endpoint behavior and not the database.
+They prove 401 without a session, the status codes 200/201/204, camelCase
+serialization (including context, status and pool) and problem+json for 403/404/422.
 """
 
 from __future__ import annotations

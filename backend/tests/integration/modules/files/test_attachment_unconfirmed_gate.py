@@ -1,13 +1,14 @@
-"""Integration (echte Postgres, testcontainers): #AUD-032 — die Anhang-Item-Routen
-spiegeln die Listen-Sichtbarkeit.
+"""Integration: the attachment item routes mirror the list visibility (#AUD-032).
 
-Eine unbestätigte Gast-Einreichung (``email_confirmed_at IS NULL``) ist in
-``list_applications``/``list_tasks`` unsichtbar. Diese Tests beweisen, dass die
-``FilesService``-Lesepfade (``list_for_application``/``signed_url``/``download_bytes``)
-für einen Principal/Gremium-Read (``allow_unconfirmed=False``) ebenso 404 liefern —
-also die separierte PII (Anhänge) der unbestätigten Einreichung NICHT freigeben — und
-dass die besitzende Antragstellerin (Magic-Link → Default ``allow_unconfirmed=True``)
-sowie bestätigte Anträge weiterhin gelesen werden können.
+The tests run against a real Postgres through testcontainers.
+
+An unconfirmed guest submission (`email_confirmed_at IS NULL`) stays invisible in
+`list_applications` and `list_tasks`. These tests prove that the `FilesService` read
+paths (`list_for_application`, `signed_url`, `download_bytes`) also answer 404 for a
+principal or Gremium read (`allow_unconfirmed=False`). They do not hand out the
+separated PII, the attachments, of the unconfirmed submission. The owning applicant
+still reads them over a magic link, where `allow_unconfirmed` defaults to True.
+Confirmed applications stay readable as well.
 """
 
 from __future__ import annotations
@@ -34,8 +35,11 @@ pytestmark = pytest.mark.integration
 
 
 class _StubStorage:
-    """In-Memory ``ObjectStorage`` — nur damit ``signed_url``/``download_bytes`` den
-    Storage-Pfad (kein 503) durchlaufen; der Sichtbarkeits-Gate ist der Prüfgegenstand."""
+    """In-memory `ObjectStorage` stub.
+
+    It lets `signed_url` and `download_bytes` pass the storage path without a 503. The
+    visibility gate is the subject of the test.
+    """
 
     def __init__(self) -> None:
         self._blobs: dict[str, bytes] = {}
@@ -49,8 +53,8 @@ class _StubStorage:
     async def get_stream(
         self, key: str, *, chunk_size: int = 64 * 1024
     ) -> AsyncIterator[bytes]:
-        # ``ObjectStorage.get_stream`` ist eine Coroutine, die einen AsyncIterator
-        # ZURÜCKGIBT (kein async-Generator) — daher inneren Generator + ``return``.
+        # `ObjectStorage.get_stream` is a coroutine that returns an AsyncIterator. It is
+        # not an async generator. Therefore this stub returns an inner generator.
         async def _iter() -> AsyncIterator[bytes]:
             yield self._blobs[key]
 
@@ -81,8 +85,10 @@ def _fields() -> list[FormFieldDef]:
 
 
 async def _seed_type(session: AsyncSession) -> tuple[ApplicationType, State]:
-    """Typ mit aktiver Form-Version + Flow (Initial-State) — kanonischer Seed wie in
-    ``test_applications_service._seed_type``."""
+    """Create a type with an active form version and a flow with an initial state.
+
+    This is the canonical seed, the same one as `test_applications_service._seed_type`.
+    """
     gremium = Gremium(name="G", slug=f"g-{uuid.uuid4()}")
     session.add(gremium)
     await session.flush()
@@ -129,8 +135,11 @@ def _payload(app_type_id: uuid.UUID) -> ApplicationCreate:
 async def _add_clean_attachment(
     svc: FilesService, application_id: uuid.UUID
 ) -> uuid.UUID:
-    """Direkt eine *clean-gescannte* Anhang-Zeile + Storage-Objekt anlegen (umgeht den
-    Upload-/Worker-Pfad; hier zählt allein der Sichtbarkeits-Gate)."""
+    """Create a clean-scanned attachment row and its storage object directly.
+
+    This skips the upload path and the worker path. Only the visibility gate matters
+    here.
+    """
     storage_key = f"{application_id}/{uuid.uuid4().hex}/note.txt"
     assert svc.storage is not None
     await svc.storage.put(storage_key, b"PII-payload", "text/plain")
@@ -155,15 +164,17 @@ async def test_unconfirmed_guest_attachments_hidden_from_principal_reads(
 ) -> None:
     app_type, _ = await _seed_type(session)
     apps = ApplicationsService(session)
-    # actor="applicant" ⇒ ``email_confirmed_at IS NULL`` (unbestätigt, listen-unsichtbar).
+    # The default actor "applicant" leaves email_confirmed_at NULL. The submission stays
+    # unconfirmed and invisible in the lists.
     app, _ = await apps.create(_payload(app_type.id))
     assert app.email_confirmed_at is None
 
     files = FilesService(session, storage=_StubStorage())
     attachment_id = await _add_clean_attachment(files, app.id)
 
-    # Principal/Gremium (Router → ``allow_unconfirmed=False``): die Anhänge der
-    # unbestätigten Gast-Einreichung sind 404 — kein PII-Leak, kein Existenz-Orakel.
+    # For a principal or Gremium read the router passes `allow_unconfirmed=False`. The
+    # attachments of the unconfirmed guest submission give 404. No PII leaks, and the
+    # caller gets no existence oracle.
     with pytest.raises(NotFoundError):
         await files.list_for_application(app.id, allow_unconfirmed=False)
     with pytest.raises(NotFoundError):
@@ -171,8 +182,8 @@ async def test_unconfirmed_guest_attachments_hidden_from_principal_reads(
     with pytest.raises(NotFoundError):
         await files.download_bytes(attachment_id, allow_unconfirmed=False)
 
-    # Besitzende Antragstellerin (Magic-Link → Default ``allow_unconfirmed=True``):
-    # voller Zugriff auf die Anhänge des eigenen, noch unbestätigten Antrags.
+    # The owning applicant comes over a magic link. There `allow_unconfirmed` defaults to
+    # True, so the attachments of the own unconfirmed application stay readable.
     listed = await files.list_for_application(app.id)
     assert [a.id for a in listed] == [attachment_id]
     url = await files.signed_url(attachment_id)
@@ -186,15 +197,15 @@ async def test_confirmed_app_attachments_readable_by_principal(
 ) -> None:
     app_type, _ = await _seed_type(session)
     apps = ApplicationsService(session)
-    # actor != "applicant" ⇒ sofort bestätigt → für Principals normal lesbar.
+    # An actor other than "applicant" confirms at once, so principals read it normally.
     app, _ = await apps.create(_payload(app_type.id), actor="admin")
     assert app.email_confirmed_at is not None
 
     files = FilesService(session, storage=_StubStorage())
     attachment_id = await _add_clean_attachment(files, app.id)
 
-    # Principal-Read (allow_unconfirmed=False) liefert die Anhänge eines bestätigten
-    # Antrags ganz normal — kein falsches 404.
+    # A principal read with `allow_unconfirmed=False` returns the attachments of a
+    # confirmed application. There is no false 404.
     listed = await files.list_for_application(app.id, allow_unconfirmed=False)
     assert [a.id for a in listed] == [attachment_id]
     url = await files.signed_url(attachment_id, allow_unconfirmed=False)

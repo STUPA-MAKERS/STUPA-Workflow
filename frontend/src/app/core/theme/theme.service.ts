@@ -7,9 +7,9 @@ const STORAGE_KEY = 'ap.theme';
 
 /**
  * Theme control:
- * - Preference: `system` (follows OS) | `light` | `dark`, persisted.
- * - The effective theme is set as `data-theme` on <html>.
- * - An OS change is picked up live in `system` mode (matchMedia listener).
+ * - The preference is `system` (follows the OS), `light` or `dark`. It is persisted.
+ * - The service writes the effective theme to `data-theme` on <html>.
+ * - In `system` mode a matchMedia listener picks up an OS change live.
  */
 @Injectable({ providedIn: 'root' })
 export class ThemeService {
@@ -19,14 +19,14 @@ export class ThemeService {
 
   readonly preference = this._preference.asReadonly();
 
-  /** The actually applied theme (`light` | `dark`). */
+  /** The theme that is in effect (`light` or `dark`). */
   readonly resolved = computed<ResolvedTheme>(() => {
     const pref = this._preference();
     if (pref === 'system') return this._systemDark() ? 'dark' : 'light';
     return pref;
   });
 
-  /** Call once at app start: listener + initial apply. */
+  /** Call this once at app start. It adds the OS listener and applies the theme. */
   init(): void {
     this.media.addEventListener('change', this.onSystemChange);
     this.apply();
@@ -38,7 +38,7 @@ export class ThemeService {
     this.apply();
   }
 
-  /** Toggles between light and dark (based on what is currently visible). */
+  /** Switch between light and dark, based on the theme that is visible now. */
   toggle(): void {
     this.setPreference(this.resolved() === 'dark' ? 'light' : 'dark');
   }

@@ -1,7 +1,7 @@
-"""MT940 statements (``.sta`` / FinTS HKKAZ) to :class:`~.statement.StatementLine`.
+"""Convert MT940 statements (``.sta`` or FinTS HKKAZ) to ``statement.StatementLine``.
 
-``mt940`` is imported lazily (transitively via ``fints``) so the pure contract
-path does not need the lib.
+The module imports ``mt940`` lazily. The library arrives only as a transitive
+dependency of ``fints``, and the pure contract path must work without it.
 """
 
 from __future__ import annotations
@@ -25,17 +25,24 @@ from app.modules.budget.bank.statement import (
 
 
 def parse_mt940(data: bytes) -> list[StatementLine]:
-    """Parse an MT940 statement (e.g. Sparkasse ``.sta``) into lines.
+    """Parse an MT940 statement (for example a Sparkasse ``.sta``) into lines.
 
-    :raises StatementParseError: unparseable / not MT940."""
+    Raises:
+        StatementParseError: The data is unparseable or not MT940.
+    """
     return parse_mt940_full(data)[0]
 
 
 def parse_mt940_full(
     data: bytes,
 ) -> tuple[list[StatementLine], StatementBalance | None]:
-    """Like :func:`parse_mt940`, additionally with the closing balance (``:62F:``), if any."""
-    import mt940  # lazy (transitively via fints)
+    """Parse like ``parse_mt940`` and also return the closing balance (``:62F:``).
+
+    Returns:
+        The lines and the closing balance. The balance is ``None`` when the
+        statement carries none.
+    """
+    import mt940  # lazy import (transitive dependency of fints)
 
     try:
         transactions = mt940.models.Transactions()
@@ -49,10 +56,12 @@ def parse_mt940_full(
 
 
 def lines_from_mt940_transactions(transactions: object) -> list[StatementLine]:
-    """Convert ``mt940`` transactions (the FinTS fetch delivers these too) into lines.
+    """Convert ``mt940`` transactions into lines.
 
-    Shared by :func:`parse_mt940` (file import) and the FinTS client (live fetch)
-    so both paths normalize identically."""
+    The FinTS fetch delivers the same transaction objects. ``parse_mt940`` (file
+    import) and the FinTS client (live fetch) share this function, so both paths
+    normalize the data in the same way.
+    """
     lines: list[StatementLine] = []
     for tx in transactions:  # type: ignore[attr-defined]
         line = _line_from_mt940_data(tx.data)
@@ -62,15 +71,20 @@ def lines_from_mt940_transactions(transactions: object) -> list[StatementLine]:
 
 
 def _line_from_mt940_data(d: dict[str, object]) -> StatementLine | None:
-    """Map one ``mt940`` transaction ``data`` dict to a :class:`StatementLine` (or ``None``)."""
+    """Map one ``mt940`` transaction ``data`` dict to a ``StatementLine``.
+
+    Returns:
+        The line, or ``None`` when the transaction carries no amount.
+    """
     amount_obj = d.get("amount")
     magnitude = getattr(amount_obj, "amount", None)
     if magnitude is None:
         return None
-    # Derive the sign explicitly from the MT940 status: the ``mt940`` lib negates
-    # ONLY on status == 'D' and leaves reversal markers 'RC'/'RD' positive — a
-    # direct-debit return (RC = reversal of a credit = outflow) would otherwise
-    # arrive as income. Outflow: D / RC. Income: C / RD. Unknown: keep lib sign.
+    # Derive the sign explicitly from the MT940 status. The ``mt940`` lib negates
+    # ONLY on status 'D' and leaves the reversal markers 'RC' and 'RD' positive.
+    # A direct-debit return (RC = reversal of a credit = outflow) would otherwise
+    # arrive as income. Outflow: D or RC. Income: C or RD. Unknown: keep the sign
+    # of the lib.
     raw_amount = Decimal(str(magnitude))
     status = str(d.get("status") or "").upper()
     if status in ("D", "RC"):
@@ -80,7 +94,7 @@ def _line_from_mt940_data(d: dict[str, object]) -> StatementLine | None:
     amount = sane_amount(raw_amount)
     cp_name, cp_iban = mt940_counterparty(d, credit=raw_amount > 0)
     # Sparkasse MT940 appends the booking time as ``…DATUM dd.mm.yyyy, hh.mm UHR``
-    # to the purpose — detach it and stash the time in ``raw`` for the booking note.
+    # to the purpose. Detach it and keep the time in ``raw`` for the booking note.
     purpose, booking_time = split_booking_time(normalize_purpose(clean(d.get("purpose"))))
     raw = {k: str(v) for k, v in d.items() if v is not None}
     if booking_time:
@@ -101,9 +115,11 @@ def _line_from_mt940_data(d: dict[str, object]) -> StatementLine | None:
 
 
 def balance_from_mt940(bal: object) -> StatementBalance | None:
-    """Map ``mt940.models.Balance`` to :class:`StatementBalance` (file closing balance
-    and the client's HKSAL live balance share this shape). The ``mt940`` lib
-    already signs the amount via the C/D status."""
+    """Map ``mt940.models.Balance`` to ``StatementBalance``.
+
+    The file closing balance and the HKSAL live balance of the client share this
+    shape. The ``mt940`` lib already signs the amount through the C/D status.
+    """
     amount_obj = getattr(bal, "amount", None)
     magnitude = getattr(amount_obj, "amount", None)
     if magnitude is None:
@@ -120,7 +136,7 @@ def balance_from_mt940(bal: object) -> StatementBalance | None:
 
 
 def mt940_closing_balance(transactions: object) -> StatementBalance | None:
-    """MT940 closing balance (``:62F:`` -> ``final_closing_balance``)."""
+    """Return the MT940 closing balance (``:62F:`` -> ``final_closing_balance``)."""
     data = getattr(transactions, "data", None)
     if not isinstance(data, dict):
         return None

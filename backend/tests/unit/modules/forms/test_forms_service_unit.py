@@ -1,8 +1,8 @@
-"""Unit (ohne DB): FormsService-Pfade, die vor jedem Session-Zugriff greifen.
+"""Unit tests without a DB for the FormsService paths that run before any session use.
 
-`create_form_version` validiert die Definition **vor** dem DB-Zugriff → eine defekte
-Definition endet als 422 (`ValidationProblem`), nicht als 500. Die Session wird dabei
-nie berührt, daher kein DB nötig.
+`create_form_version` validates the definition **before** it touches the DB. A broken
+definition ends as 422 (`ValidationProblem`), not as 500. The test never touches the
+session, so it needs no DB.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from app.shared.errors import ValidationProblem
 
 
 def test_create_form_version_bad_definition_is_422_before_db() -> None:
-    svc = FormsService(None)  # type: ignore[arg-type]  — Session wird vor Validierung nie genutzt
+    svc = FormsService(None)  # type: ignore[arg-type]  — validation runs before session use
     payload = FormVersionCreate(
         fields=[
             FormFieldDef(key="dup", type="text", label={"de": "A"}),

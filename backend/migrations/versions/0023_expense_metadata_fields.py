@@ -1,9 +1,10 @@
-"""Buchungen: Zusatzfelder (#1-1/#1-2/#3/#4).
+"""Bookings: extra metadata columns (#1-1/#1-2/#3/#4).
 
-Erweitert ``budget_expense`` um Rechnungs-/Zahldatum, Empfänger/Zahler
-(``correspondent``), Anmerkungen (``note``), Belegnummer (``reference_number``),
-Zahlungsmethode (``payment_method``) und Kategorie/Tag (``category``). Alle
-nullable (Bestandsbuchungen bleiben gültig). Idempotent (``IF NOT EXISTS``).
+Add the invoice date, the payment date and the recipient or payer
+(`correspondent`) to `budget_expense`. Add a free `note`, the receipt number
+(`reference_number`), the `payment_method` and a category tag (`category`).
+Every new column is nullable, so existing bookings stay valid. All statements
+are idempotent (`IF NOT EXISTS`).
 """
 
 from __future__ import annotations
@@ -35,7 +36,7 @@ _UPGRADE: tuple[str, ...] = (
         "CHECK (payment_method IS NULL OR payment_method IN "
         "('ueberweisung', 'bar', 'lastschrift', 'karte'))"
     ),
-    # Häufige Sortierung nach Rechnungsdatum (Default-Sortierung der Buchungsliste).
+    # The booking list sorts by invoice date by default.
     (
         "CREATE INDEX IF NOT EXISTS ix_budget_expense_invoice_date "
         "ON budget_expense (invoice_date)"

@@ -33,14 +33,14 @@ function emptyDraft(): AssignDraft {
 }
 
 /**
- * Users & roles as a **table** (modeled on the Nextcloud user table).
+ * Users and roles as a table. The table follows the Nextcloud user table.
  *
- * One row per principal: name, e-mail, OIDC subject, assigned roles (tags,
- * revocable), last login. Assigning a role happens via a per-row expandable
- * mini-form (role + optional tz validity window = substitution). **Gremium
- * membership** is deliberately no longer maintained here — that happens per
- * gremium in the gremien administration. The role **permissions** live on their
- * own page (`/admin/roles`). FE is a UX gate; the server stays authoritative.
+ * Each row holds one principal: name, e-mail, OIDC subject, the assigned roles as
+ * revocable tags, and the last login. A per-row expandable mini-form assigns a role. It
+ * takes the role and an optional time-zone-aware validity window that models a
+ * substitution. This page does not maintain Gremium membership on purpose. The gremien
+ * administration maintains it per Gremium. The role permissions have their own page
+ * (`/admin/roles`). The frontend only gates the UX. The server stays authoritative.
  */
 @Component({
   selector: 'app-admin-users',
@@ -71,14 +71,14 @@ export class UsersComponent {
   private readonly capitalize = inject(CapitalizePipe);
   private readonly auth = inject(AuthService);
 
-  /** OIDC `sub` of the logged-in user — for self-protection. */
+  /** OIDC `sub` of the logged-in user. The view uses it to block self-deactivation. */
   protected readonly mySub = computed(() => this.auth.principal()?.sub ?? null);
 
   protected readonly query = signal('');
   protected readonly principals = signal<AdminPrincipal[]>([]);
   protected readonly roles = signal<Role[]>([]);
   protected readonly drafts = signal<Record<string, AssignDraft>>({});
-  /** Which rows have the "assign role" form expanded. */
+  /** The rows that show the expanded assign-role form. */
   protected readonly expanded = signal<Set<string>>(new Set());
 
   protected readonly rolesById = computed(() => new Map(this.roles().map((r) => [r.id, r])));
@@ -98,12 +98,12 @@ export class UsersComponent {
     { key: 'actions', label: this.i18n.translate('admin.users.col.actions'), align: 'end' },
   ]);
 
-  /** Show only global roles (without gremium scope) in the roles column. */
+  /** Roles column: global roles only, without a Gremium scope. */
   protected globalAssignments(p: AdminPrincipal): RoleAssignment[] {
     return p.assignments.filter((a) => !a.gremiumId);
   }
   protected readonly rowId = (p: unknown): string => (p as AdminPrincipal).id;
-  /** Detail row (assign form) for expanded principals. */
+  /** Detail row with the assign form for an expanded principal. */
   protected readonly rowExpanded = (p: unknown): boolean => this.isExpanded((p as AdminPrincipal).id);
 
   constructor() {
@@ -111,7 +111,6 @@ export class UsersComponent {
     this.search();
   }
 
-  // --- Search ---------------------------------------------------------------
   protected search(): void {
     this.api.listPrincipals(this.query()).subscribe({
       next: (list) => this.principals.set(list),
@@ -129,18 +128,17 @@ export class UsersComponent {
     return p.displayName || p.email || p.sub;
   }
 
-  /** Protected roles (admin, member) — no revoke cross. */
+  /** Protected roles admin and member. The view shows no revoke cross for them. */
   protected isAdminRole(roleId: string): boolean {
     const key = this.rolesById().get(roleId)?.key;
     return key === 'admin' || key === 'member';
   }
 
-  /** Own account — deactivation is blocked. */
+  /** The account of the logged-in user. The view blocks a deactivation of it. */
   protected isSelf(p: AdminPrincipal): boolean {
     return this.mySub() !== null && p.sub === this.mySub();
   }
 
-  // --- Expand ---------------------------------------------------------------
   protected isExpanded(id: string): boolean {
     return this.expanded().has(id);
   }
@@ -154,7 +152,6 @@ export class UsersComponent {
     });
   }
 
-  // --- Assign ---------------------------------------------------------------
   protected draftFor(principalId: string): AssignDraft {
     return this.drafts()[principalId] ?? emptyDraft();
   }
@@ -192,7 +189,6 @@ export class UsersComponent {
       });
   }
 
-  /** Activate/deactivate a user. */
   protected setActive(principal: AdminPrincipal, active: boolean): void {
     this.api.setPrincipalActive(principal.id, active).subscribe({
       next: () => {
@@ -216,7 +212,7 @@ export class UsersComponent {
   }
 }
 
-/** Empty date → null; a `YYYY-MM-DD` value → ISO UTC midnight. */
+/** An empty date becomes null. A `YYYY-MM-DD` value becomes ISO UTC midnight. */
 function isoOrNull(value: string): string | null {
   const trimmed = value.trim();
   if (!trimmed) return null;

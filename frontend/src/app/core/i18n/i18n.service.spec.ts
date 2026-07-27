@@ -5,8 +5,8 @@ import { CATALOG } from './translations';
 describe('I18nService', () => {
   beforeEach(() => {
     localStorage.clear();
-    // jsdom reports en-US by default — pin to German so the "no stored choice"
-    // path resolves deterministically to the spec's expected default.
+    // jsdom reports en-US by default. Pin German so the "no stored choice" path
+    // always resolves to the default that this spec expects.
     Object.defineProperty(navigator, 'language', { value: 'de-DE', configurable: true });
   });
 
@@ -30,7 +30,7 @@ describe('I18nService', () => {
   });
 
   it('falls back to German for keys missing in the active locale', () => {
-    // Simulate an incomplete EN catalog (en is intentionally `Partial`).
+    // Simulate an incomplete EN catalog. The `en` type is `Partial` on purpose.
     const original = CATALOG.en['home.cta'];
     delete CATALOG.en['home.cta'];
     try {

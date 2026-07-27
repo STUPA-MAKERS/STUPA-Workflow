@@ -1,12 +1,14 @@
-"""Branded HTML mail layout: one frame in code, content from templates.
+"""Branded HTML mail layout: one frame in code, the content from templates.
 
-Every outgoing mail is wrapped in the same layout (header with platform name,
-content card, footer with trigger hint + link to the notification settings).
-DB templates provide only the **inner** content — without an HTML body the
-text body is escaped + wrapped so text-only templates get a decent HTML
-alternative.
+The layout wraps every outgoing mail in the same frame. The frame holds a
+header with the platform name, a content card, and a footer. The footer shows
+the trigger hint and a link to the notification settings. DB templates provide
+only the **inner** content. When a template has no HTML body, the code escapes
+and wraps the text body. A text-only template therefore still gets a usable
+HTML alternative.
 
-Inline CSS (mail clients partly ignore <style>), no external resources.
+The layout uses inline CSS because some mail clients ignore <style>. It loads
+no external resources.
 """
 
 from __future__ import annotations
@@ -14,7 +16,7 @@ from __future__ import annotations
 import html
 import re
 
-# Footer trigger hint ("you receive this email because …") per mail kind.
+# Footer trigger hint per mail kind ("you receive this email because ...").
 _REASONS: dict[str, dict[str, str]] = {
     "magic_link": {
         "de": "Sie erhalten diese E-Mail, weil für Ihre Adresse ein "
@@ -108,18 +110,20 @@ def reason_text(kind: str, lang: str) -> str:
     return table.get(lang, table["de"])
 
 
-# URLs in the (already escaped) text — end before whitespace/<; trailing
-# punctuation is split off below so "https://x.de/y." stays clickable.
+# A URL in the already escaped text ends before whitespace or "<". The code
+# below splits off trailing punctuation, so "https://x.de/y." stays clickable.
 _URL_RE = re.compile(r"https?://[^\s<]+")
 _TRAILING_PUNCT = ".,;:!?)]"
 _LINK_STYLE = "color:#0b6e4f;word-break:break-all;"
 
 
 def _linkify(escaped: str) -> str:
-    """Turn URLs in escaped text into clickable ``<a href>`` anchors.
+    """Turn URLs in escaped text into clickable `<a href>` anchors.
 
-    Runs AFTER ``html.escape`` — no new injection risk since only already
-    escaped text is wrapped in anchors (``&amp;`` in hrefs decodes correctly)."""
+    Call this only AFTER `html.escape`. The function wraps already escaped text
+    in anchors, so it adds no injection risk. An `&amp;` in an href decodes
+    correctly.
+    """
 
     def repl(match: re.Match[str]) -> str:
         url = match.group(0)
@@ -133,8 +137,11 @@ def _linkify(escaped: str) -> str:
 
 
 def text_to_html(text: str) -> str:
-    """Convert a plain-text body to simple HTML (escaped, paragraphs + breaks,
-    URLs as clickable links)."""
+    """Convert a plain-text body to simple HTML.
+
+    The result is escaped. It keeps the paragraphs and the line breaks and
+    turns every URL into a clickable link.
+    """
     paragraphs = [p for p in text.split("\n\n") if p.strip()]
     rendered = [
         '<p style="margin:0 0 1em;">'
@@ -154,10 +161,12 @@ def render_layout(
     reason: str,
     lang: str = "de",
 ) -> str:
-    """Wrap inner content in the branded mail layout (full document).
+    """Wrap the inner content in the branded mail layout (full document).
 
-    ``content_html`` MUST already be safe (autoescaped Jinja render or
-    :func:`text_to_html`); all other values are escaped here."""
+    This function escapes every value except `content_html`. The caller MUST
+    pass safe HTML there: an autoescaped Jinja render or the output of
+    `text_to_html`.
+    """
     esc_title = html.escape(title)
     esc_site = html.escape(site_name)
     esc_reason = html.escape(reason)

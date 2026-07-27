@@ -1,8 +1,9 @@
-// Accounts tab: pixel-identical to the bookings tab — exp__ classes reused 1:1,
-// account selector on the left in the budget-selector style (cct__), TAN/OTP in the dialog (bank__).
+// Accounts tab. The look matches the bookings tab, so it reuses the exp__ classes 1:1.
+// The account selector on the left uses the budget-selector style (cct__). The TAN and
+// OTP parts in the dialog use bank__.
 :host { display: block; }
 
-/* Centre the header at normal body width (like applications); tree in the left margin. */
+/* Center the header at normal body width, as in applications. The tree sits in the left margin. */
 .exp__head { width: 100%; max-width: var(--layout-max-width); margin: 0 auto var(--space-5); }
 .exp__title { margin: 0; }
 .exp__subtitle { color: var(--color-text-muted); margin: var(--space-1) 0 0; }
@@ -54,7 +55,6 @@ input.exp__input {
 .exp__appLink { color: var(--color-primary); text-decoration: none; font-size: var(--fs-xs); }
 .exp__appLink:hover { text-decoration: underline; }
 .exp__sentinel { height: 1px; }
-/* --- Table --- */
 .exp__tableWrap {
   overflow-x: auto;
   border: var(--border-width) solid var(--color-border);
@@ -130,7 +130,7 @@ input.exp__input {
 }
 .block { display: block; }
 
-/* Mobile: tree behind a collapsible toggle, single column (like bookings). */
+/* Mobile: the tree hides behind a collapsible toggle and the layout is one column. */
 .exp__treeToggle { display: none; }
 @media (max-width: 768px) {
   .exp__layout { grid-template-columns: 1fr; }
@@ -210,7 +210,7 @@ input.exp__input {
   .exp__num:has(.exp__actions) { order: 2; flex: 1 1 100%; }
 }
 
-/* --- Account selector on the left: same look as the budget selector (cct__) --- */
+/* Account selector on the left. It has the same look as the budget selector (cct__). */
 .cct__node {
   display: inline-flex;
   align-items: baseline;
@@ -252,7 +252,7 @@ input.exp__input {
   font-weight: var(--fw-medium);
 }
 
-/* --- TAN/OTP + lock banner in the dialog (reused from bank reconciliation) --- */
+/* TAN/OTP boxes and the lock banner in the dialog. Reused from bank reconciliation. */
 .bank__hint { margin: 0; font-size: var(--fs-xs); color: var(--color-text-muted); }
 .bank__locked {
   margin: 0;
@@ -327,7 +327,6 @@ input.exp__input {
   &:focus { outline: none; border-color: var(--color-primary); }
 }
 
-/* --- Dialogs (import / link): clean vertical rhythm + typeahead --- */
 .kon__dlg {
   display: flex;
   flex-direction: column;
@@ -359,8 +358,8 @@ input.exp__input {
   list-style: none;
   margin: var(--space-1) 0 0;
   padding: var(--space-1);
-  /* In flow (not absolute) → grows the dialog instead of being clipped at the
-     short dialog edge. Own scroll when there are many hits. */
+  /* In flow, not absolute: the list grows the dialog instead of being clipped at the
+     short dialog edge. It scrolls on its own when there are many hits. */
   max-height: 14rem;
   overflow-y: auto;
   background: var(--color-surface);
@@ -383,15 +382,15 @@ input.exp__input {
   background: var(--color-primary-subtle);
 }
 
-/* --- Sticky Action-Spalte (#expenses-ux) — analog Buchungen-Tab ---
-   Rechteste Spalte angepinnt; nur Desktop (mobil greift der Karten-Reflow oben). */
+/* Sticky action column (#expenses-ux), as in the bookings tab. The right-most column
+   is pinned on desktop only. On mobile the card reflow above applies. */
 @media (min-width: 769px) {
   .exp__table th.exp__stickyCol,
   .exp__table td.exp__stickyCol {
     position: sticky;
     right: 0;
-    /* Trenner zur scrollenden Fläche: schlichte Token-Border statt Schatten-
-       Verlauf — passt zum restlichen Tabellen-Look (#expenses-ux2). */
+    /* Separator to the scrolling area: a plain token border instead of a shadow
+       gradient. It matches the rest of the table look (#expenses-ux2). */
     border-inline-start: var(--border-width) solid var(--color-border);
   }
   .exp__table td.exp__stickyCol {
@@ -411,9 +410,8 @@ input.exp__input {
   }
 }
 
-/* --- Batch / Sammel-Aktionen: schwebende Bottom-Bar (#expenses-ux2) ---
-   Fixiert unten mittig, erscheint nur bei aktiver Auswahl — identisch zum
-   Buchungen-Tab. */
+/* Bulk actions: floating bottom bar (#expenses-ux2). It sits fixed at the bottom
+   center and appears only while a selection is active. Same as the bookings tab. */
 .exp__bulkbar {
   position: fixed;
   bottom: max(var(--space-4), env(safe-area-inset-bottom));
@@ -436,7 +434,7 @@ input.exp__input {
   font-weight: var(--fw-semibold);
   white-space: nowrap;
 }
-/* Mobile: one row that scrolls horizontally inside the bar — never stacked. */
+/* Mobile: one row that scrolls horizontally inside the bar. It never stacks. */
 @media (max-width: 768px) {
   .exp__bulkbar {
     flex-wrap: nowrap;
@@ -449,8 +447,8 @@ input.exp__input {
     flex: 0 0 auto;
   }
 }
-/* Platz am Listenende, damit die schwebende Bar die letzten Zeilen/den
-   Nachlade-Button nicht verdeckt. */
+/* Space at the end of the list. The floating bar must not cover the last rows or
+   the load-more button. */
 .exp__layout:has(.exp__bulkbar) {
   padding-bottom: 4.5rem;
 }
@@ -459,13 +457,13 @@ input.exp__input {
   white-space: nowrap;
   text-align: center;
 }
-/* Selected line/card: tinted surface instead of (mobile: hidden) checkboxes. */
+/* Selected row or card: a tinted surface, because mobile hides the checkboxes. */
 .exp__table tbody tr.exp__tr--selected,
 .exp__table tbody tr.exp__tr--selected:hover {
   background: color-mix(in srgb, var(--color-primary) 14%, var(--color-surface));
 }
 @media (max-width: 768px) {
-  /* Press & hold enters select mode; the checkbox column disappears on touch. */
+  /* Press and hold enters select mode. The checkbox column disappears on touch. */
   .exp__check { display: none; }
   .exp__table tbody tr {
     user-select: none;

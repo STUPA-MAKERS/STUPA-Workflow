@@ -40,7 +40,7 @@ describe('AdminApiService — mock mode', () => {
     expect(Object.keys(schemas)).toContain('FormFieldDef');
     expect((await firstValueFrom(s.createFormVersion('t', []))).id).toBeTruthy();
     expect((await firstValueFrom(s.listGremien())).length).toBeGreaterThan(0);
-    // #105 — Gremien anlegen/bearbeiten im Mock-Store.
+    // #105 — create and edit gremien in the mock store.
     const before = (await firstValueFrom(s.listGremien())).length;
     const newGremium = await firstValueFrom(
       s.createGremium({ name: 'Neu', slug: 'neu', cdVariant: 'stupa', defaultLang: 'de' }),
@@ -51,7 +51,7 @@ describe('AdminApiService — mock mode', () => {
     expect(edited.name).toBe('Geändert');
     expect((await firstValueFrom(s.listRoles())).length).toBeGreaterThan(0);
 
-    // update existing webhook → upsert update branch
+    // An existing webhook takes the update branch of upsert.
     const hooks = await firstValueFrom(s.listWebhooks());
     const wh = await firstValueFrom(s.saveWebhook({ ...hooks[0], name: 'renamed' }));
     expect(wh.name).toBe('renamed');
@@ -61,7 +61,6 @@ describe('AdminApiService — mock mode', () => {
     const s = svc();
     const all = await firstValueFrom(s.listPrincipals());
     expect(all.length).toBeGreaterThan(0);
-    // search filters by name/email/sub
     const hit = await firstValueFrom(s.listPrincipals('robin'));
     expect(hit.every((p) => /robin/i.test(p.sub + p.email + p.displayName))).toBe(true);
 
@@ -245,7 +244,7 @@ describe('AdminApiService — real mode (contract)', () => {
       { id: 't2' },
     ]);
     expect(out![0]).toEqual({ id: 't1', name: { de: 'Aktiv' }, gremiumId: 'g1', status: 'active', version: 0 });
-    // missing nameI18n/gremiumId/activeFormVersionId → defaults + draft
+    // Missing nameI18n/gremiumId/activeFormVersionId → defaults plus draft status.
     expect(out![1]).toEqual({ id: 't2', name: {}, gremiumId: null, status: 'draft', version: 0 });
   });
 
@@ -290,7 +289,7 @@ describe('AdminApiService — real mode (contract)', () => {
     req.flush({});
     expect(done).toBe(true);
 
-    // empty body → no keys set
+    // An empty body sets no keys.
     s.updateApplicationType('t1', {}).subscribe();
     expect(http.expectOne('/api/admin/application-types/t1').request.body).toEqual({});
 
@@ -345,7 +344,7 @@ describe('AdminApiService — real mode (contract)', () => {
     s.updateGremiumRole('gr-9', { name: { de: 'N2' } }).subscribe();
     expect(http.expectOne('/api/admin/gremium-roles/gr-9').request.method).toBe('PATCH');
 
-    // helper delegates to updateGremiumRole
+    // The helper delegates to updateGremiumRole.
     s.saveGremiumRolePermissions('gr-9', ['vote.cast']).subscribe();
     const pr = http.expectOne('/api/admin/gremium-roles/gr-9');
     expect(pr.request.body).toEqual({ permissions: ['vote.cast'] });
@@ -397,7 +396,7 @@ describe('AdminApiService — real mode (contract)', () => {
     expect(all.request.params.get('until')).toBe('u');
     all.flush({ items: [], nextCursor: null, hasMore: false });
 
-    // before: 0 is a valid cursor (!= null) — must be emitted
+    // before: 0 is a valid cursor (!= null). The request must carry it.
     s.listAuditLog({ before: 0 }).subscribe();
     const zero = http.expectOne((r) => r.url === '/api/admin/audit');
     expect(zero.request.params.get('before')).toBe('0');
@@ -436,7 +435,7 @@ describe('AdminApiService — real mode (contract)', () => {
     expect(rej.request.body).toEqual({ reason: 'nope' });
     rej.flush({});
 
-    // reason omitted → null
+    // An omitted reason becomes null.
     s.rejectErasure('e-1').subscribe();
     expect(http.expectOne('/api/admin/privacy/erasures/e-1/reject').request.body).toEqual({ reason: null });
 
@@ -519,7 +518,7 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     const s = svc();
     const all = await firstValueFrom(s.listGremien());
     const res = await firstValueFrom(s.updateGremium('does-not-exist', { name: 'Z' }));
-    // unknown id → returns store[0] unchanged (not renamed)
+    // An unknown id returns store[0] unchanged (not renamed).
     expect(res.id).toBe(all[0].id);
     expect(res.name).toBe(all[0].name);
   });
@@ -545,7 +544,7 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     const all = await firstValueFrom(s.listPrincipals());
     const updated = await firstValueFrom(s.setPrincipalActive(all[0].id, false));
     expect(updated.active).toBe(false);
-    // unknown id → returns store[0] (no crash)
+    // An unknown id returns store[0] and does not crash.
     const fallback = await firstValueFrom(s.setPrincipalActive('nope', true));
     expect(fallback.id).toBe(all[0].id);
   });
@@ -558,7 +557,8 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(a.validFrom).toBeNull();
     expect(a.validUntil).toBeNull();
     expect(a.delegateVoting).toBe(false);
-    // revoke unknown id leaves assignments untouched (loops over all principals)
+    // A revoke with an unknown id leaves the assignments untouched. The mock loops
+    // over all principals.
     await firstValueFrom(s.revokeRole('not-real'));
     expect((await firstValueFrom(s.listPrincipals())).find((p) => p.id === target.id)!.assignments.length).toBe(1);
   });
@@ -572,20 +572,20 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     const s = svc();
     const store = (s as unknown as { store: { principals: { id: string; sub: string; email: unknown; displayName: unknown; assignments: unknown[] }[] } }).store;
     store.principals.push({ id: 'p-null', sub: 'kc|nulluser', email: null, displayName: null, assignments: [] });
-    // query that doesn't match sub → forces evaluation of the email/displayName `?? ''` branches
+    // A query that does not match sub forces the email/displayName `?? ''` branches.
     const hits = await firstValueFrom(s.listPrincipals('nomatchwhatsoever'));
     expect(hits).toEqual([]);
-    // a query matching only the sub still returns the null-field principal
+    // A query that matches only the sub still returns the principal with null fields.
     expect((await firstValueFrom(s.listPrincipals('nulluser'))).map((p) => p.id)).toContain('p-null');
   });
 
   it('saveRolePermissions / renameRole no-op safely when role id is unknown', async () => {
     const s = svc();
     const roles = await firstValueFrom(s.listRoles());
-    // findIndex < 0 → no mutation; falls back to the first role (no crash)
+    // findIndex < 0 → no mutation. The call falls back to the first role and does not crash.
     const sp = await firstValueFrom(s.saveRolePermissions('nope', ['x']));
     expect(sp.id).toBe(roles[0].id);
-    // no role gained the bogus 'x' permission (no mutation happened)
+    // No role gained the bogus 'x' permission. No mutation happened.
     expect((await firstValueFrom(s.listRoles())).some((r) => r.permissions.includes('x'))).toBe(false);
     const rn = await firstValueFrom(s.renameRole('nope', { de: 'X' }));
     expect(rn.id).toBe(roles[0].id);
@@ -599,7 +599,7 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(created.hasBudget).toBe(false);
     expect((await firstValueFrom(s.listApplicationTypesFull())).length).toBe(before + 1);
 
-    // createApplicationType without a key → falls back to length index
+    // createApplicationType without a key falls back to the length index.
     const noKey = await firstValueFrom(s.createApplicationType({ key: '', name: { de: 'X' }, gremiumId: 'g1', hasBudget: true }));
     expect(noKey.id).toMatch(/^f-/);
     expect(noKey.gremiumId).toBe('g1');
@@ -611,7 +611,7 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(after.gremiumId).toBe('g-asta');
     expect(after.hasBudget).toBe(true);
 
-    // update with empty body leaves the row untouched + unknown id is a no-op
+    // An update with an empty body leaves the row untouched. An unknown id is a no-op.
     await firstValueFrom(s.updateApplicationType(created.id, {}));
     await firstValueFrom(s.updateApplicationType('ghost', { name: { de: 'X' } }));
 
@@ -636,7 +636,7 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(draft.active).toBe(true);
     expect(draft.formVersionId).toBe('formver-1');
 
-    // first version for a brand-new type (version starts at 1, description null)
+    // The first version of a brand-new type starts at version 1 with a null description.
     const fresh = await firstValueFrom(s.createFormVersion('brand-new', [], null));
     expect(fresh.id).toBe('formver-0');
     const freshDraft = await firstValueFrom(s.getFormDraft('brand-new'));
@@ -645,20 +645,20 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
 
     const deactivated = await firstValueFrom(s.setFormActive('f-foerderung', false));
     expect(deactivated.active).toBe(false);
-    // re-activating restores the type's activeFormVersionId from the draft
+    // A second activation restores activeFormVersionId of the type from the draft.
     const reactivated = await firstValueFrom(s.setFormActive('f-foerderung', true));
     expect(reactivated.active).toBe(true);
     const types = await firstValueFrom(s.listApplicationTypesFull());
     expect(types.find((t) => t.id === 'f-foerderung')!.activeFormVersionId).toBe('formver-1');
 
-    // activate a draft that has no formVersionId → activeFormVersionId becomes null
+    // Activate a draft that has no formVersionId. Then activeFormVersionId becomes null.
     const store = (s as unknown as { store: { formDrafts: Record<string, { applicationTypeId: string; active?: boolean; fields: unknown[] }> } }).store;
     store.formDrafts['f-veranstaltung'] = { applicationTypeId: 'f-veranstaltung', fields: [] };
     const noVer = await firstValueFrom(s.setFormActive('f-veranstaltung', true));
     expect(noVer.active).toBe(true);
     expect((await firstValueFrom(s.listApplicationTypesFull())).find((t) => t.id === 'f-veranstaltung')!.activeFormVersionId).toBeNull();
 
-    // setFormActive on a type with no draft yet → returns a synthesized stub
+    // setFormActive on a type with no draft returns a synthesized stub.
     const stub = await firstValueFrom(s.setFormActive('no-draft-type', true));
     expect(stub).toEqual({ applicationTypeId: 'no-draft-type', active: true, fields: [] });
   });
@@ -676,19 +676,18 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     const created = await firstValueFrom(s.createGremiumRole('g-stupa', { key: 'chair', name: { de: 'Vorsitz' } }));
     expect(created.gremiumId).toBe('g-stupa');
     expect((await firstValueFrom(s.listGremiumRoles('g-stupa'))).length).toBe(1);
-    // filter excludes other gremium
+    // The filter excludes the other gremium.
     expect(await firstValueFrom(s.listGremiumRoles('g-asta'))).toEqual([]);
 
     const updated = await firstValueFrom(s.updateGremiumRole(created.id, { name: { de: 'Neu' } }));
     expect(updated.name['de']).toBe('Neu');
-    // helper path
     const withPerms = await firstValueFrom(s.saveGremiumRolePermissions(created.id, ['vote.cast']));
     expect(withPerms.permissions).toEqual(['vote.cast']);
-    // unknown id → synthesized fallback row (with name)
+    // An unknown id gives a synthesized fallback row that carries the name.
     const fallback = await firstValueFrom(s.updateGremiumRole('ghost', { name: { de: 'F' } }));
     expect(fallback.id).toBe('ghost');
     expect(fallback.name).toEqual({ de: 'F' });
-    // unknown id with no name in body → fallback name defaults to {} (the `?? {}` branch)
+    // An unknown id with no name in the body takes the `?? {}` branch. The name becomes {}.
     const fallbackNoName = await firstValueFrom(s.updateGremiumRole('ghost2', { permissions: ['x'] }));
     expect(fallbackNoName.id).toBe('ghost2');
     expect(fallbackNoName.name).toEqual({});
@@ -702,7 +701,7 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     const store = (s as unknown as { store: { gremiumRoles: unknown } }).store;
     store.gremiumRoles = undefined;
     await firstValueFrom(s.deleteGremiumRole('any'));
-    // re-initialised to an array → no crash, list is empty
+    // The store re-initializes to an array. Nothing crashes and the list is empty.
     expect(await firstValueFrom(s.listGremiumRoles('g-stupa'))).toEqual([]);
   });
 
@@ -713,7 +712,7 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(created.id).toBe('dp-1');
     const updated = await firstValueFrom(s.updateDeadlinePolicy(created.id, { offsetDays: 5 }));
     expect(updated.offsetDays).toBe(5);
-    // unknown id → synthesized fallback
+    // An unknown id gives a synthesized fallback.
     const fallback = await firstValueFrom(s.updateDeadlinePolicy('ghost', { offsetDays: 1 }));
     expect(fallback.id).toBe('ghost');
     await firstValueFrom(s.deleteDeadlinePolicy(created.id));
@@ -745,7 +744,7 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(await firstValueFrom(s.listErasures())).toEqual([]);
     expect(await firstValueFrom(s.listErasures('open'))).toEqual([]);
 
-    // execute/reject on unknown id → synthesized {id} fallback, no crash
+    // Execute or reject on an unknown id gives a synthesized {id} fallback and no crash.
     const exec = await firstValueFrom(s.executeErasure('e-x'));
     expect(exec.id).toBe('e-x');
     const rej = await firstValueFrom(s.rejectErasure('e-x', 'reason'));
@@ -759,7 +758,7 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(settings.defaultRetentionMonths).toBe(24);
     const saved = await firstValueFrom(s.putPrivacySettings({ defaultRetentionMonths: 48 }));
     expect(saved.defaultRetentionMonths).toBe(48);
-    // persisted in store
+    // The value persists in the store.
     expect((await firstValueFrom(s.getPrivacySettings())).defaultRetentionMonths).toBe(48);
 
     const blob = await firstValueFrom(s.downloadAuskunft('a@b.org'));
@@ -768,7 +767,7 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
 
   it('filters mock erasures by status when the store has rows', async () => {
     const s = svc();
-    // seed the private store directly to exercise the status-filter branch
+    // Seed the private store directly to reach the status-filter branch.
     const store = (s as unknown as { store: { erasures: { id: string; status: string }[] } }).store;
     store.erasures.push(
       { id: 'e-open', status: 'open' } as never,
@@ -778,7 +777,7 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     const open = await firstValueFrom(s.listErasures('open'));
     expect(open.map((r) => r.id)).toEqual(['e-open']);
 
-    // execute + reject existing rows take the mutation branch
+    // Execute and reject on existing rows take the mutation branch.
     await firstValueFrom(s.executeErasure('e-open'));
     expect((await firstValueFrom(s.listErasures('executed'))).map((r) => r.id)).toContain('e-open');
     const rejected = await firstValueFrom(s.rejectErasure('e-done', 'r'));
@@ -789,7 +788,7 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
   });
 
   it('listGroupMappings/mail-templates always hit HTTP even in mock mode', () => {
-    // these methods have no mock branch — they always call HttpClient
+    // These methods have no mock branch. They always call HttpClient.
     const s = svc();
     const http = TestBed.inject(HttpTestingController);
     s.listGroupMappings().subscribe();

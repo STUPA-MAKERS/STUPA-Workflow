@@ -1,4 +1,4 @@
-"""TDD: /api/health 200 (api.md Basis-Pfad /api)."""
+"""Test that GET /api/health returns 200 under the /api base path (see api.md)."""
 
 from fastapi.testclient import TestClient
 

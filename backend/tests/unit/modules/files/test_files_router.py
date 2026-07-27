@@ -1,4 +1,4 @@
-"""Router-Tests files (T-13): Endpunkt-Verdrahtung + RBAC, Service gefaked."""
+"""Router tests for files (T-13): endpoint wiring and RBAC with a faked service."""
 
 from __future__ import annotations
 
@@ -101,15 +101,18 @@ def fake_service() -> _FakeService:
 
 
 class _EmptyResult:
-    """SQLAlchemy-Result-Stub: ``all`` → leere Liste (keine Gremium-Mitgliedschaften)."""
+    """Stub a SQLAlchemy result: `all` returns an empty list, so no Gremium memberships."""
 
     def all(self) -> list[object]:  # noqa: A003
         return []
 
 
 class _NoCreatorDb:
-    """Session-Stub: ``scalar`` → None (kein created_by) für den Ersteller-Check (#24);
-    ``execute`` → leeres Result, sodass der Gremium-Read-Pfad sauber False ergibt."""
+    """Stub a session for the creator check (#24).
+
+    `scalar` returns None, so there is no created_by. `execute` returns an empty
+    result, so the Gremium read path gives False.
+    """
 
     async def scalar(self, *_a: object, **_k: object) -> None:
         return None
@@ -126,7 +129,7 @@ async def _fake_session():  # noqa: ANN202
 def app(fake_service: _FakeService) -> FastAPI:
     application = create_app()
     application.dependency_overrides[get_files_service] = lambda: fake_service
-    # require_app_edit/read fragen created_by ab — ohne echte DB ein No-Creator-Stub.
+    # require_app_edit and require_app_read read created_by, so the stub has no creator.
     application.dependency_overrides[get_session] = _fake_session
     return application
 
@@ -142,7 +145,6 @@ def _as(app: FastAPI, *perms: str) -> None:
     )
 
 
-# --------------------------------------------------------------------------- upload
 def test_upload_requires_auth_401(client: TestClient) -> None:
     r = client.post(
         f"/api/applications/{APP_ID}/attachments",
@@ -196,7 +198,7 @@ def test_upload_too_large_413(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
     _as(app, "application.manage")
-    fake_service.max_bytes = 8  # gekapptes Lesen im Router → 413 vor dem Service
+    fake_service.max_bytes = 8  # the router caps the read, so 413 comes before the service
     r = client.post(
         f"/api/applications/{APP_ID}/attachments",
         files={"file": ("doc.pdf", b"x" * 64, "application/pdf")},
@@ -204,7 +206,6 @@ def test_upload_too_large_413(
     assert r.status_code == 413
 
 
-# --------------------------------------------------------------------------- download
 def test_get_url_requires_auth_401(client: TestClient) -> None:
     assert client.get(f"/api/attachments/{ATT_ID}").status_code == 401
 
@@ -219,14 +220,15 @@ def test_get_url_ok(app: FastAPI, client: TestClient) -> None:
     _as(app, "application.read")
     r = client.get(f"/api/attachments/{ATT_ID}")
     assert r.status_code == 200
-    # App-relativer Stream-Pfad statt presigned MinIO-URL (#attachment-links).
+    # App-relative stream path instead of a presigned MinIO URL (#attachment-links).
     assert r.json()["url"] == f"/api/attachments/{ATT_ID}/download"
     assert r.json()["expiresIn"] == 300
 
 
 def test_get_url_cross_tenant_is_404_not_403(app: FastAPI, client: TestClient) -> None:
-    # Auth, aber kein Lesezugriff auf den Antrag → 404 (kein Existenz-Orakel), nicht 403.
-    _as(app)  # keine Permissions
+    # Authenticated but without read access to the application: 404, not 403.
+    # A 403 would work as an existence oracle.
+    _as(app)  # no permissions
     r = client.get(f"/api/attachments/{ATT_ID}")
     assert r.status_code == 404
 
@@ -245,8 +247,8 @@ def test_download_streams_bytes_with_disposition(app: FastAPI, client: TestClien
 
 
 def test_download_inline_renders_in_browser(app: FastAPI, client: TestClient) -> None:
-    # ?inline=1 → Content-Disposition inline (Vorschau-Dialog), nur für die
-    # nicht-skriptbare Allowlist (PDF/PNG/JPEG = Upload-Allowlist).
+    # ?inline=1 gives Content-Disposition inline for the preview dialog. It applies
+    # only to the non-scriptable allowlist (PDF, PNG, JPEG = the upload allowlist).
     _as(app, "application.read")
     r = client.get(f"/api/attachments/{ATT_ID}/download?inline=1")
     assert r.status_code == 200
@@ -255,14 +257,13 @@ def test_download_inline_renders_in_browser(app: FastAPI, client: TestClient) ->
 
 
 def test_download_cross_tenant_is_404(app: FastAPI, client: TestClient) -> None:
-    _as(app)  # keine Permissions → kein Lesezugriff → 404 (kein Existenz-Orakel)
+    _as(app)  # no permissions, so no read access and 404 (no existence oracle)
     r = client.get(f"/api/attachments/{ATT_ID}/download")
     assert r.status_code == 404
 
 
-# --------------------------------------------------------------------------- wiring
 def test_get_files_service_builds_from_app_state() -> None:
-    """Factory verdrahtet Storage + Scan-Queue aus dem App-State (kein Pool → None)."""
+    """The factory wires storage and scan queue from the app state, None without a pool."""
 
     class _State:
         object_storage = None
@@ -280,7 +281,6 @@ def test_get_files_service_builds_from_app_state() -> None:
     assert svc.queue is None
 
 
-# --------------------------------------------------------------------------- contract
 def test_endpoints_declare_problem_responses(app: FastAPI) -> None:
     spec = app.openapi()
     upload = spec["paths"]["/api/applications/{application_id}/attachments"]["post"][
@@ -294,14 +294,13 @@ def test_endpoints_declare_problem_responses(app: FastAPI) -> None:
         assert code in get, f"get missing {code}"
 
 
-# --------------------------------------------------------------------------- delete
 def test_delete_requires_auth_401(client: TestClient) -> None:
     r = client.delete(f"/api/attachments/{ATT_ID}")
     assert r.status_code == 401
 
 
 def test_delete_forbidden_without_manage_404(app: FastAPI, client: TestClient) -> None:
-    # Principal ohne application.manage und kein Ersteller (No-Creator-Stub) → 404.
+    # A principal without application.manage and without creator rights gets 404.
     _as(app)
     r = client.delete(f"/api/attachments/{ATT_ID}")
     assert r.status_code == 404
@@ -319,20 +318,19 @@ def test_delete_ok_with_manage(
 def test_delete_ok_with_edit_any(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
-    # application.edit_any ist ein globales Schreibrecht und muss — wie beim Upload
-    # (require_app_edit) — auch das Löschen erlauben, nicht in ein 404 laufen (#AUD-040).
-    # No-Creator-Stub + keine application.manage: nur der edit_any-Short-Circuit greift.
+    # application.edit_any is a global write permission. Like the upload path
+    # (require_app_edit), it must also allow delete and must not give 404 (#AUD-040).
+    # With the no-creator stub and no application.manage, only edit_any can pass.
     _as(app, "application.edit_any")
     r = client.delete(f"/api/attachments/{ATT_ID}")
     assert r.status_code == 204
     assert fake_service.deleted == ATT_ID
 
 
-# --------------------------------------------------------------------------- FIX 4
-# Attachment-Read deckt dieselben Pfade wie require_app_read ab (nicht nur globales
-# application.read): read_all / Ersteller:in / Gremium-Read.
+# Attachment read covers the same paths as require_app_read, not only the global
+# application.read: read_all, the creator and Gremium read.
 def test_get_url_read_all_ok(app: FastAPI, client: TestClient) -> None:
-    # application.read_all → Zugriff ohne application.read (read_all-Zweig).
+    # application.read_all grants access without application.read (read_all branch).
     _as(app, "application.read_all")
     r = client.get(f"/api/attachments/{ATT_ID}")
     assert r.status_code == 200
@@ -347,8 +345,8 @@ def test_download_read_all_ok(app: FastAPI, client: TestClient) -> None:
 
 
 def _patch_creator(monkeypatch: pytest.MonkeyPatch, *, is_creator: bool) -> None:
-    # _resolve_with_creator (im access-Modul) fragt _is_creator — den Ersteller-Zweig
-    # gezielt schalten, ohne echte DB.
+    # _resolve_with_creator in the access module calls _is_creator. Patch it to
+    # switch the creator branch without a real database.
     import app.modules.applications.access as access_mod
 
     async def _fake_is_creator(*_a: object, **_k: object) -> bool:
@@ -369,7 +367,7 @@ def _patch_committee(monkeypatch: pytest.MonkeyPatch, *, can_read: bool) -> None
 def test_get_url_creator_fallback_ok(
     app: FastAPI, client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # Kein application.read, aber eingeloggte:r Ersteller:in (#24) → 200 via Creator-Zweig.
+    # No application.read, but the logged-in creator (#24) gets 200 by the creator branch.
     _as(app)
     _patch_creator(monkeypatch, is_creator=True)
     r = client.get(f"/api/attachments/{ATT_ID}")
@@ -379,7 +377,7 @@ def test_get_url_creator_fallback_ok(
 def test_get_url_committee_read_fallback_ok(
     app: FastAPI, client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # Kein Recht, kein Ersteller, aber Gremium-Read (#committee-read) → 200 via Fallback.
+    # No permission and no creator, but Gremium read (#committee-read) gives 200.
     _as(app)
     _patch_creator(monkeypatch, is_creator=False)
     _patch_committee(monkeypatch, can_read=True)
@@ -401,7 +399,7 @@ def test_download_committee_read_fallback_ok(
 def test_get_url_no_access_paths_is_404(
     app: FastAPI, client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # Weder Recht noch Ersteller noch Gremium-Read → 404 (kein Existenz-Orakel).
+    # No permission, no creator and no Gremium read, so 404 (no existence oracle).
     _as(app)
     _patch_creator(monkeypatch, is_creator=False)
     _patch_committee(monkeypatch, can_read=False)

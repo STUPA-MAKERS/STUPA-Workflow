@@ -1,12 +1,12 @@
-"""fints_lock_cooldown: Sperr-Cooldown je FinTS-Credential (#fints-review).
+"""fints_lock_cooldown: a lock cooldown per FinTS credential (#fints-review).
 
-Nach einer Bank-Sperre (FinTS 3938) oder einer Anmelde-/Signatur-Ablehnung (9340 u. a.)
-darf nicht blind weiter-synct werden — jeder Versuch zählt auf das Bank-Fehlversuchskonto
-ein und kann die Sperre bis zur Vollsperre verschärfen. ``fints_locked_until`` merkt sich
-einen Cooldown; bis dahin verweigert der Service jeden Sync dieses Buchers für das Konto.
+After a bank lock (FinTS 3938) or a rejected login or signature (9340 and others), the
+service must not sync on blindly. Every attempt counts against the failed-attempt counter
+of the bank and can escalate the lock to a full lock. ``fints_locked_until`` holds a
+cooldown. Until that time the service refuses every sync of this booker for the account.
 
-Reines additives ``ADD COLUMN`` (nullable, kein Default) — idempotent, sauberer Down-Round-
-Trip.
+The migration only adds a column (nullable, no default). It is idempotent and has a clean
+down round trip.
 """
 
 from __future__ import annotations

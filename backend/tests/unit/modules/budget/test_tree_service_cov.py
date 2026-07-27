@@ -1,16 +1,16 @@
-"""Branch-/Zeilen-Vollabdeckung für :mod:`app.modules.budget.tree`.
+"""Full branch and line coverage for `app.modules.budget.tree`.
 
-Kritisches Modul (testing.md §1: ``budget`` → 100 % Branch). DB-los: ein lokaler
-``_Session``-Fake (Spiegel der Support-Fakes, ergänzt um ``add_all``, iterierbares
-``scalars()`` und DB-Default-Nachstellung für ``ExpenseOut``/``InvoiceOut``) liefert
-vorab gefüllte ``execute``-Resultate FIFO, ``get`` aus einer eigenen Queue; die zwei
-Audit-``execute`` je Mutation werden übersprungen. Jeder Fehler-/Guard-/Leer-/None-
-Pfad wird einzeln getroffen.
+The module is critical (testing.md section 1: `budget` needs 100 % branch coverage).
+These tests run without a database. A local `_Session` fake mirrors the support fakes.
+It adds `add_all`, an iterable `scalars()` and the DB defaults that `ExpenseOut` and
+`InvoiceOut` need. It returns prefilled `execute` results FIFO and serves `get` from a
+second queue. It skips the two audit `execute` calls of every mutation. Each error,
+guard, empty and None path gets its own test.
 
-Ergänzt ``test_budget_tree_service_unit`` um die dort nicht berührten Methoden
-(Expenses, Accounts, Invoices, Transfer, ZUGFeRD-Import, ``can_view_node``,
-``list_applications``, ``_rename_key``, Suche/Paging, ``_actor_names``) sowie die
-verbleibenden ``get_tree``-Zweige (remaining≤0, Gremium-Scope).
+This file adds the methods that `test_budget_tree_service_unit` does not touch:
+expenses, accounts, invoices, transfer, ZUGFeRD import, `can_view_node`,
+`list_applications`, `_rename_key`, search and paging, and `_actor_names`. It also
+covers the remaining `get_tree` branches (remaining <= 0 and Gremium scope).
 """
 
 from __future__ import annotations
@@ -68,12 +68,8 @@ from app.shared.errors import (
 )
 
 
-# --------------------------------------------------------------- local fakes
-# Eigene Session/Result-Fakes (die Support-Fakes haben weder ``add_all``, noch ein
-# iterierbares ``scalars()``, noch das DB-``created_at``/``id``-Default-Verhalten,
-# das ``ExpenseOut``/``InvoiceOut`` brauchen). Reine Test-Hilfen, kein Support-Edit.
 class _R:
-    """Minimaler ``Result``: FIFO-Items, iterierbar, ``scalars()``/``all()``/``first()``."""
+    """Minimal `Result` stub: FIFO items, iterable, `scalars()`/`all()`/`first()`."""
 
     def __init__(self, *items: Any) -> None:
         self._items = list(items)
@@ -95,13 +91,16 @@ class _R:
 
 
 class _Session:
-    """``AsyncSession``-Stub: ``execute``/``scalar`` ziehen FIFO aus EINER Queue,
-    ``get`` aus einer eigenen. ``add``/``add_all`` vergeben DB-Defaults (id/created_at)."""
+    """Stub of `AsyncSession` with two independent result queues.
+
+    `execute` and `scalar` pull FIFO from one queue. `get` pulls from its own queue.
+    `add` and `add_all` assign the DB defaults for `id` and `created_at`.
+    """
 
     def __init__(self, results: list[_R], gets: list[Any]) -> None:
         self._results = list(results)
         self._gets = list(gets)
-        self.bind = None  # → dialect_of liefert 'postgresql' (Such-Pfad)
+        self.bind = None  # dialect_of then reports 'postgresql' (the search path)
         self.added: list[Any] = []
         self.deleted: list[Any] = []
         self.flushed = 0
@@ -109,9 +108,9 @@ class _Session:
 
     @staticmethod
     def _is_audit_stmt(stmt: Any) -> bool:
-        # Der Audit-Trail (audit_record) feuert pro Mutation 2 ``execute`` (Advisory-Lock
-        # + prev_hash-Select auf ``audit_entry``). Diese überspringen wir, damit die
-        # Test-Queue nur die fachlichen Service-Queries spiegelt (Idiom wie im Bestand).
+        # The audit trail (audit_record) fires two `execute` calls per mutation: the
+        # advisory lock and the prev_hash select on `audit_entry`. The stub skips both,
+        # so the test queue mirrors only the domain queries of the service.
         text = str(stmt).lower()
         return "pg_advisory_xact_lock" in text or "audit_entry" in text
 
@@ -130,8 +129,8 @@ class _Session:
         return self._gets.pop(0) if self._gets else None
 
     def _assign_defaults(self, obj: Any) -> None:
-        # DB-Server-Defaults nachstellen (kein refresh in der Fake-Session):
-        # id (gen_random_uuid), created_at (now), currency (EUR-CHECK).
+        # Reproduce the DB server defaults, because the fake session has no refresh:
+        # id from gen_random_uuid, created_at from now, and currency from the EUR check.
         if getattr(obj, "id", None) is None:
             obj.id = uuid.uuid4()
         if hasattr(obj, "created_at") and obj.created_at is None:
@@ -167,7 +166,6 @@ def fake_session(*results: _R, gets: list[Any] | None = None) -> Any:
     return _Session(list(results), list(gets or []))
 
 
-# ----------------------------------------------------------------- factories
 def _budget(  # noqa: ANN001
     *, id=None, parent_id=None, path_key="VS", gremium_id=None, key="VS", name="N",
     currency="EUR", fiscal_start_month=1, fiscal_start_day=1,
@@ -245,7 +243,7 @@ def _invoice(*, id=None, number="R-1", gross="119.00", file_key=None,  # noqa: A
 
 
 def _pg_session(*results: Any) -> Any:
-    """Alias für ``fake_session`` (``bind=None`` → ``dialect_of`` = 'postgresql', Such-Pfad)."""
+    """Alias for `fake_session`: `bind=None` makes `dialect_of` report 'postgresql'."""
     return fake_session(*results)
 
 
@@ -259,9 +257,8 @@ def _settings(**over: Any) -> Settings:
     return Settings(**base)
 
 
-# ----------------------------------------------------------- helper functions
 def test_natural_path_key_numeric_vs_string() -> None:
-    # Numerische Segmente als (0, int), nicht-numerische als (1, str): VSM-9 < VSM-10.
+    # Numeric segments sort as (0, int) and other segments as (1, str): VSM-9 < VSM-10.
     assert _natural_path_key("VSM-9") < _natural_path_key("VSM-10")
     assert _natural_path_key("VS") < _natural_path_key("VS-800")
 
@@ -280,12 +277,12 @@ def test_validate_invoice_file_token_traversal() -> None:
         _validate_invoice_file_token("invoices/../secret.pdf")
 
 
-# ------------------------------------------------------------------ _rename_key
 async def test_update_node_rename_key_top_level() -> None:
-    # Key-Wechsel am Top-Level → path_key neu, Nachfahren angepasst (kein Parent-Lookup).
+    # A key change at the top level rewrites path_key and every descendant. No parent
+    # lookup happens.
     node = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     child = _budget(id=uuid.uuid4(), parent_id=node.id, path_key="VS-800", key="800")
-    # _get_node(node), _sibling_exists(None), descendants
+    # Queue: the node, an empty sibling check, then the descendants.
     sess = fake_session(result(node), result(), result(child))
     svc = BudgetTreeService(sess)
     out = await svc.update_node(node.id, _node_update(key="VV"))
@@ -300,7 +297,7 @@ def _node_update(**kw: Any) -> BudgetNodeUpdate:
 async def test_update_node_rename_key_child_with_parent_lookup() -> None:
     parent = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     node = _budget(id=uuid.uuid4(), parent_id=parent.id, path_key="VS-800", key="800")
-    # _get_node(node), _sibling_exists(None→use ==), _get_node(parent), descendants(none)
+    # Queue: the node, an empty sibling check, the parent, then no descendants.
     sess = fake_session(result(node), result(), result(parent), result())
     svc = BudgetTreeService(sess)
     out = await svc.update_node(node.id, _node_update(key="900"))
@@ -309,7 +306,7 @@ async def test_update_node_rename_key_child_with_parent_lookup() -> None:
 
 async def test_update_node_rename_key_invalid() -> None:
     node = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
-    sess = fake_session(result(node))  # _get_node only; invalid key raises before sibling-check
+    sess = fake_session(result(node))  # one result: a bad key raises before the sibling check
     svc = BudgetTreeService(sess)
     with pytest.raises(ValidationProblem):
         await svc.update_node(node.id, _node_update(key="bad-key"))
@@ -318,7 +315,7 @@ async def test_update_node_rename_key_invalid() -> None:
 async def test_update_node_rename_key_conflict() -> None:
     node = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     other = _budget(id=uuid.uuid4(), path_key="VV", key="VV")
-    sess = fake_session(result(node), result(other))  # sibling exists → conflict
+    sess = fake_session(result(node), result(other))  # a sibling exists, so conflict
     svc = BudgetTreeService(sess)
     from app.shared.errors import ConflictError
 
@@ -327,7 +324,7 @@ async def test_update_node_rename_key_conflict() -> None:
 
 
 async def test_update_node_rename_key_same_value_noop() -> None:
-    # new_key == node.key → _rename_key wird NICHT aufgerufen (Branch new_key != node.key).
+    # new_key == node.key, so _rename_key does not run (branch new_key != node.key).
     node = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     sess = fake_session(result(node))
     svc = BudgetTreeService(sess)
@@ -336,29 +333,29 @@ async def test_update_node_rename_key_same_value_noop() -> None:
 
 
 async def test_update_node_stichtag_changed_but_not_top_level() -> None:
-    # Stichtag geändert, aber Knoten hat Parent → kein HHJ-Rederive (Branch parent_id None).
+    # The fiscal start date changed, but the node has a parent. The service then skips
+    # the fiscal-year rederive (branch parent_id None).
     parent_id = uuid.uuid4()
     node = _budget(id=uuid.uuid4(), parent_id=parent_id, path_key="VS-800", key="800",
                    fiscal_start_month=1)
-    sess = fake_session(result(node))  # only _get_node; no _fiscal_years_of call
+    sess = fake_session(result(node))  # the node only, no _fiscal_years_of call
     svc = BudgetTreeService(sess)
     out = await svc.update_node(node.id, _node_update(fiscalStartMonth=7))
     assert out.fiscal_start_month == 7
 
 
-# ------------------------------------------------------------ _fiscal_year_bounds
 async def test_create_fiscal_year_impossible_stichtag_raises_422() -> None:
-    # Altbestand/Direkter Aufruf mit unmöglichem Stichtag (31.02.) → der Service
-    # wrappt das ValueError aus ``fiscal_year_bounds`` zu einem 422 statt 500 (#sec-audit).
+    # Legacy rows and direct calls can carry an impossible fiscal start date (February 31).
+    # The service wraps the ValueError of `fiscal_year_bounds` into a 422, not a 500
+    # (#sec-audit).
     top = _budget(id=uuid.uuid4(), path_key="VS", key="VS",
                   fiscal_start_month=2, fiscal_start_day=31)
-    sess = fake_session(result(top))  # _require_top_level only; raises vor Dublettencheck
+    sess = fake_session(result(top))  # _require_top_level only, raises before the dup check
     svc = BudgetTreeService(sess)
     with pytest.raises(ValidationProblem):
         await svc.create_fiscal_year(top.id, FiscalYearCreate(year=2026))
 
 
-# ------------------------------------------------------------ _require_top_level
 async def test_require_top_level_rejects_child() -> None:
     child = _budget(id=uuid.uuid4(), parent_id=uuid.uuid4(), path_key="VS-800", key="800")
     sess = fake_session(result(child))
@@ -367,7 +364,6 @@ async def test_require_top_level_rejects_child() -> None:
         await svc.create_fiscal_year(child.id, FiscalYearCreate(year=2026))
 
 
-# --------------------------------------------------------------- can_view_node
 async def test_can_view_node_empty_member_set() -> None:
     svc = BudgetTreeService(fake_session())
     assert await svc.can_view_node(uuid.uuid4(), set()) is False
@@ -376,7 +372,8 @@ async def test_can_view_node_empty_member_set() -> None:
 async def test_can_view_node_match_on_ancestor() -> None:
     g = uuid.uuid4()
     node = _budget(id=uuid.uuid4(), path_key="VS-800-04", key="04")
-    # rows = view_gremium_id der Pfad-Präfixe: VS trägt g (Vorfahr-Treffer), Rest None.
+    # The rows hold view_gremium_id per path prefix. VS carries g, which is an ancestor
+    # hit, and the other prefixes are None.
     sess = fake_session(result(node), result(g, None, None))
     svc = BudgetTreeService(sess)
     assert await svc.can_view_node(node.id, {g}) is True
@@ -384,12 +381,11 @@ async def test_can_view_node_match_on_ancestor() -> None:
 
 async def test_can_view_node_no_match() -> None:
     node = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
-    sess = fake_session(result(node), result(None))  # only None view_gremium_ids
+    sess = fake_session(result(node), result(None))  # every view_gremium_id is None
     svc = BudgetTreeService(sess)
     assert await svc.can_view_node(node.id, {uuid.uuid4()}) is False
 
 
-# ----------------------------------------------------------- fiscal_year_label_map
 async def test_fiscal_year_label_map() -> None:
     fid1, fid2 = uuid.uuid4(), uuid.uuid4()
     sess = fake_session(result((fid1, 2026, 1, 1), (fid2, 2026, 7, 1)))
@@ -399,7 +395,6 @@ async def test_fiscal_year_label_map() -> None:
     assert out[fid2] == "2026/27"
 
 
-# --------------------------------------------------------------- list_applications
 async def test_list_applications_with_fiscal_year_filter() -> None:
     node = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     fy_id = uuid.uuid4()
@@ -409,7 +404,7 @@ async def test_list_applications_with_fiscal_year_filter() -> None:
     app.currency = "EUR"
     app.created_at = datetime(2026, 1, 1, tzinfo=UTC)
     row = (app, "VS", "review", {"de": "In Prüfung"}, "#abc")
-    # _get_node, rows
+    # Queue: the node, then the rows.
     sess = fake_session(result(node), result(row))
     svc = BudgetTreeService(sess)
     out = await svc.list_applications(node.id, fiscal_year_id=fy_id)
@@ -425,7 +420,7 @@ async def test_list_applications_no_filter_empty_state_label() -> None:
     app.current_state_id = None
     app.currency = "EUR"
     app.created_at = datetime(2026, 1, 1, tzinfo=UTC)
-    # state_label falsy ("" or None) → state_label or None == None
+    # A falsy state_label ("" or None) maps to None.
     row = (app, "VS", None, None, None)
     sess = fake_session(result(node), result(row))
     svc = BudgetTreeService(sess)
@@ -434,33 +429,32 @@ async def test_list_applications_no_filter_empty_state_label() -> None:
     assert out[0].stage is None
 
 
-# ------------------------------------------------------------------- expenses
 async def test_book_expense_standalone_with_account_and_actor() -> None:
     node = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     top = node
     fy = _fy(id=uuid.uuid4(), budget_id=top.id, active=True)
     acc = _account(id=uuid.uuid4(), name="Bank")
-    # _actor_names selektiert Tupel (sub, display_name, email).
-    # _get_node(payload.budget), _resolve_fy: _top_level + _fiscal_years_of,
-    # _validate_account via session.get(Account), then _actor_names
+    # _actor_names selects tuples of sub, display_name and email.
     sess = fake_session(
-        result(node),                 # _get_node(payload.budget_id)
+        result(node),                 # _get_node for payload.budget_id
         result(top),                  # _top_level
         result(fy),                   # _fiscal_years_of
         result(("u-1", "Alice", "a@x")),  # _actor_names
-        gets=[acc],                   # session.get(Account, ...)
+        gets=[acc],                   # the Account from session.get
     )
     svc = BudgetTreeService(sess)
     payload = ExpenseCreate(amount=Decimal("42.00"), description="Rechnung", budgetId=node.id)
-    # Konto ist kein Payload-Feld mehr → als expliziter Parameter (wie confirm_line, #fints-konten).
+    # The account is no longer a payload field. It comes as an explicit parameter, the
+    # same way as confirm_line does (#fints-konten).
     out = await svc.book_expense(payload, actor="u-1", account_id=acc.id)
     assert out.amount == Decimal("42.00")
     assert out.account_name == "Bank"
-    assert out.actor_name == "Alice"   # display_name aufgelöst
+    assert out.actor_name == "Alice"   # display_name resolved
 
 
 async def test_book_expense_commit_false_defers_commit() -> None:
-    # commit=False (Bankabgleich): Buchung wird angelegt, aber NICHT committet.
+    # With commit=False (bank reconciliation) the service creates the booking but does
+    # not commit.
     node = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     top = node
     fy = _fy(id=uuid.uuid4(), budget_id=top.id, active=True)
@@ -471,7 +465,7 @@ async def test_book_expense_commit_false_defers_commit() -> None:
     )
     out = await svc.book_expense(payload, actor="", commit=False)
     assert out.amount == Decimal("7.00")
-    assert sess.committed == 0  # Commit dem Aufrufer überlassen
+    assert sess.committed == 0  # the caller commits
 
 
 async def test_create_expense_compat_wraps_budget_id() -> None:
@@ -479,13 +473,13 @@ async def test_create_expense_compat_wraps_budget_id() -> None:
     top = node
     fy = _fy(id=uuid.uuid4(), budget_id=top.id, active=True)
     sess = fake_session(
-        result(node), result(top), result(fy), result(),  # last: _actor_names (empty)
+        result(node), result(top), result(fy), result(),  # last: _actor_names, no rows
     )
     svc = BudgetTreeService(sess)
     payload = ExpenseCreate(amount=Decimal("5.00"), description="d", fiscalYearId=fy.id)
     out = await svc.create_expense(node.id, payload, actor="anon")
     assert out.budget_id == node.id
-    # actor gesetzt, aber kein Principal-Treffer → actor_name None
+    # The actor is set, but no principal row matches, so actor_name stays None.
     assert out.actor == "anon"
     assert out.actor_name is None
 
@@ -494,12 +488,12 @@ async def test_book_expense_linked_to_application() -> None:
     node = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     fy_id = uuid.uuid4()
     app = _app(budget_id=node.id, fiscal_year_id=fy_id, data={"title": "Linked"})
-    # session.get(Application) → app, then _get_node(app.budget_id) → node,
-    # then _validate_account(None)→None, then _actor_names
+    # The queue serves the application from session.get, then the node lookup, then
+    # _validate_account with None, then _actor_names.
     sess = fake_session(
-        result(node),       # _get_node(app.budget_id)
-        result(),           # _actor_names (no actor row)
-        gets=[app],         # session.get(Application)
+        result(node),       # _get_node for app.budget_id
+        result(),           # _actor_names, no actor row
+        gets=[app],         # the Application from session.get
     )
     svc = BudgetTreeService(sess)
     payload = ExpenseCreate(
@@ -511,7 +505,7 @@ async def test_book_expense_linked_to_application() -> None:
 
 
 async def test_book_expense_linked_application_not_found() -> None:
-    sess = fake_session(gets=[None])  # session.get(Application) → None
+    sess = fake_session(gets=[None])  # session.get returns None for the Application
     svc = BudgetTreeService(sess)
     payload = ExpenseCreate(amount=Decimal("1.00"), description="d",
                             applicationId=uuid.uuid4())
@@ -525,8 +519,8 @@ async def test_book_expense_marks_open_invoice_paid() -> None:
     fy = _fy(id=uuid.uuid4(), budget_id=top.id, active=True)
     inv = _invoice(id=uuid.uuid4())  # status='open'
     sess = fake_session(
-        result(node), result(top), result(fy), result(),  # _actor_names empty
-        gets=[inv],  # _mark_invoice_paid → session.get(Invoice)
+        result(node), result(top), result(fy), result(),  # _actor_names, no rows
+        gets=[inv],  # _mark_invoice_paid loads the Invoice
     )
     svc = BudgetTreeService(sess)
     payload = ExpenseCreate(
@@ -534,7 +528,7 @@ async def test_book_expense_marks_open_invoice_paid() -> None:
     )
     out = await svc.book_expense(payload, actor="")
     assert out.amount == Decimal("10.00")
-    assert inv.status == "paid"  # offen → bezahlt beim Buchen
+    assert inv.status == "paid"  # open becomes paid on booking
 
 
 async def test_book_expense_already_paid_invoice_is_noop() -> None:
@@ -542,7 +536,7 @@ async def test_book_expense_already_paid_invoice_is_noop() -> None:
     top = node
     fy = _fy(id=uuid.uuid4(), budget_id=top.id, active=True)
     inv = _invoice(id=uuid.uuid4())
-    inv.status = "paid"  # bereits bezahlt → No-op (kein erneuter Status-Wechsel)
+    inv.status = "paid"  # already paid, so the booking changes no status
     sess = fake_session(
         result(node), result(top), result(fy), result(),
         gets=[inv],
@@ -561,7 +555,7 @@ async def test_book_expense_unknown_invoice_404() -> None:
     fy = _fy(id=uuid.uuid4(), budget_id=top.id, active=True)
     sess = fake_session(
         result(node), result(top), result(fy),
-        gets=[None],  # session.get(Invoice) → None
+        gets=[None],  # session.get returns None for the Invoice
     )
     svc = BudgetTreeService(sess)
     payload = ExpenseCreate(
@@ -587,9 +581,8 @@ async def test_book_expense_standalone_missing_budget_id() -> None:
         await svc.book_expense(payload, actor="a")
 
 
-# ------------------------------------------------------------- _validate_account
 async def test_validate_account_not_found() -> None:
-    sess = fake_session(gets=[None])  # session.get(Account) → None
+    sess = fake_session(gets=[None])  # session.get returns None for the Account
     svc = BudgetTreeService(sess)
     with pytest.raises(NotFoundError):
         await svc._validate_account(uuid.uuid4())
@@ -600,20 +593,20 @@ async def test_validate_account_none_returns_none() -> None:
     assert await svc._validate_account(None) is None
 
 
-# --------------------------------------------------------------- update_expense
 async def test_update_expense_all_fields_with_app_and_account() -> None:
     node = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     app = _app(budget_id=node.id, data={"title": "T"})
     acc = _account(id=uuid.uuid4(), name="Konto")
-    inv = _invoice(id=uuid.uuid4())  # offen → wird beim Verknüpfen auf bezahlt gesetzt
+    inv = _invoice(id=uuid.uuid4())  # open, so the link marks it paid
     expense = _expense(budget_id=node.id, application_id=app.id, account_id=acc.id,
                        actor="u-1")
-    # gets: BudgetExpense, Invoice(mark paid), dann nach commit: Application(get),
-    #   Account(get, Anzeige) — Konto ist KEIN Update-Feld mehr (kein Validate-get).
+    # gets: the BudgetExpense, the Invoice to mark paid, then after the commit the
+    # Application and the Account for display. The account is no longer an update field,
+    # so there is no validate get.
     sess = fake_session(
-        result(),                         # _child_counts (#subbookings) — keine Kinder
-        result(node),                     # _get_node(expense.budget_id) after commit
-        result(("u-1", None, "bob@x")),   # _actor_names → display_name None → email
+        result(),                         # _child_counts (#subbookings), no children
+        result(node),                     # _get_node for expense.budget_id after commit
+        result(("u-1", None, "bob@x")),   # _actor_names: display_name None gives email
         gets=[expense, inv, app, acc],
     )
     svc = BudgetTreeService(sess)
@@ -627,17 +620,18 @@ async def test_update_expense_all_fields_with_app_and_account() -> None:
     assert out.amount == Decimal("99.00")
     assert out.account_name == "Konto"
     assert out.application_title == "T"
-    assert out.actor_name == "bob@x"   # display_name None → email
-    assert inv.status == "paid"        # verknüpfte Rechnung → bezahlt
+    assert out.actor_name == "bob@x"   # display_name None gives the email
+    assert inv.status == "paid"        # the linked invoice becomes paid
 
 
 async def test_update_expense_clears_account_no_app() -> None:
     node = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     expense = _expense(budget_id=node.id, application_id=None, account_id=None, actor=None)
-    # Konto ist kein Update-Feld mehr → kein Validate-get; Buchung ohne Konto bleibt kontolos.
+    # The account is no longer an update field, so there is no validate get. A booking
+    # without an account keeps none.
     sess = fake_session(
-        result(node),   # _get_node after commit
-        result(),       # _actor_names (no actor)
+        result(node),   # _get_node after the commit
+        result(),       # _actor_names, no actor
         gets=[expense],
     )
     svc = BudgetTreeService(sess)
@@ -649,12 +643,13 @@ async def test_update_expense_clears_account_no_app() -> None:
 
 
 async def test_update_expense_amount_none_skipped() -> None:
-    # "amount" gesetzt aber None → Branch payload.amount is not None == False.
+    # An "amount" that is present but None takes the False side of the branch
+    # `payload.amount is not None`.
     node = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     expense = _expense(budget_id=node.id, amount="7.00")
     sess = fake_session(result(node), result(), gets=[expense])
     svc = BudgetTreeService(sess)
-    # description set so model passes _at_least_one; amount stays 7
+    # description is set, so the model passes _at_least_one and the amount stays 7
     payload = ExpenseUpdate(description="d2")
     out = await svc.update_expense(expense.id, payload)
     assert out.amount == Decimal("7.00")
@@ -662,70 +657,72 @@ async def test_update_expense_amount_none_skipped() -> None:
 
 
 async def test_update_expense_rebooks_within_same_top_level() -> None:
-    # Kostenstelle einer eigenständigen Buchung umbuchen (#25), aber NUR innerhalb des
-    # selben Top-Budgets: ``budget_id`` + Währung folgen dem neuen Knoten, das fixe HHJ
-    # gehört weiterhin zum Top-Budget (``_resolve_fiscal_year`` ok, #AUD-036).
+    # Move a standalone booking to another cost center (#25), but only inside the same
+    # top-level budget. `budget_id` and the currency follow the new node. The fixed
+    # fiscal year still belongs to the top-level budget (`_resolve_fiscal_year` passes,
+    # #AUD-036).
     top = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     new = _budget(id=uuid.uuid4(), parent_id=top.id, path_key="VS-2", key="2", currency="CHF")
-    fy = _fy(id=uuid.uuid4(), budget_id=top.id)  # HHJ gehört zum Top → kein Orphan
+    fy = _fy(id=uuid.uuid4(), budget_id=top.id)  # fiscal year of the top node, no orphan
     expense = _expense(
         budget_id=uuid.uuid4(), fy_id=fy.id, application_id=None, account_id=None, actor=None,
     )
     sess = fake_session(
-        result(new),   # _get_node(payload.budget_id) im budget_id-Branch
-        result(top),   # _resolve_fiscal_year → _top_level(new)
-        result(fy),    # _resolve_fiscal_year → _get_fiscal_year(expense.fiscal_year_id)
-        result(new),   # _get_node(expense.budget_id) nach commit (Pfad)
-        result(),      # _actor_names (kein actor)
+        result(new),   # _get_node for payload.budget_id in the budget_id branch
+        result(top),   # _resolve_fiscal_year calls _top_level for the new node
+        result(fy),    # _resolve_fiscal_year loads the fiscal year of the expense
+        result(new),   # _get_node for expense.budget_id after the commit (path)
+        result(),      # _actor_names, no actor
         gets=[expense],
     )
     svc = BudgetTreeService(sess)
     out = await svc.update_expense(expense.id, ExpenseUpdate(budgetId=new.id))
     assert out.budget_id == new.id
     assert out.path_key == "VS-2"
-    assert expense.currency == "CHF"          # Währung folgt der neuen Kostenstelle
-    assert expense.fiscal_year_id == fy.id    # HHJ bleibt fix
+    assert expense.currency == "CHF"          # the currency follows the new cost center
+    assert expense.fiscal_year_id == fy.id    # the fiscal year stays fixed
 
 
 async def test_update_expense_rebook_across_top_level_rejected() -> None:
-    # #AUD-036: Umbuchen in eine FREMDE Top-Level-Kostenstelle würde das beibehaltene HHJ
-    # verwaisen (orphan FY, Phantom-Zeile). ``_resolve_fiscal_year`` lehnt mit 422 ab,
-    # bevor ``budget_id``/Währung geschrieben oder committet werden.
+    # #AUD-036: a move into a foreign top-level cost center would orphan the fiscal year
+    # that the booking keeps. That leaves a phantom row. `_resolve_fiscal_year` rejects
+    # with a 422 before it writes budget_id or the currency, and before any commit.
     other_top = _budget(id=uuid.uuid4(), path_key="VV", key="VV")
     new = _budget(id=uuid.uuid4(), parent_id=other_top.id, path_key="VV-2", key="2")
-    fy = _fy(id=uuid.uuid4(), budget_id=uuid.uuid4())  # HHJ eines FREMDEN Top-Budgets
+    fy = _fy(id=uuid.uuid4(), budget_id=uuid.uuid4())  # fiscal year of a foreign top node
     expense = _expense(
         budget_id=uuid.uuid4(), fy_id=fy.id, application_id=None, account_id=None, currency="EUR",
     )
     sess = fake_session(
-        result(new),        # _get_node(payload.budget_id) im budget_id-Branch
-        result(other_top),  # _resolve_fiscal_year → _top_level(new)
-        result(fy),         # _get_fiscal_year → fy.budget_id != other_top.id → 422
+        result(new),        # _get_node for payload.budget_id in the budget_id branch
+        result(other_top),  # _resolve_fiscal_year calls _top_level for the new node
+        result(fy),         # _get_fiscal_year: fy.budget_id != other_top.id gives 422
         gets=[expense],
     )
     svc = BudgetTreeService(sess)
     with pytest.raises(ValidationProblem):
         await svc.update_expense(expense.id, ExpenseUpdate(budgetId=new.id))
-    assert expense.budget_id != new.id   # nicht umgebucht
-    assert expense.currency == "EUR"     # Währung unverändert
-    assert sess.committed == 0           # kein Commit beim Guard-Abbruch
+    assert expense.budget_id != new.id   # not moved
+    assert expense.currency == "EUR"     # currency unchanged
+    assert sess.committed == 0           # the guard abort commits nothing
 
 
 async def test_update_expense_rebook_unknown_budget_404() -> None:
-    # Ziel-Kostenstelle existiert nicht → 404 (kein FK-Crash beim Commit).
+    # The target cost center does not exist. The service raises a 404, so the commit
+    # cannot fail on the foreign key.
     expense = _expense(budget_id=uuid.uuid4(), application_id=None, account_id=None)
-    sess = fake_session(result(), gets=[expense])  # _get_node → None → NotFoundError
+    sess = fake_session(result(), gets=[expense])  # _get_node returns None, so NotFoundError
     svc = BudgetTreeService(sess)
     with pytest.raises(NotFoundError):
         await svc.update_expense(expense.id, ExpenseUpdate(budgetId=uuid.uuid4()))
 
 
 async def test_update_expense_clears_invoice_link_no_mark() -> None:
-    # "invoice_id" gesetzt, aber None → Verknüpfung gelöst, kein Invoice-Lookup/-Flip
-    # (Branch ``payload.invoice_id is not None`` == False).
+    # An "invoice_id" that is present but None clears the link. There is no invoice
+    # lookup and no status flip (branch `payload.invoice_id is not None` is False).
     node = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     expense = _expense(budget_id=node.id, invoice_id=uuid.uuid4())
-    sess = fake_session(result(node), result(), gets=[expense])  # nur get(BudgetExpense)
+    sess = fake_session(result(node), result(), gets=[expense])  # only the expense get
     svc = BudgetTreeService(sess)
     payload = ExpenseUpdate(invoiceId=None)
     out = await svc.update_expense(expense.id, payload)
@@ -735,7 +732,7 @@ async def test_update_expense_clears_invoice_link_no_mark() -> None:
 async def test_update_expense_app_missing_after_commit() -> None:
     node = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     expense = _expense(budget_id=node.id, application_id=uuid.uuid4())
-    # session.get(Application) → None → app_title None branch
+    # The Application get returns None, which takes the app_title None branch.
     sess = fake_session(result(node), result(), gets=[expense, None])
     svc = BudgetTreeService(sess)
     out = await svc.update_expense(expense.id, ExpenseUpdate(description="d"))
@@ -743,16 +740,16 @@ async def test_update_expense_app_missing_after_commit() -> None:
 
 
 async def test_update_expense_account_deleted_concurrently() -> None:
-    # #race: ``account_id`` gesetzt, aber paralleles delete_account (FK SET NULL) → der
-    # Re-Read ``session.get(Account)`` nach Commit liefert None → acc_name None statt 500.
+    # #race: `account_id` is set, but a parallel delete_account (FK SET NULL) removes the
+    # row. The re-read with `session.get(Account)` after the commit returns None. The
+    # result then holds acc_name None instead of a 500.
     node = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     acc = _account(id=uuid.uuid4(), name="Konto")
     expense = _expense(budget_id=node.id, application_id=None, account_id=acc.id, actor=None)
-    # Nur ``description`` im Payload → kein ``_validate_account``-Get. Nach Commit liest
-    # ``session.get(Account)`` die (zwischenzeitlich gelöschte) Zeile → None.
+    # The payload holds only `description`, so there is no `_validate_account` get.
     sess = fake_session(
-        result(node),   # _get_node nach Commit
-        result(),       # _actor_names (kein actor)
+        result(node),   # _get_node after the commit
+        result(),       # _actor_names, no actor
         gets=[expense, None],
     )
     svc = BudgetTreeService(sess)
@@ -767,11 +764,10 @@ async def test_update_expense_not_found() -> None:
         await svc.update_expense(uuid.uuid4(), ExpenseUpdate(description="x"))
 
 
-# --------------------------------------------------------------- list_expenses
 async def test_list_expenses_compat_delegates() -> None:
     node = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     e = _expense(budget_id=node.id, actor="u-1")
-    # list_expenses_paged: _get_node, count(scalar via execute), rows, _actor_names
+    # list_expenses_paged: the node, the count through execute, the rows, then _actor_names
     sess = fake_session(
         result(node),
         result(3),                                          # count
@@ -788,7 +784,7 @@ async def test_list_expenses_compat_delegates() -> None:
 
 
 async def test_list_expenses_paged_no_filters_empty() -> None:
-    # budget_id None → kein _get_node; total None → 0; keine Zeilen.
+    # A budget_id of None skips _get_node. A total of None becomes 0. No rows come back.
     sess = fake_session(result(None), result())  # count None, rows empty
     svc = BudgetTreeService(sess)
     page = await svc.list_expenses_paged()
@@ -799,11 +795,11 @@ async def test_list_expenses_paged_no_filters_empty() -> None:
 async def test_list_expenses_paged_all_filters_and_search() -> None:
     node = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     e = _expense(budget_id=node.id, actor=None)
-    # _get_node, count, rows, _actor_names(none since actor None → empty set → {} )
+    # The node, the count and the rows. _actor_names gets an empty set and returns {}.
     sess = _pg_session(
         result(node),
         result(1),
-        result((e, "VS", None, None, None)),  # data None → title None branch
+        result((e, "VS", None, None, None)),  # data None takes the title None branch
     )
     svc = BudgetTreeService(sess)
     page = await svc.list_expenses_paged(
@@ -817,8 +813,8 @@ async def test_list_expenses_paged_all_filters_and_search() -> None:
 
 
 async def test_list_expenses_paged_exact_id_filter() -> None:
-    # expense_id gesetzt → Exakt-Filter-Branch (Deeplink Konten → Buchungen,
-    # #expenses-ux2); budget_id None → kein _get_node.
+    # An expense_id takes the exact-filter branch. It serves the deeplink from accounts
+    # to bookings (#expenses-ux2). A budget_id of None skips _get_node.
     e = _expense(actor=None)
     sess = fake_session(result(1), result((e, "VS", None, None, None)))
     svc = BudgetTreeService(sess)
@@ -828,7 +824,8 @@ async def test_list_expenses_paged_exact_id_filter() -> None:
 
 
 async def test_list_expenses_paged_blank_query_no_rank() -> None:
-    # q whitespace only → kein Trigram-Pfad (rank_expr None), sort='amount', order desc.
+    # A q of only whitespace skips the trigram path (rank_expr None), with sort by amount
+    # and order desc.
     node = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     e = _expense(budget_id=node.id, actor="u-9")
     sess = fake_session(
@@ -837,19 +834,18 @@ async def test_list_expenses_paged_blank_query_no_rank() -> None:
     svc = BudgetTreeService(sess)
     page = await svc.list_expenses_paged(budget_id=node.id, q="   ", sort="amount",
                                          order="desc")
-    assert page.total == 0   # total None? no, 0 → Page total 0
+    assert page.total == 0
     assert len(page.items) == 1
 
 
 async def test_list_expenses_paged_sort_payment_date_default_order() -> None:
-    # sort='paymentDate' → nulls_last branch; order None → desc default.
+    # A sort of 'paymentDate' takes the nulls_last branch. An order of None defaults to desc.
     sess = fake_session(result(0), result())
     svc = BudgetTreeService(sess)
     page = await svc.list_expenses_paged(sort="paymentDate")
     assert page.total == 0
 
 
-# --------------------------------------------------------------- delete_expense
 async def test_delete_expense_simple() -> None:
     e = _expense(transfer_id=None)
     sess = fake_session(result(e))
@@ -870,7 +866,6 @@ async def test_delete_expense_transfer_pair() -> None:
     assert sess.deleted == [pair_a, pair_b]
 
 
-# --------------------------------------------------------------- accounts
 async def test_list_accounts() -> None:
     a1, a2 = _account(name="A"), _account(name="B")
     sess = fake_session(result(a1, a2))
@@ -881,7 +876,7 @@ async def test_list_accounts() -> None:
 
 
 async def test_list_account_options() -> None:
-    # Zeilenform jetzt (Account, has_credential, last_sync_at) je Bucher (#fints-percred).
+    # The row shape is now (Account, has_credential, last_sync_at) (#fints-percred).
     a1 = _account(name="Aktiv")
     sess = fake_session(result((a1, True, None)))
     svc = BudgetTreeService(sess, actor="tester")
@@ -929,14 +924,13 @@ async def test_delete_account_not_found() -> None:
         await svc.delete_account(uuid.uuid4())
 
 
-# --------------------------------------------------------------- invoices
 async def test_list_invoices_compat() -> None:
     inv = _invoice(file_key="invoices/x/a.pdf", file_name="a.pdf")
     sess = fake_session(result(0), result(inv))  # count, rows
     svc = BudgetTreeService(sess)
     out = await svc.list_invoices()
     assert len(out) == 1
-    assert out[0].has_file is True   # file_object_key set
+    assert out[0].has_file is True   # file_object_key is set
 
 
 async def test_list_invoices_paged_all_filters_and_search() -> None:
@@ -953,7 +947,7 @@ async def test_list_invoices_paged_all_filters_and_search() -> None:
 
 
 async def test_list_invoices_paged_no_search_blank_q() -> None:
-    sess = fake_session(result(None), result())  # count None → 0, no rows
+    sess = fake_session(result(None), result())  # a count of None becomes 0, no rows
     svc = BudgetTreeService(sess)
     page = await svc.list_invoices_paged(q="")
     assert page.total == 0
@@ -981,7 +975,7 @@ async def test_create_invoice_without_file() -> None:
         InvoiceCreate(number="R-2", grossAmount=Decimal("50.00")), actor="u"
     )
     assert out.number == "R-2"
-    # create_invoice flusht für die id (+ audit_record flusht); commit genau einmal.
+    # create_invoice flushes for the id, and audit_record flushes too. It commits once.
     assert sess.flushed >= 1 and sess.committed == 1
 
 
@@ -1026,8 +1020,9 @@ async def test_update_invoice_all_fields() -> None:
 
 
 async def test_update_invoice_gross_and_status_none_skipped() -> None:
-    # gross_amount/status NICHT in fields → ``in fields``-Kurzschluss False; nur ``note``
-    # gesetzt → ``supplier``-Branch (1413) auf der False-Seite (kein Wert geschrieben).
+    # gross_amount and status are not in fields, so the `in fields` test short-circuits
+    # to False. Only `note` is set, so the `supplier` branch (1413) takes the False side
+    # and writes no value.
     inv = _invoice(gross="119.00")
     sess = fake_session(gets=[inv])
     svc = BudgetTreeService(sess)
@@ -1037,7 +1032,8 @@ async def test_update_invoice_gross_and_status_none_skipped() -> None:
 
 
 async def test_update_invoice_gross_and_status_explicit_none() -> None:
-    # gross_amount/status explizit None → ``... and payload.X is not None`` False-Seite.
+    # An explicit None for gross_amount and status takes the False side of
+    # `... and payload.X is not None`.
     inv = _invoice(gross="119.00")
     sess = fake_session(gets=[inv])
     svc = BudgetTreeService(sess)
@@ -1045,7 +1041,7 @@ async def test_update_invoice_gross_and_status_explicit_none() -> None:
         inv.id, InvoiceUpdate(supplier="S", grossAmount=None, status=None)
     )
     assert out.supplier == "S"
-    assert out.gross_amount == Decimal("119.00")  # unverändert
+    assert out.gross_amount == Decimal("119.00")  # unchanged
     assert out.status == "open"
 
 
@@ -1098,7 +1094,7 @@ async def test_delete_invoice_storage_remove_error_is_swallowed() -> None:
 
 
 async def test_delete_invoice_with_file_but_no_storage() -> None:
-    # storage None → kein remove-Versuch (Branch storage is not None == False).
+    # A storage of None means no remove attempt (branch storage is not None is False).
     inv = _invoice(file_key="invoices/x/a.pdf")
     sess = fake_session(gets=[inv])
     svc = BudgetTreeService(sess, storage=None)
@@ -1113,9 +1109,8 @@ async def test_delete_invoice_not_found() -> None:
         await svc.delete_invoice(uuid.uuid4())
 
 
-# --------------------------------------------------- _invoice_number_exists
 async def test_invoice_number_exists_true() -> None:
-    sess = fake_session(result(uuid.uuid4()))  # scalars → first not None
+    sess = fake_session(result(uuid.uuid4()))  # scalars gives a first that is not None
     svc = BudgetTreeService(sess)
     assert await svc._invoice_number_exists("R-1") is True
 
@@ -1131,7 +1126,6 @@ async def test_invoice_number_exists_none() -> None:
     assert await svc._invoice_number_exists(None) is False
 
 
-# --------------------------------------------------- invoice_file_bytes
 async def test_invoice_file_bytes_ok() -> None:
     inv = _invoice(file_key="invoices/x/a.pdf", file_name="a.pdf", file_mime="application/pdf")
     sess = fake_session(gets=[inv])
@@ -1200,7 +1194,6 @@ async def test_invoice_file_bytes_storage_error() -> None:
         await svc.invoice_file_bytes(inv.id)
 
 
-# ----------------------------------------------------- _validate_scan_store
 def _ok_storage(store: list[Any] | None = None) -> Any:
     class _Storage:
         async def put(self, key: str, data: bytes, mime: str) -> None:
@@ -1255,9 +1248,8 @@ async def test_validate_scan_store_not_pdf(monkeypatch: pytest.MonkeyPatch) -> N
         await svc._validate_scan_store(b"data", filename="x.png")
 
 
-# --------------------------------------------------------- _scan_or_raise
 async def test_scan_skipped_when_no_scanner_dev() -> None:
-    # build_scanner None + environment != production → skip (no raise).
+    # A build_scanner of None outside production skips the scan and raises nothing.
     svc = BudgetTreeService(fake_session(), settings=_settings(environment="development"))
     await svc._scan_or_raise(b"data")  # no exception
 
@@ -1275,7 +1267,7 @@ async def test_scan_clean(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(invoices_mod, "build_scanner", lambda s: _Scanner())
     svc = BudgetTreeService(fake_session(), settings=_settings())
-    await svc._scan_or_raise(b"data")  # clean → no raise
+    await svc._scan_or_raise(b"data")  # a clean verdict raises nothing
 
 
 async def test_scan_error_raises(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1311,7 +1303,6 @@ async def test_scan_infected_unknown_signature(monkeypatch: pytest.MonkeyPatch) 
         await svc._scan_or_raise(b"data")
 
 
-# --------------------------------------------------------- _store_invoice_file
 async def test_store_invoice_file_no_storage() -> None:
     svc = BudgetTreeService(fake_session(), storage=None, settings=_settings())
     with pytest.raises(ServiceUnavailableError):
@@ -1333,7 +1324,6 @@ async def test_store_invoice_file_put_error() -> None:
         await svc._store_invoice_file(b"x", "application/pdf", "a.pdf")
 
 
-# --------------------------------------------------------- parse_invoice_file
 async def test_parse_invoice_file_ok(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(invoices_mod, "validate_upload", lambda fn, data: "application/pdf")
     monkeypatch.setattr(invoices_mod, "sanitize_filename", lambda fn: "safe.pdf")
@@ -1343,7 +1333,7 @@ async def test_parse_invoice_file_ok(monkeypatch: pytest.MonkeyPatch) -> None:
         gross_amount=Decimal("119"), currency="EUR",
     )
     monkeypatch.setattr(invoices_mod, "parse_zugferd_pdf", lambda data: parsed)
-    # _invoice_number_exists → existing scalars empty (no dup)
+    # _invoice_number_exists finds no rows, so there is no duplicate.
     sess = fake_session(result())
     svc = BudgetTreeService(sess, storage=_ok_storage(), settings=_settings())
     res = await svc.parse_invoice_file(b"%PDF-1.4", filename="r.pdf")
@@ -1361,7 +1351,7 @@ async def test_parse_invoice_file_duplicate(monkeypatch: pytest.MonkeyPatch) -> 
         net_amount=None, tax_amount=None, gross_amount=Decimal("5"), currency="EUR",
     )
     monkeypatch.setattr(invoices_mod, "parse_zugferd_pdf", lambda data: parsed)
-    sess = fake_session(result(uuid.uuid4()))  # dup found
+    sess = fake_session(result(uuid.uuid4()))  # a duplicate exists
     svc = BudgetTreeService(sess, storage=_ok_storage(), settings=_settings())
     res = await svc.parse_invoice_file(b"%PDF-1.4", filename="r.pdf")
     assert res.duplicate is True
@@ -1397,15 +1387,13 @@ async def test_parse_invoice_file_not_pdf(monkeypatch: pytest.MonkeyPatch) -> No
         await svc.parse_invoice_file(b"data", filename="r.png")
 
 
-# --------------------------------------------------------------- transfer
 async def test_create_transfer_ok() -> None:
     top = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     src = _budget(id=uuid.uuid4(), parent_id=top.id, path_key="VS-1", key="1", currency="EUR")
     dst = _budget(id=uuid.uuid4(), parent_id=top.id, path_key="VS-2", key="2", currency="EUR")
     fy = _fy(id=uuid.uuid4(), budget_id=top.id)
-    # _get_node(src), _get_node(dst),
-    # _resolve_fy(src): _top_level(src)→top, _get_fiscal_year(fy)
-    # _resolve_fy(dst): _top_level(dst)→top, _get_fiscal_year(fy)
+    # Queue: the source node, the destination node, then for each side _top_level and
+    # _get_fiscal_year.
     sess = fake_session(
         result(src), result(dst),
         result(top), result(fy),
@@ -1431,19 +1419,15 @@ async def test_create_transfer_fy_mismatch() -> None:
     dst = _budget(id=uuid.uuid4(), path_key="VV", key="VV")
     fy1 = _fy(id=uuid.uuid4(), budget_id=top1.id)
     fy2 = _fy(id=uuid.uuid4(), budget_id=top2.id)
-    # src resolves to fy1 (explicit, belongs to top1); dst explicit fy must belong to top2.
-    # We pass fiscalYearId for both = a value; resolve returns differing ids → mismatch.
-    # To force fy_src != fy_dst, give each _resolve a different explicit fy.
-    # src: _top_level(src)=top1, _get_fiscal_year(fy1)
-    # dst: _top_level(dst)=top2, _get_fiscal_year(fy2) but fy2.budget != top2? must match top.
-    # Easier: make both explicit but return different fy ids — both must pass top-check.
+    # Each side resolves to its own fiscal year: the source to fy1 and the destination to
+    # fy2. Both pass the top-level check, so only the mismatch guard can reject.
     sess = fake_session(
         result(src), result(dst),
         result(top1), result(fy1),
         result(top2), result(fy2),
     )
     svc = BudgetTreeService(sess)
-    # payload fiscal_year_id is fy1.id but resolve uses _get_fiscal_year queue → returns fy1/fy2
+    # The payload names fy1, but the resolver reads the queue and returns fy1 and fy2.
     with pytest.raises(ValidationProblem):
         await svc.create_transfer(
             TransferCreate(
@@ -1454,7 +1438,6 @@ async def test_create_transfer_fy_mismatch() -> None:
         )
 
 
-# --------------------------------------------------------------- _actor_names
 async def test_actor_names_empty_set() -> None:
     svc = BudgetTreeService(fake_session())
     assert await svc._actor_names(set()) == {}
@@ -1471,17 +1454,19 @@ async def test_actor_names_filters_blank_and_resolves() -> None:
 
 
 async def test_actor_names_fallback_to_sub() -> None:
-    # display_name None + email None → fallback to sub.
+    # A display_name of None and an email of None fall back to the sub.
     sess = fake_session(result(("c", None, None)))
     svc = BudgetTreeService(sess)
     out = await svc._actor_names({"c"})
     assert out == {"c": "c"}
 
 
-# --------------------------------------------------------------- get_tree branches
 async def test_get_tree_accepted_remaining_nonpositive_skipped() -> None:
-    """accepted app, aber Ausgaben ≥ Betrag → remaining ≤ 0 → kein bound_row
-    (Branch 1590->1582)."""
+    """Skip the bound row when an accepted application is spent in full.
+
+    Expenses greater than or equal to the amount leave remaining <= 0 (branch
+    1590->1582).
+    """
     fy_id = uuid.uuid4()
     app_id = uuid.uuid4()
     top = _budget(id=uuid.uuid4(), path_key="VS", key="VS", accepted=["approved"])
@@ -1491,13 +1476,16 @@ async def test_get_tree_accepted_remaining_nonpositive_skipped() -> None:
     sess = fake_session(result(top), result(alloc), result(app_row), result(exp_row))
     svc = BudgetTreeService(sess)
     view = (await svc.get_tree())[0].by_fiscal_year[0]
-    assert view.bound == Decimal("0")        # remaining 0 → nicht gebunden
+    assert view.bound == Decimal("0")        # remaining 0 binds nothing
     assert view.expended == Decimal("100")
 
 
 async def test_get_tree_requested_remaining_nonpositive_skipped() -> None:
-    """in-flight app, Ausgaben ≥ Betrag → remaining ≤ 0 → kein requested_row
-    (Branch 1599->1582)."""
+    """Skip the requested row when an in-flight application is spent in full.
+
+    Expenses greater than or equal to the amount leave remaining <= 0 (branch
+    1599->1582).
+    """
     fy_id = uuid.uuid4()
     app_id = uuid.uuid4()
     top = _budget(id=uuid.uuid4(), path_key="VS", key="VS")  # no accepted/denied
@@ -1524,7 +1512,7 @@ async def test_get_tree_denied_excluded() -> None:
 
 
 async def test_get_tree_with_gremium_scope() -> None:
-    """visible_gremium_ids gesetzt → scope_forest (Zeile 1653-1654)."""
+    """Reach scope_forest with visible_gremium_ids set (lines 1653-1654)."""
     g = uuid.uuid4()
     top = _budget(id=uuid.uuid4(), path_key="VS", key="VS", view_gremium_id=g)
     sess = fake_session(result(top), result(), result(), result())
@@ -1542,9 +1530,8 @@ async def test_get_tree_gremium_scope_no_match_empty() -> None:
     assert tree == []
 
 
-# --------------------------------------------------------------- audit actor
 async def test_audit_uses_actor() -> None:
-    # actor gesetzt → _audit ruft audit_record mit dem sub (Konstruktor-Zweig actor).
+    # With an actor set, _audit calls audit_record with the sub (constructor actor branch).
     node = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     sess = fake_session(result(node), result(), result())  # node, no child, no alloc
     svc = BudgetTreeService(sess, actor="admin-sub")
@@ -1552,13 +1539,11 @@ async def test_audit_uses_actor() -> None:
     assert sess.committed == 1
 
 
-# --------------------------------------------------------------------------- #
-# Audit-Log-Revert (#config-versioning): revert_audit + Helfer (DB-los)
-# --------------------------------------------------------------------------- #
+# Audit log revert (#config-versioning): revert_audit and its helpers, without a DB.
 def _entry(
     action: AuditAction, target_id: Any, data: dict | None = None, *, eid: int = 1
 ) -> AuditEntry:
-    """Minimaler Audit-Eintrag (revert_audit liest nur action/target_id/data/id)."""
+    """Build a minimal audit entry: revert_audit reads only action, target_id, data, id."""
     return cast(
         AuditEntry,
         SimpleNamespace(id=eid, action=action, target_id=str(target_id), data=data or {}),
@@ -1566,7 +1551,7 @@ def _entry(
 
 
 class _AsyncStub:
-    """Async-Aufrufrekorder zum Monkeypatchen wiederverwendeter Mutatoren."""
+    """Record async calls, so a test can monkeypatch a reused mutator."""
 
     def __init__(self) -> None:
         self.calls: list[tuple[tuple[Any, ...], dict[str, Any]]] = []
@@ -1575,7 +1560,6 @@ class _AsyncStub:
         self.calls.append((args, kwargs))
 
 
-# --- Buchung (budget_expense_create) -------------------------------------- #
 async def test_revert_expense_create_already_reverted() -> None:
     svc = BudgetTreeService(fake_session(gets=[None]), actor="admin")
     with pytest.raises(ConflictError) as ei:
@@ -1604,7 +1588,7 @@ async def test_revert_expense_create_reopens_paid_invoice() -> None:
 
 async def test_revert_expense_create_invoice_missing_skips_reopen() -> None:
     exp = _expense(id=uuid.uuid4(), invoice_id=uuid.uuid4())
-    sess = fake_session(gets=[exp, None])  # Rechnung nicht (mehr) vorhanden
+    sess = fake_session(gets=[exp, None])  # the invoice is gone
     svc = BudgetTreeService(sess, actor="admin")
     await svc.revert_audit(_entry(AuditAction.BUDGET_EXPENSE_CREATE, exp.id), "admin")
     assert exp in sess.deleted
@@ -1619,26 +1603,24 @@ async def test_revert_expense_create_invoice_not_paid_unchanged() -> None:
     assert inv.status == "open" and exp in sess.deleted
 
 
-# --- Umbuchung (budget_transfer_create) ----------------------------------- #
 async def test_revert_transfer_create_deletes_both_rows() -> None:
     tid = uuid.uuid4()
     r1 = _expense(transfer_id=tid)
     r2 = _expense(transfer_id=tid)
-    sess = fake_session(result(r1, r2))  # select … where transfer_id → scalars().all()
+    sess = fake_session(result(r1, r2))  # the select on transfer_id feeds scalars().all()
     svc = BudgetTreeService(sess, actor="admin")
     await svc.revert_audit(_entry(AuditAction.BUDGET_TRANSFER_CREATE, tid), "admin")
     assert r1 in sess.deleted and r2 in sess.deleted and sess.committed == 1
 
 
 async def test_revert_transfer_create_already_reverted() -> None:
-    sess = fake_session(result())  # keine Zeilen mehr
+    sess = fake_session(result())  # no rows left
     svc = BudgetTreeService(sess, actor="admin")
     with pytest.raises(ConflictError) as ei:
         await svc.revert_audit(_entry(AuditAction.BUDGET_TRANSFER_CREATE, uuid.uuid4()), "admin")
     assert ei.value.code == "already_reverted"
 
 
-# --- Kostenstelle anlegen (budget_node_create) ---------------------------- #
 async def test_revert_node_create_already_reverted() -> None:
     svc = BudgetTreeService(fake_session(gets=[None]), actor="admin")
     with pytest.raises(ConflictError) as ei:
@@ -1655,7 +1637,6 @@ async def test_revert_node_create_delegates_to_delete_node() -> None:
     assert stub.calls and stub.calls[0][0][0] == node.id
 
 
-# --- Kostenstelle ändern (budget_node_update) ----------------------------- #
 async def test_revert_node_update_not_revertable_without_before() -> None:
     svc = BudgetTreeService(fake_session(), actor="admin")
     with pytest.raises(ConflictError) as ei:
@@ -1689,7 +1670,7 @@ async def test_revert_node_update_restores_via_update_node() -> None:
     svc = BudgetTreeService(fake_session(gets=[node]), actor="admin")
     stub = _AsyncStub()
     svc.update_node = stub  # type: ignore[method-assign]
-    data = {"before": {"name": "Alt"}, "after": {"name": "Neu"}}  # nicht stale
+    data = {"before": {"name": "Alt"}, "after": {"name": "Neu"}}  # not stale
     await svc.revert_audit(_entry(AuditAction.BUDGET_NODE_UPDATE, node.id, data), "admin")
     assert stub.calls and stub.calls[0][0][1].name == "Alt"
 
@@ -1699,12 +1680,11 @@ async def test_revert_node_update_no_after_is_best_effort() -> None:
     svc = BudgetTreeService(fake_session(gets=[node]), actor="admin")
     stub = _AsyncStub()
     svc.update_node = stub  # type: ignore[method-assign]
-    data = {"before": {"name": "Alt"}}  # kein after → kein Stale-Check
+    data = {"before": {"name": "Alt"}}  # no after, so no stale check
     await svc.revert_audit(_entry(AuditAction.BUDGET_NODE_UPDATE, node.id, data), "admin")
     assert stub.calls
 
 
-# --- Zuteilung (budget_allocation_set) ------------------------------------ #
 async def test_revert_allocation_not_revertable_without_fy() -> None:
     svc = BudgetTreeService(fake_session(), actor="admin")
     with pytest.raises(ConflictError) as ei:
@@ -1717,7 +1697,7 @@ async def test_revert_allocation_not_revertable_without_fy() -> None:
 
 async def test_revert_allocation_stale_when_row_missing() -> None:
     bid, fy = uuid.uuid4(), uuid.uuid4()
-    svc = BudgetTreeService(fake_session(result()), actor="admin")  # _allocation → None
+    svc = BudgetTreeService(fake_session(result()), actor="admin")  # _allocation gives None
     data = {"fiscalYearId": str(fy), "allocated": "100"}
     with pytest.raises(ConflictError) as ei:
         await svc.revert_audit(_entry(AuditAction.BUDGET_ALLOCATION_SET, bid, data), "admin")
@@ -1728,7 +1708,7 @@ async def test_revert_allocation_stale_when_set_value_absent() -> None:
     bid, fy = uuid.uuid4(), uuid.uuid4()
     alloc = _alloc(budget_id=bid, fy_id=fy, allocated="100")
     svc = BudgetTreeService(fake_session(result(alloc)), actor="admin")
-    data = {"fiscalYearId": str(fy)}  # kein allocated → set_value None → stale
+    data = {"fiscalYearId": str(fy)}  # no allocated, so set_value None and stale
     with pytest.raises(ConflictError) as ei:
         await svc.revert_audit(_entry(AuditAction.BUDGET_ALLOCATION_SET, bid, data), "admin")
     assert ei.value.code == "stale_revert"
@@ -1738,7 +1718,7 @@ async def test_revert_allocation_stale_when_value_changed() -> None:
     bid, fy = uuid.uuid4(), uuid.uuid4()
     alloc = _alloc(budget_id=bid, fy_id=fy, allocated="200")
     svc = BudgetTreeService(fake_session(result(alloc)), actor="admin")
-    data = {"fiscalYearId": str(fy), "allocated": "100"}  # cur 200 ≠ 100 → stale
+    data = {"fiscalYearId": str(fy), "allocated": "100"}  # current 200 != 100, so stale
     with pytest.raises(ConflictError) as ei:
         await svc.revert_audit(_entry(AuditAction.BUDGET_ALLOCATION_SET, bid, data), "admin")
     assert ei.value.code == "stale_revert"
@@ -1765,7 +1745,6 @@ async def test_revert_allocation_restores_previous_via_set_allocation() -> None:
     assert stub.calls and stub.calls[0][0][2].allocated == Decimal("50")
 
 
-# --- Buchung ändern (budget_expense_update) ------------------------------- #
 async def test_revert_expense_update_not_revertable_without_before() -> None:
     svc = BudgetTreeService(fake_session(), actor="admin")
     with pytest.raises(ConflictError) as ei:
@@ -1790,14 +1769,14 @@ async def test_revert_expense_update_already_reverted() -> None:
 async def test_revert_expense_update_stale_when_amount_changed() -> None:
     exp = _expense(id=uuid.uuid4(), amount="90.00")
     svc = BudgetTreeService(fake_session(gets=[exp]), actor="admin")
-    data = {"before": {"amount": "50"}, "after": {"amount": "70"}}  # 90 ≠ 70 → stale
+    data = {"before": {"amount": "50"}, "after": {"amount": "70"}}  # 90 != 70, so stale
     with pytest.raises(ConflictError) as ei:
         await svc.revert_audit(_entry(AuditAction.BUDGET_EXPENSE_UPDATE, exp.id, data), "admin")
     assert ei.value.code == "stale_revert"
 
 
 async def test_revert_expense_update_restores_decimal_tolerant() -> None:
-    # after "70" vs current "70.00": wertgleich (DB-Skalierung) → nicht stale.
+    # The after value "70" equals the current "70.00" in value (DB scale), so not stale.
     exp = _expense(id=uuid.uuid4(), amount="70.00")
     svc = BudgetTreeService(fake_session(gets=[exp]), actor="admin")
     stub = _AsyncStub()
@@ -1812,12 +1791,11 @@ async def test_revert_expense_update_no_after_is_best_effort() -> None:
     svc = BudgetTreeService(fake_session(gets=[exp]), actor="admin")
     stub = _AsyncStub()
     svc.update_expense = stub  # type: ignore[method-assign]
-    data = {"before": {"amount": "50"}}  # kein after
+    data = {"before": {"amount": "50"}}  # no after
     await svc.revert_audit(_entry(AuditAction.BUDGET_EXPENSE_UPDATE, exp.id, data), "admin")
     assert stub.calls
 
 
-# ----------------------------------------------------- sub-bookings (#subbookings)
 def test_subbooking_description() -> None:
     assert subbookings_mod._subbooking_description("Miete", "ACME") == "Miete"
     assert subbookings_mod._subbooking_description("  ", "ACME") == "ACME"
@@ -1829,7 +1807,7 @@ async def test_list_sub_expenses_ok() -> None:
     child = _expense(id=uuid.uuid4(), actor="u-1")
     child.parent_expense_id = parent.id
     sess = fake_session(
-        result((child, "VS-1", "Konto")),   # Kinder join Budget/Account
+        result((child, "VS-1", "Konto")),   # children joined with Budget and Account
         result(("u-1", "Bob", None)),        # _actor_names
         gets=[parent],
     )
@@ -1858,19 +1836,19 @@ async def test_import_sub_bookings_ok(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(subbookings_mod, "parse_statement_full",
                         lambda data, *, filename=None: (lines, None))
     sess = fake_session(
-        result(),                       # existing children (Dedup) — keine
-        result(Decimal("50.00")),       # _recompute_parent_amount → Σ
-        result(node),                   # _get_node nach commit
+        result(),                       # existing children for the dedup, none
+        result(Decimal("50.00")),       # _recompute_parent_amount sum
+        result(node),                   # _get_node after the commit
         result(("u-1", "Bob", None)),   # _actor_names
-        gets=[parent, parent],          # import-get + recompute-get
+        gets=[parent, parent],          # the import get and the recompute get
     )
     svc = BudgetTreeService(sess)
     out = await svc.import_sub_bookings(parent.id, b"data", filename="x.sta", actor="u-1")
     assert len(out) == 2
     assert all(c.parent_expense_id == parent.id for c in out)
-    assert out[0].amount == Decimal("30.00")   # abs(Betrag)
+    assert out[0].amount == Decimal("30.00")   # absolute amount
     assert out[0].description == "Miete"
-    assert parent.amount == Decimal("50.00")   # Eltern = Σ Kinder
+    assert parent.amount == Decimal("50.00")   # the parent holds the sum of the children
     added_children = [o for o in sess.added if getattr(o, "parent_expense_id", None) == parent.id]
     assert len(added_children) == 2
 
@@ -1888,7 +1866,7 @@ async def test_create_sub_booking_inherits_parent() -> None:
         result(Decimal("12.00")),   # _recompute_parent_amount
         result(node),               # _get_node
         result(),                   # _actor_names
-        gets=[parent, parent],      # _subbooking_parent_or_error + recompute get
+        gets=[parent, parent],      # _subbooking_parent_or_error and the recompute get
     )
     svc = BudgetTreeService(sess)
     out = await svc.create_sub_booking(
@@ -1897,7 +1875,7 @@ async def test_create_sub_booking_inherits_parent() -> None:
     assert out.parent_expense_id == parent.id
     assert out.amount == Decimal("12.00")
     assert out.description == "Teil"
-    assert parent.amount == Decimal("12.00")   # Eltern = Σ Kinder
+    assert parent.amount == Decimal("12.00")   # the parent holds the sum of the children
 
 
 async def test_create_sub_booking_on_transfer_rejected() -> None:
@@ -1927,7 +1905,7 @@ async def test_import_sub_bookings_too_large() -> None:
 
 
 async def test_import_sub_bookings_transfer_rejected() -> None:
-    """Eine Übertrags-Buchung darf NICHT in Unterbuchungen aufgeteilt werden (#review)."""
+    """Reject a split of a transfer booking into sub-bookings (#review)."""
     parent = _expense(id=uuid.uuid4(), transfer_id=uuid.uuid4())
     svc = BudgetTreeService(fake_session(gets=[parent]))
     with pytest.raises(ValidationProblem):
@@ -1950,18 +1928,18 @@ async def test_import_sub_bookings_foreign_currency_rejected(
 async def test_import_sub_bookings_skips_dupe_zero_and_wrong_direction(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Idempotenz + 0-Betrag + Gegenrichtung werden übersprungen (#review)."""
+    """Skip duplicates, zero amounts and lines in the opposite direction (#review)."""
     node = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     parent = _expense(id=uuid.uuid4(), budget_id=node.id, kind="expense", amount="30.00")
-    dupe = _expense(amount="30.00")  # bereits vorhandenes Kind (gleicher Schlüssel)
+    dupe = _expense(amount="30.00")  # a child that already exists with the same key
     dupe.payment_date = date(2026, 2, 1)
     dupe.description = "Miete"
     dupe.reference_number = None
     lines = [
-        # Dublette (gleicher Schlüssel wie dupe) → übersprungen
+        # a duplicate with the same key as dupe, so the import skips it
         StatementLine(amount=Decimal("-30.00"), purpose="Miete", value_date=date(2026, 2, 1)),
         StatementLine(amount=Decimal("0.00"), purpose="Null", value_date=date(2026, 2, 2)),  # 0
-        # Gutschrift (income) unter Ausgabe-Eltern → übersprungen
+        # a credit (income) under an expense parent, so the import skips it
         StatementLine(amount=Decimal("5.00"), purpose="Gutschrift", value_date=date(2026, 2, 3)),
         StatementLine(amount=Decimal("-12.00"), purpose="Neu", value_date=date(2026, 2, 4)),  # ok
     ]
@@ -1969,7 +1947,7 @@ async def test_import_sub_bookings_skips_dupe_zero_and_wrong_direction(
         subbookings_mod, "parse_statement_full", lambda d, *, filename=None: (lines, None)
     )
     sess = fake_session(
-        result(dupe),                # existing children (Dedup)
+        result(dupe),                # existing children for the dedup
         result(Decimal("42.00")),    # _recompute
         result(node),                # _get_node
         result(),                    # _actor_names
@@ -1977,7 +1955,7 @@ async def test_import_sub_bookings_skips_dupe_zero_and_wrong_direction(
     )
     svc = BudgetTreeService(sess)
     out = await svc.import_sub_bookings(parent.id, b"d", filename=None, actor="u")
-    assert len(out) == 1  # nur "Neu" (dupe/0/Gegenrichtung übersprungen)
+    assert len(out) == 1  # only "Neu": the duplicate, the 0 and the credit drop out
     assert out[0].description == "Neu"
     assert out[0].amount == Decimal("12.00")
 
@@ -1999,9 +1977,9 @@ async def test_delete_expense_child_recomputes_parent() -> None:
     child = _expense(id=uuid.uuid4(), amount="20.00")
     child.parent_expense_id = parent.id
     sess = fake_session(
-        result(child),               # select Buchung zum Löschen
-        result(Decimal("30.00")),    # _recompute Σ verbleibender Kinder
-        gets=[parent],               # _recompute get(parent)
+        result(child),               # select the booking to delete
+        result(Decimal("30.00")),    # _recompute sums the remaining children
+        gets=[parent],               # the parent for _recompute
     )
     svc = BudgetTreeService(sess)
     await svc.delete_expense(child.id)
@@ -2010,14 +1988,18 @@ async def test_delete_expense_child_recomputes_parent() -> None:
 
 
 async def test_delete_expense_child_parent_vanished_no_update() -> None:
-    """Σ der Kinder > 0, aber die Eltern-Buchung ist per ``get`` nicht mehr ladbar
-    (paralleles Löschen) → kein Betrags-Update, kein Fehler (#subbookings)."""
+    """Stay quiet when the parent booking disappears during a delete.
+
+    The sum of the children is greater than 0, but `get` no longer loads the parent
+    booking after a parallel delete. The service writes no amount and raises no error
+    (#subbookings).
+    """
     child = _expense(id=uuid.uuid4(), amount="20.00")
     child.parent_expense_id = uuid.uuid4()
     sess = fake_session(
-        result(child),               # select Buchung zum Löschen
-        result(Decimal("30.00")),    # _recompute Σ verbleibender Kinder > 0
-        gets=[],                     # get(parent) → None (Eltern weg)
+        result(child),               # select the booking to delete
+        result(Decimal("30.00")),    # _recompute sums the remaining children, above 0
+        gets=[],                     # the parent get returns None, the parent is gone
     )
     svc = BudgetTreeService(sess)
     await svc.delete_expense(child.id)
@@ -2031,17 +2013,17 @@ async def test_delete_last_child_keeps_parent_amount() -> None:
     child.parent_expense_id = parent.id
     sess = fake_session(
         result(child),        # select
-        result(Decimal("0")),  # Σ = 0 → unverändert lassen
+        result(Decimal("0")),  # a sum of 0 keeps the amount
         gets=[parent],
     )
     svc = BudgetTreeService(sess)
     await svc.delete_expense(child.id)
-    assert parent.amount == Decimal("50.00")   # keine Kinder mehr → unverändert
+    assert parent.amount == Decimal("50.00")   # no children left, so unchanged
 
 
 async def test_update_expense_amount_readonly_on_parent() -> None:
     parent = _expense(id=uuid.uuid4(), amount="50.00")
-    sess = fake_session(result((parent.id, 2)), gets=[parent])  # _child_counts → 2 Kinder
+    sess = fake_session(result((parent.id, 2)), gets=[parent])  # _child_counts finds 2
     svc = BudgetTreeService(sess)
     with pytest.raises(ValidationProblem):
         await svc.update_expense(parent.id, ExpenseUpdate(amount=Decimal("99.00")))
@@ -2061,10 +2043,10 @@ async def test_update_expense_child_amount_recomputes_parent() -> None:
     child = _expense(id=uuid.uuid4(), budget_id=node.id, amount="20.00")
     child.parent_expense_id = parent.id
     sess = fake_session(
-        result(),                   # _child_counts (Kind hat selbst keine Kinder)
-        result(Decimal("35.00")),   # _recompute Eltern-Σ
-        result(node),               # _get_node nach commit
-        gets=[child, parent],       # update-get + recompute-get
+        result(),                   # _child_counts: the child has no children
+        result(Decimal("35.00")),   # _recompute sums for the parent
+        result(node),               # _get_node after the commit
+        gets=[child, parent],       # the update get and the recompute get
     )
     svc = BudgetTreeService(sess)
     out = await svc.update_expense(child.id, ExpenseUpdate(amount=Decimal("35.00")))

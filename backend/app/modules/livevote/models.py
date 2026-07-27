@@ -1,8 +1,8 @@
-"""Meeting table — a committee session that live-votes bind to.
+"""Meeting table that the live votes bind to.
 
-:class:`Meeting` — one committee session; ``status`` drives the live-vote channel
-(``planned`` → ``live`` → ``closed``), ``active_application_id`` is the application
-currently shown on the beamer.
+`Meeting` is one meeting of a Gremium. `status` drives the live-vote channel
+and runs from `planned` over `live` to `closed`. `active_application_id` is the
+application that the beamer shows now.
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ from app.db import Base, CreatedAtMixin, TimestampMixin, UUIDPkMixin
 
 
 class Meeting(UUIDPkMixin, CreatedAtMixin, Base):
-    """Committee session; anchor of the live-vote channel ``meeting:{id}``."""
+    """A meeting of a Gremium and anchor of the live-vote channel `meeting:{id}`."""
 
     __tablename__ = "meeting"
 
@@ -39,14 +39,14 @@ class Meeting(UUIDPkMixin, CreatedAtMixin, Base):
     )
     title: Mapped[str] = mapped_column(Text)
     date: Mapped[_date | None] = mapped_column(Date, nullable=True)
-    # Planned start time (optional), complements the date.
+    # Planned start time, not the time the meeting really starts.
     start_time: Mapped[_time | None] = mapped_column(Time, nullable=True)
-    # Planned end time (optional); if unset the iCal feed assumes a 1h default
-    # duration from ``start_time``. When set, must be after ``start_time``.
+    # Planned end time. Without it the iCal feed assumes a default duration of
+    # one hour from `start_time`. With it the value must be after `start_time`.
     end_time: Mapped[_time | None] = mapped_column(Time, nullable=True)
     status: Mapped[str] = mapped_column(Text, server_default="planned")
-    # Set automatically on the transition to ``closed`` (terminal); provides the
-    # end line of the protocol title page.
+    # The transition to `closed`, which is terminal, sets this automatically. It
+    # gives the end line on the title page of the protocol.
     closed_at: Mapped[_datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
@@ -54,8 +54,8 @@ class Meeting(UUIDPkMixin, CreatedAtMixin, Base):
         ForeignKey("application.id", ondelete="SET NULL"), nullable=True
     )
     created_by: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # The single protokollant assigned per meeting; leads the live session and
-    # writes the protocol. SET NULL if the principal is deleted.
+    # The one Protokollant of the meeting. This person leads the live session
+    # and writes the protocol. A deleted principal sets the column to NULL.
     protokollant_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("principal.id", ondelete="SET NULL"), nullable=True
     )
@@ -69,11 +69,12 @@ class Meeting(UUIDPkMixin, CreatedAtMixin, Base):
 
 
 class MeetingAttendance(UUIDPkMixin, TimestampMixin, Base):
-    """Attendance per (meeting, member).
+    """Attendance of one member at one meeting.
 
-    ``status`` = present/excused/absent; ``source`` is who set it (``self`` =
-    member, ``lead`` = session lead). Exactly one row per (meeting, principal),
-    upserted via the unique constraint.
+    `status` is `present`, `excused` or `absent`. `source` says who set the
+    value. `self` is the member and `lead` is the meeting lead. Each pair of
+    meeting and principal has exactly one row. The unique constraint drives the
+    upsert.
     """
 
     __tablename__ = "meeting_attendance"
@@ -99,10 +100,11 @@ class MeetingAttendance(UUIDPkMixin, TimestampMixin, Base):
 
 
 class MeetingAgendaItem(UUIDPkMixin, CreatedAtMixin, Base):
-    """Agenda item (TOP): an application assigned to the meeting.
+    """One agenda item of a meeting, in most cases an application.
 
-    Ordered list (``position``) of applications to handle in the meeting; source
-    of the protocol TOPs and live votes. One row per (meeting, application).
+    `position` orders the applications that the meeting handles. The agenda is
+    the source of the agenda items in the protocol and of the live votes. Each
+    pair of meeting and application has one row.
     """
 
     __tablename__ = "meeting_agenda_item"
@@ -110,17 +112,17 @@ class MeetingAgendaItem(UUIDPkMixin, CreatedAtMixin, Base):
     meeting_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("meeting.id", ondelete="CASCADE")
     )
-    # NULL = free-text TOP (no application); ``title`` then holds the TOP text.
+    # NULL marks a free-text agenda item with no application. The `title` column
+    # then holds the text of the item.
     application_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("application.id", ondelete="CASCADE"), nullable=True
     )
-    # Free-text title of a TOP without an application.
     title: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # Markdown body of this TOP (per-TOP editor); flows into the final protocol.
+    # Markdown body of this agenda item. It flows into the final protocol.
     body: Mapped[str | None] = mapped_column(Text, nullable=True)
     position: Mapped[int] = mapped_column(Integer, server_default="0")
-    # Non-public: replaced by a placeholder in the public protocol PDF; the TOP
-    # numbering is preserved.
+    # A non-public item becomes a placeholder in the public protocol PDF. The
+    # numbering of the agenda items stays the same.
     non_public: Mapped[bool] = mapped_column(Boolean, server_default="false")
 
     __table_args__ = (

@@ -5,31 +5,31 @@ import type { ClientMessage, ServerMessage } from './ws-messages';
 
 /** An open live-vote connection. */
 export interface MeetingChannel {
-  /** Server→client stream (JSON messages). */
+  /** Stream of JSON messages from the server to the client. */
   messages$: Observable<ServerMessage>;
-  /** Send client→server (cast/subscribe). */
+  /** Send a client to server frame, that is `cast` or `subscribe`. */
   send(msg: ClientMessage): void;
   close(): void;
 }
 
 /**
- * WebSocket factory for live-vote channels. Auth via session cookie at the
- * handshake (same-origin). Reconnect/resilience logic (subscribe resync) is
- * built on top of this by the voting feature — this is just the scaffolding.
+ * WebSocket factory for live-vote channels. The same-origin handshake authenticates
+ * with the session cookie. The voting feature builds the reconnect and resync logic on
+ * top of this class. This class is only the scaffolding.
  */
 @Injectable({ providedIn: 'root' })
 export class WsService {
   private readonly location = inject(LOCATION);
 
-  /** Opens `/api/ws/meetings/{id}` (or `…/beamer` read-only). */
+  /** Open `/api/ws/meetings/{id}`, or `…/beamer` for read-only access. */
   connectMeeting(meetingId: string, beamer = false): MeetingChannel {
     const suffix = beamer ? '/beamer' : '';
     const ws = new WebSocket(this.url(`/api/ws/meetings/${meetingId}${suffix}`));
     const subject = new Subject<ServerMessage>();
 
-    // Outbound buffer: frames sent before the handshake (`CONNECTING`) — e.g.
-    // the LiveVoteSession's initial `subscribe` — would otherwise be dropped.
-    // They are buffered and flushed in order on `open`.
+    // Outbound buffer. A socket drops a frame that goes out before the handshake ends
+    // (`CONNECTING`), for example the initial `subscribe` of LiveVoteSession. The buffer
+    // holds such a frame and flushes it in order on `open`.
     const outbox: string[] = [];
     const flush = (): void => {
       while (outbox.length > 0) ws.send(outbox.shift() as string);
@@ -53,15 +53,15 @@ export class WsService {
         if (ws.readyState === WebSocket.OPEN) {
           ws.send(data);
         } else if (ws.readyState === WebSocket.CONNECTING) {
-          outbox.push(data); // buffer until `open`, then flush
+          outbox.push(data);
         }
-        // CLOSING/CLOSED → drop (a reconnect opens a new channel)
+        // CLOSING or CLOSED: drop the frame. A reconnect opens a new channel.
       },
       close: () => ws.close(),
     };
   }
 
-  /** Builds the ws(s) URL relative to the current origin. */
+  /** Build the ws or wss URL relative to the current origin. */
   private url(path: string): string {
     const proto = this.location.protocol === 'https:' ? 'wss' : 'ws';
     return `${proto}://${this.location.host}${path}`;

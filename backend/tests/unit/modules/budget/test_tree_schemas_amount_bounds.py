@@ -1,9 +1,9 @@
-"""Geldbetrags-Obergrenze auf den Buchungs-/Übertrags-Schemata (AUD-035).
+"""Amount cap on the booking and transfer schemas (AUD-035).
 
-Die DB-Spalten sind ``numeric(12, 2)`` (max 9 999 999 999.99). Ohne ``le``-Schranke
-passierte ein zu großer Betrag die Pydantic-Validierung und führte erst beim INSERT
-zu einem numeric-overflow-500 statt des vertraglich zugesicherten 422. Diese Tests
-fixieren die Schranke auf ``ExpenseCreate``/``ExpenseUpdate``/``TransferCreate``.
+The DB columns are `numeric(12, 2)`, so the maximum is 9 999 999 999.99. Without the
+`le` bound, Pydantic accepted a larger amount. The INSERT then failed with a numeric
+overflow 500 instead of the 422 that the contract promises. These tests pin the cap on
+`ExpenseCreate`, `ExpenseUpdate` and `TransferCreate`.
 """
 
 from __future__ import annotations
@@ -27,7 +27,6 @@ _OVER_CAP = _MAX_AMOUNT + Decimal("0.01")
 def test_expense_create_rejects_over_cap_amount() -> None:
     with pytest.raises(ValidationError):
         ExpenseCreate(amount=_OVER_CAP, description="x", budgetId=uuid.uuid4())
-    # Genau am Limit bleibt gültig.
     ok = ExpenseCreate(amount=_MAX_AMOUNT, description="x", budgetId=uuid.uuid4())
     assert ok.amount == _MAX_AMOUNT
 

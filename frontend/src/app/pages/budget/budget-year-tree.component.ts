@@ -3,17 +3,18 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { Uuid } from '@core/api/models';
 import type { BudgetTreeNode, FiscalYear } from './budget-tree.api';
 
-/** Selection in the left tree: budget (top) + fiscal year. */
+/** Selection in the left tree: a top budget and a fiscal year. */
 export interface BudgetYearSelection {
   budgetId: Uuid;
   fiscalYearId: Uuid;
 }
 
 /**
- * Left navigation tree **budget → fiscal year**. Two levels: each top budget,
- * below it its fiscal years (clickable → selects budget + year). The current one
- * is highlighted; dotted, light-green, compact lines. Shows "…" when a budget has
- * more than 5 fiscal years. Reusable (dashboard + admin).
+ * Left navigation tree from budget to fiscal year. It has two levels. Each top
+ * budget shows its fiscal years below it. A click on a year selects the budget and
+ * the year. The tree highlights the current selection and draws dotted, light-green,
+ * compact lines. It shows "…" when a budget has more than 5 fiscal years. The
+ * dashboard and the admin page both use it.
  */
 @Component({
   selector: 'app-budget-year-tree',
@@ -53,7 +54,7 @@ export class BudgetYearTreeComponent {
       .join(', ');
   }
 
-  /** Node colour (set colour, or a stable palette by index). */
+  /** Color of a node. It uses the set color, else a stable palette color by index. */
   dotColor(node: BudgetTreeNode): string {
     if (node.color) return node.color;
     const idx = this.palette().indexOf(node.id);
@@ -68,7 +69,7 @@ export class BudgetYearTreeComponent {
   }
 }
 
-/** Fallback palette for nodes without a set colour (stable by index). */
+/** Fallback palette for nodes without a set color. The index keeps it stable. */
 export const PALETTE: readonly string[] = [
   '#5fb37a',
   '#4a90d9',

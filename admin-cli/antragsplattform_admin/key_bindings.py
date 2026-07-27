@@ -1,9 +1,9 @@
 """Key bindings for the full-screen UI.
 
-While a selector or form is open its navigation keys take over and everything
-else is swallowed. Otherwise Enter submits the command line, Tab completes,
-PgUp/PgDn scroll the log, and Esc closes the popped-out record. All actions are
-delegated to the orchestrator.
+While a selector or a form is open, its navigation keys take over. The UI swallows
+every other key. Otherwise Enter submits the command line, Tab completes, PgUp and
+PgDn scroll the log, and Esc closes the popped-out record. The bindings delegate
+every action to the orchestrator.
 """
 
 from __future__ import annotations
@@ -24,9 +24,9 @@ def _add_editor_bindings(
 ) -> None:
     """Wire the field-editor keys of the form dialog.
 
-    Arrows move between fields (``↑/↓``) or cycle a value (``←/→``), printable
-    keys and backspace edit the focused text field, ``enter`` submits and
-    ``escape`` cancels — all only while *condition* holds.
+    The `↑` and `↓` keys move between fields. The `←` and `→` keys cycle a value.
+    Printable keys and backspace edit the focused text field. `enter` submits the
+    form and `escape` cancels it. Every binding works only while `condition` holds.
     """
 
     @bindings.add("up", filter=condition, eager=True)
@@ -59,15 +59,15 @@ def _add_editor_bindings(
     def _(_event: KeyPressEvent) -> None:
         panel.cancel()
 
-    # Not eager: an eager wildcard would also swallow the mouse-event key, so the
-    # specific mouse binding could never dispatch clicks/scrolls to the panel.
+    # Not eager on purpose. An eager wildcard would also swallow the mouse-event key.
+    # The specific mouse binding could then never send clicks or scrolls to the panel.
     @bindings.add(Keys.Any, filter=condition)
     def _(event: KeyPressEvent) -> None:
         panel.type_char(event.data)
 
 
 def build_key_bindings(cli: AppView) -> KeyBindingsBase:
-    """Build the merged key bindings driving *cli*."""
+    """Build the merged key bindings that drive `cli`."""
     bindings = KeyBindings()
     logs, form_panel = cli.logs, cli.form_panel
     selecting = Condition(cli.showing_selector)
@@ -112,8 +112,8 @@ def build_key_bindings(cli: AppView) -> KeyBindingsBase:
     def _(_event: KeyPressEvent) -> None:
         cli.selector_backspace()
 
-    # Not eager (see _add_editor_bindings): let the mouse-event key fall through
-    # to the mouse binding so the selector list stays clickable and scrollable.
+    # Not eager, for the reason in _add_editor_bindings. The mouse-event key falls
+    # through to the mouse binding, so the selector list stays clickable and scrollable.
     @bindings.add(Keys.Any, filter=search_selecting)
     def _(event: KeyPressEvent) -> None:
         cli.selector_type(event.data)

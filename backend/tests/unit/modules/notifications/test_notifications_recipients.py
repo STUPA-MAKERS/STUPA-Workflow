@@ -1,4 +1,4 @@
-"""Empfänger-Resolver-Tests (T-18) — DB via `FakeSession` (Query-Antworten gefaked)."""
+"""Recipient resolver tests (T-18). `FakeSession` answers every database query."""
 
 from __future__ import annotations
 
@@ -84,13 +84,13 @@ async def test_resolve_dedup_across_specs() -> None:
     assert out == ["a@x.de", "b@y.de"]
 
 
-# AUD-057: Admin-Bypass-Regel der Empfänger-Auflösung ist EINE zentrale Query mit
-# EINEM Admin-Schlüssel — kein dupliziertes ``Role.key == "admin"``-Literal mehr.
+# AUD-057: the admin bypass of the recipient lookup is ONE central query with ONE admin
+# key. No duplicate `Role.key == "admin"` literal is left.
 
 
 def test_admin_role_key_matches_principal_has_bypass() -> None:
-    # ``Principal.has`` bypassed über ``ADMIN_ROLE_KEY in roles``; die Mengen-Query
-    # MUSS denselben Schlüssel verwenden, sonst divergiert die Benachrichtigung.
+    # `Principal.has` bypasses through `ADMIN_ROLE_KEY in roles`. The set query MUST use
+    # the same key, otherwise the notification diverges.
     admin = Principal(sub="s", roles=[ADMIN_ROLE_KEY], permissions=set())
     assert admin.has("any.perm") is True
     non_admin = Principal(sub="s", roles=["editor"], permissions=set())
@@ -99,10 +99,10 @@ def test_admin_role_key_matches_principal_has_bypass() -> None:
 
 def test_permission_stmt_includes_admin_bypass_via_constant() -> None:
     sql = _sql("application.transition")
-    # Admin-Bypass anhand der zentralen Konstante (nicht hartkodiert pro Resolver).
+    # The admin bypass uses the central constant, not a literal per resolver.
     assert f"key = '{ADMIN_ROLE_KEY}'" in sql
     assert "permission = 'application.transition'" in sql
-    # Aktiv + Gültigkeitsfenster der Zuweisung greifen ebenfalls.
+    # The active flag and the validity window of the assignment apply too.
     assert "active" in sql
     assert "valid_from" in sql and "valid_until" in sql
 
@@ -112,21 +112,19 @@ def test_permission_stmt_gremium_scope_optional() -> None:
     scoped = _sql("application.transition", gremium_id=gid)
     unscoped = _sql("application.transition")
     assert "gremium_id" in scoped
-    # Ohne gremium_id KEIN Gremium-Filter (globaler Empfängerkreis).
+    # Without gremium_id there is NO Gremium filter, so the recipient set is global.
     assert "gremium_id" not in unscoped
 
 
 def test_both_resolvers_share_one_query_builder() -> None:
-    # actionable_principal_emails (Task-Mail) und _emails_for_permission (Regel-
-    # Recipient) bauen denselben Admin-Bypass auf — bewiesen durch identische
-    # Kern-Klausel für dieselbe Permission.
+    # Both actionable_principal_emails (task mail) and _emails_for_permission (rule
+    # recipient) build the same admin bypass. The identical core clause for the same
+    # permission proves it.
     rule_sql = _sql("application.transition")
     assert rule_sql.count(f"key = '{ADMIN_ROLE_KEY}'") == 1
 
 
-# --------------------------------------------------------------------------- #
-# #task-recipients: identity-row seed statement
-# --------------------------------------------------------------------------- #
+# #task-recipients: identity row seed statement
 def _rows_sql(perm: str, **kw: object) -> str:
     stmt = principal_rows_with_permission_stmt(perm, datetime.now(UTC), **kw)  # type: ignore[arg-type]
     return str(stmt.compile(compile_kwargs={"literal_binds": True}))
@@ -160,9 +158,7 @@ def test_rows_stmt_gremium_scope_optional() -> None:
     assert "gremium_id" not in _rows_sql("application.transition")
 
 
-# --------------------------------------------------------------------------- #
-# firable_candidates — pure guard matrix (task-list parity, #64)
-# --------------------------------------------------------------------------- #
+# firable_candidates: pure guard matrix (task-list parity, #64)
 BASE_CTX = GuardContext(manual=True)
 
 
@@ -233,8 +229,8 @@ def test_firable_actor_is_applicant_via_created_by() -> None:
 
 
 def test_firable_admin_with_only_unsatisfied_guards_excluded() -> None:
-    # THE bug (#task-recipients): admins used to get task mail even without a
-    # firable transition. An admin without a matching guard gate is now excluded.
+    # THE bug (#task-recipients): admins got task mail even without a firable
+    # transition. The code now drops an admin without a matching guard gate.
     admin = _candidate(sub="adm", email="admin@x.de", roles=frozenset({ADMIN_ROLE_KEY}))
     out = firable_candidates(
         [admin], _transitions({"roleIs": "chair"}), BASE_CTX, created_by=None
@@ -282,9 +278,6 @@ def test_firable_empty_transitions_empty() -> None:
     assert firable_candidates([_candidate()], [], BASE_CTX, created_by=None) == []
 
 
-# --------------------------------------------------------------------------- #
-# _candidates_with_transition_permission — batch resolution
-# --------------------------------------------------------------------------- #
 async def test_candidates_batch_resolution_roles_groups_committees() -> None:
     pid1, pid2 = uuid.uuid4(), uuid.uuid4()
     g_scope, g_member = uuid.uuid4(), uuid.uuid4()
@@ -338,8 +331,8 @@ async def test_candidates_rows_without_email_skipped() -> None:
 
 
 async def test_candidates_no_groups_skips_mapping_query() -> None:
-    # Without any groups (neither OIDC nor assignment scope) the membership
-    # query comes next — the FIFO queue proves no mapping query is issued.
+    # Without any group (no OIDC group and no assignment scope) the membership query
+    # comes next. The FIFO queue proves that the code issues no mapping query.
     pid, gid = uuid.uuid4(), uuid.uuid4()
     session = FakeSession(
         executes=[
@@ -355,9 +348,7 @@ async def test_candidates_no_groups_skips_mapping_query() -> None:
     assert out[0].committees == frozenset({str(gid)})
 
 
-# --------------------------------------------------------------------------- #
-# actionable_principal_emails — end-to-end (#task-recipients)
-# --------------------------------------------------------------------------- #
+# actionable_principal_emails end to end (#task-recipients)
 def _app_ns(**over: Any) -> SimpleNamespace:
     base: dict[str, Any] = {
         "id": uuid.uuid4(),
@@ -419,8 +410,8 @@ async def test_actionable_no_requires_action_transitions_empty() -> None:
 async def test_actionable_excludes_admin_without_firable_guard(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # THE bug (#task-recipients) end-to-end: only principals whose guard fires
-    # get mail — the admin with only an unsatisfied guard is excluded.
+    # THE bug (#task-recipients) end to end: only a principal whose guard fires gets
+    # mail. The admin with an unsatisfied guard drops out.
     captured: dict[str, Any] = {}
 
     async def fake_base(

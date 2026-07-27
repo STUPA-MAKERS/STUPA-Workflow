@@ -1,4 +1,4 @@
-"""SSRF-Guard (T-19, security.md §5): jede interne/Sonder-IP wird blockiert."""
+"""SSRF guard (T-19, security.md §5): the guard blocks every internal or special IP."""
 
 from __future__ import annotations
 
@@ -49,7 +49,7 @@ def test_blocks_internal_via_dns() -> None:
 
 
 def test_blocks_when_any_record_internal() -> None:
-    # Round-Robin-Rebinding: ein interner Record unter mehreren blockt den Versand.
+    # Round-robin rebinding: one internal record among several blocks the delivery.
     with pytest.raises(SsrfError):
         assert_allowed_url(
             "http://mix.test/h", resolver=_resolver("8.8.8.8", "127.0.0.1")
@@ -84,7 +84,7 @@ def test_allowlist_blocks_unlisted_host() -> None:
 
 def test_allowlist_permits_listed_host() -> None:
     ips = assert_allowed_url(
-        "https://Good.com/h",  # Case-insensitiv
+        "https://Good.com/h",  # case-insensitive
         allowlist=["good.com"],
         resolver=_resolver("1.1.1.1"),
     )
@@ -97,7 +97,6 @@ def test_ipv6_public_ok() -> None:
     ]
 
 
-# --------------------------------------------------------------- pin_url #
 def test_pin_url_ipv4() -> None:
     ip_url, host = pin_url("https://hook.example/path?q=1", "93.184.216.34")
     assert ip_url == "https://93.184.216.34/path?q=1"

@@ -7,8 +7,8 @@ const templateParser = require('@angular-eslint/template-parser');
 
 module.exports = tseslint.config(
   {
-    // E2E (Playwright) wird separat per `npm run e2e:tsc` geprüft — eigener
-    // tsconfig (e2e/tsconfig.json), nicht Teil des Angular-Lint-Projekts.
+    // `npm run e2e:tsc` checks the E2E Playwright tests separately. Those tests use
+    // their own tsconfig at e2e/tsconfig.json, outside the Angular lint project.
     ignores: [
       'dist/**',
       'out-tsc/**',
@@ -16,7 +16,7 @@ module.exports = tseslint.config(
       'node_modules/**',
       '.angular/**',
       'e2e/**',
-      // UI-Kit-Library als Submodule — hat eigenes Lint-/CI-Setup, nicht Teil des App-Lints.
+      // The UI-Kit library is a submodule with its own lint and CI setup.
       'vendor/**',
       'playwright.config.ts',
       'playwright-report/**',

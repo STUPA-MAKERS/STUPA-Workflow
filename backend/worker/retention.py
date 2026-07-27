@@ -1,12 +1,12 @@
-"""GDPR retention cron (daily sweep).
+"""GDPR retention cron that sweeps once a day.
 
-Terminal applications past their retention window are anonymized; expired sessions
-and used/expired magic links are purged. Retention =
-``COALESCE(application_type.retention_months, privacy_settings.default_retention_months)``.
+The job anonymizes the terminal applications past their retention window. It also purges
+the expired sessions and the used or expired magic links. The retention window is
+`COALESCE(application_type.retention_months, privacy_settings.default_retention_months)`.
 
-Budget/money data (``budget*``/``expense``/``invoice``) is NEVER touched: financial
-records outside this GDPR scope. Idempotent, with per-row try/except so one bad row
-never aborts the run.
+The job NEVER touches budget or money data (`budget*`, `expense`, `invoice`). Those rows
+are financial records outside this GDPR scope. The job is idempotent. A try/except around
+each row keeps one bad row from aborting the run.
 """
 
 from __future__ import annotations
@@ -38,20 +38,23 @@ _RETENTION_ACTOR = "system:retention"
 
 
 def _sessionmaker(ctx: dict[str, Any]) -> async_sessionmaker[AsyncSession]:
-    """DB sessionmaker (injectable in tests via ``ctx['retention_sessionmaker']``)."""
+    """Return the DB sessionmaker (tests inject one via `ctx['retention_sessionmaker']`)."""
     maker = ctx.get("retention_sessionmaker")
     return maker if maker is not None else get_sessionmaker()
 
 
 def _now() -> datetime:
-    """Timezone-aware now (UTC); freezegun-controllable in tests."""
+    """Return the current tz-aware UTC time (tests control it with freezegun)."""
     return datetime.now(UTC)
 
 
 async def _due_application_ids(
     maker: async_sessionmaker[AsyncSession],
 ) -> list[UUID]:
-    """IDs of terminal, not-yet-anonymized applications past their retention window."""
+    """Return the IDs of terminal applications past their retention window.
+
+    The query skips an application that the job already anonymized.
+    """
     async with maker() as session:
         default_months = (
             await session.scalar(select(PrivacySettings.default_retention_months))
@@ -106,10 +109,13 @@ async def _anonymize_due(
 async def _purge_expired(
     maker: async_sessionmaker[AsyncSession], now: datetime
 ) -> tuple[int, int]:
-    """Delete expired sessions and used/expired magic links.
+    """Delete the expired sessions and the used or expired magic links.
 
-    Auth artifacts only: budget/``expense``/``invoice`` rows are financial records
-    and are NEVER deleted here.
+    The function touches auth artifacts only. The `budget*`, `expense` and `invoice` rows
+    are financial records. The job NEVER deletes them here.
+
+    Returns:
+        The number of deleted sessions and the number of deleted magic links.
     """
     async with maker() as session:
         sessions = cast(
@@ -131,9 +137,12 @@ async def _purge_expired(
 
 
 async def process_retention(ctx: dict[str, Any]) -> str:
-    """Entry point (arq cron): anonymize + purge.
+    """Anonymize the due applications and purge the expired auth rows.
 
-    Returns a run summary; arq logs the return value for cron visibility.
+    This function is the arq cron entry point.
+
+    Returns:
+        A run summary. arq logs the return value, so the cron run stays visible.
     """
     settings: Settings = ctx.get("settings") or load_settings()
     maker = _sessionmaker(ctx)

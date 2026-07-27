@@ -1,8 +1,8 @@
 .admin-home__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
-  /* Kacheln auf Inhalt schrumpfen (kein vertikales Strecken) — pro Zeile
-     gleich hoch durch Grid-Default-Stretch. */
+  /* Shrink the tiles to their content, with no vertical stretch. Tiles in the same
+     row stay equally high through the grid default stretch. */
   grid-auto-rows: auto;
   align-content: start;
   gap: var(--space-4);
@@ -43,7 +43,7 @@
   gap: var(--space-1);
   min-width: 0;
 }
-/* Mobil (≤768px): Kacheln einspaltig — verhindert Quetschen schmaler Tracks. */
+/* Mobile (≤768px): one tile column. This prevents squeezed narrow tracks. */
 @media (max-width: 768px) {
   .admin-home__grid {
     grid-template-columns: 1fr;

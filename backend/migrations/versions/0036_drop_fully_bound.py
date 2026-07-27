@@ -1,9 +1,9 @@
-"""drop_fully_bound: Feature »Kostenstelle komplett als gebunden« entfernt.
+"""drop_fully_bound: remove the fully-bound cost center feature.
 
-Die Spalte ``budget.fully_bound`` (eingeführt in 0004) wird entfernt — Kostenstellen
-zählen wieder ausschließlich ihre echten Anträge/Ausgaben (kein synthetisches
-Voll-Binden mehr). Idempotent (``IF EXISTS``); Down-Round-Trip stellt die Spalte
-(NOT NULL DEFAULT false) wieder her.
+The migration drops the column ``budget.fully_bound`` that 0004 added. A cost center
+again counts only its real applications and expenses. The synthetic full bind is gone.
+The migration is idempotent (``IF EXISTS``). The down round trip restores the column as
+NOT NULL DEFAULT false.
 """
 
 from __future__ import annotations

@@ -1,7 +1,8 @@
-"""Router-Tests Mail-Templates (#5-4): Endpunkt-Wiring + admin.notifications-Gate.
+"""Mail template router tests (#5-4): endpoint wiring and the admin.notifications gate.
 
-Der Service (CRUD + Vorschau) ist anderweitig unit-getestet; hier wird er gefaked,
-um Verdrahtung und Permission-Gate zu prüfen."""
+Other unit tests cover the service (CRUD and preview). These tests fake the service and
+check the wiring and the permission gate only.
+"""
 
 from __future__ import annotations
 

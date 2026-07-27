@@ -1,11 +1,11 @@
 """arq worker task: render an application PDF.
 
-``render_pdf`` builds the :class:`RenderPipeline` (pytex + MinIO) from ``ctx`` deps
-and renders a ``render_job`` end-to-end. Transient errors (pytex 5xx/transport,
-storage) -> ``arq.Retry`` with linear backoff up to ``pdf_max_tries``; then the job
-is marked permanently ``failed`` (no endless requeue). Idempotency comes from the
-``_job_id`` (= ``render:<id>``) at enqueue and the job status (a ``done`` job is not
-re-rendered).
+`render_pdf` builds the `RenderPipeline` (pytex + MinIO) from the `ctx` dependencies
+and renders a `render_job` end to end. A transient error (pytex 5xx, transport,
+storage) raises `arq.Retry` with a linear backoff up to `pdf_max_tries`. After the last
+try the task marks the job `failed` for good, so it never requeues again. Idempotency
+comes from the `_job_id` (`render:<id>`) at enqueue and from the job status. A `done`
+job does not render again.
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ async def on_startup(ctx: dict[str, Any]) -> None:
 
 
 def _sessionmaker(ctx: dict[str, Any]) -> async_sessionmaker[AsyncSession]:
-    """DB sessionmaker (injectable in tests via ``ctx['pdf_sessionmaker']``)."""
+    """Return the DB sessionmaker (tests inject one via `ctx['pdf_sessionmaker']`)."""
     maker = ctx.get("pdf_sessionmaker")
     return maker if maker is not None else get_sessionmaker()
 
@@ -48,7 +48,13 @@ def _pipeline(ctx: dict[str, Any]) -> RenderPipeline:
 
 
 async def render_pdf(ctx: dict[str, Any], job_id: str) -> str:
-    """Process one render job. Retry on transient error up to ``pdf_max_tries``."""
+    """Process one render job.
+
+    A transient error retries with a linear backoff up to `pdf_max_tries`.
+
+    Returns:
+        The status of the pipeline run, or `"dead"` after the last failed try.
+    """
     settings: Settings = ctx["settings"]
     pipeline = _pipeline(ctx)
     jid = UUID(job_id)

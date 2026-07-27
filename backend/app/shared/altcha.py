@@ -1,14 +1,15 @@
-"""Server-side Altcha proof-of-work verification.
+"""Server-side ALTCHA proof-of-work verification.
 
-Altcha-compatible HMAC scheme: the server signs a PoW challenge with
-``ALTCHA_HMAC_SECRET``; the client solves it (finds ``number`` with
-``SHA-256(salt+number) == challenge``) and returns the base64 solution.
-Verification is purely local (HMAC + hash recompute + expiry + one-time use); no
-third party, no tracking.
+The HMAC scheme follows ALTCHA. The server signs a proof-of-work challenge with
+``ALTCHA_HMAC_SECRET``. The client solves it. It looks for the ``number`` where
+``SHA-256(salt+number) == challenge``, then returns the base64 solution. Verification
+stays local: HMAC, hash recompute, expiry and one-time use. No third party takes part,
+and nothing tracks the user.
 
-``create_challenge``/``solve_challenge`` are symmetric (the latter is a reference
-solver for tests/dev). ``verify_solution`` is pure and I/O-free; one-time use
-(replay protection) lives in ``ReplayGuard`` and is orchestrated by ``AltchaVerifier``.
+``create_challenge`` and ``solve_challenge`` are symmetric. ``solve_challenge`` is a
+reference solver for tests and development. ``verify_solution`` is pure and does no
+I/O. ``ReplayGuard`` holds the one-time-use state, and ``AltchaVerifier`` orchestrates
+both parts.
 """
 
 from __future__ import annotations
@@ -31,12 +32,12 @@ ALGORITHM = "SHA-256"
 
 
 class AltchaError(Exception):
-    """Invalid, missing, expired, or reused Altcha solution."""
+    """The ALTCHA solution is missing, invalid, expired, or already used."""
 
 
 @dataclass(frozen=True)
 class Challenge:
-    """Server-signed PoW challenge served to the client."""
+    """A server-signed proof-of-work challenge for the client."""
 
     algorithm: str
     challenge: str
@@ -61,7 +62,10 @@ def create_challenge(
     expires: int | None = None,
     max_number: int = 100_000,
 ) -> Challenge:
-    """Build a signed challenge; ``expires`` (unix seconds) is encoded into the salt."""
+    """Build a signed challenge.
+
+    The salt encodes ``expires`` as unix seconds.
+    """
     base_salt = salt if salt is not None else secrets.token_hex(12)
     full_salt = f"{base_salt}?expires={expires}" if expires is not None else base_salt
     secret_number = number if number is not None else secrets.randbelow(max_number + 1)
@@ -76,7 +80,7 @@ def create_challenge(
 
 
 def encode_solution(challenge: Challenge, number: int) -> str:
-    """Build the solution payload (base64 JSON), matching what altcha-lib sends."""
+    """Build the base64 JSON solution payload that altcha-lib sends."""
     payload = {
         "algorithm": challenge.algorithm,
         "challenge": challenge.challenge,
@@ -88,7 +92,10 @@ def encode_solution(challenge: Challenge, number: int) -> str:
 
 
 def solve_challenge(challenge: Challenge) -> str:
-    """Reference solver (tests/dev): brute-forces ``number``, returns the base64 solution."""
+    """Solve a challenge by brute force and return the base64 solution.
+
+    This is a reference solver for tests and development.
+    """
     for number in range(challenge.maxnumber + 1):
         if _sha256_hex(f"{challenge.salt}{number}") == challenge.challenge:
             return encode_solution(challenge, number)
@@ -96,7 +103,11 @@ def solve_challenge(challenge: Challenge) -> str:
 
 
 def _parse_expires(salt: str) -> int | None:
-    """Read ``expires`` seconds from the salt query (or None if absent/invalid)."""
+    """Read the ``expires`` value from the salt query.
+
+    Returns:
+        The expiry in unix seconds. ``None`` when the salt holds no valid value.
+    """
     query = urlparse(f"//x?{salt.split('?', 1)[1]}").query if "?" in salt else ""
     if not query:
         return None
@@ -108,7 +119,10 @@ def _parse_expires(salt: str) -> int | None:
 
 @dataclass(frozen=True)
 class Solution:
-    """Structurally parsed (not yet cryptographically verified) PoW solution."""
+    """A parsed proof-of-work solution.
+
+    The structure is valid. No cryptographic check ran yet.
+    """
 
     algorithm: str
     challenge: str
@@ -118,12 +132,16 @@ class Solution:
 
 
 def parse_solution(payload_b64: str) -> Solution:
-    """Structurally parse the solution payload (base64 -> JSON -> required fields/types).
+    """Parse the structure of the solution payload.
 
-    Pure form validation without secret/crypto: checks that ``payload_b64`` is
-    decodable base64 JSON with the expected fields and types. Raises ``AltchaError``
-    on any structural invalidity. Used both by full verification and by early request
-    validation so malformed input is rejected with 4xx regardless of the Altcha toggle."""
+    The function decodes base64, then JSON, then checks the required fields and their
+    types. It needs no secret and does no cryptography. Full verification and early
+    request validation both call it. A malformed input therefore always gets a 4xx
+    answer, whatever the ALTCHA toggle says.
+
+    Raises:
+        AltchaError: The payload has an invalid structure.
+    """
     try:
         raw = base64.b64decode(payload_b64, validate=True)
         data = json.loads(raw)
@@ -141,7 +159,7 @@ def parse_solution(payload_b64: str) -> Solution:
         raise AltchaError("unsupported algorithm")
     if not (isinstance(challenge, str) and isinstance(salt, str) and isinstance(signature, str)):
         raise AltchaError("malformed altcha payload")
-    # bool is an int subclass; exclude it explicitly. Negative numbers are invalid.
+    # bool is a subclass of int. Exclude it here. A negative number is also invalid.
     if isinstance(number, bool) or not isinstance(number, int) or number < 0:
         raise AltchaError("malformed altcha payload")
     return Solution(
@@ -150,13 +168,18 @@ def parse_solution(payload_b64: str) -> Solution:
 
 
 def validate_solution_format(value: str) -> str:
-    """Pydantic ``AfterValidator``: structurally invalid Altcha -> ``ValueError`` (-> 422).
+    """Pydantic ``AfterValidator`` that rejects a malformed ALTCHA payload with a 422.
 
-    Runs in the request schema before any endpoint logic and independent of whether
-    Altcha verification is active, so a malformed payload is rejected consistently with
-    problem+json 422 without touching enumeration protection (the rejection depends only
-    on payload form). ``AltchaError`` is remapped to ``ValueError`` because Pydantic only
-    turns ``ValueError``/``AssertionError`` into 422 (else 500)."""
+    The validator runs in the request schema before any endpoint logic. It runs whether
+    or not ALTCHA verification is active. A malformed payload therefore always gets the
+    same problem+json 422. This keeps the enumeration protection intact, because the
+    rejection depends only on the form of the payload. The function remaps
+    ``AltchaError`` to ``ValueError``, because Pydantic turns only ``ValueError`` and
+    ``AssertionError`` into a 422. Any other exception becomes a 500.
+
+    Raises:
+        ValueError: The payload has an invalid structure.
+    """
     try:
         parse_solution(value)
     except AltchaError as exc:
@@ -165,13 +188,19 @@ def validate_solution_format(value: str) -> str:
 
 
 AltchaSolutionStr = Annotated[str, AfterValidator(validate_solution_format)]
-"""Request field type for an Altcha solution field: enforces structural form (422)."""
+"""Request field type for an ALTCHA solution that enforces the payload form (422)."""
 
 
 def verify_solution(payload_b64: str, secret: str, *, now: int) -> str:
-    """Verify a solution (algorithm, hash, HMAC, expiry); return the replay key.
+    """Verify the algorithm, the hash, the HMAC and the expiry of a solution.
 
-    Raises ``AltchaError`` on any invalidity. Constant-time compare for hash/HMAC.
+    The function compares the hash and the HMAC in constant time.
+
+    Returns:
+        The replay key of the solution.
+
+    Raises:
+        AltchaError: The solution is invalid or expired.
     """
     parsed = parse_solution(payload_b64)
     challenge = parsed.challenge
@@ -191,13 +220,16 @@ def verify_solution(payload_b64: str, secret: str, *, now: int) -> str:
 
 @runtime_checkable
 class ReplayGuard(Protocol):
-    """One-time use: True if the key was already seen within the window."""
+    """One-time-use store for solution keys.
+
+    ``seen`` returns ``True`` when the key already appeared inside the window.
+    """
 
     async def seen(self, key: str, ttl_seconds: int) -> bool: ...
 
 
 class InMemoryReplayGuard:
-    """Process-local replay protection (tests/single-worker dev)."""
+    """Process-local replay protection for tests and single-worker development."""
 
     def __init__(self, *, now: Callable[[], int] | None = None) -> None:
         self._seen: dict[str, int] = {}
@@ -205,7 +237,7 @@ class InMemoryReplayGuard:
 
     async def seen(self, key: str, ttl_seconds: int) -> bool:
         now = self._now()
-        # Reap expired entries so the store does not grow unbounded.
+        # Drop the expired entries so the store does not grow without a bound.
         self._seen = {k: exp for k, exp in self._seen.items() if exp > now}
         if key in self._seen:
             return True
@@ -214,12 +246,13 @@ class InMemoryReplayGuard:
 
 
 class RedisReplayGuard:
-    """Redis-backed replay protection (SET NX + TTL), shared across workers.
+    """Redis-backed replay protection with SET NX and a TTL, shared across workers.
 
-    On Redis failure it does NOT fall back to a no-op (a solved PoW would be replayable
-    within the TTL window); it falls back to a process-local ``InMemoryReplayGuard`` so
-    one-time use still holds per worker (defense in depth). Rate limiting may fail open,
-    replay protection must not."""
+    A Redis failure must NOT turn this guard into a no-op. A solved proof of work would
+    then be replayable inside the TTL window. The guard falls back to a process-local
+    ``InMemoryReplayGuard`` instead, so one-time use still holds per worker. That is
+    defense in depth. Rate limiting may fail open. Replay protection must not.
+    """
 
     def __init__(
         self,
@@ -233,7 +266,7 @@ class RedisReplayGuard:
         self._fallback: ReplayGuard = fallback or InMemoryReplayGuard()
 
     async def seen(self, key: str, ttl_seconds: int) -> bool:
-        # SET key 1 NX EX ttl -> None if already present (= replay).
+        # SET key 1 NX EX ttl returns None when the key exists, which means a replay.
         try:
             stored = await self._client.set(  # type: ignore[attr-defined]
                 f"{self._prefix}{key}", "1", nx=True, ex=ttl_seconds
@@ -254,7 +287,10 @@ def _wall_clock() -> int:
 
 
 class AltchaVerifier:
-    """Verification plus replay protection; ``now`` is injectable (tests/expiry)."""
+    """Verify a solution and protect against a replay.
+
+    The caller can inject ``now`` to test the expiry.
+    """
 
     def __init__(
         self,
@@ -270,7 +306,11 @@ class AltchaVerifier:
         self._now = now or _wall_clock
 
     async def verify(self, payload_b64: str | None) -> None:
-        """Raise ``AltchaError`` if the solution is missing/invalid/expired/reused."""
+        """Verify one solution.
+
+        Raises:
+            AltchaError: The solution is missing, invalid, expired, or already used.
+        """
         if not payload_b64:
             raise AltchaError("altcha solution required")
         key = verify_solution(payload_b64, self._secret, now=self._now())
@@ -279,7 +319,7 @@ class AltchaVerifier:
 
 
 class NullAltchaVerifier:
-    """No-op verifier (Altcha off: no secret configured, dev/test)."""
+    """No-op verifier used when ALTCHA is off because no secret is configured."""
 
     async def verify(self, payload_b64: str | None) -> None:
         return None

@@ -1,10 +1,11 @@
-"""Integration: ``flow.context._budget_fits`` rechnet Einnahmen richtig vorzeichen-
-behaftet (Regression). Einnahmen (``kind='income'``) ERHÖHEN den verfügbaren Rest —
-nicht senken — gleiche Richtung wie ``tree_rules.node_available``.
+"""Integration: `flow.context._budget_fits` gives income the correct sign (regression).
 
-Vor dem Fix summierte das Guard-Query ALLE ``budget_expense``-Zeilen als Ausgaben
-(ohne ``kind``-Filter), sodass eine Einnahme die Verfügbarkeit fälschlich minderte und
-auf ``budgetFits`` gewachte Auto-Übergänge daneben lagen.
+Income rows (`kind='income'`) raise the available amount. They do not lower it. This is
+the same direction as `tree_rules.node_available`.
+
+Before the fix the guard query summed all `budget_expense` rows as expenses, without a
+`kind` filter. An income then lowered the availability by mistake. Auto transitions that
+`budgetFits` guards gave the wrong answer.
 """
 
 from __future__ import annotations
@@ -42,7 +43,11 @@ async def session(
 
 
 async def _seed(session: AsyncSession) -> tuple[uuid.UUID, uuid.UUID]:
-    """Kostenstelle + Haushaltsjahr + Allocation 1000 anlegen; gibt (budget_id, fy_id)."""
+    """Create a cost center, a fiscal year and an allocation of 1000.
+
+    Returns:
+        The budget id and the fiscal year id.
+    """
     budget = Budget(key="VS", path_key="VS", name="Verfügungsstelle")
     session.add(budget)
     await session.flush()
@@ -64,7 +69,7 @@ async def _seed(session: AsyncSession) -> tuple[uuid.UUID, uuid.UUID]:
 
 
 def _app(budget_id: uuid.UUID, fy_id: uuid.UUID, amount: str) -> SimpleNamespace:
-    # `_budget_fits` liest nur diese drei Attribute der Application.
+    # `_budget_fits` reads only these three attributes of the application.
     return SimpleNamespace(
         budget_id=budget_id, fiscal_year_id=fy_id, amount=Decimal(amount)
     )
@@ -72,7 +77,7 @@ def _app(budget_id: uuid.UUID, fy_id: uuid.UUID, amount: str) -> SimpleNamespace
 
 async def test_income_raises_availability(session: AsyncSession) -> None:
     budget_id, fy_id = await _seed(session)
-    # Allocation 1000 + Einnahme 500 ⇒ verfügbar 1500. Antrag 1200 PASST.
+    # Allocation 1000 plus income 500 leaves 1500 available. An application of 1200 fits.
     session.add(
         BudgetExpense(
             budget_id=budget_id, fiscal_year_id=fy_id, kind="income",
@@ -85,7 +90,7 @@ async def test_income_raises_availability(session: AsyncSession) -> None:
 
 async def test_expense_lowers_availability(session: AsyncSession) -> None:
     budget_id, fy_id = await _seed(session)
-    # Allocation 1000 − Ausgabe 400 ⇒ verfügbar 600. Antrag 800 passt NICHT.
+    # Allocation 1000 minus expense 400 leaves 600 available. An application of 800 does not fit.
     session.add(
         BudgetExpense(
             budget_id=budget_id, fiscal_year_id=fy_id, kind="expense",
@@ -98,7 +103,7 @@ async def test_expense_lowers_availability(session: AsyncSession) -> None:
 
 async def test_mixed_income_and_expense_net(session: AsyncSession) -> None:
     budget_id, fy_id = await _seed(session)
-    # 1000 − 700 (Ausgabe) + 300 (Einnahme) = 600 verfügbar.
+    # 1000 minus 700 (expense) plus 300 (income) leaves 600 available.
     session.add_all(
         [
             BudgetExpense(

@@ -1,10 +1,9 @@
-"""Test-Fakes für die Flow-Engine (Unit-Suite ohne Docker).
+"""Test fakes for the flow engine, for the unit suite that runs without Docker.
 
-Erweitert das Muster aus :mod:`tests._support.auth_fakes` um:
-
-* ``rowcount`` an Ergebnissen (für das optimistische ``UPDATE … WHERE`` in ``fire``),
-* ``flush`` vergibt IDs an frisch hinzugefügte Objekte (DB-``gen_random_uuid()``-Ersatz),
-* ``rollback``-Zähler.
+These fakes extend the pattern of `tests._support.auth_fakes`. A result carries a
+`rowcount` for the optimistic `UPDATE ... WHERE` in `fire`. `flush` gives an id to each
+new object, in place of `gen_random_uuid()` in the database. The session also counts the
+`rollback` calls.
 """
 
 from __future__ import annotations
@@ -15,7 +14,7 @@ from typing import Any
 
 
 class FakeResult:
-    """`Result`-Ersatz mit optionalem ``rowcount`` (Default: Anzahl Items)."""
+    """Stand-in for `Result` with an optional `rowcount` that defaults to the item count."""
 
     def __init__(self, items: Iterable[Any] = (), *, rowcount: int | None = None) -> None:
         self._items = list(items)
@@ -38,17 +37,17 @@ class FakeResult:
 
 
 class FakeSession:
-    """`AsyncSession`-Stub: ``execute`` liefert die Ergebnisse in Reihenfolge."""
+    """Stub for `AsyncSession` where `execute` returns the results in order."""
 
     def __init__(self, results: Iterable[FakeResult] = ()) -> None:
         self._results = list(results)
         self.scalar_results: list[Any] = []
-        # Eigene Queue für ``session.get(Model, id)`` (Delegations-Service) —
-        # unabhängig von der ``execute``-Reihenfolge. Default ``None`` (not found).
+        # Separate queue for `session.get(Model, id)` in the delegation service. It is
+        # independent of the `execute` order. The default `None` means not found.
         self.get_results: list[Any] = []
         self.added: list[Any] = []
         self.deleted: list[Any] = []
-        # Alle ``execute``-Statements (z. B. um das Vote-Storno-UPDATE zu prüfen).
+        # Recorded so a test can check a statement, for example the vote cancellation UPDATE.
         self.statements: list[Any] = []
         self.flushed = 0
         self.committed = 0
@@ -61,14 +60,17 @@ class FakeSession:
         return self._results.pop(0)
 
     async def get(self, _model: Any, _ident: Any) -> Any:
-        """``session.get``-Ersatz: liefert die ``get_results``-Queue in Reihenfolge."""
+        """Stand-in for `session.get` that returns the `get_results` queue in order."""
         if self.get_results:
             return self.get_results.pop(0)
         return None
 
     async def scalar(self, _stmt: Any) -> Any:
-        """``session.scalar``-Ersatz (z. B. ``_deadline_passed``): eigene Queue,
-        Default ``None`` — die ``execute``-Reihenfolge der Tests bleibt unberührt."""
+        """Stand-in for `session.scalar`, used for example by `_deadline_passed`.
+
+        This method reads its own queue and defaults to `None`. The `execute` order of
+        the tests stays unchanged.
+        """
         if self.scalar_results:
             return self.scalar_results.pop(0)
         return None
@@ -92,8 +94,11 @@ class FakeSession:
         self.rolled_back += 1
 
     async def refresh(self, _obj: Any) -> None:
-        """``session.refresh``-Ersatz (No-op): nach Commit lädt der Service den Antrag
-        neu, bevor er die Frist des neuen States materialisiert."""
+        """Stand-in for `session.refresh` that does nothing.
+
+        After the commit the service reloads the application. It then materializes the
+        deadline of the new state.
+        """
 
 
 def result(*items: Any, rowcount: int | None = None) -> FakeResult:
@@ -101,5 +106,5 @@ def result(*items: Any, rowcount: int | None = None) -> FakeResult:
 
 
 def fake_session(*results: FakeResult) -> Any:
-    """`AsyncSession`-kompatibler Fake (Rückgabe ``Any`` → ohne Cast einsetzbar)."""
+    """Build an `AsyncSession` compatible fake that a caller can use without a cast."""
     return FakeSession(list(results))

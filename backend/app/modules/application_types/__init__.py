@@ -1,5 +1,5 @@
 """Public application-type listing (`GET /api/application-types`).
 
-The type-specific form endpoint lives in the forms module; the admin CRUD
-lives under `/api/admin/application-types`.
+The forms module holds the type-specific form endpoint. The admin CRUD lives
+under `/api/admin/application-types`.
 """

@@ -2,7 +2,7 @@ import type { TransitionDef } from '../admin.models';
 
 /**
  * Current canvas selection: a state (by key) or a transition (by index).
- * Groups are never selected — clicking one drills down into it.
+ * A group is never a selection. A click on a group drills down into it.
  */
 export type Selection =
   | { kind: 'state'; key: string }
@@ -21,7 +21,7 @@ export interface GroupBox {
   h: number;
   /** Transitively contained state count (badge). */
   count: number;
-  /** Transitively contained state keys (dragging moves them all). */
+  /** Transitively contained state keys. A drag moves all of them. */
   deepKeys: string[];
   /** Outgoing boundary-edge count. */
   outCount: number;
@@ -51,9 +51,9 @@ export interface ProxyBox {
 }
 
 /**
- * Outgoing transitions of one node sharing an identical guard. One connector
- * dot per distinct guard; group order is the evaluation/priority order
- * (first matching guard wins).
+ * Outgoing transitions of one node that share an identical guard. There is one
+ * connector dot per distinct guard. The group order is the evaluation order, also
+ * called the priority order. The first guard that matches wins.
  */
 export interface GuardGroup {
   /** Stable guard signature (`''` = no guard / catch-all). */
@@ -97,7 +97,7 @@ export const NODE_W = 150;
 export const NODE_H = 52;
 export const MARGIN = 40;
 
-/** Connector dots use a FIXED spacing — nodes/groups grow in height instead. */
+/** Connector dots use a fixed spacing. Nodes and groups grow in height instead. */
 export const DOT_GAP = 22;
 export const DOT_PAD = 16;
 

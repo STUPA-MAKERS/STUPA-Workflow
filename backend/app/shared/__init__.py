@@ -1,6 +1,7 @@
 """Cross-cutting helpers: error contract, paging, i18n.
 
-Config schemas and evaluators: ``config_schemas`` (Pydantic SSoT + JSON-Schema
-export), ``jsonlogic`` (pure JsonLogic subset), ``guards`` (pure guard/action
-evaluator). All declarative, whitelist, no eval.
+The package also holds the config schemas and the evaluators. `config_schemas` is
+the Pydantic single source of truth and exports JSON Schema. `jsonlogic` is a pure
+JsonLogic subset. `guards` is a pure guard and action evaluator. All of them are
+declarative and work from a whitelist. None of them uses eval.
 """

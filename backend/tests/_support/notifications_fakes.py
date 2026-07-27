@@ -1,8 +1,9 @@
-"""Test-Fakes für Notifications-Unit-Tests (kein echtes DB/Redis).
+"""Test fakes for the notifications unit tests.
 
-`FakeSession` bedient die vom Service/Resolver genutzten Methoden: ``add``,
-``commit``, ``get`` (über einen In-Memory-Store) sowie ``scalars``/``scalar``
-(über vorab gefüllte FIFO-Queues — der Test kontrolliert jede Query-Antwort).
+These fakes use no real database and no real Redis. `FakeSession` serves the methods
+that the service and the resolver call. It keeps `add`, `commit` and `get` on an
+in-memory store. It answers `scalars` and `scalar` from prefilled FIFO queues. The test
+controls every query answer.
 """
 
 from __future__ import annotations
@@ -57,12 +58,19 @@ class FakeSession:
         return self._scalar.pop(0)
 
     async def execute(self, _stmt: Any) -> FakeResult:
-        """Row-Queries (z. B. `(type_id, state_id)` des Dispatchers) — FIFO, leer ohne Setup."""
+        """Return the next queued row result, in FIFO order.
+
+        A row query is, for example, the `(type_id, state_id)` lookup of the dispatcher.
+        The result is empty when the test queues no rows.
+        """
         return FakeResult(self._executes.pop(0)) if self._executes else FakeResult([])
 
 
 class FakeQueue:
-    """Sammelt enqueued MailMessages (keine Dedup — Test prüft Aufrufe direkt)."""
+    """Collect the enqueued mail messages.
+
+    This fake does no deduplication. The test checks the calls directly.
+    """
 
     def __init__(self) -> None:
         self.messages: list[Any] = []
@@ -72,7 +80,7 @@ class FakeQueue:
 
 
 class FakeResolver:
-    """Liefert feste Adressen, unabhängig von den Specs/DB."""
+    """Return a fixed address list, independent of the specs and the database."""
 
     def __init__(self, addresses: list[str]) -> None:
         self.addresses = addresses

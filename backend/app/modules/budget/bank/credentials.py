@@ -1,7 +1,8 @@
 """Personal FinTS credentials per bookkeeper and account.
 
-Create/replace/delete the encrypted login data plus the connection status for
-the frontend (account FinTS-capable? own credentials stored? cooldown active?).
+The module creates, replaces and deletes the encrypted login data. It also builds the
+connection status for the frontend: is the account FinTS-capable, are own credentials
+stored, and is a cooldown active?
 """
 
 from __future__ import annotations
@@ -34,8 +35,11 @@ class CredentialOps(BankServiceBase):
         )
 
     async def credential_status(self, account_id: uuid.UUID) -> FintsCredentialStatus:
-        """Return the bookkeeper's connection status for an account: is it
-        FinTS-capable and has *this* user stored their own credentials?"""
+        """Return the connection status of the bookkeeper for an account.
+
+        The status says whether the account is FinTS-capable, and whether THIS user
+        stored their own credentials.
+        """
         acc = await self._account_or_404(account_id)
         cred = await self.session.scalar(
             select(AccountFintsCredential).where(
@@ -48,11 +52,15 @@ class CredentialOps(BankServiceBase):
     async def set_credential(
         self, account_id: uuid.UUID, payload: FintsCredentialIn
     ) -> FintsCredentialStatus:
-        """Create/replace the bookkeeper's personal credentials (login + PIN).
+        """Create or replace the personal credentials of the bookkeeper (login and PIN).
 
-        The PIN is stored encrypted; on change, the prior SCA state/TAN mechanism
-        is discarded (new data forces fresh SCA). Requires the admin to have set
-        the bank connection (endpoint + BLZ) on the account."""
+        The service stores the PIN encrypted. On a change it discards the previous SCA
+        state and TAN mechanism, because new data forces a fresh SCA. The admin must
+        have set the bank connection (endpoint and BLZ) on the account.
+
+        Raises:
+            ValidationProblem: The account has no FinTS connection configured.
+        """
         acc = await self._account_or_404(account_id)
         if not (acc.fints_endpoint and acc.fints_blz):
             raise ValidationProblem(
@@ -80,16 +88,20 @@ class CredentialOps(BankServiceBase):
         else:
             cred.fints_login = payload.fints_login
             cred.fints_pin_encrypted = pin_encrypted
-            # New credentials invalidate the prior dialog state (fresh SCA).
+            # New credentials invalidate the previous dialog state (fresh SCA).
             cred.fints_state = None
             cred.fints_tan_mechanism = None
-        # Audit WITHOUT login/PIN — the ``actor`` identifies the bookkeeper.
+        # Audit WITHOUT login or PIN. The `actor` identifies the bookkeeper.
         await self._audit(AuditAction.BANK_CREDENTIAL_SET, target_id=str(account_id))
         await self.session.commit()
         return self._credential_status(acc, cred)
 
     async def delete_credential(self, account_id: uuid.UUID) -> None:
-        """Delete the bookkeeper's personal credentials for an account."""
+        """Delete the personal credentials of the bookkeeper for an account.
+
+        Raises:
+            NotFoundError: The bookkeeper has no credential for this account.
+        """
         pid = self._require_principal()
         row = (
             await self.session.execute(

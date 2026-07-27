@@ -6,8 +6,8 @@ metadata:
   type: feedback
 ---
 
-For the antragsplattform repo, when work is done: create a new branch, commit, push, open a PR — then watch CI and fix any failures, without being asked each time. This is a standing default.
+For the antragsplattform repo, finish work like this: create a new branch, commit, push and open a PR. Then watch CI and fix any failures. Do all of this without being asked each time. This is a standing default.
 
-**Why:** User stated "always for this repo" on 2026-06-18. They never want to manually ask for the ship steps.
+**Why:** the user stated "always for this repo" on 2026-06-18. They never want to ask for the ship steps.
 
-**How to apply:** Remote is `stupa` → github.com/STUPA-MAKERS/STUPA-Workflow. Use `gh` for PR + CI watch (`gh pr checks --watch` / `gh run watch`). Branch off main (default branch). End commit msg with the Co-Authored-By trailer. See [[antragsplattform-backlog]].
+**How to apply:** the remote is `stupa` → github.com/STUPA-MAKERS/STUPA-Workflow. Use `gh` for the PR and the CI watch (`gh pr checks --watch` / `gh run watch`). Branch off main (the default branch). End the commit message with the Co-Authored-By trailer. See [[antragsplattform-backlog]].

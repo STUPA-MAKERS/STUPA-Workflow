@@ -11,13 +11,13 @@ class ResizeObserverStub {
     ResizeObserverStub.last = this;
   }
   observe(): void {
-    /* no layout in jsdom */
+    /* jsdom does no layout, so there is nothing to observe. */
   }
   disconnect(): void {
-    /* noop */
+    /* Intentionally empty. */
   }
   unobserve(): void {
-    /* noop */
+    /* Intentionally empty. */
   }
 }
 
@@ -37,7 +37,7 @@ describe('HScrollSyncDirective', () => {
       `<div class="wrap" appHScrollSync><table><tbody><tr><td>cell</td></tr></tbody></table></div>`,
       { imports: [HScrollSyncDirective] },
     );
-    // afterNextRender runs the DOM wiring once the view is rendered.
+    // afterNextRender builds the DOM only after the view renders.
     TestBed.tick();
     const wrap = view.container.querySelector('.wrap') as HTMLElement;
     return { view, wrap };
@@ -48,13 +48,12 @@ describe('HScrollSyncDirective', () => {
     const bar = wrap.previousElementSibling as HTMLElement;
     expect(bar).not.toBeNull();
     expect(bar.getAttribute('aria-hidden')).toBe('true');
-    // an inner spacer sizes the horizontal scroll area
+    // An inner spacer sets the width of the horizontal scroll area.
     expect(bar.firstElementChild).not.toBeNull();
-    // ResizeObserver was created (wrap + table observed)
     expect(ResizeObserverStub.last).not.toBeNull();
-    // jsdom has no layout → the content does not overflow → the bar hides itself.
+    // jsdom has no layout. The content does not overflow, so the bar hides itself.
     expect(bar.style.display).toBe('none');
-    // Simulate an overflowing wrapper; the observer callback re-runs update() and
+    // Simulate an overflowing wrapper. The observer callback runs the update again and
     // shows the bar.
     Object.defineProperty(wrap, 'scrollWidth', { value: 500, configurable: true });
     Object.defineProperty(wrap, 'clientWidth', { value: 100, configurable: true });
@@ -68,7 +67,7 @@ describe('HScrollSyncDirective', () => {
     });
     TestBed.tick();
     const wrap = view.container.querySelector('.empty') as HTMLElement;
-    // The proxy is still inserted even without a table child.
+    // The directive still inserts the proxy when the wrapper has no table child.
     expect(wrap.previousElementSibling?.getAttribute('aria-hidden')).toBe('true');
     expect(ResizeObserverStub.last).not.toBeNull();
   });
@@ -77,17 +76,15 @@ describe('HScrollSyncDirective', () => {
     const { wrap } = await setup();
     const bar = wrap.previousElementSibling as HTMLElement;
 
-    // wrapper scrolled → proxy follows
     wrap.scrollLeft = 40;
     wrap.dispatchEvent(new Event('scroll'));
     expect(bar.scrollLeft).toBe(40);
 
-    // proxy scrolled → wrapper follows
     bar.scrollLeft = 90;
     bar.dispatchEvent(new Event('scroll'));
     expect(wrap.scrollLeft).toBe(90);
 
-    // equal values → the guard short-circuits (no ping-pong)
+    // Two equal values stop the guard, so no ping-pong starts.
     wrap.dispatchEvent(new Event('scroll'));
     expect(bar.scrollLeft).toBe(90);
   });

@@ -113,7 +113,7 @@ describe('AuditLogComponent — config diff + revert', () => {
     c.doRevert();
     expect(revertAuditEntry).toHaveBeenCalledWith(7);
     expect(toast.success).toHaveBeenCalled();
-    // Reload nach Revert: erneuter Audit-Abruf.
+    // The revert triggers a reload, so the component reads the audit log a second time.
     expect(api.listAuditLog).toHaveBeenCalledTimes(2);
   });
 

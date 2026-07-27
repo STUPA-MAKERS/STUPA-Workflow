@@ -14,7 +14,10 @@ MeetingStatus = Literal["planned", "live", "closed"]
 
 
 class _CamelModel(BaseModel):
-    """camelCase aliases in JSON; fields settable by name."""
+    """Base model with camelCase aliases in JSON.
+
+    Code can also set the fields by their Python name.
+    """
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -24,12 +27,11 @@ class MeetingCreate(_CamelModel):
 
     gremium_id: UUID = Field(alias="gremiumId")
     title: str = Field(min_length=1)
-    # Date is required: a meeting can't be scheduled without one.
     date: _date
     start_time: _time = Field(alias="startTime")
-    # Optional end time; if unset the iCal feed assumes a 1h duration.
+    # Without an end time the iCal feed assumes a duration of one hour.
     end_time: _time | None = Field(default=None, alias="endTime")
-    # Exactly one assigned protokollant (a committee member).
+    # The protokollant must be a member of the Gremium.
     protokollant_id: UUID | None = Field(default=None, alias="protokollantId")
 
     @model_validator(mode="after")
@@ -40,9 +42,9 @@ class MeetingCreate(_CamelModel):
 
 
 class MeetingPatch(_CamelModel):
-    """``PATCH /api/meetings/{id}`` — control/plan a meeting.
+    """``PATCH /api/meetings/{id}`` — control or plan a meeting.
 
-    At least one field must be set; any change publishes ``meeting_state``.
+    At least one field must be set. Any change publishes ``meeting_state``.
     """
 
     active_application_id: UUID | None = Field(default=None, alias="activeApplicationId")
@@ -54,8 +56,6 @@ class MeetingPatch(_CamelModel):
 
     @model_validator(mode="after")
     def _at_least_one(self) -> MeetingPatch:
-        # ``date``/``protokollantId`` count too: schedule a planned meeting or
-        # (re)assign its protokollant.
         managed = {
             "date",
             "start_time",
@@ -71,30 +71,34 @@ class MeetingPatch(_CamelModel):
 
 
 class MeetingVoteOut(_CamelModel):
-    """A vote bound to the meeting (for session control)."""
+    """A vote bound to the meeting (for meeting control)."""
 
     id: UUID
-    # NULL = generic question (free-text TOP), no application.
+    # ``None`` marks a generic question on a free-text agenda item, with no
+    # application behind it.
     application_id: UUID | None = Field(default=None, alias="applicationId")
-    # Which TOP the vote is bound to (for grouping in the FE).
+    # The frontend groups the votes by this agenda item.
     agenda_item_id: UUID | None = Field(default=None, alias="agendaItemId")
     question: str | None = None
-    # Options (for casting in the FE).
     options: list[str] = Field(default_factory=list)
-    # ``cancelled``: the application left the vote state manually (vote aborted).
+    # ``cancelled``: somebody moved the application out of the vote state by hand,
+    # which aborts the vote.
     status: Literal["draft", "open", "closed", "cancelled"]
     result: str | None = None
-    # Current tally (option → count) + leading option; survives a reload.
+    # Current tally, option to count, plus the leading option. Both survive a
+    # reload.
     counts: dict[str, int] | None = None
     leading: str | None = None
-    # Participation progress (voted vs. present) + ``revealed``: whether
-    # ``counts``/``leading`` are visible (closed, or all present voted and not
-    # secret), otherwise hidden.
+    # Participation progress: voted against present. ``revealed`` tells whether
+    # ``counts`` and ``leading`` are visible. They are visible after the close, or
+    # when every present member voted and the vote is not secret. Otherwise they
+    # stay hidden.
     voted: int = 0
     present: int = 0
     revealed: bool = True
-    # Rejection reason (after close): ``quorum`` = quorum missed, ``majority`` =
-    # majority missed. ``None`` while open or on ``passed``/``tie``.
+    # Reason for the rejection after the close: ``quorum`` for a missed quorum,
+    # ``majority`` for a missed majority. The value stays ``None`` while the vote is
+    # open and on ``passed`` or ``tie``.
     failed_reason: Literal["quorum", "majority"] | None = Field(
         default=None, alias="failedReason"
     )
@@ -110,7 +114,7 @@ class MeetingOut(_CamelModel):
     date: _date | None = None
     start_time: _time | None = Field(default=None, alias="startTime")
     end_time: _time | None = Field(default=None, alias="endTime")
-    # Set automatically on close — end line of the protocol title page.
+    # The close sets this field. It fills the end line of the protocol title page.
     closed_at: _datetime | None = Field(default=None, alias="closedAt")
     status: MeetingStatus
     active_application_id: UUID | None = Field(default=None, alias="activeApplicationId")
@@ -118,17 +122,17 @@ class MeetingOut(_CamelModel):
     created_at: _datetime = Field(alias="createdAt")
     protokollant_id: UUID | None = Field(default=None, alias="protokollantId")
     protokollant_name: str | None = Field(default=None, alias="protokollantName")
-    # Is the requesting principal this meeting's protokollant? Resolved
-    # server-side because the FE knows only ``sub``, not the internal principal_id.
+    # The server resolves this flag, because the frontend knows only ``sub`` and not
+    # the internal principal id.
     is_protokollant: bool = Field(default=False, alias="isProtokollant")
-    # Master flag for the FE: may the principal lead the meeting (protocol/TOPs/
-    # status)? = protokollant or session manager. Granular flags below.
+    # Master flag for the frontend: the principal may lead the meeting, which covers
+    # the protocol, the agenda items and the status. It holds for the protokollant
+    # and for a meeting manager. The granular flags follow below.
     can_control: bool = Field(default=False, alias="canControl")
     can_manage: bool = Field(default=False, alias="canManage")
     can_write: bool = Field(default=False, alias="canWrite")
     can_manage_votes: bool = Field(default=False, alias="canManageVotes")
     can_vote: bool = Field(default=False, alias="canVote")
-    # Votes bound to the meeting (session control).
     votes: list[MeetingVoteOut] = Field(default_factory=list)
 
 
@@ -138,9 +142,9 @@ TimelineDirection = Literal["past", "upcoming"]
 class MeetingPage(_CamelModel):
     """Cursor page of the meeting timeline.
 
-    Keyset-paginated around *now*: ``upcoming`` runs forward (earliest first),
-    ``past`` backward (latest first). ``nextCursor`` is ``None`` once no further
-    meetings follow in that direction.
+    The page is keyset-paginated around *now*. ``upcoming`` runs forward (earliest
+    first). ``past`` runs backward (latest first). ``nextCursor`` is ``None`` when
+    no further meeting follows in that direction.
     """
 
     items: list[MeetingOut]
@@ -148,12 +152,12 @@ class MeetingPage(_CamelModel):
 
 
 class MeetingGremiumOut(_CamelModel):
-    """Committee (id + name) for the meeting-overview filter.
+    """Gremium (id and name) for the meeting-overview filter.
 
-    Source is visibility, not membership: a committee appears iff the principal
-    has at least one readable meeting there. So a pool substitute/delegation
-    recipient without membership can filter their committee, while a member of a
-    meeting-less committee isn't offered it.
+    The source is visibility, not membership. A Gremium appears exactly when the
+    principal can read at least one meeting there. A pool substitute or a
+    delegation recipient without a membership can therefore filter their Gremium. A
+    member of a Gremium without meetings does not get the entry.
     """
 
     id: UUID
@@ -164,20 +168,20 @@ AttendanceStatus = Literal["present", "excused", "absent"]
 
 
 class AttendanceOut(_CamelModel):
-    """Attendance of a committee member for a meeting."""
+    """Attendance of a Gremium member for a meeting."""
 
     principal_id: UUID = Field(alias="principalId")
     display_name: str | None = Field(default=None, alias="displayName")
     email: str | None = None
-    # ``None`` = not yet recorded (roster member without an entry).
+    # ``None`` means not yet recorded: a roster member without an entry.
     status: AttendanceStatus | None = None
     source: Literal["self", "lead"] | None = None
-    # Is the requesting principal this member (for self-marking)?
+    # True when the requesting principal is this member, which allows self-marking.
     is_self: bool = Field(default=False, alias="isSelf")
 
 
 class MeetingMemberOut(_CamelModel):
-    """Current committee member — protokollant candidate when creating a meeting."""
+    """Current Gremium member, as a protokollant candidate for a new meeting."""
 
     principal_id: UUID = Field(alias="principalId")
     display_name: str | None = Field(default=None, alias="displayName")
@@ -191,22 +195,22 @@ class AttendanceSetBody(_CamelModel):
 
 
 class AgendaItemOut(_CamelModel):
-    """Agenda item: an assigned application or free-text TOP."""
+    """Agenda item: an assigned application or a free-text item."""
 
     id: UUID
     application_id: UUID | None = Field(default=None, alias="applicationId")
     title: str | None = None
-    # Markdown body of this TOP (per-TOP editor).
+    # Markdown text of this agenda item.
     body: str | None = None
     position: int = 0
-    # Non-public: redacted in the public protocol PDF.
+    # The public protocol PDF redacts a non-public agenda item.
     non_public: bool = Field(default=False, alias="nonPublic")
-    # Current application status (i18n label), e.g. to show in the list.
+    # Current application status as an i18n label.
     state_label: dict[str, str] | None = Field(default=None, alias="stateLabel")
 
 
 class AssignableApplicationOut(_CamelModel):
-    """Application in a vote state of the meeting's committee (not yet on the agenda)."""
+    """Application of the meeting Gremium in a vote state, not yet on the agenda."""
 
     application_id: UUID = Field(alias="applicationId")
     title: str | None = None
@@ -214,12 +218,13 @@ class AssignableApplicationOut(_CamelModel):
 
 
 class MeetingVoteOpenBody(_CamelModel):
-    """``POST /meetings/{id}/votes`` — open a live vote on a TOP.
+    """``POST /meetings/{id}/votes`` — open a live vote on an agenda item.
 
-    Binds a new vote to the TOP (``agendaItemId``) and opens it at once.
-    Application TOPs allow exactly one vote (it fires the application's pass/fail
-    branch on close); free-text TOPs allow several generic questions.
-    ``question`` goes into the protocol snippet.
+    The route binds a new vote to the agenda item (``agendaItemId``) and opens it at
+    once. An application agenda item allows exactly one vote, because that vote
+    fires the pass or fail branch of the application on close. A free-text agenda
+    item allows several generic questions. ``question`` goes into the protocol
+    snippet.
     """
 
     agenda_item_id: UUID = Field(alias="agendaItemId")
@@ -229,10 +234,11 @@ class MeetingVoteOpenBody(_CamelModel):
         default="simple", alias="majorityRule"
     )
     secret: bool = False
-    # The quorum denominator is always derived server-side from the current
-    # roster (``vote_eligible_count``), never a client input, so it can't be
-    # manipulated against the real roster.
-    # Explicit percent quorum (0–100). ``None`` ⇒ committee default (if set).
+    # The server always derives the quorum denominator from the current roster
+    # through ``vote_eligible_count``. It never comes from the client, so nobody can
+    # manipulate it against the real roster. This field holds an explicit percent
+    # quorum from 0 to 100. ``None`` selects the Gremium default when the Gremium
+    # sets one.
     quorum_percent: int | None = Field(
         default=None, alias="quorumPercent", ge=0, le=100
     )
@@ -245,9 +251,9 @@ class MeetingVoteOpenBody(_CamelModel):
 
 
 class AgendaAddBody(_CamelModel):
-    """``POST /meetings/{id}/agenda`` — add a TOP: application or free-text.
+    """``POST /meetings/{id}/agenda`` — add an agenda item, application or free text.
 
-    Exactly one of ``applicationId`` / ``title`` is required.
+    Supply exactly one of ``applicationId`` and ``title``.
     """
 
     application_id: UUID | None = Field(default=None, alias="applicationId")
@@ -262,10 +268,11 @@ class AgendaAddBody(_CamelModel):
 
 
 class AgendaBodyBody(_CamelModel):
-    """``PATCH …/agenda/{itemId}`` — set a TOP's markdown body and/or title.
+    """``PATCH …/agenda/{itemId}`` — set the markdown body or the title of an item.
 
-    ``title`` renames only free-text TOPs (application TOPs inherit the title
-    from the application); ``body`` sets the markdown text. Both optional.
+    ``title`` renames only a free-text agenda item. An application agenda item
+    inherits the title from the application. ``body`` sets the markdown text. Both
+    fields are optional.
     """
 
     body: str | None = None
@@ -274,6 +281,6 @@ class AgendaBodyBody(_CamelModel):
 
 
 class AgendaReorderBody(_CamelModel):
-    """``PUT …/agenda/order`` — order TOPs as supplied."""
+    """``PUT …/agenda/order`` — order the agenda items as supplied."""
 
     item_ids: list[UUID] = Field(alias="itemIds")

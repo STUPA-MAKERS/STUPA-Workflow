@@ -1,4 +1,4 @@
-"""Unit-Tests der Kalender-Endpunkte (#ics) — TestClient + dependency_overrides."""
+"""Unit tests of the calendar endpoints (#ics) with TestClient and dependency_overrides."""
 
 from __future__ import annotations
 
@@ -52,7 +52,7 @@ def test_me_with_token_returns_feed_url() -> None:
 
 
 def test_me_requires_authentication() -> None:
-    # Kein Principal-Override → realer Resolver, kein Cookie → 401 (kein DB-Zugriff).
+    # No principal override, so the real resolver runs. No cookie gives a 401 and no DB read.
     resp = _client(fake_session()).get("/api/calendar/me")
     assert resp.status_code == 401
 
@@ -64,7 +64,7 @@ def test_rotate_generates_feed_url() -> None:
     assert resp.status_code == 200
     url = resp.json()["url"]
     assert re.fullmatch(r"https://stupa\.example/api/calendar/[\w-]+\.ics", url)
-    assert row.calendar_token is not None  # Token wurde rotiert
+    assert row.calendar_token is not None  # the token rotated
 
 
 def test_feed_unknown_token_is_404() -> None:

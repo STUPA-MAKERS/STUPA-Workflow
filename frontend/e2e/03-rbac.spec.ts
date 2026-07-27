@@ -1,12 +1,12 @@
 import { expect, test } from '@playwright/test';
 
 /**
- * Szenario 7 (testing.md §3.7): RBAC fail-closed. Ein unauthentifizierter Besucher
- * darf geschützte Bereiche NICHT sehen. Der authGuard löst entweder einen Full-Page-
- * Redirect auf `/api/auth/login` aus (ohne konfiguriertes OIDC → 404; kein Mock-
- * Keycloak im e2e-Stack, Mock seit #101 AUS) oder routet (bei vorhandener, aber
- * unzureichender Session) nach `/forbidden`. Geprüft: der geschützte Inhalt erscheint
- * nicht und der Besucher landet auf Login/Forbidden.
+ * Scenario 7 (testing.md §3.7): RBAC fails closed. An unauthenticated visitor must
+ * NOT see a guarded area. The authGuard either triggers a full page redirect to
+ * `/api/auth/login`, or it routes to `/forbidden` when a session exists but lacks the
+ * permission. Without configured OIDC the redirect ends in a 404, because the e2e
+ * stack has no mock Keycloak (the mock is OFF since #101). The test checks that the
+ * guarded content stays hidden and that the visitor lands on login or forbidden.
  */
 const GUARDED = ['/applications', '/admin', '/budget/pots', '/admin/forms'];
 
@@ -14,7 +14,6 @@ for (const path of GUARDED) {
   test(`@gating Unauth sieht ${path} nicht`, async ({ page }) => {
     await page.goto(path);
     await page.waitForURL(/auth\/login|forbidden/, { timeout: 15_000 });
-    // Doppelt abgesichert: nicht mehr auf der geschützten Route.
     expect(new URL(page.url()).pathname).not.toBe(path);
   });
 }

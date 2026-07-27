@@ -17,11 +17,14 @@ type Phase = 'loading' | 'error' | 'ready';
 
 /**
  * Vote UI: load a single vote and cast a ballot.
- * - `open` → options selectable; `allowChange` allows re-voting, else locked.
- * - `closed` → read-only with the result.
- * - not eligible (FE permission or server 403) → notice instead of casting
- *   (RBAC stays authoritative server-side).
- * With `secret`, no counts are shown during the open phase.
+ *
+ * - `open`: the user selects an option. With `allowChange` a new vote replaces the old
+ *   one. Without it the choice locks.
+ * - `closed`: a read-only view with the result.
+ * - not eligible: a notice replaces the cast controls.
+ *
+ * A missing frontend permission or a server 403 marks the user as not eligible. RBAC
+ * stays authoritative on the server. A `secret` vote shows no counts while it is open.
  */
 @Component({
   selector: 'app-vote-cast',
@@ -42,11 +45,11 @@ export class VoteCastComponent {
   readonly phase = signal<Phase>('loading');
   readonly vote = signal<Vote | null>(null);
   readonly myChoice = signal<string | null>(null);
-  /** Own choice for the PROXY ballot (separate submission). */
+  /** The choice for the proxy ballot. It goes to the server as a separate submission. */
   readonly proxyChoice = signal<string | null>(null);
   readonly submitting = signal(false);
   readonly notEligible = signal(false);
-  /** Delegation view: voting right handed over / acting as proxy. */
+  /** Delegation state: the user handed the voting right over, or the user acts as a proxy. */
   readonly delegation = signal<VoteDelegationStatus | null>(null);
 
   readonly isOpen = computed(() => this.vote()?.status === 'open');
@@ -54,12 +57,9 @@ export class VoteCastComponent {
   readonly allowChange = computed(() => this.vote()?.config.allowChange ?? true);
   readonly options = computed(() => this.vote()?.config.options ?? []);
   readonly secret = computed(() => Boolean(this.vote()?.secret));
-  /** Show counts only once no longer secret: closed or non-secret. */
   readonly showBars = computed(() => Boolean(this.vote()) && (!this.secret() || this.isClosed()));
-  /** Already voted and change locked → grey out the options. */
   readonly locked = computed(() => this.myChoice() !== null && !this.allowChange());
 
-  /** Sum of all cast votes (for "x of y"). */
   readonly castCount = computed(() => {
     const tally = this.vote()?.tally;
     return tally ? Object.values(tally.counts).reduce((a, b) => a + b, 0) : 0;
@@ -78,12 +78,13 @@ export class VoteCastComponent {
       this.phase.set('error');
       return;
     }
-    // Eligibility UX: if the permission is missing, show a notice (server stays authoritative).
+    // Eligibility UX: if the permission is missing, show a notice. The server stays
+    // authoritative.
     this.notEligible.set(!this.auth.can('vote.cast'));
-    // Delegation status: explains a 403 (voting right handed over) or unlocks the
-    // separate proxy block. IMPORTANT: `exercising` does NOT free one's own vote
-    // (external substitutes may only cast the proxy ballot) — the two submissions
-    // are separate.
+    // The delegation status explains a 403 (the user handed the voting right over) or it
+    // unlocks the separate proxy block. Important: `exercising` does not free the own
+    // vote. An external substitute can cast the proxy ballot only. The two submissions
+    // stay separate.
     this.delegations.voteStatus(id).subscribe({
       next: (status) => {
         this.delegation.set(status);
@@ -135,7 +136,7 @@ export class VoteCastComponent {
             res.status === 'changed' ? 'voting.cast.toast.changed' : 'voting.cast.toast.cast',
           ),
         );
-        // Reload the current tally from the server (no optimistic guessing).
+        // Reload the current tally from the server. Do not guess it optimistically.
         this.api.getVote(vote.id, { quiet: true }).subscribe((v) => this.vote.set(v));
       },
       error: (err: { status?: number; error?: ProblemDetail }) => {

@@ -1,8 +1,9 @@
 """API schemas for the applications module.
 
-Request/response shells for application CRUD, timeline, version history, list
-and comments. PII (``applicant`` mail/name) is emitted only to authorized
-principals or the applicant themselves (``ApplicationOut.applicant``).
+These models shape the requests and the responses for application CRUD, the
+timeline, the version history, the list and the comments. The API emits the PII
+in ``ApplicationOut.applicant`` only to an authorized principal or to the
+applicant.
 """
 
 from __future__ import annotations
@@ -20,58 +21,56 @@ from app.shared.i18n import DEFAULT_LANG, I18nMap, Lang
 
 
 class _CamelModel(BaseModel):
-    """camelCase aliases in JSON; fields populatable by name."""
+    """Base model with camelCase aliases in JSON.
+
+    The fields also populate by their Python name.
+    """
 
     model_config = ConfigDict(populate_by_name=True)
 
 
-# --------------------------------------------------------------------------- #
-# Create
-# --------------------------------------------------------------------------- #
 class ApplicationCreate(_CamelModel):
-    """Create an application. ``data`` is validated against the effective form.
+    """Create an application.
 
-    Anonymous submissions: ``altcha`` is verified server-side and
-    ``applicantEmail`` is required. Logged-in users need no ALTCHA;
-    ``applicantEmail``/``applicantName`` are derived from the account if empty.
-    The router enforces the anonymous required fields.
+    The server validates ``data`` against the effective form. An anonymous
+    submission must carry ``altcha`` and ``applicantEmail``. The server verifies
+    the ALTCHA solution. A logged-in user needs no ALTCHA. The server derives an
+    empty ``applicantEmail`` or ``applicantName`` from the account. The router
+    enforces the fields that an anonymous submission requires.
     """
 
     type_id: UUID = Field(alias="typeId")
     budget_pot_id: UUID | None = Field(default=None, alias="budgetPotId")
     data: dict[str, Any]
-    # Optional at schema level: derivable from the account for logged-in users.
-    # For anonymous submissions the router enforces it (422).
+    # Optional in the schema, because the account supplies it for a logged-in
+    # user. For an anonymous submission the router enforces it and answers 422.
     applicant_email: EmailStr | None = Field(default=None, alias="applicantEmail")
-    # Upper bound (anti-DoS): persisted free text (display name) is capped.
+    # Anti-DoS cap on the stored free text of the display name.
     applicant_name: str | None = Field(default=None, alias="applicantName", max_length=256)
     lang: Lang = DEFAULT_LANG
-    # Structurally validated in the schema (malformed -> 422); cryptographic
-    # verification happens via `require_altcha`.
+    # The schema validates the structure and answers 422 for a malformed value.
+    # `require_altcha` runs the cryptographic verification.
     altcha: AltchaSolutionStr | None = None
 
 
 class ApplicationCreated(_CamelModel):
-    """201 response to ``POST /applications`` — just the id."""
+    """201 response of ``POST /applications``, with the new id only."""
 
     application_id: UUID = Field(alias="applicationId")
 
 
-# --------------------------------------------------------------------------- #
-# Read
-# --------------------------------------------------------------------------- #
 class StateOut(_CamelModel):
     id: UUID
     key: str
     label: I18nMap
     color: str | None = None
     edit_allowed: bool = Field(alias="editAllowed")
-    # State kind — the frontend shows e.g. approve/reject actions for ``approval``.
+    # State kind. The frontend shows approve and reject actions for ``approval``.
     kind: str = "normal"
 
 
 class ApplicantOut(_CamelModel):
-    """Applicant PII — visible to authorized identities only."""
+    """Applicant PII, visible to an authorized identity only."""
 
     email: str | None = None
     name: str | None = None
@@ -94,22 +93,23 @@ class ApplicationOut(_CamelModel):
     created_at: datetime = Field(alias="createdAt")
     updated_at: datetime = Field(alias="updatedAt")
     applicant: ApplicantOut | None = None
-    # May the requester edit/delete (manager or creator)?
+    # True when the requester may edit or delete: a manager or the creator.
     can_edit: bool = Field(default=False, alias="canEdit")
-    # Is the requester the creator (applicant)? Gates the anonymization request
-    # (GDPR Art. 17): only the data subject, not administration.
+    # True when the requester is the creator, that is the applicant. This gates
+    # the anonymization request (GDPR Art. 17). Only the data subject may ask,
+    # never the administration.
     is_owner: bool = Field(default=False, alias="isOwner")
 
 
 class ApplicationPatch(_CamelModel):
-    """Update application data (new version only if ``state.editAllowed``)."""
+    """Update the application data.
+
+    A new version follows only when ``state.editAllowed`` is true.
+    """
 
     data: dict[str, Any]
 
 
-# --------------------------------------------------------------------------- #
-# Timeline / Versions
-# --------------------------------------------------------------------------- #
 class TimelineEventOut(_CamelModel):
     from_state_id: UUID | None = Field(default=None, alias="fromStateId")
     to_state_id: UUID = Field(alias="toStateId")
@@ -127,13 +127,10 @@ class VersionOut(_CamelModel):
     at: datetime
 
 
-# --------------------------------------------------------------------------- #
-# List
-# --------------------------------------------------------------------------- #
 class ApplicationListItem(_CamelModel):
     id: UUID
     type_id: UUID = Field(alias="typeId")
-    # Application title (system title field ``data['title']``) for the list column.
+    # Title for the list column, from the system title field ``data['title']``.
     title: str | None = None
     state: StateOut | None = None
     gremium_id: UUID | None = Field(default=None, alias="gremiumId")
@@ -144,12 +141,9 @@ class ApplicationListItem(_CamelModel):
     updated_at: datetime = Field(alias="updatedAt")
 
 
-# --------------------------------------------------------------------------- #
-# Comments
-# --------------------------------------------------------------------------- #
 class CommentCreate(_CamelModel):
-    # Hard cap (anti-DoS): keeps a single comment from growing unbounded
-    # (DB/mail render); beyond it -> 422.
+    # Anti-DoS cap. It stops one comment from growing without a bound in the
+    # database and in the mail render. A longer body answers 422.
     body: str = Field(min_length=1, max_length=10_000)
     visibility: Literal["internal", "public"] = "public"
 
@@ -161,5 +155,6 @@ class CommentOut(_CamelModel):
     body: str
     visibility: Literal["internal", "public"]
     at: datetime
-    # Whether the requesting viewer wrote this comment (chat alignment in the FE).
+    # True when the requesting viewer wrote the comment. The frontend aligns the
+    # chat bubble by this flag.
     is_own: bool = Field(default=False, alias="isOwn")

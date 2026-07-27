@@ -1,4 +1,4 @@
-"""Unit-Tests der reinen OAuth-Helfer + der Scope-Kappung im Principal (DB-frei)."""
+"""Unit tests of the pure OAuth helpers and the scope cap in Principal (no database)."""
 
 from __future__ import annotations
 
@@ -16,7 +16,6 @@ def _challenge(verifier: str) -> str:
     return base64.urlsafe_b64encode(d).rstrip(b"=").decode("ascii")
 
 
-# --------------------------------------------------------------------- scopes
 def test_parse_scope_default_and_dedup() -> None:
     # Empty → the full default scope set (split into tokens, not one blob).
     assert oauth.parse_scope(None) == list(oauth.SCOPES.keys())
@@ -50,14 +49,12 @@ def test_vote_cast_never_grantable() -> None:
     assert all("vote.cast" not in p for p in oauth.SCOPES.values())
 
 
-# ----------------------------------------------------------------------- PKCE
 def test_verify_pkce_s256_roundtrip() -> None:
     verifier = "a" * 64
     assert oauth.verify_pkce_s256(verifier, _challenge(verifier)) is True
     assert oauth.verify_pkce_s256(verifier, _challenge("different")) is False
 
 
-# ---------------------------------------------------------------- token shape
 def test_token_prefixes_and_hash() -> None:
     at = oauth.generate_access_token()
     rt = oauth.generate_refresh_token()
@@ -66,11 +63,10 @@ def test_token_prefixes_and_hash() -> None:
     assert not oauth.tokens_match(at, oauth.hash_token(rt))
 
 
-# -------------------------------------------------- Principal scope-Kappung
 def test_unscoped_principal_unrestricted() -> None:
     p = Principal(sub="u", permissions={"application.read"})
     assert p.has("application.read") is True
-    # ungescoped: Admin-Bypass voll wirksam
+    # Unscoped: the admin bypass applies in full.
     admin = Principal(sub="a", roles=["admin"])
     assert admin.has("budget.manage") is True
 
@@ -82,12 +78,12 @@ def test_scoped_principal_caps_permissions() -> None:
         scope_permissions=frozenset({"application.read"}),
     )
     assert p.has("application.read") is True
-    # im Besitz, aber NICHT im Scope → gekappt
+    # Held, but NOT in the scope → capped.
     assert p.has("budget.manage") is False
 
 
 def test_scope_caps_admin_bypass() -> None:
-    # Scoped Token eines Admins: der Admin-Bypass darf den Scope NICHT aushebeln.
+    # Scoped token of an admin: the admin bypass must NOT override the scope.
     admin = Principal(
         sub="a",
         roles=["admin"],
@@ -98,20 +94,19 @@ def test_scope_caps_admin_bypass() -> None:
     assert admin.has("admin.config") is False
 
 
-# ------------------------------------------------------------------- lifetimes
 def test_resolve_lifetime_known_and_default() -> None:
     assert oauth.resolve_lifetime("30d") == 30 * 24 * 3600
-    # None oder unbekannt → Default-Lebensdauer (fail-safe, kein KeyError).
+    # None or an unknown key → the default lifetime (fail-safe, no KeyError).
     default = oauth.LIFETIMES[oauth.DEFAULT_LIFETIME]
     assert oauth.resolve_lifetime(None) == default
     assert oauth.resolve_lifetime("bogus") == default
 
 
 def test_resolve_lifetime_never_dropped_and_bounded() -> None:
-    # Die "never"-Option existiert nicht mehr → unbekannter Key → Default (nicht None).
+    # The "never" option is gone → an unknown key → the default, not None.
     assert "never" not in oauth.LIFETIMES
     assert oauth.resolve_lifetime("never") == oauth.LIFETIMES[oauth.DEFAULT_LIFETIME]
-    # Jede Lebensdauer ist endlich und durch MAX_LIFETIME_SECONDS gedeckelt.
+    # Every lifetime is finite and capped by MAX_LIFETIME_SECONDS.
     assert oauth.MAX_LIFETIME_SECONDS == 90 * 24 * 3600
     for key in oauth.LIFETIMES:
         ttl = oauth.resolve_lifetime(key)
@@ -122,6 +117,6 @@ def test_resolve_lifetime_never_dropped_and_bounded() -> None:
 def test_resolve_lifetime_caps_oversized_value(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # Ein (hypothetisch) zu großer Katalogwert wird hart auf MAX gedeckelt.
+    # A catalog value that is too large gets capped hard at MAX.
     monkeypatch.setitem(oauth.LIFETIMES, "huge", oauth.MAX_LIFETIME_SECONDS * 10)
     assert oauth.resolve_lifetime("huge") == oauth.MAX_LIFETIME_SECONDS

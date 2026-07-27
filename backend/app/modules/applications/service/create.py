@@ -1,4 +1,4 @@
-"""Application creation: validate against the effective form, seed v1 + initial state."""
+"""Application creation: validate against the effective form, seed v1 and the state."""
 
 from __future__ import annotations
 
@@ -27,25 +27,35 @@ from app.shared.errors import NotFoundError, ValidationProblem
 
 
 class CreateOps(ApplicationsServiceBase):
-    """Public/managed application creation."""
+    """Public and managed application creation."""
 
     async def create(
         self, payload: ApplicationCreate, *, actor: str = "applicant"
     ) -> tuple[Application, str]:
-        """Create an application. Returns ``(application, applicant_email)`` for mailing.
+        """Create an application.
 
-        Order: load effective form → ``validate_answers`` (422 before any DB write) →
-        application + PII row + v1 + initial state + status event. ``actor`` is the
-        audit actor: ``"applicant"`` for public submission, the principal ``sub`` for
-        manual creation by a manager.
+        The method runs in a fixed order:
+
+        1. Load the effective form.
+        2. Run ``validate_answers``. A bad answer raises 422 before any DB write.
+        3. Write the application, the PII row, version 1, the initial state and
+           the status event.
+
+        ``actor`` names the audit actor. A public submission passes
+        ``"applicant"``. A manual creation by a manager passes the ``sub`` of the
+        principal.
+
+        Returns:
+            The application and the applicant email, for the magic-link mail.
         """
         app_type = await self.session.get(ApplicationType, payload.type_id)
         if app_type is None:
             raise NotFoundError(f"application type {payload.type_id} not found")
-        # There is exactly ONE active global flow; missing → 404.
+        # Exactly one global flow is active. A missing flow answers 404.
         flow_version_id = await self._resolve_flow_version_id(app_type)
 
-        # Effective form (type + optional pot fields); validates pot scoping (404).
+        # Effective form: type fields plus optional pot fields. The call also
+        # validates the pot scoping and answers 404.
         forms = FormsService(self.session)
         effective = await forms.get_effective_form(payload.type_id, payload.budget_pot_id)
         fields = [f for section in effective.sections for f in section.fields]
@@ -60,7 +70,7 @@ class CreateOps(ApplicationsServiceBase):
             ) from exc
 
         initial = await self._initial_state(flow_version_id)
-        # Persist only known field keys (unknown ones are discarded).
+        # Store the known field keys only. The code discards an unknown key.
         clean = _whitelist(fields, payload.data)
         amount, currency = _amount_currency(fields, clean)
 
@@ -75,10 +85,12 @@ class CreateOps(ApplicationsServiceBase):
             currency=currency,
             data=clean,
             lang=payload.lang,
-            # Logged-in submission: remember the creator (anonymous → None).
+            # A logged-in submission remembers the creator. An anonymous one
+            # stores None.
             created_by=actor if actor != "applicant" else None,
-            # Guest submissions start unconfirmed (invisible until magic-link verify,
-            # 12h discard); a logged-in submitter's email counts as confirmed at once.
+            # A guest submission starts unconfirmed. It stays invisible until the
+            # magic-link verify, and the platform discards it after 12 h. The mail
+            # of a logged-in submitter counts as confirmed at once.
             email_confirmed_at=None if actor == "applicant" else datetime.now(UTC),
         )
         self.session.add(app)
@@ -110,8 +122,8 @@ class CreateOps(ApplicationsServiceBase):
         )
         await self.session.commit()
 
-        # Materialize the initial state's deadline: a named deadline policy on it
-        # (e.g. "submitted + X days") creates the due deadline row.
+        # Materialize the deadline of the initial state. A named deadline policy
+        # on that state, such as "submitted + X days", creates the due deadline row.
         from app.modules.flow.service import FlowService
 
         await self.session.refresh(app)
@@ -119,10 +131,11 @@ class CreateOps(ApplicationsServiceBase):
         return app, str(payload.applicant_email)
 
     async def _resolve_flow_version_id(self, app_type: ApplicationType) -> UUID:
-        """Resolve the active (global) flow for a new application.
+        """Resolve the active global flow for a new application.
 
-        Type flows are removed — only the single global flow exists; missing
-        (fresh install without flow config) → 404."""
+        Per-type flows no longer exist. Only the single global flow remains. A
+        fresh install without a flow config has none, so the method answers 404.
+        """
         global_flow_id = (
             await self.session.execute(select(FlowVersion.id).where(FlowVersion.active.is_(True)))
         ).scalar_one_or_none()

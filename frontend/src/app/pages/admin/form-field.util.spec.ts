@@ -94,7 +94,6 @@ describe('validateJsonLogic', () => {
   });
 
   it('wraps a non-array operand into a single-element arg list', () => {
-    // raw is not an array → validated as [raw]
     expect(validateJsonLogic({ not: { var: 'x' } })).toBe(true);
     expect(validateJsonLogic({ not: { bogus: 1 } })).toBe(false);
   });
@@ -133,7 +132,7 @@ describe('round-trip', () => {
       field({ key: 'amount', type: 'currency', isPromoted: true, promoteTarget: 'amount' }),
     );
     expect(num.isPromoted).toBe(true);
-    // positions auto-promotes without the flag → strip it (backend rejects it, 422).
+    // A positions field promotes without the flag. Strip it, because the backend sends 422.
     const pos = normalizeFormField(field({ key: 'positions', type: 'positions', isPromoted: true }));
     expect(pos.isPromoted).toBeUndefined();
     expect(pos.promoteTarget).toBeUndefined();
@@ -183,7 +182,6 @@ describe('round-trip', () => {
 describe('duplicateKeys edge cases', () => {
   it('returns [] for unique keys and ignores empty keys', () => {
     expect(duplicateKeys([field({ key: 'a' }), field({ key: 'b' })])).toEqual([]);
-    // empty keys are filtered out and never reported
     expect(duplicateKeys([field({ key: '' }), field({ key: '' })])).toEqual([]);
   });
 

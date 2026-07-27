@@ -1,12 +1,15 @@
 """Delegations router.
 
-Member self-service for session-bound representations: list/create/revoke own
-delegations, meeting context (deadline/recipients), vote status, and the
-per-gremium substitute pool. RBAC is server-side authoritative — every route
-requires a session; the domain rules (gates, deadline, recipient circle, chains)
-are checked by the service. Admins (``admin.delegations``) see/revoke all;
-the pool is managed by ``admin.delegations`` or the gremium role with
-``session.manage``. Errors as ``ProblemDetail``.
+Member self-service for meeting-bound delegations. A member lists, creates and
+revokes the own delegations. A member also reads the meeting context with the
+deadline and the recipients, reads the vote status, and manages the substitute
+pool of a gremium.
+
+The server is authoritative for RBAC. Every route needs a session. The service
+checks the domain rules: gates, deadline, recipient circle and chains. A holder
+of `admin.delegations` sees and revokes every delegation. A holder of
+`admin.delegations` or of the gremium role with `session.manage` manages the
+pool. The routes report errors as `ProblemDetail`.
 """
 
 from __future__ import annotations
@@ -49,8 +52,8 @@ def get_delegation_service(session: DbSession, settings: SettingsDep) -> Delegat
 
 ServiceDep = Annotated[DelegationService, Depends(get_delegation_service)]
 AutoMailerDep = Annotated[AutoMailer, Depends(get_auto_mailer)]
-# Auth is enough (any member may delegate their own vote); the domain
-# entitlement (voting member etc.) is checked by the service.
+# Authentication is enough here, because any member may delegate the own vote.
+# The service checks the domain entitlement, such as the voting membership.
 Member = Annotated[Principal, Depends(require_principal())]
 
 
@@ -79,7 +82,7 @@ async def create_delegation(
     mailer: AutoMailerDep,
 ) -> DelegationOut:
     out = await service.create(payload, principal)
-    # Notify the delegate (kind "delegation", user opt-out possible).
+    # Notify the delegate. The mail kind is "delegation" and the user can opt out.
     info = await meeting_delegation_mail_info(getattr(service, "session", None), out.id)
     pool = getattr(request.app.state, "arq_pool", None)
     background.add_task(mailer.delegation_changed, settings, info, granted=True, pool=pool)
@@ -100,7 +103,7 @@ async def revoke_delegation(
     request: Request,
     mailer: AutoMailerDep,
 ) -> Response:
-    # Collect mail data BEFORE revoking — the row is gone afterwards.
+    # Collect the mail data before the revoke. The row is gone afterwards.
     info = await meeting_delegation_mail_info(getattr(service, "session", None), delegation_id)
     await service.revoke(delegation_id, principal)
     pool = getattr(request.app.state, "arq_pool", None)
@@ -116,8 +119,7 @@ async def revoke_delegation(
 async def meeting_context(
     meeting_id: UUID, service: ServiceDep, principal: Member
 ) -> MeetingDelegationContext:
-    """Everything for the "set up representation" dialog (gates, deadline,
-    recipients, own status)."""
+    """Return the data for the delegation dialog: gates, deadline, recipients and status."""
     return await service.meeting_context(meeting_id, principal)
 
 
@@ -132,7 +134,7 @@ async def recipients(
     principal: Member,
     q: Annotated[str, Query(max_length=100)] = "",
 ) -> list[RecipientOut]:
-    """Typeahead source for recipient selection (members, pool, maybe external)."""
+    """List the recipients for the typeahead: members, pool and maybe external users."""
     return await service.recipients(meeting_id, q, principal)
 
 
@@ -144,7 +146,7 @@ async def recipients(
 async def vote_status(
     vote_id: UUID, service: ServiceDep, principal: Member
 ) -> VoteDelegationStatus:
-    """Caller's delegation view of one vote (vote-cast banner)."""
+    """Return the delegation view of one vote for the vote-cast banner of the caller."""
     return await service.vote_status(vote_id, principal)
 
 

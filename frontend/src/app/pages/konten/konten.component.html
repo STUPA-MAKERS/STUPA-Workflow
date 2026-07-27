@@ -62,7 +62,6 @@
 </header>
 
 <div class="exp__layout">
-  <!-- Account list on the left; collapsible on mobile. -->
   <aside class="exp__tree">
     <button type="button" class="exp__treeToggle" [attr.aria-expanded]="treeOpen()" (click)="treeOpen.set(!treeOpen())">
       {{ 'konten.accounts' | t }}
@@ -98,7 +97,7 @@
     } @else if (!lines().length) {
       <div class="empty-state">{{ (activeFilterCount() || searchQ() ? 'fints.emptyFiltered' : 'konten.empty') | t }}</div>
     } @else {
-      <!-- Floating bulk bar: fixed at the bottom centre while a selection exists (#expenses-ux2). -->
+      <!-- Bulk bar, fixed at the bottom center while a selection exists (#expenses-ux2). -->
       @if ((canBook() || canIgnore()) && selectedCount()) {
         <div class="exp__bulkbar" role="toolbar" [attr.aria-label]="'konten.bulk.selectedCount' | t: { count: selectedCount() }">
           <span class="exp__bulkcount">{{ 'konten.bulk.selectedCount' | t: { count: selectedCount() } }}</span>
@@ -218,7 +217,6 @@
   </div>
 </div>
 
-<!-- Connection dialog (credentials / status / disconnect) -->
 <app-dialog [open]="connectOpen()" [title]="'konten.connection' | t" [closeLabel]="'action.close' | t" (closed)="closeConnect()">
   <div class="flex flex-col gap-3">
     @if (!configured()) {
@@ -285,7 +283,7 @@
   </div>
 </app-dialog>
 
-<!-- Import: new booking from a transaction -->
+<!-- Import: create a new booking from a transaction. -->
 <app-dialog [open]="!!importLine()" [title]="'konten.importTitle' | t" [closeLabel]="'action.cancel' | t" (closed)="closeImport()">
   @if (importLine(); as line) {
     <div class="kon__dlg">
@@ -309,7 +307,7 @@
   </div>
 </app-dialog>
 
-<!-- Link to an existing booking (typeahead) -->
+<!-- Link to an existing booking (typeahead). -->
 <app-dialog [open]="!!linkLine()" [title]="'konten.linkTitle' | t" [closeLabel]="'action.cancel' | t" (closed)="closeLink()">
   @if (linkLine(); as line) {
     <div class="kon__dlg">
@@ -359,7 +357,6 @@
   </div>
 </app-dialog>
 
-<!-- Sammel-Trennen (Bestätigung) -->
 <app-dialog [open]="bulkConfirm() === 'unlink'" [title]="'konten.bulk.unlinkTitle' | t" [closeLabel]="'action.cancel' | t" (closed)="bulkConfirm.set(null)">
   <p>{{ 'konten.bulk.unlinkBody' | t: { count: selectedMatched() } }}</p>
   <div dialog-footer class="flex justify-end gap-3">
@@ -368,7 +365,6 @@
   </div>
 </app-dialog>
 
-<!-- Sammel-Ignorieren (Bestätigung) -->
 <app-dialog [open]="bulkConfirm() === 'ignore'" [title]="'konten.bulk.ignoreTitle' | t" [closeLabel]="'action.cancel' | t" (closed)="bulkConfirm.set(null)">
   <p>{{ 'konten.bulk.ignoreBody' | t: { count: selectedIgnorable() } }}</p>
   <div dialog-footer class="flex justify-end gap-3">
@@ -377,7 +373,7 @@
   </div>
 </app-dialog>
 
-<!-- Ignore a transaction (audit-sensitive) — optional reason -->
+<!-- Ignore a transaction. This action is audit-sensitive. The reason is optional. -->
 <app-dialog [open]="!!ignoreLine()" [title]="'konten.ignoreTitle' | t" [closeLabel]="'action.cancel' | t" (closed)="closeIgnore()">
   @if (ignoreLine(); as line) {
     <div class="kon__dlg">

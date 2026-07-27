@@ -18,9 +18,9 @@
   </ng-template>
 </app-data-table>
 
-<!-- Substitute pool: elected/appointed representatives that may be delegated to
-     without a lead-time deadline (until meeting start) — even if they are not
-     members themselves (e.g. faculty representatives). -->
+<!-- Substitute pool: elected or appointed substitutes. A delegation to a substitute has
+     no lead-time deadline and stays possible until meeting start. A substitute does not
+     need to be a member, for example a faculty representative. -->
 <section class="gm__pool" [attr.aria-label]="'admin.substitutes.title' | t">
   <header class="flex items-center justify-between gap-4 flex-wrap">
     <div>
@@ -51,7 +51,7 @@
   </app-data-table>
 </section>
 
-<!-- Add substitute: dialog with typeahead (any user). -->
+<!-- The typeahead searches every user, not only members of the gremium. -->
 <app-dialog
   [open]="addSubOpen()"
   [title]="'admin.substitutes.add' | t"
@@ -100,7 +100,6 @@
   </div>
 </app-dialog>
 
-<!-- Add member: dialog with typeahead. -->
 <app-dialog
   [open]="addOpen()"
   [title]="'admin.gremien.addMember' | t"

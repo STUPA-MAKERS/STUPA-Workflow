@@ -1,4 +1,4 @@
-"""Unit-Tests des iCal-Builders (#ics) — reine Funktion, keine DB."""
+"""Unit tests of the iCal builder (#ics): a pure function, no DB."""
 
 from __future__ import annotations
 
@@ -42,14 +42,14 @@ def test_crlf_line_endings() -> None:
 
 
 def test_timed_event_utc_summer() -> None:
-    # 18:00 Europe/Berlin am 2026-07-15 = CEST (+02:00) → 16:00Z, Default +1 h → 17:00Z.
+    # 18:00 Europe/Berlin on 2026-07-15 is CEST (+02:00), so 16:00Z. The default adds 1 h.
     out = _ics([_ev(date=date(2026, 7, 15), start_time=time(18, 0))])
     assert "DTSTART:20260715T160000Z" in out
     assert "DTEND:20260715T170000Z" in out
 
 
 def test_timed_event_utc_winter() -> None:
-    # 18:00 am 2026-01-15 = CET (+01:00) → 17:00Z (DST-Wechsel korrekt).
+    # 18:00 on 2026-01-15 is CET (+01:00), so 17:00Z. The builder handles the DST switch.
     out = _ics([_ev(date=date(2026, 1, 15), start_time=time(18, 0))])
     assert "DTSTART:20260115T170000Z" in out
     assert "DTEND:20260115T180000Z" in out
@@ -62,9 +62,9 @@ def test_explicit_end_time() -> None:
 
 
 def test_end_before_start_falls_back_to_default() -> None:
-    # End ≤ Start ist ungültig → Default-Dauer statt absurder Rückwärts-Spanne.
+    # An end at or before the start is invalid, so the builder uses the default duration.
     out = _ics([_ev(start_time=time(18, 0), end_time=time(17, 0))])
-    assert "DTEND:20260715T170000Z" in out  # = Start (16:00Z) + 1 h
+    assert "DTEND:20260715T170000Z" in out  # start (16:00Z) plus 1 h
 
 
 def test_all_day_event_has_no_dtend() -> None:
@@ -103,12 +103,12 @@ def test_summary_and_description() -> None:
 def test_no_description_without_gremium() -> None:
     out = _ics([_ev(title="Solo", gremium_name=None)])
     assert "SUMMARY:Solo" in out
-    # Kein Event-DESCRIPTION (das VALARM trägt weiterhin eine eigene Beschreibung).
+    # The event has no DESCRIPTION. The VALARM still carries its own description.
     assert "DESCRIPTION:Gremium" not in out
 
 
 def test_text_escaping() -> None:
-    # RFC5545 escaping: comma, semicolon und backslash (icalendar).
+    # RFC5545 escaping of comma, semicolon and backslash (icalendar).
     out = _ics([_ev(title="A, B; C\\ D")])
     assert "SUMMARY:A\\, B\\; C\\\\ D" in out
 

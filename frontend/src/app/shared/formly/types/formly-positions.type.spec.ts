@@ -24,14 +24,14 @@ async function setup(opts: {
     formControl: control,
     props: opts.props ?? {},
     // FormlyPositionsType overrides showError to read invalid + touched/dirty,
-    // so this hook is unused — kept for FieldType compatibility.
+    // so this hook stays unused. It remains for FieldType compatibility.
     options: { showError: () => false },
   };
   const { fixture } = await render(FormlyPositionsType, {
     componentInputs: { field: field as never },
   });
   const cmp = fixture.componentInstance;
-  // The overridden showError needs invalid + touched; force it when requested.
+  // The overridden showError needs invalid + touched. Force both when requested.
   if (opts.showError) {
     control.setErrors({ positions: true });
     control.markAsTouched();
@@ -191,11 +191,9 @@ describe('FormlyPositionsType — add/remove/edit mutations', () => {
     cmp.setOfferValue(0, 0, '7');
     cmp.setPreferred(0, 0);
     const v = control.value as Position[];
-    // Offer index 1 was left untouched by the per-offer edits (else branch).
     expect(v[0].offers[1].label).toBe('B');
     expect(v[0].offers[1].value).toBe(2);
     expect(v[0].offers[1].preferred).toBe(false);
-    // The second position is unchanged through every per-offer mutation.
     expect(v[1]).toEqual(sibling);
   });
 
@@ -286,7 +284,6 @@ describe('FormlyPositionsType — value text & parsing', () => {
         },
       ],
     });
-    // editing a different cell → other cell stays formatted.
     prot(cmp).beginEditValue(0, 1);
     expect(prot(cmp).offerValueText(0, 0)).toBe('1.234,50');
   });
@@ -301,7 +298,7 @@ describe('FormlyPositionsType — value text & parsing', () => {
     const parse = (s: string): number | null => prot(cmp).parseNum(s);
     expect(parse('')).toBeNull();
     expect(parse('   ')).toBeNull();
-    // Non-empty input whose chars are all stripped → cleaned '' → Number('') === 0.
+    // The cleaner strips every character of a non-empty input, and Number('') gives 0.
     expect(parse('abc')).toBe(0);
     expect(parse('1234.56')).toBeCloseTo(1234.56);
     expect(parse('1234,56')).toBeCloseTo(1234.56);
@@ -334,7 +331,7 @@ describe('FormlyPositionsType — validation reflection', () => {
         },
       ],
     });
-    // commit through a no-op mutation to trigger revalidate.
+    // Commit a no-op mutation to trigger revalidate.
     cmp.setPositionLabel(0, 'Catering');
     expect(control.errors).toBeNull();
     expect(control.valid).toBe(true);
@@ -403,7 +400,7 @@ describe('FormlyPositionsType — inline error helpers', () => {
   it('showError requires invalid + (touched|dirty)', async () => {
     const { cmp, control } = await setup({ value: [] });
     control.setErrors({ positions: true });
-    expect(cmp.showError).toBe(false); // pristine & untouched
+    expect(cmp.showError).toBe(false); // pristine and untouched
     control.markAsTouched();
     expect(cmp.showError).toBe(true);
   });

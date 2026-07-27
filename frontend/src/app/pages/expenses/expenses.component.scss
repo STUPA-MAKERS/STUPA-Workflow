@@ -1,5 +1,5 @@
 :host { display: block; }
-/* Centre the header at normal body width (like applications); tree in the left margin. */
+/* Center the header at normal body width, like applications. The tree sits in the left margin. */
 .exp__head { width: 100%; max-width: var(--layout-max-width); margin: 0 auto var(--space-5); }
 .exp__title { margin: 0; }
 .exp__subtitle { color: var(--color-text-muted); margin: var(--space-1) 0 0; }
@@ -11,7 +11,7 @@
   color: var(--color-text);
   font: inherit;
 }
-/* Text inputs at control height → flush with app-select/datepicker beside them. */
+/* Text inputs keep the control height, so they sit flush with app-select and datepicker. */
 input.exp__input {
   height: var(--control-height);
   box-sizing: border-box;
@@ -26,7 +26,7 @@ input.exp__input {
   gap: var(--space-5);
   align-items: start;
 }
-/* Cost-centre tree in the left margin (breakout) + sticky (like applications). */
+/* The cost center tree breaks out into the left margin and stays sticky, like applications. */
 .exp__tree {
   justify-self: end;
   width: 100%;
@@ -34,7 +34,8 @@ input.exp__input {
   position: sticky;
   top: calc(var(--layout-header-height) + var(--space-4));
   align-self: start;
-  /* 3/4 viewport so the tree scrolls internally and clearly floats. */
+  /* Caps the tree at three-quarters of the viewport height, so it scrolls inside
+     itself and floats independently. */
   max-height: 75vh;
   overflow-y: auto;
 }
@@ -63,7 +64,6 @@ input.exp__input {
 .exp__invDetails dt { color: var(--color-text-muted); }
 .exp__invDetails dd { margin: 0; }
 .exp__sentinel { height: 1px; }
-/* --- Table --- */
 .exp__tableWrap {
   overflow-x: auto;
   border: var(--border-width) solid var(--color-border);
@@ -129,7 +129,6 @@ input.exp__input {
   max-width: 22rem;
   overflow-wrap: anywhere;
 }
-// Expand a truncated description: inline "more"/"less" link.
 .exp__more {
   background: transparent;
   border: 0;
@@ -144,8 +143,8 @@ input.exp__input {
 .exp__more:hover {
   text-decoration: underline;
 }
-// Wrap payee/payer (+ cost centre) instead of overflowing: long names/IBANs
-// without spaces must be allowed to break.
+// Wrap the payee, the payer, and the cost center instead of letting them overflow.
+// A long name or IBAN without spaces must still break onto a new line.
 .exp__cellMeta {
   max-width: 14rem;
   overflow-wrap: anywhere;
@@ -172,11 +171,10 @@ input.exp__input {
   gap: var(--space-1);
   justify-content: flex-end;
 }
-/* Two-column row for related fields (dates, receipt/method). */
 .exp__grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); align-items: end; }
 .exp__textarea { resize: vertical; min-height: 4.5rem; }
 @media (max-width: 30rem) { .exp__grid2 { grid-template-columns: 1fr; } }
-/* Application typeahead (like the user search) */
+/* Application typeahead, like the user search. */
 .exp__suggest {
   list-style: none;
   margin: var(--space-1) 0 0;
@@ -205,13 +203,12 @@ input.exp__input {
   font: inherit;
 }
 .exp__suggestItem:hover { background: var(--color-primary-subtle); }
-/* Amount filter (from/to) */
 @media (max-width: 720px) {
   .exp__layout { grid-template-columns: 1fr; }
   .exp__tree { position: static; max-height: none; }
 }
-/* Mobile (≤768px): tree behind a collapsible toggle (default: closed),
-   single column. Desktop unchanged — the toggle only exists hidden there. */
+/* Mobile (≤768px): a collapsible toggle hides the tree, and the layout drops to one
+   column. The toggle starts closed. Desktop keeps the tree and hides the toggle. */
 .exp__treeToggle {
   display: none;
 }
@@ -276,8 +273,8 @@ input.exp__input {
     padding: 0;
     border-bottom: none;
   }
-  /* Card layout: description on top (bold, full width), then kind badge +
-     amount, then a muted meta row. */
+  /* Card layout: the description sits on top in bold at full width. The kind badge and
+     the amount follow. A muted meta row closes the card. */
   .exp__cellDesc {
     flex: 1 1 100%;
     min-width: 0;
@@ -286,15 +283,16 @@ input.exp__input {
     font-weight: var(--fw-medium);
   }
   .exp__cellKind { order: -2; }
-  /* Amount prominent, right-aligned on the badge row. */
+  /* The amount stays prominent and right-aligned on the badge row. */
   .exp__amount {
     order: -1;
     margin-left: auto;
     font-size: var(--fs-md);
     font-weight: var(--fw-semibold);
   }
-  /* Secondary info (dates, payee, cost centre, application, account) small +
-     muted on its own wrapping row → less crowded. */
+  /* Secondary data stays small and muted on its own wrapping row, so the card looks
+     less crowded. This covers the dates, the payee, the cost center, the application
+     and the account. */
   .exp__cellDate,
   .exp__cellMeta {
     flex: 0 1 auto;
@@ -303,19 +301,19 @@ input.exp__input {
     font-size: var(--fs-xs);
     color: var(--color-text-muted);
   }
-  /* Actions on their own row (large tap targets). */
+  /* The actions get their own row to give large tap targets. */
   .exp__actions { margin-left: auto; }
   .exp__num:has(.exp__actions) { order: 2; flex: 1 1 100%; }
 }
 
-/* --- Sub-bookings: full rows like the parents, just tinted --- */
+/* Sub-bookings use full rows like the parents, only tinted. */
 .exp__subCount {
   font-size: var(--fs-xs);
   font-variant-numeric: tabular-nums;
   font-weight: var(--fw-semibold);
 }
-/* Identical cell geometry to normal rows (same td rules apply); only the background +
-   a subtle left accent mark the sub-booking. */
+/* The cell geometry matches a normal row, because the same td rules apply. Only the
+   background and a left accent mark the sub-booking. */
 .exp__subRow > td {
   background: var(--color-surface-sunken);
 }
@@ -326,20 +324,20 @@ input.exp__input {
   background: var(--color-surface-sunken);
 }
 
-/* --- Sticky Action-Spalte (#expenses-ux) ---
-   Rechteste Spalte am Rand angepinnt, damit die Aktionen ohne Horizontal-Scroll
-   erreichbar bleiben. Nur Desktop — mobil (≤768px) greift der Karten-Reflow oben
-   (overflow-x: visible), dort wäre sticky sinnlos. */
+/* Sticky action column (#expenses-ux). The rightmost column pins to the edge, so the
+   actions stay reachable without a horizontal scroll. This applies to desktop only. On
+   mobile (≤768px) the card reflow above sets overflow-x to visible, where sticky has no
+   effect. */
 @media (min-width: 769px) {
   .exp__table th.exp__stickyCol,
   .exp__table td.exp__stickyCol {
     position: sticky;
     right: 0;
-    /* Trenner zur scrollenden Fläche: schlichte Token-Border statt Schatten-
-       Verlauf — passt zum restlichen Tabellen-Look (#expenses-ux2). */
+    /* A separator against the scrolling area. A plain token border instead of a shadow
+       gradient matches the rest of the table (#expenses-ux2). */
     border-inline-start: var(--border-width) solid var(--color-border);
   }
-  /* Zellen müssen deckend sein, um darunter durchscrollende Spalten zu verdecken. */
+  /* The cells must be opaque to hide the columns that scroll beneath them. */
   .exp__table td.exp__stickyCol {
     background: var(--color-surface);
     z-index: 1;
@@ -348,8 +346,8 @@ input.exp__input {
     background: var(--color-surface-sunken);
     z-index: 2;
   }
-  /* Reihenfolge-sensitiv: Hover-/Unterbuchungs-Overrides MÜSSEN nach der generischen
-     Zell-Regel stehen (gleiche Spezifität → Quelltext-Reihenfolge entscheidet). */
+  /* Source order matters here. The hover override and the sub-booking override must
+     come after the generic cell rule, because equal specificity lets source order decide. */
   .exp__table tbody tr:hover td.exp__stickyCol {
     background: var(--color-surface-sunken);
   }
@@ -362,9 +360,9 @@ input.exp__input {
   }
 }
 
-/* --- Batch / Sammel-Aktionen: schwebende Bottom-Bar (#expenses-ux2) ---
-   Fixiert unten mittig, erscheint nur bei aktiver Auswahl. Unter den Dialogen
-   (--z-dialog), über dem Tabellen-Sticky-Kram. */
+/* Bulk actions in a floating bottom bar (#expenses-ux2). The bar is fixed at the bottom
+   center and appears only for an active selection. It stacks below the dialogs
+   (--z-dialog) and above the sticky table cells. */
 .exp__bulkbar {
   position: fixed;
   bottom: max(var(--space-4), env(safe-area-inset-bottom));
@@ -387,7 +385,7 @@ input.exp__input {
   font-weight: var(--fw-semibold);
   white-space: nowrap;
 }
-/* Mobile: one row that scrolls horizontally inside the bar — never stacked. */
+/* Mobile: keep the bar as one row that scrolls horizontally. It never stacks. */
 @media (max-width: 768px) {
   .exp__bulkbar {
     flex-wrap: nowrap;
@@ -400,8 +398,8 @@ input.exp__input {
     flex: 0 0 auto;
   }
 }
-/* Platz am Listenende, damit die schwebende Bar die letzten Zeilen/den
-   Nachlade-Button nicht verdeckt. */
+/* Space at the end of the list, so the floating bar does not hide the last rows or the
+   load-more button. */
 .exp__layout:has(.exp__bulkbar) {
   padding-bottom: 4.5rem;
 }
@@ -410,13 +408,13 @@ input.exp__input {
   white-space: nowrap;
   text-align: center;
 }
-/* Selected line/card: tinted surface instead of (mobile: hidden) checkboxes. */
+/* A selected row or card gets a tinted surface, because mobile hides the checkboxes. */
 .exp__table tbody tr.exp__tr--selected,
 .exp__table tbody tr.exp__tr--selected:hover {
   background: color-mix(in srgb, var(--color-primary) 14%, var(--color-surface));
 }
 @media (max-width: 768px) {
-  /* Press & hold enters select mode; the checkbox column disappears on touch. */
+  /* A press and hold enters select mode. The checkbox column disappears on touch. */
   .exp__check { display: none; }
   .exp__table tbody tr {
     user-select: none;

@@ -1,4 +1,4 @@
-"""TDD: Rate-Limiting (sliding window, security.md §8 / api.md §7, Issue #24)."""
+"""Rate limiting with a sliding window (security.md §8, api.md §7, Issue #24)."""
 
 from __future__ import annotations
 
@@ -31,20 +31,18 @@ async def test_inmemory_window_slides() -> None:
     limiter = InMemoryRateLimiter(now=lambda: clock["t"])
     assert (await limiter.hit("ip", limit=1, window_seconds=10)).allowed
     assert not (await limiter.hit("ip", limit=1, window_seconds=10)).allowed
-    clock["t"] = 11.0  # alter Treffer aus dem Fenster gefallen
+    clock["t"] = 11.0  # the old hit fell out of the window
     assert (await limiter.hit("ip", limit=1, window_seconds=10)).allowed
 
 
 async def test_inmemory_keys_isolated() -> None:
     limiter = InMemoryRateLimiter(now=lambda: 0.0)
     assert (await limiter.hit("a", limit=1, window_seconds=60)).allowed
-    # Anderer Key teilt das Budget nicht.
+    # A different key does not share the budget.
     assert (await limiter.hit("b", limit=1, window_seconds=60)).allowed
 
 
-# --------------------------------------------------------------------------- #
-# Redis-Backend gegen einen In-Memory-ZSET-Fake
-# --------------------------------------------------------------------------- #
+# The Redis backend runs against an in-memory ZSET fake.
 class _FakePipeline:
     def __init__(self, client: _FakeRedis) -> None:
         self._client = client

@@ -28,21 +28,20 @@ import { formatBytes, scanBadgeVariant } from './applications.util';
 /**
  * Attachments panel.
  *
- * Upload (`POST /applications/{id}/attachments`, ≤10 MB, async ClamAV scan) and
- * download via short-lived signed URLs (`GET /attachments/{id}`).
+ * The panel uploads files (`POST /applications/{id}/attachments`, 10 MB limit,
+ * async ClamAV scan). It downloads them through short-lived signed URLs
+ * (`GET /attachments/{id}`).
  *
- * There is no list endpoint and `ApplicationOut` does not embed attachments — so
- * the panel shows the attachments uploaded in **this session** (upload responses).
- * Existing attachments of an application are not enumerable without a list API.
+ * Scan status: `scanned=false` means "scanning" and blocks the download.
+ * `scanned=true` means "scan done" only. The download shows the real result.
+ * 200 means ready. 409 means quarantine, and the row becomes `quarantined`.
+ * 410 means the link expired.
  *
- * Scan status: `scanned=false` ⇒ "scanning" (no download). `scanned=true` only
- * means "scan done" — clean-vs-finding is revealed only by the download: 200 ⇒
- * ready, **409** ⇒ quarantine (row set to `quarantined`), **410** ⇒ link expired.
- *
- * Upload paths: file picker (multiple) **and** drag&drop onto the panel (overlay
- * style like the invoices page). Multiple files upload sequentially (concatMap)
- * so the rate limit (429) does not trip from parallel requests. Attachments are
- * multi-selectable (checkbox per row + "all") for bulk delete.
+ * Two upload paths exist: the file picker for several files at once, and drag
+ * and drop onto the panel. The overlay follows the style of the invoices page.
+ * Several files upload one after the other (concatMap), so parallel requests do
+ * not trip the rate limit (429). Every row carries a checkbox, next to an "all"
+ * checkbox, for bulk delete.
  */
 @Component({
   selector: 'app-attachments-panel',
@@ -74,23 +73,22 @@ export class AttachmentsPanelComponent {
   readonly downloadingId = signal<Uuid | null>(null);
   readonly removingId = signal<Uuid | null>(null);
 
-  /** Inline preview (image/PDF) in a large dialog — no download needed. */
+  /** Inline preview of an image or a PDF in a large dialog. It needs no download. */
   private readonly sanitizer = inject(DomSanitizer);
   readonly previewing = signal<Attachment | null>(null);
   readonly previewLoadingId = signal<Uuid | null>(null);
-  /** Raw signed URL (img binding) — Angular sanitizes URL contexts itself. */
+  /** Raw signed URL for the img binding. Angular sanitizes URL contexts itself. */
   readonly previewUrl = signal<string | null>(null);
   readonly previewIsImage = computed(() =>
     (this.previewing()?.mime ?? '').startsWith('image/'),
   );
-  /** iframes need an explicitly trusted resource URL; the signed URL comes
-   *  from our own API (app-relative), so trusting it is safe. */
+  /** An iframe needs an explicitly trusted resource URL. The signed URL comes
+   *  from our own API and stays app-relative, so the trust is safe. */
   readonly previewFrameUrl = computed<SafeResourceUrl | null>(() => {
     const url = this.previewUrl();
     return url === null ? null : this.sanitizer.bypassSecurityTrustResourceUrl(url);
   });
 
-  /** Multi-select (bulk delete) + in-flight bulk action. */
   readonly selected = signal<ReadonlySet<Uuid>>(new Set());
   readonly bulkDeleting = signal(false);
   readonly selectedCount = computed(() => this.selected().size);
@@ -99,8 +97,8 @@ export class AttachmentsPanelComponent {
     return list.length > 0 && list.every((a) => this.selected().has(a.id));
   });
 
-  /** Drag&drop overlay (style like the invoices page). `dragDepth` counts
-   *  enter/leave of nested children so the overlay does not flicker. */
+  /** Drag and drop overlay, styled like the invoices page. `dragDepth` counts the
+   *  enter and leave events of nested children, so the overlay does not flicker. */
   readonly dragActive = signal(false);
   private dragDepth = 0;
 
@@ -115,7 +113,7 @@ export class AttachmentsPanelComponent {
       this.api.listAttachments(id).subscribe({
         next: (list) => this.attachments.set(list),
         error: () => {
-          /* no list endpoint / error → leave empty (upload shows session state) */
+          /* On an error keep the list empty. Uploads of this session still show. */
         },
       });
     });
@@ -136,8 +134,9 @@ export class AttachmentsPanelComponent {
     input.value = '';
   }
 
-  /** Upload multiple files sequentially (concatMap → no 429 from parallel
-   *  requests). Success/failure is tallied per file, with a summary toast at the end. */
+  /** Upload several files one after the other (concatMap), so parallel requests do
+   *  not trip the 429 rate limit. The method counts the files that succeed and
+   *  shows one summary toast at the end. */
   private upload(files: File[]): void {
     if (this.uploading() || !files.length) return;
     this.uploading.set(true);
@@ -163,7 +162,6 @@ export class AttachmentsPanelComponent {
       });
   }
 
-  // ----------------------------------------------------------- drag & drop
   onDragEnter(event: DragEvent): void {
     if (!this.canUpload() || !this.hasFiles(event)) return;
     event.preventDefault();
@@ -196,7 +194,6 @@ export class AttachmentsPanelComponent {
     return Array.from(event.dataTransfer?.types ?? []).includes('Files');
   }
 
-  // ----------------------------------------------------------- bulk-select
   isSelected(id: Uuid): boolean {
     return this.selected().has(id);
   }
@@ -239,8 +236,8 @@ export class AttachmentsPanelComponent {
       });
   }
 
-  /** Remove successfully deleted (DELETE is idempotent) from list + selection.
-   *  On partial failure the remaining stay selected so a retry is possible. */
+  /** Drop the deleted attachments from the list and from the selection. DELETE is
+   *  idempotent. After a partial failure the rest stays selected for a retry. */
   private refreshAfterBulk(attempted: Uuid[]): void {
     const id = this.applicationId();
     this.api.listAttachments(id).subscribe({
@@ -250,7 +247,7 @@ export class AttachmentsPanelComponent {
         this.selected.update((cur) => new Set([...cur].filter((x) => remaining.has(x))));
       },
       error: () => {
-        // Ohne frische Liste: angefragte IDs lokal entfernen.
+        // Without a fresh list, remove the requested ids locally.
         const removed = new Set(attempted);
         this.attachments.update((list) => list.filter((a) => !removed.has(a.id)));
         this.selected.update((cur) => new Set([...cur].filter((x) => !removed.has(x))));
@@ -273,7 +270,7 @@ export class AttachmentsPanelComponent {
     }
   }
 
-  /** Preview only for scanned-clean images/PDFs (browser-renderable). */
+  /** Preview only a clean image or PDF. The browser can render those two inline. */
   canPreview(att: Attachment): boolean {
     return (
       att.scanState === 'clean' &&
@@ -281,20 +278,20 @@ export class AttachmentsPanelComponent {
     );
   }
 
-  /** Open the large preview dialog: fetch a signed URL, render inline.
-   *  Same 409/410 semantics as download (quarantine/expired). */
+  /** Open the large preview dialog. It fetches a signed URL and renders inline.
+   *  The 409 and 410 handling matches download: quarantine and expired link. */
   openPreview(att: Attachment): void {
     if (this.previewLoadingId()) return;
     this.previewLoadingId.set(att.id);
     this.api.attachmentUrl(att.id).subscribe({
       next: (signed) => {
         this.previewLoadingId.set(null);
-        // `inline=1`: the download route answers with `Content-Disposition: inline`
-        // so the iframe/img renders instead of triggering a file download.
+        // With `inline=1` the download route answers with `Content-Disposition:
+        // inline`, so the iframe or img renders instead of starting a download.
         const sep = signed.url.includes('?') ? '&' : '?';
         const url = `${signed.url}${sep}inline=1`;
-        // Mobile browsers (Android Chrome) cannot render PDFs in an iframe —
-        // hand PDFs to the system viewer there instead of an empty dialog.
+        // Mobile browsers such as Android Chrome cannot render a PDF in an iframe.
+        // Hand the PDF to the system viewer instead of showing an empty dialog.
         if (att.mime === 'application/pdf' && this.coarsePointer()) {
           this.openUrl(url);
           return;
@@ -334,7 +331,7 @@ export class AttachmentsPanelComponent {
       error: (err: { status?: number }) => {
         this.downloadingId.set(null);
         if (err.status === 409) {
-          // Finding/quarantine: mark the row permanently as quarantined.
+          // The scan found something, so mark the row as quarantined for good.
           this.attachments.update((list) =>
             list.map((a) => (a.id === att.id ? { ...a, scanState: 'quarantined' as ScanState } : a)),
           );
@@ -364,12 +361,13 @@ export class AttachmentsPanelComponent {
     });
   }
 
-  /** Open the signed URL (own method → stubbable in tests). */
+  /** Open the signed URL. A separate method makes it stubbable in tests. */
   protected openUrl(url: string): void {
     window.open(url, '_blank', 'noopener');
   }
 
-  /** Touch-first device (no iframe PDF viewer) — own method → stubbable in tests. */
+  /** Touch-first device without an iframe PDF viewer. A separate method makes it
+   *  stubbable in tests. */
   protected coarsePointer(): boolean {
     return window.matchMedia('(pointer: coarse)').matches;
   }

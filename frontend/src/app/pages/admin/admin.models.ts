@@ -14,7 +14,7 @@ import type {
   Uuid,
 } from '@core/api/models';
 
-// --- Flow graph -------------------------------------------------------------
+// Flow graph
 
 /** State kind in the global flow: only normal + vote. */
 export type StateKind = 'normal' | 'vote';
@@ -39,7 +39,7 @@ export interface StateDef {
   isInitial?: boolean;
   /** Terminal state: terminal applications are subject to retention/anonymization. */
   isTerminal?: boolean;
-  /** State kind; absent ⇒ `normal`. */
+  /** State kind. Absent ⇒ `normal`. */
   kind?: StateKind | null;
   /** Kind-specific configuration. */
   config?: StateConfig | null;
@@ -62,13 +62,14 @@ export interface TransitionDef {
   /** Result branch for vote states: pass/fail. */
   branch?: TransitionBranch | null;
   /** "Requires action": counts as an open task in the tasks tab.
-   *  Absent ⇒ `true`; `false` = purely optional action. */
+   *  Absent ⇒ `true`. `false` = a purely optional action. */
   requiresAction?: boolean;
 }
 
-/** Visual node group — editor-only rendering; the engine ignores it. On the canvas a
- *  group is always ONE labeled box; its content opens via drill-down (breadcrumbs).
- *  Groups nest via `groupIds`; a state/group sits in at most one parent. */
+/** Visual node group. Only the editor renders it and the engine ignores it. On the
+ *  canvas a group is always ONE labeled box. Its content opens through drill-down
+ *  (breadcrumbs). Groups nest through `groupIds`. A state or group sits in at most
+ *  one parent. */
 export interface FlowGroup {
   id: string;
   name: string;
@@ -78,7 +79,7 @@ export interface FlowGroup {
   color?: string | null;
 }
 
-/** Optional editor layout (node positions + groups) — persisted in the graph. */
+/** Optional editor layout (node positions + groups). The graph stores it. */
 export interface FlowLayout {
   positions?: Record<string, { x: number; y: number }>;
   groups?: FlowGroup[];
@@ -90,7 +91,7 @@ export interface FlowGraph {
   layout?: FlowLayout | null;
 }
 
-// --- Guards (shared/guards.py — whitelist) ----------------------------------
+// Guards — mirror of the backend whitelist in shared/guards.py
 
 /** Comparison operators of the `compare` guard (type-dependent at runtime). */
 export type CompareOp = '==' | '!=' | '<' | '<=' | '>' | '>=' | 'in';
@@ -137,7 +138,6 @@ export const GUARD_LEAF_OPERATORS: readonly GuardLeafOperator[] = [
 ] as const;
 export const GUARD_COMBINATORS: readonly GuardCombinator[] = ['and', 'or', 'not'] as const;
 
-// --- Actions (webhook/notify/addToNextSession/assignBudget) -----------------
 
 export type ActionType =
   | 'webhook'
@@ -171,7 +171,7 @@ export interface ActionDef {
   [param: string]: unknown;
 }
 
-// --- Organisation / RBAC (admin/models.py) ----------------------------------
+// Organization / RBAC — mirror of admin/models.py
 
 export interface Gremium {
   id: Uuid;
@@ -180,11 +180,12 @@ export interface Gremium {
   cdVariant: string;
   defaultLang: string;
   allowVoteDelegation: boolean;
-  /** Lead time (minutes before the meeting starts) for non-pool delegations; 0 = until start. */
+  /** Lead time in minutes before the meeting starts, for non-pool delegations.
+   *  0 = until the start. */
   delegationLeadMinutes?: number;
   /** Allow delegation to users outside the gremium & substitute pool. */
   delegationAllowExternal?: boolean;
-  /** Default quorum (% of eligible voters who must attend); null = none. */
+  /** Default quorum as a percent of eligible voters who must attend. null = none. */
   quorumPercent?: number | null;
 }
 
@@ -245,11 +246,11 @@ export interface MailTemplate {
   bodyI18n: I18nMap;
   bodyHtmlI18n: I18nMap;
   placeholders: Record<string, string>;
-  /** 'override' = from the DB; 'builtin' = unchanged catalogue default. */
+  /** 'override' = from the DB. 'builtin' = the unchanged catalog default. */
   source: 'override' | 'builtin';
 }
 
-/** Create/update an override by key (catalogue merge). */
+/** Create/update an override by key (catalog merge). */
 export interface MailTemplateUpsertBody {
   key: string;
   subjectI18n: I18nMap;
@@ -289,7 +290,7 @@ export interface GroupMappingBody {
   gremiumId?: Uuid | null;
 }
 
-/** Role assignment (admin API `/role-assignments`) — representation/delegation. */
+/** Role assignment (admin API `/role-assignments`) — carries the vote delegation. */
 export interface RoleAssignment {
   id: Uuid;
   principalId: Uuid;
@@ -318,7 +319,6 @@ export interface AdminPrincipal {
   email?: string | null;
   displayName?: string | null;
   lastLogin?: string | null;
-  /** Active/deactivated. */
   active?: boolean;
   assignments: RoleAssignment[];
 }
@@ -331,10 +331,6 @@ export interface ApplicationTypeAdmin {
   active: boolean;
 }
 
-/**
- * Application type (form) as the forms builder's edit view. Mirrors the admin API's
- * `ApplicationTypeOut`; `name` is the i18n map (the form's title).
- */
 /** Comparison-offers rule of an application type. */
 export interface ComparisonOffers {
   required: boolean;
@@ -343,13 +339,17 @@ export interface ComparisonOffers {
   as?: 'file' | 'field' | 'both';
 }
 
+/**
+ * Application type (form) as the forms builder edit view. It mirrors the admin API type
+ * `ApplicationTypeOut`. `name` is the i18n map that holds the form title.
+ */
 export interface ApplicationTypeFull {
   id: Uuid;
   name: I18nMap;
   gremiumId?: Uuid | null;
   hasBudget: boolean;
   comparisonOffers?: ComparisonOffers | null;
-  /** DSGVO retention in months; null = global default. */
+  /** DSGVO retention in months. null = the global default. */
   retentionMonths?: number | null;
   activeFormVersionId?: Uuid | null;
 }
@@ -387,7 +387,7 @@ export type FormStatus = 'active' | 'draft' | 'inactive';
 
 /**
  * Overview row of active forms: display name, owning gremium, status and active form
- * version. Aggregated from application type + form version; seeded in mock mode.
+ * version. The row aggregates application type and form version. Mock mode seeds it.
  */
 export interface FormOverviewItem {
   id: Uuid;
@@ -397,7 +397,7 @@ export interface FormOverviewItem {
   version: number;
 }
 
-// --- Notification/webhook config --------------------------------------------
+// Notification and webhook config
 
 export type EventName =
   | 'application_created'
@@ -505,16 +505,17 @@ export interface AuditEntry {
   id: number;
   at: string;
   actor: string | null;
-  /** Actor's clear name (resolved by the backend); null = system/unknown. */
+  /** Clear name of the actor, resolved by the backend. null = system or unknown. */
   actorName: string | null;
   action: string;
   targetType: string | null;
   targetId: string | null;
-  /** Human-readable target label (application title, role name, …); null = unknown/deleted. */
+  /** Human-readable target label (application title, role name, …). null = unknown or
+   *  deleted. */
   targetLabel?: string | null;
   data: Record<string, unknown>;
-  /** UUID → clear name for entity references embedded in `data` (resolved by the
-   *  backend). Only resolvable ids; otherwise the raw UUID is shown. */
+  /** UUID → clear name for entity references embedded in `data`, resolved by the
+   *  backend. It holds only resolvable ids. The UI shows the raw UUID for the rest. */
   resolvedIds?: Record<string, string>;
   /** Revertible from the audit log (determined by the backend) — drives the
    *  "revert" button. The backend stays authoritative on click. */
@@ -537,8 +538,8 @@ export interface AuditActor {
 }
 
 /**
- * A config snapshot (version sidebar). Append-only — earlier versions are never
- * deletable; `isCurrent` marks the active state.
+ * A config snapshot (version sidebar). The list is append-only. Nobody can delete an
+ * earlier version. `isCurrent` marks the active state.
  */
 export interface ConfigRevision {
   id: Uuid;
@@ -561,7 +562,7 @@ export interface ConfigRevisionDiffWire {
   diff: DataDiffWire;
 }
 
-/** Field diff of a config snapshot (FE view; `diff` in array form for `@for`). */
+/** Field diff of a config snapshot (FE view). `diff` is in array form for `@for`. */
 export interface ConfigRevisionDiff {
   id: Uuid;
   entityType: string;
@@ -581,9 +582,9 @@ export interface AuditRevertResult {
 /** Platform notification config (P admin.notifications). */
 export interface NotificationSettings {
   taskReminderEnabled: boolean;
-  /** Days without a status change before a reminder is sent (≥ 1). */
+  /** Days without a status change before the platform sends a reminder (≥ 1). */
   taskReminderAfterDays: number;
-  /** Then again every N days; 0 = only once per state visit. */
+  /** Then again every N days. 0 = only once per state visit. */
   taskReminderRepeatDays: number;
 }
 
@@ -610,7 +611,7 @@ export interface PrivacySettings {
   defaultRetentionMonths: number;
 }
 
-// --- Branding / site-config -------------------------------------------------
+// Branding / site-config
 
 export type LogoSlot = 'wordmark' | 'imagemark' | 'favicon';
 
@@ -644,9 +645,9 @@ export interface SiteFreetexts {
 }
 
 export interface Branding {
-  /** Full app name (browser tab, header, home page); empty ⇒ default/i18n. */
+  /** Full app name (browser tab, header, home page). Empty ⇒ the i18n default. */
   appName?: string;
-  /** Short app name (PWA icon/home screen); empty ⇒ default. */
+  /** Short app name (PWA icon/home screen). Empty ⇒ the default. */
   appShortName?: string;
   logos: Partial<Record<LogoSlot, BrandingAsset>>;
   footerColumns: FooterColumn[];
@@ -667,11 +668,12 @@ export interface SiteConfig {
 /**
  * Accepted logo MIME types + max size (UI hint + client guard).
  *
- * Security — img-only contract: branding logos are persisted site-wide as `branding`
- * JSON and rendered only via `<img src>` (never injected inline into the DOM).
- * `image/svg+xml` is deliberately excluded — an SVG can carry `<script>`/`on*`
- * handlers and would be a stored XSS vector for a future inline-SVG consumer. Raster
- * formats only (PNG/JPEG/WebP/ICO). Any logo consumer MUST stay on `<img src>`.
+ * Security — img-only contract: the platform keeps branding logos site-wide as
+ * `branding` JSON and renders them only through `<img src>`. It never injects a logo
+ * inline into the DOM. `image/svg+xml` stays excluded on purpose. An SVG can carry
+ * `<script>` or `on*` handlers. It would be a stored XSS vector for a future
+ * inline-SVG consumer. Use raster formats only (PNG/JPEG/WebP/ICO). Any logo consumer
+ * MUST stay on `<img src>`.
  */
 export const LOGO_ACCEPT_MIME: readonly string[] = [
   'image/png',

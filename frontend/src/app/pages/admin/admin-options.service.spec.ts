@@ -28,7 +28,7 @@ describe('AdminOptionsService — mock mode', () => {
     const opts = await firstValueFrom(svc().applicationTypeOptions());
     expect(opts.length).toBe(2);
     expect(opts[0]).toEqual(expect.objectContaining({ value: expect.any(String), label: expect.any(String) }));
-    // value is the type id, label the display name
+    // The value is the type id. The label is the display name.
     expect(opts.find((o) => o.label === 'Finanzantrag')).toBeTruthy();
   });
 
@@ -47,7 +47,7 @@ describe('AdminOptionsService — mock mode', () => {
     const s = svc();
     expect(s.recipientKindOptions().map((o) => o.value)).toEqual(['applicant', 'role', 'group']);
     expect(s.guardOperatorOptions().length).toBeGreaterThan(0);
-    // guard operator values equal their labels (value == key)
+    // Guard operator values equal their labels (value == key).
     expect(s.guardOperatorOptions().every((o) => o.value === o.label)).toBe(true);
   });
 });
@@ -69,7 +69,7 @@ describe('AdminOptionsService — roleOptions non-empty branch', () => {
     const s = TestBed.inject(AdminOptionsService);
     const opts = await firstValueFrom(s.roleOptions());
     expect(opts).toEqual([{ value: 'chair', label: expect.any(String) }]);
-    // not falling back to the seed → only the single API role is present
+    // No fallback to the seed list → only the single API role is present.
     expect(opts).toHaveLength(1);
     TestBed.inject(HttpTestingController).verify();
   });
@@ -86,7 +86,7 @@ describe('AdminOptionsService — roleOptions non-empty branch', () => {
     });
     const s = TestBed.inject(AdminOptionsService);
     const opts = await firstValueFrom(s.roleOptions());
-    // empty API → MOCK_ROLES fallback (member/referent/vorstand/admin)
+    // An empty API list falls back to MOCK_ROLES (member/referent/vorstand/admin).
     expect(opts.map((o) => o.value)).toContain('member');
     expect(opts.length).toBeGreaterThan(1);
     TestBed.inject(HttpTestingController).verify();

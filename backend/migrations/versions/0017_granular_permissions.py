@@ -1,13 +1,13 @@
-"""Granularere globale Permissions (#6) — Bestands-Zuweisungen remappen.
+"""Finer global permissions (#6): remap the existing assignments.
 
-Aufteilung (shared/permissions.py):
-* ``admin.config``  → ``admin.site`` + ``admin.gremien`` + ``admin.types``
-* ``budget.manage`` → ``budget.structure`` + ``budget.book``
-* ``meeting.manage`` bleibt; Inhaber erhalten zusätzlich ``protocol.finalize``
-* ``audit.read``     bleibt; Inhaber erhalten zusätzlich ``audit.verify``
+The split (shared/permissions.py):
+* `admin.config`  → `admin.site` + `admin.gremien` + `admin.types`
+* `budget.manage` → `budget.structure` + `budget.book`
+* `meeting.manage` stays. A holder also gets `protocol.finalize`.
+* `audit.read`     stays. A holder also gets `audit.verify`.
 
-Bestehende Rollen behalten damit exakt ihren bisherigen Funktionsumfang.
-Idempotent (``ON CONFLICT DO NOTHING`` / wiederholbare DELETEs).
+Every existing role therefore keeps the exact range of functions it had before.
+The migration is idempotent (`ON CONFLICT DO NOTHING` and repeatable DELETEs).
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ depends_on: str | Sequence[str] | None = None
 
 
 def _fanout(old: str, new: tuple[str, ...]) -> list[str]:
-    """``old`` → ``new``-Rechte für alle Rollen, die ``old`` halten."""
+    """Build the INSERTs that grant every `new` permission to each holder of `old`."""
     stmts = [
         (
             "INSERT INTO role_permission (role_id, permission) "

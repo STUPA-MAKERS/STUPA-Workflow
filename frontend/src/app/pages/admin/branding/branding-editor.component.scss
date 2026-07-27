@@ -62,7 +62,7 @@
   flex-wrap: wrap;
 }
 
-/* Two-column DE/EN editor — both languages side by side. */
+/* Two-column DE and EN editor. */
 .br__bi {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -84,7 +84,7 @@ textarea {
   border-radius: var(--radius-md);
 }
 
-// Uniform control height: text inputs flush with app-select/app-input.
+// Uniform control height: the text inputs align with app-select and app-input.
 input:not([type='file']) {
   height: var(--control-height);
   box-sizing: border-box;
@@ -96,7 +96,7 @@ textarea {
   resize: vertical;
 }
 
-// File upload as a compact, themed button (the native button was broken).
+// File upload as a compact themed button. The native button was broken.
 input[type='file'] {
   font-size: var(--fs-sm);
   color: var(--color-text-muted);
@@ -182,8 +182,8 @@ input[type='file']::file-selector-button:hover {
   font-size: var(--fs-xs);
 }
 
-/* Mobile (≤768px): preview no longer sticky (stacks under the editor);
-   link/column inputs full width so nothing overflows at 375px. */
+/* Mobile at 768px or less: the preview is no longer sticky and stacks below the editor.
+   The link and column inputs take the full width, so nothing overflows at 375px. */
 @media (max-width: 768px) {
   .br__preview {
     position: static;

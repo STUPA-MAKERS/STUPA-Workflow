@@ -1,106 +1,107 @@
-# Backup & Restore (T-42)
+# Backup and restore (T-42)
 
-Tägliches, **verschlüsseltes** Backup des Datenbestands und eine geübte
-Restore-Prozedur. Deckt die zwei zustandsbehafteten Stores ab:
+A daily, **encrypted** backup of the data plus a practiced restore procedure. It covers the
+two stateful stores:
 
 - **PostgreSQL** — `pg_dump` (custom format) → `db.dump`
-- **MinIO** — `mc mirror` des Buckets (Anhänge + PDFs) → `objects/`
+- **MinIO** — `mc mirror` of the bucket (attachments and PDFs) → `objects/`
 
-Beides landet in **einem** age-verschlüsselten Tar-Artefakt
-`antrag-<UTC-Zeitstempel>.tar.age` im `backups`-Volume. Quelle: `deployment.md §4`,
-`requirements R14.5/R16`.
+Both go into **one** age-encrypted tar artifact `antrag-<UTC timestamp>.tar.age` in the
+`backups` volume. Sources: `deployment.md §4` and `requirements R14.5/R16`.
 
-## Verschlüsselung (age)
+## Encryption (age)
 
-Der Backup-Host kennt **nur den Public-Key** (encrypt-only). Der private Key gehört
-**off-host** und wird ausschließlich zur Restore-Zeit gestellt — fällt die VM, ist
-der Backup-Inhalt ohne den separat verwahrten Key wertlos.
+The backup host knows **only the public key**, so it can encrypt but not decrypt. The private
+key belongs **off host**. Supply it at restore time only. If you lose the VM, the backup
+content is worthless without the key that you keep apart.
 
 ```bash
-age-keygen -o age.key          # erzeugt private key-Datei + druckt "# public key: age1..."
+age-keygen -o age.key          # creates the private key file + prints "# public key: age1..."
 ```
 
-- Public-Key → `BACKUP_AGE_RECIPIENT` in `deploy/.env`.
-- Private `age.key` → **off-host** sicher verwahren (Passwortmanager / HSM / getrennter
-  Host). NICHT ins Repo, nicht aufs Backup-Volume.
+- Public key → `BACKUP_AGE_RECIPIENT` in `deploy/.env`.
+- Keep the private `age.key` safe **off host**: password manager, HSM or a separate host. Do
+  NOT put it in the repository or on the backup volume.
 
-> GPG statt age ist möglich (`gpg --encrypt -r <key>` / `gpg -d`) — age ist hier der
-> Default: ein Datei-Key, kein Keyring, kein Agent.
+> GPG works instead of age (`gpg --encrypt -r <key>` / `gpg -d`). age is the default here
+> because it needs one key file, no keyring and no agent.
 
-## Konfiguration (`deploy/.env`)
+## Configuration (`deploy/.env`)
 
-| Var | Default | Zweck |
+| Variable | Default | Purpose |
 |---|---|---|
-| `BACKUP_AGE_RECIPIENT` | — | age-Public-Key; **leer ⇒ backup-Service startet nicht** |
-| `BACKUP_RETENTION_DAYS` | `14` | ältere Artefakte werden geprunet (`0` = nie) |
-| `BACKUP_CRON` | `17 2 * * *` | busybox-cron-Spec (täglich 02:17 UTC) |
-| `BACKUP_AGE_IDENTITY` | `/secrets/age.key` | privater Key im Container (nur Restore) |
-| `BACKUP_OFFHOST_RSYNC_TARGET` | — | optionaler rsync-Push off-host |
+| `BACKUP_AGE_RECIPIENT` | — | age public key. **Empty ⇒ the backup service does not start** |
+| `BACKUP_RETENTION_DAYS` | `14` | the job prunes older artifacts (`0` = never) |
+| `BACKUP_CRON` | `17 2 * * *` | busybox cron spec (daily at 02:17 UTC) |
+| `BACKUP_AGE_IDENTITY` | `/secrets/age.key` | private key in the container (restore only) |
+| `BACKUP_OFFHOST_RSYNC_TARGET` | — | optional rsync push off host |
 
-DB-/MinIO-Zugang kommt aus den bestehenden `POSTGRES_*` / `MINIO_*` (kein Duplikat).
+The database and MinIO access come from the existing `POSTGRES_*` and `MINIO_*` values. There
+is no second copy.
 
-## Betrieb
+## Operation
 
-Der `backup`-Service läuft im **prod-Profil** und startet `crond`:
+The `backup` service runs in the **prod profile** and starts `crond`:
 
 ```bash
-docker compose --profile prod up -d           # backup-Service inkl.
+docker compose --profile prod up -d           # includes the backup service
 ```
 
-Manueller Lauf (z. B. vor einem Update):
+Run it by hand, for example before an update:
 
 ```bash
 docker compose --profile backup run --rm backup backup.sh
 ```
 
-Artefakte liegen im `backups`-Volume (`/backups` im Container). Mit
-`BACKUP_OFFHOST_RSYNC_TARGET` wird jedes Artefakt zusätzlich off-host kopiert.
+The artifacts stay in the `backups` volume (`/backups` in the container). With
+`BACKUP_OFFHOST_RSYNC_TARGET` the job also copies every artifact off host.
 
-## Restore (destruktiv — Runbook)
+## Restore (destructive — runbook)
 
-> **Restore überschreibt die laufende DB und den MinIO-Bucket.** `restore.sh` fragt
-> nach (Eingabe `RESTORE`), sofern nicht `FORCE=1`. Vorher ein frisches Backup ziehen.
+> **A restore overwrites the running database and the MinIO bucket.** `restore.sh` asks first
+> and waits for the input `RESTORE`, unless you set `FORCE=1`. Take a fresh backup before you
+> start.
 
-1. **Privaten age-Key bereitstellen** (off-host → Stack):
+1. **Supply the private age key** (off host → stack):
    ```bash
-   cp /pfad/zum/age.key deploy/backup/secrets/age.key   # gitignored, ro gemountet
+   cp /path/to/age.key deploy/backup/secrets/age.key   # gitignored, mounted read-only
    ```
-2. **Stack-Stand sichern** und App pausieren (api/worker), damit kein Schreibzugriff
-   während des Restores passiert:
+2. **Save the state of the stack** and pause the application (api and worker), so that
+   nothing writes during the restore:
    ```bash
    docker compose stop api worker
    ```
-3. **Artefakt wählen** (neuestes zuerst):
+3. **Choose an artifact** (newest first):
    ```bash
    docker compose --profile backup run --rm backup ls -t /backups
    ```
-4. **Restore ausführen:**
+4. **Run the restore:**
    ```bash
    docker compose --profile backup run --rm backup \
-     restore.sh /backups/antrag-<ZEITSTEMPEL>.tar.age
+     restore.sh /backups/antrag-<TIMESTAMP>.tar.age
    ```
-   (CI/Smoke nutzen `-e FORCE=1`, um die Rückfrage zu überspringen.)
-5. **App wieder hochfahren + prüfen:**
+   (CI and the smoke test pass `-e FORCE=1` to skip the question.)
+5. **Start the application again and check it:**
    ```bash
    docker compose up -d
    ../scripts/smoke.sh
    ```
-6. **age.key wieder entfernen** (gehört nicht dauerhaft in den Stack):
+6. **Remove `age.key` again.** It must not stay in the stack:
    ```bash
    rm deploy/backup/secrets/age.key
    ```
 
-## Restore-Test (automatisiert)
+## Restore test (automated)
 
-`scripts/restore-smoke.sh` beweist die volle Runde in einem Wegwerf-Stack:
-Testdaten säen → `backup.sh` → Daten zerstören → `restore.sh` → DB-Zeile **und**
-MinIO-Objekt zurück? Räumt am Ende `down -v` ab.
+`scripts/restore-smoke.sh` proves the full round in a throwaway stack. It seeds test data,
+runs `backup.sh` and destroys the data. It then runs `restore.sh` and checks that the database
+row **and** the MinIO object are back. At the end it cleans up with `down -v`.
 
 ```bash
 scripts/restore-smoke.sh
 ```
 
-In CI als **opt-in** Job `restore-smoke` (Label `run-restore-smoke`,
-`workflow_dispatch` oder `RUN_RESTORE_SMOKE=true`) — analog zum e2e-Job, damit der
-Standard-PR-Lauf schlank/grün bleibt. Restore-Drift (Schema vs. Dump) fällt so
-periodisch auf, statt erst im Ernstfall.
+In CI this is the **opt-in** job `restore-smoke`. Start it with the label
+`run-restore-smoke`, with `workflow_dispatch` or with `RUN_RESTORE_SMOKE=true`. This matches
+the e2e job and keeps the standard PR run short and green. Restore drift between schema and
+dump therefore shows up regularly, and not for the first time in an emergency.

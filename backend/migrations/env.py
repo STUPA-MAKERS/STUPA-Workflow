@@ -1,8 +1,8 @@
-"""Alembic-Environment (async, SQLAlchemy 2.0).
+"""Alembic environment (async, SQLAlchemy 2.0).
 
-Ziel-Metadata = `app.db.Base.metadata` (über `app.models` vollständig befüllt).
-DB-URL-Priorität: explizit gesetzte `sqlalchemy.url` (Tests/CI) → App-Settings
-(`db_migration_url` → `database_url`).
+The target metadata is `app.db.Base.metadata`. The import of `app.models` fills it
+completely. The database URL follows this order: an explicit `sqlalchemy.url` for
+tests and CI, then the app settings `db_migration_url`, then `database_url`.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from sqlalchemy import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 from sqlalchemy.pool import NullPool
 
-import app.models  # noqa: F401  — befüllt Base.metadata
+import app.models  # noqa: F401  — fills Base.metadata
 from app.db import Base
 from app.settings import get_settings
 

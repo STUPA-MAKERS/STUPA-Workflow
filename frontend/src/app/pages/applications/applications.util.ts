@@ -2,9 +2,11 @@ import type { BadgeVariant } from '@stupa-makers/ui-kit';
 import type { ScanState } from '@core/api/models';
 
 /**
- * Derive an application's display title from the free `data` fields. Forms have
- * no guaranteed `title` field; we take the first non-empty string from the usual
- * keys, otherwise the fallback (i18n "untitled").
+ * Derive the display title of an application from the free `data` fields.
+ *
+ * A form has no guaranteed `title` field. The function takes the first non-empty
+ * string from the usual keys. It returns the fallback when no key matches. The
+ * caller passes the i18n "untitled" text as that fallback.
  */
 export function applicationTitle(
   data: Record<string, unknown> | null | undefined,
@@ -19,8 +21,10 @@ export function applicationTitle(
 }
 
 /**
- * Robustly stringify diff/data field values for display: scalars directly,
- * objects/arrays as compact JSON, `null`/`undefined` as an empty string.
+ * Stringify a diff or data field value for display.
+ *
+ * A scalar keeps its own text. An object or an array becomes compact JSON.
+ * `null` and `undefined` become an empty string.
  */
 export function formatFieldValue(value: unknown): string {
   if (value === null || value === undefined) return '';
@@ -29,7 +33,7 @@ export function formatFieldValue(value: unknown): string {
   return JSON.stringify(value);
 }
 
-/** Scan state → badge variant: scanning = warning, ready = green, finding = red. */
+/** Map a scan state to a badge variant. An unknown state gives a neutral badge. */
 export function scanBadgeVariant(state: ScanState): BadgeVariant {
   switch (state) {
     case 'clean':
@@ -43,7 +47,7 @@ export function scanBadgeVariant(state: ScanState): BadgeVariant {
   }
 }
 
-/** Human-readable bytes (binary, 1 decimal from KB up). `0` → "0 B". */
+/** Human-readable bytes, binary base, one decimal from KB up. An invalid size gives "—". */
 export function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes < 0) return '—';
   if (bytes < 1024) return `${bytes} B`;

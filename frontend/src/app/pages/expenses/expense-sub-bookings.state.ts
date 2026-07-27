@@ -7,9 +7,9 @@ import { formatEur, problemCode } from '../budget/expense-display.util';
 import type { ExpensesListState } from './expenses-list.state';
 
 /**
- * Sub-bookings: expanded parents + child cache, CAMT.053/MT940 import and the
- * manual create dialog. A parent's amount is the sum of its children
- * (server-enforced), so the list reloads after every child mutation.
+ * Sub-bookings: expanded parents, the child cache, the CAMT.053/MT940 import and the
+ * manual create dialog. The server keeps the amount of a parent equal to the sum of
+ * its children, so the list reloads after every change to a child.
  */
 export class ExpenseSubBookingsState {
   private readonly api = inject(BudgetTreeApi);
@@ -73,7 +73,8 @@ export class ExpenseSubBookingsState {
     });
   }
 
-  // --- global file import (toolbar action instead of per-row, #expenses-ux2) ---
+  // Global file import. The toolbar carries this action instead of each row
+  // (#expenses-ux2).
   readonly importOpen = signal(false);
   readonly importQuery = signal('');
   readonly importCandidates = signal<Expense[]>([]);
@@ -108,8 +109,8 @@ export class ExpenseSubBookingsState {
     this.importTimer = setTimeout(() => this.searchImportTargets(q.trim()), 300);
   }
 
-  /** Target candidates: the list endpoint only returns top-level bookings, so
-   *  every hit is a valid sub-booking parent. */
+  /** Target candidates. The list endpoint returns top-level bookings only, so every
+   *  hit is a valid sub-booking parent. */
   private searchImportTargets(q: string): void {
     this.api.listExpenses({ q: q || undefined, limit: 10 }).subscribe({
       next: (page) => this.importCandidates.set(page.items),
@@ -140,8 +141,8 @@ export class ExpenseSubBookingsState {
     this.importBusy.set(true);
     this.api.importSubBookings(target.id as Uuid, file).subscribe({
       next: (children) => {
-        // Response only holds the import batch → reload the full child list and
-        // the list (parent amount = sum of children changed).
+        // The response holds the import batch only. Reload the full child list and
+        // the booking list, because the parent amount changed.
         this.importBusy.set(false);
         this.importOpen.set(false);
         this.expandedSub.update((s) => new Set(s).add(target.id));

@@ -1,10 +1,11 @@
 """ZUGFeRD/Factur-X import.
 
-Reads the embedded CII XML from an invoice PDF and maps the header data onto
-:class:`~app.modules.budget.tree_models.Invoice` fields. Pure function (no
-storage/DB I/O); ``pycheval`` is imported lazily so it only stays in memory on
-the import path. Currencies other than EUR are rejected (DB CHECK
-``invoice_currency_eur``).
+The module reads the embedded CII XML from an invoice PDF. It maps the header
+data onto the fields of `app.modules.budget.tree_models.Invoice`. The functions
+are pure and do no storage or database I/O.
+
+The module imports ``pycheval`` lazily, so it stays in memory only on the import
+path. The DB CHECK ``invoice_currency_eur`` rejects any currency other than EUR.
 """
 
 from __future__ import annotations
@@ -26,9 +27,9 @@ _NS_RSM = "urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100"
 _NS_RAM = "urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100"
 _NS_UDT = "urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100"
 
-# Known filenames of the embedded CII XML (checked case-insensitively).
+# Known filenames of the embedded CII XML. The check is case-insensitive.
 # pycheval matches only ``factur-x.xml`` and hangs in an endless loop on other
-# names, so we fetch the attachment ourselves via pypdf.
+# names, so this module fetches the attachment itself with pypdf.
 _CII_ATTACHMENT_NAMES = (
     "factur-x.xml",  # Factur-X / ZUGFeRD >= 2.1
     "zugferd-invoice.xml",  # ZUGFeRD 2.0
@@ -38,13 +39,17 @@ _CII_ATTACHMENT_NAMES = (
 
 
 class NotZugferdError(ValueError):
-    """PDF without a (valid) embedded ZUGFeRD/Factur-X XML.
+    """The PDF has no valid embedded ZUGFeRD/Factur-X XML.
 
-    The caller then offers manual entry."""
+    The caller then offers manual entry.
+    """
 
 
 class UnsupportedInvoiceCurrencyError(ValueError):
-    """Invoice currency is not EUR — only EUR is supported (DB CHECK)."""
+    """The invoice currency is not EUR.
+
+    The DB CHECK ``invoice_currency_eur`` allows only EUR.
+    """
 
     def __init__(self, currency: str) -> None:
         super().__init__(f"unsupported invoice currency: {currency}")
@@ -65,29 +70,32 @@ class ParsedInvoice:
     currency: str
 
 
-# Upper bound for the embedded (decompressed) CII XML. Real invoices are far
-# below (< 1 MB); the cap limits a FlateDecode zip bomb inside a tiny PDF.
+# Upper bound for the embedded (decompressed) CII XML. A real invoice stays far
+# under this cap, below 1 MB. The cap limits a FlateDecode zip bomb inside a
+# tiny PDF.
 _MAX_EMBEDDED_XML_BYTES = 16 * 1024 * 1024  # 16 MiB
 
 
 def _extract_cii_xml(data: bytes) -> str:
-    """Fetch the embedded CII XML from the PDF, robust against the filename.
+    """Fetch the embedded CII XML from the PDF, whatever the attachment is named.
 
-    Replaces pycheval's ``extract_facturx_from_pdf`` (endless loop on names
-    other than ``factur-x.xml``). Reads attachment NAMES cheaply, then
-    decompresses exactly one matching attachment. Deliberately avoids
-    ``dict(reader.attachments)``: that decompresses ALL embedded streams at
-    once, letting a small PDF balloon to hundreds of MB (memory-exhaustion
-    DoS). Anything over :data:`_MAX_EMBEDDED_XML_BYTES` is refused.
+    This function replaces ``extract_facturx_from_pdf`` of pycheval, which loops
+    forever on a name other than ``factur-x.xml``. It reads the attachment NAMES
+    cheaply, then decompresses exactly one matching attachment.
+
+    The function avoids ``dict(reader.attachments)`` on purpose. That call
+    decompresses ALL embedded streams at once. A small PDF can then balloon to
+    hundreds of MB, which is a memory-exhaustion DoS.
 
     Raises:
-        NotZugferdError: Unreadable PDF, no embedded XML, or attachment too large.
+        NotZugferdError: The PDF is unreadable, has no embedded XML, or the
+            attachment is over `_MAX_EMBEDDED_XML_BYTES`.
     """
     from pypdf import PdfReader
 
     try:
         reader = PdfReader(io.BytesIO(data))
-        # `attachment_list` decompresses NOTHING; `.name` is cheap (name tree only).
+        # `attachment_list` decompresses NOTHING. `.name` only reads the name tree.
         embedded = {emb.name.lower(): emb for emb in reader.attachment_list}
     except Exception as exc:  # pypdf raises assorted error types on broken PDFs
         raise NotZugferdError(f"unreadable PDF: {exc}") from exc
@@ -102,8 +110,8 @@ def _extract_cii_xml(data: bytes) -> str:
     if chosen is None:
         raise NotZugferdError("no embedded XML invoice found")
 
-    # Check the declared size first, then the actual one — the declared
-    # ``/Size`` is untrusted.
+    # Check the declared size first, then the actual one. The declared ``/Size``
+    # is untrusted.
     declared = chosen.size
     if declared is not None and declared > _MAX_EMBEDDED_XML_BYTES:
         raise NotZugferdError(f"embedded invoice XML too large ({declared} bytes)")
@@ -134,37 +142,44 @@ def parse_zugferd_pdf(data: bytes) -> ParsedInvoice:
     try:
         invoice = pycheval.parse_xml(xml)
     except pycheval.FacturXError:
-        # pycheval is a strict EN16931 validator; real-world ZUGFeRD PDFs often
-        # carry slightly invalid fields we never read. Instead of rejecting the
-        # import, read the header data tolerantly from the extracted CII XML.
+        # pycheval is a strict EN16931 validator. Real ZUGFeRD PDFs often carry
+        # slightly invalid fields that this module never reads. So do not reject
+        # the file. Read the header data tolerantly from the extracted CII XML.
         return _parse_cii_header(xml)
     return _map(invoice)
 
 
-# Upper bound for invoice amounts = DB column ``Numeric(12, 2)``. Larger values
-# from the untrusted XML would otherwise 500 as a numeric overflow on INSERT.
+# Upper bound for invoice amounts. It matches the DB column ``Numeric(12, 2)``.
+# A larger value from the untrusted XML would otherwise raise a 500 as a numeric
+# overflow on INSERT.
 _MAX_INVOICE_AMOUNT = Decimal("9999999999.99")
 
 
 def _amount(money: Any | None) -> Decimal | None:
-    """Read ``Money.amount`` (Decimal) defensively — ``None`` stays ``None``."""
+    """Read ``Money.amount`` defensively, keeping ``None`` as ``None``."""
     return money.amount if money is not None else None
 
 
 def _sane_amount(value: Decimal | None) -> Decimal | None:
-    """Sanitize an optional amount: ``None``/NaN/negative/too large yields ``None``.
+    """Sanitize an optional amount.
 
-    Amounts come from untrusted XML; invalid optional fields (net/tax) are
-    dropped rather than blocking the import (gross is checked separately)."""
+    The function returns ``None`` for ``None``, for NaN, for a negative value and
+    for a value over the cap. Amounts come from untrusted XML. The function drops
+    an invalid optional field (net or tax) instead of blocking the import. The
+    gross amount has its own check.
+    """
     if value is None or not value.is_finite() or value < 0 or value > _MAX_INVOICE_AMOUNT:
         return None
     return value
 
 
 def _require_sane_gross(value: Decimal) -> Decimal:
-    """Validate the (required) gross amount range — otherwise not importable.
+    """Validate the range of the required gross amount.
 
-    ``NotZugferdError`` makes the UI offer manual entry (no 500/DB error)."""
+    Raises:
+        NotZugferdError: The gross amount is out of range. The UI then offers
+            manual entry instead of a 500 or a database error.
+    """
     if not value.is_finite() or value < 0 or value > _MAX_INVOICE_AMOUNT:
         raise NotZugferdError(f"invoice gross amount out of range: {value}")
     return value
@@ -177,14 +192,15 @@ def _map(invoice: MinimumInvoice) -> ParsedInvoice:
 
     gross = _amount(invoice.grand_total_amount)
     if gross is None:
-        # Without a gross total there is no booking basis — treat as not importable.
+        # Without a gross total there is no booking basis. Treat it as not importable.
         raise NotZugferdError("invoice without grand total amount")
     gross = _require_sane_gross(gross)
 
     taxes = getattr(invoice, "tax_total_amounts", None) or []
     tax = sum((t.amount for t in taxes), Decimal("0")) if taxes else None
 
-    # ``due_date`` exists only from BASIC profile up (PaymentTerms); MINIMUM lacks it.
+    # ``due_date`` exists only from the BASIC profile up (PaymentTerms). MINIMUM
+    # does not have it.
     terms = getattr(invoice, "payment_terms", None)
     due = getattr(terms, "due_date", None) if terms is not None else None
 
@@ -204,46 +220,52 @@ def _map(invoice: MinimumInvoice) -> ParsedInvoice:
 
 
 class _DtdForbiddenError(ValueError):
-    """The CII XML contains a DTD/entity declaration — rejected."""
+    """The CII XML contains a DTD or entity declaration, which is not allowed."""
 
 
 def _forbid_dtd(*_args: object, **_kwargs: object) -> None:
-    """expat callback: hard-reject any DOCTYPE/entity declaration.
+    """Reject any DOCTYPE or entity declaration (expat callback).
 
-    Defense in depth: the XML comes from an uploaded, untrusted PDF.
-    ``xml.etree`` blocks external entities (no XXE/SSRF) but allows internal
-    entity expansion (billion laughs) and DTDs. We forbid DTDs entirely — a
-    real CII invoice carries none."""
+    This is defense in depth. The XML comes from an uploaded, untrusted PDF.
+    ``xml.etree`` blocks external entities, so there is no XXE or SSRF. It still
+    allows internal entity expansion (billion laughs) and DTDs. This callback
+    forbids DTDs entirely. A real CII invoice carries none.
+
+    Raises:
+        _DtdForbiddenError: Always.
+    """
     raise _DtdForbiddenError("DTD/entity declarations are not allowed in invoice XML")
 
 
 def _hardened_fromstring(raw: bytes) -> ET.Element:
-    """``ET.fromstring`` replacement without DTD/entity expansion (stdlib-only).
+    """Replace ``ET.fromstring`` without DTD or entity expansion (stdlib only).
 
-    Wires a pyexpat parser onto an :class:`ET.TreeBuilder` with handlers that
-    reject any DOCTYPE/entity declaration, so a malicious invoice PDF can
-    trigger neither a billion-laughs DoS nor DTD resolution (XXE/SSRF) — like
-    ``defusedxml`` without the extra dependency. Namespace-aware so the
-    ``{ns}tag`` lookups below keep working.
+    The function wires a pyexpat parser onto an `ET.TreeBuilder`. The handlers
+    reject any DOCTYPE or entity declaration. A malicious invoice PDF can then
+    trigger neither a billion-laughs DoS nor DTD resolution (XXE or SSRF). This
+    gives what ``defusedxml`` gives, without the extra dependency.
+
+    The parser stays namespace-aware, so the ``{ns}tag`` lookups below keep
+    working.
 
     Raises:
-        _DtdForbiddenError: The XML contains a DTD/entity declaration.
+        _DtdForbiddenError: The XML contains a DTD or entity declaration.
         expat_errors.ExpatError: The XML is not well-formed.
     """
     builder = ET.TreeBuilder()
     parser = expat_errors.ParserCreate(namespace_separator="}")
-    # ``StartDoctypeDeclHandler`` fires at ``<!DOCTYPE`` already, ruling out any
-    # DTD and thus all entity references/expansions. The entity-decl handlers
-    # are defense in depth in case expat changes behavior.
+    # ``StartDoctypeDeclHandler`` fires at ``<!DOCTYPE`` already. That rules out
+    # any DTD and thus all entity references and expansions. The entity-decl
+    # handlers are defense in depth in case expat changes behavior.
     parser.StartDoctypeDeclHandler = _forbid_dtd
     parser.EntityDeclHandler = _forbid_dtd
     parser.UnparsedEntityDeclHandler = _forbid_dtd
-    # Request no external DTDs/parameter entities (no network/FS access).
+    # Request no external DTDs or parameter entities, so no network or FS access.
     with contextlib.suppress(AttributeError, expat_errors.ExpatError):  # pragma: no cover
         parser.UseForeignDTD(False)
 
     def _start(tag: str, attrs: dict[str, str]) -> None:
-        # expat delivers namespaces as ``ns}local`` -> ``{ns}local`` (ET convention).
+        # expat delivers a namespace as ``ns}local``. ET wants ``{ns}local``.
         builder.start(_to_qname(tag), {_to_qname(k): v for k, v in attrs.items()})
 
     parser.StartElementHandler = _start
@@ -269,7 +291,7 @@ def _qn(ns: str, tag: str) -> str:
 
 
 def _find_text(el: ET.Element | None, path: str) -> str | None:
-    """Text at ``path`` (relative to ``el``) — ``None`` if missing/empty."""
+    """Return the text at ``path`` relative to ``el``, or ``None`` when missing or empty."""
     if el is None:
         return None
     found = el.find(path)
@@ -280,7 +302,7 @@ def _find_text(el: ET.Element | None, path: str) -> str | None:
 
 
 def _cii_date(value: str | None) -> date | None:
-    """Parse a CII ``DateTimeString`` (format 102 = ``YYYYMMDD``) into a ``date``."""
+    """Parse a CII ``DateTimeString`` in format 102 (``YYYYMMDD``)."""
     if not value or len(value) < 8 or not value[:8].isdigit():
         return None
     try:
@@ -290,7 +312,7 @@ def _cii_date(value: str | None) -> date | None:
 
 
 def _cii_decimal(value: str | None) -> Decimal | None:
-    """Parse a CII amount string defensively into ``Decimal`` (``None`` if missing/invalid)."""
+    """Parse a CII amount string defensively, returning ``None`` when missing or invalid."""
     if value is None:
         return None
     try:
@@ -302,18 +324,19 @@ def _cii_decimal(value: str | None) -> Decimal | None:
 def _parse_cii_header(xml: str | bytes) -> ParsedInvoice:
     """Read header data tolerantly straight from the CII XML (pycheval fallback).
 
-    Reads only the fields the entry dialog pre-fills; contact/payment/line-item
-    data is deliberately ignored. Same guarantees as :func:`_map`: non-EUR
-    currency errors out, a missing gross total means not importable.
+    The function reads only the fields that the entry dialog pre-fills. It
+    ignores contact, payment and line-item data on purpose. It gives the same
+    guarantees as `_map`. A currency other than EUR is an error. A missing gross
+    total means the invoice is not importable.
 
     Raises:
-        NotZugferdError: XML unparseable or without a gross total.
-        UnsupportedInvoiceCurrencyError: Currency is not EUR.
+        NotZugferdError: The XML does not parse or has no gross total.
+        UnsupportedInvoiceCurrencyError: The currency is not EUR.
     """
-    # ``ET.fromstring`` rejects unicode strings with an encoding declaration -> bytes.
+    # ``ET.fromstring`` rejects a unicode string with an encoding declaration.
     raw = xml.encode("utf-8") if isinstance(xml, str) else xml
-    # Untrusted XML from an uploaded PDF: parse via :func:`_hardened_fromstring`,
-    # which hard-rejects DTD/entity expansion (billion laughs/XXE).
+    # The XML comes untrusted from an uploaded PDF. `_hardened_fromstring` rejects
+    # DTD and entity expansion (billion laughs, XXE).
     try:
         root = _hardened_fromstring(raw)
     except (ET.ParseError, _DtdForbiddenError) as exc:

@@ -12,15 +12,15 @@ import { fintsErrorKey, safeChallengeImage } from './konten.util';
 import type { KontenLinesState } from './konten-lines.state';
 
 /**
- * Per-booker FinTS credential (connect dialog) + sync / TAN (PSD2 SCA) flow
- * incl. the 6-box OTP input. Write access is enforced server-side.
+ * This class manages the per-booker FinTS credential in the connect dialog. It also
+ * runs the sync and TAN flow (PSD2 SCA) with the six-box OTP input. The server
+ * enforces write access.
  */
 export class FintsSyncState {
   private readonly api = inject(BudgetTreeApi);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
 
-  // --- credential / connect dialog ---
   readonly credStatus = signal<FintsCredentialStatus | null>(null);
   readonly connectOpen = signal(false);
   readonly credLogin = signal('');
@@ -37,7 +37,6 @@ export class FintsSyncState {
     return until ? new Date(until).toLocaleString() : '';
   });
 
-  // --- sync / TAN ---
   readonly syncing = signal(false);
   readonly sessionToken = signal<string>('');
   readonly challenge = signal<string>('');
@@ -47,7 +46,6 @@ export class FintsSyncState {
   readonly tanBusy = signal(false);
   readonly hasPendingTan = computed(() => !!this.sessionToken());
 
-  // --- OTP (6 boxes) ---
   readonly otpLength = 6;
   readonly otpSlots = Array.from({ length: 6 }, (_, i) => i);
   readonly otpDigits = signal<string[]>(Array.from({ length: 6 }, () => ''));
@@ -127,7 +125,7 @@ export class FintsSyncState {
     const acc = this.lines.accountId();
     if (!acc || this.syncing() || this.locked()) return;
     if (!this.connected()) {
-      // No credential yet → open the connect dialog instead of failing.
+      // Without a credential, open the connect dialog instead of failing.
       this.openConnect();
       return;
     }
@@ -188,7 +186,7 @@ export class FintsSyncState {
     this.lines.refreshAccounts();
   }
 
-  /** Bank lock / auth rejection changes the lock state → reload the status. */
+  /** A bank lock or an auth rejection changes the lock state. So this reloads the status. */
   refreshOnLock(e: unknown): void {
     const code = problemCode(e);
     const acc = this.lines.accountId();
@@ -211,12 +209,11 @@ export class FintsSyncState {
     this.otpMode.set(true);
   }
 
-  /** Cancel the TAN dialog — discards the pending session. */
+  /** Cancel the TAN dialog. This discards the pending session. */
   closeTan(): void {
     this.resetTan();
   }
 
-  // --- OTP handlers ---
   onOtpInput(i: number, ev: Event): void {
     const el = ev.target as HTMLInputElement;
     const digit = el.value.replace(/\D/g, '').slice(-1);

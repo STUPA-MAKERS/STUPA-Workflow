@@ -1,9 +1,10 @@
-# Antragsplattform — docker-compose Skelett (T-01)
-# Eine VM, plain HTTP intern hinter externem Nginx Proxy Manager (TLS-Edge).
-# Kein TLS/Cert/Keycloak im Stack. Einziger Host-Port: `web` (127.0.0.1:8080).
-# Alle anderen Services nur intern -> kein Internet-Ingress. Egress erlaubt
-# (worker: SMTP/WebDAV/Webhooks, pytex: tectonic-Bundle, api: OIDC).
-# Referenz: sds/deployment.md §1-§5, sds/overview.md §2.
+# Antragsplattform — docker-compose skeleton (T-01)
+# One VM, plain HTTP inside, behind an external Nginx Proxy Manager (the TLS edge).
+# The stack holds no TLS, no certificate and no Keycloak. The only host port is `web`
+# (127.0.0.1:8080). Every other service stays internal, so nothing enters from the
+# internet. Egress stays allowed (worker: SMTP/WebDAV/webhooks, pytex: tectonic bundle,
+# api: OIDC).
+# Reference: sds/deployment.md §1-§5, sds/overview.md §2.
 
 name: antragsplattform
 
@@ -12,9 +13,10 @@ x-restart: &restart
 
 services:
   web:
-    # SPA-Static + Routing /api -> api. Einziger NPM-Upstream.
-    # Multi-Stage-Image baut das Angular-FE (frontend/) und liefert es per nginx
-    # aus. Context = Repo-Root, damit frontend/ + deploy/web/nginx.conf greifbar.
+    # Static SPA plus routing /api -> api. The only NPM upstream.
+    # The multi-stage image builds the Angular frontend (frontend/), and nginx serves it.
+    # The context is the repository root, so frontend/ and deploy/web/nginx.conf are in
+    # reach.
     build:
       context: ..
       dockerfile: deploy/web/Dockerfile
@@ -23,11 +25,12 @@ services:
       api:
         condition: service_healthy
     ports:
-      # Nur lokal gebunden; externer NPM proxyt hierher (oder via `proxy`-Netz).
+      # Bound to localhost only. The external NPM proxies here, or through the `proxy`
+      # network.
       - "127.0.0.1:8080:80"
     volumes:
-      # nginx.conf ist ins Image gebacken; Mount erlaubt prod-Edits (real_ip-CIDR)
-      # ohne Rebuild. SPA-HTML kommt aus dem Image (kein html-Mount mehr).
+      # The image already holds nginx.conf. This mount allows a production edit
+      # (real_ip CIDR) without a rebuild. The SPA HTML comes from the image.
       - ./web/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     networks:
       - internal
@@ -40,12 +43,13 @@ services:
       start_period: 10s
 
   migrate:
-    # One-Shot-Migrator (Issue #38): fährt VOR api/worker `alembic upgrade head`
-    # gegen die DB — race-frei (wartet auf postgres healthy) und idempotent
-    # (alembic überspringt bereits angewandte Revisions). Kein restart-Loop:
-    # läuft einmal bis exit 0, api/worker hängen via `service_completed_successfully`
-    # daran. Migrations-URL: env.py nimmt DB_MIGRATION_URL→DATABASE_URL (s. .env);
-    # Default-Stack migriert als app-User. Nutzt dasselbe Backend-Image wie api.
+    # One-shot migrator (issue #38). It runs `alembic upgrade head` against the DB before
+    # api and worker start. The run is race-free, because it waits for postgres healthy.
+    # It is idempotent, because alembic skips the revisions it already applied. There is
+    # no restart loop: the job runs once until exit 0, and api and worker wait for it
+    # through `service_completed_successfully`. Migration URL: env.py takes
+    # DB_MIGRATION_URL, and DATABASE_URL as the fallback (see .env). The default stack
+    # migrates as the app user. The job uses the same backend image as api.
     build:
       context: ../backend
       dockerfile: Dockerfile
@@ -59,15 +63,15 @@ services:
       - internal
 
   api:
-    # FastAPI (uvicorn --proxy-headers). Kein Host-Port.
+    # FastAPI on uvicorn --proxy-headers. No host port.
     build:
       context: ../backend
       dockerfile: Dockerfile
     <<: *restart
     env_file: .env
-    # MCP-Quellpaket read-only mounten, damit der Self-Service-Download
-    # (GET /api/mcp/package) das `mcp/`-Verzeichnis findet (Build-Context ist nur
-    # ../backend, daher liegt es nicht im Image). MCP_PACKAGE_DIR zeigt darauf.
+    # Mount the MCP source package read-only, so the self-service download
+    # (GET /api/mcp/package) finds the `mcp/` directory. The build context is ../backend
+    # only, so that directory is not in the image. MCP_PACKAGE_DIR points to the mount.
     volumes:
       - ../mcp:/opt/mcp:ro
     environment:
@@ -82,7 +86,8 @@ services:
       minio:
         condition: service_healthy
     networks:
-      # internal = Egress (OIDC) + interne Services; pytex_net = egress-loser Render-Pfad.
+      # The internal network carries the egress for OIDC plus the internal services.
+      # pytex_net is the render path without egress.
       - internal
       - pytex_net
     healthcheck:
@@ -93,7 +98,7 @@ services:
       start_period: 20s
 
   worker:
-    # arq Worker + Cron (deadlines, retries, rollups). Kein Host-Port.
+    # arq worker plus cron (deadlines, retries, rollups). No host port.
     build:
       context: ../backend
       dockerfile: Dockerfile
@@ -109,12 +114,13 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
-      # ClamAV lädt Signaturen minutenlang → nur „gestartet" abwarten; der Scan-Task
-      # retryt, bis clamd bereit ist (kein Worker-Block beim Boot).
+      # ClamAV loads its signatures for minutes, so wait for "started" only. The scan
+      # task retries until clamd is ready, which keeps the worker unblocked at boot.
       clamav:
         condition: service_started
     networks:
-      # internal = Egress (SMTP/WebDAV/Webhooks) + interne Services; pytex_net = Render-Pfad.
+      # The internal network carries the egress for SMTP, WebDAV and webhooks, plus the
+      # internal services. pytex_net is the render path.
       - internal
       - pytex_net
     healthcheck:
@@ -132,9 +138,9 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      # Nur auf localhost gebunden — kein externer Zugriff. Für das Admin-CLI
-      # (direkte Verbindung) bzw. einen SSH-Port-Forward auf den Host.
-      # Das CLI liest diesen Host-Port aus der Compose-Datei (siehe admin-cli/).
+      # Bound to localhost only, so there is no external access. It serves the admin CLI
+      # on a direct connection, or an SSH port forward to the host.
+      # The CLI reads this host port from the compose file (see admin-cli/).
       - "127.0.0.1:5433:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
@@ -163,8 +169,8 @@ services:
       start_period: 5s
 
   minio:
-    # Explizit gepinnt (keine :latest) -> reproduzierbare Deploys + Versions-Audit-Trail.
-    # Bei Bump: Tag + Datum in deploy/README/Notes vermerken.
+    # Pinned on purpose (never :latest), for reproducible deploys and a version audit
+    # trail. On a bump, note the tag and the date in deploy/README or the notes.
     image: minio/minio:RELEASE.2025-04-22T22-12-26Z
     pull_policy: missing
     <<: *restart
@@ -184,8 +190,8 @@ services:
       start_period: 15s
 
   clamav:
-    # Explizit gepinnt (keine :latest) -> reproduzierbare Deploys + Versions-Audit-Trail.
-    # 1.x Patch-Tag; bei Bump Version in deploy-Notes vermerken.
+    # Pinned on purpose (never :latest), for reproducible deploys and a version audit
+    # trail. The tag is a 1.x patch tag. On a bump, note the version in the deploy notes.
     image: clamav/clamav:1.4.3
     pull_policy: missing
     <<: *restart
@@ -194,7 +200,8 @@ services:
     networks:
       - internal
     healthcheck:
-      # clamd lädt Signaturen beim Start (mehrere Minuten) -> langes start_period.
+      # clamd loads its signatures at start for several minutes, hence the long
+      # start_period.
       test: ["CMD-SHELL", "clamdcheck.sh || exit 1"]
       interval: 30s
       timeout: 10s
@@ -202,8 +209,9 @@ services:
       start_period: 300s
 
   pytex:
-    # FastAPI-Wrapper um pytex_api.render_blob (md->pdf, Variante via Frontmatter).
-    # pytex v1.0.0; tectonic-Bundle lazy in pytex_cache (XDG_CACHE_HOME=/cache).
+    # FastAPI wrapper around pytex_api.render_blob (md -> pdf, variant from the
+    # frontmatter). pytex v1.0.0. The tectonic bundle lands lazily in pytex_cache
+    # (XDG_CACHE_HOME=/cache).
     build:
       context: ../pytex
       dockerfile: Dockerfile
@@ -212,18 +220,18 @@ services:
     volumes:
       - pytex_cache:/cache
     networks:
-      # NUR das egress-lose pytex_net (internal: true): der Render-Container braucht
-      # zur Laufzeit kein Internet (tectonic-Bundle + biber sind ins Image gebacken,
-      # entrypoint.sh seedet den Cache). Damit wird ein etwaiger Compile-Time-Read/Exec
-      # (shell-escape) nicht zum Exfiltrations-Kanal (#sec-audit). api/worker erreichen
-      # pytex weiterhin über dieses Netz.
+      # ONLY pytex_net, which has no egress (internal: true). The render container needs
+      # no internet at runtime. The image already holds the tectonic bundle and biber, and
+      # entrypoint.sh seeds the cache. A compile-time read or exec (shell escape)
+      # therefore cannot become an exfiltration channel (#sec-audit). api and worker still
+      # reach pytex over this network.
       - pytex_net
-    # AUD-009 OS-Sandbox (read_only Rootfs + size-/noexec-tmpfs + cap_drop ALL) wurde
-    # ZURÜCKGEZOGEN: unter read_only Rootfs scheitert tectonic/fontconfig beim Schreiben
-    # des Font-/Build-Caches → »tectonic failed to produce a PDF (exit 1)« → pytex 400 →
-    # Protokoll-Render bricht beim Finalisieren ab. Erneut anlegen erst, wenn die
-    # schreibbaren Pfade (fontconfig-Cache via XDG_CACHE_HOME=/cache, HOME-Größe,
-    # /tmp-Exec) gegen einen echten Protokoll-Render verifiziert sind. (#sec-audit)
+    # The AUD-009 OS sandbox (read_only rootfs + size/noexec tmpfs + cap_drop ALL) is
+    # WITHDRAWN. On a read_only rootfs, tectonic and fontconfig cannot write the font and
+    # build cache. The chain is "tectonic failed to produce a PDF (exit 1)" -> pytex 400
+    # -> the protocol render aborts at finalize. Add the sandbox again only after a real
+    # protocol render verifies the writable paths: the fontconfig cache under
+    # `XDG_CACHE_HOME=/cache`, the HOME size and exec on /tmp. (#sec-audit)
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8099/health')\" || exit 1"]
       interval: 15s
@@ -232,13 +240,13 @@ services:
       start_period: 20s
 
   altcha:
-    # Captcha-Verifier: ALTCHA Sentinel (offizielles self-hosted Image).
-    # Lauscht intern auf :8080, persistiert nach /data. KEIN Host-Port —
-    # erreichbar nur über das interne Netz (altcha:8080), kein Internet-Ingress.
-    # Erstes Login root/<ALTCHA_ROOT_PASSWORD> (DEFAULT_ROOT_PASSWORD); das
-    # Passwort ist Pflicht (deploy.sh blockt leer/"root"). Fehlende
-    # Secrets (JWT_SECRET, CODE_CHALLENGE_SECRET) generiert Sentinel selbst nach
-    # /data/.env. Reale Captcha-Wiring zur Anwendung folgt im Captcha-Task.
+    # Captcha verifier: ALTCHA Sentinel (the official self-hosted image).
+    # It listens internally on :8080 and persists to /data. There is NO host port. Only
+    # the internal network reaches it at altcha:8080, and nothing enters from the
+    # internet. The first login uses root/<ALTCHA_ROOT_PASSWORD> (DEFAULT_ROOT_PASSWORD).
+    # The password is mandatory, and deploy.sh blocks an empty value or "root". Sentinel
+    # generates the missing secrets (JWT_SECRET, CODE_CHALLENGE_SECRET) itself into
+    # /data/.env.
     image: ghcr.io/altcha-org/sentinel:1.31.1
     <<: *restart
     environment:
@@ -252,12 +260,13 @@ services:
       - no-new-privileges:true
 
   backup:
-    # Tägliches verschlüsseltes Backup (T-42, deployment.md §4): pg_dump (custom) +
-    # mc mirror (MinIO) -> ein age-verschlüsseltes Artefakt im backups-Volume, mit
-    # Retention. Eigener Job statt Cron im worker -> entkoppelt vom App-Lifecycle.
-    # Nur im prod-Profil aktiv (im Default-Stack aus, damit der Smoke schlank bleibt).
-    # Profil `backup` erlaubt das Ziehen/Restoren ohne den Rest des prod-Profils.
-    # Manuell: docker compose --profile backup run --rm backup backup.sh
+    # Daily encrypted backup (T-42, deployment.md §4): pg_dump (custom) and mc mirror
+    # (MinIO) write one age-encrypted artifact into the backups volume, with retention.
+    # This is a separate job instead of a cron in the worker, so it stays free of the app
+    # lifecycle. It is active in the prod profile only. The default stack leaves it off to
+    # keep the smoke run small. The `backup` profile allows a backup or a restore without
+    # the rest of the prod profile.
+    # Manual run: docker compose --profile backup run --rm backup backup.sh
     build:
       context: ./backup
     profiles: ["prod", "backup"]
@@ -269,22 +278,23 @@ services:
       minio:
         condition: service_healthy
     volumes:
-      # Restore braucht den privaten age-Key (off-host). Default-Pfad existiert im
-      # Normalbetrieb NICHT -> Backup (encrypt-only) läuft trotzdem. Nur zum Restore
-      # eine Key-Datei nach ./backup/secrets/age.key legen (gitignored).
+      # A restore needs the private age key, which lives off-host. In normal operation
+      # the default path does NOT exist, and the encrypt-only backup still runs. For a
+      # restore only, put a key file at ./backup/secrets/age.key (gitignored).
       - backups:/backups
-      # :z relabelt für SELinux-Hosts (Fedora/rootless podman); auf Nicht-SELinux
-      # (CI/ubuntu) ein No-op. Ohne -> "Permission denied" beim Lesen des age-Keys.
+      # `:z` relabels for SELinux hosts (Fedora, rootless podman). It is a no-op on a
+      # host without SELinux, such as CI or ubuntu. Without it, the read of the age key
+      # fails with "Permission denied".
       - ./backup/secrets:/secrets:ro,z
     networks:
       - internal
     security_opt:
       - no-new-privileges:true
 
-  # TODO(T-04/e2e): Für aktivierbare e2e (T-10 Auth + Captcha + Playwright-Specs)
-  # hier dev-Profile-Services ergänzen — MailHog (SMTP-Sink) und Dev-Keycloak-Mock —
-  # unter `profiles: [dev]`, damit der Prod-Stack unberührt bleibt. Bewusst noch
-  # nicht angelegt (kein Consumer), siehe e2e-Job in .github/workflows/ci.yml.
+  # TODO T-04/e2e: add dev profile services here to enable e2e (T-10 auth, captcha and
+  # Playwright specs). Add MailHog (SMTP sink) and a dev Keycloak mock under
+  # `profiles: [dev]`, so the prod stack stays untouched. They are absent on purpose,
+  # because no consumer needs them. See the e2e job in .github/workflows/ci.yml.
 
 volumes:
   pg_data:
@@ -297,16 +307,17 @@ volumes:
 
 networks:
   internal:
-    # Keine publizierten Host-Ports an diesen Services => kein Internet-Ingress.
-    # Egress (Internet/Intranet) bleibt erlaubt für worker/api.
+    # These services publish no host ports, so nothing enters from the internet.
+    # Egress to the internet and the intranet stays allowed for worker and api.
     driver: bridge
   pytex_net:
-    # Render-Pfad api/worker <-> pytex. `internal: true` => KEIN Egress: der pytex-
-    # Container kann nichts ins Internet senden (tectonic/biber/Cache sind ins Image
-    # gebacken). Schließt einen Exfiltrations-Kanal bei Compile-Time-Exec (#sec-audit).
+    # Render path api/worker <-> pytex. `internal: true` means NO egress: the pytex
+    # container cannot send anything to the internet. The image already holds tectonic,
+    # biber and the cache. This closes an exfiltration channel on compile-time exec
+    # (#sec-audit).
     driver: bridge
     internal: true
   proxy:
-    # In prod: externes NPM-Netz. Dann hier `external: true` setzen und das
-    # vom Nginx Proxy Manager verwaltete Netz referenzieren.
+    # In production this is the external NPM network. Set `external: true` here and
+    # reference the network that the Nginx Proxy Manager manages.
     driver: bridge

@@ -1,9 +1,9 @@
 """Guard the protocol title-page monkeypatch and the runtime version string.
 
-The FastAPI ``version`` is read from ``importlib.metadata`` so it cannot drift
-from the installed ``pytex-preprocessor`` pin, and the title-page patch fails
-loud if the private ``_SCALAR_ROWS`` attribute is ever renamed. These tests
-assert the extra cover-page labels are installed and the version matches the pin.
+The service reads the FastAPI `version` from `importlib.metadata`, so it cannot
+drift from the installed `pytex-preprocessor` pin. The title-page patch fails
+loud when a later version renames the private `_SCALAR_ROWS` attribute. These
+tests check the extra cover-page labels and the version against the pin.
 """
 
 from __future__ import annotations

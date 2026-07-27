@@ -28,7 +28,10 @@ class LifecycleOps(PermissionOps, VoteReadOps):
     """Create/patch/delete meetings and broadcast state changes."""
 
     async def create(self, payload: MeetingCreate, principal: Principal) -> MeetingOut:
-        """Create a meeting (``planned``) — session managers (``session.manage``) only."""
+        """Create a meeting in status ``planned``.
+
+        Only a meeting manager (``session.manage``) may create a meeting.
+        """
         if not await self.can_manage(payload.gremium_id, principal):
             raise ForbiddenError("not allowed to create meetings for this committee")
         protokollant_id = await self._resolve_protokollant(
@@ -52,7 +55,7 @@ class LifecycleOps(PermissionOps, VoteReadOps):
     async def _resolve_protokollant(
         self, gremium_id: UUID, protokollant_id: UUID | None
     ) -> UUID | None:
-        """Validate the protokollant: must be an active member of the committee."""
+        """Validate the protokollant as an active member of the Gremium."""
         if protokollant_id is None:
             return None
         row = await self.session.get(PrincipalRow, protokollant_id)
@@ -65,11 +68,12 @@ class LifecycleOps(PermissionOps, VoteReadOps):
     async def patch(
         self, meeting_id: UUID, payload: MeetingPatch, principal: Principal
     ) -> MeetingOut:
-        """Apply control/planning changes + broadcast ``meeting_state``.
+        """Apply control and planning changes, then broadcast ``meeting_state``.
 
-        Field-level RBAC: status/active application requires ``canWrite``
-        (protokollant or manager); date/time/protokollant assignment requires
-        ``canManage`` (session manager)."""
+        RBAC works per field. Status and active application need ``canWrite``
+        (protokollant or manager). Date, time and the protokollant assignment need
+        ``canManage`` (meeting manager).
+        """
         meeting = await self._get(meeting_id)
         wants_manage = (
             "date" in payload.model_fields_set
@@ -83,20 +87,21 @@ class LifecycleOps(PermissionOps, VoteReadOps):
         if wants_write and not await self.can_write(meeting, principal):
             raise ForbiddenError("not allowed to control this meeting")
 
-        # ``closed`` is terminal: a closed meeting cannot be reopened (no
-        # closed->live/planned). Repeating ``closed`` is a no-op.
+        # ``closed`` is terminal: no transition leads from closed back to live or to
+        # planned. Repeating ``closed`` is a no-op.
         if meeting.status == "closed" and payload.status is not None and payload.status != "closed":
             raise ConflictError("a closed session cannot be re-opened")
 
-        # Closed = frozen: date/time/protokollant are immutable afterwards — the
-        # protocol references these planning data.
+        # A closed meeting is frozen: date, time and protokollant stay immutable,
+        # because the protocol refers to this planning data.
         if meeting.status == "closed" and wants_manage:
             raise ConflictError("the session is closed — its settings can no longer be changed")
 
-        # planned->live: the protocol is created only at meeting start (by the router
-        # after this commit) — no minuting/voting before. ``meeting.status`` is set
-        # only AFTER the protokollant check (atomic: no ``live`` without a
-        # protokollant, not even in-memory on a rejected patch).
+        # planned to live: the router creates the protocol at meeting start, after
+        # this commit. Nobody takes minutes or votes before that. The code sets
+        # ``meeting.status`` only AFTER the protokollant check. That keeps the change
+        # atomic: no ``live`` without a protokollant, not even in memory on a
+        # rejected patch.
         going_live = payload.status == "live" and meeting.status != "live"
         if payload.active_application_id is not None:
             meeting.active_application_id = payload.active_application_id
@@ -106,9 +111,9 @@ class LifecycleOps(PermissionOps, VoteReadOps):
             meeting.start_time = payload.start_time
         if "end_time" in payload.model_fields_set:
             meeting.end_time = payload.end_time
-        # End time must be after start time (the schema only checks create). Enforced
-        # only on time-touching patches so a pure status/protokollant patch never
-        # fails on it.
+        # The end time must be after the start time. The schema checks this only on
+        # create. The service checks it only on a patch that touches a time, so a
+        # pure status or protokollant patch never fails here.
         if (
             ("start_time" in payload.model_fields_set or "end_time" in payload.model_fields_set)
             and meeting.start_time is not None
@@ -117,20 +122,20 @@ class LifecycleOps(PermissionOps, VoteReadOps):
         ):
             raise BadRequestError("endTime must be after startTime")
         if "protokollant_id" in payload.model_fields_set:
-            # After finalization the scribe is part of the signed document — the
-            # protokollant is locked.
+            # After the finalization the protokollant is part of the signed
+            # document, so the assignment is locked.
             if await self._protocol_final(meeting.id):
                 raise ConflictError("protocol is finalized — the protokollant can no longer change")
             meeting.protokollant_id = await self._resolve_protokollant(
                 meeting.gremium_id, payload.protokollant_id
             )
-        # A protokollant must be set before going live — they are the scribe of the
-        # protocol created at start.
+        # A meeting needs a protokollant before it goes live. The protokollant
+        # writes the protocol that the start creates.
         if going_live and meeting.protokollant_id is None:
             raise ConflictError("assign a protokollant before starting the meeting")
         if payload.status is not None:
-            # Close timestamp: set once on the transition to ``closed`` — the "end"
-            # line of the protocol title page.
+            # Set the close timestamp once, on the transition to ``closed``. It
+            # fills the "end" line of the protocol title page.
             if payload.status == "closed" and meeting.status != "closed":
                 meeting.closed_at = datetime.now(UTC)
             meeting.status = payload.status
@@ -143,8 +148,11 @@ class LifecycleOps(PermissionOps, VoteReadOps):
         return out
 
     async def broadcast_state(self, meeting_id: UUID, principal: Principal) -> None:
-        """Re-send ``meeting_state`` without a state change — e.g. after a
-        protocol/TOP edit so live followers reload the new state."""
+        """Re-send ``meeting_state`` without a state change.
+
+        A protocol edit or an agenda-item edit calls this, so live followers reload
+        the new state.
+        """
         meeting = await self._get(meeting_id)
         votes = (await self._votes_for([meeting.id])).get(meeting.id, [])
         out = await self._emit(meeting, principal, votes=votes)
@@ -152,8 +160,9 @@ class LifecycleOps(PermissionOps, VoteReadOps):
             await self.publisher.meeting_state(out)
 
     async def _protocol_final(self, meeting_id: UUID) -> bool:
-        """Whether the meeting has a FINALIZED protocol."""
-        # Local import: protocol depends on livevote — module level would cycle.
+        """Report whether the protocol of the meeting is final."""
+        # Local import: ``protocol`` depends on ``livevote``. A module-level import
+        # would cycle.
         from app.modules.protocol.models import Protocol
 
         status = await self.session.scalar(
@@ -162,14 +171,16 @@ class LifecycleOps(PermissionOps, VoteReadOps):
         return status == "final"
 
     async def delete(self, meeting_id: UUID, principal: Principal) -> None:
-        """Delete a meeting — session managers (``session.manage``)/admin only.
+        """Delete a meeting.
 
-        A meeting with a FINALIZED protocol additionally requires the global
-        ``meeting.delete_finalized`` permission — the protocol is a signed, mailed
-        document. Every delete is audited.
+        Only a meeting manager (``session.manage``) or an admin may delete a
+        meeting. A meeting with a final protocol also needs the global
+        ``meeting.delete_finalized`` permission, because the protocol is a signed
+        and mailed document. The service audits every delete.
 
-        Cascade removes protocol/agenda/attendance; bound votes are detached via
-        ``SET NULL`` (results survive)."""
+        The cascade removes the protocol, the agenda and the attendance. The
+        database detaches bound votes with ``SET NULL``, so the results survive.
+        """
         meeting = await self._get(meeting_id)
         if not await self.can_manage(meeting.gremium_id, principal):
             raise ForbiddenError("not allowed to delete this meeting")

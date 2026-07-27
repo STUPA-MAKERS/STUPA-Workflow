@@ -3,13 +3,12 @@ import { API_BASE_URL, USE_MOCK_API, detectMockFlag } from './api.config';
 import { createLocationMock, provideLocationMock } from '../../../testing/location-mock';
 
 /**
- * `detectMockFlag` reads the mock opt-in from a global flag / URL `?mock=1` /
- * `localStorage['useMockApi']`. `location` is passed as a parameter (DI token
- * `LOCATION`) — so the branches are purely testable with fake objects; the
- * token-factory path runs once via TestBed + `provideLocationMock`.
+ * `detectMockFlag` reads the mock opt-in from a global flag, the URL `?mock=1`
+ * or `localStorage['useMockApi']`. The caller passes `location` as a parameter
+ * (DI token `LOCATION`). Fake objects therefore cover every branch. The
+ * token-factory path runs once through TestBed and `provideLocationMock`.
  */
 describe('api.config', () => {
-  /** Fake `Location` with the desired query string. */
   function locWith(search: string): Location {
     return createLocationMock({ search }) as unknown as Location;
   }
@@ -53,7 +52,7 @@ describe('api.config', () => {
 
   it('swallows errors thrown while reading URL/localStorage (catch branch)', () => {
     // `new URLSearchParams(location.search)` throws because `.search` is a
-    // throwing getter; detectMockFlag must catch it and return false.
+    // throwing getter. `detectMockFlag` must catch the error and return false.
     const throwing = {
       get search(): string {
         throw new Error('boom');

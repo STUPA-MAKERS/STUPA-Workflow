@@ -28,7 +28,7 @@ const KINDS: DeadlineKind[] = [
 
 const DEFAULT_TZ = 'Europe/Berlin';
 
-/** Full IANA zone list from the runtime, with a small fallback for old engines. */
+/** IANA zone list from the runtime. An old engine gets a small fallback list. */
 function buildTimezoneOptions(): SelectOption[] {
   const intl = Intl as unknown as { supportedValuesOf?: (key: string) => string[] };
   let zones: string[] = [];
@@ -70,12 +70,14 @@ function emptyDraft(): PolicyDraft {
 }
 
 /**
- * Deadline registry: named deadline policies that the flow references via `key`.
- * `absolute` carries a date (editable per semester, without changing the flow); the
- * relative variants derive the deadline from submission or last change + X days;
- * `recurring` rolls through a list of dates (the earliest still ahead is used).
- * `atTime`/`timezone` optionally pin the wall-clock (DST-correct). CRUD via the
- * admin API (dialog).
+ * Deadline registry: named deadline policies that the flow references by `key`.
+ *
+ * `absolute` carries a date. An admin can edit that date per semester without a change
+ * to the flow. The relative kinds derive the deadline from the submission date or the
+ * last change date plus X days. `recurring` steps through a list of dates and takes the
+ * earliest date that is still ahead. `atTime` and `timezone` pin the wall-clock time and
+ * stay correct over a DST switch. The dialog creates, updates and deletes policies
+ * through the admin API.
  */
 @Component({
   selector: 'app-admin-deadlines',

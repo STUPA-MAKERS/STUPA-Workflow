@@ -10,7 +10,7 @@ from app.shared.i18n import I18nMap
 
 
 class _CamelModel(BaseModel):
-    """camelCase aliases in JSON; fields populatable by name."""
+    """Use camelCase aliases in JSON. The caller may also populate the fields by name."""
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -24,22 +24,23 @@ class TransitionOut(_CamelModel):
     label: I18nMap
     # Optional color for the decision button.
     color: str | None = None
-    # "Requires action": counts as an open task in the tasks tab.
+    # Requires action: the transition counts as an open task in the tasks tab.
     requires_action: bool = Field(default=True, alias="requiresAction")
 
 
 class TransitionRequest(_CamelModel):
-    """``POST /applications/{id}/transition`` — fire a transition."""
+    """`POST /applications/{id}/transition` — fire a transition."""
 
     transition_id: UUID = Field(alias="transitionId")
     note: str | None = None
 
 
 class ForceStatusRequest(_CamelModel):
-    """``POST /applications/{id}/force-status`` — force a status directly.
+    """`POST /applications/{id}/force-status` — force a status directly.
 
-    The privileged ``application.force_status`` override; ``note`` (the reason) is
-    mandatory since the change bypasses the flow and is audited."""
+    This is the privileged `application.force_status` override. The `note` gives the
+    reason. It is mandatory because the change bypasses the flow and gets audited.
+    """
 
     state_id: UUID = Field(alias="stateId")
     note: str = Field(min_length=1)

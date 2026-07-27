@@ -1,15 +1,15 @@
 import { Injectable, signal } from '@angular/core';
 
-/** Delay before the overlay appears — de-flickers fast requests. */
+/** Delay before the overlay appears. This stops a flicker on fast requests. */
 const SHOW_DELAY_MS = 150;
-/** Minimum visible duration once shown — prevents flashing. */
+/** Minimum time the overlay stays visible after it appears. This stops a flash. */
 const MIN_VISIBLE_MS = 400;
 
 /**
- * Global loading state. Counts in-flight HTTP requests (via the
- * {@link loadingInterceptor}); `visible` turns on after {@link SHOW_DELAY_MS} as
- * long as at least one request runs, and stays visible for at least
- * {@link MIN_VISIBLE_MS}. This keeps the overlay from flickering on fast responses.
+ * Global loading state. It counts the in-flight HTTP requests through the
+ * {@link loadingInterceptor}. `visible` turns on after {@link SHOW_DELAY_MS} if at
+ * least one request still runs. It then stays on for at least {@link MIN_VISIBLE_MS}.
+ * This keeps the overlay from a flicker on fast responses.
  */
 @Injectable({ providedIn: 'root' })
 export class LoadingService {
@@ -19,11 +19,11 @@ export class LoadingService {
   private hideTimer: ReturnType<typeof setTimeout> | null = null;
 
   private readonly _visible = signal(false);
-  /** True when the loading overlay should be shown. */
+  /** True when the app must show the loading overlay. */
   readonly visible = this._visible.asReadonly();
 
-  // Timer/clock as overridable hooks → deterministically testable (without
-  // jest fake-timer / zone.js interaction).
+  // The timer and the clock are overridable hooks. Tests can then run deterministically
+  // without jest fake timers or zone.js interaction.
   protected now(): number {
     return Date.now();
   }

@@ -1,4 +1,4 @@
-"""Audit-log revert of budget/money mutations."""
+"""Audit-log revert of budget and money mutations."""
 
 from __future__ import annotations
 
@@ -22,14 +22,19 @@ class RevertOps(NodeOps, AllocationOps, ExpenseOps):
     """Undo audited budget mutations from the audit log."""
 
     async def revert_audit(self, entry: AuditEntry, actor: str) -> None:
-        """Undo an audited budget/money mutation from the audit log.
+        """Undo an audited budget or money mutation from the audit log.
 
-        Dispatch by ``entry.action`` to the respective inverse: additive actions
-        (booking/transfer/cost-centre create) are deleted, updates are restored
-        from the prior state kept in the audit ``data``. Each path is itself
-        audited; ``stale_revert`` (409) if the entity changed since,
-        ``already_reverted`` (409) if the target no longer exists. Deletions are
-        deliberately NOT revertable (``not_revertable``).
+        The method dispatches on `entry.action` to the matching inverse. It
+        deletes an additive action, that is a booking, a transfer or a
+        cost-center create. It restores an update from the prior state in the
+        audit `data`. Every path writes its own audit entry. A delete is
+        deliberately not revertable.
+
+        Raises:
+            ConflictError: `stale_revert` (409) when the entity changed since
+                the audited action. `already_reverted` (409) when the target no
+                longer exists. `not_revertable` (409) for an action without an
+                inverse.
         """
         self.actor = actor
         action = entry.action
@@ -55,7 +60,7 @@ class RevertOps(NodeOps, AllocationOps, ExpenseOps):
     async def _revert_expense_create(
         self, expense_id: UUID, reverted_audit_id: int
     ) -> None:
-        """Revert a booking = delete it; re-open an invoice it marked paid."""
+        """Delete the booking and re-open an invoice that the booking set to paid."""
         expense = await self.session.get(BudgetExpense, expense_id)
         if expense is None:
             raise ConflictError(
@@ -89,7 +94,7 @@ class RevertOps(NodeOps, AllocationOps, ExpenseOps):
     async def _revert_transfer_create(
         self, transfer_id: UUID, reverted_audit_id: int
     ) -> None:
-        """Revert a transfer = delete both (expense/income) rows."""
+        """Delete both rows of a transfer, the expense and the income."""
         rows = (
             (
                 await self.session.execute(
@@ -120,22 +125,28 @@ class RevertOps(NodeOps, AllocationOps, ExpenseOps):
         await self.session.commit()
 
     async def _revert_node_create(self, budget_id: UUID) -> None:
-        """Revert a cost-centre create = delete it (409 if used meanwhile)."""
+        """Delete the cost center that the audited create action added.
+
+        Raises:
+            ConflictError: The cost center is now in use (409).
+        """
         node = await self.session.get(Budget, budget_id)
         if node is None:
             raise ConflictError(
                 "Cost centre already removed; nothing to revert.",
                 code="already_reverted",
             )
-        # delete_node checks child-/allocation-free (else 409), audits + commits.
+        # delete_node runs the guard checks and answers 409 when the node is
+        # still in use. It also writes the audit entry and commits.
         await self.delete_node(budget_id)
 
     @staticmethod
     def _value_matches(current: object, expected: object) -> bool:
-        """Does ``current`` match the recorded ``expected`` (stale comparison)?
+        """Tell if `current` still matches the recorded `expected` value.
 
-        Numbers compare by value so the DB roundtrip does not distort the scale
-        (``"70"`` recorded vs. ``"70.00"`` read). Other values compare exactly.
+        Numbers compare by value, so the database roundtrip does not distort the
+        scale. An example is "70" recorded against "70.00" read back. Every
+        other value compares exactly.
         """
         if current == expected:
             return True
@@ -145,12 +156,15 @@ class RevertOps(NodeOps, AllocationOps, ExpenseOps):
             return False
 
     def _assert_not_stale(self, obj: object, after: object) -> None:
-        """Stale guard for update reverts: every field value recorded in the
-        original (``after``) must still match the current state — otherwise the
-        entity changed since and the revert would overwrite foreign changes
-        (409 ``stale_revert``).
+        """Guard an update revert against a newer change.
 
-        Without ``after`` (no post-state recorded), restore best-effort.
+        Every field value that the audited action recorded in `after` must still
+        match the current state. Otherwise the entity changed since and the
+        revert would overwrite foreign changes. When `after` is no mapping, the
+        revert restores the prior values as a best effort.
+
+        Raises:
+            ConflictError: `stale_revert` (409) when a value no longer matches.
         """
         if not isinstance(after, dict):
             return
@@ -162,7 +176,7 @@ class RevertOps(NodeOps, AllocationOps, ExpenseOps):
                 )
 
     async def _revert_node_update(self, budget_id: UUID, data: dict) -> None:
-        """Revert a cost-centre update = write back the recorded prior values."""
+        """Write back the prior values that the cost-center update recorded."""
         before = data.get("before")
         if not isinstance(before, dict) or not before:
             raise ConflictError(
@@ -179,7 +193,7 @@ class RevertOps(NodeOps, AllocationOps, ExpenseOps):
     async def _revert_allocation_set(
         self, budget_id: UUID, data: dict, reverted_audit_id: int
     ) -> None:
-        """Revert an allocation = restore the prior value (or drop the row)."""
+        """Restore the prior allocation value, or drop the row when there was none."""
         fy_raw = data.get("fiscalYearId")
         if not fy_raw:
             raise ConflictError("No fiscal year recorded.", code="not_revertable")
@@ -197,7 +211,8 @@ class RevertOps(NodeOps, AllocationOps, ExpenseOps):
             )
         previous = data.get("previousAllocated")
         if previous is None:
-            # First-time set → the revert removes the allocation row again.
+            # The action set the allocation for the first time. The revert
+            # removes the row again.
             await self._audit(
                 AuditAction.BUDGET_ALLOCATION_SET,
                 target_type="budget_allocation",
@@ -212,13 +227,14 @@ class RevertOps(NodeOps, AllocationOps, ExpenseOps):
             await self.session.delete(cur)
             await self.session.commit()
         else:
-            # set_allocation re-validates the top-down constraints, audits + commits.
+            # set_allocation re-validates the top-down constraints, writes the
+            # audit entry and commits.
             await self.set_allocation(
                 budget_id, fiscal_year_id, AllocationSet(allocated=Decimal(previous))
             )
 
     async def _revert_expense_update(self, expense_id: UUID, data: dict) -> None:
-        """Revert a booking update = write back the recorded prior values."""
+        """Write back the prior values that the booking update recorded."""
         before = data.get("before")
         if not isinstance(before, dict) or not before:
             raise ConflictError(
@@ -227,6 +243,7 @@ class RevertOps(NodeOps, AllocationOps, ExpenseOps):
         expense = await self.session.get(BudgetExpense, expense_id)
         if expense is None:
             raise ConflictError("Booking no longer exists.", code="already_reverted")
-        # Every field set in the original must be unchanged (not just the amount).
+        # Every field that the audited action set must be unchanged, not only
+        # the amount.
         self._assert_not_stale(expense, data.get("after"))
         await self.update_expense(expense_id, ExpenseUpdate(**before))

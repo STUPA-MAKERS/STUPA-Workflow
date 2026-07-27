@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
-# E2E-Treiber (T-40): fährt den VOLLEN Stack via compose hoch (Mock AUS, echtes
-# Backend/FE/pytex/Postgres/Redis/MinIO + mailpit als SMTP-Sink), seedet
-# deterministische Fixtures und lässt Playwright gegen den echten ``web``-Endpunkt
-# laufen. Räumt restlos ab (``down -v``). Idempotent; eigener Projektname → berührt
-# andere Stacks NICHT.
+# E2E driver (T-40). The script starts the FULL stack with compose. The mock is OFF, so
+# the stack runs the real backend, frontend, pytex, Postgres, Redis and MinIO, plus
+# mailpit as the SMTP sink. The script seeds deterministic fixtures. It then runs
+# Playwright against the real `web` endpoint. It removes everything again (`down -v`).
+# The script is idempotent. It uses its own project name, so it does NOT touch another
+# stack.
 #
-# Deckt das deterministische, gate-bindende Subset ab (CI-Job `e2e`). Die noch
-# offenen, flakeanfälligen/langsamen Szenarien (async Voting, Live-Vote-WS,
-# Protokoll→PDF, OIDC) sind als Follow-up-Issues ausgelagert — siehe e2e/README.md.
+# The script covers the deterministic subset that binds the gate (CI job `e2e`). The
+# open scenarios that are slow or flaky moved to follow-up issues: async voting,
+# live-vote WebSocket, protocol to PDF and OIDC. See e2e/README.md.
 #
 # Usage: scripts/e2e.sh
-#   E2E_TIMEOUT (Default 900s; Image-Build + ClamAV-Start). Host-Ports fix:
-#   web 127.0.0.1:8080 (compose), mailpit-API 127.0.0.1:8025 (overlay).
+#   E2E_TIMEOUT: default 900s, for the image build and the ClamAV start. The host ports
+#   are fixed: web 127.0.0.1:8080 (compose), mailpit API 127.0.0.1:8025 (overlay).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -39,20 +40,22 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# --- .env vorbereiten (Mock AUS, mailpit-SMTP, Anti-Abuse aus für Determinismus) --- #
+# Prepare .env: mock OFF, mailpit SMTP, anti-abuse off to keep the run deterministic.
 if [[ -f "${ENV_FILE}" ]]; then
   ENV_BACKUP="${ENV_FILE}.e2e-bak"
   mv -f "${ENV_FILE}" "${ENV_BACKUP}"
 fi
 cp .env.example "${ENV_FILE}"
-# OIDC + Altcha im e2e-Stack AUS: die optionalen Secrets dürfen NICHT als leerer
-# String gesetzt sein — `app.settings` validiert sie mit `min_length=16`, ein
-# präsentes "" bricht `get_settings()` (→ migrate exit 1). `.env.example` shippt sie
-# leer; hier die Zeilen entfernen ⇒ unset ⇒ Default None ⇒ Feature aus.
-# (oidc_enabled/altcha_enabled werden False; /api/auth/login → 404 für den RBAC-Test.)
+# OIDC and ALTCHA stay OFF in the e2e stack. The optional secrets must NOT hold an empty
+# string. `app.settings` validates them with `min_length=16`. A present "" breaks
+# `get_settings()`, and migrate exits with 1. `.env.example` ships the keys empty. This
+# sed removes the lines. The keys stay unset, fall back to None and turn the feature off.
+# oidc_enabled and altcha_enabled become False. /api/auth/login then returns 404, which
+# the RBAC test needs.
 sed -i -E '/^[[:space:]]*(OIDC_CLIENT_SECRET|ALTCHA_HMAC_SECRET)[[:space:]]*=/d' "${ENV_FILE}"
-# Overrides ans Ende → letzter Wert je Key gewinnt. Wegwerf-Secrets ≥16 Zeichen.
-# Rate-Limit AUS → keine Lockouts; FORWARDED_ALLOW_IPS=* ok (environment=development).
+# Append the overrides, because the last value per key wins. The throwaway secrets hold
+# at least 16 characters. The rate limit is OFF, so no lockout can happen.
+# The value `FORWARDED_ALLOW_IPS=*` is safe here, because the environment is development.
 cat >> "${ENV_FILE}" <<'EOF'
 
 # --- e2e overrides (vom Treiber erzeugt; NICHT committen) ----------------------
@@ -85,7 +88,6 @@ if ! "${COMPOSE[@]}" up -d --build; then
   exit 1
 fi
 
-# --- warten bis api + web + mailpit healthy -------------------------------- #
 echo "==> Warte bis api + web + mailpit healthy (max ${TIMEOUT}s)"
 deadline=$(( $(date +%s) + TIMEOUT ))
 while :; do
@@ -106,7 +108,6 @@ while :; do
   sleep 5
 done
 
-# --- deterministisch seeden ------------------------------------------------ #
 echo "==> Seed (Form-/Flow-Version, Admin-Session, Budget-Topf)"
 "${COMPOSE[@]}" run --rm seed
 if [[ ! -s "${ARTIFACTS}/e2e.json" ]]; then
@@ -114,7 +115,6 @@ if [[ ! -s "${ARTIFACTS}/e2e.json" ]]; then
   exit 1
 fi
 
-# --- Playwright ------------------------------------------------------------ #
 echo "==> Playwright"
 cd "${FRONTEND}"
 export E2E_BASE_URL="http://127.0.0.1:8080"

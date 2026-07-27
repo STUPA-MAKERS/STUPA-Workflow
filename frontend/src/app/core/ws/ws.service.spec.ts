@@ -10,7 +10,7 @@ class MockWebSocket {
   static CLOSING = 2;
   static CLOSED = 3;
   static instances: MockWebSocket[] = [];
-  /** Initial readyState of new instances (default OPEN; tests set CONNECTING). */
+  /** Initial readyState of a new instance. The default is OPEN, and tests set CONNECTING. */
   static startState = MockWebSocket.OPEN;
   readyState = MockWebSocket.startState;
   sent: string[] = [];
@@ -21,7 +21,7 @@ class MockWebSocket {
     MockWebSocket.instances.push(this);
   }
 
-  /** Simulates the completed handshake: OPEN + `open` event. */
+  /** Simulate the completed handshake. It sets OPEN and fires the `open` event. */
   openNow(): void {
     this.readyState = MockWebSocket.OPEN;
     this.emit('open', {});
@@ -48,8 +48,8 @@ describe('WsService', () => {
     MockWebSocket.instances = [];
     MockWebSocket.startState = MockWebSocket.OPEN;
     (globalThis as { WebSocket: unknown }).WebSocket = MockWebSocket;
-    // Mock `LOCATION` via DI — jsdom ≥26 no longer lets `window.location` be
-    // redefined. Default: http://localhost.
+    // Mock `LOCATION` through DI. jsdom 26 and later block a redefinition of
+    // `window.location`. The default is http://localhost.
     svc = TestBed.configureTestingModule({
       providers: [provideLocationMock(createLocationMock())],
     }).inject(WsService);
@@ -96,9 +96,9 @@ describe('WsService', () => {
   });
 
   it('queues frames sent while CONNECTING and flushes them on open', () => {
-    // A real socket starts in state CONNECTING. A `subscribe` sent synchronously
-    // right after connecting (LiveVoteSession resync) must NOT be dropped —
-    // without the buffer it would be lost on a real socket.
+    // A real socket starts in state CONNECTING. The `subscribe` that LiveVoteSession
+    // sends for its resync right after the connect must not be dropped. Without the
+    // buffer a real socket loses it.
     MockWebSocket.startState = MockWebSocket.CONNECTING;
     const ch = svc.connectMeeting('m-1');
     const sock = MockWebSocket.instances[0];
@@ -109,7 +109,7 @@ describe('WsService', () => {
     expect(sock.sent).toEqual([]);
 
     sock.openNow();
-    // On open the buffered frames are flushed in order.
+    // On open the channel flushes the buffered frames in order.
     expect(sock.sent).toEqual([
       JSON.stringify({ type: 'subscribe' }),
       JSON.stringify({ type: 'cast', voteId: 'v1', choice: 'yes' }),
@@ -147,7 +147,7 @@ describe('WsService', () => {
     expect(closeSpy).toHaveBeenCalled();
   });
 
-  /** Fresh service with its own `LOCATION` (protocol/host per test). */
+  /** Build a fresh service with its own `LOCATION`, one protocol and host per test. */
   function serviceAt(protocol: string, host: string): WsService {
     TestBed.resetTestingModule();
     return TestBed.configureTestingModule({

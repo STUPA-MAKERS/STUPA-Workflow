@@ -49,8 +49,8 @@
   <p class="text-xs text-muted m-0">{{ 'admin.flow.branchHint' | t }}</p>
 }
 
-<!-- Referencing a named deadline policy: the server creates the deadline on
-     state entry; the deadlinePassed transition fires when it lapses. -->
+<!-- The server creates the deadline from the named policy when the application
+     enters the state. The deadlinePassed transition fires when the deadline lapses. -->
 <app-select
   [label]="'admin.flow.cfgDeadline' | t"
   [placeholder]="'admin.flow.cfgDeadlinePh' | t"
@@ -60,8 +60,7 @@
 />
 <p class="text-xs text-muted m-0">{{ 'admin.flow.cfgDeadlineHint' | t }}</p>
 
-<!-- One connector dot per guard; the stack order is the evaluation order
-     (first matching guard wins). Only meaningful from two groups on. -->
+<!-- The stack order is the evaluation order. The first guard that matches wins. -->
 @if ((state().kind ?? 'normal') === 'normal' && guardGroups().length > 1) {
   <div class="flex flex-col gap-2">
     <span class="text-sm font-medium">{{ 'admin.flow.guardPriority' | t }}</span>

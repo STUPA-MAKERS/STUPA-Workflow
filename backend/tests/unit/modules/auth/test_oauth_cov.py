@@ -1,8 +1,9 @@
-"""Vollabdeckung (Line + Branch) der Auth-/OAuth-Endpunkte und -Services (#MCP).
+"""Full line and branch coverage of the auth and OAuth endpoints and services (#MCP).
 
-DB-frei: Router via FastAPI-``TestClient`` + ``dependency_overrides``, Services via
-``FakeSession`` (``tests._support.flow_fakes``). Deckt gezielt jeden Fehler-/Guard-Zweig
-ab (kritisches Modul: 100 % Branch ist CI-Gate).
+The tests run without a database. Router tests use the FastAPI `TestClient` with
+`dependency_overrides`. Service tests use `FakeSession` from `tests._support.flow_fakes`.
+Every error branch and every guard branch has its own test. This module is critical, so
+CI gates on 100 percent branch coverage.
 """
 
 from __future__ import annotations
@@ -93,9 +94,7 @@ def _build_client(
     return TestClient(app, follow_redirects=False)
 
 
-# =========================================================================== #
-# oauth_router.authorize
-# =========================================================================== #
+# oauth_router
 def test_authorize_oidc_disabled_404() -> None:
     client = _build_client(DISABLED)
     resp = client.get(
@@ -185,7 +184,7 @@ def test_authorize_success_starts_oidc_login() -> None:
 
 
 def test_authorize_redirect_error_appends_with_query_sep() -> None:
-    """redirect_uri mit vorhandenem Query → ``&``-Separator-Zweig."""
+    """A redirect_uri that already carries a query uses the `&` separator branch."""
     client = _build_client(ENABLED)
     resp = client.get(
         "/api/oauth/authorize",
@@ -197,7 +196,7 @@ def test_authorize_redirect_error_appends_with_query_sep() -> None:
 
 
 def test_authorize_redirect_error_without_state() -> None:
-    """state leer → kein ``state``-Param im Fehler-Redirect."""
+    """An empty state adds no `state` parameter to the error redirect."""
     client = _build_client(ENABLED)
     resp = client.get(
         "/api/oauth/authorize",
@@ -208,7 +207,7 @@ def test_authorize_redirect_error_without_state() -> None:
 
 
 def test_is_loopback_redirect_value_error() -> None:
-    """Unparsbare URL (kaputte IPv6-Klammer) → ValueError-Zweig → False."""
+    """A broken IPv6 bracket makes the URL unparsable, so the ValueError branch wins."""
     assert oauth_router_mod._is_loopback_redirect("http://[::1") is False
 
 
@@ -216,13 +215,9 @@ def test_is_loopback_redirect_non_loopback_host() -> None:
     assert oauth_router_mod._is_loopback_redirect("http://example.com/cb") is False
     assert oauth_router_mod._is_loopback_redirect("https://localhost/cb") is False
     assert oauth_router_mod._is_loopback_redirect("http://localhost/cb") is True
-    # IPv6-Loopback mit Klammern.
     assert oauth_router_mod._is_loopback_redirect("http://[::1]/cb") is True
 
 
-# =========================================================================== #
-# oauth_router.finish
-# =========================================================================== #
 def test_finish_unauthenticated_401() -> None:
     client = _build_client(ENABLED, no_principal_override=True)
     assert client.get("/api/oauth/finish").status_code == 401
@@ -252,9 +247,6 @@ def test_finish_valid_tx_redirects_to_consent() -> None:
     assert resp.headers["location"].endswith("/oauth/consent")
 
 
-# =========================================================================== #
-# oauth_router.token
-# =========================================================================== #
 def test_token_oidc_disabled_404() -> None:
     client = _build_client(DISABLED)
     resp = client.post("/api/oauth/token", data={"grant_type": "authorization_code"})
@@ -334,9 +326,6 @@ def test_token_oauth_error_maps_to_body(monkeypatch: pytest.MonkeyPatch) -> None
     assert resp.json() == {"error": "invalid_grant", "error_description": "code expired"}
 
 
-# =========================================================================== #
-# oauth_router.consent_request
-# =========================================================================== #
 def _issue_tx(scope: str = "read votes:write", state: str = "s1") -> str:
     return sessions.issue_oauth_tx(
         ENABLED.session_secret,
@@ -363,7 +352,7 @@ def test_consent_request_marks_held_scopes() -> None:
     assert body["clientId"] == CLIENT_ID
     assert body["canUseMcp"] is True
     scopes = {s["key"]: s["held"] for s in body["requestedScopes"]}
-    # read → application.read (held); votes:write → vote.manage (held).
+    # read → application.read and votes:write → vote.manage, both held.
     assert scopes["read"] is True
     assert scopes["votes:write"] is True
     assert body["defaultLifetime"] == oauth.DEFAULT_LIFETIME
@@ -371,7 +360,7 @@ def test_consent_request_marks_held_scopes() -> None:
 
 
 def test_consent_request_unheld_scope() -> None:
-    # Principal ohne admin-Rechte → admin:write nicht "held".
+    # A principal without admin permissions does not hold admin:write.
     p = Principal(sub="u", permissions={"mcp.use"})
     client = _build_client(ENABLED, principal=p)
     client.cookies.set(ENABLED.oauth_tx_cookie_name, _issue_tx(scope="admin:write"))
@@ -380,9 +369,6 @@ def test_consent_request_unheld_scope() -> None:
     assert held["admin:write"] is False
 
 
-# =========================================================================== #
-# oauth_router.consent
-# =========================================================================== #
 def test_consent_no_tx_400() -> None:
     client = _build_client(ENABLED)
     resp = client.post("/api/oauth/consent", json={"approve": True, "scopes": ["read"]})
@@ -396,7 +382,7 @@ def test_consent_deny_returns_access_denied_redirect() -> None:
     assert resp.status_code == 200
     assert "error=access_denied" in resp.json()["redirect"]
     assert "state=s1" in resp.json()["redirect"]
-    # tx-Cookie wird gelöscht.
+    # The server deletes the tx cookie.
     assert "ap_oauth_tx=" in resp.headers.get("set-cookie", "")
 
 
@@ -408,7 +394,7 @@ def test_consent_deny_without_state() -> None:
 
 
 def test_consent_approve_missing_mcp_use_403() -> None:
-    p = Principal(sub="u", permissions={"application.read"})  # kein mcp.use
+    p = Principal(sub="u", permissions={"application.read"})
     client = _build_client(ENABLED, principal=p)
     client.cookies.set(ENABLED.oauth_tx_cookie_name, _issue_tx())
     resp = client.post("/api/oauth/consent", json={"approve": True, "scopes": ["read"]})
@@ -418,7 +404,7 @@ def test_consent_approve_missing_mcp_use_403() -> None:
 def test_consent_approve_no_valid_scopes_400() -> None:
     client = _build_client(ENABLED, principal=_mcp_principal())
     client.cookies.set(ENABLED.oauth_tx_cookie_name, _issue_tx(scope="read"))
-    # angefragt war nur "read"; gewählt "budget:write" (nicht angefragt) → leer → 400.
+    # The request asked only for "read". The unrequested "budget:write" leaves no scope → 400.
     resp = client.post(
         "/api/oauth/consent", json={"approve": True, "scopes": ["budget:write"]}
     )
@@ -474,9 +460,6 @@ def test_consent_approve_success_without_state(monkeypatch: pytest.MonkeyPatch) 
     assert "state=" not in resp.json()["redirect"]
 
 
-# =========================================================================== #
-# oauth_router.list_grants / revoke
-# =========================================================================== #
 def test_list_grants_no_principal_row_empty() -> None:
     db = fake_session(result())  # _principal_row_id → None
     client = _build_client(ENABLED, db=db)
@@ -501,7 +484,7 @@ def test_list_grants_returns_rows() -> None:
     assert body[0]["accessExpiresAt"] is not None
     assert body[0]["refreshExpiresAt"] is not None
     assert body[0]["createdAt"] is not None
-    # never-expire + kein created_at → None.
+    # never-expire and no created_at → None.
     assert body[1]["createdAt"] is None
     assert body[1]["accessExpiresAt"] is None
     assert body[1]["refreshExpiresAt"] is None
@@ -546,7 +529,7 @@ def test_revoke_grant_already_revoked_no_commit() -> None:
     client = _build_client(ENABLED, db=db)
     resp = client.delete("/api/oauth/grants/gx")
     assert resp.status_code == 204
-    assert db.committed == 0  # schon widerrufen → kein Commit
+    assert db.committed == 0
 
 
 def test_revoke_all_grants_no_pid_noop() -> None:
@@ -566,9 +549,6 @@ def test_revoke_all_grants_marks_rows() -> None:
     assert db.committed == 1
 
 
-# =========================================================================== #
-# oauth_router well-known metadata
-# =========================================================================== #
 def test_authorization_server_metadata() -> None:
     client = _build_client(ENABLED)
     body = client.get("/.well-known/oauth-authorization-server").json()
@@ -587,9 +567,7 @@ def test_protected_resource_metadata() -> None:
     assert body["scopes_supported"] == sorted(oauth.SCOPES.keys())
 
 
-# =========================================================================== #
 # oauth_service
-# =========================================================================== #
 async def test_create_authorization_code_persists_and_returns_clear() -> None:
     db = fake_session()
     code = await oauth_service.create_authorization_code(
@@ -600,7 +578,6 @@ async def test_create_authorization_code_persists_and_returns_clear() -> None:
     assert code.startswith("apac_")
     assert len(db.added) == 1
     assert db.flushed == 1
-    # Hash der DB-Zeile stimmt mit dem ausgegebenen Code überein.
     assert db.added[0].code_hash == oauth.hash_token(code)
 
 
@@ -685,8 +662,8 @@ async def test_exchange_code_success_with_ttl() -> None:
         client_id=CLIENT_ID, redirect_uri=LOOPBACK, code_challenge=_challenge(verifier),
         access_ttl_seconds=3600, principal_id="pid", scope="read",
     )
-    # AUD-003: Einlösen via atomarem ``UPDATE … WHERE used_at IS NULL RETURNING id``.
-    # 1. execute = SELECT (row), 2. execute = Claim → 1 Zeile (id) ⇒ Code beansprucht.
+    # AUD-003: an atomic `UPDATE ... WHERE used_at IS NULL RETURNING id` redeems the code.
+    # execute 1 = SELECT (row), execute 2 = claim → one row (id), so the code is claimed.
     db = fake_session(result(row), result(row.id))
     issued = await oauth_service.exchange_code(
         db, code="c", code_verifier=verifier, redirect_uri=LOOPBACK,
@@ -694,7 +671,7 @@ async def test_exchange_code_success_with_ttl() -> None:
     )
     assert issued.access_token.startswith("apat_")
     assert issued.refresh_token.startswith("aprt_")
-    assert issued.expires_in == 3600  # consent-TTL maßgeblich, nicht access_ttl-Param
+    assert issued.expires_in == 3600  # the consent TTL wins, not the access_ttl argument
     token_row = db.added[0]
     assert token_row.access_expires_at == NOW + timedelta(seconds=3600)
     assert token_row.refresh_expires_at == NOW + timedelta(seconds=86400)
@@ -707,7 +684,7 @@ async def test_exchange_code_success_never_expires() -> None:
         client_id=CLIENT_ID, redirect_uri=LOOPBACK, code_challenge=_challenge(verifier),
         access_ttl_seconds=None, principal_id="pid", scope="read",
     )
-    db = fake_session(result(row), result(row.id))  # 2. execute = atomarer Claim
+    db = fake_session(result(row), result(row.id))  # execute 2 = atomic claim
     issued = await oauth_service.exchange_code(
         db, code="c", code_verifier=verifier, redirect_uri=LOOPBACK,
         client_id=CLIENT_ID, now=NOW, access_ttl=7200, refresh_ttl=86400,
@@ -729,13 +706,13 @@ async def test_refresh_tokens_not_found() -> None:
 
 
 async def test_refresh_tokens_revoked() -> None:
-    # AUD-020: ein bereits rotiertes (revoked) Token erneut vorgelegt → Replay-Verdacht;
-    # die Familie (principal_id+client_id) wird kaskadierend widerrufen, dann invalid_grant.
+    # AUD-020: a resubmitted rotated token points to a replay. The service revokes the
+    # whole family (principal_id + client_id) and then returns invalid_grant.
     row = SimpleNamespace(
         id="tok-id", revoked_at=NOW, client_id=CLIENT_ID, refresh_expires_at=None,
         principal_id="pid",
     )
-    # 1. execute = SELECT (revoked row), 2. execute = Familien-Revoke-UPDATE (Ergebnis ignoriert).
+    # execute 1 = SELECT (revoked row), execute 2 = family revoke UPDATE (result ignored).
     db = fake_session(result(row))
     with pytest.raises(oauth.OAuthError) as exc:
         await oauth_service.refresh_tokens(
@@ -743,7 +720,7 @@ async def test_refresh_tokens_revoked() -> None:
             access_ttl=3600, refresh_ttl=86400,
         )
     assert "invalid or revoked" in exc.value.description
-    # kein neues Token-Paar ausgestellt + die Familien-Revoke-Query lief.
+    # No new token pair went out and the family revoke query ran.
     assert db.added == []
     assert len(db.statements) == 2
 
@@ -779,8 +756,8 @@ async def test_refresh_tokens_success_rotation() -> None:
         refresh_expires_at=NOW + timedelta(days=30),
         access_ttl_seconds=3600, principal_id="pid", scope="read",
     )
-    # AUD-020: atomare Rotation via ``UPDATE … WHERE revoked_at IS NULL RETURNING id``.
-    # 1. SELECT (row), 2. SELECT (aktiver Principal), 3. Rotation-Claim → 1 Zeile (id).
+    # AUD-020: an atomic `UPDATE ... WHERE revoked_at IS NULL RETURNING id` rotates.
+    # 1 = SELECT (row), 2 = SELECT (active principal), 3 = rotation claim → one row (id).
     db = fake_session(
         result(row), result(SimpleNamespace(active=True)), result(row.id)
     )
@@ -788,7 +765,7 @@ async def test_refresh_tokens_success_rotation() -> None:
         db, refresh_token="rt", client_id=CLIENT_ID, now=NOW,
         access_ttl=3600, refresh_ttl=86400,
     )
-    # Altes Token rotiert (Claim lieferte eine Zeile) und ein frisches Paar ausgestellt.
+    # The claim returned a row, so the old token rotated and a fresh pair went out.
     assert len(db.statements) == 3
     assert issued.expires_in == 3600
     assert db.added[0].refresh_expires_at == NOW + timedelta(seconds=86400)
@@ -811,7 +788,7 @@ async def test_refresh_tokens_success_never_expires() -> None:
 
 
 async def test_refresh_tokens_inactive_principal_rejected() -> None:
-    """Deaktivierter Principal → ``invalid_grant`` (kein frisches Token-Paar)."""
+    """A deactivated principal gets `invalid_grant` and no fresh token pair."""
     row = SimpleNamespace(
         revoked_at=None, client_id=CLIENT_ID, refresh_expires_at=NOW + timedelta(days=30),
         access_ttl_seconds=3600, principal_id="pid", scope="read",
@@ -824,16 +801,16 @@ async def test_refresh_tokens_inactive_principal_rejected() -> None:
         )
     assert exc.value.error == "invalid_grant"
     assert "inactive" in exc.value.description
-    assert row.revoked_at is None  # nicht rotiert
+    assert row.revoked_at is None  # not rotated
 
 
 async def test_refresh_tokens_principal_missing_rejected() -> None:
-    """Principal-Zeile fehlt → ``invalid_grant``."""
+    """A missing principal row gets `invalid_grant`."""
     row = SimpleNamespace(
         revoked_at=None, client_id=CLIENT_ID, refresh_expires_at=NOW + timedelta(days=30),
         access_ttl_seconds=3600, principal_id="pid", scope="read",
     )
-    db = fake_session(result(row), result())  # zweites execute: keine Zeile
+    db = fake_session(result(row), result())  # second execute: no row
     with pytest.raises(oauth.OAuthError) as exc:
         await oauth_service.refresh_tokens(
             db, refresh_token="rt", client_id=CLIENT_ID, now=NOW,
@@ -881,16 +858,14 @@ async def test_resolve_access_token_never_expires() -> None:
     assert out == ("pid", "read")
 
 
-# =========================================================================== #
 # mcp_router
-# =========================================================================== #
 def test_mcp_config_requires_mcp_use_401() -> None:
     client = _build_client(ENABLED, no_principal_override=True)
     assert client.get("/api/mcp/config").status_code == 401
 
 
 def test_mcp_config_forbidden_without_perm_403() -> None:
-    p = Principal(sub="u", permissions={"application.read"})  # kein mcp.use
+    p = Principal(sub="u", permissions={"application.read"})  # no mcp.use
     client = _build_client(ENABLED, principal=p)
     assert client.get("/api/mcp/config").status_code == 403
 
@@ -913,7 +888,7 @@ def test_mcp_package_not_available_404(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_mcp_package_streams_tarball(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # Minimal-Quellpaket aufbauen + ausgeschlossene Verzeichnisse mit hineinlegen.
+    # Build a minimal source package that also holds an excluded __pycache__ directory.
     pkg = tmp_path / "mcp"
     (pkg / "antragsplattform_mcp").mkdir(parents=True)
     (pkg / "pyproject.toml").write_text("[project]\nname='x'\n")
@@ -932,7 +907,6 @@ def test_mcp_package_streams_tarball(
 
     with tarfile.open(fileobj=io.BytesIO(resp.content), mode="r:gz") as tar:
         names = tar.getnames()
-    # ausgeschlossener __pycache__-Inhalt fehlt; gebackene _baked.py ist drin.
     assert not any("__pycache__" in n for n in names)
     assert "antragsplattform-mcp/antragsplattform_mcp/_baked.py" in names
 
@@ -940,8 +914,11 @@ def test_mcp_package_streams_tarball(
 def test_mcp_package_bakes_url_json_safe(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """FIX 1: die BASE_URL wird per json.dumps escaped — ein Wert mit Quote/Newline darf
-    das erzeugte Python-Literal nicht aufbrechen (eval-bar + exakter Roundtrip)."""
+    """json.dumps escapes the baked BASE_URL.
+
+    A value with a quote or a newline must not break the generated Python literal. The
+    test compiles the baked module and compares the exact round trip.
+    """
     pkg = tmp_path / "mcp"
     (pkg / "antragsplattform_mcp").mkdir(parents=True)
     (pkg / "pyproject.toml").write_text("[project]\nname='x'\n")
@@ -966,8 +943,6 @@ def test_mcp_package_bakes_url_json_safe(
         )
         assert member is not None
         source = member.read().decode("utf-8")
-    # Das gebackene Modul ist gültiger Python-Code und BASE_URL trägt exakt den (gerstripten)
-    # Wert — kein Escape-Ausbruch.
     ns: dict[str, object] = {}
     exec(compile(source, "_baked.py", "exec"), ns)  # noqa: S102
     assert ns["BASE_URL"] == hostile.rstrip("/")
@@ -1033,7 +1008,7 @@ def test_package_dir_upward_search(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
         return d == found
 
     monkeypatch.setattr(mcp_router_mod, "_is_pkg", _is_pkg)
-    # Erster Parent matcht NICHT (Loop continue, Branch 55->53), zweiter matcht.
+    # The first parent does not match (loop continue, branch 55->53). The second matches.
     monkeypatch.setattr(
         mcp_router_mod.Path,
         "resolve",
@@ -1055,9 +1030,7 @@ def test_package_dir_nowhere_returns_none(monkeypatch: pytest.MonkeyPatch) -> No
     assert mcp_router_mod._package_dir(s) is None
 
 
-# =========================================================================== #
-# router.py — me-helper + callback oauth-tx branch
-# =========================================================================== #
+# router.py: /auth/me helpers and the callback oauth-tx branch
 def test_callback_with_oauth_tx_redirects_to_finish(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1068,7 +1041,7 @@ def test_callback_with_oauth_tx_redirects_to_finish(
     client = _build_client(ENABLED, no_principal_override=True)
     tx = sessions.issue_oidc_tx(ENABLED.session_secret, "st", "v", "n")
     client.cookies.set(ENABLED.oidc_tx_cookie_name, tx)
-    # Laufender OAuth-AS-Login (ap_oauth_tx gesetzt) → Redirect auf /api/oauth/finish.
+    # An OAuth AS login is in progress (ap_oauth_tx set) → redirect to /api/oauth/finish.
     client.cookies.set(ENABLED.oauth_tx_cookie_name, "anything")
     resp = client.get("/api/auth/callback?code=c&state=st")
     assert resp.status_code == 307
@@ -1076,7 +1049,7 @@ def test_callback_with_oauth_tx_redirects_to_finish(
 
 
 async def test_me_gremien_helpers_with_rows(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Direkter Aufruf der me-Helper mit Treffern (Zeilen 234-241, 257, etc.)."""
+    """Call the me helpers directly with rows that match (lines 234-241, 257)."""
     from app.modules.admin import gremium_roles as gr
 
     gid = "11111111-1111-1111-1111-111111111111"
@@ -1091,13 +1064,12 @@ async def test_me_gremien_helpers_with_rows(monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch.setattr(gr, "gremium_ids_with_permission", _ids_with_perm)
 
     gremium_row = SimpleNamespace(id=gid, name="StuPa", slug="stupa")
-    # _gremien_for: gremium_member_ids → {gid}, dann SELECT-Zeilen.
+    # _gremien_for: gremium_member_ids → {gid}, then the SELECT rows.
     db = fake_session(result(gremium_row))
     out = await router_mod._gremien_for(db, "u1")
     assert len(out) == 1
     assert out[0].name == "StuPa"
 
-    # _session_manage_gremien: sortierte UUID-Liste.
     out2 = await router_mod._session_manage_gremien(fake_session(), "u1")
     assert out2 == [gid]
 
@@ -1117,14 +1089,14 @@ async def test_has_scoped_budget_view_branches(monkeypatch: pytest.MonkeyPatch) 
 
     gid = "22222222-2222-2222-2222-222222222222"
 
-    # kein Mitglieds-Gremium → False (early return).
+    # no member Gremium → False (early return).
     async def _none(db: object, sub: str, *a: object) -> set[str]:
         return set()
 
     monkeypatch.setattr(gr, "gremium_member_ids", _none)
     assert await router_mod._has_scoped_budget_view(fake_session(), "u1") is False
 
-    # Mitglied + Budget-Treffer (scalar) → True.
+    # member plus a budget hit (scalar) → True.
     async def _some(db: object, sub: str, *a: object) -> set[str]:
         return {gid}
 
@@ -1133,22 +1105,20 @@ async def test_has_scoped_budget_view_branches(monkeypatch: pytest.MonkeyPatch) 
     db.scalar_results.append("budget-id")
     assert await router_mod._has_scoped_budget_view(db, "u1") is True
 
-    # Mitglied, aber kein Budget-Root → False (scalar None).
+    # member but no budget root → False (scalar None).
     db2 = fake_session()
     assert await router_mod._has_scoped_budget_view(db2, "u1") is False
 
 
 async def test_in_substitute_pool_branches() -> None:
-    # Treffer → True.
     hit_db = fake_session()
     hit_db.scalar_results.append("sub-id")
     assert await router_mod._in_substitute_pool(hit_db, "u1") is True
-    # Kein Treffer → False.
     assert await router_mod._in_substitute_pool(fake_session(), "u1") is False
 
 
 def test_me_endpoint_aggregates(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Voll durch ``/auth/me`` mit gemockten Helpern (Aggregation aller Felder)."""
+    """Run the whole `/auth/me` route with mocked helpers and check every field."""
     gid = "33333333-3333-3333-3333-333333333333"
 
     async def _gremien(db: object, sub: str) -> list[object]:
@@ -1189,10 +1159,11 @@ def test_me_endpoint_aggregates(monkeypatch: pytest.MonkeyPatch) -> None:
 async def test_deliver_magic_link_inner_deliver_sends(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """``_deliver_magic_link`` inner-``deliver`` ruft NotificationService.send_magic_link.
+    """The inner `deliver` of `_deliver_magic_link` calls send_magic_link.
 
-    Deckt den Body der inneren ``deliver``-Closure (Zeile 257-259), indem das gemockte
-    ``request_magic_link`` den übergebenen ``deliver`` tatsächlich aufruft."""
+    The mocked `request_magic_link` calls the `deliver` argument, so the body of the
+    inner closure runs (lines 257-259).
+    """
     db = fake_session()
 
     class _ACM:
@@ -1215,7 +1186,7 @@ async def test_deliver_magic_link_inner_deliver_sends(
         session: object, settings: object, *, email: str, application_id: object,
         deliver: object,
     ) -> None:
-        # ruft die innere deliver-Closure → Body von Zeile 257-259.
+        # Call the inner deliver closure, so lines 257-259 run.
         await deliver("r@x.de", "https://link")  # type: ignore[operator]
 
     monkeypatch.setattr(router_mod, "get_sessionmaker", lambda: _ACM)
@@ -1228,9 +1199,7 @@ async def test_deliver_magic_link_inner_deliver_sends(
     assert db.committed == 1
 
 
-# =========================================================================== #
-# service.py — deactivated account
-# =========================================================================== #
+# service.py: deactivated account
 async def test_oidc_callback_deactivated_account_forbidden(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1247,7 +1216,7 @@ async def test_oidc_callback_deactivated_account_forbidden(
 
     deactivated = PrincipalRow(sub="s1")
     deactivated.active = False  # type: ignore[assignment]
-    db = fake_session(result(deactivated))  # upsert findet bestehende, deaktivierte Zeile
+    db = fake_session(result(deactivated))  # the upsert finds a deactivated row
     with pytest.raises(ForbiddenError):
         await service.oidc_callback(db, settings, code="c", verifier="v", nonce="n")
 
@@ -1255,7 +1224,10 @@ async def test_oidc_callback_deactivated_account_forbidden(
 async def test_oidc_callback_email_verified_bootstrap(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Aktiver Account + email_verified → ensure_admin/member laufen, Session entsteht."""
+    """An active account with `email_verified` starts a session.
+
+    The callback runs `ensure_admin_for_principal` and `ensure_member_for_principal`.
+    """
     settings = ENABLED
 
     async def _exchange(s: Settings, *, code: str, verifier: str) -> dict[str, str]:
@@ -1279,7 +1251,7 @@ async def test_oidc_callback_email_verified_bootstrap(
     monkeypatch.setattr(service, "ensure_admin_for_principal", _ensure_admin)
     monkeypatch.setattr(service, "ensure_member_for_principal", _ensure_member)
 
-    db = fake_session(result())  # neuer Principal
+    db = fake_session(result())  # new principal
     cookie, row = await service.oidc_callback(
         db, settings, code="c", verifier="v", nonce="n"
     )
@@ -1287,22 +1259,19 @@ async def test_oidc_callback_email_verified_bootstrap(
     assert seen == {"email_verified": True, "member": True}
 
 
-# =========================================================================== #
-# rbac.py — vote.cast membership group
-# =========================================================================== #
+# rbac.py: vote.cast membership group
 async def test_resolve_principal_membership_grants_vote_group() -> None:
-    """Aktive Gremium-Rolle mit ``vote.cast`` → namespaced Gremium-Stimm-Key in groups.
+    """An active Gremium role with `vote.cast` adds a namespaced vote key to groups.
 
-    AUD-066: der Cast-Key ist ``vote:<gremium_id>`` (``vote_group_key``), NICHT der
-    nackte UUID-String — sonst könnte ein deckungsgleicher OIDC-Gruppen-Claim die
-    Gremium-Stimmberechtigung fälschlich erfüllen.
+    AUD-066: the cast key is `vote:<gremium_id>` (`vote_group_key`), not the bare UUID
+    string. A matching OIDC group claim must never satisfy the Gremium cast permission.
     """
     row = PrincipalRow(sub="u9", email=None, display_name=None, oidc_groups=None)
     row.id = "pid"  # type: ignore[assignment]
     gid = "44444444-4444-4444-4444-444444444444"
     db = fake_session(
-        result(),  # keine RoleAssignments
-        # keine GroupMapping-Query, weil groups leer → wird übersprungen
+        result(),  # no RoleAssignments
+        # groups stays empty, so the code skips the GroupMapping query
         result((gid, ["vote.cast", "vote.manage"])),  # membership_rows
     )
     p = await rbac.resolve_principal(db, row, NOW)
@@ -1311,13 +1280,13 @@ async def test_resolve_principal_membership_grants_vote_group() -> None:
 
 
 async def test_resolve_principal_membership_without_vote_cast() -> None:
-    """Mitgliedschaft ohne ``vote.cast`` → keine Gruppe (else-Zweig Zeile 113)."""
+    """A membership without `vote.cast` adds no group (else branch, line 113)."""
     row = PrincipalRow(sub="u10", email=None, display_name=None, oidc_groups=None)
     row.id = "pid"  # type: ignore[assignment]
     gid = "55555555-5555-5555-5555-555555555555"
     db = fake_session(
-        result(),  # keine RoleAssignments
-        result((gid, ["vote.manage"])),  # membership ohne vote.cast
+        result(),  # no RoleAssignments
+        result((gid, ["vote.manage"])),  # membership without vote.cast
     )
     p = await rbac.resolve_principal(db, row, NOW)
     assert gid not in p.groups
@@ -1325,7 +1294,7 @@ async def test_resolve_principal_membership_without_vote_cast() -> None:
 
 
 async def test_resolve_principal_membership_perms_none() -> None:
-    """``perms`` ist None (perms or []) → kein Crash, keine Gruppe."""
+    """A None `perms` value (perms or []) does not crash and adds no group."""
     row = PrincipalRow(sub="u11", email=None, display_name=None, oidc_groups=None)
     row.id = "pid"  # type: ignore[assignment]
     gid = "66666666-6666-6666-6666-666666666666"
@@ -1338,11 +1307,12 @@ async def test_resolve_principal_membership_perms_none() -> None:
 
 
 async def test_resolve_principal_with_assignment_and_group_mappings() -> None:
-    """RoleAssignment mit/ohne Gremium + GroupMapping mit/ohne Gremium → Loop-Körper.
+    """RoleAssignment and GroupMapping with and without a Gremium run the loop bodies.
 
-    Deckt: gültiges Assignment mit Gremium (groups.add), gültiges Assignment ohne
-    Gremium (kein add), abgelaufenes Assignment (else-Zweig _assignment_valid),
-    GroupMapping mit Gremium (Zeile 74-75) und GroupMapping ohne Gremium (Zeile 73).
+    The test covers a valid assignment with a Gremium (groups.add) and a valid assignment
+    without one (no add). It also covers an expired assignment (else branch of
+    `_assignment_valid`). For mappings it covers a GroupMapping with a Gremium (lines
+    74-75) and one without (line 73).
     """
     row = PrincipalRow(sub="u12", email=None, display_name=None, oidc_groups=["grpA"])
     row.id = "pid"  # type: ignore[assignment]
@@ -1368,14 +1338,17 @@ async def test_resolve_principal_with_assignment_and_group_mappings() -> None:
         result(),                              # membership rows
     )
     p = await rbac.resolve_principal(db, row, NOW)
-    assert str(gid) in p.groups        # Assignment-Gremium
-    assert str(map_gid) in p.groups    # Mapping-Gremium
-    assert "grpA" in p.groups          # OIDC-Gruppe
+    assert str(gid) in p.groups        # assignment Gremium
+    assert str(map_gid) in p.groups    # mapping Gremium
+    assert "grpA" in p.groups          # OIDC group
     assert p.permissions == {"application.read"}
 
 
 async def test_resolve_principal_naive_validity_window() -> None:
-    """Naive ``valid_from``/``valid_until`` (DB ohne tz) → ``_as_aware``-Zweig (Zeile 32)."""
+    """Naive `valid_from` and `valid_until` hit the `_as_aware` branch (line 32).
+
+    A database column without a time zone returns naive datetimes.
+    """
     row = PrincipalRow(sub="u13", email=None, display_name=None, oidc_groups=None)
     row.id = "pid"  # type: ignore[assignment]
     gid = "99999999-9999-9999-9999-999999999999"
@@ -1387,7 +1360,7 @@ async def test_resolve_principal_naive_validity_window() -> None:
     )
     db = fake_session(
         result(naive),
-        result(),                       # keine GroupMappings
+        result(),                       # no GroupMappings
         result("application.read"),
         result("member"),
         result(),                       # membership rows

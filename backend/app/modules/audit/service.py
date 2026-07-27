@@ -1,10 +1,10 @@
 """Audit service: append-only writes, chain verification, queries.
 
-:meth:`AuditService.record` takes a transaction advisory lock before reading the
-predecessor hash, so concurrent appends serialize and the chain has no
-``prev_hash`` races. :meth:`AuditService.verify_chain` recomputes the chain from
-genesis, catching both tampered fields and removed/inserted rows. The module-level
-:func:`record` hook is the standard entry point for other modules.
+`AuditService.record` takes a transaction advisory lock before it reads the
+predecessor hash. Concurrent appends therefore serialize and the chain has no
+``prev_hash`` race. `AuditService.verify_chain` recomputes the chain from genesis.
+It catches both a tampered field and a removed or inserted row. The module-level
+`record` hook is the standard entry point for other modules.
 """
 
 from __future__ import annotations
@@ -23,15 +23,16 @@ from app.modules.audit.hashing import canonical_payload, compute_hash
 from app.modules.audit.models import AuditEntry
 from app.shared.paging import Page
 
-# Fixed advisory-lock key: serializes chain appends across processes.
+# Fixed advisory-lock key. It serializes chain appends across processes.
 _CHAIN_LOCK_KEY = 0x4155_4449_5400  # "AUDIT\0"
 
 
 def data_uuid_strings(data: object) -> set[str]:
-    """Collect all UUID-shaped string values (recursively) from a ``data`` payload.
+    """Collect every UUID-shaped string value from a ``data`` payload, recursively.
 
-    Used to resolve entity ids embedded in ``data`` to display names. Keys are
-    ignored — only values count."""
+    The caller resolves the entity ids inside ``data`` to display names with this
+    set. The walk ignores keys and looks at values only.
+    """
     found: set[str] = set()
 
     def walk(v: object) -> None:
@@ -54,7 +55,7 @@ def data_uuid_strings(data: object) -> set[str]:
 
 @dataclass(frozen=True, slots=True)
 class ChainVerification:
-    """Result of :meth:`AuditService.verify_chain`."""
+    """Result of `AuditService.verify_chain`."""
 
     valid: bool
     checked: int
@@ -78,16 +79,18 @@ class AuditService:
         data: dict[str, Any] | None = None,
         at: datetime | None = None,
     ) -> AuditEntry:
-        """Append an entry to the chain (no commit — caller's transaction).
+        """Append an entry to the chain.
 
-        ``data`` must not contain raw PII values (id references/metadata only) —
-        this is the caller's responsibility."""
+        The method does not commit. It runs in the transaction of the caller. The
+        ``data`` payload holds id references and metadata only. The caller is
+        responsible for keeping raw PII values out of it.
+        """
         action_value = str(action)
         payload = data or {}
         stamp = at or datetime.now(UTC)
 
-        # Serialize appends so `prev_hash` stays consistent. The key is a fixed
-        # int constant (no user input), so embedding it directly is safe.
+        # Serialize appends so that `prev_hash` stays consistent. The key is a fixed
+        # integer constant and not user input, so the direct interpolation is safe.
         await self.session.execute(text(f"SELECT pg_advisory_xact_lock({_CHAIN_LOCK_KEY})"))
         prev_hash = (
             await self.session.execute(
@@ -120,12 +123,14 @@ class AuditService:
     async def revertable_flags(
         self, entries: Sequence[AuditEntry]
     ) -> dict[int, bool]:
-        """Determine per entry whether it is revertable from the log.
+        """Determine for each entry whether the log can revert it.
 
-        Cheap, mostly static property for the list view — no per-row head/stale
-        checks (the actual revert enforces those with 409). Config changes without
-        a predecessor are not revertable; budget updates need the captured prior
-        state. A batch lookup resolves the config-snapshot predecessor check."""
+        The check is cheap and mostly static, because the list view needs it for
+        every row. It runs no per-row head or stale check. The actual revert call
+        enforces those and answers 409. A config change without a predecessor is not
+        revertable. A budget update needs the captured prior state. One batch lookup
+        resolves the config-snapshot predecessor check.
+        """
         flags: dict[int, bool] = {}
         revision_ids: dict[int, str] = {}
         for e in entries:
@@ -133,7 +138,7 @@ class AuditService:
             rid = data.get("revisionId")
             if rid:
                 revision_ids[e.id] = str(rid)
-                flags[e.id] = False  # becomes True only after predecessor confirmation
+                flags[e.id] = False  # turns True only after the predecessor check
             elif e.action == AuditAction.STATUS_CHANGE:
                 flags[e.id] = bool(data.get("fromStateId") and data.get("toStateId"))
             elif e.action in REVERTABLE_BUDGET_ACTIONS:
@@ -172,10 +177,12 @@ class AuditService:
         return flags
 
     async def verify_chain(self) -> ChainVerification:
-        """Recompute the chain from genesis; the first break is reported (fail-closed).
+        """Recompute the chain from genesis and report the first break.
 
-        Streams row by row (server-side cursor) instead of loading the whole
-        chain into memory, so very long logs stay verifiable."""
+        The check is fail-closed. The method streams row by row with a server-side
+        cursor instead of loading the whole chain into memory. A very long log stays
+        verifiable.
+        """
         prev_hash: bytes | None = None
         checked = 0
         stream = await self.session.stream_scalars(
@@ -220,7 +227,7 @@ class AuditService:
         limit: int = 50,
         offset: int = 0,
     ) -> Page[AuditEntry]:
-        """Filtered, descending (newest first) paged audit view."""
+        """Read a filtered, offset-paged audit view, newest entry first."""
         stmt: Select[tuple[AuditEntry]] = select(AuditEntry)
         if action is not None:
             stmt = stmt.where(AuditEntry.action == action)
@@ -261,14 +268,20 @@ class AuditService:
         before: int | None = None,
         limit: int = 50,
     ) -> tuple[list[AuditEntry], bool]:
-        """Keyset-paged audit view (``id`` desc); returns (items, has_more).
+        """Read a keyset-paged audit view, ordered by ``id`` descending.
 
-        ``before`` is the keyset cursor (entries with ``id < before``); reading
-        ``limit + 1`` rows determines ``has_more`` without a separate COUNT.
+        ``before`` is the keyset cursor. The query returns entries with
+        ``id < before``. It reads ``limit + 1`` rows to find ``has_more`` without a
+        separate COUNT.
 
-        Deliberately NO gremium filter — ``audit.read`` is a global, platform-wide
-        read view. If scoped auditing is ever needed, both this query and the
-        resolvers must be restricted to the caller's ``GremiumMembership`` set."""
+        This query has NO Gremium filter, on purpose. ``audit.read`` is a global,
+        platform-wide read view. If the platform ever needs a scoped audit, restrict
+        both this query and the resolvers to the ``GremiumMembership`` set of the
+        caller.
+
+        Returns:
+            The page items and a flag that states whether more rows follow.
+        """
         stmt: Select[tuple[AuditEntry]] = select(AuditEntry)
         if action is not None:
             stmt = stmt.where(AuditEntry.action == action)
@@ -296,10 +309,12 @@ class AuditService:
     async def resolve_actor_names(
         self, subs: Sequence[str | None]
     ) -> dict[str, str | None]:
-        """Resolve ``sub`` to a display name (``display_name`` preferred, else ``email``).
+        """Resolve each ``sub`` to a display name.
 
-        Batch lookup over the ``principal`` table; unknown/None subs are absent
-        from the map."""
+        The lookup prefers ``display_name`` and falls back to ``email``. It reads the
+        ``principal`` table in one batch. An unknown sub and a None sub are absent
+        from the map.
+        """
         from app.modules.auth.models import Principal
 
         wanted = {s for s in subs if s}
@@ -317,11 +332,13 @@ class AuditService:
     async def resolve_target_labels(
         self, targets: Sequence[tuple[str | None, str | None]]
     ) -> dict[tuple[str, str], str]:
-        """Resolve ``(target_type, target_id)`` to a human-readable label (batch).
+        """Resolve each ``(target_type, target_id)`` pair to a readable label.
 
-        Best effort: only types with a name source are resolved; deleted targets
-        or non-UUID ids are absent from the map. No PII beyond the read view —
-        everything here is reachable via admin views for ``audit.read`` holders."""
+        The lookup runs in batches and is best effort. It resolves only a type that
+        has a name source. A deleted target and a non-UUID id are absent from the
+        map. The method adds no PII beyond the read view. A holder of ``audit.read``
+        can reach all of it through the admin views.
+        """
         by_type: dict[str, set[uuid.UUID]] = {}
         for target_type, target_id in targets:
             if not target_type or not target_id:
@@ -329,7 +346,7 @@ class AuditService:
             try:
                 by_type.setdefault(target_type, set()).add(uuid.UUID(target_id))
             except ValueError:
-                continue  # e.g. export filenames — target_id is itself the label
+                continue  # for example an export filename: target_id is the label
 
         labels: dict[tuple[str, str], str] = {}
 
@@ -426,12 +443,14 @@ class AuditService:
     async def resolve_data_ids(
         self, data_dicts: Sequence[dict[str, Any] | None]
     ) -> dict[str, str]:
-        """Resolve UUIDs in ``data`` payloads to display names (batch).
+        """Resolve the UUIDs inside ``data`` payloads to display names, in batches.
 
-        ``data`` keys are untyped, so all UUID-shaped values are collected
-        recursively and resolved per table via ``id IN (...)`` — UUIDs are
-        globally unique, so no collisions. Unresolvable/deleted ids are absent
-        from the map. No extra PII exposure beyond the admin views.
+        The keys of ``data`` are untyped. The method therefore collects every
+        UUID-shaped value recursively and resolves it per table with an
+        ``id IN (...)`` query. A UUID is globally unique, so the tables cannot
+        collide. An id that the method cannot resolve, and an id of a deleted row,
+        are absent from the map. The method exposes no extra PII beyond the admin
+        views.
         """
         candidates: set[uuid.UUID] = set()
         for d in data_dicts:
@@ -460,7 +479,7 @@ class AuditService:
         from app.modules.livevote.models import Meeting
         from app.modules.voting.models import Vote
 
-        # Application: the title lives in the JSONB ``data`` (no label column).
+        # Application: the title lives in the JSONB ``data``. There is no label column.
         for row_id, data in (
             await self.session.execute(
                 select(Application.id, Application.data).where(
@@ -483,7 +502,8 @@ class AuditService:
             )
         )
 
-        # Multi-column / derived labels (order irrelevant — ``fill`` never overwrites).
+        # Multi-column and derived labels. The order does not matter, because ``fill``
+        # never overwrites an entry.
         for row_id, display_name, email in (
             await self.session.execute(
                 select(Principal.id, Principal.display_name, Principal.email).where(
@@ -550,7 +570,7 @@ async def record(
     target_id: str | None = None,
     data: dict[str, Any] | None = None,
 ) -> AuditEntry:
-    """Service hook for other modules: write one audit entry (no commit)."""
+    """Write one audit entry for another module, without a commit."""
     return await AuditService(session).record(
         actor=actor,
         action=action,

@@ -1,18 +1,18 @@
-"""budget HHJ-Stichtag pro Budget + HHJ nur als Jahr (Freitext-Label entfällt).
+"""Budget: a fiscal-year start date per budget, and the fiscal year as a year only.
 
-Idempotent (``IF [NOT] EXISTS`` / Constraint-Guards): bei frischer DB legt die
-Baseline (``create_all`` aus den Modellen) die neuen Spalten/Constraints bereits an —
-diese Migration ist dann ein No-op; bei bereits migrierten DBs trägt sie nach.
+Idempotent through `IF [NOT] EXISTS` and constraint guards. On a fresh database the
+baseline (`create_all` from the models) already adds the new columns and constraints,
+so this migration is a no-op there. On an already migrated database it adds them.
 
-* ``budget.fiscal_start_month``/``fiscal_start_day`` — HHJ-Stichtag (Default 01.01.),
-  nur am Top-Level fachlich relevant. Backfill aus dem Start-Datum eines bestehenden
-  HHJ des Budgets (sonst Default 1/1).
-* ``fiscal_year.year`` — Startjahr (ersetzt den Freitext ``label``). Backfill aus
-  ``start_date``. ``label`` + dessen Unique-Constraint entfallen; neuer Unique-Key
-  ``(budget_id, year)``.
+* `budget.fiscal_start_month` and `fiscal_start_day`: the start date of the fiscal
+  year (default January 1). It matters only at the top level. The backfill reads the
+  start date of an existing fiscal year of the budget, else it keeps the default 1/1.
+* `fiscal_year.year`: the start year. It replaces the free-text `label`. The backfill
+  reads `start_date`. `label` and its unique constraint go away. The new unique key is
+  `(budget_id, year)`.
 
-Jede Anweisung als **eigenes** ``op.execute`` — asyncpg erlaubt keine Mehrfach-
-Statements in einem Prepared Statement.
+Every statement needs its own `op.execute`. asyncpg does not accept several statements
+in one prepared statement.
 """
 
 from __future__ import annotations
@@ -28,7 +28,6 @@ depends_on: str | Sequence[str] | None = None
 
 
 _UPGRADE: tuple[str, ...] = (
-    # 1. Budget-Stichtag (Tag/Monat des Periodenstarts), Default 01.01.
     "ALTER TABLE budget ADD COLUMN IF NOT EXISTS fiscal_start_month smallint NOT NULL DEFAULT 1",
     "ALTER TABLE budget ADD COLUMN IF NOT EXISTS fiscal_start_day smallint NOT NULL DEFAULT 1",
     """
@@ -47,11 +46,9 @@ _UPGRADE: tuple[str, ...] = (
         END IF;
     END $$
     """,
-    # 2. HHJ als Jahr. Spalte + Backfill aus start_date, dann NOT NULL.
     "ALTER TABLE fiscal_year ADD COLUMN IF NOT EXISTS year integer",
     "UPDATE fiscal_year SET year = EXTRACT(YEAR FROM start_date)::int WHERE year IS NULL",
     "ALTER TABLE fiscal_year ALTER COLUMN year SET NOT NULL",
-    # 3. Budget-Stichtag aus einem bestehenden HHJ-Start ableiten (sofern vorhanden).
     """
     UPDATE budget b
         SET fiscal_start_month = EXTRACT(MONTH FROM fy.start_date)::int,
@@ -63,7 +60,6 @@ _UPGRADE: tuple[str, ...] = (
         ) fy
         WHERE fy.budget_id = b.id
     """,
-    # 4. Freitext-Label + alter Unique-Key entfernen; neuer Unique (budget_id, year).
     "ALTER TABLE fiscal_year DROP CONSTRAINT IF EXISTS uq_fiscal_year_budget_label",
     "ALTER TABLE fiscal_year DROP COLUMN IF EXISTS label",
     """

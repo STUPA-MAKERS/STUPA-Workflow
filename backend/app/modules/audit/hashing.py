@@ -1,8 +1,9 @@
 """Canonical serialization and hash chain for the audit log.
 
-``hash = sha256(prev_hash || canonical_json(entry_without_hash))``. Pure,
-deterministic functions without DB/IO — the hash is reproducible from field
-values alone (stable key order via ``sort_keys`` + compact separators).
+The chain rule is ``hash = sha256(prev_hash || canonical_json(entry_without_hash))``.
+These functions are pure and deterministic and do no database or IO work. The hash
+is reproducible from the field values alone, because ``sort_keys`` and compact
+separators fix the key order.
 """
 
 from __future__ import annotations
@@ -22,11 +23,16 @@ def canonical_payload(
     at: datetime,
     data: dict[str, Any],
 ) -> bytes:
-    """Serialize audit fields (without ``id``/``hash``/``prev_hash``) to canonical UTF-8 bytes.
+    """Serialize the audit fields to canonical UTF-8 bytes.
 
-    ``at`` is normalized to UTC ISO-8601 so the hash is independent of the server
-    timezone (naive values are treated as UTC). Non-JSON-native values in ``data``
-    deliberately raise ``TypeError`` (fail-closed instead of a silent ``str()``)."""
+    The payload leaves out ``id``, ``hash`` and ``prev_hash``. The function
+    normalizes ``at`` to UTC ISO-8601, so the hash does not depend on the server
+    time zone. A naive ``at`` value counts as UTC.
+
+    Raises:
+        TypeError: ``data`` holds a value that JSON cannot represent. The call
+            fails closed on purpose instead of falling back to a silent ``str()``.
+    """
     at_utc = (at if at.tzinfo is not None else at.replace(tzinfo=UTC)).astimezone(UTC)
     payload = {
         "action": action,
@@ -47,5 +53,6 @@ def canonical_payload(
 def compute_hash(prev_hash: bytes | None, canonical: bytes) -> bytes:
     """Compute ``sha256(prev_hash || canonical)`` as a raw 32-byte digest.
 
-    The genesis entry (no predecessor) uses ``prev_hash = b""``."""
+    The genesis entry has no predecessor. It uses ``prev_hash = b""``.
+    """
     return hashlib.sha256((prev_hash or b"") + canonical).digest()

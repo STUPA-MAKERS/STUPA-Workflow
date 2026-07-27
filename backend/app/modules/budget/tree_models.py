@@ -1,11 +1,12 @@
-"""Hierarchical budgets / cost centres plus fiscal years.
+"""Hierarchical budgets and cost centers plus fiscal years.
 
-:class:`Budget` is a tree node (``parent_id`` self-FK; ``path_key`` composed
-like ``VS-800-04``, maintained by the service). :class:`FiscalYear` belongs to
-a top-level budget (service check). :class:`BudgetAllocation` is the top-down
-allocation ``Budget x FiscalYear`` — available = allocated, NO roll-up;
-consumption rolls up from approved applications (not persisted;
-``tree_rules.rollup_committed``). Single currency EUR (CHECK).
+``Budget`` is a tree node with a ``parent_id`` self-FK. The service maintains
+``path_key``, the composed key in the form ``VS-800-04``. ``FiscalYear``
+belongs to a top-level budget (service check). ``BudgetAllocation`` is the
+top-down allocation ``Budget x FiscalYear``. Available equals allocated, with
+NO roll-up. Consumption rolls up from the approved applications. It is not
+persisted, see ``tree_rules.rollup_committed``. The only currency is EUR
+(CHECK).
 """
 
 from __future__ import annotations
@@ -35,11 +36,12 @@ from app.db import Base, CreatedAtMixin, UUIDPkMixin
 
 
 class Budget(UUIDPkMixin, CreatedAtMixin, Base):
-    """Cost-centre node; ``parent_id`` NULL = top level.
+    """Cost-center node. A NULL ``parent_id`` marks the top level.
 
-    ``gremium_id`` is set only at the top level (children inherit logically);
-    ``key`` is the path segment, ``path_key`` the composed key (``VS-800-04``).
-    Self-FK ``ON DELETE RESTRICT`` — children must be deleted first.
+    Only the top level carries ``gremium_id``. The children inherit it
+    logically. ``key`` is the path segment. ``path_key`` is the composed key,
+    for example ``VS-800-04``. The self-FK uses ``ON DELETE RESTRICT``, so you
+    must delete the children first.
     """
 
     __tablename__ = "budget"
@@ -55,27 +57,28 @@ class Budget(UUIDPkMixin, CreatedAtMixin, Base):
     name: Mapped[str] = mapped_column(Text)
     currency: Mapped[str] = mapped_column(CHAR(3), server_default="EUR")
     active: Mapped[bool] = mapped_column(Boolean, server_default="true")
-    # Display color for pies and tree; NULL = auto.
+    # Display color for the pie charts and the tree. NULL selects an auto color.
     color: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # Top-level only: flow-state keys counted as accepted (-> committed) or
-    # denied (-> excluded); everything else counts as requested.
+    # Top level only: flow-state keys that count as accepted (-> committed) or
+    # as denied (-> excluded). Every other state counts as requested.
     accepted_state_keys: Mapped[list] = mapped_column(JSONB, server_default="[]")
     denied_state_keys: Mapped[list] = mapped_column(JSONB, server_default="[]")
-    # Hide in the budget tab: display-only — values still count in parent
-    # rollups/export. Python default in addition to the server default so
-    # freshly constructed instances carry a bool before flush.
+    # Hides the node in the budget tab. Display only: the values still count in
+    # the parent rollups and in the export. A Python default backs up the
+    # server default, so a new instance carries a bool before the flush.
     hidden_in_budget: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default="false"
     )
-    # Visibility gremium: its members see this cost centre (+ subtree) as a root
-    # in the budget tab without a global budget.* permission. Independent of the
-    # top-level ``gremium_id`` classification.
+    # Visibility Gremium: its members see this cost center and its subtree as a
+    # root in the budget tab without a global budget.* permission. This is
+    # independent of the top-level ``gremium_id`` classification.
     view_gremium_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("gremium.id", ondelete="SET NULL"), nullable=True
     )
-    # Fiscal-year cutoff (day/month of period start) — top-level only. Default
-    # Jan 1; a different cutoff renders fiscal years as "YYYY/YY". Fiscal years
-    # store only the year; start/end derive from this cutoff.
+    # Fiscal-year cutoff, the day and the month of the period start. Top level
+    # only. The default is Jan 1. A different cutoff renders a fiscal year as
+    # "YYYY/YY". A fiscal year stores only the year. Start and end derive from
+    # this cutoff.
     fiscal_start_month: Mapped[int] = mapped_column(SmallInteger, server_default="1")
     fiscal_start_day: Mapped[int] = mapped_column(SmallInteger, server_default="1")
 
@@ -95,12 +98,13 @@ class Budget(UUIDPkMixin, CreatedAtMixin, Base):
 
 
 class FiscalYear(UUIDPkMixin, CreatedAtMixin, Base):
-    """Fiscal year per top-level budget, identified by ``year`` (start year).
+    """Fiscal year of one top-level budget, identified by ``year``, the start year.
 
-    No free-text name. Start/end derive from the top budget's
-    ``fiscal_start_month``/``fiscal_start_day`` (``start = cutoff(year)``,
-    ``end = cutoff(year+1) - 1 day``) and are persisted for disjointness and
-    filtering. Displayed as ``YYYY`` for a Jan-1 cutoff, else ``YYYY/YY``.
+    A fiscal year has no free-text name. Start and end derive from
+    ``fiscal_start_month`` and ``fiscal_start_day`` of the top budget
+    (``start = cutoff(year)``, ``end = cutoff(year+1) - 1 day``). Both stay
+    persisted for the disjointness check and for filtering. The UI shows
+    ``YYYY`` for a Jan-1 cutoff and ``YYYY/YY`` for any other cutoff.
     """
 
     __tablename__ = "fiscal_year"
@@ -123,9 +127,9 @@ class FiscalYear(UUIDPkMixin, CreatedAtMixin, Base):
 class BudgetAllocation(UUIDPkMixin, CreatedAtMixin, Base):
     """Top-down allocation ``Budget x FiscalYear``.
 
-    ``allocated`` = available sum of the cost centre in this fiscal year.
-    Service invariant: sum of the direct children's ``allocated`` must not
-    exceed the parent's (per fiscal year).
+    ``allocated`` is the available sum of the cost center in this fiscal year.
+    Service invariant: the sum of ``allocated`` over the direct children must
+    not exceed the value of the parent, per fiscal year.
     """
 
     __tablename__ = "budget_allocation"
@@ -147,15 +151,17 @@ class BudgetAllocation(UUIDPkMixin, CreatedAtMixin, Base):
 
 
 class BudgetExpense(UUIDPkMixin, CreatedAtMixin, Base):
-    """Actual expense or income booked against a cost centre + fiscal year.
+    """Actual expense or income booked against a cost center and a fiscal year.
 
-    ``kind='expense'`` reduces the budget; ``kind='income'`` increases it.
-    ``application_id`` (optional, NOT unique — multiple partial expenses per
-    application): an application-bound expense replaces its committed amount
-    pro rata (``bound(app) = max(0, amount - sum of bound expenses)``); cost
-    centre + fiscal year are inherited from the application (service
-    invariant). Income rows are always standalone (``application_id`` null).
-    ``fiscal_year_id`` must belong to the node's top level (service check).
+    ``kind='expense'`` reduces the budget. ``kind='income'`` increases it.
+    ``application_id`` is optional and NOT unique, because one application can
+    carry several partial expenses. An application-bound expense replaces the
+    committed amount of that application pro rata
+    (``bound(app) = max(0, amount - sum of bound expenses)``). Such an expense
+    inherits cost center and fiscal year from the application (service
+    invariant). An income row is always standalone with a null
+    ``application_id``. ``fiscal_year_id`` must belong to the top level of the
+    node (service check).
     """
 
     __tablename__ = "budget_expense"
@@ -166,18 +172,19 @@ class BudgetExpense(UUIDPkMixin, CreatedAtMixin, Base):
     fiscal_year_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("fiscal_year.id", ondelete="CASCADE")
     )
-    # Booked against one application (replaces its binding pro rata) or
-    # standalone (``None``). ``SET NULL`` on application delete keeps the
-    # booking as a standalone expense.
+    # Booked against one application: the expense then replaces the binding of
+    # that application pro rata. A standalone booking uses ``None``.
+    # ``SET NULL`` on application delete keeps the booking as a standalone
+    # expense.
     application_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("application.id", ondelete="SET NULL"), nullable=True
     )
-    # Optional account (bank account, freely managed; NOT bound to cost centres).
+    # Optional bank account. An account is independent of the cost-center tree.
     account_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("account.id", ondelete="SET NULL"), nullable=True
     )
-    # Optional invoice: 1 invoice : N bookings. SET NULL on invoice delete keeps
-    # the booking.
+    # Optional invoice. One invoice can carry N bookings. SET NULL on invoice
+    # delete keeps the booking.
     invoice_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("invoice.id", ondelete="SET NULL"), nullable=True
     )
@@ -189,27 +196,25 @@ class BudgetExpense(UUIDPkMixin, CreatedAtMixin, Base):
     currency: Mapped[str] = mapped_column(CHAR(3), server_default="EUR")
     description: Mapped[str] = mapped_column(Text)
     actor: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # Optional metadata:
-    # Invoice and payment date (business dates, independent of created_at).
+    # Business dates for invoice and payment, independent of ``created_at``.
     invoice_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     payment_date: Mapped[date | None] = mapped_column(Date, nullable=True)
-    # Correspondent (free text): from whom (income) / for whom (expense).
+    # Free-text correspondent: from whom for an income, for whom for an expense.
     correspondent: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # Notes (multi-line free text).
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # Receipt/invoice reference (free text).
+    # Free-text reference of the receipt or of the invoice.
     reference_number: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # Payment method: ueberweisung | bar | lastschrift | karte.
+    # Payment method: ueberweisung | bar | lastschrift | karte | paypal.
     payment_method: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # Category/tag (free text) for grouping beyond the cost centre.
+    # Free-text category or tag. It groups bookings beyond the cost center.
     category: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # Sub-booking: points at the parent booking. Children INHERIT
-    # account/cost-centre/fiscal-year/kind from the parent (column values are
-    # copied so rollups/queries apply) and carry only their own
-    # amount/description/dates/receipt/bank link. The parent amount is the sum
-    # of the children. Budget rollup counts parents only
-    # (parent_expense_id IS NULL); children are pure breakdown. CASCADE:
-    # deleting the parent deletes its children.
+    # Sub-booking: points at the parent booking. A child INHERITS account, cost
+    # center, fiscal year and kind from the parent. The child stores copies of
+    # these column values, so the rollups and the queries still apply. A child
+    # carries only its own amount, description, dates, receipt and bank link.
+    # The parent amount is the sum of its children. The budget rollup counts
+    # parents only (parent_expense_id IS NULL). Children are a pure breakdown.
+    # CASCADE: a delete of the parent deletes its children.
     parent_expense_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("budget_expense.id", ondelete="CASCADE"), nullable=True
     )
@@ -237,10 +242,12 @@ class BudgetExpense(UUIDPkMixin, CreatedAtMixin, Base):
 
 
 class Account(UUIDPkMixin, CreatedAtMixin, Base):
-    """Account (e.g. bank account) — freely managed, not bound to cost centres.
+    """Account, for example a bank account. It is not bound to a cost center.
 
-    Optional reference on bookings (which account moved). ``iban`` is free text
-    (no format/checksum validation)."""
+    An admin manages the accounts freely. A booking can reference an account to
+    record which account moved the money. ``iban`` is free text. The platform
+    validates neither its format nor its checksum.
+    """
 
     __tablename__ = "account"
 
@@ -248,16 +255,18 @@ class Account(UUIDPkMixin, CreatedAtMixin, Base):
     iban: Mapped[str] = mapped_column(Text, server_default="")
     active: Mapped[bool] = mapped_column(Boolean, server_default="true")
 
-    # FinTS: only the bank connection (endpoint + BLZ) lives on the account —
-    # shared by all bookers, set by the admin. Personal credentials live per
-    # principal in :class:`AccountFintsCredential`; the SCA client state is
-    # bound to user+device (shared state would break TAN/SCA). Without
-    # ``fints_endpoint`` + ``fints_blz`` the account is not FinTS-capable.
+    # FinTS: only the bank connection lives on the account, the endpoint and the
+    # BLZ. The admin sets it and all bookers share it. Personal credentials live
+    # per principal in ``AccountFintsCredential``. The SCA client state is bound
+    # to user and device, because a shared state would break the TAN and SCA
+    # flow. Without ``fints_endpoint`` and ``fints_blz`` the account cannot use
+    # FinTS.
     fints_endpoint: Mapped[str | None] = mapped_column(Text, nullable=True)
     fints_blz: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # Last known account balance: from a sync's closing balance (HKSAL) or the
-    # ``:62F:``/CLBD balance of a file import; ``fints_balance_at`` is its
-    # as-of time. Display/reconcile value only — not part of budget math.
+    # Last known account balance. It comes from the closing balance of a sync
+    # (HKSAL) or from the ``:62F:``/CLBD balance of a file import.
+    # ``fints_balance_at`` is the as-of time of that balance. The value serves
+    # display and reconciliation only. It is not part of the budget math.
     fints_last_balance: Mapped[Decimal | None] = mapped_column(
         Numeric(14, 2), nullable=True
     )
@@ -271,13 +280,15 @@ class Account(UUIDPkMixin, CreatedAtMixin, Base):
 class AccountFintsCredential(UUIDPkMixin, CreatedAtMixin, Base):
     """Personal FinTS credentials of one principal for one account.
 
-    Bookers share the bank account but have individual online-banking logins,
-    so login + PIN belong to the user, not the account. The PIN is stored
-    encrypted only (Fernet, ``app.shared.crypto``) and never returned in
-    plaintext. ``fints_state`` is the encrypted serialized FinTS client state
-    (``system_id`` etc.) for the ~90-day SCA window — bound to user + device,
-    hence separate per credential. Both FKs ``ON DELETE CASCADE``: deleting the
-    account/principal removes the secret.
+    Bookers share the bank account, but each booker has a separate
+    online-banking login. Therefore login and PIN belong to the user, not to the
+    account. The platform stores the PIN encrypted only (Fernet,
+    ``app.shared.crypto``) and never returns it in plaintext. ``fints_state``
+    holds the encrypted serialized FinTS client state (``system_id`` and more)
+    for the SCA window of about 90 days. That state is bound to user and
+    device, so each credential keeps its own copy. Both FKs use
+    ``ON DELETE CASCADE``: a delete of the account or of the principal removes
+    the secret.
     """
 
     __tablename__ = "account_fints_credential"
@@ -295,8 +306,9 @@ class AccountFintsCredential(UUIDPkMixin, CreatedAtMixin, Base):
     fints_last_sync_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    # Lock cooldown: set after a bank lock/signature rejection; the service
-    # refuses syncs until then so retries don't worsen the bank-side lock.
+    # Lock cooldown. The service sets it after a bank lock or after a rejected
+    # signature. Until that time the service refuses a sync, so that retries do
+    # not make the bank-side lock worse.
     fints_locked_until: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
@@ -311,13 +323,14 @@ class AccountFintsCredential(UUIDPkMixin, CreatedAtMixin, Base):
 
 
 class BankStatementLine(UUIDPkMixin, CreatedAtMixin, Base):
-    """Single bank transaction — staged before it becomes a booking.
+    """Single bank transaction, staged before it becomes a booking.
 
-    From a FinTS fetch or file import (CAMT.053/MT940). ``idempotency_key``
-    makes re-imports idempotent (``ON CONFLICT DO NOTHING``). ``amount`` is
-    signed (>0 inflow, <0 outflow); on confirm it becomes a ``budget_expense``
-    with ``kind`` from the sign and ``amount = abs(...)`` (DB CHECK
-    ``amount > 0``).
+    The line comes from a FinTS fetch or from a file import (CAMT.053/MT940).
+    ``idempotency_key`` makes a re-import idempotent
+    (``ON CONFLICT DO NOTHING``). ``amount`` is signed: above 0 for an inflow,
+    below 0 for an outflow. On confirm the line becomes a ``budget_expense``
+    with ``kind`` from the sign and ``amount = abs(...)``, because the DB CHECK
+    demands ``amount > 0``.
     """
 
     __tablename__ = "bank_statement_line"
@@ -338,7 +351,7 @@ class BankStatementLine(UUIDPkMixin, CreatedAtMixin, Base):
     reference: Mapped[str | None] = mapped_column(Text, nullable=True)
     # 'unmatched' | 'suggested' | 'matched' | 'ignored'.
     match_state: Mapped[str] = mapped_column(Text, server_default="unmatched")
-    # Matcher suggestion (UI hint only; binding only on confirm).
+    # Matcher suggestion. It is a UI hint. Only a confirm makes it binding.
     suggested_budget_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("budget.id", ondelete="SET NULL"), nullable=True
     )
@@ -364,11 +377,11 @@ class BankStatementLine(UUIDPkMixin, CreatedAtMixin, Base):
 
 
 class BankAllocation(UUIDPkMixin, CreatedAtMixin, Base):
-    """Bank line <-> booking link (N:M — partial/collective payments).
+    """Bank line to booking link, N:M for partial and collective payments.
 
-    A transaction can split across bookings, and a booking can be paid by
-    several transactions. ``allocated_amount`` is the allocated partial amount
-    (positive). CASCADE on both sides.
+    One transaction can split across several bookings. Several transactions can
+    pay one booking. ``allocated_amount`` is the allocated partial amount and
+    is positive. Both FKs use CASCADE.
     """
 
     __tablename__ = "bank_allocation"
@@ -394,13 +407,15 @@ class BankAllocation(UUIDPkMixin, CreatedAtMixin, Base):
 
 
 class BankSyncSession(UUIDPkMixin, CreatedAtMixin, Base):
-    """Pending FinTS TAN session — short-lived encrypted dialog state between
-    sync start and TAN entry.
+    """Pending FinTS TAN session with short-lived encrypted dialog state.
 
-    ``payload_encrypted`` is the Fernet-encrypted FinTS resume state. Deleted
-    after a successful TAN or on expiry (``expires_at``) — nothing sensitive
-    stays longer than needed. ``principal_id`` binds the session to the booker
-    who started the sync: only they may submit the TAN."""
+    The state lives between the sync start and the TAN entry.
+    ``payload_encrypted`` is the Fernet-encrypted FinTS resume state. The
+    service deletes the session after a successful TAN or at ``expires_at``, so
+    that no sensitive data stays longer than needed. ``principal_id`` binds the
+    session to the booker who started the sync. Only that booker may submit the
+    TAN.
+    """
 
     __tablename__ = "bank_sync_session"
 
@@ -417,10 +432,12 @@ class BankSyncSession(UUIDPkMixin, CreatedAtMixin, Base):
 
 
 class CounterpartyMemory(UUIDPkMixin, CreatedAtMixin, Base):
-    """Remembers the last chosen cost centre per counterparty IBAN.
+    """Remembers the last chosen cost center per counterparty IBAN.
 
-    The matcher suggests this cost centre for the next transaction of the same
-    payer/payee. ``budget_id`` is ``SET NULL`` when the cost centre is deleted."""
+    The matcher suggests this cost center for the next transaction of the same
+    payer or payee. A delete of the cost center sets ``budget_id`` to NULL
+    (``SET NULL``).
+    """
 
     __tablename__ = "counterparty_memory"
 
@@ -435,17 +452,18 @@ class CounterpartyMemory(UUIDPkMixin, CreatedAtMixin, Base):
 
 
 class Invoice(UUIDPkMixin, CreatedAtMixin, Base):
-    """Invoice — standalone receipt, optionally imported from ZUGFeRD/Factur-X.
+    """Invoice: a standalone receipt, optionally imported from ZUGFeRD/Factur-X.
 
-    Bookings reference at most one invoice (1 invoice : N bookings). Not bound
-    to cost centres/gremien (like accounts)."""
+    A booking references at most one invoice. One invoice can carry N bookings.
+    An invoice is not bound to a cost center or to a Gremium, like an account.
+    """
 
     __tablename__ = "invoice"
 
     number: Mapped[str | None] = mapped_column(Text, nullable=True)
     issue_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
-    # Supplier/issuer (free text, from ZUGFeRD SellerTradeParty or manual).
+    # Free-text supplier or issuer, from the ZUGFeRD SellerTradeParty or manual.
     supplier: Mapped[str | None] = mapped_column(Text, nullable=True)
     net_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     tax_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
@@ -454,7 +472,7 @@ class Invoice(UUIDPkMixin, CreatedAtMixin, Base):
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     # 'open' | 'paid'.
     status: Mapped[str] = mapped_column(Text, server_default="open")
-    # Original receipt (PDF/XML) in object storage.
+    # Original receipt as PDF or XML in the object storage.
     file_object_key: Mapped[str | None] = mapped_column(Text, nullable=True)
     file_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     file_mime: Mapped[str | None] = mapped_column(Text, nullable=True)

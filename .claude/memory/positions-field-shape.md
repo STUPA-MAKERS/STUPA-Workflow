@@ -6,7 +6,7 @@ metadata:
   type: reference
 ---
 
-When creating an application (MCP `create_application` or API) whose form has a field of type `positions` (German "Kostenaufstellung"), the value is an **array of position objects**. Each position:
+A form field of type `positions` carries the German label "Kostenaufstellung". When you create an application (MCP `create_application` or API), the value of such a field is an **array of position objects**. Each position:
 
 ```json
 {
@@ -27,4 +27,4 @@ Rules (backend `backend/app/modules/forms/validation.py:399` `_validate_position
 
 422 errors come back as `application/problem+json` with `errors: [{field, msg}]` (e.g. `positions[0].offers[0]`).
 
-Verified 2026-06-15 creating VSM "Testantrag" (type key `vsm`). Note: `create_application` is IP-rate-limited (`429: Too many application submissions from this IP`).
+We verified this on 2026-06-15 by creating the VSM "Testantrag" (type key `vsm`). Note: `create_application` is IP-rate-limited (`429: Too many application submissions from this IP`).

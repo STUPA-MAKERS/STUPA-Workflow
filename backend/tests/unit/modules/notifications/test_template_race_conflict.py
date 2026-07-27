@@ -1,9 +1,9 @@
-"""Regression (AUD-044): nebenläufiges Anlegen desselben mail_template.key
+"""Regression (AUD-044): two requests create the same mail_template.key at the same time.
 
-Zwei gleichzeitige Requests für einen neuen Key passieren beide den
-existing-is-None-Check; der zweite Commit verletzt UNIQUE(mail_template.key)
-und muss als ConflictError (409) statt eines ungefangenen IntegrityError (500)
-durchschlagen — sonst bricht der problem+json-Contract.
+Both requests pass the existing-is-None check for a new key. The second commit then
+violates UNIQUE(mail_template.key). The service must map that to a ConflictError (409)
+and not let an uncaught IntegrityError (500) through. An uncaught IntegrityError breaks
+the problem+json contract.
 """
 
 from __future__ import annotations
@@ -28,8 +28,11 @@ SETTINGS = load_settings()
 
 
 class RaceSession(FakeSession):
-    """FakeSession, deren erstes `commit()` einen UNIQUE-Verstoß simuliert
-    (das nebenläufige Insert hat gewonnen) und `rollback()` mitzählt."""
+    """FakeSession whose `commit()` simulates a UNIQUE violation.
+
+    The violation stands for a concurrent insert that won the race. The session also
+    counts the `rollback()` calls.
+    """
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
@@ -47,7 +50,7 @@ def _service(session: FakeSession) -> NotificationService:
 
 
 async def test_create_template_race_maps_to_conflict() -> None:
-    # _get_template_by_key → keine Kollision beim Read, aber Commit verliert das Rennen.
+    # _get_template_by_key sees no collision on the read, but the commit loses the race.
     session = RaceSession(scalars=[[]])
     with pytest.raises(ConflictError):
         await _service(session).create_template(
@@ -59,8 +62,8 @@ async def test_create_template_race_maps_to_conflict() -> None:
 
 
 async def test_upsert_template_insert_race_maps_to_conflict() -> None:
-    # Katalog-Key (status_update) ist zulässig; Read findet nichts → Insert-Zweig,
-    # aber der Commit verliert das Rennen gegen ein nebenläufiges Insert.
+    # The catalogue key status_update is allowed. The read finds nothing, so the insert
+    # branch runs. Its commit then loses the race against a concurrent insert.
     session = RaceSession(scalars=[[]])
     with pytest.raises(ConflictError):
         await _service(session).upsert_template(
@@ -74,8 +77,8 @@ async def test_upsert_template_insert_race_maps_to_conflict() -> None:
 
 
 async def test_upsert_template_update_race_reraises() -> None:
-    # Update-Zweig (Bestandszeile): ein UNIQUE-Verstoß ist hier kein
-    # Key-Konflikt → kein falsches 409, der IntegrityError schlägt durch.
+    # Update branch on an existing row: a UNIQUE violation here is not a key conflict.
+    # The service must not answer with a false 409, so the IntegrityError passes through.
     existing = MailTemplate(
         key="status_update",
         subject_i18n={"de": "alt"},

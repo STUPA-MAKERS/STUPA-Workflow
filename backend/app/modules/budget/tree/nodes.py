@@ -1,4 +1,4 @@
-"""Cost-centre (node) CRUD, including key rename with subtree path rewrite."""
+"""Cost-center (node) CRUD, including a key rename with a subtree path rewrite."""
 
 from __future__ import annotations
 
@@ -39,10 +39,10 @@ def _node_out(b: Budget) -> BudgetNodeOut:
 
 
 class NodeOps(BudgetTreeServiceBase):
-    """Create, update (incl. key rename) and delete cost-centre nodes."""
+    """Create, update (with key rename) and delete cost-center nodes."""
 
     async def create_node(self, payload: BudgetNodeCreate) -> BudgetNodeOut:
-        """Create a cost centre. Children inherit the parent's gremium."""
+        """Create a cost center. A child inherits the Gremium of its parent."""
         if not tree_rules.is_valid_key(payload.key):
             raise ValidationProblem(
                 "Invalid budget key.",
@@ -50,8 +50,9 @@ class NodeOps(BudgetTreeServiceBase):
             )
 
         if payload.parent_id is None:
-            # Budgets are NOT bound to a gremium: an optional ``gremiumId`` is only
-            # validated if set. Who votes when is decided by the flow, not the budget.
+            # A budget is not bound to a Gremium. The service validates the
+            # optional gremiumId only when it is set. The flow decides who votes
+            # and when, not the budget.
             if payload.gremium_id is not None:
                 gremium = (
                     await self.session.execute(
@@ -80,7 +81,8 @@ class NodeOps(BudgetTreeServiceBase):
             currency=payload.currency,
             active=payload.active,
             color=payload.color,
-            # The fiscal start date only matters on top level (children keep defaults).
+            # The fiscal start date counts only on the top level. A child keeps
+            # the defaults.
             fiscal_start_month=payload.fiscal_start_month,
             fiscal_start_day=payload.fiscal_start_day,
         )
@@ -111,12 +113,13 @@ class NodeOps(BudgetTreeServiceBase):
         return existing is not None
 
     async def update_node(self, budget_id: UUID, payload: BudgetNodeUpdate) -> BudgetNodeOut:
-        """Change name/active/fiscal start date/**key** (parent immutable for tree stability).
+        """Update the name, the active flag, the fiscal start date or the key.
 
-        Changing the ``key`` re-derives the ``path_key`` of the node and all
-        descendants (everything references ``budget_id``, not the path). Changing
-        the fiscal start date of a top-level budget re-derives the start/end
-        dates of all existing fiscal years (year stays, dates follow).
+        The parent stays immutable to keep the tree stable. A new `key`
+        re-derives the `path_key` of the node and of every descendant.
+        Everything else references `budget_id`, not the path. A new fiscal start
+        date on a top-level budget re-derives the start and end date of every
+        existing fiscal year. The year stays and the dates follow.
         """
         node = await self._get_node(budget_id)
         provided = payload.model_dump(exclude_unset=True)
@@ -142,8 +145,8 @@ class NodeOps(BudgetTreeServiceBase):
                 fy.start_date, fy.end_date = self._fiscal_year_bounds(
                     fy.year, node.fiscal_start_month, node.fiscal_start_day
                 )
-        # Capture the new values too: revert uses them to detect later edits
-        # (stale → 409 instead of overwriting someone else's changes).
+        # Capture the new values too. Revert uses them to detect a later edit
+        # and answers 409 instead of overwriting the changes of another user.
         after: dict[str, object] = {
             field: _json_safe(getattr(node, field)) for field in before
         }
@@ -162,9 +165,11 @@ class NodeOps(BudgetTreeServiceBase):
         return _node_out(node)
 
     async def _rename_key(self, node: Budget, new_key: str) -> None:
-        """Rename a node's ``key`` → re-derive ``path_key`` of node + descendants.
+        """Rename the `key` of a node and re-derive the `path_key` of its subtree.
 
-        The segment must be valid and unique under the parent (else 422/409).
+        Raises:
+            ValidationProblem: The new key segment is invalid (422).
+            ConflictError: A sibling already uses the key (409).
         """
         if not tree_rules.is_valid_key(new_key):
             raise ValidationProblem(
@@ -178,7 +183,7 @@ class NodeOps(BudgetTreeServiceBase):
             parent_path = (await self._get_node(node.parent_id)).path_key
         old_path = node.path_key
         new_path = tree_rules.compose_path_key(parent_path, new_key)
-        # Fetch descendants (path prefix) before the node itself is renamed.
+        # Fetch the descendants by path prefix before the rename of the node.
         descendants = (
             (
                 await self.session.execute(
@@ -194,16 +199,16 @@ class NodeOps(BudgetTreeServiceBase):
             d.path_key = new_path + d.path_key[len(old_path) :]
 
     async def delete_node(self, budget_id: UUID) -> None:
-        """Delete a cost centre.
+        """Delete a cost center.
 
-        Blocked (409) only by data that must not be silently lost or orphaned:
-        child cost centres, bookings on this centre, or applications still
-        assigned to it. The node's own :class:`BudgetAllocation` rows are just
-        planning figures (the available sum per fiscal year) and are removed
-        together with the node via the FK cascade — they are deliberately NOT a
-        reason to refuse deletion. Otherwise a childless leaf that ever had an
-        allocation set could never be deleted, since setting it back to 0 keeps
-        the row and there is no separate "remove allocation" action.
+        The delete fails with 409 only for data that must not get lost or
+        orphaned. This covers child cost centers, bookings on this center, and
+        applications still assigned to it. The `BudgetAllocation` rows of the
+        node hold only planning figures, that is the available sum per fiscal
+        year. The FK cascade removes them together with the node. They are
+        deliberately no reason to refuse the delete. Otherwise a childless leaf
+        that ever had an allocation could never be deleted. A reset to 0 keeps
+        the row, and no separate action removes an allocation.
         """
         node = await self._get_node(budget_id)
         child = (

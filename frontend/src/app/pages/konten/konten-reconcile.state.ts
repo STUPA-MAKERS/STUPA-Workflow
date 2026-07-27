@@ -13,8 +13,8 @@ import { fintsErrorKey } from './konten.util';
 import type { KontenLinesState } from './konten-lines.state';
 
 /**
- * Per-row reconcile actions: import a line as a new booking, link it to an
- * existing (unallocated) booking via typeahead, or unlink it again.
+ * Per-row reconcile actions. A user can import a line as a new booking, link it to an
+ * existing unallocated booking with the typeahead, or unlink it again.
  */
 export class KontenReconcileState {
   private readonly api = inject(BudgetTreeApi);
@@ -24,17 +24,15 @@ export class KontenReconcileState {
   private readonly costOptionsSig = signal<SelectOption[]>([]);
   readonly costCentreOptions = computed<SelectOption[]>(() => this.costOptionsSig());
   readonly fiscalYearOptions = signal<SelectOption[]>([]);
-  /** Node id → top-level budget id (fiscal years live at the top). */
+  /** Node id to top-level budget id. The fiscal years live at the top. */
   private idToTopId = signal<Map<string, string>>(new Map());
 
-  // --- import dialog ---
   readonly importLine = signal<StatementLine | null>(null);
   readonly impBudgetId = signal('');
   readonly impFiscalYearId = signal('');
   readonly impDescription = signal('');
   readonly booking = signal(false);
 
-  // --- link dialog (typeahead) ---
   readonly linkLine = signal<StatementLine | null>(null);
   readonly linkQuery = signal('');
   readonly linkCandidates = signal<Expense[]>([]);
@@ -65,7 +63,6 @@ export class KontenReconcileState {
     return parts.join(' · ');
   }
 
-  // --- import ---
   openImport(line: StatementLine): void {
     this.importLine.set(line);
     this.impBudgetId.set(line.suggestedBudgetId ?? '');
@@ -122,13 +119,13 @@ export class KontenReconcileState {
       });
   }
 
-  // --- link ---
   openLink(line: StatementLine): void {
     this.linkLine.set(line);
     this.linkQuery.set('');
     this.linkSelected.set(null);
     this.linkCandidates.set([]);
-    // Seed: same amount + kind (most common match) — free search afterwards.
+    // Seed the list with lines of the same amount and kind. This is the most common
+    // match. A free search follows.
     this.searchLinkCandidates('', line, Math.abs(Number(line.amount)));
   }
 
@@ -149,8 +146,8 @@ export class KontenReconcileState {
         kind: line.kind,
         unallocated: true,
         q: q || undefined,
-        // Without a query, bound to the exact amount (obvious matches first);
-        // with one, search all open bookings of the account.
+        // Without a query, bind to the exact amount so obvious matches come first.
+        // With a query, search all open bookings of the account.
         amountMin: q ? undefined : amount,
         amountMax: q ? undefined : amount,
         limit: 10,
@@ -197,7 +194,6 @@ export class KontenReconcileState {
     });
   }
 
-  // --- unlink ---
   unlink(line: StatementLine): void {
     if (this.booking()) return;
     this.booking.set(true);
@@ -214,7 +210,8 @@ export class KontenReconcileState {
     });
   }
 
-  // --- ignore (P(budget.reconcile_ignore); audit-sensitive) ---
+  // The ignore action needs the budget.reconcile_ignore permission. It is
+  // audit-sensitive.
   readonly ignoreLine = signal<StatementLine | null>(null);
   readonly ignoreReason = signal('');
 
@@ -245,7 +242,7 @@ export class KontenReconcileState {
     });
   }
 
-  /** Undo an ignore — the line returns to the open reconcile queue. */
+  /** Undo an ignore. The line returns to the open reconcile queue. */
   reactivate(line: StatementLine): void {
     if (this.booking()) return;
     this.booking.set(true);

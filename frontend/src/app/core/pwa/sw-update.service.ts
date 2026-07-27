@@ -6,21 +6,22 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 
 /**
- * PWA update flow: when the service worker reports a new app version
- * (`VERSION_READY`), it is activated and a persistent toast prompts the required
- * reload. Without a SW (dev mode, old browsers) `isEnabled` is false and nothing
- * happens.
+ * PWA update flow. When the service worker reports a new app version
+ * (`VERSION_READY`), the service activates it. A persistent toast then asks for the
+ * necessary reload. Without a service worker (dev mode, old browsers) `isEnabled` is
+ * false and nothing happens.
  *
- * Active update detection: the service checks for updates:
- * - after a short delay at app start (to break the bootstrap deadlock)
- * - at regular intervals (every 5 minutes)
- * - when the app comes to the foreground (focus event)
- * → users see the "new version available" toast promptly after deployments.
+ * The service looks for updates at three moments.
+ * - After a short delay at app start. This breaks the bootstrap deadlock.
+ * - Every 5 minutes.
+ * - When the app comes to the foreground, on the focus event.
  *
- * BOOTSTRAP DEADLOCK FIX: old versions do not have the new polling logic.
- * Without an initial update check at start they would never load the new version
- * and thus never get the polling logic. So checkForUpdate() is called after a
- * short delay to ensure the service worker is already registered.
+ * Users therefore see the "new version available" toast soon after a deployment.
+ *
+ * BOOTSTRAP DEADLOCK FIX: old versions do not have the new polling logic. Without an
+ * update check at start they never load the new version, and so they never get the
+ * polling logic. The service calls checkForUpdate() after a short delay, when the
+ * service worker is already registered.
  */
 @Injectable({ providedIn: 'root' })
 export class SwUpdateService {
@@ -31,7 +32,6 @@ export class SwUpdateService {
   init(): void {
     if (!this.updates.isEnabled) return;
 
-    // Listen for updates ready to activate.
     this.updates.versionUpdates
       .pipe(filter((e): e is VersionReadyEvent => e.type === 'VERSION_READY'))
       .subscribe(() => {
@@ -40,10 +40,10 @@ export class SwUpdateService {
         });
       });
 
-    // BOOTSTRAP FIX: wait a short while (1 second) so the service worker has time
-    // to register before we run the first update check. The registerWhenStable
-    // strategy registers the SW after 30s or once the app is stable; this delay
-    // gives the SW time to register before we call checkForUpdate().
+    // BOOTSTRAP FIX: wait 1 second, so the service worker has time to register before
+    // the first update check. The registerWhenStable strategy registers the service
+    // worker after 30 seconds or once the app is stable. This delay gives it time to
+    // register before the call to checkForUpdate().
     setTimeout(() => {
       this.checkForUpdatesOnce();
       this.setupPeriodicPolling();
@@ -52,23 +52,21 @@ export class SwUpdateService {
   }
 
   private checkForUpdatesOnce(): void {
-    // Try an update check IMMEDIATELY (once the SW is registered). This breaks
-    // the deadlock where old versions without polling would never load the new
-    // version that has the polling logic.
+    // Run an update check as soon as the service worker is registered. This breaks the
+    // deadlock where an old version without polling never loads the new version that
+    // carries the polling logic.
     void this.updates.checkForUpdate().catch(() => {
-      // Ignore errors and carry on.
+      // Ignore the error and carry on.
     });
   }
 
   private setupPeriodicPolling(): void {
-    // Check for updates every 5 minutes (300,000 ms).
     interval(5 * 60 * 1000)
       .pipe(concatMap(() => this.updates.checkForUpdate()))
       .subscribe();
   }
 
   private setupFocusListener(): void {
-    // Check for updates when the app comes to the foreground.
     if (typeof window !== 'undefined') {
       fromEvent(window, 'focus')
         .pipe(concatMap(() => this.updates.checkForUpdate()))

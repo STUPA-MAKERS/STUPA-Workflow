@@ -1,4 +1,4 @@
-"""TDD: Config-Schemas + Flow-Graph-Validierung + JSON-Schema-Export (data-model §5)."""
+"""Config schemas, flow-graph validation and JSON-Schema export (data-model §5)."""
 
 from decimal import Decimal
 
@@ -20,9 +20,6 @@ from app.shared.config_schemas import (
 )
 
 
-# --------------------------------------------------------------------------- #
-# Form-Definition
-# --------------------------------------------------------------------------- #
 def test_form_field_minimal() -> None:
     f = FormFieldDef(key="title", type="text", label={"de": "Titel"})
     assert f.key == "title"
@@ -77,8 +74,8 @@ def test_form_field_select_requires_options() -> None:
 
 
 def test_form_field_dynamic_selects_need_no_options() -> None:
-    # gremium_select/budget_select bekommen ihre Optionen server-seitig injiziert —
-    # anders als select/multiselect brauchen sie im Formular KEINE Optionen.
+    # The server injects the options of gremium_select and budget_select. Unlike select
+    # and multiselect, these types need NO options in the form.
     for t in ("gremium_select", "budget_select"):
         f = FormFieldDef(key="ziel", type=t, label={"de": "Ziel"})  # type: ignore[arg-type]
         assert f.options is None
@@ -116,9 +113,6 @@ def test_form_field_rejects_extra_keys() -> None:
         )
 
 
-# --------------------------------------------------------------------------- #
-# Flow-Graph-Validierung
-# --------------------------------------------------------------------------- #
 def _valid_graph_dict() -> dict:
     return {
         "states": [
@@ -152,7 +146,7 @@ def test_flow_graph_from_alias_parsed() -> None:
     assert graph.transitions[0].from_ == "draft"
 
 
-# --- #28: vote/approval/decision state validation -------------------------- #
+# Issue #28: validation of vote, approval and decision states.
 def _vote_graph_dict() -> dict:
     return {
         "states": [
@@ -190,8 +184,11 @@ def test_vote_state_requires_two_branches() -> None:
 
 
 def test_vote_state_rejects_automatic_exit() -> None:
-    """#vote-bypass: ein automatischer Nicht-Branch-Ausgang würde den Antrag am
-    Vote vorbei sofort weiterschieben — fail-closed beim Speichern ablehnen."""
+    """Reject an automatic non-branch exit out of a vote state (#vote-bypass).
+
+    Such a transition moves the application on at once and skips the vote. The
+    validator fails closed and rejects the graph when someone saves it.
+    """
     g = _vote_graph_dict()
     g["transitions"].append({"from": "voting", "to": "passed", "automatic": True})
     with pytest.raises(FlowValidationError, match="automatic"):
@@ -199,14 +196,14 @@ def test_vote_state_rejects_automatic_exit() -> None:
 
 
 def test_vote_state_allows_manual_exit() -> None:
-    """Manueller Ausgang (»Wahl abbrechen«, #abort-vote) bleibt erlaubt."""
+    """A manual exit stays allowed, for example "cancel the vote" (#abort-vote)."""
     g = _vote_graph_dict()
     g["transitions"].append({"from": "voting", "to": "failed"})
     validate_flow_graph(FlowGraph.model_validate(g))  # no raise
 
 
 def test_actor_gate_rejected_on_automatic_transition() -> None:
-    # roleIs/isInCommittee sind Akteur-Gates → nur auf manuellen Übergängen.
+    # roleIs and isInCommittee are actor gates. They fit manual transitions only.
     g = _valid_graph_dict()
     g["transitions"][0]["automatic"] = True
     g["transitions"][0]["guard"] = {"roleIs": "applicant"}
@@ -215,11 +212,11 @@ def test_actor_gate_rejected_on_automatic_transition() -> None:
 
 
 def test_add_to_next_session_requires_vote_target() -> None:
-    # Die Action darf nur auf einem Übergang **in einen vote-State** stehen.
+    # The action is allowed only on a transition INTO a vote state.
     g = _vote_graph_dict()
     g["transitions"][1]["actions"] = [
         {"type": "addToNextSession", "gremiumId": "g-1"}
-    ]  # voting -> passed (kein vote-State)
+    ]  # voting -> passed (not a vote state)
     with pytest.raises(FlowValidationError, match="vote state"):
         validate_flow_graph(FlowGraph.model_validate(g))
 
@@ -228,12 +225,12 @@ def test_add_to_next_session_into_vote_ok() -> None:
     g = _vote_graph_dict()
     g["transitions"][0]["actions"] = [
         {"type": "addToNextSession", "gremiumId": "g-1"}
-    ]  # draft -> voting (vote-State)
+    ]  # draft -> voting (a vote state)
     validate_flow_graph(FlowGraph.model_validate(g))  # no raise
 
 
 def test_flow_self_loop_rejected() -> None:
-    # from==to hebelt das optimistische Locking der Engine aus (Doppel-Feuerung).
+    # A self-loop defeats the optimistic locking of the engine and fires twice.
     g = _valid_graph_dict()
     g["transitions"].append({"from": "review", "to": "review"})
     with pytest.raises(FlowValidationError, match="self-loop"):
@@ -241,8 +238,8 @@ def test_flow_self_loop_rejected() -> None:
 
 
 def test_flow_automatic_two_state_cycle_rejected() -> None:
-    # #auto-cycle: zwei normale States mit je einem automatischen Übergang zum
-    # anderen bestehen die Erreichbarkeit, würden aber endlos pingpongen.
+    # #auto-cycle: two normal states, each with one automatic transition to the other,
+    # pass the reachability check but ping-pong forever.
     g = _valid_graph_dict()
     g["transitions"].append({"from": "review", "to": "approved", "automatic": True})
     g["transitions"].append({"from": "approved", "to": "review", "automatic": True})
@@ -251,7 +248,7 @@ def test_flow_automatic_two_state_cycle_rejected() -> None:
 
 
 def test_flow_automatic_longer_cycle_rejected() -> None:
-    # Zyklus über drei States im automatischen Teilgraphen.
+    # A cycle over three states inside the automatic subgraph.
     g = {
         "states": [
             {"key": "a", "label": {"de": "A"}, "isInitial": True},
@@ -269,22 +266,22 @@ def test_flow_automatic_longer_cycle_rejected() -> None:
 
 
 def test_flow_manual_cycle_allowed() -> None:
-    # Ein Zyklus aus MANUELLEN Übergängen ist erlaubt — kein Auto-Pingpong.
+    # A cycle of MANUAL transitions is allowed, because it cannot ping-pong on its own.
     g = _valid_graph_dict()
     g["transitions"].append({"from": "approved", "to": "review"})
     validate_flow_graph(FlowGraph.model_validate(g))  # no raise
 
 
 def test_flow_mixed_cycle_with_one_manual_edge_allowed() -> None:
-    # Cron-Pingpong nur, wenn ALLE Kanten des Zyklus automatisch sind.
+    # The cron can ping-pong only when EVERY edge of the cycle is automatic.
     g = _valid_graph_dict()
     g["transitions"].append({"from": "review", "to": "approved", "automatic": True})
-    g["transitions"].append({"from": "approved", "to": "review"})  # manuell
+    g["transitions"].append({"from": "approved", "to": "review"})  # manual
     validate_flow_graph(FlowGraph.model_validate(g))  # no raise
 
 
 def test_branch_on_non_vote_state_rejected() -> None:
-    # Branch-Übergänge feuert nur das Vote-Ergebnis — auf normal-States tote Kanten.
+    # Only the vote result fires a branch transition. On a normal state it is a dead edge.
     g = _vote_graph_dict()
     g["transitions"].append({"from": "passed", "to": "failed", "branch": "pass"})
     with pytest.raises(FlowValidationError, match="branch"):
@@ -362,7 +359,7 @@ def test_flow_no_states() -> None:
 
 
 def test_flow_diamond_reconverges_ok() -> None:
-    # Zwei Pfade münden in denselben State → BFS besucht ihn doppelt (revisit).
+    # Two paths lead into the same state, so the BFS visits it twice (revisit).
     g = {
         "states": [
             {"key": "draft", "label": {"de": "E"}, "isInitial": True},
@@ -387,9 +384,6 @@ def test_form_field_explicit_none_jsonlogic_ok() -> None:
     assert f.visible_if is None
 
 
-# --------------------------------------------------------------------------- #
-# Voting-Regeln
-# --------------------------------------------------------------------------- #
 def test_vote_config_defaults_and_alias() -> None:
     v = VoteConfig.model_validate(
         {"options": ["yes", "no", "abstain"], "majorityRule": "two_thirds",
@@ -411,9 +405,6 @@ def test_vote_config_duplicate_options() -> None:
         VoteConfig.model_validate({"options": ["yes", "yes"], "majorityRule": "simple"})
 
 
-# --------------------------------------------------------------------------- #
-# Notification-Regel
-# --------------------------------------------------------------------------- #
 def test_notification_rule_ok() -> None:
     r = NotificationRule.model_validate(
         {"event": "status_changed",
@@ -443,9 +434,6 @@ def test_notification_unknown_event_rejected() -> None:
         )
 
 
-# --------------------------------------------------------------------------- #
-# Webhook-Config
-# --------------------------------------------------------------------------- #
 def test_webhook_config_ok() -> None:
     w = WebhookConfig.model_validate(
         {"name": "buchhaltung", "url": "https://example.org/hook",
@@ -462,9 +450,6 @@ def test_webhook_requires_event_and_url() -> None:
         WebhookConfig(name="x", url="not-a-url", events=["budget_booked"])  # type: ignore[arg-type]
 
 
-# --------------------------------------------------------------------------- #
-# Comparison-Offers + Budget-Field
-# --------------------------------------------------------------------------- #
 def test_comparison_offers_alias() -> None:
     c = ComparisonOffers.model_validate(
         {"required": True, "minCount": 2, "thresholdAmount": "250.00", "as": "file"}
@@ -484,16 +469,12 @@ def test_budget_field_wraps_form_field() -> None:
     assert bf.order == 3
 
 
-# --------------------------------------------------------------------------- #
-# JSON-Schema-Export
-# --------------------------------------------------------------------------- #
 def test_export_json_schemas_keys_and_deterministic() -> None:
     schemas = export_json_schemas()
     assert set(schemas) == {
         "FormFieldDef", "FlowGraph", "VoteConfig", "NotificationRule",
         "WebhookConfig", "ComparisonOffers", "BudgetField", "Branding",
     }
-    # deterministisch: zweiter Aufruf identisch
     assert export_json_schemas() == schemas
-    # camelCase-Aliase im Schema
+    # The schema carries the camelCase aliases.
     assert "isPromoted" in schemas["FormFieldDef"]["properties"]

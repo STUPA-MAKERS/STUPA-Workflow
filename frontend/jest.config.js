@@ -1,11 +1,10 @@
-/** Jest config — Angular standalone via jest-preset-angular (ESM-aware). */
 module.exports = {
   preset: 'jest-preset-angular',
   setupFilesAfterEnv: ['<rootDir>/setup-jest.ts'],
   testEnvironment: 'jsdom',
-  // Jest 30 + jsdom 26 brauchen deutlich mehr RAM pro Worker (#jest30). Kappen,
-  // sonst frisst die volle Suite auf breiten Maschinen den Speicher (OOM):
-  // halbe Kernzahl + Worker-Neustart oberhalb 1 GB Leerlauf-RSS.
+  // Jest 30 and jsdom 26 need much more RAM per worker (#jest30). Without a cap, the full
+  // suite exhausts the memory on machines with many cores (OOM). Use half of the cores and
+  // restart a worker above 1 GB of idle RSS.
   maxWorkers: '50%',
   workerIdleMemoryLimit: '1GB',
   roots: ['<rootDir>/src'],
@@ -32,13 +31,13 @@ module.exports = {
     'src/app/**/*.ts',
     '!src/app/**/*.spec.ts',
     '!src/app/**/index.ts',
-    // Bootstrap-/Wiring-Dateien (Composition Root) — über Build/E2E abgedeckt.
+    // Bootstrap and wiring files (composition root). The build and the E2E tests cover them.
     '!src/app/app.config.ts',
     '!src/app/app.routes.ts',
   ],
-  // Specs decken jetzt nahezu den gesamten App-Code ab (stmts 99.7 / branches 98.2 /
-  // funcs 99.3 / lines 99.9). Schwellen knapp unter den Ist-Stand geratscht — echte
-  // Regressionen brechen den Build, marginale Schwankungen nicht. Halten/anheben.
+  // The specs now cover nearly all application code (stmts 99.7 / branches 98.2 /
+  // funcs 99.3 / lines 99.9). The thresholds sit just below the actual values. A real
+  // regression breaks the build, but a small variation does not. Keep or raise them.
   coverageThreshold: {
     global: { statements: 98, branches: 96, functions: 98, lines: 99 },
   },

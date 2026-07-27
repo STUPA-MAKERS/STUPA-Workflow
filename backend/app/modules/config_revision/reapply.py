@@ -1,9 +1,10 @@
-"""Reapply a snapshot to the live config (restore/revert core).
+"""Reapply a snapshot to the live config: the core of restore and revert.
 
-A stored snapshot is replayed through the responsible config service via the
-normal save path (new immutable version + linked ``config_revision`` + audit);
-only the audit ``action``/``extra_data`` differ from an ordinary edit. Config
-services are imported lazily to avoid import cycles.
+This module replays a stored snapshot through the responsible config service on the
+normal save path. That path writes a new immutable version, the linked
+``config_revision`` and the audit entry. Only the audit ``action`` and ``extra_data``
+differ from an ordinary edit. The module imports the config services lazily to avoid
+import cycles.
 """
 
 from __future__ import annotations
@@ -34,8 +35,14 @@ async def reapply_snapshot(
 ) -> None:
     """Replay ``snapshot`` as the new active version of the entity.
 
-    Writes a new version via the responsible config service plus the linked
-    ``config_revision``/audit entry (action/extra as given).
+    The responsible config service writes a new version. It also writes the linked
+    ``config_revision`` and the audit entry with the given ``action`` and
+    ``extra_data``. ``entity_type`` is one of ``form``, ``flow`` or ``site_config``.
+    ``entity_id`` holds the application type id for a form, or ``global`` for the flow
+    and the site config. ``actor`` is the OIDC ``sub`` to record.
+
+    Raises:
+        ValidationProblem: ``entity_type`` is not a known config entity.
     """
     if entity_type == ENTITY_FLOW:
         from app.modules.admin.schemas import FlowVersionCreate

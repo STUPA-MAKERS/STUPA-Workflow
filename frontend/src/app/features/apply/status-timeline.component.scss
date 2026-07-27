@@ -10,8 +10,8 @@
   max-width: 36rem;
 }
 
-/* 3-column shell (actions | history+data | comments) like the internal application
-   detail page. Without actions, two columns remain (data | comments). */
+/* Three-column shell (actions | history+data | comments), as on the internal
+   application detail page. Without actions, two columns remain (data | comments). */
 .status__shell {
   display: grid;
   gap: var(--space-6);
@@ -31,7 +31,7 @@
   min-width: 0;
 }
 
-/* Schmale Viewports: alles untereinander (Aktionen zuerst). */
+/* Narrow viewports: stack everything in one column, actions first. */
 @media (max-width: 1024px) {
   .status__shell,
   .status__shell--actions {
@@ -62,7 +62,7 @@
   margin-top: var(--space-5);
 }
 
-/* Abstand zwischen den Formularfragen — wie im internen Antragsformular (#det). */
+/* Space between the form questions, as in the internal application form (#det). */
 :host ::ng-deep formly-form formly-field {
   display: block;
 }
@@ -70,7 +70,6 @@
   margin-top: var(--space-5);
 }
 
-// --- timeline ---------------------------------------------------------------
 .timeline {
   display: flex;
   flex-direction: column;
@@ -100,7 +99,6 @@
   font-size: var(--fs-sm);
 }
 
-// --- readonly data ----------------------------------------------------------
 .readonly__row {
   display: grid;
   grid-template-columns: minmax(8rem, 14rem) 1fr;
@@ -118,7 +116,6 @@
   margin: 0;
 }
 
-// --- comments ---------------------------------------------------------------
 .comments {
   display: flex;
   flex-direction: column;
@@ -167,7 +164,7 @@
   }
 }
 
-/* --- Chat (comments): identical to the internal detail view --- */
+/* Chat (comments): identical to the internal detail view. */
 .det__chat {
   display: flex;
   flex-direction: column;

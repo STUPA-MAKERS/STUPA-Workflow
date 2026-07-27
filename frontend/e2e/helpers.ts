@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { expect, type APIRequestContext, type Page } from '@playwright/test';
 
-/** Vom Seed-Service geschriebene, deterministische Fixtures (scripts/e2e.sh). */
+/** Deterministic fixtures that the seed service writes (scripts/e2e.sh). */
 export interface Artifacts {
   sessionCookieName: string;
   adminCookie: string;
@@ -22,17 +22,20 @@ export function readArtifacts(): Artifacts {
 export const MAILPIT_URL = process.env.E2E_MAILPIT_URL ?? 'http://127.0.0.1:8025';
 
 /**
- * Eindeutiger Bezeichner pro Testlauf — verhindert Kreuz-Interferenz der Szenarien.
- * Domain `e2e-antrag.de` (NICHT `.test`/`.example`): email-validator (Pydantic
- * `EmailStr`) lehnt reservierte Special-Use-TLDs ab → sonst 422 bei POST /applications.
+ * Build a unique address for each test run. It keeps the scenarios apart.
+ *
+ * The domain is `e2e-antrag.de`, not `.test` or `.example`. The email-validator behind
+ * the Pydantic `EmailStr` type rejects reserved special-use TLDs. Such a TLD gives a
+ * 422 on POST /applications.
  */
 export function uniqueEmail(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@e2e-antrag.de`;
 }
 
 /**
- * Antrag öffentlich anlegen (POST /api/applications). Unauthentifiziert → CSRF-frei
- * (middleware.py: Enforcement nur mit Auth-Cookie). Altcha ist im e2e-Stack AUS.
+ * Create an application over the public API (POST /api/applications). The call is
+ * unauthenticated and needs no CSRF token. The middleware enforces CSRF only with an
+ * auth cookie (middleware.py). ALTCHA is OFF in the e2e stack.
  */
 export async function createApplication(
   request: APIRequestContext,
@@ -50,7 +53,7 @@ export async function createApplication(
   return body.applicationId;
 }
 
-/** Magic-Link anfordern (POST /api/auth/magic-link). Antwortet immer 202. */
+/** Request a magic link (POST /api/auth/magic-link). The route always answers 202. */
 export async function requestMagicLink(
   request: APIRequestContext,
   opts: { email: string; applicationId: string },
@@ -62,9 +65,10 @@ export async function requestMagicLink(
 }
 
 /**
- * Den jüngsten an `email` zugestellten Magic-Link-Token aus mailpit ziehen.
- * Wartet aktiv (Worker stellt asynchron zu) statt `sleep` — bis die Mail da ist.
- * Token steht im Link-Fragment `#t=<token>` (security.md §1: nie an den Server).
+ * Pull the newest magic-link token that mailpit holds for `email`. The helper polls
+ * until the mail arrives instead of a fixed `sleep`, because the worker delivers the
+ * mail asynchronously. The token sits in the link fragment `#t=<token>` (security.md
+ * §1: the token never goes to the server).
  */
 export async function fetchMagicLinkToken(
   request: APIRequestContext,
@@ -92,17 +96,17 @@ export async function fetchMagicLinkToken(
   throw new Error(`Kein Magic-Link-Token in mailpit für ${email}. Letzter Body: ${lastBody}`);
 }
 
-/** Token aus Link `…/antrag/<id>#t=<token>` (oder `?t=…`) extrahieren. */
+/** Extract the token from a link `…/antrag/<id>#t=<token>` or `?t=…`. */
 export function extractToken(body: string): string | null {
   const m = body.match(/[#?]t=([A-Za-z0-9._-]+)/);
   return m ? m[1] : null;
 }
 
 /**
- * Eine geschützte Route als Unauth aufrufen und prüfen, dass KEIN Inhalt erscheint.
- * Der authGuard löst einen Full-Page-Redirect auf `/api/auth/login` aus; ohne
- * konfiguriertes OIDC (kein Mock-Keycloak im e2e-Stack) endet das in 404/Login —
- * jedenfalls NICHT auf der geschützten Seite.
+ * Open a guarded route as an unauthenticated visitor and check that NO content
+ * appears. The authGuard triggers a full page redirect to `/api/auth/login`. The e2e
+ * stack has no mock Keycloak and no configured OIDC, so the redirect ends in a 404 or
+ * on the login page. It never ends on the guarded page.
  */
 export async function expectAccessDenied(page: Page, deniedHeading: RegExp): Promise<void> {
   await expect(page.getByRole('heading', { name: deniedHeading })).toHaveCount(0);

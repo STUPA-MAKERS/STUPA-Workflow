@@ -1,11 +1,11 @@
 """Public facade of the bank reconciliation.
 
-:class:`BankService` bundles the sub-areas — the router hangs off exactly this
-class. Implementation lives in the mixins: :class:`~.credentials.CredentialOps`
-(personal FinTS credentials), :class:`~.sync.SyncOps` (live fetch + TAN
-sessions), :class:`~.staging.StagingOps` (file import + idempotent staging),
-:class:`~.reconcile.ReconcileOps` (confirm/ignore/unlink) and
-:class:`~.listing.ListingOps` (filtered list).
+``BankService`` bundles the sub-areas. The router hangs off exactly this class.
+The mixins hold the implementation. ``credentials.CredentialOps`` keeps the
+personal FinTS credentials. ``sync.SyncOps`` runs the live fetch and the TAN
+sessions. ``staging.StagingOps`` does the file import and the idempotent staging.
+``reconcile.ReconcileOps`` covers confirm, ignore and unlink.
+``listing.ListingOps`` returns the filtered list.
 """
 
 from __future__ import annotations

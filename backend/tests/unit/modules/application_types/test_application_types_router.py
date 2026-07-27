@@ -1,7 +1,8 @@
-"""Router-Tests application-types (T-25): Endpunkt-Verdrahtung ohne DB.
+"""Router tests for application-types (T-25): endpoint wiring without a database.
 
-Die DB-gestützte ``ApplicationTypesService`` wird per ``dependency_overrides`` durch
-ein Fake ersetzt; Auth über ``get_current_principal``. Echte DB-Pfade: Integration.
+A `dependency_overrides` entry replaces the database-backed `ApplicationTypesService`
+with a fake. Auth comes from `get_current_principal`. The integration suite covers the
+real database paths.
 """
 
 from __future__ import annotations
@@ -80,9 +81,6 @@ def _as_user(app: FastAPI) -> None:
     app.dependency_overrides[get_current_principal] = lambda: Principal(sub="u", permissions=set())
 
 
-# --------------------------------------------------------------------------- #
-# Public list
-# --------------------------------------------------------------------------- #
 def test_list_public_ok_camel_case(app_client: TestClient, fake_service: _FakeService) -> None:
     r = app_client.get("/api/application-types")
     assert r.status_code == 200
@@ -93,7 +91,6 @@ def test_list_public_ok_camel_case(app_client: TestClient, fake_service: _FakeSe
     assert item["hasBudget"] is True
     assert item["active"] is True
     assert "activeFormVersionId" in item
-    # Anonymer Aufruf: keine Admin-Sicht.
     call = fake_service.calls[0]
     assert call["admin"] is False
     assert call["include_inactive"] is False
@@ -130,9 +127,6 @@ def test_list_user_without_permission_is_public_view(
     assert fake_service.calls[0]["admin"] is False
 
 
-# --------------------------------------------------------------------------- #
-# Admin view
-# --------------------------------------------------------------------------- #
 def test_list_admin_sees_extra_fields(
     app: FastAPI, app_client: TestClient, fake_service: _FakeService
 ) -> None:
@@ -147,9 +141,6 @@ def test_list_admin_sees_extra_fields(
     assert item["gremiumId"] is not None
 
 
-# --------------------------------------------------------------------------- #
-# Validation
-# --------------------------------------------------------------------------- #
 @pytest.mark.parametrize("limit", [0, 201])
 def test_list_rejects_out_of_range_limit_422(app_client: TestClient, limit: int) -> None:
     r = app_client.get(f"/api/application-types?limit={limit}")
@@ -162,21 +153,23 @@ def test_list_rejects_negative_offset_422(app_client: TestClient) -> None:
 
 
 def test_list_rejects_overflow_offset_422(app_client: TestClient) -> None:
-    # > int4 würde das DB-OFFSET overflowen → muss als 422 abgewehrt werden, nicht 500.
+    # An offset above int4 overflows the database OFFSET. Reject it with 422, not 500.
     r = app_client.get("/api/application-types?offset=10000000000000000000")
     assert r.status_code == 422
 
 
 def test_list_rejects_unknown_query_param_422(app_client: TestClient) -> None:
-    # extra="forbid": unbekannte Query-Parameter → 422 (negative_data_rejection).
+    # The extra="forbid" config turns an unknown query parameter into 422
+    # (negative_data_rejection).
     r = app_client.get("/api/application-types?bogus=1")
     assert r.status_code == 422
 
 
 @pytest.mark.parametrize("lang", ["null", "xx", "EN", "de-DE", ""])
 def test_list_rejects_invalid_lang_422(app_client: TestClient, lang: str) -> None:
-    # `lang`-Enum: ungültige Werte (inkl. `lang=null`) → 422 statt still 200.
-    # Schließt den be-contract-Coverage-Flake (schemathesis injiziert Müll, erwartet 4xx; PR #63).
+    # An invalid `lang` value, `lang=null` included, must give 422 instead of a silent 200.
+    # This closes the be-contract coverage flake. Schemathesis injects junk data and
+    # requires a 4xx answer (PR #63).
     r = app_client.get(f"/api/application-types?lang={lang}")
     assert r.status_code == 422
     assert r.headers["content-type"].startswith("application/problem+json")
@@ -192,27 +185,21 @@ def test_list_accepts_valid_lang_200(
 
 
 def test_list_default_lang_is_de(app_client: TestClient, fake_service: _FakeService) -> None:
-    # Default ohne Param → 200/de.
     r = app_client.get("/api/application-types")
     assert r.status_code == 200
     assert fake_service.calls[0]["lang"] == "de"
 
 
-# --------------------------------------------------------------------------- #
-# OpenAPI-Contract
-# --------------------------------------------------------------------------- #
 def test_openapi_declares_error_responses(app_client: TestClient) -> None:
     spec = app_client.get("/openapi.json").json()
     get_list = spec["paths"]["/api/application-types"]["get"]
     assert "422" in get_list["responses"]
-    # T-10s Hook schreibt 4xx auf problem+json um.
+    # The T-10 hook rewrites a 4xx response to problem+json.
     assert "application/problem+json" in get_list["responses"]["422"]["content"]
-    # Erfolg bleibt application/json.
     assert "application/json" in get_list["responses"]["200"]["content"]
 
 
 def test_openapi_lang_param_is_enum(app_client: TestClient) -> None:
-    # `lang` als Enum dokumentiert (de|en) statt freier String.
     spec = app_client.get("/openapi.json").json()
     params = spec["paths"]["/api/application-types"]["get"]["parameters"]
     lang_param = next(p for p in params if p["name"] == "lang")

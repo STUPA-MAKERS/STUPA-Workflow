@@ -12,9 +12,9 @@ import type { MeetingOutWire, ProtocolOutWire } from '@core/api/models';
 import { WsService } from '@core/ws/ws.service';
 import { MeetingsComponent } from './meetings.component';
 
-// Focus suite: when switching the TOP selected in the editor, a still-pending
-// debounced autosave of the previous TOP's text must NOT be silently lost — it
-// must be fired to the server immediately.
+// Focus suite: the user switches the TOP selected in the editor. A pending
+// debounced autosave of the text of the previous TOP must NOT get lost.
+// The component must send it to the server at once.
 
 const MEETING: MeetingOutWire = {
   id: 'm-1',
@@ -132,7 +132,7 @@ describe('MeetingsComponent — AUD-012 autosave flush on TOP switch', () => {
       // Type in TOP t-1, but do NOT wait until the debounce ends.
       cmp.onTopBodyChange('t-1', 'Wichtiges Protokoll');
       expect(cmp.saveState()).toBe('idle');
-      // Kept locally (optimistic) so the text does not vanish in the UI.
+      // The component keeps the text locally (optimistic) so it stays in the UI.
       expect(cmp.agenda().find((a) => a.id === 't-1')?.body).toBe('Wichtiges Protokoll');
 
       // Switch to t-2 within the debounce window → MUST save t-1.
@@ -143,7 +143,7 @@ describe('MeetingsComponent — AUD-012 autosave flush on TOP switch', () => {
       req.flush([AGENDA_ITEM({ body: 'Wichtiges Protokoll' })]);
       expect(cmp.selectedTopId()).toBe('t-2');
 
-      // No trailing timer left (else a duplicate / delayed save).
+      // No trailing timer is left. Otherwise a duplicate or delayed save follows.
       jest.advanceTimersByTime(5000);
       http.verify();
     } finally {

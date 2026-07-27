@@ -34,19 +34,20 @@ def _webhook_out(row: Webhook) -> WebhookOut:
 
 
 def _delivery_reason_class(status: str, response_code: int | None) -> str:
-    """Coarse failure bucket from DB status + HTTP code.
+    """Map the DB status and the HTTP code to a coarse failure bucket.
 
-    Deliberately coarse and without host/IP detail. ``response_code is None``
-    on ``dead`` means either an SSRF block at send time or a transport error
-    (DNS/connect/timeout) — both reported as ``unreachable_or_blocked`` without
-    revealing which IP was blocked.
+    The bucket stays coarse on purpose and shows no host or IP detail. A
+    ``response_code`` of ``None`` on ``dead`` means an SSRF block at send time
+    or a transport error such as DNS, connect or timeout. Both map to
+    ``unreachable_or_blocked``, which hides the blocked IP.
     """
     if status == "ok":
         return "delivered"
     if status == "pending":
         return "in_progress"
     if response_code is None:
-        # failed (retry running) or dead without HTTP response: transport/DNS/SSRF.
+        # No HTTP response points to a transport, DNS or SSRF problem. The status
+        # failed still retries, the status dead does not.
         return "transient_transport_error" if status == "failed" else "unreachable_or_blocked"
     if 400 <= response_code < 500:
         return "rejected_by_target"
@@ -58,19 +59,19 @@ def _delivery_reason_class(status: str, response_code: int | None) -> str:
 def _delivery_status_out(
     webhook_id: UUID, row: WebhookDelivery | None
 ) -> WebhookDeliveryStatusOut:
-    """Latest delivery → coarse diagnostic view (no IP/body leak)."""
+    """Reduce the latest delivery to a coarse view without IP or body detail."""
     if row is None:
         return WebhookDeliveryStatusOut(
             webhook_id=webhook_id,
             last_state="never",
             reason_class="no_deliveries",
         )
-    # DB status (pending/ok/failed/dead) → admin-facing triad.
+    # The four DB states pending, ok, failed and dead map to three admin states.
     if row.status == "ok":
         last_state = "sent"
     elif row.status == "dead":
         last_state = "dead"
-    else:  # pending | failed (retry in progress)
+    else:  # pending, or failed with a retry in progress
         last_state = "pending"
     return WebhookDeliveryStatusOut(
         webhook_id=webhook_id,
@@ -93,25 +94,31 @@ class WebhookOps(ConfigServiceBase):
 
     @staticmethod
     def _assert_webhook_url_advisory(url: str) -> None:
-        """Save-time advisory check against the SSRF guard.
+        """Check the webhook URL against the SSRF guard at save time.
 
-        The authoritative check remains the send-time guard in the worker
-        (resolves all A/AAAA records, blocks non-global targets, pins the IP).
-        An obviously internal/invalid target (bad scheme, missing host,
-        allowlist violation, IP literal, or a host resolving to a non-global IP
-        at save time) is rejected with 400 instead of silently producing a
-        dead-letter row per event.
+        The send-time guard in the worker stays authoritative. That guard
+        resolves all A and AAAA records, blocks non-global targets and pins the
+        IP.
 
-        Best-effort: a transient DNS failure does not block saving — the
-        runtime guard covers that, keeping the advisory free of false
-        positives.
+        This advisory check rejects a clearly internal or invalid target with
+        400. Such a target has a bad scheme, a missing host or an allowlist
+        violation. An IP literal counts too, as does a host that resolves to a
+        non-global IP at save time. Without the check the platform would write
+        one dead-letter row per event.
+
+        The check is best effort. A transient DNS failure does not block the
+        save, because the runtime guard covers that case. This keeps the
+        advisory free of false positives.
+
+        Raises:
+            BadRequestError: The target is not a permitted external URL.
         """
         allowlist = get_settings().webhook_host_allowlist
         try:
             assert_allowed_url(url, allowlist=allowlist)
         except SsrfError as exc:
             msg = str(exc)
-            # Transient DNS failure → do not block (runtime guard applies).
+            # A transient DNS failure must not block the save. The runtime guard applies.
             if msg.startswith("dns resolution failed"):
                 return
             raise BadRequestError(
@@ -154,13 +161,15 @@ class WebhookOps(ConfigServiceBase):
         return _webhook_out(row)
 
     async def list_webhook_delivery_status(self) -> list[WebhookDeliveryStatusOut]:
-        """Latest delivery state per webhook (diagnostics).
+        """Report the latest delivery state per webhook.
 
-        Reduces each webhook's most recent ``webhook_delivery`` (by ``last_at``,
-        falling back to insert order) to a coarse state plus a coarse failure
-        class. Leaks no resolved IP/host topology and no response body — only
-        state class, HTTP status code and attempt count. Webhooks without any
-        delivery yield ``never``.
+        The method reads the most recent ``webhook_delivery`` of each webhook.
+        It orders by ``last_at`` and falls back to insert order. It then reduces
+        the row to a coarse state plus a coarse failure class.
+
+        The result shows no resolved IP or host topology and no response body.
+        It shows only the state class, the HTTP status code and the attempt
+        count. A webhook without any delivery yields ``never``.
         """
         webhooks = (
             await self.session.scalars(select(Webhook).order_by(Webhook.name))

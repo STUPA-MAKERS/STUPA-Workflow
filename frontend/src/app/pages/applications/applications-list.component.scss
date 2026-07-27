@@ -1,5 +1,5 @@
-/* Body (head + table) centered at normal width; the tree sits in the left
-   margin outside the body (breakout, like the budget tab). */
+/* The body (head and table) stays centered at normal width. The tree sits in
+   the left margin outside the body (breakout), like the budget tab. */
 .apps__head {
   width: 100%;
   max-width: var(--layout-max-width);
@@ -24,7 +24,7 @@
   max-width: 16rem;
   position: sticky;
   top: calc(var(--layout-header-height) + var(--space-4));
-  /* 3/4 viewport so a tall tree scrolls internally and stays floating. */
+  /* 3/4 of the viewport, so a tall tree scrolls inside itself and keeps floating. */
   max-height: 75vh;
   overflow-y: auto;
 }
@@ -45,8 +45,8 @@
     max-height: none;
   }
 }
-/* Mobile (≤768px): tree behind a collapsible toggle (default: closed),
-   single column. Desktop unchanged — the toggle only exists hidden there. */
+/* Mobile (max 768px): the tree sits behind a collapsible toggle in one column.
+   The toggle starts closed. On desktop the toggle exists but stays hidden. */
 .apps__treeToggle {
   display: none;
 }
@@ -89,7 +89,7 @@
   align-items: center;
   gap: var(--space-2);
 }
-/* Header live search: same look/height as the /expenses search input. */
+/* Header live search: same look and height as the /expenses search input. */
 .apps__search {
   padding: var(--space-2) var(--space-3);
   border: var(--border-width) solid var(--color-border);
@@ -108,12 +108,11 @@
 .apps__status--error {
   color: var(--color-danger);
 }
-/* Infinite-scroll trigger: invisible, sits before the list end so the
-   observer (rootMargin 400px) loads the next page early. */
+/* Infinite-scroll trigger: invisible, and it sits before the list end. The
+   observer (rootMargin 400px) therefore loads the next page early. */
 .apps__sentinel {
   height: 1px;
 }
-/* Mobile (≤768px): header actions may wrap. */
 @media (max-width: 768px) {
   .apps__headActions {
     flex-wrap: wrap;

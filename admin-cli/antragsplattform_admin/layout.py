@@ -1,9 +1,9 @@
 """Assembly of the full-screen application layout.
 
-A vertical stack of log, completion menu, input and status line, with the
-popped-out record detail, the inline selector and the form dialog layered as
-floats. The fragments and predicates all come from the orchestrator; this
-module only wires them into prompt_toolkit containers.
+The layout is a vertical stack of the log, the completion menu, the input and the
+status line. The popped-out record detail, the inline selector and the form dialog
+sit above that stack as floats. The fragments and the predicates all come from the
+orchestrator. This module only wires them into prompt_toolkit containers.
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ def _panel(
     max_width: int,
     max_height: int,
 ) -> ConditionalContainer:
-    """A bordered, self-sizing panel shown only while *visible*."""
+    """Build a bordered, self-sizing panel that shows only while `visible` holds."""
     window = Window(
         FormattedTextControl(fragments),  # pyright: ignore[reportArgumentType]
         width=Dimension(min=min_width, max=max_width),
@@ -44,7 +44,6 @@ def _panel(
         dont_extend_height=True,
         wrap_lines=True,
     )
-    # One column of horizontal breathing room inside the border.
     padded = Box(window, padding=0, padding_left=1, padding_right=1)
     return ConditionalContainer(
         Frame(padded, title=title),  # pyright: ignore[reportArgumentType]
@@ -53,7 +52,7 @@ def _panel(
 
 
 def build_app(cli: AppView) -> Application:
-    """Build the full-screen, mouse-aware application around *cli*."""
+    """Build the full-screen, mouse-aware application around `cli`."""
     logs, form_panel = cli.logs, cli.form_panel
     log_window = Window(
         FormattedTextControl(logs.log_fragments, focusable=False),

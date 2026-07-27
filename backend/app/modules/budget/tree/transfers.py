@@ -1,4 +1,4 @@
-"""Cost-centre to cost-centre transfers (paired expense/income bookings)."""
+"""Transfers between cost centers as a paired expense and income booking."""
 
 from __future__ import annotations
 
@@ -12,14 +12,17 @@ from app.shared.errors import ValidationProblem
 
 
 class TransferOps(BudgetTreeServiceBase):
-    """Create transfers as an expense on the source + income on the target."""
+    """Create a transfer as an expense on the source and an income on the target."""
 
     async def create_transfer(self, payload: TransferCreate, *, actor: str) -> TransferOut:
-        """Transfer between cost centres: expense on source + income on target
-        (same fiscal year)."""
+        """Transfer between two cost centers.
+
+        The service books an expense on the source and an income on the target.
+        Both bookings use the same fiscal year.
+        """
         src = await self._get_node(payload.from_budget_id)
         dst = await self._get_node(payload.to_budget_id)
-        # The fiscal year must belong to the top level of BOTH cost centres.
+        # The fiscal year must belong to the top level of both cost centers.
         fy_src = await self._resolve_fiscal_year(src, payload.fiscal_year_id)
         fy_dst = await self._resolve_fiscal_year(dst, payload.fiscal_year_id)
         if fy_src != fy_dst:

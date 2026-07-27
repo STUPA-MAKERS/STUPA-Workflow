@@ -1,5 +1,8 @@
-"""Service-Tests Notifications (T-18): Template-CRUD, notify-Action, Magic-Link —
-DB via `FakeSession`, Versand via `FakeQueue` (kein echtes SMTP/Redis)."""
+"""Notification service tests (T-18): template CRUD, the notify action and magic link.
+
+`FakeSession` answers the database queries and `FakeQueue` takes the send calls, so the
+tests need no SMTP and no Redis.
+"""
 
 from __future__ import annotations
 
@@ -35,9 +38,8 @@ def _template(key: str = "status_update") -> MailTemplate:
     )
 
 
-# --------------------------------------------------------------------------- templates
 async def test_create_template_ok() -> None:
-    session = FakeSession(scalars=[[]])  # _get_template_by_key → keine Kollision
+    session = FakeSession(scalars=[[]])  # _get_template_by_key finds no collision
     out = await _service(session).create_template(
         MailTemplateCreate(
             key="welcome",
@@ -59,18 +61,18 @@ async def test_create_template_duplicate_conflict() -> None:
 
 
 async def test_list_templates() -> None:
-    # Merge (#12): voller Katalog (Builtins) + nicht-katalogisierte DB-Zeilen.
+    # The merge (#12) keeps the full builtin catalog plus the rows outside the catalog.
     ta, tb = _template("a"), _template("b")
     ta.id, tb.id = uuid.uuid4(), uuid.uuid4()
     session = FakeSession(scalars=[[ta, tb]])
     out = await _service(session).list_templates()
     by_key = {t.key: t for t in out}
-    # Builtin-Defaults erscheinen ohne DB-ID, source='builtin'.
+    # Builtin defaults come without a database id and with source='builtin'.
     assert by_key["status_update"].source == "builtin"
     assert by_key["status_update"].id is None
     # The committee-facing notify default (bug #2) is editable via the merge too.
     assert by_key["status_update_team"].source == "builtin"
-    # Bestands-Overrides (nicht im Katalog) hängen hinten an, source='override'.
+    # Existing overrides outside the catalog go to the end with source='override'.
     assert by_key["a"].source == "override" and by_key["b"].source == "override"
     assert out[-2].key == "a" and out[-1].key == "b"
 
@@ -132,9 +134,8 @@ async def test_preview_template_not_found() -> None:
         await _service(FakeSession()).preview_template(uuid.uuid4(), MailPreviewRequest())
 
 
-# --------------------------------------------------------------------------- notify action
 async def test_handle_notify_action_inline_mode() -> None:
-    # Erster scalars-Call: Präferenz-Filter (#4-2, keine Abwahlen), dann Template.
+    # First scalars call: the preference filter (#4-2, no opt-out). Then the template.
     session = FakeSession(scalars=[[], [_template()]])
     queue = FakeQueue()
     svc = _service(session, queue)
@@ -150,7 +151,7 @@ async def test_handle_notify_action_inline_mode() -> None:
 
 
 async def test_handle_notify_action_inline_missing_template_falls_back() -> None:
-    # Unbekanntes Template -> var-freier Builtin-Fallback statt stillem Verwurf.
+    # An unknown template falls back to a variable-free builtin, not to a silent drop.
     session = FakeSession(scalars=[[], []])
     queue = FakeQueue()
     svc = _service(session, queue)
@@ -180,10 +181,13 @@ async def test_handle_notify_action_no_recipients_skips() -> None:
 async def test_handle_notify_action_derives_real_kind_from_catalogue(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """AUD-043: opt-out filter + footer use the catalogue kind, not a substring
-    heuristic. A `comment_team` template (catalogue kind `comment`) must be
-    filtered as `comment` — the old `'deadline' in key else 'status_update'`
-    test always passed `status_update`, so comment opt-outs were ineffective."""
+    """AUD-043: the opt-out filter and the footer use the catalog kind.
+
+    They do not use a substring heuristic. A `comment_team` template has the catalog
+    kind `comment`, so the filter must treat it as `comment`. The old
+    `'deadline' in key else 'status_update'` test always gave `status_update`, so a
+    comment opt-out had no effect.
+    """
     import app.modules.notifications.service as svc_mod
 
     captured: dict[str, str] = {}
@@ -236,8 +240,11 @@ async def test_handle_notify_action_unknown_key_defaults_to_status_update(
 
 
 async def test_notify_without_template_key_splits_applicant_and_team() -> None:
-    """Bug #2: no templateKey → the applicant gets `status_update`, all other
-    recipient kinds get the committee-facing `status_update_team` wording."""
+    """Bug #2: without a templateKey the send splits by recipient kind.
+
+    The applicant gets `status_update`. Every other recipient kind gets the
+    Gremium-facing `status_update_team` wording.
+    """
     # Per send: scalars #1 = preference filter, #2 = template lookup (builtin).
     session = FakeSession(scalars=[[], [], [], []])
     queue = FakeQueue()
@@ -320,8 +327,10 @@ async def test_notify_explicit_template_key_sends_once_for_all() -> None:
 async def test_notify_split_sends_filter_preferences_as_status_update(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Both default sends respect opt-outs with kind `status_update` —
-    `status_update_team` maps to the same catalogue kind."""
+    """Both default sends respect an opt-out of kind `status_update`.
+
+    `status_update_team` maps to the same catalog kind.
+    """
     import app.modules.notifications.service as svc_mod
 
     kinds: list[str] = []
@@ -346,7 +355,6 @@ async def test_notify_split_sends_filter_preferences_as_status_update(
     assert kinds == ["status_update", "status_update"]
 
 
-# --------------------------------------------------------------------------- magic link
 async def test_send_magic_link_uses_db_template() -> None:
     tpl = MailTemplate(
         key="magic_link", subject_i18n={"de": "Link"},
@@ -360,7 +368,7 @@ async def test_send_magic_link_uses_db_template() -> None:
 
 
 async def test_send_magic_link_builtin_fallback() -> None:
-    session = FakeSession(scalars=[[]])  # kein magic_link-Template
+    session = FakeSession(scalars=[[]])  # no magic_link template
     queue = FakeQueue()
     await _service(session, queue).send_magic_link(email="a@x.de", link="https://l/#t=2")
     assert "https://l/#t=2" in queue.messages[0].text
@@ -368,7 +376,7 @@ async def test_send_magic_link_builtin_fallback() -> None:
 
 async def test_enqueue_without_queue_drops(caplog: pytest.LogCaptureFixture) -> None:
     session = FakeSession(scalars=[[]])
-    # queue=None → send_magic_link loggt + verwirft, kein Fehler.
+    # With queue=None, send_magic_link logs and drops the mail without an error.
     await _service(session, None).send_magic_link(email="a@x.de", link="https://l")
 
 

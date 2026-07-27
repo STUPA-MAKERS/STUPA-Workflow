@@ -1,4 +1,7 @@
-"""Unit-Tests Worker-Task render_pdf (T-20): Erfolg, Retry, erschöpfter Retry → failed."""
+"""Unit tests for the render_pdf worker task (T-20).
+
+The tests cover success, a retry, and an exhausted retry that marks the job failed.
+"""
 
 from __future__ import annotations
 

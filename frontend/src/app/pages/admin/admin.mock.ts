@@ -1,7 +1,7 @@
 /**
- * Mock seed data for the admin area. Active only while the admin API and site-config
- * are not really merged (`USE_MOCK_API`). On the backend merge this file goes away
- * along with the mock branches in `AdminApiService`.
+ * Mock seed data for the admin area. It stays active only while the admin API and the
+ * site-config are not fully merged (`USE_MOCK_API`). Delete this file together with the
+ * mock branches in `AdminApiService` once the backend merge lands.
  */
 import type {
   AdminPrincipal,
@@ -14,7 +14,7 @@ import type {
   WebhookConfig,
 } from './admin.models';
 
-/** Permission catalogue (mirror of `app.shared.permissions.PERMISSION_CATALOGUE`). */
+/** Permission catalog (mirror of `app.shared.permissions.PERMISSION_CATALOGUE`). */
 export const MOCK_PERMISSIONS: string[] = [
   'application.read',
   'application.create',
@@ -99,8 +99,8 @@ export const MOCK_GREMIEN: Gremium[] = [
 ];
 
 /**
- * Fallback role list for the options provider, while the real `/admin/roles` is
- * empty/absent. Mirrors the seed roles from `auth/seed`
+ * Fallback role list for the options provider, while the real `/admin/roles` stays
+ * empty or absent. It mirrors the seed roles from `auth/seed`
  * (member/referent/vorstand/admin).
  */
 export const MOCK_ROLES: Role[] = [

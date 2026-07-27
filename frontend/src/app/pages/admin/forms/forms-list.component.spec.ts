@@ -64,7 +64,7 @@ describe('FormsListComponent', () => {
     await userEvent.type(nameDe, 'Härtefall Antrag');
 
     const add = screen.getAllByRole('button', { name: 'Formular anlegen' });
-    // the dialog footer add button is the enabled one
+    // The add button in the dialog footer is the enabled one.
     await userEvent.click(add[add.length - 1]);
 
     expect(createApplicationType).toHaveBeenCalledTimes(1);

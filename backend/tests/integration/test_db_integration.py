@@ -1,8 +1,9 @@
-"""Integration: echte DB via testcontainers (testing.md §5 — keine DB-Mocks).
+"""Integration tests against a real database that testcontainers starts.
 
-Beweist, dass die async SQLAlchemy-Engine gegen einen echten Postgres connecten und
-queryn kann. Default-Lauf überspringt das (Marker `integration`); CI-Stage
-`be-integration` läuft `-m integration` mit Docker.
+The tests prove that the async SQLAlchemy engine connects to a real Postgres and runs a
+query. The default test run skips them through the `integration` marker. The CI stage
+`be-integration` runs `-m integration` with Docker. See testing.md section 5: this
+repository uses no database mocks.
 """
 
 from __future__ import annotations

@@ -40,9 +40,8 @@ describe('ApplicationsTableComponent', () => {
     expect(link).toHaveAttribute('href', '/applications/app-1');
     expect(screen.getByText('Finanzantrag')).toBeInTheDocument();
     expect(screen.getByText('Eingereicht')).toBeInTheDocument();
-    // German currency formatting of the amount
+    // The amount uses German currency formatting, so match it loosely.
     expect(screen.getByText(/250/)).toBeInTheDocument();
-    // the created-at cell renders a <time> with the raw ISO datetime attribute
     const time = document.querySelector('time');
     expect(time).toHaveAttribute('datetime', '2026-05-30T09:00:00Z');
   });
@@ -67,11 +66,9 @@ describe('ApplicationsTableComponent', () => {
         },
       ],
     });
-    // type, state, amount and created all collapse to the em-dash
+    // Type, state, amount and created date all collapse to the em dash.
     expect(screen.getAllByText('—').length).toBe(4);
-    // no badge is rendered when stateLabel is null
     expect(screen.queryByText('Eingereicht')).not.toBeInTheDocument();
-    // no <time> element without a createdAt
     expect(document.querySelector('time')).toBeNull();
   });
 
@@ -96,7 +93,6 @@ describe('ApplicationsTableComponent', () => {
 
     it('defaults the currency to EUR when none is given', async () => {
       await setup({ rows: [{ ...ROW, amount: 10, currency: null }] });
-      // EUR symbol/format present even though currency was null
       expect(screen.getByText(/10[,.]00/)).toBeInTheDocument();
     });
   });
@@ -105,7 +101,6 @@ describe('ApplicationsTableComponent', () => {
     it('renders plain header text (no buttons) when sort is null', async () => {
       await setup({ sort: null });
       expect(screen.queryByRole('button')).not.toBeInTheDocument();
-      // headers carry aria-sort="none" when unsorted
       const amountHeader = screen.getByRole('columnheader', { name: /Betrag/ });
       expect(amountHeader).toHaveAttribute('aria-sort', 'none');
     });
@@ -113,11 +108,9 @@ describe('ApplicationsTableComponent', () => {
     it('renders clickable headers with indicators when sort is set (descending)', async () => {
       await setup({ sort: { field: 'amount', order: 'desc' } });
       const amountBtn = screen.getByRole('button', { name: /Betrag/ });
-      // descending indicator arrow on the active column
       expect(amountBtn.textContent).toContain('↓');
       const amountHeader = screen.getByRole('columnheader', { name: /Betrag/ });
       expect(amountHeader).toHaveAttribute('aria-sort', 'descending');
-      // the inactive (createdAt) header stays neutral
       const createdHeader = screen.getByRole('columnheader', { name: /Eingegangen/ });
       expect(createdHeader).toHaveAttribute('aria-sort', 'none');
     });
@@ -135,7 +128,6 @@ describe('ApplicationsTableComponent', () => {
       const { fixture } = await setup({ sort: { field: 'amount', order: 'desc' } });
       fixture.componentInstance.sortChange.subscribe((s) => emitted.push(s));
       await userEvent.click(screen.getByRole('button', { name: /Betrag/ }));
-      // same field that is currently desc → flips to asc
       expect(emitted).toEqual([{ field: 'amount', order: 'asc' }]);
     });
 
@@ -143,7 +135,6 @@ describe('ApplicationsTableComponent', () => {
       const emitted: SortState[] = [];
       const { fixture } = await setup({ sort: { field: 'amount', order: 'desc' } });
       fixture.componentInstance.sortChange.subscribe((s) => emitted.push(s));
-      // clicking the OTHER column → defaults to desc
       await userEvent.click(screen.getByRole('button', { name: /Eingegangen/ }));
       expect(emitted).toEqual([{ field: 'createdAt', order: 'desc' }]);
     });
@@ -152,7 +143,6 @@ describe('ApplicationsTableComponent', () => {
       const emitted: SortState[] = [];
       const { fixture } = await setup({ sort: { field: 'amount', order: 'asc' } });
       fixture.componentInstance.sortChange.subscribe((s) => emitted.push(s));
-      // same field but currently asc → cur.order !== 'desc' branch → desc
       await userEvent.click(screen.getByRole('button', { name: /Betrag/ }));
       expect(emitted).toEqual([{ field: 'amount', order: 'desc' }]);
     });

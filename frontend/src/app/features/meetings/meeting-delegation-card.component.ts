@@ -24,13 +24,14 @@ import {
 import { ToastService } from '@stupa-makers/ui-kit';
 
 /**
- * Delegation ("Vertretung") card on the meeting page.
+ * Delegation card on the meeting page.
  *
- * Shows the own outgoing delegation (revocable until meeting start) and
- * delegations directed at me; the setup dialog picks the recipient from
- * committee members + the substitute pool (plus server-side name search when
- * externals are enabled). All rules (deadline, recipient set, chains) are
- * enforced by the server — the card only hides the obviously invalid.
+ * The card shows the own outgoing delegation, which stays revocable until the
+ * meeting starts, and the delegations directed at me. The setup dialog picks the
+ * recipient from the Gremium members and the substitute pool. It also runs a
+ * server-side name search when external recipients are enabled. The server enforces
+ * all rules: deadline, recipient set and chains. The card only hides what is
+ * clearly invalid.
  */
 @Component({
   selector: 'app-meeting-delegation-card',
@@ -63,20 +64,20 @@ export class MeetingDelegationCardComponent {
   protected readonly delegateId = signal<Uuid | ''>('');
   protected readonly delegateVoting = signal(false);
   protected readonly query = signal('');
-  /** Results of the server-side name search (externals flag only). */
+  /** Results of the server-side name search. It runs only when externals are enabled. */
   protected readonly searched = signal<DelegationRecipient[] | null>(null);
   private readonly query$ = new Subject<string>();
 
-  /** Show the card once delegation is active in the committee and relevant to me. */
+  /** Show the card when delegation is active in the Gremium and relevant to me. */
   protected readonly visible = computed(() => {
     const c = this.ctx();
     if (!c || !c.allowVoteDelegation) return false;
     return c.canDelegate || c.myDelegation !== null || c.incoming.length > 0;
   });
 
-  /** Setup possible: entitled + meeting planned + an open (pool or normal)
-   *  window. Pool recipients work until meeting start — only `meetingStarted`
-   *  blocks hard. */
+  /** True when the user may delegate, the meeting is still planned and a window is
+   *  open. A pool recipient stays usable until the meeting starts. Only
+   *  `meetingStarted` blocks the setup hard. */
   protected readonly canCreate = computed(() => {
     const c = this.ctx();
     return Boolean(c && c.canDelegate && !c.meetingStarted && this.hasOpenWindow(c));
@@ -117,8 +118,8 @@ export class MeetingDelegationCardComponent {
       .subscribe((list) => this.searched.set(list));
   }
 
-  /** Past the deadline only pool recipients are allowed — the window counts
-   *  as open while at least one selectable recipient remains. */
+  /** After the deadline only pool recipients stay allowed. The window counts as open
+   *  while at least one selectable recipient remains. */
   private hasOpenWindow(c: MeetingDelegationContext): boolean {
     if (!c.deadlinePassed) return true;
     return c.recipients.some((r) => r.viaPool);

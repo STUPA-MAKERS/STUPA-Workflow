@@ -67,11 +67,12 @@ async function setup(opts: { perms?: string[]; page?: ExpensePage } = {}) {
     ],
   });
   const http = view.fixture.debugElement.injector.get(HttpTestingController);
-  // Constructor loads cost-centre tree + accounts + invoices + first bookings page.
+  // The constructor loads the cost center tree, the accounts, the invoices and the
+  // first page of bookings.
   http.match((r) => r.url.endsWith('/budgets')).forEach((req) => req.flush([]));
   http.match((r) => r.url.endsWith('/accounts/options')).forEach((req) => req.flush([]));
-  // `listInvoices()` loads paged: return a paged shape, not a [] array, else
-  // `page.items` is undefined and `invoiceOptions` (computed) throws `.map of undefined`.
+  // `listInvoices` reads a page, so the answer must be a paged shape and not an array.
+  // Otherwise `page.items` is undefined and the `invoiceOptions` computed throws.
   http
     .match((r) => r.url.endsWith('/invoices') && r.method === 'GET')
     .forEach((req) => req.flush({ items: [], total: 0, limit: 200, offset: 0 }));
@@ -88,7 +89,6 @@ describe('ExpensesComponent (rendered)', () => {
     await setup({ page: page([EXPENSE]) });
     expect(await screen.findByText('Druckkosten Flyer')).toBeInTheDocument();
     expect(screen.getByText('VS-800')).toBeInTheDocument();
-    // Expense → with a minus sign.
     expect(screen.getByText(/−.*120/)).toBeInTheDocument();
   });
 
@@ -101,7 +101,6 @@ describe('ExpensesComponent (rendered)', () => {
     await setup({ page: page([EXPENSE]) });
     expect(await screen.findByText('Druckkosten Flyer')).toBeInTheDocument();
     expect(screen.getByText('Copyshop Müller')).toBeInTheDocument();
-    // Column headers of the new date columns.
     expect(screen.getByRole('button', { name: /Rechnungsdatum/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Zahldatum/ })).toBeInTheDocument();
   });
@@ -111,11 +110,10 @@ describe('ExpensesComponent (rendered)', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Buchung hinzufügen' }));
     await userEvent.type(screen.getByLabelText('Beschreibung'), 'Kaffee');
     await userEvent.type(screen.getByLabelText('Betrag (€)'), '12.50');
-    // Cost centre is required → without a selection submit stays disabled. Here we
-    // only check the request shape once a cost centre is set (programmatically via
-    // the select).
+    // A cost center is required. Without a selection the submit button stays disabled.
+    // This test only checks the request shape after the select holds a cost center.
     const select = screen.getByLabelText('Kostenstelle') as HTMLSelectElement;
-    // With no real options (empty tree) nothing can be selected — hence the guard.
+    // The tree is empty, so the select has no real option and nothing can be selected.
     expect(select).toBeInTheDocument();
     http.verify();
   });
@@ -127,10 +125,8 @@ describe('ExpensesComponent (rendered)', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Direct component tests (methods + branches), no DOM rendering. Drives every
-// public method via the HttpTestingController and checks signal state.
-// ---------------------------------------------------------------------------
+// Direct component tests for the methods and branches, without DOM rendering. Every
+// method runs through the HttpTestingController, and the test checks the signal state.
 
 const ROOT_TREE: BudgetTreeNode[] = [
   {
@@ -217,9 +213,9 @@ interface Built {
 }
 
 /**
- * Instantiate the component directly (constructor fires tree/accounts/invoices/
- * expenses). The initial constructor load can optionally be answered with custom
- * data; default = empty.
+ * Instantiate the component directly. The constructor fires the tree, accounts,
+ * invoices and expenses requests. The caller can answer that first load with custom
+ * data. The default answer is empty.
  */
 function build(
   opts: {
@@ -266,7 +262,7 @@ function build(
   return { cmp, http };
 }
 
-/** Catch + answer the next GET /expenses (reload/fetch). */
+/** Answer the next GET /expenses from a reload or a fetch. */
 function flushList(http: HttpTestingController, body: ExpensePage): void {
   http.expectOne((r) => r.url.endsWith('/expenses') && r.method === 'GET').flush(body);
 }
@@ -274,8 +270,8 @@ function flushList(http: HttpTestingController, body: ExpensePage): void {
 describe('ExpensesComponent (unit)', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
   afterEach(() => {
-    // Some tests call TestBed.resetTestingModule() — then there's no
-    // HttpTestingController provider anymore; verify() is skipped there.
+    // Some tests reset the TestBed. After that no HttpTestingController provider
+    // exists, so the verify call does not run.
     try {
       TestBed.inject(HttpTestingController).verify();
     } catch {
@@ -297,12 +293,11 @@ describe('ExpensesComponent (unit)', () => {
     expect(cmp.items()).toEqual([EXPENSE]);
     expect(cmp.total()).toBe(1);
     expect(cmp.loading()).toBe(false);
-    // derived computed options
     expect(cmp.costCentreOptions().length).toBe(2);
     expect(cmp.accountOptions()).toEqual([{ value: 'a-1', label: 'Hauptkonto' }]);
     const label = cmp.invoiceOptions()[0];
     expect(label.value).toBe('inv-1');
-    // Intl separates with a narrow no-break space — normalise to plain whitespace.
+    // Intl separates with a narrow no-break space, so normalize to plain whitespace.
     expect(label.label.replace(/\s/g, ' ')).toBe('RE-2026-1 · Acme GmbH · 119,00 €');
   });
 
@@ -316,7 +311,6 @@ describe('ExpensesComponent (unit)', () => {
     expect(cmp.budgetTree()).toEqual([]);
     expect(cmp.accounts()).toEqual([]);
     expect(cmp.invoices()).toEqual([]);
-    // expenses error → loading/loadingMore reset, items empty
     expect(cmp.loading()).toBe(false);
     expect(cmp.loadingMore()).toBe(false);
     expect(cmp.items()).toEqual([]);
@@ -335,7 +329,7 @@ describe('ExpensesComponent (unit)', () => {
 
   it('money() formats EUR for de and en locales', () => {
     const { cmp } = build();
-    // de locale from localStorage
+    // the de locale comes from localStorage
     expect(cmp.money('120').replace(/\s/g, ' ')).toMatch(/120,00/);
     localStorage.setItem('ap.locale', 'en');
     TestBed.resetTestingModule();
@@ -425,7 +419,7 @@ describe('ExpensesComponent (unit)', () => {
     cmp.q.set('   ');
     cmp.amountMin.set('   ');
     cmp.amountMax.set('');
-    cmp.setKind(''); // reload with all-empty
+    cmp.setKind(''); // reload with every filter empty
     const req = http.expectOne((r) => r.url.endsWith('/expenses') && r.method === 'GET');
     const p = req.request.params;
     expect(p.has('q')).toBe(false);
@@ -449,7 +443,6 @@ describe('ExpensesComponent (unit)', () => {
     expect(cmp.amountMax()).toBe('50');
     expect(cmp.createdFrom()).toBe('2026-01-01');
     expect(cmp.createdTo()).toBe('2026-12-31');
-    // Before it fires: no request.
     http.expectNone((r) => r.url.endsWith('/expenses') && r.method === 'GET');
     jest.advanceTimersByTime(400);
     flushList(http, page([]));
@@ -473,16 +466,14 @@ describe('ExpensesComponent (unit)', () => {
 
   it('onSort toggles direction on same field and resets to desc on new field', () => {
     const { cmp, http } = build();
-    // same column (default paymentDate desc) → asc
+    // the default sort is paymentDate desc, so the same column flips to asc
     cmp.onSort('paymentDate');
     expect(cmp.sortField()).toBe('paymentDate');
     expect(cmp.sortOrder()).toBe('asc');
     flushList(http, page([]));
-    // again → back to desc
     cmp.onSort('paymentDate');
     expect(cmp.sortOrder()).toBe('desc');
     flushList(http, page([]));
-    // new column → desc
     cmp.onSort('amount');
     expect(cmp.sortField()).toBe('amount');
     expect(cmp.sortOrder()).toBe('desc');
@@ -491,7 +482,7 @@ describe('ExpensesComponent (unit)', () => {
 
   it('sortInd and ariaSort describe the active sort column', () => {
     const { cmp } = build();
-    // default: paymentDate desc
+    // the default sort is paymentDate desc
     expect(cmp.sortInd('paymentDate')).toBe(' ↓');
     expect(cmp.sortInd('amount')).toBe('');
     expect(cmp.ariaSort('paymentDate')).toBe('descending');
@@ -520,13 +511,11 @@ describe('ExpensesComponent (unit)', () => {
     expect(cmp.hasMore()).toBe(false);
     cmp.loadMore();
     http.expectNone((r) => r.url.endsWith('/expenses') && r.method === 'GET');
-    // while loadingMore
     cmp.total.set(5);
     cmp.loadingMore.set(true);
     cmp.loadMore();
     http.expectNone((r) => r.url.endsWith('/expenses') && r.method === 'GET');
     cmp.loadingMore.set(false);
-    // while loading
     cmp.loading.set(true);
     cmp.loadMore();
     http.expectNone((r) => r.url.endsWith('/expenses') && r.method === 'GET');
@@ -540,7 +529,7 @@ describe('ExpensesComponent (unit)', () => {
     expect(cmp.createOpen()).toBe(true);
     expect(cmp.newKind()).toBe('expense');
     expect(cmp.newBudgetId()).toBe('child-1');
-    // loadFiscalYears(child-1) → top-1
+    // the fiscal-year load resolves child-1 to its top node top-1
     const req = http.expectOne((r) => r.url.endsWith('/budgets/top-1/fiscal-years'));
     req.flush([FY_ACTIVE]);
     expect(cmp.fiscalYearOptions()).toEqual([{ value: 'fy-active', label: '2026' }]);
@@ -592,7 +581,7 @@ describe('ExpensesComponent (unit)', () => {
   it('loadFiscalYears is skipped when the budget id is not in the tree', () => {
     const { cmp, http } = build({ tree: ROOT_TREE });
     cmp.onPickBudget('unknown-id');
-    // findTop returns null → no request, options stay empty
+    // the top-node lookup returns null, so no request runs and the options stay empty
     http.expectNone((r) => r.url.includes('/fiscal-years'));
     expect(cmp.fiscalYearOptions()).toEqual([]);
   });
@@ -610,7 +599,7 @@ describe('ExpensesComponent (unit)', () => {
     expect(cmp.canSubmitCreate()).toBe(false); // fy missing
     cmp.newFiscalYearId.set('fy-1');
     expect(cmp.canSubmitCreate()).toBe(true);
-    // linked: an application suffices (cost centre/fiscal year inherited from it)
+    // a linked booking needs only an application, which carries cost center and year
     cmp.newBudgetId.set('');
     cmp.newFiscalYearId.set('');
     cmp.newApplicationId.set('app-9');
@@ -723,7 +712,7 @@ describe('ExpensesComponent (unit)', () => {
   it('onAppSearch queries applications and maps candidates (title fallback to id)', () => {
     const { cmp, http } = build();
     cmp.onAppSearch('  flyer ');
-    // appQuery holds the raw value; only the request param is trimmed.
+    // appQuery holds the raw value. Only the request param is trimmed.
     expect(cmp.appQuery()).toBe('  flyer ');
     const req = http.expectOne((r) => r.url.endsWith('/applications'));
     expect(req.request.params.get('q')).toBe('flyer');
@@ -790,7 +779,8 @@ describe('ExpensesComponent (unit)', () => {
   });
 
   it('onPickInvoice handles sparse invoices (null gross, missing fields)', () => {
-    // grossAmount runtime-null → the `?? ''` branch applies (backend may return null).
+    // A null grossAmount at runtime hits the empty-string fallback. The backend can
+    // send null for this field.
     const sparse = {
       ...INVOICE,
       id: 'inv-3',
@@ -805,7 +795,7 @@ describe('ExpensesComponent (unit)', () => {
     cmp.newReferenceNumber.set('keep');
     cmp.newInvoiceDate.set('keep');
     cmp.onPickInvoice('inv-3');
-    expect(cmp.newAmount()).toBe(''); // grossAmount null → ?? '' overwrites with ''
+    expect(cmp.newAmount()).toBe('');
     expect(cmp.newCorrespondent()).toBe('keep');
     expect(cmp.newReferenceNumber()).toBe('keep');
     expect(cmp.newInvoiceDate()).toBe('keep');
@@ -991,7 +981,7 @@ describe('ExpensesComponent (unit)', () => {
   });
 
   it('onExport downloads the xlsx and clears the exporting flag', () => {
-    // jsdom lacks URL.createObjectURL/revokeObjectURL — define them first.
+    // jsdom has no URL.createObjectURL and no URL.revokeObjectURL, so define them first.
     (URL as unknown as { createObjectURL?: unknown }).createObjectURL = () => 'blob:mock';
     (URL as unknown as { revokeObjectURL?: unknown }).revokeObjectURL = () => undefined;
     const createObjSpy = jest.spyOn(URL, 'createObjectURL').mockReturnValue('blob:mock');
@@ -1049,7 +1039,6 @@ describe('ExpensesComponent (unit)', () => {
     expect(opts.every((o) => typeof o.label === 'string' && o.label.length > 0)).toBe(true);
   });
 
-  // --- transfers ---------------------------------------------------------
   it('openTransfer seeds from the selected budget and loads its fiscal years', () => {
     const { cmp, http } = build({ tree: ROOT_TREE });
     cmp.budgetId.set('child-1');
@@ -1087,7 +1076,7 @@ describe('ExpensesComponent (unit)', () => {
 
   it('loadTransferFy is skipped for an unknown budget and resets on error', () => {
     const { cmp, http } = build({ tree: ROOT_TREE });
-    // unknown → findTop null → no request
+    // an unknown budget has no top node, so no request runs
     cmp.onTransferFrom('ghost');
     http.expectNone((r) => r.url.includes('/fiscal-years'));
     // known but error → options reset
@@ -1177,14 +1166,11 @@ describe('ExpensesComponent (unit)', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Sub-bookings, account filter, description expand and invoice detail dialog —
-// the newer account/sub-booking paths.
-// ---------------------------------------------------------------------------
+// Sub-bookings, the account filter, the description expand and the invoice detail dialog.
 
-/** Parent booking with children (amount = Σ children, read-only server-side). */
+/** Parent booking with children. Its amount is the sum of the children and read-only
+ *  on the server. */
 const PARENT: Expense = { ...EXPENSE, id: 'parent-1', parentExpenseId: null, childCount: 2 };
-/** Sub-booking (parentExpenseId set). */
 const SUB: Expense = {
   ...EXPENSE,
   id: 'sub-1',
@@ -1193,7 +1179,7 @@ const SUB: Expense = {
   description: 'Teilzahlung',
 };
 
-/** Fake a file-input change event (jsdom disallows setting files programmatically). */
+/** Fake a file-input change event. jsdom does not allow a script to set the file list. */
 function fileEvent(file: File | null): Event {
   const input = document.createElement('input');
   input.type = 'file';
@@ -1274,11 +1260,11 @@ describe('ExpensesComponent (sub-bookings #subbookings)', () => {
       .flush([SUB]);
     expect(cmp.isLoadingSub('parent-1')).toBe(false);
     expect(cmp.subOf('parent-1')).toEqual([SUB]);
-    // collapse → no request
+    // a collapse fires no request
     cmp.toggleSub(PARENT);
     expect(cmp.isSubExpanded('parent-1')).toBe(false);
     http.expectNone((r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings'));
-    // expand again → children from cache, no reload
+    // a second expand takes the children from the cache and does not reload
     cmp.toggleSub(PARENT);
     expect(cmp.isSubExpanded('parent-1')).toBe(true);
     http.expectNone((r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings'));
@@ -1355,7 +1341,7 @@ describe('ExpensesComponent (sub-bookings #subbookings)', () => {
     expect(cmp.importOpen()).toBe(false);
     expect(cmp.isSubExpanded('parent-1')).toBe(true);
     expect(success).toHaveBeenCalledWith('2 Unterbuchung(en) importiert.');
-    // the response is only the import batch → reload the full child list + parent amount.
+    // the response holds the import batch only, so reload the child list and the parent
     http
       .expectOne((r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings') && r.method === 'GET')
       .flush([SUB, { ...SUB, id: 'sub-2' }]);
@@ -1435,7 +1421,7 @@ describe('ExpensesComponent (sub-bookings #subbookings)', () => {
     expect(cmp.subParent()).toBeNull();
     expect(cmp.isSubExpanded('parent-1')).toBe(true);
     expect(success).toHaveBeenCalledWith('Unterbuchung hinzugefügt.');
-    // reload the child list + parent amount (Σ children).
+    // reload the child list and the parent amount, which is the sum of the children
     http
       .expectOne((r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings') && r.method === 'GET')
       .flush([SUB]);
@@ -1447,7 +1433,7 @@ describe('ExpensesComponent (sub-bookings #subbookings)', () => {
     cmp.openCreateSub(PARENT);
     cmp.subAmount.set('5');
     cmp.subDescription.set('Teil');
-    // createSub without an event → optional-chaining branch without preventDefault.
+    // a call without an event takes the optional-chaining branch and skips preventDefault
     cmp.createSub();
     const req = http.expectOne(
       (r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings') && r.method === 'POST',
@@ -1506,7 +1492,7 @@ describe('ExpensesComponent (sub-bookings #subbookings)', () => {
       .expectOne((r) => r.url.endsWith('/budget-expenses/sub-1') && r.method === 'PATCH')
       .flush({ ...SUB, description: 'Teil neu' });
     expect(cmp.editing()).toBeNull();
-    // parentExpenseId set → reload the parent panel + list (parent amount).
+    // parentExpenseId is set, so the parent panel and the list reload for the amount
     http
       .expectOne((r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings') && r.method === 'GET')
       .flush([{ ...SUB, description: 'Teil neu' }]);
@@ -1521,10 +1507,10 @@ describe('ExpensesComponent (sub-bookings #subbookings)', () => {
     cmp.saveEdit(new Event('submit'));
     const req = http.expectOne((r) => r.url.endsWith('/budget-expenses/parent-1') && r.method === 'PATCH');
     expect(req.request.body).toMatchObject({ budgetId: 'b-2' });
-    // amount unchanged (parent amount = Σ children, read-only) → not sent.
+    // the amount did not change and stays read-only on the server, so it is not sent
     expect((req.request.body as Record<string, unknown>)['amount']).toBeUndefined();
     req.flush({ ...PARENT, budgetId: 'b-2', childCount: undefined as unknown as number });
-    // keep childCount from the known row (a single response doesn't reliably return it).
+    // keep childCount from the known row, because a single response omits it
     expect(cmp.items().find((x) => x.id === 'parent-1')?.childCount).toBe(2);
   });
 
@@ -1534,7 +1520,7 @@ describe('ExpensesComponent (sub-bookings #subbookings)', () => {
     cmp.doDelete();
     http.expectOne((r) => r.url.endsWith('/budget-expenses/sub-1') && r.method === 'DELETE').flush(null);
     expect(cmp.confirmDelete()).toBeNull();
-    // parent row stays in the list; reload the panel + list instead.
+    // the parent row stays in the list. Reload the panel and the list instead.
     http
       .expectOne((r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings') && r.method === 'GET')
       .flush([]);
@@ -1593,7 +1579,7 @@ describe('ExpensesComponent (invoice detail #invoices)', () => {
     const revokeSpy = jest.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
     const clickSpy = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
     const { cmp, http } = build();
-    // fileName null → fallback 'beleg.pdf'
+    // a null fileName falls back to 'beleg.pdf'
     cmp.openInvoiceFile({ ...INVOICE, fileName: null });
     http.expectOne((r) => r.url.endsWith('/invoices/inv-1/file') && r.method === 'GET').flush(new Blob(['pdf']));
     expect(createObjSpy).toHaveBeenCalled();
@@ -1614,8 +1600,8 @@ describe('ExpensesComponent (invoice detail #invoices)', () => {
   });
 });
 
-// IntersectionObserver branch: the observer calls loadMore on becoming visible.
-// We shim IO and trigger the callback manually.
+// IntersectionObserver branch: the observer calls loadMore when the sentinel becomes
+// visible. The test shims the observer and fires the callback by hand.
 describe('ExpensesComponent (infinite scroll)', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
@@ -1653,12 +1639,12 @@ describe('ExpensesComponent (infinite scroll)', () => {
     view.detectChanges();
 
     expect(observe).toHaveBeenCalled();
-    // becomes visible → loadMore → second page.
+    // the sentinel becomes visible, so loadMore fetches the second page
     trigger?.([{ isIntersecting: true }]);
     http.match((r) => r.url.endsWith('/expenses') && r.method === 'GET').forEach((req) =>
       req.flush(page([{ ...EXPENSE, id: 'e-2' }], 3, 1)),
     );
-    // not visible → no additional request
+    // the sentinel is not visible, so no further request runs
     trigger?.([{ isIntersecting: false }]);
     http.expectNone((r) => r.url.endsWith('/expenses') && r.method === 'GET');
 
@@ -1667,13 +1653,12 @@ describe('ExpensesComponent (infinite scroll)', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Batch / bulk actions + cross-links + URL sync (#expenses-ux). The facade
-// members added on top of the state modules: selection, bulk delete/export/
-// reassign, ksLink and the query-param adoption + mirror effects.
-// ---------------------------------------------------------------------------
+// Bulk actions, cross-links and URL sync (#expenses-ux). The facade adds these members
+// on top of the state modules. They are the selection, the bulk delete, the bulk export
+// and reassign, ksLink, and the query-param adoption and mirror effects.
 
-/** Stub URL.createObjectURL/revokeObjectURL + anchor click for blob downloads. */
+/** Stub URL.createObjectURL, URL.revokeObjectURL and the anchor click for blob
+ *  downloads. */
 function stubDownload(): { create: jest.SpyInstance; click: jest.SpyInstance; restore: () => void } {
   (URL as unknown as { createObjectURL?: unknown }).createObjectURL = () => 'blob:mock';
   (URL as unknown as { revokeObjectURL?: unknown }).revokeObjectURL = () => undefined;
@@ -1706,7 +1691,7 @@ describe('ExpensesComponent (batch/bulk #expenses-ux)', () => {
     const inTree: Expense = { ...EXPENSE, budgetId: 'child-1' };
     const { cmp } = build({ tree: ROOT_TREE, expenses: page([inTree], 1) });
     expect(cmp.ksLink(inTree)).toEqual({ budget: 'top-1', ks: 'child-1', fy: 'fy-1' });
-    // budgetId not part of the tree → no top node.
+    // the budgetId is not part of the tree, so there is no top node
     expect(cmp.ksLink(EXPENSE)).toEqual({ budget: null, ks: 'b-1', fy: 'fy-1' });
   });
 
@@ -1768,12 +1753,12 @@ describe('ExpensesComponent (batch/bulk #expenses-ux)', () => {
     cmp.runBulk();
     http.expectOne((r) => r.url.endsWith('/budget-expenses/e-1') && r.method === 'DELETE').flush(null);
     http.expectOne((r) => r.url.endsWith('/budget-expenses/e-2') && r.method === 'DELETE').flush(null);
-    // afterBulk → list.refresh() → one GET /expenses (window reload).
+    // the bulk epilogue refreshes the list with one GET /expenses for the window
     flushList(http, page([], 0));
     expect(cmp.bulkConfirm()).toBeNull();
     expect(cmp.bulkBusy()).toBe(false);
     expect(success).toHaveBeenCalledWith('2 Buchung(en) gelöscht.');
-    // prune effect empties the (now-stale) selection.
+    // the prune effect empties the stale selection
     TestBed.tick();
     expect(cmp.selectedCount()).toBe(0);
   });
@@ -1857,11 +1842,11 @@ describe('ExpensesComponent (batch/bulk #expenses-ux)', () => {
     cmp.bulkBudgetId.set('b-9');
     cmp.bulkCategory.set('  Reise  ');
     cmp.runBulkReassign();
-    // standalone → budgetId + category
+    // a standalone booking takes budgetId and category
     const r1 = http.expectOne((r) => r.url.endsWith('/budget-expenses/e-1') && r.method === 'PATCH');
     expect(r1.request.body).toEqual({ category: 'Reise', budgetId: 'b-9' });
     r1.flush({ ...EXPENSE });
-    // bound → only category (cost centre inherited from the application)
+    // a bound booking takes only the category, because the application sets the cost center
     const r2 = http.expectOne((r) => r.url.endsWith('/budget-expenses/e-bound') && r.method === 'PATCH');
     expect(r2.request.body).toEqual({ category: 'Reise' });
     r2.flush({ ...bound });
@@ -1994,8 +1979,8 @@ describe('ExpensesComponent (query-param adoption #expenses-ux)', () => {
     http
       .expectOne((r) => r.url.endsWith('/invoices') && r.method === 'GET')
       .flush({ items: [], total: 0, limit: 200, offset: 0 });
-    // Exactly ONE reload — the component adopts the URL filters first, then loads
-    // once (the old double-reload raced and could show the unfiltered list).
+    // Exactly ONE reload. The component adopts the URL filters first and then loads
+    // one time. The old double reload raced and could show the unfiltered list.
     const reqs = http.match((r) => r.url.endsWith('/expenses') && r.method === 'GET');
     expect(reqs.length).toBe(1);
     reqs.forEach((req) => req.flush(page([])));
@@ -2037,9 +2022,7 @@ describe('ExpensesComponent (query-param adoption #expenses-ux)', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// ExpensesListState.refresh() in isolation — the post-mutation window reload.
-// ---------------------------------------------------------------------------
+// The window reload that ExpensesListState runs after a mutation, tested in isolation.
 describe('ExpensesListState.refresh (#expenses-ux)', () => {
   afterEach(() => {
     try {
@@ -2061,8 +2044,8 @@ describe('ExpensesListState.refresh (#expenses-ux)', () => {
     const state = TestBed.runInInjectionContext(() => new ExpensesListState());
     http.expectOne((r) => r.url.endsWith('/budgets')).flush([]);
     http.expectOne((r) => r.url.endsWith('/accounts/options')).flush([]);
-    // The state no longer auto-loads (#expenses-ux2) — the component triggers the
-    // first reload after adopting URL filters; mirror that here.
+    // The state no longer loads on its own (#expenses-ux2). The component fires the
+    // first reload after it adopts the URL filters. Mirror that here.
     state.reload();
     http.expectOne((r) => r.url.endsWith('/expenses') && r.method === 'GET').flush(page([]));
     return { state, http };
@@ -2074,7 +2057,8 @@ describe('ExpensesListState.refresh (#expenses-ux)', () => {
     state.expenseId.set('e-1');
     state.reload(); // request B (new filter state)
     const [reqA, reqB] = http.match((r) => r.url.endsWith('/expenses') && r.method === 'GET');
-    // B (filtered) resolves first, then the stale A — A must NOT overwrite the list.
+    // The filtered request B resolves first, then the stale request A arrives. Request
+    // A must NOT overwrite the list.
     reqB.flush(page([EXPENSE], 1));
     reqA.flush(page([{ ...EXPENSE, id: 'stale' }, EXPENSE], 2));
     expect(state.items()).toEqual([EXPENSE]);

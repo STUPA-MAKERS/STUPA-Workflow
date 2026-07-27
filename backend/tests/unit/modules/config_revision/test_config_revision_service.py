@@ -1,8 +1,8 @@
-"""Unit-Coverage für das config_revision-Modul (DB-los, #config-versioning).
+"""Unit coverage for the config_revision module, without a DB (#config-versioning).
 
-Treibt ``_flatten``/``_lock_key``, ``ConfigRevisionService`` (record/head/get/list_for/
-diff), ``RevertService`` (alle Fehler-Branches) und ``reapply_snapshot`` (else-Branch)
-über den Queue-Fake aus ``tests._support.auth_fakes``.
+The tests drive `_flatten`, `_lock_key`, `ConfigRevisionService` (record, head, get,
+list_for and diff), `RevertService` (every error branch) and `reapply_snapshot` (the
+else branch). They use the queue fake of `tests._support.auth_fakes`.
 """
 
 from __future__ import annotations
@@ -36,9 +36,6 @@ def _rev(**kw: object) -> ConfigRevision:
     return row
 
 
-# --------------------------------------------------------------------------- #
-# _flatten
-# --------------------------------------------------------------------------- #
 def test_flatten_form_keys_by_field() -> None:
     flat = _flatten(
         "form",
@@ -73,21 +70,15 @@ def test_flatten_unknown_entity_is_identity() -> None:
     assert _flatten("other", {"k": 1}) == {"k": 1}
 
 
-# --------------------------------------------------------------------------- #
-# _lock_key
-# --------------------------------------------------------------------------- #
 def test_lock_key_stable_distinct_and_in_bigint_range() -> None:
     k = _lock_key("flow", "global")
-    assert k == _lock_key("flow", "global")  # deterministisch
+    assert k == _lock_key("flow", "global")  # deterministic
     assert _lock_key("form", "x") != _lock_key("form", "y")
-    assert -(2**63) <= k < 2**63  # passt in Postgres bigint
+    assert -(2**63) <= k < 2**63  # fits into a Postgres bigint
 
 
-# --------------------------------------------------------------------------- #
-# ConfigRevisionService.record / head / get / list_for
-# --------------------------------------------------------------------------- #
 async def test_record_first_revision_no_prev() -> None:
-    db = fake_session(result(), result(), result(), result())  # lock, head→None, audit×2
+    db = fake_session(result(), result(), result(), result())  # lock, head None, two audits
     rev = await ConfigRevisionService(db).record(
         entity_type=ENTITY_FLOW,
         entity_id=GLOBAL_ID,
@@ -104,7 +95,7 @@ async def test_record_first_revision_no_prev() -> None:
 
 async def test_record_chains_from_head() -> None:
     prev = _rev(entity_type=ENTITY_FLOW, entity_id=GLOBAL_ID, version=2, snapshot={})
-    db = fake_session(result(), result(prev), result(), result())  # lock, head→prev, audit×2
+    db = fake_session(result(), result(prev), result(), result())  # lock, head prev, 2 audits
     rev = await ConfigRevisionService(db).record(
         entity_type=ENTITY_FLOW,
         entity_id=GLOBAL_ID,
@@ -133,9 +124,6 @@ async def test_resolve_versions_maps_id_to_version() -> None:
     }
 
 
-# --------------------------------------------------------------------------- #
-# ConfigRevisionService.diff
-# --------------------------------------------------------------------------- #
 async def test_diff_against_previous_snapshot() -> None:
     prev = _rev(
         entity_type="form",
@@ -163,9 +151,7 @@ async def test_diff_first_revision_is_all_added() -> None:
     assert d["removed"] == {} and d["changed"] == {}
 
 
-# --------------------------------------------------------------------------- #
-# RevertService — Fehler-Branches (Erfolg = Integrationstest)
-# --------------------------------------------------------------------------- #
+# RevertService error branches. An integration test covers the success path.
 async def test_revert_unknown_entry_404() -> None:
     with pytest.raises(NotFoundError):
         await RevertService(fake_session(result())).revert(1, "admin")
@@ -181,7 +167,7 @@ async def test_revert_without_revision_id_conflict() -> None:
 async def test_revert_missing_recorded_revision_404() -> None:
     rid = uuid.uuid4()
     entry = AuditEntry(id=1, action="config_change", data={"revisionId": str(rid)})
-    # entry select → entry; get(recorded) → None
+    # The entry select returns the entry, and the get for the recorded revision returns None.
     with pytest.raises(NotFoundError):
         await RevertService(fake_session(result(entry), gets=[None])).revert(1, "admin")
 
@@ -198,7 +184,7 @@ async def test_revert_first_state_nothing_to_revert() -> None:
 
 
 async def test_revert_status_missing_state_ids_not_revertable() -> None:
-    # status_change ohne from/to im data → Dispatcher liefert not_revertable (DB-los).
+    # A status_change without from and to in data makes the dispatcher return not_revertable.
     entry = AuditEntry(
         id=1, action="status_change", target_id="app-1", data={"toStateId": "b"}
     )
@@ -208,7 +194,7 @@ async def test_revert_status_missing_state_ids_not_revertable() -> None:
 
 
 async def test_revert_non_revertable_budget_action() -> None:
-    # Löschungen (budget_expense_delete) sind bewusst nicht revertierbar.
+    # Deletions such as budget_expense_delete are not revertable by design.
     entry = AuditEntry(
         id=1, action="budget_expense_delete", target_id="x", data={}
     )
@@ -226,16 +212,13 @@ async def test_revert_stale_when_newer_head_exists() -> None:
     prev = _rev(entity_type=ENTITY_FLOW, entity_id=GLOBAL_ID, version=1)
     prev.id = pid
     head = _rev(entity_type=ENTITY_FLOW, entity_id=GLOBAL_ID, version=3)
-    # entry select; head scalar (≠ recorded); gets: recorded, prev
+    # Queue: the entry select, a head scalar that differs from recorded, then recorded and prev.
     db = fake_session(result(entry), result(head), gets=[recorded, prev])
     with pytest.raises(ConflictError) as ei:
         await RevertService(db).revert(1, "admin")
     assert ei.value.code == "stale_revert"
 
 
-# --------------------------------------------------------------------------- #
-# reapply_snapshot — unbekannte Entität
-# --------------------------------------------------------------------------- #
 async def test_reapply_unsupported_entity_type() -> None:
     with pytest.raises(ValidationProblem):
         await reapply_snapshot(
@@ -248,9 +231,6 @@ async def test_reapply_unsupported_entity_type() -> None:
         )
 
 
-# --------------------------------------------------------------------------- #
-# Schemas
-# --------------------------------------------------------------------------- #
 def test_config_revision_out_from_row() -> None:
     row = _rev(entity_type="form", entity_id="t1", version=2, created_by="sub")
     row.at = datetime(2026, 6, 10, tzinfo=UTC)

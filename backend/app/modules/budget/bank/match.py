@@ -1,11 +1,14 @@
-"""Match statement line vs. existing booking — pure scoring, no DB.
+"""Match a statement line against an existing booking (pure scoring, no DB).
 
-Produces a suggestion only; the treasurer confirms in the review dialog. The
-service does the DB queries (candidates, counterparty-IBAN memory).
+This module produces a suggestion only. The treasurer confirms it in the review
+dialog. The service runs the DB queries for the candidates and for the
+counterparty-IBAN memory.
 
-Cascade (highest precision first): reference (same ``end_to_end_id``/receipt
-number after normalization), then amount + date window (tight = high, wide =
-review). Thresholds: >= 90 strong suggestion, 70-89 suggestion, < 70 discarded.
+The cascade starts with the most precise rule. First comes the reference: the
+same ``end_to_end_id`` or receipt number after normalization. Then come the
+amount and the date window. A tight window scores high. A wide window needs a
+review. A score of 90 or more is a strong suggestion. A score of 70 to 89 is a
+suggestion. The code discards a score below 70.
 """
 
 from __future__ import annotations
@@ -15,12 +18,13 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 
-# Date windows (days) between line and booking: tight (booking/value-date skew)
-# vs. generous (manually entered with a rough date).
+# Date windows in days between the line and the booking. The tight window covers
+# the skew between booking date and value date. The wide window covers a booking
+# that a person entered by hand with a rough date.
 _TIGHT_DAYS = 2
 _WIDE_DAYS = 5
 
-# Minimum score for a suggestion to be returned at all.
+# Minimum score for a suggestion to be returned.
 SUGGEST_THRESHOLD = 70
 
 
@@ -32,12 +36,12 @@ class ExpenseCandidate:
     budget_id: object  # UUID
     amount: Decimal  # always > 0 (DB CHECK)
     when: date | None  # payment_date ?? invoice_date ?? created_at date
-    reference: str | None  # receipt number / reference
+    reference: str | None  # receipt number or reference
 
 
 @dataclass(slots=True)
 class MatchResult:
-    """Best hit (or empty): booking + score + reason."""
+    """Best hit, or an empty result: booking, score and reason."""
 
     expense_id: object | None = None
     budget_id: object | None = None
@@ -72,12 +76,15 @@ def score_candidate(
     line_e2e: str | None,
     candidate: ExpenseCandidate,
 ) -> MatchResult:
-    """Score one candidate against the line. ``line_amount`` is signed."""
-    # The amount must match exactly (cent amounts) — otherwise it is not the same payment.
+    """Score one candidate against the line.
+
+    ``line_amount`` keeps the sign of the transaction.
+    """
+    # The amount must match to the cent. Another amount is another payment.
     if abs(line_amount) != candidate.amount:
         return MatchResult()
 
-    score = 60  # exact amount = solid base
+    score = 60  # base score for an exact amount
     reasons = ["Betrag exakt"]
 
     refs = {_norm_ref(line_ref), _norm_ref(line_e2e)} - {""}
@@ -90,8 +97,8 @@ def score_candidate(
     score += date_pts
     reasons.append(date_reason)
 
-    # Return the score uncapped so ``best_match`` can pick the more precise hit
-    # (with reference) between two "full" matches; only the winner is capped.
+    # Return the score uncapped. ``best_match`` then picks the more precise hit
+    # with a reference between two "full" matches. Only the winner is capped.
     return MatchResult(
         expense_id=candidate.expense_id,
         budget_id=candidate.budget_id,
@@ -108,10 +115,15 @@ def best_match(
     line_e2e: str | None,
     candidates: list[ExpenseCandidate],
 ) -> MatchResult:
-    """Pick the best candidate above the threshold (else an empty :class:`MatchResult`).
+    """Pick the best candidate above the threshold.
 
-    An ambiguous top score (two bookings tied) yields NO suggestion — otherwise
-    the nondeterministic DB row order would decide which one gets suggested."""
+    Two bookings with the same top score are ambiguous. The function then makes NO
+    suggestion. Otherwise the nondeterministic DB row order would decide which
+    booking the code suggests.
+
+    Returns:
+        The winning match, or an empty ``MatchResult``.
+    """
     scored = [
         score_candidate(
             line_amount=line_amount,
@@ -130,7 +142,7 @@ def best_match(
         return MatchResult()
     winners = [r for r in real if r.score == top]
     if len(winners) != 1:
-        return MatchResult()  # tied -> ambiguous, no suggestion
+        return MatchResult()  # a tie is ambiguous: no suggestion
     best = winners[0]
     best.score = min(best.score, 100)  # only the winner is capped for display
     return best

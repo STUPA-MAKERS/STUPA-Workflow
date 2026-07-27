@@ -1,12 +1,13 @@
-"""MIME sniffing (libmagic) + type allowlist.
+"""MIME sniffing with libmagic and the type allowlist.
 
-Content decides, not the extension: ``sniff_mime`` reads the magic header of the bytes.
-``validate_upload`` rejects when the sniffed type is not in the allowlist or does not
-match the file extension (sniff != extension → 415), so ``evil.exe`` cannot masquerade
-as ``foto.png``.
+The content decides, not the extension. ``sniff_mime`` reads the magic header of the
+bytes. ``validate_upload`` rejects a file when the sniffed type is not in the allowlist.
+It also rejects a file when the sniffed type does not match the extension, with 415. So
+``evil.exe`` cannot pose as ``foto.png``.
 
-``python-magic`` (libmagic) is imported lazily — the system lib is only needed where
-uploads actually happen (worker/API runtime), not in contract CI.
+The module imports ``python-magic`` (libmagic) lazily. Only the paths that really take
+uploads need the system library, that is the worker and the API runtime. Contract CI
+does not need it.
 """
 
 from __future__ import annotations
@@ -15,7 +16,7 @@ import io
 import os
 import zipfile
 
-# Allowed sniffed MIME types (PDF / image / Office).
+# The allowlist holds sniffed types, never the type that the client claims.
 ALLOWED_MIME_TYPES: frozenset[str] = frozenset(
     {
         "application/pdf",
@@ -23,9 +24,9 @@ ALLOWED_MIME_TYPES: frozenset[str] = frozenset(
         "image/jpeg",
         "image/gif",
         "image/webp",
-        # Office (legacy + OOXML). libmagic sometimes sniffs OOXML as application/zip
-        # → zip is allowed only for .docx/.xlsx/.pptx, and then only when the container
-        # carries the OOXML structure (see _is_ooxml_container).
+        # Legacy Office and OOXML. libmagic sometimes sniffs OOXML as application/zip.
+        # Zip is allowed only for .docx, .xlsx and .pptx, and only when the container
+        # carries the OOXML structure. See _is_ooxml_container.
         "application/zip",
         "application/msword",
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -39,8 +40,8 @@ ALLOWED_MIME_TYPES: frozenset[str] = frozenset(
     }
 )
 
-# Extension → acceptable sniffed MIME types. OOXML containers often sniff as
-# ``application/zip`` (older libmagic) → deliberately allowed too.
+# An older libmagic often sniffs an OOXML container as ``application/zip``. The map
+# accepts that type on purpose.
 _OOXML_ZIP = {"application/zip"}
 _EXT_TO_MIME: dict[str, frozenset[str]] = {
     ".pdf": frozenset({"application/pdf"}),
@@ -68,10 +69,10 @@ _EXT_TO_MIME: dict[str, frozenset[str]] = {
     ".odp": frozenset({"application/vnd.oasis.opendocument.presentation"}),
 }
 
-# OOXML extension → expected top-level dir in the ZIP container. Used for the
-# structural check when libmagic sniffs OOXML only as ``application/zip``: a real
-# OOXML package contains ``[Content_Types].xml`` and the format-specific dir
-# (word/ | xl/ | ppt/), so an arbitrary ZIP cannot pose as an Office document.
+# The structural check uses this map when libmagic sniffs OOXML only as
+# ``application/zip``. A real OOXML package holds ``[Content_Types].xml`` and the
+# top-level directory of the format, that is word/, xl/ or ppt/. An arbitrary ZIP
+# therefore cannot pose as an Office document.
 _OOXML_REQUIRED_DIR: dict[str, str] = {
     ".docx": "word/",
     ".xlsx": "xl/",
@@ -80,26 +81,28 @@ _OOXML_REQUIRED_DIR: dict[str, str] = {
 
 
 class MimeRejected(Exception):
-    """File not accepted (disallowed type or sniff != extension)."""
+    """The file is not accepted: the type is not allowed or does not match the extension."""
 
 
 def sniff_mime(data: bytes) -> str:
-    """Sniffed MIME type of the bytes (libmagic). Empty input → ``application/x-empty``."""
+    """Return the MIME type that libmagic sniffs from the bytes.
+
+    Empty input gives ``application/x-empty``.
+    """
     if not data:
         return "application/x-empty"
-    import magic  # lazy: libmagic only needed on the upload path
+    import magic  # lazy import: only the upload path needs libmagic
 
     return magic.from_buffer(data, mime=True)
 
 
 def file_extension(filename: str | None) -> str:
-    """Lowercased extension including the dot (``""`` if none)."""
+    """Return the lowercased extension with the dot, or ``""`` when there is none."""
     if not filename:
         return ""
     return os.path.splitext(filename)[1].lower()
 
 
-# Allowed characters in the stored filename (everything else → ``_``).
 _FILENAME_SAFE = frozenset(
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._- "
 )
@@ -107,25 +110,27 @@ _FILENAME_MAX = 200
 
 
 def sanitize_filename(filename: str | None) -> str:
-    """Harden a filename: drop path components, replace control/special characters.
+    """Harden a filename: drop the path components and replace special characters.
 
-    Protects both the ``storage_key`` (no ``../`` traversal, no NUL/slashes) and the
-    stored display name. Falls back to ``upload`` if nothing usable remains after
-    cleaning; caps the length."""
+    This protects the ``storage_key`` against ``../`` traversal, NUL bytes and slashes.
+    It also protects the stored display name. Every character outside the safe set
+    becomes an underscore. The function caps the length. If nothing usable remains, it
+    returns ``upload``.
+    """
     raw = (filename or "").replace("\\", "/")
-    base = os.path.basename(raw).strip()  # drop path components (incl. ``../``)
+    base = os.path.basename(raw).strip()
     cleaned = "".join(c if c in _FILENAME_SAFE else "_" for c in base).strip(" .")
     cleaned = cleaned[:_FILENAME_MAX]
     return cleaned or "upload"
 
 
 def _is_ooxml_container(data: bytes, ext: str) -> bool:
-    """Whether ``data`` is a real OOXML package for ``ext``.
+    """Tell whether ``data`` is a real OOXML package for ``ext``.
 
-    Requires a readable ZIP container with ``[Content_Types].xml`` and the
-    format-specific top-level dir (``word/``/``xl/``/``ppt/``), so an arbitrary ZIP
-    posing as ``.docx/.xlsx/.pptx`` is rejected even though libmagic may only sniff
-    it as ``application/zip``.
+    The check needs a readable ZIP container with ``[Content_Types].xml`` and the
+    top-level directory of the format (``word/``, ``xl/`` or ``ppt/``). It therefore
+    rejects an arbitrary ZIP that poses as ``.docx``, ``.xlsx`` or ``.pptx``, even when
+    libmagic sniffs the bytes only as ``application/zip``.
     """
     required_dir = _OOXML_REQUIRED_DIR.get(ext)
     if required_dir is None:
@@ -141,17 +146,23 @@ def _is_ooxml_container(data: bytes, ext: str) -> bool:
 
 
 def validate_upload(filename: str | None, data: bytes) -> str:
-    """Validate bytes → sniffed MIME type, or raise :class:`MimeRejected`.
+    """Validate the uploaded bytes and return the sniffed MIME type.
 
-    Rules:
+    The function applies three rules:
 
-    1. Sniffed type must be in :data:`ALLOWED_MIME_TYPES`.
-    2. Extension must be known and the sniffed type must match it (sniff != extension
-       → reject). Content counts, not the claimed extension.
+    1. The sniffed type must be in ``ALLOWED_MIME_TYPES``.
+    2. The extension must be known and the sniffed type must match it. The content
+       counts, not the claimed extension.
     3. If an OOXML upload sniffs only as ``application/zip`` (older libmagic), the ZIP
-       container must additionally carry the OOXML structure (``[Content_Types].xml`` +
-       ``word/``/``xl/``/``ppt/``) — otherwise it counts as an arbitrary ZIP and is
-       rejected.
+       container must also carry the OOXML structure. That structure is
+       ``[Content_Types].xml`` and one of ``word/``, ``xl/`` or ``ppt/``. Every other
+       ZIP counts as an arbitrary ZIP and the function rejects it.
+
+    Returns:
+        The sniffed MIME type.
+
+    Raises:
+        MimeRejected: The file breaks one of the three rules.
     """
     sniffed = sniff_mime(data)
     if sniffed not in ALLOWED_MIME_TYPES:

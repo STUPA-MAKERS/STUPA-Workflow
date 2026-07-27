@@ -1,17 +1,19 @@
-"""fints_dedup_staged: re-importierte Dubletten gestageter Umsätze aus den ROHDATEN auflösen.
+"""fints_dedup_staged: resolve re-imported duplicates of staged rows from the RAW DATA.
 
-Vor dem rohdaten-basierten Idempotenz-Schlüssel (#fints-raw) flossen parser-abgeleitete Felder
-(``counterparty_iban``, normalisierter Zweck) in den Hash ein. Eine Parser-Verbesserung verschob
-ihn → ein erneuter Abruf legte denselben Bank-Umsatz erneut an (typisch: gebuchte ``matched``-Zeile
-+ neu geparste ``unmatched``-Dublette).
+Before the raw-data idempotency key (#fints-raw), parser-derived fields fed the hash
+(``counterparty_iban`` and the normalized purpose). A parser improvement moved that hash,
+so a new fetch created the same bank transaction a second time. The typical result is a
+booked ``matched`` row plus a freshly parsed ``unmatched`` duplicate.
 
-Diese Migration vergleicht ausschließlich über ``raw_dedup_base`` (Wertstellung, Betrag, E2E,
-kanonischer Roh-Zweck, kanonischer Roh-Gegenkonto-Block — alles parser-unabhängig aus
-``raw_payload``). Zeilen mit gleicher Roh-Basis sind derselbe Umsatz: die **gebuchte** Zeile bleibt
-(Buchung unberührt; die Anzeige wird ohnehin live aus den Rohdaten aufgelöst), sonst die älteste;
-ungebuchte Kopien werden gelöscht. Gruppen ohne gebuchte Zeile UND ohne echte Roh-Dublette bleiben
-unangetastet — fünf echte 80-€-Zahlungen am selben Tag haben unterschiedliche Roh-Auftraggeber und
-kollabieren NICHT. Die behaltene Zeile bekommt den neuen Roh-Schlüssel. Down-Migration: No-Op.
+This migration compares over ``raw_dedup_base`` only: value date, amount, E2E, canonical
+raw purpose and canonical raw counterparty block. All of these come from ``raw_payload``
+and never depend on the parser. Rows with the same raw base are the same transaction. The
+**booked** row survives, otherwise the oldest row survives. The booking itself stays
+untouched, because the display resolves live from the raw data. The migration deletes the
+unbooked copies. A group without a booked row AND without a true raw duplicate stays
+untouched. Five real payments of 80 EUR on the same day carry different raw originators,
+so they do NOT collapse. The surviving row gets the new raw key. The down migration does
+nothing.
 """
 
 from __future__ import annotations
@@ -27,9 +29,9 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    # Gemeinsame, idempotente Routine (eine Logik, s. 0046). Bewusst KEINE Logik hier inline —
-    # frühere Versionen dieser Revision liefen bereits; alembic überspringt sie. Die Korrektur
-    # läuft als neue Revision 0046 erneut über dieselbe Funktion.
+    # Call the shared idempotent routine, so one logic serves 0045 and 0046. The logic
+    # stays out of this file on purpose. Earlier versions of this revision already ran,
+    # so alembic skips them. Revision 0046 calls the same function to apply the fix.
     from app.modules.budget.bank.maintenance import dedup_staged_lines
 
     dedup_staged_lines(op.get_bind())

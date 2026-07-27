@@ -38,13 +38,13 @@ import {
 } from '../budget/budget-tree.api';
 
 /**
- * Invoices tab: view/create/manage receipts — a standalone entity; bookings
- * optionally reference **one** invoice (1 : N).
+ * Invoices tab. It shows, creates, and manages invoices. An invoice is a standalone
+ * entity. A booking can reference one invoice. So one invoice can serve many bookings.
  *
- * Import: a ZUGFeRD/Factur-X PDF is parsed via drag & drop (overlay) or the file
- * picker; the fields prefill the entry dialog (review + confirm). If no valid
- * ZUGFeRD is embedded (422 ``invoice_not_zugferd``), the empty dialog opens for
- * manual entry.
+ * For import, the user drops a ZUGFeRD or Factur-X PDF on the overlay, or picks it with
+ * the file dialog. The parsed fields prefill the entry dialog for review and
+ * confirmation. If the PDF embeds no valid ZUGFeRD data (422 `invoice_not_zugferd`), the
+ * empty dialog opens for manual entry.
  */
 @Component({
   selector: 'app-invoices',
@@ -87,12 +87,12 @@ export class InvoicesComponent implements OnDestroy {
   readonly q = signal('');
   readonly saving = signal(false);
   readonly importing = signal(false);
-  /** A manual receipt upload in the create dialog is in progress. */
+  /** True while a manual receipt upload runs in the create dialog. */
   readonly attaching = signal(false);
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
 
-  /** Filters (bookings style): status, gross range, issue/due date. These drive
-   *  the server query. */
+  /** Filters are status, gross range, issue date, and due date. They drive the
+   *  server query. */
   readonly statusFilter = signal<'' | InvoiceStatus>('');
   readonly grossMin = signal('');
   readonly grossMax = signal('');
@@ -101,7 +101,7 @@ export class InvoicesComponent implements OnDestroy {
   readonly dueFrom = signal('');
   readonly dueTo = signal('');
 
-  /** Number of active filters (for the filter-button indicator) — excluding search. */
+  /** Number of active filters for the filter-button indicator. The search stays out. */
   readonly activeFilterCount = computed(
     () =>
       [
@@ -117,25 +117,23 @@ export class InvoicesComponent implements OnDestroy {
 
   readonly sentinel = viewChild<ElementRef<HTMLElement>>('sentinel');
 
-  /** Search (debounced ~400ms) drives the ``q`` param of the server query. */
+  /** Debounced search, about 400 ms. It drives the `q` param of the server query. */
   onSearch(value: string): void {
     this.q.set(value);
     this.debouncedReload();
   }
 
-  /** Set the status filter + reload (server filters). */
   setStatus(value: '' | InvoiceStatus): void {
     this.statusFilter.set(value);
     this.reload();
   }
 
-  /** Gross-range filter (debounced, since typed). */
+  /** Gross-range filter. It debounces, because the user types the value. */
   onGrossFilter(which: 'min' | 'max', value: string): void {
     (which === 'min' ? this.grossMin : this.grossMax).set(value);
     this.debouncedReload();
   }
 
-  /** Date-range filter (issue/due date). */
   onDateFilter(which: 'issueFrom' | 'issueTo' | 'dueFrom' | 'dueTo', value: string): void {
     ({
       issueFrom: this.issueFrom,
@@ -168,7 +166,6 @@ export class InvoicesComponent implements OnDestroy {
 
   readonly fileInput = viewChild<ElementRef<HTMLInputElement>>('fileInput');
 
-  // --- Drag&Drop ---
   private dragDepth = 0;
   readonly dragActive = signal(false);
 
@@ -179,7 +176,6 @@ export class InvoicesComponent implements OnDestroy {
     })),
   );
 
-  // --- Create / import ---
   readonly createOpen = signal(false);
   readonly newNumber = signal('');
   readonly newSupplier = signal('');
@@ -190,14 +186,13 @@ export class InvoicesComponent implements OnDestroy {
   readonly newGross = signal('');
   readonly newStatus = signal<InvoiceStatus>('open');
   readonly newNote = signal('');
-  /** Receipt handle from the import (empty = manual). */
+  /** Receipt handle from the import. An empty value means manual entry. */
   readonly importToken = signal('');
   readonly importFileName = signal('');
   private importFileMime = '';
 
   readonly canSubmitCreate = computed(() => Number(this.newGross()) > 0);
 
-  // --- Edit / delete ---
   readonly editing = signal<Invoice | null>(null);
   readonly editNumber = signal('');
   readonly editSupplier = signal('');
@@ -214,7 +209,7 @@ export class InvoicesComponent implements OnDestroy {
   constructor() {
     this.reload();
 
-    // Infinite scroll: sentinel at the list end → load the next page.
+    // Infinite scroll. When the sentinel at the list end appears, load the next page.
     effect((onCleanup) => {
       const el = this.sentinel()?.nativeElement;
       if (!el || typeof IntersectionObserver === 'undefined') return;
@@ -287,7 +282,6 @@ export class InvoicesComponent implements OnDestroy {
       });
   }
 
-  // ----------------------------------------------------------- drag & drop
   onDragEnter(event: DragEvent): void {
     if (!this.canManage() || !this.hasFiles(event)) return;
     event.preventDefault();
@@ -327,7 +321,7 @@ export class InvoicesComponent implements OnDestroy {
     input.value = '';
   }
 
-  /** Parse a PDF: success → prefilled dialog; no ZUGFeRD → empty dialog. */
+  /** Parse a PDF. On success, prefill the dialog. Without ZUGFeRD data, open it empty. */
   private importFile(file: File): void {
     if (this.importing()) return;
     this.importing.set(true);
@@ -341,8 +335,8 @@ export class InvoicesComponent implements OnDestroy {
         this.importing.set(false);
         const code = (err as { error?: { code?: string } } | null)?.error?.code;
         if (code === 'invoice_not_zugferd') {
-          // No embedded ZUGFeRD → enter manually, but still attach the dropped
-          // PDF as the receipt.
+          // The PDF embeds no ZUGFeRD data. The user enters the invoice manually.
+          // The dropped PDF still becomes the receipt.
           this.openCreate();
           this.attachFile(file);
           this.toast.show(this.i18n.translate('invoices.toast.notZugferd'), 'info');
@@ -367,7 +361,7 @@ export class InvoicesComponent implements OnDestroy {
     this.importFileName.set(p.fileName);
     this.importFileMime = p.fileMime;
     this.createOpen.set(true);
-    // Duplicate warning: an invoice with the same number already exists.
+    // The server sets the flag when an invoice with the same number exists.
     if (p.duplicate) {
       this.toast.show(
         this.i18n.translate('invoices.toast.duplicate', { number: p.number ?? '' }),
@@ -376,7 +370,8 @@ export class InvoicesComponent implements OnDestroy {
     }
   }
 
-  /** Upload the receipt PDF + remember it as an attachment (manual or non-ZUGFeRD drop). */
+  /** Upload the receipt PDF and keep it as an attachment. It serves manual entry and a
+   *  drop without ZUGFeRD data. */
   private attachFile(file: File): void {
     if (this.attaching()) return;
     this.attaching.set(true);
@@ -407,7 +402,6 @@ export class InvoicesComponent implements OnDestroy {
     this.importFileMime = '';
   }
 
-  // ----------------------------------------------------------------- create
   openCreate(): void {
     this.newNumber.set('');
     this.newSupplier.set('');
@@ -457,7 +451,6 @@ export class InvoicesComponent implements OnDestroy {
       });
   }
 
-  // ------------------------------------------------------------------- edit
   openEdit(i: Invoice): void {
     this.editing.set(i);
     this.editNumber.set(i.number ?? '');
@@ -502,7 +495,6 @@ export class InvoicesComponent implements OnDestroy {
       });
   }
 
-  // ----------------------------------------------------------------- delete
   askDelete(i: Invoice): void {
     this.confirmDelete.set(i);
   }
@@ -526,10 +518,10 @@ export class InvoicesComponent implements OnDestroy {
     });
   }
 
-  // ------------------------------------------------------------------- file
   openFile(i: Invoice): void {
-    // The API streams the PDF (MinIO is internal). Blob → object URL in a new tab;
-    // ``downloadBlob`` triggers reliably (even async, without popup blockers).
+    // The API streams the PDF because MinIO is internal. `downloadBlob` turns the
+    // blob into an object URL and opens it in a new tab. This works for an async
+    // call. Popup blockers do not stop it.
     this.api.invoiceFileBlob(i.id).subscribe({
       next: (blob) => downloadBlob(blob, i.fileName || 'beleg.pdf'),
       error: () => this.toast.error(this.i18n.translate('invoices.toast.failed')),

@@ -5,16 +5,16 @@ import { catchError } from 'rxjs/operators';
 import { LOCATION } from '../browser/location.token';
 import { AuthService } from './auth.service';
 
-/** Double-submit CSRF: cookie (readable) → mirrored in the header. */
+/** Double-submit CSRF. The client reads the cookie and mirrors it in the header. */
 const CSRF_COOKIE = 'XSRF-TOKEN';
 const CSRF_HEADER = 'X-XSRF-TOKEN';
 const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 /**
- * Same-origin `/api`? Only then attach the session cookie + CSRF header —
- * otherwise credentials would leak to foreign hosts. Relative URLs (`/api/...`)
- * are same-origin by definition; absolute URLs must exactly match the browser
- * origin.
+ * Tells whether the URL points at the same-origin `/api`. Only then may the caller
+ * attach the session cookie and the CSRF header. Otherwise the credentials leak to
+ * a foreign host. A relative URL (`/api/...`) is same-origin by definition. An
+ * absolute URL must match the browser origin exactly.
  */
 function isSameOriginApi(url: string, origin: string): boolean {
   if (url.startsWith('/api/')) return true;
@@ -29,7 +29,7 @@ function isSameOriginApi(url: string, origin: string): boolean {
   return false;
 }
 
-/** Endpoints whose 401 is expected → no forced re-login (loop/race). */
+/** Endpoints where a 401 is expected. A forced re-login would loop or race. */
 function skipReloginOn(url: string): boolean {
   return url.includes('/auth/me') || url.includes('/auth/login') || url.includes('/auth/logout');
 }
@@ -41,14 +41,15 @@ function readCookie(name: string): string | null {
 }
 
 /**
- * Attaches auth to outgoing same-origin `/api` requests:
- * - `withCredentials` → HttpOnly cookies (OIDC principal / magic-link
- *   applicant). No token in JS storage; nothing exfiltrable via XSS.
- * - CSRF: on writing methods, mirror the `XSRF-TOKEN` cookie into a header
- *   (double-submit).
- * - 401: expired/missing session → drop the principal + re-login (except on the
- *   auth endpoints, whose 401 is expected).
- * Foreign origins are left untouched — no credentials/headers leave.
+ * Attaches auth to an outgoing same-origin `/api` request:
+ * - `withCredentials` sends the HttpOnly cookies of the OIDC principal or of the
+ *   magic-link applicant. No token sits in JS storage, so XSS can steal nothing.
+ * - CSRF: for a writing method it mirrors the `XSRF-TOKEN` cookie into a header.
+ *   This is the double-submit pattern.
+ * - 401: the session expired or is missing. The interceptor drops the principal
+ *   and starts the re-login. It skips the auth endpoints, where a 401 is expected.
+ *
+ * It leaves a foreign origin untouched. No credential and no header leaves.
  */
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   if (!isSameOriginApi(req.url, inject(LOCATION).origin)) return next(req);

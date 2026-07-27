@@ -1,14 +1,15 @@
-/* Constrain ourselves (don't rely on the sidebar container): without display the
-   host is inline → tall content escapes the parent's overflow:auto. Block + 75vh +
-   internal scroll → the tree stays floating, not too tall. */
+/* Constrain the host here. Do not rely on the sidebar container. Without a display
+   value the host is inline, and tall content escapes the overflow:auto of the parent.
+   Block plus 75vh plus an internal scroll keeps the tree floating and not too tall. */
 :host {
   display: block;
   max-height: 75vh;
   overflow-y: auto;
-  // Inner padding = fade height: the first/last item starts BELOW the fade, so it
-  // isn't hidden at rest — the edge only fades while scrolling.
+  // The inner padding equals the fade height. The first and the last item start
+  // BELOW the fade, so the fade does not hide them at rest. The edge fades only
+  // during a scroll.
   padding-block: var(--space-5);
-  // Fade top/bottom into the background (like the meeting timeline).
+  // Fade the top and the bottom into the background, like the meeting timeline.
   --fade: linear-gradient(
     to bottom,
     transparent,
@@ -63,17 +64,17 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* Dotted, light-green connector lines (real tree: last row without a
-   continuing line downward). */
+/* Dotted, light-green connector lines. The last row carries no line that continues
+   downward. */
 .cct__children {
   padding-left: calc(var(--space-3) + 4px);
 }
 .cct__children > .cct__branch {
   position: relative;
 }
-/* Vertical line centred under the dot/node centre. Dot centre = space-2 + 4.5px;
-   child indent = space-3 + 4px ⇒ the 1px line's left edge at space-2 − space-3
-   (so its centre lands on the dot centre). */
+/* Vertical line centered under the center of the dot. The dot center sits at
+   space-2 + 4.5px. The child indent is space-3 + 4px. So the left edge of the 1px
+   line sits at space-2 − space-3, and its center lands on the dot center. */
 .cct__children > .cct__branch::before {
   content: '';
   position: absolute;

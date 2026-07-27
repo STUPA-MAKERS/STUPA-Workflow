@@ -1,21 +1,21 @@
-# Local-only Keycloak for OIDC testing. NICHT für prod (dort echtes idp.reutlingen.university).
+# Local-only Keycloak for OIDC testing. Do NOT use it in production, which runs the real
+# idp.reutlingen.university.
 # Start: docker compose -f docker-compose.yml -f docker-compose.keycloak.yml up -d
 #
-# Admin-Console: http://localhost:8081  (admin / admin)
-# Realm: antrag   Client: antragsplattform-demo-local (confidential)   Test-User: tester / tester
+# Admin console: http://localhost:8081  (admin / admin)
+# Realm: antrag   Client: antragsplattform-demo-local (confidential)   Test user: tester / tester
 #
-# WARNUNG / WARNING: Alle Credentials hier UND in keycloak/antrag-realm.json
-# (admin/admin, tester/tester, der confidential client-secret) sind reine Local-Dev-Fixtures
-# für einen Wegwerf-Keycloak gegen http://localhost:8080. Sie dürfen NIEMALS in eine echte
-# Keycloak/IdP-Realm kopiert oder wiederverwendet werden. JSON erlaubt keine Inline-Kommentare,
-# daher steht dieser Hinweis hier.
-# These are throwaway local-dev fixtures only — never reuse them in a real realm/IdP.
+# WARNING: every credential here AND in keycloak/antrag-realm.json (admin/admin,
+# tester/tester, the confidential client secret) is a local-dev fixture only. It belongs to
+# a throwaway Keycloak that serves http://localhost:8080. NEVER copy or reuse these values
+# in a real Keycloak realm or IdP. JSON allows no inline comments, so this warning stands
+# here.
 #
-# issuer = http://host.docker.internal:8081/realms/antrag muss für Browser UND api-Container
-# identisch auflösen:
-#   - Browser:    einmalig in /etc/hosts ->  127.0.0.1 host.docker.internal
-#   - Container:  extra_hosts host-gateway (unten) -> Host-IP -> publizierter Port 8081
-# Keycloak start-dev leitet den issuer-Claim aus dem Host-Header ab, daher matcht beides.
+# The issuer http://host.docker.internal:8081/realms/antrag must resolve the same way for
+# the browser AND for the api container:
+#   - Browser:    add `127.0.0.1 host.docker.internal` to /etc/hosts once
+#   - Container:  extra_hosts host-gateway (below) -> host IP -> published port 8081
+# Keycloak start-dev derives the issuer claim from the Host header, so both match.
 
 services:
   keycloak:
@@ -25,7 +25,7 @@ services:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
     volumes:
-      # Realm "antrag" + Client + Test-User werden beim Boot importiert.
+      # Keycloak imports the realm "antrag", the client and the test user at boot.
       - ./keycloak:/opt/keycloak/data/import:ro
     ports:
       - "8081:8080"
@@ -38,7 +38,7 @@ services:
       retries: 20
       start_period: 30s
 
-  # host.docker.internal:8081 vom Container aus erreichbar machen (Linux native docker).
+  # Make host.docker.internal:8081 reachable from the container (native Linux docker).
   api:
     extra_hosts:
       - "host.docker.internal:host-gateway"

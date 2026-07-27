@@ -71,7 +71,7 @@ describe('VersionHistoryComponent', () => {
     expect(c.revisions().length).toBe(2);
     expect(container.textContent).toContain('Version 2');
     expect(container.textContent).toContain('Version 1');
-    // Genau ein »Aktiv«-Badge (der Kopf-Stand).
+    // Exactly one "active" badge, for the head revision.
     expect(container.querySelectorAll('app-badge').length).toBe(1);
   });
 
@@ -96,7 +96,7 @@ describe('VersionHistoryComponent', () => {
     c.doRestore();
     expect(api.restoreConfigRevision).toHaveBeenCalledWith('r1');
     expect(toast.success).toHaveBeenCalled();
-    // Reload nach Restore: zweiter Listen-Abruf.
+    // A restore reloads the list, so the list call happens a second time.
     expect(api.listConfigRevisions).toHaveBeenCalledTimes(2);
   });
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Gemeinsame Helfer für backup.sh / restore.sh (T-42, deployment.md §4).
-# Keine Secrets im Code — alles aus der Umgebung (.env / env_file).
+# Shared helpers for backup.sh and restore.sh (T-42, deployment.md §4).
+# The code holds no secrets. Every value comes from the environment (.env or env_file).
 
-# Pflichtvariable lesen oder mit klarer Meldung abbrechen.
+# Read a mandatory variable. If the variable is empty, stop with a clear message.
 need() {
   local name="$1" val="${!1:-}"
   if [[ -z "${val}" ]]; then
@@ -12,9 +12,9 @@ need() {
   printf '%s' "${val}"
 }
 
-# pg_dump/pg_restore-Verbindung aus POSTGRES_* ableiten. Bewusst NICHT aus
-# DATABASE_URL: die trägt den asyncpg-Treiber (postgresql+asyncpg://…), den die
-# libpq-Tools nicht verstehen. Host ist der compose-Servicename.
+# Build the pg_dump and pg_restore connection from POSTGRES_*. Do NOT build it from
+# DATABASE_URL. That URL carries the asyncpg driver prefix (postgresql+asyncpg://…),
+# which the libpq tools cannot read. The host is the compose service name.
 export PGHOST="${PGHOST:-postgres}"
 export PGPORT="${PGPORT:-5432}"
 
@@ -25,7 +25,7 @@ pg_env() {
   export PGUSER PGPASSWORD PGDATABASE
 }
 
-# MinIO-Client-Alias setzen (idempotent). Liest MINIO_* aus .env.
+# Set the MinIO client alias. The call is idempotent and reads MINIO_* from .env.
 MC_ALIAS="${MC_ALIAS:-bk}"
 
 mc_env() {
@@ -37,8 +37,8 @@ mc_env() {
   mc alias set "${MC_ALIAS}" "${scheme}://${endpoint}" "${access}" "${secret}" >/dev/null
 }
 
-# age-Verschlüsselung: Backup-Host kennt nur den PUBLIC recipient (encrypt-only).
-# Der private identity-Key liegt off-host und wird erst zur Restore-Zeit gestellt.
+# age encryption: the backup host knows only the public recipient, so it can only encrypt.
+# The private identity key stays off host. Supply it at restore time only.
 age_recipient() { need BACKUP_AGE_RECIPIENT; }
 
 log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*"; }

@@ -1,10 +1,12 @@
-"""principal: calendar_token (iCal-Abo, #ics).
+"""principal: calendar_token (iCal subscription, #ics).
 
-Persönlicher, rotierbarer Feed-Token für das iCal-Abo der eigenen Sitzungen
-(``/api/calendar/{token}.ics``). Klartext (low-sensitivity), nullable bis zur
-ersten Ausgabe; ``UNIQUE`` (Postgres lässt beliebig viele NULLs zu). Idempotent
-(``IF NOT EXISTS``) — auf frischem Schema ist die Spalte bereits via
-``create_all`` (0001) vorhanden, auf älteren Schemata legt sie diese Migration an.
+Add a personal, rotatable feed token. The token authorizes the iCal
+subscription to the meetings of one principal (`/api/calendar/{token}.ics`).
+The value is plain text and low sensitivity. It stays NULL until the platform
+issues the first token. The index is `UNIQUE`, and Postgres still accepts any
+number of NULL rows. All statements are idempotent (`IF NOT EXISTS`). A fresh
+schema already has the column from `create_all` (0001). On an older schema this
+migration adds it.
 """
 
 from __future__ import annotations

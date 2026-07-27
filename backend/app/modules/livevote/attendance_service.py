@@ -1,9 +1,10 @@
-"""Meeting attendance service.
+"""Attendance service for a meeting.
 
-Roster = the current members of the meeting's gremium (membership within the
-valid term window). Members mark themselves (``source='self'``); the meeting
-lead can set anyone (``source='lead'``). Exactly one record per
-(meeting, member), upserted via the unique constraint.
+The roster holds the current members of the Gremium of the meeting. A
+membership counts when its term window is valid now. A member marks the own
+attendance (`source='self'`). The meeting lead sets the attendance of anyone
+(`source='lead'`). Each pair of meeting and member has exactly one record. The
+unique constraint drives the upsert.
 """
 
 from __future__ import annotations
@@ -26,7 +27,7 @@ from app.shared.errors import ConflictError, ForbiddenError, NotFoundError
 
 
 class AttendanceService:
-    """Roster plus attendance upsert, bound to an ``AsyncSession``."""
+    """Read the roster of a meeting and upsert the attendance records."""
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -40,7 +41,10 @@ class AttendanceService:
         return meeting
 
     async def _current_members(self, gremium_id: UUID) -> list[PrincipalRow]:
-        """Current gremium members (term window valid), each principal once."""
+        """Return each current member of the Gremium once.
+
+        A membership counts when its term window is valid now.
+        """
         now = datetime.now(UTC)
         rows = (
             await self.session.execute(
@@ -63,7 +67,7 @@ class AttendanceService:
         return list(rows)
 
     async def members(self, gremium_id: UUID) -> list[MeetingMemberOut]:
-        """Current gremium members as protokollant candidates (no meeting needed)."""
+        """Return the current Gremium members as Protokollant candidates."""
         return [
             MeetingMemberOut(
                 principalId=m.id, displayName=m.display_name, email=m.email
@@ -72,7 +76,10 @@ class AttendanceService:
         ]
 
     async def roster(self, meeting_id: UUID, requester_sub: str) -> list[AttendanceOut]:
-        """Members plus their (possibly still empty) attendance for this meeting."""
+        """Return the members with the attendance they have for this meeting.
+
+        A member without a record gets `status` and `source` as `None`.
+        """
         meeting = await self._meeting(meeting_id)
         members = await self._current_members(meeting.gremium_id)
         records = (
@@ -130,10 +137,14 @@ class AttendanceService:
 
     @staticmethod
     def _ensure_not_closed(meeting: Meeting) -> None:
-        """Attendance is frozen once the meeting is closed.
+        """Refuse a change when the meeting is closed.
 
-        The finalized protocol carries the attendance list — later changes would
-        let PDF and system diverge, so this raises 409."""
+        The finalized protocol carries the attendance list. A later change would
+        make the PDF and the system disagree.
+
+        Raises:
+            ConflictError: The meeting is closed. The API answers 409.
+        """
         if meeting.status == "closed":
             raise ConflictError(
                 "Attendance is read-only once the meeting is closed.", code="conflict"
@@ -142,7 +153,12 @@ class AttendanceService:
     async def set_self(
         self, meeting_id: UUID, status: AttendanceStatus, requester_sub: str
     ) -> list[AttendanceOut]:
-        """Set one's own attendance (gremium members only, not after closing)."""
+        """Set the own attendance of the requester.
+
+        Raises:
+            ForbiddenError: The requester is not a current member of the Gremium.
+            ConflictError: The meeting is closed.
+        """
         meeting = await self._meeting(meeting_id)
         self._ensure_not_closed(meeting)
         member = next(
@@ -165,7 +181,12 @@ class AttendanceService:
         status: AttendanceStatus,
         requester_sub: str,
     ) -> list[AttendanceOut]:
-        """Set a member's attendance as meeting lead (not after closing)."""
+        """Set the attendance of a member as the meeting lead.
+
+        Raises:
+            NotFoundError: The principal is not a current member of the Gremium.
+            ConflictError: The meeting is closed.
+        """
         meeting = await self._meeting(meeting_id)
         self._ensure_not_closed(meeting)
         members = await self._current_members(meeting.gremium_id)

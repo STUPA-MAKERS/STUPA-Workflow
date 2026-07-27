@@ -1,13 +1,14 @@
-"""Plattform-Benachrichtigungs-Config + Aufgaben-Erinnerungen (#task-reminder).
+"""Platform notification config and task reminders (#task-reminder).
 
-* ``notification_settings`` — Single-Row (id=1): Schwelle/Wiederholung der
-  Aufgaben-Erinnerungen, admin-gepflegt über ``/admin/notification-settings``.
-* ``task_reminder_log`` — letzter Erinnerungs-Versand je Antrag (gebunden an
-  den State-Aufenthalt via ``status_event``).
-* Neue Permission ``admin.notifications``: an alle Rollen verteilt, die
-  ``admin.site`` halten (Bereichs-Logik wie Migration 0016).
+* `notification_settings` — one row with `id=1`. It holds the threshold and the
+  repeat interval of the task reminders. An admin edits the row through
+  `/admin/notification-settings`.
+* `task_reminder_log` — the last reminder sent per application. The row binds to
+  one stay of the application in a state through `status_event`.
+* `admin.notifications` — a new permission. It goes to every role that holds
+  `admin.site`, the same scope logic as migration 0016.
 
-Idempotent (``IF NOT EXISTS`` / ``ON CONFLICT DO NOTHING``).
+The migration is idempotent (`IF NOT EXISTS` and `ON CONFLICT DO NOTHING`).
 """
 
 from __future__ import annotations

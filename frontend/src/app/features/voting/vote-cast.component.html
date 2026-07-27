@@ -95,8 +95,8 @@
         }
 
         @if (isOpen() && delegation()?.exercising) {
-          <!-- Proxy ballot: cast separately under the delegator's voting right —
-               may differ from one's own. -->
+          <!-- Proxy ballot: cast it separately under the voting right of the delegator.
+               The proxy choice can differ from the own choice. -->
           <h2 class="mt-2 text-base font-semibold">
             {{ 'voting.cast.delegation.proxyHeading' | t: { name: delegation()?.delegatedByName || '?' } }}
           </h2>

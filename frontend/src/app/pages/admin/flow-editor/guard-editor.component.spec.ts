@@ -6,9 +6,10 @@ import { GuardEditorComponent } from './guard-editor.component';
 const ROLES: SelectOption[] = [{ value: 'stupa', label: 'StuPa' }];
 const GREMIEN: SelectOption[] = [{ value: 'g1', label: 'Finanzausschuss' }];
 
-/** Renders ONCE; `setGuard`/`setAutomatic` mutate inputs in place (controlled
- *  component) so a single test can walk several guard shapes without re-rendering
- *  (re-rendering would re-configure the TestBed, which Angular forbids per test). */
+/** Renders once. `setGuard` and `setAutomatic` mutate the inputs in place, because the
+ *  component is controlled. One test can then walk several guard shapes without a
+ *  re-render. A re-render would re-configure the TestBed. Angular forbids that more
+ *  than once per test. */
 async function setup(
   initial: { guard?: Guard | null; automatic?: boolean } = {},
 ) {

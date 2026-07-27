@@ -1,9 +1,9 @@
-"""AUD-071: MINIO an / CLAMAV aus → laute Startup-Warnung.
+"""AUD-071: object storage on and ClamAV off must give a startup warning.
 
-Mit Object-Storage aktiv aber ohne Scanner werden Anhänge gespeichert und ein Scan-Job
-enqueued; der Worker hat aber keinen Scanner und lässt ``scanned=False`` — Downloads
-bleiben dauerhaft in Quarantäne (409). Diese Fehlkonfiguration darf nicht still bleiben:
-``Settings._strict_security_warnings`` muss laut warnen.
+With object storage active but no scanner, the backend stores attachments and enqueues a
+scan job. The worker finds no scanner and leaves `scanned=False`. Downloads then stay in
+quarantine forever (409). This misconfiguration must not stay silent.
+`Settings._strict_security_warnings` must warn about it.
 """
 
 from typing import Any
@@ -40,7 +40,7 @@ def _base_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_storage_on_clamav_off_warns(monkeypatch: pytest.MonkeyPatch) -> None:
-    """MINIO gesetzt, CLAMAV_HOST leer → CLAMAV-Quarantäne-Warnung."""
+    """Warn about quarantine when MINIO is set and CLAMAV_HOST is empty."""
     _base_env(monkeypatch)
     s, warnings = _settings_warnings(
         monkeypatch,
@@ -54,7 +54,7 @@ def test_storage_on_clamav_off_warns(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_storage_on_clamav_on_no_warning(monkeypatch: pytest.MonkeyPatch) -> None:
-    """MINIO + CLAMAV beide gesetzt → keine Quarantäne-Warnung."""
+    """Give no quarantine warning when MINIO and CLAMAV are both set."""
     _base_env(monkeypatch)
     s, warnings = _settings_warnings(
         monkeypatch,
@@ -68,7 +68,7 @@ def test_storage_on_clamav_on_no_warning(monkeypatch: pytest.MonkeyPatch) -> Non
 
 
 def test_storage_off_no_warning(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Ohne Object-Storage → keine Quarantäne-Warnung (auch ohne CLAMAV)."""
+    """Give no quarantine warning when object storage is off, even with CLAMAV off."""
     _base_env(monkeypatch)
     s, warnings = _settings_warnings(
         monkeypatch,

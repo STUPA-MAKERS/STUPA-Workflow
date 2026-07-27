@@ -1,18 +1,16 @@
-"""Integration (echte Postgres): DB-Backing der Overlap-Invariante (AUD-029).
+"""Integration (real Postgres): the DB backs the overlap invariant (AUD-029).
 
-Die reine Python-Prüfung in ``create_membership`` ist nur ein Fast-Path und schützt
-NICHT gegen TOCTOU: zwei parallele Inserts lesen beide den Vor-Zustand, beide passieren
-die Prüfung, beide committen. Verbindlich durchgesetzt wird die Invariante »pro
-(Principal, Gremium) genau eine aktive Amtszeit« über die EXCLUDE-Constraint
-``ex_gremium_membership_no_overlap`` (btree_gist, halboffenes ``tstzrange``).
+The pure Python check in `create_membership` is only a fast path. It does NOT protect
+against TOCTOU. Two parallel inserts both read the state before the change, both pass
+the check, and both commit. The EXCLUDE constraint `ex_gremium_membership_no_overlap`
+(btree_gist, half-open `tstzrange`) enforces the real invariant: one active term per
+(principal, Gremium).
 
-Beweist gegen das migrierte Schema:
-* ein zweiter, zeitlich überlappender Insert desselben (Principal, Gremium) — der die
-  Python-Prüfung umgeht — wird von der DB mit ``IntegrityError`` abgelehnt;
-* der Service übersetzt diesen ``IntegrityError`` in einen 409 (``ConflictError``),
-  nicht in einen 500;
-* aneinandergrenzende (halboffene) Folgeamtszeiten bleiben erlaubt;
-* andere Principals / andere Gremien sind nicht betroffen.
+The tests prove these facts against the migrated schema. The DB rejects a second,
+overlapping insert for the same (principal, Gremium) with an `IntegrityError`. That
+insert bypasses the Python check. The service maps the `IntegrityError` to a 409
+(`ConflictError`), not to a 500. Adjacent, half-open follow-up terms stay allowed.
+Other principals and other Gremien stay unaffected.
 """
 
 from __future__ import annotations
@@ -46,7 +44,7 @@ async def session(migrated: tuple[str, str]) -> AsyncIterator[AsyncSession]:
 async def _fixture(
     session: AsyncSession,
 ) -> tuple[Gremium, GremiumRole, PrincipalRow]:
-    """Gremium + Gremium-Rolle + Principal (committet)."""
+    """Create a Gremium, a Gremium role and a principal, and commit them."""
     gremium = Gremium(name="StuPa", slug=f"g-{uuid.uuid4()}")
     session.add(gremium)
     await session.flush()
@@ -68,7 +66,7 @@ async def _fixture(
 async def test_overlapping_insert_rejected_by_db_constraint(
     session: AsyncSession,
 ) -> None:
-    """Zwei überlappende Inserts (Python-Prüfung umgangen) → DB lehnt den 2. ab."""
+    """Two overlapping inserts bypass the Python check, and the DB rejects the second."""
     gremium, role, member = await _fixture(session)
 
     def _membership(frm: str | None, until: str | None) -> GremiumMembership:
@@ -82,13 +80,13 @@ async def test_overlapping_insert_rejected_by_db_constraint(
             else None,
         )
 
-    # 1. Amtszeit [2026-01-01, 2026-12-31): committet.
+    # First term [2026-01-01, 2026-12-31), committed.
     session.add(_membership("2026-01-01", "2026-12-31"))
     await session.commit()
 
-    # 2. Amtszeit [2026-06-01, 2027-06-01) überlappt → EXCLUDE-Constraint feuert.
-    # Direkter Insert umgeht bewusst die Python-Fast-Path-Prüfung des Service und
-    # beweist, dass die DB selbst (TOCTOU-fest) die Überlappung ablehnt.
+    # The second term [2026-06-01, 2027-06-01) overlaps, so the EXCLUDE constraint fires.
+    # The direct insert bypasses the Python fast-path check of the service on purpose. It
+    # proves that the DB itself rejects the overlap and stays safe against TOCTOU.
     session.add(_membership("2026-06-01", "2027-06-01"))
     with pytest.raises(IntegrityError):
         await session.commit()
@@ -98,17 +96,18 @@ async def test_overlapping_insert_rejected_by_db_constraint(
 async def test_service_translates_db_overlap_to_409(
     session: AsyncSession, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """TOCTOU: Fast-Path übersehen, DB-Constraint → 409 (``ConflictError``), nicht 500.
+    """TOCTOU: the fast path misses the clash, so the DB constraint must give a 409.
 
-    Simuliert das konkurrierende Race genau dort, wo es real auftritt: die Python-
-    Fast-Path-Prüfung passiert (als hätte sie den fremden Insert im eigenen Snapshot
-    nicht gesehen — hier deterministisch erzwungen durch ``intervals_overlap`` → False),
-    aber die bereits committete, überlappende Amtszeit lässt beim Commit die EXCLUDE-
-    Constraint ``ex_gremium_membership_no_overlap`` feuern. Der Service MUSS den
-    ``IntegrityError`` in einen 409 übersetzen — sonst schlüge der Race als 500 durch."""
+    The test simulates the race where it happens in production. The Python fast-path
+    check passes, as if it did not see the other insert in its own snapshot. The patched
+    `intervals_overlap` returns False and forces that outcome. The overlapping term is
+    already committed, so the EXCLUDE constraint `ex_gremium_membership_no_overlap`
+    fires on commit. The service MUST map the `IntegrityError` to a 409
+    (`ConflictError`). Without that map, the race surfaces as a 500.
+    """
     gremium, role, member = await _fixture(session)
 
-    # Bereits committete, kollidierende Amtszeit (der "Gewinner" des Races).
+    # The colliding term is already committed. It is the winner of the race.
     session.add(
         GremiumMembership(
             principal_id=member.id,
@@ -120,7 +119,7 @@ async def test_service_translates_db_overlap_to_409(
     )
     await session.commit()
 
-    # Fast-Path blind stellen: erzwingt den DB-Pfad (TOCTOU) statt der Python-Prüfung.
+    # Blind the fast path. This forces the DB path (TOCTOU) instead of the Python check.
     monkeypatch.setattr(
         "app.modules.admin.gremium_roles.intervals_overlap",
         lambda *_: False,
@@ -137,7 +136,7 @@ async def test_service_translates_db_overlap_to_409(
 
 
 async def test_consecutive_terms_allowed(session: AsyncSession) -> None:
-    """Aneinandergrenzende (halboffene) Folgeamtszeiten bleiben erlaubt."""
+    """Adjacent, half-open follow-up terms stay allowed."""
     gremium, role, member = await _fixture(session)
     session.add(
         GremiumMembership(
@@ -149,7 +148,7 @@ async def test_consecutive_terms_allowed(session: AsyncSession) -> None:
         )
     )
     await session.commit()
-    # [2026-01-01, 2027-01-01) grenzt an → keine Überlappung, kein Fehler.
+    # [2026-01-01, 2027-01-01) is adjacent, so there is no overlap and no error.
     session.add(
         GremiumMembership(
             principal_id=member.id,
@@ -159,4 +158,4 @@ async def test_consecutive_terms_allowed(session: AsyncSession) -> None:
             valid_until=datetime(2027, 1, 1, tzinfo=UTC),
         )
     )
-    await session.commit()  # darf nicht werfen
+    await session.commit()  # must not raise

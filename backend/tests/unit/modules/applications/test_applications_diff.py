@@ -1,4 +1,4 @@
-"""Unit: Feld-Diff zweier ``data``-Snapshots (T-12, data-model §1)."""
+"""Unit tests for the field diff of two `data` snapshots (T-12, data-model section 1)."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ def test_diff_unchanged_is_empty() -> None:
 
 
 def test_diff_nested_values_compared_whole() -> None:
-    # Tabellen-/Objektfelder werden wertweise als Ganzes verglichen (kein Zell-Diff).
+    # The diff compares a table or object field as one whole value, not cell by cell.
     old = {"rows": [{"k": 1}]}
     new = {"rows": [{"k": 1}, {"k": 2}]}
     diff = compute_diff(old, new)

@@ -1,7 +1,8 @@
-"""Integration: Alembic-Migrationen + DB-Constraints gegen echtes Postgres 16.
+"""Integration tests for the Alembic migrations and DB constraints on a real Postgres 16.
 
-Akzeptanz T-06: upgrade/downgrade sauber; partial-unique (active/initial) greifen;
-GIN-Index vorhanden; Seed legt Default-Rollen an; FK-CASCADE (applicant).
+Acceptance T-06: upgrade and downgrade run clean. The partial unique indexes for the
+active form version and the initial state hold. The GIN index exists. The seed creates
+the default roles. A deleted application cascades to its applicant rows.
 """
 
 from __future__ import annotations
@@ -21,7 +22,7 @@ def _new_type(conn) -> str:  # noqa: ANN001
 
 
 def test_upgrade_and_downgrade_clean(alembic_cfg: Config, engine: Engine) -> None:
-    # head ist bereits erreicht (fixture). Voller Round-Trip: head → base → head.
+    # The fixture already upgraded to head. This test runs the round trip head, base, head.
     command.downgrade(alembic_cfg, "base")
     with engine.connect() as conn:
         remaining = conn.execute(
@@ -196,9 +197,12 @@ def test_citext_email_case_insensitive(engine: Engine) -> None:
 
 
 def test_drop_type_flows_repairs_legacy_duplicates(engine: Engine) -> None:
-    """0019 auf Bestands-Daten (Per-Typ-Ära): mehrere aktive Flows und doppelte
-    Versionsnummern werden repariert, statt am partial unique Index zu scheitern;
-    der globale Flow (application_type_id IS NULL) bleibt der aktive."""
+    """Migration 0019 repairs legacy data from the per-type era.
+
+    The migration repairs several active flows and duplicate version numbers. It does
+    not fail on the partial unique index. The global flow (application_type_id IS NULL)
+    stays the active one.
+    """
     import importlib.util
     from pathlib import Path
 
@@ -214,7 +218,7 @@ def test_drop_type_flows_repairs_legacy_duplicates(engine: Engine) -> None:
     spec.loader.exec_module(mod)
 
     with engine.begin() as conn:
-        # Bestands-Schema nachstellen: neue Invarianten weg, Alt-Spalte zurück.
+        # Rebuild the legacy schema: drop the new invariants and add the old column back.
         conn.execute(text("DROP INDEX IF EXISTS uq_flow_version_one_active_global"))
         conn.execute(
             text(

@@ -1,9 +1,9 @@
 """Real-render tests (no mock).
 
-The md->tex path exercises the genuine pytex v1.0.0 variant machinery without
-needing tectonic (no PDF compile), so it runs unconditionally in CI. The md->pdf
-path additionally needs a working tectonic and a warm bundle cache, so it alone
-is skipped unless tectonic is on PATH.
+The md->tex path drives the real variant machinery of pytex v1.0.0. It compiles
+no PDF, so it needs no tectonic and runs in CI every time. The md->pdf path also
+needs a working tectonic and a warm bundle cache. pytest skips that one test
+when tectonic is not on PATH.
 """
 
 from __future__ import annotations

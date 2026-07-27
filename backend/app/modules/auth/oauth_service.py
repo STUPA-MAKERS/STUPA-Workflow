@@ -1,9 +1,9 @@
-"""OAuth2 AS service: mint authorization codes, exchange for tokens, rotate tokens.
+"""OAuth2 authorization-server service: mint codes, exchange them, rotate tokens.
 
-I/O layer over :mod:`app.modules.auth.oauth_models`; the pure logic (scopes,
-PKCE, hashing) lives in :mod:`app.modules.auth.oauth`. Codes are single-use
-(``used_at`` set atomically); refresh rotates (old row ``revoked_at``). The
-caller commits.
+This module is the I/O layer over `app.modules.auth.oauth_models`. The pure logic for
+scopes, PKCE and hashing lives in `app.modules.auth.oauth`. A code is single-use, because
+the exchange sets `used_at` atomically. A refresh rotates the pair and sets `revoked_at` on
+the old row. The caller commits.
 """
 
 from __future__ import annotations
@@ -31,10 +31,11 @@ async def create_authorization_code(
     ttl_seconds: int,
     access_ttl_seconds: int | None,
 ) -> str:
-    """Create an authorization code (hashed) and return the plaintext.
+    """Create a hashed authorization code and return the plaintext.
 
-    ``access_ttl_seconds`` is the token lifetime chosen in the consent
-    (``None`` = never expires); it is applied at token exchange."""
+    The `access_ttl_seconds` value is the token lifetime chosen in the consent. `None`
+    means that the token never expires. The token exchange applies this value.
+    """
     code = oauth.generate_access_token().replace(oauth._ACCESS_PREFIX, "apac_", 1)
     db.add(
         OAuthAuthorizationCode(
@@ -53,7 +54,10 @@ async def create_authorization_code(
 
 
 class IssuedTokens:
-    """Freshly issued token pair (plaintext exists only here, never again)."""
+    """A fresh token pair.
+
+    The plaintext exists only in this object and never again.
+    """
 
     __slots__ = ("access_token", "refresh_token", "scope", "expires_in")
 
@@ -63,11 +67,14 @@ class IssuedTokens:
         self.access_token = access_token
         self.refresh_token = refresh_token
         self.scope = scope
-        self.expires_in = expires_in  # None = never expires
+        self.expires_in = expires_in  # None means the token never expires
 
 
 def _expiry(now: datetime, ttl: int | None) -> datetime | None:
-    """Map a TTL in seconds to an expiry timestamp; ``None`` stays ``None`` (never expires)."""
+    """Map a TTL in seconds to an expiry timestamp.
+
+    A `None` TTL stays `None` and means that the token never expires.
+    """
     return None if ttl is None else now + timedelta(seconds=ttl)
 
 
@@ -110,13 +117,18 @@ async def exchange_code(
     access_ttl: int,
     refresh_ttl: int,
 ) -> IssuedTokens:
-    """Exchange an authorization code for a token pair (PKCE + client/redirect binding checked).
+    """Exchange an authorization code for a token pair.
 
-    Single-use (RFC 6749): redemption is an atomic ``UPDATE ... WHERE id=? AND
-    used_at IS NULL RETURNING id``. Under READ COMMITTED the DB serializes
-    concurrent redemptions — exactly one claims the row, the rest get
-    ``invalid_grant``. Validation (expiry/binding/PKCE) runs first so a failed
-    request does not burn the code.
+    The function checks the PKCE verifier and the binding to the client and the redirect
+    URI. The code is single-use (RFC 6749). The redemption is an atomic
+    `UPDATE ... WHERE id=? AND used_at IS NULL RETURNING id`. Under READ COMMITTED the
+    database serializes concurrent redemptions. Exactly one caller claims the row. The
+    other callers get `invalid_grant`. The checks of expiry, binding and PKCE run first, so
+    a failed request does not burn the code.
+
+    Raises:
+        OAuthError: The code is unknown, used, expired, or the binding or the PKCE check
+            fails. The error code is `invalid_grant`.
     """
     row = (
         await db.execute(
@@ -133,8 +145,8 @@ async def exchange_code(
         raise oauth.OAuthError("invalid_grant", "client/redirect mismatch")
     if not oauth.verify_pkce_s256(code_verifier, row.code_challenge):
         raise oauth.OAuthError("invalid_grant", "PKCE verification failed")
-    # Atomic claim: only the first concurrent redemption wins. 0 rows means the
-    # code was consumed between SELECT and UPDATE (double-spend protection).
+    # Atomic claim: only the first concurrent redemption wins. Zero rows mean that another
+    # caller consumed the code between the SELECT and the UPDATE (double-spend guard).
     claimed = (
         await db.execute(
             update(OAuthAuthorizationCode)
@@ -148,8 +160,9 @@ async def exchange_code(
     ).scalar_one_or_none()
     if claimed is None:
         raise oauth.OAuthError("invalid_grant", "code invalid or already used")
-    # The consent-chosen lifetime (``access_ttl_seconds``) is authoritative —
-    # ``None`` means "never expires" (NOT default); refresh then never expires either.
+    # The lifetime chosen in the consent (`access_ttl_seconds`) wins. `None` means that
+    # the token never expires. It does not mean the default. The refresh token then never
+    # expires either.
     consent_ttl = row.access_ttl_seconds
     return await _issue_tokens(
         db,
@@ -171,13 +184,16 @@ async def refresh_tokens(
     access_ttl: int,
     refresh_ttl: int,
 ) -> IssuedTokens:
-    """Exchange a refresh token for a new pair; the old token is revoked (rotation).
+    """Exchange a refresh token for a new pair and revoke the old one.
 
-    Rotation is an atomic ``UPDATE ... WHERE id=? AND revoked_at IS NULL
-    RETURNING id`` — only the first concurrent redemption wins. Presenting an
-    already-rotated token indicates theft/replay: the entire still-active token
-    family of this principal+client is cascade-revoked (RFC 6819), forcing
-    re-authentication.
+    The rotation is an atomic `UPDATE ... WHERE id=? AND revoked_at IS NULL RETURNING id`.
+    Only the first concurrent redemption wins. An already-rotated token points to a theft
+    or a replay. The service then revokes the whole still-active token family of this
+    principal and client (RFC 6819). The client must authenticate again.
+
+    Raises:
+        OAuthError: The refresh token is invalid, revoked or expired, the client does not
+            match, or the principal is inactive. The error code is `invalid_grant`.
     """
     row = (
         await db.execute(
@@ -189,7 +205,7 @@ async def refresh_tokens(
     if row is None:
         raise oauth.OAuthError("invalid_grant", "refresh token invalid or revoked")
     if row.revoked_at is not None:
-        # Replay of an already-rotated token -> force-revoke the family.
+        # A replay of an already-rotated token forces a revocation of the whole family.
         await db.execute(
             update(OAuthToken)
             .where(
@@ -204,15 +220,15 @@ async def refresh_tokens(
         raise oauth.OAuthError("invalid_grant", "client mismatch")
     if row.refresh_expires_at is not None and row.refresh_expires_at <= now:
         raise oauth.OAuthError("invalid_grant", "refresh token expired")
-    # Active check before rotation: a deactivated principal must not receive a
-    # fresh token pair (mirrors the access-token rejection in ``deps``).
+    # Check `active` before the rotation. A deactivated principal must not get a fresh
+    # token pair. This mirrors the access-token rejection in `deps`.
     principal = (
         await db.execute(select(Principal).where(Principal.id == row.principal_id))
     ).scalar_one_or_none()
     if principal is None or principal.active is False:
         raise oauth.OAuthError("invalid_grant", "principal inactive")
-    # Atomic rotation: only the first concurrent redemption wins. 0 rows means
-    # the token was rotated between SELECT and UPDATE (race protection).
+    # Atomic rotation: only the first concurrent redemption wins. Zero rows mean that
+    # another caller rotated the token between the SELECT and the UPDATE.
     rotated = (
         await db.execute(
             update(OAuthToken)
@@ -226,7 +242,7 @@ async def refresh_tokens(
     ).scalar_one_or_none()
     if rotated is None:
         raise oauth.OAuthError("invalid_grant", "refresh token invalid or revoked")
-    # Keep the chosen lifetime across the rotation (``None`` = never).
+    # Keep the chosen lifetime across the rotation. `None` means never.
     keep_access = row.access_ttl_seconds
     return await _issue_tokens(
         db,
@@ -242,7 +258,7 @@ async def refresh_tokens(
 async def resolve_access_token(
     db: AsyncSession, *, token: str, now: datetime
 ) -> tuple[UUID, str] | None:
-    """Resolve a valid access token to ``(principal_id, scope)``, or ``None``."""
+    """Resolve a valid access token to `(principal_id, scope)`, or return `None`."""
     row = (
         await db.execute(
             select(OAuthToken).where(
@@ -252,7 +268,7 @@ async def resolve_access_token(
     ).scalar_one_or_none()
     if row is None or row.revoked_at is not None:
         return None
-    # ``access_expires_at is None`` -> never expires (only revocation ends the token).
+    # `access_expires_at is None` means the token never expires. Only a revocation ends it.
     if row.access_expires_at is not None and row.access_expires_at <= now:
         return None
     return row.principal_id, row.scope

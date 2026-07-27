@@ -1,4 +1,4 @@
-"""Restabdeckung files (T-13): Modell/Metadata + Attachment-Rate-Limit-Schlüssel."""
+"""Remaining coverage for files (T-13): model metadata and attachment rate-limit keys."""
 
 from __future__ import annotations
 
@@ -17,7 +17,6 @@ from app.shared.ratelimit import RateLimitResult
 SETTINGS = load_settings()
 
 
-# --------------------------------------------------------------------------- model
 def test_attachment_table_registered() -> None:
     assert "attachment" in Base.metadata.tables
     table = Attachment.__table__
@@ -39,7 +38,6 @@ def test_attachment_fk_cascade() -> None:
     assert fk.column.table.name == "application"
 
 
-# --------------------------------------------------------------------------- ratelimit
 class _NullLimiter:
     def __init__(self) -> None:
         self.keys: list[str] = []

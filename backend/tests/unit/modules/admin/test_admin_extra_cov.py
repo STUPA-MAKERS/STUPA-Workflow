@@ -1,14 +1,15 @@
-"""Unit (ohne DB): Vollabdeckung Gremium-Rollen + Site-Config-Service.
+"""Unit tests without a DB: full coverage of Gremium roles and the site-config service.
 
-Ergänzt die bestehenden Suites um die noch nicht abgedeckten Service-Branches:
-* Gremium-Rollen-CRUD (Konflikt/Not-Found/Pflichtrollen-Schutz, In-Use-Block),
-* Pflichtrollen-Backfill (idempotent), Membership-Validierung,
-* reine Helfer (``_parse_dt``/``_iso``/``_sanitize_perms``/``_role_out``),
-* Site-Config Draft/Activate/Public/Manifest inkl. Fallback-Namen.
+These tests add the service branches that the other suites leave open. They cover the
+Gremium role CRUD with its conflict, not-found, forced-role and in-use blocks. They cover
+the idempotent forced-role backfill and the membership validation. They cover the pure
+helpers ``_parse_dt``, ``_iso``, ``_sanitize_perms`` and ``_role_out``. They also cover
+the site-config draft, activate, public and manifest paths with the fallback names.
 
-DB-frei: ``tests._support.auth_fakes.FakeSession`` liefert vorab gefüllte
-Ergebnis-/``get``-Queues. Audit-``record`` setzt zwei ``execute``-Calls ab
-(Advisory-Lock + prev-Hash) → je Audit zwei ``result()`` in der Queue.
+These tests need no DB. ``tests._support.auth_fakes.FakeSession`` serves prefilled result
+queues and ``get`` queues. Every audit ``record`` runs two ``execute`` calls: the
+advisory lock and the prev-hash select. So each audit write needs two ``result()``
+entries in the queue.
 """
 
 from __future__ import annotations
@@ -78,7 +79,7 @@ def _membership(pid, gid, frm, until) -> GremiumMembership:
 
 
 def _id_on_flush(db) -> None:
-    """``flush`` der Auth-Fakes vergibt keine PK → wie in der Bestands-Suite nachrüsten."""
+    """Give every added object an id because the fake ``flush`` sets no primary key."""
     orig_flush = db.flush
 
     async def _flush() -> None:
@@ -90,19 +91,16 @@ def _id_on_flush(db) -> None:
     db.flush = _flush
 
 
-# =========================================================== reine Helfer/Queries
-
-
 def test_intervals_overlap_all_branches() -> None:
-    # a_from None -> left_ok kurzschluss True, dann right_ok prüfen
+    # a_from None short-circuits left_ok to True, so only right_ok stays to check.
     assert intervals_overlap(None, _dt("2026-06-01"), _dt("2026-01-01"), _dt("2026-03-01"))
-    # b_until None -> left_ok True
+    # b_until None makes left_ok True.
     assert intervals_overlap(_dt("2026-01-01"), _dt("2026-02-01"), _dt("2026-01-15"), None)
-    # disjunkt: left_ok False (a_from >= b_until)
+    # Disjoint: left_ok False because a_from >= b_until.
     assert not intervals_overlap(
         _dt("2026-06-01"), _dt("2026-09-01"), _dt("2026-01-01"), _dt("2026-03-01")
     )
-    # right_ok False (b_from >= a_until), left_ok True
+    # right_ok False because b_from >= a_until, left_ok True.
     assert not intervals_overlap(
         _dt("2026-01-01"), _dt("2026-03-01"), _dt("2026-06-01"), _dt("2026-09-01")
     )
@@ -111,10 +109,8 @@ def test_intervals_overlap_all_branches() -> None:
 def test_parse_dt_variants() -> None:
     assert _parse_dt(None) is None
     assert _parse_dt("") is None
-    # naive -> UTC ergänzt
     naive = _parse_dt("2026-01-01T10:00:00")
     assert naive is not None and naive.tzinfo is UTC
-    # mit Offset bleibt erhalten
     aware = _parse_dt("2026-01-01T10:00:00+02:00")
     assert aware is not None and aware.utcoffset() is not None
 
@@ -127,7 +123,7 @@ def test_iso() -> None:
 
 def test_sanitize_perms() -> None:
     assert _sanitize_perms(None) == []
-    # dedupliziert + Katalog-Reihenfolge, Unbekanntes raus
+    # The helper drops a duplicate and an unknown key, then keeps the catalog order.
     out = _sanitize_perms(["vote.cast", "bogus", "session.manage", "vote.cast"])
     assert out == [p for p in GREMIUM_PERMISSIONS if p in {"vote.cast", "session.manage"}]
     assert "bogus" not in out
@@ -137,7 +133,6 @@ def test_role_out_forced_flag_and_empty_name() -> None:
     forced = _role(key=next(iter(FORCED_ROLE_KEYS)))
     out = _role_out(forced)
     assert out.forced is True
-    # name_i18n None -> {}
     r = GremiumRole(gremium_id=uuid4(), key="custom", name_i18n=None, permissions=None)
     r.id = uuid4()
     out2 = _role_out(r)
@@ -149,41 +144,33 @@ def test_role_out_forced_flag_and_empty_name() -> None:
 async def test_active_gremium_roles_and_permission_helpers() -> None:
     gid = uuid4()
     role = _role(gid, key="vorstand", perms=["session.manage", "vote.cast"])
-    # active_gremium_roles: execute -> rows of (gremium_id, role)
+    # active_gremium_roles: execute returns rows of (gremium_id, role).
     db = fake_session(result((gid, role)))
     pairs = await active_gremium_roles(db, "sub-1", now=_dt("2026-06-01"))
     assert pairs == [(gid, role)]
 
-    # gremium_ids_with_permission: perm vorhanden
     db2 = fake_session(result((gid, role)))
     assert await gremium_ids_with_permission(db2, "sub-1", "session.manage") == {gid}
-    # perm fehlt -> leeres set
     db3 = fake_session(result((gid, role)))
     assert await gremium_ids_with_permission(db3, "sub-1", "protocol.write") == set()
-    # Rolle ohne permissions (None) -> kein Treffer
+    # A role with permissions None must not match.
     role_none = _role(gid, key="x", perms=None)
     role_none.permissions = cast("list[str]", None)
     db4 = fake_session(result((gid, role_none)))
     assert await gremium_ids_with_permission(db4, "sub-1", "vote.cast") == set()
 
-    # gremium_member_ids
     db5 = fake_session(result((gid, role)))
     assert await gremium_member_ids(db5, "sub-1") == {gid}
 
 
 async def test_active_gremium_roles_default_now() -> None:
-    # now=None -> datetime.now(UTC)-Zweig
     db = fake_session(result())
     assert await active_gremium_roles(db, "nobody") == []
 
 
-# ==================================================== ensure_forced_roles / list
-
-
 async def test_ensure_forced_roles_adds_when_missing() -> None:
     gid = uuid4()
-    # present keys: keine vorhanden -> alle drei werden angelegt
-    db = fake_session(result())  # scalars(present keys) -> leer
+    db = fake_session(result())  # scalars(present keys) -> empty
     svc = GremiumRoleService(db)
     added = await svc.ensure_forced_roles(gid)
     assert added is True
@@ -194,7 +181,7 @@ async def test_ensure_forced_roles_adds_when_missing() -> None:
 
 async def test_ensure_forced_roles_idempotent_when_all_present() -> None:
     gid = uuid4()
-    db = fake_session(result(*FORCED_ROLE_KEYS))  # alle keys schon da
+    db = fake_session(result(*FORCED_ROLE_KEYS))  # every key already exists
     svc = GremiumRoleService(db)
     added = await svc.ensure_forced_roles(gid)
     assert added is False
@@ -204,20 +191,20 @@ async def test_ensure_forced_roles_idempotent_when_all_present() -> None:
 
 async def test_list_roles_backfills_then_commits() -> None:
     gid = uuid4()
-    # 1) ensure_forced_roles scalars(present) -> leer (=> added True, commit)
-    # 2) scalars(rows) -> die nun vorhandenen Rollen
+    # 1) ensure_forced_roles scalars(present) -> empty, so it adds and commits.
+    # 2) scalars(rows) -> the roles that now exist.
     r1 = _role(gid, key="vorstand")
     db = fake_session(result(), result(r1))
     svc = GremiumRoleService(db)
     out = await svc.list_roles(gid)
-    assert db.committed == 1  # weil backfill etwas angelegt hat
+    assert db.committed == 1  # because the backfill added a role
     assert [o.key for o in out] == ["vorstand"]
 
 
 async def test_list_roles_no_backfill_no_commit() -> None:
     gid = uuid4()
     r1 = _role(gid, key="manager")
-    # present keys = alle Pflichtrollen -> kein add, kein commit
+    # The present keys cover every forced role, so the service adds nothing and commits nothing.
     db = fake_session(result(*FORCED_ROLE_KEYS), result(r1))
     svc = GremiumRoleService(db)
     out = await svc.list_roles(gid)
@@ -225,13 +212,10 @@ async def test_list_roles_no_backfill_no_commit() -> None:
     assert len(out) == 1
 
 
-# ============================================================== create/update role
-
-
 async def test_create_role_conflict_on_duplicate_key() -> None:
     gid = uuid4()
     existing = _role(gid, key="reviewer")
-    db = fake_session(result(existing))  # scalars(existing) -> first() != None
+    db = fake_session(result(existing))  # scalars(existing) -> first() is not None
     svc = GremiumRoleService(db)
     with pytest.raises(ConflictError):
         await svc.create_role(gid, GremiumRoleCreate(key="reviewer"), "admin")
@@ -240,7 +224,7 @@ async def test_create_role_conflict_on_duplicate_key() -> None:
 async def test_create_role_success_sanitizes_perms() -> None:
     gid = uuid4()
     db = fake_session(
-        result(),  # scalars(existing) -> keiner
+        result(),  # scalars(existing) -> none
         result(),  # audit advisory lock
         result(),  # audit prev-hash
     )
@@ -256,12 +240,12 @@ async def test_create_role_success_sanitizes_perms() -> None:
     assert "bogus" not in out.permissions
     assert set(out.permissions) == {"vote.cast", "session.manage"}
     assert db.committed == 1
-    # genau eine GremiumRole angelegt (zusätzlich hängt der Audit-Eintrag dran)
+    # The service adds exactly one GremiumRole. The audit row is also in db.added.
     assert sum(isinstance(o, GremiumRole) for o in db.added) == 1
 
 
 async def test_update_role_not_found() -> None:
-    db = fake_session(gets=[None])  # get -> None
+    db = fake_session(gets=[None])
     svc = GremiumRoleService(db)
     with pytest.raises(NotFoundError):
         await svc.update_role(uuid4(), GremiumRoleUpdate(name={"de": "X"}), "admin")
@@ -269,7 +253,7 @@ async def test_update_role_not_found() -> None:
 
 async def test_update_role_updates_name_and_perms() -> None:
     role = _role(key="custom", perms=["vote.cast"])
-    db = fake_session(result(), result(), gets=[role])  # audit 2x execute
+    db = fake_session(result(), result(), gets=[role])  # audit runs execute twice
     svc = GremiumRoleService(db)
     out = await svc.update_role(
         role.id,
@@ -286,13 +270,10 @@ async def test_update_role_keeps_fields_when_none() -> None:
     role.name_i18n = {"de": "Alt"}
     db = fake_session(result(), result(), gets=[role])
     svc = GremiumRoleService(db)
-    # name=None und permissions=None -> beide Zweige übersprungen
+    # name None and permissions None skip both update branches.
     out = await svc.update_role(role.id, GremiumRoleUpdate(), "admin")
     assert out.name == {"de": "Alt"}
     assert out.permissions == ["vote.cast"]
-
-
-# ===================================================================== delete role
 
 
 async def test_delete_role_not_found() -> None:
@@ -312,7 +293,7 @@ async def test_delete_role_forced_blocked() -> None:
 
 async def test_delete_role_in_use_blocked() -> None:
     role = _role(key="custom")
-    db = fake_session(result(uuid4()), gets=[role])  # scalars(in_use) -> first() != None
+    db = fake_session(result(uuid4()), gets=[role])  # scalars(in_use) -> first() is not None
     svc = GremiumRoleService(db)
     with pytest.raises(ConflictError, match="in use"):
         await svc.delete_role(role.id, "admin")
@@ -321,7 +302,7 @@ async def test_delete_role_in_use_blocked() -> None:
 async def test_delete_role_success() -> None:
     role = _role(key="custom")
     db = fake_session(
-        result(),  # scalars(in_use) -> leer
+        result(),  # scalars(in_use) -> empty
         result(),  # audit advisory lock
         result(),  # audit prev-hash
         gets=[role],
@@ -330,9 +311,6 @@ async def test_delete_role_success() -> None:
     await svc.delete_role(role.id, "admin")
     assert role in db.deleted
     assert db.committed == 1
-
-
-# ===================================================================== memberships
 
 
 async def test_list_memberships() -> None:
@@ -354,7 +332,7 @@ async def test_create_membership_role_not_found() -> None:
 
 
 async def test_create_membership_role_wrong_gremium() -> None:
-    role = _role(gremium_id=uuid4())  # andere gremium_id
+    role = _role(gremium_id=uuid4())  # a different gremium_id
     db = fake_session(gets=[role])
     svc = GremiumRoleService(db)
     payload = GremiumMembershipCreate(principalId=uuid4(), gremiumRoleId=role.id)
@@ -365,7 +343,7 @@ async def test_create_membership_role_wrong_gremium() -> None:
 async def test_create_membership_unknown_principal_404() -> None:
     gid = uuid4()
     role = _role(gid)
-    db = fake_session(gets=[role])  # zweiter get (Principal) -> None
+    db = fake_session(gets=[role])  # the second get (principal) -> None
     svc = GremiumRoleService(db)
     payload = GremiumMembershipCreate(principalId=uuid4(), gremiumRoleId=role.id)
     with pytest.raises(NotFoundError, match="principal"):
@@ -391,7 +369,7 @@ async def test_create_membership_rejects_overlap() -> None:
 async def test_create_membership_from_after_until_rejected() -> None:
     gid = uuid4()
     role = _role(gid)
-    db = fake_session(gets=[role, object()])  # Rolle + Principal-Existenz
+    db = fake_session(gets=[role, object()])  # role plus the principal existence check
     svc = GremiumRoleService(db)
     payload = GremiumMembershipCreate(
         principalId=uuid4(),
@@ -442,11 +420,11 @@ async def test_create_membership_success_no_overlap() -> None:
 
 
 async def test_create_membership_open_ended_no_existing() -> None:
-    # valid_from/until None (offene Amtszeit), keine bestehenden Mitgliedschaften
+    # valid_from and valid_until are None (an open term) and no membership exists.
     gid, pid = uuid4(), uuid4()
     role = _role(gid)
     db = fake_session(
-        result(),  # scalars(existing) -> leer
+        result(),  # scalars(existing) -> empty
         result(),  # audit advisory lock
         result(),  # audit prev-hash
         gets=[role, object()],
@@ -469,14 +447,11 @@ async def test_delete_membership_not_found() -> None:
 
 async def test_delete_membership_success() -> None:
     m = _membership(uuid4(), uuid4(), None, None)
-    db = fake_session(result(), result(), gets=[m])  # audit 2x execute
+    db = fake_session(result(), result(), gets=[m])  # audit runs execute twice
     svc = GremiumRoleService(db)
     await svc.delete_membership(m.id, "admin")
     assert m in db.deleted
     assert db.committed == 1
-
-
-# ============================================================== Site-Config-Service
 
 
 def _scv(version: int, *, active: bool, branding=None) -> SiteConfigVersion:
@@ -497,7 +472,7 @@ def test_branding_helper_none_and_row() -> None:
 
 
 async def test_get_no_versions() -> None:
-    # _active -> None, _latest -> None => latest is None Zweig
+    # _active -> None and _latest -> None, which covers the "latest is None" branch.
     db = fake_session(result(), result())
     out = await SiteConfigService(db).get()
     assert out.version == 0
@@ -506,7 +481,7 @@ async def test_get_no_versions() -> None:
 
 async def test_get_latest_is_active_no_draft() -> None:
     active = _scv(3, active=True)
-    # _active -> active, _latest -> active (latest.active True)
+    # _active -> active and _latest -> active, so latest.active is True.
     db = fake_session(result(active), result(active))
     out = await SiteConfigService(db).get()
     assert out.version == 3
@@ -516,7 +491,7 @@ async def test_get_latest_is_active_no_draft() -> None:
 async def test_get_with_pending_draft() -> None:
     active = _scv(3, active=True)
     draft = _scv(4, active=False, branding=Branding(appName="Draft").model_dump(by_alias=True))
-    # _active -> active, _latest -> draft (inaktiv) => has_draft_changes True
+    # _active -> active and _latest -> draft (inactive), so has_draft_changes is True.
     db = fake_session(result(active), result(draft))
     out = await SiteConfigService(db).get()
     assert out.version == 3
@@ -525,7 +500,7 @@ async def test_get_with_pending_draft() -> None:
 
 
 async def test_get_draft_without_active_version() -> None:
-    # active None, latest inaktiv -> version 0, draft = latest branding
+    # active None and latest inactive give version 0 and draft = latest branding.
     draft = _scv(1, active=False)
     db = fake_session(result(), result(draft))
     out = await SiteConfigService(db).get()
@@ -534,19 +509,19 @@ async def test_get_draft_without_active_version() -> None:
 
 
 async def test_put_draft_inplace_update_existing_draft() -> None:
-    # latest inaktiv -> in-place Update, kein add
+    # An inactive latest triggers an in-place update with no add.
     draft = _scv(2, active=False)
     db = fake_session(
         result(draft),  # _latest
         result(),  # audit advisory lock
         result(),  # audit prev-hash
-        # nach commit ruft get() erneut _active + _latest:
+        # After the commit, get() calls _active and _latest again.
         result(),  # get._active -> None
-        result(draft),  # get._latest -> draft (inaktiv)
+        result(draft),  # get._latest -> draft (inactive)
     )
     svc = SiteConfigService(db)
     out = await svc.put_draft(Branding(appName="Neu"), "admin")
-    # in-place Update -> kein neuer SiteConfigVersion-Row (nur der Audit-Eintrag).
+    # An in-place update adds no SiteConfigVersion row. Only the audit row appears.
     assert not any(isinstance(o, SiteConfigVersion) for o in db.added)
     assert draft.branding["appName"] == "Neu"
     assert db.committed == 1
@@ -556,29 +531,28 @@ async def test_put_draft_inplace_update_existing_draft() -> None:
 async def test_put_draft_creates_new_version_above_active() -> None:
     active = _scv(5, active=True)
     db = fake_session(
-        result(active),  # _latest -> aktiv => neuer Draft
+        result(active),  # _latest -> active, so the service creates a new draft
         result(),  # audit advisory lock
         result(),  # audit prev-hash
         result(active),  # get._active
-        # get._latest -> der neu angelegte Draft (wir liefern den added-row über Queue):
     )
     _id_on_flush(db)
     svc = SiteConfigService(db)
     out = await svc.put_draft(Branding(appName="Brandneu"), "admin")
-    # neuer Row angelegt mit version base+1, inaktiv
+    # The new row carries version base + 1 and stays inactive.
     new_rows = [o for o in db.added if isinstance(o, SiteConfigVersion)]
     assert len(new_rows) == 1
     new_row = new_rows[0]
     assert new_row.version == 6
     assert new_row.active is False
     assert db.committed == 1
-    # get._latest: kein weiterer Eintrag in Queue -> None => latest None Zweig
+    # get._latest finds no queue entry left and returns None, the latest-None branch.
     assert out.version == 5
 
 
 async def test_put_draft_no_versions_creates_version_1() -> None:
     db = fake_session(
-        result(),  # _latest -> None => base 0
+        result(),  # _latest -> None, so base is 0
         result(),  # audit advisory lock
         result(),  # audit prev-hash
         result(),  # get._active -> None
@@ -599,7 +573,7 @@ async def test_activate_conflict_when_no_draft_none() -> None:
 
 async def test_activate_conflict_when_latest_active() -> None:
     active = _scv(2, active=True)
-    db = fake_session(result(active))  # _latest aktiv -> nichts zu aktivieren
+    db = fake_session(result(active))  # _latest is active, so nothing needs activation
     with pytest.raises(ConflictError):
         await SiteConfigService(db).activate("admin")
 
@@ -610,11 +584,11 @@ async def test_activate_promotes_draft() -> None:
         result(draft),  # _latest
         result(),  # execute(update active=False)
         result(),  # config_revision: advisory lock (#config-versioning)
-        result(),  # config_revision: head (scalar → None)
+        result(),  # config_revision: head (scalar -> None)
         result(),  # audit advisory lock
         result(),  # audit prev-hash
-        result(draft),  # get._active -> draft (jetzt aktiv)
-        result(draft),  # get._latest -> draft (active True Zweig)
+        result(draft),  # get._active -> draft (active now)
+        result(draft),  # get._latest -> draft (the active-True branch)
     )
     svc = SiteConfigService(db)
     out = await svc.activate("admin")
@@ -643,13 +617,13 @@ async def test_manifest_uses_config_names() -> None:
     man = await SiteConfigService(db).manifest()
     assert man["name"] == "My Platform"
     assert man["short_name"] == "MP"
-    # statische Felder gemerged
+    # The manifest also merges in the static fields.
     assert man["display"] == "standalone"
     assert "icons" in man
 
 
 async def test_manifest_falls_back_to_defaults_when_blank() -> None:
-    # leere/whitespace Namen -> Defaults
+    # An empty or whitespace name falls back to the default.
     branding = Branding(appName="   ", appShortName="")
     active = _scv(1, active=True, branding=branding.model_dump(by_alias=True))
     db = fake_session(result(active))
@@ -666,7 +640,6 @@ async def test_manifest_no_active_config_uses_defaults() -> None:
 
 
 def test_module_constants_consistency() -> None:
-    # Sicherstellen, dass die forcierten Default-Perms-Map dem Katalog folgen.
     assert set(gr.FORCED_ROLE_DEFAULT_PERMS) == set(FORCED_ROLE_KEYS)
     for perms in gr.FORCED_ROLE_DEFAULT_PERMS.values():
         assert all(p in GREMIUM_PERMISSIONS for p in perms)

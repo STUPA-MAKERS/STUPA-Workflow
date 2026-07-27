@@ -1,11 +1,12 @@
 """Revert an audited operation from the audit log (``audit.revert``).
 
-:class:`RevertService` dispatches by audit entry: config changes (detected via
-``data.revisionId``) replay the predecessor snapshot but only while the entity
-is unchanged since (``head == R``, else 409); status changes reset the
-application to the prior state; budget mutations apply the respective inverse
-(delete additive ops, restore updates from the captured prior state). Every
-revert is itself an audit entry and, where sensible, revertable.
+``RevertService`` dispatches on the audit entry. A config change carries
+``data.revisionId``. The service replays the predecessor snapshot, but only while the
+entity did not change after that entry (``head == R``). If it changed, the service
+answers 409. A status change resets the application to the prior state. A budget
+mutation gets its inverse: the service deletes an additive operation and restores an
+update from the captured prior state. Every revert is itself an audit entry, and it
+is revertable where that makes sense.
 """
 
 from __future__ import annotations
@@ -28,18 +29,18 @@ from app.modules.config_revision.service import (
 )
 from app.shared.errors import ConflictError, ForbiddenError, NotFoundError
 
-# Per-entity permission the *original* config change would have required —
-# identical to the sidebar restore gate. A revert is an equally strong mutation
-# and must require the same granular permission, not just global ``audit.revert``.
+# Permission per entity that the original config change needed. This is the same gate
+# as the sidebar restore. A revert is an equally strong mutation, so it must require
+# the same granular permission, not only the global ``audit.revert``.
 _CONFIG_REVERT_PERM: dict[str, str] = {
     ENTITY_FORM: "form.configure",
     ENTITY_FLOW: "flow.configure",
     ENTITY_SITE_CONFIG: "admin.site",
 }
 
-# Budget mutations: same permission the original mutation required. Structure
-# (nodes/allocations) -> ``budget.structure``; bookings/transfers move money
-# -> ``budget.book``.
+# Budget mutations need the same permission as the original mutation. Structure work
+# on nodes and allocations needs ``budget.structure``. Bookings and transfers move
+# money and need ``budget.book``.
 _BUDGET_REVERT_PERM: dict[AuditAction, str] = {
     AuditAction.BUDGET_NODE_CREATE: "budget.structure",
     AuditAction.BUDGET_NODE_UPDATE: "budget.structure",
@@ -58,7 +59,7 @@ class RevertResult:
 
 
 class RevertService:
-    """Orchestrates the audit-log revert (bound to an ``AsyncSession``)."""
+    """Run the audit-log revert, bound to an ``AsyncSession``."""
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -71,12 +72,24 @@ class RevertService:
     ) -> RevertResult:
         """Revert the operation described by ``audit_entry_id``.
 
-        404 if the entry is missing; 409 if not revertable, stale, or already
-        reverted. Besides the router's ``audit.revert`` gate, the granular
-        permission of the original operation is re-asserted (403 without it) so
-        a delegated ``audit.revert`` role gains no config/money authority.
-        ``principal=None`` (internal callers/tests) skips the re-assertion; the
-        production path always passes the principal through."""
+        The service checks the granular permission of the original operation again, on
+        top of the ``audit.revert`` gate of the router. A delegated ``audit.revert``
+        role therefore gets no config or money authority.
+
+        ``actor`` is the OIDC ``sub`` to record on the new audit entry. ``principal``
+        is the caller. Pass ``None`` for an internal caller or a test to skip the extra
+        permission check. The production path always passes the principal through.
+
+        Returns:
+            The entity that the revert changed and the audit entry it reverted.
+
+        Raises:
+            NotFoundError: The audit entry does not exist (404).
+            ConflictError: The entry is not revertable, is stale, or was reverted
+                before (409).
+            ForbiddenError: The principal lacks the permission of the original
+                operation (403).
+        """
         entry = (
             await self.session.execute(
                 select(AuditEntry).where(AuditEntry.id == audit_entry_id)
@@ -86,13 +99,10 @@ class RevertService:
             raise NotFoundError(f"audit entry {audit_entry_id} not found")
 
         data = entry.data or {}
-        # Config change: carries a linked config_revision snapshot.
         if data.get("revisionId"):
             return await self._revert_config(entry, actor, principal)
-        # Application status transition.
         if entry.action == AuditAction.STATUS_CHANGE:
             return await self._revert_status(entry, actor, principal)
-        # Budget/money mutation.
         if entry.action in REVERTABLE_BUDGET_ACTIONS:
             return await self._revert_budget(entry, actor, principal)
         raise ConflictError(
@@ -101,19 +111,23 @@ class RevertService:
 
     @staticmethod
     def _require(principal: Principal | None, perm: str, what: str) -> None:
-        """Re-assert the original permission (in addition to ``audit.revert``).
+        """Check the permission of the original operation, on top of ``audit.revert``.
 
-        ``principal=None`` (internal callers/tests) is not checked."""
+        ``principal`` is the caller. ``None`` skips the check, for an internal caller
+        or a test. ``what`` names the reverted operation for the error message.
+
+        Raises:
+            ForbiddenError: The principal does not hold ``perm``.
+        """
         if principal is not None and not principal.has(perm):
             raise ForbiddenError(
                 f"Missing permission to revert {what} (requires {perm})."
             )
 
-    # --------------------------------------------------------------- config
     async def _revert_config(
         self, entry: AuditEntry, actor: str, principal: Principal | None
     ) -> RevertResult:
-        """Revert a config change: replay the predecessor snapshot as the new active version."""
+        """Revert a config change: replay the predecessor snapshot as the active version."""
         revision_id = str((entry.data or {}).get("revisionId") or "")
         revisions = ConfigRevisionService(self.session)
         recorded = await revisions.get(revision_id)
@@ -161,15 +175,14 @@ class RevertService:
             reverted_audit_id=entry.id,
         )
 
-    # --------------------------------------------------------------- status
     async def _revert_status(
         self, entry: AuditEntry, actor: str, principal: Principal | None
     ) -> RevertResult:
-        """Revert an application status transition (back to the prior state)."""
+        """Revert an application status transition back to the prior state."""
         from app.modules.flow.service import FlowService
 
-        # A status reset is a state transition, so it needs the same permission
-        # as manually firing a transition.
+        # A status reset is a state transition, so it needs the same permission as a
+        # transition that a user fires by hand.
         self._require(principal, "application.transition", "an application status change")
 
         data = entry.data or {}
@@ -193,11 +206,10 @@ class RevertService:
             reverted_audit_id=entry.id,
         )
 
-    # --------------------------------------------------------------- budget
     async def _revert_budget(
         self, entry: AuditEntry, actor: str, principal: Principal | None
     ) -> RevertResult:
-        """Revert a budget/money mutation (inverse per action type)."""
+        """Revert a budget mutation with the inverse operation for its action type."""
         from app.modules.budget.tree.service import BudgetTreeService
 
         perm = _BUDGET_REVERT_PERM.get(AuditAction(entry.action))

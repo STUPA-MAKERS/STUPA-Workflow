@@ -1,14 +1,15 @@
-"""Session/token handling.
+"""Session and token handling.
 
-Principal session (OIDC) and applicant session (magic link) are server-side
-rows; the browser holds only a signed, opaque `sid` in an HttpOnly cookie.
-Tokens are thus not forgeable from `SESSION_SECRET` alone (a row must exist)
-and are server-side revocable (logout / `revoked_at`). The OIDC transaction is
-a signed short-lived cookie with `state`/`code_verifier`/`nonce` for the
-auth-code+PKCE flow (stateless, no server store).
+The principal session (OIDC) and the applicant session (magic link) are server-side
+rows. The browser holds only a signed, opaque `sid` in an HttpOnly cookie. Nobody can
+forge a token from `SESSION_SECRET` alone, because a matching row must exist. The server
+can revoke a session at any time (logout or `revoked_at`).
 
-Signature errors/expiry return `None` (caller maps to 401/410), never an
-exception to the outside.
+The OIDC transaction is a short-lived signed cookie with `state`, `code_verifier` and
+`nonce` for the auth-code plus PKCE flow. It is stateless and needs no server store.
+
+A bad signature or an expiry gives `None`, never an exception to the outside. The caller
+maps `None` to 401 or 410.
 """
 
 from __future__ import annotations
@@ -33,7 +34,7 @@ def _serializer(secret: str, salt: str) -> URLSafeTimedSerializer:
     return URLSafeTimedSerializer(secret, salt=salt)
 
 
-# --- applicant session (server-side, opaque sid in a signed cookie) ---
+# Applicant session: a server-side row with an opaque sid in a signed cookie.
 def _sign_applicant_sid(secret: str, sid: str) -> str:
     return _serializer(secret, _APPLICANT_SALT).dumps(sid)
 
@@ -54,11 +55,11 @@ async def create_applicant_session(
     scope: str,
     expires_at: Any,
 ) -> str:
-    """Create an `applicant_session` row; return the signed `sid` cookie.
+    """Create an `applicant_session` row and return the signed `sid` cookie.
 
-    Mirrors :func:`create_principal_session`: the opaque `sid` is the only
-    anchor — without an existing row there is no access, even with
-    `SESSION_SECRET`."""
+    This mirrors `create_principal_session`. The opaque `sid` is the only anchor.
+    Without an existing row there is no access, even with `SESSION_SECRET`.
+    """
     sid = secrets.token_urlsafe(_SID_BYTES)
     db.add(
         ApplicantSession(
@@ -75,7 +76,11 @@ async def create_applicant_session(
 async def load_applicant_session(
     db: AsyncSession, *, secret: str, cookie_value: str, now: Any, max_age: int
 ) -> ApplicantSession | None:
-    """Resolve a cookie to its `applicant_session` row (None if invalid/expired/revoked)."""
+    """Resolve a cookie to its `applicant_session` row.
+
+    Returns:
+        `None` if the cookie is invalid, or if the row is expired or revoked.
+    """
     sid = _unsign_applicant_sid(secret, cookie_value, max_age)
     if sid is None:
         return None
@@ -90,7 +95,13 @@ async def load_applicant_session(
 async def delete_applicant_session(
     db: AsyncSession, *, secret: str, cookie_value: str, max_age: int
 ) -> ApplicantSession | None:
-    """Logout: delete the applicant-session row (idempotent). None if nothing matched."""
+    """Delete the applicant-session row on logout.
+
+    The call is idempotent.
+
+    Returns:
+        The deleted row, or `None` if nothing matched.
+    """
     sid = _unsign_applicant_sid(secret, cookie_value, max_age)
     if sid is None:
         return None
@@ -107,8 +118,11 @@ async def delete_applicant_session(
 async def revoke_applicant_sessions(
     db: AsyncSession, application_id: Any, *, now: Any
 ) -> None:
-    """Kill switch: revoke all active applicant sessions of an application
-    (`revoked_at = now`). Idempotent; called on anonymization/deletion."""
+    """Revoke all active applicant sessions of an application.
+
+    This is the kill switch. It sets `revoked_at = now`. The call is idempotent.
+    Anonymization and deletion use it.
+    """
     await db.execute(
         update(ApplicantSession)
         .where(
@@ -119,7 +133,7 @@ async def revoke_applicant_sessions(
     )
 
 
-# --- OIDC transaction cookie (state + PKCE verifier + nonce) ---
+# OIDC transaction cookie: state, PKCE verifier and nonce.
 def issue_oidc_tx(secret: str, state: str, verifier: str, nonce: str) -> str:
     return _serializer(secret, _OIDC_TX_SALT).dumps(
         {"state": state, "verifier": verifier, "nonce": nonce}
@@ -136,12 +150,16 @@ def load_oidc_tx(secret: str, value: str, max_age: int) -> dict[str, str] | None
     return {k: str(data[k]) for k in ("state", "verifier", "nonce")}
 
 
-# --- OAuth AS transaction cookie (MCP login: authorize request across the OIDC hop) ---
+# OAuth AS transaction cookie. It carries the authorize request of an MCP login across
+# the OIDC hop.
 _OAUTH_TX_FIELDS = ("client_id", "redirect_uri", "code_challenge", "scope", "state")
 
 
 def issue_oauth_tx(secret: str, data: dict[str, str]) -> str:
-    """Sign and store the authorize request (client_id/redirect_uri/challenge/scope/state)."""
+    """Sign the authorize request into the tx cookie value.
+
+    The cookie holds client_id, redirect_uri, code_challenge, scope and state.
+    """
     return _serializer(secret, _OAUTH_TX_SALT).dumps(
         {k: data.get(k, "") for k in _OAUTH_TX_FIELDS}
     )
@@ -161,7 +179,7 @@ def load_oauth_tx(secret: str, value: str, max_age: int) -> dict[str, str] | Non
     return {k: str(data.get(k, "")) for k in _OAUTH_TX_FIELDS}
 
 
-# --- principal session (server-side, opaque sid in a signed cookie) ---
+# Principal session: a server-side row with an opaque sid in a signed cookie.
 def _sign_sid(secret: str, sid: str) -> str:
     return _serializer(secret, _SID_SALT).dumps(sid)
 
@@ -183,7 +201,7 @@ async def create_principal_session(
     refresh_token: str | None,
     id_token: str | None,
 ) -> str:
-    """Create an `auth_session` row; return the signed `sid` cookie."""
+    """Create an `auth_session` row and return the signed `sid` cookie."""
     sid = secrets.token_urlsafe(_SID_BYTES)
     db.add(
         AuthSession(
@@ -201,7 +219,11 @@ async def create_principal_session(
 async def load_principal_session(
     db: AsyncSession, *, secret: str, cookie_value: str, now: Any, max_age: int
 ) -> AuthSession | None:
-    """Resolve a cookie to its `auth_session` row (None if invalid/expired)."""
+    """Resolve a cookie to its `auth_session` row.
+
+    Returns:
+        `None` if the cookie is invalid or the row is expired.
+    """
     sid = _unsign_sid(secret, cookie_value, max_age)
     if sid is None:
         return None
@@ -216,7 +238,11 @@ async def load_principal_session(
 async def delete_principal_session(
     db: AsyncSession, *, secret: str, cookie_value: str, max_age: int
 ) -> AuthSession | None:
-    """Delete the session row (logout). Returns the deleted row (id_token hint)."""
+    """Delete the session row on logout.
+
+    Returns:
+        The deleted row. The caller uses its `id_token` as the logout hint.
+    """
     sid = _unsign_sid(secret, cookie_value, max_age)
     if sid is None:
         return None

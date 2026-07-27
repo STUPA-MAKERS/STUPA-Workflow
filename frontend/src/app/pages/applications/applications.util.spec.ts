@@ -50,7 +50,7 @@ describe('scanBadgeVariant', () => {
   });
 
   it('falls back to neutral for an unknown/pending scan state', () => {
-    // covers the `default` arm of the switch (e.g. "pending" before scanning starts)
+    // Covers the `default` arm of the switch, for example "pending" before the scan starts.
     expect(scanBadgeVariant('pending' as ScanState)).toBe('neutral');
   });
 });
@@ -65,11 +65,11 @@ describe('formatBytes', () => {
   });
 
   it('climbs through GB and TB units (loop body)', () => {
-    // 1 GiB = 1024^3 → unit index walks KB→MB→GB
+    // 1 GiB is 1024^3, so the unit index walks KB to MB to GB.
     expect(formatBytes(1024 ** 3)).toBe('1.0 GB');
-    // 1 TiB = 1024^4 → walks to the last unit (loop stops at units.length - 1)
+    // 1 TiB is 1024^4, so the loop walks to the last unit.
     expect(formatBytes(1024 ** 4)).toBe('1.0 TB');
-    // beyond TB the unit stays at TB (loop guard `unit < units.length - 1`)
+    // Above TB the unit stays at TB, because of the `unit < units.length - 1` guard.
     expect(formatBytes(1024 ** 5)).toBe('1024.0 TB');
   });
 

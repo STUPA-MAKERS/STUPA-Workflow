@@ -1,6 +1,7 @@
-"""Buchungen: Zahlungsmethode ``paypal`` erlauben (#dropdown-paypal).
+"""Bookings: allow the payment method `paypal` (#dropdown-paypal).
 
-Erweitert die CHECK-Constraint aus 0023 um ``paypal``. Idempotent.
+Add `paypal` to the CHECK constraint from migration 0023. The statements are
+idempotent.
 """
 
 from __future__ import annotations

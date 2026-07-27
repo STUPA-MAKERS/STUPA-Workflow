@@ -1,9 +1,9 @@
 """RBAC resolution.
 
-App-side roles are the truth: permissions come from `role_assignment`
-(time-validated: representation/delegation) plus optional `group_mapping`
-(OIDC group -> role, convenience). The gremium scope of an assignment/mapping
-lands as a group key in `Principal.groups` (`require_group` uses it).
+The roles of the application are the truth. The permissions come from `role_assignment`,
+which the resolver validates against the current time for a delegation. An optional
+`group_mapping` adds a role for an OIDC group. The Gremium scope of an assignment or a
+mapping lands as a group key in `Principal.groups`. `require_group` reads that key.
 """
 
 from __future__ import annotations
@@ -20,24 +20,24 @@ from app.modules.auth.principal import Principal
 
 
 def vote_group_key(gremium_id: object) -> str:
-    """Namespaced group key for *gremium voting eligibility*.
+    """Build the namespaced group key for the voting eligibility in a Gremium.
 
-    The cast gate must depend on a real ``vote.cast`` gremium membership, never
-    on a raw OIDC group claim that happens to equal a gremium UUID string.
-    Prefixing the internal key (``vote:<uuid>``) makes it impossible for an
-    arbitrary IdP-emitted group name to satisfy cast eligibility.
-    ``Vote.eligible_group`` stays the bare UUID-as-text; the voting service
-    derives this prefixed key from it for the membership check.
+    The cast gate must depend on a real `vote.cast` membership in the Gremium. It must
+    never depend on a raw OIDC group claim that equals a Gremium UUID string. The prefix
+    of the internal key, `vote:<uuid>`, stops any IdP-emitted group name from satisfying
+    the cast eligibility. `Vote.eligible_group` stays the bare UUID as text. The voting
+    service derives this prefixed key from it for the membership check.
     """
     return f"vote:{gremium_id}"
 
 
 def _as_aware(dt: datetime | None) -> datetime | None:
-    """Treat naive values as UTC (defensive: legacy data / tz-less timestamps).
+    """Treat a naive value as UTC.
 
-    The rest of the code uses aware UTC. A naive ``valid_from``/``valid_until``
-    from the DB would raise ``TypeError`` when compared with the aware ``now``,
-    taking down the entire principal resolution (REST and WS handshake).
+    This guard covers legacy data and timestamps without a time zone. The rest of the code
+    uses aware UTC. A naive `valid_from` or `valid_until` from the database would raise
+    `TypeError` against the aware `now`. That would break the whole principal resolution,
+    for REST and for the WebSocket handshake.
     """
     if dt is not None and dt.tzinfo is None:
         return dt.replace(tzinfo=UTC)
@@ -47,9 +47,9 @@ def _as_aware(dt: datetime | None) -> datetime | None:
 def _assignment_valid(
     valid_from: datetime | None, valid_until: datetime | None, now: datetime
 ) -> bool:
-    """Check the validity window (representation/delegation).
+    """Check the validity window of a delegation.
 
-    ``now`` is always aware UTC (caller); only the DB columns may be naive.
+    The caller always passes an aware UTC `now`. Only the database columns can be naive.
     """
     valid_from = _as_aware(valid_from)
     valid_until = _as_aware(valid_until)
@@ -59,7 +59,7 @@ def _assignment_valid(
 
 
 async def resolve_principal(db: AsyncSession, row: PrincipalRow, now: datetime) -> Principal:
-    """Resolve a `principal` row into a full `Principal` (roles/permissions/groups)."""
+    """Resolve a `principal` row into a full `Principal` with roles, permissions, groups."""
     groups: set[str] = {str(g) for g in (row.oidc_groups or [])}
     role_ids: set = set()
 
@@ -103,11 +103,11 @@ async def resolve_principal(db: AsyncSession, row: PrincipalRow, now: datetime) 
             ).scalars().all()
         )
 
-    # Gremium memberships: an active gremium role with ``vote.cast`` grants voting
-    # eligibility. The cast gate checks the NAMESPACED key ``vote:<gremium_id>``
-    # (``vote_group_key``), never the bare UUID string — so a matching OIDC group
-    # claim cannot falsely satisfy gremium voting eligibility. Merely following a
-    # meeting goes through ``MeetingService.is_member`` (separate query).
+    # An active Gremium role with `vote.cast` grants the voting eligibility. The cast gate
+    # checks the namespaced key `vote:<gremium_id>` from `vote_group_key`. It never checks
+    # the bare UUID string, so a matching OIDC group claim cannot satisfy the eligibility.
+    # A user who only follows a meeting goes through `MeetingService.is_member`, which is
+    # a separate query.
     membership_rows = (
         await db.execute(
             select(GremiumMembership.gremium_id, GremiumRole.permissions)

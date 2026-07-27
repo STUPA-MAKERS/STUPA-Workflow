@@ -1,6 +1,6 @@
 /**
- * Pure flow-graph mutations. Every function returns a NEW graph (immutable
- * updates) so signal consumers and the undo history see distinct snapshots.
+ * Pure flow-graph mutations. Every function returns a new graph and never mutates the
+ * input. Signal consumers and the undo history therefore see distinct snapshots.
  */
 import type {
   ActionDef,
@@ -35,7 +35,6 @@ import {
 } from './flow-level.util';
 import type { EndRef, Point } from './flow-editor.models';
 
-// --- states ------------------------------------------------------------------
 
 /** Unique state key (`state`, `state2`, …). */
 export function uniqueStateKey(base: string, states: readonly StateDef[]): string {
@@ -46,7 +45,7 @@ export function uniqueStateKey(base: string, states: readonly StateDef[]): strin
   return `${base}${i}`;
 }
 
-/** Add a state; inside an open group it becomes a member (else it would be invisible there). */
+/** Add a state. Inside an open group it becomes a member, else it stays invisible there. */
 export function addState(g: FlowGraph, key: string, groupCtx: string | null): FlowGraph {
   const next = autoLayout({
     ...g,
@@ -64,7 +63,7 @@ export function addState(g: FlowGraph, key: string, groupCtx: string | null): Fl
   };
 }
 
-/** Remove a state incl. its transitions, position and group membership; empty groups vanish. */
+/** Remove a state with its transitions, position and group membership. Empty groups go. */
 export function removeState(g: FlowGraph, key: string): FlowGraph {
   const positions = { ...(g.layout?.positions ?? {}) };
   delete positions[key];
@@ -84,7 +83,7 @@ export function setInitial(g: FlowGraph, key: string): FlowGraph {
   return { ...g, states: g.states.map((s) => ({ ...s, isInitial: s.key === key })) };
 }
 
-/** Rename a state key; transitions, positions and group memberships follow. */
+/** Rename a state key. Transitions, positions and group memberships follow. */
 export function renameState(g: FlowGraph, oldKey: string, key: string): FlowGraph {
   const positions = { ...(g.layout?.positions ?? {}) };
   if (positions[oldKey] && key) {
@@ -137,7 +136,7 @@ export function setStateTerminal(g: FlowGraph, key: string, on: boolean): FlowGr
   return patchState(g, key, { isTerminal: on });
 }
 
-/** Change the state kind; kind-specific config is reset (deadline policy is kept). */
+/** Change the state kind. This resets the kind-specific config but keeps the deadline policy. */
 export function setStateKind(g: FlowGraph, key: string, kind: string): FlowGraph {
   const k = (kind || 'normal') as StateKind;
   const policy = g.states.find((s) => s.key === key)?.config?.deadlinePolicyKey;
@@ -162,7 +161,6 @@ export function setStateDeadlinePolicy(g: FlowGraph, key: string, policyKey: str
   return patchConfig(g, key, { deadlinePolicyKey: policyKey || undefined });
 }
 
-// --- transitions ---------------------------------------------------------------
 
 function patchTransition(
   g: FlowGraph,
@@ -200,7 +198,7 @@ export function setTransitionLabel(
 ): FlowGraph {
   return patchTransition(g, index, (t) => {
     const label = { ...(t.label ?? {}), [lang]: value };
-    // Drop empty languages; nothing left → no label.
+    // Drop empty languages. No language left means no label.
     const cleaned = Object.fromEntries(Object.entries(label).filter(([, v]) => v));
     return { ...t, label: Object.keys(cleaned).length ? cleaned : null };
   });
@@ -214,7 +212,7 @@ export function setTransitionAutomatic(g: FlowGraph, index: number, on: boolean)
   return patchTransition(g, index, (t) => ({ ...t, automatic: on }));
 }
 
-/** `requiresAction: true` is the default and is not persisted. */
+/** `requiresAction: true` is the default. The editor does not persist it. */
 export function setTransitionRequiresAction(g: FlowGraph, index: number, on: boolean): FlowGraph {
   return patchTransition(g, index, (t) => {
     if (on) {
@@ -233,7 +231,6 @@ export function setTransitionBranch(g: FlowGraph, index: number, branch: string)
   }));
 }
 
-// --- guards --------------------------------------------------------------------
 
 export function setGuard(g: FlowGraph, index: number, guard: Guard | null): FlowGraph {
   return patchTransition(g, index, (t) => {
@@ -246,7 +243,7 @@ export function setGuard(g: FlowGraph, index: number, guard: Guard | null): Flow
   });
 }
 
-/** Choose an operator → seed the guard with a sensible default (empty = no guard). */
+/** Choose an operator to seed the guard with a default. An empty operator drops the guard. */
 export function setGuardOp(g: FlowGraph, index: number, op: string): FlowGraph {
   return patchTransition(g, index, (t) => {
     if (!op) {
@@ -281,7 +278,7 @@ export function setCompare(
     const cur = compareSpecOf(t);
     const op = patch.op ?? cur.op;
     let value: unknown = patch.value ?? cur.value;
-    // `in` expects a list — split comma-separated input.
+    // The `in` operator expects a list. Split the comma-separated input.
     if (op === 'in' && typeof value === 'string') {
       value = value.split(',').map((s) => s.trim()).filter(Boolean);
     }
@@ -293,9 +290,9 @@ export function setCompare(
 }
 
 /**
- * Move a guard group up/down in the priority stack. Rewrites the `order`
- * fields so the array order equals the evaluation order. Branch transitions
- * of the node are kept — they are not part of the guard groups.
+ * Move a guard group up or down in the priority stack. The function rewrites the
+ * `order` fields so the array order equals the evaluation order. It keeps the branch
+ * transitions of the node, because they are not part of the guard groups.
  */
 export function reorderGuardGroup(
   g: FlowGraph,
@@ -315,7 +312,6 @@ export function reorderGuardGroup(
   return { ...g, transitions: next };
 }
 
-// --- actions ---------------------------------------------------------------------
 
 export function addAction(g: FlowGraph, index: number, type: string): FlowGraph {
   const initial: ActionDef =
@@ -398,7 +394,6 @@ export function setRecipientRef(
   );
 }
 
-// --- layout ----------------------------------------------------------------------
 
 export function setStatePosition(g: FlowGraph, key: string, x: number, y: number): FlowGraph {
   return {
@@ -410,7 +405,7 @@ export function setStatePosition(g: FlowGraph, key: string, x: number, y: number
   };
 }
 
-/** Shift several states at once (group drag); clamps to non-negative coordinates. */
+/** Shift several states at once for a group drag. Clamps to non-negative coordinates. */
 export function moveStatesBy(g: FlowGraph, keys: string[], dx: number, dy: number): FlowGraph {
   const positions = { ...(g.layout?.positions ?? {}) };
   for (const k of keys) {
@@ -426,8 +421,8 @@ export function moveStatesBy(g: FlowGraph, keys: string[], dx: number, dy: numbe
 }
 
 /**
- * Auto-arrange the given drill-down level. Each sub-group acts as ONE node;
- * its members are shifted as a block.
+ * Auto-arrange the given drill-down level. Each sub-group acts as one node. The
+ * function shifts the members of a sub-group as a block.
  */
 export function relayoutLevel(g: FlowGraph, ctx: string | null): FlowGraph {
   const allGroups = g.layout?.groups ?? [];
@@ -477,7 +472,6 @@ export function relayoutLevel(g: FlowGraph, ctx: string | null): FlowGraph {
   return { ...g, layout: { ...(g.layout ?? {}), positions } };
 }
 
-// --- groups ------------------------------------------------------------------------
 
 /** First free `grpN` id. */
 export function freshGroupId(groups: readonly FlowGroup[]): { id: string; n: number } {
@@ -488,8 +482,8 @@ export function freshGroupId(groups: readonly FlowGroup[]): { id: string; n: num
 }
 
 /**
- * Create a group from selected states + groups; members leave their previous
- * bracket. Inside an open group the new group becomes a sub-group.
+ * Create a group from the selected states and groups. The members leave their previous
+ * group. Inside an open group the new group becomes a sub-group.
  */
 export function createGroup(
   g: FlowGraph,

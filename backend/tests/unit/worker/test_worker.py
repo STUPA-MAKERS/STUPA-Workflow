@@ -1,4 +1,4 @@
-"""Worker (worker/main.py) — Unit-Deckung: ping + Budget-Rollup-Refresh (T-17)."""
+"""Worker (worker/main.py) unit coverage: ping and the budget rollup refresh (T-17)."""
 
 from __future__ import annotations
 
@@ -27,14 +27,13 @@ def test_worker_settings_registers_tasks() -> None:
     assert process_deadlines in WorkerSettings.functions
     assert process_retention in WorkerSettings.functions
     assert WorkerSettings.redis_settings is not None
-    # Nächtlicher Budget-Rollup + minütlicher Deadline-Scan (T-44) +
-    # stündliche Aufgaben-Erinnerungen (#task-reminder) + tägliche DSGVO-Aufbewahrung
-    # (#PII-Re-Add).
+    # Nightly budget rollup, deadline scan every minute (T-44), hourly task reminders
+    # (#task-reminder) and daily DSGVO retention (#PII-Re-Add).
     assert len(WorkerSettings.cron_jobs) == 4
 
 
 class _SessionCM:
-    """Async-Context-Manager-Hülle um eine Fake-Session."""
+    """Wrap a fake session in an async context manager."""
 
     def __init__(self, session: FakeSession) -> None:
         self.session = session
@@ -51,5 +50,5 @@ async def test_refresh_budget_stats_uses_injected_sessionmaker() -> None:
     session = FakeSession()
     ctx: dict[str, Any] = {"budget_sessionmaker": lambda: _SessionCM(session)}
     assert await refresh_budget_stats(ctx) == "ok"
-    # Zwei REFRESH-Statements + commit (BudgetStatsService.refresh).
+    # `BudgetStatsService.refresh` runs two REFRESH statements and one commit.
     assert session.committed == 1

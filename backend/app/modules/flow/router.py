@@ -1,7 +1,7 @@
-"""Flow API router: list available transitions and fire one.
+"""Flow API router: list the available transitions and fire one.
 
-RBAC is fail-closed (401 without session, 403 without permission); errors are
-declared as ``ProblemDetail`` (problem+json contract).
+RBAC is fail-closed. A request without a session gets 401. A request without the
+permission gets 403. Every error is declared as `ProblemDetail` (problem+json contract).
 """
 
 from __future__ import annotations
@@ -29,12 +29,12 @@ router = APIRouter(tags=["flow"])
 
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 
-# Fire manual transitions: own permission, separate from full application management.
-# Per-transition actor gates in the guard refine this.
+# Fire manual transitions. This permission is separate from full application management.
+# The per-transition actor gates in the guard refine it.
 MANAGE_PERMISSION = "application.transition"
 
-# Force an application directly into any state (bypasses guards/transitions).
-# Deliberately separate from application.transition — an audited override.
+# Force an application directly into any state. This bypasses guards and transitions.
+# It stays separate from application.transition on purpose: it is an audited override.
 FORCE_PERMISSION = "application.force_status"
 
 
@@ -43,7 +43,10 @@ def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
 
 
 def get_action_dispatcher() -> ActionDispatcher:
-    """Worker dispatcher (default: no-op/log; concrete queue wiring elsewhere)."""
+    """Return the worker dispatcher.
+
+    The default dispatcher only logs. The concrete queue wiring lives elsewhere.
+    """
     return NullActionDispatcher()
 
 
@@ -69,14 +72,14 @@ async def list_transitions(
     service: ServiceDep,
     principal: PrincipalDep,
 ) -> list[TransitionOut]:
-    """Available transitions (guards satisfied for the principal)."""
+    """List the transitions whose guard the principal satisfies."""
     return await service.available_transitions(application_id, principal)
 
 
 @router.post(
     "/applications/{application_id}/transition",
     response_model=TransitionResult,
-    # 400 = malformed JSON body (FastAPI parser, before validation).
+    # 400 means a malformed JSON body. The FastAPI parser raises it before validation.
     responses=_errors(400, 401, 403, 404, 409, 422),
 )
 async def fire_transition(
@@ -85,7 +88,7 @@ async def fire_transition(
     service: ServiceDep,
     principal: PrincipalDep,
 ) -> TransitionResult:
-    """Fire a transition → 200 ``{newStateId}`` or 409 (guard/state conflict)."""
+    """Fire a transition: 200 with `{newStateId}`, or 409 on a guard or state conflict."""
     return await service.fire(
         application_id,
         payload.transition_id,
@@ -94,7 +97,6 @@ async def fire_transition(
     )
 
 
-# --- force status: privileged direct override (bypasses guards/transitions) ---
 @router.get(
     "/applications/{application_id}/flow-states",
     response_model=list[StateOut],
@@ -105,14 +107,14 @@ async def list_flow_states(
     service: ServiceDep,
     principal: ForcePrincipalDep,
 ) -> list[StateOut]:
-    """All states of the application's flow — the force-status picker options."""
+    """List all states of the application flow. These are the force-status picker options."""
     return await service.list_states(application_id)
 
 
 @router.post(
     "/applications/{application_id}/force-status",
     response_model=TransitionResult,
-    # 400 = malformed JSON body (FastAPI parser, before validation).
+    # 400 means a malformed JSON body. The FastAPI parser raises it before validation.
     responses=_errors(400, 401, 403, 404, 409, 422),
 )
 async def force_status(
@@ -121,8 +123,12 @@ async def force_status(
     service: ServiceDep,
     principal: ForcePrincipalDep,
 ) -> TransitionResult:
-    """Force an application directly into ``payload.stateId`` → 200 ``{newStateId}`` or
-    409 (no current state / already there / concurrent change)."""
+    """Force an application directly into `payload.stateId`.
+
+    The route returns 200 with `{newStateId}`. It returns 409 when the application has
+    no current state, already sits in the target state, or a concurrent change moved it
+    first.
+    """
     return await service.force_status(
         application_id,
         payload.state_id,
@@ -131,8 +137,6 @@ async def force_status(
     )
 
 
-# --- applicant actions: magic-link (A/P) access to transitions explicitly opened via
-# the ``actorIsApplicant`` guard ---
 @router.get(
     "/applications/{application_id}/applicant-transitions",
     response_model=list[TransitionOut],
@@ -143,7 +147,7 @@ async def list_applicant_transitions(
     service: ServiceDep,
     access: Annotated[Access, Depends(require_app_read)],
 ) -> list[TransitionOut]:
-    """Transitions the applicant may fire (only the ``actorIsApplicant`` gate)."""
+    """List the transitions the applicant may fire. Only `actorIsApplicant` opens one."""
     return await service.available_applicant_transitions(access.application_id)
 
 
@@ -158,8 +162,11 @@ async def fire_applicant_transition(
     service: ServiceDep,
     access: Annotated[Access, Depends(require_app_edit)],
 ) -> TransitionResult:
-    """Fire a transition as the applicant — 403 if not opened via ``actorIsApplicant``
-    (magic-link/creator, without ``application.manage``)."""
+    """Fire a transition as the applicant.
+
+    The caller is the magic-link holder or the creator, without `application.manage`.
+    A transition that `actorIsApplicant` does not open gives 403.
+    """
     return await service.fire_as_applicant(
         access.application_id, payload.transition_id, note=payload.note
     )

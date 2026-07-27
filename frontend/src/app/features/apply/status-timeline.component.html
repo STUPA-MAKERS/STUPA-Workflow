@@ -41,8 +41,8 @@
           </div>
         </header>
 
-        <!-- 3 columns like the internal application detail page: actions left,
-             history + application data center, comments (chat) right. -->
+        <!-- Three columns, as on the internal application detail page: actions left,
+             history and application data center, comments (chat) right. -->
         <div class="status__shell" [class.status__shell--actions]="actions().length">
           <!-- LEFT: applicant actions (only when enabled, actorIsApplicant) -->
           @if (actions().length) {
@@ -120,14 +120,15 @@
               }
             </app-card>
 
-            <!-- Attachments: same panel as internal. Upload works in locked states too
-                 (add receipts/invoices later) — only the magic-link edit scope counts,
-                 not the state lock. -->
+            <!-- Attachments: the same panel as the internal view. Upload also works in
+                 locked states, so the applicant can add receipts and invoices later.
+                 Only the magic-link edit scope counts, not the state lock. -->
             <app-attachments-panel [applicationId]="app.id" [canUpload]="canUploadAttachments()" />
           </div>
 
-          <!-- RIGHT: comments as chat — identical to the internal detail view.
-               "own" = the applicant's own messages on the right, committee on the left. -->
+          <!-- RIGHT: comments as a chat, identical to the internal detail view.
+               "own" marks the messages of the applicant on the right. The messages of
+               the Gremium stay on the left. -->
           <aside class="status__rail status__rail--right">
             <section class="det__chat" [attr.aria-label]="'status.comments.title' | t">
               <header class="py-3 px-4 font-semibold border-0 border-b border-solid border-line">{{ 'status.comments.title' | t }}</header>

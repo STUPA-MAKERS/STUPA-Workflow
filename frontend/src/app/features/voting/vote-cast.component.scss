@@ -16,7 +16,7 @@
   text-decoration: none;
 }
 
-// --- Options: large touch targets (thumb operation) -------------------------
+// The options need large touch targets, because a user operates them with a thumb.
 .vote__options {
   display: grid;
   gap: var(--space-3);
@@ -37,8 +37,7 @@
   }
 }
 
-// --- Mobile (≤48rem): options stacked full-width, comfortable touch
-// targets; purely additive, desktop stays unchanged --------------------------
+// Mobile: stack the options full width. This block only adds rules and leaves desktop as is.
 @media (max-width: 48rem) {
   .vote__options {
     grid-template-columns: 1fr;

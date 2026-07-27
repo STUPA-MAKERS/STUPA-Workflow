@@ -1,22 +1,23 @@
-"""arq cron task: scheduled deadline/vote processing.
+"""arq cron task: scheduled deadline and vote processing.
 
-``process_deadlines`` runs periodically (per-minute) against a tz-aware ``now``
-(UTC) and performs idempotent steps:
+`process_deadlines` runs every minute against a tz-aware `now` in UTC. It runs these
+idempotent steps:
 
-1. Reminders — deadlines within (or past) the lead window not yet reminded ->
-   ``notify(deadline_approaching)`` + set ``reminded_at`` (exactly once). No lower
-   bound: after a >lead outage the reminder fires late but exactly once.
-2. Auto-transitions / requeue — expired deadlines with ``action_on_pass`` ->
-   ``flow.fire`` (guard ``deadlinePassed``, ``manual=False``); then clear
-   ``action_on_pass`` (idempotency marker). ``kind="requeue"`` returns the
-   application via the referenced transition.
-3. Vote auto-close — open votes past ``closes_at`` -> ``voting.close`` (tallies,
-   fires the result branch).
+1. Reminders. A deadline inside or past the lead window with no reminder yet gets
+   `notify(deadline_approaching)` and a `reminded_at` timestamp, exactly once. There
+   is no lower bound: after an outage longer than the lead window the reminder is
+   late but still fires only once.
+2. Auto-transitions and requeue. An expired deadline with `action_on_pass` calls
+   `flow.fire` with the `deadlinePassed` guard and `manual=False`. The task then
+   clears `action_on_pass` as the idempotency marker. `kind="requeue"` returns the
+   application through the referenced transition.
+3. Vote auto-close. An open vote past `closes_at` goes to `voting.close`, which
+   tallies the vote and fires the result branch.
 
-Concurrency: each unit is locked in its own session via ``FOR UPDATE SKIP
-LOCKED`` so a second worker skips it — no double execution. The operations are
-themselves idempotent (optimistic locking in ``flow.fire``; status check in
-``voting.close``; ``_job_id`` dedup on mail enqueue).
+Concurrency: each unit gets a lock in its own session with `FOR UPDATE SKIP LOCKED`.
+A second worker skips a locked unit, so nothing runs twice. The operations are also
+idempotent by themselves: `flow.fire` uses optimistic locking, `voting.close` checks
+the status, and the mail enqueue deduplicates on `_job_id`.
 """
 
 from __future__ import annotations
@@ -51,7 +52,7 @@ from app.shared.errors import ConflictError, NotFoundError
 
 logger = logging.getLogger("app.deadlines")
 
-# Guest applications without email confirmation are discarded after this window.
+# The worker deletes guest applications without email confirmation after this window.
 _GUEST_CONFIRM_TTL = timedelta(hours=12)
 
 
@@ -60,19 +61,22 @@ async def on_startup(ctx: dict[str, Any]) -> None:
 
 
 def _sessionmaker(ctx: dict[str, Any]) -> async_sessionmaker[AsyncSession]:
-    """DB sessionmaker (injectable in tests via ``ctx['deadlines_sessionmaker']``)."""
+    """Return the DB sessionmaker (tests inject one via `ctx['deadlines_sessionmaker']`)."""
     maker = ctx.get("deadlines_sessionmaker")
     return maker if maker is not None else get_sessionmaker()
 
 
 def _now() -> datetime:
-    """Tz-aware now (UTC); freezegun-controllable in tests."""
+    """Return the current tz-aware UTC time (tests control it with freezegun)."""
     return datetime.now(UTC)
 
 
 def _system_principal() -> Principal:
-    """Actor for cron-triggered transitions (no user); ``application.manage`` covers
-    any role guards on requeue/result branches."""
+    """Build the actor for cron-triggered transitions.
+
+    No user stands behind this principal. `application.manage` covers the role guards
+    on the requeue and result branches.
+    """
     return Principal(
         sub="system:deadlines",
         roles=["system"],
@@ -81,7 +85,10 @@ def _system_principal() -> Principal:
 
 
 def _mail_queue(ctx: dict[str, Any]) -> MailQueue | None:
-    """Mail queue from the arq Redis pool (or test injection); ``None`` without Redis."""
+    """Return the mail queue over the arq Redis pool, or `None` without Redis.
+
+    Tests can inject a ready queue through `ctx['mail_queue']`.
+    """
     queue = ctx.get("mail_queue")
     if queue is not None:
         return queue  # type: ignore[return-value]
@@ -89,9 +96,8 @@ def _mail_queue(ctx: dict[str, Any]) -> MailQueue | None:
     return ArqMailQueue(pool) if pool is not None else None
 
 
-# --- Entry point ---
 async def process_deadlines(ctx: dict[str, Any]) -> str:
-    """Reminders + auto-transitions + vote auto-close (idempotent, SKIP LOCKED)."""
+    """Run reminders, auto-transitions and vote auto-close (idempotent, SKIP LOCKED)."""
     settings: Settings = ctx.get("settings") or load_settings()
     now = _now()
     reminded = await _process_reminders(ctx, settings, now)
@@ -105,13 +111,13 @@ async def process_deadlines(ctx: dict[str, Any]) -> str:
     )
 
 
-# --- Discard unconfirmed guest applications ---
 async def _discard_unconfirmed(ctx: dict[str, Any], now: datetime) -> int:
-    """Hard-delete guest applications unconfirmed after the TTL window.
+    """Delete guest applications that stay unconfirmed past the TTL window.
 
-    Only anonymous (``created_by IS NULL``) and unconfirmed
-    (``email_confirmed_at IS NULL``) applications older than the TTL. FK-dependent
-    rows cascade; idempotent (a second run finds nothing).
+    The delete covers only anonymous (`created_by IS NULL`) and unconfirmed
+    (`email_confirmed_at IS NULL`) applications older than the TTL. Rows that depend
+    on them through a foreign key cascade. The step is idempotent, so a second run
+    finds nothing.
     """
     maker = _sessionmaker(ctx)
     cutoff = now - _GUEST_CONFIRM_TTL
@@ -133,7 +139,6 @@ async def _discard_unconfirmed(ctx: dict[str, Any], now: datetime) -> int:
     return discarded
 
 
-# --- Reminders ---
 async def _process_reminders(
     ctx: dict[str, Any], settings: Settings, now: datetime
 ) -> int:
@@ -164,7 +169,7 @@ async def _remind_one(
         svc = DeadlineService(session)
         deadline = await svc.lock_reminder(deadline_id, now, lead)
         if deadline is None:
-            return False  # another worker / no longer due
+            return False  # another worker holds it, or it is no longer due
         type_id = deadline.type_id
         if type_id is None and deadline.application_id is not None:
             type_id = await session.scalar(
@@ -190,7 +195,6 @@ async def _remind_one(
     return True
 
 
-# --- Auto-transitions / requeue ---
 async def _process_actions(
     ctx: dict[str, Any], settings: Settings, now: datetime
 ) -> int:
@@ -214,7 +218,7 @@ async def _fire_one(ctx: dict[str, Any], deadline_id: UUID, now: datetime) -> bo
         svc = DeadlineService(session)
         deadline = await svc.lock_action_deadline(deadline_id, now)
         if deadline is None:
-            return False  # another worker / already consumed
+            return False  # another worker holds it, or it is already consumed
         application_id = deadline.application_id
         transition_id = transition_ref(deadline.action_on_pass)
         if application_id is None or transition_id is None:
@@ -222,13 +226,13 @@ async def _fire_one(ctx: dict[str, Any], deadline_id: UUID, now: datetime) -> bo
                 "deadline %s has action_on_pass without application/transition — skipped",
                 deadline_id,
             )
-            await svc.consume_action(deadline)  # do not scan again
+            await svc.consume_action(deadline)  # do not scan it again
             return False
         flow = FlowService(session, dispatcher)
         fired = False
-        # Stage the marker before firing: ``fire`` commits it atomically with the
-        # state change, so no window lets a second worker re-grab an already-fired
-        # deadline (the row lock releases with the commit).
+        # Stage the marker before the fire: `fire` commits it together with the state
+        # change. No window stays open for a second worker to re-grab an already-fired
+        # deadline, because the row lock releases with the commit.
         deadline.action_on_pass = None
         try:
             await flow.fire(
@@ -241,31 +245,30 @@ async def _fire_one(ctx: dict[str, Any], deadline_id: UUID, now: datetime) -> bo
             )
             fired = True
         except ConflictError as exc:
-            # Guard not met or state already changed (concurrent transition) — the
-            # deadline is consumed, do not fire again.
+            # The guard failed, or a concurrent transition already changed the state.
+            # The deadline stays consumed. Do not fire it again.
             logger.info("deadline %s transition not applied: %s", deadline_id, exc)
         except NotFoundError as exc:
             logger.warning("deadline %s references missing app/transition: %s", deadline_id, exc)
-        # Error paths (no commit from ``fire`` / rollback) — persist the marker here;
-        # after a successful ``fire`` this is a no-op.
+        # On the error paths `fire` does not commit, so persist the marker here.
+        # After a successful `fire` this call is a no-op.
         await svc.consume_action(deadline)
     return fired
 
 
-# --- Automatic transitions ---
 async def _process_auto_transitions(ctx: dict[str, Any]) -> int:
-    """Fire configured automatic transitions whose guard passes.
+    """Fire the configured automatic transitions whose guard passes.
 
-    Scans applications whose current state has an outgoing ``automatic`` transition
-    and fires (``manual=False``) the first matching one. Idempotent via optimistic
-    locking in ``flow.fire``; own session per application.
+    The scan finds applications whose current state has an outgoing `automatic`
+    transition. It fires the first match with `manual=False`. Optimistic locking in
+    `flow.fire` keeps the step idempotent. Each application gets its own session.
     """
     maker = _sessionmaker(ctx)
     dispatcher = ctx.get("flow_dispatcher") or build_notify_dispatcher(ctx.get("redis"))
     async with maker() as session:
         auto_states = select(Transition.from_state_id).where(Transition.automatic)
-        # Capped per tick (oldest first): a large cohort drains across several ticks
-        # instead of stretching one tick past the cadence.
+        # Capped per tick, oldest first: a large cohort drains over several ticks
+        # instead of stretching one tick past the cron cadence.
         ids = list(
             (
                 await session.execute(
@@ -295,7 +298,6 @@ async def _process_auto_transitions(ctx: dict[str, Any]) -> int:
     return advanced
 
 
-# --- Vote auto-close ---
 async def _process_votes(ctx: dict[str, Any], now: datetime) -> int:
     maker = _sessionmaker(ctx)
     async with maker() as session:
@@ -317,11 +319,12 @@ async def _close_one(ctx: dict[str, Any], vote_id: UUID, now: datetime) -> bool:
         svc = DeadlineService(session)
         vote = await svc.lock_open_vote(vote_id, now)
         if vote is None:
-            return False  # another worker / already closed
+            return False  # another worker holds it, or it is already closed
         voting = VotingService(session, dispatcher)
         try:
-            # Pass ``now`` so a time-bound vote past its window with unmet quorum
-            # closes terminally (fail branch) instead of being re-grabbed forever.
+            # Pass `now` so a time-bound vote past its window with an unmet quorum
+            # closes for good on the fail branch. Without it the cron re-grabs the
+            # vote forever.
             closed = await voting.close(vote.id, _system_principal(), now=now)
         except ConflictError as exc:
             logger.info("vote %s auto-close skipped: %s", vote_id, exc)
@@ -330,16 +333,16 @@ async def _close_one(ctx: dict[str, Any], vote_id: UUID, now: datetime) -> bool:
             logger.warning("vote %s auto-close — app missing: %s", vote_id, exc)
             return False
     logger.info("vote auto-closed (vote=%s)", vote_id)
-    # Replay the ``vote_closed`` broadcast the REST router would normally fire, else
-    # beamer/voters show the time-closed vote as open until reload. After the commit
-    # and best-effort: a broker hiccup must not fail the already-closed vote. No-op
-    # for standalone votes (``meeting_id is None``).
+    # Replay the `vote_closed` broadcast that the REST router normally sends. Without
+    # it the beamer and the voters show the time-closed vote as open until a reload.
+    # This runs after the commit and is best effort: a broker fault must not fail the
+    # already-closed vote. It is a no-op for standalone votes (`meeting_id is None`).
     await _broadcast_vote_closed(ctx, closed)
     return True
 
 
 async def _broadcast_vote_closed(ctx: dict[str, Any], closed: VoteClosed) -> None:
-    """Fan out ``vote_closed`` over the Redis broker (best effort)."""
+    """Fan out `vote_closed` over the Redis broker (best effort)."""
     redis = ctx.get("redis")
     if redis is None:
         return

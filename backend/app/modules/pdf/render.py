@@ -1,13 +1,20 @@
 """Render pipeline — Markdown → pytex → MinIO.
 
-Worker-side orchestration of a ``render_job``: set status ``running``, load the
-application document (DB), build the Markdown (DB-free), call pytex ``/render``, store
-the PDF in MinIO (``storage_key``), then ``done``. Infra dependencies (pytex/storage)
-are injected — without MinIO the job stays ``pending`` (dev/contract CI, no crash).
+The worker orchestrates a ``render_job`` in these steps:
 
-Error discipline: ``error`` holds only a path-free short code. Transient failures
-(pytex 5xx/transport, storage) → ``RenderRetry`` (worker retry); permanent ones
-(pytex 4xx) → job goes ``failed`` immediately.
+1. Set the status to ``running``.
+2. Load the application document from the DB.
+3. Build the Markdown without the DB.
+4. Call pytex ``/render``.
+5. Store the PDF in MinIO under ``storage_key``.
+6. Set the status to ``done``.
+
+The caller injects the infra dependencies pytex and storage. Without MinIO the job
+stays ``pending`` (dev and contract CI) and nothing crashes.
+
+Error discipline: ``error`` holds only a path-free short code. A transient failure
+(pytex 5xx or transport, storage) raises ``RenderRetry`` and the worker retries. A
+permanent failure (pytex 4xx) sets the job to ``failed`` at once.
 """
 
 from __future__ import annotations
@@ -40,16 +47,24 @@ def _storage_key(application_id: UUID | None, job_id: UUID) -> str:
 
 @dataclass(slots=True)
 class RenderPipeline:
-    """Render a ``render_job`` end-to-end. Deps are injected (worker wiring)."""
+    """Render a ``render_job`` end-to-end. The worker wiring injects the dependencies."""
 
     sessionmaker: async_sessionmaker[AsyncSession]
     pytex: PytexClient
     storage: ObjectStorage | None
 
     async def run(self, job_id: UUID) -> str:
-        """Render the job. Returns done/failed/skipped/gone. Transient → ``RenderRetry``."""
+        """Render the job.
+
+        Returns:
+            One of ``done``, ``failed``, ``skipped`` or ``gone``.
+
+        Raises:
+            RenderRetry: The failure is transient, so the worker must retry.
+        """
         if self.storage is None:
-            # Without object storage there is nowhere to store → job stays pending (dev).
+            # Without object storage there is nowhere to put the PDF, so the job stays
+            # pending. This happens in dev and contract CI.
             logger.warning("render skipped (job=%s) — object storage not configured", job_id)
             return "skipped"
 

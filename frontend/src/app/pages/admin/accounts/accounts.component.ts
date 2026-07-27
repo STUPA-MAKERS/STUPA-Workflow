@@ -18,8 +18,8 @@ import { ToastService } from '@stupa-makers/ui-kit';
 import { type Account, type AccountBody, BudgetTreeApi } from '../../budget/budget-tree.api';
 
 /**
- * Accounts admin. An account is name + IBAN (free text); not bound to a cost centre.
- * Optionally referenced by bookings. P(``account.manage``).
+ * Accounts admin. An account is a name plus an IBAN as free text. It is not bound to a
+ * cost center. A booking can reference an account. P(`account.manage`).
  */
 @Component({
   selector: 'app-accounts',

@@ -12,7 +12,7 @@ import {
   voteStatusVariant,
 } from './meetings-display.util';
 
-/** Beamer view: only the current question + live result, no dialogs. */
+/** Beamer view. It shows the current question and the live result only, with no dialogs. */
 @Component({
   selector: 'app-meeting-beamer',
   standalone: true,
@@ -24,7 +24,7 @@ import {
 export class MeetingBeamerComponent {
   private readonly i18n = inject(I18nService);
 
-  /** Currently open vote, else the last closed one (picked by the parent). */
+  /** The open vote, or else the last closed vote. The parent component picks it. */
   readonly vote = input.required<MeetingVote | null>();
 
   protected readonly voteVariant = voteStatusVariant;

@@ -1,8 +1,9 @@
-"""Integration (Docker/Redis): echte Redis-Pfade von Rate-Limiter + Altcha-Replay.
+"""Integration test of the real Redis paths for the rate limiter and the ALTCHA replay guard.
 
-Die Unit-Suite prüft die Logik gegen einen Fake; hier wird gegen ein echtes Redis
-verifiziert, dass die `redis.asyncio`-API (Pipeline/ZSET, SET NX EX) wie erwartet greift
-(security.md §8/§7, Issues #23/#24). Skip ohne Docker.
+The unit suite checks the logic against a fake. This module runs against a real Redis. It
+verifies that the `redis.asyncio` API behaves as expected for the pipeline with a ZSET and
+for SET NX EX. See security.md §8 and §7. See also issues #23 and #24. The tests skip
+without Docker.
 """
 
 from __future__ import annotations
@@ -36,7 +37,6 @@ async def test_redis_rate_limiter_blocks_and_recovers(redis_client: object) -> N
     clock["t"] = 1002.0
     blocked = await limiter.hit("ip:1", limit=2, window_seconds=60)
     assert not blocked.allowed and blocked.retry_after >= 1
-    # Fenster verlassen → wieder erlaubt.
     clock["t"] = 1100.0
     assert (await limiter.hit("ip:1", limit=2, window_seconds=60)).allowed
 

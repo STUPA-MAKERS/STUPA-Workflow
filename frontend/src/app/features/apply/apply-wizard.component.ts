@@ -48,9 +48,12 @@ const DRAFT_PREFIX = 'ap.draft.';
 
 /**
  * Public application wizard.
- * Steps: application type → contact → form sections (from the effective definition
- * via Formly, incl. `visibleIf`/`computed` + pot extra fields) → review/Altcha/submit.
- * Progress is saved locally per application type (autosave).
+ *
+ * The steps run in this order: application type, contact, form sections, review with
+ * Altcha and submit. Formly builds the form sections from the effective definition.
+ * That definition holds the `visibleIf` and `computed` rules plus the extra fields of
+ * the budget pot. The wizard saves the progress per application type in the browser
+ * (autosave).
  */
 @Component({
   selector: 'app-apply-wizard',
@@ -76,7 +79,10 @@ export class ApplyWizardComponent {
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
 
-  /** Logged in? Then the contact step + Altcha are skipped; identity comes from the account. */
+  /**
+   * True when a principal is logged in. The wizard then skips the contact step and
+   * Altcha. The identity comes from the account.
+   */
   protected readonly loggedIn = this.auth.isAuthenticated;
 
   readonly types = signal<ApplicationType[]>([]);
@@ -195,7 +201,6 @@ export class ApplyWizardComponent {
     );
   }
 
-  // --- navigation ----------------------------------------------------------
   next(): void {
     const step = this.currentStep();
     if (step === 'type' && !this.typeId()) return;
@@ -230,8 +235,8 @@ export class ApplyWizardComponent {
 
   readonly canSubmit = computed(
     () =>
-      // Logged in: no Altcha/contact needed; anonymous: both required —
-      // unless Altcha is off server-side.
+      // A logged-in user needs no Altcha and no contact data. An anonymous user
+      // needs both, unless the server has Altcha off.
       (this.loggedIn() || !this.altchaRequired() || this.altchaSolution() !== null) &&
       (this.loggedIn() || this.contactForm.valid) &&
       this.sections().every((s) => s.form.valid),
@@ -271,7 +276,6 @@ export class ApplyWizardComponent {
     });
   }
 
-  // --- draft (autosave) ----------------------------------------------------
   private draftKey(): string | null {
     const id = this.typeId();
     return id ? `${DRAFT_PREFIX}${id}` : null;
@@ -315,7 +319,7 @@ export class ApplyWizardComponent {
           name: draft.contact.name ?? '',
         });
       }
-      // Sections are built before restoreDraft() → steps() is complete.
+      // loadForm builds the sections before restoreDraft(), so steps() is complete.
       // Restore the saved step, clamped to the valid range.
       if (typeof draft.activeIndex === 'number' && Number.isFinite(draft.activeIndex)) {
         const max = this.steps().length - 1;
@@ -342,11 +346,10 @@ export class ApplyWizardComponent {
     try {
       sessionStorage.removeItem(key);
     } catch {
-      /* ignore */
+      /* storage blocked — nothing to clear */
     }
   }
 
-  // --- review summary ------------------------------------------------------
   private buildSummary(): SummaryRow[] {
     const eff = this.effForm();
     if (!eff) return [];

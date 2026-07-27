@@ -118,25 +118,25 @@ function flushForm(http: HttpTestingController, id = 'app-1') {
     });
 }
 
-// `form` only on initial load (loadApplication); a refresh() does not reload the form.
-// Status changes run through the flow → no more /transitions request.
+// The form loads on the initial load only. A refresh does not reload the form.
+// A status change runs through the flow, so no further /transitions request follows.
 function flushAll(http: HttpTestingController, id = 'app-1', form = true) {
   http.expectOne(url('', id)).flush({ ...appWire(), id });
   http.expectOne(url('/versions', id)).flush(VERSIONS);
   http.expectOne(url('/comments', id)).flush(COMMENTS);
-  // Managers additionally load the cost-centre tree — tolerate empty.
+  // A manager also loads the cost-centre tree. An empty answer is fine.
   for (const req of http.match((r) => r.method === 'GET' && r.url === '/api/budgets')) {
     req.flush([]);
   }
   if (form) flushForm(http, id);
 }
 
-// The attachments panel loads existing attachments on render — tolerate empty (if any).
+// The attachments panel loads the attachments on render. An empty answer is fine.
 function flushAttachments(http: HttpTestingController) {
   for (const req of http.match((r) => r.method === 'GET' && /\/attachments$/.test(r.url))) {
     req.flush([]);
   }
-  // Managers additionally load the cost-centre tree — tolerate empty.
+  // A manager also loads the cost-centre tree. An empty answer is fine.
   for (const req of http.match((r) => r.method === 'GET' && r.url === '/api/budgets')) {
     req.flush([]);
   }
@@ -145,7 +145,7 @@ function flushAttachments(http: HttpTestingController) {
 describe('ApplicationsDetailComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
-  // jsdom (jest) has no structuredClone; startEdit relies on the browser global.
+  // jsdom has no structuredClone. startEdit relies on the browser global.
   const g = globalThis as unknown as { structuredClone?: <T>(v: T) => T };
   const savedClone = g.structuredClone;
   beforeAll(() => {
@@ -162,17 +162,14 @@ describe('ApplicationsDetailComponent', () => {
 
     expect(screen.getByRole('heading', { name: 'Förderung Fest', level: 1 })).toBeInTheDocument();
     expect(screen.getByText('Eingereicht')).toBeInTheDocument();
-    // "Version 2" shows in the header and again as a history entry
+    // "Version 2" shows in the header and again as a history entry.
     expect(screen.getAllByText('Version 2').length).toBeGreaterThan(0);
-    // applicant fact
     expect(screen.getByText('Mia')).toBeInTheDocument();
-    // history is collapsed by default → expand, then the diff is visible
+    // The history starts collapsed. Expand it to make the diff visible.
     expect(screen.queryByText('Fest')).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /Versionshistorie/ }));
     detectChanges();
-    // version diff: changed title old → new
     expect(screen.getByText('Fest')).toBeInTheDocument();
-    // comment body
     expect(screen.getByText('Bitte Kostenplan ergänzen.')).toBeInTheDocument();
     flushAttachments(http);
     http.verify();
@@ -185,7 +182,7 @@ describe('ApplicationsDetailComponent', () => {
     http.expectOne(url('/comments')).flush(COMMENTS);
     detectChanges();
 
-    // No manual status-change UI (handled via the flow) and no manager-only options.
+    // The flow handles a status change. There is no manual UI and no manager option.
     expect(screen.queryByRole('heading', { name: 'Statuswechsel' })).not.toBeInTheDocument();
     expect(screen.queryByText('Sichtbarkeit')).not.toBeInTheDocument();
     flushForm(http);
@@ -227,10 +224,9 @@ describe('ApplicationsDetailComponent', () => {
     detectChanges();
 
     const input = screen.getByLabelText('Kommentar hinzufügen');
-    // Shift+Enter: no request (newline stays local).
+    // Shift+Enter keeps the newline local and fires no request.
     await userEvent.type(input, 'Hallo{Shift>}{Enter}{/Shift}');
     http.expectNone(url('/comments'));
-    // Plain Enter submits.
     await userEvent.type(input, '{Enter}');
     const post = http.expectOne(url('/comments'));
     expect(post.request.method).toBe('POST');
@@ -286,13 +282,13 @@ describe('ApplicationsDetailComponent', () => {
     flushAll(http);
     detectChanges();
 
-    // simulate Detail→Detail navigation: same component instance, new param
+    // Simulate a detail-to-detail navigation. The component instance stays the same.
     paramMap$.next(convertToParamMap({ id: 'app-2' }));
-    // a fresh detail GET for app-2 must fire (snapshot would have stayed on app-1)
+    // A fresh detail GET for app-2 must fire. A snapshot would have stayed on app-1.
     http.expectOne(url('', 'app-2')).flush({ ...appWire(), id: 'app-2' });
     http.expectOne(url('/versions', 'app-2')).flush(VERSIONS);
     http.expectOne(url('/comments', 'app-2')).flush(COMMENTS);
-    flushForm(http, 'app-2'); // loadApplication for app-2 also fetches the effective form
+    flushForm(http, 'app-2'); // loadApplication for app-2 also fetches the effective form.
     detectChanges();
 
     expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
@@ -316,13 +312,12 @@ describe('ApplicationsDetailComponent', () => {
     detectChanges();
     flushAttachments(http);
 
-    // Now flush the stale app-1 detail GET: the seq guard returns early, so it
-    // must NOT overwrite app-2's state and must NOT trigger app-1's loadAux.
+    // Now flush the stale app-1 detail GET. The seq guard returns early, so the
+    // response must not overwrite the state of app-2 and must not run loadAux.
     stale.flush(appWire());
     detectChanges();
     expect(cmp.app()?.id).toBe('app-2');
 
-    // No app-1 versions/comments/form requests should have been issued.
     expect(http.match((r) => r.url === '/api/applications/app-1/versions')).toHaveLength(0);
     expect(http.match((r) => r.url === '/api/applications/app-1/form')).toHaveLength(0);
     flushAttachments(http);
@@ -342,7 +337,7 @@ describe('ApplicationsDetailComponent', () => {
     detectChanges();
     flushAttachments(http);
 
-    // Stale 404 arrives late: the seq guard returns before setting notFound/error.
+    // The stale 404 arrives late. The seq guard returns before it sets notFound or error.
     stale.flush({ title: 'Gone' }, { status: 404, statusText: 'Not Found' });
     detectChanges();
     expect(cmp.notFound()).toBe(false);
@@ -362,8 +357,7 @@ describe('ApplicationsDetailComponent', () => {
     detectChanges();
     flushAttachments(http);
 
-    // Trigger a refresh (via a successful erasure request → no refresh; use delete?).
-    // Simpler: call the private refresh(), hold its GET, then navigate.
+    // Call the private refresh(), hold its GET, then navigate.
     (cmp as unknown as { refresh: () => void }).refresh();
     const staleRefresh = http.expectOne(url(''));
     paramMap$.next(convertToParamMap({ id: 'app-2' }));
@@ -377,7 +371,7 @@ describe('ApplicationsDetailComponent', () => {
     detectChanges();
     flushAttachments(http);
 
-    // The stale refresh response must not overwrite app-2 nor trigger app-1 loadAux.
+    // The stale refresh response must not overwrite app-2 and must not run loadAux.
     staleRefresh.flush({ ...appWire(), id: 'app-1' });
     detectChanges();
     expect(cmp.app()?.id).toBe('app-2');
@@ -400,7 +394,7 @@ describe('ApplicationsDetailComponent', () => {
     });
     detectChanges();
 
-    // data row uses the field label, not the raw key, and formats the currency value.
+    // The data row uses the field label, not the raw key, and formats the currency.
     expect(screen.getByText('Beantragte Summe')).toBeInTheDocument();
     flushAttachments(http);
     http.verify();
@@ -479,7 +473,7 @@ describe('ApplicationsDetailComponent', () => {
     expect(cmp.firing()).toBeNull();
     expect(success).toHaveBeenCalled();
 
-    // refresh re-fetches the application + aux (no form re-fetch).
+    // The refresh fetches the application and the aux data again, but not the form.
     http.expectOne(url('')).flush({ ...appWire(), version: 3 });
     http.expectOne(url('/versions')).flush(VERSIONS);
     http.expectOne(url('/comments')).flush(COMMENTS);
@@ -497,7 +491,7 @@ describe('ApplicationsDetailComponent', () => {
     const t: Transition = { id: 'tr-1', fromStateId: 's1', toStateId: 's2', label: 'Go', color: null };
     cmp.firing.set('other');
     cmp.fire(t);
-    // firing unchanged — guard returned early
+    // The guard returns early, so firing stays unchanged.
     expect(cmp.firing()).toBe('other');
   });
 
@@ -531,7 +525,7 @@ describe('ApplicationsDetailComponent', () => {
     expect(error).toHaveBeenCalledWith(message);
     expect(cmp.firing()).toBeNull();
 
-    // refresh fires even on error
+    // The refresh fires even on an error.
     http.expectOne(url('')).flush(appWire());
     http.expectOne(url('/versions')).flush(VERSIONS);
     http.expectOne(url('/comments')).flush(COMMENTS);
@@ -562,7 +556,6 @@ describe('ApplicationsDetailComponent', () => {
     http.verify();
   });
 
-  // --- budget assignment --------------------------------------------------
   function budgetTree() {
     return [
       {
@@ -593,7 +586,7 @@ describe('ApplicationsDetailComponent', () => {
     http.expectOne(url('/versions')).flush(VERSIONS);
     http.expectOne(url('/comments')).flush(COMMENTS);
     http.expectOne((r) => r.method === 'GET' && r.url === '/api/budgets').flush(budgetTree());
-    // Top budget of the assigned cost centre → fiscal-year list is reloaded.
+    // The top budget of the assigned cost centre reloads the fiscal-year list.
     http.expectOne((r) => r.url === '/api/budgets/b1/fiscal-years').flush([]);
     flushForm(http);
     detectChanges();
@@ -626,7 +619,7 @@ describe('ApplicationsDetailComponent', () => {
     http.expectOne(url('/versions')).flush(VERSIONS);
     http.expectOne(url('/comments')).flush(COMMENTS);
     http.expectOne((r) => r.method === 'GET' && r.url === '/api/budgets').flush(budgetTree());
-    // initial fiscal-year list of the assigned cost centre
+    // The initial fiscal-year list of the assigned cost centre.
     http.expectOne((r) => r.url === '/api/budgets/b1/fiscal-years').flush([]);
     flushForm(http);
     flushAttachments(http);
@@ -636,7 +629,7 @@ describe('ApplicationsDetailComponent', () => {
     cmp.openBudgetDialog();
     expect(cmp.budgetDialogOpen()).toBe(true);
     expect(cmp.budgetChoice()).toBe('b1');
-    // opening the dialog reloads the fiscal-year list of the current top budget
+    // The open dialog reloads the fiscal-year list of the current top budget.
     http.expectOne((r) => r.url === '/api/budgets/b1/fiscal-years').flush([]);
 
     cmp.budgetChoice.set('');
@@ -649,7 +642,7 @@ describe('ApplicationsDetailComponent', () => {
     expect(cmp.budgetDialogOpen()).toBe(false);
     expect(success).toHaveBeenCalled();
 
-    // refresh
+    // The refresh fetches the application and the aux data again.
     http.expectOne(url('')).flush(appWire());
     http.expectOne(url('/versions')).flush(VERSIONS);
     http.expectOne(url('/comments')).flush(COMMENTS);
@@ -665,7 +658,7 @@ describe('ApplicationsDetailComponent', () => {
     const { cmp } = await setup();
     cmp.assigningBudget.set(true);
     cmp.assignBudget();
-    // still true, no extra request emitted (verified by http.verify in other tests)
+    // The value stays true and no extra request goes out. Other tests verify this.
     expect(cmp.assigningBudget()).toBe(true);
   });
 
@@ -694,7 +687,6 @@ describe('ApplicationsDetailComponent', () => {
     http.verify();
   });
 
-  // --- value formatting via dataEntries / formatByField -------------------
   function setupWithFields(
     fields: FormFieldDef[],
     data: Record<string, unknown>,
@@ -749,11 +741,11 @@ describe('ApplicationsDetailComponent', () => {
     const byKey = new Map(cmp.dataEntries(app).map((e) => [e.key, e.value]));
     expect(byKey.get('agree')).toBe('Ja');
     expect(byKey.get('cat')).toBe('Kultur');
-    // unknown multiselect option falls back to the raw value
+    // An unknown multiselect option falls back to the raw value.
     expect(byKey.get('tags')).toBe('X-Label, y');
     expect(byKey.get('budget')).toContain('1.234,50');
     expect(byKey.get('empty')).toBe('—');
-    // markdown is a display-only field → excluded
+    // A markdown field is display-only, so the rows exclude it.
     expect(byKey.has('desc')).toBe(false);
   });
 
@@ -796,7 +788,7 @@ describe('ApplicationsDetailComponent', () => {
     const { cmp } = await setupWithFields(fields, data);
     const byKey = new Map(cmp.dataEntries(cmp.app() as Application).map((e) => [e.key, e.value]));
     expect(byKey.get('gremium')).toBe('Fachschaft TEX');
-    // unknown option (e.g. deleted budget) falls back to the raw value
+    // An unknown option, for example a deleted budget, falls back to the raw value.
     expect(byKey.get('kst')).toBe('unknown-id');
   });
 
@@ -815,7 +807,6 @@ describe('ApplicationsDetailComponent', () => {
     expect(extra?.value).toBe('{"a":1}');
   });
 
-  // --- positions block ----------------------------------------------------
   it('renders the positions block with preferred-offer totals', async () => {
     const fields: FormFieldDef[] = [
       { key: 'kosten', type: 'positions', label: { de: 'Kostenaufstellung' } },
@@ -829,24 +820,24 @@ describe('ApplicationsDetailComponent', () => {
             { label: 'Anbieter B', value: 120, preferred: false },
           ],
         },
-        { offers: 'nope' }, // missing label → defaults to '' (?? branch)
+        { offers: 'nope' }, // A missing label falls back to '' through the ?? branch.
       ],
     };
     const { cmp } = await setupWithFields(fields, data);
     const app = cmp.app() as Application;
 
-    // positions are NOT in dataEntries
+    // dataEntries holds no positions.
     expect(cmp.dataEntries(app).some((e) => e.key === 'kosten')).toBe(false);
 
     const blocks = cmp.positionEntries(app);
     expect(blocks).toHaveLength(1);
     expect(blocks[0].positions).toHaveLength(2);
-    // bad offers normalise to []
+    // A bad offers value normalizes to [].
     expect(blocks[0].positions[1].offers).toEqual([]);
     expect(blocks[0].positions[1].label).toBe('');
 
     expect(cmp.positionValue(blocks[0].positions[0])).toBe(100);
-    // no preferred → 0
+    // A position without a preferred offer counts as 0.
     expect(cmp.positionValue(blocks[0].positions[1])).toBe(0);
     expect(cmp.positionsTotal(blocks[0].positions)).toBe(100);
     expect(cmp.money(100)).toContain('100,00');
@@ -894,32 +885,31 @@ describe('ApplicationsDetailComponent', () => {
     const summary = fmt(field, [
       { offers: [{ value: 100, preferred: true }, { value: 80, preferred: false }] },
       { offers: [{ value: 50, preferred: true }] },
-      { offers: [{ value: 10, preferred: false }] }, // no preferred → 0
-      {}, // missing offers → 0
+      { offers: [{ value: 10, preferred: false }] }, // No preferred offer counts as 0.
+      {}, // Missing offers count as 0.
     ]);
     expect(summary).toMatch(/^4 ×/);
     expect(summary).toContain('150,00');
-    // non-array positions value falls back to a dash
+    // A positions value that is no array falls back to a dash.
     expect(fmt(field, 'nope')).toBe('—');
   });
 
   it('summarises positions compactly in a non-positions data row context', async () => {
-    // positions inside dataEntries route through formatByField → formatPositions,
-    // exercised here by calling the public formatter contract through a select
-    // that holds an array value handled as multiselect; positions summary is
-    // covered via positionEntries above. Here we assert formatPositions edge
-    // (empty array) using the dash branch.
+    // A positions value inside dataEntries runs through formatByField and then
+    // through formatPositions. This test drives the public formatter contract with a
+    // select that holds an array value and that the code handles as a multiselect.
+    // The positionEntries test above covers the positions summary. Here the check
+    // covers the edge case of an empty array over the dash branch.
     const fields: FormFieldDef[] = [
       { key: 'multi', type: 'multiselect', label: { de: 'Multi' } },
     ];
     const { cmp } = await setupWithFields(fields, { multi: 'not-array' });
     const app = cmp.app() as Application;
     const row = cmp.dataEntries(app).find((e) => e.key === 'multi');
-    // non-array multiselect falls through to formatFieldValue
+    // A multiselect value that is no array falls through to formatFieldValue.
     expect(row?.value).toBe('not-array');
   });
 
-  // --- amount() formatting -------------------------------------------------
   it('formats the requested amount, falling back for null / non-numeric', async () => {
     const { cmp } = await setup();
     const base = { ...({} as Application) };
@@ -932,7 +922,6 @@ describe('ApplicationsDetailComponent', () => {
     expect(cmp.amount(app('10', null))).toContain('10,00');
   });
 
-  // --- isEmptyDiff ---------------------------------------------------------
   it('isEmptyDiff is false for a null diff and true for an all-empty diff', async () => {
     const { cmp } = await setup();
     expect(cmp.isEmptyDiff({ diff: null } as ApplicationVersion)).toBe(false);
@@ -946,7 +935,6 @@ describe('ApplicationsDetailComponent', () => {
     ).toBe(false);
   });
 
-  // --- comment author / initial helpers -----------------------------------
   it('derives the author name and avatar initials', async () => {
     const { cmp } = await setup();
     expect(cmp['authorName']({ author: 'Mia Müller' } as ApplicationComment)).toBe('Mia Müller');
@@ -976,11 +964,10 @@ describe('ApplicationsDetailComponent', () => {
     cmp.newComment.set('real');
     cmp.posting.set(true);
     cmp.submitComment(evt);
-    // still posting, no request fired (verified below)
+    // The post stays in flight and no request goes out. The check below proves it.
     http.verify();
   });
 
-  // --- edit -----------------------------------------------------------------
   it('starts inline edit, cancels, and saves (success)', async () => {
     const { http, detectChanges, cmp, toast } = await setupWithFields(
       [{ key: 'title', type: 'text', label: { de: 'Titel' } }],
@@ -1007,7 +994,7 @@ describe('ApplicationsDetailComponent', () => {
     expect(cmp.editing()).toBe(false);
     expect(success).toHaveBeenCalled();
 
-    // refresh after save
+    // The save triggers a refresh.
     http.expectOne(url('')).flush(appWire());
     http.expectOne(url('/versions')).flush(VERSIONS);
     http.expectOne(url('/comments')).flush(COMMENTS);
@@ -1025,12 +1012,10 @@ describe('ApplicationsDetailComponent', () => {
     detectChanges();
     flushAttachments(http);
 
-    // invalid form
     jest.spyOn(cmp.editForm, 'invalid', 'get').mockReturnValue(true);
     cmp.saveEdit();
     expect(cmp.savingEdit()).toBe(false);
 
-    // already saving
     jest.spyOn(cmp.editForm, 'invalid', 'get').mockReturnValue(false);
     cmp.savingEdit.set(true);
     cmp.saveEdit();
@@ -1057,7 +1042,7 @@ describe('ApplicationsDetailComponent', () => {
     http.verify();
   });
 
-  // --- delete (admin-only) ------------------------------------------------
+  // Only an admin may delete an application.
   it('deletes the application and navigates to the list', async () => {
     const { http, detectChanges, cmp, toast, router } = await setup(
       ['application.read', 'application.manage'],
@@ -1101,7 +1086,6 @@ describe('ApplicationsDetailComponent', () => {
     http.verify();
   });
 
-  // --- erasure request (DSGVO) --------------------------------------------
   it('requests erasure (success) and guards double-request', async () => {
     const { http, detectChanges, cmp, toast } = await setup();
     flushAll(http);

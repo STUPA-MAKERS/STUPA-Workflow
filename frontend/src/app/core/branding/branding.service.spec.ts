@@ -35,7 +35,7 @@ describe('BrandingService', () => {
   it('falls back to the i18n app title before any config is loaded', () => {
     expect(svc.appName()).toBe(i18n.translate('app.title'));
     expect(svc.homeHeading()).toBe(i18n.translate('home.heading'));
-    // The constructor effect already mirrored the fallback into document.title.
+    // The constructor effect already copied the fallback into document.title.
     TestBed.tick();
     expect(title.getTitle()).toBe(i18n.translate('app.title'));
   });
@@ -81,7 +81,7 @@ describe('BrandingService', () => {
     i18n.setLocale('en');
     const en = svc.appName();
     expect(en).toBe(i18n.translate('app.title'));
-    // EN and DE titles differ, proving the computed re-evaluated on locale change.
+    // The EN and DE titles differ, so a change proves the computed value ran again.
     expect(en).not.toBe(de);
   });
 });

@@ -1,41 +1,41 @@
 <!--
-Definition of Done — bitte VOR dem Review durchgehen. Die Liste fragt unsere
-wiederkehrenden Review-Fehlerklassen vorab ab; jeder Haken steht für einen Fehler,
-der uns schon mind. einmal gekostet hat. Punkte, die für diesen PR nicht zutreffen,
-mit `[x] n/a — <kurzer Grund>` abhaken (nicht löschen). Begründung je Punkt:
-docs/CONTRIBUTING.md / CONTRIBUTING.md → „Definition of Done".
+Definition of Done — go through the list BEFORE the review. The list checks the
+error classes that come back again and again in our reviews. Each box stands for a
+mistake that already cost us at least once. Tick a point that does not apply to this
+pull request as `[x] n/a — <short reason>`. Do not delete the point. The reason for
+each point is in docs/CONTRIBUTING.md / CONTRIBUTING.md → "Definition of Done".
 -->
 
-## Was & Warum
+## What and Why
 
-<!-- Knapp: was ändert sich, welches Issue/Task (T-/#), warum so. -->
+<!-- Short: what changes, which issue or task (T-/#), and why this way. -->
 
 Closes #
 
 ## Definition of Done
 
 ### Backend / Contract
-- [ ] **tz-aware** — alle Zeitstempel `timestamptz` (DB) bzw. aware `datetime` (Python). **Kein** naive/aware-Mix; keine `datetime.utcnow()` (→ `datetime.now(UTC)`).
-- [ ] **problem+json auf ALLEN Fehlerpfaden** — jeder 4xx/5xx liefert `application/problem+json` (auch neue Pfade/Branches). Kein nackter String / Default-FastAPI-`detail`.
-- [ ] **RBAC serverseitig erzwungen** — Berechtigung wird im Backend geprüft (nicht nur FE-Gating); keine Privilege-Escalation (z. B. Objekt-Owner ≠ Caller, Rollen aus dem Request nicht vertrauen).
-- [ ] **Inputs strikt typisiert** — Enums/`Literal` statt freier Strings; Query/Body/Path validiert (Pydantic/`Annotated`), keine offenen `str`-Statusfelder.
-- [ ] **Migration single-head** — `alembic heads` = **ein** head, `alembic upgrade head` läuft grün. Neue Revision = **Hash-ID** (`alembic revision`, kein `--rev-id`/`000N`); `down_revision` = aktueller head.
-- [ ] **Contract-Tests grün** — Schemathesis (`--checks all`) bleibt grün; OpenAPI spiegelt die Änderung.
+- [ ] **tz-aware** — every timestamp is `timestamptz` in the DB and an aware `datetime` in Python. **No** naive/aware mix. No `datetime.utcnow()` (use `datetime.now(UTC)`).
+- [ ] **problem+json on ALL error paths** — every 4xx/5xx returns `application/problem+json`, new paths and branches included. No bare string and no default FastAPI `detail`.
+- [ ] **RBAC enforced server-side** — the backend checks the permission, not only the frontend gating. No privilege escalation: the object owner can differ from the caller, and roles from the request stay untrusted.
+- [ ] **Inputs strictly typed** — enums or `Literal` instead of free strings. Query, body and path are validated (Pydantic / `Annotated`). No open `str` status fields.
+- [ ] **Migration single-head** — `alembic heads` shows **one** head, `alembic upgrade head` runs green. A new revision gets a **hash id** (`alembic revision`, never `--rev-id`/`000N`). Its `down_revision` is the current head.
+- [ ] **Contract tests green** — Schemathesis (`--checks all`) stays green. OpenAPI mirrors the change.
 
-### FE/BE-Vertrag (Namensgleichheit)
-- [ ] **Feld-/Header-/Cookie-Namen identisch** FE↔BE, **camelCase** im JSON. Kein FE-erfundenes Feld; keine stillen Umbenennungen (`snake_case`↔`camelCase`-Drift).
+### FE/BE contract (same names)
+- [ ] **Field, header and cookie names identical** FE↔BE, **camelCase** in the JSON. No field invented by the frontend. No silent renames (`snake_case`↔`camelCase` drift).
 
 ### Frontend / UX
-- [ ] **i18n de/en Parity** — jeder neue String in **beiden** Locales (`de` + `en`), keine hartkodierten Texte.
-- [ ] **a11y** — Labels/`aria-*`, Fokus-Reihenfolge, Tastatur-Bedienbarkeit, Kontrast.
-- [ ] **Dark/Light** — in **beiden** Themes geprüft (keine fixen Farben, die im anderen Theme brechen).
-- [ ] **FE-Selbstcheck via Visual-Harness** — Vorher/Nachher-Screenshots erzeugt und gesichtet (kein „sieht-wohl-ok"); relevante Screens unten verlinkt/angehängt.
+- [ ] **i18n de/en parity** — every new string is in **both** locales (`de` + `en`). No hardcoded text.
+- [ ] **a11y** — labels and `aria-*`, focus order, keyboard operation, contrast.
+- [ ] **Dark/light** — checked in **both** themes. No fixed colors that break in the other theme.
+- [ ] **Frontend self-check with the visual harness** — before/after screenshots taken and reviewed, no "looks fine to me". Link or attach the affected screens below.
 
 ### Tests & Gates
-- [ ] Tests test-first, alle grün; Coverage-Gate gehalten (kritische Module 100 % Branch).
-- [ ] `ruff` + `basedpyright` (BE) / `eslint` + `tsc` (FE) **0** Fehler.
-- [ ] Kein `skip`/`xfail` ohne verlinkten Grund.
+- [ ] Tests written test-first, all green. The coverage gate holds (critical modules 100 % branch).
+- [ ] `ruff` + `basedpyright` (BE) / `eslint` + `tsc` (FE) report **0** errors.
+- [ ] No `skip` or `xfail` without a linked reason.
 
-## Screenshots (Vorher / Nachher)
+## Screenshots (before / after)
 
-<!-- Visual-Harness-Ausgabe für betroffene Screens, je Theme. -->
+<!-- Visual-harness output for the affected screens, one per theme. -->

@@ -1,13 +1,13 @@
-"""arq worker task: finalize a protocol (async — ``finalize`` never blocks).
+"""arq worker task: finalize a protocol asynchronously, so `finalize` never blocks.
 
-``render_protocol`` builds the :class:`ProtocolService` from the ``ctx`` deps (pytex
-+ MinIO + mail queue) and runs the render+send after the router set the protocol to
-``rendering`` and enqueued the job. Transient errors (pytex 5xx/transport, storage)
--> ``arq.Retry`` with linear backoff up to ``pdf_max_tries``; any permanent error
-resets the protocol to ``draft`` (re-finalizable, never stuck in ``rendering`` — the
-send is part of the atomic finalization, a failure rolls everything back). After both
-success and rollback, ``meeting_state`` is broadcast on ``meeting:{id}`` so live
-followers see the status flip.
+`render_protocol` builds the `ProtocolService` from the `ctx` dependencies (pytex, MinIO
+and the mail queue). It runs the render and the send after the router set the protocol
+to `rendering` and enqueued the job. A transient error (pytex 5xx, transport, storage)
+raises `arq.Retry` with a linear backoff up to `pdf_max_tries`. A permanent error resets
+the protocol to `draft`. The protocol is then finalizable again and never stays stuck in
+`rendering`. The send belongs to the atomic finalization, so a failure rolls back
+everything. After a success and after a rollback the task broadcasts `meeting_state` on
+`meeting:{id}`, so live followers see the status change.
 """
 
 from __future__ import annotations
@@ -36,13 +36,13 @@ logger = logging.getLogger("app.protocol")
 
 
 def _sessionmaker(ctx: dict[str, Any]) -> async_sessionmaker[AsyncSession]:
-    """DB sessionmaker (injectable in tests via ``ctx['protocol_sessionmaker']``)."""
+    """Return the DB sessionmaker (tests inject one via `ctx['protocol_sessionmaker']`)."""
     maker = ctx.get("protocol_sessionmaker")
     return maker if maker is not None else get_sessionmaker()
 
 
 def _mail_queue(ctx: dict[str, Any]) -> MailQueue | None:
-    """Mail queue over the same Redis (the worker's arq pool)."""
+    """Return the mail queue over the same Redis pool that arq uses in the worker."""
     redis = ctx.get("redis")
     return ArqMailQueue(redis) if redis is not None else None
 
@@ -58,17 +58,20 @@ def _service(ctx: dict[str, Any], session: AsyncSession) -> ProtocolService:
 
 
 async def _revert_to_draft(ctx: dict[str, Any], protocol_id: UUID) -> None:
-    """``rendering -> draft`` in a fresh session (the job session is rolled back)."""
+    """Set the protocol from `rendering` back to `draft`.
+
+    The function opens a fresh session, because the job session already rolled back.
+    """
     maker = _sessionmaker(ctx)
     async with maker() as session:
         await ProtocolService(session).revert_to_draft(protocol_id)
 
 
 async def _broadcast_meeting_state(ctx: dict[str, Any], protocol_id: UUID) -> None:
-    """Publish the meeting's ``meeting_state`` (status flip for the FE).
+    """Publish the `meeting_state` event of the meeting, so the frontend sees the status.
 
-    Best effort: a broadcast error must not retroactively fail the already-completed
-    render/rollback.
+    The call is best effort. A broadcast error must not fail a render or a rollback that
+    already completed.
     """
     redis = ctx.get("redis")
     if redis is None:
@@ -86,7 +89,7 @@ async def _broadcast_meeting_state(ctx: dict[str, Any], protocol_id: UUID) -> No
         return
     event = MeetingStateEvent(
         activeApplicationId=meeting.active_application_id,
-        # Text column; the service constrains values to the allowed literals.
+        # Text column. The service constrains the values to the allowed literals.
         status=cast("Any", meeting.status),
     )
     try:
@@ -98,8 +101,15 @@ async def _broadcast_meeting_state(ctx: dict[str, Any], protocol_id: UUID) -> No
 
 
 async def render_protocol(ctx: dict[str, Any], protocol_id: str) -> str:
-    """Finalize a ``rendering`` protocol (PDF + mail). Retry on transient error up to
-    ``pdf_max_tries``; permanent error -> rollback to ``draft``."""
+    """Finalize a protocol in the `rendering` status: render the PDF and send it.
+
+    A transient error retries up to `pdf_max_tries`. A permanent error rolls the protocol
+    back to `draft`.
+
+    Returns:
+        `"final"` after the send, `"dead"` after the last failed try, or `"failed"` after
+        a permanent error.
+    """
     settings: Settings = ctx["settings"]
     pid = UUID(protocol_id)
     try:

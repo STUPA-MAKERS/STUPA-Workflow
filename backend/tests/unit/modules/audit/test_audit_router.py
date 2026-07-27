@@ -1,4 +1,4 @@
-"""TDD: audit-Router (T-23, api.md ``/admin/audit``) — Verdrahtung + RBAC ohne DB."""
+"""Audit router tests (T-23, api.md `/admin/audit`): wiring and RBAC without a database."""
 
 from __future__ import annotations
 
@@ -111,8 +111,8 @@ def test_list_returns_entries_with_hex_hashes_and_cursor() -> None:
     assert first["hash"] == "02" * 32
     assert first["prevHash"] == "01" * 32
     assert first["targetType"] == "application"
-    assert first["actorName"] == "Admin One"  # sub resolved to Klarname
-    assert first["revertable"] is True  # vom Router durchgereicht
+    assert first["actorName"] == "Admin One"  # the sub resolves to a display name
+    assert first["revertable"] is True  # passed through by the router
     assert second["prevHash"] is None  # Genesis
     assert second["revertable"] is False
 
@@ -148,13 +148,14 @@ def test_list_passes_cursor_filters_to_service() -> None:
 
 
 def test_list_rejects_naive_since_with_422() -> None:
-    # #AUD-034: naive (tz-loses) since/until darf nicht bis zur timestamptz-Query
-    # durchschlagen (asyncpg DataError → 500); AwareDatetime weist es als 422 ab.
+    # #AUD-034: a naive since or until value must not reach the timestamptz query.
+    # The asyncpg driver raises a DataError there, which gives 500. AwareDatetime
+    # rejects the value with 422 instead.
     service = _FakeService()
     client = _client(service, _principal("audit.read"))
     resp = client.get("/api/admin/audit", params={"since": "2026-06-01T00:00:00"})
     assert resp.status_code == 422
-    assert service.cursor_kwargs is None  # Query erst gar nicht erreicht
+    assert service.cursor_kwargs is None  # the query is never reached
 
 
 def test_list_rejects_naive_until_with_422() -> None:

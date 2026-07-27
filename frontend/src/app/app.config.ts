@@ -35,14 +35,14 @@ export const appConfig: ApplicationConfig = {
       withComponentInputBinding(),
       withInMemoryScrolling({ scrollPositionRestoration: 'enabled', anchorScrolling: 'enabled' }),
     ),
-    // Order: loading (outermost, measures full duration) → auth (credentials/bearer)
-    // → mock response.
+    // Order: loading (outermost, measures the full duration) → auth (credentials and
+    // bearer) → mock response.
     //
-    // Security: the mock interceptor is wired into the chain only in the dev/demo
-    // build. In prod builds `isDevMode()` is false, so it is never registered — no
-    // runtime-attackable input (?mock=1, localStorage['useMockApi'],
-    // __USE_MOCK_API__) can activate it (session/data spoofing). The extra runtime
-    // guard in the interceptor (isDevMode()) remains as defence in depth.
+    // Security: only the dev or demo build puts the mock interceptor into the chain. In a
+    // prod build `isDevMode()` returns false, so the app never registers it. No input at
+    // runtime can activate it and spoof a session or data. This covers the `?mock=1` query
+    // flag, the `useMockApi` localStorage key and the `__USE_MOCK_API__` global. The
+    // `isDevMode()` guard inside the interceptor stays as defense in depth.
     provideHttpClient(
       withInterceptors(
         isDevMode()
@@ -50,26 +50,21 @@ export const appConfig: ApplicationConfig = {
           : [loadingInterceptor, authInterceptor],
       ),
     ),
-    // Live-vote source: the in-memory simulation in mock mode, otherwise the real
-    // WebSocket (WsService).
     {
       provide: LIVE_VOTE_SOURCE,
       useFactory: () => (inject(USE_MOCK_API) ? inject(MockLiveVoteSource) : inject(WsService)),
     },
     provideFormly(),
-    // Bind the UI-kit library (@stupa-makers/ui-kit) to app services: i18n follows
-    // the app locale (identical DE/EN strings), loading overlay follows LoadingService.
     { provide: UI_KIT_INTL, useFactory: () => uiKitIntlFromLang(inject(I18nService).locale) },
     { provide: UI_KIT_LOADING, useFactory: () => ({ visible: inject(LoadingService).visible }) },
     provideAppInitializer(() => {
       inject(ThemeService).init();
-      inject(I18nService); // initializes document.lang via the constructor default
-      inject(BrandingService).init(); // app name from site config → tab title/header/home
+      inject(I18nService); // the constructor default sets document.lang
+      inject(BrandingService).init(); // site-config app name: tab title, header, home
       inject(AuthService).ensureLoaded().subscribe();
       inject(SwUpdateService).init();
     }),
-    // PWA: service worker only in the prod build (ngsw-config.json caches the app
-    // shell + assets; /api is not cached). Registered once the app is stable.
+    // ngsw-config.json caches the app shell and the assets. It does not cache /api.
     provideServiceWorker('ngsw-worker.js', {
       enabled: !isDevMode(),
       registrationStrategy: 'registerWhenStable:30000',

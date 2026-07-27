@@ -1,10 +1,11 @@
-"""Zusatz-Unit-Deckung der Worker-Tasks (retention/scan/pdf/mail/webhook/main/
-task_reminders/deadlines) — alle Branches/Fehlerpfade ohne DB/Redis/Netz.
+"""Extra unit coverage of the worker tasks, without a DB, Redis or a network.
 
-Ergänzt die bestehenden Worker-Tests gezielt um die noch ungedeckten Zeilen:
-``_on_startup``-Orchestrierung, scan-/pdf-Task inkl. Retry/Dead, DSGVO-Retention
-(anonymisieren + purgen, Per-Zeile-Fehlerisolation), Deadline-Auto-Transitionen
-und die Rand-Branches der Task-Erinnerungen.
+The tasks are retention, scan, pdf, mail, webhook, main, task_reminders and deadlines.
+These tests add the branches and error paths that the other worker tests leave
+uncovered. They cover the `_on_startup` orchestration and the scan and pdf tasks with
+retry and dead. They cover DSGVO retention with anonymize, purge and per-row failure
+isolation. They also cover the deadline auto-transitions and the edge branches of the
+task reminders.
 """
 
 from __future__ import annotations
@@ -38,11 +39,9 @@ SETTINGS = load_settings()
 NOW = datetime(2026, 6, 16, 12, 0, tzinfo=UTC)
 
 
-# --------------------------------------------------------------------------- #
-# Gemeinsame Session-/Sessionmaker-Fakes
-# --------------------------------------------------------------------------- #
+# Shared session and sessionmaker fakes
 class _SessionCM:
-    """Async-Context-Manager um eine beliebige Fake-Session."""
+    """Wrap any fake session in an async context manager."""
 
     def __init__(self, session: Any) -> None:
         self.session = session
@@ -55,15 +54,13 @@ class _SessionCM:
 
 
 def _maker(session: Any) -> Any:
-    """Sessionmaker-Fake, der immer dieselbe Session liefert."""
+    """Return a fake sessionmaker that always gives the same session."""
     return lambda: _SessionCM(session)
 
 
-# =========================================================================== #
 # worker/scan.py
-# =========================================================================== #
 class _ScanSession:
-    """Minimal-Session: ``get`` aus dem Store."""
+    """Minimal session that serves `get` from the store."""
 
     def __init__(self, store: dict[uuid.UUID, Any] | None = None) -> None:
         self.store = store or {}
@@ -73,7 +70,7 @@ class _ScanSession:
 
 
 class _FinalizeFilesService:
-    """Fängt ``finalize_scan`` ab (keine echte DB-Logik)."""
+    """Capture the `finalize_scan` calls without real DB logic."""
 
     calls: list[tuple[uuid.UUID, ScanVerdict, str]] = []
 
@@ -95,7 +92,7 @@ async def test_scan_on_startup_populates_ctx() -> None:
     ctx: dict[str, Any] = {}
     await wscan.on_startup(ctx)
     assert "settings" in ctx
-    # Default-Settings → kein clamav/MinIO konfiguriert → None.
+    # The default settings configure no ClamAV and no MinIO, so both stay None.
     assert ctx["scanner"] is None
     assert ctx["object_storage"] is None
 
@@ -107,17 +104,17 @@ def test_scan_sessionmaker_default_and_injected() -> None:
 
 
 async def test_scan_skipped_when_scanner_or_storage_missing() -> None:
-    # scanner fehlt → skipped (keine DB-Berührung).
+    # No scanner: the task returns skipped and never touches the DB.
     ctx = {"settings": SETTINGS, "scanner": None, "object_storage": object()}
     assert await wscan.scan_attachment(ctx, str(uuid4())) == "skipped"
-    # storage fehlt → ebenfalls skipped.
+    # No storage: the task returns skipped as well.
     ctx2 = {"settings": SETTINGS, "scanner": object(), "object_storage": None}
     assert await wscan.scan_attachment(ctx2, str(uuid4())) == "skipped"
 
 
 async def test_scan_gone_when_attachment_missing(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(wscan, "FilesService", _FinalizeFilesService)
-    session = _ScanSession()  # leerer Store → get liefert None
+    session = _ScanSession()  # empty store, so get returns None
     ctx = {
         "settings": SETTINGS,
         "scanner": object(),
@@ -239,18 +236,17 @@ async def test_scan_scanner_error_dead_after_max_tries(
 
 
 def test_scan_retry_or_dead_default_job_try() -> None:
-    # job_try fehlt → Default 1; max_tries=5 → Retry mit Backoff job_try*backoff.
+    # A missing job_try defaults to 1. With max_tries=5 the task retries after
+    # job_try * backoff.
     settings = load_settings(scan_max_tries=5, scan_retry_backoff_seconds=11)
     with pytest.raises(Retry) as ei:
         wscan._retry_or_dead({}, settings, "aid", RuntimeError("boom"))
     assert ei.value.defer_score == 11_000  # job_try(1) * backoff(11s), in ms
 
 
-# =========================================================================== #
 # worker/pdf.py
-# =========================================================================== #
 class _Pipeline:
-    """RenderPipeline-Fake: run liefert Status oder wirft RenderRetry."""
+    """Fake render pipeline where `run` returns a status or raises RenderRetry."""
 
     def __init__(self, *, result: str = "done", error: Exception | None = None) -> None:
         self.result = result
@@ -271,7 +267,7 @@ async def test_pdf_on_startup_populates_ctx() -> None:
     await wpdf.on_startup(ctx)
     assert "settings" in ctx
     assert ctx["pytex_client"] is not None
-    # Default-Settings → MinIO nicht konfiguriert → None.
+    # The default settings configure no MinIO, so the storage stays None.
     assert ctx["object_storage"] is None
 
 
@@ -335,18 +331,16 @@ async def test_render_pdf_dead_marks_failed(monkeypatch: pytest.MonkeyPatch) -> 
 
 
 async def test_render_pdf_default_job_try(monkeypatch: pytest.MonkeyPatch) -> None:
-    # job_try fehlt → Default 1 → Retry.
+    # A missing job_try defaults to 1, so the task retries.
     pipeline = _Pipeline(error=RenderRetry("boom"))
     monkeypatch.setattr(wpdf, "_pipeline", lambda _ctx: pipeline)
     with pytest.raises(Retry):
         await wpdf.render_pdf({"settings": SETTINGS}, str(uuid4()))
 
 
-# =========================================================================== #
 # worker/retention.py
-# =========================================================================== #
 class _RetSession:
-    """Retention-Session: scalar/scalars/execute über FIFO-Queues + commit-Zähler."""
+    """Serve scalar, scalars and execute from FIFO queues and count the commits."""
 
     def __init__(
         self,
@@ -388,7 +382,8 @@ def test_retention_now_tz_aware() -> None:
 
 async def test_due_application_ids_default_retention() -> None:
     ids = [uuid4(), uuid4()]
-    # erster scalar = default_retention_months (None → 24-Fallback), dann scalars=IDs.
+    # The first scalar is default_retention_months, where None falls back to 24 months.
+    # The scalars queue then holds the ids.
     session = _RetSession(scalar=[None], scalars=[ids])
     assert await wret._due_application_ids(_maker(session)) == ids
 
@@ -450,7 +445,7 @@ async def test_anonymize_due_isolates_failure(monkeypatch: pytest.MonkeyPatch) -
     sessions = [_RetSession(), _RetSession()]
     it = iter(sessions)
     maker = lambda: _SessionCM(next(it))  # noqa: E731
-    # Die kaputte Zeile wird geloggt+übersprungen, die gute trotzdem committet.
+    # The worker logs and skips the broken row. It still commits the good one.
     assert await wret._anonymize_due(cast("Any", maker), storage=None) == 1
 
 
@@ -467,7 +462,7 @@ async def test_purge_expired_counts_rows() -> None:
 
 
 async def test_purge_expired_none_rowcount() -> None:
-    # rowcount None → 0 (die ``or 0``-Zweige).
+    # A rowcount of None counts as 0 through the `or 0` branches.
     session = _RetSession()
 
     async def _exec(_stmt: Any) -> Any:
@@ -504,7 +499,7 @@ async def test_process_retention_loads_settings_when_absent(
     monkeypatch.setattr(wret, "_purge_expired", _fake_purge)
     monkeypatch.setattr(wret, "build_object_storage", lambda _s: None)
     monkeypatch.setattr(wret, "load_settings", lambda: SETTINGS)
-    # ctx ohne 'settings' → load_settings()-Pfad.
+    # A ctx without "settings" takes the load_settings path.
     out = await wret.process_retention({})
     assert out == "anonymized=0 sessions_purged=0 links_purged=0"
 
@@ -516,9 +511,7 @@ def _fake_due_ids(ids: list[uuid.UUID]) -> Any:
     return _impl
 
 
-# =========================================================================== #
-# worker/main.py  — _on_startup-Orchestrierung
-# =========================================================================== #
+# worker/main.py: the _on_startup orchestration
 async def test_main_on_startup_calls_all_inits(monkeypatch: pytest.MonkeyPatch) -> None:
     called: list[str] = []
 
@@ -537,11 +530,9 @@ async def test_main_on_startup_calls_all_inits(monkeypatch: pytest.MonkeyPatch) 
     assert called == ["mail", "scan", "pdf", "webhook", "deadlines"]
 
 
-# =========================================================================== #
-# worker/deadlines.py — Restdeckung: discard-Log + Auto-Transitionen
-# =========================================================================== #
+# worker/deadlines.py: the discard log and the auto-transitions
 class _DlSession:
-    """``execute`` liefert gequeuete Ergebnisse als scalars().all()."""
+    """Return the queued results from `execute` through `scalars().all()`."""
 
     def __init__(self, results: list[list[Any]], *, rowcount: int = 0) -> None:
         self._results = list(results)
@@ -603,10 +594,10 @@ async def test_auto_transitions_advances(
 
     monkeypatch.setattr(wd, "FlowService", _Flow)
     scan = _DlSession([[app1, app2]])
-    # 1 scan-Session + 2 per-App-Sessions.
+    # One scan session and two per-application sessions.
     sessions = [scan, _DlSession([]), _DlSession([])]
     ctx = {"settings": SETTINGS, "deadlines_sessionmaker": _dl_maker(sessions)}
-    # app1 advanced (1), app2 None (0) → advanced == 1.
+    # app1 advances and app2 returns None, so the count is 1.
     assert await wd._process_auto_transitions(ctx) == 1
 
 
@@ -660,13 +651,11 @@ async def test_auto_transitions_generic_error_isolated(
     monkeypatch.setattr(wd, "FlowService", _Flow)
     sessions = [_DlSession([[bad, good]]), _DlSession([]), _DlSession([])]
     ctx = {"settings": SETTINGS, "deadlines_sessionmaker": _dl_maker(sessions)}
-    # bad geloggt+übersprungen, good advanced → 1.
+    # The worker logs and skips bad. good advances, so the count is 1.
     assert await wd._process_auto_transitions(ctx) == 1
 
 
-# =========================================================================== #
-# worker/task_reminders.py — Rand-Branches
-# =========================================================================== #
+# worker/task_reminders.py: the edge branches
 def _config(
     *, enabled: bool = True, after_days: int = 5, repeat_days: int = 7
 ) -> NotificationSettings:
@@ -707,7 +696,7 @@ def _patch_recipients(monkeypatch: pytest.MonkeyPatch) -> Any:
 
 
 def test_tr_sessionmaker_default_and_injected() -> None:
-    # Default-Pfad (Import des globalen get_sessionmaker) muss greifen.
+    # The default path imports the global get_sessionmaker.
     assert wtr._sessionmaker({}) is not None
     sentinel = object()
     assert wtr._sessionmaker({"sessionmaker": sentinel}) is sentinel
@@ -716,7 +705,7 @@ def test_tr_sessionmaker_default_and_injected() -> None:
 def test_tr_mail_queue_default_and_injected() -> None:
     sentinel = object()
     assert wtr._mail_queue({"mail_queue": sentinel}) is sentinel
-    # ohne mail_queue → mail_queue_from_pool(None) → None.
+    # Without a mail_queue the helper calls mail_queue_from_pool(None) and returns None.
     assert wtr._mail_queue({}) is None
 
 
@@ -732,7 +721,7 @@ async def process_reminders_disabled(session: Any, queue: FakeQueue) -> int:
 
 
 async def test_tr_no_due_rows_returns_zero(_patch_recipients: None) -> None:
-    # _due_applications: executes=[] → rows leer → frühe Rückgabe (Zeile 144).
+    # _due_applications finds no rows, so the task returns early (line 144).
     session = NotifFakeSession(executes=[[]])
     session.add(_config())
     queue = FakeQueue()
@@ -740,12 +729,12 @@ async def test_tr_no_due_rows_returns_zero(_patch_recipients: None) -> None:
 
 
 async def test_tr_state_none_or_not_actionable_skipped(_patch_recipients: None) -> None:
-    # State-Lookup liefert nichts → state is None → continue (Zeile 171).
+    # The state lookup finds nothing. state is None and the loop continues (line 171).
     app_id = uuid.uuid4()
     state = _state()
     session = NotifFakeSession(
         executes=[[(app_id, state.id, NOW - timedelta(days=6))]],
-        scalars=[[], []],  # keine States, keine Logs
+        scalars=[[], []],  # no states, no logs
     )
     session.add(_config())
     queue = FakeQueue()
@@ -754,13 +743,13 @@ async def test_tr_state_none_or_not_actionable_skipped(_patch_recipients: None) 
 
 
 async def test_tr_not_actionable_state_skipped(_patch_recipients: None) -> None:
-    # normal-State ohne handlungsfähige Übergänge (count=0) → state_actionable False.
+    # A normal state without manual transitions (count 0) is not actionable.
     app_id = uuid.uuid4()
     state = _state()
     session = NotifFakeSession(
         executes=[[(app_id, state.id, NOW - timedelta(days=6))]],
         scalars=[[state], []],
-        scalar=[0],  # state_actionable: 0 manuelle Übergänge
+        scalar=[0],  # state_actionable: 0 manual transitions
     )
     session.add(_config())
     queue = FakeQueue()
@@ -768,13 +757,13 @@ async def test_tr_not_actionable_state_skipped(_patch_recipients: None) -> None:
 
 
 async def test_tr_remind_one_app_missing(_patch_recipients: None) -> None:
-    # _remind_one: app_row None → False (Zeile 209). Wird über die Schleife ausgelöst.
+    # _remind_one returns False when app_row is None (line 209). The loop triggers it.
     app_id, event_id = uuid.uuid4(), uuid.uuid4()
     state = _state()
     session = NotifFakeSession(
         executes=[
-            [(app_id, state.id, NOW - timedelta(days=6))],  # due-Kandidaten
-            [],  # _remind_one: Antrag fehlt → first()=None
+            [(app_id, state.id, NOW - timedelta(days=6))],  # due candidates
+            [],  # _remind_one: the application is missing, so first() is None
         ],
         scalars=[[state], []],
         scalar=[1, event_id],
@@ -785,7 +774,7 @@ async def test_tr_remind_one_app_missing(_patch_recipients: None) -> None:
 
 
 async def test_tr_remind_one_no_recipients(monkeypatch: pytest.MonkeyPatch) -> None:
-    # actionable_principal_emails liefert [] → _remind_one False (Zeile 215).
+    # actionable_principal_emails returns [], so _remind_one returns False (line 215).
     async def empty(_s: Any, *, application_id: Any, state: Any) -> list[str]:
         return []
 
@@ -795,7 +784,7 @@ async def test_tr_remind_one_no_recipients(monkeypatch: pytest.MonkeyPatch) -> N
     session = NotifFakeSession(
         executes=[
             [(app_id, state.id, NOW - timedelta(days=6))],
-            [({"title": "X"},)],  # Antrag (data,)
+            [({"title": "X"},)],  # the application row (data,)
         ],
         scalars=[[state], []],
         scalar=[1, event_id],
@@ -806,7 +795,8 @@ async def test_tr_remind_one_no_recipients(monkeypatch: pytest.MonkeyPatch) -> N
 
 
 async def test_tr_label_fallback_other_lang(_patch_recipients: None) -> None:
-    # label_i18n ohne mail_default_lang-Key → next(iter(values())) (Zeile 218->219 else-Zweig).
+    # label_i18n has no mail_default_lang key. The else branch (218->219) takes the
+    # first value.
     app_id, event_id = uuid.uuid4(), uuid.uuid4()
     state = _state(label_i18n={"fr": "Examen"})
     session = NotifFakeSession(
@@ -824,7 +814,7 @@ async def test_tr_label_fallback_other_lang(_patch_recipients: None) -> None:
 
 
 async def test_tr_empty_label_i18n_no_status(_patch_recipients: None) -> None:
-    # label_i18n leer/kein dict → status_label bleibt "" (Bedingung false, Zeile 218).
+    # An empty label_i18n leaves status_label empty (the condition on line 218 is false).
     app_id, event_id = uuid.uuid4(), uuid.uuid4()
     state = _state(label_i18n={})
     session = NotifFakeSession(
@@ -841,7 +831,7 @@ async def test_tr_empty_label_i18n_no_status(_patch_recipients: None) -> None:
 
 
 async def test_tr_non_string_title(_patch_recipients: None) -> None:
-    # title kein str → applicationTitle "" (Zeile 230 else).
+    # A title that is not a string leaves applicationTitle empty (line 230, else).
     app_id, event_id = uuid.uuid4(), uuid.uuid4()
     state = _state()
     session = NotifFakeSession(
@@ -858,7 +848,7 @@ async def test_tr_non_string_title(_patch_recipients: None) -> None:
 
 
 async def test_tr_per_app_failure_isolated(monkeypatch: pytest.MonkeyPatch) -> None:
-    # _remind_one wirft → Loop fängt ab (Zeilen 103-104), Zyklus läuft weiter.
+    # _remind_one raises. The loop catches it (lines 103-104) and the cycle goes on.
     async def boom(*_a: Any, **_k: Any) -> bool:
         raise RuntimeError("remind broke")
 
@@ -878,12 +868,12 @@ async def test_tr_per_app_failure_isolated(monkeypatch: pytest.MonkeyPatch) -> N
     )
     session.add(_config())
     queue = FakeQueue()
-    # Trotz Fehler kein Crash, sent == 0.
+    # The failure causes no crash and the count stays 0.
     assert await wtr.process_task_reminders(_tr_ctx(session, queue), now=NOW) == 0
 
 
 async def test_tr_loads_settings_and_default_now(monkeypatch: pytest.MonkeyPatch) -> None:
-    # ctx ohne settings + now=None → load_settings() + datetime.now(UTC)-Pfade.
+    # A ctx without settings and now=None takes the load_settings and datetime.now paths.
     monkeypatch.setattr(wtr, "load_settings", lambda: SETTINGS)
 
     async def empty(_s: Any, *, application_id: Any, state: Any) -> list[str]:
@@ -898,8 +888,8 @@ async def test_tr_loads_settings_and_default_now(monkeypatch: pytest.MonkeyPatch
 
 
 async def test_tr_once_mode_skips_already_reminded(_patch_recipients: None) -> None:
-    # Einmal-Modus (repeat_days=0): bereits für diesen status_event erinnert →
-    # continue (Zeile 185), kein erneuter Versand.
+    # In once mode (repeat_days=0) the worker already reminded for this status_event.
+    # The loop continues at line 185 and sends nothing again.
     app_id, event_id = uuid.uuid4(), uuid.uuid4()
     state = _state()
     log = TaskReminderLog(
@@ -919,8 +909,8 @@ async def test_tr_once_mode_skips_already_reminded(_patch_recipients: None) -> N
 
 
 async def test_tr_repeat_mode_updates_existing_log(_patch_recipients: None) -> None:
-    # Wiederhol-Modus mit abgelaufenem Intervall → erneut erinnern; vorhandenes Log
-    # wird fortgeschrieben statt neu angelegt (Zeilen 253-254 else-Zweig).
+    # The repeat interval has passed, so the worker reminds again. It updates the
+    # existing log instead of adding a row (lines 253-254, else branch).
     app_id, event_id = uuid.uuid4(), uuid.uuid4()
     state = _state()
     log = TaskReminderLog(
@@ -936,11 +926,11 @@ async def test_tr_repeat_mode_updates_existing_log(_patch_recipients: None) -> N
         scalars=[[state], [log], [], []],
         scalar=[1, event_id],
     )
-    session.store[app_id] = log  # session.get(TaskReminderLog, app_id) findet das Log
+    session.store[app_id] = log  # `session.get` must find this log
     session.add(_config(repeat_days=7))
     queue = FakeQueue()
     assert await wtr.process_task_reminders(_tr_ctx(session, queue), now=NOW) == 1
-    assert log.reminded_at == NOW  # fortgeschrieben, keine zweite Zeile
+    assert log.reminded_at == NOW  # updated in place, no second row
 
 
 def test_naive_utc_strips_and_keeps() -> None:

@@ -91,7 +91,7 @@
   gap: var(--space-3);
 }
 
-/* Dialog form: create/edit as a dialog instead of an inline card. */
+/* Dialog form: create and edit run in a dialog, not in an inline card. */
 .cfg__form {
   display: flex;
   flex-direction: column;
@@ -104,7 +104,7 @@
   gap: var(--space-3);
 }
 
-/* Boolean column: colored ✓/✗ (consistent with the gremien view). */
+/* Boolean column: a colored check or cross, the same as in the gremien view. */
 .cfg__yes,
 .cfg__no {
   font-size: var(--fs-md);
@@ -128,7 +128,7 @@ textarea {
   border-radius: var(--radius-md);
 }
 
-// Uniform control height: native fields flush with app-select/app-input.
+// Uniform control height: the native fields align with app-select and app-input.
 input,
 select {
   height: var(--control-height);
@@ -140,8 +140,8 @@ textarea {
   padding: var(--space-2) var(--space-3);
 }
 
-/* Mobile (≤768px): single-column form grid; "wide" fields must not force an
-   implicit second column (else horizontal overflow at 375px). */
+/* Mobile at 768px or less: the form grid uses one column. A "wide" field must not force an
+   implicit second column, because that overflows horizontally at 375px. */
 @media (max-width: 768px) {
   .cfg__grid {
     grid-template-columns: 1fr;

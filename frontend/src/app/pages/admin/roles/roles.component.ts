@@ -26,10 +26,12 @@ interface RoleDraft {
 }
 
 /**
- * Roles & permissions as a **tree table**: each (global) role is a row; expanding
- * shows its permissions as a checkbox detail. The same view has a **dialog** to
- * create global roles. The admin role is locked (always all rights). Gremium roles
- * are managed per gremium — only global ones here.
+ * Roles and permissions as a tree table. Each global role is one row.
+ *
+ * An expanded row shows the permissions of the role as checkboxes. A dialog in the same
+ * view creates a global role. The admin role is locked and always holds all permissions.
+ * This page lists global roles only. The gremien administration manages the roles of a
+ * Gremium.
  */
 @Component({
   selector: 'app-admin-roles',
@@ -62,7 +64,7 @@ export class AdminRolesComponent {
   protected readonly expanded = signal<Set<string>>(new Set());
   protected readonly addOpen = signal(false);
   protected readonly draft = signal<RoleDraft>({ key: '', labelDe: '', labelEn: '' });
-  /** Role whose deletion is currently being confirmed. */
+  /** The role that waits for a delete confirmation. */
   protected readonly confirmRole = signal<Role | null>(null);
 
   protected readonly columns = computed<ColumnDef[]>(() => [
@@ -87,12 +89,10 @@ export class AdminRolesComponent {
     return role.key === 'admin';
   }
 
-  /** All roles except admin/member are deletable. */
   protected canDelete(role: Role): boolean {
     return role.key !== 'admin' && role.key !== 'member';
   }
 
-  /** Row click expands/collapses the permissions. */
   protected onRowClick(row: unknown): void {
     this.toggle((row as Role).id);
   }
@@ -140,9 +140,9 @@ export class AdminRolesComponent {
     });
   }
 
-  // --- Rename (display name; key immutable) --------------------------------
+  // A rename changes the display name only. The key never changes.
   private readonly nameDrafts = signal<Record<string, { de: string; en: string }>>({});
-  /** Current name draft (initially from the current label). */
+  /** The current name draft. It starts from the current label. */
   protected nameDraft(role: Role): { de: string; en: string } {
     return (
       this.nameDrafts()[role.id] ?? {
@@ -166,7 +166,6 @@ export class AdminRolesComponent {
     });
   }
 
-  // --- create global role --------------------------------------------------
   protected openAdd(): void {
     this.draft.set({ key: '', labelDe: '', labelEn: '' });
     this.addOpen.set(true);

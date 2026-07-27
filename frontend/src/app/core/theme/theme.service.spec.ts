@@ -69,10 +69,11 @@ describe('ThemeService', () => {
     svc.init();
     svc.setPreference('light');
     const applySpy = jest.spyOn(document.documentElement, 'setAttribute');
-    // OS flips to dark, but preference is the explicit 'light' → resolved stays light.
+    // The OS flips to dark. The preference stays the explicit 'light', so the resolved
+    // theme stays light.
     changeHandler?.({ matches: true } as MediaQueryListEvent);
     expect(svc.resolved()).toBe('light');
-    // apply() (setAttribute) must NOT have run for this OS change.
+    // The apply step calls setAttribute. It must not run for this OS change.
     expect(applySpy).not.toHaveBeenCalled();
     applySpy.mockRestore();
   });
@@ -98,7 +99,6 @@ describe('ThemeService', () => {
     });
     const svc = service();
     svc.init();
-    // Should not throw despite the storage write blowing up.
     expect(() => svc.setPreference('dark')).not.toThrow();
     expect(svc.preference()).toBe('dark');
     setItem.mockRestore();

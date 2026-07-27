@@ -1,14 +1,14 @@
 """Pub/sub fan-out for the live-vote channel.
 
-A message published on ``meeting:{id}`` by one app instance must reach all
-connected clients across all instances — hence Redis pub/sub.
+One app instance publishes a message on `meeting:{id}`. The message must reach
+the connected clients of every instance. Redis pub/sub does that fan-out.
 
-* :class:`RedisBroker` — production: ``PUBLISH``/``SUBSCRIBE`` via ``redis.asyncio``.
-* :class:`InMemoryBroker` — tests/single process; brokers sharing one :class:`_Hub`
-  simulate multiple app instances on one Redis.
+`RedisBroker` runs in production. It uses `PUBLISH` and `SUBSCRIBE` of
+`redis.asyncio`. `InMemoryBroker` serves the tests and a single process.
+Brokers that share one `_Hub` simulate several app instances on one Redis.
 
-Both expose :meth:`subscribe` as an async context manager yielding an async
-iterator of message dicts; closing tears the subscription down cleanly.
+Both brokers expose `subscribe` as an async context manager. It yields an async
+iterator of message dicts. The exit of the context tears the subscription down.
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ class Subscription(Protocol):
 
 
 class MeetingBroker(Protocol):
-    """Pub/sub abstraction for the ``meeting:{id}`` channel."""
+    """Pub/sub abstraction for the `meeting:{id}` channel."""
 
     async def publish(self, channel: str, message: dict[str, object]) -> None: ...
 
@@ -35,7 +35,7 @@ class MeetingBroker(Protocol):
 
 
 class _Hub:
-    """Shared routing backend: channel → set of subscriber queues."""
+    """Shared routing backend that maps a channel to its subscriber queues."""
 
     def __init__(self) -> None:
         self._channels: dict[str, set[asyncio.Queue[dict[str, object]]]] = {}
@@ -67,7 +67,10 @@ class _QueueSubscription:
 
 
 class InMemoryBroker:
-    """Process-local broker; share ``hub`` to simulate multiple instances."""
+    """Process-local broker.
+
+    Share one `hub` between brokers to simulate several app instances.
+    """
 
     def __init__(self, hub: _Hub | None = None) -> None:
         self._hub = hub or _Hub()
@@ -99,7 +102,7 @@ class _RedisSubscription:
 
 
 class RedisBroker:
-    """``redis.asyncio``-backed pub/sub broker (fan-out across instances)."""
+    """Pub/sub broker on `redis.asyncio` that fans out across app instances."""
 
     def __init__(self, client: object) -> None:
         self._client = client

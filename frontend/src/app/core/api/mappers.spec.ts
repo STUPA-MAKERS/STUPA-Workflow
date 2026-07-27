@@ -493,7 +493,7 @@ describe('mapProtocol', () => {
       publicPdfUrl: 'https://example/public.pdf',
     } as ProtocolOutWire);
     expect(p.isFinal).toBe(false);
-    expect(p.isLocked).toBe(true); // status !== 'draft'
+    expect(p.isLocked).toBe(true);
     expect(p.publicPdfUrl).toBe('https://example/public.pdf');
   });
 
@@ -571,13 +571,13 @@ describe('mapMeeting permission flags', () => {
   it('derives canWrite from canControl when canWrite is absent', () => {
     const m = mapMeeting({ ...base, canControl: true });
     expect(m.canWrite).toBe(true);
-    expect(m.canControl).toBe(true); // canControl ?? canWrite
+    expect(m.canControl).toBe(true);
   });
 
   it('prefers an explicit canWrite and falls canControl back to it', () => {
     const m = mapMeeting({ ...base, canWrite: true });
     expect(m.canWrite).toBe(true);
-    expect(m.canControl).toBe(true); // canControl absent → falls back to canWrite
+    expect(m.canControl).toBe(true);
   });
 
   it('defaults all permission flags to false when nothing is supplied', () => {
@@ -644,7 +644,6 @@ describe('mapper null/??-branch fills', () => {
       } as ApplicationOutWire,
       'de',
     );
-    // anonymized omitted → defaults to false (?? false right branch)
     expect(view.applicant).toEqual({ email: null, name: null, anonymized: false });
     expect(view.canEdit).toBe(true);
     expect(view.isOwner).toBe(true);

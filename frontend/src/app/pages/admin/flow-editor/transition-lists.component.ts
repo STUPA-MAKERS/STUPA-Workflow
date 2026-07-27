@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, input, output } from '@angular/core
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TransitionLists } from './flow-editor.models';
 
-/** Incoming/outgoing transitions of the selected state; a row click selects the transition. */
+/** Incoming and outgoing transitions of the selected state. A row click selects one. */
 @Component({
   selector: 'app-transition-lists',
   standalone: true,

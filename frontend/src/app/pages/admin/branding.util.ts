@@ -1,9 +1,9 @@
 /**
- * Branding validation. Footer and legal links may only carry safe schemes —
- * `http(s):` and `mailto:`. Others (notably `javascript:`, `data:`) are rejected
- * client-side, because the URLs are persisted site-wide as `branding` JSON and
- * rendered as links in header/footer (otherwise a stored XSS vector). The server
- * validates authoritatively; this is instant feedback.
+ * Branding validation. Footer links and legal links may carry safe schemes only: `http:`,
+ * `https:` and `mailto:`. The client rejects every other scheme, above all `javascript:` and
+ * `data:`. The platform stores these URLs site-wide as `branding` JSON and renders them as
+ * links in the header and the footer. An unsafe scheme is a stored XSS vector. The server
+ * holds the authoritative check. This one only gives instant feedback.
  */
 import type { Branding } from './admin.models';
 
@@ -16,11 +16,11 @@ export function isAllowedLinkUrl(url: string | null | undefined): boolean {
   try {
     return ALLOWED_LINK_SCHEMES.includes(new URL(u).protocol);
   } catch {
-    return false; // relative/invalid → reject
+    return false; // a relative or invalid URL lands here and is rejected
   }
 }
 
-/** All disallowed link URLs of a branding draft (footer + legal links). */
+/** All disallowed link URLs of a branding draft: the footer links and the legal links. */
 export function brandingLinkErrors(branding: Branding | null | undefined): string[] {
   if (!branding) return [];
   const urls: string[] = [

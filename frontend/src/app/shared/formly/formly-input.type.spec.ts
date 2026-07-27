@@ -51,7 +51,6 @@ describe('FormlyInputType (rendered branches)', () => {
       type: 'input',
       props: { label: 'Datum', type: 'date', min: '2020-01-01', max: '2030-12-31', required: true },
     });
-    // app-datepicker renders a date input.
     expect(document.querySelector('app-datepicker')).toBeTruthy();
     expect(screen.getByLabelText(/Datum/)).toBeInTheDocument();
   });

@@ -1,4 +1,4 @@
-"""TDD: RBAC-Auflösung (security.md §2)."""
+"""TDD: RBAC resolution (security.md §2)."""
 
 from __future__ import annotations
 
@@ -15,26 +15,27 @@ NOW = datetime(2026, 6, 5, 12, 0, tzinfo=UTC)
 def test_assignment_valid_window() -> None:
     assert rbac._assignment_valid(None, None, NOW) is True
     assert rbac._assignment_valid(NOW - timedelta(days=1), NOW + timedelta(days=1), NOW)
-    assert rbac._assignment_valid(NOW + timedelta(days=1), None, NOW) is False  # noch nicht
-    assert rbac._assignment_valid(None, NOW - timedelta(days=1), NOW) is False  # abgelaufen
+    assert rbac._assignment_valid(NOW + timedelta(days=1), None, NOW) is False  # not yet
+    assert rbac._assignment_valid(None, NOW - timedelta(days=1), NOW) is False  # expired
 
 
 def test_assignment_valid_naive_db_values_do_not_crash() -> None:
-    """Regression: naive ``valid_from``/``valid_until`` (timestamp ohne tz) aus der DB.
+    """Regression: naive `valid_from` and `valid_until` values from the database.
 
-    Vor dem Fix warf der Vergleich mit dem aware ``now``
-    ``TypeError: can't compare offset-naive and offset-aware datetimes`` und legte
-    damit die komplette Principal-Auflösung lahm (REST 500, WS-Handshake-403).
+    A naive timestamp carries no time zone. Before the fix, the comparison against the
+    aware `now` raised a `TypeError` about offset-naive and offset-aware datetimes. The
+    error broke the whole principal resolution. REST answered 500 and the WebSocket
+    handshake answered 403.
     """
     naive_from = (NOW - timedelta(days=1)).replace(tzinfo=None)
     naive_until = (NOW + timedelta(days=1)).replace(tzinfo=None)
     assert rbac._assignment_valid(naive_from, naive_until, NOW) is True
-    assert rbac._assignment_valid(None, naive_from, NOW) is False  # naiv, abgelaufen
-    assert rbac._assignment_valid(naive_until, None, NOW) is False  # naiv, noch nicht
+    assert rbac._assignment_valid(None, naive_from, NOW) is False  # naive, expired
+    assert rbac._assignment_valid(naive_until, None, NOW) is False  # naive, not yet
 
 
 async def test_resolve_principal_with_naive_validity_window() -> None:
-    """Voller Resolver-Pfad mit naivem Gültigkeitsfenster crasht nicht (WS/REST-Auth)."""
+    """The full resolver path survives a naive validity window (WebSocket and REST auth)."""
     row = PrincipalRow(sub="u4", email=None, display_name=None, oidc_groups=None)
     naive_valid = RoleAssignment(
         role_id="r1",
@@ -44,7 +45,7 @@ async def test_resolve_principal_with_naive_validity_window() -> None:
     )
     db = fake_session(
         result(naive_valid),
-        result(),  # keine GroupMappings
+        result(),  # no group mappings
         result("vote.cast"),
         result("member"),
     )
@@ -55,7 +56,7 @@ async def test_resolve_principal_with_naive_validity_window() -> None:
 
 async def test_resolve_principal_no_roles() -> None:
     row = PrincipalRow(sub="u1", email="e@x.de", display_name="N", oidc_groups=None)
-    db = fake_session(result())  # keine Assignments
+    db = fake_session(result())  # no assignments
     p = await rbac.resolve_principal(db, row, NOW)
     assert p.sub == "u1"
     assert p.email == "e@x.de"
@@ -82,7 +83,7 @@ async def test_resolve_principal_full_path() -> None:
     p = await rbac.resolve_principal(db, row, NOW)
     assert p.permissions == {"application.read", "vote.cast"}
     assert set(p.roles) == {"member", "manager"}
-    # OIDC-Gruppe + beide Gremium-Scopes (Assignment + Mapping) landen in groups.
+    # The OIDC group and both Gremium scopes (assignment and mapping) land in groups.
     assert p.groups == {"grpA", "gid1", "gid2"}
 
 
@@ -96,4 +97,4 @@ async def test_resolve_principal_assignment_without_gremium() -> None:
     )
     p = await rbac.resolve_principal(db, row, NOW)
     assert p.permissions == {"application.read"}
-    assert p.groups == set()  # kein Gremium-Scope, keine OIDC-Gruppen
+    assert p.groups == set()  # no Gremium scope and no OIDC groups

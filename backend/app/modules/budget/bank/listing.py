@@ -34,16 +34,19 @@ class ListingOps(BankServiceBase):
     ) -> Page[StatementLineOut]:
         """List staged lines, filtered and offset-paginated.
 
-        Filters: ``account``, ``state``, ``kind`` (income = amount > 0, expense < 0),
-        date range (value date, else booking date) and full text (``q``) over
-        counterparty/IBAN/purpose. ``sort`` = ``date`` (default) | ``amount``."""
+        The filters are ``account``, ``state``, ``kind`` and a date range. ``kind``
+        selects income (amount > 0) or expense (amount < 0). The date range applies
+        to the value date, or to the booking date when no value date exists. ``q``
+        is a full-text term over counterparty, IBAN and purpose. ``sort`` accepts
+        ``date`` (default) or ``amount``.
+        """
         filters = []
         if account_id is not None:
             filters.append(BankStatementLine.account_id == account_id)
         if state is not None:
             filters.append(BankStatementLine.match_state == state)
         elif not include_ignored:
-            # "Alle" view: show matched + open lines, but hide the set-aside ones.
+            # "All" view: show matched and open lines, but hide the set-aside ones.
             filters.append(BankStatementLine.match_state != "ignored")
         if linked is True:
             filters.append(BankStatementLine.match_state == "matched")
@@ -60,8 +63,8 @@ class ListingOps(BankServiceBase):
         if date_to:
             filters.append(eff_date <= date_to)
         if q and q.strip():
-            # Escape LIKE metacharacters — a literal "%"/"_" in the search term
-            # must not act as a wildcard.
+            # Escape the LIKE metacharacters. A literal "%" or "_" in the search
+            # term must not act as a wildcard.
             term = (
                 q.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
             )
@@ -112,11 +115,13 @@ class ListingOps(BankServiceBase):
         return Page(items=items, total=total or 0, limit=limit, offset=offset)
 
     async def get_line(self, line_id: uuid.UUID) -> StatementLineDetail:
-        """One staged line INCLUDING its raw payload + idempotency key.
+        """Return one staged line with its raw payload and idempotency key.
 
-        Diagnostic view (e.g. "which source format staged this batch line?") —
-        same read permissions as the list; the raw payload is bank data the
-        caller could already see via list/export."""
+        This is a diagnostic view. It answers questions such as "which source
+        format staged this batch line?". The read permissions are the same as for
+        the list. The raw payload is bank data that the caller can already see
+        through the list or the export.
+        """
         line = await self.session.get(BankStatementLine, line_id)
         if line is None:
             raise NotFoundError(f"statement line {line_id} not found")
@@ -140,8 +145,11 @@ class ListingOps(BankServiceBase):
     async def _matched_expense_ids(
         self, line_ids: list[uuid.UUID]
     ) -> dict[uuid.UUID, uuid.UUID]:
-        """Booking per matched line from ``bank_allocation``. Split payments have
-        several allocations — the oldest one wins as the deep-link target."""
+        """Map every matched line to its booking from ``bank_allocation``.
+
+        A split payment has several allocations. The oldest allocation wins as the
+        deep-link target.
+        """
         if not line_ids:
             return {}
         rows = (

@@ -1,85 +1,90 @@
-# E2E-Tests (T-40) — Playwright vs echtem Compose-Stack
+# E2E tests (T-40) — Playwright against the real compose stack
 
-End-to-End-Abdeckung der Kern-User-Journeys (testing.md §3) gegen den **echten**
-Stack (FastAPI + Angular + Postgres + Redis + MinIO + pytex hinter Nginx), **nicht**
-gegen die Mock-API (seit #101 AUS). Magic-Link-Mails landen im `mailpit`-SMTP-Sink.
+End-to-end coverage of the core user journeys (testing.md §3) against the **real**
+stack (FastAPI + Angular + Postgres + Redis + MinIO + pytex behind Nginx), **not**
+against the mock API (OFF since #101). Magic-link mails land in the `mailpit` SMTP
+sink.
 
-## Ausführen
+## Run
 
 ```bash
 scripts/e2e.sh
 ```
 
-Fährt den Stack mit eigenem `COMPOSE_PROJECT_NAME=antrag-e2e` hoch (berührt andere
-Stacks nicht), schreibt ein Wegwerf-`deploy/.env` (Mock AUS, mailpit-SMTP, Altcha +
-Rate-Limit AUS für Determinismus), seedet deterministische Fixtures, läuft Playwright
-und räumt restlos ab (`down -v`). Voraussetzung: in `frontend/` einmalig
-`npm ci && npx playwright install --with-deps chromium`.
+The script starts the stack under its own `COMPOSE_PROJECT_NAME=antrag-e2e`, so it
+leaves other stacks alone. It writes a throwaway `deploy/.env` (mock OFF, mailpit
+SMTP, ALTCHA and rate limit OFF for determinism), seeds deterministic fixtures, runs
+Playwright and cleans up fully (`down -v`). Precondition: run
+`npm ci && npx playwright install --with-deps chromium` once in `frontend/`.
 
-## Abgedeckt — gating (scharf, jeder PR, CI-Job `e2e`)
+## Covered — gating (blocking, every PR, CI job `e2e`)
 
-Deterministisch, kein Keycloak/pytex/ClamAV auf dem Gate-Pfad:
+Deterministic. No Keycloak, pytex or ClamAV on the gate path:
 
-- **01 apply** — öffentlicher Apply-Wizard durch ALLE Schritte bis zur Review-
-  Zusammenfassung (Antragsart → Kontakt → dynamisches Formular der geseedeten Form-
-  Version → Prüfen). Der finale Submit-Klick ist NICHT Teil der Assertion: die
-  FE-ALTCHA-Komponente ist ein Stub (`altcha-stub-solution`), den das Backend-Schema
-  als „malformed altcha solution" mit 422 ablehnt — der UI-Submit ist unabhängig von
-  T-40 blockiert (Issue #111; reale Captcha-Wiring ist ein eigener Task). Die
-  Antrags-*Erstellung* + Folge-Journey ist über 02 real abgedeckt (Szenario 1, Teil).
-- **02 magic-link-flow** — Antrag anlegen → Magic-Link (echtes SMTP via mailpit) →
-  bearbeiten → Admin schaltet via Flow-Transition nach `pruefung` → read-only/gesperrt
-  (Szenarien 1 + 2 + read-only).
-- **03 rbac** — Unauth sieht geschützte Routen nicht (Szenario 7).
-- **04 admin-form** — Form-Builder: Feld hinzufügen → Form-Version **persistiert**
-  (Erfolgs-Toast nur auf 2xx vom Server) (Szenario 6).
-- **05 budget-pots** — Budget-Töpfe-Sicht + Topf anlegen.
+- **01 apply** — the public apply wizard through ALL steps to the review summary
+  (application type → contact → dynamic form of the seeded form version → review).
+  The final submit click is NOT part of the assertion. The frontend ALTCHA component
+  is a stub (`altcha-stub-solution`), and the backend schema rejects it with 422 as a
+  malformed altcha solution. The UI submit is blocked independent of T-40 (issue
+  #111, the real captcha wiring is a separate task). Test 02 covers the real
+  application *creation* and the follow-up journey (scenario 1, part).
+- **02 magic-link-flow** — create the application → magic link (real SMTP over
+  mailpit) → edit → the admin moves it to `pruefung` with a flow transition →
+  read-only and locked (scenarios 1 + 2 + read-only).
+- **03 rbac** — an unauthenticated visitor does not see the guarded routes
+  (scenario 7).
+- **04 admin-form** — form builder: add a field → the form version **persists**
+  (the success toast fires only on a 2xx from the server) (scenario 6).
+- **05 budget-pots** — budget pots view plus pot creation.
 
-**T-40 deckt damit 4/7 SDS-Szenarien real grün ab** (1 apply+magic-link, 2 flow,
-6 admin-config, 7 RBAC) **plus** Budget-Töpfe + read-only.
+**T-40 therefore covers 4 of the 7 SDS scenarios green and for real** (1 apply plus
+magic link, 2 flow, 6 admin config, 7 RBAC) **plus** budget pots and read-only.
 
-## Bewusst (noch) NICHT abgedeckt — als Follow-up-Issues, keine hohlen Stubs
+## Left out on purpose — tracked as follow-up issues, not as hollow stubs
 
-Frederiks Regel „lieber stabil als flaky": voll-grün für alle 7 Szenarien gegen den
-realen Stack ist im CI nicht zuverlässig deterministisch (WS-Timing, pytex-tectonic,
-Keycloak, ClamAV). Diese Szenarien sind als klar benannte Issues ausgelagert statt
-als leere `test.fixme()`-Stubs Abdeckung vorzutäuschen:
+Frederik's rule is "stable before flaky". A full green run of all 7 scenarios against
+the real stack is not reliably deterministic in CI (WebSocket timing, pytex-tectonic,
+Keycloak, ClamAV). These scenarios move to clearly named issues. Empty
+`test.fixme()` stubs would only fake coverage.
 
-| Szenario (SDS) | Issue |
+| Scenario (SDS) | Issue |
 |----------------|-------|
-| 3 async Voting | #107 |
-| 4 Live-Vote (WS, 2 Contexts + Beamer) | #108 |
-| 5 Protokoll → PDF → Versand (pytex) | #109 |
-| OIDC-Login via Keycloak-Test-Realm | #110 |
+| 3 async voting | #107 |
+| 4 live vote (WebSocket, 2 contexts + beamer) | #108 |
+| 5 protocol → PDF → send (pytex) | #109 |
+| OIDC login over a Keycloak test realm | #110 |
 
-## Architektur-Notizen
+## Architecture notes
 
-- **Seed** (`deploy/e2e/seed.py`, One-Shot-Service `seed`): legt für den von `0018`
-  geseedeten Default-Antragstyp `foerderantrag` eine **aktive Form- + Flow-Version**
-  an (ohne sie schlägt `POST /applications` fehl). Mintet eine **Admin-Server-Session**
-  mit der App-eigenen `create_principal_session` (kennt `SESSION_SECRET`) →
-  `ap_session`-Cookie. Kein Prod-Backdoor: nur der Test-Seed nutzt die normale
-  Signier-Funktion (analog Djangos `force_login`). `global-setup.ts` baut daraus den
-  Admin-`storageState`.
-- **CSRF**: nur bei vorhandenem Auth-Cookie erzwungen (middleware.py). Unauth-Setup-
-  POSTs (apply/magic-link) sind CSRF-frei; authentifizierte Writes laufen über die
-  echte Angular-UI, deren Interceptor das Double-Submit-Token spiegelt.
-- **OIDC + Altcha AUS**: die optionalen Secrets dürfen NICHT als leerer String
-  gesetzt sein (`min_length=16` in `app.settings` → sonst bricht `get_settings()` →
-  migrate exit 1). `scripts/e2e.sh` strippt die leeren Zeilen aus dem e2e-`.env`.
-- **Migration 0019** (`application.manage`): die Flow-Transition-Endpunkte + das FE-
-  Gating verlangen die Permission `application.manage`, die in `0003` an KEINE Rolle
-  geseedet war (Seed-Lücke wie `form.configure`/`flow.configure` in 0010/0016) → ohne
-  sie kann auch ein Admin keinen Antrag durch den Flow schalten. `0019_seed_application_manage`
-  zieht sie idempotent an die admin-Rolle nach (down_revision = 0018, single head).
-- **web-Healthcheck/Mounts** (overlay): web nutzt `127.0.0.1` statt `localhost`
-  (IPv4; nginx lauscht nur IPv4, da der conf-Mount read-only ist) und `:z`-Mounts
-  (SELinux/podman lokal; No-op auf CI-docker).
+- **Seed** (`deploy/e2e/seed.py`, one-shot service `seed`): creates an **active form
+  version and flow version** for the default application type `foerderantrag` that
+  migration `0018` seeds. Without them `POST /applications` fails. The seed also mints
+  an **admin server session** with the application's own `create_principal_session`,
+  which knows `SESSION_SECRET`. That yields the `ap_session` cookie. This is no
+  production backdoor: only the test seed calls the normal signing function, in the
+  same way as `force_login` in Django. `global-setup.ts` builds the admin
+  `storageState` from it.
+- **CSRF**: the middleware enforces CSRF only when an auth cookie is present
+  (middleware.py). The unauthenticated setup POSTs (apply, magic link) need no CSRF
+  token. Authenticated writes go through the real Angular UI, whose interceptor
+  mirrors the double-submit token.
+- **OIDC and ALTCHA OFF**: the optional secrets must NOT be set to an empty string.
+  `app.settings` demands `min_length=16`, so an empty value breaks `get_settings()`
+  and migrate exits 1. `scripts/e2e.sh` strips the empty lines from the e2e `.env`.
+- **Migration 0019** (`application.manage`): the flow transition endpoints and the
+  frontend gating need the permission `application.manage`. Migration `0003` seeded it
+  to NO role, the same seed gap as `form.configure` and `flow.configure` in 0010 and
+  0016. Without it even an admin cannot move an application through the flow.
+  `0019_seed_application_manage` adds it to the admin role, idempotent
+  (down_revision = 0018, single head).
+- **web healthcheck and mounts** (overlay): web uses `127.0.0.1` instead of
+  `localhost`, because nginx listens on IPv4 only and the conf mount is read-only. The
+  `:z` mounts serve SELinux and podman locally and are a no-op on CI docker.
 
-## Gefundener Defekt (separater Bugfix-Task, nicht Teil von T-40)
+## Defect found (separate bugfix task, not part of T-40)
 
-Die BE-Mail verlinkt `/antrag/<id>#t=<token>` (Fragment, security.md §1 — Token nie
-an den Server), das FE konsumiert den Token jedoch auf `/status?t=…&app=…` und hat
-**keine** `/antrag/:id`-Route → Magic-Link-Landing ist End-to-End kaputt. Der
-gating-Test deckt die Magic-Link-*Fähigkeit* über den FE-unterstützten `/status`-Pfad
-ab (Token aus mailpit gezogen).
+The backend mail links to `/antrag/<id>#t=<token>` (a fragment, security.md §1: the
+token never reaches the server). The frontend reads the token on `/status?t=…&app=…`
+and has **no** `/antrag/:id` route. The magic-link landing is therefore broken end to
+end. The gating test covers the magic-link *capability* over the `/status` path that
+the frontend supports, with the token pulled from mailpit.

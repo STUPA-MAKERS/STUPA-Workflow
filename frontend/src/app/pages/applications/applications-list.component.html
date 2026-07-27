@@ -4,9 +4,8 @@
       <h1 class="apps__title">{{ 'applications.list.title' | t }}</h1>
       <p class="text-muted">{{ 'applications.list.subtitle' | t }}</p>
     </div>
-    <!-- Filters in a popout: button with icon + active indicator. -->
     <div class="apps__headActions">
-      <!-- Header live search: debounced, writes the q query param. -->
+      <!-- The header search is debounced. It writes the q query parameter. -->
       <input
         class="apps__search"
         type="search"
@@ -77,8 +76,8 @@
 </header>
 
 <div class="apps__layout">
-<!-- Collapsible on mobile (≤768px): toggle only shown there; desktop always
-     shows the tree (like the budget-tab picker). -->
+<!-- The toggle appears on mobile only (max 768px). The desktop layout always shows
+     the tree, like the picker of the budget tab. -->
 <aside class="apps__tree">
   <button
     type="button"
@@ -114,7 +113,6 @@
     (sortChange)="onSort($event)"
   />
 
-  <!-- Infinite scroll: sentinel only while more pages exist. -->
   @if (hasMore()) {
     <div #sentinel class="apps__sentinel" aria-hidden="true"></div>
     <div class="flex justify-center mt-4">

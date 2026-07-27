@@ -33,9 +33,9 @@ import {
 } from './meetings-display.util';
 
 /**
- * State + actions of the loaded meeting (detail route): session control,
+ * State and actions of the loaded meeting (detail route): meeting control,
  * live votes over WebSocket, protocol lifecycle and attendance.
- * RBAC here is UX gating only — the server authorizes every action.
+ * RBAC here gates the UI only. The server authorizes every action.
  * Provided by MeetingsComponent.
  */
 @Injectable()
@@ -68,19 +68,18 @@ export class MeetingSessionService implements OnDestroy {
   /** Poll fallback while the worker renders the protocol. */
   private renderPollTimer: ReturnType<typeof setTimeout> | null = null;
 
-  /** Cast-in-flight per vote / delete-in-flight per vote. */
+  /** The vote with a cast in flight, and the vote with a delete in flight. */
   readonly casting = signal<Uuid | null>(null);
   readonly deletingVote = signal<Uuid | null>(null);
   /** Own choice per vote (local, highlights the picked option). */
   readonly myChoices = signal<Record<string, string>>({});
 
-  /** Open-vote dialog state. */
   readonly voteDialogOpen = signal(false);
   private readonly voteItem = signal<AgendaItem | null>(null);
   readonly voteQuestion = signal<string>('');
   readonly voteSecret = signal(false);
-  // Only the majority rule is set per vote; quorum/eligible voters come from
-  // the committee configuration.
+  // Only the majority rule is set per vote. The quorum and the eligible voters
+  // come from the Gremium configuration.
   readonly voteMajorityRule = signal<'simple' | 'absolute' | 'two_thirds'>('simple');
   readonly majorityRuleOptions = computed<SelectOption[]>(() =>
     (['simple', 'absolute', 'two_thirds'] as const).map((v) => ({
@@ -92,38 +91,38 @@ export class MeetingSessionService implements OnDestroy {
 
   private channel: MeetingChannel | null = null;
 
-  // --- permission flags (per-meeting where loaded, gremium-exact backend) ---
+  // Permission flags, per meeting where loaded. The backend checks them per Gremium.
   readonly canManageAny = computed(() => this.auth.can('meeting.manage'));
   readonly canManage = computed(() => this.meeting()?.canManage ?? this.canManageAny());
   readonly canWrite = computed(() => this.meeting()?.canWrite ?? false);
   readonly canManageVotes = computed(() => this.meeting()?.canManageVotes ?? false);
   readonly canVote = computed(() => this.meeting()?.canVote ?? false);
-  /** Global, purely additive READ permission: sees every meeting read-only. */
+  /** Global READ permission. It only adds rights: it shows every meeting read-only. */
   readonly canViewAll = computed(() => this.auth.can('meeting.view_all'));
-  /** Server-resolved: the FE only knows `principal.sub`, not the principal id. */
+  /** The server resolves this. The FE only knows `principal.sub`, not the principal id. */
   readonly isProtokollant = computed(() => this.meeting()?.isProtokollant ?? false);
   /**
-   * Live follow view (read protocol + cast on open votes) instead of the
-   * edit/manager view. Once a protokollant is chosen, ONLY they get the
-   * manager view; without one the old write/manage gate applies so a fresh
-   * meeting is not a dead end before start.
+   * Live follow view (read the protocol and cast on open votes) instead of the
+   * edit/manager view. After a protokollant is chosen, ONLY that person gets
+   * the manager view. Without a protokollant the write/manage gate applies.
+   * This keeps a fresh meeting usable before the start.
    */
   readonly isFollower = computed(() => {
     const m = this.meeting();
     if (!m) return false;
-    // view_all readers get the full 3-column view read-only — but only when
-    // they have no write/manage right on this meeting, otherwise the
-    // protokollant exclusivity below would be bypassed.
+    // Readers with view_all get the full 3-column view read-only. This applies
+    // only when they have no write or manage right on this meeting. Otherwise
+    // they would bypass the protokollant exclusivity below.
     if (this.canViewAll() && !m.canWrite && !m.canManage) return false;
     if (m.protokollantId) return !this.isProtokollant();
     return !m.canWrite && !m.canManage;
   });
 
-  /** Votes of one TOP (grouped via agendaItemId). */
+  /** Votes of one TOP, grouped by agendaItemId. */
   votesForTop(topId: Uuid): MeetingVote[] {
     return (this.meeting()?.votes ?? []).filter((v) => v.agendaItemId === topId);
   }
-  /** Meeting votes without a TOP binding — listed in the control card. */
+  /** Meeting votes without a TOP binding. The control card lists them. */
   readonly looseVotes = computed<MeetingVote[]>(() =>
     (this.meeting()?.votes ?? []).filter((v) => !v.agendaItemId),
   );
@@ -137,7 +136,6 @@ export class MeetingSessionService implements OnDestroy {
     if (this.renderPollTimer !== null) clearTimeout(this.renderPollTimer);
   }
 
-  // --- load -----------------------------------------------------------------
   loadMeeting(id: Uuid): void {
     this.loading.set(true);
     this.error.set(false);
@@ -158,21 +156,20 @@ export class MeetingSessionService implements OnDestroy {
     this.planDate.set(m.date ?? '');
     this.planTime.set(m.startTime ?? '');
     this.connectLive(m.id);
-    // Read an existing protocol via GET (no write rate limit); it is only
-    // ever created explicitly.
+    // Read an existing protocol with GET, which keeps the write rate limit
+    // intact. A protocol is only ever created explicitly.
     if (m.protocolId && (this.canWrite() || this.canViewAll())) this.refreshProtocol();
     this.loadAttendance(m.id);
     this.agendaSvc.load(m.id, this.canManage());
   }
 
-  // --- session control --------------------------------------------------------
   setStatus(status: 'live' | 'closed'): void {
     const m = this.meeting();
     if (!m) return;
-    // "closed" is terminal — no reopening (the server refuses it anyway).
+    // "closed" is terminal. Nobody reopens a meeting, and the server refuses it.
     if (m.status === 'closed') return;
-    // Starting requires a protokollant; check upfront instead of surfacing
-    // the server's 409 after the click.
+    // A start requires a protokollant. Check it here instead of showing the
+    // server 409 after the click.
     if (status === 'live' && !m.protokollantId) {
       this.toast.error(this.i18n.translate('meetings.toast.protokollantRequired'));
       return;
@@ -180,7 +177,7 @@ export class MeetingSessionService implements OnDestroy {
     this.api.patchMeeting(m.id, { status }).subscribe({
       next: (updated) => {
         this.meeting.set(updated);
-        // The protocol is created on start (backend) — fetch it right away.
+        // The backend creates the protocol on start. Fetch it right away.
         if (updated.status === 'live' && updated.protocolId && this.canWrite()) {
           this.refreshProtocol();
         }
@@ -189,7 +186,7 @@ export class MeetingSessionService implements OnDestroy {
     });
   }
 
-  /** Close the meeting irrevocably → status closed + finalize the protocol. */
+  /** Close the meeting irrevocably: set the status to closed and finalize the protocol. */
   closeMeeting(): void {
     const m = this.meeting();
     if (!m || this.finalizing()) return;
@@ -197,7 +194,7 @@ export class MeetingSessionService implements OnDestroy {
       next: (updated) => {
         this.meeting.set(updated);
         const proto = this.protocol();
-        // Finalizing is implicit: render the PDF + send to the mailing list.
+        // The finalize step is implicit: render the PDF and mail it to the list.
         if (proto && !proto.isLocked) {
           this.finalize();
         }
@@ -247,8 +244,8 @@ export class MeetingSessionService implements OnDestroy {
     });
   }
 
-  /** Cancel a vote: open → cancelled, no result/branch — the way out when the
-   *  quorum is not reached (closing is blocked then). */
+  /** Cancel a vote: open → cancelled, with no result and no branch. This is the
+   *  way out when the quorum is not reached, because a close is blocked then. */
   cancelVote(voteId: Uuid): void {
     this.api.cancelVote(voteId).subscribe({
       next: () => this.patchVote(voteId, { status: 'cancelled' }),
@@ -256,8 +253,8 @@ export class MeetingSessionService implements OnDestroy {
     });
   }
 
-  /** Show the concrete server reason (e.g. 409) and reload the meeting —
-   *  the vote may have flipped server-side (e.g. to cancelled). */
+  /** Show the server reason (for example 409) and reload the meeting. The vote
+   *  may have changed on the server, for example to cancelled. */
   private voteActionFailed(err: unknown): void {
     const detail = errorDetail(err);
     const base = this.i18n.translate('meetings.toast.actionFailed');
@@ -288,7 +285,7 @@ export class MeetingSessionService implements OnDestroy {
     });
   }
 
-  /** Delete a vote question (incl. ballots) — vote managers only. */
+  /** Delete a vote question and its ballots. Vote managers only. */
   deleteVote(voteId: Uuid): void {
     const m = this.meeting();
     if (!m || this.deletingVote()) return;
@@ -306,16 +303,16 @@ export class MeetingSessionService implements OnDestroy {
     });
   }
 
-  // --- open-vote dialog -------------------------------------------------------
-  /** Application TOP: exactly one vote; freetext TOP: any number of questions. */
+  /** An application TOP holds exactly one vote. A freetext TOP holds any number. */
   canAddVote(item: AgendaItem): boolean {
     return !item.applicationId || this.votesForTop(item.id).length === 0;
   }
 
   openVoteDialog(item: AgendaItem): void {
     this.voteItem.set(item);
-    // Application TOPs carry the application title as TOP title — prefill the
-    // question with it (editable); freetext TOPs keep the raw title.
+    // An application TOP carries the application title as its TOP title. Prefill
+    // the question with it. The user can still edit it. A freetext TOP keeps the
+    // raw title.
     this.voteQuestion.set(
       item.applicationId
         ? this.i18n.translate('meetings.vote.questionPrefill', { name: item.title ?? '' })
@@ -343,7 +340,8 @@ export class MeetingSessionService implements OnDestroy {
         options,
         secret: this.voteSecret(),
         majorityRule: this.voteMajorityRule(),
-        // eligibleCount/quorumPercent omitted → server uses committee defaults.
+        // eligibleCount and quorumPercent are omitted, so the server uses the
+        // Gremium defaults.
       })
       .subscribe({
         next: (updated) => {
@@ -361,8 +359,7 @@ export class MeetingSessionService implements OnDestroy {
       });
   }
 
-  // --- protocol -----------------------------------------------------------------
-  /** Re-read an existing protocol via GET (no write rate limit). */
+  /** Re-read an existing protocol with GET, which keeps the write rate limit intact. */
   refreshProtocol(): void {
     const m = this.meeting();
     if (!m) return;
@@ -375,7 +372,7 @@ export class MeetingSessionService implements OnDestroy {
     });
   }
 
-  /** Apply the status flip after a background render (+ final/failed toast).
+  /** Apply the status change after a background render and show the toast.
    *  `rendering → draft` means the worker gave up and rolled back. */
   private applyProtocolUpdate(updated: Protocol): void {
     const prev = this.protocol();
@@ -390,8 +387,9 @@ export class MeetingSessionService implements OnDestroy {
     this.watchRendering(updated);
   }
 
-  /** While `rendering`: poll the protocol — fallback in case the worker's
-   *  `meeting_state` broadcast is lost. GET keeps the write rate limit intact. */
+  /** While the status is `rendering`, poll the protocol. This is the fallback if
+   *  the `meeting_state` broadcast of the worker is lost. GET keeps the write
+   *  rate limit intact. */
   private watchRendering(proto: Protocol): void {
     if (this.renderPollTimer !== null) clearTimeout(this.renderPollTimer);
     if (proto.status !== 'rendering' || (!this.canWrite() && !this.canViewAll())) return;
@@ -408,7 +406,7 @@ export class MeetingSessionService implements OnDestroy {
 
   finalize(): void {
     const proto = this.protocol();
-    // `isLocked` covers `rendering` too: no second kick-off, no 409 on PATCH.
+    // `isLocked` also covers `rendering`: no second start, no 409 on PATCH.
     if (!proto || proto.isLocked || this.finalizing() || this.agendaSvc.savingTop()) return;
     this.finalizing.set(true);
     // First persist the assembled TOP markdown, then finalize/render.
@@ -430,18 +428,18 @@ export class MeetingSessionService implements OnDestroy {
         this.finalizing.set(false);
         this.protocol.set(updated);
         if (updated.isFinal) {
-          // Sync path (dev without Redis): final right away.
+          // Sync path (dev without Redis): the protocol is final right away.
           this.toast.success(this.i18n.translate('meetings.toast.finalized'));
         } else {
-          // Async path: the worker renders in the background; completion
-          // arrives via WS broadcast or the poll fallback.
+          // Async path: the worker renders in the background. The completion
+          // arrives over the WS broadcast or the poll fallback.
           this.toast.success(this.i18n.translate('meetings.toast.renderQueued'));
           this.watchRendering(updated);
         }
       },
       error: (err: unknown) => {
         this.finalizing.set(false);
-        // Render/compile errors (400) carry a concrete reason — show it.
+        // Render and compile errors (400) carry a concrete reason. Show it.
         const detail = errorDetail(err);
         this.toast.error(
           detail
@@ -452,7 +450,6 @@ export class MeetingSessionService implements OnDestroy {
     });
   }
 
-  // --- attendance ---------------------------------------------------------------
   private loadAttendance(meetingId: Uuid): void {
     this.api.listAttendance(meetingId).subscribe({
       next: (rows) => this.attendance.set(rows),
@@ -464,7 +461,7 @@ export class MeetingSessionService implements OnDestroy {
     const m = this.meeting();
     if (!m || this.savingAttendance() || member.status === status) return;
     this.savingAttendance.set(true);
-    // Own attendance goes through the self endpoint; members are set by the lead.
+    // Own attendance goes through the self endpoint. The lead sets it for members.
     const req = member.isSelf
       ? this.api.setOwnAttendance(m.id, status)
       : this.api.setMemberAttendance(m.id, member.principalId, status);
@@ -480,10 +477,9 @@ export class MeetingSessionService implements OnDestroy {
     });
   }
 
-  // --- live (WebSocket) -----------------------------------------------------------
   private connectLive(meetingId: Uuid): void {
-    this.viewers.set([]); // drop the previous meeting's state
-    // Mock mode (FE dev/harness) has no WS server → skip the live channel.
+    this.viewers.set([]); // drop the state of the previous meeting
+    // Mock mode (FE dev and test harness) has no WS server. Skip the live channel.
     if (this.useMock) return;
     this.channel?.close();
     this.channel = this.ws.connectMeeting(meetingId);
@@ -502,11 +498,11 @@ export class MeetingSessionService implements OnDestroy {
           status: (msg.status as Meeting['status']) ?? m.status,
           activeApplicationId: msg.activeApplicationId,
         });
-        // Agenda/TOP bodies may have changed without a vote → reload so live
+        // TOP bodies can change without a vote. Reload the agenda so live
         // followers see the current protocol state.
         this.agendaSvc.load(m.id, this.canManage());
-        // The protocol status may have flipped (rendering → final/draft): the
-        // worker broadcasts meeting_state after the background render. GET so
+        // The protocol status can change (rendering → final or draft). The worker
+        // broadcasts meeting_state after the background render. Use GET so
         // broadcast bursts do not burn the write rate limit.
         if (
           (this.canWrite() || this.canViewAll()) &&
@@ -523,7 +519,7 @@ export class MeetingSessionService implements OnDestroy {
         if (m.votes.some((v) => v.id === msg.voteId)) {
           this.patchVote(msg.voteId, { status: 'open', closesAt: msg.closesAt });
         } else {
-          // Vote opened live that did not exist at load time (follower).
+          // A vote opened live that did not exist at load time (follower).
           this.meeting.set({ ...m, votes: [...m.votes, liveOpenedVote(msg)] });
         }
         break;

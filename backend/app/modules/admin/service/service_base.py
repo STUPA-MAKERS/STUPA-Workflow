@@ -1,7 +1,7 @@
-"""Shared base of the :class:`~.service.ConfigService` ops classes.
+"""Shared base of the ``service.ConfigService`` ops classes.
 
-Session-bound constructor, the audit hook used by every mutation, and the
-datetime helpers shared by the RBAC and webhook concerns.
+The base holds the session-bound constructor, the audit hook that every
+mutation uses, and the datetime helpers of the RBAC and webhook concerns.
 """
 
 from __future__ import annotations
@@ -21,11 +21,14 @@ if TYPE_CHECKING:
 
 
 def _parse_dt(value: str | None) -> datetime | None:
-    """ISO-8601 → tz-aware UTC ``datetime``.
+    """Parse an ISO-8601 string into a tz-aware UTC ``datetime``.
 
-    ``role_assignment.valid_from``/``valid_until`` are ``timestamptz``; values
-    are stored aware-UTC so validity windows compare correctly in the RBAC
-    resolver. Naive input is interpreted as UTC, aware input normalized to UTC.
+    ``role_assignment.valid_from`` and ``valid_until`` are ``timestamptz``. The
+    service stores aware UTC values, so validity windows compare correctly in
+    the RBAC resolver. A naive input counts as UTC. An aware input moves to UTC.
+
+    Raises:
+        ValidationProblem: The value is not a valid ISO-8601 datetime.
     """
     if value is None:
         return None

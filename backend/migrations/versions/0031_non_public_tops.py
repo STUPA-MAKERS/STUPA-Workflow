@@ -1,11 +1,12 @@
-"""Nicht-öffentliche TOPs + zweites (öffentliches) Protokoll-PDF.
+"""Non-public agenda items and a second, public protocol PDF.
 
-* ``meeting_agenda_item.non_public`` — TOP wird im öffentlichen Protokoll-PDF
-  durch einen Platzhalter ersetzt (Nummerierung bleibt erhalten).
-* ``protocol.public_pdf_storage_key`` — MinIO-Key der redigierten öffentlichen
-  Variante; nur befüllt, wenn die Sitzung mind. einen nicht-öffentlichen TOP hat.
+* `meeting_agenda_item.non_public` replaces the agenda item with a placeholder
+  in the public protocol PDF. The numbering stays intact.
+* `protocol.public_pdf_storage_key` is the MinIO key of the redacted public
+  variant. It carries a value only when the meeting has at least one non-public
+  agenda item.
 
-Idempotent (``IF [NOT] EXISTS``).
+All statements are idempotent (`IF [NOT] EXISTS`).
 """
 
 from __future__ import annotations

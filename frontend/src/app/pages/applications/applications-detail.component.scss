@@ -7,7 +7,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  /* Centered at body width — aligns with the layout's center column. */
+  /* Center at body width, so the header aligns with the center column. */
   width: 100%;
   max-width: var(--layout-max-width);
   margin-inline: auto;
@@ -59,13 +59,11 @@
   margin: 0;
   word-break: break-word;
 }
-/* Edit form: give Formly fields vertical breathing room. */
 formly-form {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
 }
-/* Cost-positions block */
 .det__pos-val {
   font-variant-numeric: tabular-nums;
 }
@@ -112,7 +110,7 @@ formly-form {
   flex-direction: column;
   gap: var(--space-4);
 }
-/* Klappkopf der Versionshistorie: ganze Kopfzeile ist der Toggle. */
+/* The whole header row of the version history acts as the toggle. */
 .det__historyToggle {
   display: flex;
   align-items: center;
@@ -195,8 +193,8 @@ formly-form {
   resize: vertical;
 }
 
-/* --- Breakout layout: transitions + chat float in the margins, content centered
-       at body width (like the tree/charts in the budget tab). --- */
+/* Breakout layout: the transitions and the chat float in the margins. The content stays
+   centered at body width, like the tree and the charts of the budget tab. */
 .det__layout {
   display: grid;
   grid-template-columns:
@@ -231,7 +229,6 @@ formly-form {
   font-size: var(--fs-sm);
   margin: 0 0 var(--space-3);
 }
-/* Editing: hide the margins, form full width. */
 .det__layout--editing {
   grid-template-columns: 1fr;
 }
@@ -247,7 +244,6 @@ formly-form {
   }
 }
 
-/* --- Chat (comments) — standalone panel --- */
 .det__chat {
   display: flex;
   flex-direction: column;
@@ -368,7 +364,6 @@ formly-form {
   outline-offset: 1px;
 }
 
-/* --- Force-status dialog: mandatory reason --- */
 .det__forceReason {
   display: flex;
   flex-direction: column;
@@ -400,7 +395,6 @@ formly-form {
   }
 }
 
-/* --- Edit form: consistent vertical spacing --- */
 formly-form formly-field {
   display: block;
 }
@@ -408,7 +402,6 @@ formly-form formly-field + formly-field {
   margin-top: var(--space-4);
 }
 
-/* --- Mobile (≤768px): stack the margins full-width, single-column rows --- */
 @media (max-width: 768px) {
   .det__meta {
     flex-wrap: wrap;

@@ -5,8 +5,9 @@ description = "Admin REPL for the antragsplattform platform — manage users, ro
 requires-python = ">=3.11"
 dependencies = [
     "prompt_toolkit>=3.0.43",
-    # Only used when DATABASE_URL is set (direct connection); docker-exec mode shells out to
-    # psql and never imports it. Binary wheel → no compiler needed on Linux/macOS.
+    # The CLI imports psycopg only when DATABASE_URL is set for a direct connection.
+    # Docker-exec mode shells out to psql instead. The binary wheel needs no compiler
+    # on Linux and macOS.
     "psycopg[binary]>=3.1",
 ]
 

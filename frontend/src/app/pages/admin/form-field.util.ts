@@ -1,18 +1,20 @@
 /**
- * Form-builder helper. Client-side validation + round-trip of a `FormFieldDef`,
- * mirroring `config_schemas.FormFieldDef` (model_validator): valid key, required
- * `options` for select/multiselect, required `compute` for `computed`,
- * `promoteTarget` when `isPromoted`, plus a structural JsonLogic check for
- * `visibleIf`/`compute`. The server re-validates authoritatively on save.
+ * Form-builder helper: client-side validation and round-trip of a `FormFieldDef`.
+ *
+ * The rules mirror `config_schemas.FormFieldDef` (model_validator). A field needs a valid
+ * key. A select or multiselect field needs `options`. A `computed` field needs `compute`.
+ * A field with `isPromoted` needs `promoteTarget`. The helper also checks the structure of
+ * the `visibleIf` and `compute` JsonLogic. The server validates again on save and stays
+ * authoritative.
  */
 import type { FieldType, FormFieldDef } from '@core/api/models';
 
 export const KEY_PATTERN = /^[a-z][a-z0-9_]*$/;
 
 /**
- * Valid promote targets (`promoteTarget`). The backend currently only evaluates
- * `amount` (→ `application.amount`, budget reservation/booking + statistics),
- * hence a dropdown instead of free text.
+ * Valid values for `promoteTarget`. The backend evaluates `amount` only. That value feeds
+ * `application.amount`, the budget reservation, the booking, and the statistics. For that
+ * reason the UI shows a dropdown and not free text.
  */
 export const PROMOTE_TARGETS = ['amount'] as const;
 export type PromoteTarget = (typeof PROMOTE_TARGETS)[number];
@@ -39,7 +41,7 @@ export const FIELD_TYPES: readonly FieldType[] = [
   'section',
 ] as const;
 
-/** Operator whitelist — mirror of `shared/forms/jsonlogic.ts` OPERATORS. */
+/** Operator whitelist. Mirrors `OPERATORS` in `shared/forms/jsonlogic.ts`. */
 const JSONLOGIC_OPERATORS = new Set([
   '==',
   '!=',
@@ -64,7 +66,7 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 
 /** Structural JsonLogic check: each node is exactly one known operator. */
 export function validateJsonLogic(expr: unknown): boolean {
-  if (!isRecord(expr)) return true; // Literal
+  if (!isRecord(expr)) return true; // a literal is always valid
   const keys = Object.keys(expr);
   if (keys.length !== 1) return false;
   const op = keys[0];
@@ -117,7 +119,7 @@ export function duplicateKeys(fields: FormFieldDef[]): string[] {
   return [...new Set(keys.filter((k) => keys.indexOf(k) !== keys.lastIndexOf(k)))].sort();
 }
 
-/** Canonical form: drop empty optionals (= stored definition). */
+/** Canonical form: drop empty optionals. This is the stored definition. */
 export function normalizeFormField(field: FormFieldDef): FormFieldDef {
   const out: FormFieldDef = { key: field.key, type: field.type, label: field.label };
   if (field.help && Object.keys(field.help).length > 0) out.help = field.help;
@@ -129,8 +131,8 @@ export function normalizeFormField(field: FormFieldDef): FormFieldDef {
   if (field.visibleIf) out.visibleIf = field.visibleIf;
   if (field.compute) out.compute = field.compute;
   if (field.isPII) out.isPII = true;
-  // Only numeric fields may carry `isPromoted` (backend rejects otherwise, 422).
-  // `positions` promotes into `amount` automatically — without a flag.
+  // Only a numeric field may carry `isPromoted`. The backend sends 422 for other types.
+  // A `positions` field promotes into `amount` automatically, without a flag.
   if (field.isPromoted && (field.type === 'number' || field.type === 'currency')) {
     out.isPromoted = true;
     if (field.promoteTarget) out.promoteTarget = field.promoteTarget;
@@ -147,7 +149,6 @@ export function parseFields(json: string): FormFieldDef[] {
   return parsed.map(normalizeFormField);
 }
 
-/** Create an empty field of a type (with the parts the type requires). */
 export function blankField(type: FieldType = 'text', key = ''): FormFieldDef {
   const field: FormFieldDef = { key, type, label: { de: '', en: '' } };
   if (type === 'select' || type === 'multiselect') {
@@ -159,16 +160,15 @@ export function blankField(type: FieldType = 'text', key = ''): FormFieldDef {
   return field;
 }
 
-/** Default values for a new option (form builder). */
 export function blankOption(): { value: string; label: { de: string; en: string } } {
   return { value: '', label: { de: '', en: '' } };
 }
 
 /**
- * Question group in the editor: a titled container mapping to exactly one wizard
- * step (= one effective form section). The title is the step heading. `fields`
- * holds **only** question fields (no `section` markers — those are the
- * serialization primitive, produced/consumed when packing/unpacking).
+ * Question group in the editor: a titled container that maps to exactly one wizard step,
+ * which is one section of the effective form. The title is the step heading. `fields`
+ * holds question fields **only**. A `section` marker is the serialization primitive. The
+ * pack and unpack steps produce and consume such markers.
  */
 export interface QuestionGroup {
   titleDe: string;
@@ -177,10 +177,11 @@ export interface QuestionGroup {
 }
 
 /**
- * Flat `fields[]` (backend format) → groups, splitting at every `section` marker.
- * Fields **before** the first marker form an implicit first group (empty default
- * title). Without markers exactly one group with an empty title results. Mirrors
- * `validation._split_sections` (backend) so the editor and the effective form see
+ * Split the flat `fields[]` backend format into groups at every `section` marker.
+ *
+ * Fields **before** the first marker form an implicit first group with an empty title. A
+ * form without markers gives exactly one group with an empty title. This mirrors
+ * `validation._split_sections` in the backend, so the editor and the effective form use
  * the same step split.
  */
 export function groupsFromFields(fields: FormFieldDef[]): QuestionGroup[] {
@@ -189,8 +190,8 @@ export function groupsFromFields(fields: FormFieldDef[]): QuestionGroup[] {
   let opened = false;
   for (const f of fields) {
     if (f.type === 'section') {
-      // Marker closes the running group (if it already had content/a marker)
-      // and opens a new one with the marker title.
+      // A marker closes the running group when that group has content or a marker
+      // already. The marker then opens a new group with its own title.
       if (opened || current.fields.length > 0) {
         groups.push(current);
       }
@@ -209,19 +210,20 @@ export function groupsFromFields(fields: FormFieldDef[]): QuestionGroup[] {
 }
 
 /**
- * Groups → flat `fields[]` (backend format). Each group becomes a leading
- * `section` marker (auto-key `section_N`) followed by its question fields. An
- * **implicit first group without a title** is serialized **without** a marker (it
- * is the default `main` section) — so a marker-less form is preserved exactly
- * (round-trip). Every further group, and a first group **with** a title, gets a
- * marker. An empty group (title only) serializes to just its marker.
+ * Pack groups into the flat `fields[]` backend format.
+ *
+ * Each group becomes a leading `section` marker with the auto-key `section_N`, followed
+ * by its question fields. An **implicit first group without a title** gets **no** marker,
+ * because it is the default `main` section. A form without markers therefore round-trips
+ * exactly. Every further group gets a marker, and so does a first group **with** a title.
+ * An empty group with a title only serializes to its marker alone.
  */
 export function groupsToFields(groups: QuestionGroup[]): FormFieldDef[] {
   const out: FormFieldDef[] = [];
   let n = 0;
   groups.forEach((g, gi) => {
     const hasTitle = !!(g.titleDe || g.titleEn);
-    // First group without a title: no marker (implicit main section).
+    // A first group without a title gets no marker. It is the implicit main section.
     const needsMarker = gi > 0 || hasTitle;
     if (needsMarker) {
       n += 1;

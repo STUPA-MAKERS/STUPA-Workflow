@@ -1,6 +1,6 @@
-"""Unit (ohne DB): Flow-Auswahl beim Anlegen eines Antrags (#28).
+"""Unit tests without a database: flow selection when an application is created (#28).
 
-Es gibt nur den globalen Flow (Typ-Flows entfernt); fehlt er → 404.
+Only the global flow remains. Per-type flows are gone. A missing global flow gives 404.
 """
 
 from __future__ import annotations

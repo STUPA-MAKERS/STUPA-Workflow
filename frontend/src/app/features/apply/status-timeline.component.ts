@@ -38,10 +38,12 @@ interface ReadonlyRow {
 }
 
 /**
- * Magic-link status/timeline page. Verifies the token, shows status, history
- * and public comments, and allows editing the answer data — read-only when the
- * current status is not editable (`state.editAllowed`) or the link has only
- * `view` scope.
+ * Magic-link status and timeline page.
+ *
+ * The page verifies the token. It shows the status, the history and the public
+ * comments. The applicant can also edit the answer data. The page stays read-only
+ * if the current status forbids edits (`state.editAllowed`) or if the link has only
+ * the `view` scope.
  */
 @Component({
   selector: 'app-status-timeline',
@@ -75,7 +77,7 @@ export class StatusTimelineComponent {
   readonly timeline = signal<TimelineEntry[]>([]);
   readonly comments = signal<ApplicationComment[]>([]);
   readonly readonlyRows = signal<ReadonlyRow[]>([]);
-  /** Transitions the applicant can fire (actorIsApplicant gate); empty ⇒ no actions. */
+  /** Transitions the applicant can fire (actorIsApplicant gate). Empty ⇒ no actions. */
   readonly actions = signal<Transition[]>([]);
   /** Id of the currently firing transition (button spinner / lock). */
   readonly firing = signal<string | null>(null);
@@ -101,8 +103,10 @@ export class StatusTimelineComponent {
     () => this.editScope() && Boolean(this.application()?.state?.editAllowed),
   );
 
-  /** Attachments can still be added in locked states (receipts/invoices after the
-   *  decision) — only the magic-link scope counts. */
+  /**
+   * The applicant can add attachments in locked states too, for example receipts and
+   * invoices after the decision. Only the magic-link scope counts here.
+   */
   readonly canUploadAttachments = computed(() => this.editScope());
 
   constructor() {
@@ -144,9 +148,10 @@ export class StatusTimelineComponent {
   }
 
   /**
-   * Strip the magic-link token from the URL: it must not land in History or
-   * `Referer`. The app id is kept so a reload can reuse the existing cookie
-   * session.
+   * Strip the magic-link token from the URL.
+   *
+   * The token must never land in History or in `Referer`. The method keeps the app
+   * id, so a reload can reuse the existing cookie session.
    */
   private stripTokenFromUrl(appId: string): void {
     if (typeof window === 'undefined' || typeof history === 'undefined') return;
@@ -157,8 +162,8 @@ export class StatusTimelineComponent {
       url.searchParams.delete('t'); // query form
       frag.delete('t'); // fragment form (/antrag/:id#t=…)
       url.hash = frag.toString() ? `#${frag.toString()}` : '';
-      // Keep the app id for a reload. The path /antrag/:id already carries it;
-      // only add it for the ?app= form.
+      // Keep the app id for a reload. The path /antrag/:id already carries it.
+      // Add it only for the ?app= form.
       if (appId && !url.pathname.includes(appId) && !url.searchParams.has('app')) {
         url.searchParams.set('app', appId);
       }
@@ -193,7 +198,10 @@ export class StatusTimelineComponent {
     });
   }
 
-  /** Display name of a comment (fallback: applicant/committee) — as internal. */
+  /**
+   * Display name of a comment. The fallback is the applicant or the Gremium label,
+   * as in the internal view.
+   */
   authorName(comment: ApplicationComment): string {
     if (comment.author) return comment.author;
     return this.i18n.translate(
@@ -203,7 +211,7 @@ export class StatusTimelineComponent {
     );
   }
 
-  /** Initials for the chat avatar (as internal). */
+  /** Initials for the chat avatar, as in the internal view. */
   initial(name: string): string {
     const parts = name.trim().split(/\s+/).filter(Boolean);
     if (!parts.length) return '?';
@@ -220,7 +228,7 @@ export class StatusTimelineComponent {
     this.api.fireApplicantTransition(app.id, { transitionId: t.id }).subscribe({
       next: () => {
         this.firing.set(null);
-        this.load(app.id); // status/history/actions reflect the new state.
+        this.load(app.id); // reload so status, history and actions show the new state
       },
       error: () => {
         this.firing.set(null);
@@ -235,7 +243,7 @@ export class StatusTimelineComponent {
         this.buildView(eff, application);
         this.phase.set('ready');
       },
-      // Form definition optional: status/timeline stay usable without it.
+      // The form definition is optional. Status and timeline stay usable without it.
       error: () => this.phase.set('ready'),
     });
   }
@@ -278,7 +286,7 @@ export class StatusTimelineComponent {
     return this.optionLabel(field, value, lang);
   }
 
-  /** Cost positions compact (as internal detail page): count + Σ of preferred offers. */
+  /** Compact cost positions, as on the internal detail page: count + Σ of preferred offers. */
   private formatPositions(value: unknown): string {
     if (!Array.isArray(value)) return '';
     let total = 0;
@@ -294,8 +302,10 @@ export class StatusTimelineComponent {
   }
 
   /**
-   * Make machine notes in the timeline readable: automatic transitions from votes
-   * carry `vote:<result>` — show a translated result instead of the raw value.
+   * Make machine notes in the timeline readable.
+   *
+   * An automatic transition from a vote carries the note `vote:<result>`. The method
+   * shows the translated result instead of the raw value.
    */
   noteText(note: string): string {
     const resultKeys = {
@@ -317,7 +327,6 @@ export class StatusTimelineComponent {
     return opt ? resolveI18n(opt.label, lang) : String(value);
   }
 
-  // --- actions -------------------------------------------------------------
   save(): void {
     const app = this.application();
     if (!app || !this.canEdit() || this.saving()) return;

@@ -1,10 +1,11 @@
-"""Integration (echte Postgres, testcontainers): Flow-/Status-Engine gegen T-12.
+"""Integration test for the flow and status engine (real Postgres, testcontainers, T-12).
 
-Beweist gegen ein echtes Schema (flows §3/§9, data-model §1/§5.2):
-``available_transitions`` (Guard-Filter), ``fire`` (atomarer State-Wechsel +
-``status_event`` + Action-Dispatch), Edit-Lock-Wirkung auf T-12 ``patch`` (409),
-Guard-Fail (409), ergebnis-abhängige Verzweigung (``voteResult`` passed/rejected/tie)
-und optimistisches Locking (konkurrierende Transition → 409).
+The tests run against a real schema. See flows section 3 and 9, data-model section 1
+and 5.2. `available_transitions` filters by guard. `fire` changes the state atomically,
+writes a `status_event` and dispatches the actions. The edit lock blocks the T-12
+`patch` with 409. A failed guard gives 409. The vote result picks the branch
+(`voteResult` passed, rejected or tie). Optimistic locking turns a concurrent
+transition into 409.
 """
 
 from __future__ import annotations
@@ -62,7 +63,7 @@ def _manager() -> Principal:
 
 
 async def _seed(session: AsyncSession) -> tuple[ApplicationType, dict[str, State]]:
-    """Typ + aktive Form + Flow (draft→review→voting→approved/rejected) anlegen."""
+    """Create the type, the active form and the flow (draft→review→voting→approved/rejected)."""
     gremium = Gremium(name="G", slug=f"g-{uuid.uuid4()}")
     session.add(gremium)
     await session.flush()
@@ -126,10 +127,10 @@ async def _seed(session: AsyncSession) -> tuple[ApplicationType, dict[str, State
         Transition(
             flow_version_id=flow.id, from_state_id=states["review"].id,
             to_state_id=states["voting"].id, label_i18n={"de": "Zur Abstimmung"},
-            guard={"roleIs": "treasurer"},  # mgr ist NICHT treasurer → blockiert
+            guard={"roleIs": "treasurer"},  # the manager is NOT a treasurer, so this blocks
             actions=[], order=0,
         ),
-        # vote-Ausgänge (#28): pass/fail-Branches, von fire_branch beim Vote-Close gefeuert.
+        # Vote outcomes (#28): fire_branch fires the pass and fail branch on vote close.
         Transition(
             flow_version_id=flow.id, from_state_id=states["voting"].id,
             to_state_id=states["approved"].id, label_i18n={"de": "Bewilligen"},
@@ -162,21 +163,15 @@ async def _make_application(
     return app
 
 
-# --------------------------------------------------------------------------- #
-# available_transitions
-# --------------------------------------------------------------------------- #
 async def test_available_transitions_filters_by_guard(session: AsyncSession) -> None:
     app_type, states = await _seed(session)
     app = await _make_application(session, app_type)
 
     out = await FlowService(session).available_transitions(app.id, _manager())
-    # draft hat genau einen Übergang; Guard (fieldsComplete & roleIs reviewer) erfüllt.
+    # draft has exactly one transition and its guard passes: title set, actor is reviewer.
     assert [t.to_state_id for t in out] == [states["review"].id]
 
 
-# --------------------------------------------------------------------------- #
-# fire — happy path + status_event + dispatch
-# --------------------------------------------------------------------------- #
 async def test_fire_moves_state_writes_event_dispatches(session: AsyncSession) -> None:
     app_type, states = await _seed(session)
     app = await _make_application(session, app_type)
@@ -191,9 +186,9 @@ async def test_fire_moves_state_writes_event_dispatches(session: AsyncSession) -
         app.id, transition.id, _manager(), note="ok"
     )
     assert res.new_state_id == states["review"].id
-    # fire() dispatcht neben der konfigurierten ``notify``-Action zusätzlich die
-    # implizite ``taskNotify``-Task-Mail an die Handlungsberechtigten des neuen
-    # States (#4-3, build_implicit_notifications).
+    # The fire() call also dispatches the implicit `taskNotify` mail, besides the
+    # configured `notify` action. The mail goes to the principals who may act on
+    # the new state (#4-3, build_implicit_notifications).
     assert res.dispatched_actions == ["notify", "taskNotify"]
     assert rec.actions[0].type == "notify"
     assert rec.actions[0].idempotency_key.endswith(":0:notify")
@@ -208,23 +203,20 @@ async def test_fire_moves_state_writes_event_dispatches(session: AsyncSession) -
             select(StatusEvent).where(StatusEvent.application_id == app.id)
         )
     ).scalars().all()
-    # Initial-Event (create) + Übergangs-Event.
+    # The timeline holds the initial create event plus the transition event.
     fire_event = [e for e in events if e.transition_id == transition.id]
     assert len(fire_event) == 1
     assert fire_event[0].from_state_id == states["draft"].id
     assert fire_event[0].actor == "mgr-1"
 
 
-# --------------------------------------------------------------------------- #
-# Edit-Lock-Wirkung auf T-12 (setEditLock → state.edit_allowed → patch 409)
-# --------------------------------------------------------------------------- #
 async def test_fire_into_locked_state_blocks_t12_patch(session: AsyncSession) -> None:
     app_type, states = await _seed(session)
     app = await _make_application(session, app_type)
     apps = ApplicationsService(session)
     flow = FlowService(session)
 
-    # draft → review (editierbar): T-12 patch erlaubt.
+    # review still allows edits, so the T-12 patch passes.
     t_review = (
         await session.execute(
             select(Transition).where(
@@ -234,14 +226,13 @@ async def test_fire_into_locked_state_blocks_t12_patch(session: AsyncSession) ->
         )
     ).scalar_one()
     await flow.fire(app.id, t_review.id, _manager())
-    await apps.patch(app.id, {"title": "Aktualisiert"}, changed_by="mgr-1")  # ok
+    await apps.patch(app.id, {"title": "Aktualisiert"}, changed_by="mgr-1")
 
-    # Position auf `voting` (kein Manager-Pfad dorthin), dann **per fire_branch** in
-    # den gesperrten `approved`-State (edit_allowed=False) übergehen — der Lock
-    # entsteht also end-to-end aus dem Übergang, nicht aus manuellem State-Setzen.
-    # ``voting``→``approved`` ist ein ``pass``-Branch (#vote-branch): Branch-Übergänge
-    # feuert ausschließlich das Vote-Ergebnis (fire_branch), nie ``fire`` manuell
-    # (das würde absichtlich mit 409 blockieren).
+    # Put the application into `voting` (no manager path leads there), then move into
+    # the locked `approved` state (edit_allowed=False) with fire_branch. The lock then
+    # comes from the transition itself, not from a state that the test sets by hand.
+    # `voting` → `approved` is a `pass` branch (#vote-branch). Only a vote result fires
+    # a branch transition, through fire_branch. A manual `fire` blocks with 409 on purpose.
     app_row = await session.get(Application, app.id)
     assert app_row is not None
     app_row.current_state_id = states["voting"].id
@@ -250,20 +241,17 @@ async def test_fire_into_locked_state_blocks_t12_patch(session: AsyncSession) ->
     res = await flow.fire_branch(app.id, "pass", _manager())
     assert res.new_state_id == states["approved"].id
 
-    # Folge des Übergangs: T-12 patch sperrt jetzt mit 409.
+    # The transition now blocks the T-12 patch with 409.
     with pytest.raises(ConflictError):
         await apps.patch(app.id, {"title": "Verboten"}, changed_by="mgr-1")
 
 
-# --------------------------------------------------------------------------- #
-# Guard-Fail → 409 guard_failed
-# --------------------------------------------------------------------------- #
 async def test_fire_guard_failed_409(session: AsyncSession) -> None:
     app_type, states = await _seed(session)
     app = await _make_application(session, app_type)
     flow = FlowService(session)
 
-    # nach review wechseln, dann review→voting (Guard roleIs treasurer) feuern → Fail.
+    # review → voting needs roleIs treasurer, which the manager does not have.
     t_review = (
         await session.execute(
             select(Transition).where(
@@ -283,9 +271,6 @@ async def test_fire_guard_failed_409(session: AsyncSession) -> None:
     assert exc.value.code == "guard_failed"
 
 
-# --------------------------------------------------------------------------- #
-# ergebnis-abhängige Verzweigung (#28: pass/fail-Branch via fire_branch)
-# --------------------------------------------------------------------------- #
 @pytest.mark.parametrize(
     ("branch", "target"),
     [("pass", "approved"), ("fail", "rejected")],
@@ -295,7 +280,6 @@ async def test_fire_branch_routes_to_target(
 ) -> None:
     app_type, states = await _seed(session)
     app = await _make_application(session, app_type)
-    # Antrag direkt in `voting` setzen.
     app_row = await session.get(Application, app.id)
     assert app_row is not None
     app_row.current_state_id = states["voting"].id
@@ -306,9 +290,6 @@ async def test_fire_branch_routes_to_target(
     assert res.new_state_id == states[target].id
 
 
-# --------------------------------------------------------------------------- #
-# optimistisches Locking — konkurrierende Transition → 409
-# --------------------------------------------------------------------------- #
 async def test_fire_wrong_from_state_conflict(session: AsyncSession) -> None:
     app_type, states = await _seed(session)
     app = await _make_application(session, app_type)
@@ -321,9 +302,8 @@ async def test_fire_wrong_from_state_conflict(session: AsyncSession) -> None:
             )
         )
     ).scalar_one()
-    # Erstes Feuern verschiebt draft→review.
     await flow.fire(app.id, t_review.id, _manager())
-    # Zweites Feuern desselben Übergangs: from(draft) != current(review) → 409.
+    # Fire the same transition again: from(draft) != current(review) → 409.
     with pytest.raises(ConflictError) as exc:
         await flow.fire(app.id, t_review.id, _manager())
     assert exc.value.code == "conflict"
@@ -332,12 +312,15 @@ async def test_fire_wrong_from_state_conflict(session: AsyncSession) -> None:
 async def test_fire_concurrent_race_exactly_one_wins(
     migrated: tuple[str, str], session: AsyncSession
 ) -> None:
-    """Echter UPDATE-Race: zwei nebenläufige ``fire`` auf denselben from-State über
-    **separate** Sessions/Verbindungen → genau einer gewinnt, der andere 409.
+    """Race two concurrent `fire` calls on the same from-state.
 
-    Trifft den realen ``rowcount==0``-Pfad (nicht nur Fake/sequenziell): die zweite
-    Transaktion blockiert am Row-Lock, sieht nach dem Commit der ersten ``current !=
-    from`` und liefert rowcount 0."""
+    Both calls use a **separate** session and connection. Exactly one call wins. The
+    other one gets 409.
+
+    The test hits the real `rowcount == 0` path, not a fake or sequential one. The
+    second transaction waits on the row lock. After the first transaction commits, the
+    second one sees `current != from` and gets rowcount 0.
+    """
     app_type, states = await _seed(session)
     app = await _make_application(session, app_type)
     transition = (

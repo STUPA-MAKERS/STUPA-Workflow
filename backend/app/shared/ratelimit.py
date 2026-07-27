@@ -1,13 +1,15 @@
-"""Sliding-window rate limiting, keyed per IP/mail with configurable limits.
+"""Sliding-window rate limiting, keyed per IP or mail address, with configurable limits.
 
 Backends:
-- ``NullRateLimiter``: always allows (rate limiting off).
-- ``InMemoryRateLimiter``: process-local (tests/single-worker dev), injectable ``now``.
-- ``RedisRateLimiter``: sliding window over a sorted set (ZSET), shared across workers.
-  Fail-open: if Redis is unreachable the request is allowed (availability over
-  throttling) and the error is logged.
+- `NullRateLimiter` always allows the request. Rate limiting is off.
+- `InMemoryRateLimiter` keeps the window in the process. Use it for tests and for
+  single-worker development. It takes an injected `now`.
+- `RedisRateLimiter` keeps the window in a sorted set (ZSET) that all workers share. It
+  fails open: if Redis is unreachable, it allows the request and logs the error. That
+  puts availability over throttling.
 
-No Redis ``EVAL``/Lua and no Python ``eval``: atomic enough via a pipeline.
+The Redis backend uses no `EVAL` and no Lua, and the module never calls Python `eval`. A
+pipeline gives enough atomicity.
 """
 
 from __future__ import annotations
@@ -41,14 +43,17 @@ def _wall_clock() -> float:
 
 
 class NullRateLimiter:
-    """Rate limiting disabled — every request allowed."""
+    """Disabled rate limiter that allows every request."""
 
     async def hit(self, key: str, *, limit: int, window_seconds: int) -> RateLimitResult:
         return RateLimitResult(allowed=True, retry_after=0)
 
 
 class InMemoryRateLimiter:
-    """In-process sliding window. For tests/dev; not shared across workers."""
+    """In-process sliding window.
+
+    Use it for tests and for development. Workers do not share the window.
+    """
 
     def __init__(self, *, now: Callable[[], float] | None = None) -> None:
         self._hits: defaultdict[str, deque[float]] = defaultdict(deque)
@@ -70,7 +75,10 @@ class InMemoryRateLimiter:
 
 
 class RedisRateLimiter:
-    """Sliding window over a Redis ZSET (score = timestamp). Fail-open."""
+    """Sliding window over a Redis ZSET, where the score is the timestamp.
+
+    The limiter fails open. If Redis is unreachable, it allows the request.
+    """
 
     def __init__(
         self,
@@ -87,7 +95,8 @@ class RedisRateLimiter:
         now = self._now()
         window_start = now - window_seconds
         redis_key = f"{self._prefix}{key}"
-        # Unique member (uuid): collision-free across workers sharing the same ZSET key.
+        # A unique member from a uuid prevents a collision between workers that share
+        # the same ZSET key.
         member = f"{now}:{uuid4().hex}"
         try:
             pipe = self._client.pipeline()  # type: ignore[attr-defined]
@@ -98,7 +107,7 @@ class RedisRateLimiter:
             results = await pipe.execute()
             count = int(results[2])
             if count > limit:
-                # Remove our own entry so blocked attempts don't count.
+                # Remove our own entry, so a blocked attempt does not count.
                 await self._client.zrem(redis_key, member)  # type: ignore[attr-defined]
                 oldest = await self._client.zrange(  # type: ignore[attr-defined]
                     redis_key, 0, 0, withscores=True
