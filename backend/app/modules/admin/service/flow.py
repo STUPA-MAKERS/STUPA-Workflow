@@ -26,10 +26,11 @@ class FlowOps(ConfigServiceBase):
     """Read the active global flow graph and save new immutable versions."""
 
     async def get_active_global_flow(self) -> FlowGraph | None:
-        """Graph of the active global flow.
+        """Read the graph of the active global flow.
 
-        Returns ``None`` when no global flow exists yet (the editor then starts
-        with an empty graph).
+        Returns:
+            The graph of the active version. ``None`` when no global flow
+            exists yet. The editor then starts with an empty graph.
         """
         version = await self.session.scalar(
             select(FlowVersion).where(FlowVersion.active.is_(True)).limit(1)
@@ -93,16 +94,22 @@ class FlowOps(ConfigServiceBase):
     ) -> FlowVersionOut:
         """Save the global flow as a new, immutable version.
 
-        Every save creates a new ``flow_version`` with fresh ``state``/
-        ``transition`` rows; earlier versions (including their rows and
-        ``status_event`` references) stay untouched — a version is never
-        deleted. Applications are not pinned: ALL of them are moved to the
-        newest version by state KEY — removed keys fall back to the initial
-        state. The graph must have exactly one initial state
+        Every save creates a new ``flow_version`` with fresh ``state`` and
+        ``transition`` rows. Earlier versions stay untouched, together with
+        their rows and their ``status_event`` references. A version is never
+        deleted.
+
+        Applications are not pinned to a version. The save moves ALL of them to
+        the newest version by state KEY. A removed key falls back to the
+        initial state. The graph must have exactly one initial state
         (``validate_flow_graph``).
 
-        Writes a ``config_revision`` snapshot (graph) plus a linked audit
-        entry; ``action``/``extra_data`` support the restore/revert path.
+        The save also writes a ``config_revision`` snapshot of the graph plus a
+        linked audit entry. ``action`` and ``extra_data`` support the restore
+        and revert path.
+
+        Raises:
+            ValidationProblem: The graph is invalid.
         """
         from app.modules.applications.models import Application
 
@@ -113,7 +120,7 @@ class FlowOps(ConfigServiceBase):
                 "Invalid flow graph.", errors=[{"field": "graph", "msg": str(exc)}]
             ) from exc
 
-        # Remember each application's current state (by KEY) — valid across versions.
+        # The state KEY stays valid across versions, so remember it per application.
         app_keys = {
             app_id: key
             for app_id, key in (
@@ -125,10 +132,10 @@ class FlowOps(ConfigServiceBase):
             ).all()
         }
 
-        # Deactivate the currently active version FIRST — the partial-unique index
-        # uq_flow_version_one_active_global (WHERE active) allows exactly one active
-        # row; inserting the new active row before deactivating would collide.
-        # (session.execute flushes pending inserts, hence BEFORE add(version).)
+        # Deactivate the active version FIRST. The partial unique index
+        # uq_flow_version_one_active_global, with its WHERE active clause, allows only
+        # one active row. An insert of the new active row before the update collides.
+        # session.execute flushes pending inserts, so this must run before the add.
         max_version = await self.session.scalar(
             select(FlowVersion.version).order_by(FlowVersion.version.desc()).limit(1)
         )
@@ -145,7 +152,6 @@ class FlowOps(ConfigServiceBase):
         self.session.add(version)
         await self.session.flush()
 
-        # Fresh state rows for the new version (old versions stay untouched).
         id_by_key: dict[str, UUID] = {}
         initial_id: UUID | None = None
         for state in payload.graph.states:
@@ -166,7 +172,6 @@ class FlowOps(ConfigServiceBase):
             if state.is_initial:
                 initial_id = row.id
 
-        # Fresh transition rows for the new version.
         for order, trans in enumerate(payload.graph.transitions):
             self.session.add(
                 Transition(
@@ -184,8 +189,6 @@ class FlowOps(ConfigServiceBase):
                 )
             )
 
-        # Move ALL applications to the newest version (not pinned); a removed state
-        # key falls back to the initial state. Covers applications on older versions.
         for app_id, key in app_keys.items():
             await self.session.execute(
                 update(Application)
@@ -195,7 +198,6 @@ class FlowOps(ConfigServiceBase):
                     flow_version_id=version.id,
                 )
             )
-        # Applications without a (mapped) state → initial state.
         await self.session.execute(
             update(Application)
             .where(Application.current_state_id.is_(None))

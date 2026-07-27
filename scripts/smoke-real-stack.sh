@@ -1,26 +1,28 @@
 #!/usr/bin/env bash
-# Real-Stack-Smoke (Prozess-Fix): fährt den VOLLEN Stack via compose hoch —
-# Mock AUS (echte OIDC-Config, kein Mock-Keycloak), Bootstrap-Admin gesetzt — und
-# prüft die Kernflüsse rein über HTTP/Healthcheck. Gedacht, um eine Welle bewusst
-# gegen den echten Stack zu testen (CI-Job `real-stack-smoke`, opt-in wie e2e).
+# Real-stack smoke test (process fix). The script starts the FULL stack with compose. The
+# mock is OFF, so the stack uses the real OIDC config and no mock Keycloak. The script
+# sets a bootstrap admin. It then checks the core flows over HTTP and the healthchecks
+# only. Use it to test a wave against the real stack (CI job `real-stack-smoke`, opt-in
+# like e2e).
 #
-# KEIN FE-Selenium hier — das macht die Visual-Harness. Hier nur: API up,
-# /api/health, öffentliche Endpunkte 2xx, Auth-Pfad erreichbar, WS-Handshake
-# erreichbar.
+# The script runs NO frontend Selenium. The visual harness does that. This script only
+# checks that the API is up, that /api/health answers, that the public endpoints return
+# 2xx, that the auth path answers and that the WebSocket handshake answers.
 #
-# Eigener COMPOSE_PROJECT_NAME -> berührt einen echten/anderen Stack NICHT.
-# Schreibt temporär deploy/.env (Smoke-Werte), sichert ein vorhandenes .env und
-# stellt es am Ende wieder her. Räumt restlos ab (down -v). Idempotent.
+# The script uses its own COMPOSE_PROJECT_NAME, so it does NOT touch a real or another
+# stack. It writes deploy/.env with smoke values, saves an existing .env and puts that
+# file back at the end. It removes everything again (down -v). The script is idempotent.
 #
 # Usage: scripts/smoke-real-stack.sh
-#   SMOKE_TIMEOUT (Default 600s; ClamAV lädt lange). Host-Port fix 8080 (compose).
+#   SMOKE_TIMEOUT: default 600s, because ClamAV loads slowly. The host port is fixed to
+#   8080 (compose).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEPLOY="${ROOT}/deploy"
 ENV_FILE="${DEPLOY}/.env"
 ENV_BACKUP=""
-# Host-Port ist im compose hart auf 127.0.0.1:8080:80 gemappt -> kein Override.
+# The compose file maps the host port hard to 127.0.0.1:8080:80. No override works.
 WEB="http://127.0.0.1:8080"
 TIMEOUT="${SMOKE_TIMEOUT:-600}"
 
@@ -32,23 +34,24 @@ cleanup() {
   echo "==> Teardown (down -v)"
   docker compose down -v --remove-orphans >/dev/null 2>&1 || true
   if [[ -n "${ENV_BACKUP}" && -f "${ENV_BACKUP}" ]]; then
-    mv -f "${ENV_BACKUP}" "${ENV_FILE}"          # vorhandenes .env zurück
+    mv -f "${ENV_BACKUP}" "${ENV_FILE}"          # put the existing .env back
   else
-    rm -f "${ENV_FILE}"                           # unser Smoke-.env weg
+    rm -f "${ENV_FILE}"                           # remove our smoke .env
   fi
 }
 trap cleanup EXIT
 
-# --- .env vorbereiten (Mock AUS, Bootstrap-Admin gesetzt) ------------------- #
+# Prepare .env: mock OFF, bootstrap admin set.
 if [[ -f "${ENV_FILE}" ]]; then
   ENV_BACKUP="${ENV_FILE}.smoke-bak"
   mv -f "${ENV_FILE}" "${ENV_BACKUP}"
 fi
 cp .env.example "${ENV_FILE}"
-# Overrides ans Ende -> letzter Wert je Key gewinnt (docker compose env_file).
-# Wegwerf-Secrets (≥16 Zeichen, sonst lehnt app.settings ab); OIDC bleibt auf den
-# .env.example-Platzhaltern (kein Mock) -> /api/auth/login redirected (307), wird
-# nie gefolgt. Bootstrap-Admin per E-Mail + Subject gesetzt.
+# Append the overrides, because the last value per key wins (docker compose env_file).
+# The throwaway secrets hold at least 16 characters. app.settings rejects a shorter one.
+# OIDC keeps the .env.example placeholders and gets no mock, so /api/auth/login answers
+# with a redirect (307). The script never follows that redirect. The bootstrap admin
+# comes from the email and the subject.
 cat >> "${ENV_FILE}" <<'EOF'
 
 # --- smoke-real-stack overrides (NICHT committen; vom Skript erzeugt) -------
@@ -71,10 +74,10 @@ docker compose config -q
 echo "==> docker compose up -d --build"
 docker compose up -d --build
 
-# --- warten bis api + web healthy ------------------------------------------ #
-# api hängt via depends_on an migrate(completed)+postgres/redis/minio(healthy);
-# web an api(healthy). Sind beide healthy, steht der Kern-Stack. ClamAV (langsam)
-# ist für die HTTP-Flüsse irrelevant -> nicht abgewartet.
+# api waits with depends_on for migrate (completed) and for postgres, redis and minio
+# (healthy). web waits for api (healthy). If both are healthy, the core stack is up.
+# ClamAV is slow and does not matter for the HTTP flows, so the script does not wait for
+# it.
 echo "==> Warte bis api + web healthy (max ${TIMEOUT}s)"
 deadline=$(( $(date +%s) + TIMEOUT ))
 while :; do
@@ -95,10 +98,10 @@ while :; do
   sleep 5
 done
 
-# --- Kernflüsse prüfen ------------------------------------------------------ #
 fails=0
 
-# check <name> <pfad> <erwarteter-code...>  (kein -L: Redirects NICHT folgen)
+# check <name> <path> <expected-code...>. The call has no -L, so curl does NOT follow a
+# redirect.
 check() {
   local name="$1" path="$2"; shift 2
   local code
@@ -114,19 +117,21 @@ check() {
 }
 
 echo "==> HTTP-Kernflüsse (${WEB})"
-check "web /healthz"          "/healthz"        200        # nginx-Liveness
+check "web /healthz"          "/healthz"        200        # nginx liveness
 check "api /api/health"       "/api/health"     200        # FastAPI up
-check "public site-config"    "/api/site-config" 200       # auth-freier Branding-Read
-# 307 = Redirect zur OIDC-Issuer (OIDC vollständig konfiguriert). 404 = OIDC aus,
-# weil .env.example OIDC_CLIENT_SECRET leer shippt (oidc_enabled braucht alle 4
-# Felder) -> login() 404. Smoke läuft bewusst ohne echten IdP -> beide ok; geprüft
-# wird nur, dass die Route existiert/antwortet (kein 5xx/000).
+check "public site-config"    "/api/site-config" 200       # branding read without auth
+# 307 is a redirect to the OIDC issuer, so OIDC is fully configured. 404 means OIDC is
+# off, because .env.example ships OIDC_CLIENT_SECRET empty and oidc_enabled needs all
+# four fields. login() then returns 404. The smoke test runs without a real IdP on
+# purpose, so both codes are OK. The check only proves that the route exists and answers
+# with no 5xx and no 000.
 check "auth login erreichbar" "/api/auth/login" 307 404
-check "auth me (unauth)"      "/api/auth/me"    401        # RBAC greift, problem+json
-check "unbekannt -> 404"      "/api/__nope__"   404        # Error-Handler erreichbar
+check "auth me (unauth)"      "/api/auth/me"    401        # RBAC applies, problem+json
+check "unbekannt -> 404"      "/api/__nope__"   404        # the error handler answers
 
-# WS-Handshake erreichbar: Upgrade-Header senden; die App MUSS antworten (101 bei
-# Upgrade, sonst 401/403/426/400 weil unauth). 000/502/404 => Proxy/Route kaputt.
+# Send the upgrade headers. The app MUST answer: 101 on an upgrade, else 400, 401, 403 or
+# 426, because the request carries no auth. 000, 502 or 404 means the proxy or the route
+# is broken.
 echo "==> WebSocket-Handshake erreichbar"
 ws_code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 \
   -H 'Connection: Upgrade' -H 'Upgrade: websocket' \

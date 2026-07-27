@@ -48,7 +48,7 @@ describe('CostCentreTreeComponent', () => {
       inputs: { nodes: [node()], allLabel: 'Alle', selectedId: '' },
       on: { picked: (id: string) => (picked = id) },
     });
-    // With no selection, the "all" node is the active one.
+    // Without a selection, the "all" node is the active one.
     expect(fixture.nativeElement.querySelector('.cct__node--all.cct__node--active')).toBeTruthy();
     fireEvent.click(screen.getByText('Alle'));
     expect(picked).toBe('');
@@ -68,10 +68,9 @@ describe('CostCentreTreeComponent', () => {
     expect(screen.getByText('Root')).toBeInTheDocument();
     expect(screen.getByText('800')).toBeInTheDocument();
     expect(screen.getByText('Child')).toBeInTheDocument();
-    // The root is depth 0 → has a colour dot; the child (depth>0) does not.
+    // The root sits at depth 0 and gets a color dot. A child at a deeper level does not.
     const dots = fixture.nativeElement.querySelectorAll('.cct__dot');
     expect(dots.length).toBe(1);
-    // The child branch has the children wrapper.
     expect(fixture.nativeElement.querySelector('.cct__children')).toBeTruthy();
   });
 

@@ -1,15 +1,15 @@
 /**
- * API DTOs — derived from the OpenAPI contracts. The backend OpenAPI is the
- * single source of truth; these types are the FE-side mirror for the typed API
- * client. On a contract change, coordinate rather than break unilaterally.
+ * API DTOs derived from the OpenAPI contracts. The backend OpenAPI is the single
+ * source of truth. These types mirror it on the frontend side for the typed API
+ * client. If a contract changes, coordinate the change. Do not break one side.
  *
  * Layout:
- *  - `*Wire` types mirror the backend JSON 1:1 (`_CamelModel`: camelCase aliases
- *    via `by_alias`). They are not consumed directly in components but translated
- *    into FE view models in the `ApiClient` layer via `mappers.ts`.
- *  - View models (`Application`, `ApplicationComment`, …) are the FE-friendly
- *    shapes (i18n label already resolved, boolean convenience fields). They are
- *    what components/templates see.
+ *  - `*Wire` types mirror the backend JSON 1:1. `_CamelModel` gives camelCase
+ *    aliases through `by_alias`. Components never read them. The `ApiClient` layer
+ *    translates them into frontend view models through `mappers.ts`.
+ *  - View models (`Application`, `ApplicationComment`, …) are the frontend-friendly
+ *    shapes. They carry the resolved i18n label and boolean convenience fields.
+ *    Components and templates see these.
  *  - `*Body` types are request bodies in the camelCase wire form.
  */
 
@@ -20,14 +20,15 @@ export type Lang = 'de' | 'en';
 /** Configurable multilingual text (`*_i18n` JSONB). */
 export type I18nMap = Record<string, string>;
 
-/** Public (auth-free) active branding config — deliberately loosely typed: the FE
- *  reads only the free texts (e.g. `applyInfo`) and the app name from it. */
+/** Public branding config of the active site version. It needs no authentication.
+ *  The type stays loose on purpose. The frontend reads only the free texts, for
+ *  example `applyInfo`, and the app name. */
 export interface PublicSiteConfig {
   version: number;
   branding?: {
-    /** Configured app name (language-neutral); empty ⇒ i18n/default fallback. */
+    /** Configured app name (language neutral). Empty falls back to i18n or the default. */
     appName?: string;
-    /** Short name (PWA icon); empty ⇒ default fallback. */
+    /** Short name for the PWA icon. Empty falls back to the default. */
     appShortName?: string;
     freetexts?: Partial<
       Record<'loginHint' | 'welcome' | 'support' | 'emailFooter' | 'applyInfo', I18nMap>
@@ -47,11 +48,12 @@ export interface ProblemDetail {
 }
 
 /**
- * Principal (OIDC) incl. roles/permissions/groups — GET /api/auth/me.
- * Field names mirror the backend `MeOut` 1:1. `MeOut` is a plain `BaseModel`
- * (not a `_CamelModel`) → `display_name` stays snake_case.
+ * Principal (OIDC) with roles, permissions and groups. GET /api/auth/me.
+ *
+ * The field names mirror the backend `MeOut` 1:1. `MeOut` is a plain `BaseModel`
+ * and not a `_CamelModel`, so `display_name` keeps its snake_case name.
  */
-/** Lean gremium reference (a principal's membership). */
+/** Small gremium reference. It names one membership of a principal. */
 export interface GremiumRef {
   id: Uuid;
   name: string;
@@ -65,17 +67,17 @@ export interface Principal {
   roles: string[];
   permissions: string[];
   groups: string[];
-  /** Gremien the principal is a member of — basis for "My gremien". */
+  /** Gremien the principal belongs to. This drives the "My gremien" view. */
   gremien?: GremiumRef[];
-  /** Gremien the principal manages (gremium role with `session.manage`). */
+  /** Gremien the principal manages through a gremium role with `session.manage`. */
   session_manage_gremien?: Uuid[];
-  /** ≥1 cost centre is assigned to a member gremium. */
+  /** At least one cost center belongs to a gremium of this principal. */
   has_scoped_budget_view?: boolean;
-  /** Principal is in ≥1 substitute pool — meeting timeline visible. */
+  /** The principal is in at least one substitute pool. The meeting timeline shows. */
   in_substitute_pool?: boolean;
 }
 
-/** Response of POST /api/auth/logout — RP-initiated logout URL (OIDC) or null. */
+/** Response of POST /api/auth/logout. An RP-initiated OIDC logout URL, or null. */
 export interface LogoutOut {
   logout_url: string | null;
 }
@@ -93,7 +95,7 @@ export interface ApplicationListQuery {
   gremium?: Uuid;
   type?: Uuid;
   topf?: Uuid;
-  /** Cost centre (budget tree) incl. subtree. */
+  /** Cost center in the budget tree. The filter includes the subtree. */
   budget?: Uuid;
   q?: string;
   amountMin?: number;
@@ -102,36 +104,32 @@ export interface ApplicationListQuery {
   createdTo?: string;
   sort?: 'createdAt' | 'amount';
   order?: 'asc' | 'desc';
-  /** Own applications only — forces the owner filter even with `application.read`. */
+  /** Own applications only. It forces the owner filter even with `application.read`. */
   mine?: boolean;
   limit?: number;
   offset?: number;
 }
 
-// =========================================================================== //
-// Wire DTOs — exact mirror of the backend JSON (`_CamelModel`).                //
-// =========================================================================== //
-
-/** `StateOut` — `label` is an i18n map. */
+/** `StateOut`. The `label` is an i18n map. */
 export interface StateOutWire {
   id: Uuid;
   key: string;
   label: I18nMap;
-  /** Display colour of the state badge (hex), optional. */
+  /** Optional display color of the state badge, as hex. */
   color?: string | null;
   editAllowed: boolean;
   /** State kind: normal|vote. */
   kind?: string;
 }
 
-/** `ApplicantOut` — PII, filled only for authorized readers. */
+/** `ApplicantOut`. It holds PII. The backend fills it only for an authorized reader. */
 export interface ApplicantOutWire {
   email?: string | null;
   name?: string | null;
   anonymized: boolean;
 }
 
-/** `ApplicationOut` — application detail. */
+/** `ApplicationOut`. The application detail. */
 export interface ApplicationOutWire {
   id: Uuid;
   typeId: Uuid;
@@ -152,7 +150,7 @@ export interface ApplicationOutWire {
   isOwner?: boolean;
 }
 
-/** `ApplicationListItem` — list entry (no `data`/`applicant`). */
+/** `ApplicationListItem`. A list entry without `data` and without `applicant`. */
 export interface ApplicationListItemWire {
   id: Uuid;
   typeId: Uuid;
@@ -166,7 +164,7 @@ export interface ApplicationListItemWire {
   updatedAt: IsoDateTime;
 }
 
-/** `ApplicationCreated` — 201 response to `POST /applications` (id only). */
+/** `ApplicationCreated`. The 201 response of `POST /applications`. It holds only the id. */
 export interface ApplicationCreatedWire {
   applicationId: Uuid;
 }
@@ -174,8 +172,8 @@ export interface ApplicationCreatedWire {
 /** Attendance status of a member in a meeting. */
 export type AttendanceStatus = 'present' | 'excused' | 'absent';
 
-/** `AttendanceOut` — attendance of a gremium member (GET/PUT …/attendance). */
-/** Current gremium member — protokollant candidate when creating a meeting. */
+/** `AttendanceOut`. Attendance of a gremium member. GET/PUT …/attendance. */
+/** A current gremium member. This is a protokollant candidate for a new meeting. */
 export interface MeetingMember {
   principalId: Uuid;
   displayName: string | null;
@@ -189,32 +187,32 @@ export interface Attendance {
   /** `null` = not recorded yet. */
   status: AttendanceStatus | null;
   source: 'self' | 'lead' | null;
-  /** Is this the requesting user (for self-marking)? */
+  /** True if this row is the requesting user. It enables self-marking. */
   isSelf: boolean;
 }
 
-/** `AgendaItemOut` — an agenda item: linked application or free text. */
+/** `AgendaItemOut`. An agenda item holds a linked application or free text. */
 export interface AgendaItem {
   id: Uuid;
   /** `null` for a free-text agenda item (no application). */
   applicationId: Uuid | null;
   title: string | null;
-  /** Markdown text of this agenda item (per-item editor). */
+  /** Markdown text of this agenda item. Each item has its own editor. */
   body?: string | null;
   position: number;
-  /** Non-public: redacted in the public protocol PDF. */
+  /** Non-public. The public protocol PDF redacts this agenda item. */
   nonPublic?: boolean;
   stateLabel?: I18nMap | null;
 }
 
-/** `AssignableApplicationOut` — application in a vote state, not yet on the agenda. */
+/** `AssignableApplicationOut`. An application in a vote state that is not on the agenda. */
 export interface AssignableApplication {
   applicationId: Uuid;
   title: string | null;
   stateLabel?: I18nMap | null;
 }
 
-/** `AltchaChallengeOut` — server-signed PoW challenge (GET /altcha/challenge). */
+/** `AltchaChallengeOut`. A server-signed proof-of-work challenge. GET /altcha/challenge. */
 export interface AltchaChallenge {
   algorithm: string;
   challenge: string;
@@ -223,7 +221,7 @@ export interface AltchaChallenge {
   maxnumber: number;
 }
 
-/** `TimelineEventOut` — status transition in the timeline. */
+/** `TimelineEventOut`. A status transition in the timeline. */
 export interface TimelineEventOutWire {
   fromStateId?: Uuid | null;
   toStateId: Uuid;
@@ -236,7 +234,7 @@ export interface TimelineEventOutWire {
 export type CommentVisibility = 'internal' | 'public';
 export type CommentAuthorKind = 'principal' | 'applicant';
 
-/** `CommentOut` — real backend field names: `author`/`authorKind`/`visibility`/`at`. */
+/** `CommentOut`. The backend field names are `author`, `authorKind`, `visibility`, `at`. */
 export interface CommentOutWire {
   id: Uuid;
   author?: string | null;
@@ -244,7 +242,7 @@ export interface CommentOutWire {
   body: string;
   visibility: CommentVisibility;
   at: IsoDateTime;
-  /** Viewer wrote this comment (server-side determined — chat alignment). */
+  /** True if the viewer wrote this comment. The server decides. It aligns the chat. */
   isOwn?: boolean;
 }
 
@@ -255,18 +253,18 @@ export interface ApplicationTypeListItemWire {
   hasBudget: boolean;
   active: boolean;
   activeFormVersionId?: Uuid | null;
-  /** Admin extra fields (filled only when authorized). */
+  /** Extra admin fields. The backend fills them only for an authorized reader. */
   key?: string | null;
   gremiumId?: Uuid | null;
 }
 
-/** `TransitionOut` — `label` is an i18n map. */
+/** `TransitionOut`. The `label` is an i18n map. */
 export interface TransitionOutWire {
   id: Uuid;
   fromStateId: Uuid;
   toStateId: Uuid;
   label: I18nMap;
-  /** Optional colour for the decision button. */
+  /** Optional color for the decision button. */
   color?: string | null;
 }
 
@@ -277,10 +275,11 @@ export interface FieldChangeWire {
 }
 
 /**
- * Structural diff of two `data` snapshots (`DataDiff`):
- * `added`/`removed` are field-value maps, `changed` maps key → `{old,new}`.
- * Nested fields are compared whole-value (no recursive cell diff) — robust
- * against heterogeneous tables/objects.
+ * Structural diff of two `data` snapshots (`DataDiff`). `added` and `removed` are
+ * field-value maps. `changed` maps a key to `{old,new}`.
+ *
+ * The backend compares a nested field as one whole value. It runs no recursive
+ * cell diff. That also works for heterogeneous tables and objects.
  */
 export interface DataDiffWire {
   added: Record<string, unknown>;
@@ -288,7 +287,7 @@ export interface DataDiffWire {
   changed: Record<string, FieldChangeWire>;
 }
 
-/** `VersionOut` — one submission version + diff. */
+/** `VersionOut`. One submission version and its diff. */
 export interface VersionOutWire {
   version: number;
   data: Record<string, unknown>;
@@ -298,11 +297,13 @@ export interface VersionOutWire {
 }
 
 /**
- * `AttachmentOut` — attachment metadata. Plain `BaseModel` (not a `_CamelModel`)
- * → `is_comparison_offer` stays snake_case. `scanned` = ClamAV run finished (not
- * "clean"!): the scan result (`scan_result`) is deliberately not exposed; a
- * positive finding ⇒ the object is deleted. Clean-vs-finding only resolves at
- * download time (200 vs. 409).
+ * `AttachmentOut`. Attachment metadata. It is a plain `BaseModel` and not a
+ * `_CamelModel`, so `is_comparison_offer` keeps its snake_case name.
+ *
+ * `scanned` means that the ClamAV run finished. It does not mean "clean". The API
+ * hides the scan result (`scan_result`) on purpose. If the scan finds something,
+ * the backend deletes the object. Clean and infected only separate at download
+ * time: 200 against 409.
  */
 export interface AttachmentOutWire {
   id: Uuid;
@@ -313,21 +314,23 @@ export interface AttachmentOutWire {
   is_comparison_offer: boolean;
 }
 
-/** `SignedUrlOut` (files/schemas.py) — app-relative authz-gated /download route; expiresIn is an advisory FE cache hint, not a URL expiry. */
+/**
+ * `SignedUrlOut` (files/schemas.py). An app-relative /download route behind an
+ * authorization check. `expiresIn` is an advisory cache hint for the frontend. It
+ * is not a URL expiry.
+ */
 export interface SignedUrlOutWire {
   url: string;
   expiresIn: number;
 }
-
-// --- Request bodies (camelCase wire form) ---------------------------------- //
 
 /** Body for `POST /applications` (`ApplicationCreate`, by_alias). */
 export interface ApplicationCreateBody {
   typeId: Uuid;
   budgetPotId?: Uuid | null;
   data: Record<string, unknown>;
-  // Optional: for logged-in users the backend derives identity from the account;
-  // anonymous submission enforces it server-side.
+  // Optional. For a logged-in user the backend takes the identity from the account.
+  // For an anonymous submission the server requires these fields.
   applicantEmail?: string | null;
   applicantName?: string | null;
   lang: Lang;
@@ -346,30 +349,29 @@ export interface TransitionRequestBody {
   note?: string | null;
 }
 
-/** `POST /applications/{id}/force-status` — privileged direct status override.
- *  `note` (reason) is mandatory: the change bypasses the flow and is audited. */
+/** `POST /applications/{id}/force-status`. A privileged direct status override.
+ *  `note` holds the reason and is mandatory. The change skips the flow. The audit
+ *  log records it. */
 export interface ForceStatusBody {
   stateId: Uuid;
   note: string;
 }
 
-/** `TransitionResult` — 200 response of a successful transition. */
+/** `TransitionResult`. The 200 response of a transition that succeeded. */
 export interface TransitionResult {
   newStateId: Uuid;
   statusEventId: Uuid;
   dispatchedActions: string[];
 }
 
-// =========================================================================== //
-// View models — FE-friendly, i18n already resolved (output of mappers.ts).      //
-// =========================================================================== //
+// View models. Frontend friendly, i18n already resolved. Built by `mappers.ts`.
 
-/** Application status with resolved label (for the current `lang`). */
+/** Application status with the label resolved for the current `lang`. */
 export interface ApplicationState {
   id: Uuid;
   key: string;
   label: string;
-  /** Display colour of the state badge (hex), optional. */
+  /** Optional display color of the state badge, as hex. */
   color?: string | null;
   editAllowed: boolean;
   /** State kind: normal|vote. */
@@ -398,10 +400,10 @@ export interface Application {
   createdAt: IsoDateTime;
   updatedAt: IsoDateTime;
   applicant: Applicant | null;
-  /** May the requester edit/delete (manager or creator)? */
+  /** True if the requester may edit or delete. A manager or the creator may. */
   canEdit: boolean;
-  /** Is the requester the creator (applicant)? Gates the anonymization request
-   *  (GDPR Art. 17) — only the data subject. */
+  /** True if the requester is the creator, that is the applicant. It gates the
+   *  anonymization request under GDPR Art. 17. Only the data subject may ask. */
   isOwner: boolean;
 }
 
@@ -418,12 +420,12 @@ export interface ApplicationListItem {
   updatedAt: IsoDateTime;
 }
 
-/** Result of `POST /applications` (FE view). */
+/** Result of `POST /applications`, frontend view. */
 export interface ApplicationCreated {
   applicationId: Uuid;
 }
 
-/** Timeline entry (FE view) — `label` resolved from `toState`. */
+/** Timeline entry, frontend view. The `label` comes from `toState`. */
 export interface TimelineEntry {
   toStateId: Uuid;
   toState: ApplicationState | null;
@@ -433,7 +435,7 @@ export interface TimelineEntry {
   note: string | null;
 }
 
-/** Comment (FE view) — `isPublic` derived from `visibility`. */
+/** Comment, frontend view. `isPublic` comes from `visibility`. */
 export interface ApplicationComment {
   id: Uuid;
   author: string | null;
@@ -441,12 +443,12 @@ export interface ApplicationComment {
   body: string;
   visibility: CommentVisibility;
   isPublic: boolean;
-  /** Viewer wrote this comment — own messages right, all others left/gray. */
+  /** True if the viewer wrote this comment. Own messages go right, others left and gray. */
   isOwn: boolean;
   at: IsoDateTime;
 }
 
-/** Application type (FE view) for the wizard selection. */
+/** Application type, frontend view, for the wizard selection. */
 export interface ApplicationType {
   id: Uuid;
   name: string;
@@ -457,17 +459,17 @@ export interface ApplicationType {
   gremiumId: Uuid | null;
 }
 
-/** Available transition (FE view) — `label` resolved. */
+/** Available transition, frontend view, with the `label` resolved. */
 export interface Transition {
   id: Uuid;
   fromStateId: Uuid;
   toStateId: Uuid;
   label: string;
-  /** Optional colour for the decision button; null = default. */
+  /** Optional color for the decision button. `null` selects the default. */
   color: string | null;
 }
 
-/** A changed field cell (FE view) — `key` pulled out of the diff map. */
+/** A changed field cell, frontend view. The `key` comes out of the diff map. */
 export interface FieldChange {
   key: string;
   old: unknown;
@@ -475,9 +477,9 @@ export interface FieldChange {
 }
 
 /**
- * Version diff (FE view) — the backend maps (`added`/`removed`/`changed`) are
- * resolved here into iterable, key-carrying lists so templates can render over
- * them directly with `@for`.
+ * Version diff, frontend view. The backend sends the maps `added`, `removed` and
+ * `changed`. This shape turns them into lists that carry the key. A template can
+ * then render them directly with `@for`.
  */
 export interface DataDiff {
   added: { key: string; value: unknown }[];
@@ -485,7 +487,7 @@ export interface DataDiff {
   changed: FieldChange[];
 }
 
-/** A submission version (FE view) for the history/diff view. */
+/** A submission version, frontend view, for the history and diff view. */
 export interface ApplicationVersion {
   version: number;
   data: Record<string, unknown>;
@@ -495,15 +497,15 @@ export interface ApplicationVersion {
 }
 
 /**
- * Scan state of an attachment (FE view). Derivable from the contract:
- * - `scanning`    — `scanned=false`: ClamAV still running, no download (→ 409).
- * - `clean`       — `scanned=true`: scan finished; download generally possible.
- * - `quarantined` — set client-side when the download is rejected with 409
- *   (finding/quarantine) — the metadata alone does not reveal this.
+ * Scan state of an attachment, frontend view. The contract gives it:
+ * - `scanning`: `scanned=false`. ClamAV still runs. A download returns 409.
+ * - `clean`: `scanned=true`. The scan finished. A download normally works.
+ * - `quarantined`: the client sets this when a download fails with 409, that is
+ *   on a finding or a quarantine. The metadata alone does not show this state.
  */
 export type ScanState = 'scanning' | 'clean' | 'quarantined';
 
-/** Attachment (FE view) — `isComparisonOffer` camelCase, `scanState` derived. */
+/** Attachment, frontend view. `isComparisonOffer` is camelCase. `scanState` is derived. */
 export interface Attachment {
   id: Uuid;
   filename: string;
@@ -514,25 +516,25 @@ export interface Attachment {
   scanState: ScanState;
 }
 
-/** Signed download URL (FE view). */
+/** Signed download URL, frontend view. */
 export interface SignedUrl {
   url: string;
   expiresIn: number;
 }
 
-/** FE input for a new application → mapped to `ApplicationCreateBody`. */
+/** Frontend input for a new application. It maps to `ApplicationCreateBody`. */
 export interface NewApplication {
   typeId: Uuid;
   budgetPotId?: Uuid | null;
   data: Record<string, unknown>;
-  // Null for logged-in users — the backend derives identity/altcha.
+  // Null for a logged-in user. The backend takes the identity and the altcha itself.
   applicantEmail?: string | null;
   applicantName?: string | null;
   lang: Lang;
   altcha?: string | null;
 }
 
-// --- Form definition — mirror of FormFieldDef ---------------------------------
+// Form definition. A mirror of the backend `FormFieldDef`.
 
 export type FieldType =
   | 'text'
@@ -542,7 +544,7 @@ export type FieldType =
   | 'date'
   | 'select'
   | 'multiselect'
-  // Dynamic pickers: options injected server-side (committees / budget tree).
+  // Dynamic pickers. The server injects the options: Gremien or the budget tree.
   | 'gremium_select'
   | 'budget_select'
   // Typed inputs with built-in validation.
@@ -572,15 +574,17 @@ export interface FieldValidation {
   fileTypes?: string[];
   maxSizeMB?: number;
   maxRows?: number;
-  /** `positions`: min comparison offers per position / min number of positions. */
+  /** `positions`. The minimum comparison offers per position and the minimum
+   *  number of positions. */
   minOffers?: number;
   minPositions?: number;
-  /** `positions`: allow the per-position opt-out of comparison offers
-   *  (checkbox + mandatory reason → only one offer needed). Unset = allowed. */
+  /** `positions`. Allow the opt-out of comparison offers for one position. The
+   *  user ticks a checkbox and must give a reason. Then one offer is enough. If
+   *  unset, the opt-out is allowed. */
   allowNoOffers?: boolean;
 }
 
-/** A field definition of the effective form (camelCase like the OpenAPI by_alias). */
+/** A field definition of the effective form. It is camelCase like the OpenAPI by_alias. */
 export interface FormFieldDef {
   key: string;
   type: FieldType;
@@ -602,7 +606,7 @@ export interface FormSection {
   fields: FormFieldDef[];
 }
 
-/** Effective form definition — GET /api/application-types/{id}/form. */
+/** Effective form definition. GET /api/application-types/{id}/form. */
 export interface EffectiveForm {
   applicationTypeId: Uuid;
   formVersionId: Uuid;
@@ -610,23 +614,19 @@ export interface EffectiveForm {
   sections: FormSection[];
 }
 
-// --- Magic link ---------------------------------------------------------------
-
 /**
- * Response of POST /api/auth/magic-link/verify (`MagicLinkVerifyOut`). Plain
- * `BaseModel` (not a `_CamelModel`) → field names stay snake_case
- * (`application_id`). The applicant session runs exclusively via an HttpOnly
- * cookie — no session token in the body/JS.
+ * Response of POST /api/auth/magic-link/verify (`MagicLinkVerifyOut`). It is a
+ * plain `BaseModel` and not a `_CamelModel`, so the field names stay snake_case,
+ * for example `application_id`. The applicant session runs only through an
+ * HttpOnly cookie. The body carries no session token. JavaScript never sees one.
  */
 export interface MagicLinkVerifyResult {
   application_id: Uuid;
   scope: 'edit' | 'view';
 }
 
-// --- Voting -------------------------------------------------------------------
-
 export type MajorityRule = 'simple' | 'absolute' | 'two_thirds';
-/** `cancelled` — application left the vote state manually (vote aborted). */
+/** `cancelled`. The application left the vote state by hand. The vote stopped. */
 export type VoteStatus = 'draft' | 'open' | 'closed' | 'cancelled';
 export type VoteResult = 'passed' | 'rejected' | 'tie';
 
@@ -637,9 +637,9 @@ export interface Quorum {
 }
 
 /**
- * Vote configuration (`VoteConfig`). Fields arrive camelCase via the backend
- * `_CamelModel`; defaults mirror the Pydantic defaults (`abstainCountsQuorum`/
- * `allowChange` true, `secret` false).
+ * Vote configuration (`VoteConfig`). The backend `_CamelModel` sends the fields in
+ * camelCase. The defaults mirror the Pydantic defaults: `abstainCountsQuorum` and
+ * `allowChange` are true, `secret` is false.
  */
 export interface VoteConfig {
   options: string[];
@@ -652,8 +652,8 @@ export interface VoteConfig {
 }
 
 /**
- * Aggregated interim/final result (`TallyOut`). For `secret` the server returns
- * only `counts` — never individual voters.
+ * Aggregated interim or final result (`TallyOut`). For a `secret` vote the server
+ * returns only `counts`. It never returns an individual voter.
  */
 export interface Tally {
   counts: Record<string, number>;
@@ -664,9 +664,10 @@ export interface Tally {
 }
 
 /**
- * Vote state + tally — GET /api/votes/{id} (`VoteOut`). Plain `_CamelModel`, so
- * usable 1:1 as a view model (no i18n label; options are raw keys the FE
- * translates via `vote.option.*`).
+ * Vote state and tally. GET /api/votes/{id} (`VoteOut`). It is a plain
+ * `_CamelModel`, so the frontend uses it 1:1 as a view model. It carries no i18n
+ * label. The options are raw keys. The frontend translates them through
+ * `vote.option.*`.
  */
 export interface Vote {
   id: Uuid;
@@ -681,36 +682,33 @@ export interface Vote {
   tally: Tally;
 }
 
-/** Response to an accepted ballot — POST /api/votes/{id}/ballot. */
+/** Response to an accepted ballot. POST /api/votes/{id}/ballot. */
 export interface BallotResult {
   status: 'cast' | 'changed';
 }
 
-// =========================================================================== //
-// Meetings + protocol. Wire form camelCase (`_CamelModel`).                     //
-// =========================================================================== //
+// Meetings and protocol. The wire form is camelCase (`_CamelModel`).
 
-/** Meeting status; BE enum: `planned|live|closed`. */
+/** Meeting status. The backend enum is `planned|live|closed`. */
 export type MeetingStatus = 'planned' | 'live' | 'closed';
-/** Status of a vote within a meeting. */
-/** `cancelled` — application left the vote state manually (vote aborted). */
+/** `cancelled`. The application left the vote state by hand. The vote stopped. */
 export type MeetingVoteStatus = 'pending' | 'open' | 'closed' | 'cancelled';
 
-/** `MeetingVoteOut` — vote summary in the meeting state (GET /meetings/{id}). */
+/** `MeetingVoteOut`. A vote summary in the meeting state. GET /meetings/{id}. */
 export interface MeetingVoteOutWire {
   id: Uuid;
-  /** `null` = generic motion (free-text agenda item), no application. */
+  /** `null` marks a generic motion on a free-text agenda item, with no application. */
   applicationId?: Uuid | null;
-  /** Which agenda item the vote is bound to (grouping in the FE). */
+  /** The agenda item the vote belongs to. The frontend groups by it. */
   agendaItemId?: Uuid | null;
-  /** Application title (supplied by the backend; else resolved from the application). */
+  /** Application title. The backend supplies it. Otherwise read it from the application. */
   title?: string | null;
-  /** Motion of the (live) vote — for the protocol. */
+  /** Motion of the live vote. The protocol needs it. */
   question?: string | null;
-  /** Options (for casting). */
+  /** Options a voter can pick. */
   options?: string[] | null;
   status: MeetingVoteStatus;
-  /** Final result (e.g. `accepted`/`rejected`), only after `closed`. */
+  /** Final result, for example `accepted` or `rejected`. Set only after `closed`. */
   result?: string | null;
   counts?: Record<string, number> | null;
   leading?: string | null;
@@ -718,11 +716,12 @@ export interface MeetingVoteOutWire {
   voted?: number | null;
   present?: number | null;
   revealed?: boolean | null;
-  /** Reason for rejection: `quorum` = quorum missed, `majority` = majority missed. */
+  /** Reason for the rejection. `quorum` means the vote missed the quorum.
+   *  `majority` means the vote missed the majority. */
   failedReason?: 'quorum' | 'majority' | null;
 }
 
-/** `MeetingOut` — meeting state + votes (GET /meetings/{id}). */
+/** `MeetingOut`. Meeting state and votes. GET /meetings/{id}. */
 export interface MeetingOutWire {
   id: Uuid;
   title: string;
@@ -734,40 +733,38 @@ export interface MeetingOutWire {
   gremiumId?: Uuid | null;
   gremiumName?: string | null;
   votes: MeetingVoteOutWire[];
-  /** Linked protocol (if already created). */
+  /** The linked protocol, if it already exists. */
   protocolId?: Uuid | null;
   createdAt: IsoDateTime;
   protokollantId?: Uuid | null;
   protokollantName?: string | null;
-  /** Is the requesting user the assigned protokollant? (resolved server-side). */
+  /** True if the requesting user is the assigned protokollant. The server resolves it. */
   isProtokollant?: boolean;
-  /** Master flag: may the user run the meeting (protocol/agenda/status)? */
+  /** Master flag. True if the user may run the meeting: protocol, agenda, status. */
   canControl?: boolean;
-  /** Manage the meeting (create/plan/assign protokollant). */
+  /** Manage the meeting: create it, plan it and assign the protokollant. */
   canManage?: boolean;
-  /** Write protocol/agenda (assigned protokollant or manager). */
+  /** Write the protocol and the agenda. The assigned protokollant or a manager may. */
   canWrite?: boolean;
-  /** Open/close motions. */
+  /** Open and close motions. */
   canManageVotes?: boolean;
-  /** Eligible to vote in this meeting (role with vote.cast). */
+  /** Eligible to vote in this meeting. The user needs a role with `vote.cast`. */
   canVote?: boolean;
 }
 
-/** `ProtocolOut` — meeting protocol (POST /meetings/{id}/protocol, PATCH /protocols/{id}). */
+/** `ProtocolOut`. Meeting protocol. POST /meetings/{id}/protocol, PATCH /protocols/{id}. */
 export interface ProtocolOutWire {
   id: Uuid;
   meetingId: Uuid;
   markdown: string;
-  /** `rendering` = finalize triggered, the worker renders the PDF in the background. */
+  /** `rendering` means finalize ran. The worker renders the PDF in the background. */
   status: 'draft' | 'rendering' | 'final';
-  /** Result link after `finalize` (PDF in MinIO). */
+  /** Result link after `finalize`. The PDF sits in MinIO. */
   pdfUrl?: string | null;
-  /** Redacted public variant — set only when an agenda item is non-public. */
+  /** Redacted public variant. It exists only if an agenda item is non-public. */
   publicPdfUrl?: string | null;
   sentAt?: IsoDateTime | null;
 }
-
-// --- Request bodies (camelCase wire form) ---------------------------------- //
 
 /** Body for `POST /meetings` (`MeetingCreate`). */
 export interface MeetingCreateBody {
@@ -777,17 +774,17 @@ export interface MeetingCreateBody {
   date?: string | null;
   /** Planned time (`HH:mm`), optional. */
   startTime?: string | null;
-  /** Planned end time (`HH:mm`), optional — must be after `startTime`. */
+  /** Planned end time (`HH:mm`), optional. It must be after `startTime`. */
   endTime?: string | null;
-  /** Assigned protokollant (member of the gremium), optional. */
+  /** Assigned protokollant, optional. The person must be a member of the gremium. */
   protokollantId?: Uuid | null;
 }
 
-/** Body for `PATCH /meetings/{id}` — status, active application, date and/or protokollant. */
+/** Body for `PATCH /meetings/{id}`. Status, active application, date or protokollant. */
 export interface MeetingPatchBody {
   status?: MeetingStatus;
   activeApplicationId?: Uuid | null;
-  /** Planned meeting date (`YYYY-MM-DD`); for pre-scheduling planned meetings. */
+  /** Planned meeting date (`YYYY-MM-DD`). Use it to schedule a planned meeting. */
   date?: string | null;
   /** Planned time (`HH:mm`). */
   startTime?: string | null;
@@ -797,29 +794,29 @@ export interface MeetingPatchBody {
   protokollantId?: Uuid | null;
 }
 
-/** Body for `PATCH /protocols/{id}` — update markdown. */
+/** Body for `PATCH /protocols/{id}`. It updates the markdown. */
 export interface ProtocolPatchBody {
   markdown: string;
 }
 
-/** Body for `POST /protocols/{id}/votes` — embed votes. */
+/** Body for `POST /protocols/{id}/votes`. It embeds votes. */
 export interface ProtocolVotesBody {
   voteIds: Uuid[];
 }
 
-/** `CalendarFeedOut` — own iCal subscription URL (`url` null until a token is created). */
+/** `CalendarFeedOut`. The own iCal subscription URL. `url` is null until a token exists. */
 export interface CalendarFeed {
   url: string | null;
 }
 
-// --- View models ----------------------------------------------------------- //
+// View models for meetings and protocol.
 
-/** Vote summary (FE view) — `null` defaults normalized. */
+/** Vote summary, frontend view. It normalizes the `null` defaults. */
 export interface MeetingVote {
   id: Uuid;
-  /** `null` = generic motion (free-text agenda item). */
+  /** `null` marks a generic motion on a free-text agenda item. */
   applicationId: Uuid | null;
-  /** Agenda item the vote is bound to. */
+  /** The agenda item the vote belongs to. */
   agendaItemId: Uuid | null;
   title: string | null;
   question: string | null;
@@ -829,16 +826,18 @@ export interface MeetingVote {
   counts: Record<string, number> | null;
   leading: string | null;
   closesAt: IsoDateTime | null;
-  /** Participation progress: voted vs. present members. `revealed` = whether
-   *  `counts`/`leading` are visible (otherwise progress only). */
+  /** Participation progress: members who voted against members present.
+   *  `revealed` tells whether `counts` and `leading` are visible. If not, the
+   *  frontend shows the progress only. */
   voted: number;
   present: number;
   revealed: boolean;
-  /** Reason for rejection: `quorum` = quorum missed, `majority` = majority missed. */
+  /** Reason for the rejection. `quorum` means the vote missed the quorum.
+   *  `majority` means the vote missed the majority. */
   failedReason: 'quorum' | 'majority' | null;
 }
 
-/** Meeting (FE view). */
+/** Meeting, frontend view. */
 export interface Meeting {
   id: Uuid;
   title: string;
@@ -851,22 +850,22 @@ export interface Meeting {
   status: MeetingStatus;
   activeApplicationId: Uuid | null;
   gremiumId: Uuid | null;
-  /** Name of the associated gremium (for the timeline display). */
+  /** Name of the gremium. The timeline shows it. */
   gremiumName: string | null;
   votes: MeetingVote[];
   protocolId: Uuid | null;
   createdAt: IsoDateTime;
   protokollantId: Uuid | null;
   protokollantName: string | null;
-  /** Is the logged-in user the assigned protokollant of this meeting? */
+  /** True if the logged-in user is the assigned protokollant of this meeting. */
   isProtokollant: boolean;
-  /** Master flag: may the user run the meeting (protocol/agenda/status)? */
+  /** Master flag. True if the user may run the meeting: protocol, agenda, status. */
   canControl: boolean;
-  /** Manage the meeting (create/plan/assign protokollant). */
+  /** Manage the meeting: create it, plan it and assign the protokollant. */
   canManage: boolean;
-  /** Write protocol/agenda (assigned protokollant or manager). */
+  /** Write the protocol and the agenda. The assigned protokollant or a manager may. */
   canWrite: boolean;
-  /** Open/close motions. */
+  /** Open and close motions. */
   canManageVotes: boolean;
   /** Eligible to vote in this meeting. */
   canVote: boolean;
@@ -875,36 +874,34 @@ export interface Meeting {
 /** Direction of the meeting timeline relative to *now*. */
 export type TimelineDirection = 'past' | 'upcoming';
 
-/** `MeetingPage` — cursor page of the timeline (wire). */
+/** `MeetingPage`. A cursor page of the timeline, wire form. */
 export interface MeetingPageWire {
   items: MeetingOutWire[];
   nextCursor?: string | null;
 }
 
-/** Meeting timeline page (FE view); `nextCursor === null` ⇒ end reached. */
+/** Meeting timeline page, frontend view. `nextCursor === null` marks the end. */
 export interface MeetingPage {
   items: Meeting[];
   nextCursor: string | null;
 }
 
-/** Protocol (FE view) — `isFinal`/`isLocked` derived from `status`. */
+/** Protocol, frontend view. `isFinal` and `isLocked` come from `status`. */
 export interface Protocol {
   id: Uuid;
   meetingId: Uuid;
   markdown: string;
   status: 'draft' | 'rendering' | 'final';
   isFinal: boolean;
-  /** Not editable: final or the worker is currently rendering (`rendering`). */
+  /** Not editable. The protocol is final, or the worker renders it (`rendering`). */
   isLocked: boolean;
   pdfUrl: string | null;
-  /** Redacted public variant (non-public agenda items), else null. */
+  /** Redacted public variant for non-public agenda items. Otherwise null. */
   publicPdfUrl: string | null;
   sentAt: IsoDateTime | null;
 }
 
-// =========================================================================== //
-// Notification preferences — self-service via the account popout.               //
-// =========================================================================== //
+// Notification preferences. The account popout offers them as self service.
 
 /** Toggle for a notification kind (`GET/PUT /notifications/preferences`). */
 export interface NotificationPreference {
@@ -912,11 +909,9 @@ export interface NotificationPreference {
   enabled: boolean;
 }
 
-// =========================================================================== //
-// OAuth grants + MCP setup — self-service via the account popout.                //
-// =========================================================================== //
+// OAuth grants and MCP setup. The account popout offers them as self service.
 
-/** An active OAuth grant (agent/MCP token) of the logged-in user. */
+/** An active OAuth grant of the logged-in user. It is an agent or MCP token. */
 export interface OAuthGrant {
   id: string;
   clientId: string;
@@ -926,7 +921,7 @@ export interface OAuthGrant {
   refreshExpiresAt: IsoDateTime | null;
 }
 
-/** Ready-made MCP setup snippet + metadata (GET /mcp/config). */
+/** MCP setup snippet and metadata. GET /mcp/config. */
 export interface McpSetup {
   mcpServers: Record<string, unknown>;
   baseUrl: string;
@@ -936,7 +931,7 @@ export interface McpSetup {
   note: string;
 }
 
-/** A scope row requested in the consent (held = user has the right). */
+/** A scope row in the consent screen. `held` means the user holds the permission. */
 export interface ConsentScope {
   key: string;
   held: boolean;

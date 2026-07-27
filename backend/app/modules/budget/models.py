@@ -24,8 +24,9 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, CreatedAtMixin, TimestampMixin, UUIDPkMixin
 
-# Budget lifecycle stages. Order = forward direction; stages may be skipped via
-# config. Single source for the model CHECK constraint and the rules.
+# Budget lifecycle stages. The order gives the forward direction. Config can skip
+# a stage. This tuple is the single source for the model CHECK constraint and for
+# the rules.
 STAGES: tuple[str, ...] = ("requested", "reserved", "approved", "paid")
 
 
@@ -57,11 +58,12 @@ class BudgetField(UUIDPkMixin, Base):
 
 
 class BudgetEntry(UUIDPkMixin, TimestampMixin, Base):
-    """Budget binding of an application to a pot (lifecycle).
+    """Budget binding of an application to a pot, with its lifecycle.
 
-    1:1 with the application (``application_id`` UNIQUE). ``amount`` syncs from
-    the promoted ``application.amount``; ``stage`` walks :data:`STAGES` —
-    ``reserved``/``approved``/``paid`` count against ``budget_pot.total``.
+    The relation is 1:1 with the application, so ``application_id`` is UNIQUE.
+    ``amount`` syncs from the promoted ``application.amount``. ``stage`` walks
+    `STAGES`. The stages ``reserved``, ``approved`` and ``paid`` count against
+    ``budget_pot.total``.
     """
 
     __tablename__ = "budget_entry"

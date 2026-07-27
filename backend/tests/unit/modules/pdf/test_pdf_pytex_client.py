@@ -1,7 +1,7 @@
-"""Unit-Tests pytex-Client (T-20): respx-Mock von ``POST /render``.
+"""Unit tests for the pytex client (T-20): a respx mock of `POST /render`.
 
-Deckt Erfolg (PDF-Bytes), 4xx (dauerhaft, kein Retry), 5xx (transient), Transport-
-Fehler (transient) und unerwarteten Content-Type ab.
+The tests cover success (PDF bytes), 4xx (permanent, no retry), 5xx (transient),
+a transport error (transient), and an unexpected content type.
 """
 
 from __future__ import annotations
@@ -29,7 +29,8 @@ async def test_render_success_returns_pdf_bytes() -> None:
     )
     out = await _client().render_pdf("# doc", variant="report")
     assert out == b"%PDF-1.4 ok"
-    # Markdown geht als roher Body (keine Shell/kein Form-Encoding) + Query-Params.
+    # The client sends the Markdown as a raw body plus query parameters. It runs no
+    # shell and applies no form encoding.
     req = route.calls.last.request
     assert req.content == b"# doc"
     assert req.url.params["output_kind"] == "pdf"
@@ -39,18 +40,21 @@ async def test_render_success_returns_pdf_bytes() -> None:
 
 @respx.mock
 async def test_render_trust_level_override_per_call() -> None:
-    """Ein expliziter ``trust_level`` gilt nur für diesen Aufruf, ohne das
-    Client-Default (``trusted``) zu ändern (Client-Plumbing für per-Call-Overrides)."""
+    """An explicit `trust_level` applies only to this call.
+
+    The client default (`trusted`) stays unchanged. This test covers the client
+    plumbing for per-call overrides.
+    """
     route = respx.post(f"{BASE}/render").mock(
         return_value=httpx.Response(
             200, content=b"%PDF", headers={"content-type": "application/pdf"}
         )
     )
-    client = _client()  # Default trusted
+    client = _client()  # the default is trusted
     await client.render_pdf("# d", trust_level="untrusted")
     assert route.calls.last.request.url.params["trust_level"] == "untrusted"
-    assert client.trust_level == "trusted"  # Default unverändert
-    # Ohne Override fällt der Client auf sein Default zurück.
+    assert client.trust_level == "trusted"  # the default stays unchanged
+    # Without an override the client falls back to its default.
     await client.render_pdf("# d")
     assert route.calls.last.request.url.params["trust_level"] == "trusted"
 
@@ -108,17 +112,17 @@ def test_build_pytex_client_from_settings() -> None:
     assert client.trust_level == "sandboxed"
 
 
-# --- AUD-010: client-side eval-trigger gate for trusted renders ---------------
+# AUD-010: client-side eval-trigger gate for trusted renders
 
-# A live pytex eval comment (``[//]: # "EXPR"``) — the only TRUSTED-gated RCE
-# surface for ``input_kind=md``. The Markdown builders strip it via
-# ``sanitize_user_markdown``; the client is the second, independent barrier.
+# A live pytex eval comment (`[//]: # "EXPR"`) is the only TRUSTED-gated RCE surface
+# of `input_kind=md`. The Markdown builders strip it with `sanitize_user_markdown`.
+# The client is the second, independent barrier.
 _EVAL_BODY = '[//]: # "__import__(\'os\').system(\'id\')"\n\n# doc'
 
 
 @respx.mock
 async def test_trusted_render_refuses_live_eval_trigger() -> None:
-    """A surviving eval trigger must NOT be rendered trusted (fail-closed)."""
+    """The client refuses to render a surviving eval trigger as trusted (fail closed)."""
     route = respx.post(f"{BASE}/render").mock(
         return_value=httpx.Response(
             200, content=b"%PDF", headers={"content-type": "application/pdf"}
@@ -133,7 +137,7 @@ async def test_trusted_render_refuses_live_eval_trigger() -> None:
 
 @respx.mock
 async def test_nontrusted_render_passes_eval_trigger_to_pytex() -> None:
-    """Below trusted, pytex' own policy blocks the eval — the client doesn't gate."""
+    """Below trusted the client does not gate. The pytex policy blocks the eval."""
     route = respx.post(f"{BASE}/render").mock(
         return_value=httpx.Response(
             200, content=b"%PDF", headers={"content-type": "application/pdf"}
@@ -146,14 +150,14 @@ async def test_nontrusted_render_passes_eval_trigger_to_pytex() -> None:
 
 @respx.mock
 async def test_trusted_render_allows_clean_markdown() -> None:
-    """Normal Markdown (real refs, callouts) renders trusted unimpeded."""
+    """Normal Markdown (real refs, callouts) renders as trusted without a block."""
     route = respx.post(f"{BASE}/render").mock(
         return_value=httpx.Response(
             200, content=b"%PDF", headers={"content-type": "application/pdf"}
         )
     )
-    # A real reference link def (``[foo]: #section`` — NOT a bare ``#`` target) and
-    # an inline anchor must not be mistaken for the eval trigger.
+    # A real reference link definition (`[foo]: #section`, not a bare `#` target) and
+    # an inline anchor must not look like the eval trigger.
     clean = (
         "# Protokoll\n\nSee [section](#intro)\n\n[foo]: #section\n\n"
         "> [!abstimmung] **Frage**\n"

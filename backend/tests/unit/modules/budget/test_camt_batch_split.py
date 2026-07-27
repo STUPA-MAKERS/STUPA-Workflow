@@ -1,7 +1,8 @@
-"""CAMT-Sammelbuchungs-Aufteilung (#fints-batch): ein ``Ntry`` mit n ``TxDtls``.
+"""CAMT batch booking split (#fints-batch): one `Ntry` with several `TxDtls`.
 
-Deckt Split (Beträge/Richtung/Referenzen/Batch-Metadaten) und alle konservativen
-Fallbacks (fehlender/kaputter/fremdwähriger Teilbetrag, Summen-Abweichung) ab.
+The tests cover the split of amounts, direction, references and batch metadata. They also
+cover every conservative fallback: a missing, broken or foreign-currency part amount, and a
+sum mismatch.
 """
 
 from __future__ import annotations
@@ -55,11 +56,12 @@ def test_batch_entry_splits_into_sub_transactions() -> None:
     lines = camt_parse.parse_camt(_BATCH)
     assert [line.amount for line in lines] == [Decimal("-180.00"), Decimal("-320.00")]
     first, second = lines
-    assert first.purpose == "Rechnung 4711"  # mehrere Ustrd-Zeilen werden verbunden
+    assert first.purpose == "Rechnung 4711"  # the parser joins several Ustrd lines
     assert first.counterparty_name == "ALPHA GMBH"
     assert first.end_to_end_id == "E2E-A"
     assert second.counterparty_name == "BETA EV"
-    # Bank-Referenz: je Teil-Transaktion (falls vorhanden), NIE die geteilte Eintrags-Referenz.
+    # The bank reference comes from each sub-transaction when it exists. It is never the
+    # shared entry reference.
     assert first.bank_ref == "SUBREF1"
     assert second.bank_ref is None
     for line in lines:
@@ -68,8 +70,8 @@ def test_batch_entry_splits_into_sub_transactions() -> None:
         assert line.raw["batch_count"] == "2"
         assert line.raw["batch_total"] == "-500.00"
         assert line.raw["batch_ref"] == "ENTRYREF9"
-        # Eintrags-Info (AddtlNtryInf) bleibt als Metadatum erhalten — das Staging
-        # ersetzt damit die alte Gesamt-Zeile gezielt per Datei-Nr.
+        # The entry info (AddtlNtryInf) stays as metadata. The staging uses it to supersede
+        # the old total line by its file number.
         assert line.raw["batch_info"] == "SAMMELUEBERWEISUNG DATEI-NR. 0000794247 ANZAHL 00000002"
         assert line.raw["purpose"] == line.purpose
 
@@ -78,7 +80,7 @@ def test_batch_sum_mismatch_falls_back_to_single_line() -> None:
     doc = _BATCH.replace(b">320.00<", b">300.00<")
     lines = camt_parse.parse_camt(doc)
     assert [line.amount for line in lines] == [Decimal("-500.00")]
-    # Fallback nutzt die erste TxDtls als Detail-Quelle (bisheriges Verhalten).
+    # The fallback uses the first TxDtls as the detail source, as before.
     assert lines[0].counterparty_name == "ALPHA GMBH"
     assert "batch" not in lines[0].raw
 
@@ -99,7 +101,7 @@ def test_batch_unusable_sub_amount_falls_back(mutation: tuple[bytes, bytes]) -> 
 
 
 def test_batch_sub_direction_override_and_reversal() -> None:
-    # Gemischte Sammelbuchung: eine Gutschrift-Teilzahlung in einem Soll-Eintrag.
+    # A mixed batch booking: one credit part payment inside a debit entry.
     doc = _doc(b"""
   <Ntry>
    <Amt Ccy="EUR">100.00</Amt><CdtDbtInd>DBIT</CdtDbtInd>
@@ -118,7 +120,7 @@ def test_batch_sub_direction_override_and_reversal() -> None:
     lines = camt_parse.parse_camt(doc)
     assert [line.amount for line in lines] == [Decimal("-150.00"), Decimal("50.00")]
 
-    # Storno kehrt die Richtung aller Teil-Transaktionen um (wie beim ungeteilten Eintrag).
+    # A reversal flips the direction of every sub-transaction, as for an undivided entry.
     reversed_doc = doc.replace(
         b"<CdtDbtInd>DBIT</CdtDbtInd>\n   <ValDt>",
         b"<CdtDbtInd>DBIT</CdtDbtInd><RvslInd>true</RvslInd>\n   <ValDt>",

@@ -19,8 +19,7 @@
         (ngModelChange)="onSearch($event)"
         [attr.aria-label]="'invoices.search' | t"
       />
-      <!-- Filter bar in the bookings style: status + gross, issue and due-date
-           ranges. These drive the server query. -->
+      <!-- These filters drive the server query. -->
       <app-filter-bar [live]="true" [activeCount]="activeFilterCount()" (reset)="resetFilters()">
         <app-filter-field [label]="'invoices.filter.status' | t">
           <div class="inline-flex gap-2 flex-wrap">
@@ -136,7 +135,6 @@
     }
   }
 
-  <!-- Drop overlay: shown while a file hovers over the tab. -->
   @if (dragActive()) {
     <div class="inv__dropOverlay" aria-hidden="true">
       <div class="inv__dropInner">
@@ -147,7 +145,6 @@
   }
 </div>
 
-<!-- Create / import review -->
 <app-dialog
   [open]="createOpen()"
   [title]="(importToken() ? 'invoices.importReview' : 'invoices.add') | t"
@@ -223,7 +220,6 @@
   </div>
 </app-dialog>
 
-<!-- Edit -->
 <app-dialog [open]="!!editing()" [title]="'invoices.edit' | t" [closeLabel]="'action.cancel' | t" (closed)="editing.set(null)">
   <form id="inv-edit" class="flex flex-col gap-2" (submit)="saveEdit($event)">
     <div class="inv__grid2">
@@ -264,7 +260,6 @@
   </div>
 </app-dialog>
 
-<!-- Delete -->
 <app-dialog [open]="!!confirmDelete()" [title]="'invoices.delete.title' | t" [closeLabel]="'action.cancel' | t" (closed)="confirmDelete.set(null)">
   <p>{{ 'invoices.delete.body' | t: { number: confirmDelete()?.number ?? '' } }}</p>
   <div dialog-footer class="flex justify-end gap-3">

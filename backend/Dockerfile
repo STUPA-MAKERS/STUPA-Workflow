@@ -1,4 +1,5 @@
-# Backend-Image (api + worker teilen sich dieses Image; Command unterscheidet).
+# Backend image. The api and worker services share it. The compose file overrides the
+# command for the worker.
 FROM python:3.13-slim AS base
 
 ENV PYTHONUNBUFFERED=1 \
@@ -6,42 +7,42 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# System-Lib für MIME-Sniffing (python-magic → libmagic, T-13). apt-Listen danach
-# entfernen (kleines Image).
+# System library for MIME sniffing (python-magic needs libmagic, T-13).
 RUN apt-get update \
     && apt-get install -y --no-install-recommends libmagic1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Dependencies in eigener Layer VOR dem Quellcode: ein Code-Change invalidiert
-# damit nur den (sekundenschnellen) App-Install unten, nicht den Dep-Download.
-# Die Dep-Liste kommt direkt aus pyproject.toml (tomllib, stdlib) — keine
-# separate requirements.txt zu pflegen. Zusätzlich BuildKit-Cache-Mount für den
-# pip-Wheel-Cache: auch wenn diese Layer invalidiert (Dep-Bump), wird nichts
-# erneut heruntergeladen, was schon einmal gebaut/geladen wurde.
+# Install the dependencies in their own layer before the source code. A code change then
+# invalidates only the fast app install below, not the dependency download. tomllib in the
+# standard library reads the dependency list from pyproject.toml, so this image needs no
+# separate requirements.txt. The BuildKit cache mount holds the pip wheel cache. A dependency
+# bump invalidates this layer, but pip does not fetch or build again what it already has.
 COPY pyproject.toml ./
 RUN --mount=type=cache,target=/root/.cache/pip \
     python -c "import tomllib; print('\n'.join(tomllib.load(open('pyproject.toml','rb'))['project']['dependencies']))" > /tmp/requirements.txt \
     && pip install -r /tmp/requirements.txt \
     && rm /tmp/requirements.txt
 
-# Quellcode + Alembic-Config/Migrationen (Issue #38: ohne sie kann der Container
-# kein `alembic upgrade head` ausführen → frische DB bliebe leer. env.py importiert
-# app.models/app.settings (via pip install . verfügbar), prepend_sys_path=. ⇒ /app).
+# The image also needs the alembic config and the migrations (issue #38). Without them the
+# container cannot run `alembic upgrade head` and a fresh database stays empty. The alembic
+# env.py file imports app.models and app.settings, which `pip install .` makes available.
+# The setting `prepend_sys_path=.` resolves to /app.
 COPY app ./app
 COPY worker ./worker
 COPY alembic.ini ./
 COPY migrations ./migrations
-# Deps stecken in der Layer oben → hier nur noch das Paket selbst (schnell).
+# The dependencies come from the layer above, so install only the package itself.
 RUN --mount=type=cache,target=/root/.cache/pip pip install --no-deps .
 
-# Defense-in-Depth (#sec-audit): nicht als root laufen. Zur Laufzeit ist /app nur
-# lesbar nötig (Code/Migrationen), Multipart-Uploads spoolen nach /tmp (world-writable).
-# Gilt für api, worker und den migrate-One-Shot (alembic schreibt nur in die DB).
+# Defense in depth (#sec-audit): do not run as root. At run time the container needs read
+# access to /app only, for the code and the migrations. Multipart uploads spool to /tmp,
+# which is world-writable. This holds for api, worker and the migrate one-shot, because
+# alembic writes to the database only.
 RUN useradd --create-home --uid 10001 appuser
 USER appuser
 
 EXPOSE 8000
 
-# Default: API. Worker überschreibt command in compose.
-# forwarded-allow-ips eng (security.md §3): nie "*"; Default loopback, real per FORWARDED_ALLOW_IPS (NPM-Netz).
+# Keep forwarded-allow-ips narrow (security.md §3). Never set it to "*". The default is
+# loopback. Production passes the NPM network through FORWARDED_ALLOW_IPS.
 CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips \"${FORWARDED_ALLOW_IPS:-127.0.0.1}\""]

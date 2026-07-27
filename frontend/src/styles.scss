@@ -1,34 +1,35 @@
-// Global style entry — order: fonts → tokens → base → Tailwind utilities.
 @use 'fonts';
 @use 'tokens';
 @use 'base';
 
-// Tailwind: additive utilities, preflight is disabled in tailwind.config.js → no
-// base reset, no visual change. Sass passes the unknown @-rules through to
-// PostCSS/Tailwind unchanged. Utilities last so they apply after the base styles.
+// Tailwind adds utilities only. tailwind.config.js disables preflight, so there is no
+// base reset and no visual change. Sass passes the unknown at-rules through to PostCSS
+// and Tailwind unchanged. The utilities come last so that they apply after the base
+// styles.
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-// Bank-reconcile dialog: wider than `lg` (44rem) on desktop so the transactions
-// table has room. Deliberately solved globally rather than via a ui-kit `xl` size to
-// avoid coupling to a submodule release. On mobile (≤768px) the dialog stays
-// full-width (its own ui-kit media rule), so this only applies from 769px up.
+// Bank-reconcile dialog: wider than `lg` (44rem) on desktop to give the transactions
+// table room. This stays a global rule instead of a new ui-kit `xl` size, to avoid a
+// dependency on a submodule release. Below 769px the dialog keeps the full width from
+// its own ui-kit media rule, so this rule starts at 769px.
 //
-// The `.dialog__backdrop` ancestor deliberately raises specificity above the ui-kit's
-// view-encapsulation-attributed `.dialog--lg` rule (otherwise it's a tie → source
-// order decides and 44rem wins).
+// The `.dialog__backdrop` ancestor raises the specificity above the `.dialog--lg` rule
+// of the ui-kit, which carries a view-encapsulation attribute. Without the ancestor the
+// two rules tie, source order decides, and 44rem wins.
 @media (min-width: 769px) {
-  // Child combinator instead of a bare `:has(.bank)`: on expand/collapse the style
-  // re-evaluation then only checks the direct children, not the whole (large) table subtree.
+  // Use a child combinator, not a bare `:has(.bank)`. On expand and collapse the style
+  // re-evaluation then checks only the direct children, not the whole large table subtree.
   .dialog__backdrop .dialog:has(> .dialog__body > .bank) {
     max-width: 64rem;
   }
 }
 
-// Mobile: the page itself must NEVER scroll horizontally — an overflowing element
-// (long link, wide table cell) may only scroll inside its own overflow container.
-// `clip` instead of `hidden`: no new scroll container, `position: sticky` keeps working.
+// Mobile: the page itself must NEVER scroll horizontally. An element that overflows,
+// such as a long link or a wide table cell, may only scroll inside its own overflow
+// container. `clip` instead of `hidden`: it makes no new scroll container, so
+// `position: sticky` keeps working.
 @media (max-width: 768px) {
   html,
   body {

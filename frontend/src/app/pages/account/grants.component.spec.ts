@@ -79,7 +79,7 @@ describe('AccountGrantsComponent (#MCP)', () => {
     expect(cmp.loading()).toBe(false);
     expect(cmp.grants()).toHaveLength(2);
     expect(screen.getByText('application:read')).toBeInTheDocument();
-    // second grant has no createdAt; the access-expiry still renders.
+    // The second grant has no createdAt. The access expiry still renders.
     expect(screen.getByText('2026-08-01T10:00:00Z')).toBeInTheDocument();
   });
 
@@ -122,7 +122,6 @@ describe('AccountGrantsComponent (#MCP)', () => {
     expect(cmp.setupJson()).toBe('');
   });
 
-  // ------------------------------------------------------------------ revoke
   it('revokes a single grant and reloads', async () => {
     const api = makeApi();
     const { cmp } = await setup({ api });
@@ -146,7 +145,6 @@ describe('AccountGrantsComponent (#MCP)', () => {
     expect(api.revokeAllGrants).toHaveBeenCalled();
   });
 
-  // ------------------------------------------------------------------- mcp
   it('downloads the MCP package as a tarball', async () => {
     const dl = jest.spyOn(downloadUtil, 'downloadBlob').mockImplementation(() => undefined);
     const api = makeApi();
@@ -168,7 +166,7 @@ describe('AccountGrantsComponent (#MCP)', () => {
   it('does not copy when there is no setup snippet', async () => {
     const writeText = jest.fn(() => Promise.resolve());
     Object.assign(navigator, { clipboard: { writeText } });
-    // mcp not allowed → setup is null → setupJson is '' → copy is a no-op.
+    // mcp.use is missing, so setup is null, setupJson is empty and copy does nothing.
     const { cmp } = await setup({ canMcp: false });
     cmp.copySetup();
     expect(writeText).not.toHaveBeenCalled();

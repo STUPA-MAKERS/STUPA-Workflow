@@ -50,7 +50,6 @@
     }
   </app-card>
 
-  <!-- Attendance also in the follow view (own status settable). -->
   <app-card [heading]="'meetings.attendance.title' | t">
     <app-meeting-attendance-table
       [rows]="attendance()"
@@ -61,6 +60,5 @@
     />
   </app-card>
 
-  <!-- Delegation for this meeting. -->
   <app-meeting-delegation-card [meetingId]="meeting().id" />
 </div>

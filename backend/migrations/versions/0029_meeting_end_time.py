@@ -1,8 +1,10 @@
 """meeting: end_time (#ics).
 
-Optionale End-Uhrzeit einer Sitzung (ergänzt ``start_time``). Wird im iCal-Abo als
-``DTEND`` genutzt; fehlt sie, nimmt der Feed 1 h Default-Dauer an. Nullable, idempotent
-(``IF NOT EXISTS``) — auf frischem Schema bereits via ``create_all`` (0001) vorhanden.
+The optional end time of a meeting, next to `start_time`. The iCal subscription
+uses it as `DTEND`. If the value is NULL, the feed assumes a default duration of
+one hour. The column is nullable and the statement is idempotent
+(`IF NOT EXISTS`). A fresh schema already has the column from `create_all`
+(0001).
 """
 
 from __future__ import annotations

@@ -56,8 +56,8 @@
   display: none;
 }
 .header__link {
-  /* Tighter horizontal padding: makes room so the full nav (… admin) fits on one
-     line at 1440px and the active item is not clipped at the container edge. */
+  /* Tight horizontal padding. The full nav (up to admin) then fits on one line at
+     1440px and the container edge does not clip the active item. */
   padding: var(--space-2);
   font-size: var(--fs-sm);
   font-weight: var(--fw-medium);
@@ -74,7 +74,6 @@
   color: var(--color-primary);
   background: var(--color-primary-subtle);
 }
-/* Active item keeps its green background on hover. */
 .header__link.is-active:hover {
   color: var(--color-primary);
   background: var(--color-primary-subtle);
@@ -86,7 +85,6 @@
   flex: none;
 }
 
-/* Shared base for all header controls: same height, radius, focus. */
 .lang__select,
 .theme-toggle,
 .account__btn {
@@ -117,7 +115,6 @@
   outline-offset: 2px;
 }
 
-/* Preferences group (language + appearance), to the right of "Log out". */
 .lang {
   position: relative;
   display: inline-flex;
@@ -133,13 +130,12 @@
 .lang__select {
   appearance: none;
   -webkit-appearance: none;
-  // Compact: globe icon on the left, narrow code (DE/EN); chevron as a mask on
-  // the right (follows the text color → visible in both themes + on hover).
-  // The FA globe is wider than the old SVG → more inner padding on the left.
+  // Compact layout: globe icon on the left, narrow code (DE/EN), chevron on the
+  // right. The Font Awesome globe is wide, so the left inner padding is large.
   padding-inline: calc(var(--space-2) + 1.6rem) var(--space-5);
 }
 .lang::after {
-  // Chevron inheriting currentColor (text color) — stays visible on hover/dark.
+  // The chevron mask takes the text color, so it stays visible on hover and in dark mode.
   content: '';
   position: absolute;
   right: var(--space-2);
@@ -260,7 +256,7 @@
   }
 }
 
-/* Full width (route data `wide`) — content with two sidebars (e.g. budget). */
+/* Full width for route data `wide`: content with two sidebars, for example budget. */
 .main--wide {
   max-width: none;
 }
@@ -268,12 +264,12 @@
 .footer {
   border-top: var(--border-width) solid var(--color-border);
   background: var(--color-bg-elevated);
-  // Lift content above the Android gesture bar (viewport-fit=cover).
+  // Keep the content above the Android gesture bar (viewport-fit=cover).
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-// Installed PWA (standalone): hide the footer — it stays in the browser.
-// The safe-area reserve then moves to the main content.
+// Installed PWA (standalone): hide the footer. The footer stays in the browser
+// view only. The safe-area reserve then moves to the main content.
 @media all and (display-mode: standalone) {
   .footer {
     display: none;
@@ -300,7 +296,7 @@
   color: var(--color-text);
 }
 
-/* Hamburger (mobile nav): visible only below the nav breakpoint. */
+/* Hamburger button for the mobile nav. It appears only below the nav breakpoint. */
 .menu-btn {
   display: none;
   align-items: center;
@@ -323,8 +319,8 @@
   outline-offset: 2px;
 }
 
-/* Mobile nav drawer: slides in from the left below the header. Sits above page
-   content + sticky elements, but below dialogs/toasts. */
+/* Mobile nav drawer: it slides in from the left below the header. It sits above
+   the page content and the sticky elements, but below dialogs and toasts. */
 .mobile-nav__backdrop {
   position: fixed;
   inset: var(--layout-header-height) 0 0 0;
@@ -382,14 +378,14 @@
   .menu-btn {
     display: inline-flex;
   }
-  /* Without the nav the flex-1 spacer is missing — right-align the actions again. */
+  /* The nav is hidden, so the flex-1 spacer is gone. Right-align the actions again. */
   .header__actions {
     margin-inline-start: auto;
   }
 }
 
-/* The drawer is a pure mobile pattern — never visible above the breakpoint
-   (even if it was open while shrinking). */
+/* The drawer is a mobile-only pattern. It must stay hidden above the breakpoint,
+   even when it is still open. */
 @media (min-width: 720.02px) {
   .mobile-nav,
   .mobile-nav__backdrop {

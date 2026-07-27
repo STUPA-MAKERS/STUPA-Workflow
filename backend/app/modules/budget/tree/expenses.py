@@ -1,4 +1,4 @@
-"""Expense/income bookings: create, update, filtered listing, delete."""
+"""Expense and income bookings: create, update, filtered list and delete."""
 
 from __future__ import annotations
 
@@ -28,13 +28,18 @@ from app.shared.paging import Page
 
 
 class ExpenseOps(BudgetTreeServiceBase):
-    """Book, update, list and delete expense/income bookings."""
+    """Book, update, list and delete expense and income bookings."""
 
     async def _actor_names(self, subs: set[str]) -> dict[str, str]:
-        """Map booking actor (principal ``sub``) → display name (name/email/sub).
+        """Map every booking actor (principal `sub`) to a display name.
 
-        The actor UUID must never reach the UI. Legacy actors that already are a
-        name find no principal match and are absent (FE falls back to ``actor``).
+        The actor UUID must never reach the UI. An old actor value that already
+        holds a name matches no principal and stays out of the map. The frontend
+        then falls back to `actor`.
+
+        Returns:
+            The display name per `sub`. The name falls back to the email, then
+            to the `sub` itself.
         """
         from app.modules.auth.models import Principal as PrincipalRow
 
@@ -93,7 +98,10 @@ class ExpenseOps(BudgetTreeServiceBase):
     async def create_expense(
         self, budget_id: UUID, payload: ExpenseCreate, *, actor: str
     ) -> ExpenseOut:
-        """(Compat) Book against the cost centre from the path (``/budgets/{id}``)."""
+        """Book against the cost center from the path `/budgets/{id}`.
+
+        Kept for compatibility with the older route.
+        """
         return await self.book_expense(
             payload.model_copy(update={"budget_id": budget_id}), actor=actor
         )
@@ -106,10 +114,11 @@ class ExpenseOps(BudgetTreeServiceBase):
         commit: bool = True,
         account_id: UUID | None = None,
     ) -> ExpenseOut:
-        """Book an expense/income.
+        """Book an expense or an income.
 
-        Bound (``applicationId`` set) inherits cost centre + fiscal year from
-        the application; standalone requires ``budgetId`` (FY auto-resolved).
+        A booking with `applicationId` set inherits the cost center and the
+        fiscal year from the application. A standalone booking needs `budgetId`.
+        The service then resolves the fiscal year itself.
         """
         app_title: str | None = None
         if payload.application_id is not None:
@@ -132,8 +141,8 @@ class ExpenseOps(BudgetTreeServiceBase):
                 )
             node = await self._get_node(payload.budget_id)
             fy_id = await self._resolve_fiscal_year(node, payload.fiscal_year_id)
-        # The account is NOT a manual booking field — only bank reconciliation
-        # sets it (confirm_line passes ``account_id`` explicitly).
+        # The account is not a manual booking field. Only bank reconciliation
+        # sets it: confirm_line passes account_id explicitly.
         account_name = await self._validate_account(account_id)
         expense = BudgetExpense(
             id=uuid.uuid4(),
@@ -170,8 +179,9 @@ class ExpenseOps(BudgetTreeServiceBase):
         )
         if payload.invoice_id is not None:
             await self._mark_invoice_paid(payload.invoice_id)
-        # ``commit=False``: the caller bundles the booking with follow-up mutations
-        # in ONE transaction (e.g. bank reconcile: claim + booking + allocation).
+        # With commit=False the caller bundles the booking and its follow-up
+        # mutations in one transaction. A bank reconcile does the claim, the
+        # booking and the allocation together.
         if commit:
             await self.session.commit()
         names = await self._actor_names({expense.actor} if expense.actor else set())
@@ -184,7 +194,11 @@ class ExpenseOps(BudgetTreeServiceBase):
         )
 
     async def _validate_account(self, account_id: UUID | None) -> str | None:
-        """Validate the account (if given) → its name; else ``None``."""
+        """Return the name of the account, or `None` when no account is given.
+
+        Raises:
+            NotFoundError: The account does not exist.
+        """
         if account_id is None:
             return None
         acc = await self.session.get(Account, account_id)
@@ -193,11 +207,15 @@ class ExpenseOps(BudgetTreeServiceBase):
         return acc.name
 
     async def _mark_invoice_paid(self, invoice_id: UUID) -> None:
-        """Set the linked invoice to ``paid`` on booking.
+        """Set the linked invoice to `paid` when a booking references it.
 
-        Open → paid; already paid is a no-op. Unknown invoice → 404 (instead of
-        failing on the FK at commit). No own commit — runs in the booking's
-        transaction.
+        An invoice that is already paid stays unchanged. The method does not
+        commit. It runs inside the transaction of the booking.
+
+        Raises:
+            NotFoundError: The invoice does not exist. The check happens here so
+                the request fails with 404 instead of on the foreign key at
+                commit time.
         """
         inv = await self.session.get(Invoice, invoice_id)
         if inv is None:
@@ -213,16 +231,20 @@ class ExpenseOps(BudgetTreeServiceBase):
         )
 
     async def update_expense(self, expense_id: UUID, payload: ExpenseUpdate) -> ExpenseOut:
-        """Update a booking: amount, description, bank account, cost centre and
-        extra metadata. Fiscal year/application binding stay fixed. Only set
-        fields are written; explicit ``null`` clears an optional field."""
+        """Update a booking.
+
+        The caller can change the amount, the description, the bank account, the
+        cost center and the extra metadata. The fiscal year and the application
+        binding stay fixed. The service writes only the fields that the payload
+        sets. An explicit `null` clears an optional field.
+        """
         expense = await self.session.get(BudgetExpense, expense_id)
         if expense is None:
             raise NotFoundError(f"budget expense {expense_id} not found")
         fields = payload.model_fields_set
         # Sub-booking invariant: never set the parent amount directly while
-        # children exist (it equals the children sum). Count only when an amount
-        # is actually being set (no extra query otherwise).
+        # children exist. It equals the sum of the children. Count the children
+        # only when the payload sets an amount, to save one query.
         child_n = 0
         if "amount" in fields and payload.amount is not None:
             child_n = (await self._child_counts([expense_id])).get(expense_id, 0)
@@ -232,7 +254,7 @@ class ExpenseOps(BudgetTreeServiceBase):
                     code="subbooking_parent_amount_readonly",
                 )
         if expense.parent_expense_id is not None and "budget_id" in fields:
-            # Children inherit the cost centre from the parent — not movable alone.
+            # A child inherits the cost center from its parent. It cannot move alone.
             raise ValidationProblem(
                 "A sub-booking inherits its cost-centre from its parent.",
                 code="subbooking_inherited_field",
@@ -244,14 +266,15 @@ class ExpenseOps(BudgetTreeServiceBase):
         if "description" in fields and payload.description is not None:
             expense.description = payload.description
         if "budget_id" in fields and payload.budget_id is not None:
-            # Re-book to another cost centre: target must exist (404 otherwise).
-            # FY stays fixed; currency follows the new cost centre. ``budgetId``
-            # is a required FK → ``null`` is a no-op.
+            # Re-book to another cost center. The target must exist, else 404.
+            # The fiscal year stays fixed. The currency follows the new cost
+            # center. budgetId is a required FK, so null does nothing.
             target = await self._get_node(payload.budget_id)
-            # The kept FY must belong to the target's top-level budget — else the
-            # moved booking would point at a foreign FY (orphan FY / phantom row
-            # with allocated=0 and negative available). Mirrors book_expense /
-            # move_fiscal_year: 422 on top-level mismatch.
+            # The kept fiscal year must belong to the top-level budget of the
+            # target. Otherwise the moved booking points at a foreign fiscal
+            # year: an orphan year, or a phantom row with allocated=0 and a
+            # negative available sum. This mirrors book_expense and
+            # move_fiscal_year: 422 on a top-level mismatch.
             await self._resolve_fiscal_year(target, expense.fiscal_year_id)
             expense.budget_id = target.id
             expense.currency = target.currency
@@ -273,8 +296,8 @@ class ExpenseOps(BudgetTreeServiceBase):
             expense.invoice_id = payload.invoice_id
             if payload.invoice_id is not None:
                 await self._mark_invoice_paid(payload.invoice_id)
-        # Capture the new values too: revert uses them to detect later edits
-        # (stale → 409 instead of overwriting someone else's changes).
+        # Capture the new values too. Revert uses them to detect a later edit
+        # and answers 409 instead of overwriting the changes of another user.
         after: dict[str, object] = {f: _json_safe(getattr(expense, f)) for f in fields}
         await self._audit(
             AuditAction.BUDGET_EXPENSE_UPDATE,
@@ -287,7 +310,6 @@ class ExpenseOps(BudgetTreeServiceBase):
                 "after": after,
             },
         )
-        # Child amount changed → recompute parent amount = children sum.
         if expense.parent_expense_id is not None and "amount" in fields:
             await self.session.flush()
             await self._recompute_parent_amount(expense.parent_expense_id)
@@ -297,8 +319,8 @@ class ExpenseOps(BudgetTreeServiceBase):
         if expense.application_id is not None:
             app = await self.session.get(Application, expense.application_id)
             app_title = _title_of(app.data) if app is not None else None
-        # Defensive: a parallel ``delete_account`` (FK SET NULL) can remove the
-        # account row between booking and re-read → ``get`` returns None.
+        # Defensive: a parallel delete_account (FK SET NULL) can remove the
+        # account row between the booking and this re-read. Then get gives None.
         acc = (
             await self.session.get(Account, expense.account_id)
             if expense.account_id is not None
@@ -318,7 +340,10 @@ class ExpenseOps(BudgetTreeServiceBase):
     async def list_expenses(
         self, budget_id: UUID, fiscal_year_id: UUID | None = None
     ) -> list[ExpenseOut]:
-        """(Compat) Bookings of this cost centre + subtree (optional FY filter)."""
+        """List the bookings of this cost center and of its subtree.
+
+        Kept for compatibility. The fiscal year filter is optional.
+        """
         page = await self.list_expenses_paged(
             budget_id=budget_id, fiscal_year_id=fiscal_year_id, limit=10_000, offset=0
         )
@@ -344,15 +369,15 @@ class ExpenseOps(BudgetTreeServiceBase):
         limit: int = 50,
         offset: int = 0,
     ) -> Page[ExpenseOut]:
-        """Bookings (expenses/income) filtered + offset-paginated.
+        """List bookings, that is expenses and income, filtered and paginated.
 
-        ``budget_id`` restricts to the cost centre **and its subtree**.
+        `budget_id` restricts the result to this cost center and its subtree.
         """
-        # List only top-level bookings — sub-bookings show up when expanding the
-        # parent booking, not as own rows (and not as link candidates).
+        # List only top-level bookings. A sub-booking appears when the user
+        # expands its parent. It is no row of its own and no link candidate.
         filters: list[ColumnElement[bool]] = [BudgetExpense.parent_expense_id.is_(None)]
         if expense_id is not None:
-            # Exact-booking deep link (Konten "view booking", #expenses-ux).
+            # Deep link to one exact booking (accounts page "view booking", #expenses-ux).
             filters.append(BudgetExpense.id == expense_id)
         if budget_id is not None:
             node = await self._get_node(budget_id)
@@ -370,16 +395,16 @@ class ExpenseOps(BudgetTreeServiceBase):
         if kind is not None:
             filters.append(BudgetExpense.kind == kind)
         if unallocated:
-            # Only bookings WITHOUT a bank allocation (link candidates).
+            # Only bookings without a bank allocation. These are the link candidates.
             filters.append(
                 ~exists().where(BankAllocation.expense_id == BudgetExpense.id)
             )
         if application_id is not None:
             filters.append(BudgetExpense.application_id == application_id)
-        # Fuzzy search: trigram ranking over the booking's free-text fields plus
-        # joined texts (application/account/invoice). ``rank_expr`` orders the
-        # hits; ``where`` goes into the SHARED ``filters`` (count and row query
-        # stay identical).
+        # Fuzzy search: a trigram rank over the free-text fields of the booking
+        # plus the joined texts of application, account and invoice. rank_expr
+        # orders the hits. The where clause goes into the shared filters list,
+        # so the count query and the row query stay identical.
         rank_expr = None
         if q and q.strip():
             where, rank_expr = trigram_rank(
@@ -407,7 +432,7 @@ class ExpenseOps(BudgetTreeServiceBase):
         if created_to:
             filters.append(func.date(BudgetExpense.created_at) <= created_to)
 
-        # Sort column (whitelist) + direction; default: newest first.
+        # Sort column (whitelist) and direction. The default is newest first.
         sort_map = {
             "amount": BudgetExpense.amount,
             "invoiceDate": BudgetExpense.invoice_date,
@@ -418,10 +443,10 @@ class ExpenseOps(BudgetTreeServiceBase):
         # Nullable date columns: empty values go last regardless of direction.
         ordering = direction.nulls_last() if sort in ("invoiceDate", "paymentDate") else direction
 
-        # The search references joined texts (application/account/invoice) → the
-        # count query must carry the same joins as the row query, otherwise the
-        # ``where`` over foreign tables does not resolve (or cross-joins).
-        # Without ``q`` the count query stays lean (no join).
+        # The search reads joined texts from application, account and invoice.
+        # The count query must carry the same joins as the row query. Otherwise
+        # the where clause over the foreign tables does not resolve, or it
+        # cross-joins. Without q the count query stays lean and adds no join.
         count_stmt = select(func.count()).select_from(BudgetExpense)
         if rank_expr is not None:
             count_stmt = (
@@ -430,8 +455,9 @@ class ExpenseOps(BudgetTreeServiceBase):
                 .outerjoin(Invoice, Invoice.id == BudgetExpense.invoice_id)
             )
         total = await self.session.scalar(count_stmt.where(*filters))
-        # Search active ⇒ most relevant first (rank), then the previous ordering
-        # as deterministic tiebreak; unchanged without search.
+        # With an active search the most relevant hit comes first. The normal
+        # ordering then acts as a deterministic tiebreak. Without a search
+        # nothing changes.
         order_by = (
             (rank_expr.desc(), ordering, BudgetExpense.created_at.desc())
             if rank_expr is not None
@@ -456,9 +482,7 @@ class ExpenseOps(BudgetTreeServiceBase):
                 .offset(offset)
             )
         ).all()
-        # Collect actor UUIDs → display names in one query.
         names = await self._actor_names({row[0].actor for row in rows if row[0].actor})
-        # Sub-booking count per row in ONE grouped query.
         child_counts = await self._child_counts([row[0].id for row in rows])
         items = [
             self._expense_out(
@@ -475,7 +499,7 @@ class ExpenseOps(BudgetTreeServiceBase):
         return Page(items=items, total=total or 0, limit=limit, offset=offset)
 
     async def _child_counts(self, parent_ids: list[UUID]) -> dict[UUID, int]:
-        """Sub-booking count per parent id — one grouped query."""
+        """Count the sub-bookings per parent id with one grouped query."""
         if not parent_ids:
             return {}
         rows = (
@@ -488,7 +512,10 @@ class ExpenseOps(BudgetTreeServiceBase):
         return {pid: n for pid, n in rows if pid is not None}
 
     async def delete_expense(self, expense_id: UUID) -> None:
-        """Delete a booking. Part of a transfer → delete both paired bookings."""
+        """Delete a booking.
+
+        If the booking belongs to a transfer, delete both paired bookings.
+        """
         expense = (
             await self.session.execute(select(BudgetExpense).where(BudgetExpense.id == expense_id))
         ).scalar_one_or_none()
@@ -523,16 +550,17 @@ class ExpenseOps(BudgetTreeServiceBase):
                 await self.session.delete(e)
         else:
             await self.session.delete(expense)
-        # Sub-booking deleted → parent amount = sum of the remaining children.
         if parent_id is not None:
             await self.session.flush()
             await self._recompute_parent_amount(parent_id)
         await self.session.commit()
 
     async def _recompute_parent_amount(self, parent_id: UUID) -> None:
-        """Parent amount = sum of sub-bookings. If the parent has NO children
-        left, its ``amount`` stays unchanged (it becomes a standalone booking
-        again — ``amount`` > 0 stays satisfied)."""
+        """Set the parent amount to the sum of its sub-bookings.
+
+        If no child is left, the `amount` of the parent stays unchanged. The
+        parent becomes a standalone booking again and keeps `amount` > 0.
+        """
         total = await self.session.scalar(
             select(func.coalesce(func.sum(BudgetExpense.amount), 0)).where(
                 BudgetExpense.parent_expense_id == parent_id

@@ -1,8 +1,8 @@
-"""TDD: einheitlicher Fehler-Contract (api.md §2).
+"""One error contract for the whole API (api.md §2).
 
-Problem-JSON: type/title/status/code/detail/errors/traceId.
-Status→Code-Mapping 400/401/403/404/409/410/413/422/429/500.
-Keine Stacktraces/Pfade nach außen.
+A problem JSON body carries type, title, status, code, detail, errors and traceId.
+The status-to-code map covers 400, 401, 403, 404, 409, 410, 413, 422, 429 and 500.
+No stack trace and no file path reaches the client.
 """
 
 import pytest
@@ -13,7 +13,7 @@ from app.main import create_app
 from app.middleware import RequestContextMiddleware
 from app.shared.errors import STATUS_CODE_MAP, ProblemDetail, register_exception_handlers
 
-# (Pfad-Suffix, erwarteter Status, erwarteter Code)
+# (path suffix, expected status, expected code)
 CASES = [
     ("bad-request", 400, "bad_request"),
     ("unauthorized", 401, "unauthorized"),
@@ -56,7 +56,6 @@ def test_unhandled_is_500_without_leak(error_client: TestClient) -> None:
     assert resp.status_code == 500
     body = resp.json()
     _assert_problem_shape(body, 500, "internal_error")
-    # Kein Pfad/Stacktrace nach außen.
     dumped = resp.text
     assert "/etc/passwd" not in dumped
     assert "Traceback" not in dumped
@@ -70,10 +69,8 @@ def test_unknown_route_yields_problem_json(client: TestClient) -> None:
     _assert_problem_shape(resp.json(), 404, "not_found")
 
 
-# --------------------------------------------------------------------------- #
-# Unparsebarer Request-Body → app-weit EIN dokumentierter 422 (nicht der
-# endpunktspezifische, undokumentierte FastAPI-400 bei kaputtem multipart). T-13/PR.
-# --------------------------------------------------------------------------- #
+# An unparsable request body gives ONE documented 422 across the whole app. FastAPI
+# alone answers a per-endpoint, undocumented 400 for a broken multipart body (T-13).
 _MALFORMED_MULTIPART = b"--ff\r\nFalse--ff--\r\n"
 _MULTIPART_HEADERS = {"content-type": "multipart/form-data; boundary=xxx"}
 
@@ -102,8 +99,8 @@ def test_malformed_multipart_body_is_422_problem_json() -> None:
 
 
 def test_malformed_json_body_is_422() -> None:
-    # JSON-Decode-Fehler laufen schon über RequestValidationError → 422; hier nur
-    # festhalten, dass beide Body-Parse-Pfade DENSELBEN Status liefern.
+    # A JSON decode error already runs through RequestValidationError and gives 422.
+    # This test holds both body-parse paths to the SAME status.
     resp = create_app_client().post(
         "/api/auth/magic-link", content=b"not json{", headers={"content-type": "application/json"}
     )
@@ -125,8 +122,8 @@ def test_attachments_route_documents_422_problem_json() -> None:
 
 
 def test_all_body_endpoints_document_422() -> None:
-    # Globale Garantie: jeder Body-annehmende Endpunkt dokumentiert 422 (sonst wäre ein
-    # unparsebarer Body endpunktweise ein undokumentierter Status → be-contract rot).
+    # Global guarantee: every endpoint that takes a body documents 422. Without it an
+    # unparsable body returns an undocumented status and be-contract turns red.
     schema = create_app().openapi()
     missing: list[str] = []
     for path, ops in schema["paths"].items():

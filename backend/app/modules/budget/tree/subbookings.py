@@ -1,4 +1,4 @@
-"""Sub-bookings of a booking, including CAMT/MT940 file import."""
+"""Sub-bookings of a booking, including the CAMT and MT940 file import."""
 
 from __future__ import annotations
 
@@ -18,8 +18,12 @@ from app.shared.errors import NotFoundError, ValidationProblem
 
 
 def _subbooking_description(purpose: str | None, name: str | None) -> str:
-    """Description of a file-imported sub-booking: purpose, else counterparty,
-    else placeholder. ``description`` is NOT NULL → never empty."""
+    """Build the description of a sub-booking that comes from a file import.
+
+    The function takes the purpose, else the counterparty name, else a
+    placeholder. The `description` column is NOT NULL, so the result is never
+    empty.
+    """
     text = (purpose or "").strip() or (name or "").strip()
     return text or "Unterbuchung"
 
@@ -67,9 +71,13 @@ class SubBookingOps(ExpenseOps):
     async def create_sub_booking(
         self, parent_id: UUID, payload: SubBookingCreate, *, actor: str
     ) -> ExpenseOut:
-        """Create a sub-booking: inherits account/cost centre/FY/kind from the
-        parent, carries its own amount/description/metadata; afterwards the
-        parent amount = sum of children."""
+        """Create a sub-booking under a parent booking.
+
+        The child inherits the account, the cost center, the fiscal year and the
+        kind from its parent. It carries its own amount, description and
+        metadata. After the create the parent amount equals the sum of its
+        children.
+        """
         parent = await self._subbooking_parent_or_error(parent_id)
         child = BudgetExpense(
             budget_id=parent.budget_id,
@@ -106,14 +114,17 @@ class SubBookingOps(ExpenseOps):
     async def import_sub_bookings(
         self, parent_id: UUID, data: bytes, *, filename: str | None, actor: str
     ) -> list[ExpenseOut]:
-        """Create sub-bookings from a CAMT.053/MT940 file. Each statement line
-        becomes a sub-booking that inherits account/cost centre/FY/kind from the
-        parent (copied) and only carries amount/description/dates/reference.
-        Afterwards the parent amount = sum of all children.
+        """Create sub-bookings from a CAMT.053 or MT940 file.
+
+        Every statement line becomes a sub-booking. The child copies the
+        account, the cost center, the fiscal year and the kind from the parent.
+        It carries only the amount, the description, the dates and the
+        reference. After the import the parent amount equals the sum of all
+        children.
 
         Raises:
-            ValidationProblem: File unparseable, parent is itself a sub-booking,
-                or file size over the limit.
+            ValidationProblem: The file does not parse, the parent is itself a
+                sub-booking, or the file is over the size limit.
         """
         parent = await self._subbooking_parent_or_error(parent_id)
         if len(data) > self.settings.attachment_max_bytes:
@@ -126,15 +137,16 @@ class SubBookingOps(ExpenseOps):
             raise ValidationProblem(
                 "File is neither valid CAMT.053 nor MT940.", code="bank_statement_unparseable"
             ) from exc
-        # The ledger is EUR-only: reject foreign-currency statements, otherwise a
-        # foreign-currency line's abs(amount) would enter the budget as EUR.
+        # The ledger holds EUR only. Reject a statement in another currency.
+        # Otherwise abs(amount) of such a line enters the budget as EUR.
         if any((line.currency or "EUR").upper() != "EUR" for line in lines):
             raise ValidationProblem(
                 "Only EUR statements are supported.", code="subbooking_currency_unsupported"
             )
-        # Idempotency: re-uploading the same file must NOT create duplicates
-        # (the parent amount = children sum would double). Content dedup against
-        # existing children via (amount, payment date, description, reference).
+        # Idempotency: a second upload of the same file must not create
+        # duplicates. The parent amount is the sum of the children and would
+        # double. The dedup compares the content of the existing children:
+        # amount, payment date, description and reference.
         existing = (
             await self.session.scalars(
                 select(BudgetExpense).where(BudgetExpense.parent_expense_id == parent.id)
@@ -151,23 +163,23 @@ class SubBookingOps(ExpenseOps):
         created: list[BudgetExpense] = []
         for line in lines:
             magnitude = abs(line.amount)
-            # Zero amounts would violate the amount>0 CHECK constraint → skip.
+            # A zero amount would violate the amount > 0 CHECK constraint.
             if magnitude == 0:
                 continue
-            # Sub-bookings inherit the parent's direction: only same-direction
-            # lines (a counter booking would skew the parent amount = children sum).
+            # A sub-booking inherits the direction of its parent. Take only the
+            # lines with the same direction. A counter booking would skew the
+            # parent amount, which is the sum of the children.
             if (line.amount > 0) != parent_is_income:
                 continue
             name, iban = split_leading_iban(line.counterparty_name, line.counterparty_iban)
             child = BudgetExpense(
-                # inherited from the parent (copied so roll-up/queries work)
+                # copied from the parent so the roll-up and the queries work
                 budget_id=parent.budget_id,
                 fiscal_year_id=parent.fiscal_year_id,
                 account_id=parent.account_id,
                 kind=parent.kind,
                 currency=parent.currency,
                 parent_expense_id=parent.id,
-                # own values from the statement line
                 amount=magnitude,
                 description=_subbooking_description(line.purpose, name),
                 correspondent=name or None,
@@ -177,7 +189,7 @@ class SubBookingOps(ExpenseOps):
             )
             key = _key(child.amount, child.payment_date, child.description, child.reference_number)
             if key in seen:
-                continue  # already imported → skip (idempotent)
+                continue
             seen.add(key)
             self.session.add(child)
             created.append(child)

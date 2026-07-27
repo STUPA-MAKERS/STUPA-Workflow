@@ -1,10 +1,13 @@
-"""WebSocket-Verhalten Live-Vote (T-16, api.md §4) — via TestClient (httpx-ws-äquiv.).
+"""Live-vote WebSocket behavior (T-16, api.md section 4), driven through TestClient.
 
-Deckt Handshake-Auth/RBAC (4401/4404/not_eligible), Voter-Lifecycle
-(connect→meeting_state, ``subscribe``-Reconnect-State, ``cast``→``vote_tally``-
-Broadcast), Cast-Fehler (Lock/Conflict/Eligibility/Invalid) und den read-only
-Beamer-Stream ab. Services/Principal/Broker/Lock sind via ``dependency_overrides``
-ersetzt → kein DB/Redis nötig (echte Race/Fan-out im Integrationstest)."""
+TestClient stands in for httpx-ws. The tests cover the handshake auth and RBAC
+(4401, 4404, not_eligible). They cover the voter lifecycle: connect to meeting_state,
+the `subscribe` reconnect state and cast to `vote_tally` broadcast. They also cover the
+cast errors (lock, conflict, eligibility, invalid) and the read-only beamer stream.
+`dependency_overrides` replaces the services, the principal, the broker and the lock, so
+the tests need no database and no Redis. The integration test covers the real race and
+the real fan-out.
+"""
 
 from __future__ import annotations
 
@@ -88,14 +91,15 @@ class _FakeMeetingService:
         return self._open_vote
 
     async def is_member(self, gremium_id: UUID, principal: Principal) -> bool:
-        # Live-Mitlesen = aktives Gremium-Mitglied; im Fake über die Gruppe gespiegelt.
+        # Live read access needs an active Gremium membership. The fake mirrors it
+        # through the group.
         return "admin" in principal.roles or principal.in_group(str(gremium_id))
 
     async def is_participant(
         self, _meeting_id: UUID, gremium_id: UUID, principal: Principal
     ) -> bool:
-        # #delegation-rework: Mitglied ODER Delegations-Empfänger; der Fake kennt
-        # keine Delegationen → Mitgliedschaft genügt.
+        # #delegation-rework: a member OR a delegation receiver passes. The fake knows
+        # no delegations, so membership is enough here.
         return await self.is_member(gremium_id, principal)
 
 
@@ -118,7 +122,7 @@ class _FakeVotingService:
 
 
 class _BusyLocker:
-    """Liefert immer ``False`` (Lock belegt) — simuliert konkurrierenden Cast."""
+    """Return `False` always to model a taken lock during a concurrent cast."""
 
     @asynccontextmanager
     async def acquire(self, key: str, *, ttl_ms: int = 5000) -> AsyncIterator[bool]:
@@ -155,8 +159,11 @@ def _voter(groups: set[str] | None = None) -> Principal:
 
 
 def _recv(ws) -> dict:  # noqa: ANN001 — Starlette-Test-WS
-    """Nächstes Event, Presence-Frames übersprungen (#live-viewers): der
-    ``viewers``-Broadcast feuert beim Connect/Disconnect asynchron dazwischen."""
+    """Return the next event and skip the presence frames (#live-viewers).
+
+    The `viewers` broadcast fires asynchronously on a connect or a disconnect. It can
+    arrive between two expected events.
+    """
     msg = ws.receive_json()
     while isinstance(msg, dict) and msg.get("type") == "viewers":
         msg = ws.receive_json()
@@ -167,9 +174,7 @@ def _url(meeting: MeetingOut) -> str:
     return f"/api/ws/meetings/{meeting.id}"
 
 
-# --------------------------------------------------------------------------- #
-# Handshake / RBAC
-# --------------------------------------------------------------------------- #
+# Handshake and RBAC
 def test_unauthenticated_is_closed_before_accept() -> None:
     meeting = _meeting()
     app, _, _ = _build(meeting=meeting, principal=None)
@@ -195,9 +200,7 @@ def test_not_in_group_gets_not_eligible_error() -> None:
         assert _recv(ws) == {"type": "error", "code": "not_eligible"}
 
 
-# --------------------------------------------------------------------------- #
-# Voter-Lifecycle
-# --------------------------------------------------------------------------- #
+# Voter lifecycle
 def test_connect_sends_meeting_state() -> None:
     meeting = _meeting()
     app, _, _ = _build(meeting=meeting, principal=_voter())
@@ -217,7 +220,7 @@ def test_subscribe_resends_state_with_open_vote() -> None:
     )
     client = TestClient(app)
     with client.websocket_connect(_url(meeting)) as ws:
-        # Connect liefert bereits den vollständigen State (open vote).
+        # The connect already delivers the full state, including the open vote.
         assert _recv(ws)["type"] == "meeting_state"
         assert _recv(ws)["type"] == "vote_opened"
         assert _recv(ws)["type"] == "vote_tally"
@@ -277,7 +280,7 @@ def test_invalid_cast_message_reports_invalid() -> None:
     client = TestClient(app)
     with client.websocket_connect(_url(meeting)) as ws:
         assert _recv(ws)["type"] == "meeting_state"
-        ws.send_json({"type": "cast"})  # voteId/choice fehlen
+        ws.send_json({"type": "cast"})  # voteId and choice are missing
         assert _recv(ws) == {"type": "error", "code": "invalid_message"}
 
 
@@ -297,16 +300,14 @@ def test_malformed_json_frame_does_not_crash_connection() -> None:
     client = TestClient(app)
     with client.websocket_connect(_url(meeting)) as ws:
         assert _recv(ws)["type"] == "meeting_state"
-        ws.send_text("not-json{")  # kaputter Frame → error statt Crash
+        ws.send_text("not-json{")  # a broken frame gives an error, not a crash
         assert _recv(ws) == {"type": "error", "code": "invalid_message"}
-        # Verbindung lebt weiter: gültige Folge-Nachricht wird normal bedient.
+        # The connection stays alive. The server serves the next valid message.
         ws.send_json({"type": "subscribe"})
         assert _recv(ws)["type"] == "meeting_state"
 
 
-# --------------------------------------------------------------------------- #
-# Beamer (read-only, P(meeting.manage))
-# --------------------------------------------------------------------------- #
+# Beamer stream: read only, needs the meeting.manage permission
 def _beamer() -> Principal:
     return Principal(sub="adm", permissions={"meeting.manage"}, groups=set())
 
@@ -330,15 +331,13 @@ def test_beamer_receives_state_but_cannot_cast() -> None:
     assert voting.casts == []
 
 
-# --------------------------------------------------------------------------- #
-# Realer Handshake-Auth-Pfad (Cookie → Session → RBAC-Principal)
+# Real handshake auth path: cookie to session to RBAC principal.
 #
-# Anders als oben wird ``get_ws_principal`` **nicht** überschrieben: der echte
-# ``resolve_ws_principal`` läuft (Cookie entsiegeln → ``auth_session`` → ``principal``
-# → RBAC). Nur ``get_session`` liefert einen gequeueten Fake (kein Postgres). Deckt
-# die Lücke, die den Meeting-WS-403 maskiert hat: ein eingeloggter, berechtigter
-# Nutzer mit zeit-validiertem RoleAssignment.
-# --------------------------------------------------------------------------- #
+# These tests do not override `get_ws_principal`. The real `resolve_ws_principal` runs.
+# It unseals the cookie, loads the `auth_session`, loads the `principal` and resolves
+# RBAC. Only `get_session` returns a queued fake, so the tests need no Postgres. This
+# closes the gap that masked the meeting WS 403: a logged-in user with the permission
+# and a time-validated RoleAssignment.
 from tests._support.auth_fakes import fake_session, result  # noqa: E402
 
 _SID = "ws-handshake-sid"
@@ -350,11 +349,11 @@ def _signed_cookie() -> tuple[str, str]:
 
 
 def _auth_db(*, naive: bool):
-    """Fake-Session für den realen Handshake: AuthSession → Principal → RBAC."""
+    """Build a fake session for the real handshake: AuthSession, Principal, then RBAC."""
     pid = uuid4()
     now = datetime.now(UTC)
     vf, vu = now - timedelta(days=1), now + timedelta(days=1)
-    if naive:  # so, wie eine ``timestamp``-Spalte (ohne tz) aus der DB käme
+    if naive:  # this is how a `timestamp` column without a time zone comes from the DB
         vf, vu = vf.replace(tzinfo=None), vu.replace(tzinfo=None)
     auth_session = AuthSession(
         sid=_SID, principal_id=pid, expires_at=now + timedelta(hours=1),
@@ -373,8 +372,8 @@ def _auth_db(*, naive: bool):
         return fake_session(
             result(auth_session),     # load_principal_session → AuthSession
             result(principal_row),    # PrincipalRow
-            result(assignment),       # RoleAssignment (im Sitzungs-Gremium)
-            result(),                 # GroupMapping (keine)
+            result(assignment),       # RoleAssignment (in the meeting Gremium)
+            result(),                 # GroupMapping (none)
             result("vote.cast"),      # RolePermission
             result("member"),         # Role.key
         )
@@ -412,11 +411,11 @@ def test_handshake_with_valid_cookie_opens_socket() -> None:
 
 
 def test_handshake_with_naive_assignment_does_not_403() -> None:
-    """Regression Meeting-WS-403: naive ``valid_from``/``valid_until`` aus der DB.
+    """Regression meeting WS 403: naive `valid_from` and `valid_until` from the database.
 
-    Vor dem Fix warf ``rbac._assignment_valid`` in ``resolve_ws_principal``
-    ``TypeError`` → die ``get_ws_principal``-Dependency scheiterte → Handshake
-    abgelehnt. Jetzt löst der Principal sauber auf und der Socket öffnet.
+    Before the fix, `rbac._assignment_valid` raised `TypeError` inside
+    `resolve_ws_principal`. The `get_ws_principal` dependency then failed and the server
+    rejected the handshake. Now the principal resolves and the socket opens.
     """
     app, meeting = _build_real_handshake(naive=True)
     client = TestClient(app)
@@ -427,7 +426,7 @@ def test_handshake_with_naive_assignment_does_not_403() -> None:
 
 
 def test_handshake_without_cookie_is_rejected() -> None:
-    """Ohne Cookie kein Principal → Close vor Accept (Handshake scheitert)."""
+    """Without a cookie there is no principal, so the server closes before the accept."""
     app, meeting = _build_real_handshake(naive=False)
     client = TestClient(app)
     with pytest.raises(WebSocketDisconnect), client.websocket_connect(_url(meeting)):
@@ -435,8 +434,11 @@ def test_handshake_without_cookie_is_rejected() -> None:
 
 
 def test_handshake_foreign_origin_is_rejected() -> None:
-    """FIX 4 (CSWSH): fremder ``Origin`` ⇒ Handshake schließt mit 4403, noch VOR dem
-    Cookie-/RBAC-Pfad. Der Doppel-Close des Routers verpufft geräuschlos."""
+    """FIX 4 (CSWSH): a foreign `Origin` closes the handshake with 4403.
+
+    The check runs before the cookie path and before the RBAC path. The second close of
+    the router passes silently.
+    """
     app, meeting = _build_real_handshake(naive=False)
     client = TestClient(app)
     name, value = _signed_cookie()
@@ -448,9 +450,7 @@ def test_handshake_foreign_origin_is_rejected() -> None:
     assert exc.value.code == 4403
 
 
-# --------------------------------------------------------------------------- #
-# FIX 5 — Verbindungs-Cap je (Sitzung, Principal)
-# --------------------------------------------------------------------------- #
+# FIX 5: connection cap per meeting and principal
 from app.modules.livevote import router as lv_router  # noqa: E402
 
 
@@ -459,19 +459,16 @@ def test_connection_slot_acquire_release_cap() -> None:
     sub = "p"
     lv_router._connection_counts.clear()
     cap = lv_router._MAX_CONNECTIONS_PER_PRINCIPAL
-    # Bis zum Limit belegbar …
     for _ in range(cap):
         assert lv_router._try_acquire_slot(mid, sub) is True
-    # … darüber hinaus abgewiesen.
     assert lv_router._try_acquire_slot(mid, sub) is False
-    # Freigabe öffnet wieder einen Slot.
     lv_router._release_slot(mid, sub)
     assert lv_router._try_acquire_slot(mid, sub) is True
-    # Alles freigeben räumt den Zähler-Eintrag (kein Speicherleck).
+    # A full release drops the counter entry, so there is no memory leak.
     for _ in range(cap):
         lv_router._release_slot(mid, sub)
     assert (mid, sub) not in lv_router._connection_counts
-    # Freigabe ohne Bestand ist idempotent (kein KeyError / negative Zähler).
+    # A release without a held slot is idempotent: no KeyError and no negative counter.
     lv_router._release_slot(mid, sub)
     assert (mid, sub) not in lv_router._connection_counts
 
@@ -480,7 +477,7 @@ def test_too_many_connections_rejected_over_ws() -> None:
     meeting = _meeting()
     app, _, _ = _build(meeting=meeting, principal=_voter())
     lv_router._connection_counts.clear()
-    # Slots künstlich auf das Limit füllen → der nächste Connect wird abgewiesen.
+    # Fill the slots up to the limit, so the server refuses the next connect.
     key = (meeting.id, "p")
     lv_router._connection_counts[key] = lv_router._MAX_CONNECTIONS_PER_PRINCIPAL
     client = TestClient(app)

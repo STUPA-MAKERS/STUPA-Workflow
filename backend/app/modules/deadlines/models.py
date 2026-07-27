@@ -1,10 +1,11 @@
 """Deadline table.
 
-A :class:`Deadline` binds a due time to an application and/or type. If
-``action_on_pass`` (``{"transitionId": "<uuid>"}``) is set, the arq cron fires
-that transition on expiry and then NULLs the field — the row leaves the partial
-scan index, so a rerun never fires twice (idempotency marker). ``reminded_at``
-marks an already-sent reminder for exactly-once semantics across workers.
+A `Deadline` binds a due time to an application, an application type, or both.
+If `action_on_pass` (`{"transitionId": "<uuid>"}`) is set, the arq cron fires
+that transition at expiry and then sets the field to NULL. The row leaves the
+partial scan index, so a rerun never fires the transition twice. This is the
+idempotency marker. `reminded_at` marks a reminder that went out already. All
+workers together thus send a reminder exactly one time.
 """
 
 from __future__ import annotations
@@ -29,7 +30,7 @@ from app.db import Base, UUIDPkMixin
 
 
 class Deadline(UUIDPkMixin, Base):
-    """Deadline for an application/type with an optional expiry action."""
+    """Deadline for an application or a type, with an optional expiry action."""
 
     __tablename__ = "deadline"
 
@@ -40,14 +41,15 @@ class Deadline(UUIDPkMixin, Base):
     type_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("application_type.id", ondelete="CASCADE"), nullable=True
     )
-    # Free-text classification (e.g. ``flow_phase``, ``vote``, ``requeue``);
-    # informational only — the effect lives in ``action_on_pass``.
+    # Free-text classification, for example `flow_phase`, `vote` or `requeue`.
+    # It is informational only. The effect lives in `action_on_pass`.
     kind: Mapped[str] = mapped_column(Text)
     due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    # NULL = reminder/display-only deadline. ``none_as_null=True`` is required:
-    # Python ``None`` must be stored as SQL NULL, not JSONB ``'null'`` — otherwise
-    # ``action_on_pass IS NOT NULL`` (scan + partial index) matches reminder-only
-    # rows and ``mark_fired`` never removes a row from the scan (double firing).
+    # NULL marks a reminder-only or display-only deadline. `none_as_null=True`
+    # is required: Python `None` must reach the database as SQL NULL, not as
+    # JSONB `'null'`. Otherwise `action_on_pass IS NOT NULL` (the scan and the
+    # partial index) also matches reminder-only rows, `mark_fired` never takes
+    # a row out of the scan, and the deadline fires twice.
     action_on_pass: Mapped[dict | None] = mapped_column(
         JSONB(none_as_null=True), nullable=True
     )
@@ -56,13 +58,14 @@ class Deadline(UUIDPkMixin, Base):
     )
 
     __table_args__ = (
-        # Cron scan of expiring auto-deadlines; partial — fired rows drop out.
+        # Cron scan of expiring auto-deadlines. The index is partial, so a
+        # fired row drops out of it.
         Index(
             "ix_deadline_due_at_action",
             "due_at",
             postgresql_where=text("action_on_pass IS NOT NULL"),
         ),
-        # Reminder scan: only not-yet-reminded deadlines.
+        # Reminder scan. A row with a sent reminder drops out of this index.
         Index(
             "ix_deadline_reminder",
             "due_at",
@@ -72,37 +75,42 @@ class Deadline(UUIDPkMixin, Base):
 
 
 class DeadlinePolicy(UUIDPkMixin, Base):
-    """Named deadline policy (registry) referenced by the flow via ``key``.
+    """Named deadline policy in the registry, referenced by the flow through `key`.
 
-    Decouples the concrete date from the flow definition — an ``absolute`` date
-    can be updated per semester without re-versioning the flow. Kinds:
-    ``absolute`` (fixed ``absolute_at``), ``relative_submitted`` /
-    ``relative_changed`` (application created/updated + ``offset_days``),
-    ``recurring`` (earliest of ``dates`` still ahead — a rolling submission
-    window).
+    The policy separates the concrete date from the flow definition. An admin
+    can update an `absolute` date each semester without a new flow version.
 
-    ``at_time``/``timezone`` optionally anchor the wall-clock: when ``at_time``
-    (``"HH:MM"``) is set the resolved date is snapped to that local time in
-    ``timezone`` and converted to UTC (DST-correct). When unset the historical
-    instant arithmetic is kept (backward compatible)."""
+    The kinds are `absolute`, `relative_submitted`, `relative_changed` and
+    `recurring`. `absolute` uses the fixed date in `absolute_at`. The relative
+    kinds add `offset_days` to the creation time or the update time of the
+    application. `recurring` takes the earliest of `dates` that is still ahead.
+    It gives a rolling submission window.
+
+    `at_time` and `timezone` anchor the wall clock. This is optional. If
+    `at_time` (`"HH:MM"`) is set, the code snaps the resolved date to that local
+    time in `timezone` and converts it to UTC. The result is DST-correct. If
+    `at_time` is unset, the code keeps the historical instant arithmetic. This
+    stays backward compatible.
+    """
 
     __tablename__ = "deadline_policy"
 
-    # Stable reference key used by the flow; unique.
+    # Stable reference key that the flow uses.
     key: Mapped[str] = mapped_column(Text, unique=True)
-    label: Mapped[dict] = mapped_column(JSONB)  # I18nMap (de/en …)
+    label: Mapped[dict] = mapped_column(JSONB)  # I18nMap with de and en keys.
     kind: Mapped[str] = mapped_column(Text)
-    # Set only for ``absolute``.
+    # Set only for `absolute`.
     absolute_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    # Set only for the relative kinds (day offset).
+    # Set only for the relative kinds. The unit is days.
     offset_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    # Optional wall-clock anchor: ``"HH:MM"`` local time in ``timezone`` (an IANA
-    # zone, e.g. ``Europe/Berlin``). Both NULL ⇒ raw instant arithmetic.
+    # Optional wall-clock anchor: `"HH:MM"` local time in `timezone`, an IANA
+    # zone such as `Europe/Berlin`. If both are NULL, the code uses raw instant
+    # arithmetic.
     at_time: Mapped[str | None] = mapped_column(Text, nullable=True)
     timezone: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # Set only for ``recurring``: ordered list of ``"YYYY-MM-DD"`` calendar dates.
+    # Set only for `recurring`: an ordered list of `"YYYY-MM-DD"` calendar dates.
     dates: Mapped[list | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

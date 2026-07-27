@@ -1,7 +1,7 @@
-"""Unit: signierter OAuth-AS-Transaktions-Cookie (``issue``/``load_oauth_tx``).
+"""Unit: the signed OAuth AS transaction cookie (`issue_oauth_tx` and `load_oauth_tx`).
 
-Reine itsdangerous-Signatur-Logik (DB-frei) — deckt Roundtrip, kaputte Signatur,
-falsches Secret und fehlende/Nicht-Dict-Payloads ab.
+The logic is pure itsdangerous signing and needs no database. The tests cover the
+roundtrip, a broken signature, a wrong secret, and missing or non-dict payloads.
 """
 
 from __future__ import annotations
@@ -51,7 +51,7 @@ def test_oauth_tx_wrong_secret_returns_none() -> None:
 
 
 def test_oauth_tx_missing_required_fields_returns_none() -> None:
-    # Signiert, aber ohne Pflichtfelder (redirect_uri/code_challenge) → abgelehnt.
+    # Signed, but the required fields redirect_uri and code_challenge are missing.
     blob = _serializer(_SECRET, _OAUTH_TX_SALT).dumps({"client_id": "c"})
     assert load_oauth_tx(_SECRET, blob, 600) is None
 

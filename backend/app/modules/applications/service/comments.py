@@ -54,9 +54,12 @@ class CommentOps(ApplicationsServiceBase):
         viewer_sub: str | None = None,
         viewer_is_applicant: bool = False,
     ) -> list[CommentOut]:
-        """List comments; ``viewer_*`` marks the viewer's own comments (`isOwn`):
-        principals match on the stored author ``sub``, the (magic-link) applicant
-        owns every applicant comment of their application."""
+        """List the comments of one application.
+
+        The ``viewer_*`` arguments mark the own comments of the viewer with
+        ``isOwn``. A principal matches on the stored author ``sub``. The
+        magic-link applicant owns every applicant comment of the own application.
+        """
         await self._get_app(application_id, allow_unconfirmed=allow_unconfirmed)
         stmt = select(Comment).where(Comment.application_id == application_id)
         if not include_internal:

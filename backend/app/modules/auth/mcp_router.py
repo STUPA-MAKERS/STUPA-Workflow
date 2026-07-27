@@ -1,8 +1,8 @@
-"""Self-service endpoints around the MCP server: setup config plus package download.
+"""Self-service endpoints for the MCP server: setup config and package download.
 
-Both are gated behind ``mcp.use``. ``/config`` returns a ready ``mcpServers``
-snippet including this platform's URL; ``/package`` streams the ``mcp/`` source
-package as ``.tar.gz`` for local installation.
+Both endpoints need the `mcp.use` permission. `/config` returns a ready `mcpServers`
+snippet that holds the URL of this platform. `/package` streams the `mcp/` source package
+as a `.tar.gz` archive for a local installation.
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
     return {code: _PROBLEM for code in codes}
 
 
-# Excluded from the source tree (no build/cache junk in the download).
+# Kept out of the archive so the download holds no build or cache directory.
 _EXCLUDE = {"__pycache__", ".venv", "venv", ".mypy_cache", ".pytest_cache", "dist", "build"}
 
 
@@ -39,10 +39,15 @@ def _is_pkg(d: Path) -> bool:
 
 
 def _package_dir(settings: Settings) -> Path | None:
-    """Locate the MCP source package dir (`mcp/`) across layouts/containers.
+    """Find the MCP source package directory (`mcp/`) across layouts and containers.
 
-    Order: explicit setting -> known container mount (`/opt/mcp`) -> upward
-    search from this file. ``None`` if absent (deployment without source -> 404)."""
+    The search order is the explicit setting, then the known container mount `/opt/mcp`,
+    then an upward search from this file.
+
+    Returns:
+        The package directory, or `None` when the deployment ships no source. The route
+        then answers 404.
+    """
     if settings.mcp_package_dir:
         cand = Path(settings.mcp_package_dir)
         return cand if _is_pkg(cand) else None
@@ -61,10 +66,10 @@ def mcp_config(
     settings: SettingsDep,
     _principal: Annotated[Principal, Depends(require_principal("mcp.use"))],
 ) -> dict[str, Any]:
-    """Ready-made ``mcpServers`` entry for this platform (paste into the client)."""
+    """Return a ready-made `mcpServers` entry to paste into the MCP client."""
     base = settings.public_base_url.rstrip("/")
-    # The downloaded package bakes in this URL → no ANTRAGSPLATTFORM_URL needed. Override
-    # the scope here only if you want to narrow it.
+    # The downloaded package bakes in this URL, so ANTRAGSPLATTFORM_URL is not needed.
+    # Override the scope here only to narrow it.
     return {
         "mcpServers": {
             "antragsplattform": {
@@ -87,7 +92,7 @@ def mcp_package(
     settings: SettingsDep,
     _principal: Annotated[Principal, Depends(require_principal("mcp.use"))],
 ) -> StreamingResponse:
-    """Stream the ``mcp/`` source package as ``antragsplattform-mcp.tar.gz``."""
+    """Stream the `mcp/` source package as `antragsplattform-mcp.tar.gz`."""
     pkg = _package_dir(settings)
     if pkg is None:
         raise NotFoundError(
@@ -104,9 +109,9 @@ def mcp_package(
             return None if parts & _EXCLUDE else info
 
         tar.add(pkg, arcname="antragsplattform-mcp", filter=_filter)
-        # Bake PUBLIC_BASE_URL into the package so no ANTRAGSPLATTFORM_URL is needed.
-        # ``json.dumps`` escapes quotes/newlines safely into the Python string
-        # literal (no interpolation injection if the URL ever becomes injectable).
+        # Bake PUBLIC_BASE_URL into the package so ANTRAGSPLATTFORM_URL is not needed.
+        # `json.dumps` escapes quotes and newlines into the Python string literal. This
+        # blocks an interpolation injection if the URL ever becomes attacker controlled.
         baked = (
             '"""Auto-generated at download — pins this package to its source platform."""\n'
             f"BASE_URL = {json.dumps(base)}\n"

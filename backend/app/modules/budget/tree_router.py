@@ -1,10 +1,16 @@
-"""Budget-tree API router (all principal-only, fail-closed RBAC).
+"""Budget-tree API router with principal-only and fail-closed RBAC.
 
-Permission scope: tree reads need ``budget.view`` (or gremium scope); structure
-mutations (nodes, fiscal years, allocations) need ``budget.structure``;
-bookings/transfers move money and need ``budget.book``; assign/move-fiscal-year
-need ``application.manage``. Constraint violations (children <= parent,
-fiscal-year disjointness) yield 422; deleting with children/allocations 409.
+Permission scope:
+
+1. A tree read needs ``budget.view`` or the gremium scope.
+2. A structure change (node, fiscal year, allocation) needs
+   ``budget.structure``.
+3. A booking or a transfer moves money and needs ``budget.book``.
+4. Assign-budget and move-fiscal-year need ``application.manage``.
+
+A constraint violation gives 422. The checked constraints are children <=
+parent and fiscal-year disjointness. A delete of a node that still has children
+or allocations gives 409.
 """
 
 from __future__ import annotations
@@ -77,8 +83,9 @@ from app.shared.paging import Page
 
 router = APIRouter(tags=["budget"])
 
-# Early (Content-Length) body cap for receipt uploads before FastAPI buffers —
-# defense in depth next to the nginx cap and the in-app size check.
+# Body cap on Content-Length for a receipt upload, applied before FastAPI
+# buffers the body. It adds defense in depth next to the nginx cap and the
+# in-app size check.
 _enforce_invoice_body = body_cap("attachment_max_bytes")
 
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
@@ -94,8 +101,9 @@ def get_budget_tree_service(
     settings: SettingsDep,
     principal: Annotated[Principal, Depends(require_principal())],
 ) -> BudgetTreeService:
-    # Storage is used only by the invoice import; ``actor`` = principal ``sub``
-    # for the audit trail of money mutations (all budget endpoints are authed).
+    # Only the invoice import uses the storage. ``actor`` is the principal
+    # ``sub`` for the audit trail of the money mutations. All budget endpoints
+    # require authentication.
     storage = getattr(request.app.state, "object_storage", None)
     return BudgetTreeService(session, storage=storage, settings=settings, actor=principal.sub)
 
@@ -108,8 +116,11 @@ async def get_bank_service(
     settings: SettingsDep,
     principal: Annotated[Principal, Depends(require_principal())],
 ) -> BankService:
-    """Build the bank service — ``actor`` for the audit trail; ``principal_id``
-    scopes personal credentials and TAN sessions."""
+    """Build the bank service.
+
+    ``actor`` feeds the audit trail. ``principal_id`` scopes the personal
+    credentials and the TAN sessions.
+    """
     from sqlalchemy import select
 
     from app.modules.auth.models import Principal as PrincipalRow
@@ -125,8 +136,8 @@ async def get_bank_service(
 BankServiceDep = Annotated[BankService, Depends(get_bank_service)]
 
 
-# Global full view of the budget tab — each of these permissions shows ALL;
-# without one, the gremium scope (view_gremium_id) applies.
+# Global full view of the budget tab. Each of these permissions shows ALL nodes.
+# Without one of them the gremium scope (view_gremium_id) applies.
 _FULL_VIEW_PERMS = ("budget.view", "budget.structure", "budget.book")
 
 
@@ -143,7 +154,12 @@ async def _member_gremium_ids(service: BudgetTreeService, sub: str) -> set[UUID]
 async def _require_node_view(
     service: BudgetTreeService, principal: Principal, budget_id: UUID
 ) -> None:
-    """Full view OR the node lies in a subtree assigned to a member gremium."""
+    """Require the full view, or a node in a subtree of a member Gremium.
+
+    Raises:
+        ForbiddenError: The principal has neither the full view nor the gremium
+            scope on this node.
+    """
     if _has_full_view(principal):
         return
     member = await _member_gremium_ids(service, principal.sub)
@@ -151,7 +167,6 @@ async def _require_node_view(
         raise ForbiddenError("no access to this cost centre")
 
 
-# --------------------------------------------------------------------- nodes
 @router.get(
     "/budgets",
     response_model=list[BudgetTreeNodeOut],
@@ -162,11 +177,14 @@ async def list_budget_tree(
     principal: Annotated[Principal, Depends(require_principal())],
     gremium_id: Annotated[UUID | None, Query(alias="gremium")] = None,
 ) -> list[BudgetTreeNodeOut]:
-    """Cost-centre tree (with ``pathKey``, allocated/committed/available per fiscal year).
+    """Cost-center tree with allocated, committed and available per fiscal year.
 
-    Full view with ``budget.view``/``structure``/``book``; otherwise gremium
-    scope: only subtrees whose ``viewGremiumId`` matches a member gremium, as
-    roots. Neither: empty list."""
+    Each node also carries its ``pathKey``. ``budget.view``,
+    ``budget.structure`` or ``budget.book`` give the full view. Without one of
+    them the gremium scope applies. The response then holds only the subtrees
+    whose ``viewGremiumId`` matches a member Gremium, and it returns them as
+    roots. A principal with neither gets an empty list.
+    """
     if _has_full_view(principal):
         return await service.get_tree(gremium_id=gremium_id)
     member = await _member_gremium_ids(service, principal.sub)
@@ -196,8 +214,9 @@ async def export_budget_xlsx(
 ) -> Response:
     """Export the budget tree as ``.xlsx``, filtered like the dashboard.
 
-    ``gremium`` / ``node`` (subtree selection) / ``fiscalYear`` mirror the
-    active dashboard filters; ``node`` exports only that node plus subtree.
+    ``gremium``, ``node`` and ``fiscalYear`` mirror the active dashboard
+    filters. ``node`` selects a subtree and exports that node and its subtree
+    only.
     """
     from app.shared.xlsx import XLSX_MEDIA_TYPE, build_budget_workbook
 
@@ -235,7 +254,7 @@ async def export_budget_xlsx(
     responses=_errors(400, 401, 403, 404, 409, 422),
 )
 async def create_budget_node(payload: BudgetNodeCreate, service: ServiceDep) -> BudgetNodeOut:
-    """Create a cost centre (top level with ``gremiumId``; children with ``parentId``)."""
+    """Create a cost center: a top level with ``gremiumId``, a child with ``parentId``."""
     return await service.create_node(payload)
 
 
@@ -248,7 +267,7 @@ async def create_budget_node(payload: BudgetNodeCreate, service: ServiceDep) -> 
 async def update_budget_node(
     budget_id: UUID, payload: BudgetNodeUpdate, service: ServiceDep
 ) -> BudgetNodeOut:
-    """Update a cost centre (name/active flag)."""
+    """Update a cost center: the name or the active flag."""
     return await service.update_node(budget_id, payload)
 
 
@@ -259,7 +278,7 @@ async def update_budget_node(
     responses=_errors(401, 403, 404, 409),
 )
 async def delete_budget_node(budget_id: UUID, service: ServiceDep) -> None:
-    """Delete a cost centre (only without children/allocations — 409 otherwise)."""
+    """Delete a cost center. A node with children or allocations gives 409."""
     await service.delete_node(budget_id)
 
 
@@ -274,14 +293,15 @@ async def list_budget_applications(
     principal: Annotated[Principal, Depends(require_principal())],
     fiscal_year_id: Annotated[UUID | None, Query(alias="fiscalYear")] = None,
 ) -> list[BudgetApplicationOut]:
-    """List applications of this cost centre + subtree, optionally fiscal-year-filtered.
+    """List the applications of this cost center and of its subtree.
 
-    Full view or gremium scope on the node."""
+    The ``fiscalYear`` filter is optional. The caller needs the full view or the
+    gremium scope on the node.
+    """
     await _require_node_view(service, principal, budget_id)
     return await service.list_applications(budget_id, fiscal_year_id)
 
 
-# -------------------------------------------------------------------- expenses
 @router.get(
     "/budgets/{budget_id}/expenses",
     response_model=list[ExpenseOut],
@@ -293,9 +313,11 @@ async def list_budget_expenses(
     principal: Annotated[Principal, Depends(require_principal())],
     fiscal_year_id: Annotated[UUID | None, Query(alias="fiscalYear")] = None,
 ) -> list[ExpenseOut]:
-    """List standalone expenses of this cost centre + subtree, optionally per fiscal year.
+    """List the standalone expenses of this cost center and of its subtree.
 
-    Full view or gremium scope on the node."""
+    The ``fiscalYear`` filter is optional. The caller needs the full view or the
+    gremium scope on the node.
+    """
     await _require_node_view(service, principal, budget_id)
     return await service.list_expenses(budget_id, fiscal_year_id)
 
@@ -312,7 +334,7 @@ async def create_budget_expense(
     service: ServiceDep,
     principal: Annotated[Principal, Depends(require_principal("budget.book"))],
 ) -> ExpenseOut:
-    """Book an expense without an application against cost centre + fiscal year."""
+    """Book an expense without an application against a cost center and fiscal year."""
     return await service.create_expense(budget_id, payload, actor=principal.sub)
 
 
@@ -323,11 +345,10 @@ async def create_budget_expense(
     responses=_errors(401, 403, 404),
 )
 async def delete_budget_expense(expense_id: UUID, service: ServiceDep) -> None:
-    """Delete a booked expense/income."""
+    """Delete a booked expense or income."""
     await service.delete_expense(expense_id)
 
 
-# ---------------------------------------------------------------- sub-bookings
 @router.get(
     "/budget-expenses/{expense_id}/sub-bookings",
     response_model=list[ExpenseOut],
@@ -337,7 +358,7 @@ async def delete_budget_expense(expense_id: UUID, service: ServiceDep) -> None:
     responses=_errors(401, 403, 404),
 )
 async def list_sub_bookings(expense_id: UUID, service: ServiceDep) -> list[ExpenseOut]:
-    """List sub-bookings of a booking — expanding in the bookings tab."""
+    """List the sub-bookings of a booking, for the expand row in the bookings tab."""
     return await service.list_sub_expenses(expense_id)
 
 
@@ -353,7 +374,11 @@ async def create_sub_booking(
     service: ServiceDep,
     principal: Annotated[Principal, Depends(require_principal("budget.book"))],
 ) -> ExpenseOut:
-    """Create a sub-booking manually — inherits account/cost centre/fiscal year/kind."""
+    """Create a sub-booking by hand.
+
+    The sub-booking inherits account, cost center, fiscal year and kind from
+    the parent booking.
+    """
     return await service.create_sub_booking(expense_id, payload, actor=principal.sub)
 
 
@@ -373,15 +398,18 @@ async def import_sub_bookings(
     file: Annotated[UploadFile, File()],
     principal: Annotated[Principal, Depends(require_principal("budget.book"))],
 ) -> list[ExpenseOut]:
-    """Create sub-bookings from a CAMT.053/MT940 file. Children inherit
-    account/cost centre/fiscal year/kind from the parent; parent amount = sum of children."""
+    """Create sub-bookings from a CAMT.053/MT940 file.
+
+    Each child inherits account, cost center, fiscal year and kind from the
+    parent. The parent amount is the sum of its children.
+    """
     data = await file.read()
     return await service.import_sub_bookings(
         expense_id, data, filename=file.filename, actor=principal.sub
     )
 
 
-# -------------------------------------------------------- expenses (flat tab)
+# Flat bookings tab: the next expense routes are not scoped to one node.
 @router.post(
     "/expenses",
     response_model=ExpenseOut,
@@ -393,15 +421,19 @@ async def book_expense(
     service: ServiceDep,
     principal: Annotated[Principal, Depends(require_principal("budget.book"))],
 ) -> ExpenseOut:
-    """Book an expense/income: standalone (``budgetId``) or bound to an application
-    (``applicationId`` — inherits cost centre + fiscal year, replaces its binding)."""
+    """Book an expense or an income.
+
+    A standalone booking uses ``budgetId``. A booking with ``applicationId``
+    binds to an application. It inherits cost center and fiscal year from that
+    application and replaces its binding.
+    """
     return await service.book_expense(payload, actor=principal.sub)
 
 
 @router.get(
     "/expenses",
     response_model=Page[ExpenseOut],
-    # Reads for every budget role: view/structure/book see the bookings list.
+    # Every budget role reads this: view, structure and book see the bookings.
     dependencies=[
         Depends(require_any_permission("budget.view", "budget.structure", "budget.book"))
     ],
@@ -428,10 +460,13 @@ async def list_expenses(
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> Page[ExpenseOut]:
-    """List bookings filtered + sorted + offset-paged. ``id`` = exact booking
-    (deep link from the accounts tab); ``budget`` includes the subtree; ``kind`` =
-    ``expense``/``income``; ``q`` searches descriptions; ``amountMin``/``amountMax``
-    = amount range; ``sort``/``order`` = column sort."""
+    """List bookings, filtered and sorted, with offset paging.
+
+    ``id`` selects the exact booking for the deep link from the accounts tab.
+    ``budget`` includes the subtree. ``kind`` is ``expense`` or ``income``.
+    ``q`` searches the descriptions. ``amountMin`` and ``amountMax`` bound the
+    amount. ``sort`` and ``order`` set the column sort.
+    """
     return await service.list_expenses_paged(
         expense_id=expense_id,
         budget_id=budget_id,
@@ -445,8 +480,8 @@ async def list_expenses(
         amount_max=amount_max,
         created_from=created_from,
         created_to=created_to,
-        # ``sort`` is already Literal-validated — pass through unchanged; the
-        # service's ``sort_map`` knows all four columns.
+        # ``sort`` is already Literal-validated, so it passes through
+        # unchanged. The ``sort_map`` of the service knows all four columns.
         sort=sort,
         order=order,
         limit=limit,
@@ -471,10 +506,12 @@ async def export_expenses_xlsx(
     created_to: Annotated[str | None, Query(alias="createdTo")] = None,
     ids: Annotated[list[UUID] | None, Query()] = None,
 ) -> Response:
-    """Export filtered bookings as ``.xlsx`` — same content as the list.
+    """Export the filtered bookings as ``.xlsx``, with the same content as the list.
 
-    ``ids`` (optional, #expenses-ux) restricts the export to the selected bookings:
-    the filtered page is narrowed to those IDs (selection ⊆ current filter)."""
+    The optional ``ids`` (#expenses-ux) restricts the export to the selected
+    bookings. The route narrows the filtered page to those IDs, so the
+    selection stays a subset of the current filter.
+    """
     from app.shared.xlsx import XLSX_MEDIA_TYPE, build_expenses_workbook
 
     page = await service.list_expenses_paged(
@@ -521,11 +558,10 @@ async def update_budget_expense(
     service: ServiceDep,
     principal: Annotated[Principal, Depends(require_principal("budget.book"))],
 ) -> ExpenseOut:
-    """Update a booking's amount/description."""
+    """Update the amount or the description of a booking."""
     return await service.update_expense(expense_id, payload)
 
 
-# ----------------------------------------------------------------- transfers
 @router.post(
     "/budget-transfers",
     response_model=TransferOut,
@@ -537,12 +573,14 @@ async def create_transfer(
     service: ServiceDep,
     principal: Annotated[Principal, Depends(require_principal("budget.book"))],
 ) -> TransferOut:
-    """Transfer cost centre to cost centre (expense + income, same fiscal year)."""
+    """Transfer from one cost center to another.
+
+    The transfer books an expense and an income in the same fiscal year.
+    """
     return await service.create_transfer(payload, actor=principal.sub)
 
 
-# ------------------------------------------------------------------- invoices
-# Reads: every budget role; writes: budget.book.
+# Every budget role may read an invoice. A write needs budget.book.
 _INVOICE_READ = Depends(require_any_permission("budget.view", "budget.structure", "budget.book"))
 
 
@@ -565,10 +603,13 @@ async def list_invoices(
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> Page[InvoiceOut]:
-    """List invoices fuzzy-searched + filtered + offset-paged (newest issue date
-    first). ``q`` searches number/supplier/note; ``status`` = ``open``/``paid``;
-    ``grossMin``/``grossMax`` = gross range; ``issueFrom``/``issueTo`` and
-    ``dueFrom``/``dueTo`` = date ranges."""
+    """List invoices with fuzzy search, filters and offset paging.
+
+    The newest issue date comes first. ``q`` searches number, supplier and note.
+    ``status`` is ``open`` or ``paid``. ``grossMin`` and ``grossMax`` bound the
+    gross amount. ``issueFrom``/``issueTo`` and ``dueFrom``/``dueTo`` bound the
+    dates.
+    """
     return await service.list_invoices_paged(
         q=q,
         status=status,
@@ -641,10 +682,11 @@ async def parse_invoice(
     principal: Annotated[Principal, Depends(require_principal("budget.book"))],
     file: Annotated[UploadFile, File()],
 ) -> InvoiceParseResult:
-    """Parse a ZUGFeRD/Factur-X PDF: fields + file handle for the dialog.
+    """Parse a ZUGFeRD/Factur-X PDF into fields plus a file handle for the dialog.
 
-    No valid Factur-X yields 422 ``invoice_not_zugferd`` (UI offers manual
-    entry); non-EUR currency yields 422 ``invoice_currency_unsupported``.
+    A PDF without valid Factur-X data yields 422 ``invoice_not_zugferd``. The
+    UI then offers manual entry. A currency other than EUR yields 422
+    ``invoice_currency_unsupported``.
     """
     data = await file.read()
     try:
@@ -664,7 +706,8 @@ async def parse_invoice(
 @router.post(
     "/invoices/file",
     response_model=InvoiceFileResult,
-    # Write permission: stores the original PDF (also for non-ZUGFeRD receipts).
+    # Write permission: the route stores the original PDF, also for a receipt
+    # without ZUGFeRD data.
     dependencies=[Depends(_enforce_invoice_body)],
     responses=_errors(401, 403, 413, 415, 503),
 )
@@ -673,8 +716,11 @@ async def upload_invoice_file(
     principal: Annotated[Principal, Depends(require_principal("budget.book"))],
     file: Annotated[UploadFile, File()],
 ) -> InvoiceFileResult:
-    """Store a receipt PDF without ZUGFeRD parsing: file handle for the entry
-    dialog so manually entered invoices also carry a receipt."""
+    """Store a receipt PDF without ZUGFeRD parsing.
+
+    The route returns a file handle for the entry dialog, so that a manually
+    entered invoice also carries a receipt.
+    """
     data = await file.read()
     return await service.store_invoice_file(data, filename=file.filename)
 
@@ -686,13 +732,15 @@ async def upload_invoice_file(
     response_class=Response,
 )
 async def get_invoice_file(invoice_id: UUID, service: ServiceDep) -> Response:
-    """Stream the original receipt server-side (MinIO is internal — no presigned URL).
+    """Stream the original receipt from the server.
 
-    Hardening: the client-supplied ``file_mime`` is NOT trusted on the serve
-    path. Uploads already enforce ``application/pdf``, so the media type is
-    forced to ``application/pdf`` and served with ``Content-Disposition:
-    attachment`` — an HTML polyglot stored as PDF cannot render in the app
-    origin."""
+    MinIO is internal, so the route serves no presigned URL. Hardening: the
+    route does NOT trust the client-supplied ``file_mime`` on the serve path.
+    The upload already enforces ``application/pdf``. Therefore the route forces
+    the media type to ``application/pdf`` and adds ``Content-Disposition:
+    attachment``. An HTML polyglot stored as a PDF then cannot render in the
+    app origin.
+    """
     data, _mime, name = await service.invoice_file_bytes(invoice_id)
     safe = "".join(c for c in name if c.isprintable() and c not in '"\\\r\n')
     return Response(
@@ -702,17 +750,17 @@ async def get_invoice_file(invoice_id: UUID, service: ServiceDep) -> Response:
     )
 
 
-# ------------------------------------------------------------------- accounts
 @router.get(
     "/accounts/options",
     response_model=list[AccountOption],
-    # Minimal choice (id+name, no IBAN) for booking dropdowns — bookers may read
-    # this without account.manage. Full account data stays account.manage.
+    # Minimal choice with id and name and no IBAN, for the booking dropdowns. A
+    # booker may read this without account.manage. The full account data stays
+    # behind account.manage.
     dependencies=[Depends(require_any_permission("account.manage", "budget.book", "budget.view"))],
     responses=_errors(401, 403),
 )
 async def list_account_options(service: ServiceDep) -> list[AccountOption]:
-    """List active accounts as id+name (no IBAN) — for booking selection."""
+    """List the active accounts as id and name without IBAN, for the booking form."""
     return await service.list_account_options()
 
 
@@ -723,7 +771,7 @@ async def list_account_options(service: ServiceDep) -> list[AccountOption]:
     responses=_errors(401, 403),
 )
 async def list_accounts(service: ServiceDep) -> list[AccountOut]:
-    """List accounts (name + IBAN) — requires ``account.manage``."""
+    """List the accounts with name and IBAN, gated by ``account.manage``."""
     return await service.list_accounts()
 
 
@@ -760,11 +808,10 @@ async def delete_account(account_id: UUID, service: ServiceDep) -> None:
     await service.delete_account(account_id)
 
 
-# --------------------------------------------------------------- bank reconcile
-# Fetch/import/book move money -> ``budget.book``; reading the staging list is
-# open to every budget role. The bank connection (endpoint/BLZ) on the account
-# is set by the admin (account.manage); personal credentials are set by each
-# booker (budget.book) per account.
+# Bank reconcile. Fetch, import and book move money and need ``budget.book``.
+# Reading the staging list is open to every budget role. The admin sets the bank
+# connection on the account, the endpoint and the BLZ, with account.manage. Each
+# booker sets the personal credentials per account with budget.book.
 @router.get(
     "/accounts/{account_id}/fints/credential",
     response_model=FintsCredentialStatus,
@@ -790,8 +837,11 @@ async def fints_credential_status(
 async def set_fints_credential(
     account_id: UUID, payload: FintsCredentialIn, service: BankServiceDep
 ) -> FintsCredentialStatus:
-    """Create/replace personal FinTS credentials (login + PIN) — first connect
-    in the booking tab. PIN is write-only, encrypted."""
+    """Create or replace the personal FinTS credentials with login and PIN.
+
+    The booker runs this on the first connect in the booking tab. The PIN is
+    write-only and stored encrypted.
+    """
     return await service.set_credential(account_id, payload)
 
 
@@ -802,7 +852,7 @@ async def set_fints_credential(
     responses=_errors(401, 403, 404),
 )
 async def delete_fints_credential(account_id: UUID, service: BankServiceDep) -> None:
-    """Delete own FinTS credentials for the account."""
+    """Delete the FinTS credentials of the calling booker for the account."""
     await service.delete_credential(account_id)
 
 
@@ -816,7 +866,7 @@ async def delete_fints_credential(account_id: UUID, service: BankServiceDep) -> 
     responses=_errors(401, 403, 404, 409, 422, 429, 503),
 )
 async def fints_sync(account_id: UUID, service: BankServiceDep) -> BankSyncResult:
-    """Start a FinTS sync: stage transactions OR request a TAN (``needs_tan``)."""
+    """Start a FinTS sync. It stages the transactions or requests a TAN (``needs_tan``)."""
     return await service.sync_account(account_id)
 
 
@@ -835,7 +885,7 @@ async def fints_submit_tan(
     payload: BankTanRequest,
     service: BankServiceDep,
 ) -> BankSyncResult:
-    """Resume a pending TAN session — empty ``tan`` = decoupled poll."""
+    """Resume a pending TAN session. An empty ``tan`` makes a decoupled poll."""
     return await service.submit_tan(account_id, session_token, payload.tan)
 
 
@@ -884,10 +934,13 @@ async def list_statement_lines(
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> Page[StatementLineOut]:
-    """List staged bank transactions, filtered + offset-paged. Filters:
-    ``account``, ``state``, ``kind``, ``q`` (counterparty/IBAN/purpose), date
-    range (``dateFrom``/``dateTo``); ``sort`` = date/amount. ``includeIgnored``
-    = false hides set-aside lines when no explicit ``state`` is given (Alle view)."""
+    """List the staged bank transactions, filtered and offset-paged.
+
+    The filters are ``account``, ``state``, ``kind``, ``q`` (counterparty, IBAN
+    or purpose) and the date range ``dateFrom``/``dateTo``. ``sort`` takes date
+    or amount. ``includeIgnored`` = false hides the set-aside lines when the
+    request gives no explicit ``state``, which is the All view.
+    """
     return await service.list_lines_paged(
         account_id=account_id,
         state=state,
@@ -913,8 +966,11 @@ async def list_statement_lines(
     responses=_errors(401, 403, 404),
 )
 async def get_statement_line(line_id: UUID, service: BankServiceDep) -> StatementLineDetail:
-    """One staged transaction incl. raw parser payload + idempotency key —
-    diagnostic detail view (source format, batch metadata)."""
+    """Return one staged transaction for the diagnostic detail view.
+
+    The response holds the raw parser payload and the idempotency key. It shows
+    the source format and the batch metadata.
+    """
     return await service.get_line(line_id)
 
 
@@ -928,7 +984,7 @@ async def get_statement_line(line_id: UUID, service: BankServiceDep) -> Statemen
 async def confirm_statement_line(
     line_id: UUID, payload: ConfirmLineRequest, service: BankServiceDep
 ) -> ExpenseOut:
-    """Book a transaction: new booking against ``budgetId`` OR onto ``matchExpenseId``."""
+    """Book a transaction: a new booking on ``budgetId`` or onto ``matchExpenseId``."""
     return await service.confirm_line(line_id, payload)
 
 
@@ -941,10 +997,12 @@ async def confirm_statement_line(
 async def ignore_statement_line(
     line_id: UUID, service: BankServiceDep, payload: IgnoreLineRequest | None = None
 ) -> None:
-    """Mark a transaction as irrelevant — it is kept (idempotent import).
+    """Mark a transaction as irrelevant. The line stays for the idempotent import.
 
-    Gated by the dedicated ``budget.reconcile_ignore`` permission (audit-sensitive);
-    an optional ``reason`` is recorded in the audit log."""
+    The dedicated ``budget.reconcile_ignore`` permission gates this route,
+    because the action is audit-sensitive. The audit log records the optional
+    ``reason``.
+    """
     await service.ignore_line(line_id, reason=payload.reason if payload else None)
 
 
@@ -966,12 +1024,14 @@ async def reactivate_statement_line(line_id: UUID, service: BankServiceDep) -> S
     responses=_errors(401, 403, 404),
 )
 async def unlink_statement_line(line_id: UUID, service: BankServiceDep) -> StatementLineOut:
-    """Unlink transaction from booking: remove the allocation, reopen the
-    transaction. The booking remains."""
+    """Unlink a transaction from a booking.
+
+    The route removes the allocation and reopens the transaction. The booking
+    remains.
+    """
     return await service.unlink_line(line_id)
 
 
-# ---------------------------------------------------------------- fiscal years
 @router.get(
     "/budgets/{budget_id}/fiscal-years",
     response_model=list[FiscalYearOut],
@@ -982,9 +1042,12 @@ async def list_fiscal_years(
     service: ServiceDep,
     principal: Annotated[Principal, Depends(require_principal())],
 ) -> list[FiscalYearOut]:
-    """List fiscal years — any node allowed; non-top-level resolves to its
-    top-level ancestor (scoped roots are often sub cost centres). Full view or
-    gremium scope on the node."""
+    """List the fiscal years of the top-level budget above this node.
+
+    Any node is allowed. A node below the top level resolves to its top-level
+    ancestor, because a scoped root is often a sub cost center. The caller
+    needs the full view or the gremium scope on the node.
+    """
     await _require_node_view(service, principal, budget_id)
     return await service.list_fiscal_years(budget_id)
 
@@ -999,7 +1062,10 @@ async def list_fiscal_years(
 async def create_fiscal_year(
     budget_id: UUID, payload: FiscalYearCreate, service: ServiceDep
 ) -> FiscalYearOut:
-    """Create a fiscal year (disjoint per top budget — 422 otherwise)."""
+    """Create a fiscal year.
+
+    The fiscal years of one top budget must stay disjoint. An overlap gives 422.
+    """
     return await service.create_fiscal_year(budget_id, payload)
 
 
@@ -1015,11 +1081,10 @@ async def update_fiscal_year(
     payload: FiscalYearUpdate,
     service: ServiceDep,
 ) -> FiscalYearOut:
-    """Update a fiscal year (disjointness re-checked)."""
+    """Update a fiscal year. The route checks the disjointness again."""
     return await service.update_fiscal_year(budget_id, fiscal_year_id, payload)
 
 
-# ----------------------------------------------------------------- allocation
 @router.put(
     "/budgets/{budget_id}/allocations/{fiscal_year_id}",
     response_model=AllocationOut,
@@ -1032,11 +1097,10 @@ async def set_allocation(
     payload: AllocationSet,
     service: ServiceDep,
 ) -> AllocationOut:
-    """Set the top-down allocation (422 if the children's sum exceeds the parent)."""
+    """Set the top-down allocation. A children sum above the parent gives 422."""
     return await service.set_allocation(budget_id, fiscal_year_id, payload)
 
 
-# ------------------------------------------------------------------- assign
 @router.post(
     "/applications/{application_id}/assign-budget",
     response_model=AssignBudgetOut,
@@ -1046,7 +1110,10 @@ async def set_allocation(
 async def assign_budget(
     application_id: UUID, payload: AssignBudgetRequest, service: ServiceDep
 ) -> AssignBudgetOut:
-    """Assign an application to a cost centre; sets the fiscal year (``budgetId=null`` clears)."""
+    """Assign an application to a cost center and set the fiscal year.
+
+    ``budgetId=null`` clears the assignment.
+    """
     return await service.assign_budget(application_id, payload)
 
 
@@ -1059,5 +1126,8 @@ async def assign_budget(
 async def move_fiscal_year(
     application_id: UUID, payload: MoveFiscalYearRequest, service: ServiceDep
 ) -> AssignBudgetOut:
-    """Move an application to another fiscal year (consistency with the top budget checked)."""
+    """Move an application to another fiscal year.
+
+    The route checks that the fiscal year stays consistent with the top budget.
+    """
     return await service.move_fiscal_year(application_id, payload)

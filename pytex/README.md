@@ -1,12 +1,13 @@
 # pytex
 
 Render service: a thin FastAPI wrapper around `pytex_api.render_blob`
-(pytex-preprocessor **v1.0.6**, pinned in `requirements.txt`). pytex ships no REST surface, so this container
-exposes one over the blob API for the platform's PDF module to call.
+(pytex-preprocessor **v1.0.6**, pinned in `requirements.txt`). pytex ships no
+REST surface, so this container exposes one over the blob API. The PDF module of
+the platform calls it.
 
-Markdown in (raw request body) → PDF out (or `.tex`). Variant
-(`report` / `protocol-stupa` / `protocol-asta` / …) is auto-detected from the
-document's YAML frontmatter, or forced via `?variant=`.
+Markdown in (raw request body) → PDF out (or `.tex`). The service reads the
+variant (`report` / `protocol-stupa` / `protocol-asta` / …) from the YAML
+frontmatter of the document. Force a variant with `?variant=`.
 
 ## Endpoints
 
@@ -23,19 +24,20 @@ Source = **raw request body** (Markdown bytes). Controls = query params.
 Response: `application/pdf` (PDF) or `text/plain; charset=utf-8` (`.tex`).
 Headers: `X-Render-Duration-Seconds`, `X-Warnings`.
 
-The service is **internal-only** (no host port, `internal` compose network) and
-is fed first-party, app-generated documents, so it defaults to `trusted` — which
-lets the first build pull the tectonic bundle, after which the `pytex_cache`
-volume serves it offline.
+The service is **internal-only**: it has no host port and it sits on the
+`internal` compose network. It renders first-party, app-generated documents
+only, so it defaults to `trusted`. That default lets the first build pull the
+tectonic bundle. After that the `pytex_cache` volume serves the bundle offline.
 
-> ⚠️ **The pytex port must stay private.** The `trusted` default runs builds with
-> the full tectonic/biber toolchain (shell-out, network on first build). Never
-> publish port `8099` to a host or expose it outside the `internal` network;
-> untrusted callers reaching it could abuse the trusted build path. Keep it
-> reachable only from the backend.
+> ⚠️ **Keep the pytex port private.** The `trusted` default runs a build with
+> the full tectonic and biber toolchain. Such a build shells out, and the first
+> build uses the network. Never publish port `8099` to a host. Never expose it
+> outside the `internal` network. An untrusted caller that reaches the port can
+> abuse the trusted build path. Keep the port reachable from the backend only.
 
 #### Error contract
-Detail strings are scrubbed of absolute filesystem paths; no stacktrace leaks.
+The service scrubs absolute filesystem paths out of every detail string. No
+stacktrace leaks.
 
 | condition                              | status | body                              |
 |----------------------------------------|--------|-----------------------------------|
@@ -54,7 +56,7 @@ Detail strings are scrubbed of absolute filesystem paths; no stacktrace leaks.
 |-------------------------|-------------|------------------------------------------|
 | `PYTEX_DEFAULT_OUTPUT`  | `pdf`       | output kind when `?output_kind` omitted  |
 | `PYTEX_DEFAULT_TRUST`   | `trusted`   | trust level when `?trust_level` omitted  |
-| `PYTEX_MAX_BODY_BYTES`  | `4194304`   | hard body cap, in front of the lib's 2 MiB input cap |
+| `PYTEX_MAX_BODY_BYTES`  | `4194304`   | hard body cap, before the 2 MiB library input cap |
 | `XDG_CACHE_HOME`        | `/cache`    | tectonic bundle cache (mount `pytex_cache`) |
 
 ## Develop
@@ -65,10 +67,10 @@ python3 -m venv .venv && .venv/bin/pip install -e '.[dev]'
 .venv/bin/ruff check . && .venv/bin/basedpyright && .venv/bin/python -m pytest
 ```
 
-Unit tests mock the render backend (no tectonic needed). The md→tex real-render
-integration tests run the genuine variant machinery and need no tectonic, so
-they run in CI by default. Only the md→pdf test is skipped unless `tectonic` is
-on `PATH`:
+Unit tests mock the render backend, so they need no tectonic. The md→tex
+integration tests run the real variant machinery and need no tectonic either.
+They run in CI every time. pytest skips the md→pdf test unless `tectonic` is on
+`PATH`:
 
 ```bash
 .venv/bin/python -m pytest -m integration   # md->tex run; md->pdf needs tectonic

@@ -1,5 +1,9 @@
-"""Zusatz-Coverage für app/shared: xlsx-Workbook-Builder, Guard-Helfer/-Validierung
-und Config-Schema-ReDoS-Schutz. Reine Unit-Tests (kein DB/Docker/Netz)."""
+"""Extra coverage for app/shared.
+
+The tests cover the xlsx workbook builders, the guard helpers and their validation,
+and the ReDoS guard of the config schema. They are pure unit tests. They need no
+database, no Docker and no network.
+"""
 
 from __future__ import annotations
 
@@ -32,11 +36,8 @@ from app.shared.guards import (
 )
 
 
-# --------------------------------------------------------------------------- #
-# Hilfen
-# --------------------------------------------------------------------------- #
 def _load(data: bytes) -> Any:
-    """xlsx-Bytes als openpyxl-Workbook laden (für Assertions über Inhalt)."""
+    """Load xlsx bytes into an openpyxl workbook."""
     return load_workbook(BytesIO(data))
 
 
@@ -103,16 +104,12 @@ def _list_item(**kw: Any) -> ApplicationListItem:
     return ApplicationListItem.model_validate(base)
 
 
-# --------------------------------------------------------------------------- #
-# xlsx — Budget-Workbook
-# --------------------------------------------------------------------------- #
 def test_budget_workbook_empty_tree() -> None:
-    """Kein HHJ → ein einzelnes »Budget«-Blatt nur mit Header."""
+    """Without a fiscal year the builder writes one Budget sheet with only a header."""
     data = xlsx.build_budget_workbook([], fiscal_year_labels={})
     wb = _load(data)
     assert wb.sheetnames == ["Budget"]
     ws = wb["Budget"]
-    # Header-Zeile vorhanden, keine Datenzeilen.
     assert ws.max_row == 1
     assert ws.cell(row=1, column=1).value == "Kostenstelle"
     assert ws.cell(row=1, column=1).font.bold is True
@@ -120,29 +117,29 @@ def test_budget_workbook_empty_tree() -> None:
 
 
 def test_budget_workbook_one_year_with_and_without_alloc() -> None:
-    """Ein HHJ, ein Knoten mit Alloc + ein Kind ohne Alloc (None-Zellen)."""
+    """One fiscal year, one node with an allocation and one child without one."""
     fy = uuid4()
-    child = _node("child", path_key="VS-root-child")  # keine Alloc → None-Spalten
+    child = _node("child", path_key="VS-root-child")  # no allocation gives None columns
     root = _node("root", allocs=[_alloc(fy)], children=[child])
     labels = {fy: "Haushalt 2026"}
     data = xlsx.build_budget_workbook([root], fiscal_year_labels=labels)
     wb = _load(data)
     assert wb.sheetnames == ["Haushalt 2026"]
     ws = wb["Haushalt 2026"]
-    # Header + root + child = 3 Zeilen.
+    # header + root + child = 3 rows
     assert ws.max_row == 3
-    # root: Alloc-Zahlen als float.
+    # root: allocation numbers as float
     assert ws.cell(row=2, column=1).value == "root"
     assert ws.cell(row=2, column=3).value == 1000.0
     assert ws.cell(row=2, column=5).value == 50.0
-    # child: eingerückt + None-Spalten.
+    # child: indented, with None columns
     assert ws.cell(row=3, column=1).value == "    child"
     assert ws.cell(row=3, column=3).value is None
     assert ws.cell(row=3, column=7).value == "EUR"
 
 
 def test_budget_workbook_filter_single_fiscal_year() -> None:
-    """``fiscal_year_id`` blendet andere HHJ-Blätter aus."""
+    """`fiscal_year_id` hides the sheets of the other fiscal years."""
     fy1, fy2 = uuid4(), uuid4()
     root = _node("root", allocs=[_alloc(fy1), _alloc(fy2)])
     labels = {fy1: "2025", fy2: "2026"}
@@ -154,20 +151,20 @@ def test_budget_workbook_filter_single_fiscal_year() -> None:
 
 
 def test_budget_workbook_repeated_fiscal_year_dedup() -> None:
-    """Mehrere Knoten mit demselben HHJ → fy_order dedupliziert (ein Blatt)."""
+    """Several nodes with the same fiscal year give one sheet, because fy_order dedupes."""
     fy = uuid4()
     a = _node("a", allocs=[_alloc(fy)])
-    b = _node("b", allocs=[_alloc(fy)])  # gleiche fy → kein zweites fy_order-Element
+    b = _node("b", allocs=[_alloc(fy)])  # the same fy adds no second fy_order entry
     data = xlsx.build_budget_workbook([a, b], fiscal_year_labels={fy: "2026"})
     wb = _load(data)
     assert wb.sheetnames == ["2026"]
     ws = wb["2026"]
-    # Header + a + b = 3 Zeilen, beide Knoten im selben Blatt.
+    # header + a + b = 3 rows, both nodes on the same sheet
     assert ws.max_row == 3
 
 
 def test_budget_workbook_missing_label_falls_back_to_hhj() -> None:
-    """Fehlendes Label → Default »HHJ« als Blattname."""
+    """A missing label falls back to the default sheet name HHJ."""
     fy = uuid4()
     root = _node("root", allocs=[_alloc(fy)])
     data = xlsx.build_budget_workbook([root], fiscal_year_labels={})
@@ -176,7 +173,7 @@ def test_budget_workbook_missing_label_falls_back_to_hhj() -> None:
 
 
 def test_budget_workbook_multiple_years_stable_order() -> None:
-    """Mehrere HHJ → ein Blatt je HHJ, Reihenfolge stabil aus dem Baum."""
+    """One sheet per fiscal year. The tree order stays stable."""
     fy1, fy2 = uuid4(), uuid4()
     root = _node("root", allocs=[_alloc(fy1), _alloc(fy2)])
     labels = {fy1: "Erstes", fy2: "Zweites"}
@@ -185,9 +182,6 @@ def test_budget_workbook_multiple_years_stable_order() -> None:
     assert wb.sheetnames == ["Erstes", "Zweites"]
 
 
-# --------------------------------------------------------------------------- #
-# xlsx — _sheet_title (Sanitisierung + Eindeutigkeit)
-# --------------------------------------------------------------------------- #
 def test_sheet_title_sanitizes_illegal_chars() -> None:
     used: set[str] = set()
     title = xlsx._sheet_title("A[b]:c*d?e/f\\g", used)
@@ -197,7 +191,7 @@ def test_sheet_title_sanitizes_illegal_chars() -> None:
 
 def test_sheet_title_empty_becomes_hhj() -> None:
     used: set[str] = set()
-    # Nur illegale Zeichen + Whitespace → nach strip() leer → »HHJ«.
+    # Only illegal characters and whitespace. strip() leaves nothing, so HHJ wins.
     assert xlsx._sheet_title("   ", used) == "HHJ"
 
 
@@ -227,9 +221,6 @@ def test_budget_workbook_duplicate_labels_get_unique_sheets() -> None:
     assert wb.sheetnames == ["Topf", "Topf (2)"]
 
 
-# --------------------------------------------------------------------------- #
-# xlsx — Antragsliste
-# --------------------------------------------------------------------------- #
 def test_applications_workbook_full_row() -> None:
     item = _list_item(
         state=_state({"de": "Prüfung", "en": "Review"}),
@@ -252,7 +243,7 @@ def test_applications_workbook_full_row() -> None:
 
 
 def test_applications_workbook_locale_label_fallbacks() -> None:
-    # locale=fr nicht vorhanden → de → en Fallback-Kette.
+    # locale fr is absent, so the chain falls back to de and then to en
     only_en = _list_item(state=_state({"en": "Approved"}))
     data = xlsx.build_applications_workbook(
         [only_en], type_names={}, gremium_names={}, locale="fr"
@@ -262,7 +253,7 @@ def test_applications_workbook_locale_label_fallbacks() -> None:
 
 
 def test_applications_workbook_empty_label_dict() -> None:
-    # state vorhanden, aber leeres Label → leerer String (keine der Locales matched).
+    # A state with an empty label gives an empty string, because no locale matches.
     blank = _list_item(state=_state({}))
     data = xlsx.build_applications_workbook(
         [blank], type_names={}, gremium_names={}
@@ -277,15 +268,12 @@ def test_applications_workbook_no_state_no_gremium_no_title() -> None:
         [item], type_names={}, gremium_names={}
     )
     ws = _load(data)["Anträge"]
-    # title None → "", gremium leer → "", state None → "".
+    # A None title, an empty gremium and a None state all give "".
     assert ws.cell(row=2, column=1).value is None or ws.cell(row=2, column=1).value == ""
     assert ws.cell(row=2, column=4).value is None or ws.cell(row=2, column=4).value == ""
     assert ws.cell(row=2, column=5).value is None  # _num(None)
 
 
-# --------------------------------------------------------------------------- #
-# xlsx — Buchungen
-# --------------------------------------------------------------------------- #
 class _Expense:
     def __init__(self, **kw: Any) -> None:
         self.created_at = kw.get("created_at", datetime(2026, 1, 5, 8, 0))
@@ -312,7 +300,7 @@ def test_expenses_workbook_en_labels_and_unknown_kind() -> None:
     data = xlsx.build_expenses_workbook(items, locale="en")
     ws = _load(data)["Buchungen"]
     assert ws.cell(row=2, column=2).value == "Income"
-    # Unbekannte Art → fällt auf den Roh-Wert zurück.
+    # An unknown kind falls back to the raw value.
     assert ws.cell(row=3, column=2).value == "weird"
 
 
@@ -333,9 +321,6 @@ def test_expenses_workbook_none_fields() -> None:
     assert ws.cell(row=2, column=7).value is None  # _num(None)
 
 
-# --------------------------------------------------------------------------- #
-# xlsx — DSGVO-Auskunft
-# --------------------------------------------------------------------------- #
 def test_auskunft_workbook_with_principal_and_rows() -> None:
     principal = {
         "sub": "auth0|abc",
@@ -372,11 +357,11 @@ def test_auskunft_workbook_with_principal_and_rows() -> None:
     wb = _load(data)
     assert wb.sheetnames == ["Konto", "Anträge", "Versionen"]
     konto = wb["Konto"]
-    assert konto.cell(row=2, column=2).value == "a@b.c"  # E-Mail (Anfrage)
+    assert konto.cell(row=2, column=2).value == "a@b.c"  # email of the request
     assert konto.cell(row=3, column=2).value == "auth0|abc"
-    assert konto.cell(row=6, column=2).value == "ja"  # Aktiv=True
+    assert konto.cell(row=6, column=2).value == "ja"  # active=True
     apps = wb["Anträge"]
-    # JSON sortiert (sort_keys) → "a" vor "b".
+    # The JSON is sorted (sort_keys), so "a" comes before "b".
     assert apps.cell(row=2, column=6).value == '{"a": 1, "b": 2}'
     versions_ws = wb["Versionen"]
     assert versions_ws.cell(row=2, column=2).value == 1
@@ -395,7 +380,7 @@ def test_auskunft_workbook_inactive_principal() -> None:
     )
     konto = _load(data)["Konto"]
     assert konto.cell(row=6, column=2).value == "nein"  # active False
-    # Letzter Login None → "" via _fmt_dt.
+    # A None last login becomes "" through _fmt_dt.
     assert konto.cell(row=7, column=2).value is None or konto.cell(row=7, column=2).value == ""
 
 
@@ -405,12 +390,12 @@ def test_auskunft_workbook_no_principal() -> None:
     )
     wb = _load(data)
     konto = wb["Konto"]
-    # Nur Header + E-Mail-Zeile, keine Principal-Zeilen.
+    # Only the header and the email row, no principal rows.
     assert konto.max_row == 2
 
 
 def test_auskunft_workbook_empty_app_and_version_data() -> None:
-    # data fehlt → json.dumps({}) ; ids fehlen → leerer String.
+    # A missing data key gives json.dumps({}). A missing id gives an empty string.
     applications = [{"typeName": None, "status": None, "applicantName": None}]
     versions = [{"version": None, "changedBy": None}]
     data = xlsx.build_auskunft_workbook(
@@ -421,9 +406,6 @@ def test_auskunft_workbook_empty_app_and_version_data() -> None:
     assert wb["Versionen"].cell(row=2, column=5).value == "{}"
 
 
-# --------------------------------------------------------------------------- #
-# xlsx — Klein-Helfer
-# --------------------------------------------------------------------------- #
 def test_num_and_fmt_dt_helpers() -> None:
     assert xlsx._num(None) is None
     assert xlsx._num(Decimal("3.5")) == 3.5
@@ -433,7 +415,7 @@ def test_num_and_fmt_dt_helpers() -> None:
 
 
 def test_autosize_caps_width_at_60() -> None:
-    # Eine sehr lange Zelle → Spaltenbreite auf 60 gedeckelt.
+    # A very long cell caps the column width at 60.
     long_name = "z" * 200
     fy = uuid4()
     root = _node(long_name, allocs=[_alloc(fy)])
@@ -442,12 +424,9 @@ def test_autosize_caps_width_at_60() -> None:
     assert ws.column_dimensions["A"].width == 60
 
 
-# --------------------------------------------------------------------------- #
-# guards — Koerzierungshelfer
-# --------------------------------------------------------------------------- #
 def test_to_decimal_variants() -> None:
     assert _to_decimal(None) is None
-    assert _to_decimal(True) is None  # bool ausgeschlossen
+    assert _to_decimal(True) is None  # bool is excluded
     assert _to_decimal(False) is None
     assert _to_decimal("3.14") == Decimal("3.14")
     assert _to_decimal(5) == Decimal("5")
@@ -460,7 +439,7 @@ def test_to_date_variants() -> None:
     assert _to_date(date(2026, 6, 16)) == date(2026, 6, 16)
     assert _to_date("2026-06-16T10:00:00") == date(2026, 6, 16)
     assert _to_date("not-a-date") is None  # ValueError → None
-    assert _to_date(123) is None  # nicht-str/date/datetime → None
+    assert _to_date(123) is None  # not a str, date or datetime, so None
 
 
 def test_to_bool_variants() -> None:
@@ -471,7 +450,7 @@ def test_to_bool_variants() -> None:
     assert _to_bool("nope") is False
     assert _to_bool(1) is True
     assert _to_bool(0) is False
-    assert _to_bool([1]) is True  # bool(value) Fallback
+    assert _to_bool([1]) is True  # bool(value) fallback
 
 
 def test_ops_for_type() -> None:
@@ -480,18 +459,15 @@ def test_ops_for_type() -> None:
     assert "<" in ops_for_type("date")
     assert ops_for_type("bool") == frozenset({"=="})
     assert "in" in ops_for_type("text")
-    assert "in" in ops_for_type("anything_else")  # Default → Text-Ops
+    assert "in" in ops_for_type("anything_else")  # the default is the text ops
 
 
 def test_apply_ordered_unknown_op_is_false() -> None:
     assert _apply_ordered("==", 1, 1) is True
     assert _apply_ordered("<", 1, 2) is True
-    assert _apply_ordered("~~", 1, 2) is False  # unbekannt → False
+    assert _apply_ordered("~~", 1, 2) is False  # an unknown operator gives False
 
 
-# --------------------------------------------------------------------------- #
-# guards — eval_guard compare edge cases
-# --------------------------------------------------------------------------- #
 def test_compare_requires_object() -> None:
     with pytest.raises(GuardError, match="object"):
         eval_guard({"compare": "notdict"}, GuardContext())
@@ -518,7 +494,7 @@ def test_compare_empty_left_value_is_false() -> None:
 
 def test_compare_numeric_uncoercible_operand_is_false() -> None:
     ctx = GuardContext(field_values={"amount": "5"}, field_types={"amount": "number"})
-    # Operand nicht in Decimal koerzierbar → False.
+    # The operand does not coerce to Decimal, so the guard gives False.
     assert eval_guard(
         {"compare": {"field": "amount", "op": ">", "value": "x"}}, ctx
     ) is False
@@ -533,20 +509,17 @@ def test_compare_date_uncoercible_is_false() -> None:
 
 def test_compare_text_in_non_list_is_false() -> None:
     ctx = GuardContext(field_values={"k": "a"}, field_types={"k": "text"})
-    # op "in" mit Nicht-Liste → False (kein Crash).
+    # The op "in" with a non-list gives False and does not crash.
     assert eval_guard({"compare": {"field": "k", "op": "in", "value": "abc"}}, ctx) is False
 
 
 def test_compare_text_unknown_op_after_type_check_is_false() -> None:
-    # Für text ist nur ==,!=,in erlaubt; ein numerischer Operator wird vorher per
-    # ops_for_type ausgesiebt (fail-closed False).
+    # Text allows only ==, != and in. ops_for_type filters a numeric operator out
+    # first, so the guard fails closed to False.
     ctx = GuardContext(field_values={"k": "a"}, field_types={"k": "text"})
     assert eval_guard({"compare": {"field": "k", "op": "<", "value": "b"}}, ctx) is False
 
 
-# --------------------------------------------------------------------------- #
-# guards — guard_requires_applicant
-# --------------------------------------------------------------------------- #
 def test_guard_requires_applicant_direct() -> None:
     assert guard_requires_applicant({"actorIsApplicant": True}) is True
 
@@ -557,23 +530,20 @@ def test_guard_requires_applicant_nested_in_combinator() -> None:
 
 
 def test_guard_requires_applicant_combinator_single_child_not_list() -> None:
-    # 'not' mit einem einzelnen (Nicht-Listen-)Kind, das das Gate enthält.
+    # 'not' with a single non-list child that holds the gate.
     assert guard_requires_applicant({"not": {"actorIsApplicant": True}}) is True
 
 
 def test_guard_requires_applicant_false_cases() -> None:
     assert guard_requires_applicant(None) is False
     assert guard_requires_applicant({}) is False  # len != 1
-    assert guard_requires_applicant({"a": 1, "b": 2}) is False  # mehrere Keys
+    assert guard_requires_applicant({"a": 1, "b": 2}) is False  # several keys
     assert guard_requires_applicant("notadict") is False  # type: ignore[arg-type]
-    assert guard_requires_applicant({"roleIs": "x"}) is False  # Leaf ohne Gate
-    # Kombinator ohne das Gate + Nicht-dict-Kinder werden ignoriert.
+    assert guard_requires_applicant({"roleIs": "x"}) is False  # a leaf without the gate
+    # A combinator without the gate. The walk ignores every non-dict child.
     assert guard_requires_applicant({"and": [{"roleIs": "x"}, "junk"]}) is False
 
 
-# --------------------------------------------------------------------------- #
-# guards — validate_guard / _validate_compare zusätzliche Zweige
-# --------------------------------------------------------------------------- #
 def test_validate_guard_multi_key() -> None:
     with pytest.raises(GuardError, match="exactly one operator"):
         validate_guard({"roleIs": "x", "hasField": "y"})
@@ -595,9 +565,6 @@ def test_validate_compare_in_requires_list_ok() -> None:
     validate_guard({"compare": {"field": "x", "op": "in", "value": ["a", "b"]}})
 
 
-# --------------------------------------------------------------------------- #
-# guards — validate_action notify zusätzliche Zweige
-# --------------------------------------------------------------------------- #
 def test_validate_action_notify_recipient_not_dict() -> None:
     with pytest.raises(GuardError, match="must be an object"):
         validate_action({"type": "notify", "recipients": ["junk"]})
@@ -622,11 +589,8 @@ def test_validate_action_notify_recipients_not_a_list() -> None:
         validate_action({"type": "notify", "recipients": "all"})
 
 
-# --------------------------------------------------------------------------- #
-# config_schemas — _redos_prone + FieldValidation.pattern
-# --------------------------------------------------------------------------- #
 def test_redos_prone_detects_nested_unbounded() -> None:
-    # Klassische katastrophale Form: Repeat innerhalb eines wiederholten Subpatterns.
+    # The classic catastrophic form: a repeat inside a repeated subpattern.
     assert _redos_prone(r"(a+)+") is True
     assert _redos_prone(r"(a*)*") is True
     assert _redos_prone(r"([ab]+)+") is True
@@ -635,49 +599,50 @@ def test_redos_prone_detects_nested_unbounded() -> None:
 def test_redos_prone_allows_safe_patterns() -> None:
     assert _redos_prone(r"^[A-Z]{2}\d{2}$") is False
     assert _redos_prone(r"abc") is False
-    assert _redos_prone(r"a+") is False  # nur ein einfacher Quantor
+    assert _redos_prone(r"a+") is False  # only one simple quantifier
     assert _redos_prone(r"[0-9]*") is False
 
 
 def test_redos_prone_branch_inside_repeat() -> None:
-    # BRANCH-Kinder werden traversiert; ein verschachtelter unbegrenzter Quantor
-    # innerhalb eines wiederholten Branch wird erkannt.
+    # The walk visits the BRANCH children. It detects a nested unbounded quantifier
+    # inside a repeated branch.
     assert _redos_prone(r"(a+|b)+") is True
 
 
 def test_redos_prone_repeat_nested_in_repeat_body() -> None:
-    # ``has_unbounded_repeat`` muss durch eine MAX_REPEAT in der Body-Traversierung
-    # rekursieren (children() für MAX_REPEAT → av[2]).
+    # `has_unbounded_repeat` must recurse through a MAX_REPEAT while it walks the body.
+    # For a MAX_REPEAT, children() returns av[2].
     assert _redos_prone(r"(a+b+)+") is True
 
 
 def test_redos_prone_has_unbounded_recurses_through_bounded_repeat() -> None:
-    # Äußeres unbegrenztes ``+`` → has_unbounded_repeat(body); der Body enthält ein
-    # BEGRENZTES ``{2}`` (kein maxrepeat-Treffer), das children() für MAX_REPEAT
-    # durchläuft und so das innere ``a+`` findet.
+    # The outer unbounded `+` calls has_unbounded_repeat(body). The body holds a
+    # BOUNDED `{2}` that does not hit maxrepeat. children() walks that MAX_REPEAT and
+    # finds the inner `a+`.
     assert _redos_prone(r"((a+){2})+") is True
 
 
 def test_redos_prone_bounded_outer_with_nested_inner() -> None:
-    # Äußerer Quantor begrenzt ({1,2}); ``walk(body)`` rekursiert und findet das
-    # innere nested-unbounded (a+)+ → True.
+    # The outer quantifier is bounded ({1,2}). `walk(body)` recurses and finds the
+    # inner nested unbounded (a+)+, so the result is True.
     assert _redos_prone(r"((a+)+){1,2}") is True
 
 
 def test_redos_prone_top_level_branch_with_redos_alternative() -> None:
-    # Top-Level-BRANCH ohne umschließenden Repeat: walk's elif-Zweig traversiert die
-    # Branch-Kinder, eines davon ist redos-anfällig.
+    # A top-level BRANCH without an enclosing repeat. The elif path of walk visits the
+    # branch children, and one of them is ReDoS prone.
     assert _redos_prone(r"(a+)+|safe") is True
 
 
 def test_redos_prone_bounded_outer_repeat_is_safe() -> None:
-    # Äußerer Quantor begrenzt ({1,3}) → has_unbounded_repeat-Pfad greift nicht,
-    # walk geht in den Body weiter (kein nested-unbounded-Treffer).
+    # The outer quantifier is bounded ({1,3}), so the has_unbounded_repeat path does
+    # not apply. walk continues into the body and finds no nested unbounded repeat.
     assert _redos_prone(r"(a+){1,3}") is False
 
 
 def test_redos_prone_invalid_pattern_returns_false() -> None:
-    # Unparsebares Pattern → walk wirft, äußeres except → False (nur Längen-Schranke).
+    # An unparsable pattern makes walk raise. The outer except returns False, so only
+    # the length bound still applies.
     assert _redos_prone(r"(") is False
 
 
@@ -687,7 +652,7 @@ def test_field_validation_pattern_ok() -> None:
 
 
 def test_field_validation_pattern_none() -> None:
-    # Explizites ``pattern=None`` lässt den Validator laufen (None-Frühausstieg).
+    # An explicit pattern=None still runs the validator, which exits early on None.
     v = FieldValidation.model_validate({"min": 1, "pattern": None})
     assert v.pattern is None
 

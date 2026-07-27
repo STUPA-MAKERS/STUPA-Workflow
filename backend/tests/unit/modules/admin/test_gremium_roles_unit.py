@@ -1,8 +1,8 @@
-"""Unit (ohne DB): Gremium-Rollen/-Mitgliedschaften (#42).
+"""Unit tests without a DB: Gremium roles and memberships (#42).
 
-Schwerpunkt: die reine Overlap-Invariante (Amtszeiten dürfen sich nicht überlappen,
-nicht-überlappende Folgeamtszeiten sind erlaubt) + die Service-Branches (Konflikt
-bei Überlappung, Erfolg bei Lücke).
+The focus is the pure overlap invariant. Two terms of office must not overlap, and a
+later term without an overlap stays allowed. The tests also cover the service branches:
+a conflict on an overlap and a success on a gap.
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ def test_overlap_basic_true() -> None:
 
 
 def test_adjacent_intervals_do_not_overlap() -> None:
-    # [Jan, Jun) und [Jun, Dec) grenzen an → kein Overlap (halboffen).
+    # [Jan, Jun) and [Jun, Dec) touch, so they do not overlap (half-open intervals).
     assert not intervals_overlap(
         _dt("2026-01-01"), _dt("2026-06-01"), _dt("2026-06-01"), _dt("2026-12-01")
     )
@@ -44,7 +44,7 @@ def test_disjoint_intervals_do_not_overlap() -> None:
 
 
 def test_open_ended_overlaps_everything_after() -> None:
-    # offenes Ende (None) überlappt jeden späteren Eintrag.
+    # An open end (None) overlaps every later entry.
     assert intervals_overlap(_dt("2026-01-01"), None, _dt("2030-01-01"), None)
 
 
@@ -73,7 +73,7 @@ def _membership(pid, gid, frm, until) -> GremiumMembership:
 async def test_create_membership_rejects_overlap() -> None:
     pid, gid = uuid4(), uuid4()
     existing = _membership(pid, gid, _dt("2026-01-01"), _dt("2026-12-31"))
-    # gets: GremiumRole lookup, Principal-Existenz; scalars: existing memberships
+    # gets: the GremiumRole and the principal existence check. scalars: the memberships.
     db = fake_session(result(existing), gets=[_role(gid), object()])
     payload = GremiumMembershipCreate(
         principalId=pid, gremiumRoleId=uuid4(), validFrom="2026-06-01", validUntil="2026-09-01"
@@ -83,9 +83,9 @@ async def test_create_membership_rejects_overlap() -> None:
 
 
 async def test_create_membership_unknown_principal_404() -> None:
-    # Unbekannte principal_id -> 404 statt FK-IntegrityError beim Commit.
+    # An unknown principal_id gives a 404 instead of an FK IntegrityError on the commit.
     gid = uuid4()
-    db = fake_session(gets=[_role(gid)])  # zweiter get (Principal) -> None
+    db = fake_session(gets=[_role(gid)])  # the second get (principal) returns None
     payload = GremiumMembershipCreate(principalId=uuid4(), gremiumRoleId=uuid4())
     with pytest.raises(NotFoundError):
         await GremiumRoleService(db).create_membership(gid, payload, "admin")
@@ -98,10 +98,10 @@ async def test_create_membership_allows_consecutive_term() -> None:
         result(existing),  # existing memberships
         result(),  # audit advisory lock
         result(),  # audit prev-hash
-        gets=[_role(gid), object()],  # Rolle + Principal-Existenz
+        gets=[_role(gid), object()],  # the role and the principal existence check
     )
 
-    async def _flush_assign() -> None:  # DB würde die PK setzen; Fake tut es nicht.
+    async def _flush_assign() -> None:  # the DB would set the PK, but the fake does not
         for o in db.added:
             if getattr(o, "id", None) is None:
                 o.id = uuid4()
@@ -117,12 +117,12 @@ async def test_create_membership_allows_consecutive_term() -> None:
 
 
 async def test_create_membership_db_constraint_overlap_409() -> None:
-    # AUD-029: passiert die Python-Fast-Path-Prüfung (keine bekannte Überlappung),
-    # feuert aber bei einem konkurrierenden Insert die EXCLUDE-Constraint beim Commit
-    # → IntegrityError. Muss als ConflictError (409) übersetzt werden, nicht 500.
+    # AUD-029: the row passes the Python fast-path check because no overlap is known.
+    # A concurrent insert then fires the EXCLUDE constraint on the commit, which raises
+    # IntegrityError. The service must translate that to ConflictError (409), not 500.
     pid, gid = uuid4(), uuid4()
     db = fake_session(
-        result(),  # keine vorhandenen Mitgliedschaften (Fast-Path: kein Konflikt)
+        result(),  # no existing membership, so the fast path finds no conflict
         result(),  # audit advisory lock
         result(),  # audit prev-hash
         gets=[_role(gid), object()],

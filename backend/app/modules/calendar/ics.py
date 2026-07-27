@@ -1,11 +1,12 @@
-"""iCal feed builder — meetings to RFC5545 ``VCALENDAR`` (pure function, no DB).
+"""iCal feed builder: meetings to an RFC5545 `VCALENDAR` (pure functions, no DB).
 
-``icalendar`` is imported lazily (feed path only) to keep module import cheap.
+The module imports `icalendar` lazily, on the feed path only. This keeps the
+module import cheap.
 
-Timezones: meetings carry local times (Europe/Berlin). Timed events are
-converted to UTC and emitted with ``Z``, avoiding the error-prone ``VTIMEZONE``
-block; DST is resolved per date via :mod:`zoneinfo`. Meetings without a time
-become all-day events (``VALUE=DATE``).
+Time zones: meetings carry local times (Europe/Berlin). The builder converts a
+timed event to UTC and writes it with `Z`. This avoids the error-prone
+`VTIMEZONE` block. `zoneinfo` resolves DST per date. A meeting without a time
+becomes an all-day event (`VALUE=DATE`).
 """
 
 from __future__ import annotations
@@ -20,24 +21,24 @@ from zoneinfo import ZoneInfo
 if TYPE_CHECKING:  # pragma: no cover - types only (icalendar imported lazily)
     from icalendar import Event
 
-# Local timezone of meetings (display/input time).
 _LOCAL_TZ = ZoneInfo("Europe/Berlin")
 
-# Default duration of timed meetings without a (valid) end time.
+# Duration of a timed meeting that has no valid end time.
 DEFAULT_DURATION = timedelta(hours=1)
 
-# Reminder lead (VALARM): timed 1 h before, all-day 1 day before.
+# VALARM reminder lead, relative to the start of the event.
 _ALARM_LEAD_TIMED = timedelta(hours=-1)
 _ALARM_LEAD_ALLDAY = timedelta(days=-1)
 
 
 @dataclass(frozen=True, slots=True)
 class MeetingEvent:
-    """A meeting as a calendar event (mapped from :class:`Meeting` by the service).
+    """A meeting as a calendar event, mapped from a `Meeting` row by the service.
 
-    ``uid`` is the stable meeting id (constant across re-renders), ``stamp`` the
-    ``created_at`` timestamp (deterministic ``DTSTAMP``). Times are local naive
-    ``time`` values; ``date`` is required (undated events are filtered upstream).
+    `uid` is the stable meeting id and stays constant across re-renders. `stamp`
+    is the `created_at` timestamp, which makes `DTSTAMP` deterministic. The times
+    are local naive `time` values. `date` is required, because the service drops
+    meetings without a date.
     """
 
     uid: str
@@ -50,14 +51,17 @@ class MeetingEvent:
 
 
 def _as_utc(value: datetime) -> datetime:
-    """Convert to UTC; naive values are treated as UTC (defensive)."""
+    """Convert a datetime to UTC and treat a naive value as UTC (defensive)."""
     if value.tzinfo is None:
         return value.replace(tzinfo=UTC)
     return value.astimezone(UTC)
 
 
 def _local_to_utc(day: _date, clock: _time) -> datetime:
-    """Combine local (Europe/Berlin) date+time into an aware UTC datetime (DST-correct)."""
+    """Combine a local (Europe/Berlin) date and time into an aware UTC datetime.
+
+    The conversion applies the DST offset of that date.
+    """
     return datetime.combine(day, clock, tzinfo=_LOCAL_TZ).astimezone(UTC)
 
 
@@ -74,12 +78,12 @@ def _build_event(
         ical.add("description", f"Gremium: {event.gremium_name}")
 
     if event.start_time is None:
-        # All-day: DTSTART as plain DATE (no DTEND -> exactly one day).
+        # All-day: DTSTART as a plain DATE. Without DTEND the event lasts one day.
         ical.add("dtstart", event.date)
         lead = _ALARM_LEAD_ALLDAY
     else:
         start = _local_to_utc(event.date, event.start_time)
-        # Use the end time only if it is after the start time; otherwise default duration.
+        # Use the end time only when it is after the start time.
         if event.end_time is not None and event.end_time > event.start_time:
             end = _local_to_utc(event.date, event.end_time)
         else:
@@ -103,10 +107,10 @@ def build_calendar(
     calendar_name: str = "STUPA — Sitzungen",
     default_duration: timedelta = DEFAULT_DURATION,
 ) -> bytes:
-    """Render meetings to ``VCALENDAR`` bytes (RFC5545, CRLF-folded via icalendar).
+    """Render meetings to `VCALENDAR` bytes (RFC5545, CRLF-folded by icalendar).
 
-    ``domain`` makes event UIDs globally unique and stable; ``events`` arrive
-    pre-filtered and sorted.
+    The caller filters and sorts the meetings first. `domain` is the host name
+    that makes the event UIDs globally unique and stable.
     """
     from icalendar import Calendar
 

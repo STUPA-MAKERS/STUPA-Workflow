@@ -1,4 +1,4 @@
-"""TDD: Session-/Token-Handling (security.md §1/§2)."""
+"""TDD: session and token handling (security.md §1 and §2)."""
 
 from __future__ import annotations
 
@@ -29,10 +29,9 @@ def _applicant_row(
     return row
 
 
-# --------------------------------------------------------------------------- #
-# Applicant-Session (serverseitig, DB via FakeSession) — security.md §1:
-# stateless-Token durch widerrufbare, NICHT allein-aus-Secret-fälschbare Session ersetzt.
-# --------------------------------------------------------------------------- #
+# Applicant session, server side, database through FakeSession. Per security.md §1 a
+# revocable session replaces the stateless token. Nobody can forge a session from the
+# secret alone.
 async def test_create_applicant_session_adds_row_and_signs_sid() -> None:
     db = fake_session()
     exp = datetime.now(UTC) + timedelta(hours=12)
@@ -43,9 +42,9 @@ async def test_create_applicant_session_adds_row_and_signs_sid() -> None:
     assert isinstance(db.added[0], ApplicantSession)
     assert db.added[0].scope == "edit"
     assert db.flushed == 1
-    # Cookie ist signiert; die rohe sid steckt nicht im Klartext.
+    # The cookie is signed. The raw sid does not appear in clear text.
     assert db.added[0].sid not in cookie
-    # Die signierte sid ist mit demselben Secret wieder auslesbar.
+    # The same secret reads the signed sid back.
     assert sessions._unsign_applicant_sid(SECRET, cookie, MAX_AGE) == db.added[0].sid
 
 
@@ -61,7 +60,7 @@ async def test_load_applicant_session_valid() -> None:
 
 
 async def test_load_applicant_session_bad_signature() -> None:
-    # Falsches Secret (≈ kein Secret): Signatur scheitert → None, DB nie befragt.
+    # A wrong secret makes the signature fail. The result is None and no database query.
     db = fake_session()
     row = _applicant_row()
     cookie = sessions._sign_applicant_sid(SECRET, row.sid)
@@ -82,9 +81,9 @@ async def test_load_applicant_session_tampered() -> None:
 
 
 async def test_load_applicant_session_forged_secret_no_row() -> None:
-    # KERN-REGRESSION: korrekt signierte sid, aber KEINE Zeile → None. Wer nur das
-    # Secret kennt, kann keine Zeile erfinden (security.md §1, Issue ISSUE_TOKEN).
-    db = fake_session(result())  # leeres Ergebnis
+    # Core regression: a correctly signed sid with no row gives None. An attacker who
+    # knows only the secret cannot invent a row. See security.md §1, issue ISSUE_TOKEN.
+    db = fake_session(result())  # an empty result
     cookie = sessions._sign_applicant_sid(SECRET, "forged-sid")
     loaded = await sessions.load_applicant_session(
         db, secret=SECRET, cookie_value=cookie, now=datetime.now(UTC), max_age=MAX_AGE
@@ -159,7 +158,7 @@ async def test_delete_applicant_session_unknown_sid() -> None:
 
 
 async def test_load_applicant_session_non_str_sid() -> None:
-    # Gültig signiert, aber kein String (Tamper/Programmierfehler) → None vor DB-Lookup.
+    # A signed value that is not a string (tamper or bug) gives None before the lookup.
     bad = sessions._serializer(SECRET, sessions._APPLICANT_SALT).dumps(["not", "a", "str"])
     loaded = await sessions.load_applicant_session(
         fake_session(), secret=SECRET, cookie_value=bad, now=datetime.now(UTC),
@@ -169,14 +168,12 @@ async def test_load_applicant_session_non_str_sid() -> None:
 
 
 async def test_revoke_applicant_sessions_runs() -> None:
-    # Kill-Switch (Anonymisierung): setzt revoked_at per UPDATE; läuft fehlerfrei.
+    # Kill switch for anonymization. The UPDATE sets revoked_at and raises no error.
     db = fake_session()
     await sessions.revoke_applicant_sessions(db, "app-1", now=datetime.now(UTC))
 
 
-# --------------------------------------------------------------------------- #
-# OIDC-Transaktions-Cookie
-# --------------------------------------------------------------------------- #
+# The OIDC transaction cookie.
 def test_oidc_tx_roundtrip() -> None:
     value = sessions.issue_oidc_tx(SECRET, "st", "vf", "nc")
     assert sessions.load_oidc_tx(SECRET, value, MAX_AGE) == {
@@ -196,9 +193,7 @@ def test_oidc_tx_wrong_shape_returns_none() -> None:
     assert sessions.load_oidc_tx(SECRET, bad, MAX_AGE) is None
 
 
-# --------------------------------------------------------------------------- #
-# Principal-Session (serverseitig, DB via FakeSession)
-# --------------------------------------------------------------------------- #
+# Principal session, server side, database through FakeSession.
 async def test_create_principal_session_adds_row_and_signs_sid() -> None:
     db = fake_session()
     exp = datetime.now(UTC) + timedelta(hours=12)
@@ -209,7 +204,7 @@ async def test_create_principal_session_adds_row_and_signs_sid() -> None:
     assert len(db.added) == 1
     assert isinstance(db.added[0], AuthSession)
     assert db.flushed == 1
-    # Cookie ist signiert; rohe sid steckt nicht im Klartext.
+    # The cookie is signed. The raw sid does not appear in clear text.
     assert db.added[0].sid not in cookie
 
 
@@ -233,7 +228,7 @@ async def test_load_principal_session_bad_cookie() -> None:
 
 
 async def test_load_principal_session_unknown_sid() -> None:
-    db = fake_session(result())  # keine Zeile
+    db = fake_session(result())  # no row
     cookie = sessions._sign_sid(SECRET, "s1")
     loaded = await sessions.load_principal_session(
         db, secret=SECRET, cookie_value=cookie, now=datetime.now(UTC), max_age=MAX_AGE

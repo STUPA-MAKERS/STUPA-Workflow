@@ -7,9 +7,11 @@ import type { TranslationKey } from '@core/i18n/translations';
 import { IconComponent } from '@stupa-makers/ui-kit';
 
 /**
- * OAuth consent: after login the user picks which scopes and which token lifetime
- * (including "never expires") the agent/MCP receives before the code is minted.
- * Approve/Deny return a loopback redirect URL to forward to.
+ * OAuth consent page.
+ *
+ * After login the user selects the scopes and the token lifetime that the MCP agent
+ * gets. The lifetime list can contain "never expires". The server mints the code only
+ * after this step. Approve and deny both return a loopback redirect URL to follow.
  */
 @Component({
   selector: 'app-oauth-consent',
@@ -28,11 +30,10 @@ export class OAuthConsentComponent {
   readonly error = signal<string | null>(null);
   readonly submitting = signal(false);
 
-  /** Selected scopes (key → on/off); initially all requested ones. */
+  /** Selected scopes, keyed by scope key. Every requested scope starts on. */
   readonly selected = signal<Record<string, boolean>>({});
   readonly lifetime = signal<string>('30d');
 
-  /** i18n key for a lifetime preset (account.lifetime.<key>). */
   lifetimeKey(value: string): TranslationKey {
     return `account.lifetime.${value}` as TranslationKey;
   }
@@ -87,7 +88,7 @@ export class OAuthConsentComponent {
     this.submitting.set(true);
     this.api.submitConsent({ approve, scopes, lifetime: this.lifetime() }).subscribe({
       next: (r) => {
-        // Back to the MCP client's local loopback callback (or with error=…).
+        // Go back to the local loopback callback of the MCP client. The URL can carry error=…
         this.location.assign(r.redirect);
       },
       error: () => {

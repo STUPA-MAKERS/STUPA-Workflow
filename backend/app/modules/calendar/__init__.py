@@ -1,6 +1,6 @@
-"""Calendar module: iCal subscription of the principal's meetings.
+"""Calendar module: iCal subscription to the meetings of a principal.
 
-A personal, rotatable feed token (``principal.calendar_token``) authenticates
-the ``.ics`` subscription URL — calendar clients cannot log in via OIDC. The
-feed lists meetings of the gremien the principal is a member of.
+A personal, rotatable feed token (`principal.calendar_token`) authenticates the
+`.ics` subscription URL. Calendar clients cannot log in through OIDC. The feed
+lists the meetings of the Gremien that the principal is a member of.
 """

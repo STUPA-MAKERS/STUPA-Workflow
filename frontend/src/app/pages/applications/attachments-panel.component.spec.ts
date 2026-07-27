@@ -133,7 +133,6 @@ describe('AttachmentsPanelComponent', () => {
     expect(error).toHaveBeenCalledWith(
       'Noch nicht freigegeben — Prüfung läuft oder Datei in Quarantäne.',
     );
-    // download now disabled (state != clean)
     expect(screen.getByRole('button', { name: 'Herunterladen' })).toBeDisabled();
     http.verify();
   });
@@ -159,7 +158,7 @@ describe('AttachmentsPanelComponent', () => {
 
     const byId = new Map(cmp.attachments().map((x) => [x.id, x.scanState]));
     expect(byId.get('a')).toBe('quarantined');
-    // sibling 'b' takes the `: a` (unchanged) branch of the map
+    // The sibling 'b' takes the unchanged branch of the map.
     expect(byId.get('b')).toBe('clean');
     http.verify();
   });
@@ -252,7 +251,7 @@ describe('AttachmentsPanelComponent', () => {
     const cmp = fixture.componentInstance;
     cmp.uploading.set(true);
     cmp['upload']([new File(['x'], 'a.pdf', { type: 'application/pdf' })]);
-    // still flagged; no POST emitted (verified)
+    // The flag stays set. No POST goes out, which http.verify confirms.
     expect(cmp.uploading()).toBe(true);
     http.verify();
   });
@@ -266,7 +265,7 @@ describe('AttachmentsPanelComponent', () => {
       new File(['b'], 'b.pdf', { type: 'application/pdf' }),
     ]);
 
-    // first request only (concatMap holds the second until the first completes)
+    // Only the first request goes out. concatMap holds the second one back.
     const first = http.expectOne(uploadUrl);
     first.flush(wire({ id: 'att-a', filename: 'a.pdf' }), { status: 201, statusText: 'Created' });
     const second = http.expectOne(uploadUrl);
@@ -384,7 +383,7 @@ describe('AttachmentsPanelComponent', () => {
     expect(cmp.scanLabel('quarantined')).toBe('applications.attachments.scan.quarantined');
   });
 
-  // --- bulk-select --------------------------------------------------------
+  // Bulk select
   it('tracks per-row selection, select-all and the selected count', async () => {
     const { http, detectChanges, fixture } = await setup();
     const cmp = fixture.componentInstance;
@@ -443,7 +442,7 @@ describe('AttachmentsPanelComponent', () => {
 
     cmp.toggleSelectAll(true);
     cmp.bulkDelete();
-    // sequential DELETEs (concatMap)
+    // concatMap sends the DELETE requests one after the other.
     http.expectOne((r) => r.method === 'DELETE' && r.url === '/api/attachments/a').flush(null, {
       status: 204,
       statusText: 'No Content',
@@ -452,7 +451,7 @@ describe('AttachmentsPanelComponent', () => {
       status: 204,
       statusText: 'No Content',
     });
-    // refreshAfterBulk re-lists the attachments
+    // refreshAfterBulk lists the attachments again.
     http
       .expectOne((r) => r.method === 'GET' && r.url === `/api/applications/${APP_ID}/attachments`)
       .flush([]);
@@ -496,7 +495,7 @@ describe('AttachmentsPanelComponent', () => {
 
     cmp.toggleSelectAll(true);
     cmp.bulkDelete();
-    // first DELETE succeeds, second fails
+    // The first DELETE succeeds and the second one fails.
     http.expectOne((r) => r.method === 'DELETE' && r.url === '/api/attachments/a').flush(null, {
       status: 204,
       statusText: 'No Content',
@@ -504,7 +503,7 @@ describe('AttachmentsPanelComponent', () => {
     http
       .expectOne((r) => r.method === 'DELETE' && r.url === '/api/attachments/b')
       .flush({ title: 'e' }, { status: 500, statusText: 'Server Error' });
-    // refreshAfterBulk re-lists: 'b' still present, 'a' gone
+    // refreshAfterBulk lists again: 'b' is still there and 'a' is gone.
     http
       .expectOne((r) => r.method === 'GET' && r.url === `/api/applications/${APP_ID}/attachments`)
       .flush([wire({ id: 'b', filename: 'b.pdf' })]);
@@ -513,7 +512,7 @@ describe('AttachmentsPanelComponent', () => {
     expect(cmp.bulkDeleting()).toBe(false);
     expect(error).toHaveBeenCalledWith('Anhang konnte nicht gelöscht werden.');
     expect(cmp.attachments().map((a) => a.id)).toEqual(['b']);
-    // 'b' stays selected so a retry is possible; 'a' dropped (no longer in list)
+    // 'b' stays selected for a retry. 'a' drops out because the list lost it.
     expect(cmp.isSelected('b')).toBe(true);
     expect(cmp.isSelected('a')).toBe(false);
     http.verify();
@@ -540,7 +539,7 @@ describe('AttachmentsPanelComponent', () => {
       status: 204,
       statusText: 'No Content',
     });
-    // list reload fails → local removal of attempted ids
+    // The list reload fails, so the panel removes the attempted ids locally.
     http
       .expectOne((r) => r.method === 'GET' && r.url === `/api/applications/${APP_ID}/attachments`)
       .flush({ title: 'e' }, { status: 500, statusText: 'Server Error' });
@@ -551,7 +550,7 @@ describe('AttachmentsPanelComponent', () => {
     http.verify();
   });
 
-  // --- drag & drop --------------------------------------------------------
+  // Drag and drop
   function dragEvent(types: string[], files: File[] = []): DragEvent {
     return {
       preventDefault: jest.fn(),
@@ -666,17 +665,18 @@ describe('AttachmentsPanelComponent', () => {
     const { http, fixture } = await setup();
     const cmp = fixture.componentInstance;
     const noDt = { preventDefault: jest.fn(), dataTransfer: null } as unknown as DragEvent;
-    // hasFiles → types ?? [] → false, so dragenter bails before preventDefault
+    // hasFiles gets the `types ?? []` fallback, so dragenter returns before
+    // preventDefault.
     cmp.onDragEnter(noDt);
     expect(cmp.dragActive()).toBe(false);
-    // onDrop reaches the files ?? [] fallback → empty → no upload
+    // onDrop reaches the `files ?? []` fallback, gets nothing and uploads nothing.
     cmp.onDrop(noDt);
     expect(noDt.preventDefault).toHaveBeenCalled();
     expect(cmp.dragActive()).toBe(false);
     http.verify();
   });
 
-  // ------------------------------------------------------- inline preview
+  // Inline preview
   it('offers a preview only for clean images/PDFs and opens the PDF in an iframe dialog', async () => {
     const { http, detectChanges, fixture } = await setup();
     await uploadFile();
@@ -684,7 +684,7 @@ describe('AttachmentsPanelComponent', () => {
     detectChanges();
 
     const cmp = fixture.componentInstance;
-    // canPreview: clean PDF yes, scanning/foreign mime no.
+    // canPreview accepts a clean PDF. It rejects a scanning file or a foreign mime type.
     expect(cmp.canPreview({ ...cmp.attachments()[0] })).toBe(true);
     expect(cmp.canPreview({ ...cmp.attachments()[0], scanState: 'scanning' })).toBe(false);
     expect(cmp.canPreview({ ...cmp.attachments()[0], mime: 'application/zip' })).toBe(false);
@@ -698,9 +698,10 @@ describe('AttachmentsPanelComponent', () => {
     expect(cmp.previewing()?.id).toBe('att-1');
     expect(cmp.previewIsImage()).toBe(false);
     expect(cmp.previewFrameUrl()).not.toBeNull();
-    // inline=1 keeps Content-Disposition inline (renders instead of downloading).
+    // The `inline=1` flag keeps Content-Disposition inline. The file then renders
+    // instead of downloading.
     expect(cmp.previewUrl()).toBe('/api/attachments/att-1/download?sig=ok&inline=1');
-    expect(screen.getByTitle('plan.pdf')).toBeInTheDocument(); // iframe
+    expect(screen.getByTitle('plan.pdf')).toBeInTheDocument();
 
     cmp.closePreview();
     detectChanges();
@@ -764,14 +765,14 @@ describe('AttachmentsPanelComponent', () => {
     expect(cmp.previewing()).toBeNull();
     expect(error).toHaveBeenCalledTimes(1);
 
-    // 410 + generic error paths (attachment object reused directly).
+    // The 410 path and the generic error path reuse the attachment object directly.
     cmp.openPreview({ ...cmp.attachments()[0], scanState: 'clean' });
     http.expectOne(dlUrl('att-1')).flush({}, { status: 410, statusText: 'Gone' });
     expect(error).toHaveBeenCalledTimes(2);
     cmp.openPreview({ ...cmp.attachments()[0], scanState: 'clean' });
     http.expectOne(dlUrl('att-1')).flush({}, { status: 500, statusText: 'Err' });
     expect(error).toHaveBeenCalledTimes(3);
-    // Guard: while a preview request is in flight, further opens are ignored.
+    // Guard: openPreview ignores further calls while a preview request is in flight.
     cmp.previewLoadingId.set('att-1');
     cmp.openPreview({ ...cmp.attachments()[0], scanState: 'clean' });
     cmp.previewLoadingId.set(null);

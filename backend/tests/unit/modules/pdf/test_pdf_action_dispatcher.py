@@ -1,4 +1,4 @@
-"""Unit-Tests Flow-Action-Dispatcher exportPdf + Chain (T-20, flows §9.3)."""
+"""Unit tests for the exportPdf flow-action dispatcher and the chain (T-20, flows §9.3)."""
 
 from __future__ import annotations
 
@@ -35,7 +35,7 @@ async def test_export_pdf_creates_job_and_enqueues() -> None:
     app = Application()
     app.id = uuid.uuid4()
     session.store[app.id] = app
-    session._scalar = [None]  # kein bestehender Job für den Idempotenz-Key
+    session._scalar = [None]  # no job exists yet for the idempotency key
     queue = FakeRenderQueue()
     await _dispatcher(session, queue).dispatch([_action("exportPdf", app.id)])
     assert len(session.added) == 1
@@ -52,7 +52,7 @@ async def test_non_export_action_ignored() -> None:
 
 
 async def test_export_pdf_missing_application_skipped() -> None:
-    session = FakePdfSession()  # leerer Store → Antrag fehlt → NotFoundError → skip
+    session = FakePdfSession()  # empty store: the application is gone, so NotFoundError skips
     queue = FakeRenderQueue()
     await _dispatcher(session, queue).dispatch([_action("exportPdf", uuid.uuid4())])
     assert queue.enqueued == []
@@ -65,7 +65,7 @@ async def test_export_pdf_without_queue_still_creates_job() -> None:
     session.store[app.id] = app
     session._scalar = [None]
     await _dispatcher(session, None).dispatch([_action("exportPdf", app.id)])
-    assert len(session.added) == 1  # Job angelegt; Enqueue entfällt (kein Redis)
+    assert len(session.added) == 1  # the job exists, and without Redis no enqueue runs
 
 
 async def test_chain_runs_all_dispatchers() -> None:

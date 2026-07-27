@@ -1,93 +1,98 @@
 # STUPA-Workflow
 
-Webplattform für die Antrags-, Sitzungs- und Budgetarbeit eines studentischen
-Gremiums (StuPa/AStA): Antragstellende reichen über ein öffentliches Formular ein,
-Gremienmitglieder bearbeiten Anträge, führen Sitzungen mit Live-Abstimmungen und
-Protokoll, verwalten Kostenstellen-Budgets und Rechnungen — alles versioniert und
-lückenlos auditiert.
+Web platform for the application, meeting and budget work of a student Gremium
+(StuPa/AStA). Applicants submit through a public form. Gremium members process
+applications, run meetings with live votes and a protocol, and manage cost center
+budgets and invoices. The platform versions and audits all of it.
 
-Monorepo, eine VM, `docker compose`. Intern läuft alles plain HTTP; TLS terminiert ein
-**externer Nginx Proxy Manager** davor. Kein Cert-Handling, kein eingebauter Keycloak
-im Stack.
+Monorepo, one VM, `docker compose`. Internally everything speaks plain HTTP. An
+**external Nginx Proxy Manager** in front of the stack terminates TLS. The stack does not
+handle certificates and does not contain a built-in Keycloak.
 
-Ausführliche Doku im [Wiki](https://github.com/STUPA-MAKERS/STUPA-Workflow/wiki).
+Full documentation in the [Wiki](https://github.com/STUPA-MAKERS/STUPA-Workflow/wiki).
 
 ## Stack
 
 - **Backend** — Python 3.13, FastAPI, Pydantic v2, SQLAlchemy 2.0 (async) + Alembic,
-  arq-Worker. uvicorn mit `--proxy-headers`, läuft als Non-Root-Container.
-- **Frontend** — Angular (TS strict, standalone components, separate `.html`/`.scss`),
-  @ngx-formly, RxJS, Signals.
-- **Daten** — PostgreSQL 16 (Config und Submissions als versioniertes JSONB),
-  Redis 7 (arq-Broker, Rate-Limit, Altcha-Replay), MinIO (S3-Anhänge/Belege), ClamAV.
-- **PDF** — `pytex`, ein interner Markdown→PDF-Renderer (tectonic), egress-isoliert.
-- **Captcha** — ALTCHA Sentinel (self-hosted, Proof-of-Work).
+  arq worker. uvicorn runs with `--proxy-headers` in a non-root container.
+- **Frontend** — Angular (strict TS, standalone components, separate `.html`/`.scss`),
+  @ngx-formly, RxJS, signals.
+- **Data** — PostgreSQL 16 (config and submissions as versioned JSONB), Redis 7 (arq
+  broker, rate limit, ALTCHA replay), MinIO (S3 attachments and receipts), ClamAV.
+- **PDF** — `pytex`, an internal Markdown→PDF renderer (tectonic), isolated from egress.
+- **Captcha** — ALTCHA Sentinel (self-hosted, proof of work).
 
-## Funktionsumfang
+## Features
 
-Backend funktional und getestet (~1480 Unit-Tests + Integrations-Suite). Implementiert:
+The backend works and has tests (about 1480 unit tests plus an integration suite).
+It implements:
 
-- **Auth & RBAC** — OIDC/Keycloak (Authorization Code + PKCE, Server-Session) und
-  Magic-Link für Antragstellende (HMAC-gehashte Single-Use-Token). Rollen, Permissions
-  und zeitlich begrenzte Zuweisungen; eine eigene Permission **pro `/admin/`-Seite**.
-- **Forms** — Formulare als versioniertes JSON; Definition und Antworten gegen ein
-  Schema validiert (inkl. `visibleIf`/Compute via JsonLogic, ReDoS-gehärtete Patterns).
-- **Applications** — Antrag anlegen (öffentlich, Captcha + Rate-Limit + Payload-Cap),
-  bearbeiten mit Versions-Diff, Timeline, Kommentare, DSGVO-Anonymisierung.
-- **Flow** — deklarative Zustandsmaschine mit Guard-Evaluator (Whitelist-Operatoren als
-  Dispatch-Tabelle, **kein `eval`**) und Transition-Actions (notify/webhook/exportPdf/
-  budget/openVote/…).
-- **Voting** — Quorum (Anzahl/Prozent), Mehrheiten (einfach/absolut/Zweidrittel),
-  Tie-Break, Geheimwahl (Stimme von Identität getrennt). Lesezugriff gremium-gescopt.
-- **Meetings / LiveVote** — Sitzungen mit Agenda, Anwesenheit und Live-Abstimmung über
-  WebSocket (Voter-Kanal + read-only Beamer-Stream); Protokoll entsteht beim Start.
-- **Protocol** — Sitzungsprotokoll (Markdown), Abstimmungen als Snippets, asynchroner
-  PDF-Render (pytex → MinIO) + Mail-Versand beim Finalisieren.
-- **Delegations** — sitzungsgebundene Stimm-/Vertretungs-Delegationen + Stellvertreter-Pool.
-- **Budget** — hierarchischer Kostenstellen-Baum mit Haushaltsjahren, Top-Down-Zuteilung,
-  Buchungen/Umbuchungen, Konten und **Rechnungen mit ZUGFeRD/Factur-X-Import**.
-  Alle Geldmutationen werden auditiert.
-- **Notifications** — Mail-Templates (Jinja2, sandboxed, DE/EN), Regeln
-  (Event→Template→Empfänger), per-Nutzer-Präferenzen, Versand über den arq-Worker.
-- **Audit** — append-only Hash-Kette (`sha256(prev || canonical)`), DB-Trigger gegen
-  UPDATE/DELETE, Ketten-Verifikation.
-- **Webhooks** — ausgehende Event-Webhooks mit SSRF-Guard (private/Loopback/Link-Local/
-  NAT64-Ziele blockiert, DNS-Rebind-Pinning) und HMAC-Signatur.
+- **Auth & RBAC** — OIDC/Keycloak (authorization code + PKCE, server session) and a
+  magic link for applicants (HMAC-hashed single-use token). Roles, permissions and
+  time-bound assignments. Each `/admin/` page has its own permission.
+- **Forms** — forms as versioned JSON. The backend validates the definition and the
+  answers against a schema. This covers `visibleIf` and compute through JsonLogic, with
+  ReDoS-hardened patterns.
+- **Applications** — create an application (public, with captcha, rate limit and payload
+  cap), edit it with a version diff, timeline, comments and GDPR anonymization.
+- **Flow** — a declarative state machine with a guard evaluator (whitelist operators in
+  a dispatch table, **no `eval`**) and transition actions
+  (notify/webhook/exportPdf/budget/openVote/…).
+- **Voting** — quorum (count or percent), majorities (simple, absolute, two thirds),
+  tie-break, secret ballot (the choice stays separate from the identity). The platform
+  scopes read access to the Gremium.
+- **Meetings / LiveVote** — meetings with an agenda, attendance and a live vote over
+  WebSocket (voter channel plus read-only beamer stream). The protocol starts with the
+  meeting.
+- **Protocol** — meeting protocol (Markdown), votes as snippets, an async PDF render
+  (pytex → MinIO) and a mail dispatch when you finalize it.
+- **Delegations** — meeting-bound vote and representation delegations plus a substitute
+  pool.
+- **Budget** — a hierarchical cost center tree with fiscal years, top-down allocation,
+  bookings and transfers, accounts, and **invoices with ZUGFeRD/Factur-X import**. The
+  platform audits every money mutation.
+- **Notifications** — mail templates (Jinja2, sandboxed, DE/EN), rules
+  (event→template→recipient), per-user preferences, dispatch through the arq worker.
+- **Audit** — an append-only hash chain (`sha256(prev || canonical)`), a DB trigger
+  against UPDATE and DELETE, and chain verification.
+- **Webhooks** — outgoing event webhooks with an SSRF guard (blocks private, loopback,
+  link-local and NAT64 targets, pins DNS against rebinding) and an HMAC signature.
 
-Frontend: Screens für Applications, Voting, Meetings, Budget/Expenses/Invoices und die
-Admin-Konfiguration (Forms, Flow, Gremien, Rollen, Branding, …).
+Frontend: screens for applications, voting, meetings, budget/expenses/invoices and the
+admin configuration (forms, flow, Gremien, roles, branding, …).
 
-Offen / Roadmap: erweiterte E2E-Suite (Playwright), weitere Flow-Action-Handler.
+Open work and roadmap: a wider E2E suite (Playwright) and more flow action handlers.
 
-## Setup (lokal)
+## Setup (local)
 
-Voraussetzung: Docker + Docker Compose v2.
+You need Docker and Docker Compose v2.
 
 ```bash
 cd deploy
-cp .env.example .env        # Werte einsetzen — siehe Wiki/Configuration
+cp .env.example .env        # fill in the values. See Wiki/Configuration
 docker compose up -d --build
 ```
 
-Migrationen laufen automatisch: ein One-Shot-`migrate`-Service spielt `alembic upgrade
-head` ein, bevor `api` und `worker` starten. Danach ist die SPA unter
-<http://127.0.0.1:8080/> erreichbar (einziger Host-Port). Liveness: `/healthz` (web),
+Migrations run on their own. A one-shot `migrate` service applies `alembic upgrade
+head` before `api` and `worker` start. The SPA then answers at
+<http://127.0.0.1:8080/>, the only host port. Liveness: `/healthz` (web) and
 `/api/health` (api).
 
-> Beim ersten Start lädt ClamAV mehrere Minuten Signaturen (langes `start_period`).
+> On the first start, ClamAV downloads signatures for several minutes (long
+> `start_period`).
 
-## Repo-Layout
+## Repo layout
 
 ```
-backend/    FastAPI-App, arq-Worker, Module, Migrationen, Tests
-frontend/   Angular-SPA + Design-System
-pytex/      Markdown→PDF-Renderer (FastAPI um tectonic)
-mcp/        MCP-Server (Agent-/API-Zugang)
-deploy/     docker-compose.yml, web/ (nginx + Multi-Stage-Build), .env.example, backup/
-scripts/    Hilfs-Skripte (smoke, Rollen-Pflege)
+backend/    FastAPI app, arq worker, modules, migrations, tests
+frontend/   Angular SPA + design system
+pytex/      Markdown→PDF renderer (FastAPI around tectonic)
+mcp/        MCP server (agent/API access)
+deploy/     docker-compose.yml, web/ (nginx + multi-stage build), .env.example, backup/
+scripts/    helper scripts (smoke, role maintenance)
 ```
 
-## Entwicklung
+## Development
 
 Backend:
 
@@ -105,46 +110,46 @@ npm ci
 npm run lint && npm run typecheck && npm test && npm run build
 ```
 
-TDD ist verbindlich; PRs müssen das CI-Gate grün passieren — Details in
-[CONTRIBUTING.md](CONTRIBUTING.md). Nie direkt auf `main`. Secrets nur in
-`deploy/.env` (per `.gitignore` geblockt), nie committen.
+TDD is mandatory. Every PR must pass the CI gate green. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for the details. Never push to `main` directly. Keep
+secrets in `deploy/.env` only, which `.gitignore` blocks. Never commit a secret.
 
-## Branching & Releases
+## Branching and releases
 
-Trunk-basiert mit geschütztem `main` und tag-basierter Auslieferung — bewusst leicht
-gehalten (kein langlebiger `develop`-Branch, kein GitFlow-Overhead für ein
-Single-VM-Deployment).
+Trunk-based, with a protected `main` and tag-based delivery. The setup stays light on
+purpose: no long-lived `develop` branch and no GitFlow overhead for a single-VM
+deployment.
 
-| Branch | Zweck | Regeln |
+| Branch | Purpose | Rules |
 |---|---|---|
-| `main` | immer grün, immer deploybar | **protected**: PR + grünes CI + 1 Review, kein direkter Push, linear history |
-| `feat/*`, `fix/*`, `chore/*`, `docs/*` | kurzlebige Arbeitszweige ab `main` | via PR mergen (squash), nach Merge löschen |
-| `hotfix/*` | dringender Prod-Fix ab dem laufenden Release-Tag | PR → `main`, danach neuer Patch-Tag |
+| `main` | always green, always deployable | **protected**: PR + green CI + 1 review, no direct push, linear history |
+| `feat/*`, `fix/*`, `chore/*`, `docs/*` | short-lived branches off `main` | merge by PR (squash), delete after the merge |
+| `hotfix/*` | urgent production fix off the running release tag | PR → `main`, then a new patch tag |
 
-**Releases.** Produktion läuft auf einem **Tag**, nicht auf `main`-HEAD. Versionen nach
-SemVer: `vMAJOR.MINOR.PATCH`. Ein Release wird auf `main` getaggt; CI baut die Images,
-markiert sie mit dem Tag und deployt. So ist jederzeit reproduzierbar, welcher Stand
-produktiv ist, und ein Rollback ist ein Re-Deploy des Vorgänger-Tags.
+**Releases.** Production runs on a **tag**, not on the HEAD of `main`. Versions follow
+SemVer: `vMAJOR.MINOR.PATCH`. You tag a release on `main`. CI then builds the images,
+marks them with the tag and deploys them. This keeps the production state reproducible
+at any time. A rollback is a re-deploy of the previous tag.
 
 ```
 feat/x ──PR──▶ main ──tag v1.2.0──▶ Build+Deploy
                  ▲
-hotfix/y ──PR────┘  (ab v1.2.0)  ──tag v1.2.1──▶ Deploy
+hotfix/y ──PR────┘  (from v1.2.0)  ──tag v1.2.1──▶ Deploy
 ```
 
-**DB-Migrationen** sind Teil des Releases: additive/abwärtskompatible Alembic-Schritte
-bevorzugen (erst Spalte hinzufügen, später Altlast entfernen), damit ein Rollback der
-App nicht an der DB scheitert. Revisions-IDs ≤ 32 Zeichen.
+**DB migrations** belong to the release. Prefer additive, backward-compatible Alembic
+steps: first add the column, remove the old one later. A rollback of the app then does
+not fail on the database. Revision ids are 32 characters or shorter.
 
-Empfohlene Branch-Protection für `main`: „Require a pull request before merging" (1
-Approval), „Require status checks to pass" (CI: ruff + basedpyright + pytest + ng build
-+ jest), „Require linear history", „Require branches to be up to date".
+Recommended branch protection for `main`: "Require a pull request before merging" (1
+approval), "Require status checks to pass" (CI: ruff + basedpyright + pytest + ng build
++ jest), "Require linear history", "Require branches to be up to date".
 
-## Sicherheit (kurz)
+## Security (short)
 
-Sessions als signierte HttpOnly-Cookies (`itsdangerous`), OIDC mit PKCE und
-State/Nonce, Magic-Link-Token nur als HMAC-Hash gespeichert. Öffentliche Endpunkte
-hinter ALTCHA und Redis-Rate-Limit. Ausgehende Webhooks hinter einem SSRF-Guard.
-Audit-Log append-only auf DB-Ebene. RFC-9457 `application/problem+json` als
-Fehler-Contract. Mehr im
-[Security-Wiki](https://github.com/STUPA-MAKERS/STUPA-Workflow/wiki/Security).
+Sessions are signed HttpOnly cookies (`itsdangerous`). OIDC runs with PKCE plus state
+and nonce. The platform stores a magic-link token only as an HMAC hash. Public endpoints
+sit behind ALTCHA and a Redis rate limit. Outgoing webhooks sit behind an SSRF guard.
+The audit log is append-only at the database level. RFC 9457
+`application/problem+json` is the error contract. More in the
+[Security wiki](https://github.com/STUPA-MAKERS/STUPA-Workflow/wiki/Security).

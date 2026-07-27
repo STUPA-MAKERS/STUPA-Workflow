@@ -1,26 +1,26 @@
-"""seed: rollen+rechte, gremien, gremium-rollen, mail-templates, site-config, budgets
+"""Seed: roles, permissions, Gremien, gremium roles, mail templates, site config, budgets.
 
 Revision ID: 0002_seed
 Revises: 0001_baseline
 Create Date: 2026-06-10 00:00:02
 
-Pre-Alpha-Squash (#initialdata): **alle** Seed-Daten an einem Ort, in finaler Form
-(die frühere Grant-dann-Rework-Historie ist eingedampft). Reihenfolge =
-Abhängigkeitsreihenfolge. Feste/deterministische IDs → downgrade-bar.
+Pre-alpha squash (#initialdata): all seed data sits here in its final form. The
+grant-then-rework history of before is gone. The step order is the dependency order.
+Fixed and deterministic IDs keep the downgrade possible.
 
-1. **Globale Rollen** (admin/member/manager/protocol/finance) + ``role_permission``
-   im finalen 17-Permission-Katalog (``app.shared.permissions``). ``admin`` hält
-   den vollen Katalog.
-2. **Mail-Templates** ``magic_link``, ``status_update``, ``deadline_approaching``.
-3. **Site-Config** v1 (aktiv, leeres Branding) — ``GET /api/site-config`` liefert
-   immer eine aktive Version.
-4. **Standard-Gremien** ``StuPa`` + ``AStA``.
-5. **Pflicht-Gremium-Rollen** je Gremium (``vorstand``/``manager``/``member``),
-   Permissions synchron mit ``FORCED_GREMIUM_ROLES`` (admin/gremium_roles.py).
-6. **Standard-Budgets** ``VSM`` (VS-Mittel, voller Haushaltsplan-Baum) + ``QSM``
-   (QS-Mittel, ohne Unterknoten).
+1. Global roles (admin/member/manager/protocol/finance) plus `role_permission` for the
+   final 17-permission catalog (`app.shared.permissions`). `admin` holds the full
+   catalog.
+2. Mail templates `magic_link`, `status_update` and `deadline_approaching`.
+3. Site config v1 (active, empty branding). `GET /api/site-config` must always return
+   an active version.
+4. Default Gremien `StuPa` and `AStA`.
+5. Forced gremium roles for each Gremium (`vorstand`/`manager`/`member`). The
+   permissions stay in sync with `FORCED_GREMIUM_ROLES` (admin/gremium_roles.py).
+6. Default budgets `VSM` (VS-Mittel, full budget-plan tree) and `QSM` (QS-Mittel,
+   without child nodes).
 
-**Keine** Standard-Antragstypen und **keine** Standard-Formulare (#initialdata).
+This revision seeds no default application types and no default forms (#initialdata).
 """
 
 from __future__ import annotations
@@ -37,7 +37,6 @@ down_revision: str | None = "0001_baseline"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-# --------------------------------------------------------------- table handles
 _role = sa.table(
     "role",
     sa.column("id", sa.Uuid),
@@ -94,7 +93,6 @@ _budget = sa.table(
     sa.column("denied_state_keys", JSONB),
 )
 
-# ------------------------------------------------------------------ 1. roles
 ROLE_IDS = {
     "admin": "00000000-0000-0000-0000-0000000000a1",
     "member": "00000000-0000-0000-0000-0000000000a2",
@@ -109,7 +107,7 @@ ROLE_NAMES = {
     "protocol": {"de": "Protokoll", "en": "Protocol"},
     "finance": {"de": "Finanzen", "en": "Finance"},
 }
-# Finaler Permission-Katalog (17 Keys, app.shared.permissions). admin = alles.
+# The final permission catalog. Keep it in sync with app.shared.permissions.
 _FULL = (
     "application.read",
     "application.create",
@@ -155,14 +153,14 @@ ROLE_PERMISSIONS = {
     ],
 }
 
-# --------------------------------------------------------- 4./5. gremien + roles
 _STUPA_ID = "00000000-0000-0000-0000-0000000060e1"
 _ASTA_ID = "00000000-0000-0000-0000-0000000060e3"
 _GREMIEN = [
     (_STUPA_ID, "StuPa", "stupa", "stupa"),
     (_ASTA_ID, "AStA", "asta", "asta"),
 ]
-# Pflicht-Gremium-Rollen (synchron mit FORCED_GREMIUM_ROLES, admin/gremium_roles.py).
+# Forced gremium roles. Keep them in sync with FORCED_GREMIUM_ROLES
+# (admin/gremium_roles.py).
 _ALL_G = ["session.manage", "vote.manage", "vote.cast", "protocol.write"]
 _FORCED_GREMIUM_ROLES = [
     ("vorstand", {"de": "Vorstand", "en": "Board"}, list(_ALL_G)),
@@ -170,7 +168,6 @@ _FORCED_GREMIUM_ROLES = [
     ("member", {"de": "Mitglied", "en": "Member"}, ["vote.cast"]),
 ]
 
-# ------------------------------------------------------------- 2. mail templates
 _MAIL_TEMPLATES = [
     {
         "id": "00000000-0000-0000-0000-0000000000e1",
@@ -234,7 +231,6 @@ _MAIL_TEMPLATES = [
 ]
 _SITE_CONFIG_ID = "00000000-0000-0000-0000-0000000000c1"
 
-# --------------------------------------------------------------- 6. budget tree
 _NS = uuid.UUID("00000000-0000-0000-0000-00000000b0d6")
 
 
@@ -242,9 +238,9 @@ def _node_id(path_key: str) -> str:
     return str(uuid.uuid5(_NS, path_key))
 
 
-# (key, name, children). Haushaltsplan: Einnahmen 1–5, Ausgaben 6–11. Doppelte
-# Nummern unter demselben Eltern +1 (Hilfskräfte 123→124); gestrichene Ressorts
-# (134 Internationalität, 136 Demokratie/Politische Bildung) ausgelassen.
+# (key, name, children). Budget plan: income 1–5, expenses 6–11. A key that repeats
+# under the same parent gets +1 (Hilfskräfte 123→124). The dropped Ressorts stay out
+# (134 Internationalität, 136 Demokratie/Politische Bildung).
 _VSM_TREE: list = [
     ("1", "Beiträge", []),
     ("2", "Einnahmen aus wirtschaftlicher Betätigung", [
@@ -310,7 +306,7 @@ def _flatten(nodes: list, parent_path: str, parent_id: str | None, out: list) ->
             {
                 "id": node_id,
                 "parent_id": parent_id,
-                "gremium_id": None,  # nur Top-Level trägt gremium_id
+                "gremium_id": None,  # only a top-level node carries a gremium_id
                 "key": key,
                 "path_key": path_key,
                 "name": name,
@@ -323,7 +319,6 @@ def _flatten(nodes: list, parent_path: str, parent_id: str | None, out: list) ->
 
 
 def upgrade() -> None:
-    # 1. Rollen + Rechte.
     op.bulk_insert(
         _role,
         [
@@ -340,16 +335,13 @@ def upgrade() -> None:
         ],
     )
 
-    # 2. Mail-Templates.
     op.bulk_insert(_mail_template, _MAIL_TEMPLATES)
 
-    # 3. Site-Config v1 (aktiv, leeres Branding).
     op.bulk_insert(
         _site_config,
         [{"id": _SITE_CONFIG_ID, "version": 1, "active": True, "branding": {}}],
     )
 
-    # 4. Standard-Gremien.
     op.bulk_insert(
         _gremium,
         [
@@ -364,7 +356,6 @@ def upgrade() -> None:
         ],
     )
 
-    # 5. Pflicht-Gremium-Rollen je Gremium (deterministische IDs via uuid5).
     op.bulk_insert(
         _gremium_role,
         [
@@ -380,7 +371,6 @@ def upgrade() -> None:
         ],
     )
 
-    # 6. Standard-Budgets: VSM (voller Baum) + QSM (leer). Top-Level an StuPa.
     rows: list = [
         {
             "id": _node_id("VSM"),
@@ -411,9 +401,10 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     conn = op.get_bind()
-    # Budgets zuerst, tiefste Ebene voran (Self-FK RESTRICT) — Top-Budgets tragen
-    # gremium_id, daher VOR dem Gremium-Delete (sonst CASCADE-vs-RESTRICT-Konflikt).
-    # Tiefster Knoten VSM-8-81-810-330 = 4 Striche.
+    # Delete the budgets first, deepest level first, because the self FK is RESTRICT.
+    # The top budgets carry a gremium_id, so they must go BEFORE the Gremium delete.
+    # Otherwise CASCADE and RESTRICT conflict. The deepest node VSM-8-81-810-330 has
+    # 4 dashes.
     for depth in range(4, -1, -1):
         conn.execute(
             sa.text(
@@ -423,7 +414,7 @@ def downgrade() -> None:
                 "AND length(path_key) - length(replace(path_key, '-', '')) = :d"
             ).bindparams(d=depth)
         )
-    # Gremien (CASCADE → gremium_role), dann Rechte/Rollen/Templates/Site-Config.
+    # The Gremium delete cascades to gremium_role, so that table needs no own delete.
     conn.execute(
         sa.text(
             "DELETE FROM gremium WHERE id IN (CAST(:s AS uuid), CAST(:a AS uuid))"

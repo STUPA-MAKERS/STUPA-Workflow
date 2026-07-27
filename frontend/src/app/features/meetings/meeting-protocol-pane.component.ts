@@ -17,7 +17,7 @@ import {
 
 export type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
-/** Middle column: protocol meta + per-TOP editor + the TOP's vote questions. */
+/** Middle column: protocol meta, the per-TOP editor and the vote questions of the TOP. */
 @Component({
   selector: 'app-meeting-protocol-pane',
   standalone: true,
@@ -38,7 +38,7 @@ export class MeetingProtocolPaneComponent {
 
   readonly meeting = input.required<Meeting>();
   readonly protocol = input.required<Protocol | null>();
-  /** TOP selected in the left pane (+ its 0-based index). */
+  /** TOP selected in the left pane, plus its 0-based index. */
   readonly top = input.required<AgendaItem | null>();
   readonly topIndex = input.required<number>();
   readonly saveState = input.required<SaveState>();
@@ -65,7 +65,7 @@ export class MeetingProtocolPaneComponent {
     return this.meeting().votes.filter((v) => v.agendaItemId === topId);
   }
 
-  /** Application TOP: exactly one vote; freetext TOP: any number of questions. */
+  /** An application TOP holds exactly one vote. A freetext TOP holds any number. */
   protected canAddVote(item: AgendaItem): boolean {
     return !item.applicationId || this.votesForTop(item.id).length === 0;
   }

@@ -35,9 +35,9 @@ import type { AuditActor, AuditEntry, ConfigRevisionDiff } from '../admin.models
 const PAGE_SIZE = 50;
 
 /**
- * Audit action types — mirror of `backend/app/modules/audit/actions.py` (`AuditAction`).
- * Drives the action filter and decides whether a specific message template exists
- * (else fallback `admin.audit.msg.unknown`).
+ * Audit action types. The list mirrors `AuditAction` in
+ * `backend/app/modules/audit/actions.py`. It fills the action filter. It also tells the view
+ * if a specific message template exists. If not, the view uses `admin.audit.msg.unknown`.
  */
 export const AUDIT_ACTIONS = [
   'login',
@@ -65,7 +65,7 @@ export const AUDIT_ACTIONS = [
   'webhook_config',
   'attachment_quarantine',
   'attachment_delete',
-  // Budget/money mutations — mirror of the BUDGET_* values in actions.py.
+  // Budget and money mutations. They mirror the BUDGET_* values in actions.py.
   'budget_node_create',
   'budget_node_update',
   'budget_node_delete',
@@ -83,7 +83,7 @@ export const AUDIT_ACTIONS = [
 
 const KNOWN_ACTIONS = new Set<string>(AUDIT_ACTIONS);
 
-/** Action type → feed-row icon (category glyph, like the Nextcloud activity feed). */
+/** Action type to feed-row icon: a category glyph, like the Nextcloud activity feed. */
 const ACTION_ICONS: Record<string, IconName> = {
   login: 'key',
   status_change: 'repeat',
@@ -101,7 +101,8 @@ const ACTION_ICONS: Record<string, IconName> = {
   webhook_config: 'webhook',
   attachment_quarantine: 'paperclip',
   attachment_delete: 'paperclip',
-  // Money mutations: €-glyph; cost-centre structure as a pie glyph like the budget tab.
+  // Money mutations use the euro glyph. The cost center structure uses the pie glyph of the
+  // budget tab.
   budget_node_create: 'chart-pie',
   budget_node_update: 'chart-pie',
   budget_node_delete: 'chart-pie',
@@ -117,7 +118,7 @@ const ACTION_ICONS: Record<string, IconName> = {
   budget_move_fiscal_year: 'euro',
 };
 
-/** Target type → router target (detail page or the responsible admin list). */
+/** Target type to router target: the detail page or the admin list that owns the target. */
 const TARGET_ROUTES: Record<string, (id: string) => string[]> = {
   application: (id) => ['/applications', id],
   vote: (id) => ['/voting/vote', id],
@@ -129,8 +130,9 @@ const TARGET_ROUTES: Record<string, (id: string) => string[]> = {
   group_mapping: () => ['/admin/users'],
   webhook: () => ['/admin/webhooks'],
   site_config: () => ['/admin/branding'],
-  // Budget targets → responsible tab: cost centres/allocations/transfers to the
-  // budget dashboard, bookings to the expenses list, invoices to the invoice list.
+  // Each budget target goes to the tab that owns it. Cost centers, allocations and transfers
+  // go to the budget dashboard. Bookings go to the expenses list. Invoices go to the invoice
+  // list.
   budget: () => ['/budget'],
   budget_allocation: () => ['/budget'],
   budget_transfer: () => ['/budget'],
@@ -138,7 +140,7 @@ const TARGET_ROUTES: Record<string, (id: string) => string[]> = {
   invoice: () => ['/invoices'],
 };
 
-/** Feed day group (local day boundaries). */
+/** One day group of the feed. The boundaries are local days. */
 interface DayGroup {
   key: string;
   date: Date;
@@ -146,13 +148,14 @@ interface DayGroup {
 }
 
 /**
- * Audit-log view as an activity feed (Nextcloud style): entries grouped by day, each
- * with a category icon + a human-readable sentence (`admin.audit.msg.*`, target as
- * clear name/link) and a time; details (target id, data, hash) expandable.
+ * Audit-log view as an activity feed in the Nextcloud style. The view groups the entries by
+ * day. Each row shows a category icon, a readable sentence (`admin.audit.msg.*`) and a time.
+ * The sentence shows the target as a clear name and a link. A row expands to show the target
+ * id, the data and the hash.
  *
- * - Lazy infinite scroll: keyset paging via the `before` cursor (id); an
- *   `IntersectionObserver` sentinel loads more, with a "load more" button as fallback.
- * - Filters: action type, actor (resolved clear name), time window.
+ * - Lazy infinite scroll: keyset paging over the `before` cursor. The cursor is an entry id.
+ *   An `IntersectionObserver` sentinel loads more. A "load more" button is the fallback.
+ * - Filters: action type, actor (resolved clear name) and time window.
  */
 @Component({
   selector: 'app-audit-log',
@@ -188,22 +191,20 @@ export class AuditLogComponent {
   protected readonly hasMore = signal(false);
   protected readonly loading = signal(false);
   protected readonly loadError = signal(false);
-  /** Expanded entries (detail area visible). */
+  /** Ids of the expanded entries. Their detail area is visible. */
   protected readonly open = signal<ReadonlySet<number>>(new Set());
 
-  // --- Config diff + revert -------------------------------------------------
-  /** ``audit.revert`` permission (FE gate; backend stays authoritative). Reactive,
-   *  since the principal loads asynchronously. */
+  /** The `audit.revert` permission as a front-end gate. The backend stays authoritative. The
+   *  value is reactive because the principal loads asynchronously. */
   protected readonly canRevert = computed(() => this.auth.can('audit.revert'));
-  /** Loaded config diffs per ``revisionId`` (``null`` = still loading). */
+  /** Loaded config diffs per `revisionId`. A `null` value means the diff still loads. */
   protected readonly diffs = signal<ReadonlyMap<string, ConfigRevisionDiff | null>>(
     new Map(),
   );
-  /** Entry whose revert is currently being confirmed. */
+  /** The entry whose revert the user confirms now. */
   protected readonly confirmRevert = signal<AuditEntry | null>(null);
   protected readonly reverting = signal(false);
 
-  // Filter
   protected readonly action = signal('');
   protected readonly actor = signal('');
   protected readonly since = signal('');
@@ -223,7 +224,7 @@ export class AuditLogComponent {
       (this.until() ? 1 : 0),
   );
 
-  /** Feed groups: entries by local day (newest first, as delivered). */
+  /** Feed groups: the entries per local day. The newest day comes first, as delivered. */
   protected readonly groups = computed<DayGroup[]>(() => {
     const out: DayGroup[] = [];
     for (const e of this.entries()) {
@@ -259,7 +260,6 @@ export class AuditLogComponent {
     });
   }
 
-  // --- Filter setters (each resets the list) --------------------------------
   protected setAction(v: string): void {
     this.action.set(v);
     this.reload();
@@ -305,25 +305,26 @@ export class AuditLogComponent {
     }
   }
 
-  /** ``revisionId`` from the ``data`` payload (only config changes carry it). */
+  /** The `revisionId` from the `data` payload. Only config changes carry it. */
   protected revisionId(e: AuditEntry): string | null {
     const v = e.data?.['revisionId'];
     return typeof v === 'string' ? v : null;
   }
 
-  /** Revert offered: permission present AND marked revertible by the backend
-   *  (config with predecessor, status change, reversible budget mutation). */
+  /** Offer the revert when the permission is present and the backend marks the entry
+   *  revertable. The backend marks a config with a predecessor, a status change and a
+   *  reversible budget mutation. */
   protected isRevertable(e: AuditEntry): boolean {
     return this.canRevert() && e.revertable === true;
   }
 
-  /** Loaded diff of the entry (``null`` = loading; ``undefined`` = no snapshot). */
+  /** The loaded diff of the entry. `null` means it loads. `undefined` means no snapshot. */
   protected diffOf(e: AuditEntry): ConfigRevisionDiff | null | undefined {
     const id = this.revisionId(e);
     return id ? this.diffs().get(id) : undefined;
   }
 
-  /** On expand, lazy-load the config diff once. */
+  /** Load the config diff one time, when the user expands the entry. */
   private loadDiff(e: AuditEntry): void {
     const rid = this.revisionId(e);
     if (!rid || this.diffs().has(rid)) return;
@@ -361,7 +362,8 @@ export class AuditLogComponent {
     });
   }
 
-  /** 409 error code (ProblemDetail) → matching message; else a generic error. */
+  /** Map the 409 error code of the ProblemDetail to a message. Any other error gets the
+   *  generic message. */
   private revertErrorKey(err: {
     status?: number;
     error?: { code?: string };
@@ -380,7 +382,7 @@ export class AuditLogComponent {
     }
   }
 
-  /** Filter changed → discard the list and reload from the newest entry. */
+  /** After a filter change, drop the list and load again from the newest entry. */
   private reload(): void {
     this.entries.set([]);
     this.cursor.set(null);
@@ -399,7 +401,7 @@ export class AuditLogComponent {
         before: reset ? undefined : (this.cursor() ?? undefined),
         action: this.action() || undefined,
         actor: this.actor() || undefined,
-        // Day boundaries: since from 00:00, until 23:59:59 (interpreted locally).
+        // Day boundaries: since starts at 00:00 and until ends at 23:59:59, in local time.
         since: this.since() ? `${this.since()}T00:00:00` : undefined,
         until: this.until() ? `${this.until()}T23:59:59` : undefined,
       })
@@ -417,8 +419,7 @@ export class AuditLogComponent {
       });
   }
 
-  // --- Rendering ------------------------------------------------------------
-  /** Day heading: today/yesterday, otherwise a localized date. */
+  /** Day heading: today, yesterday or a localized date. */
   protected dayLabel(g: DayGroup): string {
     const today = new Date();
     const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
@@ -436,19 +437,18 @@ export class AuditLogComponent {
     );
   }
 
-  /** Feed-row category icon (unknown action → audit glyph). */
   protected icon(action: string): IconName {
     return ACTION_ICONS[action] ?? 'audit';
   }
 
-  /** Localized action label (detail badge + filter options). */
+  /** Localized action label for the detail badge and the filter options. */
   protected actionLabel(action: string): string {
     const key = `admin.audit.action.${action}`;
     const label = this.i18n.translate(key as TranslationKey);
     return label === key ? action : label;
   }
 
-  /** Human-readable sentence per entry (template per action type + fallback). */
+  /** Readable sentence for an entry. Each action type has a template, plus a fallback. */
   protected message(e: AuditEntry): string {
     const key = KNOWN_ACTIONS.has(e.action)
       ? `admin.audit.msg.${e.action}`
@@ -462,14 +462,14 @@ export class AuditLogComponent {
     });
   }
 
-  /** Localized target type (gremium → "Gremium" …); unknown → raw key. */
+  /** Localized target type. An unknown type gives the raw key back. */
   protected targetTypeLabel(type: string): string {
     const key = `admin.audit.targetType.${type}`;
     const label = this.i18n.translate(key as TranslationKey);
     return label === key ? type : label;
   }
 
-  /** Router target of the entry's target, if a page exists for it. */
+  /** Router target for the target of the entry, if a page exists for it. */
   protected targetLink(e: AuditEntry): string[] | null {
     if (!e.targetType || !e.targetId) return null;
     return TARGET_ROUTES[e.targetType]?.(e.targetId) ?? null;
@@ -479,21 +479,21 @@ export class AuditLogComponent {
     return e.actorName ?? e.actor ?? this.i18n.translate('admin.audit.system');
   }
 
-  /** Actor in detail: "<clear name> · <sub>" if resolved, else raw sub/system. */
+  /** Actor in the details: "<clear name> · <sub>" when resolved, else the raw sub or system. */
   protected actorDisplay(e: AuditEntry): string {
     if (e.actorName && e.actor) return `${e.actorName} · ${e.actor}`;
     return e.actorName ?? e.actor ?? this.i18n.translate('admin.audit.system');
   }
 
-  /** Target in the sentence: resolved label (backend) preferred, else `type:id`. */
+  /** Target in the sentence. The label resolved by the backend wins, else `type:id`. */
   private targetLabel(e: AuditEntry): string {
     if (e.targetLabel) return `„${e.targetLabel}“`;
     if (e.targetType && e.targetId) return `${e.targetType}:${e.targetId}`;
     return e.targetType ?? e.targetId ?? '—';
   }
 
-  /** `data` content as (key, value) pairs for the detail chips. UUID values with a
-   *  known clear name render as "<name> · <uuid>", else the raw UUID. */
+  /** The `data` content as (key, value) pairs for the detail chips. A UUID value with a
+   *  known clear name reads as "<name> · <uuid>", else as the raw UUID. */
   protected dataPairs(e: AuditEntry): [string, string][] {
     const resolved = e.resolvedIds ?? {};
     const fmt = (v: unknown): string => {

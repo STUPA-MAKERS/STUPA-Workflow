@@ -1,57 +1,55 @@
-# Alembic-Migrationen
+# Alembic migrations
 
-Async-SQLAlchemy-2.0-Setup. Ziel-Metadata = `app.db.Base.metadata` (über
-`app.models` befüllt). Env-Konfiguration: `env.py`; Template: `script.py.mako`.
+Async SQLAlchemy 2.0 setup. The target metadata is `app.db.Base.metadata`. The import
+of `app.models` fills it. The environment configuration is in `env.py`. The template is
+`script.py.mako`.
 
-## Konvention: Hash-Revision-IDs (ab sofort)
+## Convention: hash revision IDs (from now on)
 
-**Neue Migration = `alembic revision` mit der von Alembic vergebenen Hash-ID.**
-Kein `--rev-id`, keine fortlaufende `000N`-Nummer mehr.
+**A new migration uses `alembic revision` with the hash ID that Alembic assigns.**
+Do not pass `--rev-id`. Do not use a running `000N` number.
 
 ```bash
 cd backend
-alembic revision -m "kurzbeschreibung"
-# -> migrations/versions/<hash>_kurzbeschreibung.py  (z.B. aa50a10a8072_…)
+alembic revision -m "short_description"
+# -> migrations/versions/<hash>_short_description.py  (for example aa50a10a8072_…)
 
-alembic heads          # MUSS genau einen head zeigen
-alembic upgrade head   # MUSS grün durchlaufen
+alembic heads          # MUST show exactly one head
+alembic upgrade head   # MUST run green
 ```
 
-`down_revision` wird automatisch auf den aktuellen head gesetzt, solange genau ein
-head existiert. Erscheint nach einem Merge ein **zweiter** head, ist das ein echter
-Konflikt — auflösen, indem die eigene Revision auf den gemergten head umgehängt wird
-(`down_revision` anpassen), **nicht** per `alembic merge` und **nicht** per
-Umnummerierung.
+Alembic sets `down_revision` to the current head by itself, as long as exactly one head
+exists. A **second** head after a merge is a real conflict. Resolve it: point your own
+revision at the merged head through `down_revision`. Do **not** use `alembic merge`. Do
+**not** renumber.
 
-### Warum Hash statt `000N`
+### Why a hash and not `000N`
 
-Parallele Entwicklungs-Wellen vergaben unabhängig dieselbe nächste fortlaufende
-Nummer (`0016` kollidierte zweimal), was bei jedem Merge manuelles Renumbering
-erzwang. Zufalls-Hashes kollidieren praktisch nie; der einzig verbleibende
-Mergekonflikt-Punkt ist der head-Vergleich (single-head) — und der soll sichtbar
-sein.
+Parallel development streams handed out the same next running number on their own.
+`0016` collided twice, and every merge then forced a manual renumbering. Random hashes
+almost never collide. One merge-conflict point is left: the head comparison (single
+head). That conflict must stay visible.
 
-### Bestand bleibt
+### The existing chain stays
 
-Die existierende Kette `0001_core_extensions … 0017_role_assignment_deleg` wird
-**nicht** umbenannt. Nur *neue* Revisions bekommen Hash-IDs. `file_template` in
-`alembic.ini` ist `%%(rev)s_%%(slug)s` — bei Hash-IDs ergibt das
-`<hash>_<slug>.py`, bei den Bestands-Dateien bleibt es `<nnnn>_<slug>.py`.
+The existing chain `0001_core_extensions … 0017_role_assignment_deleg` keeps its names.
+Only *new* revisions get hash IDs. `file_template` in `alembic.ini` is
+`%%(rev)s_%%(slug)s`. A hash ID gives `<hash>_<slug>.py`. The existing files keep
+`<nnnn>_<slug>.py`.
 
-## Tabellen vs. Daten
+## Tables versus data
 
-Tabellen/Modelle entstehen über `Base.metadata.create_all` in `0002_core_tables`
-(Single-Source-Pattern: Modelle und Schema bleiben deckungsgleich). Eine neue
-Tabelle braucht daher i. d. R. **keine** eigene DDL-Migration — sie kommt über die
-Metadata mit. Reine Daten-/Seed-/Constraint-/Index-Änderungen bekommen je eine
-eigene Revision.
+`Base.metadata.create_all` in `0002_core_tables` creates the tables from the models
+(single-source pattern: the models and the schema stay identical). A new table
+therefore needs no DDL migration of its own as a rule. It arrives with the metadata.
+Data, seed, constraint and index changes each get their own revision.
 
-## Lokal verifizieren
+## Verify locally
 
 ```bash
 cd backend
-alembic heads          # ein head
-alembic history | head # Kette ok
-# gegen echtes Postgres (compose oder Wegwerf-Container):
+alembic heads          # one head
+alembic history | head # chain ok
+# against a real Postgres (compose or throwaway container):
 alembic upgrade head
 ```

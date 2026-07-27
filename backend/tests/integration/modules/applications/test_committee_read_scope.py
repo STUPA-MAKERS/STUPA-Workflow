@@ -1,19 +1,19 @@
-"""Integration (echte Postgres, testcontainers): Gremium-Lesescope (#committee-read).
+"""Integration (real Postgres, testcontainers): Gremium read scope (#committee-read).
 
-Beweist gegen ein echtes Schema, dass ein Gremium-**Mitglied** OHNE globales
-``application.read`` zusätzlich zu seinen EIGENEN Anträgen auch jene lesen darf, die
+The tests run against a real schema. A Gremium **member** without the global
+`application.read` permission reads the OWN applications. That member also reads an
+application in a cost center whose `view_gremium_id` names one of the Gremien of that
+member (#budget-scope). The cost center node itself OR an ancestor may carry that id.
+The member also reads an application in a `vote` state whose `config.gremiumId` names
+one of those Gremien.
 
-* in einer Kostenstelle (Knoten ODER Vorfahre) mit ``view_gremium_id`` eines seiner
-  Gremien liegen (#budget-scope), **oder**
-* aktuell in einem ``vote``-State mit ``config.gremiumId`` eines seiner Gremien stehen,
+The list (`ApplicationsService.list_applications`) and the detail view
+(`access.require_app_read`) give the same view. Both paths keep the applications of
+other Gremien hidden.
 
-und dass dieselbe Sicht für die Liste (``ApplicationsService.list_applications``) wie
-für die Detailansicht (``access.require_app_read``) gilt — und Anträge fremder Gremien
-in beiden Pfaden verborgen bleiben.
-
-Test-Isolation: die ``engine``-Fixture trunkiert nur die Antrags-/Flow-Tabellen, NICHT
-``budget``/``principal``/``gremium`` — deshalb tragen alle dort eindeutig-beschränkten
-Schlüssel (``path_key``, ``principal.sub``, ``slug``) ein pro Seed frisches Token.
+Test isolation: the `engine` fixture truncates only the application and flow tables,
+NOT `budget`, `principal` and `gremium`. Every key with a unique constraint there
+(`path_key`, `principal.sub`, `slug`) therefore carries a fresh token per seed.
 """
 
 from __future__ import annotations
@@ -71,11 +71,10 @@ def _fields() -> list[FormFieldDef]:
 
 
 class _Scenario:
-    """Gesäte Welt für den Lesescope-Test (alle Anträge bestätigt = sichtbar)."""
+    """Seeded world for the read-scope test, with every application confirmed and visible."""
 
     member_sub: str
     other_sub: str
-    # Anträge:
     app_cost: uuid.UUID
     app_vote: uuid.UUID
     app_own: uuid.UUID
@@ -86,17 +85,17 @@ class _Scenario:
 
 async def _seed(session: AsyncSession) -> _Scenario:
     sc = _Scenario()
-    tag = uuid.uuid4().hex[:8]  # frisch je Seed (budget/principal/gremium leaken sonst)
+    tag = uuid.uuid4().hex[:8]  # fresh per seed, or budget/principal/gremium leak over
     sc.member_sub = f"member-{tag}"
     sc.other_sub = f"other-{tag}"
 
-    # Zwei Gremien: der/die Nutzer:in ist NUR im ersten Mitglied.
+    # Two Gremien. The user is a member of the first one ONLY.
     g_member = Gremium(name="Mitglied", slug=f"m-{tag}")
     g_other = Gremium(name="Fremd", slug=f"o-{tag}")
     session.add_all([g_member, g_other])
     await session.flush()
 
-    # Principal + aktive (unbefristete) Mitgliedschaft im Mitglieds-Gremium.
+    # A principal plus an active membership without an end date in the member Gremium.
     principal = PrincipalRow(sub=sc.member_sub, display_name="Mitglied")
     role = GremiumRole(
         gremium_id=g_member.id,
@@ -116,7 +115,6 @@ async def _seed(session: AsyncSession) -> _Scenario:
         )
     )
 
-    # Antragstyp + aktive Form.
     app_type = ApplicationType(
         gremium_id=g_member.id, key=f"t-{tag}", name_i18n={}, has_budget=True
     )
@@ -125,8 +123,8 @@ async def _seed(session: AsyncSession) -> _Scenario:
     await FormsService(session).create_form_version(
         app_type.id, FormVersionCreate(fields=_fields(), activate=True), "tester")
 
-    # Flow: Initial-State + zwei vote-States (für je ein Gremium). ``flow_version`` wird
-    # je Test trunkiert → genau EIN aktiver globaler Flow, hier frisch angelegt.
+    # Flow: an initial state plus two vote states, one per Gremium. Each test truncates
+    # `flow_version`, so exactly ONE active global flow exists, created fresh here.
     flow = FlowVersion(version=1, active=True, editor_layout={})
     session.add(flow)
     await session.flush()
@@ -150,8 +148,8 @@ async def _seed(session: AsyncSession) -> _Scenario:
     session.add_all([draft, vote_member, vote_other])
     await session.commit()
 
-    # Kostenstellen-Baum: je ein Top-Knoten mit view_gremium_id + ein Leaf darunter.
-    # Der Leaf SELBST trägt KEIN view_gremium_id → prüft die Vorfahren-Auflösung.
+    # Cost center tree: one top node per Gremium with view_gremium_id and one leaf below.
+    # The leaf ITSELF carries NO view_gremium_id, which tests the ancestor resolution.
     top_m = Budget(
         parent_id=None,
         key=f"VSM{tag}",
@@ -188,7 +186,7 @@ async def _seed(session: AsyncSession) -> _Scenario:
             }
         )
 
-    # actor != "applicant" ⇒ created_by + email_confirmed_at gesetzt (sichtbar).
+    # actor != "applicant" sets created_by and email_confirmed_at, so it stays visible.
     app_cost, _ = await svc.create(_payload(), actor=sc.other_sub)
     app_vote, _ = await svc.create(_payload(), actor=sc.other_sub)
     app_own, _ = await svc.create(_payload(), actor=sc.member_sub)
@@ -196,7 +194,7 @@ async def _seed(session: AsyncSession) -> _Scenario:
     app_vote_other, _ = await svc.create(_payload(), actor=sc.other_sub)
     app_unrelated, _ = await svc.create(_payload(), actor=sc.other_sub)
 
-    # Zuordnungen setzen (Kostenstelle / vote-State) — direkt am Modell.
+    # Set the links (cost center and vote state) directly on the model.
     app_cost.budget_id = leaf_m.id
     app_vote.current_state_id = vote_member.id
     app_cost_other.budget_id = leaf_o.id
@@ -212,9 +210,6 @@ async def _seed(session: AsyncSession) -> _Scenario:
     return sc
 
 
-# --------------------------------------------------------------------------- #
-# Liste (Anträge-Tab)
-# --------------------------------------------------------------------------- #
 async def test_list_committee_scope_unions_owner_costcenter_and_vote(
     session: AsyncSession,
 ) -> None:
@@ -225,9 +220,9 @@ async def test_list_committee_scope_unions_owner_costcenter_and_vote(
         owner_sub=sc.member_sub, committee_sub=sc.member_sub, limit=50, offset=0
     )
     got = {i.id for i in page.items}
-    # Eigener + Mitglieds-Kostenstelle + Mitglieds-vote-State.
+    # The own application, the member cost center and the member vote state.
     assert got == {sc.app_own, sc.app_cost, sc.app_vote}
-    # Fremde Gremien + unbeteiligter Fremd-Antrag bleiben verborgen.
+    # Other Gremien and the unrelated foreign application stay hidden.
     assert sc.app_cost_other not in got
     assert sc.app_vote_other not in got
     assert sc.app_unrelated not in got
@@ -259,12 +254,9 @@ async def test_list_full_read_sees_all_confirmed(session: AsyncSession) -> None:
     } <= got
 
 
-# --------------------------------------------------------------------------- #
-# Detailansicht (require_app_read) — gleiche Sicht wie die Liste
-# --------------------------------------------------------------------------- #
 async def test_detail_guard_grants_committee_scope(session: AsyncSession) -> None:
     sc = await _seed(session)
-    member = Principal(sub=sc.member_sub, permissions=set())  # KEIN application.read
+    member = Principal(sub=sc.member_sub, permissions=set())  # NO application.read
 
     for app_id in (sc.app_own, sc.app_cost, sc.app_vote):
         access = await require_app_read(app_id, session, member, None)

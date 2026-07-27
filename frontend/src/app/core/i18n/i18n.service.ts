@@ -10,15 +10,15 @@ import {
 const STORAGE_KEY = 'ap.locale';
 
 /**
- * UI i18n (DE/EN). Locale source: persisted choice → browser → DEFAULT_LOCALE.
- * Missing keys of the active locale fall back to DE. Configurable DB texts
- * (`*_i18n`) are not part of this service.
+ * UI i18n (DE and EN). Locale source: persisted choice → browser →
+ * DEFAULT_LOCALE. A key that the active locale misses falls back to DE. This
+ * service does not cover the configurable DB texts (`*_i18n`).
  */
 @Injectable({ providedIn: 'root' })
 export class I18nService {
   private readonly _locale = signal<Locale>(this.resolveInitialLocale());
 
-  /** Active locale (signal, read-only to the outside). */
+  /** Active locale, read-only to the outside. */
   readonly locale = this._locale.asReadonly();
   readonly locales = SUPPORTED_LOCALES;
 
@@ -26,8 +26,8 @@ export class I18nService {
   readonly dictionary = computed(() => CATALOG[this._locale()]);
 
   constructor() {
-    // Sync `<html lang>` with the resolved locale from the first paint (a11y/SEO)
-    // — not only on the first manual language switch.
+    // Sync `<html lang>` with the resolved locale from the first paint (a11y and
+    // SEO), not only at the first manual language switch.
     if (typeof document !== 'undefined') {
       document.documentElement.lang = this._locale();
     }
@@ -40,7 +40,7 @@ export class I18nService {
     document.documentElement.lang = locale;
   }
 
-  /** Translates a key; fallback chain: active locale → DE → the key itself. */
+  /** Translate a key. Fallback chain: active locale → DE → the key itself. */
   translate(key: TranslationKey, params?: Record<string, string | number>): string {
     const active = CATALOG[this._locale()];
     const raw = active[key] ?? CATALOG[DEFAULT_LOCALE][key] ?? key;
@@ -74,7 +74,7 @@ export class I18nService {
     try {
       localStorage.setItem(STORAGE_KEY, locale);
     } catch {
-      /* storage blocked — ignore */
+      /* Storage is blocked. Ignore the error. */
     }
   }
 }

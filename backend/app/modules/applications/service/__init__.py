@@ -1,18 +1,26 @@
-"""Application service — lifecycle, versioning, timeline, comments, anonymization.
+"""Application service: lifecycle, versioning, timeline, comments, anonymization.
 
-Layout:
+Layout of the package:
 
-* :mod:`.service_base` — shared constructor + lookup/serialization helpers, pure field helpers.
-* :mod:`.create`       — creation: effective-form validation, v1, initial state + status event.
-* :mod:`.edits`        — versioned data edits with diff, version history, deletion.
-* :mod:`.reads`        — detail view, pinned effective form, status timeline.
-* :mod:`.listing`      — filtered listing, committee read scope, open tasks, export name maps.
-* :mod:`.comments`     — internal/public comments.
-* :mod:`.anonymize`    — GDPR anonymization (PII blanking, magic links, attachments).
-* :mod:`.service`      — :class:`~.service.ApplicationsService` facade combining the ops.
+``service_base``
+    Shared constructor, lookup and serialization helpers, and pure field helpers.
+``create``
+    Creation: effective-form validation, v1, initial state and status event.
+``edits``
+    Versioned data edits with a diff, version history and deletion.
+``reads``
+    Detail view, pinned effective form and status timeline.
+``listing``
+    Filtered listing, committee read scope, open tasks and export name maps.
+``comments``
+    Internal and public comments.
+``anonymize``
+    GDPR anonymization: PII blanking, magic links and attachments.
+``service``
+    The `ApplicationsService` facade that combines these operations.
 
-The facade is re-exported here so ``from app.modules.applications.service import
-ApplicationsService`` keeps working.
+This module re-exports the facade, so ``from app.modules.applications.service
+import ApplicationsService`` keeps working.
 """
 
 from app.modules.applications.service.service import ApplicationsService

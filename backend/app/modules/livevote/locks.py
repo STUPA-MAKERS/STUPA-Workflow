@@ -1,8 +1,9 @@
-"""Distributed short-lived locks guarding concurrent cast races.
+"""Short-lived distributed locks that guard concurrent cast races.
 
-Double-votes are already excluded atomically at the DB level (UNIQUE
-constraint); this lock only serializes concurrent casts of the same voter across
-instances before the DB hit — defense-in-depth, not the sole guarantee.
+A UNIQUE constraint in the database already excludes a double vote atomically.
+This lock only serializes the concurrent casts of one voter across app
+instances before they reach the database. It is defense in depth and not the
+only guarantee.
 """
 
 from __future__ import annotations
@@ -15,7 +16,11 @@ from typing import Protocol
 
 
 class Locker(Protocol):
-    """Short-lock abstraction; ``acquire`` is a context manager yielding ``True`` when exclusive."""
+    """Abstraction of a short lock.
+
+    `acquire` is an async context manager. It yields `True` when the caller
+    holds the lock exclusively.
+    """
 
     def acquire(
         self, key: str, *, ttl_ms: int = ...
@@ -23,7 +28,7 @@ class Locker(Protocol):
 
 
 class InMemoryLocker:
-    """Process-local lock per key (tests/single-process)."""
+    """Process-local lock per key for the tests and a single process."""
 
     def __init__(self) -> None:
         self._locks: dict[str, asyncio.Lock] = {}
@@ -38,9 +43,10 @@ class InMemoryLocker:
             lock.release()
 
 
-# Token-safe release: delete only while the lock is still ours, so a lock
-# re-acquired by another holder after TTL expiry isn't deleted. Atomic Lua CAS so
-# no foreign acquire slips between GET and DEL.
+# Token-safe release. Delete the key only while the lock still belongs to this
+# holder. A lock that another holder took after the TTL expired must survive.
+# The Lua compare-and-set is atomic, so no foreign `acquire` slips between GET
+# and DEL.
 _RELEASE_LUA = (
     "if redis.call('get', KEYS[1]) == ARGV[1] "
     "then return redis.call('del', KEYS[1]) else return 0 end"
@@ -48,10 +54,11 @@ _RELEASE_LUA = (
 
 
 class RedisLocker:
-    """``SET NX PX`` lock over ``redis.asyncio`` (fan-out safe).
+    """Lock with `SET NX PX` over `redis.asyncio`, safe across app instances.
 
-    Each acquire uses a random token; the Lua-CAS release deletes only our own
-    lock, never one that already expired and was re-acquired.
+    Every `acquire` uses a random token. The Lua compare-and-set release deletes
+    the own lock only. It never deletes a lock that expired and that another
+    holder took.
     """
 
     def __init__(self, client: object) -> None:
@@ -66,5 +73,5 @@ class RedisLocker:
             yield acquired
         finally:
             if acquired:
-                # CAS release; an expiring TTL covers the crash case.
+                # Compare-and-set release. An expiring TTL covers the crash case.
                 await self._client.eval(_RELEASE_LUA, 1, key, token)  # type: ignore[attr-defined]

@@ -1,4 +1,4 @@
-"""Unit-Tests MinIO-Storage-Adapter (T-13). `minio` wird über ein Fake-Modul ersetzt."""
+"""Unit tests for the MinIO storage adapter (T-13). A fake module replaces `minio`."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ class _FakeResponse:
         self.released = False
 
     def read(self, amt: int | None = None) -> bytes:
-        # ohne amt: alles (wie urllib3); mit amt: häppchenweise (Stream-Pfad)
+        # Without amt read all, like urllib3. With amt read chunk by chunk (stream path).
         if amt is None:
             chunk = self._data[self._pos :]
             self._pos = len(self._data)
@@ -140,7 +140,7 @@ async def test_get_stream_closes_and_releases_connection() -> None:
 
 
 async def test_get_stream_connect_error_wrapped() -> None:
-    # Objekt fehlt → get_object wirft → StorageError VOR dem Stream-Start (→ 503).
+    # The object is missing: get_object raises StorageError before the stream starts (503).
     with pytest.raises(StorageError):
         await _storage().get_stream("missing")
 

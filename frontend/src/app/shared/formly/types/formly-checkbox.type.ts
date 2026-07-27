@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { ReactiveFormsModule } from '@angular/forms';
 import { FieldType, type FieldTypeConfig } from '@ngx-formly/core';
 
-/** Formly-Feldtyp `checkbox` — boolesche Zustimmung (Form-Definition `checkbox`). */
+/** Formly field type `checkbox` for a boolean consent (form definition `checkbox`). */
 @Component({
   selector: 'app-formly-checkbox',
   standalone: true,

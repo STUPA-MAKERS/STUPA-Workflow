@@ -1,8 +1,8 @@
-"""Transition: optionale Farbe (#flow).
+"""Transition: an optional color (#flow).
 
-Färbt den Pfeil im Flow-Editor und den Entscheidungs-Button im Antrag — ersetzt
-die wort-listen-basierte Farb-Heuristik. NULL = keine Farbe (Default-Darstellung).
-Idempotent (``IF [NOT] EXISTS``).
+The color paints the arrow in the flow editor and the decision button on the
+application. It replaces the color heuristic that read a word list. NULL means no
+color, so the default rendering applies. Idempotent through `IF [NOT] EXISTS`.
 """
 
 from __future__ import annotations

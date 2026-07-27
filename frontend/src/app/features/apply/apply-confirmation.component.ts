@@ -7,8 +7,11 @@ import { BadgeComponent } from '@stupa-makers/ui-kit';
 import { CardComponent } from '@stupa-makers/ui-kit';
 
 /**
- * Confirmation page after submission. Confirms receipt and points to the
- * magic-link email (edit/status without login).
+ * Confirmation page after a submission.
+ *
+ * The page confirms that the platform received the application. It points the
+ * applicant to the magic-link email. That link opens the edit and status view
+ * without a login.
  */
 @Component({
   selector: 'app-apply-confirmation',

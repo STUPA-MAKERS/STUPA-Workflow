@@ -1,9 +1,9 @@
 """Tests for OAuth discovery-endpoint re-validation (AUD-023).
 
-Discovery yields ``authorization_endpoint``/``token_endpoint`` that are used for the
-browser redirect and the code/refresh-token POST. They MUST be re-validated to be
-https (or loopback) AND same-origin as ``base_url`` so a tampered discovery body cannot
-redirect credentials to a cleartext/cross-origin endpoint.
+Discovery returns `authorization_endpoint` and `token_endpoint`. The browser redirect and
+the POST of the code and the refresh token use them. The code MUST validate both again:
+https or loopback, AND same-origin with `base_url`. Without that check a tampered
+discovery body can redirect credentials to a cleartext or cross-origin endpoint.
 """
 
 from __future__ import annotations

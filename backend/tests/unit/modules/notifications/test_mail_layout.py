@@ -1,4 +1,4 @@
-"""Tests des gebrandeten HTML-Mail-Layouts (#4)."""
+"""Tests of the branded HTML mail layout (#4)."""
 
 from __future__ import annotations
 
@@ -28,10 +28,9 @@ def test_render_layout_wraps_content_with_footer() -> None:
     )
     assert out.startswith("<!DOCTYPE html>")
     assert "<p>Inhalt</p>" in out
-    # Titel/Site-Name werden escaped.
     assert "&lt;kaufen&gt;" in out
     assert "StuPa &lt;Plattform&gt;" in out
-    # Footer: Auslöser-Hinweis + Link zu den Benachrichtigungs-Einstellungen.
+    # The footer holds the trigger note and a link to the notification settings.
     assert "Sie erhalten diese E-Mail" in out
     assert "https://antrag.example.org/account/notifications" in out
 

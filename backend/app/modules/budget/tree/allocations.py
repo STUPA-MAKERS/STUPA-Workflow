@@ -30,11 +30,11 @@ class AllocationOps(BudgetTreeServiceBase):
         ).scalar_one_or_none()
 
     async def _lock_budget(self, budget_id: UUID) -> None:
-        """Pessimistically lock the budget row (``SELECT … FOR UPDATE``).
+        """Lock the budget row pessimistically (``SELECT … FOR UPDATE``).
 
-        Serializes concurrent sibling allocations: all lock the same parent row,
-        so read-sum + validate + write stay atomic and no double over-allocation
-        can slip through.
+        The lock serializes concurrent sibling allocations. They all lock the
+        same parent row. Read-sum, validate and write then stay atomic, so no
+        double over-allocation gets through.
         """
         await self.session.execute(
             select(Budget.id).where(Budget.id == budget_id).with_for_update()
@@ -65,7 +65,13 @@ class AllocationOps(BudgetTreeServiceBase):
     async def set_allocation(
         self, budget_id: UUID, fiscal_year_id: UUID, payload: AllocationSet
     ) -> AllocationOut:
-        """Set a top-down allocation. 422 if children sum exceeds the parent (both ways)."""
+        """Set a top-down allocation.
+
+        Raises:
+            ValidationProblem: The fiscal year belongs to another top-level
+                budget, the children sum exceeds the parent allocation, or the
+                new allocation falls below the sum already given to children.
+        """
         node = await self._get_node(budget_id)
         fy = await self._get_fiscal_year(fiscal_year_id)
         top = await self._top_level(node)
@@ -75,10 +81,10 @@ class AllocationOps(BudgetTreeServiceBase):
                 errors=[{"field": "fiscalYearId", "msg": "wrong top-level budget"}],
             )
 
-        # Lock BEFORE read+validate+write (race-free): the own row guards the
-        # downward constraint (own children); the parent row serializes all
-        # concurrent sibling allocations — both then read the same, already
-        # locked sibling sum and cannot jointly overbook.
+        # Lock BEFORE read, validate and write to stay race-free. The own row
+        # guards the downward constraint against the own children. The parent row
+        # serializes all concurrent sibling allocations. Both then read the same
+        # already locked sibling sum and cannot overbook together.
         await self._lock_budget(node.id)
         if node.parent_id is not None:
             await self._lock_budget(node.parent_id)
@@ -107,7 +113,8 @@ class AllocationOps(BudgetTreeServiceBase):
             )
 
         alloc = await self._allocation(budget_id, fiscal_year_id)
-        # Remember the prior value (or ``None`` if first set) for audit-log revert.
+        # Remember the prior value for the audit-log revert. It is ``None`` on the
+        # first set.
         previous_allocated = (
             str(alloc.allocated)
             if alloc is not None and alloc.allocated is not None

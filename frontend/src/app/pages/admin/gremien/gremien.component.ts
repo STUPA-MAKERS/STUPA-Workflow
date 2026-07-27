@@ -26,7 +26,7 @@ import {
   slugify,
 } from '../admin.models';
 
-/** Edit form state of a gremium (the slug is generated automatically). */
+/** Edit form state of a gremium. The page builds the slug automatically. */
 interface GremiumForm {
   name: string;
   cdVariant: string;
@@ -34,9 +34,9 @@ interface GremiumForm {
   allowVoteDelegation: boolean;
   /** Lead time in minutes before meeting start for non-pool delegations. */
   delegationLeadMinutes: number;
-  /** Allow delegation to externals (outside gremium/pool). */
+  /** Allow a delegation to an external person outside the gremium and the pool. */
   delegationAllowExternal: boolean;
-  /** Default quorum in % of eligible voters; null = none. */
+  /** Default quorum in percent of eligible voters. Null means no default. */
   quorumPercent: number | null;
   /** Extra protocol recipients, one address per line. */
   mailRecipients: string;
@@ -55,7 +55,7 @@ function emptyForm(): GremiumForm {
   };
 }
 
-/** Textarea content → address list (newlines/commas/semicolons as separators). */
+/** Split the textarea content into addresses. Newline, comma and semicolon separate. */
 function parseRecipients(raw: string): string[] {
   return raw
     .split(/[\n,;]+/)
@@ -64,10 +64,11 @@ function parseRecipients(raw: string): string[] {
 }
 
 /**
- * Gremien administration. Table of all gremien; create/edit via a **dialog** (not
- * inline). CD variant as a dropdown, the slug is generated automatically from the
- * name, vote delegation is a per-gremium setting. "Members" leads to the
- * **subpage** per gremium (`/admin/gremien/:id`).
+ * Gremien administration.
+ *
+ * The table lists all gremien. Create and edit run in a dialog, not inline. The page
+ * builds the slug from the name. Vote delegation is a per-gremium setting. "Members"
+ * opens the subpage of a gremium at `/admin/gremien/:id`.
  */
 @Component({
   selector: 'app-admin-gremien',
@@ -120,7 +121,6 @@ export class AdminGremienComponent {
     { value: 'en', label: this.i18n.translate('admin.gremien.langEn') },
   ]);
 
-  /** Preview of the automatically generated slug. */
   readonly slugPreview = computed(() => slugify(this.form().name) || '—');
 
   constructor() {
@@ -171,7 +171,6 @@ export class AdminGremienComponent {
       mailRecipients: '',
     });
     this.dialogOpen.set(true);
-    // Load extra recipients (dedicated endpoint).
     this.api.getGremiumMailRecipients(g.id).subscribe({
       next: ({ recipients }) =>
         this.form.update((f) => ({ ...f, mailRecipients: recipients.join('\n') })),

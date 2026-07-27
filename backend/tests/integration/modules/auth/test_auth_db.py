@@ -1,7 +1,7 @@
-"""Integration: T-10-Tabellen gegen echtes Postgres 16 (security.md §1/§2).
+"""Integration: the T-10 tables against a real Postgres 16 (security.md §1/§2).
 
-Prüft Schema-Verhalten der Migration: magic_link (scope-CHECK, bytea-Hash,
-FK-CASCADE) und auth_session (sid UNIQUE, principal-FK-CASCADE).
+The tests check the schema behavior of the migration: magic_link (scope CHECK, bytea
+hash, FK CASCADE) and auth_session (sid UNIQUE, principal FK CASCADE).
 """
 
 from __future__ import annotations
@@ -82,7 +82,6 @@ def test_auth_session_sid_unique_and_cascade(engine: Engine) -> None:
             ),
             {"p": pid},
         )
-    # FK-CASCADE: Principal löschen entfernt Session.
     with engine.begin() as conn:
         conn.execute(text("DELETE FROM principal WHERE id=:p"), {"p": pid})
     with engine.connect() as conn:

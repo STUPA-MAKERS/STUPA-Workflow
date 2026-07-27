@@ -1,8 +1,9 @@
-"""Integration (echte Postgres, testcontainers): PdfService gegen echtes Schema.
+"""Integration test for PdfService against a real schema (Postgres, testcontainers).
 
-Beweist ``load_application_doc`` (Felder/Werte/PII-Ausschluss/Verlauf/Variante je
-Gremium), den Job-Lebenszyklus (``create_application_job``→``get_job``), die
-Idempotenz-Wiederverwendung und das ``render_job``-UNIQUE auf ``idempotency_key``.
+The tests cover ``load_application_doc`` with its fields, values, PII exclusion,
+timeline and per-Gremium variant. They also cover the job lifecycle
+(``create_application_job`` to ``get_job``), the idempotent reuse of a job and the
+``render_job`` UNIQUE constraint on ``idempotency_key``.
 """
 
 from __future__ import annotations
@@ -98,13 +99,13 @@ async def test_load_application_doc_and_markdown(session: AsyncSession) -> None:
     assert doc.type_name == "Förderantrag"
     assert doc.gremium_slug is not None and doc.gremium_slug.startswith("stupa-")
     assert doc.applicant_name == "Erika M."
-    assert doc.variant == "report-makers"  # cd_variant=makers → Report-Makers-Variante
+    assert doc.variant == "report-makers"  # the report-makers variant comes from makers
     assert doc.data["title"] == "Projekt X"
-    assert len(doc.timeline) >= 1  # Initial-Status-Event aus create()
+    assert len(doc.timeline) >= 1  # the initial status event from create()
 
     md = build_application_markdown(doc)
     assert "Projekt X" in md
-    assert "geheim-pii" not in md  # PII-Feld bleibt draußen
+    assert "geheim-pii" not in md  # the PII field stays out
     assert 'typ: antrag' in md
 
 
@@ -137,7 +138,7 @@ async def test_job_lifecycle_and_idempotency(session: AsyncSession) -> None:
     assert job.status == "pending"
     assert (await svc.get_job(job.id)).id == job.id
 
-    # Idempotenz: gleicher Key ⇒ derselbe Job (kein Doppel-Render).
+    # Idempotency: the same key gives the same job and no second render.
     a = await svc.create_application_job(app_id, idempotency_key="evt-1")
     await session.commit()
     b = await svc.create_application_job(app_id, idempotency_key="evt-1")

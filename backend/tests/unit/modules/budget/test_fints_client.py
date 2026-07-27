@@ -1,4 +1,7 @@
-"""FinTS-Client (#fints): reine Logik (TAN-Wahl, Konto-Auswahl). Netz = pragma no cover."""
+"""FinTS client (#fints): pure logic for the TAN choice and the account choice.
+
+The network path carries `pragma: no cover`.
+"""
 
 from __future__ import annotations
 
@@ -36,12 +39,12 @@ def test_pick_mechanism_fallback_first_and_empty() -> None:
 
 def test_select_account_by_iban() -> None:
     accs = [_Acct("DE111"), _Acct("DE 2 2 2")]
-    assert fc._select_account(accs, "de222") is accs[1]  # IBAN-Treffer (normalisiert)
+    assert fc._select_account(accs, "de222") is accs[1]  # normalized IBAN match
 
 
 def test_select_account_by_number_when_bank_omits_iban() -> None:
-    """Sparkasse: SEPA-Konten OHNE IBAN — Match über die im DE-IBAN steckende KTO."""
-    # DE + 2 Prüf + 8 BLZ + 10 KTO. KTO 0001234567 → "1234567".
+    """Sparkasse: SEPA accounts carry no IBAN. The match uses the number in the DE IBAN."""
+    # DE + 2 check digits + 8 BLZ + 10 account digits. 0001234567 becomes "1234567".
     iban = "DE00123456780001234567"
     accs = [_Acct("", accountnumber="9999999"), _Acct("", accountnumber="1234567")]
     assert fc._select_account(accs, iban) is accs[1]
@@ -54,12 +57,12 @@ def test_select_account_single_returns_it_regardless() -> None:
 
 
 def test_select_account_ambiguous_raises() -> None:
-    """Mehrere Konten, keiner passt → klarer Fehler statt still falsches Konto."""
+    """Several accounts and no match give a clear error, not a silently wrong account."""
     accs = [_Acct("DE111", "1"), _Acct("DE222", "2")]
     with pytest.raises(fc.FintsAccountSelectionError):
-        fc._select_account(accs, None)  # keine IBAN konfiguriert
+        fc._select_account(accs, None)  # no IBAN configured
     with pytest.raises(fc.FintsAccountSelectionError):
-        fc._select_account(accs, "DE00123456789999999999")  # nichts trifft
+        fc._select_account(accs, "DE00123456789999999999")  # nothing matches
 
 
 def test_select_account_empty_raises() -> None:
@@ -68,46 +71,54 @@ def test_select_account_empty_raises() -> None:
 
 
 def test_select_account_non_de_iban_no_kto_match_raises() -> None:
-    """Konfigurierte NICHT-DE-IBAN (kein KTO ableitbar) trifft nichts → klarer Fehler
-    statt still falsches Konto (deckt den ``if kto:``-False-Zweig ab)."""
+    """A configured non-DE IBAN yields no account number, so nothing matches.
+
+    The code raises a clear error instead of picking a wrong account. This covers the false
+    branch of `if kto:`.
+    """
     accs = [_Acct("DE111", "1"), _Acct("DE222", "2")]
     with pytest.raises(fc.FintsAccountSelectionError):
-        fc._select_account(accs, "FR761234567890")  # non-DE → kto leer, kein Treffer
+        fc._select_account(accs, "FR761234567890")  # non-DE, so kto stays empty
 
 
 def test_kto_from_de_iban() -> None:
     assert fc._kto_from_de_iban("DE00123456780001234567") == "1234567"
-    assert fc._kto_from_de_iban("FR761234567890") == ""  # nicht-DE
-    assert fc._kto_from_de_iban("DE12") == ""  # zu kurz
+    assert fc._kto_from_de_iban("FR761234567890") == ""  # not DE
+    assert fc._kto_from_de_iban("DE12") == ""  # too short
 
 
 def test_account_scope_includes_iban_and_number() -> None:
-    """Scope enthält IBAN + KTO (Bank + aus DB-IBAN abgeleitet), führende Nullen weg."""
+    """The scope holds the IBAN and the account number without the leading zeros.
+
+    The account number comes from the bank and from the IBAN in the database.
+    """
     acc = _Acct("", accountnumber="0001234567")
     creds = fc.FintsCredentials(
         endpoint="https://x", blz="1", login="u", pin="p",
         account_iban="DE00123456780001234567",
     )
     scope = fc._account_scope(acc, creds)
-    assert "DE00123456780001234567" in scope  # konfigurierte IBAN
-    assert "1234567" in scope  # KTO (aus Bank-accountnumber + IBAN), Nullen entfernt
+    assert "DE00123456780001234567" in scope  # configured IBAN
+    assert "1234567" in scope  # account number from the bank field and the IBAN, no zeros
 
 
 def test_account_scope_without_number_or_de_iban() -> None:
-    """Bank-Konto ohne accountnumber + NICHT-DE-IBAN als Credential: Scope enthält nur
-    die IBAN (deckt die leeren ``_norm_kto``/``_kto_from_de_iban``-Zweige ab)."""
-    acc = _Acct("", accountnumber="")  # keine KTO von der Bank
+    """A bank account without an accountnumber and a non-DE IBAN give a scope with the IBAN.
+
+    This covers the empty branches of `_norm_kto` and `_kto_from_de_iban`.
+    """
+    acc = _Acct("", accountnumber="")  # no account number from the bank
     creds = fc.FintsCredentials(
         endpoint="https://x", blz="1", login="u", pin="p",
-        account_iban="FR7612345678901234",  # non-DE → kein KTO ableitbar
+        account_iban="FR7612345678901234",  # non-DE, so no account number
     )
     scope = fc._account_scope(acc, creds)
     assert scope == frozenset({fc._norm_iban("FR7612345678901234")})
 
 
 def test_mask_id_shortens_and_handles_short_values() -> None:
-    assert fc._mask_id("DE00123456780001234567") == "…4567"  # letzte 4
-    assert fc._mask_id("ab") == "…"  # < 4 Zeichen → nur Maske
+    assert fc._mask_id("DE00123456780001234567") == "…4567"  # the last 4 characters
+    assert fc._mask_id("ab") == "…"  # fewer than 4 characters gives only the mask
 
 
 def test_outcome_dataclass_defaults() -> None:
@@ -134,57 +145,61 @@ def test_matrix_data_url_default_mime() -> None:
 
 
 def test_matrix_data_url_absent_or_empty() -> None:
-    assert fc._matrix_data_url(_Resp(None)) is None  # kein optischer Challenge
-    assert fc._matrix_data_url(_Resp(("image/png", b""))) is None  # leere Daten
-    assert fc._matrix_data_url(object()) is None  # Attribut fehlt
+    assert fc._matrix_data_url(_Resp(None)) is None  # no optical challenge
+    assert fc._matrix_data_url(_Resp(("image/png", b""))) is None  # empty data
+    assert fc._matrix_data_url(object()) is None  # attribute missing
 
 
 def test_matrix_data_url_bad_tuple() -> None:
-    assert fc._matrix_data_url(_Resp(("only-one",))) is None  # nicht entpackbar
+    assert fc._matrix_data_url(_Resp(("only-one",))) is None  # not unpackable
 
 
 def test_matrix_data_url_rejects_unknown_mime() -> None:
-    # Bank-gelieferter Nicht-Bild-MIME wird NICHT übernommen → Default image/png (#fints-review).
+    # The code never takes a non-image MIME type from the bank. It falls back to image/png
+    # (#fints-review).
     url = fc._matrix_data_url(_Resp(("text/html", b"data")))
     assert url is not None and url.startswith("data:image/png;base64,")
-    # Erlaubter Typ bleibt erhalten.
+    # An allowed type stays.
     jpg = fc._matrix_data_url(_Resp(("image/jpeg", b"data")))
     assert jpg is not None and jpg.startswith("data:image/jpeg;base64,")
 
 
 def _global_resolver(_host: str) -> list[str]:
-    return ["1.1.1.1"]  # öffentlich → erlaubt
+    return ["1.1.1.1"]  # public, so allowed
 
 
 def _internal_resolver(_host: str) -> list[str]:
-    return ["10.0.0.5"]  # privat → blockiert
+    return ["10.0.0.5"]  # private, so blocked
 
 
 def test_validate_fints_endpoint_ok() -> None:
-    # Hostname (DNS gestubbt) + globales IP-Literal.
+    # A host name with stubbed DNS and a global IP literal.
     fc.validate_fints_endpoint("https://banking.sparkasse.de/fints", resolver=_global_resolver)
     fc.validate_fints_endpoint("https://1.1.1.1/fints", resolver=_global_resolver)
 
 
 def test_validate_fints_endpoint_rejects() -> None:
-    # IP-Literale + Schema/Host brauchen kein DNS.
+    # IP literals and the scheme or host checks need no DNS.
     for bad in [
-        "http://banking.sparkasse.de/fints",   # nicht https
-        "https:///fints",                       # kein Host
+        "http://banking.sparkasse.de/fints",   # not https
+        "https:///fints",                       # no host
         "https://127.0.0.1/x",                  # loopback
-        "https://169.254.169.254/x",            # link-local (Metadaten)
-        "https://10.0.0.5/x",                   # privat
+        "https://169.254.169.254/x",            # link-local (metadata)
+        "https://10.0.0.5/x",                   # private
         "https://[::1]/x",                       # IPv6 loopback
     ]:
         with pytest.raises(ValueError):
             fc.validate_fints_endpoint(bad, resolver=_global_resolver)
-    # Öffentlicher Name, der auf eine interne IP auflöst → vom DNS-Guard geblockt.
+    # The DNS guard blocks a public name that resolves to an internal IP.
     with pytest.raises(ValueError):
         fc.validate_fints_endpoint("https://evil.example/x", resolver=_internal_resolver)
 
 
 def test_classify_maps_bank_errors() -> None:
-    """Bank-Sperre/Ablehnung → eigene Fehlertypen; alles andere bleibt generisch (#fints-review)."""
+    """A bank lock or a rejection maps to its own error type (#fints-review).
+
+    Every other error stays a generic FintsError.
+    """
     from fints.exceptions import FinTSClientPINError, FinTSClientTemporaryAuthError
 
     assert isinstance(
@@ -194,13 +209,16 @@ def test_classify_maps_bank_errors() -> None:
         fc._classify(FinTSClientPINError("rejected")), fc.FintsAuthRejectedError
     )
     generic = fc._classify(RuntimeError("connection refused"))
-    assert type(generic) is fc.FintsError  # nicht als Sperre/Ablehnung fehlklassifiziert
+    assert type(generic) is fc.FintsError  # not misclassified as a lock or a rejection
 
 
 def test_classify_walks_exception_chain() -> None:
-    """Maskierte Bank-Ablehnung erkennen (#fints-review): python-fints sperrt bei 9340 die PIN,
-    der ``with client:``-Teardown wirft dann ``Exception('Refusing to use PIN after block')`` und
-    maskiert den ``FinTSClientPINError`` — der muss über ``__context__`` gefunden werden."""
+    """Detect a masked bank rejection (#fints-review).
+
+    On code 9340 python-fints blocks the PIN. The `with client:` teardown then raises
+    `Exception("Refusing to use PIN after block")` and masks the `FinTSClientPINError`. The
+    classifier must find that error through `__context__`.
+    """
     from fints.exceptions import FinTSClientPINError
 
     try:

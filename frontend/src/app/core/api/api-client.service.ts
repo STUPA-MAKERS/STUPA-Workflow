@@ -84,12 +84,12 @@ import type {
 } from './models';
 
 /**
- * Typed REST client against the OpenAPI contracts.
+ * Typed REST client for the OpenAPI contracts.
  *
  * Responses arrive in the backend wire form (`*Wire`, camelCase via
- * `_CamelModel`) and are translated here into the FE view models via
- * `mappers.ts` (i18n labels resolved for the current `lang`). Components see
- * only the view models.
+ * `_CamelModel`). `mappers.ts` translates them into the FE view models and
+ * resolves the i18n labels for the current `lang`. Components see only the
+ * view models.
  */
 @Injectable({ providedIn: 'root' })
 export class ApiClient {
@@ -97,7 +97,6 @@ export class ApiClient {
   private readonly base = inject(API_BASE_URL);
   private readonly i18n = inject(I18nService);
 
-  // --- auth ----------------------------------------------------------------
   me(): Observable<Principal> {
     return this.http.get<Principal>(`${this.base}/auth/me`);
   }
@@ -106,25 +105,26 @@ export class ApiClient {
     return this.http.post<LogoutOut>(`${this.base}/auth/logout`, {});
   }
 
-  // --- calendar (iCal subscription) ----------------------------------------
-  /** GET /calendar/me — own subscription URL (`url` null until created). */
+  /** GET /calendar/me — own iCal subscription URL (`url` is null until created). */
   myCalendar(): Observable<CalendarFeed> {
     return this.http.get<CalendarFeed>(`${this.base}/calendar/me`, {
       context: skipLoading(),
     });
   }
 
-  /** POST /calendar/me/rotate — (re)generate the feed token; the old URL is invalidated. */
+  /** POST /calendar/me/rotate — generate a new feed token. The old URL stops working. */
   rotateCalendar(): Observable<CalendarFeed> {
     return this.http.post<CalendarFeed>(`${this.base}/calendar/me/rotate`, {});
   }
 
   /**
-   * POST /auth/magic-link/verify — exchange the magic-link token (from the mail
-   * URL) for an HttpOnly applicant session cookie. The server sets the cookie;
-   * the response carries no session token — follow-up requests authenticate via
-   * `withCredentials` (no JS storage). `MagicLinkVerifyOut` is a plain
-   * `BaseModel` → `application_id` snake_case.
+   * POST /auth/magic-link/verify — exchange the magic-link token from the mail
+   * URL for an HttpOnly applicant session cookie.
+   *
+   * The server sets the cookie. The response carries no session token.
+   * Follow-up requests authenticate with `withCredentials` and store nothing in
+   * JavaScript. `MagicLinkVerifyOut` is a plain `BaseModel`, so
+   * `application_id` stays snake_case.
    */
   verifyMagicLink(token: string): Observable<MagicLinkVerifyResult> {
     return this.http.post<MagicLinkVerifyResult>(`${this.base}/auth/magic-link/verify`, {
@@ -132,9 +132,8 @@ export class ApiClient {
     });
   }
 
-  // --- application-types (public) ------------------------------------------
-  /** GET /application-types — the backend returns a Page; the FE wants the list. */
-  /** `quiet` = loaded in the background as a type cache (no global overlay). */
+  /** GET /application-types — the backend returns a Page. The FE wants the list. */
+  /** `quiet` skips the global overlay for a background type-cache load. */
   applicationTypes(opts: { quiet?: boolean } = {}): Observable<ApplicationType[]> {
     return this.http
       .get<Page<ApplicationTypeListItemWire>>(`${this.base}/application-types`, {
@@ -155,9 +154,10 @@ export class ApiClient {
   }
 
   /**
-   * Effective form of an existing application from its pinned version. Returns
-   * the same fields the server validates against — even if the active form
-   * version has since changed.
+   * Effective form of an existing application, taken from its pinned version.
+   *
+   * The result holds the fields the server validates against, even after the
+   * active form version changed.
    */
   applicationForm(applicationId: Uuid): Observable<EffectiveForm> {
     return this.http.get<EffectiveForm>(`${this.base}/applications/${applicationId}/form`, {
@@ -165,7 +165,6 @@ export class ApiClient {
     });
   }
 
-  // --- applications --------------------------------------------------------
   listApplications(query: ApplicationListQuery = {}): Observable<Page<ApplicationListItem>> {
     let params = new HttpParams();
     for (const [key, value] of Object.entries(query)) {
@@ -185,7 +184,7 @@ export class ApiClient {
       );
   }
 
-  /** GET /applications/export.xlsx — filtered application list as Excel (P(`application.export`)). */
+  /** GET /applications/export.xlsx — filtered list as Excel (P(`application.export`)). */
   exportApplicationsXlsx(query: ApplicationListQuery = {}): Observable<Blob> {
     let params = new HttpParams();
     for (const [key, value] of Object.entries(query)) {
@@ -210,7 +209,7 @@ export class ApiClient {
       .pipe(map((items) => items.map((item) => mapApplicationListItem(item, lang))));
   }
 
-  /** `quiet` = background reload after a mutation (no global overlay). */
+  /** `quiet` skips the global overlay for a background reload after a mutation. */
   getApplication(id: Uuid, opts: { quiet?: boolean } = {}): Observable<Application> {
     const lang = this.i18n.locale();
     return this.http
@@ -222,7 +221,7 @@ export class ApiClient {
 
   /**
    * GET /altcha/challenge — fresh, server-signed PoW challenge. Returns `null`
-   * when Altcha is disabled server-side (404 → no captcha).
+   * when the server turns ALTCHA off (404 → no captcha).
    */
   altchaChallenge(): Observable<AltchaChallenge | null> {
     return this.http.get<AltchaChallenge>(`${this.base}/altcha/challenge`).pipe(
@@ -232,7 +231,7 @@ export class ApiClient {
     );
   }
 
-  /** POST /applications — camelCase body; response is `{ applicationId }` (not a full DTO). */
+  /** POST /applications — camelCase body. The response is `{ applicationId }`, not a full DTO. */
   createApplication(input: NewApplication): Observable<ApplicationCreated> {
     return this.http
       .post<ApplicationCreatedWire>(
@@ -260,7 +259,7 @@ export class ApiClient {
     return this.http.post<void>(`${this.base}/applications/${id}/erasure-request`, {});
   }
 
-  /** `quiet` = refresh after a mutation (no global overlay). */
+  /** `quiet` skips the global overlay for a refresh after a mutation. */
   timeline(id: Uuid, opts: { quiet?: boolean } = {}): Observable<TimelineEntry[]> {
     const lang = this.i18n.locale();
     return this.http
@@ -272,7 +271,9 @@ export class ApiClient {
 
   /**
    * GET /applications/{id}/versions — version history + diff (principal-only).
-   * The diff is language-neutral (raw field values) → no `lang` mapping needed.
+   *
+   * The diff is language-neutral and holds raw field values. It needs no `lang`
+   * mapping.
    */
   versions(id: Uuid): Observable<ApplicationVersion[]> {
     return this.http
@@ -282,8 +283,7 @@ export class ApiClient {
       .pipe(map((items) => items.map(mapVersion)));
   }
 
-  // --- comments (applicant: public only) -----------------------------------
-  /** `quiet` = background/refresh load (no global overlay). */
+  /** `quiet` skips the global overlay for a background refresh. */
   comments(id: Uuid, opts: { quiet?: boolean } = {}): Observable<ApplicationComment[]> {
     return this.http
       .get<CommentOutWire[]>(`${this.base}/applications/${id}/comments`, {
@@ -304,7 +304,6 @@ export class ApiClient {
       .pipe(map(mapComment));
   }
 
-  // --- flow ----------------------------------------------------------------
   transitions(id: Uuid): Observable<Transition[]> {
     const lang = this.i18n.locale();
     return this.http
@@ -318,8 +317,8 @@ export class ApiClient {
     return this.http.post<TransitionResult>(`${this.base}/applications/${id}/transition`, req);
   }
 
-  /** GET /applications/{id}/flow-states — all states of the application's flow
-   *  (force-status picker options); needs `application.force_status`. */
+  /** GET /applications/{id}/flow-states — all states of the application flow.
+   *  They fill the force-status picker. Needs `application.force_status`. */
   flowStates(id: Uuid): Observable<ApplicationState[]> {
     const lang = this.i18n.locale();
     return this.http
@@ -335,8 +334,8 @@ export class ApiClient {
       );
   }
 
-  /** POST /applications/{id}/force-status — force a status directly (privileged
-   *  override, bypasses guards/transitions); needs `application.force_status`. */
+  /** POST /applications/{id}/force-status — set a status directly. This privileged
+   *  override bypasses guards and transitions. Needs `application.force_status`. */
   forceStatus(id: Uuid, req: ForceStatusBody): Observable<TransitionResult> {
     return this.http.post<TransitionResult>(
       `${this.base}/applications/${id}/force-status`,
@@ -359,11 +358,11 @@ export class ApiClient {
     );
   }
 
-  // --- files / attachments -------------------------------------------------
   /**
    * POST /applications/{id}/attachments — multipart upload (≤10 MB, A(edit)/P).
-   * The server scans asynchronously (ClamAV); the response carries
-   * `scanned=false` until the worker is done. Errors: 413 (too large), 415
+   *
+   * The server scans the file asynchronously with ClamAV. The response carries
+   * `scanned=false` until the worker finishes. Errors: 413 (too large), 415
    * (type), 429 (rate limit), 503 (storage off).
    */
   uploadAttachment(
@@ -406,13 +405,13 @@ export class ApiClient {
     return this.http.delete<void>(`${this.base}/attachments/${attachmentId}`);
   }
 
-  // --- voting --------------------------------------------------------------
   /**
-   * GET /votes/{id} — vote state + tally. `VoteOut` is a `_CamelModel`
-   * (camelCase) and needs no mapper layer; for `secret` the server returns only
-   * `counts` in `tally`.
+   * GET /votes/{id} — vote state + tally.
+   *
+   * `VoteOut` is a `_CamelModel` (camelCase) and needs no mapper layer. For a
+   * `secret` vote the server returns only `counts` in `tally`.
    */
-  /** `quiet` = tally refresh after casting (no global overlay). */
+  /** `quiet` skips the global overlay for a tally refresh after casting. */
   getVote(id: Uuid, opts: { quiet?: boolean } = {}): Observable<Vote> {
     return this.http.get<Vote>(`${this.base}/votes/${id}`, {
       context: opts.quiet ? skipLoading() : undefined,
@@ -421,9 +420,10 @@ export class ApiClient {
 
   /**
    * POST /votes/{id}/ballot — cast a ballot (`choice` ∈ config.options).
-   * Idempotent: re-casting the same choice stays `cast`; a change returns
-   * `changed` (only when `config.allowChange`). 409 = duplicate/closed, 403 =
-   * not eligible — components evaluate the status.
+   *
+   * The call is idempotent. The same choice again stays `cast`. A different
+   * choice returns `changed`, but only when `config.allowChange` is set. 409 =
+   * duplicate or closed, 403 = not eligible. The components evaluate the status.
    */
   castBallot(id: Uuid, choice: string, asDelegation = false): Observable<BallotResult> {
     return this.http.post<BallotResult>(`${this.base}/votes/${id}/ballot`, {
@@ -432,7 +432,6 @@ export class ApiClient {
     });
   }
 
-  // --- meetings ------------------------------------------------------------
   /** POST /meetings — create a meeting (P(meeting.manage)). */
   createMeeting(body: MeetingCreateBody): Observable<Meeting> {
     return this.http
@@ -440,7 +439,7 @@ export class ApiClient {
       .pipe(map(mapMeeting));
   }
 
-  /** GET /gremien/{id}/meeting-members — protokollant candidates for creation (P(session.manage)). */
+  /** GET /gremien/{id}/meeting-members — protokollant candidates (P(session.manage)). */
   listMeetingMembers(gremiumId: Uuid): Observable<MeetingMember[]> {
     return this.http.get<MeetingMember[]>(
       `${this.base}/gremien/${gremiumId}/meeting-members`,
@@ -460,10 +459,10 @@ export class ApiClient {
   /**
    * GET /meetings/timeline — keyset-paginated timeline around *now*.
    *
-   * `direction: 'upcoming'` runs chronologically forward, `'past'` backward
-   * (infinite scroll upward). `cursor` comes from the previous page's
-   * `nextCursor`; `null`/empty ⇒ start from *now*. `nextCursor === null` ⇒ end
-   * of the direction.
+   * `direction: 'upcoming'` runs forward in time. `'past'` runs backward for
+   * the infinite scroll upward. `cursor` comes from `nextCursor` of the
+   * previous page. A `null` or empty cursor starts at *now*.
+   * `nextCursor === null` marks the end of the direction.
    */
   listMeetingsTimeline(opts: {
     direction: TimelineDirection;
@@ -485,16 +484,16 @@ export class ApiClient {
   /**
    * GET /meetings/gremien — gremien for the meeting-overview filter.
    *
-   * All gremien in which the user has at least ONE readable meeting (read right)
-   * — not the member gremien. The response is already camelCase (`id`/`name`),
-   * so no wire mapping is needed.
+   * The list holds every Gremium with at least ONE meeting the user may read.
+   * It is not the list of member Gremien. The response is already camelCase
+   * (`id`/`name`) and needs no wire mapping.
    */
   listMeetingFilterGremien(): Observable<{ id: Uuid; name: string }[]> {
     return this.http.get<{ id: Uuid; name: string }[]>(`${this.base}/meetings/gremien`);
   }
 
   /** GET /meetings/{id} — meeting state + votes. */
-  /** `quiet` = background reload (refresh after a vote action etc.; no overlay). */
+  /** `quiet` skips the global overlay for a background reload after a vote action. */
   getMeeting(id: Uuid, opts: { quiet?: boolean } = {}): Observable<Meeting> {
     return this.http
       .get<MeetingOutWire>(`${this.base}/meetings/${id}`, {
@@ -515,9 +514,8 @@ export class ApiClient {
     return this.http.delete<void>(`${this.base}/meetings/${id}`);
   }
 
-  // --- attendance ----------------------------------------------------------
   /** GET /meetings/{id}/attendance — roster of current members + status. */
-  /** `quiet` = roster reload for dialog/refresh (no global overlay). */
+  /** `quiet` skips the global overlay for a roster reload in a dialog. */
   listAttendance(meetingId: Uuid, opts: { quiet?: boolean } = {}): Observable<Attendance[]> {
     return this.http.get<Attendance[]>(`${this.base}/meetings/${meetingId}/attendance`, {
       context: opts.quiet ? skipLoading() : undefined,
@@ -544,9 +542,8 @@ export class ApiClient {
     );
   }
 
-  // --- agenda --------------------------------------------------------------
   /** GET /meetings/{id}/agenda — assigned applications (ordered). */
-  /** `quiet` = agenda reload after a WS event/mutation (no global overlay). */
+  /** `quiet` skips the global overlay for a reload after a WS event or mutation. */
   listAgenda(meetingId: Uuid, opts: { quiet?: boolean } = {}): Observable<AgendaItem[]> {
     return this.http.get<AgendaItem[]>(`${this.base}/meetings/${meetingId}/agenda`, {
       context: opts.quiet ? skipLoading() : undefined,
@@ -618,8 +615,8 @@ export class ApiClient {
   }
 
   /**
-   * POST /meetings/{id}/votes — create + open a live vote for an application,
-   * with a motion (for the protocol). Response = the updated meeting.
+   * POST /meetings/{id}/votes — create and open a live vote for an application,
+   * with a motion for the protocol. The response is the updated meeting.
    */
   openMeetingVote(
     meetingId: Uuid,
@@ -645,7 +642,7 @@ export class ApiClient {
       .pipe(map(mapMeeting));
   }
 
-  /** POST /votes/{id}/open — open a vote (also live; P(vote.manage)). */
+  /** POST /votes/{id}/open — open a vote, a live one too (P(vote.manage)). */
   openVote(voteId: Uuid): Observable<void> {
     return this.http.post<void>(`${this.base}/votes/${voteId}/open`, {});
   }
@@ -665,7 +662,6 @@ export class ApiClient {
     return this.http.get<PublicSiteConfig>(`${this.base}/site-config`);
   }
 
-  // --- protocol ------------------------------------------------------------
   /** POST /meetings/{id}/protocol — create or load the protocol (idempotent). */
   loadProtocol(meetingId: Uuid): Observable<Protocol> {
     return this.http
@@ -675,8 +671,8 @@ export class ApiClient {
 
   /** GET /meetings/{id}/protocol — read the protocol (404 if none).
 
-      For reload/status polling: GETs are not subject to the default write rate
-      limit — the 4s poll over the POST quickly ran into 429. */
+      Use this route for reload and status polling. The default write rate limit
+      does not apply to a GET. The 4s poll over the POST route soon hit 429. */
   getProtocol(meetingId: Uuid, opts: { quiet?: boolean } = {}): Observable<Protocol> {
     return this.http
       .get<ProtocolOutWire>(`${this.base}/meetings/${meetingId}/protocol`, {
@@ -707,8 +703,7 @@ export class ApiClient {
       .pipe(map(mapProtocol));
   }
 
-  // --- notification preferences (self-service) -----------------------------
-  /** GET /notifications/preferences — own toggles (full catalogue). */
+  /** GET /notifications/preferences — own toggles (full catalog). */
   listNotificationPreferences(): Observable<NotificationPreference[]> {
     return this.http.get<NotificationPreference[]>(`${this.base}/notifications/preferences`, {
       context: skipLoading(),
@@ -724,7 +719,6 @@ export class ApiClient {
     });
   }
 
-  // --- OAuth grants + MCP setup (self-service) -----------------------------
   /** GET /oauth/grants — own active agent/MCP grants. */
   listGrants(): Observable<OAuthGrant[]> {
     return this.http.get<OAuthGrant[]>(`${this.base}/oauth/grants`, {

@@ -1,9 +1,9 @@
 """Thin async HTTP client around the platform API.
 
-Attaches the OAuth bearer token; on a 401 it forces one token refresh/login and retries
-once. Token acquisition (which may open a browser) runs in a worker thread so the async
-event loop is never blocked. Errors are raised as :class:`ApiError` with the platform's
-problem-detail message where available.
+The client attaches the OAuth bearer token. On a 401 it forces one token refresh or login
+and retries once. A token request can open a browser. That step therefore runs in a
+worker thread and never blocks the async event loop. The client raises `ApiError` with
+the problem-detail message of the platform where the platform sends one.
 """
 
 from __future__ import annotations
@@ -26,17 +26,20 @@ class ApiError(RuntimeError):
 
 
 def _safe_path(path: str) -> str:
-    """Defensively re-encode an API path built from caller-supplied ids.
+    """Re-encode an API path that holds caller-supplied ids.
 
-    Tool paths are plain f-strings like ``/applications/{id}/votes`` where ``{id}``
-    is interpolated raw. httpx does not percent-encode ``/`` inside a segment nor
-    reject ``..``/``?``, so an id such as ``../admin/audit`` or ``x?y=1`` could
-    rewrite the route or smuggle a query string. Query parameters in this client
-    always travel via the ``params=`` kwarg and are never embedded in the path, so
-    every ``?``/``#`` in the path string and every ``.``/``..`` traversal segment is
-    illegitimate. We reject those and percent-encode anything else that does not
-    belong inside a single path segment, leaving the structural ``/`` separators
-    intact. Defense-in-depth: the request is still RBAC-authorized server-side.
+    Tool paths are plain f-strings like `/applications/{id}/votes`. The id goes in raw.
+    httpx does not percent-encode `/` inside a segment. It also does not reject `..`, `?`
+    or `#`. An id such as `../admin/audit` or `x?y=1` can therefore rewrite the route or
+    smuggle a query string. This client always sends query parameters through the
+    `params=` keyword argument and never puts them in the path. Every `?` or `#` in the
+    path and every `.` or `..` segment is therefore illegitimate. This function rejects
+    those. It percent-encodes anything else that does not belong in a single path
+    segment, and it leaves the structural `/` separators intact. This is defense in
+    depth. The server still authorizes the request through RBAC.
+
+    Raises:
+        ApiError: The path is relative, holds an illegal character, or traverses up.
     """
     if not path.startswith("/"):
         raise ApiError(400, f"invalid API path (must be absolute): {path!r}")
@@ -47,8 +50,8 @@ def _safe_path(path: str) -> str:
     for seg in segments:
         if seg in {".", ".."}:
             raise ApiError(400, f"path traversal is not allowed: {path!r}")
-        # quote(safe="") encodes any stray "/", "%", whitespace etc. that an id may
-        # carry while leaving plain route names and UUIDs untouched.
+        # Encode any stray "/", "%" or whitespace that an id may carry. Plain route
+        # names and UUIDs stay untouched.
         encoded.append(quote(seg, safe=""))
     return "/".join(encoded)
 
@@ -74,7 +77,7 @@ class ApiClient:
         headers = {"Authorization": f"Bearer {token}", **kwargs.pop("headers", {})}
         resp = await self._client.request(method, path, headers=headers, **kwargs)
         if resp.status_code == 401:
-            # Token rejected — force a fresh credential and retry exactly once.
+            # The server rejected the token. Get a fresh credential and retry once.
             token = await self._token(force_login=True)
             headers["Authorization"] = f"Bearer {token}"
             resp = await self._client.request(method, path, headers=headers, **kwargs)

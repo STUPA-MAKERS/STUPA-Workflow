@@ -1,5 +1,6 @@
-/* Namespaced (encapsulation: None — [innerHTML] content has no Angular
-   scoping attributes). Compact typography for text inside detail cards. */
+/* Every rule uses the .mdv namespace because the component turns encapsulation off.
+   The [innerHTML] content carries no Angular scoping attributes. The typography stays
+   compact for text inside a detail card. */
 .mdv {
   line-height: 1.55;
   word-break: break-word;

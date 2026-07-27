@@ -1,8 +1,8 @@
-"""Calendar endpoints: public iCal feed plus own subscription URL.
+"""Calendar endpoints: the public iCal feed plus the personal subscription URL.
 
-``GET /calendar/{token}.ics`` is public, authenticated by the feed token
-(calendar clients cannot log in via OIDC). ``GET /calendar/me`` reads the own
-subscription URL; ``POST /calendar/me/rotate`` (re)generates the token and
+`GET /calendar/{token}.ics` is public. The feed token authenticates it, because
+calendar clients cannot log in through OIDC. `GET /calendar/me` reads the
+personal subscription URL. `POST /calendar/me/rotate` generates a new token and
 invalidates the old URL.
 """
 
@@ -42,7 +42,10 @@ async def my_calendar(
     db: DbSession,
     settings: SettingsDep,
 ) -> CalendarFeedOut:
-    """Read the own subscription URL (``null`` until a feed token exists)."""
+    """Read the personal subscription URL.
+
+    The URL is `null` until a feed token exists.
+    """
     token = await service.get_calendar_token(db, principal.sub)
     return CalendarFeedOut(url=_feed_url(settings, token) if token else None)
 
@@ -53,7 +56,10 @@ async def rotate_my_calendar(
     db: DbSession,
     settings: SettingsDep,
 ) -> CalendarFeedOut:
-    """(Re)generate the feed token — invalidates the previous subscription URL."""
+    """Generate a new feed token.
+
+    The previous subscription URL becomes invalid.
+    """
     token = await service.rotate_calendar_token(db, principal.sub)
     await db.commit()
     return CalendarFeedOut(url=_feed_url(settings, token) if token else None)
@@ -69,7 +75,10 @@ async def rotate_my_calendar(
 async def calendar_feed(
     token: str, db: DbSession, settings: SettingsDep
 ) -> Response:
-    """Public iCal feed (by feed token); unknown/deactivated token yields 404."""
+    """Serve the public iCal feed for a feed token.
+
+    An unknown or deactivated token gives a 404.
+    """
     principal = await service.principal_by_calendar_token(db, token)
     if principal is None:
         raise NotFoundError("Unknown calendar feed.")
@@ -78,7 +87,7 @@ async def calendar_feed(
         MeetingEvent(
             uid=str(meeting.id),
             title=meeting.title,
-            # member_meetings filters ``date IS NOT NULL``, so it is set here.
+            # member_meetings filters on `date IS NOT NULL`, so the value is set here.
             date=cast(_date, meeting.date),
             start_time=meeting.start_time,
             end_time=meeting.end_time,
@@ -94,8 +103,8 @@ async def calendar_feed(
         media_type=_ICS_MEDIA_TYPE,
         headers={
             "Content-Disposition": 'inline; filename="stupa-sitzungen.ics"',
-            # Short cache: new/changed meetings show up promptly; a rotated token
-            # is a new URL and thus its own cache key.
+            # Short cache: a new or changed meeting shows up quickly. A rotated
+            # token is a new URL and therefore its own cache key.
             "Cache-Control": "private, max-age=300",
         },
     )

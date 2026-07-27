@@ -1,5 +1,5 @@
 @if (!protocol()) {
-  <!-- The protocol is created exclusively on session start. -->
+  <!-- The system creates the protocol only when the meeting starts. -->
   @if (meeting().status === 'planned') {
     <p class="mtg__beforeStart text-text-muted">{{ 'meetings.protocol.beforeStart' | t }}</p>
   } @else {
@@ -11,15 +11,15 @@
       {{ (proto.isFinal ? 'meetings.protocol.final' : proto.status === 'rendering' ? 'meetings.protocol.rendering' : 'meetings.protocol.draft') | t }}
     </app-badge>
     @if (proto.publicPdfUrl) {
-      <!-- Non-public TOPs exist → internal (full) + redacted public PDF. -->
+      <!-- Non-public TOPs exist, so there is a full internal PDF and a redacted public one. -->
       <a class="text-primary text-sm font-medium" [href]="proto.pdfUrl" target="_blank" rel="noopener">{{ 'meetings.protocol.pdfInternal' | t }}</a>
       <a class="text-primary text-sm font-medium" [href]="proto.publicPdfUrl" target="_blank" rel="noopener">{{ 'meetings.protocol.pdfPublic' | t }}</a>
     } @else if (proto.pdfUrl) {
       <a class="text-primary text-sm font-medium" [href]="proto.pdfUrl" target="_blank" rel="noopener">{{ 'meetings.protocol.pdf' | t }}</a>
     }
     @if (!proto.isLocked) {
-      <!-- Once locked (rendering/final) the editor is read-only → no autosave,
-           so any save indicator would only refer to the draft. -->
+      <!-- A locked protocol, so rendering or final, makes the editor read-only. No
+           autosave runs then, so a save indicator would refer to the draft only. -->
       <span class="mtg__saveState" [attr.data-state]="saveState()" aria-live="polite">
         @switch (saveState()) {
           @case ('saving') { {{ 'meetings.protocol.saving' | t }} }
@@ -47,7 +47,6 @@
         (valueChange)="bodyChange.emit({ itemId: top.id, body: $event })"
       />
 
-      <!-- Vote questions of this TOP. -->
       <div class="mtg__topVotes">
         @for (vote of votesForTop(top.id); track vote.id) {
           <div class="mtg__vote">
@@ -98,7 +97,7 @@
     }
   </div>
 
-  <!-- Finalizing happens implicitly when the session is closed. -->
+  <!-- The system finalizes the protocol when the meeting closes. -->
   <div class="mtg__protoActions">
     @if (proto.isFinal) {
       <p class="text-text-muted">{{ 'meetings.protocol.finalizedHint' | t }}</p>
@@ -106,7 +105,7 @@
       <p class="text-text-muted">{{ 'meetings.protocol.renderingHint' | t }}</p>
     } @else if (meeting().canWrite) {
       @if (meeting().status === 'closed') {
-        <!-- The retry button lives as a repeat icon in the toolbar; only the hint here. -->
+        <!-- The retry button sits in the toolbar as a repeat icon. Only the hint is here. -->
         <p class="text-text-muted">{{ 'meetings.protocol.retryHint' | t }}</p>
       } @else {
         <p class="text-text-muted">{{ 'meetings.protocol.finalizeOnClose' | t }}</p>

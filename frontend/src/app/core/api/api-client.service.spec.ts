@@ -168,7 +168,7 @@ describe('ApiClient', () => {
   it('maps the version history with its diff into iterable lists', (done) => {
     api.versions('app-7').subscribe((versions) => {
       expect(versions).toHaveLength(2);
-      expect(versions[0].diff).toBeNull(); // erste Version: kein Diff
+      expect(versions[0].diff).toBeNull(); // the first version has no diff
       expect(versions[1].changedBy).toBe('Mia');
       expect(versions[1].diff?.added).toEqual([{ key: 'note', value: 'neu' }]);
       expect(versions[1].diff?.changed).toEqual([
@@ -337,7 +337,6 @@ describe('ApiClient', () => {
     req.flush({ status: 'changed' });
   });
 
-  // --- auth / calendar -----------------------------------------------------
   it('POSTs an empty body to /auth/logout', () => {
     api.logout().subscribe();
     const req = http.expectOne('/api/auth/logout');
@@ -367,7 +366,6 @@ describe('ApiClient', () => {
     req.flush({ url: 'https://example/feed.ics?t=abc' });
   });
 
-  // --- forms ---------------------------------------------------------------
   it('GETs the effective form WITHOUT a budgetPotId param when none given', () => {
     api.effectiveForm('type-1').subscribe();
     const req = http.expectOne((r) => r.url === '/api/application-types/type-1/form');
@@ -382,7 +380,6 @@ describe('ApiClient', () => {
     req.flush({ applicationTypeId: 't1', formVersionId: 'v1', sections: [] });
   });
 
-  // --- applications list extras --------------------------------------------
   it('lists applications with no query (default {} param, no query params)', () => {
     api.listApplications().subscribe();
     const req = http.expectOne((r) => r.url === '/api/applications');
@@ -450,7 +447,6 @@ describe('ApiClient', () => {
     ]);
   });
 
-  // --- altcha (success + 404 → null + other error rethrow) -----------------
   it('returns the altcha challenge when the endpoint succeeds', (done) => {
     api.altchaChallenge().subscribe((c) => {
       expect(c).toEqual({ algorithm: 'SHA-256', challenge: 'ch', salt: 's', signature: 'sig' });
@@ -483,7 +479,6 @@ describe('ApiClient', () => {
       .flush(null, { status: 500, statusText: 'Server Error' });
   });
 
-  // --- delete / erasure ----------------------------------------------------
   it('DELETEs an application', () => {
     api.deleteApplication('app-1').subscribe();
     const req = http.expectOne('/api/applications/app-1');
@@ -499,7 +494,6 @@ describe('ApiClient', () => {
     req.flush(null);
   });
 
-  // --- transitions (regular + applicant) -----------------------------------
   it('maps the transition list', (done) => {
     api.transitions('app-1').subscribe((ts) => {
       expect(ts[0].label).toBe('In Prüfung');
@@ -532,7 +526,6 @@ describe('ApiClient', () => {
     req.flush({ newStateId: 's3', statusEventId: 'e1', dispatchedActions: [] });
   });
 
-  // --- attachments extras --------------------------------------------------
   it('uploads an attachment with a field key (and not a comparison offer)', () => {
     const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
     api.uploadAttachment('app-1', file, { fieldKey: 'invoice' }).subscribe();
@@ -579,7 +572,6 @@ describe('ApiClient', () => {
     req.flush(null);
   });
 
-  // --- meetings ------------------------------------------------------------
   function meetingWire(over: Partial<import('./models').MeetingOutWire> = {}): import('./models').MeetingOutWire {
     return {
       id: 'm-1',
@@ -651,7 +643,7 @@ describe('ApiClient', () => {
     expect(req.request.params.get('cursor')).toBe('c1');
     expect(req.request.params.get('limit')).toBe('10');
     expect(req.request.params.get('gremiumId')).toBe('g-1');
-    expect(req.request.params.get('q')).toBe('hi'); // trimmed
+    expect(req.request.params.get('q')).toBe('hi');
     req.flush({ items: [meetingWire()], nextCursor: 'c2' });
   });
 
@@ -697,7 +689,6 @@ describe('ApiClient', () => {
     req.flush(null);
   });
 
-  // --- attendance ----------------------------------------------------------
   it('lists attendance (no mapping)', (done) => {
     api.listAttendance('m-1').subscribe((a) => {
       expect(a).toEqual([]);
@@ -724,7 +715,6 @@ describe('ApiClient', () => {
     req.flush([]);
   });
 
-  // --- agenda --------------------------------------------------------------
   it('lists the agenda', () => {
     api.listAgenda('m-1').subscribe();
     const req = http.expectOne('/api/meetings/m-1/agenda');
@@ -794,7 +784,6 @@ describe('ApiClient', () => {
     req.flush([]);
   });
 
-  // --- meeting votes -------------------------------------------------------
   it('opens a meeting vote and maps the meeting', (done) => {
     api
       .openMeetingVote('m-1', { agendaItemId: 'ag-1', question: 'Beschluss?', majorityRule: 'simple' })
@@ -837,7 +826,6 @@ describe('ApiClient', () => {
     req.flush(null);
   });
 
-  // --- site config ---------------------------------------------------------
   it('GETs the public site config', (done) => {
     api.publicSiteConfig().subscribe((c) => {
       expect(c).toEqual({ name: 'STUPA' });
@@ -848,7 +836,6 @@ describe('ApiClient', () => {
     req.flush({ name: 'STUPA' });
   });
 
-  // --- protocol ------------------------------------------------------------
   function protocolWire(): import('./models').ProtocolOutWire {
     return { id: 'p-1', meetingId: 'm-1', markdown: '# x', status: 'draft' };
   }
@@ -898,7 +885,6 @@ describe('ApiClient', () => {
     req.flush({ id: 'p-1', meetingId: 'm-1', markdown: '# x', status: 'final' });
   });
 
-  // --- notification preferences --------------------------------------------
   it('lists notification preferences', (done) => {
     api.listNotificationPreferences().subscribe((prefs) => {
       expect(prefs).toEqual([]);
@@ -918,7 +904,6 @@ describe('ApiClient', () => {
     req.flush(prefs);
   });
 
-  // --- oauth grants + consent + mcp ----------------------------------------
   it('lists oauth grants', () => {
     api.listGrants().subscribe();
     const req = http.expectOne('/api/oauth/grants');

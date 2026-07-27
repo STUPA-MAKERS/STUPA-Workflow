@@ -1,22 +1,23 @@
-"""Pure form engine — no DB, no HTTP dependency.
+"""Pure form engine. It has no DB and no HTTP dependency.
 
 Three core functions:
 
-* :func:`validate_definition` — structurally validate a form definition (list of
-  ``FormFieldDef``) against the config schema (unique keys, promoted fields numeric).
-  Per-field schema is already guaranteed by ``FormFieldDef``.
-* :func:`effective_form` — merge type fields + pot extra fields into sectioned parts.
-  The pot section appears only when the application is assigned to a pot.
-* :func:`validate_answers` — validate answer data against all field types (required,
-  ``visibleIf`` → visible ⇒ required, ``compute`` → derived fields). Collects all field
-  errors (no fail-fast) → ``AnswerValidationError``.
+* `validate_definition` — check the structure of a form definition against the config
+  schema. It rejects duplicate keys and non-numeric promoted fields. ``FormFieldDef``
+  already guarantees the schema of a single field.
+* `effective_form` — merge the type fields and the pot extra fields into sections. The
+  pot section appears only when the application has a pot.
+* `validate_answers` — validate the answer data against every field type. It applies
+  ``required``, resolves ``visibleIf`` (a visible field stays required) and computes the
+  ``compute`` fields. It collects all field errors and does not fail fast. It then raises
+  ``AnswerValidationError``.
 
-`visibleIf`/`compute` use the JsonLogic-subset evaluator. Its ``and``/``or`` do not
-short-circuit — all operands are evaluated. A ``visibleIf`` like
-``{"and":[{"var":"x"},{">":[{"var":"y"},0]}]}`` may therefore raise a ``JsonLogicError``
-on missing ``y`` instead of stopping at ``x``. During visibility evaluation such an
-error is treated conservatively as visible (the field is validated rather than silently
-skipped), see :func:`_is_visible`.
+``visibleIf`` and ``compute`` use the JsonLogic-subset evaluator. Its ``and`` and ``or``
+do not short-circuit, so the evaluator reads every operand. A ``visibleIf`` such as
+``{"and":[{"var":"x"},{">":[{"var":"y"},0]}]}`` can therefore raise a ``JsonLogicError``
+for a missing ``y`` instead of stopping at ``x``. During a visibility check the engine
+treats such an error conservatively as visible. It validates the field instead of skipping
+it. See `_is_visible`.
 """
 
 from __future__ import annotations
@@ -34,42 +35,46 @@ from uuid import UUID
 from app.shared.config_schemas import FormFieldDef
 from app.shared.jsonlogic import JsonLogicError, eval_jsonlogic, validate_jsonlogic
 
-# Field types whose value is numeric (for promoted extraction + min/max).
+# Field types with a numeric value, used by the promoted extraction and by min and max.
 _NUMERIC_TYPES = frozenset({"number", "currency"})
 _TEXT_TYPES = frozenset({"text", "textarea", "markdown"})
 
-# ReDoS hardening: an admin-defined ``validation.pattern`` (raw regex) runs against
-# applicant input; a catastrophically backtracking expression would otherwise block the
-# single-replica event loop. Two independent bounds:
-#   1. Hard input length cap → bounds the worst case unconditionally (holds even if the
-#      timeout is not killable). Longer values count as "no match".
-#   2. Wall-clock timeout in a thread: the match runs in a worker thread; if it does not
-#      finish within the budget the caller (event loop) regains control and treats the
-#      field as invalid. The thread cannot be hard-killed — the length cap ensures it
-#      terminates in bounded time.
+# ReDoS hardening: an admin defines ``validation.pattern`` as a raw regex, and it runs
+# against applicant input. An expression with catastrophic backtracking would block the
+# single-replica event loop. Two independent bounds stop this:
+#   1. A hard input length cap bounds the worst case at all times. It holds even when the
+#      timeout cannot kill the match. A longer value counts as "no match".
+#   2. A wall-clock timeout in a thread. The match runs in a worker thread. If it does not
+#      finish inside the budget, the event loop gets control back and marks the field
+#      invalid. Nothing can hard-kill the thread. The length cap makes it stop after a
+#      bounded time.
 _PATTERN_MAX_INPUT_LEN = 4096
 _PATTERN_MATCH_TIMEOUT_SECONDS = 1.0
-# Shared, small executor — pattern matches are rare and short.
+# One small shared executor. Pattern matches are rare and short.
 _PATTERN_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="form-regex")
 
 
 class _PatternMatchError(Exception):
-    """Pattern match failed technically (broken regex or timeout)."""
+    """The pattern match failed because of a broken regex or a timeout."""
 
 
 def _pattern_matches(pattern: str, value: str) -> bool:
-    """``re.fullmatch`` against ``value`` — length-bounded + wall-clock timeout (ReDoS).
+    """Run ``re.fullmatch`` on ``value`` with a length bound and a timeout (ReDoS).
 
-    Raises :class:`_PatternMatchError` on a broken pattern or timeout; the caller then
-    flags the field invalid. Values over :data:`_PATTERN_MAX_INPUT_LEN` count
-    unconditionally as "no match" (no match attempt)."""
+    A value longer than `_PATTERN_MAX_INPUT_LEN` always counts as "no match". The
+    function makes no match attempt for it.
+
+    Raises:
+        _PatternMatchError: The pattern is broken, or the match timed out. The caller
+            then marks the field invalid.
+    """
     if len(value) > _PATTERN_MAX_INPUT_LEN:
         return False
     future = _PATTERN_EXECUTOR.submit(_full_match, pattern, value)
     try:
         return future.result(timeout=_PATTERN_MATCH_TIMEOUT_SECONDS)
     except FutureTimeout as exc:
-        # Thread keeps running bounded (length cap); we hand control back.
+        # The thread keeps running, bounded by the length cap. The caller gets control back.
         raise _PatternMatchError("pattern match timed out") from exc
     except re.error as exc:
         raise _PatternMatchError("invalid pattern") from exc
@@ -79,13 +84,13 @@ def _full_match(pattern: str, value: str) -> bool:
     return re.fullmatch(pattern, value) is not None
 
 
-# Reserved key of the system title field: every application MUST have a title. The
-# server prepends it to every effective form (not editable in the builder).
+# Reserved key of the system title field. Every application MUST have a title. The server
+# prepends the field to every effective form. The builder cannot edit it.
 SYSTEM_TITLE_KEY = "title"
 
 
 def system_title_field() -> FormFieldDef:
-    """Required title field the server prepends to every effective form."""
+    """Return the required title field that the server prepends to every form."""
     return FormFieldDef.model_validate(
         {
             "key": SYSTEM_TITLE_KEY,
@@ -97,7 +102,7 @@ def system_title_field() -> FormFieldDef:
 
 
 class FormDefinitionError(Exception):
-    """Form definition violates a structural rule (save gate)."""
+    """The form definition breaks a structural rule at the save gate."""
 
 
 @dataclass(frozen=True)
@@ -109,7 +114,10 @@ class FieldError:
 
 
 class AnswerValidationError(Exception):
-    """Answer data is invalid; carries all collected field errors (→ 422)."""
+    """The answer data is invalid.
+
+    The exception carries every collected field error and maps to a 422 response.
+    """
 
     def __init__(self, errors: Sequence[FieldError]) -> None:
         self.errors: list[FieldError] = list(errors)
@@ -118,25 +126,29 @@ class AnswerValidationError(Exception):
 
 @dataclass(frozen=True)
 class FormSection:
-    """A section of the effective form (``main`` = type, ``budget`` = pot extra).
+    """A section of the effective form.
 
-    ``label`` is set when the section comes from a ``section`` marker in the form
-    (multi-step forms); otherwise ``None`` (the service resolves the default labels
-    ``main``/``budget``)."""
+    ``main`` holds the type fields. ``budget`` holds the pot extra fields. ``label`` is
+    set when the section comes from a ``section`` marker in a multi-step form. Otherwise
+    it is ``None`` and the service resolves the default ``main`` or ``budget`` label.
+    """
 
     key: str
     fields: list[FormFieldDef]
     label: dict[str, str] | None = None
 
 
-# --- validate_definition ---
 def validate_definition(fields: Sequence[FormFieldDef]) -> None:
-    """Structurally validate a form definition. Raises ``FormDefinitionError``.
+    """Check the structure of a form definition.
 
-    Rules: no duplicate field keys; promoted fields must be numeric
-    (``number``/``currency``) since the target (e.g. ``amount``) is ``numeric``;
-    ``visibleIf``/``compute`` only with whitelist operators; a set ``pattern`` must be a
-    compilable regex (else 500 at answer runtime).
+    The definition must have unique field keys. A promoted field must be numeric
+    (``number`` or ``currency``), because the promote target such as ``amount`` is a
+    numeric column. ``visibleIf`` and ``compute`` may use whitelist operators only. A
+    ``pattern`` must compile as a regex, because a broken pattern fails at answer runtime
+    with a 500.
+
+    Raises:
+        FormDefinitionError: The definition breaks one of these rules.
     """
     keys = [f.key for f in fields]
     duplicates = sorted({k for k in keys if keys.count(k) > 1})
@@ -165,20 +177,20 @@ def validate_definition(fields: Sequence[FormFieldDef]) -> None:
                 ) from exc
 
 
-# --- effective_form ---
 def effective_form(
     type_fields: Sequence[FormFieldDef],
     pot_fields: Sequence[FormFieldDef] | None = None,
 ) -> list[FormSection]:
-    """Merge type fields + pot extra fields into sections.
+    """Merge the type fields and the pot extra fields into sections.
 
-    ``main`` always contains the type fields, prefixed by the system-required ``title``
-    field (every application MUST have a title) unless the type defines one with that
-    key itself. ``budget`` appears only when ``pot_fields`` are assigned and non-empty.
+    ``main`` always holds the type fields. The system ``title`` field comes first, because
+    every application MUST have a title. A type that defines its own field with that key
+    keeps its own field. ``budget`` appears only when the caller passes non-empty
+    ``pot_fields``.
     """
     sections = _split_sections(list(type_fields))
-    # Prepend the system title field to the FIRST section (after the split, so a leading
-    # marker does not create a title-only step) unless it is defined already.
+    # Add the title field to the FIRST section after the split. A leading marker must not
+    # create a title-only step.
     if not any(f.key == SYSTEM_TITLE_KEY for s in sections for f in s.fields):
         sections[0].fields.insert(0, system_title_field())
     if pot_fields:
@@ -187,9 +199,12 @@ def effective_form(
 
 
 def _split_sections(fields: Sequence[FormFieldDef]) -> list[FormSection]:
-    """Split fields at ``section`` markers into several sections (= wizard steps). The
-    marker itself carries only the section label and does not appear as a field. Without
-    markers exactly one ``main`` section results (backward compatibility)."""
+    """Split the fields at the ``section`` markers into wizard steps.
+
+    A marker carries the section label only. It does not appear as a field. Without a
+    marker the function returns exactly one ``main`` section. That keeps backward
+    compatibility.
+    """
     sections: list[FormSection] = []
     cur_key = "main"
     cur_label: dict[str, str] | None = None
@@ -197,8 +212,8 @@ def _split_sections(fields: Sequence[FormFieldDef]) -> list[FormSection]:
 
     for f in fields:
         if f.type == "section":
-            # Close the current section if it has fields; otherwise just take the new
-            # marker's label (leading/consecutive markers).
+            # Close the current section when it has fields. Otherwise take the label of
+            # the new marker (a leading or a consecutive marker).
             if cur_fields:
                 sections.append(FormSection(key=cur_key, fields=cur_fields, label=cur_label))
                 cur_fields = []
@@ -212,22 +227,27 @@ def _split_sections(fields: Sequence[FormFieldDef]) -> list[FormSection]:
     return sections
 
 
-# --- validate_answers ---
 def validate_answers(
     fields: Sequence[FormFieldDef],
     data: Mapping[str, Any],
     context: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Validate answer data + compute derived (``computed``) fields.
+    """Validate the answer data and compute the derived ``computed`` fields.
 
-    ``context`` supplies non-field variables for ``visibleIf`` (e.g. ``has_budget``).
-    Returns ``data`` plus computed ``computed`` values. On errors →
-    ``AnswerValidationError`` (all errors collected).
+    ``context`` supplies the variables that are not form fields to ``visibleIf``, for
+    example ``has_budget``.
+
+    Returns:
+        ``data`` plus the values of the ``computed`` fields.
+
+    Raises:
+        AnswerValidationError: At least one field is invalid. The error carries every
+            collected field error.
     """
     errors: list[FieldError] = []
     result: dict[str, Any] = dict(data)
 
-    # 1. compute computed fields (in field order; may use other fields).
+    # 1. Compute the computed fields in field order. They may read other fields.
     base_ctx: dict[str, Any] = {**(context or {}), **result}
     for f in fields:
         if f.type == "computed" and f.compute is not None:
@@ -239,10 +259,10 @@ def validate_answers(
 
     eval_ctx: dict[str, Any] = {**(context or {}), **result}
 
-    # 2. per field: visibility → required → type validation.
+    # 2. Per field, in this order: visibility, then required, then type validation.
     for f in fields:
         if f.type in ("computed", "section"):
-            continue  # derived or a pure structural marker — no answer value
+            continue  # a derived value or a pure structural marker, no answer value
         if not _is_visible(f, eval_ctx):
             continue
         value = data.get(f.key)
@@ -258,7 +278,10 @@ def validate_answers(
 
 
 def _is_present(value: Any) -> bool:
-    """A value counts as present if not ``None`` and not empty (string/list)."""
+    """Report a value as present when it is not ``None`` and not empty.
+
+    An empty string, list or dict counts as absent.
+    """
     if value is None:
         return False
     if isinstance(value, (str, list, dict)):
@@ -267,9 +290,12 @@ def _is_present(value: Any) -> bool:
 
 
 def _is_visible(field: FormFieldDef, ctx: Mapping[str, Any]) -> bool:
-    """Evaluate ``visibleIf``. No expression ⇒ visible. Eval error ⇒ conservatively
-    visible (non-short-circuiting ``and``/``or`` → field is validated, not silently
-    skipped)."""
+    """Evaluate ``visibleIf`` for a field.
+
+    A field without an expression is visible. An evaluation error also counts as visible,
+    because ``and`` and ``or`` do not short-circuit. The engine then validates the field.
+    It does not skip the field in silence.
+    """
     if field.visible_if is None:
         return True
     try:
@@ -278,9 +304,9 @@ def _is_visible(field: FormFieldDef, ctx: Mapping[str, Any]) -> bool:
         return True
 
 
-# --- per-field type validation ---
+# Per-field type validation.
 def _validate_value(field: FormFieldDef, value: Any, errors: list[FieldError]) -> None:
-    """Validate a present value against its field type; append errors."""
+    """Validate a present value against its field type and append the errors."""
     t = field.type
     if t in _TEXT_TYPES:
         _validate_text(field, value, errors)
@@ -333,9 +359,9 @@ def _validate_text(field: FormFieldDef, value: Any, errors: list[FieldError]) ->
         try:
             matched = _pattern_matches(v.pattern, value)
         except _PatternMatchError:
-            # Broken stored pattern OR ReDoS timeout: defense-in-depth (invalid patterns
-            # are already rejected at save time) — never 500/hang at runtime, surface it
-            # as a field error instead.
+            # A broken stored pattern or a ReDoS timeout. This is defense in depth,
+            # because the save gate already rejects an invalid pattern. The request must
+            # never hang or give a 500, so report a field error instead.
             _err(errors, field.key, "field has an invalid validation pattern")
             return
         if not matched:
@@ -352,8 +378,8 @@ def _validate_number(field: FormFieldDef, value: Any, errors: list[FieldError]) 
         _err(errors, field.key, "must be a number")
         return
     if not num.is_finite():
-        # NaN/Infinity: comparing with min/max would raise decimal.InvalidOperation
-        # -> 422 instead of 500.
+        # A comparison of NaN or Infinity with min or max raises
+        # decimal.InvalidOperation. Report 422 instead of 500.
         _err(errors, field.key, "must be a finite number")
         return
     v = field.validation
@@ -380,9 +406,9 @@ def _option_values(field: FormFieldDef) -> set[str]:
 
 
 def _validate_select(field: FormFieldDef, value: Any, errors: list[FieldError]) -> None:
-    # FieldOption.value is declared as str; only strings can be valid options. The
-    # isinstance guard enforces the domain and avoids a TypeError on the membership
-    # test with unhashable values.
+    # FieldOption.value is a str, so only a string can be a valid option. The isinstance
+    # guard holds that domain. It also stops a TypeError when the membership test gets an
+    # unhashable value.
     if not isinstance(value, str) or value not in _option_values(field):
         _err(errors, field.key, "is not a valid option")
 
@@ -394,8 +420,8 @@ def _validate_multiselect(
         _err(errors, field.key, "must be a list")
         return
     allowed = _option_values(field)
-    # Check each element is a str before testing it against the (str) option set —
-    # otherwise an unhashable element (dict/list) raises a TypeError -> 500.
+    # Check that each element is a str before the test against the option set. An
+    # unhashable element such as a dict or a list would raise a TypeError and give a 500.
     invalid = [v for v in value if not isinstance(v, str) or v not in allowed]
     if invalid:
         _err(errors, field.key, f"contains invalid options: {invalid}")
@@ -404,13 +430,14 @@ def _validate_multiselect(
 def _validate_uuid_ref(
     field: FormFieldDef, value: Any, errors: list[FieldError], label: str
 ) -> None:
-    """Dynamic picker field (`gremium_select`/`budget_select`): the value must be a
-    well-formed UUID.
+    """Check the value of a dynamic picker field as a well-formed UUID.
 
-    The server injects the options only at render time (``effective_form``) from the
-    current committees resp. budget tree; the pure (DB-free) answer validation has no
-    access to them — hence only the UUID form here. A value that names no real entity
-    finds no transition in the flow (fail-closed)."""
+    The picker fields are `gremium_select` and `budget_select`. The server injects their
+    options only at render time in ``effective_form``, from the current Gremien or from
+    the budget tree. This answer validation is pure and has no DB access, so it checks the
+    UUID form only. A value that names no real entity finds no transition in the flow,
+    which fails closed.
+    """
     if not isinstance(value, str) or not value:
         _err(errors, field.key, f"must be a {label}")
         return
@@ -420,8 +447,8 @@ def _validate_uuid_ref(
         _err(errors, field.key, f"is not a valid {label}")
 
 
-# Conservative e-mail pattern (one ``@``, no whitespace, a dot in the domain) —
-# mirrors the QSM/VSM form pattern without needing to hand-maintain it.
+# Conservative e-mail pattern: one ``@``, no whitespace, a dot in the domain. It mirrors
+# the QSM/VSM form pattern, so nobody has to maintain that pattern by hand.
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
@@ -431,26 +458,29 @@ def _validate_email(field: FormFieldDef, value: Any, errors: list[FieldError]) -
 
 
 def _iban_mod97_ok(iban: str) -> bool:
-    """IBAN form + ISO-7064 mod-97 checksum. Spaces are ignored.
+    """Check the IBAN form and the ISO-7064 mod-97 checksum.
 
-    (Kept standalone — the bank module has its own internal variant for statements;
-    no cross-module dependency on a private function here.)"""
+    The function ignores spaces. It stays standalone. The bank module has its own
+    internal variant for statements. This module must not depend on a private function
+    of another module.
+    """
     s = iban.replace(" ", "").upper()
     if not (15 <= len(s) <= 34) or not s.isalnum() or not s[:2].isalpha() or not s[2:4].isdigit():
         return False
-    # First four chars to the end; letters -> digits (A->10 … Z->35, ``int(ch, 36)``).
+    # Move the first four characters to the end. Map letters to digits with int(ch, 36),
+    # which gives A->10 up to Z->35.
     rearranged = s[4:] + s[:4]
     return int("".join(str(int(ch, 36)) for ch in rearranged)) % 97 == 1
 
 
 def _validate_iban(field: FormFieldDef, value: Any, errors: list[FieldError]) -> None:
-    """Check IBAN: form + ISO-7064 mod-97 checksum (not just a regex)."""
+    """Check the IBAN form and the ISO-7064 mod-97 checksum, not only a regex."""
     if not isinstance(value, str) or not _iban_mod97_ok(value):
         _err(errors, field.key, "is not a valid IBAN")
 
 
 def _validate_daterange(field: FormFieldDef, value: Any, errors: list[FieldError]) -> None:
-    """`daterange`: ``{"from": ISO, "to": ISO}`` with ``from <= to``."""
+    """Check a `daterange` value ``{"from": ISO, "to": ISO}`` with ``from <= to``."""
     if not isinstance(value, dict):
         _err(errors, field.key, "must be an object with 'from' and 'to'")
         return
@@ -474,7 +504,7 @@ def _validate_checkbox(field: FormFieldDef, value: Any, errors: list[FieldError]
 
 
 def _validate_file(field: FormFieldDef, value: Any, errors: list[FieldError]) -> None:
-    # Answer value = attachment reference(s); content/size/MIME are checked by the upload.
+    # The answer value holds attachment references. The upload checks content, size and MIME.
     if isinstance(value, str):
         return
     if isinstance(value, list) and all(isinstance(v, str) for v in value):
@@ -487,8 +517,8 @@ def _validate_table(field: FormFieldDef, value: Any, errors: list[FieldError]) -
         _err(errors, field.key, "must be a list of rows")
         return
     v = field.validation
-    # Engine cap: no falsy-`or` — an explicitly configured maxRows=0 (max_rows has ge=0,
-    # 0 is valid) MUST be preserved and reject every row. Also clamp to the engine cap so
+    # Engine cap: do not use a falsy `or` here. A configured maxRows=0 is valid, because
+    # max_rows has ge=0, and it MUST reject every row. Clamp to the engine cap as well, so
     # a higher builder value cannot lift the upper bound.
     configured = (
         v.max_rows if (v is not None and v.max_rows is not None) else _DEFAULT_MAX_ROWS
@@ -501,21 +531,24 @@ def _validate_table(field: FormFieldDef, value: Any, errors: list[FieldError]) -
             _err(errors, field.key, f"row {i} must be an object")
 
 
-# Default minimum comparison offers per position when the builder sets none.
+# Minimums that apply when the builder sets none.
 _DEFAULT_MIN_OFFERS = 3
 _DEFAULT_MIN_POSITIONS = 1
 
-# Engine caps: upper bounds for positions/offers/table rows that apply even WITHOUT a
-# builder value, independent of the body cap. Stops a raised body cap or an
-# authenticated write path from pushing unbounded positions/offers through
-# `_validate_positions`/`positions_total`/JSONB persistence.
+# Engine caps: upper bounds for positions, offers and table rows. They apply even without
+# a builder value and do not depend on the body cap. They stop a raised body cap or an
+# authenticated write path from pushing unbounded positions or offers through
+# `_validate_positions`, `positions_total` and the JSONB persistence.
 _DEFAULT_MAX_POSITIONS = 200
 _DEFAULT_MAX_OFFERS = 50
 _DEFAULT_MAX_ROWS = 1000
 
 
 def _offer_value(offer: Mapping[str, Any]) -> Decimal | None:
-    """Pull the numeric offer value as ``Decimal`` (invalid -> ``None``)."""
+    """Return the numeric offer value as ``Decimal``.
+
+    An invalid or non-finite value gives ``None``.
+    """
     raw = offer.get("value")
     if isinstance(raw, bool) or raw is None:
         return None
@@ -527,12 +560,17 @@ def _offer_value(offer: Mapping[str, Any]) -> Decimal | None:
 
 
 def _validate_positions(field: FormFieldDef, value: Any, errors: list[FieldError]) -> None:
-    """Validate cost positions: >= minPositions positions, each >= minOffers offers,
-    exactly one preferred offer, all values finite numbers > 0 (position 0-indexed).
+    """Validate the cost positions of a field.
 
-    A position may opt out of comparison offers (``noOffers: true`` + mandatory
-    ``noOffersReason``) when the field allows it (``allowNoOffers``, default on) —
-    it then needs exactly one offer instead of ``minOffers``."""
+    The list needs at least ``minPositions`` positions. Each position needs at least
+    ``minOffers`` offers and exactly one preferred offer. Every offer value must be a
+    finite number above 0. The error keys use a 0-indexed position.
+
+    A position can opt out of the comparison offers with ``noOffers: true`` and a
+    mandatory ``noOffersReason``. The field must allow this through ``allowNoOffers``,
+    which is on by default. Such a position needs exactly one offer instead of
+    ``minOffers``.
+    """
     if not isinstance(value, list):
         _err(errors, field.key, "must be a list of positions")
         return
@@ -544,9 +582,10 @@ def _validate_positions(field: FormFieldDef, value: Any, errors: list[FieldError
     min_positions = (
         v.min_positions if v and v.min_positions else None
     ) or _DEFAULT_MIN_POSITIONS
-    # Engine cap: max_positions/max_offers are ge=1 (0 impossible), but a form.configure
-    # admin could set a value above the default cap and reopen unbounded growth. So clamp
-    # the configured value to the engine cap (min) instead of only using it as a default.
+    # Engine cap: max_positions and max_offers are ge=1, so 0 is impossible. An admin can
+    # still use form.configure to set a value above the default cap and reopen unbounded
+    # growth. So clamp the configured value to the engine cap instead of using the cap as
+    # a default only.
     configured_positions = (
         v.max_positions
         if (v is not None and v.max_positions is not None)
@@ -606,9 +645,10 @@ def _validate_positions(field: FormFieldDef, value: Any, errors: list[FieldError
 
 
 def positions_total(value: Any) -> Decimal | None:
-    """Sum of the preferred offer values across all positions (= position total).
+    """Sum the preferred offer values of all positions.
 
-    ``None`` when there is no valid preferred position (e.g. an empty list).
+    The result is the position total. It is ``None`` when no position has a valid
+    preferred offer, for example for an empty list.
     """
     if not isinstance(value, list):
         return None
@@ -627,20 +667,18 @@ def positions_total(value: Any) -> Decimal | None:
     return total if found else None
 
 
-# --------------------------------------------------------------------------- #
-# Promoted extraction
-# --------------------------------------------------------------------------- #
 def extract_promoted(
     fields: Sequence[FormFieldDef], data: Mapping[str, Any]
 ) -> dict[str, Any]:
-    """Pull promoted field values from ``data`` -> ``{promote_target: value}``.
+    """Pull the promoted field values from ``data`` into ``{promote_target: value}``.
 
-    Numeric promoted fields (``amount``) are normalized to ``Decimal``.
+    The function normalizes a numeric promoted field such as ``amount`` to ``Decimal``.
     """
     out: dict[str, Any] = {}
     for f in fields:
-        # `positions` implicitly promotes the position total into `amount` (sum of
-        # preferred offers) — without an isPromoted flag; additive across several.
+        # A `positions` field promotes the position total into `amount` without an
+        # isPromoted flag. The total is the sum of the preferred offers. Several
+        # `positions` fields add up.
         if f.type == "positions":
             total = positions_total(data.get(f.key))
             if total is not None:
@@ -656,7 +694,7 @@ def extract_promoted(
                 num = Decimal(str(value))
             except (InvalidOperation, ValueError):
                 continue
-            # Never pass NaN/Infinity through as amount (would crash downstream).
+            # Never pass NaN or Infinity through as amount. It would crash a consumer.
             if not num.is_finite():
                 continue
             out[f.promote_target] = num

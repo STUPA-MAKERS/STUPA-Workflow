@@ -1,10 +1,10 @@
-"""OAuth2 AS models: authorization codes plus access/refresh tokens (MCP login).
+"""OAuth2 authorization-server models: authorization codes and tokens for MCP login.
 
-The platform acts as an OAuth2 authorization server in front of the existing
-Keycloak login: after OIDC login it mints a short-lived authorization code
-(PKCE, RFC 7636) that a native client exchanges for an opaque access/refresh
-token pair. Tokens are persisted as SHA-256 hashes only (plaintext never
-stored); the scope caps the principal's permissions at runtime.
+The platform acts as an OAuth2 authorization server in front of the Keycloak login. After
+the OIDC login it mints a short-lived authorization code with PKCE (RFC 7636). A native
+client exchanges that code for an opaque access and refresh token pair. The database holds
+the tokens as SHA-256 hashes only and never stores the plaintext. The scope caps the
+permissions of the principal at runtime.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from app.db import Base, CreatedAtMixin, UUIDPkMixin
 
 
 class OAuthAuthorizationCode(UUIDPkMixin, CreatedAtMixin, Base):
-    """Short-lived, single-use authorization code (PKCE-bound)."""
+    """Short-lived, single-use authorization code, bound to a PKCE challenge."""
 
     __tablename__ = "oauth_authorization_code"
 
@@ -31,7 +31,7 @@ class OAuthAuthorizationCode(UUIDPkMixin, CreatedAtMixin, Base):
     redirect_uri: Mapped[str] = mapped_column(Text)
     code_challenge: Mapped[str] = mapped_column(Text)  # S256, base64url
     scope: Mapped[str] = mapped_column(Text)  # space-separated scope list
-    # Token lifetime chosen in the consent (seconds); NULL = never expires.
+    # Token lifetime in seconds, chosen in the consent. NULL means the token never expires.
     access_ttl_seconds: Mapped[int | None] = mapped_column(nullable=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     used_at: Mapped[datetime | None] = mapped_column(
@@ -40,7 +40,7 @@ class OAuthAuthorizationCode(UUIDPkMixin, CreatedAtMixin, Base):
 
 
 class OAuthToken(UUIDPkMixin, CreatedAtMixin, Base):
-    """Access/refresh token pair (opaque, hashed). Rotation creates a new row."""
+    """Opaque, hashed access and refresh token pair. A rotation creates a new row."""
 
     __tablename__ = "oauth_token"
 
@@ -53,9 +53,9 @@ class OAuthToken(UUIDPkMixin, CreatedAtMixin, Base):
         LargeBinary, unique=True, nullable=True
     )
     scope: Mapped[str] = mapped_column(Text)
-    # Chosen lifetime (seconds); NULL = never expires (kept for refresh rotation).
+    # Chosen lifetime in seconds. NULL means never. Kept here for the refresh rotation.
     access_ttl_seconds: Mapped[int | None] = mapped_column(nullable=True)
-    # NULL = never expires.
+    # NULL means the token never expires.
     access_expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

@@ -20,7 +20,7 @@
 
     <div class="br__cols">
       <div class="flex flex-col gap-4">
-        <!-- App name (config-driven; leer ⇒ Default/i18n) -->
+        <!-- The app name comes from the config. An empty value falls back to the i18n default. -->
         <fieldset class="br__group">
           <legend>{{ 'admin.brand.appName.group' | t }}</legend>
           <p class="text-xs text-muted">{{ 'admin.brand.appName.hint' | t }}</p>
@@ -42,7 +42,6 @@
           </div>
         </fieldset>
 
-        <!-- Logos -->
         <fieldset class="br__group">
           <legend>{{ 'admin.brand.logos' | t }}</legend>
           <p class="text-xs text-muted">{{ 'admin.brand.logoHint' | t: { mb: maxMb } }}</p>
@@ -67,7 +66,6 @@
           }
         </fieldset>
 
-        <!-- Footer columns -->
         <fieldset class="br__group">
           <legend>{{ 'admin.brand.footer' | t }}</legend>
           @for (col of d.footerColumns; track $index; let ci = $index) {
@@ -104,7 +102,6 @@
           <app-button variant="ghost" size="sm" (click)="addColumn()">{{ 'admin.brand.addColumn' | t }}</app-button>
         </fieldset>
 
-        <!-- Copyright + legal -->
         <fieldset class="br__group">
           <legend>{{ 'admin.brand.copyright' | t }}</legend>
           <div class="br__link">
@@ -123,7 +120,6 @@
           <app-button class="self-start" variant="ghost" size="sm" (click)="addLegalLink()">+ {{ 'admin.brand.addLink' | t }}</app-button>
         </fieldset>
 
-        <!-- Freetexts -->
         <fieldset class="br__group">
           <legend>{{ 'admin.brand.texts' | t }}</legend>
           <div class="flex flex-col gap-1 text-sm font-medium">{{ 'admin.brand.text.loginHint' | t }}
@@ -150,7 +146,7 @@
               <textarea rows="2" [attr.aria-label]="('admin.brand.text.emailFooter' | t) + ' (EN)'" [(ngModel)]="d.freetexts.emailFooter['en']" (ngModelChange)="reemit()" placeholder="EN"></textarea>
             </div>
           </div>
-          <!-- Info-Text unter der Antrags-Auswahl (#18) — Markdown-kompatibel. -->
+          <!-- Info text below the application selection (#18). Markdown works here. -->
           <div class="flex flex-col gap-1 text-sm font-medium">{{ 'admin.brand.text.applyInfo' | t }}
             <div class="br__bi">
               <textarea rows="4" [attr.aria-label]="('admin.brand.text.applyInfo' | t) + ' (DE)'" [(ngModel)]="applyInfo(d)['de']" (ngModelChange)="reemit()" placeholder="DE (Markdown)"></textarea>
@@ -160,7 +156,6 @@
         </fieldset>
       </div>
 
-      <!-- Live preview -->
       <aside class="br__preview" aria-label="{{ 'admin.common.preview' | t }}">
         <h2 class="br__preview-h">{{ 'admin.common.preview' | t }}</h2>
 

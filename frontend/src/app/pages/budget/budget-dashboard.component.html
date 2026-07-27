@@ -32,8 +32,8 @@
   </section>
 } @else {
   <div class="bd__layout">
-    <!-- Left: Budget -> fiscal year. Collapsible on mobile (<=768px): the toggle is
-         shown only there via CSS; desktop always shows the tree. -->
+    <!-- The tree collapses on mobile (max 768px). CSS shows the toggle only there.
+         Desktop always shows the tree. -->
     <aside class="bd__nav">
       <button
         type="button"
@@ -56,7 +56,6 @@
       </div>
     </aside>
 
-    <!-- Middle: breadcrumbs (depth > 0) + usage + applications -->
     <main class="bd__main">
       @if (breadcrumbs().length > 1) {
         <nav class="flex flex-wrap items-center gap-2" [attr.aria-label]="'budget.breadcrumbs' | t">
@@ -72,7 +71,7 @@
       }
 
       <section class="bd__usage" [attr.aria-label]="'budget.usage.heading' | t">
-        <!-- Cross-link for the selected cost centre — replaces the per-row icon link (#expenses-ux2). -->
+        <!-- Cross-link for the selected cost center (#expenses-ux2). -->
         <div class="bd__sectionHead bd__sectionHead--end">
           <a class="bd__sectionLink" [routerLink]="['/expenses']" [queryParams]="{ budget: selectedKsId() }">
             <app-icon name="euro" [size]="14" />
@@ -116,8 +115,7 @@
       </section>
     </main>
 
-    <!-- Right: stacked pie charts over the direct sub cost-centres; clicking a
-         segment opens that cost-centre. -->
+    <!-- The pie charts cover the direct sub cost centers only. -->
     <aside class="bd__charts">
       <app-budget-pie [title]="'budget.pie.allocated' | t" [slices]="allocPie()" (sliceClick)="selectKs($event)" />
       <app-budget-pie [title]="'budget.pie.committed' | t" [slices]="committedPie()" (sliceClick)="selectKs($event)" />
@@ -126,8 +124,7 @@
     </aside>
   </div>
 
-  <!-- Overview: sunburst over the whole subtree of the selected cost-centre;
-       metric switchable via the tab selector. -->
+  <!-- The sunburst covers the whole subtree of the selected cost center. -->
   <app-dialog
     [open]="overviewOpen()"
     [title]="'budget.overview.title' | t"

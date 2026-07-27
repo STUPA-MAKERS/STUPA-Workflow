@@ -20,8 +20,6 @@ describe('downloadBlob', () => {
   it('creates an anchor, clicks it, appends and removes it, then revokes the URL', () => {
     const blob = new Blob(['x'], { type: 'text/plain' });
 
-    // Spy on the click that fires the actual download, and verify the anchor is
-    // attached to the DOM at click-time then removed afterwards.
     const clickSpy = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
       this: HTMLAnchorElement,
     ) {
@@ -34,10 +32,9 @@ describe('downloadBlob', () => {
 
     expect(URL.createObjectURL).toHaveBeenCalledWith(blob);
     expect(clickSpy).toHaveBeenCalledTimes(1);
-    // Anchor removed synchronously after the click.
     expect(document.querySelector('a')).toBeNull();
 
-    // Revoke is deferred to a macrotask (Safari/Firefox-safe).
+    // The code revokes the URL in a macrotask, which is safe for Safari and Firefox.
     expect(URL.revokeObjectURL).not.toHaveBeenCalled();
     jest.runAllTimers();
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:fake-url');

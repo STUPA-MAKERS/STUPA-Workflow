@@ -6,8 +6,19 @@ metadata:
   type: feedback
 ---
 
-**Alembic revision ids in this repo MUST be ≤32 characters.** The `alembic_version.version_num` column is `varchar(32)`. A longer `revision: str = "..."` passes locally (alembic offline `heads` doesn't write the column) but **fails the deploy migration** with `StringDataRightTruncationError: value too long for type character varying(32)` on the `UPDATE alembic_version` step.
+**Alembic revision ids in this repo MUST be ≤32 characters.** The `alembic_version.version_num`
+column is `varchar(32)`. A longer `revision: str = "..."` value passes locally, because the
+alembic offline `heads` command does not write the column. The same value then **fails the deploy
+migration** on the `UPDATE alembic_version` step with
+`StringDataRightTruncationError: value too long for type character varying(32)`.
 
-2026-06-13: `0024_expense_payment_method_paypal` (34) broke the deploy; renamed to `0024_expense_paypal` (19). Transactional DDL rolled back cleanly (DB stayed at 0023), so the fix was just renaming the revision id + file and redeploying.
+2026-06-13: `0024_expense_payment_method_paypal` (34 characters) broke the deploy. We renamed it
+to `0024_expense_paypal` (19 characters). The transactional DDL rolled back cleanly and the
+database stayed at 0023. The fix was to rename the revision id and the file, then redeploy.
 
-**How to apply:** when creating a migration, keep `revision`/filename like `00NN_short_slug`, ≤32 chars. Verify: `grep -rh '^revision: str' backend/migrations/versions/*.py | sed 's/.*= //;s/"//g' | awk '{print length,$0}' | sort -rn | head`. The longest existing is `0010_application_email_confirmed` (exactly 32). [[ng-build-budgets]] is the analogous "passes locally, fails the real build" gotcha for the frontend.
+**How to apply:** when you create a migration, keep the `revision` value and the filename in the
+form `00NN_short_slug`, at most 32 characters. Verify with
+`grep -rh '^revision: str' backend/migrations/versions/*.py | sed 's/.*= //;s/"//g' | awk '{print length,$0}' | sort -rn | head`.
+The longest existing id is `0010_application_email_confirmed`, which is exactly 32 characters.
+[[ng-build-budgets]] is the analogous "passes locally, fails the real build" gotcha for the
+frontend.

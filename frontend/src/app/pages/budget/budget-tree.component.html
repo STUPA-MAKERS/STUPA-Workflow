@@ -25,7 +25,6 @@
   <p class="bt__status">{{ 'budget.tree.empty' | t }}</p>
 } @else {
   <div class="bt__layout">
-    <!-- Links: Budget → Haushaltsjahr (persistente Sidebar) -->
     <aside class="bt__nav">
       <app-budget-year-tree
         [tops]="tops()"
@@ -39,7 +38,6 @@
 
     <main class="bt__main">
       @if (selectedTopId()) {
-        <!-- Cost-centre tree of the selected budget -->
         <app-data-table [columns]="columns()" [rows]="rows()" [rowKey]="rowId" [isExpanded]="childExpanded">
           <ng-template appCell="node" let-row>
             <span class="bt__node" [style.paddingLeft.rem]="$any(row).depth * 1.5">
@@ -91,7 +89,7 @@
   </div>
 }
 
-<!-- Limit (Zuteilung) je Kostenstelle setzen — Dialog pro Zeile -->
+<!-- Set the limit (allocation) of one cost center. One dialog per row. -->
 <app-dialog
   [open]="!!limitNode()"
   [title]="'budget.tree.limitTitle' | t"
@@ -111,7 +109,6 @@
   </div>
 </app-dialog>
 
-<!-- Edit cost-centre (key + name) -->
 <app-dialog
   [open]="!!editNode()"
   [title]="'budget.tree.editNode' | t"
@@ -130,8 +127,8 @@
         <span>{{ 'budget.tree.hiddenInBudget' | t }}</span>
       </label>
       <p class="text-muted m-0 text-xs bt__form-full">{{ 'budget.tree.hiddenInBudgetHint' | t }}</p>
-      <!-- Visibility gremium: its members see this subtree in the budget tab as a
-           root — without global budget.* permissions. -->
+      <!-- Visibility Gremium: its members see this subtree in the budget tab as a
+           root. They need no global budget.* permissions. -->
       <div class="bt__form-full">
         <app-select
           name="editViewGremium"
@@ -152,7 +149,7 @@
   </div>
 </app-dialog>
 
-<!-- Create top budget (dialog, via the header button) -->
+<!-- Create a top budget. The header button opens this dialog. -->
 <app-dialog
   [open]="topOpen()"
   [title]="'budget.tree.createTop' | t"
@@ -179,7 +176,7 @@
   </div>
 </app-dialog>
 
-<!-- Create fiscal year (dialog, via the header button) — within the selected budget -->
+<!-- Create a fiscal year inside the selected budget. The header button opens this dialog. -->
 <app-dialog
   [open]="fyOpen()"
   [title]="'budget.tree.fyTitle' | t"
@@ -198,7 +195,7 @@
   </div>
 </app-dialog>
 
-<!-- Set the fiscal-year cutoff of the selected budget (dialog, via the header button) -->
+<!-- Set the fiscal-year cutoff of the selected budget. The header button opens this dialog. -->
 <app-dialog
   [open]="stichtagOpen()"
   [title]="'budget.tree.stichtagTitle' | t"
@@ -231,7 +228,7 @@
   </div>
 </app-dialog>
 
-<!-- Accepted/denied flow states of the selected budget (dialog) -->
+<!-- Accepted and denied flow states of the selected budget. -->
 <app-dialog
   [open]="stateConfigOpen()"
   [title]="'budget.tree.stateConfig' | t"

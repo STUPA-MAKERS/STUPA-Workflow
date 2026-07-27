@@ -1,15 +1,18 @@
-"""fints_bank_sync: FinTS-Bankabgleich (#fints).
+"""fints_bank_sync: FinTS bank reconciliation (#fints).
 
-Erweitert ``account`` um die (optionalen) FinTS-Zugangsdaten — die PIN liegt **nur
-verschlüsselt** vor (Fernet, ``app.shared.crypto``) — und legt drei Tabellen an:
+The migration adds the optional FinTS credentials to ``account``. The
+``fints_pin_encrypted`` column stores the PIN in encrypted form only (Fernet,
+``app.shared.crypto``). The migration also creates four tables.
 
-* ``bank_statement_line`` — gestagete Kontoumsätze (vor dem Buchen). ``idempotency_key``
-  je Konto eindeutig → idempotenter Re-Import.
-* ``bank_allocation``     — N:M-Zuordnung Umsatz ↔ Buchung (Teil-/Sammelzahlungen).
-* ``counterparty_memory`` — Gegen-IBAN → zuletzt gewählte Kostenstelle (Matcher-Vorschlag).
+``bank_statement_line`` stages account transactions before booking. Its
+``idempotency_key`` is unique per account, so a re-import stays idempotent.
+``bank_allocation`` links a transaction to a booking as N:M, for partial payments and
+collective payments. ``counterparty_memory`` maps a counterparty IBAN to the cost center
+chosen last and feeds the matcher suggestion. ``bank_sync_session`` holds short-lived,
+encrypted TAN dialog state.
 
-Idempotent (``IF NOT EXISTS``); sauberer Down-Round-Trip. Auf einem frischen Schema
-entstehen die Tabellen ohnehin über ``Base.metadata.create_all`` (0002).
+The migration is idempotent (``IF NOT EXISTS``) and has a clean down round trip. On a
+fresh schema ``Base.metadata.create_all`` (0002) creates the tables anyway.
 """
 
 from __future__ import annotations
@@ -25,7 +28,6 @@ depends_on: str | Sequence[str] | None = None
 
 
 _UPGRADE: tuple[str, ...] = (
-    # — account: FinTS-Zugangsdaten (alle optional; PIN verschlüsselt) —
     "ALTER TABLE account ADD COLUMN IF NOT EXISTS fints_endpoint text",
     "ALTER TABLE account ADD COLUMN IF NOT EXISTS fints_blz text",
     "ALTER TABLE account ADD COLUMN IF NOT EXISTS fints_login text",
@@ -33,7 +35,6 @@ _UPGRADE: tuple[str, ...] = (
     "ALTER TABLE account ADD COLUMN IF NOT EXISTS fints_tan_mechanism text",
     "ALTER TABLE account ADD COLUMN IF NOT EXISTS fints_state text",
     "ALTER TABLE account ADD COLUMN IF NOT EXISTS fints_last_sync_at timestamptz",
-    # — bank_statement_line: gestagete Umsätze —
     """
     CREATE TABLE IF NOT EXISTS bank_statement_line (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -65,7 +66,6 @@ _UPGRADE: tuple[str, ...] = (
     "ON bank_statement_line (match_state)",
     "CREATE INDEX IF NOT EXISTS ix_bank_statement_line_booking_date "
     "ON bank_statement_line (booking_date)",
-    # — bank_allocation: N:M Umsatz ↔ Buchung —
     """
     CREATE TABLE IF NOT EXISTS bank_allocation (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -82,7 +82,6 @@ _UPGRADE: tuple[str, ...] = (
     "ON bank_allocation (statement_line_id)",
     "CREATE INDEX IF NOT EXISTS ix_bank_allocation_expense_id "
     "ON bank_allocation (expense_id)",
-    # — counterparty_memory: Gegen-IBAN → Kostenstelle —
     """
     CREATE TABLE IF NOT EXISTS counterparty_memory (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -92,7 +91,6 @@ _UPGRADE: tuple[str, ...] = (
         CONSTRAINT uq_counterparty_memory_iban UNIQUE (counterparty_iban)
     )
     """,
-    # — bank_sync_session: kurzlebiger, verschlüsselter TAN-Dialog-Zustand —
     """
     CREATE TABLE IF NOT EXISTS bank_sync_session (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

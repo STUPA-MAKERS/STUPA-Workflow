@@ -1,8 +1,10 @@
 """Auth endpoints.
 
-OIDC login/callback (Keycloak, auth code + PKCE), server-session cookie,
-magic-link issue/verify, `/auth/me`, logout. Tokens never reach JS or the body —
-HttpOnly+Secure+SameSite=Lax cookies only.
+This module holds the OIDC login and callback (Keycloak, auth code plus PKCE), the
+server-session cookie, the magic-link issue and verify routes, `/auth/me` and logout.
+
+A token never reaches JavaScript or the response body. The server sends it only in an
+HttpOnly+Secure+SameSite=Lax cookie.
 """
 
 from __future__ import annotations
@@ -64,7 +66,10 @@ def _cookie_kwargs(settings: SettingsDep) -> dict[str, object]:
     responses=_errors(404),
 )
 def login(settings: SettingsDep) -> RedirectResponse:
-    """Redirect to Keycloak (auth code + PKCE); state/verifier/nonce in the tx cookie."""
+    """Redirect to Keycloak with the auth code flow and PKCE.
+
+    The tx cookie carries the state, the code verifier and the nonce.
+    """
     if not settings.oidc_enabled:
         raise NotFoundError("OIDC is not configured.")
     verifier, challenge = oidc.generate_pkce()
@@ -93,7 +98,10 @@ async def callback(
     code: Annotated[str, Query()],
     state: Annotated[str, Query()],
 ) -> RedirectResponse:
-    """Code to token to session. CSRF/replay protection via state match + nonce in the id_token."""
+    """Exchange the code for a token and open a session.
+
+    The state match and the nonce in the id_token protect against CSRF and replay.
+    """
     if not settings.oidc_enabled:
         raise NotFoundError("OIDC is not configured.")
     tx_cookie = request.cookies.get(settings.oidc_tx_cookie_name)
@@ -110,12 +118,12 @@ async def callback(
         )
     except OidcError as exc:
         raise BadRequestError("OIDC login failed.") from exc
-    # Persist principal + auth_session (get_session never commits itself);
-    # without a commit the request close would roll both rows back.
+    # Persist the principal and the auth_session row. `get_session` never commits.
+    # Without this commit the request close rolls both rows back.
     await db.commit()
 
-    # If an OAuth AS login is in flight (MCP, ap_oauth_tx set), continue to the
-    # code-mint step instead of the app home (same-origin, no open redirect).
+    # If an OAuth AS login is in flight (MCP, ap_oauth_tx set), go to the code-mint
+    # step instead of the app home. The target stays same-origin, so no open redirect.
     dest = settings.public_base_url
     if request.cookies.get(settings.oauth_tx_cookie_name):
         dest = settings.public_base_url.rstrip("/") + "/api/oauth/finish"
@@ -134,10 +142,15 @@ async def callback(
 async def logout(
     request: Request, db: DbSession, settings: SettingsDep, response: Response
 ) -> LogoutOut:
-    """End the server session(s) and clear cookies (idempotent). Ends both the
-    principal and any applicant session. For OIDC, returns the RP-initiated
-    logout URL (Keycloak `end_session`, id_token_hint) so the frontend also
-    ends the IdP SSO session — otherwise the SSO login survives."""
+    """End the server sessions and clear the cookies.
+
+    The route is idempotent. It ends the principal session and any applicant session.
+
+    Returns:
+        For OIDC, the RP-initiated logout URL (Keycloak `end_session` with
+        `id_token_hint`). The frontend must send the browser there to end the IdP SSO
+        session. Without that step the SSO login survives.
+    """
     logout_url: str | None = None
     cookie = request.cookies.get(settings.session_cookie_name)
     if cookie:
@@ -168,7 +181,7 @@ async def me(
     principal: Annotated[Principal, Depends(require_principal())],
     db: DbSession,
 ) -> MeOut:
-    """Return the principal plus resolved roles/permissions/groups and own gremien."""
+    """Return the principal plus the resolved roles, permissions, groups and Gremien."""
     return MeOut(
         sub=principal.sub,
         email=principal.email,
@@ -184,8 +197,11 @@ async def me(
 
 
 async def _in_substitute_pool(db: DbSession, sub: str) -> bool:
-    """Is ``sub`` in at least one substitute pool? Frontend gating of the
-    meeting timeline for pool substitutes without own membership."""
+    """Tell if `sub` is in at least one substitute pool.
+
+    The frontend uses the flag to show the meeting timeline to pool substitutes that
+    have no own membership.
+    """
     from app.modules.auth.models import Principal as PrincipalRow
     from app.modules.delegations.models import DelegationSubstitute
 
@@ -199,8 +215,10 @@ async def _in_substitute_pool(db: DbSession, sub: str) -> bool:
 
 
 async def _has_scoped_budget_view(db: DbSession, sub: str) -> bool:
-    """Does a member gremium of the principal own a cost centre as visibility
-    root? Frontend gating of the budget tab."""
+    """Tell if a Gremium of the principal owns a cost center as visibility root.
+
+    The frontend uses the flag to show the budget tab.
+    """
     from app.modules.admin.gremium_roles import gremium_member_ids
     from app.modules.budget.tree_models import Budget
 
@@ -214,10 +232,11 @@ async def _has_scoped_budget_view(db: DbSession, sub: str) -> bool:
 
 
 async def _session_manage_gremien(db: DbSession, sub: str) -> list[UUID]:
-    """Gremien ``sub`` manages via their gremium role (``session.manage``).
+    """Return the Gremien that `sub` manages through a gremium role (`session.manage`).
 
-    Same source as ``MeetingService.can_manage`` — frontend gating ("create
-    meeting") and server decision stay congruent."""
+    This reads the same source as `MeetingService.can_manage`. The frontend gate for
+    "create meeting" and the server decision therefore stay congruent.
+    """
     from app.modules.admin.gremium_roles import gremium_ids_with_permission
 
     return sorted(
@@ -226,12 +245,12 @@ async def _session_manage_gremien(db: DbSession, sub: str) -> list[UUID]:
 
 
 async def _gremien_for(db: DbSession, sub: str) -> list[GremiumRef]:
-    """Gremien ``sub`` is a member of (valid ``gremium_membership``).
+    """Return the Gremien that `sub` is a member of (valid `gremium_membership`).
 
-    Uses the same source as the server-side visibility logic
-    (``gremium_member_ids``) so frontend gating and server filters agree. The
-    global ``role_assignment`` member role has ``gremium_id = NULL`` and is NOT
-    a gremium membership. Magic-link applicants get an empty list.
+    This reads the same source as the server-side visibility logic
+    (`gremium_member_ids`). The frontend gate and the server filters therefore agree.
+    The global `role_assignment` member role has `gremium_id = NULL` and is NOT a
+    gremium membership. A magic-link applicant gets an empty list.
     """
     from app.modules.admin.gremium_roles import gremium_member_ids
 
@@ -251,11 +270,13 @@ async def _gremien_for(db: DbSession, sub: str) -> list[GremiumRef]:
 async def _deliver_magic_link(
     settings: Settings, email: str, application_id: UUID | None, pool: object
 ) -> None:
-    """Create/send the magic link in its own session (background task).
+    """Create and send the magic link in its own DB session.
 
-    Runs after the 202 response, so response time is identical for hit and
-    miss (no timing enumeration). Delivery goes through the mail queue; without
-    an arq pool it is logged and dropped."""
+    This runs as a background task after the 202 response. The response time is
+    therefore the same for a hit and for a miss, so nobody can enumerate addresses by
+    timing. The mail queue delivers the link. Without an arq pool the code logs the
+    mail and drops it.
+    """
     queue = mail_queue_from_pool(pool)  # type: ignore[arg-type]
     sessionmaker = get_sessionmaker()
     async with sessionmaker() as db:
@@ -279,7 +300,7 @@ async def _deliver_magic_link(
         Depends(rate_limit_magic_link),
         Depends(verify_altcha),
     ],
-    # 400 = ALTCHA invalid/missing, 413 = body too large, 429 = rate limit.
+    # 400 = ALTCHA missing or invalid, 413 = body too large, 429 = rate limit.
     responses=_errors(400, 413, 429),
 )
 async def request_magic_link(
@@ -288,8 +309,12 @@ async def request_magic_link(
     background: BackgroundTasks,
     request: Request,
 ) -> dict[str, str]:
-    """Request a magic link. Anti-enumeration: always 202 with a constant body,
-    no hit leak. DB work runs in the background for constant response time."""
+    """Request a magic link.
+
+    The route always answers 202 with a constant body. It never tells the caller if the
+    address exists. The DB work runs in the background to keep the response time
+    constant.
+    """
     pool = getattr(request.app.state, "arq_pool", None)
     background.add_task(
         _deliver_magic_link, settings, str(body.email), body.application_id, pool
@@ -311,10 +336,13 @@ async def verify_magic_link(
     settings: SettingsDep,
     response: Response,
 ) -> MagicLinkVerifyOut:
-    """Verify a token into an applicant session (scoped to one application); expired/used -> 410.
+    """Verify a token and open an applicant session scoped to one application.
 
-    The session is set only as an HttpOnly cookie, never returned in the body
-    (no token reachable from JS)."""
+    An expired or already used token gives 410.
+
+    The server sets the session only as an HttpOnly cookie. It never returns the token
+    in the body, so JavaScript cannot read it.
+    """
     app_id, scope, token = await service.verify_magic_link(
         db, settings, token=body.token
     )

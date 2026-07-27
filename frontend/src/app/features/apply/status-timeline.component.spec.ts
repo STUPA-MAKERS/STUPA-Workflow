@@ -347,7 +347,7 @@ describe('StatusTimelineComponent', () => {
     ];
     await setup(fakeApi({ comments: () => of(comments) }), { t: 'tok', app: 'app-1' });
     await screen.findByText('Hallo');
-    // applicant fallback + committee fallback both rendered.
+    // Both fallbacks render: applicant and Gremium.
     expect(screen.getByText('Antragsteller:in')).toBeInTheDocument();
     expect(screen.getByText('Gremium')).toBeInTheDocument();
   });
@@ -365,7 +365,6 @@ describe('StatusTimelineComponent', () => {
     await userEvent.click(btn);
     expect(fire).toHaveBeenCalledWith('app-1', { transitionId: 'tr-x' });
     expect(toast.error).toHaveBeenCalledWith('Aktion fehlgeschlagen.');
-    // firing flag is cleared again after the error.
     expect(fixture.componentInstance.firing()).toBeNull();
   });
 
@@ -432,7 +431,6 @@ describe('StatusTimelineComponent', () => {
     fixture.componentInstance.save();
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Antrag ist gesperrt und kann nicht mehr bearbeitet werden.'));
     expect(update).toHaveBeenCalled();
-    // re-fetch happened (initial + reload).
     expect(getApp.mock.calls.length).toBeGreaterThan(1);
   });
 
@@ -617,7 +615,7 @@ describe('StatusTimelineComponent', () => {
     };
     const locked = app(false, {
       title: 'Sommerfest',
-      consent: false, // boolean false → "Nein"; also hides the `hidden` field
+      consent: false, // boolean false → "Nein" and it hides the `hidden` field
       hidden: 'darf nicht erscheinen',
       kosten: [{ label: 'Ohne Angebote' }, { label: 'Leeres Angebot', offers: [{ preferred: true }] }],
       leer: 'kein-array', // non-array positions → '' → row dropped
@@ -625,7 +623,7 @@ describe('StatusTimelineComponent', () => {
     await setup(fakeApi({ application: locked, effectiveForm: () => of(eff) }), { t: 'tok', app: 'app-1' });
     expect(await screen.findByText('Gesperrt')).toBeInTheDocument();
     expect(screen.getByText('Nein')).toBeInTheDocument(); // false boolean
-    // Hidden field (visibleIf false) is not rendered.
+    // The template drops the hidden field (visibleIf false).
     expect(screen.queryByText('darf nicht erscheinen')).not.toBeInTheDocument();
     // Positions with missing/empty offers sum to 0.
     expect(screen.getByText(/2 ×.*0/)).toBeInTheDocument();

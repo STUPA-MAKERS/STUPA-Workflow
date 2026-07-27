@@ -1,21 +1,23 @@
-"""Pure guard/action evaluator for the flow engine.
+"""Pure guard and action evaluator for the flow engine.
 
-Guards decide whether a transition may fire. Declarative, whitelist, NO `eval`.
-The catalogue splits into:
+A guard decides if a transition can fire. The evaluator is declarative and works from a
+whitelist. It never calls `eval`.
 
-* Conditions (auto + manual): ``deadlinePassed``, ``applicantRoleIs``,
-  ``applicantCommitteeIs``, ``applicationTypeIs`` (application type key),
-  ``attachmentPresent`` (>= 1 attachment), ``budgetIs``, ``budgetFitsApplication``,
-  ``hasField``, ``compare`` (typed comparison over a promoted/form field) — combined
-  via ``and``/``or``/``not``.
-* Actor gates (manual transitions only): ``roleIs`` (global role), ``isInCommittee``
-  (gremium membership). Forbidden on automatic transitions
-  (``validate_guard(..., allow_actor_ops=False)``).
+The catalog splits into conditions and actor gates. Conditions apply to automatic and
+manual transitions: `deadlinePassed`, `applicantRoleIs`, `applicantCommitteeIs`,
+`applicationTypeIs` (the application type key), `attachmentPresent` (one attachment or
+more), `budgetIs`, `budgetFitsApplication`, `hasField`. `compare` adds a typed
+comparison over a promoted or form field. The combinators `and`, `or` and `not` join
+conditions.
 
-Actions are one whitelisted type (``webhook``/``notify``/``addToNextSession``/
-``assignBudget``/``assignBudgetFromField``); dispatch happens in the engine — here only
-validation. An unknown operator/action type raises ``GuardError`` when the flow version
-is SAVED (not at runtime), see ``validate_guard`` / ``validate_action``.
+Actor gates apply to manual transitions only: `roleIs` (a global role) and
+`isInCommittee` (Gremium membership). `validate_guard(..., allow_actor_ops=False)`
+forbids them on automatic transitions.
+
+An action has one whitelisted type: `webhook`, `notify`, `addToNextSession`,
+`assignBudget` or `assignBudgetFromField`. The engine dispatches the action. This module
+only validates it. An unknown operator or action type raises `GuardError` when the flow
+version is SAVED, not at runtime. See `validate_guard` and `validate_action`.
 """
 
 from __future__ import annotations
@@ -27,10 +29,6 @@ from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
-# --------------------------------------------------------------------------- #
-# Operator/action whitelists
-# --------------------------------------------------------------------------- #
-# Condition operators (auto + manual).
 GUARD_CONDITION_OPERATORS: frozenset[str] = frozenset(
     {
         "deadlinePassed",
@@ -44,25 +42,26 @@ GUARD_CONDITION_OPERATORS: frozenset[str] = frozenset(
         "compare",
     }
 )
-# Actor gates — allowed on manual transitions only.
-# ``actorIsApplicant``: the triggering actor is the applicant.
+# Actor gates apply to manual transitions only. `actorIsApplicant` is true when the
+# actor that triggers the transition is the applicant.
 GUARD_ACTOR_OPERATORS: frozenset[str] = frozenset({"roleIs", "isInCommittee", "actorIsApplicant"})
 GUARD_LEAF_OPERATORS: frozenset[str] = GUARD_CONDITION_OPERATORS | GUARD_ACTOR_OPERATORS
 GUARD_COMBINATORS: frozenset[str] = frozenset({"and", "or", "not"})
 GUARD_OPERATORS: frozenset[str] = GUARD_LEAF_OPERATORS | GUARD_COMBINATORS
 
-# Comparison operators of the ``compare`` guard per value type.
+# Comparison operators of the `compare` guard, per value type.
 _NUMERIC_OPS: frozenset[str] = frozenset({"==", "!=", "<", "<=", ">", ">="})
 _DATE_OPS: frozenset[str] = _NUMERIC_OPS
 _TEXT_OPS: frozenset[str] = frozenset({"==", "!=", "in"})
 _BOOL_OPS: frozenset[str] = frozenset({"=="})
 
-# Value types of a comparable field (derived from the form-field type).
+# Value types of a comparable field. They come from the form-field type.
 COMPARE_TYPES: frozenset[str] = frozenset({"number", "currency", "date", "text", "bool"})
 
-# Leaf operators with a string value (role/gremium/budget/field key) or bool value —
-# for the save gate (``validate_guard``): a wrong value type (e.g. a list) would crash
-# at runtime (unhashable in ``in frozenset``) instead of failing cleanly.
+# Leaf operators with a string value, such as a role, Gremium, budget or field key, or
+# with a bool value. The save gate `validate_guard` checks them. A wrong value type such
+# as a list crashes at runtime as unhashable in `in frozenset` instead of failing
+# cleanly.
 _STRING_VALUE_OPERATORS: frozenset[str] = frozenset(
     {
         "roleIs",
@@ -78,13 +77,12 @@ _BOOL_VALUE_OPERATORS: frozenset[str] = frozenset(
     {"deadlinePassed", "budgetFitsApplication", "actorIsApplicant", "attachmentPresent"}
 )
 
-# Whitelisted action types (dispatch in the engine).
 ACTION_TYPES: frozenset[str] = frozenset(
     {"webhook", "notify", "addToNextSession", "assignBudget", "assignBudgetFromField"}
 )
 
-# Required string field per action type (``notify`` is checked separately).
-# ``assignBudgetFromField`` reads the cost-centre id from the named form field.
+# Required string field per action type. `notify` has a separate check.
+# `assignBudgetFromField` reads the cost center id from the named form field.
 _ACTION_REQUIRED_FIELD: dict[str, str] = {
     "webhook": "webhookId",
     "addToNextSession": "gremiumId",
@@ -92,35 +90,44 @@ _ACTION_REQUIRED_FIELD: dict[str, str] = {
     "assignBudgetFromField": "field",
 }
 
-# Valid ``notify`` recipient kinds.
 NOTIFY_RECIPIENT_KINDS: frozenset[str] = frozenset({"gremium", "role", "applicant", "email"})
 
 
 class GuardError(Exception):
-    """Invalid guard (unknown operator, wrong structure, …)."""
+    """Invalid guard, for example an unknown operator or a wrong structure."""
 
 
 @dataclass(frozen=True)
 class GuardContext:
-    """Runtime context for `eval_guard`. Pure input, no I/O.
+    """Runtime context for `eval_guard`.
 
-    * ``manual`` — whether the transition is triggered manually (actor gates apply
-      only here; in the automatic case ``roles``/``actor_committees`` are empty).
-    * ``roles``/``actor_committees`` — the actor (triggering principal).
-    * ``applicant_roles``/``applicant_committees`` — the applicant.
-    * ``budget_id`` — assigned cost centre (budget tree) as a string.
-    * ``budget_fits`` — amount <= remaining of the cost centre.
-    * ``application_type_key`` — application type key (e.g. ``qsm``/``vsm``) for
-      ``applicationTypeIs``; ``None`` when unresolvable (fail-closed).
-    * ``has_attachment`` — at least one non-quarantined attachment on the application
-      (for ``attachmentPresent``).
-    * ``field_values``/``field_types`` — promoted/form field values + type (incl.
-      built-in ``amount`` = ``currency``) for ``compare``/``hasField``.
+    The context is pure input. The evaluator does no I/O.
+
+    Attributes:
+        manual: True when an actor triggers the transition by hand. Actor gates apply
+            only here. An automatic transition has empty `roles` and
+            `actor_committees`.
+        actor_is_applicant: True when the actor is the applicant. The applicant is the
+            logged-in creator or the holder of the magic link.
+        roles: The roles of the actor, which is the triggering principal.
+        actor_committees: The Gremien of the actor.
+        applicant_roles: The roles of the applicant.
+        applicant_committees: The Gremien of the applicant.
+        budget_id: The assigned cost center of the budget tree, as a string.
+        budget_fits: True when the amount is at most the remaining sum of the cost
+            center.
+        application_type_key: The application type key, for example `qsm` or `vsm`. It
+            serves `applicationTypeIs`. `None` when the key does not resolve, which
+            fails closed.
+        has_attachment: True when the application carries at least one attachment that
+            is not in quarantine. It serves `attachmentPresent`.
+        field_values: The promoted and form field values for `compare` and `hasField`.
+        field_types: The type of each field, including the built-in `amount` of type
+            `currency`.
     """
 
     manual: bool = True
     deadline_passed: bool = False
-    # Actor is the applicant (logged-in creator or magic-link holder).
     actor_is_applicant: bool = False
     roles: frozenset[str] = frozenset()
     actor_committees: frozenset[str] = frozenset()
@@ -129,15 +136,11 @@ class GuardContext:
     budget_id: str | None = None
     budget_fits: bool = False
     application_type_key: str | None = None
-    # At least one non-quarantined attachment is present on the application.
     has_attachment: bool = False
     field_values: Mapping[str, Any] = field(default_factory=dict)
     field_types: Mapping[str, str] = field(default_factory=dict)
 
 
-# --------------------------------------------------------------------------- #
-# Type coercion + comparison (compare guard)
-# --------------------------------------------------------------------------- #
 def _to_decimal(value: Any) -> Decimal | None:
     if value is None or isinstance(value, bool):
         return None
@@ -169,7 +172,10 @@ def _to_bool(value: Any) -> bool:
 
 
 def ops_for_type(value_type: str) -> frozenset[str]:
-    """Allowed ``compare`` operators for a value type (the FE mirrors this)."""
+    """Return the allowed `compare` operators for a value type.
+
+    The frontend mirrors this mapping.
+    """
     if value_type in {"number", "currency"}:
         return _NUMERIC_OPS
     if value_type == "date":
@@ -180,10 +186,12 @@ def ops_for_type(value_type: str) -> frozenset[str]:
 
 
 def _eval_compare(spec: Any, ctx: GuardContext) -> bool:
-    """Evaluate ``compare``: compare ``{field, op, value}`` per type.
+    """Evaluate the `compare` guard over `{field, op, value}` per type.
 
-    The value type comes from ``ctx.field_types[field]`` (default ``text``). A field
-    missing from ``field_values`` -> ``False`` (fail-closed; implies ``hasField``)."""
+    The value type comes from `ctx.field_types[field]` and defaults to `text`. A field
+    that is missing from `field_values` gives `False`. That fails closed and implies
+    `hasField`.
+    """
     if not isinstance(spec, dict):
         raise GuardError("compare requires an object {field, op, value}")
     fld = spec.get("field")
@@ -195,9 +203,9 @@ def _eval_compare(spec: Any, ctx: GuardContext) -> bool:
         raise GuardError("compare.op must be a string")
     value_type = ctx.field_types.get(fld, "text")
     if op not in ops_for_type(value_type):
-        # The runtime type comes from the application's PINNED form version and can
-        # differ from the globally stored flow (form drift, missing field -> ``text``).
-        # Fail-closed instead of raising — otherwise a 500 for every transition.
+        # The runtime type comes from the PINNED form version of the application. It can
+        # differ from the globally stored flow through form drift. A missing field gives
+        # `text`. Fail closed instead of raising, or every transition returns a 500.
         return False
     if fld not in ctx.field_values:
         return False
@@ -217,7 +225,7 @@ def _eval_compare(spec: Any, ctx: GuardContext) -> bool:
         return _apply_ordered(op, l_d, r_d)
     if value_type == "bool":
         return _to_bool(left) == _to_bool(operand)
-    # text / select
+    # Fall-through for the text and select types.
     left_s = str(left)
     if op == "==":
         return left_s == str(operand)
@@ -228,8 +236,9 @@ def _eval_compare(spec: Any, ctx: GuardContext) -> bool:
     return False
 
 
-# Ordered comparison operators -> ``operator`` function. Unknown operator -> ``False``
-# (fail-closed; ``validate_guard`` rejects unknown operators at save time anyway).
+# Map an ordered comparison operator to its `operator` function. An unknown operator
+# gives `False` and fails closed. `validate_guard` rejects an unknown operator at save
+# time anyway.
 _ORDERED_OPS: dict[str, Callable[[Any, Any], bool]] = {
     "==": operator.eq,
     "!=": operator.ne,
@@ -245,38 +254,30 @@ def _apply_ordered(op: str, left: Any, right: Any) -> bool:
     return fn(left, right) if fn is not None else False
 
 
-# --------------------------------------------------------------------------- #
-# Leaf evaluator
-# --------------------------------------------------------------------------- #
 def _has_field(value: Any, ctx: GuardContext) -> bool:
-    """``hasField``: field present AND non-empty (None/""/[] count as missing)."""
+    """Evaluate `hasField`: the field is present and not empty.
+
+    A value of `None`, an empty string or an empty list counts as missing.
+    """
     v = ctx.field_values.get(str(value))
     return v is not None and v != "" and v != []
 
 
-# Leaf operator -> pure predicate ``(value, ctx) -> bool``. Actor gates apply only on
-# manual transitions (automatic ones have empty ``roles``/``actor_committees``);
-# ``compare`` values are compared per type in :func:`_eval_compare`.
+# Map a leaf operator to a pure predicate `(value, ctx) -> bool`. Actor gates apply only
+# on manual transitions. An automatic transition has empty `roles` and
+# `actor_committees`. `_eval_compare` compares a `compare` value per type.
 _LEAF_EVALUATORS: dict[str, Callable[[Any, GuardContext], bool]] = {
-    # Actor gates
     "roleIs": lambda value, ctx: value in ctx.roles,
     "isInCommittee": lambda value, ctx: str(value) in ctx.actor_committees,
-    # ``true`` -> actor must be the applicant, ``false`` -> must not.
     "actorIsApplicant": lambda value, ctx: ctx.actor_is_applicant == bool(value),
-    # Applicant
     "applicantRoleIs": lambda value, ctx: value in ctx.applicant_roles,
     "applicantCommitteeIs": lambda value, ctx: str(value) in ctx.applicant_committees,
-    # Application type (key, e.g. ``qsm``/``vsm``) — fail-closed when unresolvable.
     "applicationTypeIs": lambda value, ctx: ctx.application_type_key is not None
     and str(value) == ctx.application_type_key,
-    # Budget
     "budgetIs": lambda value, ctx: ctx.budget_id is not None and str(value) == ctx.budget_id,
     "budgetFitsApplication": lambda value, ctx: ctx.budget_fits == bool(value),
-    # Attachments — ``true`` -> at least one attachment present, ``false`` -> none.
     "attachmentPresent": lambda value, ctx: ctx.has_attachment == bool(value),
-    # Deadlines
     "deadlinePassed": lambda value, ctx: ctx.deadline_passed == bool(value),
-    # Fields
     "hasField": _has_field,
     "compare": _eval_compare,
 }
@@ -290,7 +291,13 @@ def _eval_leaf(op: str, value: Any, ctx: GuardContext) -> bool:
 
 
 def eval_guard(guard: dict[str, Any] | None, ctx: GuardContext) -> bool:
-    """Evaluate a guard against `ctx` -> bool. Empty/None guard -> True (no gate)."""
+    """Evaluate a guard against `ctx`.
+
+    An empty guard or `None` returns `True` and adds no gate.
+
+    Raises:
+        GuardError: The guard uses an unknown operator or a wrong structure.
+    """
     if not guard:
         return True
     if len(guard) != 1:
@@ -320,10 +327,11 @@ def _children(op: str, value: Any) -> list[dict[str, Any]]:
 
 
 def guard_requires_applicant(guard: dict[str, Any] | None) -> bool:
-    """``True`` when the guard tree contains an ``actorIsApplicant`` gate anywhere.
+    """Report whether the guard tree holds an `actorIsApplicant` gate anywhere.
 
-    This lets us allow exactly the transitions an admin deliberately opened up to the
-    applicant — a magic-link applicant may only fire such transitions."""
+    The caller allows exactly the transitions that an admin opened to the applicant. A
+    magic-link applicant can fire only such a transition.
+    """
     if not isinstance(guard, dict) or len(guard) != 1:
         return False
     op, value = next(iter(guard.items()))
@@ -335,14 +343,18 @@ def guard_requires_applicant(guard: dict[str, Any] | None) -> bool:
     return False
 
 
-# --------------------------------------------------------------------------- #
-# Static validation (save gate)
-# --------------------------------------------------------------------------- #
 def validate_guard(guard: dict[str, Any] | None, *, allow_actor_ops: bool = True) -> None:
-    """Statically check: only whitelisted operators, correct structure (save gate).
+    """Check the guard structure and reject every operator outside the whitelist.
 
-    ``allow_actor_ops=False`` (automatic transitions) forbids ``roleIs``/
-    ``isInCommittee`` — an actor gate without an actor makes no sense."""
+    This is the save gate for a flow version.
+
+    Pass `allow_actor_ops=False` for an automatic transition. That forbids `roleIs` and
+    `isInCommittee`, because an actor gate without an actor makes no sense.
+
+    Raises:
+        GuardError: The guard uses an unknown operator, a forbidden actor gate, a wrong
+            structure or a wrong value type.
+    """
     if not guard:
         return
     if len(guard) != 1:
@@ -370,8 +382,11 @@ def validate_guard(guard: dict[str, Any] | None, *, allow_actor_ops: bool = True
 
 
 def _validate_compare(spec: Any) -> None:
-    """Check the ``compare`` structure (the type is resolved from the field only at
-    runtime; here just the shape + that ``op`` is a known comparison operator)."""
+    """Check the shape of a `compare` guard.
+
+    This function checks the structure and that `op` is a known comparison operator.
+    The value type resolves from the field only at runtime.
+    """
     if not isinstance(spec, dict):
         raise GuardError("compare requires an object {field, op, value}")
     fld = spec.get("field")
@@ -385,11 +400,15 @@ def _validate_compare(spec: Any) -> None:
 
 
 def validate_action(action: dict[str, Any]) -> None:
-    """Statically check that `action.type` is whitelisted + required fields present.
+    """Check that `action.type` is whitelisted and that the required fields are present.
 
-    ``webhook`` needs ``webhookId``; ``notify`` a recipient list with valid kinds;
-    ``addToNextSession`` a ``gremiumId`` (the target-state constraint is checked by the
-    flow-graph validator, which knows the transition)."""
+    `webhook` needs `webhookId`. `notify` needs a recipient list with valid kinds.
+    `addToNextSession` needs a `gremiumId`. The flow-graph validator checks the
+    target-state constraint, because it knows the transition.
+
+    Raises:
+        GuardError: The action type is unknown or a required field is missing.
+    """
     if not isinstance(action, dict):
         raise GuardError(f"action must be an object, got {type(action).__name__}")
     action_type = action.get("type")
@@ -400,7 +419,6 @@ def validate_action(action: dict[str, Any]) -> None:
     if action_type == "notify":
         _validate_notify_recipients(action.get("recipients"))
         return
-    # The remaining actions each require exactly one non-empty string field.
     field = _ACTION_REQUIRED_FIELD[action_type]
     if not isinstance(action.get(field), str) or not action[field]:
         raise GuardError(f"{action_type} action requires '{field}'")

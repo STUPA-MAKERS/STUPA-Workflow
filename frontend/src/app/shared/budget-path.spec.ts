@@ -2,13 +2,11 @@ import { SimplifyPathPipe, simplifyPathKey } from './budget-path';
 
 describe('simplifyPathKey', () => {
   it('collapses numeric prefix chains, keeping the top + leaf segments', () => {
-    // 8 → 81 → 810 collapse; top (VSM) always kept, leaf (330) kept.
     expect(simplifyPathKey('VSM-8-81-810-330')).toBe('VSM-810-330');
     expect(simplifyPathKey('VSM-6-60-120')).toBe('VSM-60-120');
   });
 
   it('keeps the top-level segment even when the next is a prefix-extension', () => {
-    // i === 0 short-circuits the collapse branch: 8 stays because it is the top.
     expect(simplifyPathKey('8-81-810')).toBe('8-810');
   });
 
@@ -22,12 +20,10 @@ describe('simplifyPathKey', () => {
   });
 
   it('does not collapse when the next segment is equal length (not longer)', () => {
-    // next.length must be strictly > current; 81 vs 82 are equal length → kept.
     expect(simplifyPathKey('VSM-81-82')).toBe('VSM-81-82');
   });
 
   it('does not collapse when the next does not start with the current segment', () => {
-    // 81 is longer than 9 but does not start with "9" → no collapse.
     expect(simplifyPathKey('VSM-9-81')).toBe('VSM-9-81');
   });
 

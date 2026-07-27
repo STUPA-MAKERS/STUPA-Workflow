@@ -1,8 +1,10 @@
 """One-off cleanup routines for staged bank statement lines.
 
-Separate from the service (async ORM) because migrations work with a
-synchronous ``Connection`` (``op.get_bind()``). Pure, idempotent data fixes —
-called from migrations 0045/0046 (one logic, no duplicated migration script)."""
+These routines stay separate from the service, which uses the async ORM. A
+migration works with a synchronous ``Connection`` (``op.get_bind()``). The fixes
+are pure and idempotent. Migrations 0045 and 0046 call them, so the logic exists
+once and no migration script repeats it.
+"""
 
 from __future__ import annotations
 
@@ -15,13 +17,16 @@ if TYPE_CHECKING:
 
 
 def dedup_staged_lines(conn: Connection) -> int:
-    """Collapse re-imported duplicates of staged lines, comparing purely on raw data.
+    """Collapse re-imported duplicates of staged lines, comparing only raw data.
 
-    Per account + identical raw base: a matched line (or, absent one, the oldest)
-    is kept; the remaining unbooked exact duplicates are deleted. The keeper gets
-    the new raw key so the next fetch recognizes it. Matched lines are never
-    deleted; groups without duplicates stay untouched. Idempotent; returns the
-    number of deleted lines.
+    The function groups the lines per account and identical raw base. It keeps a
+    matched line, or the oldest line when the group holds no matched line. It then
+    deletes the remaining unbooked exact duplicates. The keeper gets the new raw
+    key, so the next fetch recognizes it. The function never deletes a matched
+    line. A group without duplicates stays untouched. The function is idempotent.
+
+    Returns:
+        The number of deleted lines.
     """
     from app.modules.budget.bank.dedup import raw_dedup_base, sha256_hex
 
@@ -45,7 +50,7 @@ def dedup_staged_lines(conn: Connection) -> int:
             continue
         non_matched = [g for g in grp if g.match_state != "matched"]
         if not non_matched:
-            continue  # only matched lines (no re-import) — leave untouched
+            continue  # only matched lines (no re-import): leave untouched
         matched = [g for g in grp if g.match_state == "matched"]
         keeper = matched[0] if matched else non_matched[0]
         for g in non_matched:

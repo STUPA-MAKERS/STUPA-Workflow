@@ -1,23 +1,23 @@
-"""Admin config service — gremien, application types, global flow, RBAC, webhooks.
+"""Admin config service: gremien, application types, global flow, RBAC, webhooks.
 
-Server-side authoritative: the frontend is only a UX gate. Permissions are
-enforced in the router, inputs are strictly validated (flow graph via
-``validate_flow_graph``), and every config mutation writes an audit entry in
-the same transaction as the change. The global flow is saved as a new,
-immutable version per save; running applications follow the newest version by
-state key (not pinned). Form versions are owned by the ``forms`` module.
+The server is authoritative. The frontend is only a UX gate. The router enforces
+the permissions. The service validates the inputs strictly and checks the flow
+graph with ``validate_flow_graph``. Every config mutation writes an audit entry
+in the same transaction as the change. A save of the global flow writes a new,
+immutable version. A running application is not pinned. It follows the newest
+version by state key. The ``forms`` module owns the form versions.
 
 Layout:
 
-* :mod:`.service_base`      — shared constructor, audit hook, datetime helpers.
-* :mod:`.gremien`           — gremium CRUD + protocol mail recipients.
-* :mod:`.application_types` — application-type CRUD.
-* :mod:`.flow`              — active global flow graph, immutable flow versions.
-* :mod:`.rbac`              — roles, role assignments, principals, group mappings.
-* :mod:`.webhooks`          — webhook CRUD + delivery diagnostics.
-* :mod:`.service`           — :class:`~.service.ConfigService` facade combining the ops.
+`.service_base`: the shared constructor, the audit hook and the datetime helpers.
+`.gremien`: gremium CRUD and the protocol mail recipients.
+`.application_types`: application-type CRUD.
+`.flow`: the active global flow graph and the immutable flow versions.
+`.rbac`: roles, role assignments, principals and group mappings.
+`.webhooks`: webhook CRUD and the delivery diagnostics.
+`.service`: the `ConfigService` facade that combines the ops.
 
-The facade is re-exported here so ``from app.modules.admin.service import
+This module re-exports the facade, so ``from app.modules.admin.service import
 ConfigService`` keeps working.
 """
 

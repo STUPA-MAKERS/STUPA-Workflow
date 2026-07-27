@@ -1,8 +1,9 @@
 """API schemas for the admin/config module.
 
-camelCase in JSON (populatable by name, out models via ``serialization_alias``).
-Field/flow/comparison definitions come from the ``config_schemas`` models;
-branding is ``admin.branding.Branding``.
+The JSON uses camelCase. The models also accept the field names. The out models
+carry the JSON name in ``serialization_alias``. The field, flow and comparison
+definitions come from the ``config_schemas`` models. The branding model is
+``admin.branding.Branding``.
 """
 
 from __future__ import annotations
@@ -18,7 +19,11 @@ from app.shared.permissions import PERMISSION_CATALOGUE
 
 
 def _validate_permissions(perms: list[str] | None) -> list[str] | None:
-    """Reject any key not in PERMISSION_CATALOGUE (→ 422), preserve order/dedup."""
+    """Reject a key that is not in PERMISSION_CATALOGUE, keep the order, drop duplicates.
+
+    Raises:
+        ValueError: A key is unknown. Pydantic turns this into a 422.
+    """
     if perms is None:
         return None
     catalogue = set(PERMISSION_CATALOGUE)
@@ -30,14 +35,11 @@ def _validate_permissions(perms: list[str] | None) -> list[str] | None:
 
 
 class _CamelModel(BaseModel):
-    """camelCase aliases in JSON; fields populatable by name."""
+    """Base model with camelCase JSON aliases and population by field name."""
 
     model_config = ConfigDict(populate_by_name=True)
 
 
-# --------------------------------------------------------------------------- #
-# Gremium
-# --------------------------------------------------------------------------- #
 class GremiumOut(_CamelModel):
     id: UUID
     name: str
@@ -45,7 +47,8 @@ class GremiumOut(_CamelModel):
     cd_variant: str = Field(serialization_alias="cdVariant")
     default_lang: str = Field(serialization_alias="defaultLang")
     allow_vote_delegation: bool = Field(serialization_alias="allowVoteDelegation")
-    # Lead time (minutes before meeting start) for non-pool delegations; 0 = until start.
+    # Lead time in minutes before the meeting start, for non-pool delegations.
+    # 0 = until the meeting start.
     delegation_lead_minutes: int = Field(
         default=0, serialization_alias="delegationLeadMinutes"
     )
@@ -53,7 +56,8 @@ class GremiumOut(_CamelModel):
     delegation_allow_external: bool = Field(
         default=False, serialization_alias="delegationAllowExternal"
     )
-    # Default quorum in % of eligible voters (0-100); None = none.
+    # Default quorum as a percentage of the eligible voters, from 0 to 100.
+    # A None value means no quorum.
     quorum_percent: int | None = Field(
         default=None, serialization_alias="quorumPercent"
     )
@@ -96,8 +100,10 @@ class GremiumUpdate(_CamelModel):
 class GremiumMailRecipients(_CamelModel):
     """Additional protocol recipients of a gremium.
 
-    These addresses receive finalized protocols in addition to active gremium
-    members. Light plausibility check instead of full RFC validation."""
+    These addresses receive the finalized protocols in addition to the active
+    gremium members. The validator runs a light plausibility check instead of a
+    full RFC validation.
+    """
 
     recipients: list[str] = Field(default_factory=list)
 
@@ -117,19 +123,16 @@ class GremiumMailRecipients(_CamelModel):
         return [a for a in cleaned if not (a.lower() in seen or seen.add(a.lower()))]
 
 
-# --------------------------------------------------------------------------- #
-# Gremium roles + memberships
-# --------------------------------------------------------------------------- #
 class GremiumRoleOut(_CamelModel):
     id: UUID
     gremium_id: UUID = Field(serialization_alias="gremiumId")
     key: str
     name: I18nMap
-    # Forced roles exist in every gremium and are not deletable; the frontend
-    # hides the delete action for them.
+    # Forced roles exist in every gremium and nobody can delete them. The
+    # frontend hides the delete action for them.
     forced: bool = False
-    # Granular meeting permissions of this role (session.manage/vote.manage/
-    # vote.cast/protocol.write).
+    # Granular meeting permissions of this role: session.manage, vote.manage,
+    # vote.cast and protocol.write.
     permissions: list[str] = Field(default_factory=list)
 
 
@@ -160,9 +163,6 @@ class GremiumMembershipCreate(_CamelModel):
     valid_until: str | None = Field(default=None, alias="validUntil")
 
 
-# --------------------------------------------------------------------------- #
-# Application-Type
-# --------------------------------------------------------------------------- #
 class ApplicationTypeOut(_CamelModel):
     id: UUID
     gremium_id: UUID | None = Field(serialization_alias="gremiumId")
@@ -201,9 +201,6 @@ class ApplicationTypeUpdate(_CamelModel):
     )
 
 
-# --------------------------------------------------------------------------- #
-# Flow version
-# --------------------------------------------------------------------------- #
 class FlowVersionCreate(_CamelModel):
     """Create a new flow version (graph checked via ``validate_flow_graph``)."""
 
@@ -219,9 +216,6 @@ class FlowVersionOut(_CamelModel):
     active: bool
 
 
-# --------------------------------------------------------------------------- #
-# Roles / RBAC
-# --------------------------------------------------------------------------- #
 class RoleOut(_CamelModel):
     id: UUID
     key: str
@@ -291,7 +285,7 @@ class PrincipalOut(_CamelModel):
 
 
 class PrincipalUpdate(_CamelModel):
-    """``PATCH /admin/principals/{id}`` — activate/deactivate."""
+    """Body of ``PATCH /admin/principals/{id}``: activate or deactivate a user."""
 
     active: bool
 
@@ -315,9 +309,6 @@ class GroupMappingUpdate(_CamelModel):
     gremium_id: UUID | None = Field(default=None, alias="gremiumId")
 
 
-# --------------------------------------------------------------------------- #
-# Webhooks (`webhook.manage`)
-# --------------------------------------------------------------------------- #
 class WebhookOut(_CamelModel):
     id: UUID
     name: str
@@ -327,7 +318,7 @@ class WebhookOut(_CamelModel):
 
 
 class WebhookCreate(_CamelModel):
-    """New webhook. An empty ``id`` sent by the frontend is ignored."""
+    """New webhook. The model ignores an empty ``id`` from the frontend."""
 
     name: str = Field(min_length=1)
     url: str = Field(min_length=1)
@@ -360,10 +351,11 @@ class WebhookUpdate(_CamelModel):
 class WebhookDeliveryStatusOut(_CamelModel):
     """Diagnostic view of the latest delivery state per webhook.
 
-    Deliberately exposes no resolved IP/host topology and no response body —
-    only the status class, HTTP status code (if any) and attempt count, so a
-    mistyped/internal webhook can be diagnosed without leaking network details.
-    ``last_state`` is condensed to ``pending``/``sent``/``dead``.
+    The model exposes no resolved IP or host topology and no response body. It
+    holds the status class, the HTTP status code if there is one, and the
+    attempt count. An operator can diagnose a mistyped or internal webhook
+    without a leak of network details. ``last_state`` is condensed to
+    ``pending``, ``sent`` or ``dead``.
     """
 
     webhook_id: UUID
@@ -374,9 +366,6 @@ class WebhookDeliveryStatusOut(_CamelModel):
     last_at: str | None = None
 
 
-# --------------------------------------------------------------------------- #
-# Site config / branding — draft/activate semantics
-# --------------------------------------------------------------------------- #
 class SiteConfigOut(_CamelModel):
     """Active branding config plus current draft plus change flag."""
 

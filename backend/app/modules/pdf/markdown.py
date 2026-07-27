@@ -1,17 +1,18 @@
 """Application → Markdown + YAML frontmatter.
 
-Pure, DB-free generation: ``ApplicationDoc`` carries everything the document needs
-(fields, values, timeline, optional vote result); ``build_application_markdown`` turns
-it into Markdown with frontmatter, keeping generation unit-testable and leaving the DB
-load to the worker.
+The generation is pure and needs no DB. ``ApplicationDoc`` carries everything the
+document needs: fields, values, timeline and an optional vote result.
+``build_application_markdown`` turns the document into Markdown with frontmatter. This
+split keeps the generation unit-testable and leaves the DB load to the worker.
 
-No injection: the result is passed to the pytex client as an HTTP body (never a shell
-command). Frontmatter scalars are defensively YAML-quoted so a field value containing
-``:`` / a newline / ``---`` can neither break the frontmatter nor inject a directive.
+Nothing can inject here. The caller passes the result to the pytex client as an HTTP
+body, never as a shell command. This module quotes frontmatter scalars defensively as
+YAML. A field value that holds a ``:``, a newline or ``---`` can therefore neither
+break the frontmatter nor inject a directive.
 
-Per-gremium variant: pytex offers the ``report`` / ``report-makers`` variants for
-applications; the gremium ``cd_variant`` selects one and the brand carries the
-``gremium`` frontmatter.
+Per-gremium variant: pytex offers the ``report`` and ``report-makers`` variants for
+applications. The gremium ``cd_variant`` selects one of them. The ``gremium``
+frontmatter key carries the brand.
 """
 
 from __future__ import annotations
@@ -45,7 +46,7 @@ class TimelineItem:
 
 @dataclass(slots=True)
 class VoteResult:
-    """Condensed vote result (optional; only when present)."""
+    """Condensed vote result, present only when the application has one."""
 
     title: str
     result: str
@@ -54,7 +55,7 @@ class VoteResult:
 
 @dataclass(slots=True)
 class ApplicationDoc:
-    """All data for an application PDF — populated by the service from the DB."""
+    """All data for an application PDF. The service fills it from the DB."""
 
     application_id: str
     type_name: str
@@ -75,7 +76,7 @@ class ApplicationDoc:
 
 
 def _yaml_scalar(value: str) -> str:
-    """String as a safe double-quoted YAML scalar (no directive injection)."""
+    """Quote a string as a safe double-quoted YAML scalar that cannot inject a directive."""
     out = []
     for ch in value:
         if ch == "\\":
@@ -96,7 +97,10 @@ def _yaml_scalar(value: str) -> str:
 
 
 def _format_value(value: object) -> str:
-    """Render a field value for the Markdown list (list → comma-joined; None → em dash)."""
+    """Render a field value for the Markdown list.
+
+    A list becomes a comma-joined string. An empty value and ``None`` become an em dash.
+    """
     if value is None or value == "":
         return "—"
     if isinstance(value, bool):
@@ -105,7 +109,7 @@ def _format_value(value: object) -> str:
         parts = [_format_value(v) for v in value]  # type: ignore[arg-type]
         return ", ".join(p for p in parts if p != "—") or "—"
     if isinstance(value, dict):
-        # Render nested structures compactly and flat (no Markdown break).
+        # Flat and compact, so a nested structure cannot break the Markdown list.
         return ", ".join(f"{k}: {_format_value(v)}" for k, v in value.items())  # type: ignore[arg-type]
     return str(value)
 
@@ -116,16 +120,17 @@ def _md_escape(text: str) -> str:
 
 
 def _sanitize_applicant_value(text: str) -> str:
-    """Neutralise RCE/traversal in an applicant field value before Markdown embedding.
+    """Neutralize RCE and traversal in an applicant field value before Markdown use.
 
-    Applications render ``trusted`` (the ``report`` variant needs pytex' template
-    machinery) and field values come from the public applicant input — the least
-    trusted path. ``_md_escape`` collapses newlines but does NOT neutralise the pytex
-    ``eval`` escape (``[//]: # "EXPR"``) or image-path traversal (``![a](/abs)``,
-    ``![a](../x)``). We therefore route the value through the same
+    Applications render ``trusted``, because the ``report`` variant needs the pytex
+    template machinery. Field values come from the public applicant input, which is the
+    least trusted path. ``_md_escape`` collapses newlines. It does NOT neutralize the
+    pytex ``eval`` escape (``[//]: # "EXPR"``) or image-path traversal (``![a](/abs)``,
+    ``![a](../x)``). The value therefore goes through the same
     ``sanitize_user_markdown`` that hardens the protocol body. The function-local
-    import breaks the module cycle (``protocol.markdown`` in turn imports
-    ``_md_escape``/``_yaml_scalar`` from here)."""
+    import breaks the module cycle, because ``protocol.markdown`` in turn imports
+    ``_md_escape`` and ``_yaml_scalar`` from here.
+    """
     from app.modules.protocol.markdown import sanitize_user_markdown
 
     return sanitize_user_markdown(text)
@@ -150,7 +155,7 @@ def _frontmatter(doc: ApplicationDoc) -> list[str]:
 
 
 def build_application_markdown(doc: ApplicationDoc) -> str:
-    """Application document as Markdown + frontmatter (deterministic, injection-safe)."""
+    """Build the application Markdown with frontmatter (deterministic, injection-safe)."""
     lang, default = doc.lang, doc.default_lang
     out: list[str] = []
     out.extend(_frontmatter(doc))

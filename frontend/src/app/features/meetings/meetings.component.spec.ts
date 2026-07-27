@@ -20,7 +20,7 @@ const MEETING: MeetingOutWire = {
   id: 'm-1',
   title: 'StuPa-Sitzung',
   status: 'live',
-  // Date/time are required (the settings dialog won't save otherwise) — like a real meeting.
+  // Date and time are required. Without them the settings dialog does not save.
   date: '2026-06-12',
   startTime: '17:00',
   endTime: null,
@@ -57,9 +57,9 @@ const MEETING: MeetingOutWire = {
   createdAt: '2026-06-12T17:00:00Z',
 };
 
-/** Domain form (all fields required) for places expecting `Meeting` instead of
- *  `MeetingOutWire` (e.g. `meeting.set` / `openSettings`) — else tsc complains about
- *  the optional wire fields. Content-identical to the `MEETING` fixture. */
+/** Domain form (all fields required) for places that expect `Meeting` instead of
+ *  `MeetingOutWire`, for example `meeting.set` or `openSettings`. Without it tsc
+ *  complains about the optional wire fields. Content is identical to `MEETING`. */
 const MEETING_MODEL: Meeting = {
   id: 'm-1',
   title: 'StuPa-Sitzung',
@@ -140,7 +140,7 @@ async function setup(
     gremien?: { id: string; name: string }[];
     meetings?: MeetingOutWire[];
     userId?: string | null;
-    /** Do NOT auto-answer the initial timeline requests (the test flushes itself). */
+    /** Do NOT auto-answer the initial timeline requests. The test flushes them itself. */
     skipTimelineFlush?: boolean;
   } = {},
 ) {
@@ -164,9 +164,9 @@ async function setup(
     ],
   });
   const http = view.fixture.debugElement.injector.get(HttpTestingController);
-  // Committee dropdown loads `/gremien` at start (only with meeting.manage).
+  // The Gremium dropdown loads `/gremien` at start, only with meeting.manage.
   http.match((r) => r.url.endsWith('/gremien')).forEach((req) => req.flush(opts.gremien ?? []));
-  // Overview route loads the timeline — one cursor page each past/upcoming.
+  // The overview route loads the timeline: one cursor page each for past and upcoming.
   const isPast = (m: MeetingOutWire) => m.status === 'closed';
   if (!opts.skipTimelineFlush) {
     http
@@ -190,8 +190,8 @@ function flushLoad(http: HttpTestingController): void {
   flushDelegationContext(http);
 }
 
-/** Delegation card: answer the meeting context neutrally (the feature is disabled
- *  in the test committee → the card is hidden). */
+/** Delegation card: answer the meeting context neutrally. The feature is disabled
+ *  in the test Gremium, so the card stays hidden. */
 function flushDelegationContext(http: HttpTestingController): void {
   http
     .match((r) => r.url.endsWith('/api/delegations/meetings/m-1/context'))
@@ -225,7 +225,7 @@ describe('MeetingsComponent', () => {
     expect(await screen.findByText('Sitzungssteuerung')).toBeInTheDocument();
     expect(screen.getByText('Antrag A')).toBeInTheDocument();
     expect(screen.getByText('Antrag B')).toBeInTheDocument();
-    // The delegation card loads its context only after rendering — flush again.
+    // The delegation card loads its context only after rendering, so flush again.
     flushDelegationContext(http);
     http.verify();
   });
@@ -272,21 +272,21 @@ describe('MeetingsComponent', () => {
     ]);
     http.expectOne('/api/meetings/m-1/agenda/assignable').flush([]);
 
-    // Closing is irreversible: the toolbar button opens the confirmation dialog,
-    // confirming closes the meeting (PATCH status) and finalizes implicitly.
+    // Closing is irreversible: the toolbar button opens the confirmation dialog.
+    // A confirm closes the meeting (PATCH status) and finalizes implicitly.
     await userEvent.click(await screen.findByRole('button', { name: 'Schließen' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Sitzung schließen' }));
     const closeReq = http.expectOne('/api/meetings/m-1');
     expect(closeReq.request.method).toBe('PATCH');
     expect(closeReq.request.body).toEqual({ status: 'closed' });
     closeReq.flush({ ...MEETING, status: 'closed' });
-    // First the TOP texts are assembled into the protocol markdown (PATCH) …
+    // The PATCH first assembles the TOP texts into the protocol markdown …
     const saveReq = http.expectOne('/api/protocols/p-1');
     expect(saveReq.request.method).toBe('PATCH');
-    // Top-level `#` without a "TOP n:" prefix — pytex numbers the TOPs itself.
+    // Top-level `#` without a "TOP n:" prefix, because pytex numbers the TOPs itself.
     expect(saveReq.request.body.markdown).toContain('# Begrüßung');
     saveReq.flush(PROTOCOL);
-    // … then finalized/rendered.
+    // … then the POST finalizes and renders it.
     const finReq = http.expectOne('/api/protocols/p-1/finalize');
     expect(finReq.request.method).toBe('POST');
     finReq.flush({ ...PROTOCOL, status: 'final', pdfUrl: 'https://example/p.pdf' });
@@ -316,7 +316,7 @@ describe('MeetingsComponent', () => {
   });
 
   it('offers a single generic PDF link when nothing is redacted', async () => {
-    // No non-public TOPs ⇒ only one PDF (publicPdfUrl null) — both internal & public.
+    // No non-public TOPs ⇒ only one PDF (publicPdfUrl null) for internal and public use.
     const { http } = await setup();
     http.expectOne('/api/meetings/m-1').flush(MEETING);
     http.expectOne('/api/meetings/m-1/protocol').flush({
@@ -339,7 +339,7 @@ describe('MeetingsComponent', () => {
   it('marks non-public TOPs with a NÖ badge once the meeting is closed and finalized', async () => {
     const { http, container } = await setup();
     http.expectOne('/api/meetings/m-1').flush({ ...MEETING, status: 'closed' });
-    // Finalized ⇒ editor locked ⇒ the non-public checkbox is gone; the badge takes over.
+    // Finalized ⇒ editor locked ⇒ the non-public checkbox is gone. The badge takes over.
     http.expectOne('/api/meetings/m-1/protocol').flush({ ...PROTOCOL, status: 'final' });
     http.expectOne('/api/meetings/m-1/attendance').flush([]);
     http.expectOne('/api/meetings/m-1/agenda').flush([
@@ -389,7 +389,7 @@ describe('MeetingsComponent', () => {
 
   it('retries a failed finalize via the toolbar repeat button', async () => {
     const { http } = await setup();
-    // Meeting already closed, protocol back to draft ⇒ render failed.
+    // The meeting is closed and the protocol is back to draft ⇒ the render failed.
     http.expectOne('/api/meetings/m-1').flush({ ...MEETING, status: 'closed' });
     http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
     http.expectOne('/api/meetings/m-1/attendance').flush([]);
@@ -399,7 +399,7 @@ describe('MeetingsComponent', () => {
     await userEvent.click(
       await screen.findByRole('button', { name: 'Finalisieren & versenden' }),
     );
-    // finalize() first saves the assembled markdown, then POST /finalize.
+    // The finalize action first saves the assembled markdown, then posts to /finalize.
     http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
     const finReq = http.expectOne('/api/protocols/p-1/finalize');
     expect(finReq.request.method).toBe('POST');
@@ -437,21 +437,20 @@ describe('MeetingsComponent', () => {
       id: null,
       gremien: [{ id: 'g-1', name: 'StuPa' }],
     });
-    // Create via a 2-step dialog: open it.
     await userEvent.click(screen.getByRole('button', { name: 'Neue Sitzung' }));
-    // Step 1: choose committee (loads the minute-taker roster) + required date.
-    // Search within the dialog: the required label carries a "*", and the overview's
-    // search bar also mentions "Gremium" — both make a global search ambiguous.
+    // Step 1: choose the Gremium (loads the minute-taker roster) and the required date.
+    // Search inside the dialog: the required label carries a "*", and the overview
+    // search bar also mentions "Gremium". A global search is ambiguous.
     const dialog = await screen.findByRole('dialog');
     await userEvent.selectOptions(within(dialog).getByLabelText(/Gremium/), 'g-1');
     http.expectOne((r) => r.url.endsWith('/gremien/g-1/meeting-members')).flush([]);
-    // Set date/time via the signals — the datepicker/time input parse free text,
-    // which is hard to type stably via userEvent.
+    // Set date and time through the signals. The datepicker and the time input
+    // parse free text, which userEvent cannot type in a stable way.
     fixture.componentInstance.newDate.set('2026-07-01');
     fixture.componentInstance.newTime.set('17:00');
     fixture.detectChanges();
     await userEvent.click(screen.getByRole('button', { name: 'Weiter' }));
-    // Step 2: override the title (otherwise prefilled from committee + date).
+    // Step 2: override the title. It is otherwise prefilled from Gremium and date.
     const input = await screen.findByLabelText('Titel');
     await userEvent.clear(input);
     await userEvent.type(input, 'Neue Sitzung');
@@ -477,7 +476,7 @@ describe('MeetingsComponent', () => {
       meetings: [{ ...MEETING, title: 'Vergangene Sitzung', status: 'closed' }],
     });
     expect(await screen.findByText('Vergangene Sitzung')).toBeInTheDocument();
-    // The timeline card itself is the open affordance (role=button with an "open" aria-label).
+    // The timeline card itself opens the meeting: role=button with an "open" aria-label.
     await userEvent.click(screen.getByRole('button', { name: /Öffnen/ }));
     expect(navigate).toHaveBeenCalledWith(['/meetings', 'm-1']);
   });
@@ -504,7 +503,7 @@ describe('MeetingsComponent', () => {
   });
 
   it('offers no on-demand protocol button — the protocol is created on start', async () => {
-    // The protocol is created only at meeting start; a manual "create protocol"
+    // The protocol is created only at meeting start. A manual "create protocol"
     // button no longer exists.
     const { http } = await setup();
     http.expectOne('/api/meetings/m-1').flush({ ...MEETING, protocolId: null });
@@ -526,8 +525,8 @@ describe('MeetingsComponent', () => {
     http.expectOne('/api/meetings/m-1/attendance').flush([
       { principalId: 'pr-1', displayName: 'Max P', email: 'm@x.de', status: null, source: null, isSelf: false },
     ]);
-    // Exact label: the start button now carries an aria-label "Protokollant zuweisen …",
-    // which would otherwise make a /Protokollant/ regex ambiguous.
+    // Match the exact label. The start button carries an aria-label
+    // "Protokollant zuweisen …", which makes a /Protokollant/ regex ambiguous.
     const select = await screen.findByLabelText('Protokollant');
     await screen.findByRole('option', { name: 'Max P' });
     await userEvent.selectOptions(select, 'pr-1');
@@ -541,8 +540,8 @@ describe('MeetingsComponent', () => {
   });
 
   it('gives non-protokollants the live read/vote view once a protokollant is assigned', async () => {
-    // Meeting with an assigned minute-taker (someone else) — the logged-in user
-    // is NOT the minute-taker ⇒ live/voting view, not the manager view.
+    // The meeting has an assigned minute-taker, and it is someone else. The
+    // logged-in user is NOT the minute-taker ⇒ live/voting view, not the manager view.
     const assigned: MeetingOutWire = {
       ...MEETING,
       canControl: false,
@@ -563,11 +562,9 @@ describe('MeetingsComponent', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Instance-driven tests: call the public methods directly and check signals +
-// HTTP. Reaches the branches the DOM alone does not trigger (error paths,
-// search debounce, drag & drop, WS messages, helpers).
-// ---------------------------------------------------------------------------
+// Instance-driven tests: call the public methods directly and check signals and
+// HTTP. They reach the branches that the DOM alone does not trigger: error paths,
+// search debounce, drag and drop, WS messages and helpers.
 type Cmp = MeetingsComponent;
 
 const AGENDA_ITEM = (over: Record<string, unknown> = {}) => ({
@@ -701,7 +698,7 @@ describe('MeetingsComponent — methods', () => {
     it('groups votes by TOP and collects loose votes', async () => {
       const { cmp } = await loaded();
       expect(cmp.votesForTop('app-1')).toEqual([]); // votesForTop matches agendaItemId
-      // MEETING votes have no agendaItemId → all "loose".
+      // The MEETING votes have no agendaItemId, so all of them are "loose".
       expect(cmp.looseVotes().length).toBe(2);
       // Bind a vote to a TOP → votesForTop matches, looseVotes shrinks.
       cmp.meeting.set({
@@ -717,7 +714,7 @@ describe('MeetingsComponent — methods', () => {
 
     it('selects the beamer vote: open first, else last closed, else null', async () => {
       const { cmp } = await loaded();
-      // MEETING has one open vote (v-1).
+      // The MEETING fixture has one open vote (v-1).
       expect(cmp.beamerVote()?.id).toBe('v-1');
       // No open votes → last closed one.
       cmp.meeting.set({
@@ -781,7 +778,7 @@ describe('MeetingsComponent — methods', () => {
         const { cmp, http } = await loaded();
         cmp.onTopBodyChange('t-1', 'Neuer Text');
         expect(cmp.saveState()).toBe('idle');
-        // Called again before it fires → reset the timer (covers the clearTimeout branch).
+        // A second call before it fires resets the timer (covers the clearTimeout branch).
         cmp.onTopBodyChange('t-1', 'Neuer Text 2');
         jest.advanceTimersByTime(1000);
         expect(cmp.saveState()).toBe('saving');
@@ -1174,7 +1171,7 @@ describe('MeetingsComponent — methods', () => {
       const closeReq = http.expectOne('/api/meetings/m-1');
       expect(closeReq.request.body).toEqual({ status: 'closed' });
       closeReq.flush({ ...MEETING, status: 'closed' });
-      // protocol (draft, not isLocked) → finalize: first markdown PATCH …
+      // The protocol is a draft and not locked, so finalize runs the markdown PATCH …
       http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
       http.expectOne('/api/protocols/p-1/finalize').flush({ ...PROTOCOL, status: 'final' });
     });
@@ -1245,11 +1242,11 @@ describe('MeetingsComponent — methods', () => {
 
     it('decides whether a TOP may get another vote', async () => {
       const { cmp } = await loaded();
-      // Free-text TOP: always allowed.
+      // A free-text TOP always allows another vote.
       expect(cmp.canAddVote(AGENDA_ITEM({ applicationId: null }) as never)).toBe(true);
-      // Application TOP without a vote (votesForTop matches agendaItemId) → allowed.
+      // An application TOP without a vote (votesForTop matches agendaItemId) allows one.
       expect(cmp.canAddVote(AGENDA_ITEM({ id: 't-x', applicationId: 'app-1' }) as never)).toBe(true);
-      // Application TOP with a bound vote → locked.
+      // An application TOP with a bound vote is locked.
       cmp.meeting.set({
         ...cmp.meeting()!,
         votes: [{ ...cmp.meeting()!.votes[0], agendaItemId: 't-x' }],
@@ -1389,7 +1386,7 @@ describe('MeetingsComponent — methods', () => {
       expect(saveReq.request.body.markdown).toContain(':::antrag{#app-1}');
       expect(saveReq.request.body.markdown).toContain('Tagesordnungspunkt'); // empty title fallback
       saveReq.flush(PROTOCOL);
-      // Async path: finalize returns rendering → poll loop.
+      // Async path: finalize returns rendering, so the poll loop starts.
       jest.useFakeTimers();
       try {
         http.expectOne('/api/protocols/p-1/finalize').flush({ ...PROTOCOL, status: 'rendering', isFinal: false, isLocked: true });
@@ -1712,8 +1709,8 @@ describe('MeetingsComponent — methods', () => {
         meetings: [],
       });
       const cmp = fixture.componentInstance as Cmp;
-      // Standard auth: gremien=[] → no overview; simulating via a signal override
-      // would be costly. Here we check the computed logic via the flags.
+      // Standard auth has gremien=[], so there is no overview. A signal override
+      // would be costly. This test checks the computed logic through the flags.
       expect(cmp.showForbidden()).toBe(true);
       expect(cmp.showOverview()).toBe(false);
     });
@@ -1755,7 +1752,7 @@ describe('MeetingsComponent — methods', () => {
     it('loads more upcoming + past pages on scroll near the edges', async () => {
       const { fixture, http } = await setup({ id: null, skipTimelineFlush: true });
       const cmp = fixture.componentInstance as Cmp;
-      // initial timeline with nextCursor → hasMore true.
+      // The initial timeline carries a nextCursor, so hasMore is true.
       const reqs = http.match((r) => r.url.endsWith('/meetings/timeline'));
       reqs.forEach((req) => {
         const past = req.request.params.get('direction') === 'past';
@@ -1764,7 +1761,8 @@ describe('MeetingsComponent — methods', () => {
       fixture.detectChanges();
       expect(cmp.upcomingHasMore()).toBe(true);
       expect(cmp.pastHasMore()).toBe(true);
-      // Bottom edge (scrollTop high → no past trigger; bottom reached → upcoming).
+      // Bottom edge: a high scrollTop blocks the past trigger. The bottom loads
+      // the upcoming page.
       const el = { scrollTop: 200, scrollHeight: 1000, clientHeight: 800 } as HTMLElement;
       cmp.onTimelineScroll(el);
       const upReq = http.expectOne((r) => r.url.endsWith('/meetings/timeline') && r.params.get('direction') === 'upcoming');
@@ -1781,7 +1779,7 @@ describe('MeetingsComponent — methods', () => {
         req.flush({ items: past ? [{ ...MEETING, id: 'p1', status: 'closed' }] : [], nextCursor: past ? 'c1' : null });
       });
       fixture.detectChanges();
-      // Mutable fake element: after appending, its height grows and the rAF callback
+      // Mutable fake element: the height grows after the append. The rAF callback
       // then corrects scrollTop by the height difference.
       const el = { scrollTop: 0, scrollHeight: 1000, clientHeight: 5000 } as unknown as HTMLElement;
       cmp.onTimelineScroll(el); // scrollTop<=80 → loadMorePast
@@ -1829,8 +1827,8 @@ describe('MeetingsComponent — methods', () => {
     it('handles a timeline load error by clearing the lists', async () => {
       const { fixture, http } = await setup({ id: null, skipTimelineFlush: true });
       const cmp = fixture.componentInstance as Cmp;
-      // forkJoin aborts as soon as ONE branch fails — the first is enough; the
-      // other is discarded (cancelled), so it must not be flushed additionally.
+      // The forkJoin aborts as soon as ONE branch fails, so the first branch is
+      // enough. The other branch is cancelled and must not be flushed too.
       const reqs = http.match((r) => r.url.endsWith('/meetings/timeline'));
       reqs[0].flush(null, { status: 500, statusText: 'e' });
       fixture.detectChanges();
@@ -1853,7 +1851,7 @@ describe('MeetingsComponent — methods', () => {
         req.flush({ items: [{ ...MEETING, id: 's1' }], nextCursor: 'c1' });
         expect(cmp.searchItems().length).toBe(1);
         expect(cmp.searchHasMore()).toBe(true);
-        // loadMoreSearch (offset cursor) appends: scrollHeight-scrollTop-clientHeight <= 80.
+        // The offset cursor appends more hits when the remaining scroll gap is 80 or less.
         const el = { scrollTop: 0, scrollHeight: 1000, clientHeight: 950 } as HTMLElement;
         cmp.onTimelineScroll(el);
         const more = http.expectOne((r) => r.url.endsWith('/meetings/timeline') && r.params.get('cursor') === 'c1');
@@ -1958,13 +1956,11 @@ describe('MeetingsComponent — methods', () => {
   describe('protocol rendering lifecycle', () => {
     it('toasts a failure when a rendering protocol rolls back to draft', async () => {
       const { cmp, ws, http } = await loaded();
-      // Bring the protocol into the "rendering" state.
       cmp.protocol.set({ ...PROTOCOL, status: 'rendering', isFinal: false, isLocked: true });
       // meeting_state with a non-final protocol → GET /protocol → applyProtocolUpdate.
       ws.subject.next({ type: 'meeting_state', activeApplicationId: null, status: 'live' });
       http.expectOne('/api/meetings/m-1/agenda').flush([]);
       http.expectOne('/api/meetings/m-1/agenda/assignable').flush([]);
-      // Roll back rendering → draft.
       http.expectOne('/api/meetings/m-1/protocol').flush({ ...PROTOCOL, status: 'draft', isFinal: false, isLocked: false });
       expect(cmp.protocol()?.status).toBe('draft');
     });
@@ -1976,7 +1972,7 @@ describe('MeetingsComponent — methods', () => {
         cmp.finalize();
         http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
         http.expectOne('/api/protocols/p-1/finalize').flush({ ...PROTOCOL, status: 'rendering', isFinal: false, isLocked: true });
-        // First poll after 4s fails → reschedule watchRendering(proto).
+        // The first poll after 4s fails, so watchRendering is rescheduled.
         jest.advanceTimersByTime(4000);
         http.expectOne('/api/meetings/m-1/protocol').flush(null, { status: 500, statusText: 'e' });
         // Second poll attempt after another 4s.
@@ -2005,7 +2001,7 @@ describe('MeetingsComponent — methods', () => {
         ],
       });
       const http = view.fixture.debugElement.injector.get(HttpTestingController);
-      // filterGremien request fails → empty list.
+      // The filterGremien request fails, so the list stays empty.
       http.expectOne('/api/meetings/gremien').flush(null, { status: 500, statusText: 'e' });
       const cmp = view.fixture.componentInstance as Cmp;
       expect(cmp.filterGremien()).toEqual([]);
@@ -2035,12 +2031,14 @@ describe('MeetingsComponent — methods', () => {
       });
       const http = view.fixture.debugElement.injector.get(HttpTestingController);
       http.expectOne('/api/meetings/gremien').flush([]);
-      // canCreate (sessionManageGremien>0) → gremiumOptions is loaded + filtered.
+      // sessionManageGremien is not empty, so canCreate holds and gremiumOptions
+      // loads and filters.
       http.expectOne('/api/gremien').flush([
         { id: 'g-1', name: 'A' },
         { id: 'g-2', name: 'B' },
       ]);
-      // loadList fires (protocol.write → canWriteGlobal) → answer the timeline requests.
+      // protocol.write grants canWriteGlobal, so loadList fires. Answer the timeline
+      // requests.
       http.match((r) => r.url.endsWith('/meetings/timeline')).forEach((req) =>
         req.flush({ items: [], nextCursor: null }),
       );
@@ -2147,14 +2145,12 @@ describe('MeetingsComponent — methods', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Remaining branches (branch coverage): fallbacks, guards, empty maps,
-  // missing meeting instance, stale search, timeline height, mock mode.
-  // -------------------------------------------------------------------------
+  // Remaining branches for branch coverage: fallbacks, guards, empty maps, a
+  // missing meeting instance, stale search, timeline height and mock mode.
   describe('branch coverage', () => {
     it('falls back to an empty string for an empty state-label map', async () => {
       const { cmp } = await loaded();
-      // map present but empty → map[locale]/map.de/Object.values()[0] all empty ⇒ ''.
+      // The map is present but empty, so locale, de and the first value are all empty.
       expect(cmp.stateLabelOf({})).toBe('');
     });
 
@@ -2189,10 +2185,10 @@ describe('MeetingsComponent — methods', () => {
         cmp.onSearch('second');
         jest.advanceTimersByTime(400);
         const secondReq = http.expectOne((r) => r.url.endsWith('/meetings/timeline') && r.params.get('q') === 'second');
-        // Late response of the FIRST query → seq no longer matches → discarded (next branch).
+        // The FIRST query answers late. The seq no longer matches, so the next branch drops it.
         firstReq.flush({ items: [{ ...MEETING, id: 'stale' }], nextCursor: null });
         expect(cmp.searchItems().some((m) => m.id === 'stale')).toBe(false);
-        // Late ERROR of the second … after a third query ran → error branch discarded.
+        // The second query errors late, after a third query ran. The error branch drops it.
         cmp.onSearch('third');
         jest.advanceTimersByTime(400);
         const thirdReq = http.expectOne((r) => r.url.endsWith('/meetings/timeline') && r.params.get('q') === 'third');
@@ -2229,7 +2225,7 @@ describe('MeetingsComponent — methods', () => {
         });
       });
       fixture.detectChanges();
-      // Open + save settings for u1 → replaceInTimeline replaces u1, keeps p1.
+      // Open and save the settings for u1: replaceInTimeline replaces u1 and keeps p1.
       cmp.openSettings({ ...MEETING_MODEL, id: 'u1', status: 'planned', title: 'Alt' });
       http.expectOne('/api/meetings/u1/attendance').flush([]);
       cmp.settingsDate.set('2026-07-01');
@@ -2246,7 +2242,7 @@ describe('MeetingsComponent — methods', () => {
       const cmp = fixture.componentInstance as Cmp;
       cmp.onCreateGremiumChange('g-1');
       http.expectOne('/api/gremien/g-1/meeting-members').flush([]);
-      // Invalid date → longDate returns the raw string (NaN branch).
+      // For an invalid date longDate returns the raw string (NaN branch).
       cmp.newDate.set('not-a-date');
       cmp.newTime.set('17:00');
       cmp.goToCreateStep2();
@@ -2261,7 +2257,7 @@ describe('MeetingsComponent — methods', () => {
       try {
         cmp.onCreateGremiumChange('g-1');
         http.expectOne('/api/gremien/g-1/meeting-members').flush([]);
-        // Valid date + locale=en → Intl with 'en-US' (longDate en branch).
+        // A valid date and locale=en select Intl with 'en-US' (longDate en branch).
         cmp.newDate.set('2026-07-01');
         cmp.newTime.set('17:00');
         cmp.goToCreateStep2();
@@ -2276,7 +2272,7 @@ describe('MeetingsComponent — methods', () => {
       const { fixture, http } = await setup({ id: null });
       const cmp = fixture.componentInstance as Cmp;
       http.match((r) => r.url.endsWith('/meetings/timeline')).forEach((req) => req.flush({ items: [], nextCursor: null }));
-      // A gremium id NOT present in gremiumOptions → find() → undefined → '' (?? '').
+      // A Gremium id that gremiumOptions does not hold resolves to undefined, then ''.
       cmp.newGremiumId.set('g-unknown');
       cmp.newDate.set('2026-07-01');
       cmp.newTime.set('17:00');
@@ -2332,7 +2328,8 @@ describe('MeetingsComponent — methods', () => {
       const { fixture } = await setup({ id: null });
       const cmp = fixture.componentInstance as Cmp;
       expect(cmp.meeting()).toBeNull();
-      // refreshProtocol is private — call directly: if (!m) return (no request).
+      // refreshProtocol is private, so call it directly. The `if (!m) return` guard
+      // stops any request.
       const http = fixture.debugElement.injector.get(HttpTestingController);
       (cmp as unknown as { refreshProtocol(): void }).refreshProtocol();
       http.verify();
@@ -2352,7 +2349,7 @@ describe('MeetingsComponent — methods', () => {
         ],
       });
       const http = view.fixture.debugElement.injector.get(HttpTestingController);
-      // Mock mode: connectLive() returns early (useMock) — no WS channel.
+      // Mock mode: connectLive returns early because useMock is set. No WS channel opens.
       http.expectOne('/api/meetings/m-1').flush(MEETING);
       http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
       http.expectOne('/api/meetings/m-1/attendance').flush([]);
@@ -2366,13 +2363,14 @@ describe('MeetingsComponent — methods', () => {
       jest.useFakeTimers();
       try {
         const { cmp, ws, http } = await loaded();
-        // Finalize → rendering → watchRendering schedules a poll timer (renderPollTimer).
+        // Finalize turns the protocol to rendering, so watchRendering schedules
+        // the renderPollTimer.
         cmp.finalize();
         http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
         http.expectOne('/api/protocols/p-1/finalize').flush({ ...PROTOCOL, status: 'rendering', isFinal: false, isLocked: true });
-        // Before the 4s poll fires, a meeting_state broadcast arrives → getProtocol →
+        // A meeting_state broadcast arrives before the 4s poll fires → getProtocol →
         // applyProtocolUpdate → watchRendering AGAIN while the old timer still runs
-        // → clearTimeout(renderPollTimer) branch.
+        // → the clearTimeout branch for renderPollTimer.
         ws.subject.next({ type: 'meeting_state', activeApplicationId: null, status: 'live' });
         http.expectOne('/api/meetings/m-1/agenda').flush([]);
         http.expectOne('/api/meetings/m-1/agenda/assignable').flush([]);
@@ -2393,7 +2391,7 @@ describe('MeetingsComponent — methods', () => {
         cmp.finalize();
         http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
         http.expectOne('/api/protocols/p-1/finalize').flush({ ...PROTOCOL, status: 'rendering', isFinal: false, isLocked: true });
-        // Meeting gone before the poll timer fires → if (!m) return in the poll callback.
+        // The meeting is gone before the poll timer fires, so the poll callback returns.
         cmp.meeting.set(null);
         jest.advanceTimersByTime(4000);
         http.verify(); // no GET /protocol
@@ -2411,8 +2409,9 @@ describe('MeetingsComponent — methods', () => {
 
     it('cancels a rename when the item turns out to be application-bound', async () => {
       const { cmp, http } = await loaded();
-      // Set renamingTopId manually to the app TOP id (startRename would reject it),
-      // then renameTop → item.applicationId branch of the OR chain → cancel, no request.
+      // Set renamingTopId manually to the app TOP id, because startRename rejects it.
+      // renameTop then takes the item.applicationId branch of the OR chain. It cancels
+      // and sends no request.
       cmp.renamingTopId.set('t-app');
       cmp.renameDraft.set('Neu');
       cmp.renameTop(AGENDA_ITEM({ id: 't-app', applicationId: 'app-1', title: 'X' }) as never);
@@ -2422,8 +2421,8 @@ describe('MeetingsComponent — methods', () => {
 
     it('saves a renamed freetext TOP whose previous title was null (?? fallback)', async () => {
       const { cmp, http } = await loaded();
-      // item.title === null → the OR chain reaches `title === (item.title ?? '')`,
-      // evaluates `item.title ?? ''` via the null branch → '' ≠ 'Neu' → save.
+      // With item.title === null the OR chain reaches `title === (item.title ?? '')`.
+      // It evaluates `item.title ?? ''` on the null branch → '' ≠ 'Neu' → save.
       cmp.startRename(AGENDA_ITEM({ id: 't-1', applicationId: null, title: null }) as never);
       cmp.renameDraft.set('Neu');
       cmp.renameTop(AGENDA_ITEM({ id: 't-1', applicationId: null, title: null }) as never);
@@ -2436,16 +2435,17 @@ describe('MeetingsComponent — methods', () => {
     it('prefills the application vote dialog with an empty name when the title is null', async () => {
       const { cmp } = await loaded();
       cmp.openVoteDialog(AGENDA_ITEM({ applicationId: 'app-1', title: null }) as never);
-      // questionPrefill with name='' (item.title ?? '') → the suggestion contains no title.
+      // questionPrefill runs with name='' (item.title ?? ''), so the suggestion has no title.
       expect(cmp.voteQuestion().length).toBeGreaterThanOrEqual(0);
       expect(cmp.voteDialogOpen()).toBe(true);
     });
 
     it('adds a live-opened vote with all optional fields defaulted', async () => {
       const { cmp, ws, fixture } = await loaded();
-      // vote_opened WITHOUT applicationId/agendaItemId/question/options → ?? null / ?? [] kick in.
-      // Deliberately minimal (wire) message: the optional fields are absent at runtime, hence
-      // the `as unknown as ServerMessage` cast (else VoteOpenedMsg requires `options`).
+      // vote_opened WITHOUT applicationId, agendaItemId, question or options starts
+      // the `?? null` and `?? []` fallbacks. The wire message stays minimal on purpose,
+      // because the optional fields are absent at runtime. That is why the test casts
+      // with `as unknown as ServerMessage`. VoteOpenedMsg otherwise requires `options`.
       ws.subject.next({ type: 'vote_opened', voteId: 'v-min', closesAt: null } as unknown as ServerMessage);
       fixture.detectChanges();
       const v = cmp.meeting()?.votes.find((x) => x.id === 'v-min');
@@ -2457,7 +2457,7 @@ describe('MeetingsComponent — methods', () => {
     });
 
     it('returns early from measureTimeline when there is no timeline element', async () => {
-      // Detail mode renders NO timeline → viewChild(tlScroll) is undefined.
+      // Detail mode renders NO timeline, so the tlScroll viewChild is undefined.
       const { cmp } = await loaded();
       const measure = (cmp as unknown as { measureTimeline(): void }).measureTimeline.bind(cmp);
       expect(() => measure()).not.toThrow(); // if (!el) return
@@ -2471,11 +2471,13 @@ describe('MeetingsComponent — methods', () => {
       const el = fixture.nativeElement.querySelector('.mtg__timeline') as HTMLElement;
       expect(el).toBeTruthy();
       const measure = (cmp as unknown as { measureTimeline(): void }).measureTimeline.bind(cmp);
-      // 1) Without .footer / .main in the DOM → footerH=0 (footer ternary false), mainPadBottom=0.
+      // 1) Without .footer or .main in the DOM: footerH=0 (footer ternary false)
+      //    and mainPadBottom=0.
       measure();
       expect(el.style.height).toMatch(/px$/);
-      // 2) With .footer (querySelector matches) + a .main ancestor WITHOUT padding-bottom →
-      //    getComputedStyle returns '' → Number.parseFloat → NaN → `|| 0` kicks in.
+      // 2) With .footer (querySelector matches) and a .main ancestor WITHOUT
+      //    padding-bottom: getComputedStyle returns '', Number.parseFloat gives NaN
+      //    and `|| 0` takes over.
       const footer = document.createElement('div');
       footer.className = 'footer';
       Object.defineProperty(footer, 'offsetHeight', { value: 40, configurable: true });
@@ -2487,13 +2489,15 @@ describe('MeetingsComponent — methods', () => {
       expect(el.closest('.main')).toBe(mainNoPad); // closest matches the .main ancestor
       measure();
       expect(el.style.height).toMatch(/px$/);
-      // 3) .main WITH parseable padding-bottom → parseFloat returns the number (ternary consequent).
+      // 3) .main WITH a parseable padding-bottom: parseFloat returns the number
+      //    (ternary consequent).
       const mainPadded = document.createElement('main');
       mainPadded.className = 'main';
       mainPadded.style.paddingBottom = '24px';
       mainNoPad.parentElement?.insertBefore(mainPadded, mainNoPad);
-      mainPadded.appendChild(mainNoPad); // el stays nested; closest still matches mainNoPad
-      // closest() returns the NEAREST .main (mainNoPad) — so attach el directly into mainPadded.
+      mainPadded.appendChild(mainNoPad); // el stays nested, closest still matches mainNoPad
+      // The closest call returns the NEAREST .main, which is mainNoPad. Attach el
+      // directly into mainPadded.
       mainPadded.appendChild(el);
       expect(el.closest('.main')).toBe(mainPadded);
       measure();
@@ -2506,7 +2510,7 @@ describe('MeetingsComponent — methods', () => {
     it('defaults plan date/time to empty strings for a meeting without a date (?? fallback)', async () => {
       const { http, fixture } = await setup();
       const cmp = fixture.componentInstance as Cmp;
-      // adoptMeeting: m.date / m.startTime null → planDate/planTime fall back to ''.
+      // In adoptMeeting a null m.date or m.startTime makes planDate and planTime ''.
       http.expectOne('/api/meetings/m-1').flush({ ...MEETING, date: null, startTime: null });
       http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
       http.expectOne('/api/meetings/m-1/attendance').flush([]);
@@ -2518,10 +2522,10 @@ describe('MeetingsComponent — methods', () => {
     });
 
     it('bails out of the now-marker scroll when the timeline disappears first', async () => {
-      // Overview with meetings → nowMarker + tlScroll render, the effect schedules
-      // the double rAF. BEFORE the rAF fires, we load a meeting → the
-      // `@if (!meeting())` block (incl. the timeline) disappears → viewChild() = undefined
-      // → the inner rAF callback hits `if (!m || !s) return`.
+      // The overview with meetings renders nowMarker and tlScroll, and the effect
+      // schedules the double rAF. The test loads a meeting BEFORE the rAF fires, so
+      // the `@if (!meeting())` block and the timeline disappear. The viewChild turns
+      // undefined and the inner rAF callback hits `if (!m || !s) return`.
       const { fixture, http } = await setup({ id: null, skipTimelineFlush: true });
       const cmp = fixture.componentInstance as Cmp;
       http.match((r) => r.url.endsWith('/meetings/timeline')).forEach((req) => {
@@ -2532,7 +2536,7 @@ describe('MeetingsComponent — methods', () => {
         });
       });
       fixture.detectChanges(); // the effect schedules the outer rAF
-      // "Load" a meeting → remove the timeline from the DOM before the rAFs fire.
+      // "Load" a meeting to remove the timeline from the DOM before the rAFs fire.
       cmp.meeting.set(MEETING_MODEL);
       fixture.detectChanges();
       await new Promise<void>((resolve) =>
@@ -2542,9 +2546,9 @@ describe('MeetingsComponent — methods', () => {
     });
 
     it('positions the timeline at the now-marker once it is rendered', async () => {
-      // Overview with meetings in both directions → nowMarker + tlScroll render.
-      // The effect scrolls once (double rAF). We await both frames so the inner
-      // rAF callback (incl. the defensive !m||!s branches) runs.
+      // The overview with meetings in both directions renders nowMarker and tlScroll.
+      // The effect scrolls once through a double rAF. The test awaits both frames so
+      // the inner rAF callback runs, including the defensive `!m || !s` branches.
       const { fixture, http } = await setup({ id: null, skipTimelineFlush: true });
       const cmp = fixture.componentInstance as Cmp;
       http.match((r) => r.url.endsWith('/meetings/timeline')).forEach((req) => {
@@ -2563,8 +2567,8 @@ describe('MeetingsComponent — methods', () => {
 
     it('does nothing in patchVote once the meeting has been cleared', async () => {
       const { cmp, http } = await loaded();
-      // openVote triggers patchVote on success — if the meeting is null in the
-      // meantime, the early guard (if (!m) return) applies and no state changes.
+      // openVote triggers patchVote on success. If the meeting is null by then,
+      // the early `if (!m) return` guard applies and no state changes.
       cmp.openVote('v-2');
       cmp.meeting.set(null);
       http.expectOne('/api/votes/v-2/open').flush(null, { status: 204, statusText: 'No Content' });

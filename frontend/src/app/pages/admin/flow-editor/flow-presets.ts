@@ -1,7 +1,7 @@
 /**
- * Flow presets. Each preset is a valid `FlowGraph` (exactly one initial, reachable)
- * and serves as a starting point. Only normal + vote states; a vote state has
- * pass/fail branches.
+ * Flow presets. Each preset is a valid `FlowGraph` with exactly one initial state and
+ * no unreachable state. A preset is a starting point. Presets use normal and vote
+ * states only. A vote state has a pass branch and a fail branch.
  */
 import type { FlowGraph } from '../admin.models';
 import type { TranslationKey } from '@core/i18n/translations';

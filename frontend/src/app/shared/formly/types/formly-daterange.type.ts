@@ -8,9 +8,10 @@ interface DateRange {
 }
 
 /**
- * Formly field type `daterange` — a {from, to} range built from two date inputs
- * (form definition `daterange`). The stored value is an object; the backend checks
- * `from <= to`. An empty shell ⇒ `null`, so `required` applies.
+ * Formly field type `daterange` that builds a {from, to} range from two date inputs.
+ *
+ * The form definition calls this field `daterange`. The stored value is an object. The
+ * backend checks `from <= to`. An empty shell becomes `null`, so `required` applies.
  */
 @Component({
   selector: 'app-formly-daterange',

@@ -35,14 +35,14 @@ interface NavItem {
   labelKey: Parameters<TranslatePipe['transform']>[0];
   /** Visible when the principal has at least one of these permissions (empty = any session). */
   permissions: string[];
-  /** Also visible to members of any committee (e.g. meetings). */
+  /** Also visible to a member of any Gremium, for example the meetings entry. */
   inAnyCommittee?: boolean;
   /** Also visible with a scoped budget view. */
   scopedBudgetView?: boolean;
   /**
-   * Exact active match: needed when the path is a prefix of another nav entry
-   * (e.g. `/budget` before `/budget/pots`) — otherwise the child route marks both
-   * parent and child active at once.
+   * Match the active route exactly. This is needed when the path is a prefix of
+   * another nav entry, for example `/budget` before `/budget/pots`. Without it a
+   * child route marks the parent and the child active at the same time.
    */
   exact?: boolean;
 }
@@ -76,24 +76,24 @@ export class ShellComponent {
   private readonly location = inject(LOCATION);
   private readonly route = inject(ActivatedRoute);
 
-  /** Full-width content (route data `wide`) — e.g. the budget tab with two sidebars. */
+  /** Full-width content from route data `wide`, for example the budget tab with two sidebars. */
   readonly wide = signal(false);
 
   /** Maintained footer content: legal links + copyright from the active site config. */
   private readonly legalLinks = signal<FooterLink[]>([]);
   private readonly copyright = signal<Record<string, string> | null>(null);
 
-  /** Legal links for the active locale; empty ⇒ default footer (imprint/privacy). */
+  /** Legal links for the active locale. Empty means the default footer (imprint/privacy). */
   readonly footerLinks = computed(() =>
     this.legalLinks().map((l) => ({ url: l.url, label: resolveI18n(l.label, this.i18n.locale()) })),
   );
 
-  /** Maintained copyright line for the active locale (empty ⇒ default co-branding text). */
+  /** Copyright line for the active locale. Empty means the default co-branding text. */
   readonly footerCopyright = computed(() => resolveI18n(this.copyright(), this.i18n.locale()));
 
   /**
-   * Theme-dependent wordmark: black type on light, white on dark (official CD
-   * variants). The multicolour mark stays legible in both modes.
+   * Theme-dependent wordmark: black type on light, white type on dark. Both are
+   * official CD variants. The multicolor mark stays legible in both modes.
    */
   readonly logoSrc = computed(() => `assets/logos/stupa-wordmark-${this.theme.resolved()}.svg`);
 
@@ -101,8 +101,8 @@ export class ShellComponent {
   readonly brandTarget = computed(() => (this.auth.isAuthenticated() ? '/dashboard' : '/'));
 
   constructor() {
-    // Load the active site config so the footer shows maintained legal links +
-    // copyright. Failure/empty ⇒ default footer (imprint/privacy).
+    // Load the active site config so the footer can show the maintained legal links
+    // and copyright. On failure or empty data the default footer applies.
     this.admin.getSiteConfig().subscribe({
       next: (cfg) => {
         this.legalLinks.set(cfg.active.legalLinks ?? []);
@@ -113,7 +113,7 @@ export class ShellComponent {
       },
     });
 
-    // Full width per route data (deepest active route wins).
+    // Full width comes from the route data. The deepest active route wins.
     this.router.events
       .pipe(
         filter((e) => e instanceof NavigationEnd),
@@ -133,10 +133,9 @@ export class ShellComponent {
 
   private readonly nav: NavItem[] = [
     { path: '/dashboard', labelKey: 'nav.dashboard', permissions: [] },
-    // Without application.read, this shows one's own applications/tasks.
+    // Without application.read these pages show only the applications and tasks of the user.
     { path: '/applications', labelKey: 'nav.applications', permissions: [] },
     { path: '/tasks', labelKey: 'nav.tasks', permissions: [] },
-    // Meetings: managers/minute-takers or any committee member.
     {
       path: '/meetings',
       labelKey: 'nav.meetings',
@@ -147,7 +146,7 @@ export class ShellComponent {
       path: '/budget',
       labelKey: 'nav.budget',
       permissions: ['budget.view', 'budget.structure', 'budget.book'],
-      // Committees with an assigned cost centre see the tab scoped.
+      // A Gremium with an assigned cost center sees the tab in scoped form.
       scopedBudgetView: true,
     },
     {
@@ -173,8 +172,10 @@ export class ShellComponent {
   ];
 
   /**
-   * RBAC-filtered navigation (UX): only with an active session, and only entries
-   * whose permission the principal holds. The server stays authoritative.
+   * RBAC-filtered navigation for the UX.
+   *
+   * It needs an active session and shows only the entries whose permission the
+   * principal holds. The server stays authoritative.
    */
   readonly visibleNav = computed(() => {
     if (!this.auth.isAuthenticated()) return [];
@@ -195,13 +196,13 @@ export class ShellComponent {
     const locale = value as Locale;
     if (locale === this.i18n.locale()) return;
     this.i18n.setLocale(locale);
-    // Server-provided i18n values (state/type/transition labels, form fields) are
-    // resolved in the then-current language at load time and otherwise do not
-    // update. Reload the current view → a consistent language switch.
+    // The server resolves its i18n values (state, type and transition labels, form
+    // fields) in the language of the load and never updates them later. Reload the
+    // current view to get a consistent language switch.
     this.reloadForLocale();
   }
 
-  /** Page reload after a language change (overridable/spyable in tests). */
+  /** Reload the page after a language change. Tests override or spy on this method. */
   protected reloadForLocale(): void {
     if (typeof window !== 'undefined') {
       this.location.reload();
@@ -213,8 +214,8 @@ export class ShellComponent {
   }
 
   /**
-   * Mobile navigation (hamburger drawer): replaces the header nav below 720px.
-   * Closes on navigation, backdrop click and ESC.
+   * Mobile navigation drawer. It replaces the header nav below 720px. It closes on
+   * navigation, on a backdrop click and on ESC.
    */
   readonly mobileNavOpen = signal(false);
 
@@ -232,7 +233,7 @@ export class ShellComponent {
     this.mobileNavOpen.set(false);
   }
 
-  /** Account popout: actions like logout live only here, not directly in the header. */
+  /** Account popout. Actions such as logout live only here, not in the header. */
   readonly accountMenuOpen = signal(false);
 
   toggleAccountMenu(): void {

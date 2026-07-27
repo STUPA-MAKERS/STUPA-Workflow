@@ -1,14 +1,14 @@
-"""DB-free full coverage of ``ConfigService`` (app/modules/admin/service/).
+"""Full coverage of ``ConfigService`` without a DB (app/modules/admin/service/).
 
-Drives every CRUD path (gremium / application type / global flow / roles /
-assignments / principals / group mappings / webhooks) plus all mappers and the
-guard/conflict/not-found branches.
+These tests drive every CRUD path plus all mappers and the guard, conflict and
+not-found branches. The paths cover gremium, application type, global flow, roles,
+assignments, principals, group mappings and webhooks.
 
-Uses a custom ``AsyncSession`` fake (no Docker/Redis/Postgres): ``execute``/
-``scalars`` pull from one ordered queue, ``scalar``/``get`` from their own
-queues. ``flush`` assigns ids (stand-in for DB ``gen_random_uuid()``). Every
-audit write internally consumes two ``execute`` calls (advisory lock +
-``prev_hash`` select); the tests size the queue accordingly.
+A custom ``AsyncSession`` fake replaces Docker, Redis and Postgres. ``execute`` and
+``scalars`` pull from one ordered queue. ``scalar`` and ``get`` pull from their own
+queues. ``flush`` assigns ids and stands in for the DB ``gen_random_uuid()``. Every
+audit write consumes two ``execute`` calls: the advisory lock and the ``prev_hash``
+select. The tests size the queue for that.
 """
 
 from __future__ import annotations
@@ -59,11 +59,8 @@ from app.shared.errors import (
 )
 
 
-# --------------------------------------------------------------------------- #
-# Fakes
-# --------------------------------------------------------------------------- #
 class FakeResult:
-    """`Result`-Ersatz für ``execute``/``scalars`` (genug Methoden für den Service)."""
+    """Stand-in for ``Result`` in ``execute`` and ``scalars`` with just enough methods."""
 
     def __init__(self, items: Iterable[Any] = ()) -> None:
         self._items = list(items)
@@ -89,13 +86,12 @@ def res(*items: Any) -> FakeResult:
 
 
 class FakeSession:
-    """`AsyncSession`-Stub.
+    """Stub for ``AsyncSession``.
 
-    * ``execute`` **und** ``scalars`` ziehen aus derselben geordneten Queue
-      ``_results`` (so wie der Service sie verschachtelt aufruft).
-    * ``scalar`` zieht aus ``_scalars`` (eigene Queue, Default ``None``).
-    * ``get`` zieht aus ``_gets`` (eigene Queue, Default ``None``).
-    * ``flush`` vergibt IDs an frisch hinzugefügte Objekte ohne ``id``.
+    ``execute`` **and** ``scalars`` pull from the same ordered queue ``_results``, because
+    the service calls them in a nested way. ``scalar`` pulls from its own queue
+    ``_scalars`` and ``get`` pulls from its own queue ``_gets``. Both default to ``None``.
+    ``flush`` gives an id to every added object that still has none.
     """
 
     def __init__(
@@ -145,8 +141,8 @@ class FakeSession:
         self.committed += 1
 
 
-# Jeder Audit-Schreibvorgang verbraucht intern zwei ``execute``-Ergebnisse
-# (``pg_advisory_xact_lock`` + ``prev_hash``-Select). Als Bequemlichkeit:
+# Every audit write consumes two ``execute`` results: the ``pg_advisory_xact_lock``
+# and the ``prev_hash`` select.
 def audit_results() -> list[FakeResult]:
     return [res(), res()]
 
@@ -161,11 +157,9 @@ def svc(
     return ConfigService(session), session  # type: ignore[arg-type]
 
 
-# --------------------------------------------------------------------------- #
-# Test-Doubles für ORM-Rows (leichtgewichtig, keine DB-Defaults)
-# --------------------------------------------------------------------------- #
+# The row doubles below carry no DB default, so each factory lists every column.
 class Row:
-    """Generischer Attribut-Container für ORM-Row-Doubles."""
+    """Generic attribute container for ORM row doubles."""
 
     def __init__(self, **kw: Any) -> None:
         for k, v in kw.items():
@@ -260,15 +254,12 @@ def webhook_row(**kw: Any) -> Any:
     return Row(**base)
 
 
-# --------------------------------------------------------------------------- #
-# _parse_dt / _iso (Modul-Helfer)
-# --------------------------------------------------------------------------- #
 def test_parse_dt_none() -> None:
     assert _parse_dt(None) is None
 
 
 def test_parse_dt_naive_becomes_utc() -> None:
-    # naive Eingabe → als UTC interpretiert (aware)
+    # The parser reads a naive input as UTC and returns an aware value.
     assert _parse_dt("2026-06-07T10:00:00") == datetime(2026, 6, 7, 10, 0, tzinfo=UTC)
 
 
@@ -291,9 +282,6 @@ def test_iso_none_and_value() -> None:
     assert _iso(datetime(2026, 1, 2, tzinfo=UTC)) == "2026-01-02T00:00:00+00:00"
 
 
-# --------------------------------------------------------------------------- #
-# Mapper-Helfer
-# --------------------------------------------------------------------------- #
 def test_mappers_roundtrip() -> None:
     g = _gremium_out(gremium_row(quorum_percent=50))
     assert g.quorum_percent == 50
@@ -314,17 +302,14 @@ def test_mappers_roundtrip() -> None:
 
 
 def test_principal_out_active_none_defaults_true() -> None:
-    # active=None ⇒ True-Default (#legacy-row ohne Spaltenwert).
+    # An active value of None means the default True (#legacy-row without a column value).
     out = _principal_out(principal_row(active=None), [])
     assert out.active is True
-    # explizit False bleibt False
+    # An explicit False stays False.
     out2 = _principal_out(principal_row(active=False), [])
     assert out2.active is False
 
 
-# --------------------------------------------------------------------------- #
-# Gremium
-# --------------------------------------------------------------------------- #
 async def test_list_gremien() -> None:
     s, _ = svc([res(gremium_row(name="A"), gremium_row(name="B"))])
     out = await s.list_gremien()
@@ -332,7 +317,8 @@ async def test_list_gremien() -> None:
 
 
 async def test_create_gremium_ok() -> None:
-    # _gremium_by_slug → None (frei); ensure_forced_roles select (keine) ; audit (2)
+    # Queue: _gremium_by_slug finds no row so the slug is free, ensure_forced_roles finds
+    # no role, then the two audit results.
     s, sess = svc(
         [res(), res(), *audit_results()]
     )
@@ -351,7 +337,7 @@ async def test_create_gremium_slug_conflict() -> None:
 
 async def test_update_gremium_all_fields() -> None:
     row = gremium_row(slug="old")
-    # get(row); _gremium_by_slug(None=frei); audit(2)
+    # Queue: the row from get, a free slug from _gremium_by_slug, then two audit results.
     s, _ = svc([res(), *audit_results()], gets=[row])
     out = await s.update_gremium(
         row.id,
@@ -375,7 +361,7 @@ async def test_update_gremium_all_fields() -> None:
 async def test_update_gremium_quorum_set_to_null() -> None:
     row = gremium_row(quorum_percent=50)
     s, _ = svc([*audit_results()], gets=[row])
-    # quorumPercent explizit None → in model_fields_set, also auf None gesetzt
+    # An explicit quorumPercent of None lands in model_fields_set, so the service sets None.
     out = await s.update_gremium(
         row.id, GremiumUpdate.model_validate({"quorumPercent": None}), "admin"
     )
@@ -390,7 +376,7 @@ async def test_update_gremium_noop_keeps_values() -> None:
 
 
 async def test_update_gremium_same_slug_no_conflict_check() -> None:
-    # slug == row.slug → KEIN _gremium_by_slug-Query (Branch: gleich)
+    # The slug equals row.slug, so the service runs NO _gremium_by_slug query.
     row = gremium_row(slug="keep")
     s, _ = svc([*audit_results()], gets=[row])
     out = await s.update_gremium(row.id, GremiumUpdate(slug="keep"), "admin")
@@ -424,11 +410,10 @@ async def test_delete_gremium_not_found() -> None:
         await s.delete_gremium(uuid.uuid4(), "admin")
 
 
-# ------------------------------------------------- Protokoll-Verteiler
 async def test_get_gremium_mail_recipients_union_dedup() -> None:
     gid = uuid.uuid4()
-    # get(gremium present) ; scalars(recipients-listen). Eine Zeile ist ``None``
-    # (deckt den ``recipients or []``-Zweig ab), eine Adresse kommt doppelt vor.
+    # Queue: get returns the Gremium, then the recipient lists. One row is ``None``, which
+    # covers the ``recipients or []`` branch. One address appears twice.
     s, _ = svc(
         [res(["a@x.de", "b@x.de"], ["b@x.de"], None)],
         gets=[gremium_row(id=gid)],
@@ -445,13 +430,13 @@ async def test_get_gremium_mail_recipients_not_found() -> None:
 
 async def test_set_gremium_mail_recipients_with_addresses() -> None:
     gid = uuid.uuid4()
-    # get(present) ; execute(delete) ; audit(2)
+    # Queue: the Gremium from get, the delete execute, then the two audit results.
     s, sess = svc([res(), *audit_results()], gets=[gremium_row(id=gid)])
     out = await s.set_gremium_mail_recipients(
         gid, GremiumMailRecipients(recipients=["a@x.de"]), "admin"
     )
     assert out.recipients == ["a@x.de"]
-    # eine MailList-Zeile wurde hinzugefügt (neben dem Audit-Eintrag)
+    # The service adds one MailList row next to the audit row.
     assert sum(type(o).__name__ == "MailList" for o in sess.added) == 1
 
 
@@ -462,7 +447,7 @@ async def test_set_gremium_mail_recipients_empty_adds_nothing() -> None:
         gid, GremiumMailRecipients(recipients=[]), "admin"
     )
     assert out.recipients == []
-    # keine MailList-Zeile (nur der Audit-Eintrag)
+    # No MailList row, only the audit row.
     assert sum(type(o).__name__ == "MailList" for o in sess.added) == 0
 
 
@@ -474,9 +459,6 @@ async def test_set_gremium_mail_recipients_not_found() -> None:
         )
 
 
-# --------------------------------------------------------------------------- #
-# Application-Type
-# --------------------------------------------------------------------------- #
 async def test_list_application_types() -> None:
     s, _ = svc([res(type_row(), type_row(key="b"))])
     out = await s.list_application_types()
@@ -484,7 +466,7 @@ async def test_list_application_types() -> None:
 
 
 async def test_create_application_type_with_comparison_offers() -> None:
-    # select(existing) None ; audit(2)
+    # Queue: the existing-type select returns None, then the two audit results.
     s, sess = svc([res(), *audit_results()])
     out = await s.create_application_type(
         ApplicationTypeCreate(
@@ -570,7 +552,7 @@ async def test_update_application_type_not_found() -> None:
 
 async def test_delete_application_type_ok() -> None:
     row = type_row()
-    # _get_type get(row) ; scalar(in_use None) ; audit(2)
+    # Queue: the type row from get, in_use None from scalar, then two audit results.
     s, sess = svc([*audit_results()], scalars=[None], gets=[row])
     await s.delete_application_type(row.id, "admin")
     assert row in sess.deleted
@@ -590,9 +572,6 @@ async def test_delete_application_type_not_found() -> None:
         await s.delete_application_type(uuid.uuid4(), "admin")
 
 
-# --------------------------------------------------------------------------- #
-# Globaler Flow
-# --------------------------------------------------------------------------- #
 def _flow_state_row(key: str, **kw: Any) -> Any:
     base = {
         "id": uuid.uuid4(),
@@ -654,7 +633,7 @@ async def test_get_active_global_flow_returns_graph() -> None:
         label_i18n={"de": "fertig"},
         actions=[{"type": "notify"}],
     )
-    # scalar(version) ; scalars(states) ; scalars(transitions)
+    # Queue: the version, the states, then the transitions.
     s, _ = svc(
         [res(s_init, s_done), res(trans)],
         scalars=[version],
@@ -671,7 +650,7 @@ async def test_get_active_global_flow_empty_label_and_layout() -> None:
     version = _flow_version_row(editor_layout={})
     s_init = _flow_state_row("draft", is_initial=True)
     s_done = _flow_state_row("done")
-    # transition mit leerem label_i18n und actions=None → label None, actions []
+    # An empty label_i18n and actions None give label None and an empty actions list.
     trans = _flow_transition_row(s_init.id, s_done.id, label_i18n="", actions=None)
     s, _ = svc([res(s_init, s_done), res(trans)], scalars=[version])
     graph = await s.get_active_global_flow()
@@ -697,14 +676,14 @@ def _two_state_graph() -> FlowGraph:
 
 
 async def test_create_global_flow_version_fresh_no_existing_version() -> None:
-    """Kein bestehender FlowVersion ⇒ neu anlegen, States anlegen, Transitions bauen."""
+    """With no FlowVersion yet the service creates the version, the states and the graph."""
     graph = _two_state_graph()
     # execute order:
-    #  1 app_keys select.all() -> keine Anträge
-    #  2 select FlowVersion .scalar_one_or_none() -> None (neu)
-    #  3 update FlowVersion (deactivate others)
-    #  4 select existing State .scalars().all() -> keine (frischer Flow)
-    #  5 select Transition.id .scalars().all() -> keine
+    #  1 app_keys select.all() -> no applications
+    #  2 select FlowVersion .scalar_one_or_none() -> None, so the service creates one
+    #  3 update FlowVersion (deactivate the others)
+    #  4 select existing State .scalars().all() -> none, because the flow is fresh
+    #  5 select Transition.id .scalars().all() -> none
     #  6 update Application where current_state_id is None
     #  7,8 audit
     s, sess = svc(
@@ -714,7 +693,6 @@ async def test_create_global_flow_version_fresh_no_existing_version() -> None:
     assert out.active is True
     assert out.version == 1
     assert sess.committed == 1
-    # FlowVersion + 2 States hinzugefügt
     added_types = [type(o).__name__ for o in sess.added]
     assert "FlowVersion" in added_types
     assert added_types.count("State") == 2
@@ -722,14 +700,16 @@ async def test_create_global_flow_version_fresh_no_existing_version() -> None:
 
 
 async def test_create_global_flow_version_new_version_remaps_apps() -> None:
-    """Save legt eine NEUE, unveränderliche FlowVersion an (#config-versioning); ein
-    laufender Antrag wird per State-KEY auf die jüngste Version gezogen (entfernter
-    Key → Initial). Frische State-/Transition-Zeilen, **kein** Löschen alter Versionen.
+    """A save creates a NEW immutable FlowVersion (#config-versioning).
 
-    DB: ``app_keys`` (execute) liefert einen Antrag auf entferntem Key ``legacy``;
-    ``max_version`` (scalar) = 3 ⇒ neue Version 4; alle übrigen execute-Aufrufe
-    (deactivate, per-App-Update, None-Update, config_revision-Record) fallen auf das
-    leere Default-Result zurück; ``head`` (scalar) = None.
+    The service moves a running application to the newest version by state key. A removed
+    key falls back to the initial state. The service writes fresh state and transition
+    rows and deletes **no** old version.
+
+    DB queue: ``app_keys`` (execute) returns one application on the removed key
+    ``legacy``. ``max_version`` (scalar) is 3, so the new version is 4. Every other
+    execute call falls back to the empty default result: deactivate, the per-application
+    update, the None update and the config_revision record. ``head`` (scalar) is None.
     """
     graph = _two_state_graph()
     app_id = uuid.uuid4()
@@ -739,19 +719,21 @@ async def test_create_global_flow_version_new_version_remaps_apps() -> None:
     assert out.active is True
     added_types = [type(o).__name__ for o in sess.added]
     assert added_types.count("FlowVersion") == 1
-    # Frische States (kein Reuse einer Altversion) + Transition.
+    # Fresh states without reuse of an old version, plus the transition.
     assert added_types.count("State") == 2
     assert added_types.count("Transition") == 1
-    # Append-only: nichts wird gelöscht (frühere Version bleibt erhalten).
+    # Append-only: the service deletes nothing, so the earlier version survives.
     assert sess.deleted == []
     assert sess.committed == 1
 
 
 async def test_create_global_flow_version_no_apps_bumps_version() -> None:
-    """Ohne laufende Anträge: neue Version = ``max+1``; der ``current_state_id IS NULL``-
-    Sammel-Update läuft; nichts wird gelöscht."""
+    """Without running applications the new version is ``max+1``.
+
+    The bulk update for ``current_state_id IS NULL`` runs and the service deletes nothing.
+    """
     graph = _two_state_graph()
-    s, sess = svc([res()], scalars=[5])  # keine Anträge; max=5 → neue Version 6
+    s, sess = svc([res()], scalars=[5])  # no applications, max 5, so the new version is 6
     out = await s.create_global_flow_version(FlowVersionCreate(graph=graph), "admin")
     assert out.version == 6
     assert out.active is True
@@ -760,7 +742,7 @@ async def test_create_global_flow_version_no_apps_bumps_version() -> None:
 
 
 async def test_create_global_flow_version_transition_explicit_order() -> None:
-    """``trans.order`` gesetzt ⇒ wird übernommen (Branch order is not None)."""
+    """A set ``trans.order`` reaches the row (the branch order is not None)."""
     graph = FlowGraph.model_validate(
         {
             "states": [
@@ -779,7 +761,7 @@ async def test_create_global_flow_version_transition_explicit_order() -> None:
 
 
 async def test_create_global_flow_version_invalid_graph_422() -> None:
-    # Kein Initial-State → ValidationProblem vor jedem DB-Zugriff
+    # Without an initial state the service raises ValidationProblem before any DB access.
     graph = FlowGraph.model_validate(
         {"states": [{"key": "a", "label": {"de": "A"}}], "transitions": []}
     )
@@ -789,15 +771,12 @@ async def test_create_global_flow_version_invalid_graph_422() -> None:
     assert ei.value.status == 422
 
 
-# --------------------------------------------------------------------------- #
-# Rollen
-# --------------------------------------------------------------------------- #
 async def test_list_roles_groups_permissions() -> None:
     r1 = role_row(key="a")
     r2 = role_row(key="b")
     perm = Row(role_id=r1.id, permission="x.read")
     perm2 = Row(role_id=r1.id, permission="x.write")
-    # scalars(roles) ; scalars(perms)
+    # Queue: the roles, then the permissions.
     s, _ = svc([res(r1, r2), res(perm, perm2)])
     out = await s.list_roles()
     by_key = {o.key: o for o in out}
@@ -806,7 +785,7 @@ async def test_list_roles_groups_permissions() -> None:
 
 
 async def test_create_role_ok() -> None:
-    # scalars(existing None) ; audit(2)
+    # Queue: the existing-role select returns None, then the two audit results.
     s, sess = svc([res(), *audit_results()])
     out = await s.create_role(
         RoleCreate(
@@ -818,7 +797,7 @@ async def test_create_role_ok() -> None:
     )
     assert out.key == "neu"
     assert out.permissions == ["application.read"]
-    # eine RolePermission-Zeile (dedupliziert)
+    # One RolePermission row, because the service drops the duplicate.
     assert sum(type(o).__name__ == "RolePermission" for o in sess.added) == 1
 
 
@@ -830,7 +809,7 @@ async def test_create_role_conflict() -> None:
 
 async def test_update_role_label_and_permissions() -> None:
     role = role_row()
-    # get(role) ; execute(delete perms) ; audit(2) ; scalars(perms after)
+    # Queue: the role, the permission delete, two audit results, the permissions after.
     s, _ = svc(
         [res(), *audit_results(), res("application.read", "application.create")],
         gets=[role],
@@ -848,7 +827,7 @@ async def test_update_role_label_and_permissions() -> None:
 
 
 async def test_update_role_permissions_only_label_none() -> None:
-    # label None (Branch 572->574 übersprungen) ; permissions gesetzt
+    # A None label skips the branch 572->574. The payload sets the permissions.
     role = role_row(name_i18n={"de": "Alt"})
     s, _ = svc(
         [res(), *audit_results(), res("application.create")],
@@ -857,13 +836,13 @@ async def test_update_role_permissions_only_label_none() -> None:
     out = await s.update_role(
         role.id, RoleUpdate(permissions=["application.create"]), "admin"
     )
-    assert role.name_i18n == {"de": "Alt"}  # unverändert
+    assert role.name_i18n == {"de": "Alt"}  # unchanged
     assert out.permissions == ["application.create"]
 
 
 async def test_update_role_no_permissions_change() -> None:
     role = role_row()
-    # permissions None → kein delete; audit(2) ; scalars(perms after = leer)
+    # A None permissions field skips the delete. Queue: two audit results, then no row.
     s, _ = svc([*audit_results(), res()], gets=[role])
     out = await s.update_role(role.id, RoleUpdate(label={"de": "Nur Label"}), "admin")
     assert out.label == {"de": "Nur Label"}
@@ -897,9 +876,6 @@ async def test_delete_role_not_found() -> None:
         await s.delete_role(uuid.uuid4(), "admin")
 
 
-# --------------------------------------------------------------------------- #
-# Role-Assignments
-# --------------------------------------------------------------------------- #
 async def test_list_role_assignments() -> None:
     s, _ = svc([res(assignment_row(), assignment_row())])
     out = await s.list_role_assignments()
@@ -909,7 +885,7 @@ async def test_list_role_assignments() -> None:
 async def test_create_role_assignment_ok() -> None:
     principal = principal_row()
     role = role_row()
-    # get(principal) ; get(role) ; audit(2)
+    # Queue: the principal, the role, then the two audit results.
     s, sess = svc([*audit_results()], gets=[principal, role])
     out = await s.create_role_assignment(
         RoleAssignmentCreate(
@@ -949,8 +925,8 @@ async def test_update_role_assignment_all_fields_non_admin_role() -> None:
     new_role_id = new_role.id
     old_role = role_row(key="editor")  # _guard_self_admin_removal: not admin
     gid = uuid.uuid4()
-    # get(RoleAssignmentRow row) ; get(Role new_role for existence) ;
-    # _guard: get(Role old_role by row.role_id) ; audit(2)
+    # Queue: the assignment row, the new role for the existence check, the old role for
+    # the guard, then the two audit results.
     s, _ = svc([*audit_results()], gets=[row, new_role, old_role])
     out = await s.update_role_assignment(
         row.id,
@@ -969,9 +945,10 @@ async def test_update_role_assignment_all_fields_non_admin_role() -> None:
 
 
 async def test_update_role_assignment_same_role_guard_runs_non_admin() -> None:
-    # AUD-031: _guard_self_admin_removal läuft jetzt IMMER zuerst. Bei einer
-    # Nicht-Admin-Rolle (editor) kehrt der Guard ohne Konflikt zurück.
-    # gets: get(row) ; guard: get(Role row.role_id=editor) ; existence: get(Role)
+    # AUD-031: _guard_self_admin_removal now ALWAYS runs first. For a non-admin role
+    # (editor) the guard returns without a conflict.
+    # gets: the assignment row, the editor role for the guard, the role for the
+    # existence check.
     rid = uuid.uuid4()
     row = assignment_row(role_id=rid)
     editor_role = role_row(id=rid)
@@ -1000,12 +977,13 @@ async def test_update_role_assignment_not_found() -> None:
 
 
 async def test_update_role_assignment_self_admin_removal_blocked() -> None:
-    # row hat admin-Rolle, principal.sub == actor → ConflictError beim Rollen-Wechsel
+    # The row holds the admin role and principal.sub equals the actor. The role change
+    # therefore raises ConflictError.
     principal = principal_row(sub="me")
     row = assignment_row(principal_id=principal.id)
     new_role = role_row(key="editor")
     admin_role = role_row(key="admin")
-    # AUD-031: Guard läuft zuerst → get(row) ; guard: get(admin_role) ; get(principal)
+    # AUD-031: the guard runs first. gets: the row, the admin role, the principal.
     s, _ = svc(gets=[row, admin_role, principal])
     with pytest.raises(ConflictError):
         await s.update_role_assignment(
@@ -1023,12 +1001,12 @@ async def test_update_role_assignment_noop() -> None:
 async def test_update_role_assignment_self_admin_valid_until_self_expiry_blocked() -> (
     None
 ):
-    # AUD-031: Eine Nicht-role_id-Mutation (valid_until in der Vergangenheit) der
-    # EIGENEN Admin-Zuweisung darf nicht durchgehen — sonst Selbst-Ablauf des Admins.
+    # AUD-031: a change that does not touch role_id (a past valid_until) on the OWN admin
+    # assignment must fail. Otherwise the admin can expire the own access.
     principal = principal_row(sub="me")
     row = assignment_row(principal_id=principal.id)
     admin_role = role_row(key="admin")
-    # get(row) ; guard: get(admin_role) ; get(principal)
+    # gets: the row, the admin role, the principal.
     s, sess = svc(gets=[row, admin_role, principal])
     with pytest.raises(ConflictError):
         await s.update_role_assignment(
@@ -1037,12 +1015,12 @@ async def test_update_role_assignment_self_admin_valid_until_self_expiry_blocked
             "me",
         )
     assert sess.committed == 0
-    assert row.valid_until is None  # unverändert
+    assert row.valid_until is None  # unchanged
 
 
 async def test_delete_role_assignment_ok() -> None:
-    # get(assignment row) ; guard: get(editor → not admin) ;
-    # member-check: get(editor → key != member) ; audit(2)
+    # gets: the assignment row, the editor role for the guard (not admin), the editor
+    # role for the member check (the key is not member). Then the two audit results.
     row = assignment_row()
     guard_role = role_row(key="editor")
     member_role = role_row(key="editor")
@@ -1058,7 +1036,8 @@ async def test_delete_role_assignment_not_found() -> None:
 
 
 async def test_delete_role_assignment_member_unremovable() -> None:
-    # get(assignment) ; guard: not admin ; member-role + gremium_id None → Conflict
+    # gets: the assignment, a non-admin role for the guard, the member role. A member
+    # role with gremium_id None raises ConflictError.
     row = assignment_row(gremium_id=None)
     guard_role = role_row(key="editor")
     member_role = role_row(key="member")
@@ -1068,7 +1047,7 @@ async def test_delete_role_assignment_member_unremovable() -> None:
 
 
 async def test_delete_role_assignment_member_with_gremium_ok() -> None:
-    # member-role aber gremium_id gesetzt → löschbar (Branch: gremium_id not None)
+    # The member role with a set gremium_id stays deletable (branch gremium_id not None).
     row = assignment_row(gremium_id=uuid.uuid4())
     guard_role = role_row(key="editor")
     member_role = role_row(key="member")
@@ -1081,22 +1060,22 @@ async def test_delete_role_assignment_self_admin_blocked() -> None:
     principal = principal_row(sub="me")
     row = assignment_row(principal_id=principal.id)
     admin_role = role_row(key="admin")
-    # get(assignment) ; guard: get(admin_role) → admin ; get(principal) →
-    # sub == actor → Conflict
+    # gets: the assignment, the admin role for the guard, the principal. The sub equals
+    # the actor, so the call raises ConflictError.
     s, _ = svc(gets=[row, admin_role, principal])
     with pytest.raises(ConflictError):
         await s.delete_role_assignment(row.id, "me")
 
 
 async def test_guard_self_admin_role_none_returns() -> None:
-    # _guard_self_admin_removal: role None → früh return (kein Conflict)
+    # _guard_self_admin_removal returns early when the role is None. No conflict.
     row = assignment_row()
     s, _ = svc(gets=[None])
-    await s._guard_self_admin_removal(row, "anyone")  # darf NICHT werfen
+    await s._guard_self_admin_removal(row, "anyone")  # must NOT raise
 
 
 async def test_guard_self_admin_other_principal_ok() -> None:
-    # role admin, aber principal.sub != actor → kein Conflict
+    # The role is admin, but principal.sub differs from the actor, so no conflict.
     row = assignment_row()
     admin_role = role_row(key="admin")
     other = principal_row(sub="someone-else")
@@ -1105,21 +1084,18 @@ async def test_guard_self_admin_other_principal_ok() -> None:
 
 
 async def test_guard_self_admin_principal_none_ok() -> None:
-    # role admin, principal None → kein Conflict (Branch principal is None)
+    # The role is admin and the principal is None, so no conflict (branch principal None).
     row = assignment_row()
     admin_role = role_row(key="admin")
     s, _ = svc(gets=[admin_role, None])
     await s._guard_self_admin_removal(row, "actor")
 
 
-# --------------------------------------------------------------------------- #
-# Principals / Permissions
-# --------------------------------------------------------------------------- #
 async def test_search_principals_with_query_and_assignments() -> None:
     p1 = principal_row(sub="alice")
     p2 = principal_row(sub="bob")
     a1 = assignment_row(principal_id=p1.id)
-    # scalars(principals) ; scalars(assignments)
+    # Queue: the principals, then the assignments.
     s, _ = svc([res(p1, p2), res(a1)])
     out = await s.search_principals("ali")
     by_sub = {o.sub: o for o in out}
@@ -1128,7 +1104,8 @@ async def test_search_principals_with_query_and_assignments() -> None:
 
 
 async def test_search_principals_no_query_no_results() -> None:
-    # query None → kein where; keine Principals → assignments-Query wird übersprungen
+    # A None query adds no where clause. Without a principal the service skips the
+    # assignments query.
     s, _ = svc([res()])
     out = await s.search_principals(None)
     assert out == []
@@ -1136,7 +1113,7 @@ async def test_search_principals_no_query_no_results() -> None:
 
 async def test_set_principal_active_activate() -> None:
     principal = principal_row(active=False, sub="x")
-    # get(principal) ; audit(2) ; scalars(assignments)
+    # Queue: the principal, the two audit results, then the assignments.
     s, _ = svc([*audit_results(), res()], gets=[principal])
     out = await s.set_principal_active(principal.id, True, "admin")
     assert out.active is True
@@ -1173,9 +1150,6 @@ def test_list_permissions() -> None:
     assert len(perms) > 0
 
 
-# --------------------------------------------------------------------------- #
-# Group-Mappings
-# --------------------------------------------------------------------------- #
 async def test_list_group_mappings() -> None:
     s, _ = svc([res(mapping_row(), mapping_row())])
     out = await s.list_group_mappings()
@@ -1184,7 +1158,7 @@ async def test_list_group_mappings() -> None:
 
 async def test_create_group_mapping_ok() -> None:
     role = role_row()
-    # get(role) ; audit(2)
+    # Queue: the role, then the two audit results.
     s, sess = svc([*audit_results()], gets=[role])
     out = await s.create_group_mapping(
         GroupMappingCreate(oidcGroup="grp", roleId=role.id), "admin"
@@ -1205,7 +1179,7 @@ async def test_update_group_mapping_all_fields() -> None:
     row = mapping_row()
     new_role = role_row()
     gid = uuid.uuid4()
-    # get(mapping row) ; get(role existence) ; audit(2)
+    # Queue: the mapping row, the role for the existence check, then two audit results.
     s, _ = svc([*audit_results()], gets=[row, new_role])
     out = await s.update_group_mapping(
         row.id,
@@ -1255,9 +1229,6 @@ async def test_delete_group_mapping_not_found() -> None:
         await s.delete_group_mapping(uuid.uuid4(), "admin")
 
 
-# --------------------------------------------------------------------------- #
-# Webhooks
-# --------------------------------------------------------------------------- #
 async def test_list_webhooks() -> None:
     s, _ = svc([res(webhook_row(), webhook_row(name="b"))])
     out = await s.list_webhooks()
@@ -1274,7 +1245,7 @@ async def test_create_webhook_ok() -> None:
     )
     assert out.name == "hook"
     assert out.events == ["status_changed"]
-    # secret wurde serverseitig erzeugt (32 Bytes)
+    # The server generates the secret with 32 bytes.
     wh = sess.added[0]
     assert isinstance(wh.secret, bytes)
     assert len(wh.secret) == 32
@@ -1313,11 +1284,9 @@ async def test_update_webhook_not_found() -> None:
         await s.update_webhook(uuid.uuid4(), WebhookUpdate(name="x"), "admin")
 
 
-# --------------------------------------------------------------------------- #
-# AUD-062: CRUD-Zeit-Advisory SSRF-Prüfung der Webhook-URL
-# --------------------------------------------------------------------------- #
+# AUD-062: the advisory SSRF check of the webhook URL at CRUD time.
 def test_webhook_url_advisory_blocks_internal_ip_literal() -> None:
-    # Metadaten-IP (link-local) ist nicht global → 400, kein stilles Dead-Letter.
+    # The link-local metadata IP is not global, so this is a 400 and no silent dead-letter.
     with pytest.raises(BadRequestError):
         ConfigService._assert_webhook_url_advisory("http://169.254.169.254/")
 
@@ -1333,18 +1302,16 @@ def test_webhook_url_advisory_blocks_bad_scheme() -> None:
 
 
 def test_webhook_url_advisory_allows_global_ip_literal() -> None:
-    # Globale IP-Literal löst keine Blockade aus (kein DNS).
+    # A global IP literal passes without a block and without DNS.
     ConfigService._assert_webhook_url_advisory("https://1.1.1.1/hook")
 
 
 def test_webhook_url_advisory_dns_failure_is_non_blocking() -> None:
-    # Nicht auflösbarer Host (.example reserviert) → best-effort, nicht blockieren.
+    # The host does not resolve (.example is reserved), so the check stays best-effort.
     ConfigService._assert_webhook_url_advisory("https://x.example/h")
 
 
-# --------------------------------------------------------------------------- #
-# AUD-062 (2. Hälfte): Delivery-Status-Diagnose-Read
-# --------------------------------------------------------------------------- #
+# AUD-062 (second half): the delivery-status diagnostic read.
 def delivery_row(**kw: Any) -> Any:
     base = {
         "id": uuid.uuid4(),
@@ -1359,15 +1326,15 @@ def delivery_row(**kw: Any) -> Any:
 
 
 def test_reason_class_buckets() -> None:
-    # ok → delivered; pending → in_progress.
+    # ok maps to delivered. pending maps to in_progress.
     assert _delivery_reason_class("ok", 200) == "delivered"
     assert _delivery_reason_class("pending", None) == "in_progress"
-    # dead ohne HTTP-Code (SSRF-Block ODER Transport/DNS) → unreachable_or_blocked,
-    # OHNE die geblockte IP zu nennen.
+    # dead without an HTTP code (an SSRF block or a transport or DNS error) maps to
+    # unreachable_or_blocked and never names the blocked IP.
     assert _delivery_reason_class("dead", None) == "unreachable_or_blocked"
-    # failed (Retry läuft) ohne Code → transienter Transportfehler.
+    # failed with a running retry and without a code is a transient transport error.
     assert _delivery_reason_class("failed", None) == "transient_transport_error"
-    # 4xx = Ziel lehnt ab; 5xx = Ziel-Serverfehler.
+    # 4xx means the target rejects the call. 5xx means a target server error.
     assert _delivery_reason_class("dead", 404) == "rejected_by_target"
     assert _delivery_reason_class("dead", 503) == "target_server_error"
 
@@ -1382,14 +1349,14 @@ def test_delivery_status_out_never_when_no_delivery() -> None:
 
 
 def test_delivery_status_out_dead_no_ip_leak() -> None:
-    # Vertippter/interner Webhook → dead ohne HTTP-Code; die Sicht nennt NUR die
-    # grobe Klasse, keine aufgelöste IP / keinen Host.
+    # A mistyped or internal webhook ends as dead without an HTTP code. The view names
+    # ONLY the coarse class, never a resolved IP and never a host.
     row = delivery_row(status="dead", response_code=None, attempts=5)
     out = _delivery_status_out(row.webhook_id, row)
     assert out.last_state == "dead"
     assert out.reason_class == "unreachable_or_blocked"
     assert out.attempts == 5
-    # Kein IP-/Host-/Body-Feld im Diagnose-DTO.
+    # The diagnostic DTO carries no IP, host or body field.
     dumped = out.model_dump()
     assert "ip" not in dumped
     assert "host" not in dumped
@@ -1409,8 +1376,8 @@ def test_delivery_status_out_sent_maps_ok() -> None:
 async def test_list_webhook_delivery_status_per_hook() -> None:
     hook_a = webhook_row(name="a")
     hook_b = webhook_row(name="b")
-    # Webhook-Liste über scalars-Queue (_results); je Hook eine latest-Delivery
-    # über die scalar-Queue (_scalars), in derselben Reihenfolge.
+    # The webhook list comes from the scalars queue (_results). Each hook gets one latest
+    # delivery from the scalar queue (_scalars), in the same order.
     latest_a = delivery_row(webhook_id=hook_a.id, status="dead", response_code=None)
     s, _ = svc(
         [res(hook_a, hook_b)],
@@ -1421,14 +1388,12 @@ async def test_list_webhook_delivery_status_per_hook() -> None:
     assert out[0].webhook_id == hook_a.id
     assert out[0].last_state == "dead"
     assert out[0].reason_class == "unreachable_or_blocked"
-    # Hook ohne Delivery → never.
+    # A hook without a delivery maps to never.
     assert out[1].webhook_id == hook_b.id
     assert out[1].last_state == "never"
 
 
-# --------------------------------------------------------------------------- #
-# AUD-053: Role permission whitelist validation
-# --------------------------------------------------------------------------- #
+# AUD-053: the role permission whitelist validation.
 def test_role_create_rejects_unknown_permission() -> None:
     with pytest.raises(ValueError, match="unknown permission"):
         RoleCreate(key="r", permissions=["application.read", "bogus.key"])

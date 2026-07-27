@@ -5,16 +5,16 @@ import type { MeetingChannel } from './ws.service';
 import type { MeetingStateMsg, ServerMessage, VoteOpenedMsg, VoteTallyMsg } from './ws-messages';
 
 /**
- * In-memory live-vote source for mock/harness operation. Simulates a running
- * vote: `subscribe` returns the current state (reconnect resync), a timer lets
- * ballots trickle in, and `cast` frames bump the chosen option live.
+ * In-memory live-vote source for mock and harness operation. It simulates a running
+ * vote. `subscribe` returns the current state for a reconnect resync. A timer lets
+ * ballots trickle in, and a `cast` frame raises the chosen option live.
  *
- * No protocol is invented: only the frames defined in `ws-messages.ts` are
- * sent. In beamer mode `cast` frames are ignored (read-only).
+ * This source invents no protocol. It sends only the frames that `ws-messages.ts`
+ * defines. In beamer mode it ignores a `cast` frame, because that stream is read-only.
  */
 @Injectable({ providedIn: 'root' })
 export class MockLiveVoteSource implements LiveVoteSource {
-  /** Interval of the simulated incoming ballots (ms). */
+  /** Interval between the simulated incoming ballots, in milliseconds. */
   tickMs = 2500;
 
   connectMeeting(_meetingId: string, beamer = false): MeetingChannel {
@@ -60,15 +60,15 @@ export class MockLiveVoteSource implements LiveVoteSource {
     const bump = (choice: string): void => {
       if (!vote.options.includes(choice)) return;
       const cast = Object.values(tally.counts).reduce((a, b) => a + b, 0);
-      if (cast >= tally.eligible) return; // don't exceed the eligible voters
+      if (cast >= tally.eligible) return; // do not go above the eligible voter count
       tally.counts[choice] = (tally.counts[choice] ?? 0) + 1;
       recompute();
       emitTally();
     };
 
-    // Simulates ballots trickling in until all eligible voters have voted, then
-    // stops the timer so no perpetual macrotask keeps the zone awake (otherwise
-    // Angular never stabilizes → screenshots/SSR hang).
+    // Simulate ballots that trickle in until all eligible voters have voted. The timer
+    // then stops, so no perpetual macrotask keeps the zone awake. If not, Angular never
+    // stabilizes and screenshots or SSR hang.
     const rotation = vote.options;
     let i = 0;
     const timer = setInterval(() => {

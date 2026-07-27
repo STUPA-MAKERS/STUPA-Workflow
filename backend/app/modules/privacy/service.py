@@ -1,6 +1,7 @@
 """Privacy/GDPR services: principal erasure, erasure-request queue, retention settings.
 
-Notifications are fired best-effort by the router/worker after commit, not here.
+The router or the worker sends the notifications best-effort after the commit. This
+module sends none.
 """
 
 from __future__ import annotations
@@ -36,7 +37,7 @@ def _now() -> datetime:
 
 
 def _i18n(value: dict[str, str] | None, locale: str) -> str:
-    """Pick a localized value from an i18n map (fallback de then en)."""
+    """Pick a localized value from an i18n map, with fallback to de then en."""
     data = value or {}
     return data.get(locale) or data.get("de") or data.get("en") or ""
 
@@ -50,10 +51,13 @@ class PrincipalService:
     async def erase(
         self, principal_id: UUID, *, actor: str, commit: bool = True
     ) -> Principal:
-        """Null the PII fields, deactivate, and drop sessions.
+        """Null the PII fields, deactivate the principal, and drop the sessions.
 
-        ``sub`` is kept as a pseudonym for the audit chain; Keycloak user deletion is
-        out-of-band and the remaining pseudonymity depends on it.
+        The `sub` stays as a pseudonym for the audit chain. Keycloak deletes the user
+        out of band. The pseudonymity that remains depends on that deletion.
+
+        Raises:
+            NotFoundError: No principal has this id.
         """
         principal = await self.session.get(Principal, principal_id)
         if principal is None:
@@ -89,7 +93,7 @@ class PrivacySettingsService:
     async def get(self) -> PrivacySettings:
         settings = await self.session.get(PrivacySettings, 1)
         if settings is None:
-            # Seed row missing (fresh schema without migration seed): create it.
+            # If the migration seed row is missing (fresh schema), create it.
             settings = PrivacySettings(id=1)
             self.session.add(settings)
             await self.session.flush()
@@ -122,14 +126,14 @@ class ErasureRequestService:
             raise ValidationProblem("applicant erasure requires an application_id")
         if subject_type == "principal" and principal_id is None:
             raise ValidationProblem("principal erasure requires a principal_id")
-        # Check existence up front so a bad FK is a 404, not a 500 on flush.
+        # Check the row first so a bad FK gives a 404, not a 500 on flush.
         if (
             application_id is not None
             and await self.session.get(Application, application_id) is None
         ):
             raise NotFoundError(f"application {application_id} not found")
         if subject_type == "applicant" and email is None and application_id is not None:
-            # Capture the applicant email now; anonymization nulls it but the
+            # Capture the applicant email now. Anonymization nulls it, but the
             # confirmation mail still needs it.
             email = await self.session.scalar(
                 select(Applicant.email).where(
@@ -180,9 +184,14 @@ class ErasureRequestService:
     async def execute(
         self, request_id: UUID, *, actor: str, files: FilesService | None = None
     ) -> ErasureRequest:
-        """Execute the request: anonymize the application or erase the principal,
-        atomically with the status change. ``files`` (with storage) also removes
-        attachment objects.
+        """Execute the request and change the status in the same transaction.
+
+        The service anonymizes the application or erases the principal. If `files`
+        carries an object storage, the service also removes the attachment objects.
+
+        Raises:
+            NotFoundError: No erasure request has this id.
+            ConflictError: The request is not open, or it has no resolvable subject.
         """
         request = await self._require_open(request_id)
         if request.subject_type == "applicant" and request.application_id is not None:
@@ -245,10 +254,14 @@ class AuskunftService:
         self.session = session
 
     async def collect(self, email: str, *, locale: str = "de") -> dict[str, Any]:
-        """Gather applicants, their applications + data + version history, subject-
-        visible comments, attachment metadata, and the matching principal.
+        """Gather every record that the platform stores for one email address.
 
-        Returns rows ready for :func:`build_auskunft_workbook`.
+        The result holds the applicants and their applications with data and version
+        history. It also holds the comments that the subject can see, the attachment
+        metadata, and the matching principal.
+
+        Returns:
+            Rows ready for `build_auskunft_workbook`.
         """
         applicants = list(
             (
@@ -332,8 +345,9 @@ class AuskunftService:
                 for v in vrows
             ]
 
-            # Only comments the subject can see: own (author_kind='applicant') and
-            # public ones. Internal principal notes are excluded.
+            # Restrict the result to the comments that the subject can see. These are
+            # the comments of the subject (author_kind='applicant') and the comments
+            # with visibility 'public'. The query excludes internal principal notes.
             crows = list(
                 (
                     await self.session.scalars(
@@ -360,7 +374,8 @@ class AuskunftService:
                 for c in crows
             ]
 
-            # Attachment metadata (filenames may be PII); no binary object.
+            # Attachment metadata only. A filename can be PII. The export holds no
+            # binary object.
             arows = list(
                 (
                     await self.session.scalars(
@@ -418,10 +433,10 @@ def build_auskunft_workbook(
     comments: Sequence[Mapping[str, Any]] = (),
     attachments: Sequence[Mapping[str, Any]] = (),
 ) -> bytes:
-    """GDPR access request (Art. 15) as ``.xlsx`` bytes.
+    """Build the GDPR access request (Art. 15) as `.xlsx` bytes.
 
-    Extends the shared :func:`app.shared.xlsx.build_auskunft_workbook` with two extra
-    sheets for subject-visible comments and attachment metadata.
+    This function extends the shared `app.shared.xlsx.build_auskunft_workbook`. It adds
+    two sheets: the comments that the subject can see, and the attachment metadata.
     """
     from io import BytesIO
 
@@ -451,8 +466,9 @@ def build_auskunft_workbook(
             cell.font = Font(bold=True)
         ws.freeze_panes = "A2"
         for row in rows:
-            # Neutralize formula injection (applicant-supplied body/filename), same
-            # protection as the shared base sheets via app.shared.xlsx._safe.
+            # Neutralize formula injection in applicant-supplied text such as a
+            # comment body or a filename. The shared base sheets get the same
+            # protection from app.shared.xlsx._safe.
             ws.append([_safe(cell) for cell in row])
         widths = [len(str(h)) for h in headers]
         for r in ws.iter_rows(min_row=2, values_only=True):

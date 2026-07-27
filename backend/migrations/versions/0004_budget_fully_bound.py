@@ -1,10 +1,12 @@
-"""budget: Flag »komplett gebunden« je Kostenstelle.
+"""Budget: a fully-bound flag per cost center.
 
-Idempotent (``IF NOT EXISTS``): frische DBs erhalten die Spalte bereits aus
-``create_all`` (Baseline) — dann No-op; migrierte DBs tragen sie nach.
+Idempotent through `IF NOT EXISTS`. A fresh database already gets the column from
+`create_all` (baseline), so this migration is a no-op there. A migrated database gets
+the column here.
 
-``budget.fully_bound`` = die gesamte Zuteilung der Kostenstelle (inkl. Unterbaum)
-gilt je HHJ als gebunden (committed = allocated, verfügbar 0).
+`budget.fully_bound` marks the whole allocation of the cost center, the subtree
+included, as bound for each fiscal year. Then committed equals allocated and the
+available amount is 0.
 """
 
 from __future__ import annotations

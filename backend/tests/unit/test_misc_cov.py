@@ -1,20 +1,25 @@
-"""Zusatz-Coverage (Misc): search / deps / middleware / admin+applications-Router.
+"""Extra coverage (misc): search, deps, middleware, admin and applications routers.
 
-Treibt die bisher unerreichten Zweige der fünf Ziel-Module auf ~100 %:
+The tests drive the branches of five modules that no other suite reaches.
 
-* ``app.search``         — Postgres-Trigram **und** ILIKE-Fallback, ein- vs. mehrspaltig,
-  ``dialect_of`` mit/ohne gebundene Engine, leere Query.
-* ``app.deps``           — OAuth-Bearer-Pfad (``apat_``) inkl. ungültig/inaktiv/abgelaufen,
-  ``require_any_permission`` (401/403/ok).
-* ``app.middleware``     — CSRF enforce/fail/cookie-set, Default-Write-Rate-Limit 429.
-* ``app.modules.admin.router``        — Service-Factory-Deps, restliche Endpunkt-Bodies
-  (Gremium löschen, Gremium-Rollen/Mitgliedschaften, globaler Flow, Principal-Toggle,
-  Rolle löschen) + PWA-Manifest.
-* ``app.modules.applications.router`` — Service-Factory + injizierbare Sender,
-  ``_deliver_magic_link`` / ``_deliver_comment_mails`` (gefakte Sessionmaker), die
-  ``list_tasks``-/``get_form``-Routen und der DSGVO-Löschantrag.
+`app.search`: Postgres trigram and the ILIKE fallback. One column against several
+columns. `dialect_of` with and without a bound engine. An empty query.
 
-Alle Tests sind reine Unit-Tests: keine echte DB, kein Redis, kein Netzwerk.
+`app.deps`: the OAuth bearer path (`apat_`) with an invalid, inactive or expired token.
+`require_any_permission` with 401, 403 and the pass case.
+
+`app.middleware`: CSRF enforce, CSRF fail and the CSRF cookie set. The default write
+rate limit returns 429.
+
+`app.modules.admin.router`: the service factory deps and the remaining endpoint bodies.
+These cover delete Gremium, Gremium roles and memberships, the global flow, the
+principal toggle, delete role and the PWA manifest.
+
+`app.modules.applications.router`: the service factory and the injectable senders.
+`_deliver_magic_link` and `_deliver_comment_mails` run against faked sessionmakers.
+The `list_tasks` and `get_form` routes and the DSGVO erasure request also run here.
+
+All tests are pure unit tests. They need no real database, no Redis and no network.
 """
 
 from __future__ import annotations
@@ -107,11 +112,9 @@ def _request(
     )
 
 
-# =========================================================================== #
 # app.search
-# =========================================================================== #
 def test_dialect_of_without_bind_defaults_postgres() -> None:
-    """Ohne gebundene Engine fällt ``dialect_of`` auf den Prod-Default zurück."""
+    """Without a bound engine `dialect_of` falls back to the production default."""
     sess = SimpleNamespace(bind=None)
     assert search_mod.dialect_of(sess) == "postgresql"  # type: ignore[arg-type]
 
@@ -123,18 +126,18 @@ def test_dialect_of_with_bind_reports_dialect_name() -> None:
 
 
 def test_trigram_rank_postgres_single_column() -> None:
-    """Eine Spalte → ``rank`` ist die einzelne ``word_similarity`` (kein ``greatest``)."""
+    """One column makes `rank` a single `word_similarity` call without `greatest`."""
     col = column("title")
     where, rank = search_mod.trigram_rank("foo", [col], threshold=0.3)
     txt = str(rank)
     assert "word_similarity" in txt
     assert "greatest" not in txt
-    # WHERE ist ein Vergleich ``rank > threshold``.
+    # The WHERE clause is the comparison `rank > threshold`.
     assert ">" in str(where)
 
 
 def test_trigram_rank_postgres_multi_column_uses_greatest() -> None:
-    """Mehrere Spalten → ``greatest(...)`` über alle Spalten-Ähnlichkeiten."""
+    """Several columns make `greatest(...)` span all column similarities."""
     where, rank = search_mod.trigram_rank(
         "  needle  ", [column("a"), column("b")], dialect="postgresql"
     )
@@ -143,40 +146,38 @@ def test_trigram_rank_postgres_multi_column_uses_greatest() -> None:
 
 
 def test_trigram_rank_sqlite_fallback_uses_ilike_and_zero_rank() -> None:
-    """Nicht-Postgres → ILIKE-Substring-OR und konstanter Rang ``0.0``."""
+    """A dialect other than Postgres gives an ILIKE substring OR and rank `0.0`."""
     where, rank = search_mod.trigram_rank(
         "term", [column("a"), column("b")], dialect="sqlite"
     )
-    # Konstanter 0.0-Rang (literal) erlaubt bedingungsloses ORDER BY rank.
+    # The constant rank literal 0.0 allows an unconditional ORDER BY rank.
     assert isinstance(rank, type(literal(0.0)))
     where_txt = str(where).lower()
     assert "like" in where_txt
-    # OR über alle Spalten (zwei coalesce-Ausdrücke).
+    # The OR spans all columns as two coalesce expressions.
     assert " or " in where_txt
 
 
 def test_trigram_rank_strips_empty_query() -> None:
-    """Leerer/weißraum-Query wird defensiv gestrippt (kein Crash)."""
+    """`trigram_rank` strips an empty or whitespace query and does not crash."""
     where, rank = search_mod.trigram_rank("   ", [column("a")], dialect="sqlite")
     assert where is not None and rank is not None
 
 
 def test_trigram_rank_none_query_postgres() -> None:
-    """``None``-artige (leere) Query auch im Postgres-Zweig abgefangen."""
+    """The Postgres branch also catches a `None`-like empty query."""
     where, rank = search_mod.trigram_rank("", [func.coalesce(column("x"), "")])
     assert "word_similarity" in str(rank)
 
 
-# =========================================================================== #
-# app.deps — OAuth-Bearer-Pfad + require_any_permission
-# =========================================================================== #
+# app.deps: OAuth bearer path and require_any_permission
 def test_principal_bearer_token_apat_prefix() -> None:
     req = _request(headers={"Authorization": "Bearer apat_tok123"})
     assert deps._principal_bearer_token(req) == "apat_tok123"
 
 
 def test_principal_bearer_token_non_apat_ignored() -> None:
-    # Signiertes Applicant-Bearer (kein apat_) wird hier ignoriert → None.
+    # A signed applicant bearer carries no apat_ prefix, so this path ignores it.
     req = _request(headers={"Authorization": "Bearer some.signed.applicant"})
     assert deps._principal_bearer_token(req) is None
 
@@ -239,7 +240,7 @@ async def test_principal_from_access_token_inactive_row(
 async def test_principal_from_access_token_ok_caps_scope(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Gültiges Token → RBAC-Principal, dessen Permissions auf den Scope gekappt sind."""
+    """A valid token gives an RBAC principal with permissions capped to the scope."""
 
     async def _resolve(*a: object, **k: object) -> tuple[Any, str]:
         return (uuid4(), "read")
@@ -260,14 +261,14 @@ async def test_principal_from_access_token_ok_caps_scope(
         _DB(), "apat_x", datetime.now(UTC)  # type: ignore[arg-type]
     )
     assert out is not None
-    # Scope-Kappung gesetzt (nicht None) — der Admin-Bypass wird dadurch neutralisiert.
+    # The scope cap is set and not None. This neutralizes the admin bypass.
     assert out.scope_permissions is not None
 
 
 async def test_get_current_principal_uses_oauth_bearer(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """``get_current_principal`` zweigt bei ``apat_``-Bearer auf den OAuth-Pfad ab."""
+    """`get_current_principal` branches to the OAuth path for an `apat_` bearer."""
     sentinel = Principal(sub="mcp")
 
     async def _from_token(*a: object, **k: object) -> Principal:
@@ -295,11 +296,9 @@ def test_require_any_permission_ok_when_one_matches() -> None:
     assert require_any_permission("a", "b")(principal=p) is p
 
 
-# =========================================================================== #
-# app.middleware — CSRF + Default-Write-Rate-Limit (Klassen direkt getrieben)
-# =========================================================================== #
+# app.middleware: CSRF and the default write rate limit, driven through the classes
 async def _passthrough(_request: Request) -> Response:
-    """Minimaler ``call_next``: liefert eine Response mit einem headers-/cookies-Stub."""
+    """Return a response with a headers stub and a cookies stub as a minimal `call_next`."""
     return cast("Response", _FakeResponse())
 
 
@@ -314,7 +313,7 @@ class _FakeResponse:
 
 
 async def test_csrf_blocks_unsafe_without_token() -> None:
-    """Unsichere Methode + Auth-Cookie + kein Bearer + fehlendes CSRF-Token → 403."""
+    """An unsafe method with an auth cookie, no bearer and no CSRF token gives 403."""
     mw = CsrfMiddleware(app=object(), settings=_settings())
     req = _request(method="POST", cookies={"ap_session": "sid"})
     resp = await mw.dispatch(req, _passthrough)
@@ -335,7 +334,7 @@ async def test_csrf_blocks_when_tokens_mismatch() -> None:
 
 
 async def test_csrf_passes_with_matching_tokens_and_no_recookie() -> None:
-    """Stimmige Tokens passieren; vorhandenes CSRF-Cookie wird nicht neu gesetzt."""
+    """Matching tokens pass, and the middleware does not set the CSRF cookie again."""
     mw = CsrfMiddleware(app=object(), settings=_settings())
     req = _request(
         method="POST",
@@ -344,12 +343,11 @@ async def test_csrf_passes_with_matching_tokens_and_no_recookie() -> None:
     )
     resp = await mw.dispatch(req, _passthrough)
     assert resp.status_code == 200
-    # Cookie war schon da → kein erneutes Set-Cookie.
     assert cast("Any", resp).set_cookies == []
 
 
 async def test_csrf_sets_cookie_when_missing() -> None:
-    """Sichere Methode ohne CSRF-Cookie → es wird auf der Antwort ausgestellt."""
+    """A safe method without a CSRF cookie gets one on the response."""
     mw = CsrfMiddleware(app=object(), settings=_settings(cookie_secure=False))
     req = _request(method="GET")
     resp = await mw.dispatch(req, _passthrough)
@@ -358,7 +356,7 @@ async def test_csrf_sets_cookie_when_missing() -> None:
 
 
 async def test_csrf_disabled_passes_and_no_cookie() -> None:
-    """Bei ``csrf_enabled=False`` keine Erzwingung und kein Cookie-Set."""
+    """With `csrf_enabled=False` the middleware enforces nothing and sets no cookie."""
     mw = CsrfMiddleware(app=object(), settings=_settings(csrf_enabled=False))
     req = _request(method="POST", cookies={"ap_session": "sid"})
     resp = await mw.dispatch(req, _passthrough)
@@ -367,7 +365,7 @@ async def test_csrf_disabled_passes_and_no_cookie() -> None:
 
 
 async def test_csrf_bearer_request_exempt() -> None:
-    """Bearer-authentifizierte (nicht CSRF-fähige) Requests sind ausgenommen."""
+    """The middleware exempts bearer-authenticated requests, because CSRF cannot forge them."""
     mw = CsrfMiddleware(app=object(), settings=_settings())
     req = _request(
         method="POST",
@@ -379,10 +377,9 @@ async def test_csrf_bearer_request_exempt() -> None:
 
 
 async def test_csrf_default_settings_branch() -> None:
-    """``CsrfMiddleware`` ohne explizite Settings nutzt ``get_settings()``."""
+    """`CsrfMiddleware` without explicit settings uses `get_settings()`."""
     mw = CsrfMiddleware(app=object())
     assert mw._settings is not None
-    # Safe-Methode, kein Auth-Cookie → einfacher Durchlass.
     resp = await mw.dispatch(_request(), _passthrough)
     assert resp.status_code == 200
 
@@ -416,7 +413,7 @@ async def test_write_rate_limit_blocks_over_limit_429() -> None:
     req = _request(method="DELETE")
     resp = await mw.dispatch(req, _passthrough)
     assert resp.status_code == 429
-    # Retry-After auf >=0 geklemmt (max(0, -5) == 0).
+    # The middleware clamps Retry-After to zero or more, so -5 becomes 0.
     assert resp.headers["Retry-After"] == "0"
     assert resp.media_type == middleware.PROBLEM_JSON
 
@@ -428,13 +425,13 @@ async def test_write_rate_limit_skips_safe_methods() -> None:
     )
     resp = await mw.dispatch(_request(method="GET"), _passthrough)
     assert resp.status_code == 200
-    assert limiter.calls == []  # GET wird nie gegen das Limit geprüft
+    assert limiter.calls == []
 
 
 async def test_write_rate_limit_default_limiter_from_request(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Ohne injizierten Limiter holt die Middleware ihn via ``get_rate_limiter``."""
+    """Without an injected limiter the middleware gets one from `get_rate_limiter`."""
     fallback = _Limiter(allowed=True)
     monkeypatch.setattr(
         middleware, "get_rate_limiter", lambda _req, _settings: fallback
@@ -442,14 +439,12 @@ async def test_write_rate_limit_default_limiter_from_request(
     mw = DefaultWriteRateLimitMiddleware(app=object(), settings=_settings())
     resp = await mw.dispatch(_request(method="PATCH"), _passthrough)
     assert resp.status_code == 200
-    assert fallback.calls  # der Fallback-Limiter wurde benutzt
+    assert fallback.calls
 
 
-# =========================================================================== #
-# app.modules.admin.router — Service-Factories + Rest-Endpunkte
-# =========================================================================== #
+# app.modules.admin.router: service factories and the remaining endpoints
 def test_admin_service_factories_construct() -> None:
-    """Die drei Service-Factory-Deps liefern den jeweiligen Service über die Session."""
+    """The three service factory dependencies build their service from the session."""
     from app.modules.admin.gremium_roles import GremiumRoleService
     from app.modules.admin.service import ConfigService
     from app.modules.admin.site_config_service import SiteConfigService
@@ -488,7 +483,7 @@ class _AdminConfigFake:
     async def delete_role(self, role_id: Any, actor: str) -> None:
         self.deleted_role = role_id
 
-    # Reads, die die Gates der Endpunkte (Principal-Injektion) benötigen.
+    # The endpoint gates need these reads for the principal injection.
     async def list_roles(self) -> list[RoleOut]:
         return []
 
@@ -653,7 +648,7 @@ def test_admin_gremium_membership_create_delete(
 def test_admin_manifest_webmanifest(
     admin_app: tuple[FastAPI, _AdminConfigFake, _GremiumRolesFake, _SiteFake],
 ) -> None:
-    """PWA-Manifest: auth-frei, application/manifest+json, Cache-Header."""
+    """The PWA manifest needs no auth and returns manifest JSON with a cache header."""
     application, *_ = admin_app
     client = TestClient(application)
     r = client.get("/api/manifest.webmanifest")
@@ -663,15 +658,13 @@ def test_admin_manifest_webmanifest(
     assert r.json()["name"] == "Antrag"
 
 
-# =========================================================================== #
-# app.modules.applications.router — Factory, Sender, list_tasks/form, erasure
-# =========================================================================== #
+# app.modules.applications.router: factory, senders, list_tasks, form and erasure
 def test_applications_service_factory_and_sender_getters() -> None:
     from app.modules.applications.service import ApplicationsService
 
     svc = get_applications_service(SimpleNamespace())  # type: ignore[arg-type]
     assert isinstance(svc, ApplicationsService)
-    # Default-Sender sind die ungetauschten Modul-Funktionen.
+    # The default senders are the module functions that no override replaced.
     assert get_magic_link_sender() is _deliver_magic_link
     assert get_comment_mail_sender() is _deliver_comment_mails
 
@@ -685,7 +678,7 @@ class _FakeMagicSession:
 
 
 class _FakeSessionmaker:
-    """Async-Contextmanager-Sessionmaker, der eine vorgegebene Session liefert."""
+    """Async context-manager sessionmaker that returns a fixed session."""
 
     def __init__(self, session: object) -> None:
         self._session = session
@@ -703,7 +696,7 @@ class _FakeSessionmaker:
 async def test_deliver_magic_link_invokes_request_magic_link(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """``_deliver_magic_link`` öffnet eine eigene Session, ruft den Auth-Service + commit."""
+    """`_deliver_magic_link` opens its own session, calls the auth service and commits."""
     import app.modules.applications.router as ar
 
     fake_db = _FakeMagicSession()
@@ -715,10 +708,10 @@ async def test_deliver_magic_link_invokes_request_magic_link(
     async def _request_magic_link(db, settings, *, email, application_id, deliver):  # noqa: ANN001
         seen["email"] = email
         seen["application_id"] = application_id
-        # Den injizierten Deliver einmal aufrufen (deckt die innere Closure ab).
+        # Call the injected deliver once to cover the inner closure.
         await deliver(email, "https://link/x")
 
-    # NotificationService.send_magic_link darf nicht den echten Mailer berühren.
+    # The send_magic_link of NotificationService must not touch the real mailer.
     class _NS:
         def __init__(self, *a: object, **k: object) -> None:
             pass
@@ -740,7 +733,7 @@ async def test_deliver_magic_link_invokes_request_magic_link(
 async def test_deliver_comment_mails_invokes_send(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """``_deliver_comment_mails`` öffnet die Session und ruft ``send_comment_notifications``."""
+    """`_deliver_comment_mails` opens the session and calls `send_comment_notifications`."""
     import app.modules.applications.router as ar
     import app.modules.notifications.comments as comments_mod
 
@@ -786,7 +779,7 @@ async def test_deliver_comment_mails_invokes_send(
     assert captured["author_name"] == "Mia M."
 
 
-# --- Router-Endpunkte (list_tasks, get_form, erasure) via TestClient ------- #
+# Router endpoints (list_tasks, get_form, erasure) driven through TestClient
 def _state() -> StateOut:
     return StateOut(
         id=uuid4(), key="draft", label={"de": "E"}, color="#abcdef", editAllowed=True
@@ -860,7 +853,10 @@ def test_list_tasks_requires_auth_401(
 def test_get_application_form_principal(
     apps_app: tuple[FastAPI, _AppsServiceFake],
 ) -> None:
-    """``GET /applications/{id}/form`` liefert die gepinnte effektive Form (A/P-Read)."""
+    """`GET /applications/{id}/form` returns the pinned effective form.
+
+    The route accepts an applicant read and a principal read.
+    """
     application, svc = apps_app
     application.dependency_overrides[get_current_principal] = lambda: Principal(
         sub="reader", permissions={"application.read"}
@@ -886,7 +882,7 @@ class _ErasureFake:
 def test_request_erasure_202(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """DSGVO-Löschantrag: 202 + Benachrichtigung der Datenschutz-Verantwortlichen."""
+    """A GDPR erasure request returns 202 and notifies the data protection officers."""
     import app.modules.applications.router as ar
     from app.db import get_session
     from app.deps import get_current_applicant
@@ -916,12 +912,12 @@ def test_request_erasure_202(
     client = TestClient(application)
     r = client.post(f"/api/applications/{app_id}/erasure-request")
     assert r.status_code == 202
-    # Background-Task lief synchron im TestClient → Benachrichtigung wurde ausgelöst.
+    # TestClient runs the background task synchronously, so the notification fires here.
     assert notified.get("subject_type") == "applicant"
 
 
 def test_request_erasure_requires_access_401() -> None:
-    """Ohne Identität (kein Principal/Applicant) → 401 (require_app_read)."""
+    """Without a principal and without an applicant, `require_app_read` gives 401."""
     from app.db import get_session
 
     application = create_app()
@@ -936,7 +932,7 @@ def test_request_erasure_requires_access_401() -> None:
 
 
 class _CreateServiceFake:
-    """Service-Fake für ``POST /applications`` (in-Handler-Validierungszweige)."""
+    """Service fake for `POST /applications` that covers the in-handler validation."""
 
     def __init__(self) -> None:
         self.created = False
@@ -962,29 +958,31 @@ def _create_app_for_post() -> tuple[FastAPI, _CreateServiceFake]:
 
 
 def test_create_application_in_handler_payload_cap_413() -> None:
-    """In-Handler-Schranke (serialisierte ``data``) → 413, auch wenn die
-    Content-Length-Dependency den Body durchgelassen hätte."""
+    """The in-handler cap on the serialized `data` gives 413.
+
+    The cap still fires when the Content-Length dependency lets the body pass.
+    """
     from app.shared.antiabuse import enforce_application_payload_limit
 
     application, svc = _create_app_for_post()
-    # Content-Length-Dependency zum No-op machen → der Handler-Check (Zeile 162-165)
-    # ist die maßgebliche Schranke.
+    # Make the Content-Length dependency a no-op. The handler check at router
+    # lines 162-165 is then the cap that decides.
     application.dependency_overrides[enforce_application_payload_limit] = lambda: None
     application.dependency_overrides[get_current_principal] = lambda: None
     client = TestClient(application)
     body = {
         "typeId": str(uuid4()),
-        "data": {"blob": "x" * 70_000},  # serialisiert > max_application_payload_bytes
+        "data": {"blob": "x" * 70_000},  # serialized size is over max_application_payload_bytes
         "applicantEmail": "a@example.org",
         "lang": "de",
     }
     r = client.post("/api/applications", json=body)
     assert r.status_code == 413
-    assert svc.created is False  # nie an den Service durchgereicht
+    assert svc.created is False
 
 
 def test_create_application_missing_email_422() -> None:
-    """Anonym + ohne ``applicantEmail`` + ohne Account → ValidationProblem (422)."""
+    """An anonymous post with no `applicantEmail` and no account raises ValidationProblem."""
     application, svc = _create_app_for_post()
     application.dependency_overrides[get_current_principal] = lambda: None
     client = TestClient(application)
@@ -995,7 +993,10 @@ def test_create_application_missing_email_422() -> None:
 
 
 def test_create_application_derives_name_from_principal_only() -> None:
-    """Eingeloggt mit ``applicantEmail`` aber ohne Name → Name aus dem Account (Zeile 180-181)."""
+    """A logged-in post with `applicantEmail` but no name takes the name from the account.
+
+    The router does this at lines 180-181.
+    """
     application, svc = _create_app_for_post()
     application.dependency_overrides[get_current_principal] = lambda: Principal(
         sub="u-9", email="acct@example.org", display_name="Account Name"
@@ -1012,5 +1013,5 @@ def test_create_application_derives_name_from_principal_only() -> None:
     assert svc.created is True
 
 
-# Defensive: vermeidet ungenutzte Importe, falls Linter streng ist.
+# This reference keeps the imports in use for a strict linter.
 _ = (column, GremiumOut, contextlib)

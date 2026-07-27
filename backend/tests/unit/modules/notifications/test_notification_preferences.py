@@ -1,4 +1,4 @@
-"""Tests der Benachrichtigungs-Präferenzen (#4-2): API + Empfänger-Filter."""
+"""Tests of the notification preferences (#4-2): the API and the recipient filter."""
 
 from __future__ import annotations
 
@@ -84,7 +84,7 @@ class _FakeScalars:
 
 
 class _FakeFilterSession:
-    """Bedient nur ``scalars`` für den Präferenz-Filter."""
+    """Serve only `scalars`, which is all the preference filter calls."""
 
     def __init__(self, disabled_emails: list[str]) -> None:
         self.disabled = disabled_emails

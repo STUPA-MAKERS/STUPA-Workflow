@@ -1,3 +1,3 @@
-// Jest stub for *.css / *.scss imports (e.g. @fontsource/archivo) — styles are
-// irrelevant in unit tests.
+// Jest stub for *.css and *.scss imports, for example @fontsource/archivo.
+// Unit tests do not use styles.
 module.exports = {};

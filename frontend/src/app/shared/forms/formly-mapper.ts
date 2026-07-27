@@ -7,12 +7,12 @@ import { resolveI18n } from './i18n-text';
 const INPUT_HTML_TYPE: Partial<Record<FieldType, string>> = {
   text: 'text',
   number: 'number',
-  // 'currency' → its own branch in FormlyInputType (app-currency-input with €/format).
+  // 'currency' takes its own branch in FormlyInputType (app-currency-input with € format).
   currency: 'currency',
   date: 'date',
-  file: 'text', // file upload (attachment reference) — full upload lands later.
+  file: 'text', // file upload (attachment reference). The full upload lands later.
   email: 'email',
-  iban: 'text', // format check (mod-97) is done by the backend; free text field here.
+  iban: 'text', // the backend checks the format (mod-97), so this is a free text field.
 };
 
 /** Form field type → registered Formly type (`@shared/formly/formly.providers`). */
@@ -25,8 +25,8 @@ const FORMLY_TYPE: Record<FieldType, string> = {
   textarea: 'textarea',
   select: 'select',
   multiselect: 'multicheckbox',
-  // Dynamic pickers: rendered as a normal select; the server supplies the options in
-  // the effective form (no hand-maintenance).
+  // Dynamic pickers render as a normal select. The server supplies the options in the
+  // effective form, so nobody maintains them by hand.
   gremium_select: 'select',
   budget_select: 'select',
   email: 'input',
@@ -37,29 +37,29 @@ const FORMLY_TYPE: Record<FieldType, string> = {
   computed: 'display',
   table: 'display',
   positions: 'positions',
-  // Section markers are structural; they are filtered out in `toFormlyFields` and
-  // should never be mapped (the backend strips them from the effective form).
+  // Section markers are structural. `toFormlyFields` handles them apart from this map,
+  // so this entry never applies. The backend strips them from the effective form.
   section: 'display',
 };
 
 /**
- * Translate an effective form definition (`FormFieldDef[]`) into Formly field
- * configs. Maps:
- * - labels/help texts via `resolveI18n` (active UI locale).
- * - `required` + `validation` (min/max/minLen/maxLen/pattern) → Formly props.
- * - `visibleIf` → `expressions.hide` (negated; eval error ⇒ conservatively visible).
+ * Translate an effective form definition (`FormFieldDef[]`) into Formly field configs.
+ * The mapping covers:
+ * - labels and help texts through `resolveI18n` (active UI locale).
+ * - `required` and `validation` (min/max/minLen/maxLen/pattern) → Formly props.
+ * - `visibleIf` → `expressions.hide` (negated). An eval error keeps the field visible.
  * - `compute`/`computed` → `expressions['model.<key>']` (derived value).
  *
- * `extraContext` supplies non-field variables (e.g. `has_budget`) to the JsonLogic
- * evaluation, analogous to the backend `validate_answers(context=…)`.
+ * `extraContext` supplies non-field variables such as `has_budget` to the JsonLogic
+ * evaluation. This matches the backend `validate_answers(context=…)`.
  */
 export function toFormlyFields(
   fields: FormFieldDef[],
   lang: Lang | string,
   extraContext: Record<string, unknown> = {},
 ): FormlyFieldConfig[] {
-  // Render section/group markers as headings instead of discarding them — so
-  // question groups appear grouped in the inline editor too.
+  // Render section and group markers as headings instead of discarding them. Question
+  // groups then also appear grouped in the inline editor.
   return fields.map((f) =>
     f.type === 'section'
       ? sectionHeading(f, lang)

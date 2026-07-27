@@ -3,11 +3,12 @@
 The client sends the server-generated Markdown as the raw request body to
 ``POST {PYTEX_URL}/render`` (``input_kind=md``, ``output_kind=pdf``,
 ``trust_level=trusted``, ``variant=<per gremium>``) and returns the PDF bytes. There is
-no shell call — the Markdown is never part of a command line.
+no shell call. The Markdown is never part of a command line.
 
-Errors map to ``PytexError`` carrying only status/short reason (the pytex container
-scrubs paths/stacktraces itself), so no internal path leaks out. 4xx is a permanent
-input/policy error (no retry), 5xx/transport is transient (worker retry).
+Errors map to ``PytexError``, which carries only the status and a short reason. The
+pytex container scrubs paths and stacktraces itself, so no internal path leaks out. A
+4xx is a permanent input or policy error and gets no retry. A 5xx or a transport error
+is transient, so the worker retries.
 """
 
 from __future__ import annotations
@@ -19,16 +20,16 @@ import httpx
 
 from app.settings import Settings
 
-# pytex signals a PDF via the Content-Type; any other body breaks the contract.
+# pytex signals a PDF through the Content-Type. Any other body breaks the contract.
 _PDF_CONTENT_TYPE = "application/pdf"
 _MAX_ERROR_DETAIL = 300
 
-# Live pytex ``eval`` trigger: pytex' ``_eval_comment`` fires ONLY for a link-reference
-# definition with ``label == "//"`` AND a bare-``#`` target (``[//]: # "EXPR"``).
-# CommonMark allows whitespace/newlines inside the label and around the ``:``; the
-# label then normalises to ``//`` (whitespace collapses). We match exactly this head,
-# independent of the sanitizer's regex, so the barrier holds even without ``marko``
-# installed (the structural verifier there is only an extra line).
+# Live pytex ``eval`` trigger: pytex ``_eval_comment`` fires ONLY for a link-reference
+# with ``label == "//"`` AND a bare-``#`` target (``[//]: # "EXPR"``). CommonMark
+# allows whitespace and newlines inside the label and around the ``:``. The label then
+# normalizes to ``//``, because the whitespace collapses. We match exactly this head,
+# independent of the sanitizer regex, so the barrier holds even when ``marko`` is
+# missing. The structural verifier there is only an extra line of defense.
 _LIVE_EVAL_TRIGGER_RE = re.compile(
     r"\[[ \t\r\n]*/[ \t\r\n]*/[ \t\r\n]*\]"  # label ``//`` (whitespace/newline tolerant)
     r"[ \t]*(?:\r?\n[ \t]*)?:"  # ``:`` (may sit on the next line)
@@ -36,21 +37,22 @@ _LIVE_EVAL_TRIGGER_RE = re.compile(
     r"(?=[ \t\r\n\"'(]|$)",  # … followed by whitespace/title delimiter/line end
     re.DOTALL,
 )
-# The evaluated pytex marker (``\iffalse{pytex(...)}\fi``) has no place in the body —
-# its presence is likewise a not-trusted-capable signal.
+# The evaluated pytex marker (``\iffalse{pytex(...)}\fi``) has no place in the body.
+# Its presence is also a signal that the body must not render trusted.
 _PYTEX_MARKER_RE = re.compile(r"\\iffalse\s*\{?\s*pytex\s*\(", re.DOTALL | re.IGNORECASE)
 
 
 def _markdown_has_eval_trigger(markdown: str) -> bool:
-    """``True`` if ``markdown`` carries a live pytex ``eval`` trigger.
+    r"""``True`` if ``markdown`` carries a live pytex ``eval`` trigger.
 
-    Second, independent RCE barrier for ``trusted`` renders: the sanitizer
-    (``sanitize_user_markdown``) already strips eval-capable ``[//]: # "EXPR"``
-    definitions while building the Markdown; here we verify at the client edge with a
-    standalone regex that none survived (and no evaluated ``\\iffalse{pytex(...)}\\fi``
-    marker leaks through). Works without an external dependency (unlike the marko-based
-    structural check). Genuine reference links (``[foo]: #section`` → no bare ``#``)
-    are untouched."""
+    This is the second and independent RCE barrier for ``trusted`` renders. The
+    sanitizer ``sanitize_user_markdown`` already strips eval-capable
+    ``[//]: # "EXPR"`` definitions while it builds the Markdown. Here we verify at the
+    client edge with a standalone regex that none of them survived. We also check that
+    no evaluated ``\iffalse{pytex(...)}\fi`` marker leaks through. The check needs no
+    external dependency, unlike the marko-based structural check. A genuine reference
+    link (``[foo]: #section`` has no bare ``#``) stays untouched.
+    """
     return bool(_LIVE_EVAL_TRIGGER_RE.search(markdown) or _PYTEX_MARKER_RE.search(markdown))
 
 
@@ -66,8 +68,11 @@ def _error_detail(response: httpx.Response) -> str:
 
 
 class PytexError(RuntimeError):
-    """Render failed. ``retryable`` separates transient (5xx/transport) from permanent
-    (4xx/input)."""
+    """The render failed.
+
+    ``retryable`` separates a transient failure (5xx or transport) from a permanent one
+    (4xx or bad input).
+    """
 
     def __init__(self, detail: str, *, status: int | None = None, retryable: bool) -> None:
         super().__init__(detail)
@@ -90,27 +95,33 @@ class PytexClient:
         variant: str | None = None,
         trust_level: str | None = None,
     ) -> bytes:
-        """Markdown → PDF bytes. ``variant=None`` ⇒ pytex infers it from the frontmatter.
+        """Render Markdown to PDF bytes.
 
-        ``trust_level=None`` uses the client default (``self.trust_level``, usually
-        ``trusted`` for app-generated PDFs). An explicit override applies to this call
-        only — e.g. ``trust_level="untrusted"`` for user-written Markdown
-        (protocol/agenda bodies), which locks pytex' Markdown ``eval`` escape and
-        sandboxes the build (RCE protection).
+        With ``variant=None`` pytex infers the variant from the frontmatter. With
+        ``trust_level=None`` the call uses the client default (``self.trust_level``,
+        usually ``trusted`` for app-generated PDFs). An explicit override applies to
+        this call only. For example ``trust_level="untrusted"`` fits user-written
+        Markdown such as a protocol or an agenda body. It locks the pytex Markdown
+        ``eval`` escape and sandboxes the build, which protects against RCE.
 
-        Defense in depth: the protocol/report variants must render ``trusted`` (the
-        template machinery blocks ``untrusted``/``sandboxed``), so the only
-        trusted-gated RCE vector for ``input_kind=md`` is the ``eval`` comment
-        (``[//]: # "EXPR"``). The Markdown builders neutralise it via
+        Defense in depth: the protocol and report variants must render ``trusted``,
+        because the template machinery blocks ``untrusted`` and ``sandboxed``. The only
+        trusted-gated RCE vector for ``input_kind=md`` is therefore the ``eval``
+        comment (``[//]: # "EXPR"``). The Markdown builders neutralize it through
         ``sanitize_user_markdown`` before the Markdown reaches here, but that sanitizer
-        was the only barrier. As a second, independent line we structurally verify just
-        before the ``trusted`` render that the body carries no live eval trigger; any
-        sanitizer bypass thus becomes a contained (non-retryable) error rather than RCE
-        (fail-closed). For non-``trusted`` renders pytex' own policy applies."""
+        was the only barrier. As a second and independent line we check the structure
+        before the ``trusted`` render. The body must carry no live eval trigger. A
+        sanitizer bypass thus becomes a contained, non-retryable error instead of RCE
+        (fail-closed). For a non-``trusted`` render the pytex policy applies.
+
+        Raises:
+            PytexError: pytex refused or failed the render, or it returned a body that
+                is not a PDF.
+        """
         effective_trust = trust_level if trust_level is not None else self.trust_level
         if effective_trust == "trusted" and _markdown_has_eval_trigger(markdown):
-            # Fail-closed: a surviving eval trigger must NOT render trusted. No retry —
-            # the input permanently violates policy.
+            # Fail-closed: a surviving eval trigger must NOT render trusted. There is
+            # no retry, because the input permanently violates the policy.
             raise PytexError(
                 "refused to render trusted markdown with a live eval trigger",
                 retryable=False,
@@ -132,16 +143,14 @@ class PytexClient:
                     headers={"Content-Type": "text/markdown; charset=utf-8"},
                 )
         except httpx.HTTPError as exc:
-            # Transport/timeout error: transient → worker retry.
             raise PytexError(
                 f"pytex unreachable ({type(exc).__name__})", retryable=True
             ) from exc
 
         if response.status_code != httpx.codes.OK:
-            # 4xx = permanent input/policy error, 5xx = transient. The (already
-            # pytex-scrubbed) ``{"error": …}`` body carries the reason (e.g. a LaTeX
-            # compile error) — kept, defensively truncated, so the server log/422 shows
-            # the cause instead of an opaque 503.
+            # The pytex-scrubbed ``{"error": …}`` body carries the reason, for example a
+            # LaTeX compile error. We keep it, defensively truncated, so the server log
+            # and the 422 show the cause instead of an opaque 503.
             retryable = response.status_code >= 500
             raise PytexError(
                 f"pytex render failed (status {response.status_code}): {_error_detail(response)}",

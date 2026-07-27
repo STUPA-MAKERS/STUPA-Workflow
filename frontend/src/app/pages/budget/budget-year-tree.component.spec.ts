@@ -48,7 +48,7 @@ describe('BudgetYearTreeComponent', () => {
     const { fixture } = await render(BudgetYearTreeComponent, {
       inputs: { tops: [], fiscalYears: {} },
     });
-    // Empty paragraph text comes from the 'budget.tree.empty' i18n key.
+    // The 'budget.tree.empty' i18n key supplies the text of the empty paragraph.
     expect(fixture.nativeElement.querySelector('.byt__empty')).toBeTruthy();
   });
 
@@ -65,9 +65,7 @@ describe('BudgetYearTreeComponent', () => {
     expect(screen.getByText('VS-Mittel')).toBeInTheDocument();
     expect(screen.getByText('2026')).toBeInTheDocument();
     expect(screen.getByText('2027')).toBeInTheDocument();
-    // The selected budget div carries the --sel modifier.
     expect(fixture.nativeElement.querySelector('.byt__budget--sel')).toBeTruthy();
-    // The active year button carries the --active modifier.
     expect(fixture.nativeElement.querySelector('.byt__node--active')).toBeTruthy();
   });
 
@@ -75,7 +73,6 @@ describe('BudgetYearTreeComponent', () => {
     const { fixture } = await render(BudgetYearTreeComponent, {
       inputs: { tops: [top()], fiscalYears: {} },
     });
-    // budget present but no years → .byt__empty inside the <ul>, plus dot rendered.
     expect(fixture.nativeElement.querySelector('.byt__years .byt__empty')).toBeTruthy();
   });
 
@@ -165,7 +162,7 @@ describe('BudgetYearTreeComponent', () => {
       const { fixture } = await render(BudgetYearTreeComponent, {
         inputs: { tops: [top({ id: 't-known' })], fiscalYears: {} },
       });
-      // index === -1 → ((-1 % len) + len) % len === len - 1
+      // An index of -1 gives ((-1 % len) + len) % len, which equals len - 1.
       const expected = PALETTE[PALETTE.length - 1];
       expect(fixture.componentInstance.dotColor(top({ id: 'unknown' }))).toBe(expected);
     });

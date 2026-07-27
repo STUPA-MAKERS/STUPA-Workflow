@@ -37,7 +37,7 @@ describe('WebhooksComponent', () => {
     const save = screen.getByRole('button', { name: 'Speichern' });
     expect(save).toBeDisabled();
 
-    // A valid URL is enough — saving is allowed even without a single event.
+    // A valid URL is enough. The save works even without a single event.
     await userEvent.type(screen.getByRole('textbox', { name: 'Ziel-URL' }), 'https://hook.test');
 
     expect(save).toBeEnabled();
@@ -55,16 +55,16 @@ describe('WebhooksComponent', () => {
     const c = fixture.componentInstance as any;
     c.openEdit(0);
     expect(c.draft().url).toBe('https://a');
-    c.toggleEvent('vote_opened'); // remove existing event from the draft
+    c.toggleEvent('vote_opened');
     expect(c.draft().events).toEqual([]);
-    c.toggleEvent('vote_closed'); // add a new one
+    c.toggleEvent('vote_closed');
     expect(c.draft().events).toEqual(['vote_closed']);
-    // Editing leaves the original untouched until saved.
+    // The edit leaves the original untouched until the save.
     expect(c.hooks()[0].events).toEqual(['vote_opened']);
     c.save();
     expect(saveWebhook).toHaveBeenCalledTimes(1);
     expect(c.hooks()[0].events).toEqual(['vote_closed']);
-    expect(c.draft()).toBeNull(); // Dialog nach dem Speichern zu
+    expect(c.draft()).toBeNull(); // the dialog closes after the save
   });
 
   it('cancelling the dialog discards the draft', async () => {
@@ -87,11 +87,11 @@ describe('WebhooksComponent', () => {
     const { fixture, saveWebhook } = await setup(seed as any);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
-    c.openEdit(1); // edit the SECOND hook → index 0 stays as-is (else branch)
+    c.openEdit(1); // edit the second hook, so index 0 stays as it is (else branch)
     c.patch('name', 'B2');
     c.save();
     expect(saveWebhook).toHaveBeenCalledTimes(1);
-    expect(c.hooks()[0].name).toBe('A'); // untouched sibling
+    expect(c.hooks()[0].name).toBe('A');
     expect(c.hooks()[1].name).toBe('B2');
   });
 
@@ -118,7 +118,7 @@ describe('WebhooksComponent', () => {
     c.patch('url', 'https://hook.test');
     c.save();
     expect(toast.error).toHaveBeenCalledWith('Speichern fehlgeschlagen.');
-    // draft is preserved so the user can retry
+    // the draft stays, so the user can try again
     expect(c.draft()).not.toBeNull();
   });
 
@@ -127,7 +127,7 @@ describe('WebhooksComponent', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
     c.openAdd();
-    c.patch('url', 'ftp://nope'); // not http(s) → errors().length > 0
+    c.patch('url', 'ftp://nope'); // not http or https, so errors() is not empty
     expect(c.errors()).toContain('admin.webhook.badUrl');
     c.save();
     expect(saveWebhook).not.toHaveBeenCalled();

@@ -1,9 +1,8 @@
-"""Unit (ohne echte DB): ApplicationsService-Pfade, die vor Schreibzugriffen greifen.
+"""Unit tests without a real database: ApplicationsService paths that guard a write.
 
-* 404, wenn der Antrag fehlt.
-* 409 (Edit-Lock), wenn der aktuelle State ``edit_allowed=False`` ist — **vor** jeder
-  Versions-/Schreiboperation.
-* ``_amount_currency``/``_state_out`` Hilfslogik (promoted-Sync, State-Serialisierung).
+A missing application gives 404. A current state with `edit_allowed=False` gives 409,
+before any version or write operation. The helpers `_amount_currency` and `_state_out`
+cover the promoted sync and the state serialization.
 """
 
 from __future__ import annotations
@@ -32,7 +31,7 @@ class _Obj:
 
 
 class _GetSession:
-    """Minimaler AsyncSession-Stub: ``get(model, pk)`` aus einer Typ→Objekt-Map."""
+    """Minimal AsyncSession stub: `get(model, pk)` reads from a type-to-object map."""
 
     def __init__(self, by_type: dict[type, Any]) -> None:
         self._by_type = by_type
@@ -72,9 +71,6 @@ def test_patch_missing_application_404() -> None:
         asyncio.run(svc.patch(uuid4(), {}, changed_by="x"))
 
 
-# --------------------------------------------------------------------------- #
-# helpers
-# --------------------------------------------------------------------------- #
 def test_amount_currency_extracts_promoted() -> None:
     fields = [
         FormFieldDef.model_validate(
@@ -129,7 +125,7 @@ class _Result:
 
 
 class _ColorSession:
-    """AsyncSession-Stub für die Farb-Auflösung: ``execute`` liefert (key, color)-Rows."""
+    """AsyncSession stub for color resolution: `execute` returns (key, color) rows."""
 
     def __init__(self, rows: list[tuple[str, str | None]]) -> None:
         self._rows = rows
@@ -139,9 +135,9 @@ class _ColorSession:
 
 
 def test_resolve_state_colors_overrides_stored_color() -> None:
-    """Bug-Fix: alte State-Zeile mit ``color=None`` → Farbe aus aktivem globalem Flow."""
+    """Bug fix: a state row with `color=None` takes the color of the active global flow."""
     svc = ApplicationsService(_ColorSession([("approved", "#2ecc71")]))  # type: ignore[arg-type]
-    # gespeicherte State-Zeile (alte FlowVersion) hat keine Farbe
+    # The stored state row comes from an old FlowVersion and carries no color.
     stored = _Obj(
         id=uuid4(),
         key="approved",
@@ -156,7 +152,7 @@ def test_resolve_state_colors_overrides_stored_color() -> None:
 
 
 def test_resolve_state_colors_falls_back_to_stored() -> None:
-    """Kein Eintrag im globalen Flow für diesen Key → gespeicherte Farbe bleibt."""
+    """Without an entry for this key in the global flow the stored color stays."""
     svc = ApplicationsService(_ColorSession([("other", "#111111")]))  # type: ignore[arg-type]
     stored = _Obj(
         id=uuid4(),

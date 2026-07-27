@@ -1,8 +1,8 @@
-"""Integration (echte Postgres, testcontainers): ApplicationTypesService.
+"""Integration (real Postgres, testcontainers): ApplicationTypesService.
 
-Beweist gegen ein echtes Schema (data-model §1): öffentlich werden nur Typen mit
-aktiver Form-Version gelistet, Paging zählt korrekt, und die Admin-Sicht
-(``include_inactive``/``admin``) liefert inaktive Typen + Zusatzfelder.
+The tests run against a real schema (data-model §1). The public list shows only types
+with an active form version. Paging counts the total correctly. The admin view
+(`include_inactive` and `admin`) returns inactive types plus the extra fields.
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ async def _seed_type(
     has_budget: bool = False,
     active: bool = True,
 ) -> ApplicationType:
-    """Antragstyp anlegen; bei ``active`` mit aktiver Form-Version verknüpft."""
+    """Create an application type. With `active`, link an active form version to it."""
     gremium = Gremium(name="G", slug=f"g-{uuid.uuid4()}")
     session.add(gremium)
     await session.flush()
@@ -68,7 +68,7 @@ async def test_public_lists_only_active_types(session: AsyncSession) -> None:
     page = await svc.list_types(lang="de", limit=50, offset=0)
 
     assert page.total == 1
-    assert [i.key for i in page.items] == [None]  # public: kein key
+    assert [i.key for i in page.items] == [None]  # the public view hides the key
     assert [i.name for i in page.items] == ["Aktiv"]
     assert page.items[0].active is True
 
@@ -98,7 +98,7 @@ async def test_paging_limits_and_counts(session: AsyncSession) -> None:
     svc = ApplicationTypesService(session)
     page = await svc.list_types(lang="de", limit=2, offset=0)
 
-    assert page.total == 3  # Total ignoriert das Limit
+    assert page.total == 3  # the total ignores the limit
     assert len(page.items) == 2
     assert page.limit == 2
 

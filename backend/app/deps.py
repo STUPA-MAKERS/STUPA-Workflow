@@ -1,12 +1,13 @@
 """FastAPI auth dependencies.
 
-- `get_current_principal`: session cookie or OAuth bearer → RBAC-resolved principal.
-- `get_current_applicant`: signed opaque `sid` (bearer/cookie) → applicant session + scope.
-- `require_principal`/`require_group`/`require_applicant`: 401 without auth, 403 on
-  missing permission/group/scope.
+`get_current_principal` resolves a session cookie or an OAuth bearer token to an
+RBAC-resolved principal. `get_current_applicant` resolves a signed opaque `sid`
+from a bearer header or a cookie to an applicant session and its scope.
+`require_principal`, `require_group` and `require_applicant` raise 401 without
+authentication and 403 when the permission, the group or the scope is missing.
 
-`Principal`/`Applicant` are re-exported from `app.modules.auth.principal` (leaf
-module, avoids a deps ↔ auth import cycle).
+`Principal` and `Applicant` come from `app.modules.auth.principal`. That module is
+a leaf, so the re-export avoids an import cycle between `deps` and `auth`.
 """
 
 from __future__ import annotations
@@ -45,9 +46,11 @@ SettingsDep = Annotated[Settings, Depends(get_settings)]
 def _bearer_token(request: Request, settings: Settings) -> str | None:
     """Read the applicant token from `Authorization: Bearer` or the HttpOnly cookie.
 
-    Deliberately no `?t=` query support: tokens in the query leak via
-    Referer/history/logs. The magic link carries its token in the URL fragment;
-    the frontend exchanges it for the cookie via POST."""
+    The function does not accept a `?t=` query parameter on purpose. A token in the
+    query string leaks through the Referer header, the browser history and the logs.
+    The magic link carries its token in the URL fragment. The frontend exchanges the
+    fragment for the cookie with a POST request.
+    """
     auth = request.headers.get("Authorization", "")
     if auth.startswith("Bearer "):
         return auth[7:]
@@ -57,8 +60,8 @@ def _bearer_token(request: Request, settings: Settings) -> str | None:
 def _principal_bearer_token(request: Request) -> str | None:
     """Return the OAuth access token from `Authorization: Bearer apat_…`, else `None`.
 
-    Only the `apat_` prefix counts as a principal token; signed applicant bearers
-    (magic link) are ignored here and handled by the applicant path.
+    Only the `apat_` prefix counts as a principal token. This function ignores a
+    signed applicant bearer token from a magic link. The applicant path handles it.
     """
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
@@ -70,7 +73,11 @@ def _principal_bearer_token(request: Request) -> str | None:
 async def _principal_from_access_token(
     db: AsyncSession, token: str, now: datetime
 ) -> Principal | None:
-    """Resolve an OAuth access token to a scoped principal, `None` if invalid/expired."""
+    """Resolve an OAuth access token to a scoped principal.
+
+    Returns:
+        The scoped principal, or `None` when the token is invalid or expired.
+    """
     resolved = await oauth_service.resolve_access_token(db, token=token, now=now)
     if resolved is None:
         return None
@@ -96,8 +103,11 @@ async def get_current_principal(
 ) -> Principal | None:
     """Resolve the principal from an OAuth bearer token (MCP) or the session cookie.
 
-    A `Bearer apat_…` token is resolved first and caps permissions to the token
-    scope; otherwise falls back to the session cookie. `None` if nothing valid.
+    The function tries a `Bearer apat_…` token first and caps the permissions to
+    the token scope. Without such a token it falls back to the session cookie.
+
+    Returns:
+        The resolved principal, or `None` when no credential is valid.
     """
     now = datetime.now(UTC)
     bearer = _principal_bearer_token(request)
@@ -132,9 +142,11 @@ async def get_current_applicant(
 ) -> Applicant | None:
     """Resolve the server-side magic-link session (signed opaque `sid`) to an Applicant.
 
-    The `sid` is signature-checked, then looked up in `applicant_session`: no access
-    without an existing, unrevoked, unexpired row — a token forged from
-    `SESSION_SECRET` alone matches no row and yields `None`."""
+    The function checks the signature of the `sid` first. It then looks the `sid` up
+    in `applicant_session`. Access needs a row that exists, is not revoked and is not
+    expired. A token forged from `SESSION_SECRET` alone matches no row and gives
+    `None`.
+    """
     token = _bearer_token(request, settings)
     if not token:
         return None
@@ -170,8 +182,10 @@ def require_principal(*perms: str) -> Callable[..., Principal]:
 def require_any_permission(*perms: str) -> Callable[..., Principal]:
     """Return a dependency: 401 without a session, 403 unless ANY permission matches.
 
-    For shared read endpoints serving multiple admin areas
-    (e.g. ``/admin/config-schemas`` for both type and branding editors)."""
+    Use this for a shared read endpoint that serves several admin areas. One example
+    is `/admin/config-schemas`, which the type editor and the branding editor both
+    read.
+    """
 
     def dependency(
         principal: Annotated[Principal | None, Depends(get_current_principal)],

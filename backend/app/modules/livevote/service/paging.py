@@ -14,8 +14,9 @@ from sqlalchemy import DateTime, cast, func
 from app.modules.livevote.models import Meeting
 from app.shared.errors import BadRequestError
 
-# Timeline sort/boundary key: the meeting's scheduled moment. A missing time means
-# midnight; a missing date (openly planned) sorts the meeting to the far future.
+# Timeline sort and boundary key: the scheduled moment of the meeting. A missing
+# time means midnight. A missing date (an openly planned meeting) sorts the meeting
+# to the far future.
 _MIDNIGHT = _time(0, 0)
 _UNDATED_FALLBACK = _date(9999, 12, 31)
 
@@ -36,7 +37,14 @@ def _encode_cursor(ts: _datetime, meeting_id: UUID) -> str:
 
 
 def _decode_cursor(cursor: str | None) -> tuple[_datetime, UUID] | None:
-    """Cursor to (timestamp, id); ``None`` for an empty cursor, 400 for garbage."""
+    """Decode a keyset cursor into a timestamp and an id.
+
+    Returns:
+        The pair from the cursor, or ``None`` for an empty cursor.
+
+    Raises:
+        BadRequestError: The cursor is malformed.
+    """
     if not cursor:
         return None
     try:
@@ -53,7 +61,14 @@ def _encode_offset(offset: int) -> str:
 
 
 def _decode_offset(cursor: str | None) -> int:
-    """Offset cursor to int (``0`` for an empty cursor, 400 for garbage)."""
+    """Decode an offset cursor.
+
+    Returns:
+        The offset, or ``0`` for an empty cursor.
+
+    Raises:
+        BadRequestError: The cursor is malformed or the offset is negative.
+    """
     if not cursor:
         return 0
     try:

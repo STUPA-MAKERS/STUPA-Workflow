@@ -1,4 +1,4 @@
-"""Secret-Verschlüsselung (Fernet, #fints): Roundtrip + Fehlerfälle."""
+"""Secret encryption for FinTS (Fernet, #fints): roundtrip and error cases."""
 
 from __future__ import annotations
 

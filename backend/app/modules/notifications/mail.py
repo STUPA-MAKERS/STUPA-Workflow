@@ -1,11 +1,13 @@
-"""Mail sending: ``MailMessage`` + ``MailSender`` protocol (SMTP/capturing).
+"""Mail sending: `MailMessage` and the `MailSender` protocol (SMTP or capturing).
 
-Domain/transport split: the service builds pure ``MailMessage`` values; a
-``MailSender`` sends them. Sending stays testable (capturing sender, no real
-SMTP) and the worker injects the SMTP sender in production.
+The module splits the domain from the transport. The service builds pure
+`MailMessage` values. A `MailSender` sends them. Sending stays testable through
+the capturing sender, without real SMTP. In production the worker injects the
+SMTP sender.
 
-Never log secrets/PII: logs carry only recipient domains + idempotency key,
-never addresses, subject, body or the SMTP password.
+Never log a secret or personal data. The logs carry only the recipient domains
+and the idempotency key. They never carry an address, a subject, a body or the
+SMTP password.
 """
 
 from __future__ import annotations
@@ -24,9 +26,12 @@ logger = logging.getLogger("app.mail")
 
 @dataclass(frozen=True, slots=True)
 class MailAttachment:
-    """A mail attachment (pure value; ``content`` travels base64-encoded
-    through the queue). Attachments are sent instead of PDF links because
-    links would require login/permission and are useless to external lists."""
+    """A mail attachment as a pure value.
+
+    The `content` field travels base64-encoded through the queue. The platform
+    sends an attachment instead of a PDF link. A link would need a login and a
+    permission, and an external mailing list cannot use it.
+    """
 
     filename: str
     mime: str
@@ -57,13 +62,13 @@ class MailMessage:
     text: str
     html: str | None = None
     idempotency_key: str = ""
-    # Optional header info; the sender takes defaults from the settings.
+    # Optional header info. The sender takes the defaults from the settings.
     from_addr: str | None = None
     from_name: str | None = None
     attachments: tuple[MailAttachment, ...] = ()
 
     def recipient_domains(self) -> list[str]:
-        """Return recipient domains (for PII-free logs)."""
+        """Return the recipient domains (for logs free of personal data)."""
         return sorted({addr.rsplit("@", 1)[-1] for addr in self.to if "@" in addr})
 
     def to_payload(self) -> dict[str, object]:
@@ -81,7 +86,7 @@ class MailMessage:
 
     @classmethod
     def from_payload(cls, payload: dict[str, object]) -> MailMessage:
-        """Reconstruct from the queue payload (inverse of ``to_payload``)."""
+        """Rebuild the message from the queue payload (inverse of `to_payload`)."""
         raw_attachments = payload.get("attachments") or []
         return cls(
             to=tuple(payload["to"]),  # type: ignore[arg-type]
@@ -101,14 +106,15 @@ class MailMessage:
 def compute_idempotency_key(*parts: str) -> str:
     """Build a deterministic key from the parts (event|app|template|rcpt).
 
-    Same input → same key → queue/sender deduplicates (idempotent sending).
+    The same input gives the same key. The queue and the sender then drop the
+    duplicate, so a send is idempotent.
     """
     digest = hashlib.sha256("\x1f".join(parts).encode("utf-8")).hexdigest()
     return f"mail:{digest}"
 
 
 def build_email_message(msg: MailMessage, settings: Settings) -> EmailMessage:
-    """Build an RFC-5322 ``EmailMessage`` (text + optional HTML + attachments)."""
+    """Build an RFC-5322 `EmailMessage` (text, optional HTML, attachments)."""
     email = EmailMessage()
     from_addr = msg.from_addr or settings.mail_from
     from_name = msg.from_name or settings.mail_from_name
@@ -137,7 +143,7 @@ class MailSender(Protocol):
 
 @dataclass(slots=True)
 class CapturingMailSender:
-    """Test/dev sender: collects mails instead of sending (no real SMTP)."""
+    """Test and dev sender: collect the mails instead of sending them (no SMTP)."""
 
     sent: list[MailMessage] = field(default_factory=list)
 
@@ -157,10 +163,10 @@ class SmtpMailSender:
     settings: Settings
 
     async def send(self, msg: MailMessage) -> None:
-        import aiosmtplib  # local: worker path, keeps the API import lean
+        import aiosmtplib  # local import: worker path only, keeps the API import lean
 
         s = self.settings
-        if not msg.to:  # nothing to send (resolver returned no recipients)
+        if not msg.to:  # nothing to send: the resolver returned no recipients
             return
         email = build_email_message(msg, s)
         logger.info(

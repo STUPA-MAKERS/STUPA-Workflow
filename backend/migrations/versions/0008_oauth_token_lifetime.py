@@ -1,8 +1,9 @@
-"""OAuth-Token: wählbare Lebensdauer inkl. »läuft nie ab«.
+"""OAuth token: a selectable lifetime, including a never-expires option.
 
-Macht ``access_expires_at`` NULL-bar (NULL = nie ablaufend) und ergänzt
-``access_ttl_seconds`` auf Authorization-Code + Token (gewählte Lebensdauer, für die
-Refresh-Rotation gemerkt). Idempotent (``IF [NOT] EXISTS`` / ``DROP NOT NULL``).
+`access_expires_at` becomes nullable. NULL means the token never expires. The migration
+also adds `access_ttl_seconds` to the authorization code and to the token. That column
+keeps the selected lifetime for the refresh rotation. Idempotent through
+`IF [NOT] EXISTS` and `DROP NOT NULL`.
 """
 
 from __future__ import annotations
@@ -26,7 +27,7 @@ _UPGRADE: tuple[str, ...] = (
 _DOWNGRADE: tuple[str, ...] = (
     "ALTER TABLE oauth_authorization_code DROP COLUMN IF EXISTS access_ttl_seconds",
     "ALTER TABLE oauth_token DROP COLUMN IF EXISTS access_ttl_seconds",
-    # access_expires_at bleibt NULL-bar (Downgrade-Daten könnten NULL enthalten).
+    # access_expires_at stays nullable, because the data can hold NULL after a downgrade.
 )
 
 

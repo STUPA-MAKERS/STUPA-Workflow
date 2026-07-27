@@ -1,9 +1,11 @@
-"""Pure field-diff computation for application versions — no DB/HTTP.
+"""Pure field-diff computation for application versions. No DB and no HTTP.
 
-:func:`compute_diff` compares two ``data`` snapshots and returns
+`compute_diff` compares two ``data`` snapshots. It returns
 ``{"added": {key: new}, "removed": {key: old}, "changed": {key: {"old", "new"}}}``.
-Nested fields (objects, ``table`` row lists) are compared by value as a whole —
-no recursive cell diff; robust against heterogeneous structures.
+
+The code compares a nested field as a whole value. This covers an object and a
+``table`` row list. There is no recursive cell diff. Mixed structures therefore
+stay safe to compare.
 """
 
 from __future__ import annotations
@@ -26,8 +28,10 @@ class DataDiff(TypedDict):
 def compute_diff(old: Mapping[str, Any], new: Mapping[str, Any]) -> DataDiff:
     """Compute a structured diff of two field-value maps.
 
-    ``added``: keys only in ``new``; ``removed``: keys only in ``old``;
-    ``changed``: keys in both with unequal values.
+    Returns:
+        ``added`` holds the keys only in ``new``. ``removed`` holds the keys
+        only in ``old``. ``changed`` holds the keys in both maps whose values
+        differ.
     """
     added: dict[str, Any] = {k: new[k] for k in new.keys() - old.keys()}
     removed: dict[str, Any] = {k: old[k] for k in old.keys() - new.keys()}
@@ -40,5 +44,5 @@ def compute_diff(old: Mapping[str, Any], new: Mapping[str, Any]) -> DataDiff:
 
 
 def is_empty_diff(diff: DataDiff) -> bool:
-    """Return ``True`` if the diff contains no change (no new version needed)."""
+    """Return ``True`` when the diff holds no change, so no new version is needed."""
     return not (diff["added"] or diff["removed"] or diff["changed"])

@@ -8,7 +8,7 @@ import {
   attendanceKey,
 } from './meetings-display.util';
 
-/** Attendance roster table: own row always editable, all rows for the lead. */
+/** Attendance roster table. A user edits the own row. The meeting lead edits all rows. */
 @Component({
   selector: 'app-meeting-attendance-table',
   standalone: true,
@@ -19,7 +19,7 @@ import {
 })
 export class MeetingAttendanceTableComponent {
   readonly rows = input.required<Attendance[]>();
-  /** Whether every row is editable (session lead) or only the own row. */
+  /** True for the meeting lead. False limits the edit to the own row. */
   readonly editAll = input.required<boolean>();
   readonly locked = input.required<boolean>();
   readonly saving = input.required<boolean>();

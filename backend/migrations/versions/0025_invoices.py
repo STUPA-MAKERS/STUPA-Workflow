@@ -1,7 +1,8 @@
-"""Rechnungen (#invoices): ``invoice`` Tabelle + ``budget_expense.invoice_id``.
+"""Invoices (#invoices): the `invoice` table and `budget_expense.invoice_id`.
 
-Eigenständige Rechnungen (optional aus ZUGFeRD/Factur-X importiert); Buchungen
-referenzieren optional eine Rechnung (1 Rechnung : N Buchungen). Idempotent.
+An invoice is a standalone record. A ZUGFeRD or Factur-X import can create it.
+A booking references at most one invoice, and one invoice can carry many
+bookings. All statements are idempotent.
 """
 
 from __future__ import annotations

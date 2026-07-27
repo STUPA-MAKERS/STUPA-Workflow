@@ -1,4 +1,4 @@
-"""arq-Enqueue-Abstraktion (T-19): idempotenter Job-Key + Dedup + None-Pool."""
+"""arq enqueue abstraction (T-19): idempotent job key, dedup and a None pool."""
 
 from __future__ import annotations
 
@@ -36,7 +36,7 @@ async def test_enqueue_passes_idempotent_job_id() -> None:
 
 async def test_enqueue_deduped_when_job_exists() -> None:
     did = uuid.uuid4()
-    pool = _Pool(returns=None)  # arq: bereits vorhandener Job → None
+    pool = _Pool(returns=None)  # arq returns None for a job that already exists
     await ArqWebhookQueue(pool).enqueue(did)
     assert pool.calls[0][0] == "deliver_webhook"
 

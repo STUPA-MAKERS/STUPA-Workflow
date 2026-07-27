@@ -1,12 +1,14 @@
-"""config_revision: append-only Config-Snapshot-Kette + Permission ``audit.revert``.
+"""config_revision: append-only config snapshot chain and the `audit.revert` permission.
 
-#config-versioning. Universelle, **append-only** Historie der versionierten Configs
-(Forms/Flow/Branding): UPDATE/DELETE/TRUNCATE werden DB-seitig per Trigger abgelehnt
-(eine Version ist **nie** löschbar) + Least-Privilege-Grant an ``audit_writer`` (wie
-``audit_entry``). Dazu die destruktive Permission ``audit.revert`` (Audit-Log-Revert),
-geseedet an die ``admin``-Rolle.
+#config-versioning. The table holds a universal, **append-only** history of the
+versioned configs (forms, flow, branding). A database trigger rejects UPDATE, DELETE
+and TRUNCATE, so a version is **never** deletable. The table also gets a
+least-privilege grant to `audit_writer`, the same as `audit_entry`. The destructive
+permission `audit.revert` covers the audit-log revert. The migration seeds it to the
+`admin` role.
 
-Idempotent (``IF NOT EXISTS`` / ``ON CONFLICT DO NOTHING``); sauberer Down-Round-Trip.
+All statements are idempotent (`IF NOT EXISTS` or `ON CONFLICT DO NOTHING`). The
+downgrade is a clean round trip.
 """
 
 from __future__ import annotations

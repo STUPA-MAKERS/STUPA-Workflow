@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Smoke-Test (T-01): bringt den Stack hoch und prüft, dass alle Services healthy
-# werden. Zählt als "Test" dieser Infra-Task (T-01 AK).
+# Smoke test (T-01). The script starts the stack and checks that all services become
+# healthy. It counts as the test of this infrastructure task (T-01 AK).
 #
 # Usage: scripts/smoke.sh [up|down]
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 COMPOSE_DIR="${ROOT}/deploy"
-TIMEOUT="${SMOKE_TIMEOUT:-420}"   # ClamAV-DB-Load braucht Zeit
+TIMEOUT="${SMOKE_TIMEOUT:-420}"   # the ClamAV database load takes time
 
 cd "${COMPOSE_DIR}"
 
@@ -39,7 +39,7 @@ while :; do
     [[ -z "${cid}" ]] && { unhealthy=1; continue; }
     status="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "${cid}" 2>/dev/null || echo missing)"
     case "${status}" in
-      healthy|running) ;;   # running = Service ohne Healthcheck (z.B. altcha-Platzhalter)
+      healthy|running) ;;   # running = a service with no healthcheck (altcha placeholder)
       *) unhealthy=1; echo "   ${svc}: ${status}" ;;
     esac
   done

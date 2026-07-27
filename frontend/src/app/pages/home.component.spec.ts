@@ -18,7 +18,6 @@ describe('HomeComponent', () => {
   it('shows the returning-applicant magic-link note and no feature cards', async () => {
     await render(HomeComponent, { providers: [provideRouter([])] });
     expect(screen.getByText(/Bestätigungs-E-Mail/)).toBeInTheDocument();
-    // The former marketing cards (applications/live-vote/budget) have been removed.
     expect(screen.queryByRole('heading', { name: 'Live-Vote' })).not.toBeInTheDocument();
   });
 

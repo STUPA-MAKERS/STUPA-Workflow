@@ -1,8 +1,8 @@
 import { LoadingService } from './loading.service';
 
 /**
- * Deterministische Test-Uhr: ersetzt setTimeout/Date.now durch eine manuelle
- * Zeitachse — frei von jest-Fake-Timer/zone.js-Wechselwirkungen.
+ * Deterministic test clock. It replaces setTimeout and Date.now with a manual
+ * time axis, free of side effects between the jest fake timers and zone.js.
  */
 class TestLoadingService extends LoadingService {
   private time = 0;
@@ -60,7 +60,7 @@ describe('LoadingService', () => {
     svc.advance(500);
     expect(svc.visible()).toBe(true);
 
-    svc.dec(); // none running → hide after MIN_VISIBLE (elapsed already > min here)
+    svc.dec(); // none running, hide after MIN_VISIBLE (elapsed is already above the minimum)
     expect(svc.visible()).toBe(false);
   });
 
@@ -80,7 +80,7 @@ describe('LoadingService', () => {
     svc.advance(150);
     svc.dec(); // schedule hide
     svc.advance(200);
-    svc.inc(); // new request → cancel hide
+    svc.inc(); // new request, cancels the hide
     svc.advance(400);
     expect(svc.visible()).toBe(true);
   });

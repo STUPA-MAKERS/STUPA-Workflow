@@ -1,4 +1,4 @@
-"""Scoped tree view with allocated/committed/requested/expended roll-up."""
+"""Scoped tree view with the allocated, committed, requested and expended roll-up."""
 
 from __future__ import annotations
 
@@ -17,19 +17,25 @@ from app.modules.flow.models import State
 
 
 def _natural_path_key(path_key: str) -> tuple:
-    """Natural path ordering: numeric segments as numbers (``VSM-10`` after
-    ``VSM-9``), non-numeric as strings. Tuple comparison is type-pure since
-    numeric ``(0, int)`` and string ``(1, str)`` segments differ at position 0.
-    Prefix paths (parents) sort before their extensions."""
+    """Build the sort key for a natural path order.
+
+    A numeric segment sorts as a number, so `VSM-10` comes after `VSM-9`. Every
+    other segment sorts as a string. The tuple comparison stays type-pure: a
+    numeric `(0, int)` segment and a string `(1, str)` segment already differ at
+    position 0. A prefix path, that is a parent, sorts before its extensions.
+    """
     return tuple((0, int(s)) if s.isdigit() else (1, s) for s in path_key.split("-"))
 
 
 class TreeViewOps(BudgetTreeServiceBase):
-    """Build the scoped cost-centre tree and answer node visibility."""
+    """Build the scoped cost-center tree and answer node visibility."""
 
     async def can_view_node(self, budget_id: UUID, member_gremium_ids: set[UUID]) -> bool:
-        """Is the node visible to a gremium member? True if the node ITSELF or
-        an ANCESTOR is assigned to one of the member's gremien."""
+        """Tell if a member of a Gremium can see the node.
+
+        The result is true when the node itself or an ancestor belongs to one of
+        the Gremien of the member.
+        """
         if not member_gremium_ids:
             return False
         node = await self._get_node(budget_id)
@@ -48,19 +54,20 @@ class TreeViewOps(BudgetTreeServiceBase):
         gremium_id: UUID | None = None,
         visible_gremium_ids: set[UUID] | None = None,
     ) -> list[BudgetTreeNodeOut]:
-        """Cost-centre tree with allocated/committed/requested/available per FY.
+        """Build the cost-center tree with the sums per fiscal year.
 
-        Classification per top budget: an application counts as **committed**
-        when its current flow-state key is in the top budget's
-        ``accepted_state_keys``; as **requested** when it is neither accepted
-        nor denied; denied is excluded.
+        Every node carries allocated, committed, requested and available. Each
+        top-level budget classifies its applications. An application counts as
+        committed when its current flow-state key is in `accepted_state_keys` of
+        the top budget. It counts as requested when it is neither accepted nor
+        denied. A denied application drops out.
         """
         nodes = list((await self.session.execute(select(Budget))).scalars().all())
-        # Natural order (VSM-10 after VSM-9 instead of lexicographic); parents
-        # before children is preserved → build_forest inherits sibling order.
+        # Natural order puts VSM-10 after VSM-9 instead of sorting
+        # lexicographically. Parents still come before children, so build_forest
+        # inherits the sibling order.
         nodes.sort(key=lambda b: _natural_path_key(b.path_key))
         allocs = (await self.session.execute(select(BudgetAllocation))).scalars().all()
-        # Applications with cost centre + FY + current flow-state key.
         app_rows = (
             await self.session.execute(
                 select(
@@ -79,9 +86,9 @@ class TreeViewOps(BudgetTreeServiceBase):
             )
         ).all()
 
-        # Bookings: actual consumption (expended) or income. Application-bound
-        # expenses carry ``application_id`` → they proportionally replace the
-        # application's committed amount.
+        # A booking holds the real consumption (expended) or the income. An
+        # expense that binds to an application carries application_id. It
+        # replaces that share of the committed amount of the application.
         expense_rows = (
             await self.session.execute(
                 select(
@@ -92,19 +99,21 @@ class TreeViewOps(BudgetTreeServiceBase):
                     BudgetExpense.application_id,
                 )
                 .join(Budget, Budget.id == BudgetExpense.budget_id)
-                # Do NOT count sub-bookings — the parent amount (= children sum)
-                # is already included; otherwise it would double.
+                # Do not count sub-bookings. The parent amount is the sum of the
+                # children and is already included. Both would double the sum.
                 .where(BudgetExpense.parent_expense_id.is_(None))
             )
         ).all()
 
-        # Sum of application-bound **expenses** (income does not reduce the binding).
+        # Sum of the expenses bound to an application. Income does not reduce
+        # the binding.
         spent_per_app: dict[object, Decimal] = {}
         for _path, _fy, amount, kind, app_id in expense_rows:
             if kind == "expense" and app_id is not None:
                 spent_per_app[app_id] = spent_per_app.get(app_id, _ZERO) + (amount or _ZERO)
 
-        # Top-budget config: first path segment → (accepted, denied) state keys.
+        # Top-budget config: the first path segment maps to the accepted and the
+        # denied state keys.
         top_config: dict[str, tuple[set[str], set[str]]] = {
             n.path_key: (set(n.accepted_state_keys or []), set(n.denied_state_keys or []))
             for n in nodes
@@ -122,10 +131,10 @@ class TreeViewOps(BudgetTreeServiceBase):
                 if remaining > _ZERO:
                     bound_rows.append((fy, path, remaining))
             elif state_key in denied:
-                continue  # excluded
+                continue
             else:
-                # Reduce requested (in-flight) applications by already booked
-                # expenses too — the expense counts as spent, not twice.
+                # Reduce a requested (in-flight) application by the booked
+                # expenses too. The expense counts as spent, not twice.
                 spent = spent_per_app.get(app_id, _ZERO)
                 remaining = (amount or _ZERO) - spent
                 if remaining > _ZERO:
@@ -173,7 +182,8 @@ class TreeViewOps(BudgetTreeServiceBase):
             gremium_id=gremium_id,
         )
         # Gremium scope: without a global budget.* permission only the assigned
-        # subtrees (view_gremium_id ∈ member gremien) become roots.
+        # subtrees become roots. Their view_gremium_id is one of the Gremien of
+        # the member.
         if visible_gremium_ids is not None:
             forest = tree_rules.scope_forest(forest, set(visible_gremium_ids))
         return [BudgetTreeNodeOut.model_validate(d) for d in forest]

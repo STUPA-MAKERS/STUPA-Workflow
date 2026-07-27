@@ -1,9 +1,12 @@
-"""Unit-Tests der DSGVO/Privacy-Services (ohne DB).
+"""Unit tests for the privacy (DSGVO/GDPR) services without a database.
 
-Deckt PrincipalService (Erasure), ErasureRequestService (Queue: create/list/get/
-execute/reject inkl. Guards), PrivacySettingsService (Single-Row mit Seed-Fallback)
-und AuskunftService (PII-Sammlung Art. 15). Session über ``privacy_fakes.FakeSession``;
-``audit_record`` läuft echt gegen den Fake (Advisory-Lock + Genesis = Defaults).
+The suite covers four services. PrincipalService erases a principal.
+ErasureRequestService runs the queue with create, list, get, execute and reject, plus
+the guards. PrivacySettingsService reads a single row with a seed fallback.
+AuskunftService collects the PII for Art. 15.
+
+The session comes from `privacy_fakes.FakeSession`. `audit_record` runs for real
+against that fake, so the advisory lock and the genesis entry keep the defaults.
 """
 
 from __future__ import annotations
@@ -57,7 +60,6 @@ def _erasure(**over: object) -> ErasureRequest:
     return ErasureRequest(**defaults)
 
 
-# --------------------------------------------------------------- PrincipalService
 async def test_principal_erase_clears_pii_and_deactivates() -> None:
     principal = _principal()
     db = fake_session(gets=[principal])
@@ -68,10 +70,9 @@ async def test_principal_erase_clears_pii_and_deactivates() -> None:
     assert principal.calendar_token is None
     assert principal.oidc_groups is None
     assert principal.active is False
-    # sub bleibt als Pseudonym erhalten (Audit-Kette/Keycloak-Verknüpfung).
+    # The sub stays as a pseudonym for the audit chain and the Keycloak link.
     assert principal.sub == "kc-123"
     assert db.committed == 1
-    # audit_record hängt einen Eintrag an.
     assert any(getattr(o, "action", None) == "principal_erased" for o in db.added)
 
 
@@ -89,13 +90,12 @@ async def test_principal_erase_commit_false_flushes_only() -> None:
     assert db.flushed >= 1
 
 
-# ---------------------------------------------------------- PrivacySettingsService
 async def test_settings_get_returns_existing_row() -> None:
     row = PrivacySettings(id=1, default_retention_months=36)
     db = fake_session(gets=[row])
     got = await PrivacySettingsService(db).get()
     assert got is row
-    assert db.added == []  # Seed-Fallback nicht getriggert
+    assert db.added == []  # the seed fallback did not fire
 
 
 async def test_settings_get_seeds_when_missing() -> None:
@@ -116,7 +116,6 @@ async def test_settings_update_persists_value() -> None:
     assert row in db.refreshed
 
 
-# ------------------------------------------------------- ErasureRequestService.create
 async def test_create_applicant_requires_application_id() -> None:
     db = fake_session()
     with pytest.raises(ValidationProblem):
@@ -130,7 +129,7 @@ async def test_create_principal_requires_principal_id() -> None:
 
 
 async def test_create_applicant_unknown_application_raises_not_found() -> None:
-    db = fake_session(gets=[None])  # Application existiert nicht
+    db = fake_session(gets=[None])  # the application does not exist
     with pytest.raises(NotFoundError):
         await ErasureRequestService(db).create(
             subject_type="applicant", application_id=uuid4()
@@ -140,8 +139,8 @@ async def test_create_applicant_unknown_application_raises_not_found() -> None:
 async def test_create_applicant_backfills_email_from_applicant() -> None:
     app_id = uuid4()
     db = fake_session(
-        gets=[Application(id=app_id)],  # Existenzprüfung
-        scalar=["found@example.org"],  # Applicant.email-Lookup
+        gets=[Application(id=app_id)],  # existence check
+        scalar=["found@example.org"],  # Applicant.email lookup
     )
     request = await ErasureRequestService(db).create(
         subject_type="applicant", application_id=app_id
@@ -173,11 +172,10 @@ async def test_create_applicant_keeps_explicit_email() -> None:
         application_id=app_id,
         email="explicit@example.org",
     )
-    # Explizite Mail bleibt — kein Backfill-Lookup nötig.
+    # The explicit email stays. The service runs no backfill lookup.
     assert request.email == "explicit@example.org"
 
 
-# --------------------------------------------------------- ErasureRequestService.list/get
 async def test_list_all() -> None:
     rows = [_erasure(), _erasure()]
     db = fake_session(scalars=[result(*rows)])
@@ -198,12 +196,11 @@ async def test_get_returns_row() -> None:
     assert await ErasureRequestService(db).get(row.id) is row
 
 
-# ------------------------------------------------------- ErasureRequestService.execute
 async def test_execute_applicant_dispatches_anonymize(monkeypatch) -> None:
     calls: list[tuple[UUID, str, object, bool]] = []
 
     async def fake_anonymize(_self, application_id, *, files, actor, commit):  # type: ignore[no-untyped-def]
-        # files (hier None) + commit=False belegen den Dispatch-Pfad.
+        # Here files is None and commit is False, which proves the dispatch path.
         calls.append((application_id, actor, files, commit))
 
     monkeypatch.setattr(
@@ -215,7 +212,8 @@ async def test_execute_applicant_dispatches_anonymize(monkeypatch) -> None:
     assert out.status == "executed"
     assert out.handled_by == "admin"
     assert out.handled_at is not None
-    # Anonymisierung dispatcht atomar (commit=False) auf die richtige Application.
+    # The service dispatches the anonymization to the right application atomically
+    # (commit=False).
     assert calls == [(request.application_id, "admin", None, False)]
     assert db.committed == 1
 
@@ -225,7 +223,7 @@ async def test_execute_principal_dispatches_erase() -> None:
     request = _erasure(
         subject_type="principal", application_id=None, principal_id=principal.id
     )
-    # _require_open get, dann PrincipalService.erase get.
+    # First the get of _require_open, then the get of PrincipalService.erase.
     db = fake_session(gets=[request, principal])
     out = await ErasureRequestService(db).execute(request.id, actor="dpo")
     assert out.status == "executed"
@@ -248,7 +246,7 @@ async def test_execute_already_handled_raises_conflict() -> None:
 
 
 async def test_execute_no_resolvable_subject_raises_conflict() -> None:
-    # applicant ohne application_id (DB-Inkonsistenz) → kein Subjekt auflösbar.
+    # An applicant row without application_id is a DB inconsistency: no subject resolves.
     request = _erasure(subject_type="applicant", application_id=None)
     db = fake_session(gets=[request])
     with pytest.raises(ConflictError) as exc:
@@ -256,7 +254,6 @@ async def test_execute_no_resolvable_subject_raises_conflict() -> None:
     assert exc.value.code == "erasure_no_subject"
 
 
-# -------------------------------------------------------- ErasureRequestService.reject
 async def test_reject_sets_status_and_reason() -> None:
     request = _erasure()
     db = fake_session(gets=[request])
@@ -282,9 +279,8 @@ async def test_reject_already_handled_raises_conflict() -> None:
         await ErasureRequestService(db).reject(request.id, actor="admin")
 
 
-# ---------------------------------------------------------------- AuskunftService
 async def test_auskunft_empty_when_no_applicant_or_principal() -> None:
-    db = fake_session(scalars=[result()], scalar=[None])  # keine Applicants, kein Principal
+    db = fake_session(scalars=[result()], scalar=[None])  # no applicants, no principal
     data = await AuskunftService(db).collect("nobody@example.org")
     assert data["email"] == "nobody@example.org"
     assert data["applications"] == []
@@ -306,15 +302,15 @@ async def test_auskunft_collects_applications_versions_principal() -> None:
     principal = _principal(email="x@example.org", last_login=_AT)
     db = fake_session(
         scalars=[
-            result(applicant),  # applicants
-            result(application),  # apps
-            result(version),  # versions
+            result(applicant),
+            result(application),
+            result(version),
         ],
         execute=[
             result((type_id, {"de": "Typ"})),  # type_names
             result((state_id, {"de": "Eingereicht"})),  # state_labels
         ],
-        scalar=[principal],  # principal row
+        scalar=[principal],
     )
     data = await AuskunftService(db).collect("x@example.org", locale="de")
     assert len(data["applications"]) == 1
@@ -332,7 +328,7 @@ async def test_auskunft_i18n_falls_back_and_handles_missing_state() -> None:
     app_id = uuid4()
     type_id = uuid4()
     applicant = Applicant(application_id=app_id, email="y@example.org", name="Y")
-    # current_state_id None → state_labels-Query wird übersprungen.
+    # current_state_id is None, so the service skips the state_labels query.
     application = Application(
         id=app_id, type_id=type_id, current_state_id=None, created_at=_AT, data={}
     )
@@ -340,12 +336,12 @@ async def test_auskunft_i18n_falls_back_and_handles_missing_state() -> None:
         scalars=[
             result(applicant),
             result(application),
-            result(),  # keine Versionen
+            result(),  # no versions
         ],
-        execute=[result((type_id, {"en": "Type"}))],  # nur EN → Fallback de→en
+        execute=[result((type_id, {"en": "Type"}))],  # EN only, so de falls back to en
         scalar=[None],
     )
     data = await AuskunftService(db).collect("y@example.org", locale="de")
-    assert data["applications"][0]["typeName"] == "Type"  # de fehlt → en
-    assert data["applications"][0]["status"] == ""  # kein State
+    assert data["applications"][0]["typeName"] == "Type"  # de is missing, so en wins
+    assert data["applications"][0]["status"] == ""  # no state
     assert data["versions"] == []

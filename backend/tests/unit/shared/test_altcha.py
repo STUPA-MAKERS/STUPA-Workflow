@@ -1,4 +1,4 @@
-"""TDD: serverseitige Altcha-Verifikation (security.md §7, Issue #23)."""
+"""Server-side ALTCHA verification (security.md §7, Issue #23)."""
 
 from __future__ import annotations
 
@@ -29,9 +29,6 @@ def _solved(*, expires: int | None = None, max_number: int = 50) -> str:
     return solve_challenge(challenge)
 
 
-# --------------------------------------------------------------------------- #
-# verify_solution (reine Krypto)
-# --------------------------------------------------------------------------- #
 def test_valid_solution_round_trips() -> None:
     key = verify_solution(_solved(), SECRET, now=0)
     assert isinstance(key, str) and key
@@ -89,7 +86,6 @@ def test_invalid_number_type_rejected(number: object) -> None:
 
 def test_tampered_number_breaks_hash() -> None:
     challenge = create_challenge(SECRET, number=3, salt="s", max_number=10)
-    # Andere Zahl → Hash passt nicht mehr zur Challenge.
     enc = encode_solution(challenge, 4)
     with pytest.raises(AltchaError):
         verify_solution(enc, SECRET, now=0)
@@ -112,7 +108,7 @@ def test_missing_string_field_rejected() -> None:
         "algorithm": "SHA-256",
         "challenge": challenge.challenge,
         "number": 1,
-        "salt": 123,  # kein String
+        "salt": 123,
         "signature": challenge.signature,
     }
     enc = base64.b64encode(json.dumps(payload).encode()).decode()
@@ -120,9 +116,6 @@ def test_missing_string_field_rejected() -> None:
         verify_solution(enc, SECRET, now=0)
 
 
-# --------------------------------------------------------------------------- #
-# parse_solution / validate_solution_format (Strukturprüfung ohne Secret) — Issue #23
-# --------------------------------------------------------------------------- #
 def test_parse_solution_returns_fields() -> None:
     challenge = create_challenge(SECRET, number=7, salt="abcd", max_number=10)
     parsed = parse_solution(encode_solution(challenge, 7))
@@ -134,12 +127,12 @@ def test_parse_solution_returns_fields() -> None:
 @pytest.mark.parametrize(
     "bad",
     [
-        "ZÈ♯",  # Steuerzeichen (exakt CI-Reproduktion)
-        "garbage!!",  # kein gültiges Base64
-        "",  # leer
-        base64.b64encode(b"abc").decode(),  # gültiges Base64, aber kein JSON
-        base64.b64encode(json.dumps([1, 2]).encode()).decode(),  # JSON, aber kein Objekt
-        base64.b64encode(json.dumps({"algorithm": "SHA-256"}).encode()).decode(),  # Felder fehlen
+        "ZÈ♯",  # control characters, the exact CI reproduction
+        "garbage!!",  # not valid base64
+        "",
+        base64.b64encode(b"abc").decode(),  # valid base64 but not JSON
+        base64.b64encode(json.dumps([1, 2]).encode()).decode(),  # JSON but not an object
+        base64.b64encode(json.dumps({"algorithm": "SHA-256"}).encode()).decode(),  # fields missing
     ],
 )
 def test_parse_solution_rejects_malformed(bad: str) -> None:
@@ -150,25 +143,24 @@ def test_parse_solution_rejects_malformed(bad: str) -> None:
 def test_validate_solution_format_passes_well_formed() -> None:
     challenge = create_challenge(SECRET, number=3, salt="s", max_number=10)
     enc = encode_solution(challenge, 3)
-    # Strukturell ok → unverändert zurück (Krypto wird hier NICHT geprüft).
+    # A structurally valid solution comes back unchanged. This call does NOT check
+    # the crypto.
     assert validate_solution_format(enc) == enc
 
 
 def test_validate_solution_format_raises_valueerror_for_pydantic() -> None:
-    # Pydantic macht nur aus ValueError/AssertionError ein 422 (sonst 500) → kein AltchaError.
+    # Pydantic maps only ValueError and AssertionError to a 422. Every other exception
+    # becomes a 500, so this path must not raise AltchaError.
     with pytest.raises(ValueError):
         validate_solution_format("ZÈ")
 
 
-# --------------------------------------------------------------------------- #
-# AltchaVerifier + Replay
-# --------------------------------------------------------------------------- #
 async def test_verifier_accepts_then_rejects_replay() -> None:
     verifier = AltchaVerifier(SECRET, replay=InMemoryReplayGuard(now=lambda: 0), now=lambda: 0)
     enc = _solved()
-    await verifier.verify(enc)  # erste Nutzung ok
+    await verifier.verify(enc)
     with pytest.raises(AltchaError, match="already used"):
-        await verifier.verify(enc)  # Replay
+        await verifier.verify(enc)
 
 
 async def test_verifier_missing_solution_rejected() -> None:
@@ -188,7 +180,7 @@ async def test_inmemory_replay_evicts_expired() -> None:
     guard = InMemoryReplayGuard(now=lambda: clock["t"])
     assert await guard.seen("k", ttl_seconds=10) is False
     assert await guard.seen("k", ttl_seconds=10) is True
-    clock["t"] = 20  # über TTL → Eintrag geerntet
+    clock["t"] = 20  # past the TTL, so the guard drops the entry
     assert await guard.seen("k", ttl_seconds=10) is False
 
 
@@ -215,8 +207,9 @@ async def test_redis_replay_guard_detects_replay() -> None:
 async def test_redis_replay_guard_falls_back_not_noop() -> None:
     kv = _FakeKV()
     kv.fail = True
-    # Redis weg → NICHT no-op (sonst 300s replaybar, Review #1), sondern prozesslokaler
-    # Fallback: Einmal-Nutzung gilt wenigstens pro Worker.
+    # If Redis fails, the guard must NOT become a no-op. A no-op makes a solution
+    # replayable for 300 seconds (Review #1). The guard falls back to a process-local
+    # guard, so single use still holds per worker.
     guard = RedisReplayGuard(kv, fallback=InMemoryReplayGuard(now=lambda: 0))
     assert await guard.seen("k", ttl_seconds=10) is False
-    assert await guard.seen("k", ttl_seconds=10) is True  # Replay erkannt
+    assert await guard.seen("k", ttl_seconds=10) is True

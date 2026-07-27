@@ -129,7 +129,7 @@ describe('toFormlyFields', () => {
       },
     ];
     const [total] = toFormlyFields(fields, 'de');
-    // cofunding missing → null var → arithmetic throws → caught → null.
+    // A missing cofunding gives a null var, the arithmetic throws, and the catch gives null.
     expect(callExpr(total, 'model.total', { amount: 100 })).toBeNull();
   });
 
@@ -140,7 +140,6 @@ describe('toFormlyFields', () => {
     ];
     const out = toFormlyFields(fields, 'de');
     expect(out).toHaveLength(2);
-    // Section marker → keyless display heading; real field unchanged.
     expect(out[0].type).toBe('display');
     expect(out[0].props?.['heading']).toBe(true);
     expect(out[0].props?.['label']).toBe('Schritt 1');
@@ -172,7 +171,7 @@ describe('toFormlyFields', () => {
       },
     ];
     const [cfg] = toFormlyFields(fields, 'de', { has_budget: true });
-    // No model on the field → extraContext supplies has_budget.
+    // The field carries no model, so extraContext supplies has_budget.
     const hide = cfg.expressions?.['hide'] as (f: FormlyFieldConfig) => unknown;
     expect(hide({} as FormlyFieldConfig)).toBe(false);
   });
@@ -193,7 +192,7 @@ describe('toFormlyFields', () => {
     const [cfg] = toFormlyFields(fields, 'de');
     expect(cfg.type).toBe('display');
     expect(cfg.props?.['text']).toBe('Nur Label');
-    // display fields never carry required even if flagged.
+    // Display fields never carry required, even when the definition sets it.
     expect(cfg.props?.['required']).toBeUndefined();
   });
 
@@ -258,7 +257,7 @@ describe('toFormlyFields', () => {
   });
 
   it('rethrows non-JsonLogicError from a computed expression', () => {
-    // compute is a proxy whose ownKeys trap throws a TypeError inside evalJsonLogic.
+    // compute is a proxy. Its ownKeys trap throws a TypeError inside evalJsonLogic.
     const boom = new Proxy(
       {},
       {

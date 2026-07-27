@@ -1,16 +1,16 @@
-"""status_event.at + submission_version.at → timestamptz (#tz).
+"""Convert status_event.at and submission_version.at to timestamptz (#tz).
 
-Beide Spalten waren als ``TIMESTAMP WITHOUT TIME ZONE`` deklariert (Modell ohne
-``DateTime(timezone=True)``), während ``func.now()`` bei Session-TimeZone=UTC die
-UTC-Wanduhr schreibt. asyncpg liefert dann *naive* Werte, Pydantic serialisiert ohne
-Offset, das Frontend interpretiert die ISO-Strings als Lokalzeit → Anzeige um den
-lokalen UTC-Offset verschoben (1 h CET / 2 h CEST).
+Both columns were `TIMESTAMP WITHOUT TIME ZONE`, because the model did not set
+`DateTime(timezone=True)`. With the session time zone at UTC, `func.now()` writes the
+UTC wall-clock time. asyncpg then returns naive values. Pydantic serializes them
+without an offset. The frontend reads the ISO strings as local time. The display then
+shifts by the local UTC offset (1 h CET, 2 h CEST).
 
-Fix: Spalten auf ``timestamptz`` umstellen und die bestehenden naiven Werte als UTC
-interpretieren (``USING at AT TIME ZONE 'UTC'`` — entspricht dem tatsächlichen
-Speicherinhalt). Danach trägt der Wire-Wert einen ``+00:00``-Offset; alle übrigen
-DateTime-Spalten sind bereits tz-aware. Reversibel: downgrade dreht zurück und gibt
-die UTC-Wanduhr als naive Wert zurück.
+Fix: change both columns to `timestamptz` and read the existing naive values as UTC
+(`USING at AT TIME ZONE 'UTC'`). This matches the real stored content. The wire value
+then carries a `+00:00` offset. All other DateTime columns are already tz-aware. The
+migration is reversible. The downgrade converts back and returns the UTC wall-clock
+time as a naive value.
 """
 
 from __future__ import annotations

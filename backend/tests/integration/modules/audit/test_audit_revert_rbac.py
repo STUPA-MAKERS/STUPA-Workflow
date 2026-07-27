@@ -1,10 +1,11 @@
-"""Integration (echte Postgres, testcontainers): der Audit-Log-Revert re-asserted die
-*granulare* Permission des Original-Vorgangs, nicht nur ``audit.revert`` (#AUD-018).
+"""Integration (real Postgres, testcontainers): granular permissions on an audit revert.
 
-Beweist gegen ein echtes Schema, dass :meth:`RevertService.revert` einen Principal ohne
-die jeweilige Original-Permission mit ``403`` (``ForbiddenError``) abweist — und mit der
-passenden Permission durchläuft — für Config-, Budget- und Status-Reverts. ``principal=
-None`` (interne Aufrufer/Tests) bleibt ungeprüft (kein Regress der Bestands-Tests).
+The audit log revert re-asserts the *granular* permission of the original operation,
+not only `audit.revert` (#AUD-018). The tests prove against a real schema that
+`RevertService.revert` rejects a principal without the matching original permission
+with a 403 (`ForbiddenError`). With that permission the revert runs through. This holds
+for config, budget and status reverts. `principal=None` (internal callers and tests)
+stays unchecked, so the existing tests do not regress.
 """
 
 from __future__ import annotations
@@ -59,7 +60,7 @@ def _suffix() -> str:
 
 
 def _principal(*perms: str) -> Principal:
-    """Nicht-Admin-Principal mit GENAU diesen Permissions (kein Admin-Bypass)."""
+    """Build a non-admin principal with EXACTLY these permissions and no admin bypass."""
     return Principal(sub=f"u-{_suffix()}", roles=["reviewer"], permissions=set(perms))
 
 
@@ -74,9 +75,6 @@ async def _audit_id(session: AsyncSession, action: AuditAction, target_id: str) 
     ).scalar_one()
 
 
-# --------------------------------------------------------------------------- #
-# Budget: budget.book verlangt; eine Rolle ohne sie wird abgewiesen.
-# --------------------------------------------------------------------------- #
 async def test_budget_revert_requires_budget_book(session: AsyncSession) -> None:
     svc = BudgetTreeService(session, actor="tester")
     g = Gremium(name="FS", slug=f"fs-{_suffix()}")
@@ -96,15 +94,15 @@ async def test_budget_revert_requires_budget_book(session: AsyncSession) -> None
         session, AuditAction.BUDGET_EXPENSE_CREATE, str(booked.id)
     )
 
-    # audit.revert allein genügt NICHT (#AUD-018): es fehlt budget.book.
+    # audit.revert alone is NOT enough (#AUD-018). The permission budget.book is missing.
     with pytest.raises(ForbiddenError):
         await RevertService(session).revert(
             audit_id, "u", _principal("audit.revert")
         )
-    # Die Buchung steht noch (kein Money-Move ohne Permission).
+    # The booking still stands. No money moves without the permission.
     assert await session.get(Budget, top.id) is not None
 
-    # Mit budget.book läuft derselbe Revert durch.
+    # With budget.book the same revert runs through.
     await RevertService(session).revert(
         audit_id, "u", _principal("audit.revert", "budget.book")
     )
@@ -124,7 +122,7 @@ async def test_budget_node_revert_requires_budget_structure(
 
     with pytest.raises(ForbiddenError):
         await RevertService(session).revert(
-            audit_id, "u", _principal("audit.revert", "budget.book")  # falsche Perm
+            audit_id, "u", _principal("audit.revert", "budget.book")  # wrong permission
         )
     assert await session.get(Budget, node.id) is not None
 
@@ -134,13 +132,16 @@ async def test_budget_node_revert_requires_budget_structure(
     assert await session.get(Budget, node.id) is None
 
 
-# --------------------------------------------------------------------------- #
-# Config (Form): form.configure verlangt.
-# --------------------------------------------------------------------------- #
 async def _seeded_form_change(
     session: AsyncSession,
 ) -> tuple[str, int]:
-    """Form mit zwei Versionen → der Revert der zweiten ist der zu prüfende Vorgang."""
+    """Create a form with two versions.
+
+    The revert of the second version is the operation under test.
+
+    Returns:
+        The application type id and the id of the audit entry for that version.
+    """
     g = Gremium(name="G", slug=f"g-{_suffix()}")
     session.add(g)
     await session.flush()
@@ -166,7 +167,7 @@ async def _seeded_form_change(
         ),
         "tester",
     )
-    # Jüngste config_revision der Form-Entität = der zu revertierende Change.
+    # The newest config_revision of the form entity is the change to revert.
     revisions = ConfigRevisionService(session)
     head = await revisions.head(ENTITY_FORM, str(at.id))
     assert head is not None
@@ -177,7 +178,7 @@ async def _seeded_form_change(
             .order_by(AuditEntry.id.desc())
         )
     ).scalars()
-    # den Audit-Eintrag finden, dessen data.revisionId auf head zeigt
+    # Find the audit entry whose data.revisionId points to head.
     for entry in audit:
         if str((entry.data or {}).get("revisionId") or "") == str(head.id):
             return str(at.id), entry.id
@@ -192,15 +193,12 @@ async def test_config_revert_requires_form_configure(session: AsyncSession) -> N
             audit_id, "u", _principal("audit.revert")
         )
 
-    # Mit form.configure läuft der Config-Revert durch.
+    # With form.configure the config revert runs through.
     await RevertService(session).revert(
         audit_id, "u", _principal("audit.revert", "form.configure")
     )
 
 
-# --------------------------------------------------------------------------- #
-# Status: application.transition verlangt.
-# --------------------------------------------------------------------------- #
 def _manager() -> Principal:
     return Principal(
         sub="mgr-1", roles=["reviewer"], permissions={"application.manage"}

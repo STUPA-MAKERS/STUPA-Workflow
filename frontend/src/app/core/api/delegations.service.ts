@@ -1,11 +1,12 @@
 /**
- * Delegations API against `/api/delegations`.
+ * Delegations API for `/api/delegations`.
  *
- * A delegation is session-bound: created with `meetingId` + `delegateId`
- * (optional voting right); gremium/validity derive from the meeting. Plus the
- * meeting context (gates, deadline, recipients), the vote status (banner in the
- * ballot) and the per-gremium substitute pool. RBAC stays authoritative
- * server-side — this client is pure data binding.
+ * A delegation is session-bound. The caller creates it with `meetingId` and
+ * `delegateId` plus an optional voting right. The Gremium and the validity come
+ * from the meeting. The service also serves the meeting context (gates,
+ * deadline, recipients), the vote status for the ballot banner and the
+ * per-Gremium substitute pool. The server stays authoritative for RBAC. This
+ * client only binds data.
  */
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
@@ -14,7 +15,7 @@ import type { Observable } from 'rxjs';
 import { API_BASE_URL } from '@core/api/api.config';
 import type { IsoDateTime, Uuid } from '@core/api/models';
 
-/** Session-bound representation (GET/POST /delegations). */
+/** Session-bound delegation (GET/POST /delegations). */
 export interface Delegation {
   readonly id: Uuid;
   readonly meetingId: Uuid;
@@ -29,9 +30,9 @@ export interface Delegation {
   readonly delegateVoting: boolean;
   readonly viaPool: boolean;
   readonly createdAt: IsoDateTime;
-  /** Revocation still possible (meeting `planned` + before start)? */
+  /** True while revocation is possible: meeting `planned` and before the start. */
   readonly revocable: boolean;
-  /** Direction from the caller's view; null = uninvolved (admin view). */
+  /** Direction from the view of the caller. `null` = not involved (admin view). */
   readonly direction: 'outgoing' | 'incoming' | null;
 }
 
@@ -51,14 +52,14 @@ export interface DelegationRecipient {
   readonly isMember: boolean;
 }
 
-/** Context of the "set up representation" dialog (GET /delegations/meetings/{id}/context). */
+/** Context of the "create delegation" dialog (GET /delegations/meetings/{id}/context). */
 export interface MeetingDelegationContext {
   readonly meetingId: Uuid;
   readonly gremiumId: Uuid;
   readonly allowVoteDelegation: boolean;
   readonly votingDelegationEnabled: boolean;
   readonly delegationAllowExternal: boolean;
-  /** Deadline for non-pool delegations (ISO/UTC); null = status gate only. */
+  /** Deadline for non-pool delegations (ISO/UTC). `null` = status gate only. */
   readonly deadline: IsoDateTime | null;
   readonly deadlinePassed: boolean;
   readonly meetingStarted: boolean;
@@ -80,7 +81,7 @@ export interface VoteDelegationStatus {
 export interface DelegationSubstitute {
   readonly id: Uuid;
   readonly gremiumId: Uuid;
-  /** null = gremium-wide substitute (represents every member). */
+  /** `null` = Gremium-wide substitute that represents every member. */
   readonly memberId: Uuid | null;
   readonly memberName: string | null;
   readonly substituteId: Uuid;
@@ -101,8 +102,8 @@ export class DelegationsApiService {
 
   list(meetingId?: Uuid): Observable<Delegation[]> {
     const params = meetingId ? new HttpParams().set('meetingId', meetingId) : undefined;
-    // The list has its own loading indicator (or runs in the background on the
-    // dashboard) → suppress the global overlay.
+    // The list has its own loading indicator, or it runs in the background on
+    // the dashboard → suppress the global overlay.
     return this.http.get<Delegation[]>(`${this.base}/delegations`, {
       params,
       context: skipLoading(),
@@ -117,7 +118,7 @@ export class DelegationsApiService {
     return this.http.delete<void>(`${this.base}/delegations/${id}`);
   }
 
-  /** `quiet` = background reload after a mutation (no global overlay). */
+  /** `quiet` skips the global overlay for a background reload after a mutation. */
   meetingContext(
     meetingId: Uuid,
     opts: { quiet?: boolean } = {},

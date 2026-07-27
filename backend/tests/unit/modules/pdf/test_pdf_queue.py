@@ -1,4 +1,4 @@
-"""Unit-Tests Render-Queue (T-20): Enqueue, Idempotenz-Dedupe, »kein Pool«."""
+"""Unit tests for the render queue (T-20): enqueue, idempotency dedupe, and no pool."""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ async def test_enqueue_uses_render_task_and_idempotent_job_id() -> None:
 
 async def test_enqueue_dedupe_is_silent() -> None:
     pool = _FakePool(dedupe=True)
-    await ArqRenderQueue(pool).enqueue(uuid.uuid4())  # None-Rückgabe → kein Fehler
+    await ArqRenderQueue(pool).enqueue(uuid.uuid4())  # a None return raises no error
     assert len(pool.calls) == 1
 
 

@@ -1,12 +1,12 @@
 """Audit API router (``/api/admin/audit``): read, verify, revert.
 
-RBAC is fail-closed: 401 without a session, 403 without permission. The read
-view resolves actor subs, target ids and ``data`` UUIDs to display names
-server-side.
+RBAC is fail-closed. A request without a session gets 401. A request without the
+permission gets 403. The read view resolves actor subs, target ids and ``data``
+UUIDs to display names on the server.
 
-WARNING: ``audit.read`` is a GLOBAL platform-wide read permission with no
-gremium scoping — the resolved log exposes PII across all gremien. Grant it to
-the ``admin`` role only; there is no "scoped" auditing.
+WARNING: ``audit.read`` is a GLOBAL platform-wide read permission with no Gremium
+scope. The resolved log exposes PII across all Gremien. Grant it to the ``admin``
+role only. There is no "scoped" auditing.
 """
 
 from __future__ import annotations
@@ -52,16 +52,18 @@ async def list_audit(
     service: ServiceDep,
     action: Annotated[str | None, Query()] = None,
     actor: Annotated[str | None, Query()] = None,
-    # AwareDatetime: the ``at`` column is timestamptz — asyncpg rejects naive
-    # values with a 500, so Pydantic rejects them up front with 422.
+    # AwareDatetime: the ``at`` column is timestamptz. asyncpg rejects a naive
+    # value with a 500, so Pydantic rejects it up front with 422.
     since: Annotated[AwareDatetime | None, Query()] = None,
     until: Annotated[AwareDatetime | None, Query()] = None,
     before: Annotated[int | None, Query(ge=1)] = None,
     limit: Annotated[int, Query(ge=1, le=MAX_LIMIT)] = DEFAULT_LIMIT,
 ) -> AuditPageOut:
-    """Read the audit log — keyset paging (``before`` cursor, newest first).
+    """Read the audit log with keyset paging.
 
-    Filters: ``action``/``actor``/time window (``since``/``until``)."""
+    The ``before`` cursor pages backwards and the newest entry comes first. Filter
+    by ``action``, by ``actor``, or by the time window ``since``/``until``.
+    """
     items, has_more = await service.query_cursor(
         action=action,
         actor=actor,
@@ -81,7 +83,6 @@ async def list_audit(
             e,
             names.get(e.actor or ""),
             labels.get((e.target_type or "", e.target_id or "")),
-            # pass on only the ids that actually occur in this entry
             {
                 k: resolved_ids[k]
                 for k in data_uuid_strings(e.data)
@@ -114,12 +115,12 @@ async def list_audit_actors(service: ServiceDep) -> list[AuditActorOut]:
 @router.get(
     "/verify",
     response_model=ChainVerificationOut,
-    # Chain verification is gated separately (audit.verify); reads stay audit.read.
+    # Chain verification has its own permission (audit.verify). Reads stay audit.read.
     dependencies=[Depends(require_principal("audit.verify"))],
     responses=_AUTH_ERRORS,
 )
 async def verify_audit_chain(service: ServiceDep) -> ChainVerificationOut:
-    """Recompute the hash chain; reports ``valid`` plus the first break, if any."""
+    """Recompute the hash chain and report ``valid`` plus the first break, if any."""
     result = await service.verify_chain()
     return ChainVerificationOut(
         valid=result.valid,
@@ -132,8 +133,8 @@ async def verify_audit_chain(service: ServiceDep) -> ChainVerificationOut:
 @router.post(
     "/{entry_id}/revert",
     response_model=AuditRevertOut,
-    # Destructive: own permission, separate from audit.read/verify.
-    # 404 entry/revision missing, 409 not revertable or stale.
+    # Destructive. It has its own permission, separate from audit.read and audit.verify.
+    # 404 when the entry or the revision is missing. 409 when it is not revertable or stale.
     dependencies=[Depends(require_principal("audit.revert"))],
     responses={**_AUTH_ERRORS, 404: _PROBLEM, 409: _PROBLEM},
 )
@@ -142,10 +143,14 @@ async def revert_audit_entry(
     session: DbSession,
     principal: Annotated[Principal, Depends(require_principal("audit.revert"))],
 ) -> AuditRevertOut:
-    """Revert the change described by ``entry_id`` (restore the prior state; 409 on
-    conflict). The revert is itself logged and revertable."""
-    # audit.revert gates the route; RevertService additionally re-asserts the
-    # granular permission of the original operation, hence the principal pass-through.
+    """Revert the change that ``entry_id`` describes.
+
+    The call restores the prior state. It answers 409 on a conflict. The platform
+    logs the revert itself, and that log entry is revertable too.
+    """
+    # audit.revert gates the route. RevertService also re-asserts the granular
+    # permission of the original operation. That is why the route passes the
+    # principal through.
     result = await RevertService(session).revert(entry_id, principal.sub, principal)
     return AuditRevertOut(
         revertedAuditId=result.reverted_audit_id,

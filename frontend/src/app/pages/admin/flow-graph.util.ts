@@ -1,9 +1,12 @@
 /**
- * Flow-graph helpers (flow editor). Client validation + graph↔JSON + auto-layout.
- * Validation mirrors `app/shared/config_schemas.py` (`validate_flow_graph`): ≥1 state,
- * exactly one initial, no duplicate keys, no dangling `from`/`to`, all states reachable
- * from the initial, guards/actions only from the whitelist. The server re-validates
- * authoritatively on save — this is purely instant feedback in the UI.
+ * Flow-graph helpers for the flow editor: client validation, graph to JSON, and
+ * auto-layout.
+ *
+ * Validation mirrors `app/shared/config_schemas.py` (`validate_flow_graph`). It asks for at
+ * least one state, exactly one initial state, no duplicate keys, and no dangling `from` or
+ * `to`. All states must be reachable from the initial state. Guards and actions must come
+ * from the whitelist. The server validates again on save and stays authoritative. This
+ * check only gives the user instant feedback.
  */
 import {
   type FlowGraph,
@@ -13,7 +16,7 @@ import {
 } from './admin.models';
 import { validateAction, validateGuard } from './guard-builder.util';
 
-/** Field/state keys: `^[a-z][a-z0-9_]*$` (config_schemas KEY_PATTERN). */
+/** Keys of a field or a state. Mirrors `KEY_PATTERN` in `config_schemas`. */
 export const KEY_PATTERN = /^[a-z][a-z0-9_]*$/;
 
 export interface FlowValidationResult {
@@ -58,11 +61,10 @@ export function validateFlowGraph(graph: FlowGraph): FlowValidationResult {
       errors.push(`transition references unknown to-state: ${JSON.stringify(t.to)}`);
     }
     try {
-      // Actor gates (roleIs/isInCommittee) only on manual transitions.
+      // Actor gates (roleIs/isInCommittee) apply to manual transitions only.
       validateGuard(t.guard, !t.automatic);
       for (const a of t.actions ?? []) {
         validateAction(a);
-        // `addToNextSession` may only lead into a vote state.
         if (a.type === 'addToNextSession') {
           const target = states.find((s) => s.key === t.to);
           if ((target?.kind ?? 'normal') !== 'vote') {
@@ -84,8 +86,8 @@ export function validateFlowGraph(graph: FlowGraph): FlowValidationResult {
     }
   }
 
-  // State-kind rules — mirror `_validate_state_kinds` (BE), so the user sees the error
-  // immediately (instead of only on save as a 422).
+  // State-kind rules mirror `_validate_state_kinds` in the backend. The user sees the
+  // error at once, and not only on save as a 422.
   for (const s of states) {
     if (!s.kind || s.kind === 'normal') continue;
     const outBranches = transitions
@@ -97,8 +99,8 @@ export function validateFlowGraph(graph: FlowGraph): FlowValidationResult {
       if (outBranches.join(',') !== 'fail,pass') {
         errors.push(`vote state "${s.key}" needs exactly two outgoing transitions: branch "pass" and "fail"`);
       }
-      // A vote state is decided only by the vote (or a manual abort): an automatic
-      // exit would fire immediately, before any vote happened — mirrors the BE validator.
+      // Only the vote or a manual abort decides a vote state. An automatic exit would
+      // fire at once, before a vote happened. This mirrors the backend validator.
       if (transitions.some((t) => t.from === s.key && t.automatic && !t.branch)) {
         errors.push(
           `vote state "${s.key}" must not have automatic outgoing transitions — only the vote outcome (pass/fail) or a manual exit may leave it`,
@@ -131,12 +133,11 @@ function findUnreachable(
   return [...keySet].filter((k) => !seen.has(k));
 }
 
-// --- Graph ↔ JSON (Round-Trip) ----------------------------------------------
 
 /**
- * Bring the graph into canonical wire form (exactly the schema fields, empty optionals
- * omitted) — what gets stored as a flow version. Stable:
- * `normalize(parse(serialize(g))) === normalize(g)` (round-trip guarantee).
+ * Bring the graph into canonical wire form: exactly the schema fields, with empty
+ * optionals dropped. A flow version stores this form. The round-trip guarantee holds:
+ * `normalize(parse(serialize(g))) === normalize(g)`.
  */
 export function normalizeFlowGraph(graph: FlowGraph): FlowGraph {
   const states: StateDef[] = graph.states.map((s) => {
@@ -145,7 +146,7 @@ export function normalizeFlowGraph(graph: FlowGraph): FlowGraph {
     if (s.editAllowed === false) out.editAllowed = false;
     if (s.isInitial) out.isInitial = true;
     if (s.isTerminal) out.isTerminal = true;
-    // State kind + config — `normal` is the default and is omitted.
+    // `normal` is the default kind and stays out of the wire form.
     if (s.kind && s.kind !== 'normal') out.kind = s.kind;
     if (s.config && Object.keys(s.config).length > 0) out.config = s.config;
     return out;
@@ -153,13 +154,13 @@ export function normalizeFlowGraph(graph: FlowGraph): FlowGraph {
   const transitions: TransitionDef[] = (graph.transitions ?? []).map((t) => {
     const out: TransitionDef = { from: t.from, to: t.to };
     if (t.label) out.label = t.label;
-    if (t.color) out.color = t.color; // keep the arrow/button color
+    if (t.color) out.color = t.color;
     if (t.guard) out.guard = t.guard;
     if (t.actions && t.actions.length > 0) out.actions = t.actions;
     if (t.order != null) out.order = t.order;
     if (t.automatic) out.automatic = true;
-    if (t.branch) out.branch = t.branch; // result branch
-    // Default `true` is omitted — persist only the explicit opt-out.
+    if (t.branch) out.branch = t.branch;
+    // The default `true` stays out. Persist the explicit opt-out only.
     if (t.requiresAction === false) out.requiresAction = false;
     return out;
   });
@@ -168,9 +169,9 @@ export function normalizeFlowGraph(graph: FlowGraph): FlowGraph {
   const positions = graph.layout?.positions ?? {};
   const layout: { positions?: Record<string, { x: number; y: number }>; groups?: FlowGroup[] } = {};
   if (Object.keys(positions).length > 0) layout.positions = { ...positions };
-  // Groups: reference only existing states/groups; a group with no states AND no
-  // sub-groups disappears. Legacy `collapsed` is normalized away (content opens via
-  // drill-down today).
+  // Groups reference existing states and groups only. A group with no states and no
+  // sub-groups disappears. Drop the legacy `collapsed` flag, because content opens
+  // through drill-down today.
   const allGroupIds = new Set((graph.layout?.groups ?? []).map((g) => g.id));
   const groups = (graph.layout?.groups ?? [])
     .map((g) => ({
@@ -199,24 +200,25 @@ export function parseFlowGraph(json: string): FlowGraph {
   return normalizeFlowGraph(parsed);
 }
 
-// --- Auto-layout (Sugiyama-light: layers + barycenter + centering) ----------
+// Auto-layout: Sugiyama-light with layers, barycenter, and centering.
 
 const COL_GAP = 240;
 const ROW_GAP = 130;
-/** Left/top padding so nodes don't stick to the canvas edge. */
+/** Left and top padding that keeps nodes off the canvas edge. */
 const PAD = 40;
 
 /**
- * Fill in missing node positions (already-set ones are kept — editor drag persists).
+ * Fill in missing node positions. A position that is already set stays, because an editor
+ * drag persists.
+ *
  * Layout algorithm:
  *
- * 1. Layer = longest path from the initial state (not BFS): nodes shift as far right as
- *    needed — edges point mostly forward, back-edges stay the exception rather than
- *    layout chaos.
- * 2. Barycenter ordering per layer (3 forward/backward sweeps): nodes line up next to
- *    their neighbors → far fewer crossings.
- * 3. Vertical centering: small layers centered against the tallest layer instead of all
- *    stuck to the top.
+ * 1. Layer = longest path from the initial state, and not BFS. Nodes move as far right as
+ *    needed. Edges then point mostly forward, and back-edges stay the exception.
+ * 2. Barycenter ordering per layer, with 3 forward and backward sweeps. Nodes line up next
+ *    to their neighbors, which gives far fewer crossings.
+ * 3. Vertical centering. A small layer centers against the tallest layer instead of
+ *    sticking to the top.
  */
 export function autoLayout(graph: FlowGraph): FlowGraph {
   const existing: Record<string, { x: number; y: number }> = {
@@ -231,15 +233,15 @@ export function autoLayout(graph: FlowGraph): FlowGraph {
     incoming.set(k, []);
   }
   for (const t of graph.transitions ?? []) {
-    if (t.from === t.to) continue; // self-loops are layout-neutral
+    if (t.from === t.to) continue; // a self-loop does not change the layout
     if (keySet.has(t.from) && keySet.has(t.to)) {
       out.get(t.from)!.push(t.to);
       incoming.get(t.to)!.push(t.from);
     }
   }
 
-  // 1. Layers: longest path from the initial (Bellman-style relaxation, terminating
-  //    even with cycles thanks to the iteration bound).
+  // 1. Layers: longest path from the initial state. The Bellman-style relaxation stops
+  //    even with cycles, because the iteration bound limits it.
   const initial = graph.states.find((s) => s.isInitial)?.key ?? keys[0];
   const depth = new Map<string, number>();
   if (initial) depth.set(initial, 0);
@@ -299,7 +301,7 @@ export function autoLayout(graph: FlowGraph): FlowGraph {
     }
   }
 
-  // 3. Positions: column = layer, row = order; layer vertically centered.
+  // 3. Positions: column = layer, row = order. Center each layer vertically.
   const tallest = Math.max(...layerDepths.map((d) => layers.get(d)!.length), 1);
   const computed: Record<string, { x: number; y: number }> = {};
   for (const d of layerDepths) {
@@ -316,9 +318,10 @@ export function autoLayout(graph: FlowGraph): FlowGraph {
 }
 
 /**
- * Condensed auto-layout: arrange arbitrary entities (visible states + group boxes of one
- * drill-down level) as nodes of a virtual graph — a group behaves like ONE node during
- * auto-arrange. Returns fresh positions per entity id (existing ones are ignored).
+ * Condensed auto-layout for one drill-down level. It treats arbitrary entities, that is
+ * the visible states and the group boxes, as nodes of a virtual graph. A group behaves
+ * like ONE node during auto-arrange. The function returns fresh positions per entity id
+ * and ignores existing positions.
  */
 export function layoutEntities(
   entities: ReadonlyArray<{ id: string; isInitial?: boolean }>,
@@ -332,7 +335,6 @@ export function layoutEntities(
   return autoLayout(fake).layout?.positions ?? {};
 }
 
-// --- Factories --------------------------------------------------------------
 
 export function emptyFlowGraph(): FlowGraph {
   return { states: [], transitions: [] };

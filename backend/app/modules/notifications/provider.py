@@ -1,8 +1,9 @@
 """arq pool lifecycle and mail-queue provisioning.
 
-The API never sends mail itself; it enqueues jobs in Redis (arq) for the worker.
-The pool is opened best-effort at startup: if Redis is missing the pool stays
-``None`` and the mail queue stays ``None``, so callers log and skip (no crash).
+The API never sends a mail itself. It puts the jobs into Redis (arq) for the
+worker. The startup opens the pool best effort. If Redis is missing, the pool
+stays `None` and the mail queue stays `None`. The callers then log and skip the
+mail instead of crashing.
 """
 
 from __future__ import annotations
@@ -22,7 +23,11 @@ _POOL_OPEN_TIMEOUT = 5.0
 
 
 async def create_mail_pool(redis_url: str) -> ArqRedis | None:
-    """Open the arq pool best-effort; return None on error/timeout."""
+    """Open the arq pool best effort.
+
+    Returns:
+        The pool, or None after an error or a timeout.
+    """
     from arq import create_pool
     from arq.connections import RedisSettings
 
@@ -43,5 +48,5 @@ async def close_mail_pool(pool: ArqRedis | None) -> None:
 
 
 def mail_queue_from_pool(pool: ArqRedis | None) -> MailQueue | None:
-    """Wrap the pool in a MailQueue, or None when there is no pool."""
+    """Wrap the pool in a `MailQueue`, or return None when there is no pool."""
     return ArqMailQueue(pool) if pool is not None else None

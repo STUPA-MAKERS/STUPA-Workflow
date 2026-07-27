@@ -1,6 +1,6 @@
-"""The fixed set of slash-commands, used for completion and the help screen."""
+"""The fixed set of slash-commands for completion and the help screen."""
 
-# Command name -> one-line description (shown in the completion menu).
+# The completion menu shows the description of each command.
 BASE_COMMANDS: dict[str, str] = {
     "/users": "list users (optional search term)",
     "/user": "inspect / act on one user (selector when no argument)",
@@ -19,7 +19,6 @@ BASE_COMMANDS: dict[str, str] = {
     "/quit": "exit",
 }
 
-# The per-entity actions offered by /user, /role and /mapping.
 USER_ACTIONS: tuple[str, ...] = (
     "show",
     "roles",
@@ -32,10 +31,9 @@ USER_ACTIONS: tuple[str, ...] = (
 ROLE_ACTIONS: tuple[str, ...] = ("show", "perms", "rename", "delete")
 MAPPING_ACTIONS: tuple[str, ...] = ("show", "edit", "delete")
 
-# Keys accepted by /audit key=value tokens.
+# Filter keys that /audit accepts as key=value tokens.
 AUDIT_KEYS: tuple[str, ...] = ("action=", "actor=", "target=", "limit=")
 
-# Lines shown by ``/help``.
 HELP_LINES: tuple[str, ...] = (
     "hover a row to highlight · click to pop out the full record · esc closes",
     "/users [search]              list users",

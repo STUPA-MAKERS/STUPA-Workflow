@@ -68,11 +68,13 @@ import { TransitionInspectorComponent } from './transition-inspector.component';
 import { TransitionListsComponent } from './transition-lists.component';
 
 /**
- * Flow editor as a visual drag&drop canvas. States are freely movable nodes
- * (positions persist in `layout`); transitions are drawn by dragging from a
- * connector dot onto a target node. Clicking a node/edge opens the inspector.
- * Saving creates a flow version; client validation mirrors the server's
- * `validate_flow_graph` (whitelist operators, no free-text eval).
+ * Flow editor as a visual drag-and-drop canvas.
+ *
+ * The user moves the states freely as nodes. Node positions persist in `layout`.
+ * To draw a transition, the user drags from a connector dot onto a target node.
+ * A click on a node or an edge opens the inspector. A save creates a flow version.
+ * Client validation mirrors the server function `validate_flow_graph`. It accepts
+ * only whitelisted operators and no free-text eval.
  */
 @Component({
   selector: 'app-flow-editor',
@@ -99,7 +101,7 @@ export class FlowEditorComponent {
   private readonly opts = inject(FlowEditorOptionsService);
 
   protected readonly canvas = viewChild<ElementRef<SVGSVGElement>>('canvas');
-  /** Version sidebar — reloaded after each save. */
+  /** Version sidebar. The editor reloads it after each save. */
   protected readonly versionHistory = viewChild(VersionHistoryComponent);
 
   protected readonly compareOps = COMPARE_OPS;
@@ -119,14 +121,14 @@ export class FlowEditorComponent {
   private applyingHistory = false;
 
   protected readonly selection = signal<Selection>(null);
-  /** Drill-down context: opened group; null = top level. */
+  /** Drill-down context: the open group. A null value means the top level. */
   protected readonly currentGroupId = signal<string | null>(null);
-  /** Multi-selection (shift-click) for "create group" — states + groups. */
+  /** Multi-selection with shift-click for "create group": states and groups. */
   protected readonly multiSel = signal<ReadonlySet<string>>(new Set());
   protected readonly multiSelGroups = signal<ReadonlySet<string>>(new Set());
   /** Temporary edge while dragging out a new transition. */
   protected readonly tempEdge = signal<TempEdge | null>(null);
-  /** Viewport (zoom/pan) in world coordinates; null = whole content (fit). */
+  /** Viewport (zoom and pan) in world coordinates. A null value fits the whole content. */
   protected readonly view = signal<ViewRect | null>(null);
 
   protected readonly NODE_W = NODE_W;
@@ -167,7 +169,7 @@ export class FlowEditorComponent {
   });
 
   constructor() {
-    // Load the active global flow; keep the empty graph when there is none.
+    // Load the active global flow. Keep the empty graph when there is none.
     this.api
       .getGlobalFlow()
       .pipe(takeUntilDestroyed())
@@ -183,15 +185,15 @@ export class FlowEditorComponent {
         error: () => this.toast.error(this.i18n.translate('admin.flow.loadFailed')),
       });
 
-    // The drill-down context must never point at a deleted group (undo/redo,
-    // dissolve from another path) — fall back to the top level.
+    // The drill-down context must never point at a deleted group. Undo, redo or a
+    // dissolve from another path can delete it. Fall back to the top level.
     effect(() => {
       const id = this.currentGroupId();
       if (id && !this.vm.groupById().has(id)) this.currentGroupId.set(null);
     });
 
-    // Record structural graph changes (states/transitions, not positions) as
-    // undo steps — node moves must not flood the history.
+    // Record structural graph changes as undo steps. Structural means states and
+    // transitions, not positions. Node moves must not flood the history.
     effect(() => {
       const g = this.graph();
       if (this.applyingHistory) {
@@ -201,11 +203,10 @@ export class FlowEditorComponent {
       }
       if (g === this.lastGraph) return;
       if (structuralKey(g) !== structuralKey(this.lastGraph)) this.history.record(this.lastGraph);
-      this.lastGraph = g; // follow layout-only changes too
+      this.lastGraph = g; // Follow layout-only changes too.
     });
   }
 
-  // --- derived state ---------------------------------------------------------
 
   protected readonly multiCount = computed(
     () => this.multiSel().size + this.multiSelGroups().size,
@@ -241,7 +242,6 @@ export class FlowEditorComponent {
     return buildTransitionLists(this.graph(), sel.key, this.opts.labelContext());
   });
 
-  // --- labels & options -------------------------------------------------------
 
   protected label(s: StateDef): string {
     return stateDisplayLabel(s);
@@ -298,13 +298,12 @@ export class FlowEditorComponent {
     return this.opts.guardValueHint(op);
   }
 
-  // --- guard groups (priority stack) -------------------------------------------
 
   protected guardGroupsFor(fromKey: string): GuardGroup[] {
     return groupsOf(this.graph().transitions ?? [], fromKey);
   }
 
-  /** Rows for the state inspector's priority stack (labels resolved here). */
+  /** Rows for the priority stack of the state inspector. Labels resolve here. */
   protected guardGroupRows(fromKey: string): GuardPriorityRow[] {
     return this.guardGroupsFor(fromKey).map((g) => ({ sig: g.sig, label: this.guardGroupLabel(g) }));
   }
@@ -333,7 +332,6 @@ export class FlowEditorComponent {
     this.graph.update((g) => ops.reorderGuardGroup(g, fromKey, sig, dir));
   }
 
-  // --- states -------------------------------------------------------------------
 
   protected addState(): void {
     const key = ops.uniqueStateKey('state', this.graph().states);
@@ -392,7 +390,6 @@ export class FlowEditorComponent {
     return this.graph().states.find((s) => s.key === key);
   }
 
-  // --- transitions -----------------------------------------------------------------
 
   protected removeSelectedTransition(): void {
     const sel = this.selection();
@@ -425,7 +422,6 @@ export class FlowEditorComponent {
     this.graph.update((g) => ops.setTransitionBranch(g, index, branch));
   }
 
-  // --- guards ------------------------------------------------------------------------
 
   protected setGuard(index: number, guard: Guard | null): void {
     this.graph.update((g) => ops.setGuard(g, index, guard));
@@ -472,7 +468,6 @@ export class FlowEditorComponent {
     this.graph.update((g) => ops.setCompare(g, index, patch));
   }
 
-  // --- actions ------------------------------------------------------------------------
 
   protected addAction(index: number, type: string): void {
     if (!type) return;
@@ -515,7 +510,6 @@ export class FlowEditorComponent {
     return recipientNeedsRef(kind);
   }
 
-  // --- groups & navigation ---------------------------------------------------------------
 
   protected relayout(): void {
     const ctx = this.currentGroupId();
@@ -563,8 +557,8 @@ export class FlowEditorComponent {
     this.navigateTo(id);
   }
 
-  /** Proxy click: jump to the external target — open the group or switch to
-   *  the state's level and select it. */
+  /** Proxy click: jump to the external target. Open the group, or switch to the
+   *  level of the state and select it. */
   protected onProxyClick(pid: string): void {
     if (pid.startsWith('group:')) {
       this.navigateTo(pid.slice('group:'.length));
@@ -575,7 +569,6 @@ export class FlowEditorComponent {
     this.selection.set({ kind: 'state', key });
   }
 
-  // --- undo/redo + keyboard ------------------------------------------------------------
 
   protected undo(): void {
     const prev = this.history.undo(this.graph());
@@ -600,9 +593,10 @@ export class FlowEditorComponent {
   }
 
   /**
-   * Shortcuts: Del/Backspace = delete selection, Insert = add state,
-   * Ctrl+Z = undo, Ctrl+Y / Ctrl+Shift+Z = redo. Inactive while typing in an
-   * input (except undo/redo) so normal editing stays untouched.
+   * Shortcuts: Del or Backspace deletes the selection, Insert adds a state, Ctrl+Z
+   * undoes, Ctrl+Y or Ctrl+Shift+Z redoes. The handler stays inactive while the user
+   * types in an input, with undo and redo as the exception. Normal text editing stays
+   * untouched.
    */
   @HostListener('document:keydown', ['$event'])
   protected onKeydown(event: KeyboardEvent): void {
@@ -635,7 +629,6 @@ export class FlowEditorComponent {
     }
   }
 
-  // --- canvas interaction (delegated) ----------------------------------------------------
 
   protected onNodePointerDown(event: PointerEvent, key: string): void {
     this.pointer.nodePointerDown(event, key);
@@ -690,7 +683,6 @@ export class FlowEditorComponent {
     this.pointer.resetView();
   }
 
-  // --- save -------------------------------------------------------------------------------
 
   /** Guards against double-click (two flow versions from one click). */
   protected readonly saving = signal(false);

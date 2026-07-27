@@ -1,5 +1,5 @@
-/* Shared vote-block styles. Emulated encapsulation scopes styles per
-   component, so every component showing vote blocks @use's its own copy. */
+/* Shared vote-block styles. Emulated encapsulation scopes styles per component.
+   Each component that shows vote blocks must @use its own copy. */
 .mtg__vote {
   padding: var(--space-3);
   border: var(--border-width) solid var(--color-border);
@@ -56,7 +56,6 @@
   border-radius: var(--radius-md);
 }
 @media (max-width: 48rem) {
-  /* Ballot buttons: full width + comfortable touch targets. */
   .mtg__voteActions app-button {
     flex: 1 1 auto;
   }

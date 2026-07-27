@@ -31,7 +31,7 @@ class ErasureRequestOut(_CamelModel):
 
 
 class ErasureRejectBody(_CamelModel):
-    """Rejection reason (used in the notification to the subject)."""
+    """Rejection reason. The notification to the subject shows it."""
 
     reason: str | None = None
 

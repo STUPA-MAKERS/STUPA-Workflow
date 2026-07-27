@@ -1,10 +1,10 @@
 """Rendering of domain rows into log fragments.
 
-Each list command's rows become aligned, coloured log lines; every row also gets
-a pre-rendered pop-out detail view (shown on click). All pure text-in →
-fragments-out; mouse handlers are attached by the log panel when the entries are
-appended. Works on both DB backends: values may be native (psycopg) or strings
-(docker/psql CSV), so everything is normalised through :func:`fmt` first.
+The rows of each list command become aligned, colored log lines. Every row also
+gets a pre-rendered pop-out detail view, which the UI shows on click. All builders
+are pure: text in, fragments out. The log panel attaches the mouse handlers when it
+appends the entries. The builders work on both database backends. A value can be
+native (psycopg) or a string (docker or psql CSV), so `fmt` normalizes it first.
 
 Row = ``(line fragments, detail fragments, detail title)``.
 """
@@ -24,28 +24,34 @@ Row = tuple[StyleAndTextTuples, StyleAndTextTuples, str]
 
 
 def fmt(value: Any) -> str:
-    """Normalise a DB value (native or CSV string) to display text."""
+    """Normalize a database value, native or CSV string, to display text."""
     return "" if value is None else str(value)
 
 
 def truthy(value: Any) -> bool:
-    """Interpret a boolean DB value from either backend."""
+    """Interpret a boolean database value from either backend."""
     return value is True or str(value).lower() in ("true", "t", "1")
 
 
 def clip(text: str, width: int) -> str:
-    """Clip *text* to *width*, marking the cut with an ellipsis."""
+    """Clip the text to a width and mark the cut with an ellipsis."""
     return text if len(text) <= width else text[: max(0, width - 1)] + "…"
 
 
 def short_id(value: Any) -> str:
-    """A recognisable 8-char prefix of a UUID-ish id (full value in the detail)."""
+    """Return a short 8-character prefix of a UUID-like id.
+
+    The detail pop-out shows the full value.
+    """
     text = fmt(value)
     return text[:8] + "…" if len(text) > 9 else text
 
 
 def dt_parts(value: Any) -> tuple[str, str]:
-    """Split a timestamp (datetime or ISO-ish string) into (date, HH:MM:SS)."""
+    """Split a timestamp into a ``(date, HH:MM:SS)`` pair.
+
+    The value can be a datetime or a string in ISO-like form.
+    """
     if isinstance(value, datetime):
         return value.date().isoformat(), value.strftime("%H:%M:%S")
     text = fmt(value)
@@ -55,7 +61,7 @@ def dt_parts(value: Any) -> tuple[str, str]:
 
 
 def day_heading(date_str: str) -> str:
-    """``Mon 2026-06-30`` when the date parses, else the raw string."""
+    """Return ``Mon 2026-06-30`` when the date parses, else the raw string."""
     try:
         parsed = date.fromisoformat(date_str)
     except ValueError:
@@ -64,13 +70,17 @@ def day_heading(date_str: str) -> str:
 
 
 def separator(label: str, width: int = 72) -> StyleAndTextTuples:
-    """A ``── label ───…`` day/section break line."""
+    """Build a ``── label ───…`` day or section break line."""
     bar = "─" * max(0, width - len(label) - 4)
     return [("class:sep", "── "), ("class:dim", label), ("class:sep", f" {bar}\n")]
 
 
 def _kv(rows: list[tuple[str, str, str]]) -> StyleAndTextTuples:
-    """Aligned ``name  value`` lines for a detail pop-out: (name, style, value)."""
+    """Build aligned ``name  value`` lines for a detail pop-out.
+
+    Args:
+        rows: The ``(name, style, value)`` triples, in display order.
+    """
     if not rows:
         return []
     width = max(len(name) for name, _style, _value in rows)
@@ -81,9 +91,8 @@ def _kv(rows: list[tuple[str, str, str]]) -> StyleAndTextTuples:
     return fragments
 
 
-# --------------------------------------------------------------------------------- users
 def user_name(row: dict[str, Any]) -> str:
-    """The best display handle for a principal row."""
+    """Return the best display handle for a principal row."""
     return fmt(row.get("email")) or fmt(row.get("display_name")) or fmt(row.get("sub"))
 
 
@@ -111,7 +120,7 @@ def _user_detail(row: dict[str, Any], assignments: str) -> StyleAndTextTuples:
 
 
 def user_rows(rows: list[dict[str, Any]]) -> list[Row]:
-    """One aligned line per principal: active dot, name, roles, last login."""
+    """Build one aligned line per principal: active dot, name, roles, last login."""
     if not rows:
         return []
     name_width = min(40, max(len(clip(user_name(r), 40)) for r in rows))
@@ -132,9 +141,8 @@ def user_rows(rows: list[dict[str, Any]]) -> list[Row]:
     return out
 
 
-# --------------------------------------------------------------------------------- roles
 def role_rows(rows: list[dict[str, Any]]) -> list[Row]:
-    """One line per role: key, permission count, assignment count."""
+    """Build one line per role: key, permission count, assignment count."""
     if not rows:
         return []
     key_width = min(28, max(len(clip(fmt(r.get("key")), 28)) for r in rows))
@@ -165,7 +173,7 @@ def role_rows(rows: list[dict[str, Any]]) -> list[Row]:
 def role_detail(
     key: str, permissions: list[str], assignees: list[str]
 ) -> StyleAndTextTuples:
-    """The full pop-out for one role: its permission set and its holders."""
+    """Build the full pop-out for one role: its permission set and its holders."""
     fragments: StyleAndTextTuples = [("class:detail-accent", f"{key}\n\n")]
     fragments.append(("class:dim", f"permissions ({len(permissions)})\n"))
     for perm in permissions or ["—"]:
@@ -176,7 +184,6 @@ def role_detail(
     return fragments
 
 
-# ----------------------------------------------------------------------- OIDC mappings
 def mapping_label(row: dict[str, Any]) -> str:
     scope = fmt(row.get("gremium"))
     return f"{fmt(row.get('oidc_group'))} → {fmt(row.get('role_key'))}" + (
@@ -185,7 +192,7 @@ def mapping_label(row: dict[str, Any]) -> str:
 
 
 def mapping_rows(rows: list[dict[str, Any]]) -> list[Row]:
-    """One line per OIDC group-mapping: group → role @ scope."""
+    """Build one line per OIDC group mapping: group → role @ scope."""
     if not rows:
         return []
     group_width = min(30, max(len(clip(fmt(r.get("oidc_group")), 30)) for r in rows))
@@ -214,8 +221,7 @@ def mapping_rows(rows: list[dict[str, Any]]) -> list[Row]:
     return out
 
 
-# --------------------------------------------------------------------------------- audit
-# Action-prefix → style class; first match wins, checked in order.
+# Action keyword to style class. The first match in this order wins.
 _ACTION_STYLES: tuple[tuple[tuple[str, ...], str], ...] = (
     (("delete", "remove", "revoke", "erasure"), "class:act-delete"),
     (("login", "logout", "auth", "token", "session"), "class:act-auth"),
@@ -231,7 +237,7 @@ _ACTION_STYLES: tuple[tuple[tuple[str, ...], str], ...] = (
 
 
 def action_style(action: str) -> str:
-    """The colour class for an audit action, by keyword."""
+    """Return the color class for an audit action, chosen by keyword."""
     lowered = action.lower()
     for keywords, style in _ACTION_STYLES:
         if any(keyword in lowered for keyword in keywords):
@@ -240,7 +246,7 @@ def action_style(action: str) -> str:
 
 
 def _pretty_data(raw: Any) -> str:
-    """Pretty-print the audit ``data`` JSON; fall back to the raw text."""
+    """Pretty-print the audit ``data`` JSON, or fall back to the raw text."""
     text = fmt(raw)
     if not text or text in ("{}", "null"):
         return ""
@@ -251,7 +257,7 @@ def _pretty_data(raw: Any) -> str:
 
 
 def audit_actor(row: dict[str, Any]) -> str:
-    """The resolved actor handle: email/display name, else the raw sub, else system."""
+    """Return the resolved actor handle: email or name, else the sub, else system."""
     return (
         fmt(row.get("actor_email"))
         or fmt(row.get("actor_name"))
@@ -287,11 +293,14 @@ def _audit_detail(row: dict[str, Any]) -> StyleAndTextTuples:
 
 
 def audit_rows(rows: list[dict[str, Any]], previous_date: str = "") -> list[Row]:
-    """Audit lines, newest first, with a day-break separator between dates.
+    """Build the audit lines, newest first, with a day break between dates.
 
-    Day-break rows carry no detail (empty list) and are appended as plain,
-    non-clickable lines by the log panel. *previous_date* threads the last
-    rendered date across pages so /more does not repeat the day heading.
+    A day-break row carries no detail, an empty list. The log panel appends it as a
+    plain line that the user cannot click.
+
+    Args:
+        previous_date: The last rendered date, threaded across pages. It stops
+            ``/more`` from repeating the day heading.
     """
     out: list[Row] = []
     actor_width = min(
@@ -325,7 +334,6 @@ def audit_rows(rows: list[dict[str, Any]], previous_date: str = "") -> list[Row]
     return out
 
 
-# --------------------------------------------------------------------------- row repaint
 def repaint(
     fragments: StyleAndTextTuples,
     width: int,
@@ -333,14 +341,16 @@ def repaint(
     background: str | None = None,
     handler: MouseHandler | None = None,
 ) -> StyleAndTextTuples:
-    """Re-emit a rendered row, padded with spaces to *width*.
+    """Re-emit a rendered row and pad it with spaces to `width`.
 
-    With *background* set, every fragment (and the pad) is repainted over it,
-    keeping per-fragment foreground styles and mouse handlers — the hover and
-    detail highlight. With *handler* set, it fills in for fragments that carry
-    no handler of their own and is attached to the pad and the trailing newline
-    — plain-text rows, whose full width must clear a stale hover highlight. A
-    fragment's own handler always wins (e.g. the clickable ``/more`` link).
+    A set `background` repaints every fragment and the pad over that color. The
+    per-fragment foreground styles and mouse handlers stay. The hover highlight
+    and the detail highlight use this.
+
+    A set `handler` fills in for fragments that carry no handler of their own.
+    It also covers the pad and the trailing newline. A plain text row needs a
+    handler over its full width to clear a stale hover highlight. The own
+    handler of a fragment always wins, for example the clickable `/more` link.
     """
     first = fragments[0] if fragments else None
     pad_handler = handler or (first[2] if first and len(first) == 3 else None)
@@ -371,7 +381,7 @@ def repaint(
 def highlight(
     fragments: StyleAndTextTuples, background: str, width: int
 ) -> StyleAndTextTuples:
-    """Repaint *fragments* over *background*, padded to *width*."""
+    """Repaint `fragments` over `background` and pad the row to `width`."""
     return repaint(fragments, width, background=background)
 
 

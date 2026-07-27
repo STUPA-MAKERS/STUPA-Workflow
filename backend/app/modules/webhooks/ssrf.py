@@ -1,15 +1,16 @@
 """SSRF guard for webhook targets.
 
-Before every send the target is checked: ``http(s)`` scheme, an optional host allowlist,
-and - the core - the resolved target IP. All non-global addresses are blocked
-(private/loopback/link-local/multicast/reserved/unspecified), which also covers the
-metadata IP ``169.254.169.254`` (link-local). IPv4-in-IPv6 mappings (``::ffff:a.b.c.d``)
-are unwrapped before the check.
+The guard checks the target before every send. It accepts only the `http` scheme and the
+`https` scheme. It applies the optional host allowlist. As the core check it then looks
+at the resolved target IP. The guard blocks every non-global address: private, loopback,
+link-local, multicast, reserved and unspecified. This also covers the metadata IP
+`169.254.169.254`, which is link-local. The guard unwraps an IPv4-in-IPv6 mapping such
+as `::ffff:a.b.c.d` before the check.
 
-DNS rebinding: resolution happens at send time (worker, right before the POST) and
-checks every returned A/AAAA record - a single internal record blocks the send. A
-residual TOCTOU between resolution and connect remains (httpx re-resolves); the worker's
-egress policy is the second line of defense.
+DNS rebinding: the worker resolves the host at send time, right before the POST. The
+guard checks every A record and AAAA record that comes back. One internal record blocks
+the send. A residual TOCTOU between resolution and connect stays, because httpx resolves
+again. The egress policy of the worker is the second line of defense.
 """
 
 from __future__ import annotations
@@ -19,16 +20,22 @@ import socket
 from collections.abc import Callable, Iterable
 from urllib.parse import urlsplit, urlunsplit
 
-# Host -> list of resolved IP strings. Injectable (tests / DNS-rebinding protection).
+# Maps a host to the list of resolved IP strings. Callers inject it in tests and for the
+# DNS-rebinding check.
 Resolver = Callable[[str], list[str]]
 
 
 class SsrfError(Exception):
-    """Target URL is not allowed (scheme/allowlist/internal IP)."""
+    """The target URL failed the scheme check, the allowlist check or the IP check."""
 
 
 def default_resolver(host: str) -> list[str]:  # pragma: no cover — real DNS
-    """Resolve all A/AAAA records (deduped). Errors -> empty list (= blocked)."""
+    """Resolve all A records and AAAA records of a host, deduped and sorted.
+
+    Returns:
+        The resolved IP strings. An empty list on a resolution error, which blocks the
+        target.
+    """
     try:
         infos = socket.getaddrinfo(host, None, proto=socket.IPPROTO_TCP)
     except OSError:
@@ -36,22 +43,22 @@ def default_resolver(host: str) -> list[str]:  # pragma: no cover — real DNS
     return sorted({str(info[4][0]) for info in infos})
 
 
-# NAT64 well-known prefix (RFC 6052): the target IPv4 lives in the low 32 bits of a
-# ``64:ff9b::/96`` address. Such an address reports ``is_global=True`` and would slip
-# through without unwrapping - a NAT64 gateway in the worker egress would then translate
-# it to the embedded IPv4 (e.g. the metadata IP ``169.254.169.254`` or RFC1918).
+# NAT64 well-known prefix (RFC 6052). A `64:ff9b::/96` address holds the target IPv4 in
+# its low 32 bits and reports `is_global=True`. Without the unwrap it passes the guard.
+# A NAT64 gateway in the worker egress then translates it to the embedded IPv4, for
+# example the metadata IP `169.254.169.254` or an RFC1918 address.
 _NAT64_WKP = ipaddress.IPv6Network("64:ff9b::/96")
 
 
 def _unmap(
     ip: ipaddress.IPv4Address | ipaddress.IPv6Address,
 ) -> ipaddress.IPv4Address | ipaddress.IPv6Address:
-    """Reduce IPv4-in-IPv6 embeddings to the embedded IPv4 so the global check sees the
-    actual target address.
+    """Reduce an IPv4-in-IPv6 embedding to the embedded IPv4 address.
 
-    Covers all three embeddings through which an internal IPv4 could otherwise slip
-    through as a global IPv6: ``::ffff:a.b.c.d`` (IPv4-mapped), ``2002:a.b.c.d::/16``
-    (6to4) and ``64:ff9b::a.b.c.d`` (NAT64, RFC 6052).
+    The global check then sees the actual target address. Three embeddings could
+    otherwise let an internal IPv4 pass as a global IPv6. The unwrap covers all of them:
+    `::ffff:a.b.c.d` (IPv4-mapped), `2002:a.b.c.d::/16` (6to4) and `64:ff9b::a.b.c.d`
+    (NAT64, RFC 6052).
     """
     if not isinstance(ip, ipaddress.IPv6Address):
         return ip
@@ -65,7 +72,7 @@ def _unmap(
 
 
 def _is_blocked(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
-    """``True`` for any non-global (internal/special) address."""
+    """Report whether the address is non-global, that is internal or special."""
     return not _unmap(ip).is_global
 
 
@@ -75,11 +82,16 @@ def assert_allowed_url(
     allowlist: Iterable[str] = (),
     resolver: Resolver = default_resolver,
 ) -> list[str]:
-    """Check the target URL against the SSRF guard. Returns the checked target IPs.
+    """Check the target URL against the SSRF guard.
 
-    Raises ``SsrfError`` if the scheme is unsupported, the host is missing, the allowlist
-    (if set) does not contain the host, or any target IP is non-global. A host given as an
-    IP literal is checked directly (no DNS).
+    A host that is already an IP literal goes through the check directly, without DNS.
+
+    Returns:
+        The checked target IPs.
+
+    Raises:
+        SsrfError: The scheme is not supported, the host is missing, the allowlist is set
+            and does not contain the host, or one target IP is non-global.
     """
     parsed = urlsplit(url)
     if parsed.scheme.lower() not in ("http", "https"):
@@ -109,12 +121,14 @@ def assert_allowed_url(
 
 
 def pin_url(url: str, ip: str) -> tuple[str, str]:
-    """Rewrite the URL to the validated target IP (DNS-rebinding pinning).
+    """Rewrite the URL to the validated target IP and pin it against DNS rebinding.
 
-    Returns ``(ip_url, host_header)``: ``ip_url`` replaces the host with the IP (so the
-    client connects to exactly the checked address instead of re-resolving),
-    ``host_header`` carries the original ``Host`` for routing/TLS SNI. This removes the
-    TOCTOU between resolution and connect.
+    The pin removes the TOCTOU between resolution and connect.
+
+    Returns:
+        A tuple `(ip_url, host_header)`. In `ip_url` the IP replaces the host, so the
+        client connects to the checked address and does not resolve again.
+        `host_header` keeps the original `Host` value for routing and TLS SNI.
     """
     parsed = urlsplit(url)
     port = parsed.port

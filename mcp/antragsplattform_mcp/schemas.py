@@ -1,13 +1,13 @@
-"""Wire-format request models, mirrored from the backend's Pydantic schemas.
+"""Wire-format request models, mirrored from the Pydantic schemas of the backend.
 
-Field names are the **camelCase wire keys** (the backend accepts camelCase aliases);
-``extra="allow"`` keeps the mirror drift-tolerant — new backend fields can be passed
-through without updating this file. Create models are dumped with ``exclude_none``,
-patch/update models with ``exclude_unset`` (only the explicitly provided keys go on
-the wire, so partial updates stay partial).
+The field names are the **camelCase wire keys**. The backend accepts camelCase aliases.
+`extra="allow"` keeps the mirror tolerant against drift. A caller can pass a new backend
+field through without an update to this file. A create model dumps with `exclude_none`.
+A patch or update model dumps with `exclude_unset`. Only the keys that the caller sets
+go on the wire, so a partial update stays partial.
 
-Source of truth: ``backend/app/shared/config_schemas.py`` + the per-module
-``schemas.py`` files (state 2026-06-12).
+Source of truth: `backend/app/shared/config_schemas.py` plus the per-module `schemas.py`
+files (state 2026-06-12).
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ class WireModel(BaseModel):
 I18nMap = dict[str, str]
 
 
-# ============================================================ flow graph (shared)
+# Flow graph, shared by the flow tools.
 class StateDef(WireModel):
     key: str = Field(description="State key, ^[a-z][a-z0-9_]*$")
     label: I18nMap = Field(description='Display label per language, e.g. {"de": "...", "en": "..."}')
@@ -42,7 +42,7 @@ class StateDef(WireModel):
 
 
 class StateDefPatch(WireModel):
-    """Partial state update — only provided keys are applied."""
+    """Partial state update. Only the keys you provide change."""
 
     key: str | None = Field(default=None, description="New key (renames cascade to transitions/layout/groups)")
     label: I18nMap | None = None
@@ -81,8 +81,11 @@ class TransitionDef(WireModel):
 
 
 class TransitionDefPatch(WireModel):
-    """Partial transition update — only provided keys are applied; an explicit
-    ``null`` removes the key (e.g. ``guard: null`` drops the guard)."""
+    """Partial transition update.
+
+    Only the keys you provide change. An explicit `null` removes the key. For example,
+    `guard: null` drops the guard.
+    """
 
     from_: str | None = Field(default=None, alias="from")
     to: str | None = None
@@ -97,9 +100,12 @@ class TransitionDefPatch(WireModel):
 
 
 class FlowGroupDef(WireModel):
-    """Visual node group (editor-only, stored in ``layout.groups``; the engine
-    ignores it). Groups are NESTABLE via ``groupIds``; the editor renders each
-    group as one box whose content opens by drill-down."""
+    """Visual node group for the editor only.
+
+    The graph keeps it in `layout.groups` and the engine ignores it. Groups are NESTABLE
+    through `groupIds`. The editor draws each group as one box. The content of the box
+    opens by drill-down.
+    """
 
     id: str
     name: str
@@ -110,7 +116,7 @@ class FlowGroupDef(WireModel):
     color: str | None = None
 
 
-# ============================================================ form fields (shared)
+# Form fields, shared by the form tools.
 class FormFieldDef(WireModel):
     key: str = Field(description="Field key, ^[a-z][a-z0-9_]*$")
     type: str = Field(
@@ -137,7 +143,7 @@ class FormFieldDef(WireModel):
 
 
 class FormFieldPatch(WireModel):
-    """Partial form-field update — only provided keys are applied."""
+    """Partial form-field update. Only the keys you provide change."""
 
     key: str | None = None
     type: str | None = None
@@ -152,7 +158,7 @@ class FormFieldPatch(WireModel):
     promoteTarget: str | None = None
 
 
-# ============================================================ admin: gremien/RBAC
+# Admin: Gremien and RBAC.
 class GremiumCreate(WireModel):
     name: str
     slug: str
@@ -233,7 +239,7 @@ class GroupMappingUpdate(WireModel):
     gremiumId: str | None = None
 
 
-# ============================================================ admin: types/webhooks
+# Admin: application types, webhooks and deadline policies.
 class ApplicationTypeCreate(WireModel):
     key: str
     nameI18n: I18nMap
@@ -278,7 +284,7 @@ class DeadlinePolicyUpdate(WireModel):
     offsetDays: int | None = None
 
 
-# ============================================================ budget tree
+# Budget tree, bookings and transfers.
 class BudgetNodeCreate(WireModel):
     key: str
     name: str
@@ -338,8 +344,8 @@ class AccountCreate(WireModel):
     name: str
     iban: str = ""
     active: bool = True
-    # FinTS bank connection (shared by all bookers). Personal login/PIN are set per booker
-    # via set_fints_credential, not here (#fints-percred).
+    # FinTS bank connection. All bookers share it. Each booker sets a personal login and
+    # PIN with set_fints_credential, not here (#fints-percred).
     fintsEndpoint: str | None = Field(default=None, description="FinTS server URL (https)")
     fintsBlz: str | None = Field(default=None, description="Bank code (BLZ)")
 
@@ -352,18 +358,23 @@ class AccountUpdate(WireModel):
     fintsBlz: str | None = Field(default=None, description="Bank code (BLZ); null/'' clears")
 
 
-# -------------------------------------------------------- bank reconcile (#fints)
+# Bank reconcile and invoices (#fints).
 class FintsCredentialIn(WireModel):
     """Personal FinTS login of the requesting booker for one account (#fints-percred).
-    fintsPin is write-only (stored encrypted, never returned)."""
+
+    fintsPin is write-only. The platform stores it encrypted and never returns it.
+    """
 
     fintsLogin: str
     fintsPin: str
 
 
 class ConfirmLineRequest(WireModel):
-    """Confirm a staged bank transaction into a booking. Provide EITHER budgetId
-    (new booking on that cost centre) OR matchExpenseId (attach to existing booking)."""
+    """Confirm a staged bank transaction into a booking.
+
+    Provide EITHER budgetId for a new booking on that cost center, OR matchExpenseId to
+    attach the transaction to a booking that exists.
+    """
 
     budgetId: str | None = None
     fiscalYearId: str | None = None
@@ -372,8 +383,11 @@ class ConfirmLineRequest(WireModel):
 
 
 class InvoiceCreate(WireModel):
-    """Create an invoice (#invoices). grossAmount required; the rest optional. fileToken
-    links a previously uploaded/parsed original PDF (from parse_invoice/upload_invoice_file)."""
+    """Create an invoice (#invoices).
+
+    `grossAmount` is required and the rest is optional. `fileToken` links an original PDF
+    that you uploaded or parsed before, with `parse_invoice` or `upload_invoice_file`.
+    """
 
     grossAmount: str = Field(description="Decimal string >= 0")
     number: str | None = None
@@ -401,7 +415,7 @@ class InvoiceUpdate(WireModel):
     status: Literal["open", "paid"] | None = None
 
 
-# ============================================================ meetings/votes
+# Meetings and votes.
 class MeetingCreate(WireModel):
     gremiumId: str
     title: str
@@ -440,7 +454,7 @@ class VoteCreate(WireModel):
     resultBranchTransitionId: str | None = None
 
 
-# ============================================================ misc
+# Notification settings, delegations and substitutes.
 class NotificationSettingsUpdate(WireModel):
     taskReminderEnabled: bool | None = None
     taskReminderAfterDays: int | None = None
@@ -460,10 +474,10 @@ class SubstituteCreate(WireModel):
 
 
 def dump_create(model: BaseModel) -> dict[str, Any]:
-    """Create bodies: omit unset Nones, keep defaults, use wire aliases."""
+    """Dump a create body: drop None values, keep defaults, use the wire aliases."""
     return model.model_dump(by_alias=True, exclude_none=True)
 
 
 def dump_patch(model: BaseModel) -> dict[str, Any]:
-    """Patch bodies: only the explicitly provided keys (partial update)."""
+    """Dump a patch body with only the keys that the caller set, for a partial update."""
     return model.model_dump(by_alias=True, exclude_unset=True)

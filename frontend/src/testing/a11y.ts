@@ -1,31 +1,32 @@
 /**
  * a11y test helper (WCAG 2.1 AA).
  *
- * Wraps `jest-axe` with project-wide configuration and runs the axe scan against a
- * rendered DOM node. Returns the axe result, which the caller checks with
- * `toHaveNoViolations()` (matcher registered in `setup-jest.ts`).
+ * The helper wraps `jest-axe` with a project-wide configuration and scans a rendered DOM
+ * node. It returns the axe result. The caller checks that result with
+ * `toHaveNoViolations()`, a matcher that `setup-jest.ts` registers.
  *
- * Colour-contrast note: axe cannot compute `color-contrast` in jsdom (no layout /
- * no resolved computed styles) and reports it as "incomplete". The rule is disabled
- * here; contrasts are instead checked deterministically in `styles/contrast.spec.ts`
- * against the CD tokens.
+ * Color contrast: jsdom has no layout and no resolved computed styles, so axe cannot
+ * compute `color-contrast` and reports it as "incomplete". This file disables the rule.
+ * `styles/contrast.spec.ts` checks the contrasts against the CD tokens instead, with a
+ * deterministic result.
  */
 import { axe, type AxeResults, type JestAxeConfigureOptions } from 'jest-axe';
 
-/** Default rule configuration for unit/component scans in jsdom. */
 export const A11Y_RULES: JestAxeConfigureOptions = {
   rules: {
-    // Not computable in jsdom — covered separately by the token test.
+    // jsdom cannot compute this rule. The token test covers it instead.
     'color-contrast': { enabled: false },
-    // Single components render without a <main>/landmark wrapper; the landmark
-    // structure is checked in the shell/view scan, not per fragment.
+    // A single component renders without a <main> landmark wrapper. The shell view
+    // scan checks the landmark structure, not each fragment.
     region: { enabled: false },
   },
 };
 
 /**
- * axe scan over a DOM node (or the fixture root). For full-view scans (shell with
- * landmarks) re-enable `region` via `extraRules`.
+ * Run an axe scan over a DOM node or over the fixture root.
+ *
+ * For a full-view scan of the shell with its landmarks, enable `region` again through
+ * `extraRules`.
  */
 export function runAxe(
   target: Element | Document,

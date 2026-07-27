@@ -1,4 +1,4 @@
-"""AC (T-05): **kein `eval`/`exec`** in den deklarativen Evaluatoren — statisch geprüft."""
+"""Static check for AC (T-05): the declarative evaluators must not call `eval` or `exec`."""
 
 import ast
 from pathlib import Path

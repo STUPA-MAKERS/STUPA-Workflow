@@ -1,14 +1,13 @@
-"""applicant_session: serverseitige Magic-Link-Sessions (security.md §1).
+"""applicant_session: server-side magic-link sessions (security.md §1).
 
-Macht den Antragsteller-(Magic-Link-)Token **zustandsbehaftet**, analog zu
-``auth_session``: der Browser hält nur eine signierte, opake ``sid``; ``application_id``
-und ``scope`` liegen serverseitig. Damit ist ein Token nicht mehr allein aus
-``SESSION_SECRET`` fälschbar (er braucht eine existierende Zeile) und serverseitig
-widerrufbar (Logout = Zeile gelöscht, Kill-Switch = ``revoked_at`` gesetzt, z. B. bei
-Anonymisierung).
+The migration makes the applicant magic-link token **stateful**, like ``auth_session``.
+The browser holds only a signed, opaque ``sid``. The server keeps ``application_id`` and
+``scope``. An attacker can no longer forge a token from ``SESSION_SECRET`` alone, because
+the token needs an existing row. The server can also revoke a token. A logout deletes the
+row. The kill switch sets ``revoked_at``, for example on anonymization.
 
-Idempotent (``IF NOT EXISTS``); sauberer Down-Round-Trip. Auf einem frischen Schema
-entsteht die Tabelle ohnehin über ``Base.metadata.create_all`` (0001/0002).
+The migration is idempotent (``IF NOT EXISTS``) and has a clean down round trip. On a
+fresh schema ``Base.metadata.create_all`` (0001/0002) creates the table anyway.
 """
 
 from __future__ import annotations

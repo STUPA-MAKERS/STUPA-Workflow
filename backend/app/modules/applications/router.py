@@ -1,8 +1,9 @@
 """Applications API router.
 
-Public create (ALTCHA-guarded) plus applicant-or-principal (A/P) reads/edits:
-detail, patch (new version), timeline, versions, comments, erasure request.
-PII and internal comments are principal-only.
+The create route is public and ALTCHA-guarded. The other routes accept an
+applicant or a principal. They cover the detail view, the patch that writes a
+new version, the timeline, the versions, the comments and the erasure request.
+Only a principal reads the PII and the internal comments.
 """
 
 from __future__ import annotations
@@ -69,9 +70,9 @@ router = APIRouter(tags=["applications"])
 
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 
-# Hard cap for the synchronous XLSX export (anti-DoS): the workbook is built
-# fully in memory in-request, so larger result sets answer 413 and the user
-# must narrow the filter.
+# Anti-DoS cap for the synchronous XLSX export. The request builds the whole
+# workbook in memory. A larger result set answers 413, and the user must narrow
+# the filter.
 EXPORT_MAX_ROWS = 10_000
 
 
@@ -91,9 +92,10 @@ async def _deliver_magic_link(
 ) -> None:
     """Issue and send the magic link for a new application in its own session.
 
-    Runs as a background task after the 201 response; scope follows the initial
-    state (edit). Delivery goes through the mail queue — without an arq pool it
-    is logged and dropped (`NotificationService`)."""
+    This runs as a background task after the 201 response. The scope follows the
+    initial state and is ``edit``. The mail queue delivers the message. Without
+    an arq pool, `NotificationService` logs the mail and drops it.
+    """
     queue = mail_queue_from_pool(pool)  # type: ignore[arg-type]
     sessionmaker = get_sessionmaker()
     async with sessionmaker() as db:
@@ -113,7 +115,7 @@ MagicLinkSender = Callable[[Settings, str, UUID, object], Awaitable[None]]
 
 
 def get_magic_link_sender() -> MagicLinkSender:
-    """Injectable magic-link sender (overridable in tests)."""
+    """Return the injectable magic-link sender that a test can override."""
     return _deliver_magic_link
 
 
@@ -122,15 +124,16 @@ def get_magic_link_sender() -> MagicLinkSender:
     response_model=ApplicationCreated,
     status_code=status.HTTP_201_CREATED,
     dependencies=[
-        # Body cap (413): Content-Length bound plus capped reading (also chunked);
-        # the authoritative check on serialized field values happens after parsing.
+        # Body cap that answers 413. It bounds Content-Length and reads the body
+        # under a cap, also for a chunked body. The authoritative check on the
+        # serialized field values runs after parsing.
         Depends(enforce_application_payload_limit),
         Depends(rate_limit_applications),
-        # ALTCHA only for anonymous submissions; logged-in users are exempt.
+        # ALTCHA applies to an anonymous submission only. A logged-in user is exempt.
         Depends(verify_altcha_unless_authenticated),
     ],
-    # 400 malformed JSON / invalid ALTCHA, 413 body too large, 422 form/schema
-    # validation, 429 rate limit.
+    # 400 malformed JSON or invalid ALTCHA, 413 body too large, 422 form or
+    # schema validation, 429 rate limit.
     responses=_errors(400, 404, 413, 422, 429),
 )
 async def create_application(
@@ -142,17 +145,20 @@ async def create_application(
     principal: Annotated[Principal | None, Depends(get_current_principal)],
     send_magic_link: Annotated[MagicLinkSender, Depends(get_magic_link_sender)],
 ) -> ApplicationCreated:
-    """Create an application: PII split out, v1 version, magic-link mail enqueued.
+    """Create an application.
 
-    Logged-in users need no ALTCHA; missing ``applicantEmail``/``applicantName``
-    are derived from the account and the audit actor is their ``sub``. Anonymous
-    submissions require ALTCHA and ``applicantEmail``."""
-    # Authoritative bound: serialized field values (independent of Content-Length).
+    The route splits out the PII, writes version 1 and enqueues the magic-link
+    mail. A logged-in user needs no ALTCHA. The route derives a missing
+    ``applicantEmail`` or ``applicantName`` from the account and audits the
+    ``sub`` of that account as the actor. An anonymous submission requires
+    ALTCHA and ``applicantEmail``.
+    """
+    # Authoritative bound on the serialized field values, free of Content-Length.
     if len(json.dumps(payload.data)) > settings.max_application_payload_bytes:
         raise PayloadTooLargeError(
             f"Application data exceeds {settings.max_application_payload_bytes} bytes."
         )
-    # Derive identity: explicit value wins, else the logged-in account.
+    # Derive the identity. An explicit value wins over the logged-in account.
     email = (
         str(payload.applicant_email)
         if payload.applicant_email
@@ -183,9 +189,12 @@ async def list_tasks(
     service: ServiceDep,
     principal: Annotated[Principal, Depends(require_principal())],
 ) -> list[ApplicationListItem]:
-    """List the principal's open tasks: applications in vote states or with a
-    firable transition, plus own applications in an editable state (even
-    without ``application.read``)."""
+    """List the open tasks of the principal.
+
+    The list holds the applications in a vote state, the applications with a
+    firable transition, and the own applications in an editable state. The last
+    group appears even without ``application.read``.
+    """
     return await service.list_tasks(principal)
 
 
@@ -210,15 +219,16 @@ async def list_applications(
     created_to: Annotated[date | None, Query(alias="createdTo")] = None,
     sort: Annotated[Literal["createdAt", "amount"], Query()] = "createdAt",
     order: Annotated[Literal["asc", "desc"], Query()] = "desc",
-    # "My applications": forces the owner filter even for principals WITH
-    # application.read — otherwise they would see everything there.
+    # "My applications" forces the owner filter even for a principal that holds
+    # application.read. Without it, that principal would see every application.
     mine: Annotated[bool, Query()] = False,
 ) -> Page[ApplicationListItem]:
-    """List applications (filters, sorting, paging).
+    """List applications with filters, sorting and paging.
 
-    Without ``application.read`` (and not admin) the principal sees own
-    applications (``created_by``) plus the committee read scope.
-    ``mine=true`` forces the pure owner filter even for authorized readers."""
+    A principal without ``application.read`` and without the admin role sees the
+    own applications (``created_by``) plus the committee read scope.
+    ``mine=true`` forces the pure owner filter, also for an authorized reader.
+    """
     can_read = (
         "admin" in principal.roles
         or principal.has("application.read")
@@ -239,8 +249,8 @@ async def list_applications(
         sort=sort,
         order=order,
         owner_sub=principal.sub if (mine or not can_read) else None,
-        # Committee read scope only for restricted principals; "mine" stays
-        # deliberately owner-only.
+        # The committee read scope applies to a restricted principal only.
+        # "mine" stays owner-only on purpose.
         committee_sub=principal.sub if restricted else None,
         limit=page.limit,
         offset=page.offset,
@@ -267,7 +277,10 @@ async def export_applications_xlsx(
     sort: Annotated[Literal["createdAt", "amount"], Query()] = "createdAt",
     order: Annotated[Literal["asc", "desc"], Query()] = "desc",
 ) -> Response:
-    """Export the application list as ``.xlsx``; filters as in ``GET /applications``."""
+    """Export the application list as ``.xlsx``.
+
+    The filters work as in ``GET /applications``.
+    """
     from app.shared.xlsx import XLSX_MEDIA_TYPE, build_applications_workbook
 
     page = await service.list_applications(
@@ -283,13 +296,13 @@ async def export_applications_xlsx(
         created_to=created_to,
         sort=sort,
         order=order,
-        # +1 over the cap so "more than EXPORT_MAX_ROWS" is detected reliably
-        # even if ``total`` is not counted.
+        # One row over the cap. This detects "more than EXPORT_MAX_ROWS" even
+        # when the query does not count ``total``.
         limit=EXPORT_MAX_ROWS + 1,
         offset=0,
     )
-    # Result set too large -> 413 instead of building a huge workbook in-request;
-    # checks both ``total`` (if counted) and the actually returned rows.
+    # A result set over the cap answers 413 instead of building a huge workbook
+    # in the request. The check reads ``total`` when counted and the returned rows.
     if page.total > EXPORT_MAX_ROWS or len(page.items) > EXPORT_MAX_ROWS:
         raise PayloadTooLargeError(
             f"Export exceeds {EXPORT_MAX_ROWS} rows; please narrow the filter."
@@ -323,7 +336,10 @@ async def get_application(
     service: ServiceDep,
     access: Annotated[Access, Depends(require_app_read)],
 ) -> ApplicationOut:
-    """Read an application. PII/internal view for principals only."""
+    """Read an application.
+
+    Only a principal gets the PII and the internal view.
+    """
     principal = access.principal
     return await service.get(
         access.application_id,
@@ -345,8 +361,11 @@ async def get_application_form(
     service: ServiceDep,
     access: Annotated[Access, Depends(require_app_read)],
 ) -> EffectiveFormOut:
-    """Effective form from the application's pinned version — the detail view
-    shows/edits the same state it is validated against, even after form changes."""
+    """Return the effective form of the pinned version of the application.
+
+    The detail view shows and edits the same field set that validates the
+    answers. This holds after a later form change.
+    """
     return await service.effective_form(
         access.application_id, allow_unconfirmed=access.is_owning_applicant
     )
@@ -362,8 +381,10 @@ async def patch_application(
     service: ServiceDep,
     access: Annotated[Access, Depends(require_app_edit)],
 ) -> ApplicationOut:
-    """Update application data as a new version (locked state -> 409, unless
-    ``application.edit_any``)."""
+    """Update the application data as a new version.
+
+    A locked state answers 409, unless the caller holds ``application.edit_any``.
+    """
     bypass = access.principal is not None and access.principal.has(EDIT_ANY_PERMISSION)
     return await service.patch(
         access.application_id,
@@ -384,7 +405,11 @@ async def delete_application(
     service: ServiceDep,
     principal: Annotated[Principal, Depends(require_principal())],
 ) -> None:
-    """Delete an application — admin only (irreversible; managers/creators may not)."""
+    """Delete an application.
+
+    Only an admin may delete. A manager and the creator may not. The delete is
+    irreversible.
+    """
     if "admin" not in principal.roles:
         raise ForbiddenError("Only an admin may delete applications.")
     await service.delete(application_id, actor=principal.sub)
@@ -415,9 +440,12 @@ async def get_versions(
     application_id: UUID,
     service: ServiceDep,
 ) -> list[VersionOut]:
-    """Version history plus diff (principal-only)."""
-    # Principal-only route: unconfirmed guest submissions stay invisible (404),
-    # mirroring the list semantics.
+    """Return the version history and the diff.
+
+    Only a principal may read this route.
+    """
+    # This route serves a principal only. An unconfirmed guest submission stays
+    # invisible and answers 404, like the list.
     return await service.versions(application_id, allow_unconfirmed=False)
 
 
@@ -431,7 +459,7 @@ async def _deliver_comment_mails(
     author_name: str | None,
     pool: object,
 ) -> None:
-    """Send comment mails in an own session — background after the 201 response."""
+    """Send the comment mails in an own session, in the background after the 201."""
     from app.modules.notifications.comments import send_comment_notifications
 
     queue = mail_queue_from_pool(pool)  # type: ignore[arg-type]
@@ -456,7 +484,7 @@ CommentMailSender = Callable[
 
 
 def get_comment_mail_sender() -> CommentMailSender:
-    """Injectable comment-mail sender (overridable in tests)."""
+    """Return the injectable comment-mail sender that a test can override."""
     return _deliver_comment_mails
 
 
@@ -473,15 +501,20 @@ async def add_comment(
     background: BackgroundTasks,
     request: Request,
     send_comment_mails: Annotated[CommentMailSender, Depends(get_comment_mail_sender)],
-    # Deliberately ``require_app_read`` (view scope suffices): commenting is
-    # communication, not a data mutation — applicants may still ask publicly in a
-    # locked (view-only) state.
+    # ``require_app_read`` on purpose, because the view scope is enough. A
+    # comment is communication, not a data change. An applicant still posts
+    # a public question while the state is locked to view-only.
     access: Annotated[Access, Depends(require_app_read)],
 ) -> CommentOut:
-    """Add a comment. Applicants may only post ``public`` (else 403).
+    """Add a comment.
 
-    Triggers comment mails: public principal comments go to the applicant;
-    applicant comments go to everyone who can act on the current state."""
+    An applicant may post a ``public`` comment only. An internal comment from an
+    applicant answers 403.
+
+    The route triggers comment mails. A public principal comment goes to the
+    applicant. An applicant comment goes to everybody who can act on the current
+    state.
+    """
     if payload.visibility == "internal" and not access.can_see_internal:
         raise ForbiddenError("Applicants may only post public comments.")
     author = access.principal.sub if access.principal is not None else None
@@ -517,7 +550,10 @@ async def list_comments(
     service: ServiceDep,
     access: Annotated[Access, Depends(require_app_read)],
 ) -> list[CommentOut]:
-    """List comments. Applicants see ``public`` only."""
+    """List the comments.
+
+    An applicant sees the ``public`` comments only.
+    """
     return await service.list_comments(
         access.application_id,
         include_internal=access.can_see_internal,
@@ -538,12 +574,15 @@ async def request_erasure(
     settings: SettingsDep,
     background: BackgroundTasks,
     request: Request,
-    # GDPR Art. 17: anyone allowed to read the application (magic-link applicant,
-    # creator, authorized principal) may request erasure of the associated PII.
+    # GDPR Art. 17: every identity that may read the application may request the
+    # erasure of the PII. This covers the magic-link applicant, the creator and
+    # an authorized principal.
     access: Annotated[Access, Depends(require_app_read)],
 ) -> Response:
-    """File an erasure request (GDPR Art. 17) into the ``/admin/privacy`` queue;
-    notifies the privacy officers."""
+    """File an erasure request (GDPR Art. 17) into the ``/admin/privacy`` queue.
+
+    The route notifies the privacy officers.
+    """
     result = await ErasureRequestService(session).create(
         subject_type="applicant",
         application_id=access.application_id,

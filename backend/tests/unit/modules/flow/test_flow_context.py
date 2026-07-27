@@ -1,10 +1,10 @@
-"""Unit tests for the guard-context split (``build_base_context`` / ``with_actor``).
+"""Unit tests for the guard-context split (`build_base_context` and `with_actor`).
 
-The actor-free base context and the pure actor overlay were extracted from
-``build_context`` (#task-recipients). This suite covers every branch of the
-extracted functions plus the recomposed ``build_context`` semantics; the DB
-helpers (``_committees_for_sub``/``_field_types``/``_budget_fits``) keep their
-own branch coverage in ``test_deadlines_flow_cov``.
+The actor-free base context and the pure actor overlay come from `build_context`
+(#task-recipients). This suite covers every branch of the two extracted functions
+and the recomposed `build_context` semantics. The DB helpers (`_committees_for_sub`,
+`_field_types` and `_budget_fits`) keep their own branch coverage in
+`test_deadlines_flow_cov`.
 """
 
 from __future__ import annotations
@@ -19,8 +19,8 @@ import pytest
 from app.modules.auth.principal import Principal
 from app.modules.flow import context as flow_context
 
-# Original helper-Bindings (unabhängig vom autouse-Monkeypatch, der die Modul-Attribute
-# ersetzt) — für die direkten Coverage-Tests ihrer realen Rümpfe.
+# Original helper bindings. The autouse monkeypatch replaces the module attributes, so
+# these direct imports keep the real bodies for the coverage tests below.
 from app.modules.flow.context import (
     _application_type_key,
     _has_attachment,
@@ -78,9 +78,6 @@ def _pure_helpers(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(flow_context, "_has_attachment", _ha)
 
 
-# --------------------------------------------------------------------------- #
-# with_actor (pure)
-# --------------------------------------------------------------------------- #
 def test_with_actor_overlays_on_manual_context() -> None:
     base = GuardContext(
         manual=True, deadline_passed=True, applicant_roles=frozenset({"member"})
@@ -94,10 +91,9 @@ def test_with_actor_overlays_on_manual_context() -> None:
     assert ctx.roles == frozenset({"chair"})
     assert ctx.actor_committees == frozenset({"g-1"})
     assert ctx.actor_is_applicant is True
-    # Actor-free facts stay untouched.
     assert ctx.deadline_passed is True
     assert ctx.applicant_roles == frozenset({"member"})
-    # Pure overlay: the base context itself is unchanged (frozen + replace).
+    # The overlay is pure. It replaces a frozen object and leaves the base context intact.
     assert base.roles == frozenset()
     assert base.actor_is_applicant is False
 
@@ -125,9 +121,6 @@ def test_with_actor_manual_not_applicant() -> None:
     assert ctx.actor_is_applicant is False
 
 
-# --------------------------------------------------------------------------- #
-# build_base_context (actor-free I/O)
-# --------------------------------------------------------------------------- #
 async def test_base_context_collects_actor_free_facts() -> None:
     app = _app(
         data={"_applicantRoles": ["member"], "feld": 1},
@@ -137,7 +130,6 @@ async def test_base_context_collects_actor_free_facts() -> None:
     ctx = await build_base_context(fake_session(), cast("Any", app), manual=True)
     assert ctx.manual is True
     assert ctx.deadline_passed is False
-    # Actor fields stay at their empty defaults.
     assert ctx.roles == frozenset()
     assert ctx.actor_committees == frozenset()
     assert ctx.actor_is_applicant is False
@@ -189,9 +181,6 @@ async def test_base_context_flags_propagate() -> None:
     assert ctx.deadline_passed is True
 
 
-# --------------------------------------------------------------------------- #
-# build_context — recomposition (base + actor overlay, unchanged semantics)
-# --------------------------------------------------------------------------- #
 async def test_build_context_manual_creator_is_applicant() -> None:
     app = _app(created_by="actor-1")
     ctx = await build_context(fake_session(), cast("Any", app), _principal(), manual=True)
@@ -229,5 +218,5 @@ async def test_build_context_automatic_strips_actor_signals() -> None:
     assert ctx.roles == frozenset()
     assert ctx.actor_committees == frozenset()
     assert ctx.actor_is_applicant is False
-    # Applicant facts from the base context survive the strip.
+    # The strip removes the actor signals only. The applicant facts of the base survive.
     assert ctx.applicant_committees == frozenset({"g-actor-1"})

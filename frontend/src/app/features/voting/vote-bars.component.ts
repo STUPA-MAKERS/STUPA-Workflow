@@ -6,17 +6,18 @@ interface BarRow {
   option: string;
   label: string;
   count: number;
-  /** Bar width in percent (relative to eligible or the maximum). */
+  /** Bar width in percent, relative to the eligible count or to the maximum count. */
   pct: number;
   leading: boolean;
 }
 
 /**
- * Presentational component: a result bar per option with the vote count. Shared
- * by vote-cast, live-vote and beamer. Never shows names — only aggregated
- * counts. Bar width is relative to the number of eligible voters (`eligible`)
- * so progress toward the quorum is visible; without `eligible` it scales
- * relative to the maximum.
+ * Presentational component that draws one result bar per option with the vote count.
+ *
+ * The vote-cast, live-vote and beamer views share this component. It never shows names.
+ * It shows aggregated counts only. The bar width is relative to the number of eligible
+ * voters (`eligible`), so the progress toward the quorum stays visible. Without
+ * `eligible` the bar scales relative to the maximum count.
  */
 @Component({
   selector: 'app-vote-bars',
@@ -50,7 +51,7 @@ export class VoteBarsComponent {
     });
   });
 
-  /** Translate known options (`yes`/`no`/`abstain`) via i18n, else the raw key. */
+  /** Translate a known option (`yes`, `no`, `abstain`) through i18n. Unknown keys stay raw. */
   private optionLabel(option: string): string {
     const key = `vote.option.${option}` as TranslationKey;
     const label = this.i18n.translate(key);

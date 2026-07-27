@@ -1,8 +1,8 @@
 """Async DB engine, session lifecycle, and metadata registry (SQLAlchemy 2.0).
 
-Engine/sessionmaker are lazy and cached (no connect at import time). `get_session`
-is the FastAPI dependency. All module models register on `Base.metadata`, which is
-the single source for Alembic and the tests.
+The engine and the sessionmaker are lazy and cached, so no connection opens at
+import time. `get_session` is the FastAPI dependency. Every module model registers
+on `Base.metadata`, the single source for Alembic and for the tests.
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ class Base(DeclarativeBase):
 
 
 class UUIDPkMixin:
-    """`id uuid PK DEFAULT gen_random_uuid()` (pgcrypto)."""
+    """UUID primary key with a `gen_random_uuid()` server default (needs pgcrypto)."""
 
     id: Mapped[uuid.UUID] = mapped_column(
         Uuid, primary_key=True, server_default=text("gen_random_uuid()")
@@ -48,7 +48,7 @@ class UUIDPkMixin:
 
 
 class CreatedAtMixin:
-    """`created_at timestamptz DEFAULT now()`."""
+    """Row creation timestamp, set by the database with `now()`."""
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
@@ -56,7 +56,11 @@ class CreatedAtMixin:
 
 
 class TimestampMixin(CreatedAtMixin):
-    """`created_at` + `updated_at` (auto-touch via `onupdate`)."""
+    """Row creation and update timestamps.
+
+    SQLAlchemy writes `updated_at` into every UPDATE it issues. A raw SQL update
+    does not touch the column.
+    """
 
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
@@ -83,7 +87,7 @@ def get_sessionmaker() -> async_sessionmaker[AsyncSession]:
 
 
 async def get_session() -> AsyncGenerator[AsyncSession]:
-    """Yield a request-scoped session; rollback on error, always close."""
+    """Yield a request-scoped session that rolls back on an error and always closes."""
     session = get_sessionmaker()()
     try:
         yield session
@@ -95,6 +99,6 @@ async def get_session() -> AsyncGenerator[AsyncSession]:
 
 
 async def dispose_engine() -> None:
-    """Dispose the engine pool (lifespan shutdown)."""
+    """Dispose the engine pool at lifespan shutdown."""
     if get_engine.cache_info().currsize:
         await get_engine().dispose()

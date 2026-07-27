@@ -1,4 +1,4 @@
-"""Tests der Kommentar-Benachrichtigungen (#4-1) — Service/Resolver gefaked."""
+"""Comment notification tests (#4-1) with a fake service and a fake resolver."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ SETTINGS = load_settings()
 
 
 class _FakeService:
-    """Ersetzt NotificationService: kein Template in DB, Enqueue wird gesammelt."""
+    """Replace NotificationService: no template in the database, collect each enqueue."""
 
     last: _FakeService | None = None
 
@@ -51,7 +51,7 @@ def _app_row(title: str | None = "Beamer") -> list[Any]:
 
 
 async def test_principal_public_comment_mails_applicant() -> None:
-    # scalars: 1× Präferenz-Filter (keine Abwahlen).
+    # scalars: one preference filter query with no opt-outs.
     session = cast(AsyncSession, FakeSession(executes=[_app_row()], scalars=[[]]))
     sent = await send_comment_notifications(
         session,
@@ -120,7 +120,7 @@ async def test_applicant_comment_mails_actionable_team(
 
 
 async def test_preference_optout_blocks_comment_mail() -> None:
-    # Präferenz-Filter liefert die Antragsteller-Adresse als abgewählt.
+    # The preference filter reports the applicant address as opted out.
     session = cast(AsyncSession, FakeSession(executes=[_app_row()], scalars=[["applicant@x.de"]]))
     sent = await send_comment_notifications(
         session,

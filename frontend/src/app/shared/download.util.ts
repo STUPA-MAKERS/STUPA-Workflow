@@ -7,6 +7,6 @@ export function downloadBlob(blob: Blob, filename: string): void {
   document.body.appendChild(a);
   a.click();
   a.remove();
-  // Revoke the URL only after the click (Safari/Firefox-safe).
+  // Revoke the URL only after the click, which is safe for Safari and Firefox.
   setTimeout(() => URL.revokeObjectURL(url), 0);
 }

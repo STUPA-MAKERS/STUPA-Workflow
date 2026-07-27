@@ -102,7 +102,7 @@ describe('UsersComponent (#70/#72/#73)', () => {
     const { inst } = await setup();
     expect(inst.roleLabel('r-admin')).toBe('administrator');
     expect(inst.roleLabel('unknown')).toBe('unknown');
-    // r-ref has no de → key
+    // r-ref has no German label, so the key is the fallback.
     expect(inst.roleLabel('r-ref')).toBe('referent');
   });
 
@@ -124,7 +124,7 @@ describe('UsersComponent (#70/#72/#73)', () => {
     expect(inst.roleOptions()).toEqual([
       { value: 'r-admin', label: 'Administrator' },
       { value: 'r-member', label: 'Mitglied' },
-      { value: 'r-ref', label: 'Referent' }, // r-ref has no de → key, capitalized
+      { value: 'r-ref', label: 'Referent' }, // no German label, so the capitalized key wins
     ]);
   });
 
@@ -186,7 +186,7 @@ describe('UsersComponent (#70/#72/#73)', () => {
 
   it('assigns a role with optional validity window and resets state (#72)', async () => {
     const { api, inst } = await setup();
-    inst.toggleAssign('p-3'); // expand it first
+    inst.toggleAssign('p-3');
     inst.patchDraft('p-3', { roleId: 'r-member', validFrom: '2026-07-01', validUntil: '2026-12-31' });
     inst.assign(PRINCIPALS[1]);
     expect(api.assignRole).toHaveBeenCalledWith({
@@ -196,7 +196,6 @@ describe('UsersComponent (#70/#72/#73)', () => {
       validFrom: '2026-07-01T00:00:00Z',
       validUntil: '2026-12-31T00:00:00Z',
     });
-    // draft reset + row collapsed + reloaded
     expect(inst.draftFor('p-3')).toEqual({ roleId: '', validFrom: '', validUntil: '' });
     expect(inst.isExpanded('p-3')).toBe(false);
     expect(api.listPrincipals).toHaveBeenCalledTimes(2);

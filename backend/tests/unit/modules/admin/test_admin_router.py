@@ -1,9 +1,12 @@
-"""Router-Tests Admin/Config (T-24): Endpunkt-Verdrahtung + RBAC, Service gefaked.
+"""Router tests for admin and config (T-24): endpoint wiring and RBAC with a faked service.
 
-Beweist: korrekte Permission-Gates je Bereich (admin.config / admin.roles /
-webhook.manage), camelCase-Serialisierung der DTOs, die FE-Site-Config-Form
-(``{version, active, draft, hasDraftChanges}``), der auth-freie Public-Read und dass
-alle body-tragenden Mutationen ``400`` (problem+json) deklarieren (be-contract).
+These tests prove four things.
+
+1. Each area keeps its own permission gate: admin.config, admin.roles, webhook.manage.
+2. The DTOs serialize to camelCase.
+3. The site-config read returns ``{version, active, draft, hasDraftChanges}`` for the
+   frontend, and the public read needs no auth.
+4. Every mutation with a body declares ``400`` as problem+json (be-contract).
 """
 
 from __future__ import annotations
@@ -144,7 +147,7 @@ class _FakeConfig:
         ]
 
     async def get_active_global_flow(self):
-        return None  # leerer Flow reicht für die Gate-Tests (#5-2)
+        return None  # an empty flow is enough for the gate tests (#5-2)
 
     async def create_role(self, payload, actor):  # noqa: ANN001
         return RoleOut(
@@ -305,7 +308,7 @@ class _FakeSite:
 
 
 class _FakeGremiumRoles:
-    """Minimal-Fake für die Gremium-Rollen/Mitgliedschaften (#5-3 Gate-Tests)."""
+    """Minimal fake for the Gremium roles and memberships (#5-3 gate tests)."""
 
     async def list_roles(self, gremium_id):  # noqa: ANN001
         return [
@@ -335,7 +338,7 @@ class _FakeGremiumRoles:
 @pytest.fixture
 def app() -> FastAPI:
     application = create_app()
-    config, site = _FakeConfig(), _FakeSite()  # je App eine Instanz → Zustand bleibt
+    config, site = _FakeConfig(), _FakeSite()  # one instance per app, so the state survives
     application.dependency_overrides[get_config_service] = lambda: config
     application.dependency_overrides[get_site_config_service] = lambda: site
     return application
@@ -356,7 +359,6 @@ def _as_admin(app: FastAPI) -> None:
     _as(app, set(_ALL_PERMS))
 
 
-# --------------------------------------------------------------------------- auth
 def test_requires_auth_401(client: TestClient) -> None:
     assert client.get("/api/admin/gremien").status_code == 401
 
@@ -369,7 +371,7 @@ def test_forbidden_without_permission(app: FastAPI, client: TestClient) -> None:
 
 
 def test_roles_write_needs_admin_roles_not_just_config(app: FastAPI, client: TestClient) -> None:
-    _as(app, {"admin.types"})  # darf Config-Bereiche lesen, aber keine Rollen schreiben
+    _as(app, {"admin.types"})  # may read config areas, but must not write roles
     assert client.get("/api/admin/roles").status_code == 200
     r = client.post("/api/admin/roles", json={"key": "x", "label": {}, "permissions": []})
     assert r.status_code == 403
@@ -380,7 +382,6 @@ def test_webhooks_need_webhook_manage(app: FastAPI, client: TestClient) -> None:
     assert client.get("/api/admin/webhooks").status_code == 403
 
 
-# --------------------------------------------------------------------------- schemas
 def test_config_schemas_includes_branding(app: FastAPI, client: TestClient) -> None:
     _as_admin(app)
     r = client.get("/api/admin/config-schemas")
@@ -389,7 +390,6 @@ def test_config_schemas_includes_branding(app: FastAPI, client: TestClient) -> N
     assert "Branding" in body and "FlowGraph" in body
 
 
-# --------------------------------------------------------------------------- gremien
 def test_list_create_update_gremium(app: FastAPI, client: TestClient) -> None:
     _as_admin(app)
     assert client.get("/api/admin/gremien").json()[0]["cdVariant"] == "stupa"
@@ -406,7 +406,7 @@ def test_update_gremium_404(app: FastAPI, client: TestClient) -> None:
 
 
 def test_gremium_mail_recipients_roundtrip(app: FastAPI, client: TestClient) -> None:
-    """#protocol-recipients: GET liefert, PUT ersetzt (validierte Adressen)."""
+    """#protocol-recipients: GET returns the list. PUT replaces it with validated addresses."""
     _as_admin(app)
     gid = uuid4()
     r = client.get(f"/api/admin/gremien/{gid}/mail-recipients")
@@ -416,7 +416,7 @@ def test_gremium_mail_recipients_roundtrip(app: FastAPI, client: TestClient) -> 
         json={"recipients": ["a@x.de", " a@X.de ", "b@y.org"]},
     )
     assert r.status_code == 200
-    # Duplikate (case-insensitiv) verworfen, Reihenfolge erhalten.
+    # The server drops case-insensitive duplicates and keeps the order.
     assert r.json() == {"recipients": ["a@x.de", "b@y.org"]}
 
 
@@ -432,9 +432,11 @@ def test_gremium_mail_recipients_rejects_implausible_address(
 
 
 def test_gremien_authed_list_without_admin_perm(app: FastAPI, client: TestClient) -> None:
-    """#68: `GET /api/gremien` ist für jeden eingeloggten Principal lesbar
-    (Dropdown-Quelle) — auch ohne ``admin.config``."""
-    _as(app, set())  # eingeloggt, aber keinerlei Permission
+    """#68: every logged-in principal may read `GET /api/gremien`.
+
+    The endpoint feeds a dropdown, so it also works without ``admin.config``.
+    """
+    _as(app, set())  # logged in, but without any permission
     r = client.get("/api/gremien")
     assert r.status_code == 200
     assert r.json()[0]["cdVariant"] == "stupa"
@@ -444,7 +446,6 @@ def test_gremien_authed_requires_auth_401(client: TestClient) -> None:
     assert client.get("/api/gremien").status_code == 401
 
 
-# --------------------------------------------------------------------------- types
 def test_application_types_crud(app: FastAPI, client: TestClient) -> None:
     _as_admin(app)
     assert client.get("/api/admin/application-types").json()[0]["key"] == "grant"
@@ -460,17 +461,16 @@ def test_application_types_crud(app: FastAPI, client: TestClient) -> None:
 def test_application_type_delete_requires_own_permission(
     app: FastAPI, client: TestClient
 ) -> None:
-    """Löschen verlangt die eigene Permission admin.types_delete (nicht admin.types)."""
+    """The delete needs the separate permission admin.types_delete, not admin.types."""
     type_id = uuid4()
-    # admin.types allein (Anlegen/Bearbeiten) reicht NICHT zum Löschen.
+    # admin.types alone covers create and update. It does NOT allow the delete.
     _as(app, {"admin.types"})
     assert client.delete(f"/api/admin/application-types/{type_id}").status_code == 403
-    # Mit der eigenen Lösch-Permission: 204.
+    # With the separate delete permission the call returns 204.
     _as(app, {"admin.types_delete"})
     assert client.delete(f"/api/admin/application-types/{type_id}").status_code == 204
 
 
-# --------------------------------------------------------------------------- rbac
 def test_roles_and_assignments_and_mappings(app: FastAPI, client: TestClient) -> None:
     _as_admin(app)
     assert client.get("/api/admin/roles").json()[0]["permissions"] == ["admin.gremien"]
@@ -497,7 +497,6 @@ def test_roles_and_assignments_and_mappings(app: FastAPI, client: TestClient) ->
     assert client.get("/api/admin/group-mappings").status_code == 200
 
 
-# ------------------------------------------------------------- principals/#72
 def test_list_principals_camelcase(app: FastAPI, client: TestClient) -> None:
     _as_admin(app)
     r = client.get("/api/admin/principals?q=max")
@@ -510,18 +509,21 @@ def test_list_principals_camelcase(app: FastAPI, client: TestClient) -> None:
 
 
 def test_list_principals_needs_admin_roles(app: FastAPI, client: TestClient) -> None:
-    _as(app, {"admin.types"})  # Bereichs-Admin (weder gremien noch roles) darf das nicht
+    _as(app, {"admin.types"})  # an area admin without gremien or roles must not read this
     assert client.get("/api/admin/principals").status_code == 403
 
 
 def test_gremien_admin_can_manage_members_without_admin_roles(
     app: FastAPI, client: TestClient
 ) -> None:
-    """#5-3: Die Mitglieder-Subseite läuft unter admin.gremien. Mitgliedschaften,
-    Gremium-Rollen (Rollen-Dropdown) und Principals (Namen/Typeahead) müssen daher
-    auch ohne admin.roles lesbar sein, sonst bleibt die Tabelle leer."""
+    """#5-3: the members subpage runs under admin.gremien.
+
+    A principal without admin.roles must still read the memberships, the Gremium roles for
+    the role dropdown and the principals for the name typeahead. Without these reads the
+    table stays empty.
+    """
     app.dependency_overrides[get_gremium_role_service] = lambda: _FakeGremiumRoles()
-    _as(app, {"admin.gremien"})  # bewusst OHNE admin.roles
+    _as(app, {"admin.gremien"})  # deliberately WITHOUT admin.roles
     gid = uuid4()
     assert client.get(f"/api/admin/gremien/{gid}/memberships").status_code == 200
     assert client.get(f"/api/admin/gremien/{gid}/roles").status_code == 200
@@ -529,7 +531,7 @@ def test_gremien_admin_can_manage_members_without_admin_roles(
 
 
 def test_members_endpoints_forbidden_for_unrelated_area(app: FastAPI, client: TestClient) -> None:
-    """admin.types ist weder gremien noch roles → kein Zugriff auf Mitglieder-Reads."""
+    """admin.types is neither gremien nor roles, so the member reads stay forbidden."""
     app.dependency_overrides[get_gremium_role_service] = lambda: _FakeGremiumRoles()
     _as(app, {"admin.types"})
     gid = uuid4()
@@ -540,9 +542,12 @@ def test_members_endpoints_forbidden_for_unrelated_area(app: FastAPI, client: Te
 def test_flow_editor_can_read_its_sources_without_admin_types(
     app: FastAPI, client: TestClient
 ) -> None:
-    """#5-2: Der Flow-Editor läuft unter flow.configure und liest globalen Flow, Rollen
-    und Webhooks als Auswahlquellen — diese Reads müssen ohne admin.types/roles/
-    webhook.manage gehen, sonst startet der Editor leer."""
+    """#5-2: the flow editor runs under flow.configure.
+
+    The editor reads the global flow, the roles and the webhooks as option sources. These
+    reads must work without admin.types, admin.roles and webhook.manage. Otherwise the
+    editor starts empty.
+    """
     _as(app, {"flow.configure"})
     assert client.get("/api/admin/flow-versions/global").status_code == 200
     assert client.get("/api/admin/roles").status_code == 200
@@ -550,14 +555,16 @@ def test_flow_editor_can_read_its_sources_without_admin_types(
 
 
 def test_global_flow_readable_by_budget_structure(app: FastAPI, client: TestClient) -> None:
-    """#5-2: Der Budget-Baum (budget.structure) liest den globalen Flow für die
-    Status-Dropdowns (accepted/denied)."""
+    """#5-2: the budget tree (budget.structure) reads the global flow.
+
+    The tree needs the flow for the status dropdowns (accepted and denied).
+    """
     _as(app, {"budget.structure"})
     assert client.get("/api/admin/flow-versions/global").status_code == 200
 
 
 def test_application_types_readable_by_form_configure(app: FastAPI, client: TestClient) -> None:
-    """#5-2: Der Form-Editor (form.configure) liest die Antragstypen-Liste."""
+    """#5-2: the form editor (form.configure) reads the application-type list."""
     _as(app, {"form.configure"})
     assert client.get("/api/admin/application-types").status_code == 200
 
@@ -565,7 +572,7 @@ def test_application_types_readable_by_form_configure(app: FastAPI, client: Test
 def test_editor_source_reads_still_gated_for_unrelated_area(
     app: FastAPI, client: TestClient
 ) -> None:
-    """admin.notifications berührt keinen dieser Bereiche → weiterhin 403."""
+    """admin.notifications covers none of these areas, so each read stays 403."""
     _as(app, {"admin.notifications"})
     assert client.get("/api/admin/flow-versions/global").status_code == 403
     assert client.get("/api/admin/webhooks").status_code == 403
@@ -599,14 +606,13 @@ def test_revoke_needs_admin_roles(app: FastAPI, client: TestClient) -> None:
 
 
 def test_group_mapping_delete_204_and_gate(app: FastAPI, client: TestClient) -> None:
-    """#5-4: Group-Mappings sind jetzt löschbar (admin.roles)."""
+    """#5-4: admin.roles may now delete a group mapping."""
     _as_admin(app)
     assert client.delete(f"/api/admin/group-mappings/{uuid4()}").status_code == 204
-    _as(app, {"admin.types"})  # falsche Bereichs-Rolle → 403
+    _as(app, {"admin.types"})  # the wrong area permission, so 403
     assert client.delete(f"/api/admin/group-mappings/{uuid4()}").status_code == 403
 
 
-# --------------------------------------------------------------------------- webhooks
 def test_webhooks_crud_and_validation(app: FastAPI, client: TestClient) -> None:
     _as_admin(app)
     assert client.get("/api/admin/webhooks").json()[0]["name"] == "n8n"
@@ -615,13 +621,13 @@ def test_webhooks_crud_and_validation(app: FastAPI, client: TestClient) -> None:
         json={"name": "h", "url": "https://h/x", "events": ["status_changed"]},
     )
     assert ok.status_code == 201
-    # non-http url → 422 (Schema)
+    # A non-http URL fails the schema with 422.
     bad = client.post(
         "/api/admin/webhooks",
         json={"name": "h", "url": "ftp://h/x", "events": ["status_changed"]},
     )
     assert bad.status_code == 422
-    # FE schickt volles Objekt inkl. leerem id beim POST → wird ignoriert
+    # The frontend posts the full object with an empty id. The server ignores that id.
     withid = client.post(
         "/api/admin/webhooks",
         json={
@@ -637,7 +643,6 @@ def test_webhooks_crud_and_validation(app: FastAPI, client: TestClient) -> None:
     assert patched.status_code == 200
 
 
-# --------------------------------------------------------------------------- site-config
 def test_site_config_draft_activate_cycle(app: FastAPI, client: TestClient) -> None:
     _as_admin(app)
     r = client.get("/api/admin/site-config")
@@ -682,7 +687,6 @@ def test_public_site_config_no_auth_and_cache_header(client: TestClient) -> None
     assert "branding" in r.json()
 
 
-# --------------------------------------------------------------------------- contract
 def test_mutating_endpoints_declare_400(app: FastAPI) -> None:
     spec = app.openapi()
     cases = [

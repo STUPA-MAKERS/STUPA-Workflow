@@ -1,8 +1,8 @@
-"""Service-Tests files (T-13): Upload, Quarantäne, signierte URLs, Scan-Abschluss.
+"""Service tests for files (T-13): upload, quarantine, signed URLs and scan finish.
 
-DB via `FakeSession`, Storage/Queue/Scan via Fakes (kein echtes MinIO/ClamAV/Redis).
-MIME-Sniffing wird gemockt (kein libmagic nötig) — die Sniff-Logik testet
-`test_files_mime`.
+`FakeSession` stands in for the database. Fakes stand in for storage, queue and scan,
+so no real MinIO, ClamAV or Redis runs. The tests mock MIME sniffing and need no
+libmagic. `test_files_mime` covers the sniff logic.
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ PDF = b"%PDF-1.4 fake pdf bytes"
 
 @pytest.fixture(autouse=True)
 def _mock_mime(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Sniff/Validate auf »PDF ok« mocken (libmagic-frei)."""
+    """Mock sniff and validate to accept PDF without libmagic."""
     monkeypatch.setattr(
         files_service, "validate_upload", lambda filename, data: "application/pdf"
     )
@@ -58,7 +58,6 @@ def _service(
     return FilesService(session, storage=storage, queue=queue, settings=SETTINGS)  # type: ignore[arg-type]
 
 
-# --------------------------------------------------------------------------- upload
 async def test_upload_clean_path_stores_and_enqueues() -> None:
     session = FakeSession()
     app_id = _app(session)
@@ -75,9 +74,11 @@ async def test_upload_clean_path_stores_and_enqueues() -> None:
 
 
 async def test_upload_allowed_in_locked_state() -> None:
-    """#attachments-when-locked: Anhänge sind auch in gesperrten States nachreichbar
-    (Belege/Rechnungen nach der Entscheidung) — nur die Formular-Daten bleiben
-    über den PATCH-Lock geschützt."""
+    """Allow an upload while the state locks edits (#attachments-when-locked).
+
+    A user may add attachments in a locked state, for example receipts and invoices
+    after the decision. The PATCH lock protects only the form data.
+    """
     session = FakeSession()
     state = State()
     state.id = uuid.uuid4()
@@ -94,7 +95,7 @@ async def test_upload_allowed_in_locked_state() -> None:
 
 
 async def test_upload_state_row_missing_proceeds() -> None:
-    # current_state_id gesetzt, aber kein State-Datensatz → kein Lock, Upload geht durch.
+    # current_state_id is set but no State row exists, so no lock blocks the upload.
     session = FakeSession()
     app = Application()
     app.id = uuid.uuid4()
@@ -184,12 +185,11 @@ async def test_upload_without_queue_stays_quarantined() -> None:
     out = await _service(session, storage=storage, queue=None).upload(
         app_id, filename="doc.pdf", data=PDF, by="p"
     )
-    # Datei liegt, aber kein Scan-Job (kein Redis) → bleibt scanned=false.
+    # The file is stored, but no scan job runs without Redis, so scanned stays false.
     assert out.scanned is False
     assert len(storage.put_calls) == 1
 
 
-# ----------------------------------------------------------------- signed_url
 def _attachment(session: FakeSession, **kw: object) -> Attachment:
     att = Attachment(
         application_id=uuid.uuid4(),
@@ -209,14 +209,15 @@ def _attachment(session: FakeSession, **kw: object) -> Attachment:
 
 
 async def test_signed_url_clean_returns_relative_download_path() -> None:
-    # App-relativer Stream-Pfad statt presigned MinIO-URL (interner Host unerreichbar).
+    # App-relative stream path instead of a presigned MinIO URL. The internal host of
+    # MinIO is unreachable for the browser.
     session = FakeSession()
     att = _attachment(session, scanned=True, scan_result=SCAN_RESULT_CLEAN)
     storage = FakeStorage()
     out = await _service(session, storage=storage).signed_url(att.id)
     assert out.url == f"/api/attachments/{att.id}/download"
     assert out.expiresIn == SETTINGS.attachment_url_ttl_seconds
-    assert storage.signed == []  # NICHT mehr presigned
+    assert storage.signed == []  # no longer presigned
 
 
 async def test_signed_url_still_scanning_409() -> None:
@@ -246,7 +247,6 @@ async def test_signed_url_without_storage_503() -> None:
         await _service(session, storage=None).signed_url(att.id)
 
 
-# ------------------------------------------------------------- download_bytes
 async def test_download_bytes_clean_returns_data() -> None:
     session = FakeSession()
     att = _attachment(session, scanned=True, scan_result=SCAN_RESULT_CLEAN)
@@ -279,7 +279,6 @@ async def test_download_bytes_infected_410() -> None:
         await _service(session, storage=FakeStorage()).download_bytes(att.id)
 
 
-# ------------------------------------------------------------ download_stream
 async def test_download_stream_clean_yields_chunks() -> None:
     session = FakeSession()
     att = _attachment(session, scanned=True, scan_result=SCAN_RESULT_CLEAN)
@@ -292,7 +291,7 @@ async def test_download_stream_clean_yields_chunks() -> None:
     assert b"".join(chunks) == b"the-bytes"
     assert filename == "doc.pdf"
     assert mime == "application/pdf"
-    assert size == 10  # aus der gespeicherten Größe (Content-Length)
+    assert size == 10  # from the stored size (Content-Length)
 
 
 async def test_download_stream_storage_failure_503() -> None:
@@ -316,7 +315,6 @@ async def test_download_stream_infected_410() -> None:
         await _service(session, storage=FakeStorage()).download_stream(att.id)
 
 
-# ---------------------------------------------------------------- finalize_scan
 async def test_finalize_scan_clean_marks_scanned() -> None:
     session = FakeSession()
     att = _attachment(session)
@@ -363,7 +361,7 @@ async def test_finalize_scan_infected_tolerates_remove_error(
     await _service(session, storage=FailingStorage()).finalize_scan(
         att.id, ScanVerdict(clean=False, signature="x")
     )
-    # Quarantäne gilt trotz Remove-Fehler (storage_key genullt).
+    # Quarantine still applies after a remove error, because storage_key is cleared.
     assert att.storage_key is None
     assert att.scanned is True
 
@@ -377,7 +375,7 @@ async def test_finalize_scan_infected_without_storage_still_quarantines(
     monkeypatch.setattr(files_service, "audit_record", _record)
     session = FakeSession()
     att = _attachment(session)
-    # storage=None → kein remove-Aufruf, Quarantäne (storage_key=None) gilt trotzdem.
+    # Without storage there is no remove call, but the quarantine still applies.
     await _service(session, storage=None).finalize_scan(
         att.id, ScanVerdict(clean=False, signature="x")
     )
@@ -387,7 +385,7 @@ async def test_finalize_scan_infected_without_storage_still_quarantines(
 
 async def test_finalize_scan_unknown_attachment_skips() -> None:
     session = FakeSession()
-    # kein Commit, kein Fehler
+    # no commit and no error
     await _service(session, storage=FakeStorage()).finalize_scan(
         uuid.uuid4(), ScanVerdict(clean=True)
     )

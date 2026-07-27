@@ -10,20 +10,20 @@ export const API_BASE_URL = new InjectionToken<string>('API_BASE_URL', {
 /**
  * Toggles the in-memory mock-backend interceptor.
  *
- * Default `false`: the FE talks to the real backend (`/api`). The mock is only
- * an explicit opt-in for dev/harness/tests:
+ * The default is `false`. The FE then talks to the real backend (`/api`). The
+ * mock needs an explicit opt-in for dev, harness or tests:
  *   - global flag `window.__USE_MOCK_API__ = true` (set before bootstrap),
  *   - query param `?mock=1`,
  *   - `localStorage['useMockApi'] === '1'`.
- * Unit tests set the token directly via a provider (`{ provide: USE_MOCK_API, … }`).
+ * Unit tests set the token directly with a provider (`{ provide: USE_MOCK_API, … }`).
  */
 export const USE_MOCK_API = new InjectionToken<boolean>('USE_MOCK_API', {
   providedIn: 'root',
   factory: () => detectMockFlag(inject(LOCATION)),
 });
 
-/** Reads the mock opt-in from global flag / URL / localStorage (browser only).
- *  `location` comes via DI — purely testable, without jsdom `window.location`. */
+/** Read the mock opt-in from the global flag, the URL or localStorage (browser only).
+ *  `location` comes from DI, so a test needs no jsdom `window.location`. */
 export function detectMockFlag(location: Location): boolean {
   if (typeof window === 'undefined') return false; // SSR/prerender → real API
   const w = window as Window & { __USE_MOCK_API__?: boolean };
@@ -32,7 +32,7 @@ export function detectMockFlag(location: Location): boolean {
     if (new URLSearchParams(location.search).get('mock') === '1') return true;
     if (window.localStorage?.getItem('useMockApi') === '1') return true;
   } catch {
-    // localStorage/URL unreachable in sandbox/SSR → no mock.
+    // localStorage or the URL is unreachable in a sandbox or in SSR → no mock.
   }
   return false;
 }

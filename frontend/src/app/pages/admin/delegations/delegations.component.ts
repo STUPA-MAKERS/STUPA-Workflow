@@ -15,11 +15,11 @@ import {
 import { ToastService } from '@stupa-makers/ui-kit';
 
 /**
- * Admin overview of session-bound representations.
+ * Admin overview of the delegations that a meeting binds.
  *
- * Members create delegations themselves on the meeting page (self-service; the gremium
- * must allow it); admins see all active/created representations here and can revoke them
- * if needed. The substitute pool is maintained per gremium in the membership admin.
+ * A member creates a delegation on the meeting page. The Gremium must allow this.
+ * An admin sees every active delegation here and can revoke it. The membership admin
+ * page holds the substitute pool of each Gremium.
  */
 @Component({
   selector: 'app-delegations',

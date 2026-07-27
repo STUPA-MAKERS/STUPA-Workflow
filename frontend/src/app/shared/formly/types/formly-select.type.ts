@@ -7,7 +7,7 @@ interface SelectOption {
   label: string;
 }
 
-/** Formly-Feldtyp `select` — Einfachauswahl (Form-Definition `select`). */
+/** Formly field type `select`: single choice (form definition `select`). */
 @Component({
   selector: 'app-formly-select',
   standalone: true,

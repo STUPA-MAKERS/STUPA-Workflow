@@ -1,162 +1,170 @@
 # deploy
 
-Compose-Stack für eine VM. Plain HTTP intern; TLS terminiert der externe Nginx Proxy
-Manager. Einziger Host-Port ist `web` auf `127.0.0.1:8080` — alle anderen Services
-hängen nur am internen Netz und sind nicht vom Internet erreichbar.
+Compose stack for one VM. Internal traffic is plain HTTP. The external Nginx Proxy Manager
+terminates TLS. The only host port is `web` on `127.0.0.1:8080`. Every other service stays on
+the internal network, so the internet cannot reach it.
 
 ## Start
 
 ```bash
 git submodule update --init --recursive   # frontend/vendor/ui-kit (@stupa-makers/ui-kit)
-cp .env.example .env        # Werte einsetzen, NIE committen
-docker compose config -q    # Topologie validieren
+cp .env.example .env        # fill in the values, NEVER commit
+docker compose config -q    # validate the topology
 docker compose up -d --build
 ```
 
-> Das Frontend (`web`) bezieht das UI-Kit aus dem Git-Submodule
-> `frontend/vendor/ui-kit`. Vor jedem `--build` muss das Submodule ausgecheckt sein,
-> sonst bricht `npm run build` mit unaufgelöstem `@stupa-makers/ui-kit`-Pfad ab.
-> `deploy/deploy.sh` erledigt das (Submodule-Sync nach `git pull`) automatisch.
+> The frontend (`web`) takes the UI kit from the git submodule `frontend/vendor/ui-kit`.
+> Check out the submodule before every `--build`. If you do not, `npm run build` fails on
+> an unresolved `@stupa-makers/ui-kit` path. `deploy/deploy.sh` does this for you and syncs
+> the submodule after `git pull`.
 
 ## Services
 
-| Service | Rolle | Host-Port |
+| Service | Role | Host port |
 |---|---|---|
-| `web` | nginx, serviert die gebaute SPA, routet `/api` → `api` | `127.0.0.1:8080` |
-| `migrate` | One-Shot: `alembic upgrade head`, dann Exit | — |
+| `web` | nginx, serves the built SPA, routes `/api` to `api` | `127.0.0.1:8080` |
+| `migrate` | one-shot: `alembic upgrade head`, then exit | — |
 | `api` | FastAPI (uvicorn `--proxy-headers`) | — |
-| `worker` | arq (Mail-Versand, nächtlicher Budget-Rollup) | — |
+| `worker` | arq (mail send, nightly budget rollup) | — |
 | `postgres` | PostgreSQL 16 | — |
-| `redis` | Redis 7 (arq-Broker, Rate-Limit, Altcha-Replay) | — |
-| `minio` | S3-Objektspeicher (Anhänge) | — |
-| `clamav` | Virenscan (langer erster Start: Signaturen) | — |
-| `pytex` | interner Markdown→PDF-Renderer | — |
-| `altcha` | ALTCHA Sentinel (Captcha-Verifier) | — |
-| `backup` | tägliches verschlüsseltes Backup (pg_dump + MinIO-Spiegel, age); Profil `prod`/`backup` | — |
+| `redis` | Redis 7 (arq broker, rate limit, ALTCHA replay) | — |
+| `minio` | S3 object store (attachments) | — |
+| `clamav` | virus scan (the first start is slow because it loads the signatures) | — |
+| `pytex` | internal Markdown→PDF renderer | — |
+| `altcha` | ALTCHA Sentinel (captcha verifier) | — |
+| `backup` | daily encrypted backup (pg_dump + MinIO mirror, age). Profile `prod`/`backup` | — |
 
-`web` wird über das `..`-Repo-Root in zwei Stufen gebaut (`web/Dockerfile`): Stage 1
-baut mit Node das Angular-Frontend, Stage 2 serviert es per nginx. `web/nginx.conf` ist
-ins Image gebacken, aber zusätzlich gemountet — so lassen sich prod-Edits (z. B.
-`real_ip`-CIDR des Proxy Managers) ohne Rebuild machen.
+Docker builds `web` from the repository root `..` in two stages (`web/Dockerfile`). Stage 1
+builds the Angular frontend with Node. Stage 2 serves it with nginx. The image contains
+`web/nginx.conf`, but compose also mounts it. You can therefore edit the file in production
+without a rebuild, for example the `real_ip` CIDR of the Proxy Manager.
 
-## Migrationen
+## Migrations
 
-`migrate` läuft einmalig vor `api`/`worker` (beide haben
-`depends_on: migrate: service_completed_successfully`). `alembic upgrade head` ist
-idempotent — schon eingespielte Revisionen werden übersprungen. Kein manueller
-Migrationsschritt nötig, auch nicht beim Update: `docker compose up -d --build` zieht
-das neue Image und `migrate` spielt offene Revisionen ein, bevor die App hochfährt.
+`migrate` runs once before `api` and `worker`. Both declare
+`depends_on: migrate: service_completed_successfully`. `alembic upgrade head` is idempotent
+and skips the revisions that already ran. You need no manual migration step, not even for an
+update. `docker compose up -d --build` pulls the new image, and `migrate` applies the open
+revisions before the application starts.
 
-Optional läuft `migrate` unter einem eigenen DB-User (`DB_MIGRATION_URL`), getrennt vom
-Laufzeit-User der App.
+`migrate` can also run as its own database user (`DB_MIGRATION_URL`), separate from the
+runtime user of the application.
 
-### Least-Privilege-DB-Rollen (security.md §4/§10) — MANUELLER Prod-Schritt
+### Least-privilege database roles (security.md §4/§10) — MANUAL production step
 
-> ⚠️ **Nicht automatisch.** Compose fährt nur `alembic upgrade head` (DDL/DML); es
-> legt **keine** Rollen an und entzieht **keine** Grants. Ohne diesen Schritt läuft die
-> Plattform funktional, aber **ohne** Rollentrennung — der Runtime-User könnte dann das
-> Audit-Log per UPDATE/DELETE manipulieren (der Append-only-Trigger aus Migration 0006
-> blockt das zwar rollenunabhängig, aber die Least-Privilege-Schicht fehlt). In Prod
-> daher Pflicht.
+> ⚠️ **Not automatic.** Compose runs only `alembic upgrade head` (DDL/DML). It creates
+> **no** roles and revokes **no** grants. Without this step the platform works, but
+> **without** role separation. The runtime user could then change the audit log with UPDATE
+> or DELETE. The append-only trigger from migration 0006 blocks that for every role, but the
+> least-privilege layer is missing. This step is therefore mandatory in production.
 
-`db/roles.sql` provisioniert die getrennten Service-User (`app` Runtime, `migrator`
-DDL, optional `audit_writer`) und entzieht dem Runtime-User UPDATE/DELETE/TRUNCATE auf
-`audit_entry`. **Einmalig als DB-Superuser** ausführen — Schritte 1–4 **vor**, Schritt 5
-**nach** `alembic upgrade head` (idempotent, mehrfach gefahrlos):
+`db/roles.sql` creates the separate service users (`app` for runtime, `migrator` for DDL,
+optional `audit_writer`). It also revokes UPDATE, DELETE and TRUNCATE on `audit_entry` from
+the runtime user. Run it **once as database superuser**. Run steps 1 to 4 **before**
+`alembic upgrade head` and step 5 **after** it. The script is idempotent, so more runs do no
+harm.
 
 ```bash
-# 1) Rollen anlegen (vor den Migrationen)
+# 1) create the roles (before the migrations)
 psql -U postgres -d antrag -f db/roles.sql
-# 2) Passwörter aus dem Secret-Store setzen
+# 2) set the passwords from the secret store
 psql -U postgres -d antrag -c "ALTER ROLE app PASSWORD '…'; ALTER ROLE migrator PASSWORD '…';"
-# 3) Migrationen unter migrator (DB_MIGRATION_URL) laufen lassen — via compose-migrate
-#    oder manuell: alembic upgrade head
-# 4) Audit-Grant-Entzug erneut anwenden (Schritt 5 in roles.sql, jetzt existiert audit_entry)
+# 3) run the migrations as migrator (DB_MIGRATION_URL) with compose-migrate
+#    or manually: alembic upgrade head
+# 4) revoke the audit grants again (step 5 in roles.sql, audit_entry now exists)
 psql -U postgres -d antrag -f db/roles.sql
 ```
 
-Danach in `.env`: `DATABASE_URL` → User `app`, `DB_MIGRATION_URL` → User `migrator`.
+Then point `DATABASE_URL` to user `app` and `DB_MIGRATION_URL` to user `migrator` in `.env`.
 
-## Netze
+## Networks
 
-- `internal` — bridge, keine publizierten Ports → kein Ingress. Egress bleibt offen
-  (Worker: SMTP/WebDAV/Webhooks, pytex: tectonic-Bundle, api: OIDC).
-- `proxy` — in prod das vom Nginx Proxy Manager verwaltete Netz; dort `external: true`
-  setzen und das NPM-Netz referenzieren.
+- `internal` — bridge with no published ports, so there is no ingress. Egress stays open.
+  The worker needs SMTP, WebDAV and webhooks, pytex needs the tectonic bundle, and the api
+  needs OIDC.
+- `proxy` — in production this is the network of the Nginx Proxy Manager. Set `external: true`
+  there and reference the NPM network.
 
-## Konfiguration
+## Configuration
 
-Alle Secrets in `.env` (Vorlage: `.env.example`). Pflichtwerte für den API-Start:
-`DATABASE_URL`, `SESSION_SECRET`, `MAGIC_LINK_SECRET`. OIDC, SMTP und Altcha aktivieren
-sich, sobald ihre Werte gesetzt sind — fehlen sie, bleiben die jeweiligen Funktionen
-sauber abgeschaltet (kein Crash). Vollständige Referenz im
-[Configuration-Wiki](https://github.com/frederikbeimgraben/antragsplattform/wiki/Configuration).
+All secrets live in `.env`. The template is `.env.example`. The API needs `DATABASE_URL`,
+`SESSION_SECRET` and `MAGIC_LINK_SECRET` to start. OIDC, SMTP and ALTCHA turn on as soon as
+you set their values. If the values are missing, the platform keeps the matching features off
+and does not crash. For the full reference see the
+[Configuration wiki](https://github.com/frederikbeimgraben/antragsplattform/wiki/Configuration).
 
-### Bootstrap initialer Admins (#70) — Pflichtschritt bei echter OIDC-Auth
+### Bootstrap of the first admins (#70) — mandatory step with real OIDC auth
 
-Unter echter OIDC-Auth (ohne Mock) hat ein frisches Schema **keinen** Admin: niemand
-besitzt `admin.*`, also kann auch niemand über die Rollen-/Rechte-UI (`/admin/users`)
-Rollen vergeben. Damit sich die Plattform nicht selbst aussperrt, weist der
-Bootstrap-Mechanismus den/die ersten Admin(s) per OIDC-Subject **oder** E-Mail
-idempotent die `admin`-Rolle zu — **beim Login** (OIDC-Callback) und **beim Startup**:
+Under real OIDC auth (no mock) a fresh schema has **no** admin. Nobody holds `admin.*`, so
+nobody can grant a role in the role and permission UI (`/admin/users`). To keep the platform
+from locking itself out, the bootstrap grants the `admin` role to the first admins. It matches
+them by OIDC subject **or** email. It is idempotent. It runs **at login** (the OIDC callback)
+and **at startup**:
 
 ```dotenv
-# kommagetrennt; mind. einen der beiden setzen
+# comma-separated. Set at least one of the two.
 BOOTSTRAP_ADMIN_SUBJECTS=f47ac10b-58cc-4372-a567-0e02b2c3d479,kc|alice
 BOOTSTRAP_ADMIN_EMAILS=admin@hochschule.example,vorstand@stupa.example
 ```
 
-- **Subject** = der OIDC-`sub`-Claim aus Keycloak (stabil, fälschungssicher) — **bevorzugt**.
-- **E-Mail** = der `email`-Claim (case-insensitiv). Greift **nur, wenn das id_token
-  `email_verified: true` führt** — sonst könnte auf einem IdP/Realm mit Self-Registration
-  ohne Mail-Verifikation jemand einen Token mit `email` = Bootstrap-Adresse minten und so
-  Admin werden. Der E-Mail-Bootstrap wird daher **am Login** ausgewertet (frischer,
-  verifizierter Claim); der **Startup-Sweep matcht ausschließlich per `sub`** (die
-  gespeicherte `principal.email` trägt kein Verifikations-Flag). Praktisch: ein per E-Mail
-  bootstrappter Admin erhält die Rolle bei seinem **nächsten Login**.
-- Die Zuweisung ist global (kein Gremium-Scope), unbefristet, `granted_by=bootstrap` und
-  **idempotent**: bereits vergebene Rollen werden nicht doppelt zugewiesen.
-- Nach dem ersten erfolgreichen Admin-Login kann der Eintrag bleiben (no-op) oder über
-  die normale RBAC-UI durch weitere Admins ersetzt werden.
+- **Subject** = the OIDC `sub` claim from Keycloak. It is stable and hard to forge.
+  **Prefer it.**
+- **Email** = the `email` claim, matched case-insensitively. It applies **only when the
+  id_token carries `email_verified: true`**. Without that check, an attacker could abuse an
+  IdP or realm that allows self-registration without mail verification. The attacker could
+  mint a token whose `email` is a bootstrap address and become admin. The platform therefore
+  reads the email bootstrap **at login**, where the claim is fresh and verified. The
+  **startup sweep matches by `sub` alone**, because the stored `principal.email` carries no
+  verification flag. In practice an admin bootstrapped by email gets the role at the
+  **next login**.
+- The assignment is global (no Gremium scope), has no end date, sets `granted_by=bootstrap`
+  and is **idempotent**. The bootstrap never grants the same role twice.
+- After the first successful admin login the entry can stay and does nothing. Other admins
+  can also replace it through the normal RBAC UI.
 
-## Profile
+## Profiles
 
-- **prod** — hinter NPM, externe Keycloak/SMTP/Nextcloud, ClamAV aktiv, **kein**
-  Host-Port außer `web`. Aktiviert zusätzlich den `backup`-Service:
+- **prod** — behind NPM, with external Keycloak, SMTP and Nextcloud, ClamAV on, and **no**
+  host port except `web`. It also starts the `backup` service:
   ```bash
   docker compose --profile prod up -d --build
   ```
-  Für das echte NPM-Netz im compose `proxy:` auf `external: true` umstellen.
-- Default (ohne Profil) = Smoke-/Dev-Stack ohne `backup`.
+  For the real NPM network, switch `proxy:` in the compose file to `external: true`.
+- Default (no profile) = smoke and dev stack without `backup`.
 
-## Backup & Restore
+## Backup and restore
 
-Tägliches verschlüsseltes Backup (PostgreSQL + MinIO, age) und die getestete
-Restore-Prozedur: siehe [`backup/README.md`](backup/README.md). Restore-Test:
-`../scripts/restore-smoke.sh`.
+For the daily encrypted backup (PostgreSQL and MinIO, age) and the tested restore procedure
+see [`backup/README.md`](backup/README.md). The restore test is `../scripts/restore-smoke.sh`.
 
-## Smoke-Test
-
-```bash
-../scripts/smoke.sh        # up + warten bis healthy
-../scripts/smoke.sh down   # Stack inkl. Volumes abräumen
-```
-
-### Real-Stack-Smoke (Kernflüsse via HTTP/WS)
-
-Fährt den vollen Stack hoch (Mock AUS, Bootstrap-Admin gesetzt) und prüft die
-Kernflüsse rein über HTTP/WS — API up, `/api/health`, öffentlicher Branding-Read,
-Auth-Pfad erreichbar (307), `/auth/me` 401, WS-Handshake erreichbar. Eigener
-`COMPOSE_PROJECT_NAME` (berührt keinen anderen Stack); sichert/stellt ein
-vorhandenes `deploy/.env` wieder her; räumt restlos ab.
+## Smoke test
 
 ```bash
-../scripts/smoke-real-stack.sh        # up -> Kernflüsse prüfen -> teardown
+../scripts/smoke.sh        # up + wait until healthy
+../scripts/smoke.sh down   # remove the stack and its volumes
 ```
 
-Host-Port ist fix `127.0.0.1:8080` (compose-Mapping). `SMOKE_TIMEOUT` (Default
-600s) steuert die Wartezeit (ClamAV lädt lange).
+### Real stack smoke (core flows over HTTP and WS)
 
-CI: Job `real-stack-smoke` (opt-in wie e2e). Default-PR bleibt grün (skipped).
-Triggern: `workflow_dispatch`, PR-Label `run-real-stack-smoke`, oder Repo-Variable
-`RUN_REAL_STACK_SMOKE=true`. Kein FE-Selenium — das macht die Visual-Harness.
+The script starts the full stack with the mock off and a bootstrap admin set. It then checks
+the core flows over HTTP and WS alone:
+
+- the API is up and `/api/health` answers
+- the public branding read works
+- the auth path answers 307 and `/auth/me` answers 401
+- the WS handshake works
+
+It uses its own `COMPOSE_PROJECT_NAME` and touches no other stack. It saves an existing
+`deploy/.env` and puts it back afterwards. It cleans up completely.
+
+```bash
+../scripts/smoke-real-stack.sh        # up -> check the core flows -> teardown
+```
+
+The compose mapping fixes the host port at `127.0.0.1:8080`. `SMOKE_TIMEOUT` controls the wait
+time and defaults to 600 seconds, because ClamAV loads for a long time.
+
+CI runs the job `real-stack-smoke`. It is opt-in like e2e, so a default PR stays green and
+skips it. Trigger it with `workflow_dispatch`, the PR label `run-real-stack-smoke`, or the
+repository variable `RUN_REAL_STACK_SMOKE=true`. The job runs no frontend Selenium. The visual
+harness covers that.

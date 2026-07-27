@@ -33,8 +33,8 @@ class ListingOps(PermissionOps, VoteReadOps):
     async def get(self, meeting_id: UUID, principal: Principal | None = None) -> MeetingOut:
         """Meeting state (404 if unknown).
 
-        ``principal`` is optional: the WS path (reconnect state) does not need the
-        flags and calls without one.
+        ``principal`` is optional. The WebSocket path (reconnect state) does not
+        need the flags and calls without one.
         """
         meeting = await self._get(meeting_id)
         votes = (await self._votes_for([meeting.id])).get(meeting.id, [])
@@ -46,32 +46,33 @@ class ListingOps(PermissionOps, VoteReadOps):
         )
 
     async def list(self, principal: Principal, gremium_id: UUID | None = None) -> list[MeetingOut]:
-        """Meetings (newest first), optionally filtered to one gremium."""
+        """List the meetings, newest first, optionally filtered to one Gremium."""
         stmt = select(Meeting).order_by(Meeting.created_at.desc())
         if gremium_id is not None:
             stmt = stmt.where(Meeting.gremium_id == gremium_id)
         visible = await self._visible_gremium_ids(principal)
         if visible is not None:
-            # Delegation recipients see "their" meetings even without membership.
+            # Delegation recipients see their meetings even without a membership.
             delegated = await self._delegated_meeting_ids(principal.sub)
             stmt = stmt.where(or_(Meeting.gremium_id.in_(visible), Meeting.id.in_(delegated)))
         meetings = list((await self.session.execute(stmt)).scalars().all())
         return await self._decorate(meetings, principal)
 
     async def list_filter_gremien(self, principal: Principal) -> list[MeetingGremiumOut]:
-        """Gremien (id + name) for the meetings-overview filter.
+        """Gremien (id and name) for the meeting-overview filter.
 
-        Exactly the gremien in which the principal has AT LEAST ONE visible meeting
-        — not the membership list. Visibility matches timeline/list
-        (``_visible_gremium_ids`` plus individually delegated meetings).
+        The result holds exactly the Gremien where the principal sees AT LEAST ONE
+        meeting. It is not the membership list. The visibility matches the timeline
+        and the list: ``_visible_gremium_ids`` plus the individually delegated
+        meetings.
         """
         stmt = select(Meeting.gremium_id, Gremium.name).join(
             Gremium, Gremium.id == Meeting.gremium_id
         )
         visible = await self._visible_gremium_ids(principal)
         if visible is not None:
-            # Delegation recipients see "their" meetings even without membership —
-            # their gremium then belongs into the filter as well.
+            # Delegation recipients see their meetings even without a membership,
+            # so their Gremium also belongs in the filter.
             delegated = await self._delegated_meeting_ids(principal.sub)
             stmt = stmt.where(or_(Meeting.gremium_id.in_(visible), Meeting.id.in_(delegated)))
         rows = (await self.session.execute(stmt.distinct())).all()
@@ -91,26 +92,27 @@ class ListingOps(PermissionOps, VoteReadOps):
     ) -> MeetingPage:
         """Keyset-paginated meeting timeline around *now*.
 
-        ``upcoming`` runs forward from now (earliest first, undated meetings last),
-        ``past`` backward (latest first). The cursor carries the sort timestamp and
-        id of the last delivered meeting — stable even on equal dates.
+        ``upcoming`` runs forward from now (earliest first, undated meetings last).
+        ``past`` runs backward (latest first). The cursor carries the sort timestamp
+        and the id of the last delivered meeting. That keeps the order stable even
+        on equal dates.
 
         With an active search (``q``) the timeline COLLAPSES into a single
-        relevance-sorted list (no past/upcoming split, no now marker): the buckets
-        cannot be relevance-ranked. Visibility scoping + ``gremium_id`` filter stay;
-        the cursor then carries an offset.
+        relevance-sorted list, without a past and upcoming split and without a now
+        marker. The buckets cannot carry a relevance rank. The visibility scope and
+        the ``gremium_id`` filter stay. The cursor then carries an offset.
         """
         if q and q.strip():
             return await self._search_timeline(
                 principal, q=q.strip(), cursor=cursor, limit=limit, gremium_id=gremium_id
             )
         sort_ts = _sort_ts_expr()
-        # Naive "now" timestamp — comparable with the date-based sort key.
+        # A naive "now" timestamp compares with the date-based sort key.
         now_ts = datetime.now(UTC).replace(tzinfo=None)
         cur = _decode_cursor(cursor)
-        # Bucket status-aware (not purely by time): ``live`` is always upcoming (a
-        # meeting running since morning must not slip into the past), ``closed``
-        # always past, ``planned`` decided by its date.
+        # The buckets follow the status, not only the time. ``live`` is always
+        # upcoming, so a meeting that runs since the morning does not slip into the
+        # past. ``closed`` is always past. The date decides for ``planned``.
         is_upcoming = or_(
             Meeting.status == "live",
             and_(Meeting.status == "planned", sort_ts >= now_ts),
@@ -139,7 +141,7 @@ class ListingOps(PermissionOps, VoteReadOps):
                 cts, cid = cur
                 stmt = stmt.where(or_(sort_ts < cts, and_(sort_ts == cts, Meeting.id < cid)))
             stmt = stmt.order_by(sort_ts.desc(), Meeting.id.desc())
-        # Load one row past the limit — tells whether a next page exists.
+        # Load one row past the limit to learn whether a next page exists.
         rows = (await self.session.execute(stmt.limit(limit + 1))).all()
         has_more = len(rows) > limit
         rows = rows[:limit]
@@ -158,10 +160,11 @@ class ListingOps(PermissionOps, VoteReadOps):
     ) -> MeetingPage:
         """Relevance-sorted meeting search (collapsed timeline, offset paging).
 
-        Trigram ranking over title + gremium name + protokollant display name.
-        Visibility (``_visible_gremium_ids`` + delegations) and the ``gremium_id``
-        filter stay identical to the keyset path; only the bucket split + now marker
-        drop. The cursor carries an offset here (relevance ranking, no keyset).
+        The trigram rank covers the title, the Gremium name and the display name of
+        the protokollant. The visibility (``_visible_gremium_ids`` plus delegations)
+        and the ``gremium_id`` filter stay identical to the keyset path. Only the
+        bucket split and the now marker drop out. The cursor carries an offset here,
+        because the relevance rank gives no keyset.
         """
         offset = _decode_offset(cursor)
         where, rank = trigram_rank(
@@ -181,9 +184,10 @@ class ListingOps(PermissionOps, VoteReadOps):
         if visible is not None:
             delegated = await self._delegated_meeting_ids(principal.sub)
             stmt = stmt.where(or_(Meeting.gremium_id.in_(visible), Meeting.id.in_(delegated)))
-        # Most relevant first; id as deterministic tiebreak (stable offset paging).
+        # Most relevant first, with the id as a deterministic tiebreak. That keeps
+        # the offset paging stable.
         stmt = stmt.order_by(rank.desc(), Meeting.id.desc()).offset(offset)
-        # Load one row past the limit — tells whether a next page exists.
+        # Load one row past the limit to learn whether a next page exists.
         rows = (await self.session.execute(stmt.limit(limit + 1))).scalars().all()
         has_more = len(rows) > limit
         page_rows = list(rows[:limit])
@@ -192,15 +196,15 @@ class ListingOps(PermissionOps, VoteReadOps):
         return MeetingPage(items=items, nextCursor=next_cursor)
 
     async def _decorate(self, meetings: list[Meeting], principal: Principal) -> list[MeetingOut]:
-        """Enrich meetings with protocol id, votes, and per-principal RBAC flags.
+        """Enrich meetings with the protocol id, the votes and per-principal RBAC flags.
 
-        Shared by :meth:`list` and :meth:`list_timeline`; loads everything batched
-        (no N+1) and filters NO meetings — visibility is module-wide, the flags are
-        purely per principal.
+        `list` and `list_timeline` share this helper. It loads everything in batches
+        and creates no N+1 queries. It filters NO meetings: the visibility rule is
+        module-wide, and the flags are per principal only.
         """
         if not meetings:
             return []
-        # Protocol ids batched (no N+1): meeting_id -> protocol.id.
+        # One batched query for the protocol ids, to avoid N+1.
         proto_rows = (
             await self.session.execute(
                 select(Protocol.meeting_id, Protocol.id).where(
@@ -209,10 +213,10 @@ class ListingOps(PermissionOps, VoteReadOps):
             )
         ).all()
         proto_by_meeting = {meeting_id: pid for meeting_id, pid in proto_rows}
-        # Load the principal's gremium scopes once (no N+1 per meeting). Admin/global
-        # ``meeting.manage`` short-circuits all gremium queries.
+        # Load the Gremium scopes of the principal once, to avoid one query per
+        # meeting. An admin or a global ``meeting.manage`` skips all Gremium queries.
         all_gids = {m.gremium_id for m in meetings}
-        # Gremium names batched (the timeline shows the affiliation).
+        # One batched query for the Gremium names, which the timeline shows.
         gremium_names: dict[UUID, str] = {
             gid: name
             for gid, name in (
@@ -221,8 +225,9 @@ class ListingOps(PermissionOps, VoteReadOps):
                 )
             ).all()
         }
-        # Protokollant names batched (no N+1) — otherwise the timeline shows no
-        # protokollant (``protokollantName`` null) although the id is persisted.
+        # One batched query for the protokollant names. Without it the timeline
+        # shows no protokollant, because ``protokollantName`` stays null although
+        # the database holds the id.
         prot_ids = {m.protokollant_id for m in meetings if m.protokollant_id is not None}
         prot_names: dict[UUID, str | None] = (
             {

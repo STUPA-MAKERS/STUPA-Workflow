@@ -8,7 +8,7 @@ describe('MarkdownViewComponent', () => {
     });
     const strong = screen.getByText('fett');
     expect(strong.tagName).toBe('STRONG');
-    // Raw HTML is escaped, not executed.
+    // The renderer escapes raw HTML and never runs it.
     expect(document.querySelector('script')).toBeNull();
     expect(screen.getByText(/<script>/)).toBeInTheDocument();
   });

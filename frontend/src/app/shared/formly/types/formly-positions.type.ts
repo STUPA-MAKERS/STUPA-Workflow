@@ -14,17 +14,17 @@ interface Offer {
 interface Position {
   label: string;
   offers: Offer[];
-  /** Opt-out of comparison offers (needs a reason; only one offer then). */
+  /** Opt-out of comparison offers. It needs a reason and allows only one offer. */
   noOffers?: boolean;
   noOffersReason?: string;
 }
 
 /**
  * Formly field type `positions` (cost positions). The model value is an array of
- * positions; each carries ≥ `minOffers` comparison offers, exactly one of which is
- * preferred — its value is the position value. The total (Σ positions) flows into
- * `amount` server-side. Validity (min positions/offers, one preferred, values > 0)
- * is mirrored onto the FormControl.
+ * positions. Each position carries at least `minOffers` comparison offers. Exactly one
+ * offer is preferred, and its value is the value of the position. The server writes the
+ * total of all positions into `amount`. The component mirrors validity onto the
+ * FormControl: minimum positions and offers, one preferred offer, and values above 0.
  */
 @Component({
   selector: 'app-formly-positions',
@@ -213,8 +213,8 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
   private readonly i18n = inject(I18nService);
 
   ngOnInit(): void {
-    // Mirror validity immediately: an empty (min-)positions field is invalid even if
-    // the applicant never touches it (otherwise it passes the wizard's required check).
+    // Mirror validity at once. A field below `minPositions` is invalid even when the
+    // applicant never touches it. Otherwise it passes the required check of the wizard.
     queueMicrotask(() => this.revalidate(this.positions));
   }
 
@@ -228,11 +228,11 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
   get minPositions(): number {
     return Number(this.props['minPositions']) || 1;
   }
-  /** Opt-out of comparison offers offered at all (form config; default yes). */
+  /** Whether the form config offers the comparison-offer opt-out at all. Default yes. */
   get allowNoOffers(): boolean {
     return this.props['allowNoOffers'] !== false;
   }
-  /** Offers required for one position — 1 when it opted out, else `minOffers`. */
+  /** Offers required for one position: 1 when the position opted out, else `minOffers`. */
   protected requiredOffers(p: Position): number {
     return this.allowNoOffers && p.noOffers ? 1 : this.minOffers;
   }
@@ -250,7 +250,7 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
     return this.t('apply.positions.invalid');
   }
 
-  // --- Inline per-field validation: mark the affected field red, message in place. ---
+  // Inline per-field validation marks the affected field red and shows the message in place.
   protected titleInvalid(p: Position): boolean {
     return this.showError && !p.label.trim();
   }
@@ -264,7 +264,7 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
     return this.showError && p.noOffers === true && !(p.noOffersReason ?? '').trim();
   }
 
-  /** Concrete, terse error message per position card (or '' when valid). */
+  /** Terse error message for one position card, or '' when the position is valid. */
   protected cardError(p: Position): string {
     if (!this.showError) return '';
     if (p.offers.length < this.requiredOffers(p)) return this.t('apply.positions.errMinOffers');
@@ -370,7 +370,7 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
     );
   }
 
-  /** Which value cell is currently being edited (then raw value instead of formatted). */
+  /** The value cell under edit. It shows the raw value instead of the formatted value. */
   protected editing: { pi: number; oi: number } | null = null;
 
   protected beginEditValue(pi: number, oi: number): void {
@@ -380,8 +380,9 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
     this.editing = null;
   }
 
-  /** Display text of the value input: raw while typing, otherwise formatted to 2
-   *  decimals localized (1.234,56) — without a currency symbol (the column says €). */
+  /** Display text of the value input. It shows the raw text while the user types.
+   *  Otherwise it shows a localized number with 2 decimals (1.234,56). It omits the
+   *  currency symbol because the column header carries the € sign. */
   protected offerValueText(pi: number, oi: number): string {
     const v = this.positions[pi]?.offers[oi]?.value ?? null;
     if (v === null) return '';
@@ -394,8 +395,8 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
     }).format(v);
   }
 
-  /** Robustly parse a localized/free money input to `number` (accepts "1.234,56"
-   *  and "1234.56"); empty/invalid → `null`. */
+  /** Parse a localized money input into a `number`. It accepts "1.234,56" and
+   *  "1234.56". An empty or invalid input gives `null`. */
   private parseNum(raw: string): number | null {
     const s = raw.trim();
     if (!s) return null;
@@ -423,8 +424,8 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
     );
   }
 
-  /** Toggle the comparison-offer opt-out. On: drop untouched blank offers (one
-   *  offer input remains, marked preferred). Off: pad back up to `minOffers`. */
+  /** Toggle the comparison-offer opt-out. When on, drop the blank offers and keep one
+   *  offer input marked as preferred. When off, pad the offers back up to `minOffers`. */
   setNoOffers(pi: number, checked: boolean): void {
     this.commit(
       this.positions.map((p, i) => {

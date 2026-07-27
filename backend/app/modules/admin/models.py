@@ -1,9 +1,10 @@
-"""Organisation & config tables: gremium, mail_list, application_type, plus
-webhook(+delivery) and site_config_version.
+"""Organization and config tables of the admin module.
 
-The webhook tables deliberately live in the admin module (not
-``modules/webhooks``) because the admin CRUD is their only consumer
-(``webhook.manage``).
+The module owns ``gremium``, ``mail_list``, ``application_type``, ``webhook``
+with ``webhook_delivery``, and ``site_config_version``.
+
+The webhook tables live in the admin module and not in ``modules/webhooks``,
+because the admin CRUD (``webhook.manage``) is their only consumer.
 """
 
 from __future__ import annotations
@@ -40,22 +41,24 @@ class Gremium(UUIDPkMixin, CreatedAtMixin, Base):
     default_lang: Mapped[str] = mapped_column(Text, server_default="de")
     # Vote delegation allowed in this gremium (per gremium, not per assignment).
     allow_vote_delegation: Mapped[bool] = mapped_column(Boolean, server_default="false")
-    # Lead time in minutes before meeting start up to which a (non-pool)
-    # delegation may be set up; 0 = until meeting start.
+    # Lead time in minutes before the meeting start. A non-pool delegation must
+    # be set up before this lead time. 0 = until the meeting start.
     delegation_lead_minutes: Mapped[int] = mapped_column(Integer, server_default="0")
     # Allow delegation to users outside gremium & substitute pool.
     delegation_allow_external: Mapped[bool] = mapped_column(
         Boolean, server_default="false"
     )
-    # Default quorum (% of eligible voters that must participate) for this
-    # gremium's votes; NULL = no default. 0-100.
+    # Default quorum for the votes of this gremium. It is the percentage of
+    # eligible voters that must take part, from 0 to 100. NULL = no default.
     quorum_percent: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class GremiumRole(UUIDPkMixin, Base):
-    """Gremium-specific role — an own role set, separate from global roles
-    (``role``) and maintained per gremium. Membership is held by
-    :class:`GremiumMembership`."""
+    """Gremium-specific role.
+
+    Each gremium maintains its own role set, separate from the global roles
+    (``role``). `GremiumMembership` holds the membership.
+    """
 
     __tablename__ = "gremium_role"
 
@@ -64,8 +67,8 @@ class GremiumRole(UUIDPkMixin, Base):
     )
     key: Mapped[str] = mapped_column(Text)
     name_i18n: Mapped[dict] = mapped_column(JSONB, server_default="{}")
-    # Granular per-role meeting-domain permissions
-    # (session.manage / vote.manage / vote.cast / protocol.write). List of keys.
+    # Granular meeting-domain permissions of this role, as a list of keys:
+    # session.manage, vote.manage, vote.cast, protocol.write.
     permissions: Mapped[list] = mapped_column(JSONB, server_default="[]")
 
     __table_args__ = (
@@ -76,9 +79,10 @@ class GremiumRole(UUIDPkMixin, Base):
 class GremiumMembership(UUIDPkMixin, Base):
     """Time-bound membership of a principal in a gremium.
 
-    Per (principal, gremium) exactly one role is active at any point in time —
-    overlapping terms are forbidden, consecutive ones allowed.
-    ``valid_from``/``valid_until`` = term of office (NULL = open)."""
+    For each (principal, gremium) pair exactly one role is active at any point
+    in time. Overlapping terms are forbidden. Consecutive terms are allowed.
+    ``valid_from`` and ``valid_until`` hold the term of office. NULL means open.
+    """
 
     __tablename__ = "gremium_membership"
 
@@ -101,10 +105,11 @@ class GremiumMembership(UUIDPkMixin, Base):
     __table_args__ = (
         Index("ix_gremium_membership_principal", "principal_id"),
         Index("ix_gremium_membership_gremium", "gremium_id"),
-        # DB backing of the overlap invariant: no overlapping term intervals per
-        # (principal, gremium). NULL bounds = +/- infinity; half-open [from, until),
-        # so adjacent memberships are allowed. Closes the TOCTOU gap of the pure
-        # Python check on parallel inserts. Requires the btree_gist extension.
+        # Database backing of the overlap invariant. A (principal, gremium) pair
+        # must not have overlapping term intervals. A NULL bound means minus or
+        # plus infinity. The range is half-open [from, until), so adjacent
+        # memberships are allowed. The constraint closes the TOCTOU gap of the
+        # pure Python check on parallel inserts. It needs the btree_gist extension.
         ExcludeConstraint(
             ("principal_id", "="),
             ("gremium_id", "="),
@@ -136,8 +141,11 @@ class MailList(UUIDPkMixin, Base):
 
 
 class ApplicationType(UUIDPkMixin, CreatedAtMixin, Base):
-    """Application type; references the active form version (use_alter: circular
-    FK to form_version)."""
+    """Application type.
+
+    The row references the active form version. The foreign key to
+    ``form_version`` is circular, so it uses ``use_alter``.
+    """
 
     __tablename__ = "application_type"
 
@@ -148,8 +156,8 @@ class ApplicationType(UUIDPkMixin, CreatedAtMixin, Base):
     name_i18n: Mapped[dict] = mapped_column(JSONB, server_default="{}")
     has_budget: Mapped[bool] = mapped_column(Boolean, server_default="false")
     comparison_offers: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-    # GDPR retention: months until anonymization; NULL = global default
-    # (``privacy_settings.default_retention_months``).
+    # GDPR retention in months until the anonymization. NULL = the global default
+    # ``privacy_settings.default_retention_months``.
     retention_months: Mapped[int | None] = mapped_column(Integer, nullable=True)
     active_form_version_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("form_version.id", ondelete="SET NULL", use_alter=True),
@@ -160,9 +168,9 @@ class ApplicationType(UUIDPkMixin, CreatedAtMixin, Base):
 class Webhook(UUIDPkMixin, CreatedAtMixin, Base):
     """Outbound webhook config (`webhook.manage`).
 
-    ``secret`` is generated server-side (HMAC signing of deliveries) and never
-    exposed via the API. ``events`` is a whitelist from
-    :data:`app.shared.config_schemas.EventName`.
+    The server generates ``secret`` and never exposes it through the API. The
+    worker signs the deliveries with it (HMAC). ``events`` is a whitelist from
+    `app.shared.config_schemas.EventName`.
     """
 
     __tablename__ = "webhook"
@@ -175,11 +183,13 @@ class Webhook(UUIDPkMixin, CreatedAtMixin, Base):
 
 
 class WebhookDelivery(UUIDPkMixin, Base):
-    """Delivery attempt of a webhook (worker pickup via index ``(status, next_at)``).
+    """Delivery attempt of a webhook.
 
-    ``idempotency_key`` decouples event instance from dispatch: a flow retry of
-    the same status event creates no second delivery (unique
-    ``(webhook_id, idempotency_key)``; ``NULL`` = no dedup, e.g. manual).
+    The worker picks the rows up through the index ``(status, next_at)``.
+    ``idempotency_key`` decouples the event instance from the dispatch. A flow
+    retry of the same status event creates no second delivery, because
+    ``(webhook_id, idempotency_key)`` is unique. A ``NULL`` key means no
+    deduplication, for example for a manual delivery.
     """
 
     __tablename__ = "webhook_delivery"
@@ -215,12 +225,13 @@ class WebhookDelivery(UUIDPkMixin, Base):
 
 
 class SiteConfigVersion(UUIDPkMixin, CreatedAtMixin, Base):
-    """Versioned branding/site config.
+    """Versioned branding and site config.
 
-    Versioned like form/flow: a new version instead of in-place edits; at most
-    one ``active`` (partial unique ``WHERE active``). ``branding`` is the
-    schema-validated JSON; ``created_by`` holds the activating principal's OIDC
-    ``sub`` (no PII).
+    The table is versioned like form and flow. A save writes a new version and
+    never edits a row in place. At most one row is ``active``, held by the
+    partial unique index ``WHERE active``. ``branding`` holds the
+    schema-validated JSON. ``created_by`` holds the OIDC ``sub`` of the
+    activating principal, so it carries no PII.
     """
 
     __tablename__ = "site_config_version"

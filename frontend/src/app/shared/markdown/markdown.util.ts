@@ -1,13 +1,14 @@
 /**
- * Miniature Markdown renderer — escape-first, therefore XSS-safe: the ENTIRE
- * input is HTML-escaped before any tag is generated, so markup can only come
- * from the generator itself (fixed tags/attributes, link protocols allow-listed).
+ * Miniature Markdown renderer. It escapes first, so it is safe against XSS. The renderer
+ * escapes the WHOLE input before it makes any tag. Markup can come from the generator
+ * only. The generator writes fixed tags and attributes and allows a fixed list of link
+ * protocols.
  *
- * Supported subset (enough for long-text form fields):
- * headings (`#`…, rendered small as h4–h6), `**bold**`, `*italic*`/`_italic_`,
- * `` `code` ``, ``` fenced blocks, `[label](https://…)` links (http/https/mailto),
- * `-`/`*` and `1.` lists, `>` quotes; single line breaks inside a paragraph are
- * preserved as `<br>`.
+ * The supported subset is enough for a long-text form field. It covers headings (`#` and
+ * more), which render small as h4 to h6. It covers `**bold**`, `*italic*`, `_italic_` and
+ * `` `code` ``. It covers fenced code blocks and `>` quotes. It covers a
+ * `[label](https://…)` link with the http, https or mailto protocol. It covers `-` and `*`
+ * lists and `1.` lists. A single line break inside a paragraph stays as a `<br>`.
  */
 
 function escapeHtml(s: string): string {
@@ -18,8 +19,9 @@ function escapeHtml(s: string): string {
     .replace(/"/g, '&quot;');
 }
 
-/** Inline markup on already-escaped text: code spans first (protected via
- *  placeholder so bold/italic/link rules cannot touch their content). */
+/** Apply the inline markup to text that is already escaped. The renderer handles a code
+ *  span first and replaces it with a placeholder. The bold, italic and link rules then
+ *  cannot touch the content of a code span. */
 function renderInline(text: string): string {
   const codes: string[] = [];
   let out = text.replace(/`([^`]+)`/g, (_m, code: string) => {
@@ -27,7 +29,7 @@ function renderInline(text: string): string {
     return `\u0000${codes.length - 1}\u0000`;
   });
   out = out.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (m: string, label: string, href: string) => {
-    // href is escaped text (& → &amp;) — fine for an attribute value.
+    // The href holds escaped text with an escaped ampersand. It is safe as an attribute.
     if (!/^(https?:\/\/|mailto:)/i.test(href)) return m;
     return `<a href="${href}" target="_blank" rel="noopener noreferrer">${label}</a>`;
   });
@@ -94,7 +96,7 @@ export function markdownToSafeHtml(src: string): string {
     const h = /^(#{1,6})\s+(.*)$/.exec(t);
     if (h) {
       flushAll();
-      // Shifted down (h4–h6): headings inside a detail card stay card-sized.
+      // Shift the level down to h4 or lower. A heading inside a detail card stays small.
       const lvl = Math.min(h[1].length + 3, 6);
       out.push(`<h${lvl}>${renderInline(h[2])}</h${lvl}>`);
       continue;
@@ -121,7 +123,7 @@ export function markdownToSafeHtml(src: string): string {
       list.items.push(ol[1]);
       continue;
     }
-    // '>' is already escaped at this point.
+    // The escape step already replaced the '>' character with its HTML entity.
     const q = /^&gt;\s?(.*)$/.exec(t);
     if (q) {
       flushPara();

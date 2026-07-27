@@ -43,11 +43,11 @@ import { AuthService } from '@core/auth/auth.service';
 import { downloadBlob } from '@shared/download.util';
 
 /**
- * Application list: filter/search (`state/gremium/type/topf/q`) + offset paging.
- * Filter/page state lives in the route **query params** — so a filtered list is
- * shareable/linkable (e.g. from the budget area) and browser-back works. Visible
- * controls exist for search/type/status; `gremium`/`topf` are taken from the URL
- * (pickers to follow with the gremium/pot list endpoints).
+ * Application list with filter and search (`state/gremium/type/topf/q`) and offset paging.
+ * The filter and page state lives in the route query params. A filtered list is therefore
+ * shareable as a link, for example from the budget area, and the browser back button works.
+ * Visible controls exist for search, type and status. `gremium` and `topf` come from the
+ * URL only. Pickers follow once the gremium and pot list endpoints exist.
  */
 @Component({
   selector: 'app-applications-list',
@@ -70,26 +70,25 @@ export class ApplicationsListComponent implements OnDestroy {
 
   readonly limit = 20;
 
-  /** Initial load (filter/sort change) — hides the whole list. */
+  /** Initial load after a filter or sort change. It hides the whole list. */
   readonly loading = signal(true);
-  /** Loading more pages while scrolling (incremental, list stays visible). */
+  /** Load of more pages while scrolling. It is incremental and the list stays visible. */
   readonly loadingMore = signal(false);
   readonly error = signal(false);
   /** Accumulated applications across all loaded pages so far (infinite scroll). */
   readonly items = signal<ApplicationListItem[]>([]);
   readonly total = signal(0);
-  /** Offset of the **next** page to load. */
   private nextOffset = 0;
-  /** Fetch sequence number: late responses from old filters are discarded. */
+  /** Fetch sequence number. The fetch handler drops late responses from old filters. */
   private fetchSeq = 0;
-  /** `gremium`/`topf` have no visible controls — mirrored from the URL. */
+  /** `gremium` and `topf` have no visible controls. They mirror the URL. */
   private gremium = '';
   private topf = '';
   readonly types = signal<ApplicationType[]>([]);
 
-  /** Visible filter controls (mirrored from the query params). */
+  /** Visible filter controls. They mirror the query params. */
   readonly q = signal('');
-  /** Debounce timer of the header search (~400 ms, like /expenses). */
+  /** Debounce timer of the header search (about 400 ms, like /expenses). */
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
   readonly typeId = signal('');
   readonly state = signal('');
@@ -99,22 +98,21 @@ export class ApplicationsListComponent implements OnDestroy {
   readonly createdFrom = signal('');
   readonly createdTo = signal('');
   readonly budgetId = signal('');
-  /** Cost-centre tree for the left tree picker (same look as the budget tab). */
+  /** Cost center tree for the left tree picker, with the look of the budget tab. */
   readonly budgetTree = signal<BudgetTreeNode[]>([]);
 
-  /** Remove cost centres (+ subtree) hidden in the budget tab from the filter
-   *  tree — mirrors the budget dashboard's `visibleTree`. */
+  /** Remove cost centers hidden in the budget tab, and their subtree, from the
+   *  filter tree. This mirrors `visibleTree` of the budget dashboard. */
   private pruneHidden(nodes: BudgetTreeNode[]): BudgetTreeNode[] {
     return nodes
       .filter((n) => !n.hiddenInBudget)
       .map((n) => ({ ...n, children: this.pruneHidden(n.children) }));
   }
-  /** Mobile: tree behind a collapsible toggle (desktop always visible). */
+  /** Mobile: the tree sits behind a collapsible toggle. Desktop always shows it. */
   readonly treeOpen = signal(false);
   readonly sortField = signal<'createdAt' | 'amount'>('createdAt');
   readonly sortOrder = signal<'asc' | 'desc'>('desc');
 
-  /** Number of active filters (for the indicator). */
   readonly activeFilterCount = computed(
     () =>
       [
@@ -129,27 +127,27 @@ export class ApplicationsListComponent implements OnDestroy {
   );
 
   /**
-   * Status dropdown options accumulated from the **real** states of the loaded
-   * applications (value = state UUID, label = resolved state name). The sent
-   * `state` filter value stays the UUID (contract: `current_state_id`). Once-seen
-   * states are kept so the filter does not collapse to a single value.
+   * Status dropdown options collected from the real states of the loaded applications.
+   * The option value is the state UUID and the label is the resolved state name. The
+   * `state` filter sends the UUID as its value (contract: `current_state_id`). The map
+   * keeps every state seen once, so the filter does not collapse to a single value.
    */
   private readonly seenStates = signal<Map<string, string>>(new Map());
   readonly stateOptions = computed<SelectOption[]>(() =>
     [...this.seenStates()].map(([value, label]) => ({ value, label })),
   );
 
-  /** Any unloaded applications left? Controls the sentinel + "load more". */
+  /** True while unloaded applications are left. It controls the sentinel and "load more". */
   readonly hasMore = computed(() => this.items().length < this.total());
 
-  /** Sentinel at the list end — becoming visible triggers the next load. */
+  /** Sentinel at the list end. The next load starts when it becomes visible. */
   readonly sentinel = viewChild<ElementRef<HTMLElement>>('sentinel');
 
   private readonly typesById = computed(
     () => new Map(this.types().map((t) => [t.id, t.name])),
   );
 
-  /** Application-type options for the filter (value = type UUID, label = type name). */
+  /** Application-type filter options. The value is the type UUID, the label the type name. */
   readonly typeOptions = computed<SelectOption[]>(() =>
     this.types().map((type) => ({ value: type.id, label: type.name })),
   );
@@ -177,16 +175,16 @@ export class ApplicationsListComponent implements OnDestroy {
       next: (types) => this.types.set(types),
       error: () => this.types.set([]),
     });
-    // Cost-centre tree for the left filter picker (eager). Cost centres hidden
-    // in the budget tab (`hiddenInBudget`) do not appear here either.
+    // Cost centers hidden in the budget tab (`hiddenInBudget`) do not appear in
+    // the left filter picker either.
     this.budgetApi.tree().subscribe({
       next: (tree) => this.budgetTree.set(this.pruneHidden(tree)),
       error: () => this.budgetTree.set([]),
     });
 
-    // Filter/sort live in the query params: every change resets the list and
-    // reloads page 0. The offset is **no longer** in the URL (infinite scroll),
-    // it is counted up internally.
+    // The filter and sort values live in the query params. Every change resets
+    // the list and reloads page 0. The offset is not in the URL (infinite
+    // scroll). The component counts it up internally.
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((pm) => {
       this.q.set(pm.get('q') ?? '');
       this.typeId.set(pm.get('type') ?? '');
@@ -203,12 +201,14 @@ export class ApplicationsListComponent implements OnDestroy {
       this.reload();
     });
 
-    // True lazy infinite scroll: an IntersectionObserver on the sentinel loads the
-    // next page once the list end comes into view (rootMargin as prefetch). The
-    // effect re-binds whenever the sentinel (only with hasMore) appears/disappears.
+    // Lazy infinite scroll: an IntersectionObserver on the sentinel loads the next
+    // page once the list end comes into view. The rootMargin acts as a prefetch.
+    // The effect re-binds whenever the sentinel appears or disappears, and the
+    // sentinel exists only while hasMore is true.
     effect((onCleanup) => {
       const el = this.sentinel()?.nativeElement;
-      // No observer without a DOM API (SSR/tests) — the "load more" button stays fallback.
+      // Without a DOM API (SSR or tests) there is no observer. The "load more"
+      // button then stays as the fallback.
       if (!el || typeof IntersectionObserver === 'undefined') return;
       const obs = new IntersectionObserver(
         (entries) => {
@@ -221,7 +221,7 @@ export class ApplicationsListComponent implements OnDestroy {
     });
   }
 
-  /** Select a cost centre in the left tree (``''`` = all); filters the list. */
+  /** Select a cost center in the left tree and filter the list. `''` means all. */
   selectBudgetNode(id: string): void {
     this.budgetId.set(id);
     this.navigate({ budget: id || null, offset: null });
@@ -231,7 +231,7 @@ export class ApplicationsListComponent implements OnDestroy {
     return this.typesById().get(typeId) ?? typeId;
   }
 
-  /** Application title (system title field) with fallback "untitled". */
+  /** Application title from the system title field, with the fallback "untitled". */
   titleOf(item: ApplicationListItem): string {
     return item.title?.trim() || this.i18n.translate('applications.list.untitled');
   }
@@ -249,7 +249,7 @@ export class ApplicationsListComponent implements OnDestroy {
     if (changed) this.seenStates.set(next);
   }
 
-  /** Export the current list (filters from the query params) as Excel. */
+  /** Export the current list as Excel. The filters come from the query params. */
   onExport(): void {
     if (this.exporting()) return;
     this.exporting.set(true);
@@ -274,8 +274,9 @@ export class ApplicationsListComponent implements OnDestroy {
     });
   }
 
-  /** Header live search: debounced ~400 ms → ``q`` query param → reload (mirrors
-   *  /expenses). The ``q`` value lives on in the URL (shareable/linkable). */
+  /** Header live search. After about 400 ms of debounce it writes the `q` query
+   *  param and reloads, like /expenses. The `q` value stays in the URL, so the
+   *  filtered list is shareable as a link. */
   onSearch(value: string): void {
     this.q.set(value);
     if (this.searchTimer) clearTimeout(this.searchTimer);
@@ -318,12 +319,12 @@ export class ApplicationsListComponent implements OnDestroy {
     });
   }
 
-  /** Sort event from the shared table → into the query params. */
+  /** Write a sort event of the shared table into the query params. */
   onSort(sort: SortState): void {
     this.navigate({ sort: sort.field, order: sort.order, offset: null });
   }
 
-  /** Append the next page (sentinel visible or "load more" button). */
+  /** Append the next page. The visible sentinel or the "load more" button calls this. */
   loadMore(): void {
     if (this.loadingMore() || this.loading() || !this.hasMore()) return;
     this.loadingMore.set(true);
@@ -338,7 +339,7 @@ export class ApplicationsListComponent implements OnDestroy {
     });
   }
 
-  /** Reset the list (filter/sort change) and reload page 0. */
+  /** Reset the list after a filter or sort change and reload page 0. */
   private reload(): void {
     this.nextOffset = 0;
     this.items.set([]);
@@ -349,7 +350,6 @@ export class ApplicationsListComponent implements OnDestroy {
     this.fetch(true);
   }
 
-  /** Build the query from the current filter state for a given offset. */
   private buildQuery(offset: number): ApplicationListQuery {
     const query: ApplicationListQuery = { limit: this.limit, offset };
     if (this.q().trim()) query.q = this.q().trim();
@@ -368,20 +368,22 @@ export class ApplicationsListComponent implements OnDestroy {
   }
 
   /**
-   * Fetch a page. ``initial`` replaces the list (and shows the full error on
-   * failure), otherwise it appends (a load-more error stays silent — the
-   * already-loaded list remains usable).
+   * Fetch a page.
+   *
+   * With `initial` the page replaces the list and a failure shows the full error.
+   * Without it the page appends and a load-more error stays silent, so the already
+   * loaded list stays usable.
    */
   private fetch(initial: boolean): void {
-    // Sequence number against out-of-order responses: on fast filter changes a
-    // late page of the old filter must not overwrite the current list.
+    // Sequence number against out-of-order responses. After a fast filter change
+    // a late page of the old filter must not overwrite the current list.
     const seq = ++this.fetchSeq;
     this.api.listApplications(this.buildQuery(this.nextOffset)).subscribe({
       next: (page) => {
         if (seq !== this.fetchSeq) return;
         this.total.set(page.total);
         this.items.update((cur) => (initial ? page.items : [...cur, ...page.items]));
-        // Count up by the actual result count (last page < limit).
+        // Count up by the real result count. The last page holds fewer than limit.
         this.nextOffset = page.offset + page.items.length;
         this.collectStates(page.items);
         this.loading.set(false);

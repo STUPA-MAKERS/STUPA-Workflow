@@ -1,4 +1,4 @@
-"""HMAC-Signatur + Header (T-19, security.md §5)."""
+"""HMAC signature and headers (T-19, security.md §5)."""
 
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ def test_sign_binds_timestamp_and_body() -> None:
 
 
 def test_signature_changes_with_timestamp() -> None:
-    # Replay-Schutz: gleicher Body, neuer Timestamp → andere Signatur.
+    # Replay protection: the same body with a new timestamp gives another signature.
     secret, body = b"shared", canonical_body({"event": "status_changed"})
     assert sign(secret, 1000, body) != sign(secret, 2000, body)
 
@@ -57,5 +57,5 @@ def test_build_headers_shape() -> None:
     assert headers[SIGNATURE_HEADER].startswith("sha256=")
     assert headers[TIMESTAMP_HEADER] == "1700000000"
     assert headers[EVENT_HEADER] == "application_approved"
-    # Signatur bindet den gesendeten Timestamp.
+    # The signature binds the timestamp that the header sends.
     assert headers[SIGNATURE_HEADER] == sign(b"secret", 1700000000, b'{"x":1}')

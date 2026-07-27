@@ -8,7 +8,7 @@ export interface MeetingStateMsg {
 export interface VoteOpenedMsg {
   type: 'vote_opened';
   voteId: string;
-  /** `null` = generic motion (free-text agenda item). */
+  /** `null` means a generic motion, that is a free-text agenda item. */
   applicationId?: string | null;
   agendaItemId?: string | null;
   question?: string | null;
@@ -22,7 +22,7 @@ export interface VoteTallyMsg {
   eligible: number;
   quorumMet: boolean;
   leading: string | null;
-  /** Participation progress + reveal gate. */
+  /** Participation progress and the reveal gate. */
   cast?: number;
   present?: number;
   revealed?: boolean;
@@ -32,10 +32,10 @@ export interface VoteClosedMsg {
   voteId: string;
   result: string;
   counts: Record<string, number>;
-  /** Reason for rejection: `quorum` = quorum missed, `majority` = majority missed. */
+  /** Rejection reason: `quorum` for a missed quorum, `majority` for a missed majority. */
   failedReason?: 'quorum' | 'majority' | null;
 }
-/** Vote cancelled — no result, no branch. */
+/** A cancelled vote. It has no result and fires no branch. */
 export interface VoteCancelledMsg {
   type: 'vote_cancelled';
   voteId: string;
@@ -44,7 +44,7 @@ export interface ErrorMsg {
   type: 'error';
   code: string;
 }
-/** Who currently has the meeting page open — display names. */
+/** The people who have the meeting page open now, by display name. */
 export interface ViewersMsg {
   type: 'viewers';
   viewers: string[];

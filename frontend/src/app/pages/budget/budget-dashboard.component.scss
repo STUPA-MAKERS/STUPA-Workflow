@@ -10,13 +10,12 @@
   justify-content: space-between;
   gap: var(--space-4);
   flex-wrap: wrap;
-  /* Centre the title at normal body width; aligns with the middle column. */
+  /* Center the title at body width. It then aligns with the middle column. */
   width: 100%;
   max-width: var(--layout-max-width);
   margin-inline: auto;
 }
 
-/* Status/empty rows at body width too (like the title). */
 .bd__status,
 .bd__empty {
   width: 100%;
@@ -24,8 +23,7 @@
   margin-inline: auto;
 }
 
-/* Metric tabs in the overview overlay — same look as the nav pills in the app
-   header, horizontally centred. */
+/* The metric tabs copy the look of the nav pills in the app header. */
 .bd__ovTabs {
   display: flex;
   justify-content: center;
@@ -56,7 +54,7 @@
   background: var(--color-primary-subtle);
 }
 
-/* Active tab must keep its selected background on hover: `.bd__ovTab:hover`
+/* The active tab must keep its selected background on hover. `.bd__ovTab:hover`
    (specificity 0,2,0) would otherwise beat `--active` (0,1,0). */
 .bd__ovTab--active:hover {
   color: var(--color-primary);
@@ -72,7 +70,6 @@
   flex: 1 1 14rem;
 }
 
-/* --- Breadcrumbs --------------------------------------------------------- */
 .bd__crumb {
   border: 0;
   background: transparent;
@@ -116,16 +113,16 @@
   color: var(--color-text);
 }
 
-/* --- Stacked: applications below the tree table, not beside it. ---------- */
+/* The applications go below the tree table, not beside it. */
 .bd__cols {
   display: grid;
   grid-template-columns: 1fr;
   gap: var(--space-5);
 }
 
-/* Three zones: nav (budget->year) | main content (body width) | charts.
-   Middle column capped at ``--layout-max-width`` and centred via symmetric 1fr
-   sides; only the tree (left) and charts (right) break into the margins. */
+/* Three zones: nav (budget to year), main content (body width) and charts.
+   The middle column stays at `--layout-max-width`. Symmetric 1fr sides center it.
+   Only the tree on the left and the charts on the right reach into the margins. */
 .bd__layout {
   display: grid;
   grid-template-columns:
@@ -139,11 +136,11 @@
   position: sticky;
   top: calc(var(--layout-header-height) + var(--space-4));
   min-width: 0;
-  /* Pull toward the middle column (right-aligned in the left margin). */
+  /* Pull toward the middle column: right-aligned inside the left margin. */
   justify-self: end;
   width: 100%;
   max-width: 14rem;
-  /* Stays in view and doesn't scroll away, even with a long tree. */
+  /* Stays in view and does not scroll away, even with a long tree. */
   max-height: 75vh;
   overflow-y: auto;
 }
@@ -170,7 +167,7 @@
 .bd__apps {
   min-width: 0;
 }
-/* Narrower: charts drop below the content, nav stays left. */
+/* On a narrower screen the charts drop below the content and the nav stays left. */
 @media (max-width: 60rem) {
   .bd__layout {
     grid-template-columns: minmax(10rem, 13rem) minmax(0, 1fr);
@@ -191,7 +188,6 @@
   }
 }
 
-/* Left usage part without a box. */
 .bd__usage {
   min-width: 0;
 }
@@ -258,7 +254,8 @@
   text-decoration: underline;
 }
 
-/* Section-Kopf mit Cross-Link in den Buchungen-/Antrags-Tab (#expenses-ux2). */
+/* Section head with a cross-link into the bookings tab and the applications tab
+   (#expenses-ux2). */
 .bd__sectionHead {
   display: flex;
   align-items: center;
@@ -301,7 +298,7 @@
   vertical-align: bottom;
 }
 
-/* Usage column: fixed width so bars line up across rows. */
+/* Usage column: a fixed width lines the bars up across the rows. */
 .bd__table th:nth-child(2),
 .bd__table td:nth-child(2) {
   width: 12rem;
@@ -329,7 +326,6 @@
   background: var(--color-primary);
 }
 
-/* Two-tone: light grey = committed, primary = expended. */
 .bd__seg--bound {
   background: var(--color-border-strong, #8a8f98);
 }
@@ -371,8 +367,9 @@
   text-decoration: underline;
 }
 
-/* --- Mobile (<=768px = 48rem): single column — picker (collapsible) -> content
-   -> charts. Desktop unchanged: the toggle only exists there, hidden. --- */
+/* Mobile (<=768px = 48rem): one column with the collapsible picker, then the
+   content, then the charts. Desktop keeps its layout. The toggle exists there
+   too, but stays hidden. */
 .bd__nav-toggle {
   display: none;
 }
@@ -388,7 +385,6 @@
     max-height: none;
     overflow: visible;
   }
-  /* Toggle: shows the selected budget/fiscal year, expands/collapses the tree. */
   .bd__nav-toggle {
     display: flex;
     align-items: center;
@@ -418,8 +414,8 @@
   .bd__nav-body--open {
     display: block;
   }
-  /* Charts below the content: side by side while there's room, else wrap —
-     nothing overflows the 375px viewport. */
+  /* Charts below the content: side by side while there is room, else they wrap.
+     Nothing overflows the 375px viewport. */
   .bd__charts {
     position: static;
     justify-self: stretch;
@@ -434,7 +430,6 @@
     flex: 0 1 auto;
     min-width: 0;
   }
-  /* Cost-centre row may wrap instead of overflowing. */
   .bd__ks {
     flex-wrap: wrap;
   }
@@ -442,8 +437,8 @@
     max-width: 100%;
     white-space: normal;
   }
-  /* Usage bar: in the card layout the flex track otherwise collapses to content
-     width (~0) — a fixed, right-aligned width gives it room. */
+  /* Usage bar: in the card layout the flex track collapses to content width
+     (~0). A fixed, right-aligned width gives it room. */
   .bd__bar-cell {
     flex: 1 1 auto;
     max-width: 14rem;

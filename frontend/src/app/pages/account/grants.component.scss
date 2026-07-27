@@ -20,8 +20,9 @@
   margin-top: 0;
 }
 
-/* Empty state sits INSIDE .card (which already gives border+radius+surface), so it's
-   just centred, muted text — no own border (else box-in-box). Matches the canonical
+/* The empty state sits inside .card, which already supplies the border, the radius and
+   the surface. The empty state therefore uses centered muted text with no border of its
+   own. A border of its own would make a box in a box. This matches the canonical
    .empty-state. */
 .grants__list-head,
 .mcp__config-head {
@@ -129,7 +130,6 @@
   color: var(--color-danger);
 }
 
-/* Mobile (≤768px): table scrolls horizontally, long commands wrap. */
 @media (max-width: 768px) {
   .grants__table {
     display: block;

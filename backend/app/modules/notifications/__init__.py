@@ -1,11 +1,11 @@
-"""Notifications module: rules, mail templates (Jinja2/i18n), dispatch.
+"""Notifications module: rules, mail templates (Jinja2 and i18n), dispatch.
 
 Public building blocks:
 
-* :mod:`events`     — stable event list.
-* :mod:`mail`       — ``MailMessage`` + ``MailSender`` protocol (SMTP/capturing).
-* :mod:`templating` — Jinja2 rendering (subject/body, i18n DE/EN, preview).
-* :mod:`queue`      — enqueue abstraction (arq) + idempotent job key.
-* :mod:`service`    — rule/template CRUD, event dispatch, ``notify`` action handler.
-* :mod:`router`     — ``/api/admin/notification-rules`` + ``/mail-templates`` (+ preview).
+`events`: the stable event list.
+`mail`: `MailMessage` and the `MailSender` protocol (SMTP or capturing).
+`templating`: Jinja2 rendering of subject and body, i18n DE and EN, preview.
+`queue`: the enqueue abstraction (arq) and the idempotent job key.
+`service`: rule and template CRUD, event dispatch, the `notify` action handler.
+`router`: `/api/admin/notification-rules` and `/mail-templates`, with preview.
 """

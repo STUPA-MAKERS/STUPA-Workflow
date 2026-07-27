@@ -104,7 +104,6 @@ describe('FormEditorComponent', () => {
     const { fixture } = await setup(draft([]));
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
-    // Empty form loads as a single empty group.
     expect(c.groups()).toHaveLength(1);
     await userEvent.click(screen.getByRole('button', { name: '+ Frage hinzufügen' }));
     await userEvent.click(screen.getByRole('menuitem', { name: 'Langtext' }));
@@ -240,7 +239,6 @@ describe('FormEditorComponent — load branches', () => {
     const { c } = await setup(draft([{ key: 't', type: 'text', label: { de: 'T', en: '' } }]), {
       api: { listApplicationTypesFull: jest.fn(() => throwError(() => new Error('boom'))) },
     });
-    // Draft still loads -> not loading, groups present.
     expect(c.loading()).toBe(false);
     expect(c.groups()).toHaveLength(1);
   });
@@ -358,7 +356,7 @@ describe('FormEditorComponent — title/description/label helpers', () => {
 describe('FormEditorComponent — group & question mutations', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
-  // jsdom (jest) has no structuredClone; the component relies on the browser global.
+  // jsdom in jest has no structuredClone. The component relies on the browser global.
   const g = globalThis as unknown as { structuredClone?: <T>(v: T) => T };
   const savedClone = g.structuredClone;
   beforeAll(() => {
@@ -394,7 +392,7 @@ describe('FormEditorComponent — group & question mutations', () => {
     expect(c.groups()[0].titleDe).toBe('First');
     c.moveGroup(1, 1); // to=2 -> out of bounds
     expect(c.groups()).toHaveLength(2);
-    // from===to via the private reorderGroup directly (covers the equal-index guard)
+    // Call the private reorderGroup with equal indices to cover the guard.
     c.reorderGroup(0, 0);
     expect(c.groups()[0].titleDe).toBe('First');
   });
@@ -762,7 +760,7 @@ describe('FormEditorComponent — nullish/branch edges', () => {
         { key: 'b', type: 'text', label: { de: 'B', en: '' } },
       ]),
     );
-    c.addOption({ gi: 0, qi: 1 }); // mutate the 2nd field only
+    c.addOption({ gi: 0, qi: 1 });
     expect(c.groups()[0].fields[0].options).toBeUndefined();
     expect(c.groups()[0].fields[1].options).toHaveLength(1);
   });

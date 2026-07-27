@@ -1,8 +1,9 @@
-"""Unit (ohne DB): ApplicationTypesService-Mapping + Query-Verzweigung.
+"""Unit tests without a database: ApplicationTypesService mapping and query branches.
 
-Die ``AsyncSession`` wird durch ein Fake ersetzt, das ``scalar`` (Total) und
-``scalars`` (Zeilen) bedient — so sind Paging-Hülle, i18n-Auflösung und die
-Admin-/Public-Feldverzweigung ohne Postgres testbar. Echte SQL-Pfade: Integration.
+A fake replaces the `AsyncSession`. It serves `scalar` for the total and `scalars` for
+the rows. This keeps the paging envelope, the i18n name resolution and the admin versus
+public field branch testable without Postgres. The integration suite covers the real
+SQL paths.
 """
 
 from __future__ import annotations
@@ -23,7 +24,7 @@ class _ScalarsResult:
 
 
 class _FakeSession:
-    """Minimal-Session: merkt sich, ob ein WHERE-Filter (inaktiv-Ausschluss) greift."""
+    """Minimal session that tracks whether a WHERE filter excludes inactive rows."""
 
     def __init__(self, rows: list[object], total: int) -> None:
         self.rows = rows
@@ -51,7 +52,7 @@ def _row(**over: object) -> SimpleNamespace:
     return SimpleNamespace(**base)
 
 
-def _run(coro):  # noqa: ANN001, ANN202 — Test-Helfer
+def _run(coro):  # noqa: ANN001, ANN202 — test helper
     return asyncio.run(coro)
 
 
@@ -68,7 +69,6 @@ def test_list_public_maps_minimal_fields() -> None:
     assert item.has_budget is True
     assert item.active is True
     assert item.active_form_version_id == row.active_form_version_id
-    # Public: keine Admin-Felder.
     assert item.key is None
     assert item.gremium_id is None
 
@@ -91,7 +91,7 @@ def test_list_admin_includes_extra_fields_and_inactive() -> None:
     svc = ApplicationTypesService(_FakeSession([row], total=1))  # type: ignore[arg-type]
     page = _run(svc.list_types(lang="de", limit=50, offset=0, include_inactive=True, admin=True))
     item = page.items[0]
-    assert item.active is False  # keine aktive Form-Version
+    assert item.active is False  # no active form version
     assert item.active_form_version_id is None
     assert item.key == "finanz"
     assert item.gremium_id == row.gremium_id

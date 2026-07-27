@@ -1,10 +1,10 @@
-"""Application: ``email_confirmed_at`` (Gast-Einreichung muss bestätigt werden).
+"""Application: `email_confirmed_at` (a guest submission needs a confirmation).
 
-Eine von einem nicht angemeldeten Nutzer eingereichte Antragstellung ist erst
-**sichtbar**, nachdem die E-Mail per Magic-Link bestätigt wurde; unbestätigt wird
-sie nach 12 h verworfen. Bestandsanträge gelten als bestätigt → Backfill auf
-``created_at`` (sonst würden sie unsichtbar). Neue Gast-Anträge starten mit NULL.
-Idempotent (``IF NOT EXISTS``).
+An application from a user who is not logged in stays invisible until that user
+confirms the email through a magic link. The platform discards an unconfirmed
+application after 12 h. Existing applications count as confirmed, so the backfill sets
+`email_confirmed_at` to `created_at`. Without that backfill they would go invisible. A
+new guest application starts with NULL. Idempotent through `IF NOT EXISTS`.
 """
 
 from __future__ import annotations
@@ -21,7 +21,6 @@ depends_on: str | Sequence[str] | None = None
 
 _UPGRADE: tuple[str, ...] = (
     "ALTER TABLE application ADD COLUMN IF NOT EXISTS email_confirmed_at timestamptz",
-    # Bestandsanträge als bestätigt behandeln, damit sie nicht plötzlich verschwinden.
     "UPDATE application SET email_confirmed_at = created_at WHERE email_confirmed_at IS NULL",
 )
 

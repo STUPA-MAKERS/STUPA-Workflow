@@ -15,7 +15,7 @@ import type {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Inst = any;
 
-/** Full allocation view (all fields, so Number(undefined)=NaN never occurs). */
+/** Full allocation view. All fields are set, so Number(undefined) never gives NaN. */
 function alloc(over: Partial<BudgetAllocationView> & { fiscalYearId: string }): BudgetAllocationView {
   return {
     fiscalYearId: over.fiscalYearId,
@@ -140,12 +140,12 @@ async function setup(opts: SetupOpts = {}) {
   });
   const http = TestBed.inject(HttpTestingController);
   http.expectOne((r) => r.url.endsWith('/budgets')).flush(tree);
-  // Each top with a fiscal-years request.
   const tops = tree.filter((n) => !n.hiddenInBudget);
   for (const top of tops) {
     http.expectOne((r) => r.url.endsWith(`/budgets/${top.id}/fiscal-years`)).flush(fys);
   }
-  // After restore, applications for the selected ks (= first top) is requested.
+  // After the restore the component requests the applications of the selected cost
+  // center, which is the first top.
   const reqs = http.match((r) => r.url.includes('/applications'));
   reqs.forEach((r) => r.flush(apps));
   view.fixture.detectChanges();
@@ -176,11 +176,11 @@ describe('BudgetDashboardComponent (#17)', () => {
     const rows = c.appRows();
     expect(rows.length).toBe(APPS.length);
     expect(rows[0].id).toBe(APPS[0].applicationId);
-    // stateLabel resolved in the active locale (de).
+    // stateLabel resolves in the active locale (de).
     expect(rows[0].stateLabel).toBe('Angenommen');
     expect(rows[0].stateColor).toBe('#0a0');
-    // Neben dem Antrags-Link gibt es jetzt auch Kostenstellen→Buchungen-Links (#expenses-ux),
-    // daher gezielt den Antrags-Link suchen statt „ersten Link".
+    // The page also holds links from a cost center into the bookings tab
+    // (#expenses-ux), so pick the application link by its href, not by position.
     const links = screen.getAllByRole('link') as HTMLAnchorElement[];
     const appLink = links.find((a) => a.getAttribute('href')?.includes('/applications/'));
     expect(appLink).toBeTruthy();
@@ -224,7 +224,7 @@ describe('BudgetDashboardComponent (#17)', () => {
     expect(rows[0].bound).toBe(300);
     expect(rows[0].expended).toBe(100);
     expect(rows[0].income).toBe(0);
-    // Child row present (flattened subtree).
+    // The child row is there too, because the subtree is flattened.
     expect(rows.length).toBe(2);
   });
 
@@ -319,13 +319,13 @@ describe('BudgetDashboardComponent (#17)', () => {
 
   it('pie builders include an own-segment when the parent retains a remainder', async () => {
     const { c } = await setup();
-    // Root allocated 1000, child allocated 400 → own remainder 600 (> 0.005) → own slice with parent color.
+    // Root allocated 1000, child allocated 400 → own remainder 600 (> 0.005), so the
+    // own slice appears in the parent color.
     const slices = c.allocPie();
     const own = slices.find((s: { label: string }) => s.label === 'VS-Mittel');
     expect(own).toBeTruthy();
     expect(own.value).toBe(600);
     expect(own.color).toBe('#123456');
-    // The child slice exists too.
     expect(slices.some((s: { label: string }) => s.label === 'Dezentrale Einrichtungen')).toBe(true);
   });
 
@@ -351,7 +351,7 @@ describe('BudgetDashboardComponent (#17)', () => {
     const slices = c.allocPie();
     const child = slices.find((s: { id?: string }) => s.id === 'ch');
     expect(child.color).toMatch(/^#/);
-    // Own remainder slice color falls back to PALETTE[0] when parent has no color.
+    // The own remainder slice falls back to PALETTE[0] when the parent has no color.
     const own = slices.find((s: { label: string }) => s.label === 'Node top');
     expect(own.color).toBe('#5fb37a');
   });
@@ -366,7 +366,7 @@ describe('BudgetDashboardComponent (#17)', () => {
   it('overviewRoot is the selected cost centre and visibleOverviewMetrics drops empty metrics', async () => {
     const { c } = await setup();
     expect(c.overviewRoot()?.id).toBe('b-vs');
-    // allocated + available + expended all have data on the root → all three visible.
+    // The root has data for allocated, available and expended, so all three show.
     expect(c.visibleOverviewMetrics()).toEqual(['allocated', 'available', 'expended']);
   });
 
@@ -423,13 +423,13 @@ describe('BudgetDashboardComponent (#17)', () => {
     // null and '' coerce to 0.
     expect(c.money(null)).toContain('0');
     expect(c.money('')).toContain('0');
-    // Currency override.
     expect(c.money(5, 'USD')).toMatch(/[$]|USD/);
   });
 
   it('boundPct and expendedPct clamp to 0..100 and handle a zero denominator', async () => {
     const { c } = await setup();
-    // total = available 600 + committed 400 = 1000. bound 300 → 30%, expended 100 → 10%.
+    // The total is 1000 (available 600 + committed 400). Bound 300 gives 30% and
+    // expended 100 gives 10%.
     const row = c.usageRows()[0];
     expect(c.boundPct(row)).toBeCloseTo(30);
     expect(c.expendedPct(row)).toBeCloseTo(10);
@@ -509,7 +509,8 @@ describe('BudgetDashboardComponent (#17)', () => {
   });
 
   it('renders the export button and exports on click', async () => {
-    // jsdom lacks URL.createObjectURL/revokeObjectURL — stub them for downloadBlob.
+    // jsdom has no URL.createObjectURL and no URL.revokeObjectURL. Stub both for
+    // downloadBlob.
     (URL as unknown as { createObjectURL?: unknown }).createObjectURL = () => 'blob:mock';
     (URL as unknown as { revokeObjectURL?: unknown }).revokeObjectURL = () => undefined;
     jest.spyOn(URL, 'createObjectURL').mockReturnValue('blob:mock');
@@ -533,7 +534,7 @@ describe('BudgetDashboardComponent (#17)', () => {
     c.selectedFyId.set('');
     c.onExport();
     const req = http.expectOne((r) => r.url.includes('/budget/export.xlsx'));
-    // Both `|| undefined` branches taken → no params on the request.
+    // Both `|| undefined` branches run, so the request carries no params.
     expect(req.request.params.keys()).toEqual([]);
     req.flush(new Blob(['x']));
     expect(c.exporting()).toBe(false);
@@ -560,7 +561,7 @@ describe('BudgetDashboardComponent (#17)', () => {
     jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
     c.selectKs('orphan');
     http.expectOne((r) => r.url.includes('/budgets/orphan/applications')).flush([]);
-    // parentId resolves to nothing (?? null) → chain has only the orphan itself.
+    // parentId resolves to nothing (?? null), so the chain holds only the orphan.
     expect(c.breadcrumbs().map((n: { id: string }) => n.id)).toEqual(['orphan']);
   });
 
@@ -618,7 +619,6 @@ describe('BudgetDashboardComponent (#17)', () => {
     view.fixture.detectChanges();
     expect(c.applications()).toEqual([]);
     expect(c.tops()).toEqual([]);
-    // Empty-state section is rendered (no tree rows, no charts).
     expect(view.container.querySelector('.bd__empty')).toBeTruthy();
     http.verify();
   });
@@ -686,7 +686,8 @@ describe('BudgetDashboardComponent (#17)', () => {
     const http = TestBed.inject(HttpTestingController);
     const c = view.fixture.componentInstance as unknown as Inst;
     http.expectOne((r) => r.url.endsWith('/budgets')).flush([node({ id: 'b-vs', key: 'VS' })]);
-    // listFiscalYears errors → error callback runs restoreOrDefault but no FY exists.
+    // listFiscalYears fails, so the error callback runs restoreOrDefault. No fiscal
+    // year exists at that point.
     http.expectOne((r) => r.url.endsWith('/budgets/b-vs/fiscal-years')).error(new ProgressEvent('err'));
     view.fixture.detectChanges();
     expect(c.selectedBudgetId()).toBe('');
@@ -695,8 +696,9 @@ describe('BudgetDashboardComponent (#17)', () => {
   });
 
   it('defers restore while the chosen budget fiscal-years have not arrived yet', async () => {
-    // Two tops; flush the SECOND top first. restoreOrDefault runs with the first
-    // budget chosen but its `fys` still undefined → line 420 early-return branch.
+    // Two tops. Flush the SECOND top first. restoreOrDefault then runs with the
+    // first budget chosen but its `fys` still undefined, which takes the
+    // early-return branch.
     const tree = [
       node({ id: 'b-a', key: 'A', byFiscalYear: [alloc({ fiscalYearId: 'fy-1', allocated: '10' })] }),
       node({ id: 'b-b', key: 'B', byFiscalYear: [alloc({ fiscalYearId: 'fy-1', allocated: '10' })] }),
@@ -712,9 +714,9 @@ describe('BudgetDashboardComponent (#17)', () => {
     const http = TestBed.inject(HttpTestingController);
     const c = view.fixture.componentInstance as unknown as Inst;
     http.expectOne((r) => r.url.endsWith('/budgets')).flush(tree);
-    // Respond for b-b first: withFy=[b-b]→chosen withFy[0]=b-b? No — withFy filters by
-    // tops having FY. Only b-b has FY here, so it becomes the default; once selected,
-    // its fys exist → restored. Flush b-a afterwards (no-op, already restored).
+    // Respond for b-b first. withFy keeps only the tops that have a fiscal year.
+    // Only b-b has one here, so it becomes the default. Its fys then exist and the
+    // restore runs. The later flush for b-a does nothing.
     http.expectOne((r) => r.url.endsWith('/budgets/b-b/fiscal-years')).flush([{ ...FY, budgetId: 'b-b' }]);
     http.match((r) => r.url.includes('/applications')).forEach((r) => r.flush([]));
     http.expectOne((r) => r.url.endsWith('/budgets/b-a/fiscal-years')).flush([{ ...FY, budgetId: 'b-a' }]);
@@ -725,7 +727,8 @@ describe('BudgetDashboardComponent (#17)', () => {
   });
 
   it('skips restore until a top with a fiscal year is loaded', async () => {
-    // Top whose fiscal-years come back empty → restoreOrDefault returns without selecting.
+    // The fiscal years of the top come back empty, so restoreOrDefault returns
+    // without a selection.
     const view = await render(BudgetDashboardComponent, {
       providers: [
         provideHttpClient(),
@@ -739,7 +742,7 @@ describe('BudgetDashboardComponent (#17)', () => {
     http.expectOne((r) => r.url.endsWith('/budgets')).flush([node({ id: 'b-vs', key: 'VS' })]);
     http.expectOne((r) => r.url.endsWith('/budgets/b-vs/fiscal-years')).flush([]);
     view.fixture.detectChanges();
-    // No fiscal year → nothing selected, no applications request.
+    // Without a fiscal year nothing is selected and no applications request goes out.
     expect(c.selectedBudgetId()).toBe('');
     http.verify();
   });

@@ -1,8 +1,8 @@
-"""Per-User-Benachrichtigungs-Schalter (#4-2).
+"""Per-user notification switches (#4-2).
 
-``notification_preference`` speichert nur Abweichungen vom Default (alle
-Arten aktiv): eine Zeile (principal, kind, enabled=false) = abgewählt.
-Idempotent (``IF [NOT] EXISTS``).
+Every notification kind is active by default. `notification_preference` stores
+the exceptions only. A row with `enabled=false` for a principal and a kind turns
+that kind off. The migration is idempotent (`IF [NOT] EXISTS`).
 """
 
 from __future__ import annotations

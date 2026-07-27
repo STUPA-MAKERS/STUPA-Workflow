@@ -1,8 +1,10 @@
-"""BankService (#fints): Staging, Abgleich, Sync/TAN, Datei-Import — Fake-Session.
+"""BankService (#fints): staging, matching, sync and TAN, file import with a fake session.
 
-Reine Unit-Tests: die DB-Session ist ein Stub (FIFO-Queues), die Kollaborateure
-(``fints_client``, ``parse_statement``, ``BudgetTreeService.book_expense``, ``audit_record``)
-werden gemockt. Der FinTS-Netzpfad selbst ist ``pragma: no cover`` (kein Bank-Zugang)."""
+These are pure unit tests. The DB session is a stub with FIFO queues. The tests mock the
+collaborators `fints_client`, `parse_statement`, `BudgetTreeService.book_expense` and
+`audit_record`. The FinTS network path itself carries `pragma: no cover` because the test
+run has no bank access.
+"""
 
 from __future__ import annotations
 
@@ -34,7 +36,7 @@ from app.shared.crypto import decrypt_secret, encrypt_secret
 from app.shared.errors import NotFoundError, ServiceUnavailableError, ValidationProblem
 
 _KEY = "0123456789abcdef-fints-enc-key"
-# Fester Bucher (Principal) für die per-Principal-Zugangsdaten (#fints-percred).
+# Fixed booker (principal) for the per-principal credentials (#fints-percred).
 _PID = uuid.UUID("00000000-0000-0000-0000-0000000000aa")
 
 
@@ -53,7 +55,7 @@ class _Result:
 
 
 class _Session:
-    """AsyncSession-Stub: ``get`` aus einem Store, ``execute``/``scalars``/``scalar`` FIFO."""
+    """AsyncSession stub: `get` reads a store. `execute`, `scalars` and `scalar` are FIFO."""
 
     def __init__(self) -> None:
         self.store: dict[tuple[str, Any], Any] = {}
@@ -67,7 +69,7 @@ class _Session:
         self.store[(type(obj).__name__, obj.id)] = obj
 
     async def get(self, model: type, ident: Any, **_kw: Any) -> Any:
-        # ``with_for_update`` u. a. werden im Fake ignoriert (keine echte Sperre).
+        # The fake ignores `with_for_update` and similar options. It takes no real lock.
         return self.store.get((model.__name__, ident))
 
     async def execute(self, _stmt: Any) -> _Result:
@@ -94,12 +96,12 @@ def _settings(**over: Any) -> Any:
 
 
 def _service(session: _Session, monkeypatch: pytest.MonkeyPatch, **over: Any) -> BankService:
-    # Audit entkoppeln (Hash-Kette würde sonst die Session anfassen).
+    # Decouple the audit. The hash chain would otherwise touch the session.
     async def _noop(*_a: Any, **_k: Any) -> None:
         return None
 
     monkeypatch.setattr(service_base, "audit_record", _noop)
-    # SSRF-Re-Validierung (DNS) ist separat getestet — im Unit-Test neutralisieren.
+    # A separate test covers the SSRF revalidation over DNS. Neutralize it here.
     monkeypatch.setattr(fc, "validate_fints_endpoint", lambda _u: None)
     return BankService(
         session,  # type: ignore[arg-type]
@@ -110,7 +112,7 @@ def _service(session: _Session, monkeypatch: pytest.MonkeyPatch, **over: Any) ->
 
 
 def _account(*, configured: bool = True) -> Account:
-    """Konto mit (optionaler) FinTS-**Bank-Verbindung** — Endpunkt + BLZ (#fints-percred)."""
+    """Build an account with an optional FinTS connection: endpoint and BLZ (#fints-percred)."""
     acc = Account(id=uuid.uuid4(), name="Giro", iban="DE111", active=True)
     if configured:
         acc.fints_endpoint = "https://fints.sparkasse.example/"
@@ -126,7 +128,7 @@ def _cred(
     state: str | None = None,
     tan: str | None = None,
 ) -> AccountFintsCredential:
-    """Persönliche FinTS-Zugangsdaten des Buchers ``_PID`` für ein Konto (#fints-percred)."""
+    """Build the personal FinTS credentials of booker `_PID` for an account (#fints-percred)."""
     return AccountFintsCredential(
         id=uuid.uuid4(),
         account_id=account_id or uuid.uuid4(),
@@ -149,13 +151,15 @@ def _line(**over: Any) -> BankStatementLine:
     )
     base.update(over)
     line = BankStatementLine(**base)
-    line.created_at = datetime(2024, 1, 2, tzinfo=UTC)  # CreatedAtMixin-Default fehlt ohne DB
+    line.created_at = datetime(2024, 1, 2, tzinfo=UTC)  # No DB, so CreatedAtMixin sets no default
     return line
 
 
 def test_line_out_resolves_counterparty_purpose_from_raw() -> None:
-    """_line_out löst Gegenkonto/Zweck aus den Rohdaten auf (#fints-raw); CAMT-Roh ohne die
-    Felder → Fallback auf die gespeicherten Spalten."""
+    """`_line_out` reads the counterparty and the purpose from the raw payload (#fints-raw).
+
+    Raw CAMT data without those fields falls back to the stored columns.
+    """
     mt = _line(
         amount=Decimal("-10.00"), counterparty_name="STALE", counterparty_iban=None,
         purpose="stale",
@@ -172,7 +176,7 @@ def test_line_out_resolves_counterparty_purpose_from_raw() -> None:
     out2 = BankService._line_out(camt, None)
     assert out2.counterparty_name == "ACME"
     assert out2.purpose == "Rechnung"
-    # Platzhalter „KRZL" wird auch im Fallback (Rohfelder leer) verworfen.
+    # The fallback also drops the "KRZL" placeholder when the raw fields stay empty.
     krzl = _line(
         amount=Decimal("-10.00"), counterparty_name="KRZL", counterparty_iban="DE79",
         purpose="DATEI-NR. 1", raw_payload={"creditDebit": "DBIT"},
@@ -180,7 +184,6 @@ def test_line_out_resolves_counterparty_purpose_from_raw() -> None:
     assert BankService._line_out(krzl, None).counterparty_name is None
 
 
-# --------------------------------------------------------------- feature gate
 def test_require_enabled_off_raises() -> None:
     svc = BankService(_Session(), settings=load_settings())  # type: ignore[arg-type]
     with pytest.raises(ServiceUnavailableError):
@@ -194,10 +197,9 @@ async def test_account_or_404(monkeypatch: pytest.MonkeyPatch) -> None:
         await svc._account_or_404(uuid.uuid4())
 
 
-# --------------------------------------------------------------- credentials
 @pytest.mark.asyncio
 async def test_credentials_incomplete(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Konto ohne Bank-Verbindung (Endpunkt/BLZ) → fints_not_configured."""
+    """An account without a bank connection (endpoint or BLZ) gives fints_not_configured."""
     svc = _service(_Session(), monkeypatch)
     with pytest.raises(ValidationProblem):
         svc._credentials(_account(configured=False), _cred())
@@ -223,7 +225,7 @@ async def test_credentials_ok(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.mark.asyncio
 async def test_require_principal_missing(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Ohne Principal-Id (interne Invariante) → 503."""
+    """A missing principal id breaks an internal invariant and gives 503."""
     monkeypatch.setattr(service_base, "audit_record", lambda *_a, **_k: None)
     svc = BankService(_Session(), settings=_settings(), principal_id=None)  # type: ignore[arg-type]
     with pytest.raises(ServiceUnavailableError):
@@ -232,7 +234,10 @@ async def test_require_principal_missing(monkeypatch: pytest.MonkeyPatch) -> Non
 
 @pytest.mark.asyncio
 async def test_load_credential_missing(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Kein Credential für den Bucher → fints_no_credential (FE fordert Verbinden)."""
+    """A missing credential for the booker gives fints_no_credential.
+
+    The frontend then asks the user to connect.
+    """
     session = _Session()
     svc = _service(session, monkeypatch)
     session.scalar_q.append(None)
@@ -240,14 +245,13 @@ async def test_load_credential_missing(monkeypatch: pytest.MonkeyPatch) -> None:
         await svc._load_credential(uuid.uuid4())
 
 
-# ----------------------------------------------------- credential CRUD (#fints-percred)
 @pytest.mark.asyncio
 async def test_set_credential_new(monkeypatch: pytest.MonkeyPatch) -> None:
     session = _Session()
     svc = _service(session, monkeypatch)
     acc = _account()
     session.put(acc)
-    session.scalar_q.append(None)  # noch kein Credential
+    session.scalar_q.append(None)  # no credential yet
     out = await svc.set_credential(
         acc.id, FintsCredentialIn(fintsLogin="user1", fintsPin="1234")
     )
@@ -272,7 +276,7 @@ async def test_set_credential_existing_resets_state(monkeypatch: pytest.MonkeyPa
     assert out.fints_login == "new"
     assert cred.fints_login == "new"
     assert decrypt_secret(cred.fints_pin_encrypted, key=_KEY) == "9999"
-    # Neue Zugangsdaten → bisheriger SCA-Zustand/TAN verworfen.
+    # New credentials drop the previous SCA state and TAN mechanism.
     assert cred.fints_state is None
     assert cred.fints_tan_mechanism is None
 
@@ -308,16 +312,15 @@ async def test_delete_credential_found_and_missing(monkeypatch: pytest.MonkeyPat
     session = _Session()
     svc = _service(session, monkeypatch)
     cred_id = uuid.uuid4()
-    session.execute_q.append(_Result([(cred_id,)]))  # DELETE … RETURNING trifft
+    session.execute_q.append(_Result([(cred_id,)]))  # DELETE ... RETURNING matches
     await svc.delete_credential(uuid.uuid4())
     assert session.commits == 1
-    # nichts zu löschen → NotFoundError
+    # nothing to delete gives NotFoundError
     session.execute_q.append(_Result([]))
     with pytest.raises(NotFoundError):
         await svc.delete_credential(uuid.uuid4())
 
 
-# --------------------------------------------------------------- staging
 @pytest.mark.asyncio
 async def test_stage_lines_idempotent_count(monkeypatch: pytest.MonkeyPatch) -> None:
     session = _Session()
@@ -327,8 +330,8 @@ async def test_stage_lines_idempotent_count(monkeypatch: pytest.MonkeyPatch) -> 
         statement.StatementLine(amount=Decimal("10.00"), counterparty_iban="DEXP", bank_ref="a"),
         statement.StatementLine(amount=Decimal("-5.00"), bank_ref="b"),
     ]
-    # _suggest: keine Kandidaten (execute → leer), keine Memory (scalar → None);
-    # dann pg_insert returning: erste neu (Zeile), zweite Dublette (leer).
+    # _suggest finds no candidates (execute is empty) and no memory (scalar is None).
+    # The pg_insert then returns a row for the first line and nothing for the duplicate.
     session.execute_q.extend([_Result([]), _Result([(uuid.uuid4(),)])])  # line1: candidates, insert
     session.scalar_q.append(None)
     session.execute_q.extend([_Result([]), _Result([])])  # line2: candidates, insert(dup)
@@ -337,7 +340,6 @@ async def test_stage_lines_idempotent_count(monkeypatch: pytest.MonkeyPatch) -> 
     assert (imported, dup) == (1, 1)
 
 
-# --------------------------------------------------------------- listing
 @pytest.mark.asyncio
 async def test_list_lines(monkeypatch: pytest.MonkeyPatch) -> None:
     session = _Session()
@@ -356,7 +358,7 @@ async def test_list_lines(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.mark.asyncio
 async def test_list_lines_paged_filters(monkeypatch: pytest.MonkeyPatch) -> None:
-    """kind/q/Datums-Filter + amount-Sort laufen durch (Filter-Zweige abgedeckt)."""
+    """The kind, q and date filters plus the amount sort cover the remaining branches."""
     session = _Session()
     svc = _service(session, monkeypatch)
     session.scalar_q.append(0)  # count
@@ -374,7 +376,7 @@ async def test_list_lines_paged_filters(monkeypatch: pytest.MonkeyPatch) -> None
 async def test_list_lines_paged_linked_and_income_filters(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """linked=True (gebucht) / linked=False (offen) / kind=income — restliche Filter-Zweige."""
+    """Cover the last filter branches: linked True (booked), linked False (open), kind income."""
     session = _Session()
     svc = _service(session, monkeypatch)
     for linked, kind in ((True, "income"), (False, None)):
@@ -387,7 +389,7 @@ async def test_list_lines_paged_linked_and_income_filters(
 
 @pytest.mark.asyncio
 async def test_list_lines_paged_excludes_ignored(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Alle view (state=None, include_ignored=False) hides set-aside lines."""
+    """The All view (state None, include_ignored False) hides set-aside lines."""
     session = _Session()
     svc = _service(session, monkeypatch)
     session.scalar_q.append(0)  # count
@@ -399,7 +401,10 @@ async def test_list_lines_paged_excludes_ignored(monkeypatch: pytest.MonkeyPatch
 
 @pytest.mark.asyncio
 async def test_get_line_includes_raw_payload(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Detail-Sicht liefert rawPayload + idempotencyKey (Diagnose: Quellformat/Batch)."""
+    """The detail view returns rawPayload and idempotencyKey.
+
+    Both fields help to diagnose the source format and the batch handling.
+    """
     session = _Session()
     svc = _service(session, monkeypatch)
     raw = {"batch": "true", "batch_total": "-500.00", "purpose": "DATEI-NR. 1"}
@@ -413,14 +418,13 @@ async def test_get_line_includes_raw_payload(monkeypatch: pytest.MonkeyPatch) ->
         await svc.get_line(uuid.uuid4())
 
 
-# --------------------------------------------------------------- ignore
 @pytest.mark.asyncio
 async def test_ignore_line(monkeypatch: pytest.MonkeyPatch) -> None:
     session = _Session()
     svc = _service(session, monkeypatch)
     line = _line()
     session.put(line)
-    session.execute_q.append(_Result([(line.id,)]))  # konditionaler Claim gewinnt
+    session.execute_q.append(_Result([(line.id,)]))  # the conditional claim wins
     await svc.ignore_line(line.id)
     assert session.commits == 1
 
@@ -434,7 +438,7 @@ async def test_ignore_line_not_found(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.mark.asyncio
 async def test_ignore_line_records_reason(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Optionaler Grund landet (getrimmt) in den Audit-Daten."""
+    """The optional reason reaches the audit data with the whitespace trimmed."""
     captured: list[dict[str, Any]] = []
 
     async def _capture(_session: Any, **kw: Any) -> None:
@@ -445,7 +449,7 @@ async def test_ignore_line_records_reason(monkeypatch: pytest.MonkeyPatch) -> No
     monkeypatch.setattr(service_base, "audit_record", _capture)
     line = _line()
     session.put(line)
-    session.execute_q.append(_Result([(line.id,)]))  # Claim gewinnt
+    session.execute_q.append(_Result([(line.id,)]))  # claim wins
     await svc.ignore_line(line.id, reason="  Doppelbuchung  ")
     assert session.commits == 1
     assert captured and captured[0]["data"] == {"reason": "Doppelbuchung"}
@@ -457,7 +461,7 @@ async def test_reactivate_line(monkeypatch: pytest.MonkeyPatch) -> None:
     svc = _service(session, monkeypatch)
     line = _line(match_state="ignored")
     session.put(line)
-    session.execute_q.append(_Result([(line.id,)]))  # Claim (ignored -> unmatched) gewinnt
+    session.execute_q.append(_Result([(line.id,)]))  # claim (ignored -> unmatched) wins
     out = await svc.reactivate_line(line.id)
     assert out.match_state == "unmatched"
     assert session.commits == 1
@@ -472,18 +476,17 @@ async def test_reactivate_line_not_found(monkeypatch: pytest.MonkeyPatch) -> Non
 
 @pytest.mark.asyncio
 async def test_reactivate_line_rejects_non_ignored(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Nur eine ignorierte Zeile ist reaktivierbar — sonst 422 (line_not_ignored)."""
+    """Only an ignored line reactivates. Any other state gives 422 (line_not_ignored)."""
     session = _Session()
     svc = _service(session, monkeypatch)
     line = _line(match_state="matched")
     session.put(line)
-    session.execute_q.append(_Result([]))  # Claim verfehlt (nicht ignored)
+    session.execute_q.append(_Result([]))  # claim misses because the line is not ignored
     with pytest.raises(ValidationProblem) as ei:
         await svc.reactivate_line(line.id)
     assert ei.value.code == "line_not_ignored"
 
 
-# --------------------------------------------------------------- confirm
 def _canned_expense(kind: str = "expense") -> ExpenseOut:
     return ExpenseOut(
         id=uuid.uuid4(),
@@ -508,21 +511,25 @@ async def test_confirm_line_new_booking(monkeypatch: pytest.MonkeyPatch) -> None
         self: Any, payload: Any, *, actor: str, commit: bool = True, account_id: Any = None
     ) -> ExpenseOut:
         assert payload.kind == "expense"
-        assert commit is False  # Bankabgleich bucht in gemeinsamer Transaktion
+        assert commit is False  # the bank matching books in the shared transaction
         return _canned_expense("expense")
 
     monkeypatch.setattr(BudgetTreeService, "book_expense", _book)
     session.execute_q.extend([_Result([(line.id,)]), _Result([])])  # claim wins, remember
     out = await svc.confirm_line(line.id, ConfirmLineRequest(budgetId=uuid.uuid4()))
     assert isinstance(out, ExpenseOut)
-    # Allocation hinzugefügt; counterparty-memory via execute (on_conflict).
+    # The service adds the allocation. The counterparty memory goes through execute
+    # with on_conflict.
     assert any(type(o).__name__ == "BankAllocation" for o in session.added)
 
 
 @pytest.mark.asyncio
 async def test_confirm_line_cleans_mashed_counterparty(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Vor dem Parser-Fix gestageter Umsatz (IBAN+Name in EINEM Feld, leeres IBAN-Feld) →
-    die Buchung bekommt sauberen Empfänger/Beschreibung/Notiz (#fints)."""
+    """A transaction staged before the parser fix holds the IBAN and the name in one field.
+
+    The IBAN field itself stays empty. The booking still gets a clean correspondent, a clean
+    description and a clean note (#fints).
+    """
     session = _Session()
     svc = _service(session, monkeypatch)
     line = _line(
@@ -542,10 +549,10 @@ async def test_confirm_line_cleans_mashed_counterparty(monkeypatch: pytest.Monke
     session.execute_q.extend([_Result([(line.id,)]), _Result([])])  # claim, remember
     await svc.confirm_line(line.id, ConfirmLineRequest(budgetId=uuid.uuid4()))
     payload = captured["payload"]
-    assert captured["account_id"] == line.account_id  # Konto des Umsatzes übernommen (Parameter)
-    assert payload.correspondent == "Quentin Walz"  # IBAN abgespalten
+    assert captured["account_id"] == line.account_id  # the account carries over
+    assert payload.correspondent == "Quentin Walz"  # the parser splits the IBAN off
     assert payload.description == "Erstattung – Quentin Walz"
-    # Notiz trägt Name + (gruppierte) IBAN, nicht den verschmolzenen Rohwert.
+    # The note carries the name and the grouped IBAN, not the merged raw value.
     assert "Empfänger: Quentin Walz" in (payload.note or "")
     assert "DE70 1203 0000 1076 8788 08" in (payload.note or "")
 
@@ -554,9 +561,11 @@ async def test_confirm_line_cleans_mashed_counterparty(monkeypatch: pytest.Monke
 async def test_confirm_line_derives_counterparty_from_raw(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Vor dem Parser-Fix gestagete Gehaltszeile (Name nur „KRZL", keine IBAN; echter Empfänger
-    in den SEPA-Rohfeldern ABWE+/IBAN+ im raw_payload) → Buchung bekommt sauberen Empfänger +
-    IBAN aus dem raw_payload (#fints)."""
+    """A salary line staged before the parser fix names only "KRZL" and holds no IBAN.
+
+    The real recipient sits in the SEPA raw fields ABWE+ and IBAN+ inside raw_payload. The
+    booking gets a clean correspondent and a clean IBAN from raw_payload (#fints).
+    """
     session = _Session()
     svc = _service(session, monkeypatch)
     line = _line(
@@ -582,8 +591,8 @@ async def test_confirm_line_derives_counterparty_from_raw(
     session.execute_q.extend([_Result([(line.id,)]), _Result([])])  # claim, remember
     await svc.confirm_line(line.id, ConfirmLineRequest(budgetId=uuid.uuid4()))
     payload = captured["payload"]
-    assert payload.correspondent == "Max Mustermann"  # aus ABWE+, nicht „KRZL"
-    assert "DE70 1203 0000 1076 8788 08" in (payload.note or "")  # IBAN aus IBAN+
+    assert payload.correspondent == "Max Mustermann"  # from ABWE+, not "KRZL"
+    assert "DE70 1203 0000 1076 8788 08" in (payload.note or "")  # IBAN from IBAN+
 
 
 @pytest.mark.asyncio
@@ -603,8 +612,8 @@ async def test_confirm_line_match_existing(monkeypatch: pytest.MonkeyPatch) -> N
     )
     expense.created_at = datetime(2024, 1, 1, tzinfo=UTC)
     session.put(expense)
-    session.scalar_q.append(None)  # noch nicht zugeordnet
-    session.execute_q.append(_Result([(line.id,)]))  # claim gewinnt
+    session.scalar_q.append(None)  # not linked yet
+    session.execute_q.append(_Result([(line.id,)]))  # claim wins
     out = await svc.confirm_line(line.id, ConfirmLineRequest(matchExpenseId=expense.id))
     assert out.id == expense.id
     assert any(type(o).__name__ == "BankAllocation" for o in session.added)
@@ -614,20 +623,17 @@ async def test_confirm_line_match_existing(monkeypatch: pytest.MonkeyPatch) -> N
 async def test_confirm_line_errors(monkeypatch: pytest.MonkeyPatch) -> None:
     session = _Session()
     svc = _service(session, monkeypatch)
-    # not found
     with pytest.raises(NotFoundError):
         await svc.confirm_line(uuid.uuid4(), ConfirmLineRequest(budgetId=uuid.uuid4()))
-    # already matched
     matched = _line(match_state="matched")
     session.put(matched)
     with pytest.raises(ValidationProblem):
         await svc.confirm_line(matched.id, ConfirmLineRequest(budgetId=uuid.uuid4()))
-    # match expense missing
     line = _line()
     session.put(line)
     with pytest.raises(NotFoundError):
         await svc.confirm_line(line.id, ConfirmLineRequest(matchExpenseId=uuid.uuid4()))
-    # kind mismatch (line expense, booking income)
+    # kind mismatch: the line is an expense, the booking is an income
     line2 = _line()
     session.put(line2)
     inc = BudgetExpense(
@@ -640,8 +646,9 @@ async def test_confirm_line_errors(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_default_description() -> None:
-    # Kurzform jetzt „<Zweck> – <Name>" (Gedankenstrich), Fallback Name bzw. Bankumsatz.
-    # Name/Zweck kommen bereits bereinigt (IBAN abgespalten) herein.
+    # The short form joins purpose and name with an en dash. It falls back to the name and
+    # then to a generic label. Name and purpose arrive already cleaned, with the IBAN
+    # split off.
     assert BankService._default_description("A", "B") == "B – A"
     assert BankService._default_description("A", None) == "A"
     assert BankService._default_description(None, None) == "Bankumsatz"
@@ -666,7 +673,6 @@ def test_booking_note_format() -> None:
     )
 
 
-# --------------------------------------------------------------- file import
 @pytest.mark.asyncio
 async def test_import_file_ok(monkeypatch: pytest.MonkeyPatch) -> None:
     session = _Session()
@@ -684,27 +690,30 @@ async def test_import_file_ok(monkeypatch: pytest.MonkeyPatch) -> None:
     session.scalar_q.append(None)
     res = await svc.import_file(acc.id, b"data", filename="x.sta")
     assert res.imported == 1
-    # Schlusssaldo aus der Datei landet am Konto (#fints-konten).
+    # The closing balance from the file reaches the account (#fints-konten).
     assert acc.fints_last_balance == Decimal("1234.56")
 
 
 def test_apply_balance() -> None:
     acc = _account()
-    BankService._apply_balance(acc, None)  # kein Saldo → unverändert
+    BankService._apply_balance(acc, None)  # no balance leaves the account unchanged
     assert acc.fints_last_balance is None
     BankService._apply_balance(
         acc, statement.StatementBalance(amount=Decimal("99.00"), as_of=date(2026, 6, 30))
     )
     assert acc.fints_last_balance == Decimal("99.00")
     assert acc.fints_balance_at is not None
-    # ohne Stichtag → now() (nur Nicht-None geprüft, Wert variabel)
+    # Without a cut-off date the code uses now(), so the test checks only for a value.
     BankService._apply_balance(acc, statement.StatementBalance(amount=Decimal("5.00")))
     assert acc.fints_last_balance == Decimal("5.00")
 
 
 def test_apply_balance_recency_guard() -> None:
-    """Recency-Guard (#review): ein ÄLTERER Datei-Saldo überschreibt einen neueren
-    bekannten Stand nicht; gleicher Stichtag aktualisiert weiterhin."""
+    """The recency guard (#review) protects the newer balance.
+
+    An older file balance does not overwrite a newer known state. A balance with the same
+    cut-off date still updates the account.
+    """
     acc = _account()
     BankService._apply_balance(
         acc, statement.StatementBalance(amount=Decimal("99.00"), as_of=date(2026, 6, 30))
@@ -712,9 +721,9 @@ def test_apply_balance_recency_guard() -> None:
     BankService._apply_balance(
         acc, statement.StatementBalance(amount=Decimal("11.00"), as_of=date(2026, 6, 1))
     )
-    assert acc.fints_last_balance == Decimal("99.00")  # älterer Import ignoriert
+    assert acc.fints_last_balance == Decimal("99.00")  # the older import stays ignored
     assert acc.fints_balance_at == datetime(2026, 6, 30, tzinfo=UTC)
-    # gleicher Stichtag → Update greift (Guard nur bei ECHT älterem Stand).
+    # The same cut-off date still updates. The guard blocks only a strictly older state.
     BankService._apply_balance(
         acc, statement.StatementBalance(amount=Decimal("77.00"), as_of=date(2026, 6, 30))
     )
@@ -723,7 +732,7 @@ def test_apply_balance_recency_guard() -> None:
 
 @pytest.mark.asyncio
 async def test_unlink_line(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Unlink löst die Allocation + setzt den Umsatz wieder offen; Buchung bleibt."""
+    """Unlink drops the allocation and reopens the transaction. The booking stays."""
     session = _Session()
     svc = _service(session, monkeypatch)
     line = _line()
@@ -767,7 +776,6 @@ async def test_import_file_unparseable(monkeypatch: pytest.MonkeyPatch) -> None:
         await svc.import_file(acc.id, b"data", filename="x.bin")
 
 
-# --------------------------------------------------------------- sync / tan
 @pytest.mark.asyncio
 async def test_sync_account_done(monkeypatch: pytest.MonkeyPatch) -> None:
     session = _Session()
@@ -792,7 +800,8 @@ async def test_sync_account_done(monkeypatch: pytest.MonkeyPatch) -> None:
     res = await svc.sync_account(acc.id)
     assert res.status == "done"
     assert res.imported == 1
-    # fints_state liegt verschlüsselt am **Credential** des Buchers (#fints-percred), round-trippt.
+    # The encrypted fints_state sits on the credential of the booker (#fints-percred).
+    # It round-trips through decrypt_secret.
     assert cred.fints_state is not None
     assert cred.fints_state != "state"
     assert decrypt_secret(cred.fints_state, key=_KEY) == "state"
@@ -801,7 +810,7 @@ async def test_sync_account_done(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.mark.asyncio
 async def test_sync_account_ambiguous_account(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Konto nicht eindeutig zuordenbar → 422 (fints_account_ambiguous), KEIN Lock."""
+    """An ambiguous account gives 422 (fints_account_ambiguous) and sets no lock."""
     session = _Session()
     svc = _service(session, monkeypatch)
     acc = _account()
@@ -817,7 +826,7 @@ async def test_sync_account_ambiguous_account(monkeypatch: pytest.MonkeyPatch) -
     with pytest.raises(ValidationProblem) as ei:
         await svc.sync_account(acc.id)
     assert ei.value.code == "fints_account_ambiguous"
-    assert cred.fints_locked_until is None  # nicht als Bank-Fehler gewertet
+    assert cred.fints_locked_until is None  # not counted as a bank error
 
 
 @pytest.mark.asyncio
@@ -846,8 +855,8 @@ async def test_sync_account_needs_tan(monkeypatch: pytest.MonkeyPatch) -> None:
     assert res.status == "needs_tan"
     assert res.session_token is not None
     assert res.challenge == "Bitte TAN"
-    assert res.challenge_image == "data:image/png;base64,QQ=="  # photoTAN/QR durchgereicht
-    # Sitzung wurde verschlüsselt gespeichert.
+    assert res.challenge_image == "data:image/png;base64,QQ=="  # photoTAN and QR pass through
+    # The service stored the session in encrypted form.
     assert any(type(o).__name__ == "BankSyncSession" for o in session.added)
 
 
@@ -863,15 +872,15 @@ async def test_claim_session_roundtrip_and_expiry(monkeypatch: pytest.MonkeyPatc
     )
     await svc._store_session(acc_id, out, token=token)
     payload = session.added[-1].payload_encrypted
-    # Claim löscht atomar (DELETE … RETURNING) und liefert (payload, expires_at).
+    # The claim deletes atomically (DELETE ... RETURNING) and returns payload and expires_at.
     future = datetime.now(UTC) + timedelta(seconds=60)
     session.execute_q.append(_Result([(payload, future)]))
     loaded = await svc._claim_session(token, acc_id)
     assert loaded.client_data == b"c"
     assert loaded.decoupled is True
-    # Konto-Scope überlebt die Sitzung: der TAN-Resume filtert das CAMT damit.
+    # The account scope survives the session. The TAN resume uses it to filter the CAMT data.
     assert loaded.account_scope == ("DE111", "97157")
-    # abgelaufen → ValidationProblem (kein 500)
+    # an expired session gives ValidationProblem, not 500
     past = datetime.now(UTC) - timedelta(seconds=1)
     session.execute_q.append(_Result([(payload, past)]))
     with pytest.raises(ValidationProblem):
@@ -897,21 +906,20 @@ async def test_submit_tan_done(monkeypatch: pytest.MonkeyPatch) -> None:
 
     def _submit(creds: Any, pending: Any, tan: str) -> fc.FintsOutcome:
         assert tan == "123456"
-        assert pending.client_data == b"c"  # aus dem geclaimten, entschlüsselten Blob
+        assert pending.client_data == b"c"  # from the claimed and decrypted blob
         return fc.FintsOutcome(status="done", new_state=b"s", lines=[])
 
     monkeypatch.setattr(fc, "submit_tan", _submit)
     res = await svc.submit_tan(acc.id, token, "123456")
     assert res.status == "done"
     assert res.imported == 0
-    # SCA-Zustand am Credential des Buchers aktualisiert.
+    # The service updated the SCA state on the credential of the booker.
     assert cred.fints_state is not None
 
 
-# ------------------------------------------------- review round 4 (#fints-review)
 @pytest.mark.asyncio
 async def test_confirm_line_account_mismatch(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Buchung gehört zu einem anderen Konto als der Umsatz → 422 (F4)."""
+    """A booking on another account than the transaction gives 422 (F4)."""
     session = _Session()
     svc = _service(session, monkeypatch)
     line = _line(amount=Decimal("-50.00"))
@@ -920,7 +928,7 @@ async def test_confirm_line_account_mismatch(monkeypatch: pytest.MonkeyPatch) ->
         id=uuid.uuid4(), budget_id=uuid.uuid4(), fiscal_year_id=uuid.uuid4(),
         kind="expense", amount=Decimal("50.00"), currency="EUR", description="x",
     )
-    exp.account_id = uuid.uuid4()  # ≠ line.account_id
+    exp.account_id = uuid.uuid4()  # differs from line.account_id
     session.put(exp)
     with pytest.raises(ValidationProblem):
         await svc.confirm_line(line.id, ConfirmLineRequest(matchExpenseId=exp.id))
@@ -928,7 +936,7 @@ async def test_confirm_line_account_mismatch(monkeypatch: pytest.MonkeyPatch) ->
 
 @pytest.mark.asyncio
 async def test_sync_account_revalidate_blocks(monkeypatch: pytest.MonkeyPatch) -> None:
-    """SSRF-Re-Validierung zur Abruf-Zeit lehnt ab → 422, kein Netz-Call (F1)."""
+    """The SSRF revalidation at fetch time refuses. It gives 422 and makes no network call (F1)."""
     session = _Session()
     svc = _service(session, monkeypatch)
     acc = _account()
@@ -947,14 +955,14 @@ async def test_sync_account_revalidate_blocks(monkeypatch: pytest.MonkeyPatch) -
 @pytest.mark.asyncio
 async def test_claim_session_not_found(monkeypatch: pytest.MonkeyPatch) -> None:
     svc = _service(_Session(), monkeypatch)
-    # DELETE … RETURNING liefert nichts → NotFoundError.
+    # DELETE ... RETURNING returns nothing, so the service raises NotFoundError.
     with pytest.raises(NotFoundError):
         await svc._claim_session(uuid.uuid4(), uuid.uuid4())
 
 
 @pytest.mark.asyncio
 async def test_claim_session_undecryptable(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Nicht entschlüsselbarer Blob (Key-Rotation) → 422, nicht 500 (Crypto #3)."""
+    """A blob that does not decrypt after a key rotation gives 422, not 500 (Crypto #3)."""
     session = _Session()
     svc = _service(session, monkeypatch)
     future = datetime.now(UTC) + timedelta(seconds=60)

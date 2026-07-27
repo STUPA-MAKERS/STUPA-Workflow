@@ -83,13 +83,10 @@ describe('SwUpdateService', () => {
     configure(true);
     svc.init();
 
-    // Initially, checkForUpdate should not be called (timeout not yet fired)
     expect(sw.checkForUpdate).not.toHaveBeenCalled();
 
-    // Advance time by 1 second (the setTimeout delay)
     jest.advanceTimersByTime(1000);
 
-    // Now checkForUpdate should have been called (after SW registration time)
     expect(sw.checkForUpdate).toHaveBeenCalled();
   });
 
@@ -97,17 +94,14 @@ describe('SwUpdateService', () => {
     configure(true);
     svc.init();
 
-    // Advance time to trigger the initial check
     jest.advanceTimersByTime(1000);
     expect(sw.checkForUpdate).toHaveBeenCalledTimes(1);
 
-    // Reset the mock to track future calls
     sw.checkForUpdate.mockClear();
 
-    // Advance by 5 minutes to trigger the periodic polling
+    // Five minutes is the polling interval.
     jest.advanceTimersByTime(5 * 60 * 1000);
 
-    // Now the periodic interval should have triggered checkForUpdate
     expect(sw.checkForUpdate).toHaveBeenCalled();
   });
 });

@@ -1,5 +1,8 @@
-"""Core auth types (leaf module, imports nothing from `app.deps`) — breaks the
-deps <-> auth import cycle. `app.deps` re-exports `Principal`/`Applicant`."""
+"""Core auth types.
+
+This is a leaf module. It imports nothing from `app.deps`, which breaks the import cycle
+between `app.deps` and this package. `app.deps` re-exports `Principal` and `Applicant`.
+"""
 
 from __future__ import annotations
 
@@ -11,7 +14,7 @@ ApplicantScope = Literal["edit", "view"]
 
 @dataclass(slots=True)
 class Principal:
-    """OIDC member/admin with resolved roles/permissions/groups (RBAC)."""
+    """An OIDC member or admin with resolved RBAC roles, permissions and groups."""
 
     sub: str
     email: str | None = None
@@ -19,18 +22,18 @@ class Principal:
     roles: list[str] = field(default_factory=list)
     permissions: set[str] = field(default_factory=set)
     groups: set[str] = field(default_factory=set)
-    # OAuth scope cap (MCP): `None` = unscoped (session/cookie, full range); a set
-    # = only these permissions are reachable — applies to admins too, so a scoped
-    # token cannot bypass the cap via the admin role.
+    # OAuth scope cap for MCP. `None` marks an unscoped session cookie with the full
+    # range. A set makes only these permissions reachable. The cap also applies to an
+    # admin, so a scoped token cannot bypass it through the admin role.
     scope_permissions: frozenset[str] | None = None
 
     def has(self, perm: str) -> bool:
-        # Scope cap first: a permission outside the token scope is unreachable
-        # regardless of role/admin bypass.
+        # Check the scope cap first. A permission outside the token scope stays
+        # unreachable, whatever the role or the admin bypass says.
         if self.scope_permissions is not None and perm not in self.scope_permissions:
             return False
-        # Admin always holds all (in-scope) rights, regardless of explicitly
-        # assigned permissions. Single RBAC chokepoint.
+        # An admin holds every in-scope right, whatever the explicitly assigned
+        # permissions are. This is the single RBAC chokepoint.
         return "admin" in self.roles or perm in self.permissions
 
     def in_group(self, group: str) -> bool:
@@ -45,5 +48,8 @@ class Applicant:
     scope: ApplicantScope
 
     def allows(self, required: ApplicantScope) -> bool:
-        """An `edit` token also covers `view`; a `view` token covers only `view`."""
+        """Check whether the scope of this token covers the required scope.
+
+        An `edit` token also covers `view`. A `view` token covers only `view`.
+        """
         return self.scope == "edit" or self.scope == required

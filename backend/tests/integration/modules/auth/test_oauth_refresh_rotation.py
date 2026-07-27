@@ -1,15 +1,15 @@
-"""Integration: Refresh-Token-Rotation ist atomar + erkennt Wiederverwendung.
+"""Integration: refresh-token rotation is atomic and detects reuse.
 
-Regression für AUD-020:
+Regression for AUD-020:
 
-1. NEBENLÄUFIGE Rotation: zwei Requests mit demselben Refresh-Token dürfen nicht
-   beide ein neues Paar erhalten. ``refresh_tokens`` rotiert atomar via
-   ``UPDATE ... WHERE id=? AND revoked_at IS NULL RETURNING id`` — der Verlierer
-   bekommt ``invalid_grant``, die Token-Familie spaltet sich NICHT auf.
+1. CONCURRENT rotation. Two requests with the same refresh token must not both get a
+   new pair. `refresh_tokens` rotates atomically with
+   `UPDATE ... WHERE id=? AND revoked_at IS NULL RETURNING id`. The loser gets
+   `invalid_grant` and the token family does NOT split.
 
-2. REUSE-DETECTION (RFC 6819 §5.2.2.3): wird ein bereits rotiertes (widerrufenes)
-   Refresh-Token erneut vorgelegt, wird die gesamte noch aktive Token-Familie des
-   Principals + Clients kaskadierend widerrufen, um Neu-Authentisierung zu erzwingen.
+2. REUSE DETECTION (RFC 6819 §5.2.2.3). A caller can present a rotated and therefore
+   revoked refresh token again. The server then revokes the whole active token family of
+   the principal and the client. This forces the client to authenticate again.
 """
 
 from __future__ import annotations
@@ -44,11 +44,13 @@ async def maker(
 async def _seed_principal_with_token(
     maker: async_sessionmaker[AsyncSession],
 ) -> tuple[uuid.UUID, str, str]:
-    """Lege einen aktiven Principal + eine frische Token-Familie an.
+    """Create an active principal and a fresh token family.
 
-    Der ``client_id`` ist pro Test eindeutig, damit die client-gescopten Prüfungen
-    anderer Test-Dateien nicht durch diese Zeilen verfälscht werden.
-    Gibt ``(principal_id, client_id, refresh_token)`` zurück.
+    The `client_id` is unique per test. This keeps the client-scoped checks of other
+    test files free of these rows.
+
+    Returns:
+        The principal id, the client id and the refresh token.
     """
     client_id = f"mcp-{uuid.uuid4()}"
     async with maker() as setup:
@@ -88,8 +90,8 @@ async def test_concurrent_refresh_only_one_wins(
 
     winners = 0
     losers = 0
-    # Zwei getrennte Sessions lesen beide die noch unwiderrufene Zeile, committen dann
-    # nacheinander. Ohne den atomaren Guard würden beide ein Paar minten (Familien-Fork).
+    # Both sessions read the row while it is not yet revoked. Without the atomic guard
+    # both would mint a pair and fork the token family.
     async with maker() as s1, maker() as s2:
         for s in (s1, s2):
             pre = (
@@ -120,7 +122,7 @@ async def test_concurrent_refresh_only_one_wins(
     assert winners == 1, "exactly one refresh may rotate the token family"
     assert losers == 1, "the second refresh must be rejected as invalid_grant"
 
-    # Genau EINE noch aktive Zeile (das frisch rotierte Paar) — kein Familien-Fork.
+    # Only one active row is left, the freshly rotated pair. The family did not fork.
     async with maker() as check:
         live = (
             await check.execute(
@@ -138,7 +140,7 @@ async def test_reuse_of_rotated_token_revokes_family(
 ) -> None:
     principal_id, client_id, refresh = await _seed_principal_with_token(maker)
 
-    # Legitime Rotation: altes Token → neues Paar.
+    # A legitimate rotation turns the old token into a new pair.
     async with maker() as s:
         issued = await oauth_service.refresh_tokens(
             s, **_kw(refresh, client_id, datetime.now(UTC))  # type: ignore[arg-type]
@@ -146,7 +148,7 @@ async def test_reuse_of_rotated_token_revokes_family(
         await s.commit()
         new_refresh = issued.refresh_token
 
-    # Replay des ALTEN (jetzt widerrufenen) Tokens → invalid_grant + Familien-Revoke.
+    # A replay of the old and now revoked token gives invalid_grant and revokes the family.
     async with maker() as s:
         with pytest.raises(oauth.OAuthError) as exc:
             await oauth_service.refresh_tokens(
@@ -155,7 +157,7 @@ async def test_reuse_of_rotated_token_revokes_family(
         assert exc.value.error == "invalid_grant"
         await s.commit()
 
-    # Das frische Token der Familie wurde kaskadierend mitwiderrufen → keine aktive Zeile mehr.
+    # The revoke cascades to the fresh token of the family, so no active row is left.
     async with maker() as check:
         live = (
             await check.execute(
@@ -167,7 +169,7 @@ async def test_reuse_of_rotated_token_revokes_family(
         ).scalars().all()
         assert live == []
 
-    # Folgerichtig schlägt auch eine Rotation mit dem zuvor frischen Token fehl.
+    # A rotation with the previously fresh token therefore fails as well.
     async with maker() as s:
         with pytest.raises(oauth.OAuthError):
             await oauth_service.refresh_tokens(

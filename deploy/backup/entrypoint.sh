@@ -1,29 +1,29 @@
 #!/usr/bin/env bash
-# Entrypoint des backup-Service: schreibt eine Crontab aus $BACKUP_CRON und startet
-# busybox-crond im Vordergrund. So läuft das Backup periodisch im eigenen Container
-# (deployment.md §4: "Cron im worker oder separater Backup-Job" -> separater Job).
+# Entrypoint of the backup service. It writes a crontab from $BACKUP_CRON and starts
+# busybox crond in the foreground. The backup then runs periodically in its own container.
+# See deployment.md §4: "cron in the worker or a separate backup job" -> separate job.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Mit Argumenten als einmaliger Lauf nutzen (One-Shot statt Cron-Daemon), z. B.:
+# With arguments the container makes a single run instead of a cron daemon. For example:
 #   docker compose --profile backup run --rm backup backup.sh
-#   docker compose --profile backup run --rm -e FORCE=1 backup restore.sh <artefakt>
-# backup.sh/restore.sh liegen via $PATH (/opt/backup) bereit.
+#   docker compose --profile backup run --rm -e FORCE=1 backup restore.sh <artifact>
+# $PATH holds backup.sh and restore.sh under /opt/backup.
 if [[ "$#" -gt 0 ]]; then
   exec "$@"
 fi
 
-CRON_SPEC="${BACKUP_CRON:-17 2 * * *}"   # Default: täglich 02:17
+CRON_SPEC="${BACKUP_CRON:-17 2 * * *}"   # default: daily at 02:17
 
-# Beim Start einmal validieren, dass die Pflicht-Variable da ist -> früher, klarer
-# Fehler statt erst um 02:17.
+# Check the mandatory variable at start. That gives an early and clear error instead of
+# a failure at 02:17.
 : "${BACKUP_AGE_RECIPIENT:?BACKUP_AGE_RECIPIENT (age-Public-Key) nicht gesetzt}"
 
-# Env in eine Datei sichern, die der cron-Job einliest (crond-Jobs erben die
-# Service-Umgebung nicht). `export -p` schreibt bash-Syntax (`declare -x …`) —
-# busybox-crond führt Jobs aber via ash aus, das `declare` NICHT kennt. Daher den
-# Job explizit unter bash starten, das die Datei sauber sourcen kann.
+# Save the environment to a file that the cron job reads. A crond job does not inherit
+# the environment of the service. `export -p` writes bash syntax (`declare -x …`), but
+# busybox crond runs jobs with ash, which does NOT know `declare`. The crontab therefore
+# starts the job under bash, which can source the file.
 export -p > /etc/backup.env
 
 crontab_file="/etc/crontabs/root"

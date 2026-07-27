@@ -1,11 +1,13 @@
-"""Permission ``application.force_status`` (#force-status).
+"""Permission `application.force_status` (#force-status).
 
-Global permission: force an application directly into any flow state, bypassing
-the flow guards/transitions. Seed to the ``admin`` role (Admin = alle Rechte);
-admins already hold it via the role-key bypass, the row is the house convention
-and makes the grant explicit for non-admin roles.
+This global permission forces an application directly into any flow state. It bypasses
+the flow guards and transitions.
 
-Idempotent (``ON CONFLICT DO NOTHING``).
+The migration seeds the permission to the `admin` role, which holds all permissions. An
+admin already gets the permission through the role-key bypass. The row follows the house
+convention and makes the grant explicit for non-admin roles.
+
+The insert is idempotent through `ON CONFLICT DO NOTHING`.
 """
 
 from __future__ import annotations

@@ -1,4 +1,4 @@
-"""Application ↔ cost-centre assignment and subtree application listing."""
+"""Application to cost-center assignment and subtree application listing."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ from app.shared.errors import NotFoundError, ValidationProblem
 
 
 class AssignmentOps(BudgetTreeServiceBase):
-    """Assign applications to cost centres / fiscal years and list them."""
+    """Assign applications to cost centers and fiscal years, and list them."""
 
     async def _get_application(self, application_id: UUID) -> Application:
         app = (
@@ -37,11 +37,12 @@ class AssignmentOps(BudgetTreeServiceBase):
     async def list_applications(
         self, budget_id: UUID, fiscal_year_id: UUID | None = None
     ) -> list[BudgetApplicationOut]:
-        """Applications of this cost centre **and its subtree**.
+        """List the applications of this cost center **and of its subtree**.
 
-        Subtree via the ``path_key`` prefix (node itself ``==`` or descendant
-        ``LIKE path||'-%'``). ``stage`` comes from the ``budget_entry`` (1:1 per
-        application), optionally filtered to a fiscal year. Newest first.
+        The subtree comes from the ``path_key`` prefix: the node itself (``==``)
+        or a descendant (``LIKE path||'-%'``). ``stage`` comes from the
+        ``budget_entry``, which is 1:1 per application. An optional fiscal year
+        filters the result. The newest application comes first.
         """
         node = await self._get_node(budget_id)
         subtree = select(Budget.id).where(
@@ -88,14 +89,19 @@ class AssignmentOps(BudgetTreeServiceBase):
     async def assign_budget(
         self, application_id: UUID, payload: AssignBudgetRequest
     ) -> AssignBudgetOut:
-        """Assign an application to a cost centre; fiscal year explicit or derived.
+        """Assign an application to a cost center.
 
-        ``budgetId=null`` clears the assignment (``fiscalYearId`` → null too).
+        ``budgetId=null`` clears the assignment. ``fiscalYearId`` then becomes
+        null as well.
 
-        With a cost centre set, ``_resolve_fiscal_year`` picks the fiscal year:
-        explicit via ``fiscalYearId`` (must belong to the top budget) or — if
-        open — the single active one; if ambiguous/missing it fails with 422
-        instead of silently leaving ``fiscal_year_id`` NULL (mirrors bookings).
+        With a cost center set, ``_resolve_fiscal_year`` picks the fiscal year.
+        An explicit ``fiscalYearId`` must belong to the top-level budget. Without
+        one, the method takes the single open active fiscal year.
+
+        Raises:
+            ValidationProblem: The fiscal year is ambiguous or missing. The
+                method fails with a 422 instead of leaving ``fiscal_year_id``
+                NULL. This mirrors the behavior of bookings.
         """
         app = await self._get_application(application_id)
         if payload.budget_id is None:
@@ -126,7 +132,12 @@ class AssignmentOps(BudgetTreeServiceBase):
     async def move_fiscal_year(
         self, application_id: UUID, payload: MoveFiscalYearRequest
     ) -> AssignBudgetOut:
-        """Move an application to another fiscal year of its top-level budget."""
+        """Move an application to another fiscal year of its top-level budget.
+
+        Raises:
+            ValidationProblem: The application has no budget assignment, or the
+                fiscal year belongs to another top-level budget.
+        """
         app = await self._get_application(application_id)
         if app.budget_id is None:
             raise ValidationProblem(

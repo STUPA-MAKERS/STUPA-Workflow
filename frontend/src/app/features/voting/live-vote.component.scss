@@ -24,7 +24,7 @@
   padding: var(--space-8) var(--space-4);
 }
 
-// --- Thumb operation: large, stacked touch targets --------------------------
+// Thumb operation: large, stacked touch targets.
 .live__option {
   width: 100%;
 }
@@ -35,7 +35,8 @@
   font-size: var(--fs-lg);
 }
 
-// --- Mobil (≤48rem): Beamer-Link als bequemes Touch-Ziel; rein additiv ------
+// Mobile view up to 48rem: the beamer link becomes a comfortable touch target.
+// This block only adds rules, it never removes any.
 @media (max-width: 48rem) {
   .live__beamer {
     display: inline-flex;

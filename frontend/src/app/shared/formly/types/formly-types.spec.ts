@@ -89,7 +89,7 @@ describe('Formly field types', () => {
       { key: 'total', type: 'display', props: { label: 'Summe', computed: true } },
     ]);
     expect(screen.getByText('Bitte beachten.')).toBeInTheDocument();
-    // computed without a value renders the em-dash placeholder.
+    // A computed field without a value renders the em-dash placeholder.
     expect(screen.getByText('—')).toBeInTheDocument();
   });
 
@@ -99,16 +99,15 @@ describe('Formly field types', () => {
       { key: 'costs', type: 'positions', props: { label: 'Kosten', minOffers: 2, minPositions: 1 } },
     ]);
     const form = host.form;
-    expect(form.invalid).toBe(true); // empty → invalid
+    expect(form.invalid).toBe(true);
 
     await userEvent.click(screen.getByRole('button', { name: /Position hinzufügen/ }));
-    // One position with minOffers (2) offers, the first preferred.
     const value = host.model['costs'] as { label: string; offers: unknown[] }[];
     expect(value).toHaveLength(1);
     expect(value[0].offers).toHaveLength(2);
 
-    // Single `input` events (a full re-render per keystroke would lose characters)
-    // and re-query after each event, since the re-render replaces prior elements.
+    // Use single `input` events. A full re-render per keystroke would lose characters.
+    // Re-query after each event because the re-render replaces the previous elements.
     fireEvent.input(screen.getByLabelText('Bezeichnung der Position'), { target: { value: 'Catering' } });
     fireEvent.input(screen.getAllByLabelText('Vergleichsangebot')[0], { target: { value: 'Anbieter A' } });
     fireEvent.input(screen.getAllByLabelText('Vergleichsangebot')[1], { target: { value: 'Anbieter B' } });

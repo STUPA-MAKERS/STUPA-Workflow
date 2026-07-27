@@ -1,8 +1,11 @@
-"""Meeting-cycle tools: votes (manage, never cast), meetings/agenda/attendance,
-protocol (minutes), delegations, and application attachments.
+"""Meeting-cycle tools for votes, meetings, protocols, delegations and attachments.
 
-Agents can create/open/close/cancel votes but there is intentionally no tool to cast
-a ballot — voting is human-only.
+The group manages a vote but never casts one. It also covers the agenda and the
+attendance of a meeting, the protocol (minutes), the delegations, and the application
+attachments.
+
+An agent can create, open, close and cancel a vote. There is deliberately no tool to
+cast a ballot. Voting is human-only.
 """
 
 from __future__ import annotations
@@ -18,10 +21,12 @@ from ._common import ToolGroup, api, params
 group = ToolGroup()
 
 
-# --- votes (manage, NOT cast)
 @group.tool
 async def get_vote(vote_id: str) -> dict:
-    """Fetch a vote's state + aggregated tally (secret votes expose counts only)."""
+    """Fetch the state and the aggregated tally of a vote.
+
+    A secret vote exposes the counts only.
+    """
     return await api().get(f"/votes/{vote_id}")
 
 
@@ -41,30 +46,35 @@ async def open_vote(vote_id: str) -> dict:
 
 @group.tool
 async def close_vote(vote_id: str) -> dict:
-    """Close a vote, tally it, fire the result branch. 409 while the quorum is
-    not met — collect more ballots or cancel_vote. Requires vote.manage.
-    (Agents manage votes but cannot cast ballots — that is human-only.)"""
+    """Close a vote, tally it, and fire the result branch.
+
+    The call gives a 409 while the quorum is not met. Collect more ballots or call
+    `cancel_vote`. An agent manages a vote but cannot cast a ballot. Casting is
+    human-only. Requires vote.manage.
+    """
     return await api().post(f"/votes/{vote_id}/close")
 
 
 @group.tool
 async def cancel_vote(vote_id: str) -> dict:
-    """Cancel an OPEN vote: status becomes cancelled, no result, no flow branch —
-    the application stays in its vote state. The way out when the quorum cannot
-    be reached (close is blocked then). Requires vote.manage."""
+    """Cancel an OPEN vote.
+
+    The status becomes `cancelled`. There is no result and no flow branch. The
+    application stays in its vote state. This is the way out when the quorum cannot be
+    reached, because `close_vote` is blocked then. Requires vote.manage.
+    """
     return await api().post(f"/votes/{vote_id}/cancel")
 
 
-# --- meetings
 @group.tool
 async def list_meetings() -> dict:
-    """List meetings."""
+    """List the meetings."""
     return await api().get("/meetings")
 
 
 @group.tool
 async def get_meeting(meeting_id: str) -> dict:
-    """Fetch one meeting (agenda, attendance, votes)."""
+    """Fetch one meeting with its agenda, its attendance and its votes."""
     return await api().get(f"/meetings/{meeting_id}")
 
 
@@ -76,8 +86,11 @@ async def create_meeting(meeting: S.MeetingCreate) -> dict:
 
 @group.tool
 async def update_meeting(meeting_id: str, patch: S.MeetingPatch) -> dict:
-    """Patch a meeting (status planned|live|closed, date, startTime, protokollantId,
-    activeApplicationId). Requires meeting.manage."""
+    """Patch a meeting.
+
+    The fields are `status` (planned, live or closed), `date`, `startTime`,
+    `protokollantId` and `activeApplicationId`. Requires meeting.manage.
+    """
     return await api().patch(f"/meetings/{meeting_id}", json=dump_patch(patch))
 
 
@@ -89,7 +102,7 @@ async def delete_meeting(meeting_id: str) -> dict:
 
 @group.tool
 async def get_attendance(meeting_id: str) -> dict:
-    """Attendance list of a meeting (present/excused/absent per member)."""
+    """Get the attendance list of a meeting: present, excused or absent per member."""
     return await api().get(f"/meetings/{meeting_id}/attendance")
 
 
@@ -99,7 +112,7 @@ async def set_attendance(
     principal_id: str,
     status: Literal["present", "excused", "absent"],
 ) -> dict:
-    """Set a member's attendance for a meeting. Requires meeting.manage."""
+    """Set the attendance of a member for a meeting. Requires meeting.manage."""
     return await api().put(
         f"/meetings/{meeting_id}/attendance/{principal_id}", json={"status": status}
     )
@@ -111,8 +124,11 @@ async def add_agenda_item(
     application_id: str | None = None,
     title: str | None = None,
 ) -> dict:
-    """Add an agenda item (TOP): EXACTLY ONE of application_id (application TOP) or
-    title (free-text TOP). Requires meeting.manage."""
+    """Add an agenda item to a meeting.
+
+    Give EXACTLY ONE of `application_id` for an application item or `title` for a
+    free-text item. Requires meeting.manage.
+    """
     return await api().post(
         f"/meetings/{meeting_id}/agenda",
         json=params(applicationId=application_id, title=title),
@@ -126,8 +142,11 @@ async def update_agenda_item(
     body: str | None = None,
     title: str | None = None,
 ) -> dict:
-    """Update an agenda item: `body` sets the markdown text; `title` renames a
-    free-text TOP (application TOPs inherit their title). Requires meeting.manage."""
+    """Update an agenda item.
+
+    The `body` sets the markdown text. The `title` renames a free-text item. An
+    application item inherits its title. Requires meeting.manage.
+    """
     return await api().patch(
         f"/meetings/{meeting_id}/agenda/{item_id}",
         json=params(body=body, title=title),
@@ -142,7 +161,7 @@ async def delete_agenda_item(meeting_id: str, item_id: str) -> dict:
 
 @group.tool
 async def reorder_agenda(meeting_id: str, item_ids: list[str]) -> dict:
-    """Reorder the agenda: item_ids in the desired order. Requires meeting.manage."""
+    """Reorder the agenda. Give `item_ids` in the desired order. Requires meeting.manage."""
     return await api().put(
         f"/meetings/{meeting_id}/agenda/order", json={"itemIds": item_ids}
     )
@@ -150,14 +169,17 @@ async def reorder_agenda(meeting_id: str, item_ids: list[str]) -> dict:
 
 @group.tool
 async def list_assignable_agenda_items(meeting_id: str) -> dict:
-    """Applications available to be added as agenda items for this meeting."""
+    """List the applications that you can add as agenda items to this meeting."""
     return await api().get(f"/meetings/{meeting_id}/agenda/assignable")
 
 
 @group.tool
 async def create_meeting_vote(meeting_id: str, vote: S.MeetingVoteOpenBody) -> dict:
-    """Open a live vote within a meeting on an agenda item (generic TOP or
-    application-bound). Requires vote.manage."""
+    """Open a live vote on an agenda item of a meeting.
+
+    The agenda item can be a free-text item or an application item.
+    Requires vote.manage.
+    """
     return await api().post(f"/meetings/{meeting_id}/votes", json=dump_create(vote))
 
 
@@ -167,25 +189,32 @@ async def delete_meeting_vote(meeting_id: str, vote_id: str) -> dict:
     return await api().delete(f"/meetings/{meeting_id}/votes/{vote_id}")
 
 
-# --- protocol (minutes)
 @group.tool
 async def get_or_create_protocol(meeting_id: str) -> dict:
-    """Create OR load the meeting's protocol (idempotent, 1:1 per meeting).
-    Requires meeting.manage."""
+    """Create OR load the protocol of a meeting.
+
+    The call is idempotent. A meeting holds exactly one protocol.
+    Requires meeting.manage.
+    """
     return await api().post(f"/meetings/{meeting_id}/protocol")
 
 
 @group.tool
 async def update_protocol(protocol_id: str, markdown: str) -> dict:
-    """Update the protocol's markdown body. 409 while it is final or rendering.
-    Requires meeting.manage."""
+    """Update the markdown body of a protocol.
+
+    The call gives a 409 while the protocol is final or rendering.
+    Requires meeting.manage.
+    """
     return await api().patch(f"/protocols/{protocol_id}", json={"markdown": markdown})
 
 
 @group.tool
 async def embed_protocol_votes(protocol_id: str, vote_ids: list[str]) -> dict:
-    """Append closed votes as markdown snippets to the protocol (idempotent per vote).
-    Requires meeting.manage."""
+    """Append closed votes to the protocol as markdown snippets.
+
+    The call is idempotent per vote. Requires meeting.manage.
+    """
     return await api().post(
         f"/protocols/{protocol_id}/votes", json={"voteIds": vote_ids}
     )
@@ -193,24 +222,28 @@ async def embed_protocol_votes(protocol_id: str, vote_ids: list[str]) -> dict:
 
 @group.tool
 async def finalize_protocol(protocol_id: str) -> dict:
-    """Finalize the protocol: ASYNC — returns `status: "rendering"` while a worker
-    renders the PDF and mails it to the committee. Re-fetch via
-    `get_or_create_protocol(meeting_id)` until `status` is `final`; a fall back to
-    `draft` means the render failed (fix content, finalize again). Idempotent.
-    Requires meeting.manage."""
+    """Finalize the protocol.
+
+    The call is ASYNC. It returns `status: "rendering"` while a worker renders the PDF
+    and mails it to the Gremium. Re-fetch with `get_or_create_protocol(meeting_id)`
+    until `status` is `final`. A fall back to `draft` means the render failed. Fix the
+    content and finalize again. The call is idempotent. Requires meeting.manage.
+    """
     return await api().post(f"/protocols/{protocol_id}/finalize")
 
 
-# --- delegations
 @group.tool
 async def list_delegations() -> dict:
-    """List meeting delegations (who delegates attendance/voting to whom)."""
+    """List the meeting delegations: who delegates attendance and voting to whom."""
     return await api().get("/delegations")
 
 
 @group.tool
 async def create_delegation(delegation: S.DelegationCreate) -> dict:
-    """Delegate attendance (and optionally voting) for a meeting to another member."""
+    """Delegate attendance for a meeting to another member.
+
+    The delegation can also transfer the vote.
+    """
     return await api().post("/delegations", json=dump_create(delegation))
 
 
@@ -222,13 +255,13 @@ async def revoke_delegation(delegation_id: str) -> dict:
 
 @group.tool
 async def list_substitutes() -> dict:
-    """List the substitute pool (standing stand-ins per committee)."""
+    """List the substitute pool of standing stand-ins per Gremium."""
     return await api().get("/delegations/substitutes")
 
 
 @group.tool
 async def create_substitute(substitute: S.SubstituteCreate) -> dict:
-    """Add a stand-in to a committee's substitute pool."""
+    """Add a stand-in to the substitute pool of a Gremium."""
     return await api().post("/delegations/substitutes", json=dump_create(substitute))
 
 
@@ -238,11 +271,13 @@ async def delete_substitute(substitute_id: str) -> dict:
     return await api().delete(f"/delegations/substitutes/{substitute_id}")
 
 
-# --- attachments (metadata only)
 @group.tool
 async def list_attachments(application_id: str) -> dict:
-    """List an application's file attachments (metadata only — up/download is
-    UI/REST territory)."""
+    """List the file attachments of an application.
+
+    The call returns the metadata only. Upload and download stay with the UI and the
+    REST API.
+    """
     return await api().get(f"/applications/{application_id}/attachments")
 
 

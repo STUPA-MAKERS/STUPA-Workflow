@@ -15,20 +15,22 @@ export function skipLoading(): HttpContext {
 }
 
 /**
- * Feeds the global loading overlay via the {@link LoadingService}.
+ * Feeds the global loading overlay through the {@link LoadingService}.
  *
- * The overlay should only appear when data is being loaded — so only GET
- * requests count, and only while they are not opted out via {@link SKIP_LOADING}:
+ * The overlay must appear only while the app loads data. Only GET requests
+ * count. A request that opts out with {@link SKIP_LOADING} never counts.
  *
- * - Mutations (POST/PUT/PATCH/DELETE) never trigger the overlay — they have
- *   local feedback (button `loading`, optimistic updates) and should not flash
- *   the view (autosave, vote, reorder, finalize …).
- * - Background GETs (status polls, refresh after a mutation/WS event, debounced
- *   typeahead) and loads that already show a local spinner set `SKIP_LOADING`
- *   and skip the overlay — so two spinners never stack.
+ * - Mutations (POST/PUT/PATCH/DELETE) never trigger the overlay.
+ *   They have local feedback (button `loading`, optimistic updates).
+ *   They also must not flash the view (autosave, vote, reorder, finalize …).
+ * - Background GETs skip the overlay with `SKIP_LOADING`.
+ *   Examples: status polls, a refresh after a mutation or a WS event, and a
+ *   debounced typeahead.
+ *   A load that already shows a local spinner also sets `SKIP_LOADING`.
+ *   Two spinners then never stack.
  *
- * Registered as the outermost interceptor so the full request duration (incl.
- * auth/mock) is captured.
+ * Register this as the outermost interceptor. It then measures the full request
+ * duration, including the auth and mock layers.
  */
 export const loadingInterceptor: HttpInterceptorFn = (req, next) => {
   if (req.method !== 'GET' || req.context.get(SKIP_LOADING)) {

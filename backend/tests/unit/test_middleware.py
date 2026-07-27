@@ -1,4 +1,4 @@
-"""TDD: Security-Header + Trace-Id-Middleware (security.md §10, §3)."""
+"""Tests for the security-header and trace-id middleware (security.md §10, §3)."""
 
 from fastapi.testclient import TestClient
 
@@ -10,7 +10,7 @@ def test_security_headers_present(client: TestClient) -> None:
     assert h["referrer-policy"] == "no-referrer"
     assert h["x-frame-options"] == "DENY"
     assert "permissions-policy" in h
-    # Strikte CSP für die JSON-API (security.md §10): kein aktiver Inhalt, kein Framing.
+    # Strict CSP for the JSON API (security.md §10): no active content and no framing.
     assert "default-src 'none'" in h["content-security-policy"]
     assert "frame-ancestors 'none'" in h["content-security-policy"]
 

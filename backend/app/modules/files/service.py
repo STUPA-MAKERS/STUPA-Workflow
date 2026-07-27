@@ -1,17 +1,22 @@
-"""Files service: upload, quarantine, signed URLs, scan completion.
+"""Files service: upload, quarantine, download URLs and scan completion.
 
-Flow:
+The flow has three steps.
 
-1. :meth:`upload` — size/MIME check (sniff != extension → 415, > 10 MB → 413), object
-   into MinIO (``scanned=false``), create row, enqueue scan job. No synchronous scan.
-2. Worker scans, calls :meth:`finalize_scan` — ``scanned=true`` + result; on a finding
-   delete object + audit (quarantine).
-3. :meth:`signed_url` — only after a clean scan returns the app-relative, authz-gated
-   ``/download`` route (no signature, no expiry); otherwise 409 (still scanning) /
-   410 (removed). No direct bucket access.
+``upload`` checks the size and the MIME type. A sniff that does not match the extension
+gives 415. More than 10 MB gives 413. The method puts the object into MinIO with
+``scanned=false``, creates the row and enqueues the scan job. It never scans
+synchronously.
 
-The service only enqueues; without the queue (no Redis) the file stays quarantined (no
-block). Without storage, upload is impossible → 503.
+``finalize_scan`` runs after the worker scanned the object. It sets ``scanned=true`` and
+the result. On a finding it deletes the object and writes an audit entry (quarantine).
+
+``signed_url`` returns the app-relative ``/download`` route that the authorization layer
+gates. It does so only after a clean scan. The route carries no signature and does not
+expire. While the scan runs the method answers 409. After a removal it answers 410. There
+is no direct bucket access.
+
+The service only enqueues the scan. Without the queue (no Redis) the file stays
+quarantined and nothing blocks. Without storage an upload is impossible and gives 503.
 """
 
 from __future__ import annotations
@@ -48,7 +53,7 @@ SCAN_RESULT_CLEAN = "clean"
 
 
 def _is_infected(attachment: Attachment) -> bool:
-    """Whether a finished scan found something (!= clean)."""
+    """Tell whether a finished scan found something other than clean."""
     return attachment.scanned and attachment.scan_result not in (None, SCAN_RESULT_CLEAN)
 
 
@@ -72,7 +77,6 @@ class FilesService:
     def max_bytes(self) -> int:
         return min(self.settings.attachment_max_bytes, MAX_ATTACHMENT_BYTES)
 
-    # --- upload ---
     async def upload(
         self,
         application_id: uuid.UUID,
@@ -95,10 +99,10 @@ class FilesService:
         if app is None:
             raise NotFoundError(f"application {application_id} not found")
 
-        # Deliberately no edit lock (unlike the PATCH path): attachments may be added
-        # even in locked states (submitted/approved) — e.g. invoices/receipts after the
-        # decision. Form data stays protected by the PATCH lock; access is still guarded
-        # by the router's RBAC/applicant check.
+        # There is no edit lock here, unlike on the PATCH path. A caller may add an
+        # attachment even in a locked state such as submitted or approved, for example an
+        # invoice or a receipt after the decision. The PATCH lock still protects the form
+        # data. The RBAC and applicant check in the router still guards access.
 
         try:
             mime = validate_upload(filename, data)
@@ -133,7 +137,10 @@ class FilesService:
         return _attachment_out(attachment)
 
     async def _enqueue_scan(self, attachment_id: uuid.UUID, *, actor: str) -> None:
-        """Best-effort enqueue of the scan job; without a queue the file stays quarantined."""
+        """Enqueue the scan job as best effort.
+
+        Without a queue the file stays quarantined.
+        """
         if self.queue is None:
             logger.warning(
                 "scan queue unavailable — attachment %s stays quarantined", attachment_id
@@ -144,12 +151,22 @@ class FilesService:
     async def _assert_app_visible(
         self, application_id: uuid.UUID, *, allow_unconfirmed: bool
     ) -> None:
-        """Mirror the application's visibility: an unconfirmed guest submission
-        (``email_confirmed_at IS NULL``) stays invisible to principals/gremium, exactly
-        as ``list_applications``/``list_tasks`` hide it. Item routes without an owning
-        magic-link applicant pass ``allow_unconfirmed=False`` and get 404 not 403 (no
-        existence oracle), mirroring the app detail/timeline/version/comment gates. The
-        owning applicant reads with the default (``allow_unconfirmed=True``)."""
+        """Mirror the visibility of the application.
+
+        An unconfirmed guest submission has ``email_confirmed_at IS NULL``. It stays
+        invisible to a principal or a member of the Gremium, exactly as
+        ``list_applications`` and ``list_tasks`` hide it.
+
+        An item route without an owning magic-link applicant passes
+        ``allow_unconfirmed=False``. It then gets 404 instead of 403, so the API is no
+        existence oracle. This mirrors the application detail, timeline, version and
+        comment gates. The owning applicant reads with the default
+        ``allow_unconfirmed=True``.
+
+        Raises:
+            NotFoundError: The application is an unconfirmed guest submission and
+                ``allow_unconfirmed`` is false.
+        """
         if allow_unconfirmed:
             return
         confirmed = await self.session.scalar(
@@ -163,10 +180,14 @@ class FilesService:
     async def list_for_application(
         self, application_id: uuid.UUID, *, allow_unconfirmed: bool = True
     ) -> list[AttachmentOut]:
-        """All attachments of an application (for the panel after reload). Oldest first.
+        """Return all attachments of an application, oldest first.
 
-        ``allow_unconfirmed=False`` (principal/gremium read) hides the attachments of an
-        unconfirmed guest submission (404), mirroring the list semantics."""
+        The frontend uses this for the panel after a reload.
+
+        A read by a principal or a member of the Gremium passes
+        ``allow_unconfirmed=False``. The method then hides the attachments of an
+        unconfirmed guest submission with a 404. This mirrors the list semantics.
+        """
         await self._assert_app_visible(
             application_id, allow_unconfirmed=allow_unconfirmed
         )
@@ -179,7 +200,6 @@ class FilesService:
         ).all()
         return [_attachment_out(a) for a in rows]
 
-    # --- downloads ---
     async def get_attachment(self, attachment_id: uuid.UUID) -> Attachment:
         attachment = await self.session.get(Attachment, attachment_id)
         if attachment is None:
@@ -187,15 +207,22 @@ class FilesService:
         return attachment
 
     async def _ready_attachment(self, attachment_id: uuid.UUID) -> Attachment:
-        """Load attachment + download gates: 410 (removed/finding), 409 (scanning), 503
-        (no storage). Shared by the URL and the stream route."""
+        """Load the attachment and apply the download gates.
+
+        The URL route and the stream route share this method.
+
+        Raises:
+            GoneError: The scan found something, or the object is gone (HTTP 410).
+            ConflictError: The scan is not finished yet (HTTP 409).
+            ServiceUnavailableError: Object storage is off (HTTP 503).
+        """
         attachment = await self.get_attachment(attachment_id)
         if _is_infected(attachment) or attachment.storage_key is None:
             raise GoneError("Attachment removed (failed virus scan).")
-        # FAIL-CLOSED — MUST NOT be inverted: while the ClamAV scan is not finished
-        # (``scanned=False``) the download is refused (409). An unscanned object is NEVER
-        # served; loosening/inverting this condition would let unscanned content be
-        # downloaded.
+        # FAIL CLOSED. Do NOT invert this condition. The method refuses the download
+        # with 409 while ``scanned`` is false and the ClamAV scan is not finished. The
+        # API NEVER serves an unscanned object. A weaker or inverted condition would let
+        # a caller download unscanned content.
         if not attachment.scanned:
             raise ConflictError("Attachment is still being scanned.")
         if self.storage is None:
@@ -205,17 +232,21 @@ class FilesService:
     async def signed_url(
         self, attachment_id: uuid.UUID, *, allow_unconfirmed: bool = True
     ) -> SignedUrlOut:
-        """App-relative download URL — only after a clean scan (else 409/410/503).
+        """Return the app-relative download URL after a clean scan.
 
-        No presigned MinIO URL: MinIO is on the internal Docker network without port
-        publish; an S3v4-signed URL binds the (internal) host into the signature → not
-        reachable from the browser. Instead the ``/download`` endpoint streams the bytes
-        server-side via nginx ``/api/``.
+        Any other state gives 409, 410 or 503.
 
-        ``allow_unconfirmed=False`` (principal/gremium read) → 404 for an unconfirmed
-        guest submission, mirroring the list semantics. The visibility gate runs BEFORE
-        the quarantine gates so a hidden application does not shine through as existent
-        via 409/410/503 (no existence oracle)."""
+        The route is no presigned MinIO URL. MinIO runs on the internal Docker network
+        and publishes no port. An S3v4 signature binds the internal host, so the browser
+        cannot reach such a URL. The ``/download`` endpoint streams the bytes from the
+        server through nginx under ``/api/`` instead.
+
+        A read by a principal or a member of the Gremium passes
+        ``allow_unconfirmed=False``. An unconfirmed guest submission then gives 404,
+        which mirrors the list semantics. The visibility gate runs BEFORE the quarantine
+        gates. A hidden application must not shine through as existing over 409, 410
+        or 503.
+        """
         attachment = await self.get_attachment(attachment_id)
         await self._assert_app_visible(
             attachment.application_id, allow_unconfirmed=allow_unconfirmed
@@ -229,20 +260,26 @@ class FilesService:
     async def download_bytes(
         self, attachment_id: uuid.UUID, *, allow_unconfirmed: bool = True
     ) -> tuple[bytes, str, str]:
-        """Fetch attachment bytes server-side from storage (for the ``/download`` stream).
+        """Fetch the attachment bytes from storage for the ``/download`` stream.
 
-        Same quarantine gates as :meth:`signed_url` (409/410/503); transient storage
-        error → 503. Returns ``(bytes, filename, mime)`` for the stream response.
+        The method applies the same quarantine gates as ``signed_url`` (409, 410, 503). A
+        transient storage error also gives 503. The visibility gate runs BEFORE the
+        quarantine gates, so 409, 410 and 503 are no existence oracle.
 
-        ``allow_unconfirmed=False`` (principal/gremium read) → 404 for an unconfirmed
-        guest submission, mirroring the list semantics; visibility gate BEFORE the
-        quarantine gates (no existence oracle via 409/410/503)."""
+        A read by a principal or a member of the Gremium passes
+        ``allow_unconfirmed=False``. An unconfirmed guest submission then gives 404,
+        which mirrors the list semantics.
+
+        Returns:
+            The bytes, the filename and the MIME type for the stream response.
+        """
         loaded = await self.get_attachment(attachment_id)
         await self._assert_app_visible(
             loaded.application_id, allow_unconfirmed=allow_unconfirmed
         )
         attachment = await self._ready_attachment(attachment_id)
-        # Both guaranteed by _ready_attachment (else 410/503) — for the type checker.
+        # _ready_attachment guarantees both values, else it raises 410 or 503. The
+        # two asserts only help the type checker.
         assert attachment.storage_key is not None
         assert self.storage is not None
         try:
@@ -254,19 +291,27 @@ class FilesService:
     async def download_stream(
         self, attachment_id: uuid.UUID, *, allow_unconfirmed: bool = True
     ) -> tuple[AsyncIterator[bytes], str, str, int]:
-        """Like :meth:`download_bytes`, but returns a chunk iterator instead of loading
-        the bytes fully into memory. The quarantine gates (409/410/503) and the
-        visibility gate run unchanged BEFORE the stream starts; the storage connection is
-        opened eagerly, so a transient error is still surfaced as 503 (before the
-        response header).
+        """Return a chunk iterator instead of the full bytes of ``download_bytes``.
 
-        Returns ``(iterator, filename, mime, size)`` — ``size`` for ``Content-Length``."""
+        The quarantine gates (409, 410, 503) and the visibility gate run unchanged BEFORE
+        the stream starts. The method opens the storage connection eagerly, so a
+        transient error still surfaces as 503 before the response header goes out.
+
+        A read by a principal or a member of the Gremium passes
+        ``allow_unconfirmed=False``. An unconfirmed guest submission then gives 404,
+        which mirrors the list semantics.
+
+        Returns:
+            The iterator, the filename, the MIME type and the size. The caller puts the
+            size into ``Content-Length``.
+        """
         loaded = await self.get_attachment(attachment_id)
         await self._assert_app_visible(
             loaded.application_id, allow_unconfirmed=allow_unconfirmed
         )
         attachment = await self._ready_attachment(attachment_id)
-        # Both guaranteed by _ready_attachment (else 410/503) — for the type checker.
+        # _ready_attachment guarantees both values, else it raises 410 or 503. The
+        # two asserts only help the type checker.
         assert attachment.storage_key is not None
         assert self.storage is not None
         try:
@@ -276,10 +321,12 @@ class FilesService:
         return stream, attachment.filename, attachment.mime, attachment.size
 
     async def delete(self, attachment_id: uuid.UUID, *, actor: str) -> None:
-        """Delete an attachment: remove DB row + storage object (+ audit). 404 if missing.
+        """Delete an attachment: the database row, the storage object and an audit entry.
 
-        Access is checked by the router (A/P, edit scope); the storage object is removed
-        best-effort (if already gone, the deletion still stands)."""
+        A missing attachment gives 404. The router checks access (A/P, edit scope). The
+        method removes the storage object as best effort. If the object is already gone,
+        the deletion still stands.
+        """
         attachment = await self.get_attachment(attachment_id)
         application_id = attachment.application_id
         storage_key = attachment.storage_key
@@ -302,10 +349,15 @@ class FilesService:
     async def delete_for_application(
         self, application_id: uuid.UUID, *, actor: str
     ) -> int:
-        """Remove all attachments of an application (DSGVO anonymization).
+        """Remove all attachments of an application for DSGVO anonymization.
 
-        DB row + storage object per attachment (best-effort) + audit. Does not commit —
-        the calling anonymization routine commits the transaction atomically."""
+        For each attachment the method deletes the database row, removes the storage
+        object as best effort and writes an audit entry. It does not commit. The calling
+        anonymization routine commits the transaction atomically.
+
+        Returns:
+            The number of removed attachments.
+        """
         rows = (
             await self.session.scalars(
                 select(Attachment).where(Attachment.application_id == application_id)
@@ -332,7 +384,6 @@ class FilesService:
             )
         return len(rows)
 
-    # --- scan result ---
     async def finalize_scan(
         self,
         attachment_id: uuid.UUID,
@@ -340,7 +391,11 @@ class FilesService:
         *,
         actor: str = "system",
     ) -> None:
-        """Persist the scan result. Finding → delete object + audit (quarantine)."""
+        """Persist the scan result.
+
+        On a finding the method deletes the object and writes an audit entry
+        (quarantine).
+        """
         attachment = await self.session.get(Attachment, attachment_id)
         if attachment is None:
             logger.info("scan result for unknown attachment %s — skipped", attachment_id)
@@ -360,7 +415,8 @@ class FilesService:
             try:
                 await self.storage.remove(storage_key)
             except StorageError:
-                # Object may already be gone; quarantine (storage_key=None) still stands.
+                # The object may already be gone. The quarantine still stands, because
+                # storage_key is NULL now.
                 logger.warning("could not remove infected object for %s", attachment_id)
         await audit_record(
             self.session,

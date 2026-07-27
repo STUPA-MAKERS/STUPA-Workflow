@@ -90,13 +90,12 @@ describe('DelegationsComponent (#delegation-rework)', () => {
     expect(cmp.loading()).toBe(false);
     expect(cmp.loadError()).toBe(false);
     expect(cmp.delegations()).toHaveLength(2);
-    // names rendered (delegator → delegate).
     expect(screen.getByText('Sitzung A')).toBeInTheDocument();
   });
 
   it('falls back to ids when title/names are missing', async () => {
     await setup();
-    // second row has null meetingTitle → meetingId shown instead.
+    // The second row has no meetingTitle, so the component shows the meetingId.
     expect(screen.getByText('m-2')).toBeInTheDocument();
   });
 
@@ -114,7 +113,6 @@ describe('DelegationsComponent (#delegation-rework)', () => {
     expect(cmp.rowId(DELEGATIONS[0])).toBe('d-1');
   });
 
-  // ------------------------------------------------------------------ revoke
   it('askRevoke arms the confirm dialog', async () => {
     const { cmp } = await setup();
     cmp.askRevoke(DELEGATIONS[0]);
@@ -130,8 +128,8 @@ describe('DelegationsComponent (#delegation-rework)', () => {
   it('does nothing on revoke while busy', async () => {
     const { cmp, api } = await setup();
     cmp.confirmRevoke.set(DELEGATIONS[0]);
-    // simulate an in-flight revoke by leaving busy=true via a never-completing call;
-    // here we just directly assert the guard by setting busy first.
+    // A revoke that is still in flight keeps busy at true. Set the flag directly to
+    // reach the guard without a pending call.
     (cmp as unknown as { busy: { set: (v: boolean) => void } }).busy.set(true);
     cmp.revoke();
     expect(api.revoke).not.toHaveBeenCalled();
@@ -145,7 +143,6 @@ describe('DelegationsComponent (#delegation-rework)', () => {
     expect(api.revoke).toHaveBeenCalledWith('d-1');
     expect(cmp.busy()).toBe(false);
     expect(cmp.confirmRevoke()).toBeNull();
-    // d-1 filtered out, d-2 remains.
     expect(cmp.delegations().map((d) => d.id)).toEqual(['d-2']);
     expect(toast.success).toHaveBeenCalled();
   });
@@ -157,7 +154,6 @@ describe('DelegationsComponent (#delegation-rework)', () => {
     cmp.revoke();
     expect(toast.error).toHaveBeenCalled();
     expect(cmp.busy()).toBe(false);
-    // list unchanged on failure.
     expect(cmp.delegations()).toHaveLength(2);
   });
 });

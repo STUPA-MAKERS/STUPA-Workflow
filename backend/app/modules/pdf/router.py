@@ -1,14 +1,14 @@
 """pdf API router.
 
-* ``POST /api/applications/{id}/pdf`` — applicant/principal; creates a render job and
-  enqueues it (the worker renders) → 202 + ``JobOut`` (``status=pending``). Storage in
-  MinIO happens async.
-* ``GET  /api/jobs/{id}``           — applicant/principal; job status + (when ``done``)
-  a signed result URL. Access via a principal or the applicant of the related
-  application.
+* ``POST /api/applications/{id}/pdf`` — applicant or principal. Creates a render job
+  and enqueues it for the worker, then answers 202 with ``JobOut``
+  (``status=pending``). The storage in MinIO happens async.
+* ``GET  /api/jobs/{id}``           — applicant or principal. Returns the job status
+  and, when the job is ``done``, a signed result URL. Access goes through a principal
+  or through the applicant of the related application.
 
 Errors are declared as ``ProblemDetail`` (problem+json). Without Redis the job stays
-``pending`` (no API block); without MinIO ``GET`` returns no ``resultUrl``.
+``pending`` and the API does not block. Without MinIO ``GET`` returns no ``resultUrl``.
 """
 
 from __future__ import annotations
@@ -66,11 +66,14 @@ async def create_application_pdf(
     session: DbSession,
     _access: Annotated[Access, Depends(require_app_read)],
 ) -> JobOut:
-    """Trigger an application PDF. 202 + job (``pending``); the worker renders async."""
+    """Trigger an application PDF.
+
+    Answers 202 with the job in state ``pending``. The worker renders async.
+    """
     job = await service.create_application_job(application_id)
     await session.commit()
-    # Enqueue after commit so the worker is guaranteed to see the job row. Without Redis
-    # the job stays pending (no block); a later trigger/requeue picks it up.
+    # Enqueue after the commit so the worker always sees the job row. Without Redis the
+    # job stays pending and nothing blocks. A later trigger or requeue picks it up.
     pool = getattr(request.app.state, "arq_pool", None)
     queue = render_queue_from_pool(pool)
     if queue is not None:
@@ -91,13 +94,17 @@ async def get_job(
     principal: Annotated[Principal | None, Depends(get_current_principal)],
     applicant: Annotated[Applicant | None, Depends(get_current_applicant)],
 ) -> JobOut:
-    """Job status. Access via a principal or the applicant of the related application."""
+    """Return the job status.
+
+    A principal or the applicant of the related application may read the job.
+    """
     # Fail-closed before the DB access: no identity → 401 (no existence oracle).
     if principal is None and applicant is None:
         raise UnauthorizedError("Authentication required.")
     job = await service.get_job(job_id)
-    # Check applicant/principal access against the job's application. Cross-tenant →
-    # deliberately 404 not 403 (no existence oracle, like files). view scope suffices.
+    # Check applicant and principal access against the application of the job. A
+    # cross-tenant read returns 404 on purpose, not 403, so there is no existence
+    # oracle. The files module does the same. The view scope is enough.
     if job.application_id is not None:
         try:
             resolve_access(

@@ -1,4 +1,4 @@
-"""Tests der Aufgaben-Erinnerungen (#task-reminder) — Worker + Admin-API ohne DB."""
+"""Task reminders (#task-reminder): the worker and the admin API without a DB."""
 
 from __future__ import annotations
 
@@ -81,18 +81,18 @@ async def test_stale_application_gets_reminder() -> None:
     entered = NOW - timedelta(days=6)
     session = FakeSession(
         executes=[
-            [(app_id, state.id, entered)],  # due-Kandidaten
-            [({"title": "Beamer"},)],  # _remind_one: Antrag
+            [(app_id, state.id, entered)],  # due candidates
+            [({"title": "Beamer"},)],  # _remind_one: the application
         ],
         scalars=[
-            [state],  # States
-            [],  # bestehende Logs
-            [],  # Präferenz-Filter (#4-2, keine Abwahlen)
-            [],  # Template-Lookup (kein DB-Override)
+            [state],  # states
+            [],  # existing logs
+            [],  # preference filter (#4-2, no opt-outs)
+            [],  # template lookup (no DB override)
         ],
         scalar=[
-            1,  # _state_actionable: manuelle Übergänge
-            event_id,  # letztes status_event
+            1,  # _state_actionable: manual transitions
+            event_id,  # the last status_event
         ],
     )
     session.add(_config(after_days=5))
@@ -125,7 +125,7 @@ async def test_once_mode_skips_already_reminded_stay() -> None:
         scalars=[[state], [log]],
         scalar=[1, event_id],
     )
-    session.add(_config(repeat_days=0))  # Einmal-Modus
+    session.add(_config(repeat_days=0))  # once mode
     queue = FakeQueue()
     assert await process_task_reminders(_ctx(session, queue), now=NOW) == 0
     assert queue.messages == []
@@ -147,12 +147,12 @@ async def test_repeat_mode_reminds_again_after_interval() -> None:
         scalars=[[state], [log], [], []],
         scalar=[1, event_id],
     )
-    session.store[app_id] = log  # session.get(TaskReminderLog, app_id)
+    session.store[app_id] = log  # `session.get` must find this log
     session.add(_config(repeat_days=7))
     queue = FakeQueue()
 
     assert await process_task_reminders(_ctx(session, queue), now=NOW) == 1
-    assert log.reminded_at == NOW  # Log fortgeschrieben, keine zweite Zeile
+    assert log.reminded_at == NOW  # the worker updates the log and adds no second row
 
 
 async def test_vote_state_counts_as_actionable() -> None:
@@ -163,7 +163,7 @@ async def test_vote_state_counts_as_actionable() -> None:
             [(app_id, state.id, NOW - timedelta(days=6))],
             [({},)],
         ],
-        # vote-State → kein Transition-Count-scalar nötig
+        # A vote state needs no transition-count scalar.
         scalars=[[state], [], [], []],
         scalar=[event_id],
     )
@@ -172,7 +172,7 @@ async def test_vote_state_counts_as_actionable() -> None:
     assert await process_task_reminders(_ctx(session, queue), now=NOW) == 1
 
 
-# --------------------------------------------------------------- Admin-API (#6)
+# Admin API (#6)
 class _FakeService:
     def __init__(self) -> None:
         self.updated: dict[str, Any] | None = None

@@ -1,7 +1,7 @@
-"""Test-Fakes für den Audit-Service (Unit-Suite ohne DB).
+"""Test fakes for the audit service, for the unit suite that runs without a database.
 
-``execute`` liefert vorab gefüllte Ergebnisse in Reihenfolge; ``FakeResult`` deckt die
-vom Service genutzten Zugriffe ab (``scalar_one``/``scalar_one_or_none``/``scalars``).
+`execute` returns the prepared results in order. `FakeResult` covers the accessors that
+the service uses: `scalar_one`, `scalar_one_or_none` and `scalars`.
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ class FakeResult:
 
 
 class FakeAsyncScalars:
-    """Async-iterierbarer ``stream_scalars``-Ersatz."""
+    """Async-iterable replacement for `stream_scalars`."""
 
     def __init__(self, items: Iterable[Any]) -> None:
         self._items = list(items)

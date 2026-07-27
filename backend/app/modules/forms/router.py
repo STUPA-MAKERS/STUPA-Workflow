@@ -2,13 +2,14 @@
 
 Endpoints:
 
-* ``GET  /api/application-types/{type_id}/form`` — public; effective form definition
-  (+ budget-pot extra fields when ``budget_pot_id`` is chosen).
-* ``POST /api/admin/application-types/{type_id}/form-versions`` — permission
-  ``form.configure``; new form version (definition validated).
+* ``GET  /api/application-types/{type_id}/form`` — public. It returns the effective form
+  definition, plus the budget-pot extra fields when the caller sends ``budget_pot_id``.
+* ``POST /api/admin/application-types/{type_id}/form-versions`` — needs the
+  ``form.configure`` permission. It creates a new form version and validates the
+  definition.
 
-Error responses are declared as ``ProblemDetail`` so the OpenAPI contract is
-status/content/schema-conformant.
+Every error response declares ``ProblemDetail``, so the OpenAPI contract matches the
+status, the content type and the schema.
 """
 
 from __future__ import annotations
@@ -35,7 +36,10 @@ _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 
 
 def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
-    """Error status → ``ProblemDetail`` (a hook sets content to problem+json)."""
+    """Map each error status to ``ProblemDetail``.
+
+    A response hook sets the content type to problem+json.
+    """
     return {code: _PROBLEM for code in codes}
 
 
@@ -56,7 +60,7 @@ async def get_effective_form(
     service: ServiceDep,
     budget_pot_id: Annotated[UUID | None, Query(alias="budgetPotId")] = None,
 ) -> EffectiveFormOut:
-    """Effective form definition for submission (public)."""
+    """Return the effective form definition for a submission (public endpoint)."""
     return await service.get_effective_form(type_id, budget_pot_id)
 
 
@@ -70,7 +74,7 @@ async def get_form_draft(
     type_id: UUID,
     service: ServiceDep,
 ) -> FormDraftOut:
-    """Load a type's most recent form version for editing."""
+    """Load the most recent form version of an application type for editing."""
     return await service.get_form_draft(type_id)
 
 
@@ -78,7 +82,7 @@ async def get_form_draft(
     "/admin/application-types/{type_id}/form-versions",
     response_model=FormVersionOut,
     status_code=201,
-    # 400 = malformed JSON body (parse error), 422 = schema/definition validation.
+    # 400 = malformed JSON body (parse error). 422 = schema or definition validation.
     responses=_errors(400, 401, 403, 404, 422),
 )
 async def create_form_version(
@@ -87,7 +91,10 @@ async def create_form_version(
     service: ServiceDep,
     principal: Annotated[Principal, Depends(require_principal("form.configure"))],
 ) -> FormVersionOut:
-    """Create a new form version (definition validated server-side)."""
+    """Create a new form version.
+
+    The server validates the definition.
+    """
     return await service.create_form_version(type_id, payload, principal.sub)
 
 
@@ -102,6 +109,9 @@ async def set_form_active(
     payload: FormActiveSet,
     service: ServiceDep,
 ) -> FormDraftOut:
-    """Activate/deactivate a type's form. ``active=false`` locks the type for new
-    applications; ``true`` reactivates the latest version."""
+    """Activate or deactivate the form of an application type.
+
+    ``active=false`` locks the type for new applications. ``active=true`` reactivates the
+    latest version.
+    """
     return await service.set_form_active(type_id, payload.active)

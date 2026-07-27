@@ -1,11 +1,14 @@
-"""Site-config/branding service.
+"""Site-config and branding service.
 
-Versioned like form/flow: edits go to the draft (a new inactive version or
-in-place on the existing draft — never on the active version); activation flips
-``active`` (at most one active, partial unique) and writes a
-``config_activation`` audit entry. Branding is validated against
-``admin.branding.Branding`` (image-only logos, no inline SVG); invalid branding
-fails with 422.
+The service versions the config like form and flow. An edit goes to the draft,
+either as a new inactive version or in place on the existing draft. An edit
+never touches the active version.
+
+Activation flips ``active`` and writes a ``config_activation`` audit entry. A
+partial unique index allows at most one active version.
+
+``admin.branding.Branding`` validates the branding. A logo must be an image and
+inline SVG is not allowed. Invalid branding fails with 422.
 """
 
 from __future__ import annotations
@@ -25,13 +28,13 @@ from app.modules.config_revision.service import (
 )
 from app.shared.errors import ConflictError
 
-# Default app names (fallback when the config leaves them empty) — the values
-# of the previously static ``frontend/public/manifest.webmanifest``.
+# Fallback app names for the case where the config leaves them empty. The
+# values come from the previously static ``frontend/public/manifest.webmanifest``.
 DEFAULT_APP_NAME = "STUPA Antragsplattform"
 DEFAULT_APP_SHORT_NAME = "StuPa"
 
-# Static manifest fields (everything except name/short_name) — single source of
-# truth for the dynamically served PWA manifest.
+# The static manifest fields, that is everything except name and short_name.
+# They are the single source of truth for the PWA manifest that the API serves.
 _MANIFEST_BASE: dict = {
     "description": (
         "Antragsplattform des Studierendenparlaments — Anträge, Abstimmungen, "
@@ -145,11 +148,11 @@ class SiteConfigService:
         latest = await self._latest()
         payload = branding.model_dump(by_alias=True)
         if latest is not None and not latest.active:
-            # Update the existing draft in place (no new version bump).
+            # The latest version is an open draft. Update it in place.
             latest.branding = payload
             target_id = latest.id
         else:
-            # Create a new draft version above the active one (inactive).
+            # No open draft exists. Add an inactive draft above the active version.
             base = latest.version if latest is not None else 0
             row = SiteConfigVersion(
                 version=base + 1, active=False, branding=payload, created_by=actor
@@ -177,7 +180,6 @@ class SiteConfigService:
             .values(active=False)
         )
         latest.active = True
-        # Versioned snapshot of the now-active branding config plus linked audit entry.
         await ConfigRevisionService(self.session).record(
             entity_type=ENTITY_SITE_CONFIG,
             entity_id=GLOBAL_ID,
@@ -197,11 +199,11 @@ class SiteConfigService:
         action: AuditAction = AuditAction.CONFIG_CHANGE,
         extra_data: dict | None = None,
     ) -> SiteConfigOut:
-        """Replay a branding config as the new active version (restore/revert).
+        """Replay a branding config as the new active version (restore or revert).
 
-        Creates a new active ``SiteConfigVersion`` from the snapshot (deactivates
-        the rest) and writes a ``config_revision``/audit entry. Earlier versions
-        are kept.
+        The method creates a new active ``SiteConfigVersion`` from the snapshot
+        and deactivates the rest. It writes a ``config_revision`` entry plus the
+        linked audit entry. Earlier versions stay.
         """
         latest = await self._latest()
         base = latest.version if latest is not None else 0
@@ -237,8 +239,9 @@ class SiteConfigService:
     async def manifest(self) -> dict:
         """Build the PWA manifest from the active branding config.
 
-        ``name``/``short_name`` come from the config (defaults when empty); all
-        other fields are static."""
+        ``name`` and ``short_name`` come from the config. An empty value falls
+        back to the default. All other fields are static.
+        """
         branding = _branding(await self._active())
         return {
             "name": branding.app_name.strip() or DEFAULT_APP_NAME,

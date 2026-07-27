@@ -130,10 +130,14 @@ class RbacOps(ConfigServiceBase):
         )
 
     async def delete_role(self, role_id: UUID, actor: str) -> None:
-        """Delete a role; ``admin``/``member`` are protected.
+        """Delete a role.
 
-        Assignments and permissions cascade (FK ``ON DELETE CASCADE``).
-        Unknown id → 404.
+        The roles ``admin`` and ``member`` are protected. Assignments and
+        permissions cascade through the FK ``ON DELETE CASCADE``.
+
+        Raises:
+            NotFoundError: No role has this id (404).
+            ConflictError: The role is protected.
         """
         role = await self.session.get(Role, role_id)
         if role is None:
@@ -176,10 +180,10 @@ class RbacOps(ConfigServiceBase):
         row = await self.session.get(RoleAssignmentRow, assignment_id)
         if row is None:
             raise NotFoundError(f"role assignment {assignment_id} not found")
-        # Prevent self-lockout: ANY mutation of one's own admin assignment is
-        # forbidden — e.g. expiring it via a past valid_until. Global role
-        # permissions are deliberately not gremium-scoped, so the guard applies
-        # uniformly to all fields.
+        # Self-lockout guard: a caller must not change their own admin assignment
+        # in any way. One example is an expiry through a past valid_until. Global
+        # role permissions are not gremium-scoped on purpose, so the guard covers
+        # every field.
         await self._guard_self_admin_removal(row, actor)
         if payload.role_id is not None:
             if await self.session.get(Role, payload.role_id) is None:
@@ -202,9 +206,8 @@ class RbacOps(ConfigServiceBase):
         row = await self.session.get(RoleAssignmentRow, assignment_id)
         if row is None:
             raise NotFoundError(f"role assignment {assignment_id} not found")
-        # Prevent self-lockout: never remove one's own admin role.
         await self._guard_self_admin_removal(row, actor)
-        # The global base role member is irrevocable: every user always keeps it.
+        # The member role is irrevocable at global scope. Every user keeps it.
         role = await self.session.get(Role, row.role_id)
         if role is not None and role.key == "member" and row.gremium_id is None:
             raise ConflictError("the member role cannot be removed")
@@ -215,10 +218,13 @@ class RbacOps(ConfigServiceBase):
     async def _guard_self_admin_removal(
         self, row: RoleAssignmentRow, actor: str
     ) -> None:
-        """Prevent admins from removing their own admin role.
+        """Prevent an admin from removing their own admin role.
 
-        ``actor`` is the OIDC ``sub``; an admin assignment of the caller's own
-        principal must not be deleted or rewritten (self-lockout).
+        The caller must not delete or rewrite an admin assignment of their own
+        principal (self-lockout). ``actor`` is the OIDC ``sub`` of the caller.
+
+        Raises:
+            ConflictError: The assignment holds the admin role of the caller.
         """
         role = await self.session.get(Role, row.role_id)
         if role is None or role.key != "admin":
@@ -230,17 +236,21 @@ class RbacOps(ConfigServiceBase):
     async def search_principals(
         self, query: str | None, limit: int = 50
     ) -> list[PrincipalOut]:
-        """Search principals (users) by OIDC ``sub``/name/e-mail.
+        """Search principals (users) by OIDC ``sub``, name or e-mail.
 
-        Without ``query`` the first ``limit`` principals are returned; with
-        ``query`` a case-insensitive substring match (the CITEXT e-mail is ci
-        anyway). Includes each principal's role assignments (one follow-up
-        query, no N+1).
+        ``query`` matches as a case-insensitive substring. The e-mail column is
+        CITEXT and therefore case-insensitive anyway. Without ``query`` the
+        search returns the first ``limit`` principals.
+
+        Returns:
+            The principals with their role assignments. One follow-up query
+            loads the assignments, so there is no N+1.
         """
         stmt = select(Principal)
         if query:
-            # Escape LIKE metacharacters in user input — otherwise %/_ act as
-            # wildcards (wildcard injection / index bypass).
+            # Escape the LIKE metacharacters in user input. Without the escape,
+            # % and _ act as wildcards and allow wildcard injection or an index
+            # bypass.
             like = f"%{escape_like(query)}%"
             stmt = stmt.where(
                 or_(
@@ -268,10 +278,14 @@ class RbacOps(ConfigServiceBase):
     async def set_principal_active(
         self, principal_id: UUID, active: bool, actor: str
     ) -> PrincipalOut:
-        """Activate/deactivate a user; 404 for unknown ids.
+        """Activate or deactivate a user.
 
-        Self-lockout guard: the caller (OIDC ``sub``) cannot deactivate their
-        own account.
+        ``actor`` is the OIDC ``sub`` of the caller.
+
+        Raises:
+            NotFoundError: No principal has this id (404).
+            ConflictError: The caller tries to deactivate their own account.
+                This is the self-lockout guard.
         """
         principal = await self.session.get(Principal, principal_id)
         if principal is None:
@@ -291,7 +305,7 @@ class RbacOps(ConfigServiceBase):
         return _principal_out(principal, list(assignments))
 
     def list_permissions(self) -> list[str]:
-        """Catalogue of selectable permission keys for the roles/permissions UI."""
+        """Return the catalog of permission keys for the roles and permissions UI."""
         return list(PERMISSION_CATALOGUE)
 
     async def list_group_mappings(self) -> list[GroupMappingOut]:

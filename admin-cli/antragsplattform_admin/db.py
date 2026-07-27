@@ -1,13 +1,14 @@
-"""Database access — two interchangeable backends behind one tiny interface.
+"""Database access: two interchangeable backends behind one small interface.
 
-All call sites write SQL with ``%s`` positional placeholders and pass a params tuple:
-- :class:`DirectDb` (psycopg) feeds them straight to the driver (real bind params).
-- :class:`DockerDb` renders them into a literal-quoted SQL string and runs it via
-  ``docker compose exec -T <service> psql`` (``--csv`` for reads). Quoting doubles single quotes;
-  Postgres ``standard_conforming_strings`` is ON by default (PG16) → no backslash escaping needed.
+Every call site writes SQL with `%s` positional placeholders and passes a params tuple.
+`DirectDb` (psycopg) binds them as real driver parameters. `DockerDb` renders them into a
+literal-quoted SQL string and runs it through `docker compose exec -T <service> psql`. It
+adds `--csv` for reads. The quoting doubles every single quote. Postgres sets
+`standard_conforming_strings` to ON by default on PG16, so no backslash escape is needed.
 
-``query`` returns ``list[dict[str, str|None]]`` (values are strings in docker mode; the UI treats
-everything as text). ``execute`` returns the affected row count (best-effort in docker mode).
+`query` returns `list[dict[str, str|None]]`. In docker mode every value is a string, and
+the UI treats everything as text. `execute` returns the affected row count. In docker mode
+that count is a best-effort value.
 """
 
 from __future__ import annotations
@@ -33,7 +34,6 @@ class Db(Protocol):
     def label(self) -> str: ...
 
 
-# --------------------------------------------------------------------------- literal rendering
 def sql_literal(value: Any) -> str:
     """Render a Python value as a safe Postgres SQL literal (standard_conforming_strings=on)."""
     if value is None:
@@ -46,7 +46,14 @@ def sql_literal(value: Any) -> str:
 
 
 def render(sql: str, params: tuple[Any, ...]) -> str:
-    """Substitute ``%s`` placeholders positionally with quoted literals (docker/psql backend)."""
+    """Substitute `%s` placeholders positionally with quoted literals.
+
+    The docker/psql backend uses this. The direct psycopg backend binds real parameters
+    instead.
+
+    Raises:
+        DbError: The placeholder count does not match the params count.
+    """
     parts = sql.split("%s")
     if len(parts) - 1 != len(params):
         raise DbError(f"placeholder/param mismatch: {len(parts) - 1} vs {len(params)}")
@@ -57,7 +64,6 @@ def render(sql: str, params: tuple[Any, ...]) -> str:
     return "".join(out)
 
 
-# --------------------------------------------------------------------------- direct (psycopg)
 class DirectDb:
     def __init__(self, dsn: str, *, connect_timeout: int = 5, label: str = "direct") -> None:
         self._label = label
@@ -87,7 +93,7 @@ class DirectDb:
             with self._conn.cursor() as cur:
                 cur.execute(sql, params)
                 return list(cur.fetchall())
-        except Exception as exc:  # psycopg errors → the DbError contract callers rely on
+        except Exception as exc:  # A psycopg error becomes the DbError that callers expect.
             raise DbError(str(exc).strip() or type(exc).__name__) from exc
 
     def execute(self, sql: str, params: tuple[Any, ...] = ()) -> int:
@@ -95,7 +101,7 @@ class DirectDb:
             with self._conn.cursor() as cur:
                 cur.execute(sql, params)
                 return cur.rowcount
-        except Exception as exc:  # psycopg errors → the DbError contract callers rely on
+        except Exception as exc:  # A psycopg error becomes the DbError that callers expect.
             raise DbError(str(exc).strip() or type(exc).__name__) from exc
 
     def close(self) -> None:
@@ -105,7 +111,6 @@ class DirectDb:
             pass
 
 
-# ----------------------------------------------------------------------- docker exec / psql
 _TAG_RE = re.compile(r"\b(?:INSERT \d+|UPDATE|DELETE|SELECT)\s+(\d+)\b")
 
 
@@ -155,7 +160,7 @@ class DockerDb:
     def query(self, sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
         out = self._psql(render(sql, params), csv_out=True)
         reader = csv.DictReader(io.StringIO(out))
-        # psql --csv emits empty strings for NULL; normalise to None.
+        # psql --csv emits an empty string for NULL. Map it back to None.
         return [{k: (v if v != "" else None) for k, v in row.items()} for row in reader]
 
     def execute(self, sql: str, params: tuple[Any, ...] = ()) -> int:
@@ -174,10 +179,13 @@ class DockerDb:
 def connect_auto(config: Config) -> tuple[Db | None, list[str]]:
     """Try the resolved direct DSN first, then the docker-exec fallback.
 
-    Returns the connected backend (or ``None`` when both fail) plus the log
-    lines describing what happened. Each candidate is probed with a real query
-    so a half-working path (port forwarded but stack down, docker present but
-    stack stopped) is caught here rather than on the first command.
+    The function probes each candidate with a real query. A half-working path therefore
+    fails here and not on the first command. Two such paths: the port is forwarded but
+    the stack is down, or docker runs but the stack is stopped.
+
+    Returns:
+        The connected backend, or `None` when both candidates fail, plus the log lines
+        that describe what happened.
     """
     notes = list(config.notes)
     if config.database_url:

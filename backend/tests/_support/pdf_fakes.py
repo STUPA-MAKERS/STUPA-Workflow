@@ -1,9 +1,9 @@
-"""Test-Fakes für pdf-Unit-Tests (kein echtes pytex/MinIO/Redis/DB).
+"""Test fakes for the PDF unit tests. They use no real pytex, MinIO, Redis or database.
 
-``FakePdfSession`` bedient die vom ``PdfService``/``RenderPipeline`` genutzten
-DB-Methoden (``get``/``scalar``/``add``/``flush``/``commit``) über einen In-Memory-Store;
-``FakeSessionmaker`` reicht sie als async-Context-Manager. ``FakePytex`` liefert feste
-Ergebnisse bzw. wirft konfigurierte Fehler; ``FakeRenderQueue`` sammelt enqueued Job-Ids.
+`FakePdfSession` serves the database methods that `PdfService` and `RenderPipeline` call
+(`get`, `scalar`, `add`, `flush`, `commit`) from an in-memory store. `FakeSessionmaker`
+hands that session out as an async context manager. `FakePytex` returns fixed results or
+raises a configured error. `FakeRenderQueue` collects the enqueued job ids.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from typing import Any
 
 
 class FakePdfSession:
-    """In-Memory-Session: ``get`` aus dem Store, ``scalar`` aus einer Queue."""
+    """In-memory session. `get` reads the store and `scalar` pops a queue."""
 
     def __init__(
         self,
@@ -47,7 +47,7 @@ class FakePdfSession:
 
 
 class FakeSessionmaker:
-    """Callable → async-Context-Manager, der immer dieselbe Session liefert."""
+    """Callable async context manager that always returns the same session."""
 
     def __init__(self, session: FakePdfSession) -> None:
         self.session = session
@@ -63,15 +63,15 @@ class FakeSessionmaker:
 
 
 class FakePytex:
-    """pytex-Client-Fake: liefert feste PDF-Bytes oder wirft einen vorgegebenen Fehler."""
+    """Fake pytex client. It returns fixed PDF bytes or raises a given error."""
 
     def __init__(self, *, pdf: bytes = b"%PDF-1.4 fake", error: Exception | None = None) -> None:
         self.pdf = pdf
         self.error = error
         self.calls: list[tuple[str, str | None]] = []
-        # Pro Aufruf mitgeschriebener ``trust_level``-Override; ``None`` = Default
-        # (= ``trusted`` im Client). Der Protokoll-Pfad nutzt den Default (RCE-Schutz
-        # liegt im Sanitizer, nicht im Trust-Level).
+        # The `trust_level` override recorded for each call. `None` means the client
+        # falls back to `trusted`. The protocol path keeps that fallback. The RCE
+        # protection lives in the sanitizer, not in the trust level.
         self.trust_levels: list[str | None] = []
 
     async def render_pdf(
@@ -89,7 +89,7 @@ class FakePytex:
 
 
 class FakeRenderQueue:
-    """Sammelt enqueued Job-Ids."""
+    """Collects the enqueued job ids."""
 
     def __init__(self) -> None:
         self.enqueued: list[uuid.UUID] = []

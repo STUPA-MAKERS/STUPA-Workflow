@@ -23,13 +23,13 @@ import { AdminApiService } from '../admin-api.service';
 import type { ConfigRevision, ConfigRevisionDiff } from '../admin.models';
 
 /**
- * Version sidebar: lists the immutable config snapshots of an entity
- * (forms/flow/branding), shows the field diff per snapshot and allows
- * **restoring** an earlier state (forward restore → new active version). There is
- * **deliberately no delete** — a version is never removable.
+ * Version sidebar for the immutable config snapshots of an entity.
  *
- * `entityType`/`entityId` control which history is loaded; `restored` reports a
- * successful restore to the editor (→ reload).
+ * An entity is a form, the flow, or the branding. The sidebar shows the field diff of
+ * each snapshot. A restore writes an earlier state forward as a new active version.
+ * The sidebar has no delete control on purpose. A version is never removable.
+ *
+ * `entityType` and `entityId` select the history to load.
  */
 @Component({
   selector: 'app-version-history',
@@ -55,7 +55,7 @@ export class VersionHistoryComponent {
 
   readonly entityType = input.required<string>();
   readonly entityId = input.required<string>();
-  /** Emits after a successful restore — the editor reloads its state. */
+  /** Emits after a successful restore. The editor then reloads its state. */
   readonly restored = output<void>();
 
   protected readonly revisions = signal<ConfigRevision[]>([]);
@@ -66,7 +66,6 @@ export class VersionHistoryComponent {
   protected readonly restoring = signal(false);
 
   constructor() {
-    // (Re)loads whenever the target entity changes.
     effect(() => {
       const type = this.entityType();
       const id = this.entityId();
@@ -74,7 +73,7 @@ export class VersionHistoryComponent {
     });
   }
 
-  /** Callable externally/after save: reload the list. */
+  /** Reload the list. The editor calls this after a save. */
   reload(): void {
     this.load(this.entityType(), this.entityId());
   }
@@ -132,7 +131,6 @@ export class VersionHistoryComponent {
     });
   }
 
-  /** Actor display name (else sub, else "System"). */
   protected actor(rev: ConfigRevision): string {
     return rev.createdByName ?? rev.createdBy ?? this.i18n.translate('admin.audit.system');
   }

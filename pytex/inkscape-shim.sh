@@ -1,13 +1,13 @@
 #!/bin/sh
-# Minimal `inkscape` CLI shim backed by rsvg-convert (T-21, image stays slim).
+# Minimal `inkscape` CLI shim backed by rsvg-convert (T-21, the image stays slim).
 #
-# pytex's IncludeImage converts SVG logos by shelling out exactly:
+# The IncludeImage step of pytex converts SVG logos with exactly this shell-out:
 #   inkscape <src.svg> --export-type=pdf --export-filename=<dst.pdf>
-# Without it the CD variants with SVG logos (protocol-asta: ASTA.svg) lose
-# their assets and tectonic aborts with "Unable to load picture or PDF file".
-# Real Inkscape would add hundreds of MB to the image; rsvg-convert (librsvg)
-# renders the flat vector logos identically. Any unexpected invocation fails
-# loudly instead of guessing.
+# Without the shim the CD variants with SVG logos (protocol-asta: ASTA.svg) lose
+# their assets and tectonic stops with "Unable to load picture or PDF file".
+# Real Inkscape would add hundreds of MB to the image. rsvg-convert (librsvg)
+# renders the flat vector logos the same way. The shim fails loudly on any other
+# call. It never guesses.
 set -eu
 
 src=""

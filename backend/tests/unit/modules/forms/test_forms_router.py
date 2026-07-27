@@ -1,7 +1,7 @@
-"""Router-Tests Forms (T-11): Endpunkt-Verdrahtung ohne DB (Service überschrieben).
+"""Router tests for forms (T-11): endpoint wiring without a DB.
 
-Die DB-gestützte ``FormsService`` wird per ``dependency_overrides`` durch ein
-Fake ersetzt; Auth über ``get_current_principal``. Echte DB-Pfade: Integration.
+`dependency_overrides` replaces the DB-backed `FormsService` with a fake. Auth runs
+through `get_current_principal`. The integration suite covers the real DB paths.
 """
 
 from __future__ import annotations
@@ -90,9 +90,6 @@ def _as_admin(app: FastAPI) -> None:
     )
 
 
-# --------------------------------------------------------------------------- #
-# GET effective form
-# --------------------------------------------------------------------------- #
 def test_get_effective_form_main_only(app_client: TestClient) -> None:
     type_id = uuid4()
     r = app_client.get(f"/api/application-types/{type_id}/form")
@@ -125,9 +122,6 @@ def test_get_effective_form_bad_uuid_422(app_client: TestClient) -> None:
     assert r.status_code == 422
 
 
-# --------------------------------------------------------------------------- #
-# POST form version (auth)
-# --------------------------------------------------------------------------- #
 def _payload() -> dict:
     return {
         "fields": [
@@ -186,14 +180,12 @@ def test_create_form_version_rejects_empty_fields(
     assert r.status_code == 422
 
 
-# --------------------------------------------------------------------------- #
-# OpenAPI-Contract: Fehler-Status deklariert (für Schemathesis-Conformance)
-# --------------------------------------------------------------------------- #
+# OpenAPI contract: the spec declares the error statuses for Schemathesis conformance.
 def test_openapi_declares_error_responses(app_client: TestClient) -> None:
     spec = app_client.get("/openapi.json").json()
     get_form = spec["paths"]["/api/application-types/{type_id}/form"]["get"]
     assert "404" in get_form["responses"]
     post = spec["paths"]["/api/admin/application-types/{type_id}/form-versions"]["post"]
     assert {"400", "401", "403", "404", "422"} <= set(post["responses"])
-    # T-10s Hook schreibt 4xx auf problem+json um
+    # The T-10 hook rewrites 4xx to problem+json.
     assert "application/problem+json" in get_form["responses"]["404"]["content"]

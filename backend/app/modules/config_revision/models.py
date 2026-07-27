@@ -1,10 +1,10 @@
-"""``config_revision`` — append-only snapshot chain of versioned configs.
+"""``config_revision``: an append-only snapshot chain of the versioned configs.
 
-Like ``audit_entry``, a DB trigger rejects UPDATE/DELETE/TRUNCATE (migration
-0034 plus the ``audit_writer`` grant) — prior versions can never be deleted.
-``snapshot`` holds the full restorable config in its natural form, config only,
-never principal PII (keeps GDPR erasure intact). ``version`` counts
-monotonically per entity; ``prev_revision_id`` chains the states.
+As for ``audit_entry``, a database trigger rejects UPDATE, DELETE and TRUNCATE. See
+migration 0034 and the ``audit_writer`` grant. Nothing can delete an earlier version.
+``snapshot`` holds the full restorable config in its natural form. It holds config
+only and never principal PII, which keeps GDPR erasure intact. ``version`` counts up
+per entity. ``prev_revision_id`` chains the states.
 """
 
 from __future__ import annotations
@@ -43,7 +43,7 @@ class ConfigRevision(Base):
     prev_revision_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("config_revision.id", ondelete="RESTRICT"), nullable=True
     )
-    # OIDC ``sub`` of the trigger (no PII).
+    # OIDC ``sub`` of the actor that caused the change (no PII).
     created_by: Mapped[str | None] = mapped_column(Text, nullable=True)
     at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

@@ -1,4 +1,4 @@
-"""Sammelbuchungs-Anzeige (#fints-batch) + form-agnostische Client-Ergebnis-Auswertung."""
+"""Batch booking display (#fints-batch) and format-agnostic client result handling."""
 
 from __future__ import annotations
 
@@ -16,8 +16,9 @@ from app.modules.budget.bank.client import (
 from app.modules.budget.bank.service import BankService
 from app.modules.budget.bank.statement import StatementParseError
 
-# Combined camt.053 (ONE HKCAZ fetch, two accounts) — Sparkasse returns this even
-# for an account-scoped request. Each <Stmt> carries its own <Acct>/<IBAN>.
+# Combined camt.053 with two accounts from ONE HKCAZ fetch. Sparkasse returns this shape
+# even when the request scopes to a single account. Each <Stmt> carries its own
+# <Acct>/<IBAN>.
 _CAMT_COMBINED = b"""<?xml version="1.0" encoding="UTF-8"?>
 <Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.08">
  <BkToCstmrStmt>
@@ -67,7 +68,6 @@ _CAMT_UNUSABLE = b"""<?xml version="1.0" encoding="UTF-8"?>
  </BkToCstmrAcctRpt></Document>"""
 
 
-# ------------------------------------------------------------------- prettify
 @pytest.mark.parametrize(
     ("raw", "pretty"),
     [
@@ -81,7 +81,7 @@ _CAMT_UNUSABLE = b"""<?xml version="1.0" encoding="UTF-8"?>
         ),
         ("datei-nr 12 anzahl 3", "Sammelbuchung Datei-Nr. 12 (3 Posten)"),
         ("Miete Mai", "Miete Mai"),
-        ("DATEI-NR. 123", "DATEI-NR. 123"),  # ohne ANZAHL kein Sammel-Muster
+        ("DATEI-NR. 123", "DATEI-NR. 123"),  # without ANZAHL there is no batch pattern
         (None, None),
         ("", ""),
     ],
@@ -121,7 +121,6 @@ def test_prettify_flows_into_description_note_and_line_out() -> None:
     )
 
 
-# ------------------------------------------------------------- fetch results
 def test_lines_from_fetch_result_camt_tuple() -> None:
     lines = lines_from_fetch_result(([_CAMT_ONE], [None]))
     assert [line.amount for line in lines] == [Decimal("12.00")]
@@ -145,7 +144,7 @@ def test_lines_from_camt_documents_raises_on_junk() -> None:
         lines_from_camt_documents([b"not xml at all"])
 
 
-# ------------------------------------------------- account scoping (#konten all-accounts)
+# account scoping (#konten all-accounts)
 def test_parse_camt_scopes_to_requested_iban() -> None:
     """A combined camt.053 is filtered to the selected account (spaces tolerated)."""
     only_a = parse_camt(_CAMT_COMBINED, iban="DE11 1111 1111 1111 1111 11")

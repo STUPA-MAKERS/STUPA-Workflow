@@ -1,10 +1,10 @@
-"""CAMT.052/053 statements (XML) to :class:`~.statement.StatementLine`.
+"""Map CAMT.052/053 statements (XML) to `statement.StatementLine`.
 
-Namespace-tolerant (via local name) and version-tolerant (any
-``camt.05x.001.yy``). Batch bookings — one ``Ntry`` with several ``TxDtls`` —
-are split into single transactions, one line per ``TxDtls`` with its own
-amount/purpose/counterparty. Split only when the partial amounts add up exactly
-to the entry amount; otherwise conservatively keep one line with the total.
+The parser is namespace-tolerant (it matches the local name) and version-tolerant (any
+`camt.05x.001.yy`). It splits a batch booking (one `Ntry` with several `TxDtls`) into
+single transactions. Each `TxDtls` becomes one line with its own amount, purpose and
+counterparty. The split runs only when the partial amounts add up exactly to the entry
+amount. If they do not, the parser keeps one line with the total.
 """
 
 from __future__ import annotations
@@ -34,18 +34,22 @@ def parse_camt(
     iban: str | None = None,
     account_ids: Collection[str] | None = None,
 ) -> list[StatementLine]:
-    """Parse a CAMT statement (report ``camt.052`` or statement ``camt.053``).
+    """Parse a CAMT statement (report `camt.052` or statement `camt.053`).
 
-    ``iban``/``account_ids`` (optional) scope the result to one account: a single
-    HKCAZ fetch can return a COMBINED camt.053 with one ``<Stmt>`` per account of
-    the login, and without scoping every account's bookings would be merged (and
-    staged under the one selected account). Statements identifying a DIFFERENT
-    account (by IBAN OR proprietary account number) are skipped; statements
-    without an identifiable account, and an empty scope (file imports), keep all —
-    so nothing regresses. ``account_ids`` allows scoping by account number when
-    the bank exposes no IBAN (older Sparkasse SEPA accounts).
+    One HKCAZ fetch can return a COMBINED `camt.053` with one `<Stmt>` per account of
+    the login. Without a scope, the parser merges the bookings of every account and
+    stages them under the one selected account. The parser therefore skips a statement
+    that identifies a DIFFERENT account, by IBAN or by proprietary account number. It
+    keeps a statement without an identifiable account, and it keeps everything when the
+    scope is empty (file imports). This fallback keeps existing file imports working.
 
-    :raises StatementParseError: missing/broken CAMT XML or no usable entries."""
+    `iban` scopes the result to one account. `account_ids` scopes it by account number.
+    Use `account_ids` when the bank exposes no IBAN, as older Sparkasse SEPA accounts do.
+
+    Raises:
+        StatementParseError: The CAMT XML is missing or broken, or it holds no usable
+            entries.
+    """
     try:
         root = ET.fromstring(data)  # noqa: S314 - own statement, no external entities
     except ET.ParseError as exc:
@@ -69,16 +73,16 @@ def _scope_values(iban: str | None, account_ids: Collection[str] | None) -> list
 
 
 def _norm_id(value: str | None) -> str:
-    """Normalise an account identifier (IBAN/number) for comparison."""
+    """Normalize an account identifier (IBAN or number) for comparison."""
     return (value or "").replace(" ", "").upper()
 
 
 def statement_account_ids(data: bytes) -> list[str]:
-    """The account identifiers (IBAN or number) of every statement in a CAMT doc.
+    """Return the account identifiers (IBAN or number) of every statement in a CAMT doc.
 
-    Diagnostic helper: reveals which accounts a fetched document actually carries,
-    so an all-accounts fetch can be told apart from an empty scope. Broken XML
-    yields ``[]``."""
+    This diagnostic helper shows which accounts a fetched document carries. It tells an
+    all-accounts fetch apart from an empty scope. Broken XML gives an empty list.
+    """
     try:
         root = ET.fromstring(data)  # noqa: S314 - own statement, no external entities
     except ET.ParseError:
@@ -90,29 +94,32 @@ def statement_account_ids(data: bytes) -> list[str]:
 
 
 def _stmt_account_ids(stmt: ET.Element) -> set[str]:
-    """The identifiers of a statement's OWN account: IBAN and/or the proprietary
-    account number (``<Acct>/<Id>/<Othr>/<Id>``). Empty when unidentifiable.
+    """Return the identifiers of the OWN account of a statement.
 
-    The statement account is the first ``<Acct>`` in document order; counterparty
-    accounts are ``<DbtrAcct>``/``<CdtrAcct>``, not ``<Acct>``."""
+    The identifiers are the IBAN and the proprietary account number
+    (`<Acct>/<Id>/<Othr>/<Id>`). The result is empty when the account is not
+    identifiable. The statement account is the first `<Acct>` in document order.
+    Counterparty accounts are `<DbtrAcct>` and `<CdtrAcct>`, not `<Acct>`.
+    """
     acct = _find_local(stmt, "Acct")
     if acct is None:
         return set()
     ids = {_norm_id(_find_text_local(acct, "IBAN"))}
-    # The proprietary account number is compared with leading zeros stripped —
-    # banks pad it inconsistently between the account list and the statement.
+    # Compare the proprietary account number with the leading zeros stripped. Banks pad
+    # it inconsistently between the account list and the statement.
     ids.add(_norm_id(_find_text_local(_find_local(acct, "Othr"), "Id")).lstrip("0"))
     return {i for i in ids if i}
 
 
 def _scoped_entries(root: ET.Element, want: set[str]) -> list[ET.Element]:
-    """The ``Ntry`` elements, limited to the statement(s) matching ``want``.
+    """Return the `Ntry` elements of the statements that match `want`.
 
-    camt.053 groups bookings under one ``<Stmt>`` per account (camt.052 under
-    ``<Rpt>``). Drop a statement only when it identifies a DIFFERENT account —
-    never when its account is unidentifiable or ``want`` is empty (avoids an empty
-    fetch if a bank omits/varies the identifier). A doc without any statement
-    container falls back to a flat ``Ntry`` scan."""
+    In camt.053 the bookings sit under one `<Stmt>` per account. In camt.052 they sit
+    under `<Rpt>`. Drop a statement only when it identifies a DIFFERENT account. Never
+    drop it when the account is not identifiable, or when `want` is empty. That rule
+    avoids an empty fetch when a bank omits the identifier or varies it. A document
+    without any statement container falls back to a flat `Ntry` scan.
+    """
     statements = _findall_local(root, "Stmt") + _findall_local(root, "Rpt")
     if not statements:
         return _findall_local(root, "Ntry")
@@ -128,10 +135,10 @@ def _scoped_entries(root: ET.Element, want: set[str]) -> list[ET.Element]:
 
 @dataclass(slots=True)
 class _Entry:
-    """Pre-digested ``Ntry`` facts shared by every line derived from it."""
+    """Facts read once from an `Ntry` and shared by every line derived from it."""
 
-    amount: Decimal  # signed (incl. reversal flip)
-    orig_credit: bool  # the entry's CdtDbtInd (original direction)
+    amount: Decimal  # signed, the reversal flip included
+    orig_credit: bool  # the CdtDbtInd of the entry (original direction)
     reversal: bool
     currency: str
     booking_date: date | None
@@ -140,7 +147,11 @@ class _Entry:
 
 
 def _entry_facts(ntry: ET.Element) -> _Entry | None:
-    """Read amount/direction/reversal/dates of one ``Ntry`` — ``None`` = unusable."""
+    """Read the amount, direction, reversal flag and dates of one `Ntry`.
+
+    Returns:
+        The facts of the entry, or `None` when the entry is unusable.
+    """
     amt_el = _find_local(ntry, "Amt")
     if amt_el is None or not (amt_el.text or "").strip():
         return None
@@ -148,8 +159,8 @@ def _entry_facts(ntry: ET.Element) -> _Entry | None:
         magnitude = Decimal((amt_el.text or "").strip())
     except (InvalidOperation, ValueError):
         return None
-    # Require the direction explicitly: without a clear CRDT/DBIT the economic
-    # direction is unknown — do not silently assume outflow.
+    # Require the direction explicitly. Without a clear CRDT or DBIT the economic
+    # direction is unknown. Do not assume an outflow.
     ind = (_find_text_local(ntry, "CdtDbtInd") or "").upper()
     if ind.startswith("CRDT"):
         orig_credit = True
@@ -157,11 +168,12 @@ def _entry_facts(ntry: ET.Element) -> _Entry | None:
         orig_credit = False
     else:
         return None
-    # A reversal (``RvslInd=true``) flips the economic direction (chargeback).
+    # A reversal (`RvslInd=true`) flips the economic direction (chargeback).
     reversal = (_find_text_local(ntry, "RvslInd") or "").strip().lower() in ("true", "1")
     credit = (not orig_credit) if reversal else orig_credit
-    # CAMT ``<Amt>`` is >= 0 per spec; a negative value would flip the sign again
-    # below — defensively decouple the amount (direction comes only from the indicator).
+    # The CAMT `<Amt>` value is >= 0 per spec. A negative value would flip the sign
+    # again below. Decouple the amount as a defense. The direction comes from the
+    # indicator only.
     amount = sane_amount(abs(magnitude) if credit else -abs(magnitude))
     return _Entry(
         amount=amount,
@@ -175,7 +187,7 @@ def _entry_facts(ntry: ET.Element) -> _Entry | None:
 
 
 def _lines_from_entry(ntry: ET.Element) -> list[StatementLine]:
-    """Map one ``Ntry`` to 1 line (single booking) or n lines (split batch booking)."""
+    """Map one `Ntry` to one line (single booking) or n lines (split batch booking)."""
     entry = _entry_facts(ntry)
     if entry is None:
         return []
@@ -191,11 +203,15 @@ def _lines_from_entry(ntry: ET.Element) -> list[StatementLine]:
 def _split_batch(
     ntry: ET.Element, entry: _Entry, tx_details: list[ET.Element]
 ) -> list[StatementLine] | None:
-    """Resolve a batch booking into single transactions — or ``None`` if unsafe.
+    """Resolve a batch booking into single transactions.
 
-    Safe means: every ``TxDtls`` carries its own ``TxAmt`` in the entry currency
-    and the signed partial amounts sum exactly to the entry amount — otherwise
-    the split would invent amounts (e.g. gross/net deviation due to fees).
+    A split is safe only when every `TxDtls` carries its own `TxAmt` in the entry
+    currency. The signed partial amounts must also sum exactly to the entry amount.
+    Otherwise the split would invent amounts, for example on a gross or net deviation
+    from fees.
+
+    Returns:
+        One line per `TxDtls`, or `None` when the split is not safe.
     """
     lines: list[StatementLine] = []
     total = Decimal("0")
@@ -203,17 +219,18 @@ def _split_batch(
         amount = _tx_amount(tx, entry)
         if amount is None:
             return None
-        # Bank reference per sub-transaction (if any). The entry reference is
-        # identical for all parts and must NOT be used — all sub-lines would
-        # collapse onto the same idempotency key.
+        # Bank reference per sub-transaction, if there is one. The entry reference is
+        # identical for all parts and must NOT be used. All sub-lines would collapse
+        # onto the same idempotency key.
         tx_ref = clean(_find_text_local(_find_local(tx, "Refs"), "AcctSvcrRef"))
         lines.append(_line_from_scope(tx, ntry, entry, amount=amount, bank_ref=tx_ref))
         total += amount
     if total != entry.amount:
         return None
-    # The entry's AddtlNtryInf (e.g. "SAMMELUEBERWEISUNG DATEI-NR. … ANZAHL …")
-    # is lost on split (each line carries its own Ustrd purpose) — keep it as
-    # metadata so staging can match the old total line by its file number.
+    # The split loses the AddtlNtryInf of the entry, for example
+    # "SAMMELUEBERWEISUNG DATEI-NR. … ANZAHL …", because each line carries its own
+    # Ustrd purpose. Keep it as metadata so staging can match the old total line by
+    # its file number.
     info = clean(_find_text_local(ntry, "AddtlNtryInf"))
     batch_meta = {
         "batch": "true",
@@ -228,11 +245,15 @@ def _split_batch(
 
 
 def _tx_amount(tx: ET.Element, entry: _Entry) -> Decimal | None:
-    """Signed amount of a sub-transaction (``AmtDtls/TxAmt/Amt``).
+    """Return the signed amount of a sub-transaction (`AmtDtls/TxAmt/Amt`).
 
-    ``None`` when amount/currency are missing or do not match the entry currency.
-    Direction comes from the sub-transaction's ``CdtDbtInd``, else the entry's;
-    an entry reversal flips it (as for the unsplit entry)."""
+    The direction comes from the `CdtDbtInd` of the sub-transaction, else from the one
+    of the entry. An entry reversal flips it, as it does for the unsplit entry.
+
+    Returns:
+        The signed amount, or `None` when the amount or the currency is missing, or
+        when the currency does not match the entry currency.
+    """
     tx_amt = _find_local(tx, "TxAmt")
     amt_el = _find_local(tx_amt, "Amt") if tx_amt is not None else None
     if amt_el is None or not (amt_el.text or "").strip():
@@ -262,10 +283,10 @@ def _line_from_scope(
     amount: Decimal,
     bank_ref: str | None,
 ) -> StatementLine:
-    """Build one line from a detail scope (``TxDtls`` or the ``Ntry`` itself)."""
+    """Build one line from a detail scope (`TxDtls` or the `Ntry` itself)."""
     credit = amount > 0
-    # The counterparty follows the ORIGINAL direction (Dbtr/Cdtr in the XML refer
-    # to it) — on credit the debtor (payer), otherwise the creditor.
+    # The counterparty follows the ORIGINAL direction. Dbtr and Cdtr in the XML refer
+    # to it. On a credit this is the debtor (the payer), otherwise the creditor.
     orig_credit = (not credit) if entry.reversal else credit
     party_tag, acct_tag = ("Dbtr", "DbtrAcct") if orig_credit else ("Cdtr", "CdtrAcct")
     party = _find_local(scope, party_tag)
@@ -279,8 +300,8 @@ def _line_from_scope(
         "creditDebit": "CRDT" if entry.orig_credit else "DBIT",
         **({"reversal": "true"} if entry.reversal else {}),
         **({"booking_time": booking_time} if booking_time else {}),
-        # Record the raw purpose: feeds ``resolve_purpose`` and makes the
-        # content-hash key meaningful (lines without a bank reference).
+        # Record the raw purpose. It feeds `resolve_purpose` and makes the content-hash
+        # key meaningful for lines without a bank reference.
         **({"purpose": purpose} if purpose else {}),
     }
     return StatementLine(
@@ -299,19 +320,29 @@ def _line_from_scope(
 
 
 def _purpose_text(scope: ET.Element, ntry: ET.Element) -> str | None:
-    """Purpose of a scope: all ``Ustrd`` lines joined (banks split long purposes
-    across elements); without ``Ustrd``, the entry's ``AddtlNtryInf`` (Sparkasse
-    puts e.g. "SAMMELUEBERWEISUNG DATEI-NR. …" there)."""
+    """Return the purpose of a scope.
+
+    The purpose is every `Ustrd` line joined, because banks split a long purpose across
+    several elements. Without `Ustrd` the parser falls back to the `AddtlNtryInf` of the
+    entry. Sparkasse puts text such as "SAMMELUEBERWEISUNG DATEI-NR. …" there.
+    """
     parts = [t for el in _findall_local(scope, "Ustrd") if (t := clean(el.text))]
     if parts:
         return " ".join(parts)
     return clean(_find_text_local(ntry, "AddtlNtryInf"))
 
 
-# ------------------------------------------------------------------------ balance
 def camt_closing_balance(data: bytes) -> StatementBalance | None:
-    """CAMT closing balance: ``<Bal>`` with code ``CLBD`` (Closing Booked); sign
-    from ``CdtDbtInd``. Falls back to ``CLAV`` (Closing Available) without CLBD."""
+    """Return the CAMT closing balance.
+
+    The balance is the `<Bal>` element with code `CLBD` (Closing Booked). The sign comes
+    from `CdtDbtInd`. Without a CLBD entry the parser falls back to `CLAV` (Closing
+    Available).
+
+    Returns:
+        The closing balance, or `None` when the XML is broken or holds no usable
+        balance.
+    """
     try:
         root = ET.fromstring(data)  # noqa: S314 - own statement, no external entities
     except ET.ParseError:
@@ -322,7 +353,8 @@ def camt_closing_balance(data: bytes) -> StatementBalance | None:
         if code:
             # With several <Stmt> (multi-day export) the LAST closing balance wins.
             by_code[code] = bal
-    # `Element or Element` trips the ElementTree truthiness deprecation — check explicitly.
+    # `Element or Element` trips the ElementTree truthiness deprecation. Check it
+    # explicitly.
     chosen = by_code.get("CLBD")
     if chosen is None:
         chosen = by_code.get("CLAV")
@@ -344,9 +376,8 @@ def camt_closing_balance(data: bytes) -> StatementBalance | None:
     )
 
 
-# -------------------------------------------------------------------- XML helpers
 def _local(tag: str) -> str:
-    """Local tag name without the ``{namespace}`` prefix."""
+    """Return the local tag name without the `{namespace}` prefix."""
     return tag.rsplit("}", 1)[-1]
 
 
@@ -369,7 +400,7 @@ def _find_text_local(el: ET.Element | None, name: str) -> str | None:
 
 
 def _camt_date(el: ET.Element | None) -> date | None:
-    """CAMT ``BookgDt``/``ValDt`` to ``date`` (``Dt`` = YYYY-MM-DD, or ``DtTm``)."""
+    """Convert a CAMT `BookgDt` or `ValDt` to a `date` (`Dt` = YYYY-MM-DD, or `DtTm`)."""
     if el is None:
         return None
     raw = _find_text_local(el, "Dt") or _find_text_local(el, "DtTm")

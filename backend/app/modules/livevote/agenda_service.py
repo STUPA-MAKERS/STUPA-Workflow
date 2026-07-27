@@ -1,8 +1,9 @@
-"""Agenda service: applications ↔ meeting.
+"""Agenda service that binds applications to a meeting.
 
-"Assignable" are applications whose current state is a vote state
-(``kind=='vote'``) with ``config.gremiumId`` pointing at the meeting's gremium.
-The agenda is ordered (``position``) and is the source of the protocol TOPs.
+An application is assignable when its current state is a vote state
+(`kind=='vote'`) and `config.gremiumId` points at the Gremium of the meeting.
+The agenda keeps an explicit order (`position`). It is the source of the agenda
+items in the protocol.
 """
 
 from __future__ import annotations
@@ -21,7 +22,7 @@ from app.shared.errors import ConflictError, NotFoundError
 
 
 def _title_of(data: dict[str, Any] | None) -> str | None:
-    """Return the application title from the system field ``title`` (or ``None``)."""
+    """Return the application title from the system field `title`, or `None`."""
     if not data:
         return None
     value = data.get("title")
@@ -29,7 +30,7 @@ def _title_of(data: dict[str, Any] | None) -> str | None:
 
 
 class AgendaService:
-    """Manage a meeting's agenda (assign/remove/list applications)."""
+    """Manage the agenda of a meeting: assign, remove and list applications."""
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -43,7 +44,7 @@ class AgendaService:
         return meeting
 
     async def _vote_states(self, gremium_id: UUID) -> dict[UUID, State]:
-        """Vote states whose ``config.gremiumId`` points at this gremium."""
+        """Return the vote states whose `config.gremiumId` points at this Gremium."""
         states = (
             await self.session.scalars(select(State).where(State.kind == "vote"))
         ).all()
@@ -55,7 +56,11 @@ class AgendaService:
         return out
 
     async def item(self, meeting_id: UUID, item_id: UUID) -> MeetingAgendaItem:
-        """Load one agenda item of the meeting (404 if unknown)."""
+        """Load one agenda item of the meeting.
+
+        Raises:
+            NotFoundError: The meeting has no agenda item with this id.
+        """
         row = (
             await self.session.execute(
                 select(MeetingAgendaItem).where(
@@ -109,7 +114,7 @@ class AgendaService:
                 if app is not None and app.current_state_id is not None
                 else None
             )
-            # Application item: title/status from the application; free-text item: ``title`` column.
+            # A free-text item has no application and carries its own title.
             title = _title_of(app.data) if app is not None else r.title
             out.append(
                 AgendaItemOut(
@@ -132,11 +137,14 @@ class AgendaService:
         title: str | None = None,
         non_public: bool | None = None,
     ) -> list[AgendaItemOut]:
-        """Set an item's Markdown body, title and/or visibility.
+        """Update the Markdown body, the title or the visibility of an agenda item.
 
-        ``title`` only renames free-text items (application items inherit the
-        application's title); ``non_public`` toggles redaction in the public
-        protocol PDF.
+        A `title` renames a free-text item only. An application item keeps the
+        title of its application. `non_public` hides the item content in the
+        public protocol PDF.
+
+        Raises:
+            NotFoundError: The meeting has no agenda item with this id.
         """
         row = (
             await self.session.execute(
@@ -161,7 +169,10 @@ class AgendaService:
     async def reorder(
         self, meeting_id: UUID, item_ids: list[UUID]
     ) -> list[AgendaItemOut]:
-        """Reorder agenda items into the given order."""
+        """Set the agenda order to the given sequence of item ids.
+
+        The method skips an id that does not belong to this meeting.
+        """
         rows = {
             r.id: r
             for r in (
@@ -238,10 +249,19 @@ class AgendaService:
         title: str | None = None,
         non_public: bool = False,
     ) -> list[AgendaItemOut]:
-        """Add an agenda item: application (in a vote state of the gremium) or free text."""
+        """Add an agenda item for an application or for free text.
+
+        A `title` creates a free-text item. The method then ignores
+        `application_id`. Without a title the application must be in a vote
+        state of the Gremium of the meeting. A second add for the same
+        application changes nothing.
+
+        Raises:
+            NotFoundError: The application does not exist.
+            ConflictError: The application is not in a vote state of the Gremium.
+        """
         meeting = await self._meeting(meeting_id)
         if title is not None:
-            # Free-text item (no application) — append directly.
             self.session.add(
                 MeetingAgendaItem(
                     meeting_id=meeting_id,

@@ -1,10 +1,10 @@
-"""A reusable field-by-field dialog engine (mapping editor, permission set, …).
+"""A reusable field-by-field dialog engine: mapping editor, permission set, and more.
 
-Owns the open :class:`Form`, drives editing (keyboard and mouse) and the
-scrolled render, and calls the form's ``on_submit`` on Enter. Callers build a
-:class:`Form` — its fields and submit callback — and open it through
-:meth:`~antragsplattform_admin.protocols.AppView.open_form`; this component
-knows nothing about what any particular form means.
+The controller owns the open `Form`. It drives the editing through keyboard and mouse,
+and it drives the scrolled render. On Enter it calls the `on_submit` callback of the
+form. A caller builds a `Form` with its fields and its submit callback. The caller then
+opens the form through `AppView.open_form`. This component knows nothing about the
+meaning of any particular form.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from . import panels
 from .models import Form
 from .protocols import AppContext, MouseHandler
 
-# Fields shown at once in a form panel; longer forms (e.g. /role … perms) scroll.
+# Fields shown at once in a form panel. A longer form scrolls, for example /role perms.
 _FORM_ROWS = 14
 
 
@@ -28,7 +28,7 @@ class FormController:
         self._form: Form | None = None
 
     def open(self, form: Form) -> None:
-        """Show *form*, replacing any open one."""
+        """Show `form` and replace any open one."""
         self._form = form
         self._context.invalidate()
 
@@ -57,11 +57,11 @@ class FormController:
             self._context.invalidate()
 
     def submit(self) -> None:
-        """Fire the form's ``on_submit`` and close it.
+        """Fire the `on_submit` callback of the form and close the form.
 
-        Guarded like every other command entry point: a failing submit callback
-        (e.g. a duplicate-key DB error) lands in the log, not on the screen as
-        a traceback.
+        A guard wraps the callback, like every other command entry point. A failing
+        callback, a duplicate-key DB error for example, lands in the log. It shows no
+        traceback on the screen.
         """
         form = self._form
         if form is None:
@@ -74,7 +74,7 @@ class FormController:
             self._context.error(f"{type(error).__name__}: {error}")
 
     def move(self, delta: int) -> None:
-        """Move the field cursor by *delta*, wrapping around."""
+        """Move the field cursor by `delta` and wrap around."""
         form = self._form
         if form is None or not form.fields:
             return
@@ -82,7 +82,7 @@ class FormController:
         self._context.invalidate()
 
     def change(self, delta: int) -> None:
-        """Cycle the focused bool/choice field; ignored for text fields."""
+        """Cycle the focused bool or choice field. A text field does not change."""
         form = self._form
         if form is None or not form.fields:
             return
@@ -96,7 +96,7 @@ class FormController:
         self._context.invalidate()
 
     def type_char(self, text: str) -> None:
-        """Append typed *text* to the focused text field; space toggles bools."""
+        """Append `text` to the focused text field. A space toggles a bool field."""
         form = self._form
         if form is None or not form.fields:
             return

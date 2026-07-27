@@ -1,8 +1,9 @@
-"""TDD: DeadlineService (T-44) — Scans/Locks/Marker + Helfer ohne DB.
+"""Unit tests for `DeadlineService` (T-44): scans, locks, markers and helpers.
 
-Die echten partiellen Indizes + ``FOR UPDATE SKIP LOCKED`` liegen in der Integration
-(``tests/integration/test_deadlines_service.py``); hier wird jede Verzweigung über
-einen Ergebnis-Queue-Fake deterministisch getroffen (Branch-Abdeckung)."""
+The real partial indexes and `FOR UPDATE SKIP LOCKED` live in the integration suite
+(`tests/integration/test_deadlines_service.py`). Here a result-queue fake hits every
+branch deterministically.
+"""
 
 from __future__ import annotations
 
@@ -24,9 +25,6 @@ NOW = datetime(2026, 6, 7, 12, 0, tzinfo=UTC)
 LEAD = timedelta(hours=24)
 
 
-# --------------------------------------------------------------------------- #
-# Helpers
-# --------------------------------------------------------------------------- #
 def test_transition_ref_camel_and_snake() -> None:
     tid = uuid4()
     assert transition_ref({"transitionId": str(tid)}) == tid
@@ -41,9 +39,6 @@ def test_transition_ref_invalid_is_none(value: Any) -> None:
     assert transition_ref(value) is None
 
 
-# --------------------------------------------------------------------------- #
-# Scans
-# --------------------------------------------------------------------------- #
 async def test_due_action_deadline_ids() -> None:
     ids = [uuid4(), uuid4()]
     svc = DeadlineService(fake_session(result(*ids)))
@@ -62,9 +57,6 @@ async def test_due_open_vote_ids() -> None:
     assert await svc.due_open_vote_ids(NOW) == ids
 
 
-# --------------------------------------------------------------------------- #
-# Locks (hit + miss)
-# --------------------------------------------------------------------------- #
 async def test_lock_action_deadline_hit_and_miss() -> None:
     deadline = SimpleNamespace(id=uuid4())
     svc = DeadlineService(fake_session(result(deadline)))
@@ -86,9 +78,6 @@ async def test_lock_open_vote_hit() -> None:
     assert await svc.lock_open_vote(vote.id, NOW) is vote
 
 
-# --------------------------------------------------------------------------- #
-# Create + markers
-# --------------------------------------------------------------------------- #
 async def test_create_persists_and_commits() -> None:
     session = fake_session()
     svc = DeadlineService(session)
@@ -121,14 +110,11 @@ async def test_mark_reminded_sets_timestamp_and_commits() -> None:
 
 
 def test_uuid_roundtrip_in_ref() -> None:
-    # Defensive: bereits-UUID-Objekt als String akzeptiert.
     tid = uuid4()
     assert transition_ref({"transitionId": UUID(str(tid)).hex}) == tid
 
 
-# --------------------------------------------------------------------------- #
-# flow_deadline_passed (shared by FlowService + task-mail recipients)
-# --------------------------------------------------------------------------- #
+# flow_deadline_passed serves both FlowService and the task-mail recipients.
 async def test_flow_deadline_passed_true_when_row_due() -> None:
     session = fake_session()
     session.scalar_results = [uuid4()]  # a due flow_deadline row exists
@@ -136,5 +122,5 @@ async def test_flow_deadline_passed_true_when_row_due() -> None:
 
 
 async def test_flow_deadline_passed_false_without_due_row() -> None:
-    # Empty scalar queue -> None -> no due deadline.
+    # An empty scalar queue gives None, so no deadline is due.
     assert await flow_deadline_passed(fake_session(), uuid4()) is False

@@ -59,10 +59,10 @@ interface DetailPosition {
 }
 
 /**
- * Application detail: fields, version history/diff, comments (internal/public),
- * and RBAC-gated status-change actions with confirmation and 409 handling.
+ * Application detail: fields, version history with diff, comments, and status actions.
  *
- * RBAC here is UX gating (not authoritative — the server decides): the actions and
+ * A comment is internal or public. A status action asks for a confirmation and handles a
+ * 409 answer. RBAC here only gates the UX. The server decides. The actions and the
  * internal comment visibility appear only with `application.manage`.
  */
 @Component({
@@ -102,45 +102,46 @@ export class ApplicationsDetailComponent {
   readonly app = signal<Application | null>(null);
   readonly versions = signal<ApplicationVersion[]>([]);
   readonly comments = signal<ApplicationComment[]>([]);
-  /** Field definitions of the effective form — for labels/typed values (else empty). */
+  /** Field definitions of the effective form for labels and typed values. Empty on error. */
   readonly formFields = signal<FormFieldDef[]>([]);
 
   readonly newComment = signal('');
   readonly visibility = signal<CommentVisibility>('public');
   readonly posting = signal(false);
 
-  /** Versionshistorie eingeklappt (Default) — Toggle im Kartenkopf. */
+  /** The version history starts collapsed. The card header holds the toggle. */
   readonly historyOpen = signal(false);
 
-  /** Available manual transitions (guard-filtered by the server) + in-flight fire. */
+  /** Manual transitions that the server guard allows, plus the fire in flight. */
   readonly transitions = signal<Transition[]>([]);
   readonly firing = signal<Uuid | null>(null);
   readonly canTransition = computed(() => this.auth.can('application.transition'));
 
-  /** Cost-centre assignment: tree, dialog selection, in-flight assignment. */
   protected readonly budgetTree = signal<BudgetTreeNode[]>([]);
   protected readonly budgetChoice = signal('');
   protected readonly assigningBudget = signal(false);
   protected readonly budgetDialogOpen = signal(false);
-  /** Fiscal-year choice: fiscal year of the top budget of the selected cost centre;
-   *  empty = "automatic" (server derives the single active year, else 422). */
+  /** Fiscal-year choice among the years of the top budget of the selected cost centre.
+   *  An empty value means automatic. The server then derives the single active year,
+   *  or it answers 422. */
   protected readonly fiscalYears = signal<FiscalYear[]>([]);
   protected readonly fiscalChoice = signal('');
-  /** ``budgetId`` → "FULL-PATH – name" (badge of the current cost centre). */
+  /** Maps `budgetId` to "FULL-PATH – name" for the badge of the current cost centre. */
   private readonly budgetLabels = computed(
     () => new Map(flattenBudgetOptions(this.budgetTree()).map((o) => [o.value, o.label])),
   );
   protected budgetLabel(id: string | null | undefined): string {
     return (id && this.budgetLabels().get(id)) || '';
   }
-  /** ``fiscalYearId`` → display (e.g. ``2026``) of the currently loaded fiscal year. */
+  /** Maps `fiscalYearId` to the display text of a loaded fiscal year, for example `2026`. */
   private readonly fiscalLabels = computed(
     () => new Map(this.fiscalYears().map((y) => [y.id, y.display])),
   );
   protected fiscalLabel(id: string | null | undefined): string {
     return (id && this.fiscalLabels().get(id)) || '';
   }
-  /** Dropdown-Optionen: „Automatisch" + alle HHJ des Top-Budgets (inaktive markiert). */
+  /** Dropdown options: "automatic" plus every fiscal year of the top budget.
+   *  An inactive year carries a mark. */
   protected readonly fiscalOptions = computed<SelectOption[]>(() => [
     { value: '', label: this.i18n.translate('applications.budget.fiscalAuto') },
     ...this.fiscalYears().map((y) => ({
@@ -174,8 +175,9 @@ export class ApplicationsDetailComponent {
       },
     });
   }
-  /** Cost centre picked in the dialog: reload the fiscal-year list; keep the
-   *  fiscal-year choice only if the original cost centre is re-selected. */
+  /** Handle a cost centre picked in the dialog and reload the fiscal-year list.
+   *  The fiscal-year choice survives only when the user picks the original cost
+   *  centre again. */
   protected onBudgetPicked(id: string): void {
     this.budgetChoice.set(id);
     this.fiscalChoice.set(
@@ -191,7 +193,7 @@ export class ApplicationsDetailComponent {
     this.budgetDialogOpen.set(true);
   }
 
-  // Inline editing (creator/manager) + delete.
+  // Inline editing for the creator or a manager, plus delete.
   readonly editing = signal(false);
   readonly editFields = signal<FormlyFieldConfig[]>([]);
   readonly savingEdit = signal(false);
@@ -202,15 +204,16 @@ export class ApplicationsDetailComponent {
   readonly confirmErase = signal(false);
   readonly requestingErasure = signal(false);
 
-  // Force status (privileged `application.force_status` override): dialog, the
-  // application's flow states (lazy-loaded), target selection + mandatory reason.
+  // Force status is a privileged override that needs `application.force_status`.
+  // The dialog lazy-loads the flow states of the application. It asks for a target
+  // state and for a mandatory reason.
   readonly canForceStatus = computed(() => this.auth.can('application.force_status'));
   readonly forceDialogOpen = signal(false);
   readonly forcingStatus = signal(false);
   private readonly forceStates = signal<ApplicationState[]>([]);
   readonly forceStateChoice = signal('');
   readonly forceNote = signal('');
-  /** Target-state options — every state of the flow except the current one. */
+  /** Target-state options: every state of the flow except the current one. */
   readonly forceStateOptions = computed<SelectOption[]>(() => {
     const currentId = this.app()?.state?.id ?? '';
     return this.forceStates()
@@ -231,17 +234,18 @@ export class ApplicationsDetailComponent {
   );
 
   constructor() {
-    // `paramMap` (not `snapshot`): on detail→detail navigation Angular reuses the
-    // component, so the constructor does **not** run again — a snapshot would keep
-    // the old `id`. The subscription reloads on every `id` change.
+    // Use `paramMap`, not `snapshot`. Angular reuses the component on a
+    // detail-to-detail navigation, so the constructor does not run again. A snapshot
+    // would keep the old `id`. The subscription reloads on every `id` change.
     this.route.paramMap.pipe(takeUntilDestroyed()).subscribe((pm) => {
       this.loadApplication(pm.get('id') ?? '');
     });
   }
 
-  /** Load sequence number: late responses from an earlier application (fast
-   *  switching between detail pages) must not overwrite the current one — each
-   *  response checks it still belongs to the latest load. */
+  /** Load sequence number that guards against a late response.
+   *  A fast switch between detail pages can deliver a response of an earlier
+   *  application. Such a response must not overwrite the current one. Each response
+   *  checks that it still belongs to the latest load. */
   private loadSeq = 0;
 
   private loadApplication(id: Uuid): void {
@@ -271,8 +275,9 @@ export class ApplicationsDetailComponent {
         this.app.set(app);
         this.loading.set(false);
         this.loadAux();
-        // Effective form from the application's **pinned** version (not the active one) —
-        // so labels/edit fields match the data the server validates against.
+        // Take the effective form from the pinned version of the application, not from
+        // the active one. The labels and the edit fields then match the data that the
+        // server validates.
         this.api.applicationForm(app.id).subscribe({
           next: (eff) => {
             if (seq === this.loadSeq) this.formFields.set(eff.sections.flatMap((s) => s.fields));
@@ -291,8 +296,9 @@ export class ApplicationsDetailComponent {
     });
   }
 
-  /** Load versions/comments/available transitions — errors degrade silently to
-   *  empty. Transitions only with the needed permission (server also filters). */
+  /** Load the versions, the comments and the available transitions.
+   *  An error degrades silently to an empty result. The transitions load only with
+   *  the needed permission. The server filters them again. */
   private loadAux(): void {
     const seq = this.loadSeq;
     this.api.versions(this.id).subscribe({
@@ -317,7 +323,7 @@ export class ApplicationsDetailComponent {
         },
       });
     }
-    // Cost-centre assignment: load the tree (badge label + dialog picker).
+    // The badge label and the dialog picker both need the cost-centre tree.
     if (this.canManage()) {
       this.budgetChoice.set(this.app()?.budgetId ?? '');
       this.fiscalChoice.set(this.app()?.fiscalYearId ?? '');
@@ -325,7 +331,7 @@ export class ApplicationsDetailComponent {
         next: (tree) => {
           if (seq !== this.loadSeq) return;
           this.budgetTree.set(tree);
-          // Load the fiscal-year list for the current cost centre (badge display).
+          // The badge needs the fiscal years of the current cost centre.
           this.loadFiscalYears(this.app()?.budgetId ?? null);
         },
         error: () => {
@@ -335,7 +341,7 @@ export class ApplicationsDetailComponent {
     }
   }
 
-  /** Assign/unassign the cost centre: POST /assign-budget → reload the application. */
+  /** Assign or unassign the cost centre with POST /assign-budget, then reload. */
   assignBudget(): void {
     if (this.assigningBudget()) return;
     this.assigningBudget.set(true);
@@ -361,10 +367,11 @@ export class ApplicationsDetailComponent {
       });
   }
 
-  /** Application data as label/value rows: field definition → label + typed value;
-   *  unknown keys raw; omit `title` (shown in the header) + pure display fields.
-   *  Long text (`textarea`) is flagged `md` and rendered as Markdown (keeps
-   *  newlines and simple formatting). */
+  /** Build the application data as label and value rows.
+   *  A field definition gives the label and the typed value. An unknown key stays
+   *  raw. The rows omit `title`, because the header shows it, and they omit the pure
+   *  display fields. A long text (`textarea`) carries the `md` flag and renders as
+   *  Markdown. This keeps the newlines and the simple formatting. */
   dataEntries(app: Application): { key: string; label: string; value: string; md: boolean }[] {
     const lang = this.i18n.locale();
     const byKey = new Map(this.formFields().map((f) => [f.key, f]));
@@ -373,7 +380,7 @@ export class ApplicationsDetailComponent {
 
     const pushField = (f: FormFieldDef): void => {
       if (f.type === 'markdown' || f.type === 'computed') return;
-      // Cost positions are shown as their own block (positions + offers).
+      // Cost positions get their own block with the positions and the offers.
       if (f.type === 'positions') return;
       if (f.key === 'title') return;
       if (!(f.key in app.data)) return;
@@ -387,7 +394,7 @@ export class ApplicationsDetailComponent {
     };
 
     for (const f of this.formFields()) pushField(f);
-    // Still show data without a matching field definition (raw) — except `title`.
+    // Show data without a matching field definition as a raw value. Skip `title`.
     for (const [key, value] of Object.entries(app.data)) {
       if (seen.has(key) || key === 'title' || byKey.has(key)) continue;
       rows.push({ key, label: key, value: formatFieldValue(value), md: false });
@@ -403,8 +410,8 @@ export class ApplicationsDetailComponent {
     if (field.type === 'checkbox' && typeof value === 'boolean') {
       return this.i18n.translate(value ? 'common.yes' : 'common.no');
     }
-    // Dynamic pickers (gremium/budget) carry server-supplied options in the
-    // effective form — resolve them to names like a plain select.
+    // A dynamic picker for a Gremium or a budget carries the options of the server in
+    // the effective form. Resolve them to names, like a plain select.
     if (field.type === 'select' || field.type === 'gremium_select' || field.type === 'budget_select') {
       const opt = field.options?.find((o) => o.value === value);
       return opt ? resolveI18n(opt.label, lang) : formatFieldValue(value);
@@ -426,8 +433,8 @@ export class ApplicationsDetailComponent {
     return formatFieldValue(value);
   }
 
-  /** Cost-position fields (if any) as a structured block for the detail view:
-   *  per position the comparison offers including the preferred one. */
+  /** Build the cost-position fields as a structured block for the detail view.
+   *  Each position carries its comparison offers, the preferred one included. */
   positionEntries(app: Application): {
     key: string;
     label: string;
@@ -459,7 +466,7 @@ export class ApplicationsDetailComponent {
     }).format(Number.isFinite(n) ? n : 0);
   }
 
-  /** Position value = value of the preferred offer. */
+  /** The value of a position is the value of the preferred offer. */
   positionValue(p: DetailPosition): number {
     return p.offers.find((o) => o.preferred)?.value ?? 0;
   }
@@ -469,7 +476,7 @@ export class ApplicationsDetailComponent {
     return positions.reduce((s, p) => s + this.positionValue(p), 0);
   }
 
-  /** Cost positions compact: number of positions + sum of preferred values. */
+  /** Format the cost positions compactly: the position count and the preferred sum. */
   private formatPositions(value: unknown): string {
     if (!Array.isArray(value)) return '—';
     let total = 0;
@@ -500,7 +507,6 @@ export class ApplicationsDetailComponent {
     return !!d && !d.added.length && !d.removed.length && !d.changed.length;
   }
 
-  // --- edit / delete -------------------------------------------------------
   startEdit(app: Application): void {
     const lang = this.i18n.locale();
     this.editFields.set(toFormlyFields(this.formFields(), lang, { has_budget: true }));
@@ -549,7 +555,8 @@ export class ApplicationsDetailComponent {
     });
   }
 
-  /** GDPR Art. 17: request erasure of one's own application data (magic-link view). */
+  /** Request the erasure of the application data of the applicant, per GDPR Art. 17.
+   *  The magic-link view offers this action. */
   doRequestErasure(): void {
     if (this.requestingErasure()) return;
     this.requestingErasure.set(true);
@@ -566,7 +573,7 @@ export class ApplicationsDetailComponent {
     });
   }
 
-  /** Open the force-status dialog: lazy-load the flow's states, reset the form. */
+  /** Open the force-status dialog, lazy-load the flow states and reset the form. */
   openForceDialog(): void {
     this.forceStateChoice.set('');
     this.forceNote.set('');
@@ -582,8 +589,8 @@ export class ApplicationsDetailComponent {
     this.forceDialogOpen.set(true);
   }
 
-  /** Force the application directly into the chosen state (reason mandatory).
-   *  Bypasses the flow guards server-side; 403/409 → toast. */
+  /** Force the application directly into the chosen state. The reason is mandatory.
+   *  The server bypasses the flow guards. A 403 or a 409 answer shows a toast. */
   doForceStatus(): void {
     const stateId = this.forceStateChoice();
     const note = this.forceNote().trim();
@@ -609,7 +616,7 @@ export class ApplicationsDetailComponent {
     });
   }
 
-  /** Display name of a comment (author or role-based fallback). */
+  /** Display name of a comment: the author, or a fallback based on the role. */
   protected authorName(comment: ApplicationComment): string {
     if (comment.author) return comment.author;
     return this.i18n.translate(
@@ -628,8 +635,8 @@ export class ApplicationsDetailComponent {
     return (first + last).toUpperCase();
   }
 
-  /** Enter sendet (Shift+Enter = Zeilenumbruch; Angulars `keydown.enter`
-   *  matcht nur den unmodifizierten Enter). */
+  /** Enter sends the comment. Shift+Enter makes a line break.
+   *  The Angular `keydown.enter` binding matches the unmodified Enter only. */
   protected onComposerEnter(event: Event): void {
     this.submitComment(event);
   }
@@ -653,8 +660,9 @@ export class ApplicationsDetailComponent {
     });
   }
 
-  /** Fire a manual transition: POST /transition → reload the application.
-   *  The server re-checks the guard (403/409 possible → toast + refresh). */
+  /** Fire a manual transition with POST /transition, then reload the application.
+   *  The server checks the guard again. A 403 or a 409 answer shows a toast and
+   *  refreshes. */
   fire(t: Transition): void {
     if (this.firing() !== null) return;
     this.firing.set(t.id);
@@ -678,7 +686,7 @@ export class ApplicationsDetailComponent {
     });
   }
 
-  /** Reload the application + dependent sections after a transition. */
+  /** Reload the application and the dependent sections after a transition. */
   private refresh(): void {
     const seq = this.loadSeq;
     this.api.getApplication(this.id, { quiet: true }).subscribe({

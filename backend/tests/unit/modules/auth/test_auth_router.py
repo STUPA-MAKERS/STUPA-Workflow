@@ -1,4 +1,4 @@
-"""TDD: Auth-Endpunkte (api.md §3 »auth«) — Contract + Cookie-Flags."""
+"""TDD: auth endpoints (api.md §3 "auth") — contract and cookie flags."""
 
 from __future__ import annotations
 
@@ -57,17 +57,16 @@ def enabled_client() -> Iterator[TestClient]:
 
 
 def _csrf(client: TestClient, settings: Settings) -> dict[str, str]:
-    """CSRF-Cookie setzen + passenden Header liefern (Double-Submit, security.md §10).
+    """Set the CSRF cookie and return the matching header.
 
-    Nötig, sobald der Request ein Auth-Cookie trägt (z. B. Logout mit Session-Cookie)."""
+    The double-submit rule comes from security.md §10. A request needs the header as
+    soon as it carries an auth cookie. One example is a logout with a session cookie.
+    """
     token = "csrf-test-token"
     client.cookies.set(settings.csrf_cookie_name, token)
     return {settings.csrf_header_name: token}
 
 
-# --------------------------------------------------------------------------- #
-# login
-# --------------------------------------------------------------------------- #
 def test_login_disabled_returns_404(disabled_client: TestClient) -> None:
     assert disabled_client.get("/api/auth/login").status_code == 404
 
@@ -79,9 +78,6 @@ def test_login_redirects_to_keycloak(enabled_client: TestClient) -> None:
     assert ENABLED.oidc_tx_cookie_name in resp.headers.get("set-cookie", "")
 
 
-# --------------------------------------------------------------------------- #
-# callback
-# --------------------------------------------------------------------------- #
 def test_callback_disabled_returns_404(disabled_client: TestClient) -> None:
     resp = disabled_client.get("/api/auth/callback?code=c&state=s")
     assert resp.status_code == 404
@@ -132,9 +128,6 @@ def test_callback_success_sets_session(
     assert ENABLED.session_cookie_name in resp.headers.get("set-cookie", "")
 
 
-# --------------------------------------------------------------------------- #
-# logout
-# --------------------------------------------------------------------------- #
 def test_logout_without_cookie_local_only(enabled_client: TestClient) -> None:
     resp = enabled_client.post("/api/auth/logout")
     assert resp.status_code == 200
@@ -160,7 +153,7 @@ def test_logout_with_cookie_returns_rp_logout_url(
 def test_logout_revokes_applicant_session(
     enabled_client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Logout widerruft auch eine vorhandene Applicant-Session + löscht ihr Cookie."""
+    """Logout also revokes an existing applicant session and deletes its cookie."""
     seen: dict[str, object] = {}
 
     async def _del_ap(*a: object, **k: object) -> None:
@@ -190,9 +183,6 @@ def test_logout_disabled_oidc_no_url(
     assert resp.json() == {"logout_url": None}
 
 
-# --------------------------------------------------------------------------- #
-# me
-# --------------------------------------------------------------------------- #
 def test_me_unauthenticated_401(enabled_client: TestClient) -> None:
     assert enabled_client.get("/api/auth/me").status_code == 401
 
@@ -225,9 +215,6 @@ def test_me_returns_principal() -> None:
     }
 
 
-# --------------------------------------------------------------------------- #
-# magic-link
-# --------------------------------------------------------------------------- #
 def test_magic_link_always_202(
     enabled_client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -238,12 +225,12 @@ def test_magic_link_always_202(
     ) -> None:
         scheduled.append((email, application_id))
 
-    # Hintergrund-Task abfangen (kein realer DB-Zugriff im Test).
+    # Catch the background task. The test makes no real database access.
     monkeypatch.setattr(router_mod, "_deliver_magic_link", _capture)
     resp = enabled_client.post("/api/auth/magic-link", json={"email": "x@y.de"})
     assert resp.status_code == 202
     assert resp.json() == {"status": "accepted"}
-    # Arbeit wurde als Background-Task geplant (konstante Antwortzeit).
+    # The work runs as a background task, which keeps the response time constant.
     assert scheduled == [("x@y.de", None)]
 
 
@@ -253,8 +240,8 @@ def test_magic_link_invalid_email_422(enabled_client: TestClient) -> None:
 
 
 def test_magic_link_malformed_altcha_422(enabled_client: TestClient) -> None:
-    # Strukturell ungültiges altcha (Steuerzeichen) → 422 VOR der Logik, auch bei
-    # ausgeschalteter Verifikation (Contract `negative_data_rejection`, Issue #23).
+    # A structurally invalid altcha value (control characters) gives 422 before the logic
+    # runs, also with verification off. Contract `negative_data_rejection`, issue #23.
     resp = enabled_client.post(
         "/api/auth/magic-link", json={"email": "x@y.de", "altcha": "ZÈ♯æL¾&"}
     )
@@ -265,7 +252,7 @@ def test_magic_link_malformed_altcha_422(enabled_client: TestClient) -> None:
 def test_magic_link_well_formed_altcha_202(
     enabled_client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # Strukturell gültige Lösung (Krypto irrelevant, Verifikation aus) → Happy-Path 202.
+    # Verification is off, so a structurally valid solution is enough for 202.
     from app.shared.altcha import create_challenge, solve_challenge
 
     async def _noop(settings: object, email: str, application_id: object, pool: object) -> None:

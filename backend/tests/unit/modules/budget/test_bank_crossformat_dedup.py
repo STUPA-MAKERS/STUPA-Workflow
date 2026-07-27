@@ -1,8 +1,8 @@
-"""Format-übergreifende Staging-Deduplizierung + Sammel-Ersetzung (#fints-batch).
+"""Cross-format staging deduplication and batch replacement (#fints-batch).
 
-Der Umstieg MT940 → CAMT ändert Idempotenz-Schlüssel; das Staging gleicht deshalb
-zusätzlich inhaltlich ab (Fingerprint) und ersetzt aufgeteilte Sammelbuchungen durch
-ihre Einzelumsätze. Fakes wie in ``test_bank_service`` (FIFO-Queues, kein DB-I/O).
+A move from MT940 to CAMT changes the idempotency keys. Staging therefore also compares
+the content through a fingerprint. It replaces a split batch booking with its single
+transactions. The fakes work as in `test_bank_service`: FIFO queues and no database I/O.
 """
 
 from __future__ import annotations
@@ -85,15 +85,14 @@ def _line(**over: Any) -> StatementLine:
     return StatementLine(**base)
 
 
-# ------------------------------------------------------------- pure fingerprints
 def test_fingerprint_keys_variants() -> None:
-    # Mit E2E-Ref zählt NUR die E2E-Ref (präzisester Schlüssel).
+    # With an E2E reference, ONLY the E2E reference counts. It is the most precise key.
     fp = _line_fingerprint(_line(end_to_end_id="E2E-1", purpose="Miete"))
     assert _fingerprint_keys(fp) == [("2026-06-30|-10.00", "e2e:E2E-1")]
-    # Ohne E2E: kanonischer Zweck + Gegen-IBAN.
+    # Without E2E: canonical purpose plus counterparty IBAN.
     fp = _line_fingerprint(_line(purpose="Miete Mai!", counterparty_iban="DE99"))
     assert _fingerprint_keys(fp) == [("2026-06-30|-10.00", "pp:MIETEMAI|DE99")]
-    # Ohne Wertstellung oder ohne Zweck+E2E: kein Inhalts-Vergleich.
+    # Without a value date, or without both purpose and E2E: no content comparison.
     assert _fingerprint_keys(_line_fingerprint(_line(value_date=None, purpose="x"))) == []
     assert _fingerprint_keys(_line_fingerprint(_line())) == []
 
@@ -102,26 +101,28 @@ def test_consume_fingerprint_is_a_multiset() -> None:
     known = {("2026-06-30|-10.00", "e2e:E2E-1"): 1}
     fp = _line_fingerprint(_line(end_to_end_id="E2E-1"))
     assert StagingOps._consume_fingerprint(known, fp) is True
-    # Der eine Bestands-Eintrag ist verbraucht → die zweite identische Zeile ist NEU.
+    # The single stored entry is used up, so the second identical line counts as NEW.
     assert StagingOps._consume_fingerprint(known, fp) is False
     assert StagingOps._consume_fingerprint(known, _line_fingerprint(_line())) is False
 
 
-# ----------------------------------------------------------- _stage_lines flows
 @pytest.mark.asyncio
 async def test_stage_skips_cross_format_duplicate(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Eine per MT940 gestagete Zahlung kommt per CAMT (anderer Schlüssel) erneut →
-    inhaltlicher Fingerprint (E2E) erkennt sie; kein Insert."""
+    """Skip a payment that arrives again in another statement format.
+
+    MT940 staged the payment. CAMT delivers it again under a different key. The content
+    fingerprint (E2E) finds it, so the service inserts nothing.
+    """
     session = _Session()
     svc = _svc(session, monkeypatch)
-    # _existing_fingerprints: eine Bestandszeile mit gleicher Valuta/Betrag/E2E.
+    # _existing_fingerprints: one stored line with the same value date, amount and E2E.
     session.execute_q.append(
         _Result([(date(2026, 6, 30), Decimal("-10.00"), "E2E-1", "Miete Mai", None)])
     )
     line = _line(end_to_end_id="E2E-1", bank_ref="CAMTREF", purpose="Miete Mai")
     imported, duplicates, superseded = await svc._stage_lines(_account(), [line])
     assert (imported, duplicates, superseded) == (0, 1, 0)
-    # Nur die Fingerprint-Query lief — kein Vorschlag, kein Insert.
+    # Only the fingerprint query ran. There is no suggestion and no insert.
     assert len(session.executed) == 1
 
 
@@ -143,8 +144,11 @@ async def test_stage_purpose_iban_fingerprint_without_e2e(
 async def test_stage_multiset_keeps_second_identical_payment(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Zwei identische Zahlungen am selben Tag, nur EINE davon im Bestand → genau eine
-    der eingehenden gilt als Dublette, die andere wird importiert."""
+    """Treat only one of two identical same-day payments as a duplicate.
+
+    The store holds one of the two payments. The service marks exactly one incoming line
+    as a duplicate and imports the other one.
+    """
     session = _Session()
     svc = _svc(session, monkeypatch)
     session.execute_q.append(
@@ -154,9 +158,9 @@ async def test_stage_multiset_keeps_second_identical_payment(
         _line(end_to_end_id="E2E-1", bank_ref="R1"),
         _line(end_to_end_id="E2E-1", bank_ref="R2"),
     ]
-    # Zweite Zeile: Vorschlag (leer) + Insert (liefert Zeile).
-    session.execute_q.append(_Result([]))  # _suggest: Kandidaten
-    session.execute_q.append(_Result([uuid.uuid4()]))  # Insert RETURNING
+    # Second line: an empty suggestion plus an insert that returns a row.
+    session.execute_q.append(_Result([]))  # _suggest: candidates
+    session.execute_q.append(_Result([uuid.uuid4()]))  # insert RETURNING
     imported, duplicates, _ = await svc._stage_lines(_account(), lines)
     assert (imported, duplicates) == (1, 1)
 
@@ -165,8 +169,11 @@ async def test_stage_multiset_keeps_second_identical_payment(
 async def test_stage_supersedes_stale_batch_total_line(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """CAMT-Split staged Einzelumsätze → die alte, ungebuchte MT940-Gesamt-Zeile
-    („DATEI-NR. …", Gesamtbetrag) wird entfernt; Zeilen ohne Sammel-Muster bleiben."""
+    """Remove the stale MT940 batch-total line when a CAMT split arrives.
+
+    The CAMT split stages the single transactions. The service drops the old unbooked
+    total line ("DATEI-NR. ...", total amount). A line without the batch pattern stays.
+    """
     session = _Session()
     svc = _svc(session, monkeypatch)
     batch_raw = {"batch": "true", "batch_total": "-500.00", "batch_count": "2"}
@@ -174,8 +181,8 @@ async def test_stage_supersedes_stale_batch_total_line(
         _line(amount=Decimal("-180.00"), bank_ref="S1", raw=dict(batch_raw)),
         _line(amount=Decimal("-320.00"), bank_ref="S2", raw=dict(batch_raw)),
     ]
-    session.execute_q.append(_Result([]))  # Fingerprints: leer
-    for _ in lines:  # je Zeile: Vorschlag leer + Insert ok
+    session.execute_q.append(_Result([]))  # fingerprints: empty
+    for _ in lines:  # per line: empty suggestion plus a good insert
         session.execute_q.append(_Result([]))
         session.execute_q.append(_Result([uuid.uuid4()]))
     stale_id = uuid.uuid4()
@@ -186,7 +193,7 @@ async def test_stage_supersedes_stale_batch_total_line(
                 (uuid.uuid4(), "Echte Einzelzahlung 500"),
             ]
         )
-    )  # Supersede-Kandidaten
+    )  # supersede candidates
     imported, duplicates, superseded = await svc._stage_lines(_account(), lines)
     assert (imported, duplicates, superseded) == (2, 0, 1)
 
@@ -205,8 +212,11 @@ def test_batch_file_number_extraction() -> None:
 async def test_stage_supersede_scoped_by_file_number(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Zwei Sammler am selben Tag mit gleichem Betrag: nur die Gesamt-Zeile MIT der
-    Datei-Nr. des eingehenden Splits wird ersetzt — der fremde Sammler bleibt."""
+    """Replace only the total line that carries the file number of the incoming split.
+
+    Two batches share the same day and the same amount. The service replaces the total
+    line whose `DATEI-NR.` matches the split. The other batch stays.
+    """
     session = _Session()
     svc = _svc(session, monkeypatch)
     batch_raw = {
@@ -219,8 +229,8 @@ async def test_stage_supersede_scoped_by_file_number(
         _line(amount=Decimal("-180.00"), bank_ref="S1", raw=dict(batch_raw)),
         _line(amount=Decimal("-320.00"), bank_ref="S2", raw=dict(batch_raw)),
     ]
-    session.execute_q.append(_Result([]))  # Fingerprints: leer
-    for _ in lines:  # je Zeile: Vorschlag leer + Insert ok
+    session.execute_q.append(_Result([]))  # fingerprints: empty
+    for _ in lines:  # per line: empty suggestion plus a good insert
         session.execute_q.append(_Result([]))
         session.execute_q.append(_Result([uuid.uuid4()]))
     session.execute_q.append(
@@ -230,7 +240,7 @@ async def test_stage_supersede_scoped_by_file_number(
                 (uuid.uuid4(), "SAMMELUEBERWEISUNG DATEI-NR. 0000111111 ANZAHL 00000002"),
             ]
         )
-    )  # Supersede-Kandidaten: gleicher Tag + Betrag, zwei verschiedene Sammler
+    )  # supersede candidates: same day and amount, two different batches
     imported, _, superseded = await svc._stage_lines(_account(), lines)
     assert (imported, superseded) == (2, 1)
 
@@ -242,9 +252,9 @@ async def test_stage_ignores_unparseable_batch_total(
     session = _Session()
     svc = _svc(session, monkeypatch)
     line = _line(bank_ref="S1", raw={"batch": "true", "batch_total": "kaputt"})
-    session.execute_q.append(_Result([]))  # Fingerprints
-    session.execute_q.append(_Result([]))  # Vorschlag
-    session.execute_q.append(_Result([uuid.uuid4()]))  # Insert
+    session.execute_q.append(_Result([]))  # fingerprints
+    session.execute_q.append(_Result([]))  # suggestion
+    session.execute_q.append(_Result([uuid.uuid4()]))  # insert
     imported, _, superseded = await svc._stage_lines(_account(), [line])
     assert (imported, superseded) == (1, 0)
 
@@ -254,10 +264,10 @@ async def test_stage_supersede_no_candidates(monkeypatch: pytest.MonkeyPatch) ->
     session = _Session()
     svc = _svc(session, monkeypatch)
     line = _line(bank_ref="S1", raw={"batch": "true", "batch_total": "-10.00"})
-    session.execute_q.append(_Result([]))  # Fingerprints
-    session.execute_q.append(_Result([]))  # Vorschlag
-    session.execute_q.append(_Result([uuid.uuid4()]))  # Insert
-    session.execute_q.append(_Result([]))  # Supersede: keine Kandidaten
+    session.execute_q.append(_Result([]))  # fingerprints
+    session.execute_q.append(_Result([]))  # suggestion
+    session.execute_q.append(_Result([uuid.uuid4()]))  # insert
+    session.execute_q.append(_Result([]))  # supersede: no candidates
     imported, _, superseded = await svc._stage_lines(_account(), [line])
     assert (imported, superseded) == (1, 0)
 

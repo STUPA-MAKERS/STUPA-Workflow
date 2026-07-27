@@ -1,14 +1,15 @@
 import { Directive, ElementRef, type OnDestroy, afterNextRender, inject } from '@angular/core';
 
 /**
- * Spiegelt eine zweite, horizontale Scrollleiste **über** einem überlaufenden Container
- * (typisch eine breite Tabelle in `.exp__tableWrap`), sodass die rechten Spalten erreichbar
- * sind, ohne bis zum unteren Rand scrollen zu müssen (#expenses-ux).
+ * Mirror a second horizontal scrollbar above an overflowing container. The container is
+ * normally a wide table in `.exp__tableWrap`. The user reaches the right columns without a
+ * scroll down to the bottom edge (#expenses-ux).
  *
- * Rein DOM — keine Template-Änderung außer dem Attribut am Wrapper. Der Proxy wird als
- * Geschwister-Element direkt vor den Wrapper gesetzt; sein `scrollLeft` ist beidseitig mit
- * dem Wrapper synchronisiert. Sichtbar nur, wenn der Inhalt tatsächlich überläuft (Desktop);
- * mobil (Karten-Reflow ohne Überlauf) blendet er sich selbst aus.
+ * The directive works on the DOM only. The template needs no change except the attribute
+ * on the wrapper. The proxy goes in as a sibling directly before the wrapper. Its `scrollLeft`
+ * stays in sync with the wrapper in both directions. The bar shows only when the content
+ * really overflows, which is the desktop case. On mobile the cards reflow without an
+ * overflow, and the bar hides itself.
  */
 @Directive({ selector: '[appHScrollSync]', standalone: true })
 export class HScrollSyncDirective implements OnDestroy {
@@ -18,7 +19,7 @@ export class HScrollSyncDirective implements OnDestroy {
   private readonly disposers: Array<() => void> = [];
 
   constructor() {
-    // Nur im Browser (nicht SSR): DOM anlegen, wenn der View gerendert ist.
+    // Browser only, never SSR: build the DOM after the view renders.
     afterNextRender(() => this.setup());
   }
 
@@ -36,8 +37,8 @@ export class HScrollSyncDirective implements OnDestroy {
     parent.insertBefore(bar, wrap);
     this.bar = bar;
 
-    // scrollLeft beidseitig spiegeln. Die Gleichheits-Prüfung verhindert Ping-Pong:
-    // das gespiegelte scroll-Event findet beide Werte identisch vor und setzt nichts mehr.
+    // Mirror scrollLeft in both directions. The equality check prevents a ping-pong. The
+    // mirrored scroll event finds two equal values and writes nothing.
     const mirror = (from: HTMLElement, to: HTMLElement): void => {
       if (to.scrollLeft !== from.scrollLeft) to.scrollLeft = from.scrollLeft;
     };
@@ -51,7 +52,7 @@ export class HScrollSyncDirective implements OnDestroy {
     const update = (): void => {
       const full = wrap.scrollWidth;
       inner.style.width = `${full}px`;
-      // Kein Überlauf (z.B. mobiler Karten-Reflow) → Leiste ausblenden.
+      // No overflow, for example after a mobile card reflow: hide the bar.
       bar.style.display = full > wrap.clientWidth + 1 ? 'block' : 'none';
     };
     update();

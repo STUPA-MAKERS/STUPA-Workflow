@@ -9,27 +9,28 @@ import {
 } from './helpers';
 
 /**
- * Szenarien 1 + 2 (testing.md §3): Magic-Link-Bearbeitung + Flow-Durchlauf +
- * Read-only im gesperrten Status. Bündelt drei Kern-Journeys in einem
- * deterministischen Ablauf gegen den echten Stack:
+ * Scenarios 1 and 2 (testing.md §3): magic-link edit, flow run, and read-only in the
+ * locked status. The test bundles three core journeys into one deterministic run
+ * against the real stack:
  *
- *  1. Antrag anlegen (API) → Magic-Link anfordern → Token aus mailpit (echtes SMTP-
- *     Sink) → /status öffnen → Antrag ist bearbeitbar (Initialstatus `entwurf`).
- *  2. Admin (geseedete Session) schaltet den Antrag via Flow-Transition nach
- *     `pruefung` (edit_allowed=false).
- *  3. Applicant lädt erneut → Antrag ist read-only/gesperrt.
+ *  1. Create the application over the API. Request a magic link. Read the token from
+ *     mailpit, a real SMTP sink. Open /status. The application is editable in the
+ *     initial status `entwurf`.
+ *  2. The admin (seeded session) moves the application to `pruefung` with a flow
+ *     transition (edit_allowed=false).
+ *  3. The applicant loads the page again. The application is read-only and locked.
  *
- * HINWEIS (in PR dokumentiert): die BE-Mail verlinkt `/antrag/<id>#t=<token>`,
- * das FE konsumiert den Token jedoch auf `/status?t=…&app=…`. Diese Route-/Fragment-
- * Diskrepanz ist ein gefundener Defekt; der Test deckt die Magic-Link-*Fähigkeit*
- * über den vom FE unterstützten Pfad ab. Die echte Link-Landing ist als Bugfix-Task
- * ausgelagert (nicht Teil von T-40).
+ * NOTE (documented in the PR): the backend mail links to `/antrag/<id>#t=<token>`,
+ * but the frontend reads the token on `/status?t=…&app=…`. This route and fragment
+ * mismatch is a defect that this work found. The test covers the magic-link
+ * *capability* over the path that the frontend supports. A separate bugfix task
+ * holds the real link landing. It is not part of T-40.
  */
 test('@gating Magic-Link bearbeiten → Flow-Transition → read-only', async ({ browser, request }) => {
   const art = readArtifacts();
   const email = uniqueEmail('antrag');
 
-  // 1) Antrag anlegen + Magic-Link anfordern (unauth, CSRF-frei).
+  // 1) Create the application and request a magic link. Unauthenticated, so no CSRF.
   const appId = await createApplication(request, {
     typeId: art.typeId,
     email,
@@ -38,26 +39,25 @@ test('@gating Magic-Link bearbeiten → Flow-Transition → read-only', async ({
   await requestMagicLink(request, { email, applicationId: appId });
   const token = await fetchMagicLinkToken(request, email);
 
-  // 2) Applicant-Kontext: Token einlösen, Bearbeitbarkeit prüfen.
+  // 2) Applicant context: redeem the token and check that the application is editable.
   const applicant = await browser.newContext();
   const ap = await applicant.newPage();
   await ap.goto(`/status?t=${token}&app=${appId}`);
   await expect(ap.getByRole('heading', { name: 'Antragsstatus' })).toBeVisible();
   await expect(ap.locator('ol.timeline')).toBeVisible();
-  // Bearbeitbar: Editier-Formular + Speichern-Button vorhanden.
   await expect(ap.getByRole('button', { name: 'Änderungen speichern' })).toBeVisible();
 
-  // 3) Admin-Kontext: Antrag zur Prüfung schalten (Flow-Transition).
+  // 3) Admin context: move the application to review with a flow transition.
   const admin = await browser.newContext({ storageState: ADMIN_STATE });
   const ad = await admin.newPage();
   await ad.goto(`/applications/${appId}`);
   await expect(ad.getByRole('button', { name: 'Zur Prüfung' })).toBeVisible();
   await ad.getByRole('button', { name: 'Zur Prüfung' }).click();
-  // Bestätigungsdialog → Ausführen.
+  // The transition first opens a confirmation dialog.
   await ad.getByRole('button', { name: 'Ausführen' }).click();
   await expect(ad.getByText('In Prüfung')).toBeVisible();
 
-  // 4) Applicant lädt erneut (Cookie-Session) → read-only/gesperrt.
+  // 4) The applicant loads again with the cookie session. The view is now read-only.
   await ap.goto(`/status?app=${appId}`);
   await expect(ap.getByText('Gesperrt')).toBeVisible();
   await expect(ap.getByRole('button', { name: 'Änderungen speichern' })).toHaveCount(0);

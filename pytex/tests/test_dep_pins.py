@@ -1,9 +1,9 @@
-"""Guard against the pytex-preprocessor pin diverging between the two manifests.
+"""Guard the pytex-preprocessor pin against drift between the two manifests.
 
-The Docker image installs ``requirements.txt`` while local dev / tooling reads
-``pyproject.toml``; if the two ``pytex-preprocessor==`` pins drift, dev/CI and
-prod can resolve different versions of a security-sensitive Markdown→PDF
-renderer (AUD-052). This test fails fast on that divergence.
+The Docker image installs `requirements.txt`. Local dev and the tooling read
+`pyproject.toml`. If the two `pytex-preprocessor==` pins drift, dev/CI and prod
+can resolve different versions of a security-sensitive Markdown to PDF renderer
+(AUD-052). This test fails fast on that drift.
 """
 
 from __future__ import annotations

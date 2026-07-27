@@ -1,13 +1,13 @@
 """Public facade of the meeting service.
 
-:class:`MeetingService` combines the concerns — the router, WS connection layer,
-and all callers bind to exactly this class. The implementation lives in the ops
+`MeetingService` combines the concerns. The router, the WebSocket connection layer,
+and every other caller bind to this class only. The implementation lives in the ops
 classes:
 
-* :class:`~.lifecycle.LifecycleOps` — create/patch/delete, lifecycle rules, broadcast
-* :class:`~.listing.ListingOps` — detail read, list, filter gremien, timeline/search
-* :class:`~.permissions.PermissionOps` — RBAC checks, visibility scope, flag serializer
-* :class:`~.votes.VoteReadOps` — vote tally reload, reveal rule, quorum helpers
+* `lifecycle.LifecycleOps` — create, patch, delete, lifecycle rules, broadcast
+* `listing.ListingOps` — detail read, list, gremien filter, timeline and search
+* `permissions.PermissionOps` — RBAC checks, visibility scope, flag serializer
+* `votes.VoteReadOps` — vote tally reload, reveal rule, quorum helpers
 """
 
 from __future__ import annotations
@@ -24,4 +24,4 @@ class MeetingService(
     PermissionOps,
     VoteReadOps,
 ):
-    """DB-backed meeting operations (bound to one ``AsyncSession`` + publisher)."""
+    """DB-backed meeting operations bound to one `AsyncSession` and a publisher."""

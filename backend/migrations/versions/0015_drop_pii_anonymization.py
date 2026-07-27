@@ -1,10 +1,11 @@
-"""PII-/Anonymisierungs-Feature entfernt (Backlog #3).
+"""Remove the PII and anonymization feature (backlog #3).
 
-Die Feature-Reste (``applicant.anonymized_at``, ``form_field.is_pii``) stammen
-aus dem lange verworfenen Anonymisierungs-Konzept: es gab weder einen Endpoint
-noch UI; die Audit-Actions ``pii_access``/``pii_deletion``/``anonymization``
-wurden nie geschrieben. Bestehende ``audit_entry``-Zeilen bleiben unberührt
-(append-only). Idempotent (``IF [NOT] EXISTS``).
+`applicant.anonymized_at` and `form_field.is_pii` are the last parts of an
+anonymization concept that the project dropped long ago. Neither an endpoint nor
+a user interface ever used them. The audit actions `pii_access`, `pii_deletion`
+and `anonymization` never reached the log. Existing `audit_entry` rows stay
+untouched, because the audit log is append-only. The migration is idempotent
+(`IF [NOT] EXISTS`).
 """
 
 from __future__ import annotations

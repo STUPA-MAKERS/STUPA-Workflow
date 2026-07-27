@@ -1,4 +1,8 @@
-"""Router-Tests protocol (T-22): Endpunkt-Verdrahtung + RBAC (protocol.write), Service gefaked."""
+"""Router tests for the protocol endpoints (T-22).
+
+The tests cover the endpoint wiring and the RBAC gate (protocol.write). The service is
+a fake.
+"""
 
 from __future__ import annotations
 
@@ -31,7 +35,7 @@ class _FakeSession:
 
 
 class _FakePool:
-    """arq-Pool-Fake: protokolliert enqueue_job-Aufrufe."""
+    """arq pool fake that records the enqueue_job calls."""
 
     def __init__(self) -> None:
         self.jobs: list[tuple[str, str]] = []
@@ -46,8 +50,8 @@ class _FakeService:
         self.calls: list[str] = []
         self.status = status
         self.session = _FakeSession()
-        # Authz delegiert (per Gremium) an MeetingService; im Router-Unit-Test no-op.
-        # Die echten authz-Pfade prüft der Service-Test (test_protocol_service).
+        # The router delegates the per-Gremium authorization to MeetingService, so this
+        # fake is a no-op. test_protocol_service covers the real authz paths.
         self.authz: list[str] = []
 
     async def authorize_write_meeting(self, meeting_id: UUID, principal: object) -> None:
@@ -136,7 +140,7 @@ def _writer(app: FastAPI, *perms: str) -> None:
     )
 
 
-# ----------------------------------------------------------------- RBAC fail-closed
+# RBAC fail-closed.
 def test_create_protocol_requires_auth_401(client: TestClient) -> None:
     assert client.post(f"/api/meetings/{MEETING_ID}/protocol").status_code == 401
 
@@ -144,9 +148,12 @@ def test_create_protocol_requires_auth_401(client: TestClient) -> None:
 def test_create_protocol_authz_delegated_to_service(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
-    """Router gatet nur Authentifizierung; die per-Gremium-Berechtigung delegiert er an
-    den Service (AUD-016) — hier nachgewiesen über den authz-Hook-Aufruf."""
-    _writer(app)  # nur eingeloggt, keine globale Permission
+    """The router gates authentication only.
+
+    It delegates the per-Gremium permission to the service (AUD-016). The call of the
+    authz hook proves the delegation.
+    """
+    _writer(app)  # logged in only, no global permission
     r = client.post(f"/api/meetings/{MEETING_ID}/protocol")
     assert r.status_code == 200
     assert fake_service.authz == [f"write_meeting:{MEETING_ID}"]
@@ -165,7 +172,7 @@ def test_finalize_requires_auth_401(client: TestClient) -> None:
     assert client.post(f"/api/protocols/{PROTOCOL_ID}/finalize").status_code == 401
 
 
-# ------------------------------------------------------------------- happy paths
+# Happy paths.
 def test_create_or_load_protocol(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
@@ -179,7 +186,7 @@ def test_create_or_load_protocol(
 def test_get_protocol_read_only(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
-    """Reload-/Poll-Pfad (#429): GET liest ohne Anlage-Seiteneffekt."""
+    """Reload and poll path (#429): GET reads and creates no protocol."""
     _writer(app, "meeting.manage")
     fake_service.status = "rendering"
     r = client.get(f"/api/meetings/{MEETING_ID}/protocol")
@@ -208,12 +215,12 @@ def test_update_protocol_rejects_empty_body_422(app: FastAPI, client: TestClient
 def test_update_protocol_rejects_oversized_markdown_422(
     app: FastAPI, client: TestClient
 ) -> None:
-    """AUD-060: Markdown ist am API-Rand auf 512 kB begrenzt (deployment-unabhängiges 422)."""
+    """AUD-060: the API caps the Markdown at 512 kB and answers 422 in any deployment."""
     _writer(app, "meeting.manage")
     oversized = "x" * (512_000 + 1)
     r = client.patch(f"/api/protocols/{PROTOCOL_ID}", json={"markdown": oversized})
     assert r.status_code == 422
-    # Knapp unter dem Limit bleibt gültig (Service liefert 200).
+    # Just under the limit stays valid, and the service answers 200.
     ok = client.patch(f"/api/protocols/{PROTOCOL_ID}", json={"markdown": "x" * 512_000})
     assert ok.status_code == 200
 
@@ -235,7 +242,7 @@ def test_embed_votes_rejects_empty_list_422(app: FastAPI, client: TestClient) ->
 def test_finalize_protocol_sync_fallback_without_pool(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
-    """Ohne Redis (kein ``arq_pool``) rendert finalize synchron — Alt-Verhalten."""
+    """Without Redis (no `arq_pool`) finalize renders synchronously, as it did before."""
     _writer(app, "protocol.finalize")
     r = client.post(f"/api/protocols/{PROTOCOL_ID}/finalize")
     assert r.status_code == 200
@@ -252,7 +259,7 @@ def test_finalize_protocol_sync_fallback_without_pool(
 def test_finalize_protocol_enqueues_with_pool(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
-    """Mit Redis: ``rendering`` zurückgeben + ``render_protocol``-Job enqueuen."""
+    """With Redis: return `rendering` and enqueue the `render_protocol` job."""
     _writer(app, "protocol.finalize")
     pool = _FakePool()
     app.state.arq_pool = pool
@@ -260,13 +267,13 @@ def test_finalize_protocol_enqueues_with_pool(
     assert r.status_code == 200
     assert r.json()["status"] == "rendering"
     assert pool.jobs == [("render_protocol", str(PROTOCOL_ID))]
-    assert fake_service.calls == [f"start_finalize:{PROTOCOL_ID}"]  # kein Sync-Render
+    assert fake_service.calls == [f"start_finalize:{PROTOCOL_ID}"]  # no sync render
 
 
 def test_finalize_protocol_idempotent_while_rendering(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
-    """Ein zweites finalize während des Renders enqueued nicht erneut."""
+    """A second finalize during the render does not enqueue again."""
     _writer(app, "protocol.finalize")
     fake_service.status = "rendering"
     pool = _FakePool()
@@ -278,9 +285,9 @@ def test_finalize_protocol_idempotent_while_rendering(
     assert fake_service.calls == [f"start_finalize:{PROTOCOL_ID}"]
 
 
-# ------------------------------------------------------------- service wiring
+# Service wiring.
 def test_get_protocol_service_wires_state_infra() -> None:
-    """Storage + Mail-Queue stammen aus dem App-State (T-20-Infra), nicht dupliziert."""
+    """The storage and the mail queue come from the app state (T-20 infra), not a copy."""
     request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(
         object_storage="STORE", arq_pool=object()
     )))

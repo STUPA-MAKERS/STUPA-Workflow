@@ -1,11 +1,12 @@
-"""Meeting: ``closed_at`` (#14) + Permission ``meeting.delete_finalized`` (#16).
+"""Meeting: `closed_at` (#14) and the `meeting.delete_finalized` permission (#16).
 
-* ``meeting.closed_at`` — automatisch gesetzt, wenn die Sitzung auf ``closed``
-  gestellt wird; liefert die »Ende«-Zeile der Protokoll-Titelseite.
-* ``meeting.delete_finalized`` — globale Permission: Sitzungen mit FINALISIERTEM
-  Protokoll löschen. Seed an die ``admin``-Rolle (Admin = alle Rechte).
+* `meeting.closed_at` — the platform sets it when the meeting goes to `closed`.
+  It fills the "end" row on the title page of the protocol.
+* `meeting.delete_finalized` — a global permission to delete a meeting that has
+  a FINALIZED protocol. The migration seeds it to the `admin` role, because an
+  admin holds every permission.
 
-Idempotent (``IF NOT EXISTS`` / ``ON CONFLICT DO NOTHING``).
+The migration is idempotent (`IF NOT EXISTS` and `ON CONFLICT DO NOTHING`).
 """
 
 from __future__ import annotations

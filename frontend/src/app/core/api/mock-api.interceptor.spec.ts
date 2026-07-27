@@ -30,11 +30,11 @@ describe('mockApiInterceptor', () => {
     const { api, http } = setup(true);
     api.applicationTypes().subscribe((types) => {
       expect(types.length).toBeGreaterThan(0);
-      // mapper applied to the wire Page → view shape with hasBudget
+      // The mapper turned the wire Page into the view shape with hasBudget.
       expect(typeof types[0].hasBudget).toBe('boolean');
       done();
     });
-    http.expectNone('/api/application-types'); // handled by the mock, never hits the backend
+    http.expectNone('/api/application-types');
   });
 
   it('passes through when the mock is disabled', () => {
@@ -48,7 +48,6 @@ describe('mockApiInterceptor', () => {
     const { http } = setup(true);
     const client = TestBed.inject(HttpClient);
     client.get('/assets/logo.svg', { responseType: 'text' }).subscribe();
-    // Not an /api/ path → reaches the testing backend.
     http.expectOne('/assets/logo.svg').flush('<svg/>');
     http.verify();
   });
@@ -56,7 +55,7 @@ describe('mockApiInterceptor', () => {
   it('passes through unmatched /api/ methods/paths (final next)', () => {
     const { http } = setup(true);
     const client = TestBed.inject(HttpClient);
-    // OPTIONS is never matched by any branch → falls through to next().
+    // No branch matches OPTIONS → the request falls through to next().
     client.request('OPTIONS', '/api/unknown').subscribe();
     http.expectOne('/api/unknown').flush(null);
     http.verify();
@@ -101,7 +100,7 @@ describe('mockApiInterceptor', () => {
     const { api } = setup(true);
     api.getApplication('33333333-3333-3333-3333-333333333333').subscribe((app) => {
       expect(app.state?.editAllowed).toBe(true);
-      // i18n label resolved by the mapper (de default)
+      // The mapper resolved the i18n label (de default).
       expect(app.state?.label).toBe('Eingereicht');
       api.timeline(app.id).subscribe((t) => {
         expect(t.length).toBeGreaterThan(0);
@@ -121,7 +120,6 @@ describe('mockApiInterceptor', () => {
     });
   });
 
-  // ----- raw-HttpClient branch coverage of the mock router ------------------
   describe('mock router branches (raw HttpClient)', () => {
     let http: HttpClient;
     let ctrl: HttpTestingController;
@@ -251,9 +249,7 @@ describe('mockApiInterceptor', () => {
       expect(app.id).toBeTruthy();
     });
 
-    // ----- PUT branches -----
     it('PUT …/agenda/order reorders the in-memory agenda', async () => {
-      // First add two freetext TOPs, then reorder.
       const after1 = await firstValueFrom(
         http.post<{ id: string }[]>('/api/meetings/m1/agenda', { title: 'TOP A' }),
       );
@@ -299,11 +295,10 @@ describe('mockApiInterceptor', () => {
         ),
       );
       const member = res.find((r) => r.principalId === 'p-2');
-      expect(member?.status).toBe('present'); // default when body has no status
+      expect(member?.status).toBe('present');
       expect(member?.source).toBe('lead');
     });
 
-    // ----- POST branches -----
     it('POST /auth/logout → logout out', async () => {
       const res = await firstValueFrom(http.post<{ logout_url: null }>('/api/auth/logout', {}));
       expect(res.logout_url).toBeNull();
@@ -354,7 +349,6 @@ describe('mockApiInterceptor', () => {
       );
       const countAfterFirst = first.filter((a) => a.applicationId === appId).length;
       expect(countAfterFirst).toBe(1);
-      // Adding the same appId again must not duplicate it.
       const second = await firstValueFrom(
         http.post<{ applicationId: string | null }[]>('/api/meetings/m1/agenda', {
           applicationId: appId,
@@ -482,7 +476,7 @@ describe('mockApiInterceptor', () => {
     });
 
     it('POST /votes/{id}/close on a vote without leading falls back to "accepted"', async () => {
-      // a2 has leading=null → result should become 'accepted'.
+      // a2 has leading=null, so the result must become 'accepted'.
       await firstValueFrom(http.post('/api/votes/a0000000-0000-0000-0000-0000000000a2/close', {}));
       const m = await get<{ votes: { id: string; result: string | null }[] }>('/api/meetings/m1');
       const v = m.votes.find((x) => x.id === 'a0000000-0000-0000-0000-0000000000a2');
@@ -490,7 +484,7 @@ describe('mockApiInterceptor', () => {
     });
 
     it('POST /votes/{id}/open on a vote keeps its existing result (status branch)', async () => {
-      // open uses status === 'closed' ? ... : v.result → keeps result on open.
+      // The open branch keeps `v.result` because the new status is not 'closed'.
       const res = await firstValueFrom(http.post('/api/votes/a0000000-0000-0000-0000-0000000000a2/open', {}));
       expect(res).toBeNull();
     });
@@ -509,7 +503,7 @@ describe('mockApiInterceptor', () => {
         }),
       );
       expect(m.status).toBe('planned');
-      expect(m.title).toBe('Neue Sitzung'); // trimmed
+      expect(m.title).toBe('Neue Sitzung');
       expect(m.date).toBe('2026-07-01');
     });
 
@@ -543,7 +537,6 @@ describe('mockApiInterceptor', () => {
       expect(res.scope).toBe('edit');
     });
 
-    // ----- PATCH branches -----
     it('PATCH /applications/{id} → echoes the data', async () => {
       const app = await firstValueFrom(
         http.patch<{ data: Record<string, unknown> }>('/api/applications/x', {
@@ -594,7 +587,7 @@ describe('mockApiInterceptor', () => {
         http.patch<{ status: string; activeApplicationId: string | null }>('/api/meetings/m1', {}),
       );
       expect(m.status).toBeTruthy();
-      // activeApplicationId stays whatever it was (not undefined).
+      // activeApplicationId keeps its previous value and never becomes undefined.
       expect(m.activeApplicationId !== undefined).toBe(true);
     });
 
@@ -643,7 +636,6 @@ describe('mockApiInterceptor', () => {
       expect(p.markdown).toBeTruthy();
     });
 
-    // ----- DELETE branches -----
     it('DELETE …/agenda/{itemId} removes the TOP', async () => {
       const added = await firstValueFrom(
         http.post<{ id: string }[]>('/api/meetings/m1/agenda', { title: 'TOP del' }),
@@ -657,7 +649,7 @@ describe('mockApiInterceptor', () => {
 
     it('DELETE on an unmatched /api path falls through to next()', () => {
       http.delete('/api/applications/x').subscribe();
-      // No agenda regex match → falls through to the testing backend.
+      // No agenda regex matches → the request falls through to the testing backend.
       ctrl.expectOne('/api/applications/x').flush(null);
     });
   });

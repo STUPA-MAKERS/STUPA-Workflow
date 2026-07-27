@@ -116,7 +116,7 @@ describe('BrandingEditorComponent (#21)', () => {
     const file = new File(['x'], 'logo.png', { type: 'image/png' });
     await userEvent.upload(input, file);
 
-    // editor thumbnail carries the slot name as alt → exposed as role img
+    // The editor thumbnail uses the slot name as alt text, so it gets the img role.
     await waitFor(() =>
       expect(screen.getByRole('img', { name: 'Bildmarke' })).toBeInTheDocument(),
     );
@@ -127,7 +127,7 @@ describe('BrandingEditorComponent (#21)', () => {
     const { toast } = await setup();
     const input = screen.getByLabelText('Favicon') as HTMLInputElement;
     const bad = new File(['x'], 'evil.exe', { type: 'application/x-msdownload' });
-    // applyAccept:false so the handler runs and its own guard rejects the type
+    // applyAccept is false, so the handler runs and its own guard rejects the type.
     await userEvent.upload(input, bad, { applyAccept: false });
     expect(toast.error).toHaveBeenCalledWith('Dateityp nicht erlaubt.');
   });
@@ -167,16 +167,16 @@ describe('BrandingEditorComponent (#21)', () => {
     c.addLink(col);
     expect(col.links.length).toBeGreaterThan(0);
     c.removeLink(col, 0);
-    c.moveColumn(cols.length - 1, -1); // valid move up
-    c.moveColumn(0, -1); // out of bounds → no-op
-    c.moveColumn(cols.length - 1, 1); // out of bounds → no-op
+    c.moveColumn(cols.length - 1, -1); // a valid move up
+    c.moveColumn(0, -1); // out of bounds, so a no-op
+    c.moveColumn(cols.length - 1, 1); // out of bounds, so a no-op
     c.removeColumn(0);
 
-    c.addLegalLink(); // appends an empty-url legal link
+    c.addLegalLink(); // adds a legal link with an empty URL
     expect(c.draft().legalLinks.length).toBeGreaterThan(0);
-    c.removeLegalLink(c.draft().legalLinks.length - 1); // drop the empty one, keep valid seed
+    c.removeLegalLink(c.draft().legalLinks.length - 1); // drop the empty one, keep the valid seed
 
-    c.removeLogo('wordmark'); // absent slot → safe delete branch
+    c.removeLogo('wordmark'); // an absent slot takes the safe delete branch
     c.reemit();
     c.saveDraft();
     expect(c.hasDraftChanges()).toBe(true);
@@ -232,7 +232,6 @@ describe('BrandingEditorComponent (#21)', () => {
     delete d.freetexts.applyInfo;
     const map = c.applyInfo(d);
     expect(map).toEqual({});
-    // a second call returns the already-initialised map
     expect(c.applyInfo(d)).toBe(map);
   });
 

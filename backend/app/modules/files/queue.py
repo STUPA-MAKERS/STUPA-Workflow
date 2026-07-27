@@ -1,10 +1,12 @@
-"""Scan enqueue abstraction (arq) — upload never blocks on ClamAV.
+"""Scan enqueue abstraction over arq. An upload never blocks on ClamAV.
 
-After upload the service only puts a ``scan_attachment`` job in Redis (same arq pool as
-mail dispatch); the worker scans async and writes the result back. Job id =
-``scan:<attachment_id>`` → duplicate enqueues of the same attachment coalesce
-(idempotent). Without Redis (DEV/contract CI) the queue is ``None`` → callers log + skip
-(file stays quarantined, no API block).
+After an upload the service only puts a ``scan_attachment`` job into Redis. It uses the
+same arq pool as the mail dispatch. The worker scans the file asynchronously and writes
+the result back. The job id is ``scan:<attachment_id>``, so two enqueues for the same
+attachment coalesce into one job.
+
+Without Redis (development or contract CI) the queue is ``None``. The caller then logs
+and skips the enqueue. The file stays quarantined and the API does not block.
 """
 
 from __future__ import annotations
@@ -23,16 +25,16 @@ SCAN_TASK_NAME = "scan_attachment"
 
 
 class ScanQueue(Protocol):
-    """Enqueue interface (used by the service)."""
+    """Enqueue interface that the service uses."""
 
     async def enqueue(self, attachment_id: UUID) -> None: ...
 
 
 @dataclass(slots=True)
 class ArqScanQueue:
-    """arq-backed queue: ``scan_attachment`` job with an idempotent job id."""
+    """Queue on top of arq: a ``scan_attachment`` job with an idempotent job id."""
 
-    pool: object  # arq.ArqRedis (loosely typed: no arq import in the API surface)
+    pool: object  # arq.ArqRedis, typed loosely to keep arq out of the API surface
 
     async def enqueue(self, attachment_id: UUID) -> None:
         job = await self.pool.enqueue_job(  # type: ignore[attr-defined]
@@ -43,5 +45,5 @@ class ArqScanQueue:
 
 
 def scan_queue_from_pool(pool: ArqRedis | None) -> ScanQueue | None:
-    """Pool → :class:`ScanQueue` (or ``None`` if no pool)."""
+    """Build a ``ScanQueue`` from the pool, or return ``None`` when there is no pool."""
     return ArqScanQueue(pool) if pool is not None else None

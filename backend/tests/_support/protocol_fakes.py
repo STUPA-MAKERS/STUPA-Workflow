@@ -1,10 +1,10 @@
-"""Test-Fakes für die Protokoll-Unit-Suite (T-22, ohne DB/pytex/MinIO/Redis).
+"""Test fakes for the protocol unit suite (T-22, without DB, pytex, MinIO or Redis).
 
-``FakeSession`` kombiniert beide vom :class:`~app.modules.protocol.service.ProtocolService`
-genutzten Zugriffsmuster: ``get(model, id)`` aus einem Store + ``execute(stmt)`` aus
-einer **geordneten** Ergebnis-Queue (wie :mod:`tests._support.flow_fakes`). ``FakeStorage``/
-``FakeMailQueue`` protokollieren Put/Enqueue; ``FakePytex`` wird aus
-:mod:`tests._support.pdf_fakes` wiederverwendet.
+`FakeSession` combines the two access patterns of
+`app.modules.protocol.service.ProtocolService`. It answers `get(model, id)` from a store
+and `execute(stmt)` from an **ordered** result queue, as `tests._support.flow_fakes` does.
+`FakeStorage` and `FakeMailQueue` record each put and each enqueue call. `FakePytex` comes
+from `tests._support.pdf_fakes`.
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ class FakeResult:
 
 
 class FakeSession:
-    """``get`` aus dem Store, ``execute`` aus der geordneten Queue."""
+    """Answer `get` from the store and `execute` from the ordered queue."""
 
     def __init__(
         self,
@@ -50,9 +50,9 @@ class FakeSession:
         self.committed = 0
 
     async def execute(self, _stmt: Any) -> FakeResult:
-        # Der Header-Meta-Pfad (#protocol-metadata) fragt die Anwesenheit ab; ohne
-        # positionsbasiertes Ergebnis liefern wir leer, statt einen anderen Treffer
-        # zu verschieben.
+        # The header metadata path (#protocol-metadata) reads the attendance. That query
+        # has no entry in the ordered queue. Return an empty result for it, so that it
+        # does not take the result of another query.
         if "meeting_attendance" in str(_stmt).lower():
             return FakeResult()
         return self._results.pop(0) if self._results else FakeResult()
@@ -61,8 +61,11 @@ class FakeSession:
         return self._results.pop(0) if self._results else FakeResult()
 
     async def scalar(self, _stmt: Any) -> Any:
-        """``session.scalar``-Ersatz (Protokollant-Name, Mitglieder-Count): eigene
-        Queue, Default ``None`` — die ``execute``-Reihenfolge bleibt unberührt."""
+        """Stand in for `session.scalar` (minute taker name, member count).
+
+        This method uses its own queue and returns `None` by default. It keeps the order
+        of the `execute` queue unchanged.
+        """
         if self.scalar_results:
             return self.scalar_results.pop(0)
         return None
@@ -83,7 +86,7 @@ class FakeSession:
 
 
 class FakeStorage:
-    """Object-Storage-Fake: protokolliert Puts, liefert eine feste signierte URL."""
+    """Object storage fake that records each put and returns a fixed signed URL."""
 
     def __init__(self, *, url: str = "https://minio.local/signed") -> None:
         self.url = url
@@ -104,7 +107,7 @@ class FakeStorage:
 
 
 class FakeMailQueue:
-    """Sammelt enqueued Mails."""
+    """Collect the enqueued mails."""
 
     def __init__(self) -> None:
         self.sent: list[MailMessage] = []

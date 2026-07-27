@@ -1,9 +1,9 @@
 """Shared fixtures: a TestClient and a fake render backend.
 
-Unit tests never touch tectonic; they monkeypatch ``app.render_blob_async`` so
-the wrapper logic (parsing, error mapping, response shaping) is exercised in
-isolation. The fake records the :class:`BuildRequest` it was handed so tests can
-assert the wrapper forwards body/variant/kinds verbatim.
+Unit tests never touch tectonic. They monkeypatch `app.render_blob_async`, so a
+test drives the wrapper logic in isolation: parsing, error mapping and response
+shaping. The fake records the `BuildRequest` it received. A test can then assert
+that the wrapper forwards the body, the variant and the kinds unchanged.
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ def client() -> Iterator[TestClient]:
 
 
 class RenderRecorder:
-    """Captures the last :class:`BuildRequest` and replays a canned result/error."""
+    """Capture the last `BuildRequest` and replay a canned result or error."""
 
     def __init__(self) -> None:
         self.calls: list[BuildRequest] = []

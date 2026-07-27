@@ -2,7 +2,7 @@ import type { TranslationKey } from '@core/i18n/translations';
 import type { StatementLine } from '../budget/budget-tree.api';
 import { problemCode } from '../budget/expense-display.util';
 
-/** Split a counterparty into name + IBAN; banks sometimes prefix the name with the IBAN. */
+/** Split a counterparty into name and IBAN. Some banks prefix the name with the IBAN. */
 export function splitCounterparty(l: StatementLine): { name: string; iban: string } {
   let iban = (l.counterpartyIban ?? '').trim();
   let name = (l.counterpartyName ?? '').trim();
@@ -33,7 +33,7 @@ export function fintsErrorKey(err: unknown): TranslationKey {
   return (code && FINTS_ERROR_KEYS[code]) || 'fints.errSync';
 }
 
-/** Only inline data-URL raster images may be shown as TAN challenge (no remote URLs). */
+/** Accept only inline data-URL raster images as a TAN challenge. Reject remote URLs. */
 export function safeChallengeImage(img: string): string {
   return /^data:image\/(png|jpe?g|gif|webp);base64,/i.test(img) ? img : '';
 }

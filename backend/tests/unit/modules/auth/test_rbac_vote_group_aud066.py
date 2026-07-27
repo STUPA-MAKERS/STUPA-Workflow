@@ -1,6 +1,8 @@
-"""AUD-066: an active ``vote.cast`` gremium membership adds the NAMESPACED
-``vote:<gremium_id>`` key (not the bare UUID-as-text) to ``Principal.groups``,
-so a coincident OIDC group claim cannot satisfy gremium cast eligibility.
+"""AUD-066: an active `vote.cast` Gremium membership adds a namespaced group key.
+
+The membership adds `vote:<gremium_id>` to `Principal.groups`, not the bare UUID as
+text. A coincident OIDC group claim can therefore not satisfy the Gremium cast
+eligibility.
 """
 
 from __future__ import annotations
@@ -18,14 +20,14 @@ async def test_vote_cast_membership_emits_namespaced_group_key() -> None:
     row = PrincipalRow(sub="u", email=None, display_name=None, oidc_groups=None)
     row.id = "pid"  # type: ignore[assignment]
     gid = "11111111-1111-1111-1111-111111111111"
-    # Bei leeren Assignments ist ``groups`` leer ⇒ Mapping-Query wird übersprungen;
-    # ``role_ids`` leer ⇒ permissions/role_keys-Queries werden übersprungen. Es bleibt:
-    # (1) Assignments, (2) Membership-Query.
+    # Without assignments, `groups` stays empty, so the code skips the mapping query.
+    # An empty `role_ids` also skips the permission and role-key queries. Two queries
+    # remain: (1) assignments, (2) membership.
     db = fake_session(
-        result(),  # keine RoleAssignments
-        result((gid, ["vote.cast"])),  # Membership: (gremium_id, perms)
+        result(),  # no RoleAssignments
+        result((gid, ["vote.cast"])),  # membership: (gremium_id, perms)
     )
     p = await rbac.resolve_principal(db, row, NOW)
     assert rbac.vote_group_key(gid) in p.groups
-    # Der nackte UUID-String darf NICHT als Cast-Key gesetzt sein (AUD-066).
+    # The bare UUID string must NOT serve as the cast key (AUD-066).
     assert gid not in p.groups

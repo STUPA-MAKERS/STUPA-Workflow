@@ -11,9 +11,10 @@ import type { SelectOption } from '@stupa-makers/ui-kit';
 const PAGE = 15;
 
 /**
- * Overview timeline state: server-side keyset paging in both directions
- * (past above, upcoming below a "now" marker) plus a collapsed, relevance-
- * sorted search mode with offset paging. Provided by MeetingsComponent.
+ * Overview timeline state with server-side keyset paging in both directions.
+ * Past meetings sit above a "now" marker, upcoming ones below it. The search mode
+ * collapses both into one relevance-sorted list with offset paging.
+ * Provided by MeetingsComponent.
  */
 @Injectable()
 export class MeetingsTimelineService implements OnDestroy {
@@ -36,9 +37,9 @@ export class MeetingsTimelineService implements OnDestroy {
   /** One-shot flag for the initial scroll to the "now" marker (parent effect). */
   didInitialScroll = false;
 
-  /** Committee filter of the overview ('' = all). */
+  /** Gremium filter of the overview ('' = all). */
   readonly gremiumFilter = signal<string>('');
-  /** Committees with at least one readable meeting (backend-provided). */
+  /** Gremien with at least one readable meeting. The backend provides the list. */
   readonly filterGremien = signal<{ id: string; name: string }[]>([]);
   readonly filterGremiumOptions = computed<SelectOption[]>(() => [
     { value: '', label: this.i18n.translate('meetings.list.allCommittees') },
@@ -53,7 +54,7 @@ export class MeetingsTimelineService implements OnDestroy {
   readonly searchHasMore = signal(false);
   readonly loadingSearch = signal(false);
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
-  /** Sequence counter so late responses of stale queries are discarded. */
+  /** Sequence counter that lets the service discard late responses of stale queries. */
   private searchSeq = 0;
 
   readonly hasMorePast = computed(() => this.pastHasMore());
@@ -65,8 +66,8 @@ export class MeetingsTimelineService implements OnDestroy {
   );
 
   constructor() {
-    // Filter options: committees with at least one READABLE meeting — every
-    // reader may filter, so this loads ungated.
+    // Filter options: Gremien with at least one READABLE meeting. Every reader
+    // may filter, so this load has no permission gate.
     this.api
       .listMeetingFilterGremien()
       .pipe(takeUntilDestroyed())
@@ -81,9 +82,9 @@ export class MeetingsTimelineService implements OnDestroy {
   }
 
   /**
-   * Scroll-driven lazy loading: near the top edge → older past, near the
-   * bottom edge → more upcoming. In search mode the bottom edge loads the
-   * next offset page instead.
+   * Scroll-driven lazy loading. Near the top edge it loads older past meetings.
+   * Near the bottom edge it loads more upcoming meetings. In search mode the
+   * bottom edge loads the next offset page instead.
    */
   onScroll(el: HTMLElement): void {
     if (this.searchActive()) {
@@ -94,7 +95,7 @@ export class MeetingsTimelineService implements OnDestroy {
     if (el.scrollHeight - el.scrollTop - el.clientHeight <= 80) this.loadMoreUpcoming();
   }
 
-  /** Debounced (~400 ms) header search; an empty query returns to the timeline. */
+  /** Debounced (~400 ms) header search. An empty query returns to the timeline. */
   onSearch(value: string): void {
     this.searchQuery.set(value);
     if (this.searchTimer) clearTimeout(this.searchTimer);
@@ -124,7 +125,7 @@ export class MeetingsTimelineService implements OnDestroy {
     const seq = ++this.searchSeq;
     this.api
       .listMeetingsTimeline({
-        direction: 'upcoming', // meaningless in search mode (backend collapses)
+        direction: 'upcoming', // no effect in search mode: the backend collapses both
         cursor: this.searchCursor,
         limit: PAGE,
         gremiumId: this.gremiumFilter() || undefined,
@@ -145,7 +146,7 @@ export class MeetingsTimelineService implements OnDestroy {
       });
   }
 
-  /** Switch the committee filter → reload the timeline (or the search). */
+  /** Switch the Gremium filter and reload the timeline or the search. */
   selectGremiumFilter(id: string): void {
     this.gremiumFilter.set(id);
     if (this.searchActive()) {
@@ -155,7 +156,7 @@ export class MeetingsTimelineService implements OnDestroy {
     this.loadList();
   }
 
-  /** Load the next past page, keeping the scroll position across the new height. */
+  /** Load the next past page and keep the scroll position across the new height. */
   loadMorePast(el: HTMLElement): void {
     if (this.loadingPast() || !this.pastHasMore() || this.pastCursor === null) return;
     this.loadingPast.set(true);
@@ -170,7 +171,8 @@ export class MeetingsTimelineService implements OnDestroy {
       .subscribe({
         next: (page) => {
           this.loadingPast.set(false);
-          // Page arrives newest-first → reverse and prepend (oldest stays on top).
+          // The page arrives newest-first. Reverse and prepend it, so the oldest
+          // meeting stays on top.
           this.pastItems.update((cur) => [...[...page.items].reverse(), ...cur]);
           this.pastCursor = page.nextCursor;
           this.pastHasMore.set(page.nextCursor !== null);
@@ -204,7 +206,7 @@ export class MeetingsTimelineService implements OnDestroy {
       });
   }
 
-  /** Replace an updated meeting in both directions (settings save). */
+  /** Replace an updated meeting in both directions after a settings save. */
   replaceInTimeline(updated: Meeting): void {
     const repl = (list: Meeting[]): Meeting[] =>
       list.map((x) => (x.id === updated.id ? updated : x));
@@ -221,7 +223,7 @@ export class MeetingsTimelineService implements OnDestroy {
 
   /** Initial load: first upcoming AND past page in parallel. */
   loadList(): void {
-    // Plain committee members also see their (server-side filtered) timeline.
+    // Plain Gremium members also see their timeline, filtered on the server.
     if (
       !this.auth.can('meeting.manage') &&
       !this.auth.can('protocol.write') &&
@@ -253,7 +255,7 @@ export class MeetingsTimelineService implements OnDestroy {
         this.upcomingItems.set(upcoming.items);
         this.upcomingCursor = upcoming.nextCursor;
         this.upcomingHasMore.set(upcoming.nextCursor !== null);
-        // "past" arrives newest-first → reverse: oldest on top, newest at "now".
+        // "past" arrives newest-first. Reverse it: oldest on top, newest at "now".
         this.pastItems.set([...past.items].reverse());
         this.pastCursor = past.nextCursor;
         this.pastHasMore.set(past.nextCursor !== null);

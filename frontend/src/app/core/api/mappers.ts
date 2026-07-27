@@ -1,13 +1,13 @@
 /**
  * Wire → view mappers.
  *
- * Pure functions that translate the backend JSON (`*Wire`, camelCase via
- * `_CamelModel`) into the FE view models: i18n labels are resolved for the
- * requested language, convenience fields (`isPublic`) derived and optional
- * fields normalized to a fixed `null` default.
+ * These pure functions translate the backend JSON (`*Wire`, camelCase via
+ * `_CamelModel`) into the FE view models. They resolve the i18n labels for the
+ * requested language. They derive convenience fields such as `isPublic`. They
+ * normalize optional fields to a fixed `null` default.
  *
- * Deliberately DI-free (no Angular) → isolated-testable in `mappers.spec.ts`;
- * `lang` is passed through by the `ApiClient` (via `I18nService`).
+ * The module stays free of DI and Angular, so `mappers.spec.ts` can test it in
+ * isolation. The `ApiClient` passes `lang` in from the `I18nService`.
  */
 
 import { resolveI18n } from '@shared/forms/i18n-text';
@@ -166,9 +166,10 @@ export function mapTransition(wire: TransitionOutWire, lang: string): Transition
 }
 
 /**
- * Resolve the backend diff maps into iterable, key-carrying lists. `null` (no
- * diff, e.g. first version) is passed through; missing sub-maps are defensively
- * normalized to `{}`.
+ * Resolve the backend diff maps into iterable lists that carry their key.
+ *
+ * A `null` diff passes through. The first version has no diff. The function
+ * normalizes a missing sub-map to `{}`.
  */
 export function mapDiff(wire: DataDiffWire | null | undefined): DataDiff | null {
   if (!wire) return null;
@@ -191,7 +192,7 @@ export function mapAttachment(wire: AttachmentOutWire): Attachment {
     size: wire.size,
     scanned: wire.scanned,
     isComparisonOffer: wire.is_comparison_offer,
-    // `scanned=true` only means "scan finished"; clean-vs-finding is decided at download.
+    // `scanned=true` only means "scan finished". The download decides clean or finding.
     scanState: wire.scanned ? 'clean' : 'scanning',
   };
 }
@@ -209,8 +210,6 @@ export function mapVersion(wire: VersionOutWire): ApplicationVersion {
     at: wire.at,
   };
 }
-
-// --- Meetings + protocol --------------------------------------------------- //
 
 export function mapMeetingVote(wire: MeetingVoteOutWire): MeetingVote {
   return {

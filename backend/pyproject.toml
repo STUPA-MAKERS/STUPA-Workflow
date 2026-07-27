@@ -18,51 +18,54 @@ dependencies = [
     "asyncpg>=0.30",
     "alembic>=1.14",
     "greenlet>=3.1",
-    # Auth (T-10): OIDC-Token-Exchange (httpx), id_token-Verify (PyJWT+crypto),
-    # signierte Cookies/Tokens (itsdangerous).
+    # Auth stack (T-10): OIDC token exchange (httpx), id_token verification
+    # (PyJWT+crypto), signed cookies and tokens (itsdangerous).
     "httpx>=0.28",
     "pyjwt[crypto]>=2.10",
     "itsdangerous>=2.2",
-    # Notifications/Mail (T-18): Jinja2-Templates (Subject/Body, i18n DE/EN),
-    # async SMTP-Versand im arq-Worker (kein Blockieren der API).
+    # Notifications and mail (T-18): Jinja2 templates (subject and body, i18n DE/EN).
+    # The arq worker sends the mail over SMTP asynchronously, so the API never blocks.
     "jinja2>=3.1",
     "aiosmtplib>=3.0",
-    # Files/Uploads (T-13): MIME-Sniffing (libmagic), MinIO/S3-Client + signierte URLs,
-    # ClamAV-Scan via clamd. Alle drei werden lazy importiert (nur auf dem Upload-/
-    # Worker-Pfad) — der Contract-CI (nur Postgres) lädt sie nie.
+    # Files and uploads (T-13): MIME sniffing (libmagic), MinIO/S3 client with signed
+    # URLs, ClamAV scan through clamd. All three load lazily, only on the upload path or
+    # the worker path. The contract CI runs Postgres only and never loads them.
     "python-magic>=0.4",
     "minio>=7.2",
-    # >=1.0.2: clamd 1.0.1 ist sdist-only und baut über d2to1 (importiert
-    # setuptools.dist._get_unpatched, ab setuptools>=71 entfernt) → Build-Bruch.
-    # 1.0.2 liefert ein Wheel. Floor verhindert, dass der Resolver auf 1.0.1 zurückfällt.
+    # >=1.0.2: clamd 1.0.1 ships as sdist only and builds through d2to1. d2to1 imports
+    # setuptools.dist._get_unpatched, which setuptools>=71 removed, so the build breaks.
+    # 1.0.2 ships a wheel. The floor stops the resolver from falling back to 1.0.1.
     "clamd>=1.0.2",
-    # Multipart-Parsing für den Datei-Upload (FastAPI UploadFile/Form).
+    # Multipart parsing for the file upload (FastAPI UploadFile and Form).
     "python-multipart>=0.0.18",
-    # Live-Vote (T-16): Redis-PubSub-Fan-out + Cast-Lock (redis.asyncio) — bislang
-    # transitiv über arq, jetzt direkt genutzt (Broker/Locker), daher explizit.
+    # Live vote (T-16): Redis pub/sub fan-out and cast lock (redis.asyncio). arq pulled
+    # redis in transitively before. The broker and the locker now use it directly, so the
+    # dependency is explicit.
     "redis>=5.0",
-    # Excel-Export (TASKS #2): Budget-Baum + Anträge als .xlsx (filter-aware).
-    # Lazy importiert (nur auf dem Export-Pfad), reines Python-Paket.
+    # Excel export (TASKS #2): budget tree and applications as .xlsx, filter aware.
+    # Loads lazily, only on the export path. Pure Python package.
     "openpyxl>=3.1",
-    # ZUGFeRD/Factur-X-Import (#invoices): eingebettetes CII-XML aus Rechnungs-PDFs
-    # lesen. Reines Python, lazy importiert (nur auf dem Import-Pfad). pypdf wird
-    # direkt genutzt (eigener Anhang-Extractor statt pychevals buggy while-Loop).
+    # ZUGFeRD/Factur-X import (#invoices): read the embedded CII XML from invoice PDFs.
+    # Pure Python, loads lazily, only on the import path. The code uses pypdf directly
+    # through our own attachment extractor, because the while loop in pycheval has a bug.
     "pycheval>=0.3,<0.4",
     "pypdf>=6.0",
-    # iCal-Abo (#ics): RFC5545-Feed der eigenen Sitzungen. Lazy importiert (nur auf
-    # dem Feed-Pfad), reines Python-Paket.
+    # iCal subscription (#ics): RFC5545 feed of the meetings of the user. Loads lazily,
+    # only on the feed path. Pure Python package.
     "icalendar>=6.0",
-    # FinTS-Bankabgleich (#fints): PIN/TAN-Online-Banking-Client (z. B. Sparkasse) zum
-    # Abruf echter Kontoumsätze. Zieht ``mt-940`` transitiv (MT940-Parser). Lazy
-    # importiert (nur auf dem Sync-/Import-Pfad) — der Contract-CI lädt es nie.
+    # FinTS bank reconciliation (#fints): PIN/TAN online banking client, for example
+    # Sparkasse, to fetch real account transactions. It pulls `mt-940` in transitively as
+    # the MT940 parser. Loads lazily, only on the sync path or the import path. The
+    # contract CI never loads it.
     "fints>=5.0",
-    # Hinweis: fints pinnt lxml~=6.0.2 (<6.1), daher lässt sich der lxml-XXE-Fix (6.1.0,
-    # PYSEC-2026-87) hier NICHT erzwingen (ResolutionImpossible). lxml wird nur transitiv
-    # von fints/sepaxml/xmlschema zum Parsen der authentifizierten Bank-Antworten genutzt;
-    # unser eigenes CAMT-Parsing läuft über die stdlib ``ElementTree``. Das Advisory ist
-    # daher in pip-audit gezielt ausgenommen (CI be-deps-audit, mit Begründung).
-    # PIN-Verschlüsselung at-rest (Fernet) für FinTS-Zugangsdaten. Bisher transitiv über
-    # ``pyjwt[crypto]``, jetzt direkt genutzt (app.shared.crypto), daher explizit gepinnt.
+    # fints pins lxml~=6.0.2 (<6.1). We therefore cannot force the lxml XXE fix (6.1.0,
+    # PYSEC-2026-87) here, because pip reports ResolutionImpossible. Only fints, sepaxml
+    # and xmlschema use lxml transitively. They parse the authenticated bank answers. Our
+    # own CAMT parsing uses the stdlib `ElementTree`. pip-audit therefore excludes this
+    # advisory on purpose, with a reason (CI job be-deps-audit).
+    # PIN encryption at rest (Fernet) for the FinTS credentials. pyjwt[crypto] pulled
+    # cryptography in transitively before. app.shared.crypto now uses it directly, so the
+    # dependency is explicit.
     "cryptography>=44.0",
 ]
 
@@ -73,16 +76,16 @@ dev = [
     "pytest-cov>=6.0",
     "coverage[toml]>=7.6",
     "httpx>=0.28",
-    # Test-Infra (testing.md §5): testcontainers (PG/Redis/MinIO), HTTP-Mock,
-    # Zeit-Freeze, Pydantic/SQLAlchemy-Factories, Contract (Schemathesis).
+    # Test infrastructure (testing.md §5): testcontainers (PG/Redis/MinIO), HTTP mock,
+    # time freeze, Pydantic and SQLAlchemy factories, contract tests (Schemathesis).
     "testcontainers[postgres,redis]>=4.9",
     "respx>=0.22",
     "freezegun>=1.5",
     "polyfactory>=2.18",
-    # Contract-Runner gepinnt: schemathesis + hypothesis erzeugen pro Lauf zufällige
-    # Fälle; ohne festen Versions- + Seed-Pin (s. CI `--seed`) wäre `be-contract`
-    # nichtdeterministisch (mal grün, mal rot am selben Commit). Exakt pinnen, damit ein
-    # roter Lauf reproduzierbar ist und nicht durch Tool-Updates wandert.
+    # The contract runner uses exact pins. schemathesis and hypothesis build random cases
+    # on every run. Without a fixed version and a fixed seed (see `--seed` in the CI),
+    # `be-contract` turns non-deterministic and passes or fails on the same commit. Exact
+    # pins keep a red run reproducible and stop tool updates from moving it.
     "schemathesis==4.22.3",
     "hypothesis==6.155.7",
     "ruff>=0.9",
@@ -105,14 +108,15 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 pythonVersion = "3.13"
 typeCheckingMode = "standard"
 reportMissingTypeStubs = false
-# Alembic-Migrationen: dynamische op/context-API → vom Strict-Typecheck ausgenommen
-# (Modelle/Logik bleiben geprüft). env.py wird separat typisiert gehalten.
+# Alembic migrations use the dynamic op and context API, so the strict type check skips
+# them. The check still covers the models and the logic. env.py stays typed on its own.
 exclude = ["migrations/versions", ".venv"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
-# Default-Lauf = schnelle Unit-Suite (kein Docker). Integration/E2E opt-in via -m.
+# The default run is the fast unit suite and needs no Docker. Integration and e2e tests
+# are opt-in through -m.
 addopts = "-m 'not integration and not e2e'"
 markers = [
     "integration: braucht testcontainers (PG/Redis/MinIO) — Docker erforderlich",
@@ -126,10 +130,11 @@ omit = ["tests/*"]
 
 [tool.coverage.report]
 show_missing = true
-# Gesamt-Gate (testing.md §1): Backend (unit-only, Lines+Branches). Die Unit-Suite deckt
-# jetzt 98,7 % ab (alle Services/Router/Worker per DB-losen Fakes getestet). Gate auf 97 %
-# geratscht — knapp unter Ist-Stand, damit echte Regressionen brechen, ohne bei marginalen
-# Schwankungen falsch-rot zu sein. Ziel bleibt, die 97 % zu halten/anzuheben.
+# Total gate (testing.md §1): backend, unit tests only, lines and branches. The unit suite
+# now reaches 98.7 %. Fakes without a database cover all services, routers and workers.
+# The gate sits at 97 %, just below the current value. Real regressions then break the
+# build, and small swings do not turn it red by mistake. The goal is to hold or raise the
+# 97 %.
 fail_under = 97
 exclude_lines = [
     "pragma: no cover",
@@ -138,18 +143,16 @@ exclude_lines = [
     "\\.\\.\\.",
 ]
 
-# Kritische Module: 100 % Branch als eigenes Gate (testing.md §1).
-# Geprüft von scripts/coverage_critical.py gegen coverage.xml. Pfade sind relativ
-# zum Coverage-`source` (= `app`), wie in coverage.xml gelistet (z.B.
-# `modules/auth/oidc.py`). Module entstehen in Folge-Tasks (auth/voting/flow/budget/
-# webhooks/audit) — Gate aktiviert sich, sobald der jeweilige Pfad existiert;
-# Negativ-Probe: tests/test_coverage_gate.py.
-#
-# HINWEIS: Im reinen Unit-Lauf liegen mehrere dieser Module weit unter 100 % Branch
-# (oauth/mcp/flow/budget/audit werden v. a. über Integrationstests abgedeckt). Das Ziel
-# bleibt 100 %, der `coverage-gate`-Job ist daher vorerst NICHT blockierend
-# (continue-on-error, .github/workflows/ci.yml) — er reportet den Abstand, bis die
-# Unit-Branch-Coverage nachgezogen ist.
+# Critical modules: 100 % branch coverage as a separate gate (testing.md §1).
+# scripts/coverage_critical.py checks it against coverage.xml. The paths are relative to
+# the coverage `source` (= `app`), as coverage.xml lists them, for example
+# `modules/auth/oidc.py`. The gate turns on as soon as the path exists. The negative probe
+# is tests/test_coverage_gate.py.
+# In a pure unit run several of these modules stay far below 100 % branch coverage.
+# Integration tests cover oauth, mcp, flow, budget and audit for the most part. The goal
+# stays 100 %. The `coverage-gate` job therefore does not block yet (continue-on-error in
+# .github/workflows/ci.yml). It reports the distance until the unit branch coverage
+# catches up.
 [tool.coverage_critical]
 modules = [
     "modules/auth",

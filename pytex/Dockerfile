@@ -1,12 +1,13 @@
 # pytex render service (T-21): FastAPI wrapper around pytex_api.render_blob.
 #
-# tectonic is baked onto PATH at build time from a pinned GitHub release binary
-# (static musl build, sha256-verified), so the build is deterministic and needs
-# no `curl | sh` installer — the old drop-sh script failed with exit 127 in CI
-# (no network to drop-sh.fullyjustified.net). No binary download happens per
-# request. Only the LaTeX *bundle* is fetched lazily on the first TRUSTED build
-# and persisted under $XDG_CACHE_HOME=/cache — mount the `pytex_cache` volume
-# there so it survives restarts and later builds run offline
+# The build installs tectonic on PATH from a pinned GitHub release binary. The
+# binary is a static musl build and the build checks its sha256. The build stays
+# deterministic and needs no `curl | sh` installer. The old drop-sh script
+# failed with exit 127 in CI, because CI has no network route to
+# drop-sh.fullyjustified.net. No request downloads a binary. Only the LaTeX
+# bundle comes later. Tectonic fetches the bundle lazily on the first trusted
+# build and keeps it under $XDG_CACHE_HOME=/cache. Mount the `pytex_cache`
+# volume there. The cache then survives a restart and later builds run offline
 # (sds/deployment.md §1, §4).
 FROM python:3.13-slim
 
@@ -16,16 +17,16 @@ ENV PYTHONUNBUFFERED=1 \
     XDG_CACHE_HOME=/cache
 
 # Pinned tectonic release (tectonic-typesetting/tectonic). To bump: update the
-# version and BOTH sha256 sums from the release assets' static musl tarballs.
+# version and BOTH sha256 sums from the static musl tarballs of the release.
 ARG TECTONIC_VERSION=0.15.0
 ARG TECTONIC_SHA256_AMD64=dfb82876f2986862996e564fa507a9e576e0c1e3bee63c2c1bd677c2543e6407
 ARG TECTONIC_SHA256_ARM64=1f59f9fb8eb65e8ba18658fc9016767e7d3e12488ded8b8fffa34254e51ce42c
 
-# fontconfig + Basis-Fonts: ohne sie scheitert XeTeX/fontspec schon am Default-
-# Font ("Fontconfig error: Cannot load default config file"). CD-spezifische
-# Fonts (z. B. Blender für die STUPA-Variante) müssen zusätzlich bereitgestellt
-# werden — s. /usr/share/fonts (unten optional einkopieren).
-# librsvg2-bin: rsvg-convert hinter dem inkscape-Shim (SVG-Logos -> PDF, s. u.).
+# fontconfig plus the base fonts: without them XeTeX and fontspec fail on
+# the default font ("Fontconfig error: Cannot load default config file"). Add
+# the CD-specific fonts (for example Blender for the STUPA variant) on top of
+# these. See /usr/share/fonts and copy them in below when you need them.
+# librsvg2-bin gives rsvg-convert behind the inkscape shim (SVG logos to PDF).
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
@@ -51,23 +52,23 @@ RUN pip install -r requirements.txt
 
 COPY app.py ./
 
-# pytex's IncludeImage shells out to `inkscape` to convert SVG logos to PDF
-# (write_inline_logos). The shim maps that exact call onto rsvg-convert so the
-# CD variants with SVG logos (z. B. protocol-asta: ASTA.svg) render without
-# pulling the full Inkscape stack into the image.
+# The IncludeImage step of pytex shells out to `inkscape` to convert SVG logos
+# to PDF (write_inline_logos). The shim maps that exact call onto rsvg-convert.
+# The CD variants with SVG logos (for example protocol-asta: ASTA.svg) then
+# render without the full Inkscape stack in the image.
 COPY inkscape-shim.sh /usr/local/bin/inkscape
 RUN chmod +x /usr/local/bin/inkscape
 
-# Cache warm-up AT BUILD TIME (network is available here): renders one realistic
-# document per protocol variant into /cache-seed, pulling the tectonic bundle and
-# all LaTeX packages those documents need. The entrypoint seeds the (empty) /cache
-# volume from it — at RUNTIME the container then needs NO internet; tectonic would
-# otherwise lazily fetch packages per document and die behind an egress block
-# ("error sending request … operation timed out").
-# Retried: the warm-up downloads the bundle, LaTeX packages AND the matching
-# biber release — on a flaky build network a single timeout (e.g. the biber
-# fetch) failed the whole build. Every retry resumes from the already-cached
-# parts, so three attempts ride out transient timeouts.
+# Warm the cache at build time, where the network is available. The build
+# renders one realistic document per protocol variant into /cache-seed. This
+# pulls the tectonic bundle and every LaTeX package those documents need. The
+# entrypoint seeds the empty /cache volume from it. The container then needs no
+# internet at run time. Otherwise tectonic fetches packages per document lazily
+# and dies behind an egress block ("error sending request … operation timed
+# out"). The warm-up retries. It downloads the bundle, the LaTeX packages and
+# the matching biber release. On a flaky build network one timeout (for example
+# the biber fetch) failed the whole build. Every retry resumes from the parts
+# already in the cache, so three attempts ride out short timeouts.
 COPY warmup.py ./
 RUN set -eux; \
     mkdir -p /cache-seed; \
@@ -82,8 +83,8 @@ RUN set -eux; \
 COPY entrypoint.sh /usr/local/bin/pytex-entrypoint
 RUN chmod +x /usr/local/bin/pytex-entrypoint
 
-# Drop privileges; the cache volume AND the seed must be readable/writable by
-# the unprivileged user (the entrypoint copies the seed into the volume).
+# The unprivileged user must read and write the cache volume and the seed,
+# because the entrypoint copies the seed into the volume.
 RUN useradd --create-home --uid 10001 pytex \
     && mkdir -p /cache \
     && chown -R pytex:pytex /cache /cache-seed /app

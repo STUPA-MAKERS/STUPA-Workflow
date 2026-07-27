@@ -1,8 +1,9 @@
-"""Test-Fakes für files-Unit-Tests (kein echtes MinIO/ClamAV/Redis).
+"""Test fakes for the files unit tests. They replace MinIO, ClamAV and Redis.
 
-`FakeStorage` hält Objekte in-memory + protokolliert put/remove/presign; `FailingStorage`
-wirft `StorageError`. `FakeScanQueue` sammelt enqueued IDs. `StubScanner` liefert ein
-festes `ScanVerdict`. Die DB wird über `FakeSession` (aus `notifications_fakes`) gefaked.
+`FakeStorage` keeps the objects in memory and records the put, remove and presign calls.
+`FailingStorage` raises `StorageError`. `FakeScanQueue` collects the enqueued IDs.
+`StubScanner` returns a fixed `ScanVerdict`. `FakeSession` from `notifications_fakes`
+fakes the database.
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ from app.modules.files.storage import StorageError
 
 
 class FakeStorage:
-    """In-Memory-Object-Storage (erfüllt das ObjectStorage-Protokoll)."""
+    """In-memory object storage that implements the `ObjectStorage` protocol."""
 
     def __init__(self) -> None:
         self.objects: dict[str, tuple[bytes, str]] = {}
@@ -54,7 +55,7 @@ class FakeStorage:
 
 
 class FailingStorage(FakeStorage):
-    """Storage, dessen Operationen `StorageError` werfen (Ausfall-Simulation)."""
+    """Storage that raises `StorageError` in each operation to simulate an outage."""
 
     async def put(self, key: str, data: bytes, content_type: str) -> None:
         raise StorageError("boom")
@@ -77,7 +78,7 @@ class FailingStorage(FakeStorage):
 
 
 class FakeScanQueue:
-    """Sammelt enqueued Attachment-IDs."""
+    """Collects the enqueued attachment IDs."""
 
     def __init__(self) -> None:
         self.enqueued: list[uuid.UUID] = []
@@ -87,7 +88,7 @@ class FakeScanQueue:
 
 
 class StubScanner:
-    """Liefert ein festes Verdict; protokolliert die gescannten Bytes."""
+    """Scanner that returns a fixed verdict and records the scanned bytes."""
 
     def __init__(self, verdict: ScanVerdict) -> None:
         self.verdict = verdict
@@ -99,7 +100,7 @@ class StubScanner:
 
 
 class RaisingScanner:
-    """Wirft beim Scan (ScannerError-Simulation)."""
+    """Scanner that raises the given exception to simulate a scanner error."""
 
     def __init__(self, exc: Exception) -> None:
         self.exc = exc

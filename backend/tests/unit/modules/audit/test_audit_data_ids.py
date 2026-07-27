@@ -1,7 +1,8 @@
-"""Unit: ``data_uuid_strings`` — UUID-Extraktion aus ``data``-Payloads (#no-uuids-in-ui).
+"""Unit tests for `data_uuid_strings`: UUID extraction from `data` (#no-uuids-in-ui).
 
-Reine Funktion ohne DB: deckt die Sammel-Logik ab (rekursiv, Werte-only, nur
-UUID-förmige Strings). Die DB-Auflösung selbst liegt im Integrationstest.
+The function is pure and needs no database. These tests cover the collection logic. It
+walks the payload, reads values only and keeps UUID-shaped strings only. The
+integration test covers the database lookup.
 """
 
 from __future__ import annotations
@@ -19,7 +20,6 @@ def test_collects_top_level_uuid_values() -> None:
 
 
 def test_ignores_non_uuid_and_keys() -> None:
-    # Schlüssel zählen nicht; Nicht-UUID-Werte werden verworfen.
     assert data_uuid_strings({_U1: "not-a-uuid", "count": 7, "flag": True}) == set()
 
 

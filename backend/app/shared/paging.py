@@ -1,6 +1,6 @@
 """Uniform offset paging.
 
-``PageParams`` holds the query defaults; ``Page[T]`` is the response wrapper.
+`PageParams` holds the query defaults. `Page[T]` wraps the response.
 """
 
 from __future__ import annotations

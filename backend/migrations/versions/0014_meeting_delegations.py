@@ -1,11 +1,12 @@
-"""Sitzungsgebundene Delegationen (#delegation-rework).
+"""Meeting-bound delegations (#delegation-rework).
 
-Neue Tabellen ``meeting_delegation`` (Vertretung je Sitzung, Stimmrecht optional)
-und ``delegation_substitute`` (Stellvertreter-Pool je Gremium); ``gremium`` erhält
-``delegation_lead_minutes`` (Vorlauf-Deadline) und ``delegation_allow_external``.
-Bestehende Blanko-Delegationen (``role_assignment.delegated_by``) bleiben als
-Alt-Zeilen stehen, werden vom Stimmrechts-Check aber nicht mehr berücksichtigt.
-Idempotent (``IF NOT EXISTS``).
+`meeting_delegation` holds one delegation per meeting. The transfer of the vote
+is optional. `delegation_substitute` holds the substitute pool of a Gremium.
+`gremium` gets `delegation_lead_minutes` for the lead time of the deadline and
+`delegation_allow_external`. Old blanket delegations in
+`role_assignment.delegated_by` stay in the table as legacy rows. The check that
+resolves the vote right ignores them from now on. The migration is idempotent
+(`IF NOT EXISTS`).
 """
 
 from __future__ import annotations

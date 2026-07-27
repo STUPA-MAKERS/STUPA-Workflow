@@ -43,7 +43,6 @@ async function setup(opts: {
     : jest.fn(() => of(opts.castResult ?? { status: 'cast' as const }));
   const api = { getVote, castBallot };
   const auth = { can: () => opts.canVote ?? true };
-  // Delegation status: default = uninvolved.
   const voteStatus = opts.delegationError
     ? jest.fn(() => throwError(() => new Error('boom')))
     : jest.fn(() =>
@@ -106,7 +105,6 @@ describe('VoteCastComponent', () => {
     });
     await userEvent.click(screen.getByRole('button', { name: 'Ja' }));
     expect(castBallot).toHaveBeenCalledTimes(1);
-    // The other option is now locked.
     expect(screen.getByRole('button', { name: 'Nein' })).toBeDisabled();
     expect(screen.getByText(/nicht möglich/i)).toBeInTheDocument();
   });
@@ -130,11 +128,10 @@ describe('VoteCastComponent', () => {
   it('surfaces a 409 conflict as already-voted', async () => {
     const { getVote } = await setup({ castError: { status: 409 } });
     await userEvent.click(screen.getByRole('button', { name: 'Ja' }));
-    // initial load + refetch after conflict
+    // The initial load plus the refetch after the conflict.
     expect(getVote).toHaveBeenCalledTimes(2);
   });
 
-  // --- Delegation feedback ---------------------------------------------------
   it('explains a delegated-away voting right instead of a bare not-eligible hint', async () => {
     await setup({
       delegation: {
@@ -149,8 +146,8 @@ describe('VoteCastComponent', () => {
   });
 
   it('offers a separate proxy cast when exercising a delegation', async () => {
-    // External substitute without their own voting right: ONLY the proxy
-    // block is visible; the ballot runs with asDelegation=true.
+    // An external substitute has no own voting right. Only the proxy block stays visible.
+    // The ballot runs with asDelegation=true.
     const { castBallot } = await setup({
       canVote: false,
       delegation: {
@@ -179,7 +176,7 @@ describe('VoteCastComponent', () => {
     });
     expect(screen.getByText('Deine Stimme')).toBeInTheDocument();
     expect(screen.getByText(/Als Vertretung für Alice Beispiel/)).toBeInTheDocument();
-    // Two separate option groups → two "Ja" buttons.
+    // Two separate option groups give two "Ja" buttons.
     const yesButtons = screen.getAllByRole('button', { name: 'Ja' });
     expect(yesButtons).toHaveLength(2);
     await userEvent.click(yesButtons[0]);
@@ -188,10 +185,8 @@ describe('VoteCastComponent', () => {
     expect(castBallot).toHaveBeenCalledWith('v1', 'yes', true);
   });
 
-  // --- Edge cases / branches ------------------------------------------------
   it('goes straight to error when the route has no vote id', async () => {
     const { getVote, voteStatus } = await setup({ routeId: null });
-    // Without an id no load: neither the vote nor the delegation fetch.
     expect(getVote).not.toHaveBeenCalled();
     expect(voteStatus).not.toHaveBeenCalled();
     expect(screen.getByText(/nicht geladen/i)).toBeInTheDocument();
@@ -199,7 +194,6 @@ describe('VoteCastComponent', () => {
 
   it('swallows a failing delegation-status lookup without breaking the vote UI', async () => {
     await setup({ delegationError: true, canVote: true });
-    // The vote loads anyway; options appear.
     expect(screen.getByRole('button', { name: 'Ja' })).toBeInTheDocument();
   });
 
@@ -213,7 +207,6 @@ describe('VoteCastComponent', () => {
   it('marks not-eligible on a 403 from an own cast', async () => {
     await setup({ castError: { status: 403 } });
     await userEvent.click(screen.getByRole('button', { name: 'Ja' }));
-    // After the 403 the notice is visible and the buttons are gone.
     expect(screen.getByRole('alert')).toHaveTextContent(/nicht stimmberechtigt/i);
     expect(screen.queryByRole('button', { name: 'Ja' })).not.toBeInTheDocument();
   });
@@ -229,11 +222,11 @@ describe('VoteCastComponent', () => {
         delegatedByName: 'Alice Beispiel',
       },
     });
-    // Click the proxy block (second option group) → a 403 must NOT lock one's own block.
+    // Click the proxy block, which is the second option group. A 403 must not lock the
+    // own block.
     const yesButtons = screen.getAllByRole('button', { name: 'Ja' });
     await userEvent.click(yesButtons[1]);
     expect(castBallot).toHaveBeenCalledWith('v1', 'yes', true);
-    // Own options still visible (no not-eligible flag set).
     expect(screen.getByText('Deine Stimme')).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Ja' }).length).toBe(2);
   });
@@ -277,7 +270,6 @@ describe('VoteCastComponent', () => {
         },
       }),
     });
-    // Header (majority rule · quorum 7) — count quorum without a % sign.
     const header = container.querySelector('header p') as HTMLElement;
     expect(header.textContent).toMatch(/Quorum\s*7/);
     expect(header.textContent).not.toContain('7%');
@@ -289,7 +281,6 @@ describe('VoteCastComponent', () => {
     });
     await userEvent.click(screen.getByRole('button', { name: 'Ja' }));
     expect(castBallot).toHaveBeenCalledTimes(1);
-    // Re-click on the same (now selected) option is a no-op: no second call.
     await userEvent.click(screen.getByRole('button', { name: 'Ja' }));
     expect(castBallot).toHaveBeenCalledTimes(1);
   });
@@ -313,12 +304,12 @@ describe('VoteCastComponent', () => {
         tally: { counts: { yes: 1, wildcard: 0 }, eligible: 5, quorumMet: false, leading: 'yes' },
       }),
     });
-    // Unknown key stays raw (no leaked i18n key).
     expect(screen.getByRole('button', { name: 'wildcard' })).toBeInTheDocument();
   });
 
   it('falls back to simple majority and tie result when the config omits them', async () => {
-    // majorityRule/result missing → fallback keys vote.majority.simple / vote.result.tie.
+    // A missing majorityRule falls back to vote.majority.simple. A missing result falls
+    // back to vote.result.tie.
     const v = vote();
     delete (v.config as { majorityRule?: unknown }).majorityRule;
     v.result = null;
@@ -328,13 +319,11 @@ describe('VoteCastComponent', () => {
 
   it('ignores casts while a ballot is closed (guarded by isOpen)', async () => {
     const { castBallot } = await setup({ vote: vote({ status: 'closed', result: 'passed' }) });
-    // Closed → no option buttons; even a direct cast would be a no-op.
     expect(screen.queryByRole('button', { name: 'Ja' })).not.toBeInTheDocument();
     expect(castBallot).not.toHaveBeenCalled();
   });
 
   it('does not allow a proxy cast when not exercising a delegation', async () => {
-    // exercising=false → no proxy block, no second "Ja" button.
     const { castBallot } = await setup({
       canVote: true,
       delegation: {
@@ -354,7 +343,6 @@ describe('VoteCastComponent', () => {
     delete (v.config as { allowChange?: unknown }).allowChange;
     const { castBallot } = await setup({ vote: v });
     await userEvent.click(screen.getByRole('button', { name: 'Ja' }));
-    // allowChange defaulted true → re-voting allowed, no lock notice.
     await userEvent.click(screen.getByRole('button', { name: 'Nein' }));
     expect(castBallot).toHaveBeenCalledTimes(2);
     expect(screen.queryByText(/nicht möglich/i)).not.toBeInTheDocument();
@@ -370,7 +358,7 @@ describe('VoteCastComponent', () => {
     expect(screen.getByText('Stimmengleichheit')).toBeInTheDocument();
   });
 
-  // --- Internal cast() guards (buttons disabled in DOM → call directly) -------
+  // The next tests call cast() directly, because the DOM disables the buttons.
   it('cast() is a no-op when the vote is closed (isOpen guard)', async () => {
     const { fixture, castBallot } = await setup({
       vote: vote({ status: 'closed', result: 'passed' }),
@@ -398,7 +386,7 @@ describe('VoteCastComponent', () => {
     });
     fixture.componentInstance.cast('yes', true);
     expect(castBallot).toHaveBeenCalledTimes(1);
-    // proxyChoice set + allowChange=false → block further proxy casts.
+    // A set proxyChoice with allowChange=false blocks all further proxy casts.
     fixture.componentInstance.cast('no', true);
     expect(castBallot).toHaveBeenCalledTimes(1);
   });
@@ -407,7 +395,7 @@ describe('VoteCastComponent', () => {
     const v = vote();
     delete (v.config as { options?: unknown }).options;
     await setup({ vote: v });
-    // options() falls back to [] → no buttons, but no crash.
+    // The options signal falls back to an empty array, so no button renders and nothing crashes.
     expect(screen.queryByRole('button', { name: 'Ja' })).not.toBeInTheDocument();
   });
 
@@ -432,10 +420,8 @@ describe('VoteCastComponent', () => {
         delegatedByName: 'Alice Beispiel',
       },
     });
-    // The first proxy vote counts …
     await userEvent.click(screen.getByRole('button', { name: 'Ja' }));
     expect(castBallot).toHaveBeenCalledTimes(1);
-    // … the second (different field) is locked when allowChange=false.
     expect(screen.getByRole('button', { name: 'Nein' })).toBeDisabled();
   });
 });

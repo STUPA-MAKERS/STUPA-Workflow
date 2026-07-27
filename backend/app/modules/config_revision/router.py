@@ -1,7 +1,7 @@
-"""config_revision API router: list, diff, restore.
+"""``config_revision`` API router: list, diff and restore.
 
-Reads are open to audit readers OR config editors; restore requires the entity's
-config permission (form.configure / flow.configure / admin.site).
+An audit reader can read, and so can a config editor. A restore needs the config
+permission of the entity: ``form.configure``, ``flow.configure`` or ``admin.site``.
 """
 
 from __future__ import annotations
@@ -33,14 +33,13 @@ router = APIRouter(prefix="/admin/config-revisions", tags=["config-revision"])
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 _AUTH_ERRORS: dict[int | str, dict[str, Any]] = {401: _PROBLEM, 403: _PROBLEM}
 
-# Reads: audit readers OR a config editor (the sidebar lives in the editors).
+# Reads: an audit reader or a config editor. The sidebar lives in the editors.
 _READABLE = Depends(
     require_any_permission(
         "audit.read", "form.configure", "flow.configure", "admin.site"
     )
 )
 
-# Per-entity restore gate.
 _RESTORE_PERM: dict[str, str] = {
     ENTITY_FORM: "form.configure",
     ENTITY_FLOW: "flow.configure",
@@ -74,7 +73,7 @@ async def list_config_revisions(
     entity_type: Annotated[str, Query(alias="entityType")],
     entity_id: Annotated[str, Query(alias="entityId")],
 ) -> list[ConfigRevisionOut]:
-    """List snapshots of an entity (newest first) — version sidebar."""
+    """List the snapshots of an entity, newest first, for the version sidebar."""
     rows = await service.list_for(entity_type, entity_id)
     names = await AuditService(service.session).resolve_actor_names(
         [r.created_by for r in rows]
@@ -131,8 +130,10 @@ async def restore_config_revision(
 ) -> None:
     """Replay an earlier snapshot as the new active version (sidebar restore).
 
-    Forward operation (no conflict block): makes the chosen state current again;
-    earlier versions are kept. Gated per entity (form/flow/site_config)."""
+    This is a forward operation with no conflict block. It makes the chosen state
+    current again and keeps the earlier versions. The caller needs the config
+    permission of the entity: form, flow or site_config.
+    """
     revision: ConfigRevision | None = await service.get(revision_id)
     if revision is None:
         raise NotFoundError(f"config revision {revision_id} not found")

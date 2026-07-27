@@ -41,7 +41,6 @@
   }
 </section>
 
-<!-- Create dialog. -->
 <app-dialog
   [open]="dialogOpen()"
   [title]="'admin.forms.create' | t"
@@ -82,7 +81,7 @@
   </div>
 </app-dialog>
 
-<!-- Delete application type (own permission admin.types_delete). -->
+<!-- Delete an application type. This action needs the admin.types_delete permission. -->
 <app-dialog
   [open]="confirmDelete() !== null"
   [title]="'admin.forms.delete' | t"

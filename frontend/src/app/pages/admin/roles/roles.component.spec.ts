@@ -53,9 +53,8 @@ describe('AdminRolesComponent (#12)', () => {
   it('roleLabel falls back locale→de→key', async () => {
     const { inst } = await setup();
     expect(inst.roleLabel(ROLES[0])).toBe('administrator');
-    // de locale present
     expect(inst.roleLabel({ label: { de: 'x' }, key: 'k' })).toBe('x');
-    // no de, falls to key (en is not the active locale fallback)
+    // Without a de label the fallback is the key. The en label is not a fallback.
     expect(inst.roleLabel({ label: { en: 'y' }, key: 'k' })).toBe('k');
     expect(inst.roleLabel({ label: {}, key: 'k' })).toBe('k');
   });
@@ -119,9 +118,7 @@ describe('AdminRolesComponent (#12)', () => {
   it('nameDraft returns label-derived default then the patched draft', async () => {
     const { inst } = await setup();
     expect(inst.nameDraft(ROLES[1])).toEqual({ de: 'mitglied', en: 'member' });
-    // referent has no de label → empty string
     expect(inst.nameDraft(ROLES[2])).toEqual({ de: '', en: 'officer' });
-    // role with neither de nor en → both empty
     expect(inst.nameDraft({ id: 'r-x', key: 'x', label: {}, permissions: [] })).toEqual({ de: '', en: '' });
     inst.patchName(ROLES[1], 'de', 'Mitglied!');
     expect(inst.nameDraft(ROLES[1])).toEqual({ de: 'Mitglied!', en: 'member' });
@@ -210,7 +207,7 @@ describe('AdminRolesComponent (#12)', () => {
 
   it('askDelete + confirmDelete removes the role; no-op without target', async () => {
     const { inst, api, toast } = await setup();
-    inst.confirmDelete(); // no target → no call
+    inst.confirmDelete();
     expect(api.deleteRole).not.toHaveBeenCalled();
 
     inst.askDelete(ROLES[1]);

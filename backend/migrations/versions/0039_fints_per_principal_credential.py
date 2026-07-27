@@ -1,14 +1,15 @@
-"""fints_principal_creds: FinTS-Zugangsdaten je Principal trennen (#fints-percred).
+"""fints_principal_creds: split the FinTS credentials per principal (#fints-percred).
 
-Mehrere Bucher teilen sich dasselbe Bankkonto, haben aber je **eigene** Online-Banking-
-Logins. Login/PIN/TAN-Methode/Client-Zustand wandern daher vom Konto in eine neue
-``account_fints_credential``-Tabelle (Konto × Principal, PIN verschlüsselt). Am Konto bleibt
-nur die für alle gleiche **Bank-Verbindung** (``fints_endpoint`` + ``fints_blz``). Die
-TAN-Sitzung wird zusätzlich an den startenden Principal gebunden.
+Several bookers share the same bank account, but each one has a **separate** online
+banking login. Login, PIN, TAN method and client state therefore move from the account
+into the new ``account_fints_credential`` table (account by principal, PIN encrypted).
+The account keeps only the **bank connection** that is the same for everyone
+(``fints_endpoint`` and ``fints_blz``). The migration also binds the TAN session to the
+principal that starts it.
 
-Das Feature war noch nicht produktiv genutzt (kein Live-Bank-Test); ein Datentransfer der
-alten Konto-Spalten ist deshalb nicht nötig — sie werden schlicht entfernt. Idempotent
-(``IF (NOT) EXISTS``); sauberer Down-Round-Trip.
+Nobody used the feature in production yet, because there was no live bank test. The old
+account columns therefore need no data transfer. The migration drops them. It is
+idempotent (``IF (NOT) EXISTS``) and has a clean down round trip.
 """
 
 from __future__ import annotations
@@ -24,7 +25,6 @@ depends_on: str | Sequence[str] | None = None
 
 
 _UPGRADE: tuple[str, ...] = (
-    # — account_fints_credential: persönliche Zugangsdaten je (Konto, Principal) —
     """
     CREATE TABLE IF NOT EXISTS account_fints_credential (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -43,13 +43,12 @@ _UPGRADE: tuple[str, ...] = (
     "ON account_fints_credential (account_id)",
     "CREATE INDEX IF NOT EXISTS ix_account_fints_credential_principal_id "
     "ON account_fints_credential (principal_id)",
-    # — bank_sync_session: an den startenden Principal binden —
-    # Bestehende (kurzlebige) Sitzungen sind nach dem Deploy ohnehin wertlos → leeren, dann
-    # die NOT-NULL-Spalte ergänzen (kein sinnvoller Default für Altzeilen).
+    # Bind the TAN session to the principal that starts it. Existing sessions are short
+    # lived and worthless after the deploy. Delete them first, then add the NOT NULL
+    # column. Old rows have no useful default.
     "DELETE FROM bank_sync_session",
     "ALTER TABLE bank_sync_session ADD COLUMN IF NOT EXISTS principal_id uuid "
     "NOT NULL REFERENCES principal (id) ON DELETE CASCADE",
-    # — account: persönliche FinTS-Spalten entfernen (nur Endpunkt + BLZ bleiben) —
     "ALTER TABLE account DROP COLUMN IF EXISTS fints_last_sync_at",
     "ALTER TABLE account DROP COLUMN IF EXISTS fints_state",
     "ALTER TABLE account DROP COLUMN IF EXISTS fints_tan_mechanism",
@@ -58,7 +57,7 @@ _UPGRADE: tuple[str, ...] = (
 )
 
 _DOWNGRADE: tuple[str, ...] = (
-    # account-Spalten zurück (ohne Daten — sie sind unwiederbringlich entfernt) —
+    # The account columns come back empty. The upgrade removed the data for good.
     "ALTER TABLE account ADD COLUMN IF NOT EXISTS fints_login text",
     "ALTER TABLE account ADD COLUMN IF NOT EXISTS fints_pin_encrypted text",
     "ALTER TABLE account ADD COLUMN IF NOT EXISTS fints_tan_mechanism text",

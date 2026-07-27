@@ -56,10 +56,11 @@ import { ExpenseSubBookingsState } from './expense-sub-bookings.state';
 import { ExpensesListState, type ExpenseSortField } from './expenses-list.state';
 
 /**
- * Bookings tab: view/create/manage actual expense/income bookings. A booking is
- * either standalone (cost centre + fiscal year picked) or bound to an
- * application (inherits both). Thin facade over the state modules below; its
- * public surface also drives the specs.
+ * Bookings tab. It shows, creates, and manages expense and income bookings.
+ *
+ * A booking is either standalone or bound to an application. A standalone booking needs
+ * a cost center and a fiscal year. A bound booking inherits both. This class is a thin
+ * facade over the state modules below. Its public surface also drives the specs.
  */
 @Component({
   selector: 'app-expenses',
@@ -92,7 +93,7 @@ import { ExpensesListState, type ExpenseSortField } from './expenses-list.state'
 export class ExpensesComponent implements OnDestroy {
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
-  // Referenced via the same root instance by the state modules; specs spy here.
+  // The state modules share this root toast instance. Specs spy on it here.
   private readonly toast = inject(ToastService);
   private readonly api = inject(BudgetTreeApi);
   private readonly route = inject(ActivatedRoute);
@@ -105,7 +106,6 @@ export class ExpensesComponent implements OnDestroy {
   readonly canManage = computed(() => this.auth.can('budget.book'));
   readonly canExport = computed(() => this.auth.can('budget.export'));
 
-  // --- list state (ExpensesListState) ---------------------------------------
   readonly budgetTree = this.list.budgetTree;
   readonly items = this.list.items;
   readonly total = this.list.total;
@@ -132,7 +132,7 @@ export class ExpensesComponent implements OnDestroy {
   readonly exporting = this.list.exporting;
   readonly refreshing = this.list.refreshing;
 
-  // --- batch / bulk actions (#expenses-ux) ---
+  // Batch and bulk actions. See #expenses-ux.
   readonly selected = signal<ReadonlySet<Uuid>>(new Set());
   readonly bulkBusy = signal(false);
   readonly selectedCount = computed(() => this.selected().size);
@@ -140,10 +140,11 @@ export class ExpensesComponent implements OnDestroy {
     const list = this.items();
     return list.length > 0 && list.every((e) => this.selected().has(e.id));
   });
-  /** Bulk confirm dialog: null = closed, else the pending yes/no action. */
+  /** The bulk confirm dialog signal is null when closed. Otherwise it holds the
+   *  pending action, delete or export. */
   readonly bulkConfirm = signal<null | 'delete' | 'export'>(null);
-  /** Select-all must not enable mass deletion — rows have to be picked
-   *  individually for the destructive bulk action (#expenses-ux2). */
+  /** Select-all must not enable mass deletion. The user must pick each row for the
+   *  destructive bulk action. See #expenses-ux2. */
   readonly bulkDeleteBlocked = computed(() => this.allSelected() && this.selectedCount() > 1);
   readonly bulkReassignOpen = signal(false);
   readonly bulkBudgetId = signal('');
@@ -152,7 +153,6 @@ export class ExpensesComponent implements OnDestroy {
     () => !!this.bulkBudgetId() || !!this.bulkCategory().trim(),
   );
 
-  // --- dialog state (ExpenseDialogsState) ------------------------------------
   readonly createOpen = this.dialogs.createOpen;
   readonly newKind = this.dialogs.newKind;
   readonly newAmount = this.dialogs.newAmount;
@@ -199,29 +199,26 @@ export class ExpensesComponent implements OnDestroy {
   readonly canSubmitTransfer = this.dialogs.canSubmitTransfer;
   readonly canSubmitCreate = this.dialogs.canSubmitCreate;
 
-  // --- sub-booking state (ExpenseSubBookingsState) ----------------------------
   readonly subParent = this.sub.subParent;
   readonly subAmount = this.sub.subAmount;
   readonly subDescription = this.sub.subDescription;
   readonly subPaymentDate = this.sub.subPaymentDate;
   readonly subCorrespondent = this.sub.subCorrespondent;
 
-  // --- local UI state -----------------------------------------------------------
-  /** Mobile only: tree behind a collapsible toggle (always visible on desktop). */
+  /** On mobile, the tree sits behind a collapsible toggle. On desktop it stays visible. */
   readonly treeOpen = signal(false);
   readonly DESC_LIMIT = 90;
   readonly expandedDesc = signal<ReadonlySet<string>>(new Set());
   readonly sentinel = viewChild<ElementRef<HTMLElement>>('sentinel');
 
   constructor() {
-    // Adopt filters from the URL (shareable + survives a real reload; target of the
-    // Budget/Konten cross-links), THEN load exactly once. The state fires no request
-    // of its own — two racing reloads used to let the unfiltered response overwrite
-    // the filtered one when it resolved last (#expenses-ux2).
+    // Apply the URL filters first, then load data exactly once. The URL keeps the view
+    // shareable, survives a browser reload, and is the target of cross-links from Budget
+    // and Konten. The state module sends no request on its own. If the unfiltered
+    // reload resolves last, it can overwrite the filtered one. See #expenses-ux2.
     this.applyQueryParams();
     this.list.reload();
 
-    // Mirror active filters back into the URL on every change.
     effect(() => {
       const queryParams = {
         id: this.expenseId() || null,
@@ -238,7 +235,8 @@ export class ExpensesComponent implements OnDestroy {
       });
     });
 
-    // Keep the bulk selection pruned to rows that still exist (after refresh/reload/delete).
+    // Remove selected ids for rows that no longer exist after a refresh, reload,
+    // or delete.
     effect(() => {
       const ids = new Set(this.items().map((e) => e.id));
       this.selected.update((cur) =>
@@ -260,9 +258,10 @@ export class ExpensesComponent implements OnDestroy {
     });
   }
 
-  /** Adopt id/budget/account/kind/q filters from the URL; returns true if any were
-   *  present. ``id`` = exact-booking deep link (Konten "Buchung ansehen") — it has
-   *  no own control, but counts as an active filter and resets with the others. */
+  /** Read the id, budget, account, kind, and q filters from the URL. Return true if
+   *  the URL carried at least one of them. `id` is a deep link to one exact booking,
+   *  used by the view-booking action of the Konten tab. It has no dedicated control,
+   *  but it counts as an active filter and resets with the others. */
   private applyQueryParams(): boolean {
     const qp = this.route.snapshot.queryParamMap;
     const id = qp.get('id');
@@ -283,7 +282,6 @@ export class ExpensesComponent implements OnDestroy {
     this.sub.dispose();
   }
 
-  // --- display helpers -------------------------------------------------------------
   money(amount: string): string {
     return formatEur(Number(amount), this.i18n.locale());
   }
@@ -313,7 +311,6 @@ export class ExpensesComponent implements OnDestroy {
     return ariaSortDir(this.sortField() === field, this.sortOrder());
   }
 
-  // --- list delegates ------------------------------------------------------------
   setKind(k: '' | ExpenseKind): void {
     this.list.setKind(k);
   }
@@ -354,7 +351,6 @@ export class ExpensesComponent implements OnDestroy {
     this.list.onExport();
   }
 
-  // --- sub-booking delegates ---------------------------------------------------------
   isSubExpanded(id: string): boolean {
     return this.sub.isSubExpanded(id);
   }
@@ -387,7 +383,7 @@ export class ExpensesComponent implements OnDestroy {
     this.sub.createSub(event);
   }
 
-  // --- global file import (ExpenseSubBookingsState, #expenses-ux2) -------------------
+  // Global file import. See #expenses-ux2.
   readonly importOpen = this.sub.importOpen;
   readonly importQuery = this.sub.importQuery;
   readonly importCandidates = this.sub.importCandidates;
@@ -427,7 +423,6 @@ export class ExpensesComponent implements OnDestroy {
     this.sub.submitImport(event);
   }
 
-  // --- dialog delegates -----------------------------------------------------------
   openCreate(): void {
     this.dialogs.openCreate();
   }
@@ -500,14 +495,13 @@ export class ExpensesComponent implements OnDestroy {
     this.dialogs.createTransfer(event);
   }
 
-  // --- cross-links (#expenses-ux) ---------------------------------------------------
-  /** Deep-link target for the cost-centre cell → Budget tab drilled into this KS. */
+  /** Deep-link target for the cost-center cell. It opens the Budget tab drilled into
+   *  this cost center. See #expenses-ux. */
   ksLink(e: Expense): { budget: string | null; ks: string; fy: string } {
     const top = findTopBudgetNode(this.budgetTree(), e.budgetId);
     return { budget: top?.id ?? null, ks: e.budgetId, fy: e.fiscalYearId };
   }
 
-  // --- batch (#expenses-ux) ---------------------------------------------------------
   isSelected(id: Uuid): boolean {
     return this.selected().has(id);
   }
@@ -550,7 +544,7 @@ export class ExpensesComponent implements OnDestroy {
       });
   }
 
-  /** Export only the selected bookings (the server narrows by ``ids``). */
+  /** Export only the selected bookings. The server filters the export by `ids`. */
   private runBulkExport(): void {
     const ids = [...this.selected()];
     if (!ids.length) return;
@@ -589,7 +583,8 @@ export class ExpensesComponent implements OnDestroy {
           const e = byId.get(id);
           const patch: ExpenseUpdate = {};
           if (category) patch.category = category;
-          // Cost centre only for standalone bookings (bound/sub inherit it).
+          // Set the cost center only for a standalone booking. A bound booking and a
+          // sub-booking inherit it.
           if (budgetId && e && !e.applicationId && !e.parentExpenseId) {
             patch.budgetId = budgetId as Uuid;
           }
@@ -609,7 +604,7 @@ export class ExpensesComponent implements OnDestroy {
     this.bulkBusy.set(false);
     this.bulkConfirm.set(null);
     this.bulkReassignOpen.set(false);
-    this.list.refresh(); // server truth (e.g. transfer legs); the prune effect fixes selection
+    this.list.refresh(); // Get server truth, e.g. transfer legs. Prune effect fixes the selection.
     if (failed) {
       const key = kind === 'delete' ? 'expenses.bulk.deleteError' : 'expenses.bulk.reassignError';
       this.toast.error(this.i18n.translate(key));

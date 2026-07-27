@@ -1,6 +1,7 @@
-"""Delegations (Vertretung).
+"""Delegations.
 
-A member delegates one of their own rights (role, optionally voting right) to
-another member for a single meeting. Every delegation and revocation is
-audited; voting-right delegation is toggleable via settings.
+A member delegates one own right to another member for a single meeting. The
+right is a role, and optionally the voting right. The audit log records every
+delegation and every revocation. A setting turns the delegation of the voting
+right on or off.
 """

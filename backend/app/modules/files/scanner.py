@@ -1,7 +1,7 @@
-"""Virus scanning (ClamAV/clamd): ``VirusScanner`` protocol + ``ScanVerdict``.
+"""Virus scanning with ClamAV/clamd: the ``VirusScanner`` protocol and ``ScanVerdict``.
 
-The worker scans the uploaded object via ``clamd`` INSTREAM. ``clamd`` is imported
-lazily (only needed on the worker path).
+The worker scans the uploaded object with the ``clamd`` INSTREAM command. The module
+imports ``clamd`` lazily, because only the worker path needs it.
 """
 
 from __future__ import annotations
@@ -12,33 +12,40 @@ from typing import Protocol
 
 from app.settings import Settings
 
-# Official EICAR test signature (not a real virus) for quarantine tests/fakes.
+# The official EICAR test signature. It is not a real virus. Quarantine tests and fakes
+# use it.
 EICAR_TEST_BYTES = (
     rb"X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
 )
 
 
 class ScannerError(RuntimeError):
-    """ClamAV unreachable or scan failed; worker retries (fail-closed)."""
+    """ClamAV is unreachable or the scan failed. The worker retries and fails closed."""
 
 
 @dataclass(frozen=True, slots=True)
 class ScanVerdict:
-    """Scan result. When ``clean=False``, ``signature`` carries the finding."""
+    """Scan result.
+
+    When ``clean`` is false, ``signature`` carries the finding.
+    """
 
     clean: bool
     signature: str | None = None
 
 
 class VirusScanner(Protocol):
-    """Scan interface used by the worker."""
+    """Scan interface that the worker uses."""
 
     async def scan(self, data: bytes) -> ScanVerdict: ...
 
 
 @dataclass(slots=True)
 class ClamdScanner:
-    """clamd backend (TCP INSTREAM). Blocking call runs in a threadpool."""
+    """clamd backend over TCP INSTREAM.
+
+    The blocking call runs in a thread pool.
+    """
 
     host: str
     port: int = 3310
@@ -69,7 +76,11 @@ class ClamdScanner:
 
 
 def build_scanner(settings: Settings) -> VirusScanner | None:
-    """Build a clamd scanner from settings; ``None`` when ClamAV is disabled."""
+    """Build a clamd scanner from the settings.
+
+    Returns:
+        The scanner, or ``None`` when ClamAV is off.
+    """
     if not settings.clamav_enabled:
         return None
     assert settings.clamav_host is not None

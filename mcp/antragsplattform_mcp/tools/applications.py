@@ -1,4 +1,4 @@
-"""Application tools: CRUD, comments, PDF jobs, and flow decisions (tasks/transitions)."""
+"""Application tools for CRUD, comments, PDF jobs, tasks and flow transitions."""
 
 from __future__ import annotations
 
@@ -22,8 +22,14 @@ async def list_applications(
     limit: int | None = None,
     offset: int | None = None,
 ) -> dict:
-    """List applications (paged). Filters: state (id), gremium (id), type (id),
-    q (full-text), sort, order."""
+    """List applications, one page at a time.
+
+    Args:
+        state: Filter by the id of a flow state.
+        gremium: Filter by the id of a Gremium.
+        type: Filter by the id of an application type.
+        q: Full-text search term.
+    """
     return await api().get(
         "/applications",
         params=params(
@@ -35,25 +41,28 @@ async def list_applications(
 
 @group.tool
 async def get_application(application_id: str) -> dict:
-    """Fetch one application (data, state, applicant, budget binding)."""
+    """Get one application with its data, state, applicant and budget binding."""
     return await api().get(f"/applications/{application_id}")
 
 
 @group.tool
 async def get_application_timeline(application_id: str) -> dict:
-    """Status/transition history of an application."""
+    """Get the status and transition history of an application."""
     return await api().get(f"/applications/{application_id}/timeline")
 
 
 @group.tool
 async def list_application_versions(application_id: str) -> dict:
-    """Version history of an application's form data (with diffs)."""
+    """Get the version history of the form data of an application, with diffs."""
     return await api().get(f"/applications/{application_id}/versions")
 
 
 @group.tool
 async def get_application_form(application_id: str) -> dict:
-    """The form version pinned to an application (fields as the applicant saw them)."""
+    """Get the form version that is pinned to an application.
+
+    The fields come back as the applicant saw them.
+    """
     return await api().get(f"/applications/{application_id}/form")
 
 
@@ -66,9 +75,15 @@ async def create_application(
     lang: str | None = None,
     budget_pot_id: str | None = None,
 ) -> dict:
-    """Create an application of the given type. `data` = form-field values (validated
-    against the type's effective form — see get_effective_form). For a logged-in user,
-    email/name are derived from the account if omitted."""
+    """Create an application of the given type.
+
+    For a logged-in user, the server takes the email and the name from the account
+    when you omit them.
+
+    Args:
+        data: The form-field values. The server validates them against the effective
+            form of the type. Read that form with `get_effective_form`.
+    """
     return await api().post(
         "/applications",
         json=params(
@@ -80,14 +95,17 @@ async def create_application(
 
 @group.tool
 async def update_application(application_id: str, data: dict[str, Any]) -> dict:
-    """Patch an application's form data (creates a new data version). Subject to edit
-    permissions and the state's editAllowed flag."""
+    """Patch the form data of an application.
+
+    The call creates a new data version. It obeys the edit permissions and the
+    `editAllowed` flag of the state.
+    """
     return await api().patch(f"/applications/{application_id}", json={"data": data})
 
 
 @group.tool
 async def delete_application(application_id: str) -> dict:
-    """Delete an application (admin-only, irreversible)."""
+    """Delete an application. Admin only. You cannot undo this."""
     return await api().delete(f"/applications/{application_id}")
 
 
@@ -95,7 +113,10 @@ async def delete_application(application_id: str) -> dict:
 async def comment_application(
     application_id: str, body: str, visibility: Literal["public", "internal"] = "public"
 ) -> dict:
-    """Add a comment to an application. `internal` comments are hidden from the applicant."""
+    """Add a comment to an application.
+
+    An `internal` comment stays hidden from the applicant.
+    """
     return await api().post(
         f"/applications/{application_id}/comments",
         json={"body": body, "visibility": visibility},
@@ -110,28 +131,37 @@ async def list_comments(application_id: str) -> dict:
 
 @group.tool
 async def create_application_pdf(application_id: str) -> dict:
-    """Enqueue PDF generation for an application — ASYNC, returns a job; poll with
-    `get_job(job_id)` until done."""
+    """Queue the PDF generation for an application.
+
+    The call runs asynchronously and returns a job. Poll `get_job(job_id)` until the
+    job is done.
+    """
     return await api().post(f"/applications/{application_id}/pdf")
 
 
 @group.tool
 async def get_job(job_id: str) -> dict:
-    """Status of an async job (e.g. PDF generation)."""
+    """Get the status of an async job, for example a PDF generation."""
     return await api().get(f"/jobs/{job_id}")
 
 
 @group.tool
 async def list_tasks() -> dict:
-    """List the logged-in user's open tasks: applications in vote states of their
-    committees, or with at least one firable transition that requires action."""
+    """List the open tasks of the logged-in user.
+
+    A task is an application in a vote state of one of the Gremien of the user. A task
+    is also an application with at least one firable transition that requires action.
+    """
     return await api().get("/applications/tasks")
 
 
 @group.tool
 async def list_transitions(application_id: str) -> dict:
-    """List the flow transitions currently firable on an application (for this user).
-    Each carries `requiresAction` — false marks an optional action (no open task)."""
+    """List the flow transitions that this user can fire on an application.
+
+    Each transition carries `requiresAction`. A value of false marks an optional
+    action that creates no open task.
+    """
     return await api().get(f"/applications/{application_id}/transitions")
 
 
@@ -139,8 +169,11 @@ async def list_transitions(application_id: str) -> dict:
 async def fire_transition(
     application_id: str, transition_id: str, note: str | None = None
 ) -> dict:
-    """Decide on an application: fire a manual flow transition (approve/reject/etc).
-    Get valid transition ids from `list_transitions`."""
+    """Decide on an application and fire a manual flow transition.
+
+    A transition can approve the application, reject it, or move it in another way.
+    Read the valid transition ids from `list_transitions`.
+    """
     return await api().post(
         f"/applications/{application_id}/transition",
         json=params(transitionId=transition_id, note=note),

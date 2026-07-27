@@ -1,7 +1,8 @@
 """API schemas of the notifications module.
 
-Request/response for ``mail_template`` CRUD and mail preview. JSON is camelCase
-(populate-by-name); i18n maps are free-form ``{lang: text}`` dicts.
+These models carry the request and the response of the ``mail_template`` CRUD endpoints
+and of the mail preview. The JSON keys are camelCase and the models also populate by
+name. An i18n map is a free-form ``{lang: text}`` dict.
 """
 
 from __future__ import annotations
@@ -15,7 +16,7 @@ from app.shared.i18n import I18nMap
 
 
 class _CamelModel(BaseModel):
-    """camelCase JSON aliases; fields populatable by name."""
+    """Base model with camelCase JSON aliases and population by field name."""
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -40,10 +41,10 @@ class MailTemplateUpdate(_CamelModel):
 
 
 class MailTemplateUpsert(_CamelModel):
-    """Create/update an override by ``key``.
+    """Create or update an override by ``key``.
 
-    The editor saves both builtin (no DB row yet) and override templates the
-    same way — keyed by ``key`` rather than id, since builtins have no id.
+    The editor saves builtin templates and override templates the same way. A builtin
+    has no DB row and no id yet, so the key identifies the template.
     """
 
     key: str = Field(min_length=1)
@@ -53,16 +54,16 @@ class MailTemplateUpsert(_CamelModel):
 
 
 class MailTemplateOut(_CamelModel):
-    """Template as shown in the editor — override (DB) or builtin default."""
+    """Template as shown in the editor: a DB override or a builtin default."""
 
-    # Builtins (not yet overridden) have no DB id.
+    # A builtin template without an override has no DB id.
     id: UUID | None = None
     key: str
     subject_i18n: I18nMap = Field(serialization_alias="subjectI18n")
     body_i18n: I18nMap = Field(serialization_alias="bodyI18n")
     body_html_i18n: I18nMap = Field(serialization_alias="bodyHtmlI18n")
     placeholders: dict[str, str]
-    # 'override' = from the DB; 'builtin' = from the catalogue (unchanged).
+    # 'override' comes from the DB. 'builtin' comes from the catalogue, unchanged.
     source: Literal["override", "builtin"] = "override"
 
 
@@ -100,7 +101,7 @@ class NotificationPreferenceOut(_CamelModel):
 
 
 class NotificationPreferencesUpdate(_CamelModel):
-    """Bulk update of own notification switches."""
+    """Bulk update of the own notification switches."""
 
     preferences: list[NotificationPreferenceOut]
 
@@ -110,7 +111,7 @@ class NotificationSettingsOut(_CamelModel):
 
     task_reminder_enabled: bool = Field(alias="taskReminderEnabled")
     task_reminder_after_days: int = Field(alias="taskReminderAfterDays", ge=1)
-    # 0 = remind only once per state visit.
+    # A value of 0 sends one reminder per state visit only.
     task_reminder_repeat_days: int = Field(alias="taskReminderRepeatDays", ge=0)
 
 

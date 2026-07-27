@@ -1,8 +1,8 @@
 """Audited actions.
 
-Closed catalog of security-/config-relevant operations. Modules reference these
-constants instead of scattering free-form strings, keeping ``action`` values
-stable and queryable.
+This is the closed catalog of security-relevant and config-relevant operations.
+Modules reference these constants instead of free-form strings. That keeps the
+``action`` values stable and queryable.
 """
 
 from __future__ import annotations
@@ -18,8 +18,9 @@ class AuditAction(StrEnum):
     VOTE_CAST = "vote_cast"
     CONFIG_CHANGE = "config_change"
     CONFIG_ACTIVATION = "config_activation"
-    # Revert of a config change from the audit log (``audit.revert``); ``data``
-    # carries only id references, including the new (itself revertable) revisionId.
+    # Revert of a config change from the audit log, gated by ``audit.revert``.
+    # ``data`` carries only id references, including the new revisionId. That new
+    # revision is itself revertable.
     CONFIG_REVERT = "config_revert"
     ROLE_CHANGE = "role_change"
     DELEGATION_GRANT = "delegation_grant"
@@ -28,11 +29,11 @@ class AuditAction(StrEnum):
     DELEGATION_SUBSTITUTE_ADD = "delegation_substitute_add"
     DELEGATION_SUBSTITUTE_REMOVE = "delegation_substitute_remove"
     EXPORT = "export"
-    # Meeting deleted; deleting finalized meetings requires ``meeting.delete_finalized``.
+    # Meeting deleted. To delete a finalized meeting you need ``meeting.delete_finalized``.
     MEETING_DELETE = "meeting_delete"
-    # Application deleted — irreversible admin action cascading to PII, versions,
-    # status events, magic links, comments, budget entries and votes. ``data``
-    # carries only id references/metadata, never raw PII.
+    # Application deleted. This admin action is irreversible. It cascades to PII,
+    # versions, status events, magic links, comments, budget entries and votes.
+    # ``data`` carries only id references and metadata, never raw PII.
     APPLICATION_DELETE = "application_delete"
     WEBHOOK_CONFIG = "webhook_config"
     ATTACHMENT_QUARANTINE = "attachment_quarantine"
@@ -49,9 +50,9 @@ class AuditAction(StrEnum):
     ERASURE_REJECTED = "erasure_rejected"
     PRINCIPAL_ERASED = "principal_erased"
     RETENTION_ANONYMIZE = "retention_anonymize"
-    # Budget/money mutations: cost-centre CRUD, top-down allocation, bookings and
-    # transfers, invoices, application-to-cost-centre/fiscal-year moves. ``data``
-    # carries only id references and amounts (no PII).
+    # Budget and money mutations: cost-center CRUD, top-down allocation, bookings
+    # and transfers, invoices, moves of an application to another cost center or
+    # fiscal year. ``data`` carries only id references and amounts, no PII.
     BUDGET_NODE_CREATE = "budget_node_create"
     BUDGET_NODE_UPDATE = "budget_node_update"
     BUDGET_NODE_DELETE = "budget_node_delete"
@@ -65,9 +66,9 @@ class AuditAction(StrEnum):
     BUDGET_INVOICE_DELETE = "budget_invoice_delete"
     BUDGET_ASSIGN = "budget_assign"
     BUDGET_MOVE_FISCAL_YEAR = "budget_move_fiscal_year"
-    # FinTS bank reconciliation: connection/credential changes, sync runs, statement
-    # imports and line reconcile/ignore/unlink. ``data`` carries only id
-    # references and counters — never PIN or other credential material.
+    # FinTS bank reconciliation: connection and credential changes, sync runs,
+    # statement imports, and line reconcile, ignore or unlink. ``data`` carries only
+    # id references and counters. It never carries a PIN or other credential material.
     BANK_ACCOUNT_CONFIG = "bank_account_config"
     BANK_CREDENTIAL_SET = "bank_credential_set"
     BANK_CREDENTIAL_DELETE = "bank_credential_delete"
@@ -79,9 +80,10 @@ class AuditAction(StrEnum):
     BANK_LINE_UNLINK = "bank_line_unlink"
 
 
-# Budget mutations revertable from the audit log: additive ops are deleted,
-# updates restored from the prior state captured in audit ``data``. Deletes and
-# assign/fiscal-year moves are deliberately excluded (no re-creation).
+# Budget mutations that the audit log can revert. A revert deletes an additive
+# operation. A revert of an update restores the prior state that audit ``data``
+# captured. Deletes and assign or fiscal-year moves stay out on purpose, because
+# the platform cannot re-create them.
 REVERTABLE_BUDGET_ACTIONS: frozenset[AuditAction] = frozenset(
     {
         AuditAction.BUDGET_NODE_CREATE,

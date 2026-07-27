@@ -86,7 +86,6 @@
   </header>
 
   <div class="det__layout" [class.det__layout--editing]="editing()">
-  <!-- Left rail: transitions as a floating card -->
   <aside class="det__rail det__rail--left">
     @if (canTransition() && transitions().length) {
       <app-card [heading]="'applications.transitions.title' | t">
@@ -107,9 +106,7 @@
     }
   </aside>
 
-  <!-- Center: application data + history + attachments -->
   <div class="det__center">
-  <!-- Application data (view or inline edit by creator/manager) -->
   <app-card [heading]="'applications.detail.data.title' | t">
     @if (editing()) {
       <formly-form [form]="editForm" [fields]="editFields()" [model]="editModel" />
@@ -134,7 +131,6 @@
           }
         </dl>
       }
-      <!-- Cost positions with comparison offers -->
       @for (pf of positionEntries(application); track pf.key) {
         <section class="flex flex-col gap-3 mt-4">
           <h3 class="m-0 text-base">{{ pf.label }}</h3>
@@ -171,7 +167,6 @@
     }
   </app-card>
 
-  <!-- Versions-Historie + Diff (einklappbar, standardmäßig zu) -->
   <app-card>
     <button
       card-header
@@ -236,11 +231,9 @@
     }
   </app-card>
 
-  <!-- Attachments: upload + signed download URLs + scan status -->
   <app-attachments-panel [applicationId]="application.id" [canUpload]="canManage()" />
   </div><!-- /det__center -->
 
-  <!-- Right rail: comments as a chat -->
   <aside class="det__rail det__rail--right">
     <section class="det__chat" [attr.aria-label]="'applications.comments.title' | t">
       <header class="py-3 px-4 font-semibold border-0 border-b border-solid border-line">{{ 'applications.comments.title' | t }}</header>
@@ -319,7 +312,6 @@
   </div>
 </app-dialog>
 
-<!-- Assign cost centre: tree picker in a dialog. -->
 <app-dialog
   [open]="budgetDialogOpen()"
   [title]="'applications.budget.title' | t"
@@ -356,7 +348,7 @@
   </div>
 </app-dialog>
 
-<!-- Force status: privileged direct override (bypasses the flow). -->
+<!-- Force status is a privileged override. It bypasses the flow. -->
 <app-dialog
   [open]="forceDialogOpen()"
   [title]="'applications.detail.forceStatusTitle' | t"

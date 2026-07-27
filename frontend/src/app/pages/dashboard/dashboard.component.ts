@@ -17,12 +17,14 @@ import { CapitalizePipe } from '@shared/pipes/capitalize.pipe';
 const PREVIEW_ROWS = 5;
 
 /**
- * Role-based home page. Three distinct areas instead of redundant count tiles:
- *  - **Submit application** – primary CTA into the apply wizard (`/apply`).
- *  - **Open tasks** – applications awaiting processing/review (non-final states),
- *    with a deep link.
- *  - **My applications** – the user's (readable) applications with status + deep link.
- * Below, RBAC-gated quick links (votes/meetings/budget/administration).
+ * Role-based home page. It shows three areas instead of count tiles.
+ *
+ * Submit application: the primary CTA into the apply wizard (`/apply`).
+ * Open tasks: applications that wait for processing or review, each with a deep link.
+ * These applications sit in a non-final state.
+ * My applications: every application the user can read, with status and a deep link.
+ *
+ * Below these areas, RBAC-gated quick links lead to votes, meetings, budget, and admin.
  */
 @Component({
   selector: 'app-dashboard',
@@ -36,9 +38,9 @@ export class DashboardComponent {
   readonly auth = inject(AuthService);
   private readonly api = inject(ApiClient);
 
-  /** "My applications": only the user's OWN applications — `mine=true` forces
-   *  the owner filter even for principals with `application.read` (otherwise the
-   *  card would show all applications to entitled users). */
+  /** "My applications": only the applications the user owns. `mine=true` forces the
+   *  owner filter, even for a principal with `application.read`. Without it, the card
+   *  would show every application to an entitled user. */
   private readonly applications = toSignal(
     this.api.listApplications({ mine: true }).pipe(catchError(() => of(null))),
     { initialValue: undefined },
@@ -67,7 +69,6 @@ export class DashboardComponent {
   private readonly items = computed<ApplicationListItem[]>(() => this.applications()?.items ?? []);
   readonly total = computed(() => this.applications()?.total ?? 0);
 
-  /** Open tasks: applications with a decision open for me. */
   readonly openTasks = computed(() => this.tasks());
 
   readonly taskRows = computed(() => this.openTasks().slice(0, PREVIEW_ROWS));
@@ -77,7 +78,6 @@ export class DashboardComponent {
     return this.typeName()(item.typeId);
   }
 
-  /** Application title (system title field) with fallback to the application type. */
   titleOf(item: ApplicationListItem): string {
     return item.title?.trim() || this.typeName()(item.typeId);
   }
@@ -86,15 +86,14 @@ export class DashboardComponent {
     return item.createdAt ?? null;
   }
 
-  /** Application panels only if the user may read applications. */
+  /** The template shows the application panels only when this permission holds. */
   readonly canReadApplications = computed(() => this.auth.canAny('application.read'));
 
-  // --- Meeting shortcuts: running/upcoming meetings shown prominently ---
   private readonly meetings = toSignal(
     this.api.listMeetings().pipe(catchError(() => of([] as Meeting[]))),
     { initialValue: [] as Meeting[] },
   );
-  /** Running first, then planned (next dates), max 4 — large shortcuts. */
+  /** Live meetings first, then planned ones by date. The list keeps at most 4. */
   readonly sessionShortcuts = computed<Meeting[]>(() => {
     const rank = (m: Meeting): number => (m.status === 'live' ? 0 : m.status === 'planned' ? 1 : 2);
     return this.meetings()
@@ -113,32 +112,29 @@ export class DashboardComponent {
   }
 
   private readonly i18n = inject(I18nService);
-  /** Localized role key (admin→Administrator …); unknown → raw key. */
+  /** Localized role label. An unknown role key returns the raw key. */
   roleLabel(role: string): string {
     const key = `role.${role}`;
     const label = this.i18n.translate(key as TranslationKey);
     return label === key ? role : label;
   }
 
-  /** The user's global roles (badges). */
   readonly roles = computed(() => this.auth.roles());
-  /** The user's gremium memberships (badges). */
   readonly gremien = computed(() => this.auth.gremien());
 
-  // --- Substitution/delegation: active session-bound substitutions ---
   private readonly delegationsApi = inject(DelegationsApiService);
   private readonly delegationsRaw = toSignal(
     this.delegationsApi.list().pipe(catchError(() => of([] as Delegation[]))),
     { initialValue: [] as Delegation[] },
   );
-  /** Only substitutions of upcoming/running meetings (revocable first). */
+  /** Only delegations for a planned or live meeting. The server marks those revocable. */
   readonly delegations = computed<Delegation[]>(() =>
     this.delegationsRaw()
       .filter((d) => d.revocable)
       .slice(0, PREVIEW_ROWS),
   );
 
-  /** Outgoing = I am being represented (direction comes from the server). */
+  /** Outgoing means another person represents the user. The server sets the direction. */
   isOutgoing(d: Delegation): boolean {
     return d.direction === 'outgoing';
   }

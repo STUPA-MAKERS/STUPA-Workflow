@@ -1,8 +1,9 @@
-"""Shared base of the :class:`~.service.BankService` mixins.
+"""Shared base of the ``service.BankService`` mixins.
 
-Constructor plus helpers used by several sub-areas: feature/principal gates,
-account/credential lookup, audit hook, balance carry-over and the output
-projection of a staged statement line.
+The class holds the constructor and the helpers that several sub-areas use. These
+helpers cover the feature and principal gates, the account and credential lookup,
+the audit hook and the balance carry-over. They also build the output projection
+of a staged statement line.
 """
 
 from __future__ import annotations
@@ -29,8 +30,8 @@ from app.shared.errors import NotFoundError, ServiceUnavailableError, Validation
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
-# Cap on lines per import/fetch (anti-DoS): a 10-MiB MT940 can carry tens of
-# thousands of transactions, and each staged line costs 1-2 queries.
+# Cap on the lines per import or fetch (anti-DoS). A 10-MiB MT940 can carry tens
+# of thousands of transactions, and each staged line costs 1 to 2 queries.
 MAX_STATEMENT_LINES = 10_000
 
 
@@ -48,12 +49,11 @@ class BankServiceBase:
         self.session = session
         self.settings = settings or get_settings()
         self.actor = actor
-        # Personal FinTS credentials and TAN sessions are separated per bookkeeper,
-        # so the sync/credential path needs the principal id; the file import
-        # (no bank access) works without it.
+        # The system separates personal FinTS credentials and TAN sessions per
+        # bookkeeper. The sync and credential path therefore needs the principal
+        # id. The file import has no bank access and works without it.
         self.principal_id = principal_id
 
-    # ----------------------------------------------------------------- helpers
     def _require_enabled(self) -> str:
         """Return the FinTS encryption key or 503 (feature off)."""
         key = self.settings.fints_enc_key
@@ -62,15 +62,23 @@ class BankServiceBase:
         return key
 
     def _require_principal(self) -> uuid.UUID:
-        """Return the bookkeeper's principal id or 503 (internal invariant: the
-        router always supplies it for authenticated FinTS calls)."""
+        """Return the principal id of the bookkeeper, or raise a 503.
+
+        The router always supplies the id for an authenticated FinTS call. A
+        missing id breaks an internal invariant.
+        """
         if self.principal_id is None:
             raise ServiceUnavailableError("FinTS requires an authenticated principal.")
         return self.principal_id
 
     async def _load_credential(self, account_id: uuid.UUID) -> AccountFintsCredential:
-        """Load the bookkeeper's personal credentials for an account — or 422
-        ``fints_no_credential`` (the frontend then prompts for the initial connect)."""
+        """Load the personal credentials of the bookkeeper for an account.
+
+        Raises:
+            ValidationProblem: The account has no credential. The code is 422
+                ``fints_no_credential``, and the frontend then prompts for the
+                first connect.
+        """
         cred = await self.session.scalar(
             select(AccountFintsCredential).where(
                 AccountFintsCredential.account_id == account_id,
@@ -104,8 +112,11 @@ class BankServiceBase:
 
     @staticmethod
     def _apply_balance(acc: Account, balance: statement.StatementBalance | None) -> None:
-        """Store bank balance + as-of date on the account. Only overwrite when a
-        balance was delivered (HKSAL/`:62F:`/CLBD); otherwise keep the last known one."""
+        """Store the bank balance and the as-of date on the account.
+
+        The method overwrites the values only when the source delivered a balance
+        (HKSAL, ``:62F:`` or CLBD). Otherwise it keeps the last known balance.
+        """
         if balance is None:
             return
         as_of = (
@@ -113,8 +124,8 @@ class BankServiceBase:
             if balance.as_of is not None
             else datetime.now(UTC)
         )
-        # Recency guard: never overwrite a newer balance with an older file
-        # import. With an equal/missing as-of date (None), always update.
+        # Recency guard: never overwrite a newer balance with an older file import.
+        # An equal or missing as-of date (``None``) always updates the balance.
         if (
             acc.fints_balance_at is not None
             and balance.as_of is not None
@@ -130,20 +141,22 @@ class BankServiceBase:
         suggested_path_key: str | None,
         matched_expense_id: uuid.UUID | None = None,
     ) -> StatementLineOut:
-        # ALWAYS resolve counterparty + purpose from the raw data — never from the
-        # stored counterparty_*/purpose columns, which may stem from an older
-        # parser version (e.g. "KRZL" placeholder, glued IBAN/purpose). CAMT raw
-        # without GVC fields falls back to the column.
+        # ALWAYS resolve counterparty and purpose from the raw data. Never use the
+        # stored counterparty_* or purpose columns, because they can come from an
+        # older parser version, for example a "KRZL" placeholder or a glued IBAN and
+        # purpose. CAMT raw data without GVC fields falls back to the column.
         name, iban = normalize.resolve_counterparty(line.raw_payload, credit=line.amount > 0)
         if not name and not iban:
-            # Fall back to the stored column (CAMT/legacy) — still drop placeholders.
+            # Fall back to the stored column (CAMT or legacy) but still drop
+            # the placeholders.
             name = normalize.clean_counterparty_name(line.counterparty_name)
             iban = line.counterparty_iban
         purpose = normalize.resolve_purpose(line.raw_payload)
         if purpose is None:
             purpose = line.purpose
-        # Make Sparkasse batch-booking purposes ("DATEI-NR. ...") human-readable
-        # — display only; column/raw data stay unchanged.
+        # Make Sparkasse batch-booking purposes ("DATEI-NR. ...") readable for a
+        # person. This affects the display only. The column and raw data stay
+        # unchanged.
         purpose = normalize.prettify_purpose(purpose)
         return StatementLineOut(
             id=line.id,

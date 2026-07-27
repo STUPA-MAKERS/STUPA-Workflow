@@ -1,6 +1,8 @@
-"""Unit-Tests AttendanceService: Anwesenheit ist nach dem Schließen eingefroren
-(#attendance-lock) — das finalisierte Protokoll trägt die Listen, nachträgliche
-Änderungen würden PDF und System auseinanderlaufen lassen."""
+"""Unit tests for AttendanceService.
+
+The close of a meeting freezes the attendance (#attendance-lock). The final protocol
+carries the lists. A later change makes the PDF and the system disagree.
+"""
 
 from __future__ import annotations
 

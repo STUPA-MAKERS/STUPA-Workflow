@@ -1,14 +1,15 @@
 """Voting API router.
 
-* ``POST /api/applications/{id}/votes`` - P(vote.manage); create a vote.
-* ``POST /api/votes/{id}/open``         - P(vote.manage); open.
-* ``POST /api/votes/{id}/close``        - P(vote.manage); close -> result -> flow.
-* ``POST /api/votes/{id}/ballot``       - P(vote.cast)+group; cast a vote.
+* ``POST /api/applications/{id}/votes`` - create a vote. P(vote.manage).
+* ``POST /api/votes/{id}/open``         - open a vote. P(vote.manage).
+* ``POST /api/votes/{id}/close``        - close -> result -> flow. P(vote.manage).
+* ``POST /api/votes/{id}/ballot``       - cast a vote. P(vote.cast) plus group.
 * ``GET  /api/votes/{id}``              - vote state + tally (secret: only counts).
 
 RBAC is fail-closed: 401 without a session, 403 without the permission or group
-membership (``cast``). The group lives on the vote (dynamic), so the check runs in
-the service after loading. Errors are declared as ``ProblemDetail`` (problem+json).
+membership (``cast``). The group lives on the vote and is dynamic. The service
+therefore runs the check after it loads the vote. The routes declare their errors as
+``ProblemDetail`` (problem+json).
 """
 
 from __future__ import annotations
@@ -56,10 +57,11 @@ def get_voting_service(
 
 ServiceDep = Annotated[VotingService, Depends(get_voting_service)]
 PublisherDep = Annotated[MeetingPublisher, Depends(get_meeting_publisher)]
-# Lifecycle (create/open/close/cancel) is not global-only gated: the router gate only
-# requires auth; the gremium-scoped ``vote.manage`` check (admin / global vote.manage /
-# per-gremium role) is fail-closed in the service (``assert_can_manage*``), symmetric
-# with the scoped read (``get_scoped``).
+# The lifecycle routes (create/open/close/cancel) do not use a global-only gate. The
+# router gate requires only a session. The service then runs the fail-closed
+# gremium-scoped ``vote.manage`` check (``assert_can_manage*``), which admits admin, a
+# global ``vote.manage`` holder, or a per-gremium role. This is symmetric with the
+# scoped read (``get_scoped``).
 ReaderDep = Annotated[Principal, Depends(require_principal())]
 
 
@@ -77,7 +79,8 @@ async def create_vote(
     """Create a draft vote on an application.
 
     Gremium-scoped: admin, global ``vote.manage``, or a gremium role with
-    ``vote.manage`` for the ``eligibleGroup`` gremium - no creating in other gremien.
+    ``vote.manage`` for the ``eligibleGroup`` gremium. A caller cannot create a vote in
+    another gremium.
     """
     await service.assert_can_manage_group(payload.eligible_group, None, principal)
     return await service.create(application_id, payload)
@@ -94,10 +97,11 @@ async def open_vote(
     publisher: PublisherDep,
     principal: ReaderDep,
 ) -> VoteOut:
-    """Open a vote (``draft`` -> ``open``); 409 if not ``draft``.
+    """Open a vote and move it from ``draft`` to ``open``.
 
-    Gremium-scoped ``vote.manage``. If the vote is bound to a meeting, the publisher
-    broadcasts ``vote_opened`` on the live-vote channel; otherwise no-op.
+    Gremium-scoped ``vote.manage``. The call returns 409 when the vote is not
+    ``draft``. If a meeting holds the vote, the publisher broadcasts ``vote_opened``
+    on the live-vote channel. Without a meeting the broadcast is a no-op.
     """
     await service.assert_can_manage_vote(vote_id, principal)
     vote = await service.open(vote_id, now=datetime.now(UTC))
@@ -116,10 +120,12 @@ async def close_vote(
     publisher: PublisherDep,
     principal: ReaderDep,
 ) -> VoteClosed:
-    """Close a vote -> tally -> result -> ``flow.fire(result_branch)``.
+    """Close a vote, compute the tally, set the result and fire the flow branch.
 
-    Gremium-scoped ``vote.manage`` - no cross-tenant close (which would fire another
-    application's flow). Broadcasts ``vote_closed`` on the meeting channel (no-op if no meeting).
+    The close calls ``flow.fire(result_branch)``. Gremium-scoped ``vote.manage`` blocks
+    a cross-tenant close, which would fire the flow of another application. The
+    publisher broadcasts ``vote_closed`` on the meeting channel. Without a meeting the
+    broadcast is a no-op.
     """
     await service.assert_can_manage_vote(vote_id, principal)
     closed = await service.close(vote_id, principal)
@@ -138,10 +144,11 @@ async def cancel_vote(
     publisher: PublisherDep,
     principal: ReaderDep,
 ) -> VoteOut:
-    """Cancel a vote: ``open`` -> ``cancelled`` - no result, no branch; the application
-    stays in the ``vote`` state. The escape hatch when the quorum is not reached
-    (``close`` is then blocked).
+    """Cancel an open vote.
 
+    The vote moves from ``open`` to ``cancelled``. It gets no result and fires no
+    branch. The application stays in the ``vote`` state. This is the escape hatch when
+    the vote does not reach the quorum, because ``close`` is then blocked.
     Gremium-scoped ``vote.manage``.
     """
     await service.assert_can_manage_vote(vote_id, principal)
@@ -160,16 +167,19 @@ async def cast_ballot(
     payload: BallotIn,
     service: ServiceDep,
     publisher: PublisherDep,
-    # Auth-only gate: an external substitute has no global ``vote.cast``; the
-    # authorization (vote.cast+group for the own vote, delegation row for the
-    # represented vote) lives in the service.
+    # Auth-only gate: an external substitute has no global ``vote.cast``. The service
+    # holds the authorization. It checks ``vote.cast`` plus group for the own vote, and
+    # a delegation row for the represented vote.
     principal: ReaderDep,
 ) -> BallotAccepted:
-    """Cast a vote - 403 (not in group), 409 (closed/double), 422 (option).
+    """Cast a vote.
 
-    Then broadcasts ``vote_tally`` so every client's 'N of M voted' counter stays
-    fresh. Aggregates only - the reveal rule hides counts/leading until all present
-    members have voted (``VoteTallyEvent.from_vote``).
+    The call returns 403 when the caller is not in the group. It returns 409 when the
+    vote is closed or the caller already voted. It returns 422 for an unknown option.
+    The router then broadcasts ``vote_tally`` so the 'N of M voted' counter of every
+    client stays fresh. The event carries aggregates only. The reveal rule hides the
+    counts and the leading option until all present members have voted
+    (``VoteTallyEvent.from_vote``).
     """
     accepted = await service.cast(
         vote_id,
@@ -192,9 +202,11 @@ async def get_vote(
     service: ServiceDep,
     principal: ReaderDep,
 ) -> VoteOut:
-    """Vote state + aggregated tally (only ``counts`` when ``secret``, never voters).
+    """Return the vote state and the aggregated tally.
 
-    Scoped to the vote's read audience: meeting members/participants or a
-    read/manage permission - 403 for other gremien (no cross-tenant read).
+    A secret vote exposes only ``counts`` and never the voters. The service scopes the
+    read to the read audience of the vote: meeting members, meeting participants, or a
+    holder of a read or manage permission. Other gremien get 403, so there is no
+    cross-tenant read.
     """
     return await service.get_scoped(vote_id, principal)

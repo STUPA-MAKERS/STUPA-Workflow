@@ -1,4 +1,4 @@
-"""Filtered application listing, committee read scope, open tasks, export name maps."""
+"""Filtered application listing, Gremium read scope, open tasks, export name maps."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ from app.shared.paging import Page
 
 
 class ListingOps(ApplicationsServiceBase):
-    """List/filter applications, committee read scope, tasks and export helpers."""
+    """List and filter applications, Gremium read scope, tasks and export helpers."""
 
     async def list_applications(
         self,
@@ -45,19 +45,22 @@ class ListingOps(ApplicationsServiceBase):
         limit: int,
         offset: int,
     ) -> Page[ApplicationListItem]:
-        """Filtered, paged, sorted application list (``GET /applications``).
+        """List applications with filters, paging and sorting for `GET /applications`.
 
-        ``owner_sub`` restricts to own applications (``created_by``) — set for users
-        WITHOUT ``application.read`` who may only see their own. ``committee_sub``
-        widens that restriction by the committee read scope: also visible are
-        applications in a view cost centre of a member gremium or in a ``vote`` state
-        for one. Both are OR-combined; with neither set there is no read restriction
-        (full view for ``application.read``/admin)."""
-        # Unconfirmed guest applications stay invisible until the email is confirmed
-        # (existing + logged-in applications carry ``email_confirmed_at``).
+        `owner_sub` limits the result to applications with that `created_by`. Set it for
+        a user without `application.read` who may see only own applications.
+
+        `committee_sub` adds the Gremium read scope. The result then holds an
+        application in a view cost center of a member Gremium. It also holds an
+        application in a `vote` state of such a Gremium.
+
+        The query combines both limits with OR. If the caller sets neither, the list
+        holds every application. That is the full view for `application.read` and for
+        admin.
+        """
+        # An unconfirmed guest application stays invisible until the applicant confirms
+        # the email. An existing or logged-in application carries `email_confirmed_at`.
         filters: list[ColumnElement[bool]] = [Application.email_confirmed_at.is_not(None)]
-        # Read scope: own applications OR committee scope, OR-combined; without
-        # ``owner_sub``/``committee_sub`` the list stays unfiltered.
         read_scope: list[ColumnElement[bool]] = []
         if owner_sub is not None:
             read_scope.append(Application.created_by == owner_sub)
@@ -74,8 +77,8 @@ class ListingOps(ApplicationsServiceBase):
         if budget_pot_id is not None:
             filters.append(Application.budget_pot_id == budget_pot_id)
         if budget_id is not None:
-            # Cost centre incl. subtree via the ``path_key`` prefix (node itself +
-            # all descendants ``<path>-…``). Unknown cost centre → empty list.
+            # The filter covers the cost center and its whole subtree through the
+            # `path_key` prefix. An unknown cost center gives an empty list.
             node_path = await self.session.scalar(
                 select(Budget.path_key).where(Budget.id == budget_id)
             )
@@ -89,11 +92,11 @@ class ListingOps(ApplicationsServiceBase):
                     )
                 )
                 filters.append(Application.budget_id.in_(descendants))
-        # Fuzzy search on MEANINGFUL text: title + string answer values of the
-        # ``data`` JSONB — no ids/enums/numbers. Postgres uses the IMMUTABLE
-        # ``app_search_text(data)`` function (the trigram index expression); the
-        # SQLite fallback (unit stubs) lacks it → whole ``data`` blob as text
-        # (substring ILIKE only).
+        # The fuzzy search reads meaningful text only: the title and the string answer
+        # values of the `data` JSONB. It skips ids, enums and numbers. Postgres uses the
+        # IMMUTABLE `app_search_text(data)` function, which is the trigram index
+        # expression. The SQLite fallback for the unit stubs has no such function and
+        # searches the whole `data` blob as text with a substring ILIKE.
         rank_expr: ColumnElement[Any] | None = None
         if q and q.strip():
             dialect = dialect_of(self.session)
@@ -111,14 +114,14 @@ class ListingOps(ApplicationsServiceBase):
         if created_from is not None:
             filters.append(Application.created_at >= datetime.combine(created_from, time.min, UTC))
         if created_to is not None:
-            # ``created_to`` is inclusive → until end of day (< next day 00:00 UTC).
+            # `created_to` is inclusive, so the filter ends at 00:00 UTC of the next day.
             end = datetime.combine(created_to + timedelta(days=1), time.min, UTC)
             filters.append(Application.created_at < end)
 
         sort_col = Application.amount if sort == "amount" else Application.created_at
         ordering = (sort_col.asc() if order == "asc" else sort_col.desc()).nulls_last()
-        # Active search ⇒ most relevant first (rank), then the chosen sort as
-        # deterministic tiebreak; unchanged otherwise.
+        # An active search puts the most relevant row first. The chosen sort then acts
+        # as a deterministic tiebreak. Without a search the order does not change.
         order_by = (rank_expr.desc(), ordering) if rank_expr is not None else (ordering,)
 
         total = await self.session.scalar(
@@ -149,18 +152,24 @@ class ListingOps(ApplicationsServiceBase):
         return Page(items=items, total=total or 0, limit=limit, offset=offset)
 
     async def _committee_read_clauses(self, sub: str) -> list[ColumnElement[bool]]:
-        """Committee read scope as SQL clauses (OR-combined with the owner filter).
+        """Build the Gremium read scope as SQL clauses.
 
-        Three paths — mirrored from ``access._committee_can_read`` (detail view):
+        The caller combines these clauses with the owner filter through OR. The three
+        paths mirror `access._committee_can_read`, which the detail view uses:
 
-        * cost centre (node OR ancestor) with ``view_gremium_id`` in a member
-          gremium → the whole subtree (``path_key`` prefix),
-        * current ``vote`` state with ``config.gremiumId`` in a member gremium, and
-        * legacy: voted in a meeting of a member gremium (``vote → meeting.gremium_id``).
+        * a cost center (the node or an ancestor) with `view_gremium_id` in a member
+          Gremium, which opens the whole subtree through the `path_key` prefix,
+        * the current `vote` state with `config.gremiumId` in a member Gremium, and
+        * legacy: a vote in a meeting of a member Gremium, found over `vote` and
+          `meeting.gremium_id`.
 
-        Both functions MUST cover the same paths so a listed application is also
-        openable (and vice versa). No active memberships → empty list (no extra
-        scope)."""
+        Both functions must cover the same paths. A listed application must also be
+        openable, and an openable application must also be listed.
+
+        Returns:
+            An empty list when the principal holds no active membership. The caller
+            then adds no extra scope.
+        """
         from app.modules.admin.gremium_roles import gremium_member_ids
 
         member_ids = await gremium_member_ids(self.session, sub)
@@ -168,9 +177,10 @@ class ListingOps(ApplicationsServiceBase):
             return []
         clauses: list[ColumnElement[bool]] = []
 
-        # (a) Member view cost centres (node/ancestor) incl. subtree: first the
-        #     "root" paths with a matching ``view_gremium_id``, then all applications
-        #     whose ``budget_id`` points at one of those paths OR a descendant.
+        # (a) View cost centers of a member Gremium, the node or an ancestor, with the
+        #     whole subtree. First collect the root paths with a matching
+        #     `view_gremium_id`. Then take every application whose `budget_id` points
+        #     at such a path or at a descendant.
         root_paths = (
             await self.session.scalars(
                 select(Budget.path_key).where(Budget.view_gremium_id.in_(member_ids))
@@ -187,9 +197,9 @@ class ListingOps(ApplicationsServiceBase):
             )
             clauses.append(Application.budget_id.in_(scoped))
 
-        # (b) Current ``vote`` state for a member gremium. JSONB ``config`` evaluated
-        #     in Python (dialect-neutral, like ``list_tasks``); the set of ``vote``
-        #     states is small.
+        # (b) The current `vote` state belongs to a member Gremium. Python evaluates the
+        #     JSONB `config` to stay dialect-neutral, as `list_tasks` does. The set of
+        #     `vote` states is small.
         member_str = {str(g) for g in member_ids}
         vote_state_ids = [
             s.id
@@ -202,9 +212,8 @@ class ListingOps(ApplicationsServiceBase):
         if vote_state_ids:
             clauses.append(Application.current_state_id.in_(vote_state_ids))
 
-        # (c) Legacy: voted in a meeting of a member gremium. Applications with a
-        #     ``Vote`` whose ``meeting.gremium_id`` belongs to one of the gremien —
-        #     mirrored from ``access._committee_can_read`` (c).
+        # (c) Legacy: the application has a `Vote` in a meeting of a member Gremium.
+        #     This mirrors `access._committee_can_read` (c).
         from app.modules.livevote.models import Meeting
         from app.modules.voting.models import Vote
 
@@ -218,7 +227,7 @@ class ListingOps(ApplicationsServiceBase):
         return clauses
 
     async def name_maps(self, locale: str = "de") -> tuple[dict[UUID, str], dict[UUID, str]]:
-        """``(type_names, gremium_names)`` for the application export (xlsx)."""
+        """Return `(type_names, gremium_names)` for the application xlsx export."""
         type_rows = (
             await self.session.execute(select(ApplicationType.id, ApplicationType.name_i18n))
         ).all()
@@ -231,7 +240,7 @@ class ListingOps(ApplicationsServiceBase):
         return type_names, gremium_names
 
     async def _in_gremium(self, sub: str, gremium_id: UUID) -> bool:
-        """``True`` if ``sub`` is currently (valid term) a member of the gremium."""
+        """Tell if `sub` is a member of the Gremium with a currently valid term."""
         from app.modules.auth.models import Principal as PrincipalRow
 
         now = datetime.now(UTC)
@@ -249,12 +258,14 @@ class ListingOps(ApplicationsServiceBase):
         return row is not None
 
     async def list_tasks(self, principal: Any) -> list[ApplicationListItem]:
-        """Open tasks of the principal.
+        """List the open tasks of the principal.
 
         An application is a task when the principal can act on it:
-        * a ``vote`` state + gremium membership (or admin) → vote, **or**
-        * at least one **manual** transition is firable (guard satisfied) and the
-          principal may fire transitions (``application.transition`` / admin).
+
+        * the application is in a `vote` state and the principal is a member of the
+          Gremium or an admin, so the principal can vote, or
+        * at least one manual transition is firable because its guard holds, and the
+          principal may fire transitions with `application.transition` or as admin.
         """
         from app.modules.flow.service import FlowService
 
@@ -262,7 +273,6 @@ class ListingOps(ApplicationsServiceBase):
         is_admin = "admin" in principal.roles
         can_transition = is_admin or principal.has("application.transition")
 
-        # All open (confirmed) applications with a current state — newest first.
         apps = (
             await self.session.scalars(
                 select(Application)
@@ -302,9 +312,9 @@ class ListingOps(ApplicationsServiceBase):
                         and await self._in_gremium(principal.sub, UUID(gid))
                     )
             if not ok and (can_transition or app.created_by == principal.sub):
-                # Only firable manual transitions with ``requiresAction`` count —
-                # optional actions create no pseudo-task; a terminal state (no exits)
-                # is not a task, also for one's own submission.
+                # Only a firable manual transition with `requiresAction` counts. An
+                # optional action creates no pseudo-task. A terminal state has no exit
+                # and is no task, also for an application of the principal.
                 ok = any(
                     t.requires_action for t in await flow.available_transitions(app.id, principal)
                 )

@@ -24,7 +24,7 @@ class HostComponent {
   toggles = 0;
 }
 
-/** matchMedia stub: `(pointer: coarse)` matches iff `coarse` is true. */
+/** Stub for matchMedia. The query `(pointer: coarse)` matches only when `coarse` is true. */
 function mockPointer(coarse: boolean): void {
   (window as { matchMedia: unknown }).matchMedia = jest.fn().mockImplementation((query: string) => ({
     matches: coarse && query.includes('coarse'),
@@ -65,7 +65,7 @@ describe('PressSelectDirective', () => {
     card.dispatchEvent(pointer('pointerdown', 10, 10));
     jest.advanceTimersByTime(450);
     expect(host.toggles).toBe(1);
-    // The click fired after releasing the long press must NOT re-toggle.
+    // The click after the release of the long press must NOT toggle again.
     card.dispatchEvent(pointer('click', 10, 10));
     expect(host.toggles).toBe(1);
   });

@@ -1,8 +1,8 @@
-"""Unit (ohne DB): Branding-Schema-Validierung (#21, T-24).
+"""Unit tests without a DB: branding schema validation (#21, T-24).
 
-Sicherheitskontrakt: Logos sind **Bild-only**, **kein Inline-SVG**, ≤2 MB; Footer-/
-Legal-URLs ohne `javascript:`/`data:`-Schemata. Diese Regeln greifen serverseitig
-autoritativ (das FE-Client-Gate ist nur UX).
+Security contract: a logo must be an image, must not be an inline SVG and must stay
+at or below 2 MB. A footer or legal URL must not use the `javascript:` or `data:`
+scheme. The server enforces these rules. The frontend gate is only UX.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from app.modules.admin.branding import (
 )
 
 
-# `iVBORw0KGgo=` ist exakt die 8-Byte-PNG-Signatur → echter Magic-Byte-Check besteht.
+# `iVBORw0KGgo=` is exactly the 8-byte PNG signature, so the magic-byte check passes.
 def _png(url: str = "data:image/png;base64,iVBORw0KGgo=") -> dict:
     return {"url": url, "filename": "logo.png", "mime": "image/png", "size": 1024}
 
@@ -52,7 +52,6 @@ def test_full_branding_roundtrip_by_alias() -> None:
     dumped = b.model_dump(by_alias=True)
     assert "footerColumns" in dumped
     assert dumped["freetexts"]["loginHint"] == {"de": "Hinweis"}
-    # deterministischer Roundtrip
     assert Branding.model_validate(dumped).model_dump(by_alias=True) == dumped
 
 
@@ -62,11 +61,11 @@ def test_http_and_absolute_logo_urls_allowed() -> None:
 
 
 def test_favicon_ico_allowed() -> None:
-    # 4-Byte-ICO-Header 00 00 01 00 → base64 "AAABAA=="
+    # The 4-byte ICO header 00 00 01 00 gives the base64 string "AAABAA==".
     BrandingAsset(
         url="data:image/x-icon;base64,AAABAA==",
         filename="favicon.ico",
-        mime="image/vnd.microsoft.icon",  # Alias von image/x-icon → akzeptiert
+        mime="image/vnd.microsoft.icon",  # alias of image/x-icon, so it is accepted
         size=10,
     )
 
@@ -85,7 +84,7 @@ def test_rejects_inline_svg_data_url() -> None:
         BrandingAsset(
             url="data:image/svg+xml;base64,PHN2Zz4=",
             filename="l.svg",
-            mime="image/png",  # gelogen — Inline-SVG wird unabhängig vom mime geblockt
+            mime="image/png",  # deliberately wrong: the check blocks an inline SVG anyway
             size=10,
         )
 
@@ -153,9 +152,8 @@ def test_unknown_logo_slot_rejected() -> None:
         Branding.model_validate({"logos": {"banner": _png()}})
 
 
-# --------------------------------------------------------------- echte Bytes härten
 def test_data_url_real_bytes_exceed_cap_rejected() -> None:
-    """Client-`size` ist nicht vertrauenswürdig → echte Byte-Größe entscheidet."""
+    """The real byte count decides because the server distrusts the client `size` field."""
     big = b"\x89PNG\r\n\x1a\n" + b"\x00" * (MAX_LOGO_BYTES + 1)
     url = "data:image/png;base64," + base64.b64encode(big).decode()
     with pytest.raises(ValidationError):
@@ -163,7 +161,7 @@ def test_data_url_real_bytes_exceed_cap_rejected() -> None:
 
 
 def test_png_declared_but_svg_bytes_rejected() -> None:
-    """Als image/png getarntes SVG (base64) → Magic-Byte-Sniff lehnt ab."""
+    """The magic-byte sniff rejects an SVG in base64 that claims to be image/png."""
     svg = base64.b64encode(b"<svg xmlns='http://www.w3.org/2000/svg'></svg>").decode()
     with pytest.raises(ValidationError):
         BrandingAsset(

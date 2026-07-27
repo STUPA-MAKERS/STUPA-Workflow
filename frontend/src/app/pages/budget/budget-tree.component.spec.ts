@@ -103,7 +103,7 @@ function makeAdminMock(m: Mocks) {
       return of({
         states: [
           { key: 'accepted', label: { de: 'Angenommen', en: 'Accepted' } },
-          { key: 'orphan', label: {} }, // label['de'] missing → falls back to key
+          { key: 'orphan', label: {} }, // No German label, so the code falls back to the key.
         ],
       });
     },
@@ -127,7 +127,8 @@ async function setup(m: Mocks = { gremien: 'ok', flow: 'null' }) {
     ],
   });
   const http = TestBed.inject(HttpTestingController);
-  // Initial reload(): tree GET + per-top fiscal-years GET (single top b-vs).
+  // The initial reload() sends a tree GET and one fiscal-years GET per top. Here the
+  // only top is b-vs.
   http.expectOne((r) => r.url.endsWith('/budgets') && r.method === 'GET').flush(TREE);
   http.expectOne((r) => r.url.endsWith('/budgets/b-vs/fiscal-years')).flush([FY]);
   view.fixture.detectChanges();
@@ -136,7 +137,7 @@ async function setup(m: Mocks = { gremien: 'ok', flow: 'null' }) {
   return { ...view, http, c, toast: toastSpy };
 }
 
-/** Flush a reload() cycle (tree GET + per-top fiscal-years GET). */
+/** Flush a reload() cycle: the tree GET and one fiscal-years GET per top. */
 function flushReload(http: HttpTestingController, tree: BudgetTreeNode[] = TREE): void {
   http.expectOne((r) => r.url.endsWith('/budgets') && r.method === 'GET').flush(tree);
   for (const top of tree.filter((n) => n.parentId === null)) {
@@ -147,7 +148,6 @@ function flushReload(http: HttpTestingController, tree: BudgetTreeNode[] = TREE)
 describe('BudgetTreeComponent (#9)', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
-  // ---------------------------------------------------------------- rendering
   it('renders the cost-centre tree with full path keys', async () => {
     await setup();
     expect(screen.getByText('VS')).toBeInTheDocument();
@@ -194,7 +194,6 @@ describe('BudgetTreeComponent (#9)', () => {
     expect(c.childExpanded(row)).toBe(true);
   });
 
-  // ---------------------------------------------------------- constructor side
   it('maps gremien into options on construction', async () => {
     const { c } = await setup({ gremien: 'ok', flow: 'null' });
     expect(c.gremiumOptions()).toEqual([{ value: 'g-1', label: 'StuPa' }]);
@@ -218,7 +217,6 @@ describe('BudgetTreeComponent (#9)', () => {
     expect(c.stateOptions()).toEqual([]);
   });
 
-  // ---------------------------------------------------------------- reload()
   it('keeps the selection across reloads when the top still exists', async () => {
     const { c, http } = await setup();
     c.selectedTopId.set('b-vs');
@@ -257,7 +255,7 @@ describe('BudgetTreeComponent (#9)', () => {
     c.selectedFyId.set('fy-1');
     c['reload']();
     http.expectOne((r) => r.url.endsWith('/budgets') && r.method === 'GET').flush(TREE);
-    // Empty fiscal-years list for the selected top → fys[0]?.id ?? '' → ''.
+    // The selected top gets an empty fiscal-years list, so fys[0]?.id ?? '' gives ''.
     http.expectOne((r) => r.url.endsWith('/budgets/b-vs/fiscal-years')).flush([]);
     expect(c.fiscalYears()).toEqual([]);
     expect(c.selectedFyId()).toBe('');
@@ -283,7 +281,6 @@ describe('BudgetTreeComponent (#9)', () => {
     expect(c.loading()).toBe(false);
   });
 
-  // ------------------------------------------------------------ alloc / money
   it('alloc returns the matching fiscal-year allocation or null', async () => {
     const { c } = await setup();
     expect(c.alloc(TREE[0])?.allocated).toBe('1000');
@@ -305,7 +302,6 @@ describe('BudgetTreeComponent (#9)', () => {
     expect(c.money(42, 'EUR')).toBe(eur(42));
   });
 
-  // -------------------------------------------------------- accepted / denied
   it('reports accepted/denied membership for the selected top', async () => {
     const { c } = await setup();
     expect(c.isAccepted('accepted')).toBe(true);
@@ -321,7 +317,6 @@ describe('BudgetTreeComponent (#9)', () => {
     expect([...c.deniedKeys()]).toEqual([]);
   });
 
-  // ---------------------------------------------------------------- selectTop
   it('selectTop sets the budget, clears the fy and loads fiscal years', async () => {
     const { c, http } = await setup();
     c.selectTop('b-vs');
@@ -336,7 +331,7 @@ describe('BudgetTreeComponent (#9)', () => {
     const { c, http } = await setup();
     c.selectedFyId.set('fy-1');
     c.selectTop('b-vs');
-    // selectTop wiped the fy; loadFiscalYears keeps it only if still present.
+    // selectTop wiped the fy. loadFiscalYears keeps it only if the list still holds it.
     http.expectOne((r) => r.url.endsWith('/budgets/b-vs/fiscal-years')).flush([FY]);
     expect(c.selectedFyId()).toBe('fy-1');
   });
@@ -374,7 +369,6 @@ describe('BudgetTreeComponent (#9)', () => {
     expect(c.selectedFyId()).toBe('fy-x');
   });
 
-  // ----------------------------------------------------------------- saveColor
   it('saveColor PATCHes the color, toasts success and reloads', async () => {
     const { c, http, toast } = await setup();
     c.saveColor(TREE[0], '#ff0000');
@@ -404,17 +398,16 @@ describe('BudgetTreeComponent (#9)', () => {
     http.verify();
   });
 
-  // --------------------------------------------------------------- toggleState
   it('toggleState does nothing when no top is selected', async () => {
     const { c, http } = await setup();
     c.selectedTopId.set('none');
     c.toggleState('accepted', 'x');
-    http.verify(); // no PATCH was issued
+    http.verify(); // The component sent no PATCH.
   });
 
   it('toggleState removes an already-set key', async () => {
     const { c, http } = await setup();
-    c.toggleState('accepted', 'accepted'); // currently set → removed
+    c.toggleState('accepted', 'accepted'); // The key is set, so the toggle removes it.
     const patch = http.expectOne((r) => r.url.endsWith('/budgets/b-vs') && r.method === 'PATCH');
     expect(patch.request.body).toEqual({ acceptedStateKeys: [], deniedStateKeys: ['denied'] });
     patch.flush({});
@@ -423,7 +416,7 @@ describe('BudgetTreeComponent (#9)', () => {
 
   it('toggleState adds a new accepted key and removes it from denied (mutual exclusion)', async () => {
     const { c, http } = await setup();
-    c.toggleState('accepted', 'denied'); // 'denied' was in deniedKeys → moves to accepted
+    c.toggleState('accepted', 'denied'); // 'denied' sits in deniedKeys and moves to accepted.
     const patch = http.expectOne((r) => r.url.endsWith('/budgets/b-vs') && r.method === 'PATCH');
     expect(patch.request.body).toEqual({
       acceptedStateKeys: ['accepted', 'denied'],
@@ -454,7 +447,6 @@ describe('BudgetTreeComponent (#9)', () => {
     expect(toast.error).toHaveBeenCalled();
   });
 
-  // ------------------------------------------------------------ top dialog
   it('openTop resets the draft and opens; closeTop closes', async () => {
     const { c } = await setup();
     c.newTop.set({ key: 'X', name: 'Y', fiscalStartMonth: 3, fiscalStartDay: 4 });
@@ -514,7 +506,7 @@ describe('BudgetTreeComponent (#9)', () => {
     expect(c.selectedTopId()).toBe('b-asta');
     expect(c.topOpen()).toBe(false);
     expect(toast.success).toHaveBeenCalled();
-    // reload: TREE has no b-asta → keep=false → falls back to first top b-vs.
+    // TREE holds no b-asta, so the reload sets keep=false and falls back to b-vs.
     flushReload(http);
     expect(c.selectedTopId()).toBe('b-vs');
   });
@@ -531,7 +523,6 @@ describe('BudgetTreeComponent (#9)', () => {
     expect(toast.error).toHaveBeenCalled();
   });
 
-  // ------------------------------------------------------------ saveStichtag
   it('saveStichtag does nothing without a selected top', async () => {
     const { c, http } = await setup();
     c.selectedTopId.set('none');
@@ -546,7 +537,8 @@ describe('BudgetTreeComponent (#9)', () => {
     expect(patch.request.body).toEqual({ fiscalStartMonth: 12 });
     patch.flush({});
     expect(toast.success).toHaveBeenCalled();
-    // reload() then loadFiscalYears(top.id) → 1 tree GET + 2 fiscal-years GETs.
+    // The reload() runs, then loadFiscalYears(top.id). That gives 1 tree GET and 2
+    // fiscal-years GETs.
     http.expectOne((r) => r.url.endsWith('/budgets') && r.method === 'GET').flush(TREE);
     http.match((r) => r.url.endsWith('/budgets/b-vs/fiscal-years')).forEach((req) => req.flush([FY]));
   });
@@ -560,7 +552,6 @@ describe('BudgetTreeComponent (#9)', () => {
     expect(toast.error).toHaveBeenCalled();
   });
 
-  // ----------------------------------------------------------- dialog toggles
   it('opens and closes the stichtag and state-config dialogs', async () => {
     const { c } = await setup();
     c.openStichtag();
@@ -573,7 +564,6 @@ describe('BudgetTreeComponent (#9)', () => {
     expect(c.stateConfigOpen()).toBe(false);
   });
 
-  // -------------------------------------------------------------- child nodes
   it('startAddChild opens the parent and resets the draft; cancelAddChild closes', async () => {
     const { c } = await setup();
     c.childDraft.set({ key: 'X', name: 'Y' });
@@ -631,7 +621,6 @@ describe('BudgetTreeComponent (#9)', () => {
     expect(toast.error).toHaveBeenCalled();
   });
 
-  // ---------------------------------------------------------------- deleteNode
   it('deleteNode DELETEs, toasts success and reloads', async () => {
     const { c, http, toast } = await setup();
     c.deleteNode(TREE[0].children[0]);
@@ -649,7 +638,6 @@ describe('BudgetTreeComponent (#9)', () => {
     expect(toast.error).toHaveBeenCalled();
   });
 
-  // ------------------------------------------------------------- edit node
   it('openEditNode prefills key/name/hidden/viewGremium from the node', async () => {
     const { c } = await setup();
     const node = fullNode({
@@ -731,7 +719,6 @@ describe('BudgetTreeComponent (#9)', () => {
     expect(toast.error).toHaveBeenCalled();
   });
 
-  // -------------------------------------------------------------- limit dialog
   it('openLimit prefills the value from the current allocation', async () => {
     const { c } = await setup();
     c.openLimit(TREE[0]);
@@ -755,10 +742,10 @@ describe('BudgetTreeComponent (#9)', () => {
 
   it('saveLimit does nothing without a node or fiscal year', async () => {
     const { c, http } = await setup();
-    c.saveLimit(); // no node
+    c.saveLimit(); // No node.
     c.openLimit(TREE[0]);
     c.selectedFyId.set('');
-    c.saveLimit(); // no fy
+    c.saveLimit(); // No fiscal year.
     http.verify();
   });
 
@@ -795,7 +782,6 @@ describe('BudgetTreeComponent (#9)', () => {
     expect(toast.error).toHaveBeenCalled();
   });
 
-  // ------------------------------------------------------------- fiscal years
   it('patchFyYear truncates the year and defaults non-numbers to the current year', async () => {
     const { c } = await setup();
     c.patchFyYear('2027.9');

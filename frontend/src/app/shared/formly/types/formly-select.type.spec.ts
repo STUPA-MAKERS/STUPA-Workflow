@@ -56,8 +56,8 @@ describe('FormlySelectType (rendered)', () => {
   });
 
   it('renders the required marker and a disabled placeholder option', async () => {
-    // Through formly, props.placeholder defaults to '' so the disabled prompt is
-    // empty — the realistic integration behaviour.
+    // Formly defaults props.placeholder to '', so the disabled prompt stays empty.
+    // This is the real integration behavior.
     await renderField({
       key: 'c',
       type: 'select',
@@ -69,8 +69,8 @@ describe('FormlySelectType (rendered)', () => {
   });
 
   it('falls back to the default prompt when placeholder is genuinely undefined', async () => {
-    // Render the type directly (no formly prop init) so props.placeholder is
-    // undefined → the template's default-placeholder fallback fires.
+    // Render the type directly, without the formly prop init, so props.placeholder
+    // stays undefined and the default-placeholder fallback of the template fires.
     await render(FormlySelectType, {
       componentInputs: {
         field: {

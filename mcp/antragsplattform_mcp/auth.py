@@ -1,9 +1,10 @@
 """OAuth2 browser-grant client (Authorization Code + PKCE, RFC 7636/8252).
 
-Synchronous on purpose (network via ``httpx.Client``, browser + a one-shot loopback
-HTTP server); the async API client calls :func:`ensure_access_token` via a worker thread.
-Tokens are cached on disk per platform URL and refreshed automatically; a failed refresh
-falls back to a fresh browser login.
+This module is synchronous on purpose. It reaches the network through `httpx.Client` and
+drives a browser plus a one-shot loopback HTTP server. The async API client calls
+`ensure_access_token` in a worker thread. The module caches tokens on disk, one file per
+platform URL, and refreshes them automatically. A failed refresh falls back to a fresh
+browser login.
 """
 
 from __future__ import annotations
@@ -36,13 +37,19 @@ class AuthError(RuntimeError):
     pass
 
 
-# Loopback hosts where cleartext http is tolerated for local dev (RFC 8252).
+# Loopback hosts that may use cleartext http for local development (RFC 8252).
 _LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1", "[::1]"}
 
 
 def _require_secure_base(base_url: str) -> None:
-    """Reject cleartext http:// base URLs; OAuth codes/tokens must not transit in
-    the clear. http:// is allowed only for loopback/dev hosts."""
+    """Reject a cleartext http:// base URL.
+
+    OAuth codes and tokens must not travel in the clear. Only a loopback or development
+    host may use http://.
+
+    Raises:
+        AuthError: The URL is not https:// and the host is not a loopback host.
+    """
     parsed = urlparse(base_url)
     if parsed.scheme == "https":
         return
@@ -56,10 +63,14 @@ def _require_secure_base(base_url: str) -> None:
 
 
 def _require_secure_endpoint(label: str, endpoint: str, base_url: str) -> None:
-    """Re-validate a discovery-supplied endpoint before using it.
+    """Check an endpoint from the discovery document again before use.
 
-    Endpoints must pass the base scheme rule and be same-origin with ``base_url``
-    so a tampered discovery document cannot divert the auth code/verifier or tokens.
+    An endpoint must pass the base scheme rule. It must also be same-origin with
+    `base_url`. This stops a tampered discovery document from diverting the
+    authorization code, the verifier or the tokens.
+
+    Raises:
+        AuthError: The endpoint is cleartext, or it is not same-origin with `base_url`.
     """
     _require_secure_base(endpoint)
     ep = urlparse(endpoint)
@@ -81,11 +92,11 @@ def _pkce_pair() -> tuple[str, str]:
 
 
 def _discover(base_url: str) -> dict:
-    # Reject cleartext URLs before any network call — discovery + the endpoints it yields
-    # (authorization/token) carry the OAuth code and tokens.
+    # Reject a cleartext URL before any network call. Discovery returns the authorization
+    # endpoint and the token endpoint. Both carry the OAuth code and the tokens.
     _require_secure_base(base_url)
-    # Standard discovery is at the root; some deployments only route /api through the
-    # edge proxy, so fall back to the /api-mirrored metadata.
+    # Standard discovery sits at the root. Some deployments route only /api through the
+    # edge proxy, so fall back to the metadata mirrored under /api.
     candidates = [
         f"{base_url}/.well-known/oauth-authorization-server",
         f"{base_url}/api/.well-known/oauth-authorization-server",
@@ -103,8 +114,8 @@ def _discover(base_url: str) -> dict:
             except ValueError:
                 last = f"non-JSON response at {url}"
                 continue
-            # Endpoints from the metadata must be https (or loopback) and same-origin
-            # as base_url before any browser redirect or token POST uses them.
+            # The metadata endpoints must be https (or loopback) and same-origin with
+            # base_url before a browser redirect or a token POST uses them.
             for label in ("authorization_endpoint", "token_endpoint"):
                 value = meta.get(label)
                 if not isinstance(value, str) or not value:
@@ -116,7 +127,7 @@ def _discover(base_url: str) -> dict:
 
 
 def _capture_code(redirect_path: str) -> tuple[HTTPServer, dict]:
-    """Start a loopback server on a random port; return (server, result-holder)."""
+    """Start a loopback server on a random port and return it with a result holder."""
     holder: dict = {}
 
     class Handler(BaseHTTPRequestHandler):
@@ -135,7 +146,7 @@ def _capture_code(redirect_path: str) -> tuple[HTTPServer, dict]:
             self.end_headers()
             self.wfile.write(_DONE_HTML)
 
-        def log_message(self, *_args) -> None:  # silence stdlib logging
+        def log_message(self, *_args) -> None:  # keep the stdlib request log quiet
             return
 
     server = HTTPServer(("127.0.0.1", 0), Handler)
@@ -143,7 +154,7 @@ def _capture_code(redirect_path: str) -> tuple[HTTPServer, dict]:
 
 
 def browser_login(config: Config) -> dict:
-    """Run the full browser grant; return the token dict (and persist it)."""
+    """Run the full browser grant, save the token to disk and return it."""
     meta = _discover(config.base_url)
     verifier, challenge = _pkce_pair()
     state = secrets.token_urlsafe(16)
@@ -164,7 +175,7 @@ def browser_login(config: Config) -> dict:
         }
     )
 
-    # Serve exactly one request, bounded by a timeout, in a background thread.
+    # Serve exactly one request in a background thread. The timeout bounds the wait.
     server.timeout = _CALLBACK_TIMEOUT
     thread = threading.Thread(target=server.handle_request, daemon=True)
     thread.start()
@@ -206,7 +217,8 @@ def _exchange(token_endpoint: str, data: dict) -> dict:
         raise AuthError(f"token endpoint error ({resp.status_code}): {detail}")
     tokens = resp.json()
     expires_in = tokens.get("expires_in")
-    # ``expires_in: null`` (or absent) means a non-expiring token — only revocation ends it.
+    # An absent or null expires_in means the token does not expire. Only a revocation
+    # ends it.
     tokens["expires_at"] = None if expires_in is None else time.time() + int(expires_in) - 60
     return tokens
 
@@ -237,8 +249,8 @@ def _load(config: Config) -> dict | None:
 
 def _save(config: Config, tokens: dict) -> None:
     path = config.token_path()
-    # Create the token cache atomically with mode 0600 from the start (no TOCTOU
-    # window where the secret is world-readable); permission failures must surface.
+    # Create the token cache atomically with mode 0600 from the start. This leaves no
+    # TOCTOU window where the secret is world-readable. A permission failure must surface.
     payload = json.dumps(tokens).encode("utf-8")
     tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     fd = os.open(str(tmp), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
@@ -255,23 +267,27 @@ def _save(config: Config, tokens: dict) -> None:
 
 
 def ensure_access_token(config: Config, *, force_login: bool = False) -> str:
-    """Return a valid access token: cached → refreshed → fresh browser login."""
+    """Return a valid access token: from the cache, from a refresh, or from a new login."""
     tokens = None if force_login else _load(config)
     if tokens and tokens.get("access_token"):
         expires_at = tokens.get("expires_at", 0)
-        # ``expires_at is None`` → non-expiring token; otherwise honour the deadline.
+        # An expires_at of None means the token does not expire. Otherwise honor the deadline.
         if expires_at is None or expires_at > time.time():
             return tokens["access_token"]
     if tokens and tokens.get("refresh_token"):
         try:
             return _refresh(config, tokens["refresh_token"])["access_token"]
         except AuthError:
-            pass  # refresh expired/revoked → fall through to a fresh login
+            pass  # the refresh token expired or is revoked: fall through to a fresh login
     return browser_login(config)["access_token"]
 
 
 def logout(config: Config) -> bool:
-    """Drop the cached token (next call triggers a fresh browser login)."""
+    """Delete the cached token so the next call starts a new browser login.
+
+    Returns:
+        True if a cached token existed.
+    """
     path = config.token_path()
     if path.exists():
         path.unlink()

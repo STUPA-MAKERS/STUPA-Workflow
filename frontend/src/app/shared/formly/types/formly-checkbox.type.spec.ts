@@ -87,7 +87,6 @@ describe('FormlyCheckboxType (rendered)', () => {
     const box = screen.getByLabelText(/Err/);
     expect(box.getAttribute('aria-invalid')).toBe('true');
     expect(box.getAttribute('aria-describedby')).toMatch(/-error$/);
-    // hint hidden while error shown.
     expect(screen.queryByText('desc')).not.toBeInTheDocument();
   });
 

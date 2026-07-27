@@ -1,12 +1,12 @@
-"""deadline_policy scheduling: time-of-day + timezone + recurring dates (#90).
+"""deadline_policy scheduling: time of day, timezone and recurring dates (#90).
 
-Phase 1 of the deadline-definition redesign. Additive + idempotent:
+Phase 1 of the deadline-definition redesign. The change is additive and idempotent.
 
-* ``at_time`` (``"HH:MM"``) and ``timezone`` (IANA zone) snap the resolved due
-  date to a wall-clock time, DST-correct; both NULL keeps the old instant
-  arithmetic — no backfill needed.
-* ``dates`` (JSONB list of ``"YYYY-MM-DD"``) backs the new ``recurring`` kind (a
-  rolling submission window); the kind ``CheckConstraint`` is widened to allow it.
+* `at_time` (`"HH:MM"`) and `timezone` (IANA zone) snap the resolved due date to a
+  wall-clock time. The snap stays correct across DST. If both columns stay NULL, the
+  old instant arithmetic applies. The migration needs no backfill.
+* `dates` (a JSONB list of `"YYYY-MM-DD"`) backs the new `recurring` kind, a rolling
+  submission window. The migration widens the kind `CheckConstraint` to allow it.
 """
 
 from __future__ import annotations

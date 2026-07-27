@@ -19,7 +19,7 @@ describe('validateGuard (mirror of backend validate_guard)', () => {
     expect(() => validateGuard({ deadlinePassed: true })).not.toThrow();
     expect(() => validateGuard({ hasField: 'iban' })).not.toThrow();
     expect(() => validateGuard({ compare: { field: 'amount', op: '>', value: 100 } })).not.toThrow();
-    // Neue Bedingungen (auch auf automatischen Übergängen erlaubt).
+    // These conditions are also allowed on automatic transitions.
     expect(() => validateGuard({ applicationTypeIs: 'qsm' }, false)).not.toThrow();
     expect(() => validateGuard({ attachmentPresent: true }, false)).not.toThrow();
   });
@@ -60,7 +60,7 @@ describe('validateGuard (mirror of backend validate_guard)', () => {
     expect(() => validateGuard({ and: [{ roleIs: 'x' }] }, false)).toThrow(/manual/);
     // condition op nested under or is fine even on automatic transitions
     expect(() => validateGuard({ or: [{ deadlinePassed: true }, { hasField: 'iban' }] }, false)).not.toThrow();
-    // multiple keys still fail with the "(none)"/joined message
+    // a guard without an operator fails with the "(none)" form of the message
     expect(() => validateGuard({})).toThrow(/\(none\)/);
   });
 

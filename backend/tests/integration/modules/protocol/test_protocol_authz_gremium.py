@@ -1,20 +1,21 @@
-"""Integration (echte Postgres): per-Gremium-Protokoll-Berechtigung (AUD-016).
+"""Integration test for per-Gremium protocol permissions (AUD-016, real Postgres).
 
-Regression: Protokoll-Schreiben/Lesen war auf GLOBALE ``meeting.manage``/
-``protocol.finalize``/``meeting.view_all`` gegatet — das sperrte einen per-Gremium
-zugewiesenen Protokollanten bzw. einen Inhaber einer Gremium-Rolle mit
-``protocol.write`` aus, obwohl er die TOP-Bodies (Live-Stack) editieren darf.
-``resolve_principal`` führt Gremium-Rollen-Permissions absichtlich NICHT in
-``principal.permissions``; der Protokoll-Service delegiert deshalb an
-``MeetingService`` (``can_write``/``assert_can_read``).
+Regression: the protocol write and read paths were gated on the GLOBAL
+``meeting.manage``, ``protocol.finalize`` and ``meeting.view_all`` permissions. That
+locked out a protocol writer assigned per Gremium. It also locked out the holder of a
+Gremium role with ``protocol.write``, who may edit the agenda item bodies in the live
+stack. ``resolve_principal`` keeps the Gremium role permissions out of
+``principal.permissions`` on purpose. The protocol service therefore delegates to
+``MeetingService`` (``can_write`` and ``assert_can_read``).
 
-Beweist gegen das migrierte Schema:
-* ein Mitglied mit Gremium-Rolle ``protocol.write`` darf das Protokoll SEINER Sitzung
-  schreiben (``authorize_write``) und lesen (``authorize_read``);
-* derselbe Principal ist auf das Protokoll einer FREMDEN Sitzung 403 (kein
-  Cross-Tenant-Zugriff);
-* ``authorize_finalize`` verlangt zusätzlich ``protocol.finalize`` (hier per
-  Gremium-Rolle) — reines ``protocol.write`` reicht NICHT.
+The tests run against the migrated schema.
+
+* A member with the Gremium role ``protocol.write`` may write the protocol of ITS OWN
+  meeting. The member may also read it. See ``authorize_write`` and ``authorize_read``.
+* The same principal gets 403 on the protocol of a FOREIGN meeting. There is no
+  cross-tenant access.
+* ``authorize_finalize`` also needs ``protocol.finalize``, here through a Gremium role.
+  Plain ``protocol.write`` is NOT enough.
 """
 
 from __future__ import annotations
@@ -49,7 +50,11 @@ async def session(migrated: tuple[str, str], engine: Engine) -> AsyncIterator[As
 async def _gremium_with_protocol(
     session: AsyncSession, *, role_perms: list[str]
 ) -> tuple[Gremium, Meeting, Protocol, PrincipalRow]:
-    """Gremium + live-Sitzung + Protokoll + Mitglied mit Gremium-Rolle ``role_perms``."""
+    """Create a Gremium with a live meeting, a protocol and one member.
+
+    The `role_perms` list holds the permissions of the Gremium role that the member
+    holds.
+    """
     gremium = Gremium(name="StuPa", slug=f"g-{uuid.uuid4()}")
     session.add(gremium)
     await session.flush()
@@ -93,9 +98,9 @@ async def test_gremium_protocol_write_role_can_write_and_read_own(
         session, role_perms=["protocol.write"]
     )
     svc = ProtocolService(session)
-    principal = Principal(sub=member.sub)  # KEINE globalen Permissions
+    principal = Principal(sub=member.sub)  # NO global permissions
 
-    # Schreiben + Lesen des EIGENEN Protokolls: erlaubt (per Gremium).
+    # Write and read the OWN protocol: allowed through the Gremium.
     await svc.authorize_write_meeting(meeting.id, principal)
     await svc.authorize_write(protocol.id, principal)
     await svc.authorize_read(protocol.id, principal)
@@ -108,7 +113,7 @@ async def test_gremium_protocol_write_role_forbidden_on_other_gremium(
     _, _, _, member = await _gremium_with_protocol(
         session, role_perms=["protocol.write"]
     )
-    # Zweites, FREMDES Gremium mit eigenem Protokoll.
+    # A second, FOREIGN Gremium with its own protocol.
     _, other_meeting, other_protocol, _ = await _gremium_with_protocol(
         session, role_perms=["protocol.write"]
     )
@@ -126,7 +131,7 @@ async def test_gremium_protocol_write_role_forbidden_on_other_gremium(
 async def test_finalize_requires_protocol_finalize_permission(
     session: AsyncSession,
 ) -> None:
-    # Nur ``protocol.write`` → darf schreiben, aber NICHT finalisieren.
+    # Only ``protocol.write``: the member may write, but must NOT finalize.
     _, _, write_protocol, write_member = await _gremium_with_protocol(
         session, role_perms=["protocol.write"]
     )
@@ -134,7 +139,7 @@ async def test_finalize_requires_protocol_finalize_permission(
     with pytest.raises(ForbiddenError):
         await svc.authorize_finalize(write_protocol.id, Principal(sub=write_member.sub))
 
-    # Gremium-Rolle mit ``protocol.finalize`` (+ write) → darf finalisieren.
+    # A Gremium role with ``protocol.finalize`` plus write may finalize.
     _, _, fin_protocol, fin_member = await _gremium_with_protocol(
         session, role_perms=["protocol.write", "protocol.finalize"]
     )
@@ -142,16 +147,16 @@ async def test_finalize_requires_protocol_finalize_permission(
 
 
 async def test_global_meeting_manage_still_writes(session: AsyncSession) -> None:
-    """Globale ``meeting.manage`` (Admin/org-weit) bleibt unverändert berechtigt."""
+    """The global ``meeting.manage`` permission (admin, org-wide) still grants write."""
     _, meeting, protocol, _ = await _gremium_with_protocol(session, role_perms=[])
     svc = ProtocolService(session)
     admin = Principal(sub="org-admin", permissions={"meeting.manage"})
     await svc.authorize_write_meeting(meeting.id, admin)
     await svc.authorize_write(protocol.id, admin)
-    # Lesen: org-weite Inhaber sehen alles (meeting.view_all/meeting.manage/Admin).
+    # Read: an org-wide holder sees everything (meeting.view_all, meeting.manage, admin).
     viewer = Principal(sub="org-view", permissions={"meeting.view_all"})
     await svc.authorize_read(protocol.id, viewer)
-    # Finalisieren verlangt zusätzlich protocol.finalize (auch für meeting.manage).
+    # Finalize also needs protocol.finalize, even with meeting.manage.
     with pytest.raises(ForbiddenError):
         await svc.authorize_finalize(protocol.id, admin)
     finalizer = Principal(

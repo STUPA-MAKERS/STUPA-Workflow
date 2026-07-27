@@ -6,13 +6,14 @@ import { readArtifacts } from './helpers';
 export const ADMIN_STATE = 'e2e/.auth/admin.json';
 
 /**
- * Globaler Setup: baut aus dem Seed-Artefakt einen Playwright-`storageState` mit der
- * vom Seed-Service gemünzten Admin-Session (`ap_session`-Cookie). Admin-Specs nutzen
- * ihn via `test.use({ storageState: ADMIN_STATE })` — kein UI-Login, kein Keycloak.
+ * Global setup: build a Playwright `storageState` from the seed artifact. The artifact
+ * holds the admin session that the seed service minted (`ap_session` cookie). Admin
+ * specs use it with `test.use({ storageState: ADMIN_STATE })`. They need no UI login
+ * and no Keycloak.
  *
- * `secure: false`: der e2e-Stack läuft auf plain HTTP (127.0.0.1) — sonst sendet der
- * Browser das Cookie nicht. Der Server liest nur den Wert; das Secure-Flag ist
- * inbound bedeutungslos.
+ * `secure: false`: the e2e stack runs on plain HTTP (127.0.0.1). With the secure flag
+ * the browser would not send the cookie. The server reads only the value, so the flag
+ * has no meaning on the inbound path.
  */
 export default function globalSetup(_config: FullConfig): void {
   const art = readArtifacts();

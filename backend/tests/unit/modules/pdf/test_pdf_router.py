@@ -1,4 +1,7 @@
-"""Router-Tests pdf (T-20): Endpunkt-Verdrahtung + A/P-Zugriff, Service gefaked."""
+"""Router tests for pdf (T-20): endpoint wiring plus applicant and principal access.
+
+The tests replace the PDF service with a fake.
+"""
 
 from __future__ import annotations
 
@@ -30,11 +33,11 @@ class _FakeSession:
     async def commit(self) -> None: ...
 
     async def scalar(self, *_a: object, **_k: object) -> None:
-        # created_by-Lookup (#24): kein Treffer → kein Ersteller-Bonus, 403 bleibt.
+        # created_by lookup (#24): no hit, so no creator bonus and the 403 stands.
         return None
 
     async def execute(self, *_a: object, **_k: object) -> _EmptyResult:
-        return _EmptyResult()  # keine Gremium-Mitgliedschaften (#vote-read)
+        return _EmptyResult()  # no Gremium memberships (#vote-read)
 
 
 class _EmptyResult:
@@ -111,7 +114,6 @@ def _applicant(app: FastAPI, application_id: UUID, scope: str = "view") -> None:
     )
 
 
-# ------------------------------------------------------------------- POST /pdf
 def test_create_pdf_requires_auth_401(client: TestClient) -> None:
     assert client.post(f"/api/applications/{APP_ID}/pdf").status_code == 401
 
@@ -138,7 +140,6 @@ def test_create_pdf_accepted_applicant(app: FastAPI, client: TestClient) -> None
     assert client.post(f"/api/applications/{APP_ID}/pdf").status_code == 202
 
 
-# ------------------------------------------------------------------- GET /jobs
 def test_get_job_requires_auth_401(client: TestClient) -> None:
     assert client.get(f"/api/jobs/{JOB_ID}").status_code == 401
 
@@ -157,7 +158,7 @@ def test_get_job_not_found_404(app: FastAPI, client: TestClient) -> None:
 
 
 def test_get_job_cross_tenant_applicant_404(app: FastAPI, client: TestClient) -> None:
-    # Antragsteller eines *fremden* Antrags → 404 (kein Existenz-Orakel).
+    # An applicant of a *different* application gets 404, not an existence oracle.
     _applicant(app, uuid4(), "view")
     r = client.get(f"/api/jobs/{JOB_ID}")
     assert r.status_code == 404

@@ -1,17 +1,20 @@
-"""Meeting service — lifecycle, timeline, RBAC scope, vote reads, WS pub/sub glue.
+"""Meeting service — lifecycle, timeline, RBAC scope, vote reads, WebSocket glue.
 
-Layout:
+The package splits the service across modules.
 
-* :mod:`.service_base` — shared constructor + lookup/serialization helpers.
-* :mod:`.pubsub`       — ``meeting:{id}`` channel + :class:`~.pubsub.BrokerPublisher` WS glue.
-* :mod:`.paging`       — timeline keyset/offset cursor helpers.
-* :mod:`.permissions`  — RBAC checks, visibility scope, permission-flag serializer.
-* :mod:`.votes`        — meeting-bound vote reads: tally reload, reveal rule, quorum.
-* :mod:`.listing`      — detail read, list, filter gremien, keyset/search timeline.
-* :mod:`.lifecycle`    — create/patch/delete, planned→live→closed rules, broadcast.
-* :mod:`.service`      — :class:`~.service.MeetingService` facade combining the ops.
+``service_base`` holds the shared constructor and the lookup and serialization helpers.
+``pubsub`` holds the ``meeting:{id}`` channel and the ``BrokerPublisher`` WebSocket glue.
+``paging`` holds the timeline keyset and offset cursor helpers.
+``permissions`` holds the RBAC checks, the visibility scope and the permission-flag
+serializer.
+``votes`` holds the meeting-bound vote reads: tally reload, reveal rule and quorum.
+``listing`` holds the detail read, the list, the Gremium filter and the keyset and
+search timeline.
+``lifecycle`` holds create, patch, delete, the planned to live to closed rules and
+the broadcast.
+``service`` holds the ``MeetingService`` facade that combines the operations.
 
-The facade (plus ``BrokerPublisher``/``meeting_channel``) is re-exported here so
+This module re-exports the facade, ``BrokerPublisher`` and ``meeting_channel``, so
 ``from app.modules.livevote.service import MeetingService`` keeps working.
 """
 

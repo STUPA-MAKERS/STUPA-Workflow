@@ -16,8 +16,8 @@ import type { ExpensesListState } from './expenses-list.state';
 import type { ExpenseSubBookingsState } from './expense-sub-bookings.state';
 
 /**
- * Booking dialogs: create (standalone or application-bound), edit, delete,
- * cost-centre transfer and the linked-invoice cache/detail dialog.
+ * Booking dialogs: create (standalone or application-bound), edit, delete, transfer
+ * between cost centers, and the linked-invoice cache with its detail dialog.
  */
 export class ExpenseDialogsState {
   private readonly api = inject(BudgetTreeApi);
@@ -25,7 +25,6 @@ export class ExpenseDialogsState {
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
 
-  // --- create dialog ---
   readonly createOpen = signal(false);
   readonly newKind = signal<ExpenseKind>('expense');
   readonly newAmount = signal('');
@@ -51,7 +50,6 @@ export class ExpenseDialogsState {
     })),
   );
 
-  // --- edit / delete ---
   readonly editing = signal<Expense | null>(null);
   readonly editAmount = signal('');
   readonly editDescription = signal('');
@@ -65,13 +63,13 @@ export class ExpenseDialogsState {
   readonly editNote = signal('');
   readonly confirmDelete = signal<Expense | null>(null);
 
-  // --- linked invoices (1 invoice : N bookings) ---
+  // Linked invoices. One invoice can back many bookings.
   readonly invoices = signal<Invoice[]>([]);
   readonly newInvoiceId = signal('');
   readonly editInvoiceId = signal('');
   readonly viewingInvoice = signal<Invoice | null>(null);
-  /** Open invoices, newest issue date first. Booking marks the linked invoice
-   *  paid server-side, so paid ones drop out of the create dropdown. */
+  /** Open invoices, newest issue date first. A booking marks its linked invoice paid
+   *  on the server, so paid invoices drop out of the create dropdown. */
   private readonly openInvoices = computed<Invoice[]>(() =>
     this.invoices()
       .filter((i) => i.status === 'open')
@@ -91,7 +89,6 @@ export class ExpenseDialogsState {
     return opts;
   });
 
-  // --- transfer dialog ---
   readonly transferOpen = signal(false);
   readonly tFromId = signal('');
   readonly tToId = signal('');
@@ -111,9 +108,9 @@ export class ExpenseDialogsState {
 
   readonly canSubmitCreate = computed(() => {
     if (!this.newDescription().trim() || !(Number(this.newAmount()) > 0)) return false;
-    // Bound: cost centre + fiscal year are inherited from the application.
+    // A bound booking inherits the cost center and the fiscal year from the application.
     if (this.newApplicationId()) return true;
-    // Standalone: both are required (422 otherwise).
+    // A standalone booking needs both. The server answers 422 without them.
     return !!this.newBudgetId() && !!this.newFiscalYearId();
   });
 
@@ -124,7 +121,6 @@ export class ExpenseDialogsState {
     this.loadInvoices();
   }
 
-  /** Invoice dropdown label: number · supplier · gross. */
   private invoiceLabel(i: Invoice): string {
     return [i.number, i.supplier, formatEur(Number(i.grossAmount), this.i18n.locale())]
       .filter((p) => !!p)
@@ -135,7 +131,7 @@ export class ExpenseDialogsState {
     return problemDetail(err) ?? this.i18n.translate('expenses.toast.failed');
   }
 
-  /** Booking marks a linked invoice paid → refresh the open-invoice dropdown. */
+  /** A booking marks its linked invoice paid, so refresh the open-invoice dropdown. */
   private loadInvoices(): void {
     this.api.listInvoices().subscribe({
       next: (rows) => this.invoices.set(rows),
@@ -143,7 +139,6 @@ export class ExpenseDialogsState {
     });
   }
 
-  // --- create ---
   openCreate(): void {
     this.newKind.set('expense');
     this.newAmount.set('');
@@ -210,8 +205,7 @@ export class ExpenseDialogsState {
     if (!top) return;
     this.api.listFiscalYears(top.id).subscribe({
       next: (fys: FiscalYear[]) => {
-        // Offer all fiscal years (explicit inactive ones are allowed); a single
-        // active one is preselected.
+        // Offer every fiscal year. An inactive one is allowed on purpose.
         this.fiscalYearOptions.set(fys.map((f) => ({ value: f.id, label: f.display })));
         const active = fys.filter((f) => f.active);
         if (active.length === 1) this.newFiscalYearId.set(active[0].id);
@@ -277,7 +271,6 @@ export class ExpenseDialogsState {
       });
   }
 
-  // --- linked invoice detail ---
   openInvoiceDialog(e: Expense): void {
     if (!e.invoiceId) return;
     const cached = this.invoices().find((i) => i.id === e.invoiceId);
@@ -285,15 +278,14 @@ export class ExpenseDialogsState {
       this.viewingInvoice.set(cached);
       return;
     }
-    // A linked (often paid/old) invoice can be outside the capped list cache →
-    // fetch it by id instead of silently doing nothing.
+    // A linked invoice is often paid or old and can sit outside the capped list cache.
     this.api.getInvoice(e.invoiceId).subscribe({
       next: (inv) => this.viewingInvoice.set(inv),
       error: (err) => this.toast.error(this.failureText(err)),
     });
   }
 
-  /** MinIO is internal-only → the API streams the PDF as a blob. */
+  /** MinIO is internal only, so the API streams the PDF as a blob. */
   openInvoiceFile(inv: Invoice): void {
     this.api.invoiceFileBlob(inv.id).subscribe({
       next: (blob) => downloadBlob(blob, inv.fileName || 'beleg.pdf'),
@@ -301,7 +293,6 @@ export class ExpenseDialogsState {
     });
   }
 
-  // --- edit ---
   openEdit(e: Expense): void {
     this.editing.set(e);
     this.editAmount.set(e.amount);
@@ -322,12 +313,12 @@ export class ExpenseDialogsState {
     const e = this.editing();
     if (!e || this.list.saving()) return;
     this.list.saving.set(true);
-    // Cost centre is only movable on standalone bookings (bound ones inherit it
-    // from the application); send it only when actually changed.
+    // Only a standalone booking can move to another cost center. A bound booking
+    // inherits it from the application. Send the field only after a change.
     const budgetChanged =
       !e.applicationId && !!this.editBudgetId() && this.editBudgetId() !== e.budgetId;
-    // A parent's amount (childCount > 0) is the sum of its children and
-    // read-only server-side — send only when changed.
+    // The amount of a parent (childCount > 0) is the sum of its children and
+    // read-only on the server. Send it only after a change.
     const amountChanged = this.editAmount() !== e.amount;
     this.api
       .updateExpense(e.id, {
@@ -348,12 +339,12 @@ export class ExpenseDialogsState {
           this.list.saving.set(false);
           this.editing.set(null);
           if (e.parentExpenseId) {
-            // Sub-booking edited: refresh the parent panel + parent amount.
+            // A sub-booking changed, so refresh the parent panel and the parent amount.
             this.sub.loadSub(e.parentExpenseId);
             this.list.refresh();
           } else {
-            // childCount/parentExpenseId are unreliable in the single-item
-            // response → keep them from the known row.
+            // The single-item response does not carry childCount and parentExpenseId
+            // reliably. Keep both values from the known row.
             const merged = {
               ...updated,
               childCount: e.childCount,
@@ -371,7 +362,6 @@ export class ExpenseDialogsState {
       });
   }
 
-  // --- delete ---
   askDelete(e: Expense): void {
     this.confirmDelete.set(e);
   }
@@ -385,7 +375,7 @@ export class ExpenseDialogsState {
         this.list.saving.set(false);
         this.confirmDelete.set(null);
         if (e.parentExpenseId) {
-          // Sub-booking deleted: refresh the parent panel + parent amount.
+          // A sub-booking is gone, so refresh the parent panel and the parent amount.
           this.sub.loadSub(e.parentExpenseId);
           this.list.refresh();
         } else {
@@ -401,7 +391,6 @@ export class ExpenseDialogsState {
     });
   }
 
-  // --- transfer ---
   openTransfer(): void {
     this.tFromId.set(this.list.budgetId() || '');
     this.tToId.set('');

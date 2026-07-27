@@ -1,10 +1,10 @@
-"""Protocol: Status ``rendering`` (asynchroner Protokoll-Render, T-22-Nachzug).
+"""Protocol: the `rendering` status (async protocol render, T-22 follow-up).
 
-``finalize`` blockiert nicht mehr den Request: das Protokoll wechselt auf
-``rendering``, ein arq-Worker rendert PDF + versendet die Mail und setzt
-``final``; bei dauerhaftem Fehler fällt es auf ``draft`` zurück. Der
-CheckConstraint ``protocol_status`` muss den neuen Zwischenzustand erlauben.
-Idempotent (DROP IF EXISTS + Neuanlage).
+`finalize` no longer blocks the request. The protocol moves to `rendering`. An
+arq worker then renders the PDF, sends the mail and sets `final`. After a
+permanent failure the protocol falls back to `draft`. The `protocol_status`
+check constraint must allow the new intermediate status. The migration is
+idempotent. It drops the constraint if it exists and creates it again.
 """
 
 from __future__ import annotations
@@ -28,8 +28,8 @@ _UPGRADE: tuple[str, ...] = (
 )
 
 _DOWNGRADE: tuple[str, ...] = (
-    # Laufende Renders auf Entwurf zurücksetzen, sonst verletzt die Zeile den
-    # wiederhergestellten (engeren) Constraint.
+    # Reset a render in progress to draft. Otherwise the row breaks the
+    # restored, narrower constraint.
     "UPDATE protocol SET status = 'draft' WHERE status = 'rendering'",
     "ALTER TABLE protocol DROP CONSTRAINT IF EXISTS protocol_status",
     (

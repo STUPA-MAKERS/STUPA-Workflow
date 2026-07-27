@@ -7,8 +7,8 @@ from dataclasses import dataclass, field
 
 from prompt_toolkit.formatted_text import StyleAndTextTuples
 
-# ``(value, label)`` pairs offered by a selector. Defined here (a package leaf)
-# so protocols can import it without a models↔protocols cycle.
+# ``(value, label)`` pairs that a selector offers. This module is a package leaf,
+# so protocols can import the type without a models/protocols import cycle.
 Choices = list[tuple[str, str]]
 
 
@@ -16,14 +16,16 @@ Choices = list[tuple[str, str]]
 class LogEntry:
     """One rendered line in the scrolling log.
 
-    Info, error and prompt-echo lines are pure text. A domain row (user, role,
-    mapping, audit entry) additionally carries pre-rendered *detail* fragments
-    so the UI can highlight it on hover and pop out the full record on click.
+    Info, error and prompt-echo lines are pure text. A domain row also carries
+    pre-rendered detail fragments. A domain row is a user, a role, a mapping or an
+    audit entry. The UI uses the detail fragments to highlight the row on hover and
+    to pop out the full record on click.
 
     Attributes:
         fragments: The pre-rendered line, newline included.
-        detail: The popped-out record view, or ``None`` for plain text rows.
-        detail_title: Heading of the pop-out panel (e.g. ``user`` / ``audit #4812``).
+        detail: The popped-out record view. ``None`` marks a plain text row.
+        detail_title: Heading of the pop-out panel, for example ``user`` or
+            ``audit #4812``.
     """
 
     fragments: StyleAndTextTuples = field(default_factory=list)
@@ -33,16 +35,17 @@ class LogEntry:
 
 @dataclass
 class Selector:
-    """An in-app single-choice picker awaiting a decision.
+    """An in-app single-choice picker that waits for a decision.
 
     Attributes:
         title: Heading shown above the options.
-        values: ``(key, label)`` options to choose from.
-        on_choose: Called with the chosen key, or ``None`` when cancelled.
-        cursor: Index of the currently-highlighted option (into :meth:`visible`).
-        scroll: Index of the first visible option (into :meth:`visible`).
-        query: Live search text; narrows the options when :attr:`searchable`.
-        searchable: Whether typing filters the options (for long lists).
+        values: The ``(key, label)`` options to choose from.
+        on_choose: Called with the chosen key, or with ``None`` on cancel.
+        cursor: Index of the highlighted option, into `visible`.
+        scroll: Index of the first visible option, into `visible`.
+        query: Live search text. It narrows the options when `searchable` is set.
+        searchable: Set this to filter the options as the user types. Use it for
+            long lists.
     """
 
     title: str
@@ -54,7 +57,7 @@ class Selector:
     searchable: bool = False
 
     def visible(self) -> Choices:
-        """The options matching the current query (all of them when empty)."""
+        """Return the options that match the query, or all when the query is empty."""
         if not self.query:
             return self.values
         needle = self.query.lower()
@@ -67,21 +70,23 @@ class Selector:
 
 @dataclass
 class FormField:
-    """One editable row in a form dialog (mapping editor, permission set, …).
+    """One editable row in a form dialog, such as the mapping or permission editor.
 
     Attributes:
-        key: Stable identifier used when reading the value back out.
+        key: Stable identifier that the caller uses to read the value back out.
         label: Heading shown for the row.
-        kind: ``text`` (free text), ``bool`` (on/off) or ``choice`` (one of ``choices``).
-        text: The edit buffer, for ``text`` fields.
-        choice_index: The selected option, for ``bool``/``choice`` fields.
-        choices: The option labels, for ``choice`` fields.
-        hint: Extra hint shown while the row is focused (e.g. ``⚠ human-only``).
+        kind: ``text`` for free text, ``bool`` for on/off, or ``choice`` for one of
+            ``choices``.
+        text: The edit buffer, for a ``text`` field.
+        choice_index: The selected option, for a ``bool`` or ``choice`` field.
+        choices: The option labels, for a ``choice`` field.
+        hint: Extra hint shown while the row has the focus, for example
+            ``⚠ human-only``.
     """
 
     key: str
     label: str
-    kind: str  # "text" | "bool" | "choice"
+    kind: str
     text: str = ""
     choice_index: int = 0
     choices: list[str] = field(default_factory=list)
@@ -90,7 +95,7 @@ class FormField:
 
 @dataclass
 class Form:
-    """A generic field-by-field dialog awaiting entry.
+    """A generic field-by-field dialog that waits for entry.
 
     Attributes:
         title: Heading shown on the panel frame.
@@ -107,7 +112,7 @@ class Form:
     scroll: int = 0
 
     def by_key(self) -> dict[str, FormField]:
-        """The fields indexed by their stable :attr:`FormField.key`."""
+        """Return the fields indexed by their stable `FormField.key`."""
         return {field.key: field for field in self.fields}
 
 

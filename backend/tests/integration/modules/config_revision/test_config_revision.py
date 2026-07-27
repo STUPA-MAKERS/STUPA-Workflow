@@ -1,11 +1,12 @@
-"""Integration (echte Postgres, testcontainers): config_revision (#config-versioning).
+"""Integration (real Postgres, testcontainers): config_revision (#config-versioning).
 
-Beweist gegen ein echtes Schema:
-* **Append-only**: UPDATE/DELETE/TRUNCATE auf ``config_revision`` → Fehler (Trigger
-  ``config_revision_append_only``, Migration 0034) — eine Version ist nie löschbar.
-* :meth:`ConfigRevisionService.record` verkettet Snapshots (version+1, prev_revision_id)
-  und schreibt den verlinkten Audit-Eintrag; :meth:`diff` rechnet den Feld-Diff.
-* Migration 0034 seedet die Permission ``audit.revert`` an die ``admin``-Rolle.
+These tests run against a real schema. They prove:
+* **Append-only**: an UPDATE, DELETE or TRUNCATE on `config_revision` fails. The trigger
+  `config_revision_append_only` from migration 0034 blocks it, so a version is never
+  deletable.
+* `ConfigRevisionService.record` chains the snapshots (version+1, prev_revision_id). It
+  also writes the linked audit entry. `diff` computes the field diff.
+* Migration 0034 seeds the permission `audit.revert` to the `admin` role.
 """
 
 from __future__ import annotations

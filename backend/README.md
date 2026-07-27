@@ -1,76 +1,77 @@
 # backend
 
-FastAPI-API + arq-Worker. Python 3.13, Pydantic v2, SQLAlchemy 2.0 (async) + Alembic,
+FastAPI API + arq worker. Python 3.13, Pydantic v2, SQLAlchemy 2.0 (async) + Alembic,
 uvicorn (`--proxy-headers`).
 
-## Aufbau
+## Layout
 
 ```
 app/
-  main.py            App-Factory: Router unter /api, Middleware, Error-Contract
-  settings.py        pydantic-settings; lädt .env, erzwingt Pflicht-Secrets
-  db.py              async Engine/Session, DeclarativeBase, Mixins
-  middleware.py      Trace-Id + Security-Header (CORS bewusst aus)
+  main.py            app factory: routers under /api, middleware, error contract
+  settings.py        pydantic-settings, loads .env, requires the mandatory secrets
+  db.py              async engine/session, DeclarativeBase, mixins
+  middleware.py      trace id + security headers (CORS off on purpose)
   shared/
-    errors.py        RFC-9457 problem+json (ProblemDetail, Handler, OpenAPI-Rewrite)
-    guards.py        Guard-Evaluator (Whitelist-Operatoren, kein eval)
-    jsonlogic.py     JsonLogic-Evaluator für Form-visibleIf/compute
-    config_schemas.py  camelCase-Basismodell (alias, extra=forbid)
+    errors.py        RFC-9457 problem+json (ProblemDetail, handler, OpenAPI rewrite)
+    guards.py        guard evaluator (whitelist operators, no eval)
+    jsonlogic.py     JsonLogic evaluator for form visibleIf/compute
+    config_schemas.py  camelCase base model (alias, extra=forbid)
   modules/
-    auth/            OIDC (PKCE) + Magic-Link, Sessions, RBAC, OAuth2/MCP
-    forms/           versionierte Formulare, Definition-/Antwort-Validierung
-    application_types/ Antragstypen (Formular-/Flow-Bindung, Budget-Flag)
-    applications/    Antrags-Lifecycle, Versions-Diff, Kommentare, Anonymisierung
-    flow/            Zustandsmaschine, Guards, Transition-Actions
-    voting/          Quorum/Mehrheiten/Geheimwahl, Tally (lesegescopt)
-    livevote/        Sitzungen, Agenda, Anwesenheit, Live-Vote über WebSocket
-    protocol/        Sitzungsprotokoll (Markdown → PDF), Vote-Snippets, Finalisierung
-    delegations/     sitzungsgebundene Delegationen + Stellvertreter-Pool
-    deadlines/       benannte Frist-Policies (vom Flow referenziert)
-    budget/          Kostenstellen-Baum, HHJ, Zuteilung, Buchungen, Rechnungen (ZUGFeRD)
-    files/           Upload, MIME-Sniff, ClamAV-Scan, MinIO/S3, signierte URLs
-    pdf/             asynchroner Antrags-PDF-Render (pytex → MinIO)
-    notifications/   Mail-Templates/Regeln, per-Nutzer-Präferenzen, arq-Versand
-    webhooks/        ausgehende Event-Webhooks (SSRF-Guard, HMAC-Signatur)
-    audit/           append-only Hash-Kette + Verifikation
-    antiabuse/       Altcha-Challenge/-Verify, Rate-Limit, Payload-Cap
-    admin/           Config-CRUD (Gremien, Rollen, Antragstypen, Branding, …),
-                     eine Permission pro /admin/-Seite
+    auth/            OIDC (PKCE) + magic link, sessions, RBAC, OAuth2/MCP
+    forms/           versioned forms, definition and answer validation
+    application_types/ application types (form and flow binding, budget flag)
+    applications/    application lifecycle, version diff, comments, anonymization
+    flow/            state machine, guards, transition actions
+    voting/          quorum/majorities/secret ballot, tally (scoped reads)
+    livevote/        meetings, agenda, attendance, live vote over WebSocket
+    protocol/        meeting protocol (Markdown → PDF), vote snippets, finalize
+    delegations/     meeting-bound delegations + substitute pool
+    deadlines/       named deadline policies (the flow references them)
+    budget/          cost center tree, fiscal years, allocation, bookings, invoices (ZUGFeRD)
+    files/           upload, MIME sniff, ClamAV scan, MinIO/S3, signed URLs
+    pdf/             async application PDF render (pytex → MinIO)
+    notifications/   mail templates and rules, per-user preferences, arq dispatch
+    webhooks/        outgoing event webhooks (SSRF guard, HMAC signature)
+    audit/           append-only hash chain + verification
+    antiabuse/       ALTCHA challenge/verify, rate limit, payload cap
+    admin/           config CRUD (Gremien, roles, application types, branding, …),
+                     one permission per /admin/ page
 migrations/          Alembic (0001–0026)
-worker/              arq WorkerSettings: Mail/PDF/Scan-Tasks + nächtlicher Budget-Cron
+worker/              arq WorkerSettings: mail/PDF/scan tasks + nightly budget cron
 tests/
 ```
 
-Alle Router hängen unter `/api`. Modelle registrieren sich in `Base.metadata`; Alembic
-zieht daraus. Antworten/Requests sind camelCase (per-Feld-Alias auf snake_case-Feldern).
+All routers mount under `/api`. Models register themselves in `Base.metadata`, and Alembic
+reads the schema from there. Requests and responses use camelCase. A per-field alias maps
+each camelCase name to its snake_case field.
 
-## Lokal
+## Local
 
 ```bash
 pip install -e '.[dev]'
-ruff check .                       # Lint
-basedpyright                       # Typen, 0 Fehler erforderlich
-pytest                             # Unit-Suite (kein Docker)
-pytest --cov --cov-report=term-missing   # mit Coverage (Gate 85 %)
-pytest -m integration              # testcontainers (Docker nötig)
+ruff check .                       # lint
+basedpyright                       # types, 0 errors required
+pytest                             # unit suite (no Docker)
+pytest --cov --cov-report=term-missing   # with coverage (85 % gate)
+pytest -m integration              # testcontainers (Docker required)
 ```
 
-Kritische Module (`auth`, `voting`, `flow`, `budget`, `webhooks`, `audit`) haben ein
-eigenes Gate von 100 % Branch:
+The critical modules (`auth`, `voting`, `flow`, `budget`, `webhooks`, `audit`) have their own
+gate of 100 % branch coverage:
 
 ```bash
 pytest --cov --cov-report=xml
 python -m scripts.coverage_critical coverage.xml pyproject.toml
 ```
 
-App ohne Compose starten (z. B. gegen lokale Postgres):
+Start the app without compose, for example against a local Postgres:
 
 ```bash
 export DATABASE_URL=postgresql+asyncpg://app:pw@localhost/antrag
-export SESSION_SECRET=... MAGIC_LINK_SECRET=...   # je ≥16 Zeichen
+export SESSION_SECRET=... MAGIC_LINK_SECRET=...   # each at least 16 characters
 alembic upgrade head
 uvicorn app.main:app --reload --port 8000
 ```
 
-OpenAPI unter `/openapi.json`, Swagger-UI `/docs`. Konfiguration: siehe
-[Configuration-Wiki](https://github.com/STUPA-MAKERS/STUPA-Workflow/wiki/Configuration).
+OpenAPI sits at `/openapi.json`. Swagger UI sits at `/docs`. For configuration, see the
+[Configuration wiki](https://github.com/STUPA-MAKERS/STUPA-Workflow/wiki/Configuration).

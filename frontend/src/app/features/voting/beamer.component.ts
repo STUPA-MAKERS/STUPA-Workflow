@@ -13,10 +13,10 @@ import { LiveVoteService, type LiveVoteSession } from '@core/ws/live-vote.servic
 import { VoteBarsComponent } from './vote-bars.component';
 
 /**
- * Beamer/projector view: read-only, large type, high contrast. Shows live bars,
- * vote count, quorum indicator and result — never names (the beamer stream only
- * carries aggregated counts). Consumes WS frames only; sends `subscribe`, never
- * `cast` (session beamer mode).
+ * Beamer/projector view: read-only, large type, high contrast. It shows live
+ * bars, the vote count, the quorum indicator and the result. It never shows
+ * names, because the beamer stream carries aggregated counts only. It consumes
+ * WS frames only. It sends `subscribe`, never `cast` (session beamer mode).
  */
 @Component({
   selector: 'app-beamer',

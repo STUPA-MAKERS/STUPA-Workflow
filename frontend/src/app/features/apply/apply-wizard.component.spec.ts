@@ -162,7 +162,7 @@ describe('ApplyWizardComponent', () => {
 
     expect(screen.getByText('Sommerfest')).toBeInTheDocument();
 
-    // Altcha widget tested separately — feed the solution in directly here.
+    // A separate spec covers the Altcha widget, so feed the solution in directly.
     comp.onAltchaSolved('sol');
     fixture.detectChanges();
     expect(comp.canSubmit()).toBe(true);
@@ -217,7 +217,6 @@ describe('ApplyWizardComponent', () => {
     await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → budget
     await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → review
 
-    // No Altcha widget, still submittable.
     expect(comp.canSubmit()).toBe(true);
     await userEvent.click(screen.getByRole('button', { name: /Antrag absenden/ }));
 
@@ -442,7 +441,7 @@ describe('ApplyWizardComponent', () => {
     comp.submit();
     expect(create).not.toHaveBeenCalled();
 
-    // submitting() guard: flip the flag and confirm submit() bails.
+    // Check the submitting guard: set the flag, then submit must bail.
     comp.contactForm.setValue({ email: 'a@b.de', name: '' });
     comp.model = { title: 'X' };
     comp.onAltchaSolved('sol');
@@ -636,7 +635,7 @@ describe('ApplyWizardComponent', () => {
     const comp = fixture.componentInstance;
     comp.selectType('t1');
     comp.model = { kosten: 'not-an-array' };
-    // formatValue → formatPositions('not-an-array') → '' → row dropped.
+    // A non-array value yields '' from formatPositions, so the summary drops the row.
     expect(comp.summary().some((r) => r.label === 'Kosten')).toBe(false);
   });
 
@@ -644,7 +643,7 @@ describe('ApplyWizardComponent', () => {
     const { fixture } = await setup();
     const comp = fixture.componentInstance;
     await userEvent.click(screen.getByRole('radio', { name: /Finanzantrag/ }));
-    // category has option {event}; an unknown value falls back to String(value).
+    // The category field has only the option event. An unknown value falls back to the raw string.
     comp.model = { category: 'unknown-value', tags: ['x', 'a'] };
     const rows = comp.summary();
     expect(rows.find((r) => r.label === 'Kategorie')?.value).toBe('unknown-value');
@@ -747,7 +746,7 @@ describe('ApplyWizardComponent', () => {
   it('discardDraft is a no-op for clearing when no type is selected', async () => {
     const { fixture } = await setup();
     const comp = fixture.componentInstance;
-    // No type → draftKey() null → clearDraft returns early; still resets state.
+    // No type → draftKey() null → clearDraft returns early. The state still resets.
     expect(() => comp.discardDraft()).not.toThrow();
     expect(comp.model).toEqual({});
     expect(comp.activeIndex()).toBe(0);

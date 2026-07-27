@@ -50,7 +50,7 @@ describe('AuthService', () => {
 
   it('loads the principal once and exposes permission checks', () => {
     auth.ensureLoaded().subscribe();
-    auth.ensureLoaded().subscribe(); // memoisiert → nur ein HTTP-Call
+    auth.ensureLoaded().subscribe(); // Memoized, so only one HTTP call.
     http.expectOne('/api/auth/me').flush(PRINCIPAL);
 
     expect(auth.isAuthenticated()).toBe(true);
@@ -123,7 +123,7 @@ describe('AuthService', () => {
   });
 
   it('defaults the derived signals when the principal omits them / is anonymous', () => {
-    // Anonymous: all derived signals use their empty/false fallbacks.
+    // Anonymous. Every derived signal uses its empty or false fallback.
     expect(auth.userId()).toBeNull();
     expect(auth.gremien()).toEqual([]);
     expect(auth.roles()).toEqual([]);
@@ -132,7 +132,7 @@ describe('AuthService', () => {
     expect(auth.inSubstitutePool()).toBe(false);
 
     auth.ensureLoaded().subscribe();
-    // Authenticated but with the optional fields absent → still the fallbacks.
+    // Authenticated, but the optional fields are absent. The fallbacks still apply.
     http.expectOne('/api/auth/me').flush(PRINCIPAL);
     expect(auth.gremien()).toEqual([]);
     expect(auth.sessionManageGremien()).toEqual([]);
@@ -167,7 +167,7 @@ describe('AuthService', () => {
     http.expectOne('/api/auth/me').flush({ ...PRINCIPAL, roles: ['admin'], permissions: [] });
     expect(auth.can('anything.at.all')).toBe(true);
     expect(auth.canAny('whatever')).toBe(true);
-    // Empty permission list → canAny is vacuously true (any session passes).
+    // An empty permission list makes canAny true. Any session passes.
     expect(auth.canAny()).toBe(true);
   });
 
@@ -178,7 +178,7 @@ describe('AuthService', () => {
     auth.logout();
     http.expectOne('/api/auth/logout').flush({ logout_url: null });
 
-    // The cached principal$ was reset → a fresh ensureLoaded triggers a new /me.
+    // Logout reset the cached principal$. A new ensureLoaded calls /me again.
     auth.ensureLoaded().subscribe();
     http.expectOne('/api/auth/me').flush(PRINCIPAL);
     expect(auth.isAuthenticated()).toBe(true);

@@ -1,16 +1,17 @@
-"""Per-Seite-Admin-Permissions (#per-page-admin) — Bestands-Zuweisungen remappen.
+"""Per-page admin permissions (#per-page-admin): remap the existing assignments.
 
-Die zuvor von ``admin.roles`` mitgegatete Personen-/Zugriffsverwaltung wird je
-Admin-Seite getrennt; ``admin.deadlines`` löst die Fristen-Seite aus ``admin.types``:
+The person and access management that `admin.roles` gated before now gets one
+permission per admin page. `admin.deadlines` splits the deadline page out of
+`admin.types`.
 
-* ``admin.roles`` → behält /admin/roles; Inhaber erhalten zusätzlich
-  ``admin.users`` + ``admin.group_mappings`` + ``admin.gremium_roles`` +
-  ``admin.delegations`` (bisheriger Funktionsumfang bleibt exakt erhalten).
-* ``admin.types`` → bleibt (Antragstypen/Forms/Flows); Inhaber erhalten zusätzlich
-  ``admin.deadlines`` (die Fristen-Seite war bisher unter ``admin.types``).
+* `admin.roles` keeps /admin/roles. Its holders also get `admin.users`,
+  `admin.group_mappings`, `admin.gremium_roles` and `admin.delegations`. The
+  reach of the permission stays exactly the same.
+* `admin.types` stays for application types, forms and flows. Its holders also
+  get `admin.deadlines`, because the deadline page sat under `admin.types`.
 
-Idempotent (``ON CONFLICT DO NOTHING``). ``admin.roles``/``admin.types`` bleiben
-bestehen — kein DELETE.
+All statements are idempotent (`ON CONFLICT DO NOTHING`). `admin.roles` and
+`admin.types` stay in place. This migration deletes no permission.
 """
 
 from __future__ import annotations
@@ -26,7 +27,13 @@ depends_on: str | Sequence[str] | None = None
 
 
 def _fanout(old: str, new: tuple[str, ...]) -> list[str]:
-    """``old`` → ``new``-Rechte für alle Rollen, die ``old`` halten (additiv)."""
+    """Build the INSERTs that add the `new` permissions to every holder of `old`.
+
+    The statements only add permissions. They never remove `old`.
+
+    Returns:
+        One SQL statement per entry in `new`.
+    """
     return [
         (
             "INSERT INTO role_permission (role_id, permission) "

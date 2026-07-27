@@ -1,24 +1,23 @@
-# Logo-Set
+# Logo set
 
-Offizielle **STUPA**-Assets aus dem Corporate Design (Nextcloud
-`Corporate Design/Icons-und-Logos/`, requirements N1). 1:1 als Ersatz der
-früheren CD-Stil-Platzhalter eingesetzt.
+Official **STUPA** assets from the corporate design (Nextcloud
+`Corporate Design/Icons-und-Logos/`, requirements N1). These assets replace the earlier
+CD-style placeholders 1:1.
 
-| Datei | Verwendung | Quelle (Nextcloud CD) |
+| File | Use | Source (Nextcloud CD) |
 |---|---|---|
-| `stupa-mark.svg` | quadratische Marke (Favicon, App-Icon) | `Icon/STUPA/STUPA-Logo_icon-only.svg` |
-| `stupa-wordmark-light.svg` | Header-/Footer-Logo im **Light**-Theme (schwarze Schrift + Marke) | `Logo/STUPA/STUPA-Logo_black-text.svg` |
-| `stupa-wordmark-dark.svg` | Header-/Footer-Logo im **Dark**-Theme (weiße Schrift + Marke) | `Logo/STUPA/STUPA-Logo_white-text.svg` |
-| `stupa-wordmark.svg` | _Alt-Asset (gray-text), nicht mehr eingebunden_ | `Logo/STUPA/STUPA-Logo_gray-text.svg` |
+| `stupa-mark.svg` | square mark (favicon, app icon) | `Icon/STUPA/STUPA-Logo_icon-only.svg` |
+| `stupa-wordmark-light.svg` | header and footer logo in the **light** theme (black text plus mark) | `Logo/STUPA/STUPA-Logo_black-text.svg` |
+| `stupa-wordmark-dark.svg` | header and footer logo in the **dark** theme (white text plus mark) | `Logo/STUPA/STUPA-Logo_white-text.svg` |
+| `stupa-wordmark.svg` | _old asset (gray-text), no longer in use_ | `Logo/STUPA/STUPA-Logo_gray-text.svg` |
 
-`favicon.ico` (`frontend/public/`) ist aus `stupa-mark.svg` gerendert
-(16/32/48/64 px, ImageMagick).
+ImageMagick renders `favicon.ico` (`frontend/public/`) from `stupa-mark.svg` at 16, 32, 48
+and 64 px.
 
-**Theme/Hell-Dunkel (#43):** Die Wortmarke wird theme-abhängig umgeschaltet.
-`ShellComponent.logoSrc` (computed) wählt anhand von `ThemeService.resolved()`
-zwischen `stupa-wordmark-light.svg` (schwarze Schrift) und
-`stupa-wordmark-dark.svg` (weiße Schrift); gebunden via `[src]` in Header **und**
-Footer. So bleibt die Schrift in beiden Modi kontraststark — die mehrfarbige
-Marke (CD-Signalfarben) liest ohnehin auf hell wie dunkel. Die frühere neutrale
-`gray-text`-Variante (`stupa-wordmark.svg`) wirkte in beiden Modi verwaschen und
-wird nicht mehr eingebunden.
+**Theme, light and dark (#43):** the theme selects the wordmark. The computed
+`ShellComponent.logoSrc` reads `ThemeService.resolved()` and picks either
+`stupa-wordmark-light.svg` (black text) or `stupa-wordmark-dark.svg` (white text). The header
+**and** the footer bind it through `[src]`. The text keeps a strong contrast in both modes.
+The multi-color mark (CD signal colors) reads well on a light and on a dark background. The
+earlier neutral `gray-text` variant (`stupa-wordmark.svg`) looked washed out in both modes.
+The shell no longer loads it.

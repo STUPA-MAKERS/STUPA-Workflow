@@ -1,23 +1,24 @@
-"""Integration (echte Postgres, testcontainers): DSGVO/Privacy **HTTP-Router**.
+"""Integration test for the GDPR privacy **HTTP router** (real Postgres).
 
-Während ``test_privacy`` die Services direkt aufruft, prüft dieses
-Modul den verdrahteten ``/api/admin/privacy``-Router (api.md, security.md §4) durch den
-realen ASGI-Request-Zyklus:
+``test_privacy`` calls the services directly. This module drives the wired
+``/api/admin/privacy`` router through the real ASGI request cycle. See api.md and
+security.md section 4. The tests cover:
 
-* das ``privacy.manage``-Gate (401 ohne Session, 403 ohne Permission),
-* Löschantrags-Queue (Liste + ``?status``-Filter), Ausführen/Ablehnen inkl. 409 auf
-  nicht-offenen Anträgen,
-* Direkt-Erasure eines Principals (204 + PII genullt),
-* die Settings (GET/PUT, ``ge=1`` → 422),
-* die Art.-15-Auskunft als XLSX **plus** der Beweis, dass der ``pii_export``-Audit-Eintrag
-  **keine** Roh-PII (E-Mail) trägt,
-* der Self-Service-Endpunkt ``POST /api/applications/{id}/erasure-request`` über den
-  **echten** Magic-Link-Antragsteller-Token (kein Principal-Workaround).
+* the ``privacy.manage`` gate. It answers 401 without a session and 403 without the
+  permission.
+* the erasure request queue with the list and the ``?status`` filter. Execute and
+  reject answer 409 on a request that is no longer open.
+* the direct erasure of a principal. It answers 204 and nulls the PII.
+* the settings with GET and PUT. A value under the ``ge=1`` bound gives 422.
+* the Art. 15 data export as XLSX. The test also proves that the ``pii_export`` audit
+  entry carries **no** raw PII such as the email address.
+* the self-service endpoint ``POST /api/applications/{id}/erasure-request``. It uses
+  the **real** magic-link applicant token and no principal workaround.
 
-Der Request läuft über eine geteilte Test-Engine (``get_session``-Override), sodass im Test
-mit der ``session``-Fixture geseedet und assertiert werden kann. Die Best-Effort-Mail-
-Hintergrund-Tasks werden auf No-ops gepatcht — sie würden sonst den globalen
-``get_sessionmaker()`` (localhost) ansprechen und sind hier nicht der Prüfgegenstand.
+The request runs on a shared test engine through the ``get_session`` override. The test
+can therefore seed and assert with the ``session`` fixture. The best-effort mail
+background tasks run as no-ops. They would otherwise reach the global
+``get_sessionmaker()`` on localhost, and they are not the subject of this test.
 """
 
 from __future__ import annotations
@@ -58,7 +59,7 @@ _SECRET = "session-secret-privacy-router-0"
 
 @pytest.fixture
 async def session(migrated: tuple[str, str], engine: Engine) -> AsyncIterator[AsyncSession]:
-    clear_privacy_tables(engine)  # principal/auth_session/erasure_request/settings isolieren
+    clear_privacy_tables(engine)  # isolate principal, auth_session, erasure_request, settings
     eng = create_async_engine(migrated[1])
     maker = async_sessionmaker(eng, expire_on_commit=False)
     async with maker() as s:
@@ -70,7 +71,10 @@ async def session(migrated: tuple[str, str], engine: Engine) -> AsyncIterator[As
 def app(
     migrated: tuple[str, str], monkeypatch: pytest.MonkeyPatch
 ) -> Iterator[FastAPI]:
-    """App gegen die Test-DB; `get_session` teilt sich die Engine, Mail-Tasks sind No-ops."""
+    """Build the app against the test database.
+
+    `get_session` shares the engine. The mail tasks run as no-ops.
+    """
     _, async_url = migrated
     settings = load_settings(
         database_url=async_url,
@@ -91,8 +95,8 @@ def app(
         finally:
             await db.close()
 
-    # Best-Effort-Mail-Hintergrund-Tasks neutralisieren (würden sonst den globalen
-    # localhost-Sessionmaker ansprechen) — sie sind hier nicht der Prüfgegenstand.
+    # Neutralize the best-effort mail background tasks. They would otherwise reach the
+    # global localhost sessionmaker, and they are not the subject of this test.
     async def _noop(*_args: object, **_kwargs: object) -> None:
         return None
 
@@ -128,7 +132,6 @@ def _as_dpo(app: FastAPI) -> None:
     _as(app, {"privacy.manage"})
 
 
-# --------------------------------------------------------------------------- auth
 def test_erasures_requires_auth_401(client: TestClient) -> None:
     assert client.get("/api/admin/privacy/erasures").status_code == 401
 
@@ -136,18 +139,17 @@ def test_erasures_requires_auth_401(client: TestClient) -> None:
 def test_erasures_forbidden_without_privacy_manage_403(
     app: FastAPI, client: TestClient
 ) -> None:
-    _as(app, {"admin.users"})  # eingeloggt, aber ohne privacy.manage
+    _as(app, {"admin.users"})  # logged in, but without privacy.manage
     r = client.get("/api/admin/privacy/erasures")
     assert r.status_code == 403
     assert r.json()["code"] == "forbidden"
-    # auch eine Mutation ist gegated
+    # the gate also covers a mutation
     assert (
         client.post(f"/api/admin/privacy/principals/{uuid.uuid4()}/erase").status_code
         == 403
     )
 
 
-# --------------------------------------------------------------------------- queue
 async def test_list_erasures_and_status_filter(
     app: FastAPI, client: TestClient, session: AsyncSession
 ) -> None:
@@ -168,7 +170,7 @@ async def test_list_erasures_and_status_filter(
     assert isinstance(body, list)
     ids = {row["id"] for row in body}
     assert {open_id, str(rejected_req.id)} <= ids
-    # Listen-Shape (camelCase-DTO): die Pflichtfelder sind vorhanden.
+    # list shape (camelCase DTO): the required fields are present
     row = next(row for row in body if row["id"] == open_id)
     assert row["subjectType"] == "principal"
     assert row["status"] == "open"
@@ -181,7 +183,6 @@ async def test_list_erasures_and_status_filter(
     assert str(rejected_req.id) not in fids
 
 
-# --------------------------------------------------------------------------- execute
 async def test_execute_applicant_erasure_anonymizes(
     app: FastAPI, client: TestClient, session: AsyncSession
 ) -> None:
@@ -208,13 +209,13 @@ async def test_execute_applicant_erasure_anonymizes(
     assert body["handledBy"] == "dpo"
     assert body["handledAt"] is not None
 
-    # frisch aus der DB (Request lief über eine eigene Engine) — `refresh` ist awaited,
-    # kein expired-Attr-Zugriff (der eine sync-Lazy-Load auslösen würde).
+    # Fresh from the database, because the request ran on its own engine. The `refresh`
+    # call is awaited. An expired attribute access would start a sync lazy load.
     await session.refresh(applicant)
     assert applicant.email is None
     assert applicant.anonymized_at is not None
 
-    # zweite Ausführung → 409 (nicht mehr offen)
+    # a second execute gives 409, because the request is no longer open
     again = client.post(f"/api/admin/privacy/erasures/{req_id}/execute")
     assert again.status_code == 409
 
@@ -227,7 +228,6 @@ async def test_execute_unknown_request_404(app: FastAPI, client: TestClient) -> 
     assert r.status_code == 404
 
 
-# --------------------------------------------------------------------------- reject
 async def test_reject_then_double_reject_409(
     app: FastAPI, client: TestClient, session: AsyncSession
 ) -> None:
@@ -249,19 +249,18 @@ async def test_reject_then_double_reject_409(
     assert body["reason"] == "unbegründet"
     assert body["handledBy"] == "dpo"
 
-    # Subjekt bleibt unangetastet.
+    # the subject stays untouched
     await session.refresh(principal)
     assert principal.email == "rej@example.org"
     assert principal.active is True
 
-    # nicht mehr offen → 409
+    # no longer open, therefore 409
     again = client.post(
         f"/api/admin/privacy/erasures/{req_id}/reject", json={"reason": "x"}
     )
     assert again.status_code == 409
 
 
-# --------------------------------------------------------------------------- principal
 async def test_erase_principal_endpoint_nulls_pii_204(
     app: FastAPI, client: TestClient, session: AsyncSession
 ) -> None:
@@ -279,10 +278,9 @@ async def test_erase_principal_endpoint_nulls_pii_204(
     assert principal.email is None
     assert principal.display_name is None
     assert principal.active is False
-    assert principal.sub == original_sub  # Pseudonym bleibt
+    assert principal.sub == original_sub  # the pseudonym stays
 
 
-# --------------------------------------------------------------------------- settings
 async def test_settings_get_put_and_validation(
     app: FastAPI, client: TestClient, session: AsyncSession
 ) -> None:
@@ -304,14 +302,13 @@ async def test_settings_get_put_and_validation(
     ).scalar_one()
     assert persisted.default_retention_months == 12
 
-    # ge=1: 0 ist unzulässig → 422 (Schema-Validierung, vor dem Service)
+    # The schema rejects 0 because of ge=1 and answers 422 before the service runs.
     bad = client.put(
         "/api/admin/privacy/settings", json={"defaultRetentionMonths": 0}
     )
     assert bad.status_code == 422
 
 
-# --------------------------------------------------------------------------- auskunft
 async def test_auskunft_xlsx_and_audit_records_subject_email(
     app: FastAPI, client: TestClient, session: AsyncSession
 ) -> None:
@@ -325,9 +322,9 @@ async def test_auskunft_xlsx_and_audit_records_subject_email(
     assert r.headers["content-type"] == XLSX_MEDIA_TYPE
     assert "attachment" in r.headers["content-disposition"]
     assert len(r.content) > 0
-    assert r.content[:2] == b"PK"  # XLSX = ZIP-Container
+    assert r.content[:2] == b"PK"  # an XLSX file is a ZIP container
 
-    # ein pii_export-Audit-Eintrag wurde geschrieben (vom Request frisch angelegt) …
+    # the request wrote exactly one fresh pii_export audit entry ...
     rows = (
         await session.scalars(
             select(AuditEntry).where(AuditEntry.action == "pii_export")
@@ -335,9 +332,9 @@ async def test_auskunft_xlsx_and_audit_records_subject_email(
     ).all()
     assert len(rows) == 1
     entry = rows[0]
-    # … und er hält die KANONISIERTE E-Mail fest (Rechenschaft: WESSEN Daten exportiert).
-    # Der Router kanonisiert die Anfrage-Adresse (Kleinschreibung), damit ein konsistenter
-    # target_id im Audit landet — die Assertion spiegelt diese Kanonisierung.
+    # ... and it keeps the CANONICAL email for accountability: WHOSE data left the
+    # system. The router lowercases the requested address so that the audit gets a
+    # consistent target_id. The assertion mirrors that canonicalization.
     canonical_email = email.lower()
     assert entry.target_id == canonical_email
     assert entry.data is not None
@@ -346,18 +343,17 @@ async def test_auskunft_xlsx_and_audit_records_subject_email(
     assert entry.data.get("applications") == 1
 
 
-# --------------------------------------------------------------------------- self-service
 async def test_applicant_self_service_erasure_request(
     app: FastAPI, client: TestClient, session: AsyncSession
 ) -> None:
-    """``POST /applications/{id}/erasure-request`` über den **echten** Magic-Link-Token."""
+    """``POST /applications/{id}/erasure-request`` with the **real** magic-link token."""
     app_type, _, _ = await _seed_type(session)
     svc = ApplicationsService(session)
     application, _ = await svc.create(_create_payload(app_type.id))
     app_id = str(application.id)
 
-    # Echte serverseitige Applicant-Session (statt zustandslosem Token): Zeile anlegen
-    # und committen, damit die Request-Session (eigene Transaktion) die sid auflösen kann.
+    # A real server-side applicant session instead of a stateless token. The row needs a
+    # commit so that the request session in its own transaction can resolve the sid.
     token = await sessions.create_applicant_session(
         session,
         secret=_SECRET,
@@ -367,7 +363,7 @@ async def test_applicant_self_service_erasure_request(
     )
     await session.commit()
 
-    # KEIN Principal-Override hier — der Applicant-Pfad (require_app_read) muss greifen.
+    # NO principal override here. The applicant path (require_app_read) must apply.
     r = client.post(
         f"/api/applications/{app_id}/erasure-request",
         headers={"Authorization": f"Bearer {token}"},
@@ -384,7 +380,7 @@ async def test_applicant_self_service_erasure_request(
     assert created.status == "open"
     assert created.subject_type == "applicant"
 
-    # ein erasure_requested-Audit-Eintrag liegt vor.
+    # one erasure_requested audit entry exists
     audited = (
         await session.scalars(
             select(AuditEntry).where(

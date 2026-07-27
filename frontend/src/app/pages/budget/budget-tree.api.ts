@@ -6,29 +6,28 @@ import { map } from 'rxjs/operators';
 import { API_BASE_URL } from '@core/api/api.config';
 import type { Uuid } from '@core/api/models';
 
-/** Available/bound/requested of a node in a fiscal year (money as string). */
+/** Available, bound and requested amount of a node in a fiscal year. Money is a string. */
 export interface BudgetAllocationView {
   fiscalYearId: Uuid;
   allocated: string;
-  /** Bound: accepted applications, reduced proportionally by committed expenses. */
+  /** Accepted applications, reduced proportionally by committed expenses. */
   bound: string;
-  /** Expended: actual expenses. */
+  /** Actual expenses. */
   expended: string;
-  /** Income — increases the available budget. */
+  /** Income increases the available budget. */
   income: string;
-  /** Total consumption (= bound + expended, backwards-compatible). */
+  /** Total consumption (bound + expended). Kept for backward compatibility. */
   committed: string;
-  /** Requested (in-flight applications, neither accepted nor denied). */
+  /** Requested amount of in-flight applications that are neither accepted nor denied. */
   requested: string;
   available: string;
 }
 
 /** Booking kind of an actual movement. */
 export type ExpenseKind = 'expense' | 'income';
-/** Payment method. */
 export type PaymentMethod = 'ueberweisung' | 'bar' | 'lastschrift' | 'karte' | 'paypal';
 
-/** Booked expense/income; money as string (Decimal). */
+/** Booked expense or income. Money is a string (Decimal). */
 export interface Expense {
   id: Uuid;
   budgetId: Uuid;
@@ -43,7 +42,7 @@ export interface Expense {
   accountId: Uuid | null;
   accountName: string | null;
   transferId: Uuid | null;
-  // `actor` = raw principal `sub` (audit); `actorName` = server-resolved display
+  // `actor` = raw principal `sub` (audit). `actorName` = server-resolved display
   // name. Always show `actorName` in the UI, never the UUID.
   actor: string | null;
   actorName: string | null;
@@ -59,22 +58,22 @@ export interface Expense {
   invoiceId: Uuid | null;
   invoiceNumber: string | null;
   // Sub-bookings: `parentExpenseId` set -> this booking IS a sub-booking.
-  // `childCount` > 0 -> it HAS sub-bookings (expandable; `amount` = sum of children,
-  // then read-only).
+  // `childCount` > 0 -> it HAS sub-bookings. Such a booking expands, `amount` is
+  // the sum of the children, and `amount` is then read-only.
   parentExpenseId: Uuid | null;
   childCount: number;
   createdAt: string;
 }
 
-/** Account (name + free-text IBAN), not bound to cost-centres. */
+/** Account (name and free-text IBAN). It is not bound to cost centers. */
 export interface Account {
   id: Uuid;
   name: string;
   iban: string;
   active: boolean;
-  // FinTS **bank connection**: only endpoint + BLZ (same for all bookers, set by the
-  // admin). `fintsConfigured` = both set -> the account is FinTS-capable. Personal
-  // logins/PINs are kept per booker and never appear here.
+  // FinTS bank connection: only endpoint and BLZ. They are the same for all bookers
+  // and the admin sets them. `fintsConfigured` = both set -> the account is
+  // FinTS-capable. Each booker keeps a personal login and PIN that never appear here.
   fintsEndpoint: string | null;
   fintsBlz: string | null;
   fintsConfigured: boolean;
@@ -84,13 +83,13 @@ export interface AccountBody {
   name: string;
   iban?: string;
   active?: boolean;
-  // FinTS bank connection: `null`/`""` clears it. Login/PIN are no longer part of
-  // the account master data — each booker sets them in the bookings tab.
+  // FinTS bank connection: `null` or `""` clears it. The login and the PIN are not
+  // part of the account master data. Each booker sets them in the bookings tab.
   fintsEndpoint?: string | null;
   fintsBlz?: string | null;
 }
 
-/** Booker's personal FinTS credentials; `fintsPin` write-only. */
+/** Personal FinTS credentials of a booker. `fintsPin` is write-only. */
 export interface FintsCredentialBody {
   fintsLogin: string;
   fintsPin: string;
@@ -102,18 +101,19 @@ export interface FintsCredentialStatus {
   configured: boolean;
   /** The requesting booker has stored their own credentials. */
   hasCredential: boolean;
-  /** Booker's login name (not a secret); `null` when no credential. */
+  /** Login name of the booker. It is not a secret. `null` means no credential. */
   fintsLogin: string | null;
   fintsLastSyncAt: string | null;
   /**
-   * Lock cooldown: ISO timestamp until which the server rejects every sync (after a
-   * bank lock/signature rejection). `null` = not locked. Until then the FE disables
-   * the fetch button and warns NOT to retry (risk of a full bank lock).
+   * Lock cooldown as an ISO timestamp. The server rejects every sync until this
+   * time after a bank lock or a signature rejection. `null` means not locked. Until
+   * then the frontend disables the fetch button and warns NOT to retry. A retry
+   * risks a full bank lock.
    */
   fintsLockedUntil: string | null;
 }
 
-/** Staged account statement line; `amount` signed (>0 incoming). */
+/** Staged account statement line. `amount` is signed and a value >0 means incoming. */
 export interface StatementLine {
   id: Uuid;
   accountId: Uuid;
@@ -169,17 +169,18 @@ export interface ConfirmLineBody {
 export interface AccountOption {
   id: Uuid;
   name: string;
-  /** Account is FinTS-capable (endpoint + BLZ set) — not a secret, visible without account.manage. */
+  /** Account is FinTS-capable (endpoint + BLZ set). It is not a secret and stays
+   *  visible without account.manage. */
   fintsConfigured: boolean;
   /** The requesting booker has already stored their own credentials. */
   fintsHasCredential: boolean;
   fintsLastSyncAt: string | null;
-  /** Last bank balance + as-of date; `null` = never synced. */
+  /** Last bank balance and its as-of date. `null` means never synced. */
   fintsLastBalance: string | null;
   fintsBalanceAt: string | null;
 }
 
-/** Transfer cost-centre -> cost-centre (same fiscal year). */
+/** Transfer from cost center to cost center inside the same fiscal year. */
 export interface TransferCreate {
   fromBudgetId: Uuid;
   toBudgetId: Uuid;
@@ -204,7 +205,7 @@ export interface StatementLinePage {
   offset: number;
 }
 
-/** Extra metadata of a booking — on create & update. */
+/** Extra metadata of a booking, used on create and on update. */
 export interface ExpenseMetadata {
   invoiceDate?: string | null;
   paymentDate?: string | null;
@@ -213,7 +214,7 @@ export interface ExpenseMetadata {
   referenceNumber?: string | null;
   paymentMethod?: PaymentMethod | null;
   category?: string | null;
-  /** Linked invoice; ``null`` removes the link. */
+  /** Linked invoice. ``null`` removes the link. */
   invoiceId?: Uuid | null;
 }
 
@@ -225,29 +226,27 @@ export interface ExpenseCreate extends ExpenseMetadata {
   budgetId?: Uuid | null;
   fiscalYearId?: Uuid | null;
   applicationId?: Uuid | null;
-  // No `accountId`: the account is not a manual booking field, it's only set by the
-  // account reconciliation.
+  // No `accountId`: the account is not a manual booking field. Only the account
+  // reconciliation sets it.
 }
 
-/** Update a booking: amount, description, cost-centre + extra metadata. */
+/** Update a booking: amount, description, cost center and extra metadata. */
 export interface ExpenseUpdate extends ExpenseMetadata {
   amount?: string;
   description?: string;
-  /** Rebook to another cost-centre; fiscal year stays fixed. */
+  /** Rebook to another cost center. The fiscal year stays fixed. */
   budgetId?: Uuid;
 }
 
-/** Manually create a sub-booking — only its own fields; the rest inherited from the parent. */
+/** Manually create a sub-booking. It carries only its own fields. The parent gives the rest. */
 export interface SubBookingBody extends ExpenseMetadata {
   amount: string;
   description: string;
 }
 
-// ------------------------------------------------------------------ invoices
-/** Status of an invoice. */
 export type InvoiceStatus = 'open' | 'paid';
 
-/** Invoice — standalone document; money as string (Decimal). */
+/** Invoice as a standalone document. Money is a string (Decimal). */
 export interface Invoice {
   id: Uuid;
   number: string | null;
@@ -266,8 +265,8 @@ export interface Invoice {
   createdAt: string;
 }
 
-/** Create an invoice: ``grossAmount`` required, the rest optional. On import,
- *  ``fileToken``/``fileName``/``fileMime`` are taken from the parse. */
+/** Create an invoice. ``grossAmount`` is required and the rest is optional. On
+ *  import the parse supplies ``fileToken``, ``fileName`` and ``fileMime``. */
 export interface InvoiceCreate {
   number?: string | null;
   issueDate?: string | null;
@@ -283,7 +282,7 @@ export interface InvoiceCreate {
   fileMime?: string | null;
 }
 
-/** Update an invoice — only the set fields; no file handling. */
+/** Update an invoice. It applies only the set fields and does no file handling. */
 export interface InvoiceUpdate {
   number?: string | null;
   issueDate?: string | null;
@@ -326,7 +325,7 @@ export interface InvoiceOption {
   label: string;
 }
 
-/** Filter/paging of the invoice list — fuzzy-matched + filtered server-side. */
+/** Filter and paging of the invoice list. The server does the fuzzy match and the filter. */
 export interface InvoiceQuery {
   q?: string;
   status?: InvoiceStatus;
@@ -370,7 +369,7 @@ export interface ExpenseQuery {
   offset?: number;
 }
 
-/** Tree node (cost-centre) incl. sums per fiscal year + children (recursive). */
+/** Tree node (cost center) with the sums per fiscal year and the recursive children. */
 export interface BudgetTreeNode {
   id: Uuid;
   parentId: Uuid | null;
@@ -380,17 +379,18 @@ export interface BudgetTreeNode {
   name: string;
   currency: string;
   active: boolean;
-  /** Display colour (pie/tree); null = automatic. */
+  /** Display color for the pie and the tree. `null` means automatic. */
   color: string | null;
   /** Top-level only: flow-state keys that count as accepted/denied. */
   acceptedStateKeys: string[];
   deniedStateKeys: string[];
-  /** Hide in the budget tab — display only, rollups unchanged. */
+  /** Hide in the budget tab. This is display only and the rollups do not change. */
   hiddenInBudget: boolean;
-  /** Visibility gremium: its members see this subtree in the budget tab as a root
-   *  — without global budget.* permissions. */
+  /** Visibility gremium: its members see this subtree in the budget tab as a root.
+   *  They need no global budget.* permissions. */
   viewGremiumId: Uuid | null;
-  /** Fiscal-year cutoff (day/month of the period start) — only relevant at top level. */
+  /** Fiscal-year cutoff: the day and month of the period start. Only the top level
+   *  uses it. */
   fiscalStartMonth: number;
   fiscalStartDay: number;
   byFiscalYear: BudgetAllocationView[];
@@ -417,7 +417,7 @@ export interface BudgetNode {
 export interface FiscalYear {
   id: Uuid;
   budgetId: Uuid;
-  /** Start year (a fiscal year is unique by year — no free text). */
+  /** Start year. A fiscal year is unique by year and takes no free text. */
   year: number;
   /** Display: ``YYYY`` (cutoff 01.01.) or ``YYYY/YY`` (otherwise). */
   display: string;
@@ -437,7 +437,7 @@ export interface BudgetNodeCreate {
   fiscalStartDay?: number;
 }
 
-/** Partial update of a node (all fields optional; ``color:""`` clears the colour). */
+/** Partial update of a node. All fields are optional and ``color:""`` clears the color. */
 export interface BudgetNodeUpdate {
   key?: string;
   name?: string;
@@ -446,7 +446,7 @@ export interface BudgetNodeUpdate {
   acceptedStateKeys?: string[];
   deniedStateKeys?: string[];
   hiddenInBudget?: boolean;
-  /** Visibility gremium; `null` clears the assignment. */
+  /** Visibility gremium. `null` clears the assignment. */
   viewGremiumId?: Uuid | null;
   fiscalStartMonth?: number;
   fiscalStartDay?: number;
@@ -456,7 +456,7 @@ export interface FiscalYearCreate {
   year: number;
 }
 
-/** An application within a cost-centre (+ subtree) — budget statistics. */
+/** An application inside a cost center and its subtree. Used for budget statistics. */
 export interface BudgetApplication {
   applicationId: Uuid;
   title: string | null;
@@ -467,16 +467,16 @@ export interface BudgetApplication {
   currency: string | null;
   stage: string | null;
   stateId: Uuid | null;
-  /** Current flow state (i18n label map + colour) for the status column. */
+  /** Current flow state (i18n label map and color) for the status column. */
   stateLabel?: Record<string, string> | null;
   stateColor?: string | null;
   createdAt: string;
 }
 
 /**
- * Client for the cost-centre tree (P(`budget.view`/`manage`)). Talks to the
- * **existing** tree endpoints (`/api/budgets`, fiscal-years, allocations). Money
- * stays as string (Decimal) — the UI formats via `Number`.
+ * Client for the cost-center tree (P(`budget.view`/`manage`)). It calls the tree
+ * endpoints `/api/budgets`, fiscal-years and allocations. Money stays a string
+ * (Decimal). The UI formats it with `Number`.
  */
 @Injectable({ providedIn: 'root' })
 export class BudgetTreeApi {
@@ -485,8 +485,8 @@ export class BudgetTreeApi {
 
   tree(gremiumId?: string): Observable<BudgetTreeNode[]> {
     const params = gremiumId ? { gremium: gremiumId } : undefined;
-    // Budget/dashboard pages have their own loading indicator; otherwise just
-    // nav/dropdown hydration -> suppress the global overlay.
+    // The budget and dashboard pages have their own loading indicator. Every other
+    // call only hydrates the nav or a dropdown, so suppress the global overlay.
     return this.http.get<BudgetTreeNode[]>(`${this.base}/budgets`, {
       params,
       context: skipLoading(),
@@ -519,7 +519,7 @@ export class BudgetTreeApi {
     return this.http.put(`${this.base}/budgets/${id}/allocations/${fiscalYearId}`, { allocated });
   }
 
-  /** Applications of a cost-centre + subtree, optionally filtered by fiscal year. */
+  /** Applications of a cost center and its subtree, optionally filtered by fiscal year. */
   applications(budgetId: Uuid, fiscalYearId?: string): Observable<BudgetApplication[]> {
     const params = fiscalYearId ? { fiscalYear: fiscalYearId } : undefined;
     return this.http.get<BudgetApplication[]>(`${this.base}/budgets/${budgetId}/applications`, {
@@ -528,7 +528,7 @@ export class BudgetTreeApi {
     });
   }
 
-  /** Booked expenses/income, filtered + offset-paginated. */
+  /** Booked expenses and income, filtered and offset-paginated. */
   listExpenses(query: ExpenseQuery = {}): Observable<ExpensePage> {
     const params: Record<string, string> = {};
     for (const [key, value] of Object.entries(query)) {
@@ -547,25 +547,26 @@ export class BudgetTreeApi {
     return this.http.post<Expense>(`${this.base}/expenses`, body);
   }
 
-  /** Update a booking's amount/description. */
   updateExpense(id: Uuid, body: ExpenseUpdate): Observable<Expense> {
     return this.http.patch<Expense>(`${this.base}/budget-expenses/${id}`, body);
   }
 
-  /** Delete a booking. Part of a transfer -> both bookings go. */
+  /** Delete a booking. If it is part of a transfer, both bookings go. */
   deleteExpense(id: Uuid): Observable<void> {
     return this.http.delete<void>(`${this.base}/budget-expenses/${id}`);
   }
 
-  /** Sub-bookings of a booking — expand in the bookings tab. */
+  /** Sub-bookings of a booking. The bookings tab expands them. */
   listSubBookings(expenseId: Uuid): Observable<Expense[]> {
     return this.http.get<Expense[]>(`${this.base}/budget-expenses/${expenseId}/sub-bookings`);
   }
-  /** Manually create a sub-booking — inherits account/cost-centre/fiscal year/kind from the parent. */
+  /** Manually create a sub-booking. It inherits account, cost center, fiscal year
+   *  and kind from the parent. */
   createSubBooking(expenseId: Uuid, body: SubBookingBody): Observable<Expense> {
     return this.http.post<Expense>(`${this.base}/budget-expenses/${expenseId}/sub-bookings`, body);
   }
-  /** Create sub-bookings from a CAMT.053/MT940 file — inherit account/cost-centre/fiscal year/kind. */
+  /** Create sub-bookings from a CAMT.053/MT940 file. They inherit account, cost
+   *  center, fiscal year and kind. */
   importSubBookings(expenseId: Uuid, file: File): Observable<Expense[]> {
     const form = new FormData();
     form.append('file', file);
@@ -575,14 +576,14 @@ export class BudgetTreeApi {
     );
   }
 
-  /** Transfer cost-centre -> cost-centre (expense + income, same fiscal year). */
+  /** Transfer from cost center to cost center. It books an expense and an income in
+   *  the same fiscal year. */
   createTransfer(body: TransferCreate): Observable<unknown> {
     return this.http.post(`${this.base}/budget-transfers`, body);
   }
 
-  // ------------------------------------------------------------- invoices
-  /** Invoices, fuzzy-searched + filtered + offset-paginated (mirrors
-   *  {@link listExpenses}). */
+  /** Invoices, fuzzy-searched, filtered and offset-paginated. Mirrors
+   *  {@link listExpenses}. */
   listInvoicesPaged(query: InvoiceQuery = {}): Observable<InvoicePage> {
     const params: Record<string, string> = {};
     for (const [key, value] of Object.entries(query)) {
@@ -596,13 +597,13 @@ export class BudgetTreeApi {
     });
   }
 
-  /** Full invoice list (newest invoice date first) — for the booking link dropdown,
-   *  which needs all invoices. */
+  /** Full invoice list, newest invoice date first. The booking link dropdown needs
+   *  all invoices. */
   listInvoices(): Observable<Invoice[]> {
     return this.listInvoicesPaged({ limit: 200 }).pipe(map((page) => page.items));
   }
-  /** Single invoice by ID — detail dialog, in case the linked invoice is outside
-   *  the list cache capped at 200. */
+  /** Single invoice by ID for the detail dialog. The linked invoice can sit outside
+   *  the list cache, which is capped at 200. */
   getInvoice(id: Uuid): Observable<Invoice> {
     return this.http.get<Invoice>(`${this.base}/invoices/${id}`);
   }
@@ -615,31 +616,30 @@ export class BudgetTreeApi {
   deleteInvoice(id: Uuid): Observable<void> {
     return this.http.delete<void>(`${this.base}/invoices/${id}`);
   }
-  /** Parse a ZUGFeRD/Factur-X PDF: fields + file handle for the dialog.
-   *  422 ``invoice_not_zugferd`` => the UI offers manual entry. */
+  /** Parse a ZUGFeRD/Factur-X PDF: fields and a file handle for the dialog.
+   *  On 422 ``invoice_not_zugferd`` the UI offers manual entry. */
   parseInvoice(file: File): Observable<InvoiceParseResult> {
     const form = new FormData();
     form.append('file', file);
     return this.http.post<InvoiceParseResult>(`${this.base}/invoices/parse`, form);
   }
-  /** Store a document PDF without a ZUGFeRD parse — for manual invoices. */
+  /** Store a document PDF without a ZUGFeRD parse. This serves manual invoices. */
   uploadInvoiceFile(file: File): Observable<InvoiceFileResult> {
     const form = new FormData();
     form.append('file', file);
     return this.http.post<InvoiceFileResult>(`${this.base}/invoices/file`, form);
   }
-  /** Load the original document as a blob: the API streams the PDF because MinIO is
-   *  only reachable internally (no presigned URL with an internal host). */
+  /** Load the original document as a blob. The API streams the PDF because MinIO is
+   *  reachable only internally, so a presigned URL would carry an internal host. */
   invoiceFileBlob(id: Uuid): Observable<Blob> {
     return this.http.get(`${this.base}/invoices/${id}/file`, { responseType: 'blob' });
   }
 
-  // ------------------------------------------------------------- accounts
   listAccounts(): Observable<Account[]> {
     return this.http.get<Account[]>(`${this.base}/accounts`);
   }
-  /** Active accounts as id+name (no IBAN) for booking dropdowns — bookers may do
-   *  this without account.manage. */
+  /** Active accounts as id and name (no IBAN) for booking dropdowns. Bookers may
+   *  call this without account.manage. */
   listAccountOptions(): Observable<AccountOption[]> {
     return this.http.get<AccountOption[]>(`${this.base}/accounts/options`, {
       context: skipLoading(),
@@ -655,16 +655,16 @@ export class BudgetTreeApi {
     return this.http.delete<void>(`${this.base}/accounts/${id}`);
   }
 
-  // ------------------------------------------------------- bank reconcile
-  /** Booker's connection status for an account: FinTS-capable + own credentials
-   *  stored? Without the global loading overlay (dialog-internal loading). */
+  // Bank reconciliation.
+  /** Connection status of a booker for an account: FinTS-capable and own credentials
+   *  stored. It skips the global loading overlay because the dialog shows its own. */
   fintsCredentialStatus(accountId: Uuid): Observable<FintsCredentialStatus> {
     return this.http.get<FintsCredentialStatus>(
       `${this.base}/accounts/${accountId}/fints/credential`,
       { context: skipLoading() },
     );
   }
-  /** Create/replace personal FinTS credentials (login + PIN). */
+  /** Create or replace the personal FinTS credentials (login and PIN). */
   setFintsCredential(accountId: Uuid, body: FintsCredentialBody): Observable<FintsCredentialStatus> {
     return this.http.put<FintsCredentialStatus>(
       `${this.base}/accounts/${accountId}/fints/credential`,
@@ -679,8 +679,8 @@ export class BudgetTreeApi {
   fintsSync(accountId: Uuid): Observable<BankSyncResult> {
     return this.http.post<BankSyncResult>(`${this.base}/accounts/${accountId}/fints/sync`, {});
   }
-  /** Continue a pending TAN session — empty `tan` = decoupled poll. Polls without
-   *  the global loading overlay. */
+  /** Continue a pending TAN session. An empty `tan` is a decoupled poll. The poll
+   *  skips the global loading overlay. */
   fintsSubmitTan(accountId: Uuid, sessionToken: Uuid, tan: string): Observable<BankSyncResult> {
     return this.http.post<BankSyncResult>(
       `${this.base}/accounts/${accountId}/fints/sessions/${sessionToken}/tan`,
@@ -697,7 +697,7 @@ export class BudgetTreeApi {
       form,
     );
   }
-  /** Staged statement lines, filtered + paginated. */
+  /** Staged statement lines, filtered and paginated. */
   listStatementLines(
     opts: {
       account?: Uuid;
@@ -733,25 +733,26 @@ export class BudgetTreeApi {
   confirmStatementLine(lineId: Uuid, body: ConfirmLineBody): Observable<Expense> {
     return this.http.post<Expense>(`${this.base}/statement-lines/${lineId}/confirm`, body);
   }
-  /** Mark a statement line as irrelevant (P(``budget.reconcile_ignore``)); optional
-   * audit reason. */
+  /** Mark a statement line as irrelevant (P(``budget.reconcile_ignore``)). The audit
+   * reason is optional. */
   ignoreStatementLine(lineId: Uuid, reason?: string): Observable<void> {
     return this.http.post<void>(`${this.base}/statement-lines/${lineId}/ignore`, {
       reason: reason?.trim() || undefined,
     });
   }
-  /** Undo an ignore — the line returns to the open reconcile queue
+  /** Undo an ignore. The line returns to the open reconcile queue
    * (P(``budget.reconcile_ignore``)). */
   reactivateStatementLine(lineId: Uuid): Observable<StatementLine> {
     return this.http.post<StatementLine>(`${this.base}/statement-lines/${lineId}/reactivate`, {});
   }
-  /** Remove the statement-line<->booking link — the booking stays, the line reopens. */
+  /** Remove the statement-line<->booking link. The booking stays and the line reopens. */
   unlinkStatementLine(lineId: Uuid): Observable<StatementLine> {
     return this.http.post<StatementLine>(`${this.base}/statement-lines/${lineId}/unlink`, {});
   }
 
-  /** Filtered bookings as ``.xlsx`` (P(``budget.export``)) — content like the list.
-   *  ``ids`` (optional) exports exactly the selected bookings (#expenses-ux: bulk export). */
+  /** Filtered bookings as ``.xlsx`` (P(``budget.export``)). The content matches the
+   *  list. Optional ``ids`` exports exactly the selected bookings
+   *  (#expenses-ux: bulk export). */
   exportExpensesXlsx(
     opts: {
       budget?: string;
@@ -782,9 +783,10 @@ export class BudgetTreeApi {
     return this.http.get(`${this.base}/budget/export.xlsx`, { params, responseType: 'blob' });
   }
 
-  /** Assign an application to a cost-centre; ``budgetId=null`` removes the assignment.
-   *  ``fiscalYearId`` optional: set -> explicit fiscal year; unset -> the server
-   *  derives the single active fiscal year (else 422). */
+  /** Assign an application to a cost center. ``budgetId=null`` removes the
+   *  assignment. ``fiscalYearId`` is optional. If it is set, it names the fiscal
+   *  year. If it is unset, the server derives the single active fiscal year, else
+   *  it answers 422. */
   assignBudget(
     applicationId: Uuid,
     budgetId: Uuid | null,
@@ -797,8 +799,8 @@ export class BudgetTreeApi {
   }
 }
 
-// The shared path simplification lives in @shared/budget-path; imported locally
-// (for flattenBudgetOptions) + re-exported for existing imports.
+// The shared path simplification lives in @shared/budget-path. This file imports it,
+// uses it below, and re-exports it so that the existing imports keep working.
 import { simplifyPathKey } from '@shared/budget-path';
 export { simplifyPathKey };
 

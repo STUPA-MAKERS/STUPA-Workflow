@@ -1,4 +1,4 @@
-"""TDD: Flow-Action-Dispatch (T-14, flows §9.3 Schritt 4)."""
+"""Unit tests for the flow action dispatch (T-14, flows §9.3 step 4)."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ def test_build_skips_set_edit_lock_and_strips_type() -> None:
     app_id, transition_id, event_id = uuid4(), uuid4(), uuid4()
     actions = [
         {"type": "notify", "group": "gremium", "template": "submitted"},
-        {"type": "setEditLock", "locked": True},  # inline → nicht dispatcht
+        {"type": "setEditLock", "locked": True},  # inline action, never dispatched
         {"type": "webhook", "url": "https://example.org/hook"},
     ]
     dispatched = build_dispatched_actions(
@@ -32,7 +32,7 @@ def test_build_skips_set_edit_lock_and_strips_type() -> None:
     assert [a.type for a in dispatched] == ["notify", "webhook"]
     notify = dispatched[0]
     assert notify.params == {"group": "gremium", "template": "submitted"}
-    # idempotency_key trägt den ORIGINAL-Index (notify=0), nicht den gefilterten.
+    # The idempotency key holds the original index (notify=0), not the filtered index.
     assert notify.idempotency_key == f"{app_id}:{event_id}:0:notify"
     assert dispatched[1].idempotency_key == f"{app_id}:{event_id}:2:webhook"
 
@@ -54,9 +54,12 @@ def test_build_only_inline_action_yields_nothing() -> None:
 
 
 class _SpyLogger:
-    """Stand-in für den Modul-Logger — deterministisch, immun gegen globale
-    Logging-Config (``disable_existing_loggers``/Propagation würden caplog & direkt
-    angehängte Handler leeren)."""
+    """Stand-in for the module logger.
+
+    The spy stays deterministic and immune to the global logging config.
+    `disable_existing_loggers` or propagation would empty caplog and every handler that
+    a test attaches directly.
+    """
 
     def __init__(self) -> None:
         self.messages: list[str] = []
@@ -91,9 +94,7 @@ async def test_null_dispatcher_empty_is_noop(monkeypatch: pytest.MonkeyPatch) ->
     assert spy.messages == []
 
 
-# --------------------------------------------------------------------------- #
-# Implizite Auto-Mails je Statuswechsel (#4-3)
-# --------------------------------------------------------------------------- #
+# Implicit auto mails per status change (#4-3).
 def test_implicit_adds_applicant_notify_and_task() -> None:
     app_id, t_id, e_id = uuid4(), uuid4(), uuid4()
     implicit = build_implicit_notifications(

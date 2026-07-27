@@ -23,9 +23,9 @@ function emptyHook(): WebhookConfig {
 }
 
 /**
- * Webhook config UI (`/admin/webhooks`). Header with a create button, the list as a
- * shared {@link DataTableComponent}, create/edit via a dialog. Client validation:
- * a valid http(s) URL + at least one event.
+ * Webhook config UI at `/admin/webhooks`. The header holds a create button. The list uses the
+ * shared {@link DataTableComponent}. Create and edit run in a dialog. The client validation
+ * asks for a valid http or https URL. The event selection stays optional.
  */
 @Component({
   selector: 'app-webhooks',
@@ -69,7 +69,7 @@ export class WebhooksComponent {
     if (!d) return [] as string[];
     const errs: string[] = [];
     if (!/^https?:\/\/.+/i.test(d.url)) errs.push('admin.webhook.badUrl');
-    // Triggers are optional — they usually come from the flow graph.
+    // Triggers are optional. They usually come from the flow graph.
     return errs;
   });
 

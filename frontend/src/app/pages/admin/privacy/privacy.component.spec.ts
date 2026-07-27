@@ -67,11 +67,10 @@ describe('PrivacyComponent (#PII-Re-Add)', () => {
     const { api } = await setup();
     expect(api.listErasures).toHaveBeenCalled();
     expect(api.getPrivacySettings).toHaveBeenCalled();
-    // open + executed rows present; only the open one renders action buttons.
     expect(screen.getByText('a@x')).toBeInTheDocument();
-    // executed row has no email → em dash placeholder.
+    // The executed row has no email, so the table shows an em dash.
     expect(screen.getByText('—')).toBeInTheDocument();
-    // retention input reflects the loaded default.
+    // The retention input shows the loaded default.
     expect(screen.getByDisplayValue('24')).toBeInTheDocument();
   });
 
@@ -93,17 +92,15 @@ describe('PrivacyComponent (#PII-Re-Add)', () => {
     ]);
   });
 
-  // ----------------------------------------------------------------- execute
   it('executes an open erasure after confirmation and reloads', async () => {
     const api = makeApi();
     const { toast } = await setup(api);
     await userEvent.click(screen.getByRole('button', { name: 'Ausführen' }));
-    // confirm dialog → execute.
     const confirm = screen.getAllByRole('button', { name: 'Ausführen' });
     await userEvent.click(confirm[confirm.length - 1]);
     expect(api.executeErasure).toHaveBeenCalledWith('er-1');
     expect(toast.success).toHaveBeenCalled();
-    // reloaded the queue once on init + once after execute.
+    // The queue loads once on init and once after the execute.
     expect(api.listErasures).toHaveBeenCalledTimes(2);
   });
 
@@ -124,11 +121,10 @@ describe('PrivacyComponent (#PII-Re-Add)', () => {
     cmp.askExecute(OPEN);
     cmp.doExecute();
     expect(toast.error).toHaveBeenCalled();
-    // queue not reloaded on failure (only the init call).
+    // A failure does not reload the queue, so only the init call counts.
     expect(api.listErasures).toHaveBeenCalledTimes(1);
   });
 
-  // ------------------------------------------------------------------ reject
   it('rejects an erasure with a trimmed reason', async () => {
     const api = makeApi();
     const { fixture, toast } = await setup(api);
@@ -175,7 +171,6 @@ describe('PrivacyComponent (#PII-Re-Add)', () => {
     expect(toast.error).toHaveBeenCalled();
   });
 
-  // --------------------------------------------------------------- auskunft
   it('does nothing when exporting with an empty email', async () => {
     const api = makeApi();
     const { fixture } = await setup(api);
@@ -218,7 +213,6 @@ describe('PrivacyComponent (#PII-Re-Add)', () => {
     expect(toast.error).toHaveBeenCalled();
   });
 
-  // ----------------------------------------------------- principal erasure
   it('does nothing when asking to erase a principal with empty id', async () => {
     const api = makeApi();
     const { fixture } = await setup(api);
@@ -284,7 +278,6 @@ describe('PrivacyComponent (#PII-Re-Add)', () => {
     expect(toast.error).toHaveBeenCalled();
   });
 
-  // --------------------------------------------------------------- retention
   it('does nothing when saving a null retention', async () => {
     const api = makeApi();
     const { fixture } = await setup(api);
@@ -338,7 +331,7 @@ describe('PrivacyComponent (#PII-Re-Add)', () => {
   });
 
   it('wires the reject action button click through the queue row', async () => {
-    // Smoke-tests the rendered template + openReject → dialog open path.
+    // This covers the rendered template and the openReject path that opens the dialog.
     const { container } = await setup();
     fireEvent.click(screen.getByRole('button', { name: 'Ablehnen' }));
     expect(container.querySelector('textarea')).toBeInTheDocument();

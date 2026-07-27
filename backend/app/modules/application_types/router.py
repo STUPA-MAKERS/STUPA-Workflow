@@ -1,8 +1,8 @@
 """Application-types API router.
 
-``GET /api/application-types`` — public, paged list of types offered for
-submission. A principal with ``form.configure`` additionally gets inactive
-types and admin-only fields.
+`GET /api/application-types` returns a public, paged list of the types offered
+for submission. A principal with `form.configure` also gets the inactive types
+and the admin-only fields.
 """
 
 from __future__ import annotations
@@ -22,14 +22,14 @@ from app.shared.paging import Page
 
 router = APIRouter(tags=["application-types"])
 
-# Principals with this permission see inactive types plus admin-only fields.
+# A principal with this permission sees the inactive types and the admin-only fields.
 _ADMIN_PERMISSION = "form.configure"
 
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 
 
 def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
-    """Map error status codes to ``ProblemDetail`` responses."""
+    """Map the given error status codes to `ProblemDetail` responses."""
     return {code: _PROBLEM for code in codes}
 
 
@@ -50,7 +50,7 @@ async def list_application_types(
     query: Annotated[ApplicationTypeListQuery, Query()],
     principal: Annotated[Principal | None, Depends(get_current_principal)],
 ) -> Page[ApplicationTypeListItem]:
-    """List application types (public; admin view with ``form.configure``)."""
+    """List the application types (public, admin view with `form.configure`)."""
     is_admin = principal is not None and principal.has(_ADMIN_PERMISSION)
     return await service.list_types(
         lang=query.lang,

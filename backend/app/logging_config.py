@@ -1,6 +1,7 @@
 """Logging setup.
 
-Simple structured console logs. Never log secrets or PII.
+The application writes structured log lines to the console. Never log a secret or
+personal data.
 """
 
 from __future__ import annotations

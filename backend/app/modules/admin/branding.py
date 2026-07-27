@@ -1,17 +1,20 @@
-"""Branding/site-config schema — single source of truth for the editor frontend.
+"""Branding and site-config schema for the editor frontend.
 
-Logos, footer (link columns + copyright + legal links) and i18n freetexts are
-config-driven. The schema is served via ``/admin/config-schemas``.
+This schema is the single source of truth. Logos, footer (link columns,
+copyright and legal links) and i18n freetexts come from the config. The route
+``/admin/config-schemas`` serves the schema.
 
-Security contract (logos): the frontend sends logos inline as base64 data URLs;
-the server validates authoritatively. Data URLs are decoded and the actual byte
-size is checked against the 2 MB cap (not the client ``size`` field); the image
-type is sniffed from decoded magic bytes (PNG/JPEG/WebP/ICO whitelist) and must
-match the declared ``mime``. No inline SVG (XSS vector). http(s)/absolute asset
-URLs are allowed but not fetched, so only declared values are checked.
-Footer/legal URLs reject ``javascript:``/``data:`` schemes. Freetexts/labels
-have server-side length caps (guards the auth-free ``GET /api/site-config``
-against JSONB bloat).
+Security contract for the logos. The frontend sends a logo inline as a base64
+data URL. The server validates it authoritatively. The server decodes the data
+URL and checks the real byte size against the 2 MB cap. It does not trust the
+client ``size`` field. It sniffs the image type from the decoded magic bytes and
+accepts the PNG, JPEG, WebP and ICO whitelist only. The sniffed type must match
+the declared ``mime``. Inline SVG is an XSS vector, so the server refuses it. An
+http(s) URL or an absolute asset URL is allowed, but the server never fetches
+it. For such a URL the server checks the declared values only. Footer and legal
+URLs refuse the ``javascript:`` and ``data:`` schemes. Freetexts and labels have
+server-side length caps. The caps guard the auth-free ``GET /api/site-config``
+against JSONB bloat.
 """
 
 from __future__ import annotations
@@ -24,7 +27,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from app.shared.i18n import I18nMap
 
-# Image whitelist for logos/favicon — deliberately without image/svg+xml (SVG XSS).
+# Image whitelist for the logos and the favicon. image/svg+xml is left out on purpose,
+# because SVG carries an XSS risk.
 ALLOWED_LOGO_MIME: frozenset[str] = frozenset(
     {
         "image/png",
@@ -36,14 +40,14 @@ ALLOWED_LOGO_MIME: frozenset[str] = frozenset(
 )
 MAX_LOGO_BYTES = 2 * 1024 * 1024  # 2 MB (matches frontend LOGO_MAX_SIZE_MB)
 
-# Length caps for i18n texts (guards the auth-free public config against bloat).
+# Length caps for the i18n texts. They guard the auth-free public config against bloat.
 MAX_FREETEXT_CHARS = 10_000
 MAX_LABEL_CHARS = 500
 MAX_I18N_KEY_CHARS = 16
 
 LogoSlot = Literal["wordmark", "imagemark", "favicon"]
 
-# image/vnd.microsoft.icon is an alias of image/x-icon; normalized for comparison.
+# image/vnd.microsoft.icon is an alias of image/x-icon. Normalize it before a comparison.
 _MIME_ALIASES = {"image/vnd.microsoft.icon": "image/x-icon"}
 
 
@@ -52,7 +56,12 @@ def _norm_mime(mime: str) -> str:
 
 
 def _sniff_image(data: bytes) -> str | None:
-    """Sniff the image type from magic bytes (None = unknown/not whitelisted, e.g. SVG)."""
+    """Sniff the image type from the magic bytes.
+
+    Returns:
+        The sniffed MIME type. ``None`` means unknown or not in the whitelist,
+        for example SVG.
+    """
     if data.startswith(b"\x89PNG\r\n\x1a\n"):
         return "image/png"
     if data.startswith(b"\xff\xd8\xff"):
@@ -65,7 +74,7 @@ def _sniff_image(data: bytes) -> str | None:
 
 
 def _cap_i18n(value: I18nMap, limit: int) -> I18nMap:
-    """Enforce length caps per i18n value and language key (server-side authoritative)."""
+    """Apply the authoritative server-side length caps per i18n text and language key."""
     for key, text in value.items():
         if len(key) > MAX_I18N_KEY_CHARS:
             raise ValueError(f"i18n key too long: {key!r}")
@@ -75,7 +84,7 @@ def _cap_i18n(value: I18nMap, limit: int) -> I18nMap:
 
 
 class _CamelModel(BaseModel):
-    """camelCase aliases in JSON; fields populatable by name; no extra fields."""
+    """Base model with camelCase JSON aliases, population by name and no extra fields."""
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
@@ -107,13 +116,13 @@ class BrandingAsset(_CamelModel):
     def _check_url_and_bytes(self) -> BrandingAsset:
         raw = self.url.strip()
         low = raw.lower()
-        # Reject inline SVG in any form (markup or data:image/svg+xml).
         if "<svg" in low or "image/svg" in low:
             raise ValueError("inline SVG logos are not allowed")
         if low.startswith("data:"):
             self._validate_data_url(raw)
             return self
-        # External/absolute asset URL: not fetchable, so check declared values only.
+        # External or absolute asset URL: the server does not fetch it and therefore
+        # checks the declared values only.
         if not low.startswith(("https://", "http://", "/")):
             raise ValueError("logo url must be a data-URL, http(s) URL or absolute path")
         if self.size > MAX_LOGO_BYTES:
@@ -121,7 +130,7 @@ class BrandingAsset(_CamelModel):
         return self
 
     def _validate_data_url(self, raw: str) -> None:
-        """Decode the data URL and validate against the actual bytes (magic type + size)."""
+        """Decode the data URL and validate the real bytes against the magic type and size."""
         try:
             header, payload = raw.split(",", 1)
         except ValueError as exc:
@@ -134,14 +143,14 @@ class BrandingAsset(_CamelModel):
             raise ValueError(f"data-URL media type not allowed: {mediatype!r}")
         if _norm_mime(mediatype) != _norm_mime(self.mime):
             raise ValueError("data-URL media type does not match declared mime")
-        # Roughly cap the encoded length before decoding (bounds the work).
+        # Cap the encoded length before the decode. This bounds the decode work.
         if len(payload) > MAX_LOGO_BYTES * 2:
             raise ValueError(f"logo exceeds {MAX_LOGO_BYTES} bytes")
         try:
             decoded = base64.b64decode(payload, validate=True)
         except (binascii.Error, ValueError) as exc:
             raise ValueError("invalid base64 logo payload") from exc
-        # Actual size against the cap — the client `size` field is untrusted.
+        # Check the real size against the cap. The client `size` field is untrusted.
         if len(decoded) > MAX_LOGO_BYTES:
             raise ValueError(f"logo exceeds {MAX_LOGO_BYTES} bytes")
         sniffed = _sniff_image(decoded)
@@ -195,9 +204,9 @@ class SiteFreetexts(_CamelModel):
 class Branding(_CamelModel):
     """Full branding config (active or draft)."""
 
-    # App name (config-driven, language-neutral). Drives the PWA manifest,
-    # browser-tab title, header aria-label and the home H1. Empty falls back to
-    # the hardcoded defaults / i18n values.
+    # App name from the config, language-neutral. It drives the PWA manifest, the
+    # browser-tab title, the header aria-label and the home H1. An empty value falls
+    # back to the hardcoded defaults and the i18n values.
     app_name: str = Field(default="", alias="appName", max_length=MAX_LABEL_CHARS)
     app_short_name: str = Field(
         default="", alias="appShortName", max_length=MAX_LABEL_CHARS

@@ -1,14 +1,16 @@
-"""Central catalogue of *all* notification mail templates.
+"""Central catalogue of all notification mail templates.
 
-Every mail the platform sends is listed here by its ``key``, with the builtin
-subject/body (the *same* objects the sender uses as fallback) and placeholder
-hints. The editor (`/admin/mail-templates`) shows every mail through it: a DB
-override wins if present, else the builtin default, so editor and actual send
-never drift apart (no seed-copying into the DB).
+This module lists every mail the platform sends under its ``key``. An entry holds the
+builtin subject and body plus the placeholder hints. The subject and the body are the
+same objects that the sender uses as fallback.
 
-Imports the builtins from the respective sender modules; only ``task_reminder``
-(sent by the worker) and ``deadline_approaching`` (otherwise falling back to
-``status_update``) are defined here as single source.
+The editor (`/admin/mail-templates`) shows every mail through this catalogue. A DB
+override wins when it exists, otherwise the builtin default applies. The editor and the
+real send therefore never drift apart. Nothing copies a seed into the DB.
+
+The module imports the builtins from the sender modules. Only ``task_reminder`` (the
+worker sends it) and ``deadline_approaching`` (it otherwise falls back to
+``status_update``) live here as the single source.
 """
 
 from __future__ import annotations
@@ -18,9 +20,8 @@ from dataclasses import dataclass
 from app.modules.notifications import action_dispatcher, auto, comments, privacy
 from app.modules.notifications import service as _svc
 
-# --- Builtins defined only here (single source) ---
-# task_reminder: sent by the worker (``worker/task_reminders.py``), which imports
-# these constants from here (no app→worker import).
+# task_reminder: the worker (``worker/task_reminders.py``) sends it. The worker imports
+# these constants from here. The app never imports the worker.
 TASK_REMINDER_SUBJECT: dict[str, str] = {
     "de": "Erinnerung: offene Aufgabe"
     "{% if applicationTitle %} — „{{ applicationTitle }}“{% endif %}",
@@ -50,8 +51,8 @@ DEADLINE_APPROACHING_BODY: dict[str, str] = {
     '{% if applicationTitle %} for the application "{{ applicationTitle }}"{% endif %} '
     "is approaching{% if dueAt %} (due: {{ dueAt }}){% endif %}.\n",
 }
-# status_update_team: committee-facing default for flow `notify` actions without
-# an explicit templateKey and non-applicant recipients — the applicant default
+# status_update_team: the team-facing default for a flow `notify` action without an
+# explicit templateKey and with non-applicant recipients. The applicant default
 # (`status_update`) reads "Your application" and is wrong for the team.
 STATUS_UPDATE_TEAM_SUBJECT: dict[str, str] = {
     "de": "Statuswechsel: Antrag{% if applicationTitle %} „{{ applicationTitle }}“{% endif %}",
@@ -71,7 +72,7 @@ STATUS_UPDATE_TEAM_BODY: dict[str, str] = {
 
 @dataclass(frozen=True, slots=True)
 class MailTemplateSpec:
-    """Builtin spec for a mail (send fallback + editor default)."""
+    """Builtin spec of a mail: the send fallback and the editor default."""
 
     key: str
     kind: str
@@ -80,7 +81,7 @@ class MailTemplateSpec:
     placeholders: dict[str, str]
 
 
-# Order = display order in the editor.
+# The order of this tuple is the display order in the editor.
 TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
     MailTemplateSpec(
         "status_update",

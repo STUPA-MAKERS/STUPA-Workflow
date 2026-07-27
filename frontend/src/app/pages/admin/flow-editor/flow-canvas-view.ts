@@ -1,8 +1,10 @@
 /**
- * Derived canvas view-model of the flow editor: all read-only geometry
- * (nodes, edges, group boxes, proxies, bounds) computed from the graph plus
- * the drill-down/selection state. Pure with respect to its inputs — labels
- * come in via callbacks so i18n/catalogue lookups stay in the component.
+ * Derived canvas view model of the flow editor.
+ *
+ * It computes all read-only geometry from the graph and from the drill-down and
+ * selection state: nodes, edges, group boxes, proxies and bounds. The module stays pure
+ * with respect to its inputs. Labels arrive through callbacks, so the i18n and catalog
+ * lookups stay in the component.
  */
 import { type Signal, computed } from '@angular/core';
 import type { FlowGraph, FlowGroup, StateDef, TransitionDef } from '../admin.models';
@@ -107,7 +109,7 @@ function nodeHeight(dotCount: number): number {
   return Math.max(NODE_H, 2 * DOT_PAD + Math.max(0, dotCount - 1) * DOT_GAP);
 }
 
-/** Y of a connector dot: fixed spacing, vertically centered. */
+/** Y of a connector dot. The spacing is fixed and the column is centered vertically. */
 function dotY(i: number, n: number, h: number): number {
   if (n <= 1) return h / 2;
   return h / 2 - ((n - 1) * DOT_GAP) / 2 + i * DOT_GAP;
@@ -120,8 +122,10 @@ function edgePath(x1: number, y1: number, x2: number, y2: number): string {
 }
 
 /**
- * Y offset of the source dot of a transition: its branch dot (vote) or the
- * dot of its guard group — consistent with the combined dot list in `nodes`.
+ * Y offset of the source dot of a transition.
+ *
+ * The dot is the branch dot of a vote state or the dot of the guard group. The order
+ * matches the combined dot list that `nodes` builds.
  */
 function outDotYFor(
   fromKey: string,
@@ -177,7 +181,7 @@ export function createFlowCanvasView(deps: FlowCanvasViewDeps): FlowCanvasView {
     computeEdgeEnds(deps.graph(), deps.currentGroupId(), stateOwnerId(), parentGroupId()),
   );
 
-  /** One box per sub-group: centered on the (hidden) member bbox, height grows with out-dots. */
+  /** One box per sub-group. It centers on the hidden member bbox and grows with out-dots. */
   const groupBoxes = computed<GroupBox[]>(() => {
     const pos = positions();
     const ends = edgeEnds();
@@ -219,9 +223,9 @@ export function createFlowCanvasView(deps: FlowCanvasViewDeps): FlowCanvasView {
     const multi = deps.multiSel();
     const transitions = deps.graph().transitions ?? [];
     return visibleStates().map((s) => {
-      // vote: one labeled dot per branch (pass/fail) PLUS the guard dots for
-      // manual exits. normal: one dot per distinct guard (+ a default dot for
-      // drawing new guard-less edges).
+      // A vote state gets one labeled dot per branch (pass/fail) PLUS the guard
+      // dots of the manual exits. A normal state gets one dot per distinct guard.
+      // It also gets a default dot to draw a new edge that has no guard.
       const branches = sortedBranchDots(s.key, s.kind, transitions, pos);
       const guardGroups = outDots(s.key, transitions);
       const total = branches.length + guardGroups.length;
@@ -237,7 +241,7 @@ export function createFlowCanvasView(deps: FlowCanvasViewDeps): FlowCanvasView {
         ...guardGroups.map((gp, i) => ({
           id: gp.sig || 'out',
           branch: null as string | null,
-          // Dragging from a guard dot: the new transition inherits its guard.
+          // A drag from a guard dot gives the new transition the same guard.
           guard: gp.guard ?? null,
           cy: dotY(branches.length + i, total, h),
           label: gp.sig ? deps.guardDotLabel(gp) : '',
@@ -259,7 +263,7 @@ export function createFlowCanvasView(deps: FlowCanvasViewDeps): FlowCanvasView {
     });
   });
 
-  /** Proxy columns while drilled in: external sources left, external targets right. */
+  /** Proxy columns while drilled in. External sources go left, external targets right. */
   const proxies = computed<{ left: ProxyBox[]; right: ProxyBox[] }>(() => {
     if (deps.currentGroupId() === null) return { left: [], right: [] };
     const ends = edgeEnds();
@@ -270,7 +274,7 @@ export function createFlowCanvasView(deps: FlowCanvasViewDeps): FlowCanvasView {
       if (e.src.type === 'proxy' && !leftIds.includes(e.src.pid)) leftIds.push(e.src.pid);
       if (e.dst.type === 'proxy' && !rightIds.includes(e.dst.pid)) rightIds.push(e.dst.pid);
     }
-    // Columns left/right of the content bbox (nodes + group boxes).
+    // The columns sit left and right of the content bbox of nodes and group boxes.
     const xs: number[] = [];
     const ys: number[] = [];
     for (const n of nodes()) {
@@ -312,7 +316,7 @@ export function createFlowCanvasView(deps: FlowCanvasViewDeps): FlowCanvasView {
     const { left, right } = proxies();
     const leftBy = new Map(left.map((p) => [p.pid, p]));
     const rightBy = new Map(right.map((p) => [p.pid, p]));
-    // Out-dot index per group edge: order of appearance.
+    // Out-dot index per group edge. The order of appearance decides it.
     const groupOutSeen = new Map<string, number>();
     return transitions
       .map((t, index) => ({ t, index, e: ends[index] }))
@@ -327,7 +331,7 @@ export function createFlowCanvasView(deps: FlowCanvasViewDeps): FlowCanvasView {
         if (e.src.type === 'state') {
           const a = pos[t.from];
           x1 = a.x + NODE_W;
-          // Start at the source dot: branch (pass/fail) or the guard dot.
+          // Start at the source dot, that is, a branch dot (pass/fail) or a guard dot.
           y1 =
             a.y +
             outDotYFor(t.from, kindOf.get(t.from), t, transitions, pos, nodeH.get(t.from) ?? NODE_H);
@@ -375,9 +379,11 @@ export function createFlowCanvasView(deps: FlowCanvasViewDeps): FlowCanvasView {
   });
 
   /**
-   * Content bbox of the current level (nodes + group boxes + proxies) —
-   * proxies can sit left of x=0, hence real bounds instead of 0/0. The SVG
-   * renders 1:1 (viewBox == size) so 1 user unit == 1 px for exact dragging.
+   * Content bbox of the current level: nodes, group boxes and proxies.
+   *
+   * A proxy can sit left of x=0, so this returns the real bounds and not 0/0. The SVG
+   * renders 1:1, that is, the viewBox equals the size. One user unit is one pixel, which
+   * keeps a drag exact.
    */
   const contentBounds = computed<ViewRect>(() => {
     const xs: number[] = [];

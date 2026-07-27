@@ -1,13 +1,13 @@
 """Render jobs: the ``render_job`` table.
 
-One row per triggered PDF render. The async path needs a persistent status that
-``GET /jobs/{id}`` reads: ``pending`` → ``running`` → ``done``/``failed``. The PDF
-itself lives in MinIO (``storage_key``), never in the DB; ``error`` holds a short,
-path-free failure code (no leak).
+The table holds one row per triggered PDF render. The async path needs a persistent
+status that ``GET /jobs/{id}`` reads: ``pending`` → ``running`` → ``done``/``failed``.
+The PDF itself lives in MinIO (``storage_key``), never in the DB. ``error`` holds a
+short, path-free failure code that leaks nothing.
 
-``idempotency_key`` (UNIQUE, NULL allowed) carries flow-action idempotency
-(``exportPdf``): the same status event must not create a second job. The REST path
-(``POST /applications/{id}/pdf``) leaves the key NULL, so every call is a fresh,
+``idempotency_key`` (UNIQUE, NULL allowed) carries the idempotency of the ``exportPdf``
+flow action. The same status event must not create a second job. The REST path
+(``POST /applications/{id}/pdf``) leaves the key NULL, so every call is a fresh and
 explicit render request.
 """
 
@@ -27,11 +27,10 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, TimestampMixin, UUIDPkMixin
 
-# Allowed job statuses (pending/done/failed; running = in progress).
 JOB_STATUSES = ("pending", "running", "done", "failed")
 
-# The only job kind so far; kept as a column so ``/jobs`` can later accept further
-# render kinds (e.g. protocol) without a schema change.
+# The only job kind so far. It stays a column so ``/jobs`` can accept further render
+# kinds later, for example protocol, without a schema change.
 JOB_KIND_APPLICATION_PDF = "application_pdf"
 
 
@@ -57,11 +56,12 @@ class RenderJob(UUIDPkMixin, TimestampMixin, Base):
             "status IN ('pending','running','done','failed')", name="render_job_status"
         ),
         Index("ix_render_job_application_id", "application_id"),
-        # Flow-action idempotency: one status event ⇒ at most one job (NULL = REST path,
-        # allowed repeatedly — Postgres treats NULLs in UNIQUE as distinct).
+        # Flow-action idempotency: one status event creates at most one job. NULL marks
+        # the REST path and may repeat, because Postgres treats NULLs in a UNIQUE index
+        # as distinct.
         Index("ix_render_job_idempotency_key", "idempotency_key", unique=True),
     )
 
     def touch_finished(self, now: datetime) -> None:
-        """Set ``finished_at`` (done/failed), worker-side after completion."""
+        """Set ``finished_at`` after the worker finishes the job (done or failed)."""
         self.finished_at = now

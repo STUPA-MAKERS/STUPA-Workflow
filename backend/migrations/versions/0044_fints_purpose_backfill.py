@@ -1,13 +1,15 @@
-"""fints_purpose_backfill: Zweck + Gegenkonto gestageter Umsätze neu normalisieren (#fints).
+"""fints_purpose_backfill: normalize the purpose and the counterparty again (#fints).
 
-Vor dem Parser-Fix gestagete, **noch nicht gebuchte** Umsätze haben verklebte ?86-Subfelder
-(„…0000794247ANZAHL 00000002", „30.06.2026siehe Anlage"), einen angehängten ``DATUM …UHR``-
-Zusatz im Zweck und teils das Platzhalter-Kürzel „KRZL" als Gegenkonto. Diese Migration leitet
-``purpose``/``counterparty_*`` für **offene** (``unmatched``/``suggested``) Zeilen einmalig aus
-``raw_payload`` neu ab — über dieselbe Logik wie der Parser.
+The old parser staged transactions that **nobody booked yet**. Such a row has glued ?86
+subfields (``…0000794247ANZAHL 00000002``, ``30.06.2026siehe Anlage``). Its purpose also
+carries an appended ``DATUM …UHR`` part. Some rows hold the placeholder code ``KRZL`` as
+the counterparty. This migration derives ``purpose`` and ``counterparty_*`` once from
+``raw_payload`` for **open** (``unmatched``/``suggested``) rows. It uses the same logic as
+the parser.
 
-Idempotent + additiv: schreibt nur, wenn sich etwas ändert. Gebuchte Buchungen bleiben
-unangetastet. Down-Migration: No-Op (ursprünglicher Rohwert nicht rekonstruierbar).
+The migration is idempotent and only adds information. It writes a row only when a value
+changes. Booked expenses stay untouched. The down migration does nothing, because the
+original raw value is not reconstructable.
 """
 
 from __future__ import annotations
@@ -31,8 +33,9 @@ def upgrade() -> None:
     )
 
     conn = op.get_bind()
-    # Alle Zeilen (auch gebuchte): Gegenkonto/Zweck sind reine Anzeige der gestageten Zeile; die
-    # zugehörige Buchung trägt ihre eigenen Werte. Saubere Anzeige auch für ``matched``.
+    # Read all rows, booked ones too. The counterparty and the purpose only feed the
+    # display of the staged row. The related booking carries its own values. This keeps
+    # the display clean for ``matched`` rows as well.
     rows = conn.execute(
         sa.text(
             "SELECT id, raw_payload, amount, purpose, counterparty_name, counterparty_iban "

@@ -38,8 +38,8 @@ const wideRoutes = [
 ];
 
 async function setup() {
-  // Mock `LOCATION` via DI: a path to `location.reload()` must never hit the
-  // real (immutable) jsdom location.
+  // Mock `LOCATION` through DI. A code path that reloads must never touch the
+  // real jsdom location, which is immutable.
   const location = createLocationMock();
   const view = await render(ShellComponent, {
     providers: [
@@ -53,7 +53,7 @@ async function setup() {
   const auth = view.fixture.debugElement.injector.get(AuthService);
   const http = view.fixture.debugElement.injector.get(HttpTestingController);
   // The shell loads the active site config for the footer at start. In real mode
-  // (USE_MOCK_API=false) the request goes out — flush it neutrally here.
+  // (USE_MOCK_API=false) the request goes out, so flush it with neutral data here.
   http
     .match((r) => r.url.endsWith('/admin/site-config'))
     .forEach((req) =>
@@ -67,7 +67,7 @@ async function setup() {
   return { ...view, auth, http, location };
 }
 
-/** Authenticates the principal and triggers nav visibility. */
+/** Authenticate the principal so the nav becomes visible. */
 function login(auth: AuthService, http: HttpTestingController, principal: Principal): void {
   auth.ensureLoaded().subscribe();
   http.expectOne('/api/auth/me').flush(principal);
@@ -91,7 +91,7 @@ describe('ShellComponent', () => {
 
     expect(screen.getByRole('link', { name: /Dashboard/ })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Anträge/ })).toBeInTheDocument();
-    // member lacks admin.config → admin hidden
+    // The member lacks admin.config, so the admin link stays hidden.
     expect(screen.queryByRole('link', { name: /Verwaltung/ })).not.toBeInTheDocument();
     expect(screen.getByText('Mia Member')).toBeInTheDocument();
     http.verify();
@@ -103,7 +103,7 @@ describe('ShellComponent', () => {
     fixture.detectChanges();
 
     const spy = jest.spyOn(auth, 'logout').mockImplementation(() => undefined);
-    // Logout now lives in the account popout: click the name first.
+    // Logout lives in the account popout, so click the name button first.
     await userEvent.click(screen.getByRole('button', { name: /Mia Member/ }));
     await userEvent.click(screen.getByRole('menuitem', { name: /Abmelden|Sign out/ }));
     expect(spy).toHaveBeenCalled();
@@ -120,7 +120,8 @@ describe('ShellComponent', () => {
   });
 
   it('switches locale through the language selector and reloads the view', async () => {
-    // Language change reloads (server i18n in the new language) — stubbed in jsdom.
+    // A language change reloads the page to get the server i18n in the new language.
+    // jsdom cannot reload, so the test stubs the call.
     const reload = jest
       .spyOn(
         ShellComponent.prototype as unknown as { reloadForLocale: () => void },
@@ -152,10 +153,9 @@ describe('ShellComponent', () => {
     theme.setPreference('light');
     fixture.detectChanges();
 
-    // Language dropdown has an accessible name from the wrapping label.
+    // The wrapping label gives the language dropdown its accessible name.
     expect(screen.getByRole('combobox', { name: /Sprache|language/i })).toBeInTheDocument();
 
-    // Theme toggle mirrors the resolved theme via aria-pressed.
     const toggle = screen.getByRole('button', { name: /Erscheinungsbild|appearance/i });
     expect(toggle).toHaveAttribute('aria-pressed', 'false');
     await userEvent.click(toggle);
@@ -237,7 +237,6 @@ describe('ShellComponent', () => {
       .mockImplementation(() => {});
     const { http } = await setup();
     const select = screen.getByRole('combobox') as HTMLSelectElement;
-    // Re-selecting the already-active locale is a no-op (no reload).
     await userEvent.selectOptions(select, 'de');
     expect(reload).not.toHaveBeenCalled();
     reload.mockRestore();
@@ -253,7 +252,6 @@ describe('ShellComponent', () => {
     expect(cmp.mobileNavOpen()).toBe(false);
     cmp.toggleMobileNav();
     expect(cmp.mobileNavOpen()).toBe(true);
-    // Escape closes the drawer (and the account menu).
     cmp.onEscape();
     expect(cmp.mobileNavOpen()).toBe(false);
     http.verify();
@@ -314,7 +312,6 @@ describe('ShellComponent', () => {
     view.fixture.detectChanges();
     expect(cmp.wide()).toBe(true);
 
-    // Navigating back to a narrow route clears the wide flag.
     await router.navigateByUrl('/narrow');
     view.fixture.detectChanges();
     expect(cmp.wide()).toBe(false);
@@ -337,7 +334,6 @@ describe('ShellComponent', () => {
       .flush(null, { status: 500, statusText: 'Server Error' });
     view.fixture.detectChanges();
     const cmp = view.fixture.componentInstance as ShellComponent;
-    // Error path → no maintained links/copyright, defaults shown.
     expect(cmp.footerLinks()).toEqual([]);
     expect(cmp.footerCopyright()).toBe('');
     http.verify();
@@ -354,7 +350,7 @@ describe('ShellComponent', () => {
       ],
     });
     const http = view.fixture.debugElement.injector.get(HttpTestingController);
-    // active without legalLinks/copyright → the `?? []` / `?? null` fallbacks fire.
+    // The active config omits legalLinks and copyright, so the fallbacks fire.
     http.expectOne((r) => r.url.endsWith('/admin/site-config')).flush({
       version: 1,
       active: { logos: {}, footerColumns: [], freetexts: {} },

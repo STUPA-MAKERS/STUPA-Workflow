@@ -9,9 +9,9 @@ import type {
 import type { GuardGroup, Point } from './flow-editor.models';
 
 /**
- * Group outgoing transitions by guard, in array (= priority) order.
- * Branch transitions (pass/fail of a vote state) are excluded — they have
- * their own dots and no guard priority.
+ * Group the outgoing transitions by guard, in array order, which is the priority order.
+ * The function skips branch transitions, the pass and fail edges of a vote state. They
+ * have their own dots and no guard priority.
  */
 export function groupsOf(transitions: readonly TransitionDef[], fromKey: string): GuardGroup[] {
   const bySig = new Map<string, GuardGroup>();
@@ -37,8 +37,8 @@ export function groupsOf(transitions: readonly TransitionDef[], fromKey: string)
 }
 
 /**
- * Connector dots of a normal node: one per guard group, plus a default
- * (catch-all) dot for drawing new guard-less edges if none exists.
+ * Connector dots of a normal node: one dot per guard group. The function adds a
+ * default catch-all dot for new guard-less edges when no such group exists.
  */
 export function outDots(fromKey: string, transitions: readonly TransitionDef[]): GuardGroup[] {
   const groups = groupsOf(transitions, fromKey);
@@ -53,8 +53,8 @@ export function branchDotsFor(kind: string | null | undefined): string[] {
 }
 
 /**
- * Sort branch dots by average target y: without this, "pass" pointing down
- * and "fail" pointing up would cross right in front of the node.
+ * Sort the branch dots by the average target y coordinate. Without this sort, a "pass"
+ * edge that points down and a "fail" edge that points up cross in front of the node.
  */
 export function sortedBranchDots(
   fromKey: string,
@@ -106,12 +106,13 @@ export function defaultGuard(op: GuardLeafOperator): Guard {
 }
 
 /**
- * Value-control kind per guard operator:
- * - `none`      → boolean operators (deadlinePassed/budgetFitsApplication)
- * - `role`      → roleIs/applicantRoleIs → global-role dropdown
- * - `committee` → isInCommittee/applicantCommitteeIs → gremium dropdown
- * - `compare`   → typed comparison (field + operator + value)
- * - `text`      → budgetIs/hasField → free text
+ * Value-control kind per guard operator.
+ *
+ * `none`      → the boolean operators `deadlinePassed` and `budgetFitsApplication`.
+ * `role`      → `roleIs` and `applicantRoleIs`, shown as a global-role dropdown.
+ * `committee` → `isInCommittee` and `applicantCommitteeIs`, shown as a Gremium dropdown.
+ * `compare`   → a typed comparison of field, operator and value.
+ * `text`      → `budgetIs` and `hasField`, shown as free text.
  */
 export function guardValueKind(op: string): 'none' | 'role' | 'committee' | 'compare' | 'text' {
   if (op === 'deadlinePassed' || op === 'budgetFitsApplication' || !op) return 'none';

@@ -1,7 +1,8 @@
-"""TDD: FlowExtrasActionDispatcher (#28) — addToNextSession + assignBudget.
+"""Tests for `FlowExtrasActionDispatcher` (#28) — addToNextSession and assignBudget.
 
-Reine Branch-Abdeckung ohne DB: ein In-Memory-Session-Fake (``get``/``scalar``/
-``scalars``/``commit``) + ein Sessionmaker-Wrapper. AgendaService wird gepatcht.
+The suite covers the branches without a DB. It uses an in-memory session fake
+(`get`, `scalar`, `scalars` and `commit`) plus a sessionmaker wrapper. The tests patch
+`AgendaService`.
 """
 
 from __future__ import annotations
@@ -27,7 +28,10 @@ class _Result:
 
 
 class _Session:
-    """``AsyncSession``-Fake: ``get`` per Id-Store, ``scalar``/``scalars`` fix."""
+    """Fake for `AsyncSession`.
+
+    `get` reads from an id store. `scalar` and `scalars` return fixed values.
+    """
 
     def __init__(
         self,
@@ -59,7 +63,7 @@ class _Session:
 
 
 def _stub_audit(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
-    """Patch the audit hook to record (kein echtes ``AuditService`` nötig)."""
+    """Patch the audit hook to record the calls, without a real `AuditService`."""
     calls: list[dict[str, Any]] = []
 
     async def _fake(_session: Any, **kwargs: Any) -> Any:
@@ -94,7 +98,6 @@ def _action(
     )
 
 
-# --------------------------------------------------------------- dispatch routing #
 async def test_dispatch_ignores_other_action_types() -> None:
     session = _Session()
     await FlowExtrasActionDispatcher(_maker(session)).dispatch(
@@ -104,15 +107,15 @@ async def test_dispatch_ignores_other_action_types() -> None:
 
 
 async def test_dispatch_swallows_action_errors() -> None:
-    # session.get wirft → dispatch fängt + loggt, propagiert NICHT (flows §9.3).
+    # session.get raises. The dispatcher logs the error and does not propagate it
+    # (flows §9.3).
     session = _Session(raise_on_get=True)
     await FlowExtrasActionDispatcher(_maker(session)).dispatch(
         [_action("assignBudget", budgetId=str(uuid4()), application_id=uuid4())]
-    )  # kein Raise
+    )  # must not raise
     assert session.committed == 0
 
 
-# ----------------------------------------------------------- addToNextSession #
 async def test_add_to_next_session_without_gremium_id_skipped() -> None:
     session = _Session()
     await FlowExtrasActionDispatcher(_maker(session)).dispatch([_action("addToNextSession")])
@@ -164,7 +167,7 @@ async def test_add_to_next_session_agenda_conflict_is_logged(
     session = _Session(meeting=SimpleNamespace(id=uuid4()))
     await FlowExtrasActionDispatcher(_maker(session)).dispatch(
         [_action("addToNextSession", gremiumId=str(uuid4()))]
-    )  # NotFound/Conflict gefangen → kein Raise
+    )  # dispatch catches ConflictError and does not raise
 
 
 async def test_add_to_next_session_agenda_not_found_is_logged(
@@ -183,7 +186,6 @@ async def test_add_to_next_session_agenda_not_found_is_logged(
     )
 
 
-# --------------------------------------------------------------- assignBudget #
 async def test_assign_budget_without_budget_id_skipped() -> None:
     session = _Session()
     await FlowExtrasActionDispatcher(_maker(session)).dispatch([_action("assignBudget")])
@@ -199,7 +201,7 @@ async def test_assign_budget_invalid_budget_id_skipped() -> None:
 
 
 async def test_assign_budget_missing_app_or_node_skipped() -> None:
-    # Store leer → get liefert None → übersprungen, kein Commit.
+    # The store is empty, so get returns None. The dispatcher skips and does not commit.
     session = _Session(store={})
     await FlowExtrasActionDispatcher(_maker(session)).dispatch(
         [_action("assignBudget", budgetId=str(uuid4()), application_id=uuid4())]
@@ -213,7 +215,7 @@ async def test_assign_budget_sets_single_active_fiscal_year(
     _stub_audit(monkeypatch)
     app_id, node_id, fy_id = uuid4(), uuid4(), uuid4()
     app = SimpleNamespace(id=app_id, budget_id=None, fiscal_year_id=None)
-    node = SimpleNamespace(id=node_id, parent_id=None)  # Top-Level
+    node = SimpleNamespace(id=node_id, parent_id=None)  # top-level node
     session = _Session(store={app_id: app, node_id: node}, active_fy=(fy_id,))
     await FlowExtrasActionDispatcher(_maker(session)).dispatch(
         [_action("assignBudget", budgetId=str(node_id), application_id=app_id)]
@@ -235,13 +237,15 @@ async def test_assign_budget_ambiguous_fiscal_year_left_open(
         [_action("assignBudget", budgetId=str(node_id), application_id=app_id)]
     )
     assert app.budget_id == node_id
-    assert app.fiscal_year_id is None  # mehrdeutig → offen gelassen
+    assert app.fiscal_year_id is None  # ambiguous, so it stays open
     assert session.committed == 1
 
 
 async def test_assign_budget_writes_audit_entry(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Geld-Mutation per Flow-Action MUSS einen BUDGET_ASSIGN-Audit-Eintrag schreiben
-    (Hausregel: alle Budget-Mutationen sind im append-only Audit-Trail belegt)."""
+    """A money mutation from a flow action must write a BUDGET_ASSIGN audit entry.
+
+    House rule: the append-only audit trail records every budget mutation.
+    """
     from app.modules.audit.actions import AuditAction
 
     calls = _stub_audit(monkeypatch)
@@ -265,11 +269,11 @@ async def test_assign_budget_writes_audit_entry(monkeypatch: pytest.MonkeyPatch)
 
 
 async def test_assign_budget_node_missing_no_commit(monkeypatch: pytest.MonkeyPatch) -> None:
-    # App vorhanden, Knoten fehlt → _assign_node liefert False → kein Commit.
+    # The application exists but the node is missing. _assign_node returns False.
     _stub_audit(monkeypatch)
     app_id, node_id = uuid4(), uuid4()
     app = SimpleNamespace(id=app_id, budget_id=None, fiscal_year_id=None)
-    session = _Session(store={app_id: app})  # Knoten nicht im Store
+    session = _Session(store={app_id: app})  # node not in the store
     await FlowExtrasActionDispatcher(_maker(session)).dispatch(
         [_action("assignBudget", budgetId=str(node_id), application_id=app_id)]
     )
@@ -277,7 +281,6 @@ async def test_assign_budget_node_missing_no_commit(monkeypatch: pytest.MonkeyPa
     assert session.committed == 0
 
 
-# ----------------------------------------------------------- assignBudgetFromField #
 async def test_assign_from_field_without_field_skipped() -> None:
     session = _Session()
     await FlowExtrasActionDispatcher(_maker(session)).dispatch(
@@ -295,7 +298,8 @@ async def test_assign_from_field_app_missing_skipped() -> None:
 
 
 async def test_assign_from_field_value_absent_or_invalid_skipped() -> None:
-    # Feld fehlt in data → None; data kein dict → None; Müll-Wert → keine UUID.
+    # A missing field gives None. A data value that is not a dict gives None. A garbage
+    # value is not a UUID.
     app_id = uuid4()
     for data in ({}, "not-a-dict", {"ziel": "garbage"}):
         app = SimpleNamespace(id=app_id, budget_id=None, fiscal_year_id=None, data=data)
@@ -325,13 +329,13 @@ async def test_assign_from_field_assigns_from_data(monkeypatch: pytest.MonkeyPat
 
 
 async def test_assign_from_field_node_missing_no_commit(monkeypatch: pytest.MonkeyPatch) -> None:
-    # Feldwert ist eine gültige UUID, aber der Knoten fehlt → _assign_node False → kein Commit.
+    # The field value is a valid UUID but the node is missing. _assign_node returns False.
     _stub_audit(monkeypatch)
     app_id, node_id = uuid4(), uuid4()
     app = SimpleNamespace(
         id=app_id, budget_id=None, fiscal_year_id=None, data={"ziel": str(node_id)}
     )
-    session = _Session(store={app_id: app})  # Knoten nicht im Store
+    session = _Session(store={app_id: app})  # node not in the store
     await FlowExtrasActionDispatcher(_maker(session)).dispatch(
         [_action("assignBudgetFromField", field="ziel", application_id=app_id)]
     )
@@ -339,7 +343,6 @@ async def test_assign_from_field_node_missing_no_commit(monkeypatch: pytest.Monk
     assert session.committed == 0
 
 
-# ------------------------------------------------------------------ _top_level #
 async def test_top_level_walks_parent_chain() -> None:
     root = SimpleNamespace(id=uuid4(), parent_id=None)
     mid = SimpleNamespace(id=uuid4(), parent_id=root.id)
@@ -350,7 +353,7 @@ async def test_top_level_walks_parent_chain() -> None:
 
 
 async def test_top_level_breaks_on_missing_parent() -> None:
-    node = SimpleNamespace(id=uuid4(), parent_id=uuid4())  # Eltern fehlen
+    node = SimpleNamespace(id=uuid4(), parent_id=uuid4())  # the parent is missing
     session = _Session(store={node.id: node})
     top = await FlowExtrasActionDispatcher._top_level(session, node)  # pyright: ignore[reportArgumentType]
     assert top is node
@@ -363,7 +366,7 @@ async def test_top_level_stops_on_cycle() -> None:
     b.parent_id = a.id
     session = _Session(store={a.id: a, b.id: b})
     top = await FlowExtrasActionDispatcher._top_level(session, a)  # pyright: ignore[reportArgumentType]
-    assert top is b  # a → b → (a bereits gesehen) Stop
+    assert top is b  # a → b → a is already seen, so the walk stops
 
 
 def test_build_flow_extras_dispatcher_needs_no_pool() -> None:

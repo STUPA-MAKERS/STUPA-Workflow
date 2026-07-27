@@ -1,8 +1,8 @@
-"""Unit-Tests RenderPipeline (T-20): Markdown→pytex→MinIO + Fehlerpfade.
+"""Unit tests for the RenderPipeline (T-20): Markdown to pytex to MinIO, plus error paths.
 
-``PdfService.load_application_doc`` + ``build_application_markdown`` werden gestubbt
-(DB-frei); getestet wird die Orchestrierung: Statuswechsel, Ablage,
-transiente vs. dauerhafte Fehler.
+The tests stub `PdfService.load_application_doc` and `build_application_markdown`, so
+they need no database. They check the orchestration: status changes, storage, and the
+split between transient and permanent errors.
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ class _SvcStub:
 
 @pytest.fixture(autouse=True)
 def _stub_doc(monkeypatch: pytest.MonkeyPatch) -> None:
-    """DB-Laden + Markdown-Bau stubben (Pipeline-Orchestrierung isoliert testen)."""
+    """Stub the database load and the Markdown build to isolate the orchestration."""
     monkeypatch.setattr(render_mod, "PdfService", _SvcStub)
     monkeypatch.setattr(render_mod, "build_application_markdown", lambda _doc: "# md")
 
@@ -79,7 +79,7 @@ async def test_run_skipped_when_no_storage() -> None:
     job = _job()
     pipe, _ = _pipeline(job, storage=None)
     assert await pipe.run(job.id) == "skipped"
-    assert job.status == "pending"  # unverändert
+    assert job.status == "pending"  # unchanged
 
 
 async def test_run_gone_when_job_missing() -> None:
@@ -136,4 +136,4 @@ async def test_mark_failed_sets_status() -> None:
 
 async def test_mark_failed_missing_job_noop() -> None:
     pipe, _ = _pipeline(None, storage=FakeStorage())
-    await pipe.mark_failed(uuid.uuid4(), "x")  # kein Fehler
+    await pipe.mark_failed(uuid.uuid4(), "x")  # no error

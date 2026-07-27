@@ -1,4 +1,4 @@
-"""Flow-Action-Handler `webhook` (T-19)."""
+"""Flow action handler `webhook` (T-19)."""
 
 from __future__ import annotations
 
@@ -68,7 +68,7 @@ async def test_webhook_action_without_webhook_id_skipped() -> None:
 
 
 async def test_webhook_action_invalid_webhook_id_skipped() -> None:
-    # webhookId ist keine gültige UUID → ValueError → still übersprungen.
+    # An invalid webhookId raises ValueError. The dispatcher skips the action in silence.
     session = FakeSession()
     queue = FakeWebhookQueue()
     await _disp(session, queue).dispatch([_action("webhook", webhookId="not-a-uuid")])
@@ -77,7 +77,7 @@ async def test_webhook_action_invalid_webhook_id_skipped() -> None:
 
 
 async def test_webhook_action_missing_hook_skipped() -> None:
-    # webhookId zeigt auf keinen vorhandenen Webhook → still übersprungen.
+    # A webhookId that points to no webhook skips the action in silence.
     session = FakeSession(scalars=[[]])
     queue = FakeWebhookQueue()
     await _disp(session, queue).dispatch(
@@ -89,7 +89,7 @@ async def test_webhook_action_missing_hook_skipped() -> None:
 
 async def test_webhook_action_delivers_to_referenced_hook() -> None:
     hook = _hook()
-    session = FakeSession(scalars=[[]])  # _existing_keys → keine Dedup
+    session = FakeSession(scalars=[[]])  # _existing_keys is empty, so no dedup
     session.store[hook.id] = hook
     queue = FakeWebhookQueue()
     action = _action("webhook", webhookId=str(hook.id))

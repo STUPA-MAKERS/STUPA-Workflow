@@ -12,11 +12,11 @@ describe('FLOW_PRESETS', () => {
 
   it('every preset has exactly one initial state and reachable structure', () => {
     for (const preset of FLOW_PRESETS) {
-      // exactly one initial state
       expect(preset.graph.states.filter((s) => s.isInitial)).toHaveLength(1);
       const errors = validateFlowGraph(preset.graph).errors;
-      // The only acceptable "error" is the vote preset's empty committee seed —
-      // the admin fills it in. No structural problems (dangling/unreachable/dup).
+      // The only acceptable "error" is the empty Gremium seed of the vote preset.
+      // The admin fills it in later. No structural problem may remain: dangling,
+      // unreachable or duplicate.
       expect(
         errors.filter((e) => !e.includes('needs a committee')),
       ).toEqual([]);
@@ -30,9 +30,7 @@ describe('FLOW_PRESETS', () => {
 
   it('the vote preset becomes valid once a committee is chosen', () => {
     const vote = FLOW_PRESETS.find((p) => p.key === 'vote')!;
-    // empty seed → invalid (needs a committee)
     expect(validateFlowGraph(vote.graph).valid).toBe(false);
-    // fill the committee → fully valid
     const filled = {
       ...vote.graph,
       states: vote.graph.states.map((s) =>

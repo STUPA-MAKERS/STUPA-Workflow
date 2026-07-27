@@ -1,12 +1,15 @@
-"""DB-lose Vollabdeckung für :mod:`app.modules.applications.service`.
+"""Full coverage of `app.modules.applications.service` without a database.
 
-Treibt jeden Service-Pfad über einen Ergebnis-Queue-Fake (FIFO je ``execute`` /
-``scalars`` / ``scalar``; eigene Queue für ``get``), inkl. Fehlerpfade (404/409/422),
-Guard-Branches (Edit-Lock, Bypass), PII-Anonymisierung, Filter-/Sortier-Kombinationen
-in :meth:`list_applications` und :meth:`list_tasks` (vote- vs. manuelle-Übergang-Pfade).
+A result-queue fake drives every service path. It holds one FIFO queue per `execute`,
+`scalars` and `scalar` call, plus a separate queue for `get`. The tests cover the error
+paths (404/409/422) and the guard branches (edit lock, bypass). They also cover the PII
+anonymization and the filter and sort combinations of `list_applications` and
+`list_tasks`. For `list_tasks` they cover both the vote path and the manual transition
+path.
 
-Externe Service-Abhängigkeiten (FormsService, FlowService) und die Volltext-Helfer
-(``dialect_of``/``trigram_rank``) werden gemonkeypatcht — kein Postgres/Redis/Netz.
+The tests monkeypatch the external service dependencies (FormsService, FlowService) and
+the full-text helpers (`dialect_of`, `trigram_rank`). No Postgres, Redis or network
+access is needed.
 """
 
 from __future__ import annotations
@@ -36,18 +39,16 @@ from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 NOW = datetime(2026, 6, 16, 12, 0, tzinfo=UTC)
 
 
-# --------------------------------------------------------------------------- #
-# generische Fakes
-# --------------------------------------------------------------------------- #
+# generic fakes
 class _Obj:
-    """Attribut-Container (leichter als SimpleNamespace für Tippzwecke)."""
+    """Attribute container that is lighter than `SimpleNamespace` for the type checker."""
 
     def __init__(self, **kw: Any) -> None:
         self.__dict__.update(kw)
 
-    # Dynamischer ORM-Zeilen-Stub: jeder Attributzugriff/-zuweisung ist erlaubt.
-    # Hält den Strict-Typecheck ruhig, ohne `Any`-Casts an jeder Zugriffsstelle.
-    def __getattr__(self, name: str) -> Any:  # nur bei fehlendem Attribut
+    # Dynamic ORM row stub. Every attribute read and write is allowed.
+    # This keeps the strict type check quiet without an `Any` cast at each access.
+    def __getattr__(self, name: str) -> Any:  # only for a missing attribute
         raise AttributeError(name)
 
     def __setattr__(self, name: str, value: Any) -> None:
@@ -55,7 +56,7 @@ class _Obj:
 
 
 class _Result:
-    """``Result``/``ScalarResult``-Ersatz."""
+    """Stand-in for `Result` and `ScalarResult`."""
 
     def __init__(self, items: list[Any]) -> None:
         self._items = items
@@ -71,12 +72,13 @@ class _Result:
 
 
 class _Session:
-    """``AsyncSession``-Stub mit getrennten FIFO-Queues je Zugriffsart.
+    """Stub for `AsyncSession` with one FIFO queue per access type.
 
-    * ``get_results`` — Queue für ``session.get(Model, pk)`` (Default ``None``).
-    * ``execute_results`` — Queue für ``session.execute`` (liefert ``_Result``).
-    * ``scalars_results`` — Queue für ``session.scalars`` (liefert ``_Result``).
-    * ``scalar_results`` — Queue für ``session.scalar`` (Default ``None``).
+    Attributes:
+        get_results: Queue for `session.get(Model, pk)`. An empty queue gives `None`.
+        execute_results: Queue for `session.execute`. Each entry becomes a `_Result`.
+        scalars_results: Queue for `session.scalars`. Each entry becomes a `_Result`.
+        scalar_results: Queue for `session.scalar`. An empty queue gives `None`.
     """
 
     def __init__(
@@ -122,8 +124,8 @@ class _Session:
         self.added.append(obj)
         if getattr(obj, "id", None) is None:
             obj.id = uuid4()
-        # ``at`` ist DB-server_default → bei einem frischen ORM-Objekt None; der
-        # Service serialisiert es direkt nach commit() (ohne refresh) → hier setzen.
+        # `at` has a DB server_default, so a fresh ORM object holds None. The service
+        # serializes it right after commit() without a refresh, so set it here.
         if hasattr(obj, "at") and getattr(obj, "at", None) is None:
             obj.at = NOW
 
@@ -192,9 +194,7 @@ def _state(**over: Any) -> _Obj:
     return _Obj(**base)
 
 
-# --------------------------------------------------------------------------- #
-# Modul-Helfer
-# --------------------------------------------------------------------------- #
+# tests for the module-level helpers
 def test_field_from_row_maps_all_columns() -> None:
     row = _Obj(
         key="cost",
@@ -217,7 +217,7 @@ def test_field_from_row_maps_all_columns() -> None:
 
 
 def test_field_from_row_validation_falsy_becomes_none() -> None:
-    """``validation`` mit Falsy-Wert (``{}``) → ``None`` (or-Kurzschluss)."""
+    """A falsy `validation` value such as `{}` becomes `None` through the or shortcut."""
     row = _Obj(
         key="x", type="text", label_i18n={"de": "x"}, help_i18n=None,
         required=False, validation={}, visible_if=None, compute=None,
@@ -243,7 +243,7 @@ def test_amount_currency_decimal_passthrough() -> None:
 
 
 def test_state_out_color_override_empty_string_kept() -> None:
-    """color_override='' (nicht None) wird übernommen, nicht der Fallback."""
+    """An empty color_override applies instead of the fallback because it is not None."""
     state = _state(color="#stored")
     out = _state_out(state, "")  # type: ignore[arg-type]
     assert out is not None
@@ -262,9 +262,6 @@ def test_whitelist_keeps_known_drops_unknown() -> None:
     }
 
 
-# --------------------------------------------------------------------------- #
-# _get_app / get
-# --------------------------------------------------------------------------- #
 async def test_get_app_missing_404() -> None:
     svc = ApplicationsService(_Session(get_results=[None]))  # type: ignore[arg-type]
     with pytest.raises(NotFoundError):
@@ -277,7 +274,7 @@ async def test_get_with_pii_owner_and_applicant() -> None:
     applicant = _Obj(email="a@b.de", name="Alice", anonymized_at=None)
     session = _Session(
         get_results=[app, state],
-        # _to_out: zuerst applicant-Query, dann _resolve_state_colors (gecached).
+        # _to_out: first the applicant query, then _resolve_state_colors (cached).
         execute_results=[[applicant], [("draft", "#zzz")]],
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
@@ -312,7 +309,7 @@ async def test_get_include_pii_but_no_applicant_row() -> None:
     app = _app(current_state_id=state.id)
     session = _Session(
         get_results=[app, state],
-        execute_results=[[], [("draft", "#zzz")]],  # leeres applicant-Result, dann Farben
+        execute_results=[[], [("draft", "#zzz")]],  # empty applicant result, then colors
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     out = await svc.get(app.id, include_pii=True)
@@ -327,15 +324,12 @@ async def test_get_state_none_when_no_current_state() -> None:
     assert out.state is None
 
 
-# --------------------------------------------------------------------------- #
-# _resolve_state_colors (Cache) / _state_out_resolved
-# --------------------------------------------------------------------------- #
 async def test_resolve_state_colors_caches_result() -> None:
     session = _Session(execute_results=[[("approved", "#0f0"), ("draft", None)]])
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     first = await svc._resolve_state_colors()
-    assert first == {"approved": "#0f0"}  # None gefiltert
-    # zweiter Aufruf → Cache, KEIN weiteres execute
+    assert first == {"approved": "#0f0"}  # None values dropped
+    # The second call hits the cache, so no further execute runs.
     second = await svc._resolve_state_colors()
     assert second is first
     assert len(session.statements) == 1
@@ -346,9 +340,6 @@ async def test_state_out_resolved_none() -> None:
     assert await svc._state_out_resolved(None) is None
 
 
-# --------------------------------------------------------------------------- #
-# create
-# --------------------------------------------------------------------------- #
 def _payload(**over: Any) -> SimpleNamespace:
     base: dict[str, Any] = {
         "type_id": uuid4(),
@@ -368,7 +359,7 @@ def _effective(fields: list[FormFieldDef], fv_id: UUID) -> Any:
 
 
 class _FakeForms:
-    """FormsService-Ersatz, der eine vordefinierte effektive Form liefert."""
+    """Stand-in for FormsService that returns a predefined effective form."""
 
     effective: Any = None
 
@@ -426,7 +417,7 @@ async def test_create_unknown_type_404() -> None:
 
 async def test_create_no_active_flow_404(_patch_forms: type[_FakeForms]) -> None:
     app_type = _Obj(id=uuid4(), has_budget=False, gremium_id=uuid4())
-    session = _Session(get_results=[app_type], execute_results=[[]])  # kein aktiver Flow
+    session = _Session(get_results=[app_type], execute_results=[[]])  # no active flow
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     with pytest.raises(NotFoundError, match="no active global flow"):
         await svc.create(_payload())  # type: ignore[arg-type]
@@ -435,7 +426,7 @@ async def test_create_no_active_flow_404(_patch_forms: type[_FakeForms]) -> None
 async def test_create_validation_error_422(_patch_forms: type[_FakeForms]) -> None:
     app_type = _Obj(id=uuid4(), has_budget=False, gremium_id=uuid4())
     fv_id = uuid4()
-    # Pflichtfeld 'title' fehlt im Payload-data → AnswerValidationError → 422.
+    # The required field 'title' is missing from the payload data, so 422 follows.
     _FakeForms.effective = _effective(
         [_ff("title", required=True)], fv_id
     )
@@ -456,7 +447,7 @@ async def test_create_no_initial_state_404(
     _FakeForms.effective = _effective([_ff("title", required=True)], fv_id)
     session = _Session(
         get_results=[app_type],
-        execute_results=[[fv_id], []],  # flow ok, aber kein initial state
+        execute_results=[[fv_id], []],  # flow found, but no initial state
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     with pytest.raises(NotFoundError, match="initial state"):
@@ -488,13 +479,12 @@ async def test_create_anonymous_ok(
     assert app.amount == Decimal("12.50")
     assert app.currency == "EUR"
     assert "junk" not in app.data  # whitelist
-    assert app.created_by is None  # anonym
-    assert app.email_confirmed_at is None  # Gast unbestätigt
+    assert app.created_by is None  # anonymous
+    assert app.email_confirmed_at is None  # a guest stays unconfirmed
     assert session.committed == 1
-    # Applicant + SubmissionVersion + StatusEvent + Application
     kinds = {type(o).__name__ for o in session.added}
     assert {"Application", "Applicant", "SubmissionVersion", "StatusEvent"} <= kinds
-    assert _FakeFlow.scheduled  # Frist materialisiert
+    assert _FakeFlow.scheduled  # the deadline is materialized
 
 
 async def test_create_logged_in_actor_confirms_immediately(
@@ -516,9 +506,6 @@ async def test_create_logged_in_actor_confirms_immediately(
     assert app.email_confirmed_at is not None
 
 
-# --------------------------------------------------------------------------- #
-# effective_form
-# --------------------------------------------------------------------------- #
 async def test_effective_form_delegates_with_pinned_version(
     _patch_forms: type[_FakeForms],
 ) -> None:
@@ -530,9 +517,6 @@ async def test_effective_form_delegates_with_pinned_version(
     assert out is _FakeForms.effective
 
 
-# --------------------------------------------------------------------------- #
-# patch
-# --------------------------------------------------------------------------- #
 def _patch_pinned(monkeypatch: pytest.MonkeyPatch, fields: list[FormFieldDef]) -> None:
     async def _fake_pinned(self: Any, app: Any) -> list[FormFieldDef]:
         return list(fields)
@@ -585,18 +569,18 @@ async def test_patch_validation_error_422(monkeypatch: pytest.MonkeyPatch) -> No
     session = _Session(get_results=[app, state, app_type])
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     with pytest.raises(ValidationProblem):
-        await svc.patch(app.id, {"other": "v"}, changed_by="u")  # title fehlt
+        await svc.patch(app.id, {"other": "v"}, changed_by="u")  # title is missing
     assert session.committed == 0
 
 
 async def test_patch_adds_system_title_field_when_absent(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """``_pinned_fields`` ohne 'title' → System-Titelfeld wird vorangestellt."""
+    """Without a 'title' entry in `_pinned_fields` the system title field goes first."""
     app = _app(data={"title": "old", "note": "a"})
     state = _state(edit_allowed=True)
     app_type = _Obj(id=app.type_id, has_budget=False)
-    _patch_pinned(monkeypatch, [_ff("note")])  # KEIN title
+    _patch_pinned(monkeypatch, [_ff("note")])  # no title field
     session = _Session(
         get_results=[app, state, app_type, state],
         execute_results=[[("draft", "#z")]],
@@ -604,11 +588,11 @@ async def test_patch_adds_system_title_field_when_absent(
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     out = await svc.patch(app.id, {"title": "new", "note": "b"}, changed_by="u")
-    assert out.data == {"title": "new", "note": "b"}  # title NICHT verworfen
+    assert out.data == {"title": "new", "note": "b"}  # title is NOT dropped
 
 
 async def test_patch_empty_diff_stores_none(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Keine Datenänderung → ``diff=None`` in der neuen Version."""
+    """A patch without a data change stores `diff=None` in the new version."""
     app = _app(data={"title": "same"})
     state = _state(edit_allowed=True)
     app_type = _Obj(id=app.type_id, has_budget=False)
@@ -627,12 +611,12 @@ async def test_patch_empty_diff_stores_none(monkeypatch: pytest.MonkeyPatch) -> 
 async def test_patch_app_type_missing_uses_false_context(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """``app_type`` None → has_budget-Kontext fällt auf False zurück."""
+    """A missing `app_type` makes the has_budget context fall back to False."""
     app = _app(data={"title": "x"})
     state = _state(edit_allowed=True)
     _patch_pinned(monkeypatch, [_ff("title", required=True)])
     session = _Session(
-        get_results=[app, state, None, state],  # 3. get = app_type → None
+        get_results=[app, state, None, state],  # the third get is app_type and gives None
         execute_results=[[("draft", "#z")]],
         scalar_results=[0, None],
     )
@@ -658,21 +642,19 @@ async def test_patch_concurrent_integrity_error_409(
     assert session.rolled_back == 1
 
 
-# --------------------------------------------------------------------------- #
-# delete
-# --------------------------------------------------------------------------- #
 async def test_delete_removes_and_commits() -> None:
     app = _app()
-    # delete() schreibt vor dem Löschen einen APPLICATION_DELETE-Audit-Eintrag (#AUD-002):
-    # zuerst scalar() für version_count, dann audit_record → 2x execute (advisory-lock +
-    # prev-hash-Select via scalar_one_or_none) + add(entry) + flush(). Der Fake liefert
-    # für beide execute() ein leeres _Result (prev_hash None = Genesis), das genügt.
+    # Before the row goes away, delete() writes an APPLICATION_DELETE audit entry
+    # (#AUD-002). It calls scalar() for the version count and then audit_record. That
+    # runs two execute() calls, one advisory lock and one prev-hash select through
+    # scalar_one_or_none, then add(entry) and flush(). Both execute() calls get an empty
+    # _Result from the fake, so prev_hash stays None (genesis). That is enough here.
     session = _Session(get_results=[app], scalar_results=[0])
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     await svc.delete(app.id, actor="admin")
     assert app in session.deleted
     assert session.committed == 1
-    # Audit-Eintrag wurde angehängt + geflusht (vor dem Delete, gleiche Transaktion).
+    # The audit entry is added and flushed before the delete, in the same transaction.
     assert any(type(o).__name__ == "AuditEntry" for o in session.added)
     assert session.flushed == 1
 
@@ -682,15 +664,12 @@ async def test_delete_missing_404() -> None:
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     with pytest.raises(NotFoundError):
         await svc.delete(uuid4(), actor="admin")
-    # Fehlender Antrag → kein Audit-Eintrag, kein Delete, kein Commit (404 vor allem).
+    # A missing application gives 404 first: no audit entry, no delete and no commit.
     assert session.added == []
     assert session.deleted == []
     assert session.committed == 0
 
 
-# --------------------------------------------------------------------------- #
-# timeline
-# --------------------------------------------------------------------------- #
 async def test_timeline_resolves_actor_names_and_states() -> None:
     app = _app()
     to_state = _state(key="approved")
@@ -704,15 +683,15 @@ async def test_timeline_resolves_actor_names_and_states() -> None:
         get_results=[app, to_state, to_state],
         execute_results=[
             [("sub-1", "Alice", None)],  # _author_names
-            [("approved", "#0f0")],  # _resolve_state_colors (gecached danach)
+            [("approved", "#0f0")],  # _resolve_state_colors (cached after this call)
         ],
         scalars_results=[[ev1, ev2]],  # timeline events
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     out = await svc.timeline(app.id)
     assert len(out) == 2
-    assert out[0].actor == "Alice"  # aufgelöst
-    assert out[1].actor is None  # kein Akteur
+    assert out[0].actor == "Alice"  # resolved
+    assert out[1].actor is None  # no actor
 
 
 async def test_timeline_missing_404() -> None:
@@ -721,16 +700,13 @@ async def test_timeline_missing_404() -> None:
         await svc.timeline(uuid4())
 
 
-# --------------------------------------------------------------------------- #
-# versions
-# --------------------------------------------------------------------------- #
 async def test_versions_resolves_names() -> None:
     app = _app()
     v1 = _Obj(version=1, data={"title": "a"}, diff=None, changed_by="sub-1", at=NOW)
     v2 = _Obj(version=2, data={"title": "b"}, diff=None, changed_by=None, at=NOW)
     session = _Session(
         get_results=[app],
-        execute_results=[[("sub-1", None, "alice@x.de")]],  # _author_names: dn None → email
+        execute_results=[[("sub-1", None, "alice@x.de")]],  # _author_names falls back to email
         scalars_results=[[v1, v2]],
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
@@ -745,9 +721,7 @@ async def test_versions_missing_404() -> None:
         await svc.versions(uuid4())
 
 
-# --------------------------------------------------------------------------- #
-# _pinned_fields / _pii_keys_for_type (echte Implementierung)
-# --------------------------------------------------------------------------- #
+# These tests run the real _pinned_fields and _pii_keys_for_type, without a monkeypatch.
 async def test_pinned_fields_with_budget_pot() -> None:
     app = _app(budget_pot_id=uuid4())
     row = _Obj(
@@ -783,9 +757,6 @@ async def test_pii_keys_for_type() -> None:
     assert keys == {"email", "name"}
 
 
-# --------------------------------------------------------------------------- #
-# list_applications
-# --------------------------------------------------------------------------- #
 @pytest.fixture
 def _patch_search(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(listing_mod, "dialect_of", lambda _s: "postgresql")
@@ -859,7 +830,7 @@ async def test_list_applications_unknown_budget_yields_empty() -> None:
 
 
 async def test_list_applications_blank_q_skips_search() -> None:
-    """q='   ' (nur Whitespace) → kein Trigram-Pfad."""
+    """A q value of only whitespace skips the trigram path."""
     session = _Session(scalar_results=[0], scalars_results=[[]])
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     page = await svc.list_applications(q="   ", limit=10, offset=0)
@@ -889,9 +860,6 @@ async def test_list_applications_total_none_becomes_zero() -> None:
     assert page.total == 0
 
 
-# --------------------------------------------------------------------------- #
-# name_maps
-# --------------------------------------------------------------------------- #
 async def test_name_maps_locale_fallbacks() -> None:
     tid1, tid2, tid3 = uuid4(), uuid4(), uuid4()
     gid = uuid4()
@@ -899,8 +867,8 @@ async def test_name_maps_locale_fallbacks() -> None:
         execute_results=[
             [
                 (tid1, {"de": "DE", "en": "EN"}),  # locale en wanted
-                (tid2, {"de": "NurDE"}),  # fällt auf de zurück
-                (tid3, None),  # None → "" (über {} fallbacks)
+                (tid2, {"de": "NurDE"}),  # falls back to de
+                (tid3, None),  # None becomes "" through the {} fallback
             ],
             [(gid, "Gremium A")],
         ]
@@ -921,9 +889,6 @@ async def test_name_maps_en_missing_falls_to_de() -> None:
     assert types[tid] == "X"
 
 
-# --------------------------------------------------------------------------- #
-# _in_gremium
-# --------------------------------------------------------------------------- #
 async def test_in_gremium_true() -> None:
     session = _Session(scalar_results=[uuid4()])
     svc = ApplicationsService(session)  # type: ignore[arg-type]
@@ -936,9 +901,6 @@ async def test_in_gremium_false() -> None:
     assert await svc._in_gremium("sub", uuid4()) is False
 
 
-# --------------------------------------------------------------------------- #
-# list_tasks
-# --------------------------------------------------------------------------- #
 def _principal(**over: Any) -> SimpleNamespace:
     base: dict[str, Any] = {
         "sub": "me",
@@ -953,7 +915,7 @@ def _principal(**over: Any) -> SimpleNamespace:
 
 
 async def test_list_tasks_no_apps_returns_empty(_patch_flow: type[_FakeFlow]) -> None:
-    session = _Session(scalars_results=[[]])  # keine Anträge
+    session = _Session(scalars_results=[[]])  # no applications
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     out = await svc.list_tasks(_principal(roles=["admin"]))
     assert out == []
@@ -996,13 +958,14 @@ async def test_list_tasks_vote_state_member_not_in_gremium_no_transition(
     app = _app(current_state_id=uuid4(), created_by="someone")
     vote_state = _state(kind="vote", config={"gremiumId": str(gid)})
     vote_state.id = app.current_state_id
-    _FakeFlow.available = []  # keine manuellen Übergänge
+    _FakeFlow.available = []  # no manual transitions
     session = _Session(
         execute_results=[[("draft", "#z")]],
         scalars_results=[[app], [vote_state]],
-        scalar_results=[None],  # nicht im Gremium
+        scalar_results=[None],  # not in the Gremium
     )
-    # principal darf transition → geht in den manuellen Pfad, available leer → kein Task
+    # The principal may transition, so the manual path runs. available is empty, so
+    # no task appears.
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     out = await svc.list_tasks(_principal(_perms={"application.transition"}))
     assert out == []
@@ -1011,7 +974,7 @@ async def test_list_tasks_vote_state_member_not_in_gremium_no_transition(
 async def test_list_tasks_vote_state_invalid_gremium_config(
     _patch_flow: type[_FakeFlow],
 ) -> None:
-    """config ohne/leeres gremiumId → ok bleibt False (Vote-Pfad), kein _in_gremium."""
+    """A missing or empty gremiumId keeps ok False on the vote path and skips _in_gremium."""
     app = _app(current_state_id=uuid4(), created_by="other")
     vote_state = _state(kind="vote", config={"gremiumId": ""})
     vote_state.id = app.current_state_id
@@ -1021,7 +984,7 @@ async def test_list_tasks_vote_state_invalid_gremium_config(
         scalars_results=[[app], [vote_state]],
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
-    out = await svc.list_tasks(_principal(_perms=set()))  # kein transition, nicht owner
+    out = await svc.list_tasks(_principal(_perms=set()))  # no transition right, not owner
     assert out == []
 
 
@@ -1045,7 +1008,7 @@ async def test_list_tasks_manual_transition_requires_action(
 
 
 async def test_list_tasks_owner_only_no_perm(_patch_flow: type[_FakeFlow]) -> None:
-    """Kein transition-Recht, aber Ersteller:in → manueller Pfad greift."""
+    """The creator without the transition permission still enters the manual path."""
     app = _app(current_state_id=uuid4(), created_by="me")
     normal = _state(kind="normal")
     normal.id = app.current_state_id
@@ -1062,9 +1025,9 @@ async def test_list_tasks_owner_only_no_perm(_patch_flow: type[_FakeFlow]) -> No
 async def test_list_tasks_state_missing_in_map_skipped(
     _patch_flow: type[_FakeFlow],
 ) -> None:
-    """Antrag verweist auf State, der nicht im by_id-Map ist → übersprungen."""
+    """An application that points to a state outside the by_id map is skipped."""
     app = _app(current_state_id=uuid4())
-    other_state = _state()  # andere id
+    other_state = _state()  # a different id
     session = _Session(scalars_results=[[app], [other_state]])
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     out = await svc.list_tasks(_principal(roles=["admin"]))
@@ -1074,10 +1037,11 @@ async def test_list_tasks_state_missing_in_map_skipped(
 async def test_list_tasks_current_state_none_skipped(
     _patch_flow: type[_FakeFlow],
 ) -> None:
-    """current_state_id None (Defensive im Loop) → übersprungen.
+    """A None current_state_id hits the defensive guard in the loop and is skipped.
 
-    Die Query filtert ``is_not(None)``, der Fake liefert dennoch einen Antrag mit
-    ``current_state_id=None`` → der Loop-Guard greift."""
+    The query filters with `is_not(None)`. The fake still returns an application with
+    `current_state_id=None`, so the loop guard runs.
+    """
     app = _app(current_state_id=None)
     session = _Session(scalars_results=[[app], []])
     svc = ApplicationsService(session)  # type: ignore[arg-type]
@@ -1085,14 +1049,11 @@ async def test_list_tasks_current_state_none_skipped(
     assert out == []
 
 
-# --------------------------------------------------------------------------- #
-# _author_names
-# --------------------------------------------------------------------------- #
 async def test_author_names_empty_set_short_circuits() -> None:
     session = _Session()
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     assert await svc._author_names(set()) == {}
-    assert session.statements == []  # kein Query
+    assert session.statements == []  # no query runs
 
 
 async def test_author_names_resolves_display_then_email_then_sub() -> None:
@@ -1110,9 +1071,6 @@ async def test_author_names_resolves_display_then_email_then_sub() -> None:
     assert names == {"s1": "Display", "s2": "e2@x.de", "s3": "s3"}
 
 
-# --------------------------------------------------------------------------- #
-# add_comment / list_comments
-# --------------------------------------------------------------------------- #
 async def test_add_comment_with_author() -> None:
     app = _app()
     session = _Session(
@@ -1190,9 +1148,6 @@ async def test_list_comments_missing_404() -> None:
         await svc.list_comments(uuid4(), include_internal=False)
 
 
-# --------------------------------------------------------------------------- #
-# anonymize
-# --------------------------------------------------------------------------- #
 async def test_anonymize_full_with_files_service_commit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1228,7 +1183,7 @@ async def test_anonymize_full_with_files_service_commit(
     assert applicant.email is None
     assert applicant.name is None
     assert applicant.anonymized_at is not None
-    assert "email" not in app.data  # PII-Schlüssel entfernt
+    assert "email" not in app.data  # the PII key is removed
     assert "email" not in v1.data
     assert "email" not in v1.diff["added"]
     assert files_calls == [(app.id, "admin")]
@@ -1246,34 +1201,36 @@ def _patch_pinned_keys(monkeypatch: pytest.MonkeyPatch, fields: list[FormFieldDe
 async def test_anonymize_no_applicant_no_pii_keys_no_files_no_commit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Kein Applicant, keine PII-Keys, files=None, commit=False:
+    """Cover the path with no applicant, no PII keys, `files=None` and `commit=False`.
 
-    deckt: applicant None, ``if pii_keys`` False, files-else (DB-Delete), flush-Zweig."""
+    The test covers the `applicant is None` branch and the false `if pii_keys` branch.
+    It also covers the files else branch with the database delete and the flush branch.
+    """
     app = _app(data={"title": "T"})
-    _patch_pinned_keys(monkeypatch, [_ff("title")])  # kein isPII
+    _patch_pinned_keys(monkeypatch, [_ff("title")])  # no isPII field
     session = _Session(
         get_results=[app],
-        execute_results=[[]],  # applicant select → leer
-        scalars_results=[[]],  # _pii_keys_for_type → leer
+        execute_results=[[]],  # the applicant select gives nothing
+        scalars_results=[[]],  # _pii_keys_for_type gives nothing
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     await svc.anonymize(app.id, files=None, commit=False)
     assert session.committed == 0
     assert session.flushed == 1
-    # data unverändert (keine PII-Keys)
+    # data stays unchanged because there is no PII key
     assert app.data == {"title": "T"}
 
 
 async def test_anonymize_version_without_diff(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """PII-Keys vorhanden, aber eine Version hat ``diff=None`` → diff-Scrub übersprungen."""
+    """With PII keys present, a version with `diff=None` skips the diff scrub."""
     app = _app(data={"title": "T", "email": "x@y.de"})
     v1 = _Obj(version=1, data={"email": "x@y.de"}, diff=None)
     _patch_pinned_keys(monkeypatch, [_ff("email", isPII=True)])
     session = _Session(
         get_results=[app],
-        execute_results=[[]],  # kein applicant
+        execute_results=[[]],  # no applicant
         scalars_results=[[], [v1]],  # pii_keys_for_type empty, but pinned has email
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
@@ -1289,9 +1246,6 @@ async def test_anonymize_missing_app_404() -> None:
         await svc.anonymize(uuid4())
 
 
-# --------------------------------------------------------------------------- #
-# _current_version (max None → 0)
-# --------------------------------------------------------------------------- #
 async def test_current_version_default_zero() -> None:
     session = _Session(scalar_results=[None])
     svc = ApplicationsService(session)  # type: ignore[arg-type]

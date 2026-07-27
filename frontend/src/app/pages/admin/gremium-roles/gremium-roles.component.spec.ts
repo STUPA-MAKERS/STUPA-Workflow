@@ -52,11 +52,11 @@ describe('GremiumRolesComponent (#42)', () => {
   it('permLabel + label resolve as expected', async () => {
     const { c } = await setup();
     expect(c.permLabel('vote.cast')).toBe('admin.gremiumPerm.vote.cast');
-    // label(): locale → de → key fallbacks, and null guard
+    // the label falls back locale → de → key, and a null role gives an empty string
     expect(c.label(ROLES[0])).toBe('Vorsitz');
     expect(c.label({ name: {}, key: 'beisitz' })).toBe('beisitz');
     expect(c.label(null)).toBe('');
-    expect(c.label({ name: { en: 'OnlyEn' }, key: 'k' })).toBe('k'); // de locale, no de/en→key? de missing→key
+    expect(c.label({ name: { en: 'OnlyEn' }, key: 'k' })).toBe('k'); // de locale, no de entry → key
   });
 
   it('label uses en when locale is en', async () => {
@@ -67,7 +67,7 @@ describe('GremiumRolesComponent (#42)', () => {
 
   it('togglePerm adds/removes preserving catalog order; no-op without draft', async () => {
     const { c } = await setup();
-    // no draft yet → returns d unchanged (null)
+    // no draft yet, so the update returns the draft unchanged
     c.togglePerm('vote.manage', true);
     expect(c.draft()).toBeNull();
 
@@ -186,7 +186,7 @@ describe('GremiumRolesComponent (#42)', () => {
     c.patch('key', 'x');
     c.save();
     expect(toast.error).toHaveBeenCalled();
-    expect(c.draft()).not.toBeNull(); // close() not called on error
+    expect(c.draft()).not.toBeNull();
   });
 
   it('askDelete sets the confirm target', async () => {

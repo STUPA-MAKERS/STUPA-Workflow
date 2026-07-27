@@ -1,8 +1,8 @@
-"""Confirm / ignore / unlink staged statement lines.
+"""Confirm, ignore and unlink staged statement lines.
 
-Confirming a line in the review dialog creates a ``budget_expense`` (via
-:meth:`BudgetTreeService.book_expense`, incl. its validation + audit) and a
-``bank_allocation`` (line <-> booking).
+A confirm in the review dialog creates a ``budget_expense`` through
+``BudgetTreeService.book_expense``, with its validation and audit. It also
+creates a ``bank_allocation`` that links the line and the booking.
 """
 
 from __future__ import annotations
@@ -35,9 +35,10 @@ class ReconcileOps(BankServiceBase):
     """Confirm (book), ignore and unlink staged statement lines."""
 
     async def confirm_line(self, line_id: uuid.UUID, payload: ConfirmLineRequest) -> ExpenseOut:
-        """Confirm a line: create a new booking or attach to an existing one.
+        """Confirm a line: create a new booking or attach it to an existing one.
 
-        Both paths create a ``bank_allocation`` and set the line to ``matched``."""
+        Both paths create a ``bank_allocation`` and set the line to ``matched``.
+        """
         line = await self.session.get(BankStatementLine, line_id)
         if line is None:
             raise NotFoundError(f"statement line {line_id} not found")
@@ -54,11 +55,11 @@ class ReconcileOps(BankServiceBase):
                 "A zero-amount transaction cannot be booked.", code="line_zero_amount"
             )
 
-        # Clean the counterparty: re-derive primarily from the SEPA raw fields
-        # (``raw_payload``: ABWE+/ABWA+/IBAN+) so lines staged BEFORE the parser fix
-        # also get a clean recipient/IBAN at booking. If that yields nothing (e.g.
-        # CAMT/file import without GVC fields), use the stored values (possibly
-        # detaching the IBAN from the name).
+        # Clean the counterparty. Derive it first from the SEPA raw fields
+        # (``raw_payload``: ABWE+, ABWA+, IBAN+), so a line staged BEFORE the parser
+        # fix also gets a clean recipient and IBAN at booking time. When that yields
+        # nothing, for example on a CAMT or file import without GVC fields, use the
+        # stored values and detach the IBAN from the name.
         clean_name, clean_iban = normalize.mt940_counterparty(
             line.raw_payload or {}, credit=line.amount > 0
         )
@@ -67,15 +68,16 @@ class ReconcileOps(BankServiceBase):
                 line.counterparty_name, line.counterparty_iban
             )
 
-        # Validate the target BEFORE the claim so the claim only happens when the
-        # booking will go through (minimizes the orphan window: matched without booking).
+        # Validate the target BEFORE the claim, so the claim happens only when the
+        # booking goes through. This keeps the orphan window small: a matched line
+        # without a booking.
         expense: BudgetExpense | None = None
         if payload.match_expense_id is not None:
-            # ``with_for_update`` locks the booking row until commit: without it,
-            # two parallel confirms of different lines against the SAME booking
-            # could both pass the ``already`` check and each create an allocation
-            # (one payment reconciled twice) — the conditional claim UPDATE only
-            # protects per statement line, not the shared booking.
+            # ``with_for_update`` locks the booking row until the commit. Without
+            # the lock, two parallel confirms of different lines against the SAME
+            # booking could both pass the ``already`` check and each create an
+            # allocation. That reconciles one payment twice. The conditional claim
+            # UPDATE protects one statement line only, not the shared booking.
             expense = await self.session.get(
                 BudgetExpense, payload.match_expense_id, with_for_update=True
             )
@@ -107,12 +109,12 @@ class ReconcileOps(BankServiceBase):
                     code="expense_already_allocated",
                 )
 
-        # ONE transaction for claim + booking + allocation + audit: the conditional
-        # claim UPDATE (match_state != 'matched') keeps the row locked until the
-        # commit at the bottom, so concurrent confirms block and then see 'matched'
-        # (no double booking). book_expense runs with ``commit=False`` so a failure
-        # anywhere rolls back EVERYTHING — claim AND booking (no orphaned booking,
-        # no double debit on retry).
+        # ONE transaction covers claim, booking, allocation and audit. The
+        # conditional claim UPDATE (match_state != 'matched') keeps the row locked
+        # until the commit at the bottom. A concurrent confirm therefore blocks and
+        # then sees 'matched', so no double booking happens. ``book_expense`` runs
+        # with ``commit=False``, so a failure anywhere rolls back EVERYTHING: the
+        # claim AND the booking. No orphaned booking and no double debit on a retry.
         try:
             claimed = (
                 await self.session.execute(
@@ -151,10 +153,10 @@ class ReconcileOps(BankServiceBase):
                         paymentMethod="ueberweisung",
                     ),
                     actor=self.actor or "",
-                    # Carry the line's account onto the booking — no manual field
-                    # anymore, hence passed through explicitly here.
+                    # Carry the account of the line onto the booking. There is no
+                    # manual field anymore, so the code passes it explicitly.
                     account_id=line.account_id,
-                    commit=False,  # shared transaction — the commit below is the only one
+                    commit=False,  # shared transaction: the commit below is the only one
                 )
                 expense_out = created
                 expense_id = created.id
@@ -176,28 +178,34 @@ class ReconcileOps(BankServiceBase):
             )
             await self.session.commit()
         except Exception:
-            # Everything in one transaction: a rollback takes claim + booking back
-            # together; the line stays open and can be confirmed again cleanly.
+            # Everything runs in one transaction. A rollback takes the claim and
+            # the booking back together. The line stays open, and a later confirm
+            # works cleanly.
             await self.session.rollback()
             raise
         return expense_out
 
     @staticmethod
     def _default_description(name: str | None, purpose: str | None) -> str:
-        """Short description ``<purpose> – <name>`` (same format as the curated
-        existing bookings); the full formatted description lives in the note.
-        ``name`` is already cleaned (IBAN detached)."""
+        """Build the short description ``<purpose> – <name>``.
+
+        The format matches the curated existing bookings. The full formatted
+        description lives in the note. The caller passes ``name`` already cleaned,
+        with the IBAN detached.
+        """
         return normalize.build_short_description(name, purpose)
 
     @staticmethod
     def _booking_note(
         line: BankStatementLine, kind: str, *, name: str | None, iban: str | None
     ) -> str | None:
-        """Structured note (recipient/sender · IBAN · purpose · booking) for the line.
-        ``name``/``iban`` are already cleaned (IBAN detached from the name).
+        """Build the structured note for the line.
 
-        The Sparkasse booking time (``DATUM … UHR``) was moved to
-        ``raw_payload['booking_time']`` at parse time; CAMT/other banks only have the date."""
+        The note holds recipient or sender, IBAN, purpose and booking. The caller
+        passes ``name`` and ``iban`` already cleaned, with the IBAN detached from
+        the name. The parser moved the Sparkasse booking time (``DATUM … UHR``) to
+        ``raw_payload['booking_time']``. CAMT and other banks carry the date only.
+        """
         booking_time = (line.raw_payload or {}).get("booking_time")
         return normalize.build_booking_note(
             name=name,
@@ -211,7 +219,7 @@ class ReconcileOps(BankServiceBase):
     async def _remember_counterparty(
         self, counterparty_iban: str | None, budget_id: uuid.UUID
     ) -> None:
-        """Remember/update counterparty IBAN -> cost centre (suggestion next time)."""
+        """Store the counterparty IBAN -> cost center link for the next suggestion."""
         if not counterparty_iban:
             return
         stmt = (
@@ -225,16 +233,18 @@ class ReconcileOps(BankServiceBase):
         await self.session.execute(stmt)
 
     async def ignore_line(self, line_id: uuid.UUID, reason: str | None = None) -> None:
-        """Mark a line as irrelevant — it is kept (idempotent import).
+        """Mark a line as irrelevant.
 
-        ``reason`` (optional free text) is recorded in the audit entry only; this
-        is an audit-sensitive act gated by ``budget.reconcile_ignore``."""
+        The line stays in place, so the import remains idempotent. ``reason`` is
+        optional free text and goes into the audit entry only. This act is
+        audit-sensitive, and the permission ``budget.reconcile_ignore`` gates it.
+        """
         line = await self.session.get(BankStatementLine, line_id)
         if line is None:
             raise NotFoundError(f"statement line {line_id} not found")
-        # Conditional claim as in confirm_line: a concurrently just-booked
-        # ('matched') line must NOT be flipped back to 'ignored' via an ORM dirty
-        # flush — that would decouple the reconcile state from the ledger.
+        # Conditional claim as in confirm_line. An ORM dirty flush must NOT flip a
+        # line that a concurrent confirm just booked ('matched') back to 'ignored'.
+        # That would decouple the reconcile state from the ledger.
         claimed = (
             await self.session.execute(
                 update(BankStatementLine)
@@ -259,13 +269,16 @@ class ReconcileOps(BankServiceBase):
         await self.session.commit()
 
     async def reactivate_line(self, line_id: uuid.UUID) -> StatementLineOut:
-        """Revert an ignored line back to ``unmatched`` so it re-enters the open
-        reconciliation queue. Audited (bank_line_reactivate)."""
+        """Revert an ignored line back to ``unmatched``.
+
+        The line then re-enters the open reconciliation queue. The audit records
+        this act as ``bank_line_reactivate``.
+        """
         line = await self.session.get(BankStatementLine, line_id)
         if line is None:
             raise NotFoundError(f"statement line {line_id} not found")
-        # Only an ignored line can be reactivated — never touch a matched
-        # (booked) or already-open line, so the reconcile state stays coherent.
+        # Only an ignored line can be reactivated. Never touch a matched (booked)
+        # or already-open line, so the reconcile state stays coherent.
         claimed = (
             await self.session.execute(
                 update(BankStatementLine)
@@ -288,9 +301,12 @@ class ReconcileOps(BankServiceBase):
         return self._line_out(line, None)
 
     async def unlink_line(self, line_id: uuid.UUID) -> StatementLineOut:
-        """Unlink line <-> booking: remove the ``bank_allocation`` and set the line
-        back to ``unmatched``. The booking REMAINS (it is the money record; only
-        the bank link is removed)."""
+        """Unlink a line from its booking.
+
+        The method removes the ``bank_allocation`` and sets the line back to
+        ``unmatched``. The booking REMAINS, because it is the money record. Only
+        the bank link goes away.
+        """
         line = await self.session.get(BankStatementLine, line_id)
         if line is None:
             raise NotFoundError(f"statement line {line_id} not found")
@@ -300,5 +316,6 @@ class ReconcileOps(BankServiceBase):
         line.match_state = "unmatched"
         await self._audit(AuditAction.BANK_LINE_UNLINK, target_id=str(line_id))
         await self.session.commit()
-        # The frontend reloads the list after unlink (incl. suggestion) — no path key needed.
+        # The frontend reloads the list after an unlink, together with the
+        # suggestion. No path key is needed here.
         return self._line_out(line, None)

@@ -25,9 +25,11 @@ interface Row {
 }
 
 /**
- * OIDC-Gruppen → Rolle(+ optional Gremium) Mappings (#5-4). Eigene Admin-Seite
- * (`/admin/group-mappings`, P `admin.roles`): beim Login werden OIDC-Gruppen des
- * Nutzers auf Plattform-Rollen abgebildet. Tabelle + Anlegen/Bearbeiten-Dialog.
+ * Mappings from an OIDC group to a role and an optional Gremium (#5-4).
+ *
+ * The page lives at `/admin/group-mappings` and needs the `admin.roles`
+ * permission. At login the platform maps the OIDC groups of the user to platform
+ * roles.
  */
 @Component({
   selector: 'app-group-mappings',
@@ -59,7 +61,7 @@ export class GroupMappingsComponent {
   readonly editId = signal<string | null>(null);
   readonly oidcGroup = signal('');
   readonly roleId = signal('');
-  /** '' = global (kein Gremium). */
+  /** An empty value means global, so no Gremium. */
   readonly gremiumId = signal('');
   readonly confirmId = signal<string | null>(null);
 

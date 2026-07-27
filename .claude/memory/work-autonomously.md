@@ -1,13 +1,21 @@
 ---
 name: work-autonomously
-description: User wants full-auto execution; only pause to ask via the question tool
+description: User wants full-auto execution. Pause only to ask through the question tool
 metadata:
   node_type: memory
   type: feedback
 ---
 
-Work in **full auto**: keep executing backlog items end-to-end (implement → build → test → commit → push) without pausing for confirmation or status check-ins. Only stop when genuinely blocked on a decision — and then use the AskUserQuestion tool, not a prose question that waits.
+Work in **full auto**. Run backlog items end to end: implement, build, test, commit, push.
+Do not pause for a confirmation or for a status check-in. Stop only when a decision truly
+blocks you. Then use the AskUserQuestion tool, not a prose question that waits.
 
-**Why:** User explicitly changed the process ("Pausiere nur, wenn du fragen hast und dann verwende das fragen-tool. Ansonsten Full Auto"). Status summaries that wait for "continue" waste their time.
+**Why:** The user changed the process explicitly. Translated from German: "Pause only when
+you have questions, and then use the question tool. Otherwise full auto." A status summary
+that waits for "continue" wastes the time of the user.
 
-**How to apply:** Don't end turns with "Next: X or Y?" pick-a-direction prompts. Pick the next item and do it. Batch related fixes, commit per logical unit, push. Still honor [[track-side-requests]] (todo + memory for every casual request). Surface a brief recap only after a substantial chunk lands, then immediately continue. See [[ui-patterns-and-backlog2]], [[antragsplattform-backlog]].
+**How to apply:** Do not end a turn with a "Next: X or Y?" pick-a-direction prompt. Pick the
+next item and do it. Batch related fixes, commit per logical unit, and push. Still honor
+[[track-side-requests]]: a to-do plus a memory entry for every casual request. Give a short
+recap only after a large chunk lands, then continue at once. See
+[[ui-patterns-and-backlog2]], [[antragsplattform-backlog]].

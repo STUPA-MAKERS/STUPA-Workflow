@@ -1,8 +1,8 @@
-"""Unit (no DB): ConfigService paths that run before any session access + helpers.
+"""Unit tests without a DB: ConfigService paths that run before any session access.
 
-``create_global_flow_version`` validates the graph BEFORE touching the DB — an
-invalid flow ends as 422 (``ValidationProblem``), not 500. The session is never
-touched, so no DB is needed.
+``create_global_flow_version`` validates the graph BEFORE it touches the DB. An invalid
+flow ends as 422 (``ValidationProblem``), not as 500. The service never touches the
+session, so these tests need no DB. The module also covers the date helpers.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from app.shared.errors import ValidationProblem
 
 
 def _svc() -> ConfigService:
-    return ConfigService(None)  # type: ignore[arg-type]  — Session wird vor Validierung nie genutzt
+    return ConfigService(None)  # type: ignore[arg-type]  — the session is unused before validation
 
 
 def test_create_flow_version_no_initial_is_422_before_db() -> None:
@@ -61,11 +61,11 @@ def test_create_flow_version_unknown_guard_operator_is_422() -> None:
 
 def test_parse_dt_normalizes_to_aware_utc_and_none() -> None:
     assert _parse_dt(None) is None
-    # tz-aware Eingabe → aware UTC (Spalte ist timestamptz seit Migration 0015)
+    # A tz-aware input becomes aware UTC. The column is timestamptz since migration 0015.
     assert _parse_dt("2026-06-07T12:00:00+02:00") == datetime(2026, 6, 7, 10, 0, tzinfo=UTC)
-    # naive Eingabe wird als UTC interpretiert (aware)
+    # The parser reads a naive input as UTC and returns an aware value.
     assert _parse_dt("2026-06-07T10:00:00") == datetime(2026, 6, 7, 10, 0, tzinfo=UTC)
-    # _iso emittiert den UTC-Offset
+    # _iso emits the UTC offset.
     assert _iso(_parse_dt("2026-06-07T10:00:00")) == "2026-06-07T10:00:00+00:00"
 
 

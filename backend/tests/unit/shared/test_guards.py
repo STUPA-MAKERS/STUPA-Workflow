@@ -1,4 +1,4 @@
-"""TDD: pure Guard-/Action-Evaluator (flows §9.2, #28-Redesign). Branch-Coverage 100 %."""
+"""Pure guard and action evaluator (flows §9.2, #28 redesign). Branch coverage 100 %."""
 
 from decimal import Decimal
 
@@ -20,7 +20,6 @@ def test_empty_guard_is_true() -> None:
     assert eval_guard({}, GuardContext()) is True
 
 
-# --- Akteur-Gates (manuell) -------------------------------------------------
 def test_role_is() -> None:
     ctx = GuardContext(roles=frozenset({"reviewer"}))
     assert eval_guard({"roleIs": "reviewer"}, ctx) is True
@@ -38,19 +37,18 @@ def test_actor_is_applicant() -> None:
     other = GuardContext(actor_is_applicant=False)
     assert eval_guard({"actorIsApplicant": True}, applicant) is True
     assert eval_guard({"actorIsApplicant": True}, other) is False
-    # Negiertes Gate: ``false`` ⇒ Akteur darf NICHT der/die Antragsteller:in sein.
+    # Negated gate: false means the actor must NOT be the applicant.
     assert eval_guard({"actorIsApplicant": False}, other) is True
     assert eval_guard({"actorIsApplicant": False}, applicant) is False
 
 
 def test_actor_is_applicant_is_actor_gate() -> None:
-    # Nur auf manuellen Übergängen erlaubt (wie roleIs/isInCommittee).
+    # Allowed on manual transitions only, like roleIs and isInCommittee.
     validate_guard({"actorIsApplicant": True}, allow_actor_ops=True)
     with pytest.raises(GuardError):
         validate_guard({"actorIsApplicant": True}, allow_actor_ops=False)
 
 
-# --- Antragsteller ----------------------------------------------------------
 def test_applicant_role_and_committee() -> None:
     ctx = GuardContext(
         applicant_roles=frozenset({"student"}),
@@ -62,21 +60,19 @@ def test_applicant_role_and_committee() -> None:
     assert eval_guard({"applicantCommitteeIs": "g-0"}, ctx) is False
 
 
-# --- Antragstyp -------------------------------------------------------------
 def test_application_type_is() -> None:
     ctx = GuardContext(application_type_key="qsm")
     assert eval_guard({"applicationTypeIs": "qsm"}, ctx) is True
     assert eval_guard({"applicationTypeIs": "vsm"}, ctx) is False
-    # Nicht auflösbarer Typ (z. B. Datendrift) ⇒ fail-closed False.
+    # A type that does not resolve, after data drift for example, fails closed to False.
     assert eval_guard({"applicationTypeIs": "qsm"}, GuardContext()) is False
 
 
 def test_application_type_is_condition_op_allowed_on_automatic() -> None:
-    # Bedingung (kein Akteur-Gate) → auch auf automatischen Übergängen erlaubt (Triage).
+    # A condition is no actor gate, so an automatic transition may use it (triage).
     validate_guard({"applicationTypeIs": "qsm"}, allow_actor_ops=False)
 
 
-# --- Budget -----------------------------------------------------------------
 def test_budget_is_and_fits() -> None:
     ctx = GuardContext(budget_id="b-1", budget_fits=True)
     assert eval_guard({"budgetIs": "b-1"}, ctx) is True
@@ -96,13 +92,12 @@ def test_attachment_present() -> None:
     without = GuardContext(has_attachment=False)
     assert eval_guard({"attachmentPresent": True}, with_att) is True
     assert eval_guard({"attachmentPresent": True}, without) is False
-    # Negiert: ``false`` ⇒ es darf KEIN Anhang vorliegen.
+    # Negated: false means NO attachment may exist.
     assert eval_guard({"attachmentPresent": False}, without) is True
-    # Bedingung (kein Akteur-Gate) → auf automatischen Übergängen erlaubt.
+    # A condition is no actor gate, so an automatic transition may use it.
     validate_guard({"attachmentPresent": True}, allow_actor_ops=False)
 
 
-# --- Felder -----------------------------------------------------------------
 def test_has_field() -> None:
     ctx = GuardContext(field_values={"iban": "DE123", "blank": "", "list": []})
     assert eval_guard({"hasField": "iban"}, ctx) is True
@@ -144,13 +139,12 @@ def test_compare_missing_field_is_false() -> None:
 
 
 def test_compare_wrong_op_for_type_fails_closed() -> None:
-    # Laufzeit-Typ stammt aus der gepinnten Form-Version (Drift möglich) →
-    # unpassender Operator ist fail-closed False, keine Exception (sonst 500).
+    # The runtime type comes from the pinned form version, so drift is possible. A
+    # wrong operator fails closed to False and raises nothing, because a raise gives 500.
     ctx = GuardContext(field_values={"amount": 5}, field_types={"amount": "currency"})
     assert eval_guard({"compare": {"field": "amount", "op": "in", "value": [1]}}, ctx) is False
 
 
-# --- Kombinatoren -----------------------------------------------------------
 def test_and_or_not_combinators() -> None:
     ctx = GuardContext(roles=frozenset({"reviewer"}), deadline_passed=True)
     assert eval_guard({"and": [{"deadlinePassed": True}, {"roleIs": "reviewer"}]}, ctx) is True
@@ -177,7 +171,6 @@ def test_not_arity_and_bad_child() -> None:
         eval_guard({"and": ["notadict"]}, GuardContext())
 
 
-# --- Validierung (Speicher-Gate) --------------------------------------------
 def test_validate_guard_ok() -> None:
     validate_guard(None)
     validate_guard({})
@@ -186,7 +179,7 @@ def test_validate_guard_ok() -> None:
 
 
 def test_validate_guard_rejects_actor_op_on_automatic() -> None:
-    # roleIs/isInCommittee nur auf manuellen Übergängen erlaubt.
+    # roleIs and isInCommittee are allowed on manual transitions only.
     validate_guard({"roleIs": "x"}, allow_actor_ops=True)
     with pytest.raises(GuardError, match="only allowed on manual"):
         validate_guard({"roleIs": "x"}, allow_actor_ops=False)
@@ -208,8 +201,8 @@ def test_validate_guard_rejects_unknown_and_bad_structure() -> None:
 
 
 def test_validate_guard_rejects_bad_leaf_value_types() -> None:
-    # Falscher Wert-Typ würde zur Laufzeit crashen (Liste unhashable in frozenset)
-    # bzw. still falsch auswerten → Speicher-Gate.
+    # A wrong value type crashes at runtime, because a list is unhashable in a
+    # frozenset. It can also evaluate wrong in silence. The save gate stops it early.
     with pytest.raises(GuardError, match="non-empty string"):
         validate_guard({"roleIs": ["admin"]})
     with pytest.raises(GuardError, match="non-empty string"):
@@ -224,7 +217,6 @@ def test_validate_guard_rejects_bad_leaf_value_types() -> None:
         validate_guard({"actorIsApplicant": 1})
 
 
-# --- Actions ----------------------------------------------------------------
 def test_validate_action_ok() -> None:
     validate_action({"type": "webhook", "webhookId": "w-1"})
     validate_action(

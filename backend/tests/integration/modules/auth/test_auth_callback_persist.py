@@ -1,13 +1,14 @@
-"""Integration: OIDC-Callback persistiert Principal + auth_session (Commit-Regression).
+"""Integration: the OIDC callback commits the principal and the auth_session row.
 
-Reproduziert den T-10-Bug: ohne `await db.commit()` im Callback-Handler werden der
-frisch angelegte Principal + die `auth_session`-Zeile beim Schließen der
-Request-Session zurückgerollt → ein Folge-`GET /auth/me` mit gesetztem Session-Cookie
-liefert 401 statt 200.
+The test reproduces the T-10 bug. Without `await db.commit()` in the callback handler,
+the DB rolls back the fresh principal and the `auth_session` row when the request
+session closes. A later `GET /auth/me` with the session cookie then returns 401 instead
+of 200.
 
-Echtes Postgres (`gen_random_uuid`, jsonb-Gruppen), RS256-signiertes id_token (respx,
-wie T-10) und der reale ASGI-Request-Zyklus über `get_session` (das selbst **nie**
-committet) — nur so deckt der Test die fehlende Persistenz im Router auf.
+The test needs real Postgres (`gen_random_uuid`, jsonb groups) and an RS256-signed
+id_token (respx, as in T-10). It also needs the real ASGI request cycle through
+`get_session`, which **never** commits by itself. Only this setup shows the missing
+persistence in the router.
 """
 
 from __future__ import annotations
@@ -68,7 +69,10 @@ def _id_token(nonce: str) -> str:
 async def test_callback_persists_principal_then_me_returns_200(
     migrated: tuple[str, str],
 ) -> None:
-    """Callback legt Principal+Session an; `/auth/me` mit dem Cookie → 200 (nicht 401)."""
+    """The callback creates the principal and the session.
+
+    A `/auth/me` call with the cookie then returns 200, not 401.
+    """
     _, async_url = migrated
     settings = load_settings(
         database_url=async_url,
@@ -78,7 +82,7 @@ async def test_callback_persists_principal_then_me_returns_200(
         oidc_client_id=CLIENT_ID,
         oidc_client_secret="client-secret-01234",
         oidc_redirect_url="https://antrag.example/api/auth/callback",
-        cookie_secure=False,  # http://testserver → Secure-Cookie würde sonst nicht zurückgesendet
+        cookie_secure=False,  # http://testserver would not send a Secure cookie back
     )
     oidc._jwks_cache.clear()
 
@@ -86,7 +90,7 @@ async def test_callback_persists_principal_then_me_returns_200(
     sessionmaker = async_sessionmaker(engine, expire_on_commit=False, autoflush=False)
 
     async def _request_session() -> AsyncIterator[object]:
-        """Wie `app.db.get_session`: yield + close, **kein** Auto-Commit."""
+        """Behave like `app.db.get_session`: yield and close, with **no** auto commit."""
         db = sessionmaker()
         try:
             yield db
@@ -109,7 +113,7 @@ async def test_callback_persists_principal_then_me_returns_200(
                 )
             )
             mock.get(CERTS).mock(return_value=httpx.Response(200, json={"keys": [_jwk()]}))
-            mock.route(host="testserver").pass_through()  # ASGI-Requests durchreichen
+            mock.route(host="testserver").pass_through()  # pass ASGI requests through
             async with httpx.AsyncClient(
                 transport=transport,
                 base_url="http://testserver",
@@ -125,7 +129,7 @@ async def test_callback_persists_principal_then_me_returns_200(
     finally:
         await engine.dispose()
 
-    assert me.status_code == 200, me.text  # ohne Commit im Callback: 401
+    assert me.status_code == 200, me.text  # without the commit in the callback: 401
     body = me.json()
     assert body["sub"] == "user-cb-1"
     assert body["email"] == "cb@x.de"

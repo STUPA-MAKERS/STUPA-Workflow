@@ -1,13 +1,15 @@
 """Auto mails for platform events: meetings, roles, delegations.
 
-Background-task entry points (own session, after the API response), all
-best effort: a mail failure must never break the triggering request —
-exceptions are logged and dropped. Sending goes through
-:meth:`NotificationService.send_kind_mail` (preference filter, layout,
-DB template with builtin fallback).
+Every entry point runs as a background task with its own session after the API
+response. All of them are best effort. A mail failure must never break the
+request that triggered it. The code logs the exception and drops it.
 
-Status-update and task mails per status change run NOT here but as implicit
-flow actions (``build_implicit_notifications`` → notify dispatcher).
+Sending goes through `NotificationService.send_kind_mail`. That call applies
+the preference filter, the layout and the DB template with a builtin fallback.
+
+Status-update and task mails for a status change do NOT run here. They run as
+implicit flow actions: `build_implicit_notifications` feeds the notify
+dispatcher.
 """
 
 from __future__ import annotations
@@ -65,8 +67,8 @@ _BUILTIN_ROLE_REVOKED_BODY = {
     "revoked from you.\n",
 }
 
-# Session-bound proxies: the substitute receives the mail; context names the
-# meeting, committee and delegating member.
+# Session-bound delegations: the substitute gets the mail. The context names
+# the meeting, the Gremium and the delegating member.
 _BUILTIN_DELEGATION_GRANTED_SUBJECT = {
     "de": "Vertretung erhalten: {{ meetingTitle }}",
     "en": "Proxy received: {{ meetingTitle }}",
@@ -99,7 +101,7 @@ _BUILTIN_DELEGATION_REVOKED_BODY = {
 
 @dataclass(frozen=True, slots=True)
 class AssignmentMailInfo:
-    """Assignment data collected before sending (or before deletion)."""
+    """Role assignment data collected before the send or before the deletion."""
 
     assignment_id: uuid.UUID
     email: str | None
@@ -111,10 +113,15 @@ class AssignmentMailInfo:
 async def assignment_mail_info(
     session: object, assignment_id: uuid.UUID
 ) -> AssignmentMailInfo | None:
-    """Collect mail-relevant data of a role assignment (None = unknown).
+    """Collect the mail data of a role assignment.
 
-    Best effort: if the query fails, only the mail is skipped — never the
-    triggering request."""
+    The call is best effort. If the query fails, the caller skips only the mail
+    and never the request that triggered it.
+
+    Returns:
+        The collected data, or None when the assignment is unknown or the query
+        failed.
+    """
     from app.modules.admin.models import Gremium
     from app.modules.auth.models import Principal, Role, RoleAssignment
 
@@ -154,8 +161,10 @@ async def assignment_mail_info(
 
 @dataclass(frozen=True, slots=True)
 class DelegationMailInfo:
-    """Proxy data (session-bound ``meeting_delegation`` row) collected before
-    sending (or before revocation)."""
+    """Delegation data collected before the send or before the revocation.
+
+    The source is the session-bound `meeting_delegation` row.
+    """
 
     delegation_id: uuid.UUID
     email: str | None
@@ -169,7 +178,7 @@ class DelegationMailInfo:
 async def meeting_delegation_mail_info(
     session: object, delegation_id: uuid.UUID
 ) -> DelegationMailInfo | None:
-    """Collect mail-relevant data of a meeting proxy (best effort)."""
+    """Collect the mail data of a meeting delegation (best effort)."""
     from app.modules.admin.models import Gremium
     from app.modules.auth.models import Principal
     from app.modules.delegations.models import MeetingDelegation
@@ -219,7 +228,7 @@ async def meeting_delegation_mail_info(
 
 
 class AutoMailer:
-    """Background entry points for auto mails — best effort, own session."""
+    """Background entry points for auto mails: best effort, own session."""
 
     async def meeting_created(
         self, settings: Settings, meeting_id: uuid.UUID, pool: object
@@ -255,7 +264,6 @@ class AutoMailer:
         except Exception:  # noqa: BLE001
             logger.exception("delegation mail failed")
 
-    # ------------------------------------------------------------ internals #
     async def _meeting_created(
         self, settings: Settings, meeting_id: uuid.UUID, pool: object
     ) -> None:
@@ -376,5 +384,5 @@ class AutoMailer:
 
 
 def get_auto_mailer() -> AutoMailer:
-    """Injectable auto mailer (overridable in tests)."""
+    """Return the auto mailer (tests can override this dependency)."""
     return AutoMailer()

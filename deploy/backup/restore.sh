@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# Restore aus einem age-verschlüsselten Backup-Artefakt (T-42, deployment.md §4).
-#   age -d  ->  pg_restore (DB) + mc mirror (MinIO).  ZERSTÖRERISCH: überschreibt
-#   die laufende DB und den Bucket. Daher Pflicht-Bestätigung, sofern nicht FORCE=1.
+# Restore from an age-encrypted backup artifact (T-42, deployment.md section 4).
+#   age -d  ->  pg_restore (DB) + mc mirror (MinIO).  DESTRUCTIVE: it overwrites the
+#   running DB and the bucket. The script asks for confirmation unless FORCE=1.
 #
 # Usage:
-#   restore.sh <artefakt.tar.age>
-#   FORCE=1 restore.sh <artefakt.tar.age>          # ohne Rückfrage (Smoke/CI)
-#   BACKUP_AGE_IDENTITY=/pfad/key restore.sh ...    # privater age-Key (off-host)
+#   restore.sh <artifact.tar.age>
+#   FORCE=1 restore.sh <artifact.tar.age>          # no confirmation (smoke/CI)
+#   BACKUP_AGE_IDENTITY=/path/key restore.sh ...   # private age key (off-host)
 #
-# Der private age-Key liegt im Normalbetrieb NICHT im Stack — er wird nur zur
-# Restore-Zeit gestellt (Datei via BACKUP_AGE_IDENTITY oder gemountet).
+# Normal operation keeps the private age key OUT of the stack. Supply the key only at
+# restore time, as a file in BACKUP_AGE_IDENTITY or as a mount.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -30,7 +30,6 @@ fi
 
 BUCKET="$(need MINIO_BUCKET)"
 
-# --- Sicherheitsabfrage: Restore ist destruktiv (DB + Bucket werden ersetzt). ---
 if [[ "${FORCE:-0}" != "1" ]]; then
   cat >&2 <<EOF
 WARNUNG: Restore überschreibt die laufende Datenbank ($(need POSTGRES_DB)) und
@@ -54,14 +53,14 @@ age -d -i "${identity}" "${artifact}" | tar -C "${tmp}" -xf -
 
 [[ -f "${tmp}/db.dump" ]] || { echo "FEHLER: db.dump fehlt im Artefakt." >&2; exit 1; }
 
-# 1) Postgres: --clean --if-exists droppt vorhandene Objekte vor dem Wiederherstellen.
+# The flags --clean --if-exists drop the existing objects before the restore.
 pg_env
 log "pg_restore -> ${PGDATABASE}@${PGHOST}"
 pg_restore --clean --if-exists --no-owner --no-privileges \
   --dbname="${PGDATABASE}" "${tmp}/db.dump"
 
-# 2) MinIO: Spiegel zurückschreiben. --remove entfernt im Bucket, was im Backup
-#    fehlt -> exakter Stand des Artefakts.
+# MinIO: --remove deletes every bucket object that the backup does not hold.
+# The bucket then matches the artifact exactly.
 mc_env
 log "mc mirror -> ${BUCKET}"
 mc mb --ignore-existing "${MC_ALIAS}/${BUCKET}" >/dev/null

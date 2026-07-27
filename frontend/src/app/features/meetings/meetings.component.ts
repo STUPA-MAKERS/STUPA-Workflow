@@ -71,7 +71,7 @@ import {
 /**
  * Meetings page: overview timeline (`/meetings`) and the 3-column session
  * detail view (`/meetings/:id`). This component is a thin facade over the
- * component-scoped services below; its public surface also drives the specs.
+ * component-scoped services below. Its public surface also drives the specs.
  */
 @Component({
   selector: 'app-meetings',
@@ -124,7 +124,6 @@ export class MeetingsComponent implements OnDestroy {
   /** Confirmation dialog for (irrevocably) closing the session. */
   readonly closeConfirmOpen = signal(false);
 
-  // --- session state (MeetingSessionService) --------------------------------
   readonly loading = this.session.loading;
   readonly error = this.session.error;
   readonly meeting = this.session.meeting;
@@ -149,7 +148,6 @@ export class MeetingsComponent implements OnDestroy {
   readonly beamerVote = this.session.beamerVote;
   readonly FIXED_VOTE_OPTIONS = FIXED_VOTE_OPTIONS;
 
-  // --- permission flags -------------------------------------------------------
   readonly canManageAny = this.session.canManageAny;
   readonly canManage = this.session.canManage;
   readonly canWrite = this.session.canWrite;
@@ -158,7 +156,7 @@ export class MeetingsComponent implements OnDestroy {
   readonly canViewAll = this.session.canViewAll;
   readonly isProtokollant = this.session.isProtokollant;
   readonly isFollower = this.session.isFollower;
-  /** Create: global `meeting.manage` OR board/manager in at least one committee. */
+  /** Create needs global `meeting.manage` OR a manage role in at least one Gremium. */
   readonly canCreate = computed(
     () => this.canManageAny() || this.auth.sessionManageGremien().length > 0,
   );
@@ -182,7 +180,6 @@ export class MeetingsComponent implements OnDestroy {
       !this.inSubstitutePool(),
   );
 
-  // --- agenda state (MeetingAgendaService) --------------------------------------
   readonly agenda = this.agendaSvc.agenda;
   readonly assignable = this.agendaSvc.assignable;
   readonly savingAgenda = this.agendaSvc.savingAgenda;
@@ -197,7 +194,6 @@ export class MeetingsComponent implements OnDestroy {
   readonly selectedIndex = this.agendaSvc.selectedIndex;
   readonly assignableOptions = this.agendaSvc.assignableOptions;
 
-  // --- timeline state (MeetingsTimelineService) ------------------------------------
   readonly loadingList = this.timeline.loadingList;
   readonly upcomingItems = this.timeline.upcomingItems;
   readonly pastItems = this.timeline.pastItems;
@@ -217,7 +213,6 @@ export class MeetingsComponent implements OnDestroy {
   readonly timelineEmpty = this.timeline.timelineEmpty;
   readonly searchEmpty = this.timeline.searchEmpty;
 
-  // --- dialog state (MeetingDialogsService) -------------------------------------------
   readonly createOpen = this.dialogs.createOpen;
   readonly createStep = this.dialogs.createStep;
   readonly creating = this.dialogs.creating;
@@ -259,7 +254,8 @@ export class MeetingsComponent implements OnDestroy {
       }
     });
     // Position the timeline once on the "now" marker as soon as the list is
-    // loaded + rendered — upcoming visible, past reachable by scrolling up.
+    // loaded and rendered. Upcoming meetings stay visible. A scroll up reaches
+    // the past ones.
     effect(() => {
       const marker = this.nowMarker()?.nativeElement;
       const scroller = this.timelineScroll()?.nativeElement;
@@ -268,9 +264,9 @@ export class MeetingsComponent implements OnDestroy {
       this.upcomingItems();
       if (marker && scroller && !this.timeline.didInitialScroll && !this.loadingList()) {
         this.timeline.didInitialScroll = true;
-        // Double rAF: measure after layout. getBoundingClientRect (not
-        // offsetTop) is robust regardless of the offsetParent — otherwise the
-        // list lands on the oldest meeting instead of "now".
+        // Double rAF: measure after layout. getBoundingClientRect works with
+        // any offsetParent, offsetTop does not. Otherwise the list lands on the
+        // oldest meeting instead of "now".
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
             const m = this.nowMarker()?.nativeElement;
@@ -283,11 +279,11 @@ export class MeetingsComponent implements OnDestroy {
         });
       }
     });
-    // Size the timeline to the free viewport rest whenever it (re)appears or
-    // its content grows. Window resizes trigger separately (listener).
+    // Size the timeline to the free viewport space whenever it appears or its
+    // content grows. A separate resize listener handles window resizes.
     effect(() => {
       const el = this.timelineScroll();
-      // Dependencies: (re)appearance + content amount (incl. search hits).
+      // Dependencies: appearance and content amount, including search hits.
       this.timelineEmpty();
       this.loadingList();
       this.pastItems();
@@ -303,7 +299,6 @@ export class MeetingsComponent implements OnDestroy {
     if (this.measureRaf !== null) cancelAnimationFrame(this.measureRaf);
   }
 
-  // --- timeline height ----------------------------------------------------------
   /** Minimum timeline height (px) for very small viewports. */
   private readonly TIMELINE_MIN_PX = 192;
   private measureRaf: number | null = null;
@@ -319,10 +314,10 @@ export class MeetingsComponent implements OnDestroy {
   }
 
   /**
-   * Timeline height = viewport − everything above (header/breadcrumb/h1/
-   * toolbar) − everything below (footer + main bottom padding). Measured
-   * scroll-independently (`rect.top + scrollY` = absolute layout offset) so
-   * the page itself does not scroll — only the timeline does.
+   * Timeline height = viewport − everything above (header, breadcrumb, h1,
+   * toolbar) − everything below (footer + bottom padding of main). The method
+   * measures independent of the scroll position, because `rect.top + scrollY`
+   * is the absolute layout offset. Only the timeline scrolls, never the page.
    */
   private measureTimeline(): void {
     const el = this.timelineScroll()?.nativeElement;
@@ -338,7 +333,6 @@ export class MeetingsComponent implements OnDestroy {
     el.style.height = `${Math.max(this.TIMELINE_MIN_PX, Math.round(avail))}px`;
   }
 
-  // --- timeline / search delegates -------------------------------------------------
   onTimelineScroll(el: HTMLElement): void {
     this.timeline.onScroll(el);
   }
@@ -368,7 +362,6 @@ export class MeetingsComponent implements OnDestroy {
     void this.router.navigate(['/meetings', id]);
   }
 
-  // --- create / settings / delete dialogs ---------------------------------------------
   openCreate(): void {
     this.dialogs.openCreate();
   }
@@ -414,7 +407,6 @@ export class MeetingsComponent implements OnDestroy {
     this.dialogs.doDeleteMeeting();
   }
 
-  // --- session control -------------------------------------------------------------
   setStatus(status: 'live' | 'closed'): void {
     this.session.setStatus(status);
   }
@@ -471,7 +463,6 @@ export class MeetingsComponent implements OnDestroy {
     this.session.setAttendance(member, status);
   }
 
-  // --- vote dialog ---------------------------------------------------------------------
   canAddVote(item: AgendaItem): boolean {
     return this.session.canAddVote(item);
   }
@@ -488,7 +479,6 @@ export class MeetingsComponent implements OnDestroy {
     this.session.submitVote();
   }
 
-  // --- agenda / TOP editing --------------------------------------------------------------
   selectTop(id: Uuid): void {
     this.agendaSvc.selectTop(this.meeting()?.id ?? null, id);
   }
@@ -551,7 +541,7 @@ export class MeetingsComponent implements OnDestroy {
     this.agendaSvc.setNonPublic(m.id, item, nonPublic);
   }
 
-  // --- display helpers (pure, see meetings-display.util) -----------------------------------
+  // The display helpers below are pure, see meetings-display.util.
   stateLabelOf(map: I18nMap | null | undefined): string {
     return resolveI18n(map, this.i18n.locale());
   }

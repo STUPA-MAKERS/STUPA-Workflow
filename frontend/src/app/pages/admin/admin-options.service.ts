@@ -16,13 +16,15 @@ import {
 const RECIPIENT_KINDS: readonly RecipientKind[] = ['applicant', 'role', 'group'];
 
 /**
- * Options provider for dropdowns. Bundles the sources for fields with restricted
- * options (gremium, role, event, recipient kind, guard) in one place, instead of
- * free text or scattered inline lists. Prefers admin-API/config data; where that is
- * empty (in mock mode) a clean fallback list kicks in. Labels follow the active locale.
+ * Options provider for dropdowns. It holds the sources for fields with restricted
+ * options in one place: gremium, role, event, recipient kind and guard. This replaces
+ * free text and scattered inline lists. It prefers admin-API and config data. If that
+ * data is empty, as in mock mode, a fallback list applies. Labels follow the active
+ * locale.
  *
- * With mock off, the sources are wired for real: gremien via `/gremien`
- * (authenticated), application types via `/application-types`, roles via `/admin/roles`.
+ * With mock mode off, the service calls the real sources: gremien through `/gremien`
+ * (authenticated), application types through `/application-types`, roles through
+ * `/admin/roles`.
  */
 @Injectable({ providedIn: 'root' })
 export class AdminOptionsService {
@@ -42,8 +44,7 @@ export class AdminOptionsService {
 
   /**
    * Application types as options (id → name) for the form/flow builders, from the
-   * public `/application-types`. Replaces the hardcoded `'mock-type'`: the builder
-   * saves against a real type UUID.
+   * public `/application-types`. The builder saves against a real type UUID.
    */
   applicationTypeOptions(): Observable<SelectOption[]> {
     return this.api
@@ -51,7 +52,7 @@ export class AdminOptionsService {
       .pipe(map((list) => list.map((t) => ({ value: t.id, label: t.name }))));
   }
 
-  /** Roles as options (key → localized label); fallback list when empty. */
+  /** Roles as options (key → localized label). It uses the fallback list when empty. */
   roleOptions(): Observable<SelectOption[]> {
     const lang = this.i18n.locale();
     return this.api.listRoles().pipe(
@@ -65,7 +66,7 @@ export class AdminOptionsService {
     return EVENT_NAMES.map((ev) => ({ value: ev, label: humanizeEvent(ev) }));
   }
 
-  /** Recipient kinds (applicant/role/group) — labels from the i18n catalogue. */
+  /** Recipient kinds (applicant/role/group) — labels from the i18n catalog. */
   recipientKindOptions(): SelectOption[] {
     return RECIPIENT_KINDS.map((k) => ({
       value: k,

@@ -3,7 +3,7 @@
 :host {
   display: contents;
 }
-/* Center the cards on body width (like toolbar + 3-column shell). */
+/* Center the cards on the body width, like the toolbar and the three-column shell. */
 .mtg__follow {
   display: flex;
   flex-direction: column;
@@ -93,7 +93,7 @@
   font-weight: var(--fw-semibold);
 }
 @media (max-width: 48rem) {
-  /* Markdown tables in the protocol scroll horizontally instead of overflowing. */
+  /* Markdown tables in the protocol scroll sideways instead of overflowing the page. */
   .mtg__preview table {
     display: block;
     max-width: 100%;

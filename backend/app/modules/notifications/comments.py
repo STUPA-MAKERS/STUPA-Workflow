@@ -1,17 +1,19 @@
 """Comment notifications.
 
-Two directions, depending on the comment author:
+The author of the comment decides the direction.
 
-* **Principal comments publicly** → mail to the applicant address (internal
-  comments deliberately trigger NOTHING — applicants never see them).
-* **Applicant comments** → mail to everyone who can act at the current state
-  (task semantics): for ``vote`` states the members of the voting committee,
-  otherwise exactly the principals for whom at least one manual
-  ``requires_action`` transition is actually firable.
+A public comment from a principal sends a mail to the applicant address. An
+internal comment deliberately sends nothing. Applicants never see an internal
+comment.
 
-Both paths respect the ``comment`` kind opt-out and use the DB templates
-``comment_applicant``/``comment_team`` (builtin fallback). Called as a
-background task after the comment response (own session).
+A comment from the applicant sends a mail to everyone who can act at the
+current state (task semantics). For a `vote` state these are the members of the
+voting Gremium. For any other state these are exactly the principals that can
+fire at least one manual `requires_action` transition.
+
+Both paths respect the opt-out of the `comment` kind. Both use the DB templates
+`comment_applicant` and `comment_team`, with a builtin fallback. The caller runs
+this as a background task with its own session after the comment response.
 """
 
 from __future__ import annotations
@@ -76,11 +78,11 @@ _BUILTIN_TEAM_BODY = {
 
 _COMMENT_EXCERPT_LEN = 1000
 
-# --- Stylized chat message for the HTML mail (mirrors the web-UI chat) ------ #
-# One shared bubble snippet: avatar with initials, author name, gray
-# left-aligned bubble — the same look as a foreign message in the web UI.
-# Rendered with Jinja autoescape; `| e … | safe` only turns the *inserted*
-# ``<br>`` into markup, the comment text itself stays escaped.
+# Stylized chat message for the HTML mail. It mirrors the web-UI chat: an
+# avatar with initials, the author name and a gray left-aligned bubble. This is
+# the look of a message from another person in the web UI.
+# Jinja renders the snippet with autoescape. The `| e ... | safe` chain turns
+# only the inserted `<br>` into markup. The comment text stays escaped.
 _CHAT_BUBBLE_HTML = (
     '<table role="presentation" cellpadding="0" cellspacing="0"'
     ' style="margin:16px 0 0;">'
@@ -121,12 +123,12 @@ _BUILTIN_TEAM_BODY_HTML = {
     "{% if status %} (current status: {{ status }}){% endif %}:</p>" + _CHAT_BUBBLE_HTML,
 }
 
-# Fallback author label when no display name is known (applicant comments).
+# Author label used when no display name is known (applicant comments).
 _APPLICANT_AUTHOR_FALLBACK = {"de": "Antragsteller:in", "en": "Applicant"}
 
 
 def _initials(name: str) -> str:
-    """Initial(s) for the mail avatar — same rule as the web-UI chat."""
+    """Return the initials for the mail avatar (same rule as the web-UI chat)."""
     parts = [p for p in name.split() if p]
     if not parts:
         return "?"
@@ -147,7 +149,11 @@ async def send_comment_notifications(
     body: str,
     author_name: str | None = None,
 ) -> int:
-    """Send comment mails; returns the number of mail jobs."""
+    """Send the comment mails.
+
+    Returns:
+        The number of mail jobs that went to the queue.
+    """
     app_row = (
         await session.execute(
             select(
@@ -169,8 +175,8 @@ async def send_comment_notifications(
             iter(state.label_i18n.values())
         )
 
-    # Author label for the chat bubble: display name, else the localized
-    # applicant fallback (matches the web-UI author fallback).
+    # Author label for the chat bubble: the display name, or else the localized
+    # applicant fallback. This matches the author fallback of the web UI.
     author_label = (author_name or "").strip()
     if not author_label:
         author_label = _APPLICANT_AUTHOR_FALLBACK.get(
@@ -187,7 +193,7 @@ async def send_comment_notifications(
     }
 
     if author_kind == "principal":
-        # Internal comments are invisible to applicants → no mail.
+        # Applicants never see an internal comment, so send no mail.
         if visibility != "public":
             return 0
         recipients = await service.resolver.resolve(
@@ -232,7 +238,7 @@ async def send_comment_notifications(
             lang=settings.mail_default_lang,
             default_lang=settings.mail_default_lang,
         )
-    except TemplateRenderError as exc:  # defensive — builtin covers all vars
+    except TemplateRenderError as exc:  # defensive: the builtin covers every variable
         logger.warning("comment builtin render failed: %s", exc)
         return 0
     msg = MailMessage(

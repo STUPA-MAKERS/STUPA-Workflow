@@ -1,7 +1,8 @@
-"""Unit-Tests Markdown-Gen + Frontmatter-Variante (T-20, Akzeptanz: flows §6).
+"""Unit tests for the Markdown builder and the frontmatter variant (T-20, flows §6).
 
-Reine, DB-freie Logik: Frontmatter je Gremium, Variante-Mapping, Wert-Formatierung,
-PII-Ausschluss, YAML-/Markdown-Injection-Sicherheit.
+The tests cover pure logic and need no database. They check the frontmatter per Gremium,
+the variant mapping, the value formatting, the PII exclusion, and the defense against
+YAML and Markdown injection.
 """
 
 from __future__ import annotations
@@ -117,16 +118,16 @@ def test_value_formatting_list_bool_none_dict() -> None:
 
 
 def test_yaml_injection_is_escaped() -> None:
-    # Ein Antragsteller-Name mit Newline + Quote darf das Frontmatter nicht sprengen.
+    # An applicant name with a newline and a quote must not break the frontmatter.
     md = build_application_markdown(_doc(applicant_name='x"\n---\ngremium: evil'))
     lines = md.splitlines()
-    # Genau zwei `---`-Zeilen (Frontmatter-Start/-Ende), keine eingeschleuste dritte.
+    # Exactly two `---` lines for the start and the end, no injected third one.
     assert lines.count("---") == 2
-    # Im Frontmatter-Block exakt ein `gremium:`-Key — der injizierte Wert bleibt als
-    # escaptes Skalar im title-Feld gefangen, wird keine eigene Direktive.
+    # The frontmatter block holds exactly one `gremium:` key. The injected value stays
+    # an escaped scalar in the title field and never becomes a directive of its own.
     fm = lines[1 : lines.index("---", 1)]
     assert sum(1 for ln in fm if ln.startswith("gremium:")) == 1
-    assert "\\n" in md  # Newline wurde escaped, nicht als echter Umbruch übernommen
+    assert "\\n" in md  # the newline stays escaped and never becomes a real line break
 
 
 def test_markdown_value_newline_collapsed() -> None:
@@ -139,7 +140,8 @@ def test_markdown_value_newline_collapsed() -> None:
 
 
 def test_yaml_scalar_escapes_tab_and_control_chars() -> None:
-    # Tab + Steuerzeichen werden escaped (kein roher Umbruch/Steuerzeichen im YAML).
+    # The builder escapes tabs and control characters. The YAML never holds a raw
+    # control character or a raw line break.
     md = build_application_markdown(_doc(applicant_name="a\tb\x01c"))
     fm = md.splitlines()[1 : md.splitlines().index("---", 1)]
     title_line = next(ln for ln in fm if ln.startswith("title:"))
@@ -159,9 +161,9 @@ def test_frontmatter_minimal_without_gremium_cd_date() -> None:
 
 
 def test_applicant_values_sanitized_against_eval_and_image_traversal() -> None:
-    # AUD-006: Anträge werden trusted gerendert; öffentliche Antragsteller-Feldwerte
-    # müssen pytex-eval-Escapes und Bild-Pfad-Traversal verlieren (nicht nur Newline-
-    # Kollaps). Der Wert läuft durch denselben Sanitizer wie der Protokoll-Body.
+    # AUD-006: the renderer treats an application as trusted. A public applicant field
+    # value must lose pytex eval escapes and image path traversal, not only the newline
+    # collapse. The value runs through the same sanitizer as the protocol body.
     doc = _doc(
         fields=[
             _field("abs_img", "Absolut"),
@@ -182,7 +184,7 @@ def test_applicant_values_sanitized_against_eval_and_image_traversal() -> None:
 
 
 def test_applicant_value_benign_markdown_survives() -> None:
-    # Harmloser relativer Bildpfad / Klartext bleibt erhalten (kein Over-Sanitizing).
+    # The sanitizer must not remove a harmless relative image path or plain text.
     doc = _doc(
         fields=[_field("note", "Notiz"), _field("img", "Bild")],
         data={"note": "Pfad a/b/c ist ok", "img": "![logo](images/logo.png)"},
@@ -200,5 +202,5 @@ def test_lang_fallback_uses_default_lang() -> None:
         data={"title": "X"},
     )
     md = build_application_markdown(doc)
-    assert "- **Titel:** X" in md  # de-Label als Fallback
+    assert "- **Titel:** X" in md  # the de label serves as the fallback
     assert 'lang: "en"' in md

@@ -6,13 +6,13 @@ import type { SelectOption } from '@stupa-makers/ui-kit';
 import type { AgendaItem, AssignableApplication, Uuid } from '@core/api/models';
 import { resolveI18n } from './meetings-display.util';
 
-/** Idle time after the last keystroke before the TOP body is autosaved. */
+/** Idle time after the last keystroke before the service autosaves the TOP body. */
 const AUTOSAVE_DELAY_MS = 1000;
 
 /**
- * Agenda (TOP) state of the loaded meeting: item CRUD, inline rename,
- * drag&drop reorder, per-TOP selection and the debounced body autosave.
- * Provided by MeetingsComponent.
+ * Agenda (TOP) state of the loaded meeting: item CRUD, inline rename, drag and drop
+ * reorder, per-TOP selection and the debounced body autosave.
+ * MeetingsComponent provides this service.
  */
 @Injectable()
 export class MeetingAgendaService implements OnDestroy {
@@ -25,7 +25,7 @@ export class MeetingAgendaService implements OnDestroy {
   readonly savingAgenda = signal(false);
   readonly agendaPick = signal<string>('');
   readonly agendaFreetext = signal<string>('');
-  /** Inline rename of a freetext TOP: active item + draft input. */
+  /** Inline rename of a freetext TOP: the active item and the draft input. */
   readonly renamingTopId = signal<Uuid | null>(null);
   readonly renameDraft = signal<string>('');
 
@@ -35,7 +35,7 @@ export class MeetingAgendaService implements OnDestroy {
   /** Autosave state of the current TOP body. */
   readonly saveState = signal<'idle' | 'saving' | 'saved' | 'error'>('idle');
   private bodyTimer: ReturnType<typeof setTimeout> | null = null;
-  /** Debounced, not yet persisted TOP edit (item + text). */
+  /** Debounced TOP edit that the server does not hold yet: the item and the text. */
   private pendingBody: { itemId: Uuid; body: string } | null = null;
   private dragTopIndex: number | null = null;
 
@@ -58,12 +58,11 @@ export class MeetingAgendaService implements OnDestroy {
     if (this.bodyTimer !== null) clearTimeout(this.bodyTimer);
   }
 
-  /** Load the agenda; further calls are quiet refreshes (WS event, DnD recovery). */
+  /** Load the agenda. Later calls are quiet refreshes after a WS event or a failed drop. */
   load(meetingId: Uuid, canManage: boolean): void {
     this.api.listAgenda(meetingId, { quiet: true }).subscribe({
       next: (rows) => {
         this.agenda.set(rows);
-        // Keep the selected TOP if still present, else select the first.
         const sel = this.selectedTopId();
         if (!sel || !rows.some((r) => r.id === sel)) {
           this.selectedTopId.set(rows[0]?.id ?? null);
@@ -145,10 +144,9 @@ export class MeetingAgendaService implements OnDestroy {
   }
 
   renameTop(meetingId: Uuid | null, item: AgendaItem): void {
-    // Already cancelled/switched? Ignore (prevents a duplicate blur save).
+    // Ignore a stale call after a cancel or a switch. This blocks a second save on blur.
     if (this.renamingTopId() !== item.id) return;
     const title = this.renameDraft().trim();
-    // Empty or unchanged → just close, no request.
     if (!meetingId || item.applicationId || !title || title === (item.title ?? '')) {
       this.cancelRename();
       return;
@@ -168,7 +166,7 @@ export class MeetingAgendaService implements OnDestroy {
     });
   }
 
-  /** Mark a TOP as (non-)public — redacted in the public PDF. */
+  /** Mark a TOP as public or non-public. The public PDF redacts a non-public TOP. */
   setNonPublic(meetingId: Uuid, item: AgendaItem, nonPublic: boolean): void {
     this.savingAgenda.set(true);
     this.api.setAgendaNonPublic(meetingId, item.id, nonPublic).subscribe({
@@ -198,7 +196,7 @@ export class MeetingAgendaService implements OnDestroy {
     const items = [...this.agenda()];
     const [moved] = items.splice(from, 1);
     items.splice(index, 0, moved);
-    this.agenda.set(items); // optimistic
+    this.agenda.set(items); // optimistic update
     this.api.reorderAgenda(meetingId, items.map((i) => i.id)).subscribe({
       next: (rows) => this.agenda.set(rows),
       error: () => {
@@ -209,15 +207,17 @@ export class MeetingAgendaService implements OnDestroy {
   }
 
   /**
-   * Select a TOP, first flushing a still pending autosave of the previous
-   * TOP body — otherwise the next debounce cancel would silently drop it.
+   * Select a TOP.
+   *
+   * The method first flushes a pending autosave of the previous TOP body. Without
+   * that flush, the next debounce cancel drops the edit without a message.
    */
   selectTop(meetingId: Uuid | null, id: Uuid): void {
     this.flushPendingBody(meetingId);
     this.selectedTopId.set(id);
   }
 
-  /** Debounce the TOP body to the server, keeping the text locally meanwhile. */
+  /** Debounce the save of the TOP body. The local text changes at once. */
   onTopBodyChange(meetingId: Uuid, itemId: Uuid, body: string): void {
     if (this.bodyTimer !== null) clearTimeout(this.bodyTimer);
     this.pendingBody = { itemId, body };
@@ -230,7 +230,7 @@ export class MeetingAgendaService implements OnDestroy {
     }, AUTOSAVE_DELAY_MS);
   }
 
-  /** Fire a pending autosave immediately (TOP switch) so no edit is lost. */
+  /** Run a pending autosave at once on a TOP switch so that no edit is lost. */
   flushPendingBody(meetingId: Uuid | null): void {
     if (this.bodyTimer === null || this.pendingBody === null) return;
     clearTimeout(this.bodyTimer);

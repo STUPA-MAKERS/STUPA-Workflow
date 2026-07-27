@@ -1,12 +1,12 @@
-"""AUD-030: ``delete_gremium`` muss 409 (ConflictError) liefern, wenn eine
-Antragsart des Gremiums noch Anträge hat.
+"""AUD-030: ``delete_gremium`` must return 409 (ConflictError), not 500.
 
-``application_type.gremium_id`` kaskadiert, ``application.type_id`` ist aber
-RESTRICT — ohne Vorab-Prüfung würde das Löschen die FK verletzen und einen 500
-(IntegrityError) statt eines sauberen 409 erzeugen, plus ein Audit-Row für ein
-zum Scheitern verurteiltes Löschen schreiben.
+The conflict applies when an application type of the Gremium still holds applications.
+``application_type.gremium_id`` cascades, but ``application.type_id`` is RESTRICT.
+Without the check up front the delete breaks the foreign key. The caller then gets a 500
+(IntegrityError) instead of a clean 409, and the service writes an audit row for a delete
+that cannot succeed.
 
-DB-loser Test mit einem ``AsyncSession``-Fake (kein Docker/Postgres).
+The test needs no DB. An ``AsyncSession`` fake replaces Docker and Postgres.
 """
 
 from __future__ import annotations
@@ -21,12 +21,11 @@ from app.shared.errors import ConflictError
 
 
 class _FakeSession:
-    """Minimaler ``AsyncSession``-Stub für ``delete_gremium``.
+    """Minimal ``AsyncSession`` stub for ``delete_gremium``.
 
-    * ``get`` liefert das (vorhandene) Gremium beim ersten Aufruf.
-    * ``scalar`` liefert den ``in_use``-Treffer (oder ``None``).
-    * ``execute``/``commit``/``delete`` zählen mit, um zu prüfen, dass im
-      Conflict-Fall *kein* Audit-Row und *kein* Commit passieren.
+    ``get`` returns the existing Gremium on the first call. ``scalar`` returns the
+    ``in_use`` hit or ``None``. ``execute``, ``commit`` and ``delete`` count their calls.
+    The test proves that a conflict writes *no* audit row and runs *no* commit.
     """
 
     def __init__(self, *, gremium: Any, in_use: Any) -> None:
@@ -69,7 +68,7 @@ async def test_delete_gremium_with_in_use_type_raises_conflict() -> None:
     with pytest.raises(ConflictError):
         await svc.delete_gremium(gid, "admin")
 
-    # Kein Audit-Schreibvorgang, kein delete, kein commit für ein doomed delete.
+    # A doomed delete writes no audit row, deletes nothing and commits nothing.
     assert session.execute_calls == 0
     assert session.deleted == []
     assert session.committed == 0

@@ -1,8 +1,8 @@
-"""Erasure-request mails: received / executed / rejected.
+"""Erasure-request mails: received, executed, rejected.
 
-Sent best-effort as background tasks after the triggering transaction commits; each
-opens its own sessionmaker. The builtin subject/body dicts are also the editor
-defaults.
+Each function runs as a background task after the triggering transaction
+commits. Each opens its own sessionmaker. The send is best effort. The builtin
+subject and body dicts are also the editor defaults.
 """
 
 from __future__ import annotations
@@ -57,7 +57,7 @@ async def notify_erasure_requested(
     request_id: UUID,
     subject_type: str,
 ) -> None:
-    """Notify the privacy admins (``privacy.manage``) of a new request."""
+    """Notify the privacy admins (`privacy.manage`) about a new request."""
     sessionmaker = get_sessionmaker()
     async with sessionmaker() as session:
         recipients = await RecipientResolver(session).resolve(
@@ -86,7 +86,10 @@ async def notify_erasure_executed(
     email: str | None,
     subject_type: str,
 ) -> None:
-    """Notify the subject that the request was executed (if the email is known)."""
+    """Notify the data subject that the request was executed.
+
+    The function sends nothing when the email is unknown.
+    """
     if not email:
         return
     sessionmaker = get_sessionmaker()
@@ -112,7 +115,10 @@ async def notify_erasure_rejected(
     email: str | None,
     reason: str | None,
 ) -> None:
-    """Notify the subject that the request was rejected (with reason)."""
+    """Notify the data subject that the request was rejected, with the reason.
+
+    The function sends nothing when the email is unknown.
+    """
     if not email:
         return
     sessionmaker = get_sessionmaker()

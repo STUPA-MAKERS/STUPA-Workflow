@@ -11,7 +11,7 @@ import type {
 import type { BadgeVariant, IconName } from '@stupa-makers/ui-kit';
 import type { ServerMessage } from '@core/ws/ws-messages';
 
-/** Canonical ballot options — pass/fail evaluation needs yes/no/abstain. */
+/** Canonical ballot options. The pass/fail evaluation needs yes, no and abstain. */
 export const FIXED_VOTE_OPTIONS = ['yes', 'no', 'abstain'] as const;
 
 export function meetingStatusVariant(status: Meeting['status']): BadgeVariant {
@@ -62,18 +62,18 @@ export function countEntries(vote: MeetingVote): { key: string; value: number }[
   return Object.entries(vote.counts ?? {}).map(([key, value]) => ({ key, value }));
 }
 
-/** Selectable options of a vote (fallback: keys of the tally). */
+/** Selectable options of a vote. The fallback is the set of tally keys. */
 export function voteOptionsFor(vote: MeetingVote): string[] {
   return vote.options.length ? vote.options : Object.keys(vote.counts ?? {});
 }
 
-/** Resolve an i18n map for the given locale, falling back to de → first value. */
+/** Resolve an i18n map for the given locale. The fallback is de, then the first value. */
 export function resolveI18n(map: I18nMap | null | undefined, locale: string): string {
   if (!map) return '';
   return map[locale] ?? map['de'] ?? Object.values(map)[0] ?? '';
 }
 
-/** Display label of a ballot option (yes→Ja …); unknown options stay raw. */
+/** Display label of a ballot option (yes→Ja …). An unknown option stays raw. */
 export function voteOptionLabel(
   opt: string,
   translate: (key: TranslationKey) => string,
@@ -83,16 +83,17 @@ export function voteOptionLabel(
   return label === key ? opt : label;
 }
 
-/** Concrete problem+json `detail` message from an HTTP error (or empty). */
+/** The problem+json `detail` message of an HTTP error, or an empty string. */
 export function errorDetail(err: unknown): string {
   const body = (err as { error?: { detail?: string } } | null)?.error;
   return typeof body?.detail === 'string' ? body.detail : '';
 }
 
 /**
- * Assemble the protocol markdown from the ordered TOPs. Top-level `#` headings
- * are required: pytex' protocol variant numbers them itself as "TOP n", so no
- * manual prefix and no `##` (which would double the numbering).
+ * Assemble the protocol markdown from the ordered TOPs.
+ * Top-level `#` headings are required. The protocol variant of pytex numbers them
+ * as "TOP n" on its own. Do not add a manual prefix and do not use `##`, because
+ * that doubles the numbering.
  */
 export function assembleProtocolMarkdown(agenda: AgendaItem[]): string {
   return agenda
@@ -114,7 +115,7 @@ export function pickBeamerVote(votes: MeetingVote[]): MeetingVote | null {
   );
 }
 
-/** Long localized date ("14. Juni 2026") mirroring the `ldate` pipe. */
+/** Long localized date ("14. Juni 2026"). It mirrors the `ldate` pipe. */
 export function longDate(isoDate: string, i18nLocale: string): string {
   const date = new Date(isoDate);
   if (Number.isNaN(date.getTime())) return isoDate;

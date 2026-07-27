@@ -1,9 +1,9 @@
 """Pydantic schemas of the files API.
 
 ``AttachmentOut`` follows the documented contract exactly. ``SignedUrlOut`` returns the
-app-relative, authz-gated download route (no direct bucket access) — NOT an S3v4-signed
-MinIO URL. The ``/download`` route enforces authorization independently; ``expiresIn`` is
-only a frontend cache hint.
+app-relative download route that the authorization layer gates. It is NOT an S3v4-signed
+MinIO URL and it gives no direct bucket access. The ``/download`` route checks
+authorization on its own. ``expiresIn`` is only a cache hint for the frontend.
 """
 
 from __future__ import annotations
@@ -25,13 +25,13 @@ class AttachmentOut(BaseModel):
 
 
 class SignedUrlOut(BaseModel):
-    """App-relative, authz-gated download route.
+    """App-relative download route that the authorization layer gates.
 
-    ``url`` is the ``/api/attachments/{id}/download`` route — it carries no token and no
-    signature and does not expire; the endpoint enforces authorization on every call.
-    ``expiresIn`` is therefore not a security/expiry guarantee, only an advisory frontend
-    cache hint (seconds).
+    ``url`` is the ``/api/attachments/{id}/download`` route. It carries no token and no
+    signature and it does not expire. The endpoint checks authorization on every call.
+    ``expiresIn`` is therefore no security or expiry guarantee. It is only an advisory
+    cache hint for the frontend, in seconds.
     """
 
     url: str
-    expiresIn: int  # advisory frontend cache hint (s) — not a URL expiry
+    expiresIn: int  # advisory cache hint in seconds, not a URL expiry

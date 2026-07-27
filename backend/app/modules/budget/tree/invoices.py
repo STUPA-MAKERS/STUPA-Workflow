@@ -36,8 +36,9 @@ from app.shared.paging import Page
 
 logger = logging.getLogger("app.budget")
 
-# Invoice file tokens are always server-generated keys under this prefix; reject
-# anything else so a client cannot point ``fileObjectKey`` at a foreign bucket object.
+# An invoice file token is always a server-generated key under this prefix.
+# Reject anything else, so a client cannot point fileObjectKey at a foreign
+# object in the bucket.
 _INVOICE_FILE_PREFIX = "invoices/"
 
 
@@ -71,8 +72,10 @@ class InvoiceOps(BudgetTreeServiceBase):
         )
 
     async def list_invoices(self) -> list[InvoiceOut]:
-        """(Compat) All invoices (newest issue date first) — for the booking-link
-        dropdown, which needs the full list."""
+        """List all invoices, newest issue date first.
+
+        Kept for compatibility. The booking-link dropdown needs the full list.
+        """
         page = await self.list_invoices_paged(limit=10_000, offset=0)
         return page.items
 
@@ -90,17 +93,17 @@ class InvoiceOps(BudgetTreeServiceBase):
         limit: int = 50,
         offset: int = 0,
     ) -> Page[InvoiceOut]:
-        """Invoices filtered + fuzzy-searched + offset-paginated.
+        """List invoices with filters, fuzzy search and offset pagination.
 
-        Mirrors :meth:`~.expenses.ExpenseOps.list_expenses_paged`: the
-        search/filter predicates live in a SHARED ``filters`` list that goes
-        identically into the count AND the row query (no total/hit drift on
-        infinite scroll). With ``q`` the trigram rank orders hits by relevance
-        before the usual "newest issue date first".
+        This mirrors `expenses.ExpenseOps.list_expenses_paged`. The search and
+        filter predicates live in one shared `filters` list. That list goes into
+        the count query and into the row query, so the total and the hits do not
+        drift on infinite scroll. With `q` the trigram rank orders the hits by
+        relevance before the usual "newest issue date first".
         """
         filters = []
-        # Fuzzy search: trigram ranking over number/supplier/note (GIN indexes).
-        # On non-Postgres the ILIKE substring fallback applies.
+        # Fuzzy search: a trigram rank over number, supplier and note (GIN
+        # indexes). On a non-Postgres dialect the ILIKE substring fallback runs.
         rank_expr = None
         if q and q.strip():
             where, rank_expr = trigram_rank(
@@ -115,10 +118,10 @@ class InvoiceOps(BudgetTreeServiceBase):
             filters.append(Invoice.gross_amount >= gross_min)
         if gross_max is not None:
             filters.append(Invoice.gross_amount <= gross_max)
-        # Nullable date columns: an invoice without a date falls out of any set
-        # range. ``func.date`` parses the ISO string from the FE datepicker into
-        # a real date — Postgres would otherwise reject ``date >= varchar``; on
-        # SQLite it is a no-op (ISO stays ISO).
+        # Nullable date columns: an invoice without a date falls out of every
+        # range. func.date parses the ISO string from the frontend datepicker
+        # into a real date. Postgres rejects "date >= varchar". On SQLite the
+        # call does nothing, because ISO stays ISO.
         if issue_from:
             filters.append(Invoice.issue_date >= func.date(issue_from))
         if issue_to:
@@ -165,8 +168,8 @@ class InvoiceOps(BudgetTreeServiceBase):
             actor=actor,
         )
         if payload.file_token is not None:
-            # Take over the file from the ZUGFeRD import — the token is the
-            # already stored MinIO key (prefix-validated against foreign objects).
+            # Take over the file from the ZUGFeRD import. The token is the MinIO
+            # key of the stored object. The prefix check keeps foreign objects out.
             inv.file_object_key = _validate_invoice_file_token(payload.file_token)
             inv.file_name = payload.file_name
             inv.file_mime = payload.file_mime
@@ -184,9 +187,12 @@ class InvoiceOps(BudgetTreeServiceBase):
     async def _validate_scan_store(
         self, data: bytes, *, filename: str | None
     ) -> tuple[str, str, str]:
-        """Validate a PDF (size/MIME/AV scan) and store it → (token, safe_name, mime).
+        """Validate a PDF by size, MIME type and virus scan, then store it.
 
-        Shared path for ZUGFeRD parse and manual invoice-file upload.
+        Both the ZUGFeRD parse and the manual invoice-file upload use this path.
+
+        Returns:
+            The storage token, the sanitized file name and the MIME type.
         """
         max_bytes = self.settings.attachment_max_bytes
         if len(data) > max_bytes:
@@ -206,19 +212,23 @@ class InvoiceOps(BudgetTreeServiceBase):
         return storage_key, safe_name, mime
 
     async def store_invoice_file(self, data: bytes, *, filename: str | None) -> InvoiceFileResult:
-        """Validate + store an invoice PDF (no ZUGFeRD parse) — for manual files.
+        """Validate and store an invoice PDF without a ZUGFeRD parse.
 
-        Allows attaching an original to non-ZUGFeRD invoices: returns the same
-        ``fileToken`` that ``POST /invoices`` expects.
+        This lets the user attach an original file to an invoice that carries no
+        ZUGFeRD data.
+
+        Returns:
+            The same `fileToken` that `POST /invoices` expects.
         """
         storage_key, safe_name, mime = await self._validate_scan_store(data, filename=filename)
         return InvoiceFileResult(fileToken=storage_key, fileName=safe_name, fileMime=mime)
 
     async def parse_invoice_file(self, data: bytes, *, filename: str | None) -> InvoiceParseResult:
-        """Validate the PDF (MIME + AV scan), parse ZUGFeRD, store the original.
+        """Validate the PDF, parse the ZUGFeRD data and store the original.
 
-        Deliberate order: scan → parse → store only afterwards, so a
-        non-ZUGFeRD PDF (the common case) leaves NO orphaned object behind.
+        The order is deliberate: scan first, then parse, then store. A PDF
+        without ZUGFeRD data is the common case. It must leave no orphaned
+        object behind.
         """
         max_bytes = self.settings.attachment_max_bytes
         if len(data) > max_bytes:
@@ -233,7 +243,8 @@ class InvoiceOps(BudgetTreeServiceBase):
             raise UnsupportedMediaTypeError("Invoice import expects a PDF.")
 
         await self._scan_or_raise(data)
-        # Parsing is synchronous/CPU-bound → thread pool (no loop blocking).
+        # The parser runs synchronously and binds the CPU. Move it to a thread,
+        # so it does not block the event loop.
         parsed = await asyncio.to_thread(parse_zugferd_pdf, data)
 
         safe_name = sanitize_filename(filename)
@@ -254,7 +265,7 @@ class InvoiceOps(BudgetTreeServiceBase):
         )
 
     async def _invoice_number_exists(self, number: str | None) -> bool:
-        """Does an invoice with this number already exist? (duplicate warning)."""
+        """Tell if an invoice with this number exists, for the duplicate warning."""
         if not number:
             return False
         existing = await self.session.scalars(
@@ -263,11 +274,15 @@ class InvoiceOps(BudgetTreeServiceBase):
         return existing.first() is not None
 
     async def invoice_file_bytes(self, invoice_id: UUID) -> tuple[bytes, str, str]:
-        """Load the original file server-side → (data, mime, filename).
+        """Load the original file on the server.
 
-        Deliberately NO presigned URL: MinIO lives only on the internal Docker
-        network, an S3v4-signed URL binds the internal host and is unreachable
-        from the browser — like the protocol PDF we stream via the API.
+        The method returns no presigned URL on purpose. MinIO runs only on the
+        internal Docker network. An S3v4-signed URL binds the internal host and
+        the browser cannot reach it. The protocol PDF follows the same rule and
+        streams through the API.
+
+        Returns:
+            The file bytes, the MIME type and the file name.
         """
         inv = await self.session.get(Invoice, invoice_id)
         if inv is None:
@@ -283,9 +298,13 @@ class InvoiceOps(BudgetTreeServiceBase):
         return data, inv.file_mime or "application/pdf", inv.file_name or "beleg.pdf"
 
     async def _scan_or_raise(self, data: bytes) -> None:
-        """Synchronous AV scan. Skipped without ClamAV (DEV/contract CI) — but
-        fail-closed in ``production``: never store an unscanned invoice PDF when
-        the scanner is missing (consistent with the files quarantine)."""
+        """Scan the data for viruses and raise on a bad verdict.
+
+        Without ClamAV the scan is skipped, which covers development and
+        contract CI. In `production` the method fails closed. The server never
+        stores an unscanned invoice PDF when the scanner is missing. This
+        matches the quarantine of the files module.
+        """
         scanner = build_scanner(self.settings)
         if scanner is None:
             if self.settings.environment == "production":
@@ -346,7 +365,7 @@ class InvoiceOps(BudgetTreeServiceBase):
         inv = await self.session.get(Invoice, invoice_id)
         if inv is None:
             raise NotFoundError(f"invoice {invoice_id} not found")
-        # Bookings keep invoice_id=NULL (FK SET NULL).
+        # A booking survives the delete. The FK sets its invoice_id to NULL.
         storage_key = inv.file_object_key
         await self._audit(
             AuditAction.BUDGET_INVOICE_DELETE,
@@ -357,7 +376,8 @@ class InvoiceOps(BudgetTreeServiceBase):
         await self.session.delete(inv)
         await self.session.commit()
         if storage_key is not None and self.storage is not None:
-            # Remove the original best-effort (if already gone, deletion stands).
+            # Remove the original as a best effort. If the object is already
+            # gone, the delete still stands.
             try:
                 await self.storage.remove(storage_key)
             except StorageError:

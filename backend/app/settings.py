@@ -1,8 +1,8 @@
 """Application settings from `.env` (pydantic-settings).
 
-Required secrets have no default: if missing, `load_settings` raises a clear
-`SettingsError` at startup instead of a raw pydantic ValidationError. See
-`deploy/.env.example` for layout and names.
+A required secret has no default. If a secret is missing, `load_settings` raises a
+clear `SettingsError` at startup instead of a raw pydantic ValidationError. See
+`deploy/.env.example` for the layout and the names.
 """
 
 import logging
@@ -30,44 +30,42 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # Identity / operation.
     app_name: str = "Antragsplattform API"
     app_version: str = "0.0.2"
     environment: str = "development"
     log_level: str = "INFO"
     public_base_url: str = "http://localhost"
 
-    # Hardening switch (fail-safe). ``environment`` defaults to "development" for
-    # DEV ergonomics; so production-critical guards (invoice AV fail-closed, proxy
-    # spoofing guard) do not silently disable when someone forgets to set
-    # ENVIRONMENT=production, this switch defaults ON. See ``strict_security_enabled``.
+    # Hardening switch (fail-safe). `environment` defaults to "development" for DEV
+    # ergonomics. This switch defaults ON, so the production-critical guards (invoice
+    # AV fail-closed, proxy spoofing guard) stay active even when someone forgets to
+    # set ENVIRONMENT=production. See `strict_security_enabled`.
     strict_security: bool = True
 
-    # Required secrets (no default; minimum length enforced).
+    # Required secrets. They have no default, and the model enforces a minimum length.
     database_url: str
     session_secret: str = Field(min_length=_MIN_SECRET_LEN)
     magic_link_secret: str = Field(min_length=_MIN_SECRET_LEN)
 
-    # Reverse proxy: narrow, never "*". In production "*" is forbidden (X-Forwarded-*
-    # could otherwise be spoofed by any source) -> SettingsError.
+    # Reverse proxy: keep it narrow, never "*". Production forbids "*", because any
+    # source could then spoof X-Forwarded-*. The validator raises SettingsError.
     forwarded_allow_ips: str = "127.0.0.1"
 
-    # CSRF (double-submit). Protects cookie-authenticated writes; bearer-token
-    # requests are exempt. Names follow the Angular default (HttpClient reads
-    # `XSRF-TOKEN`, sends `X-XSRF-TOKEN`) so the FE interceptor works unchanged.
+    # CSRF double-submit. It protects cookie-authenticated writes. A bearer-token
+    # request stays exempt. The names follow the Angular default (HttpClient reads
+    # `XSRF-TOKEN` and sends `X-XSRF-TOKEN`), so the FE interceptor works unchanged.
     csrf_enabled: bool = True
     csrf_cookie_name: str = "XSRF-TOKEN"
     csrf_header_name: str = "X-XSRF-TOKEN"
 
-    # CORS off by default (no cross-origin).
+    # The empty default keeps cross-origin access off.
     cors_allow_origins: list[str] = []
 
-    # Optional infra.
     redis_url: str = "redis://redis:6379/0"
     db_migration_url: str | None = None
 
-    # OIDC / Keycloak. Without full config OIDC is off (login/callback -> 503);
-    # magic-link stays usable independently.
+    # OIDC / Keycloak. Without the full config, OIDC stays off and login and callback
+    # answer 503. The magic link stays usable on its own.
     oidc_issuer: str | None = None
     oidc_client_id: str | None = None
     oidc_client_secret: str | None = Field(default=None, min_length=_MIN_SECRET_LEN)
@@ -76,10 +74,11 @@ class Settings(BaseSettings):
     oidc_groups_claim: str = "groups"
     oidc_post_logout_redirect_url: str | None = None
 
-    # Bootstrap admins. Comma-separated OIDC `sub` and/or email. On OIDC login and
-    # at startup the matched principals are idempotently granted the `admin` role.
-    # Prevents lockout of a fresh real OIDC install (without a mock nobody would
-    # hold `admin.*` and thus could not assign roles). Empty = off.
+    # Bootstrap admins. Comma-separated OIDC `sub` values and/or emails. On OIDC login
+    # and at startup the app grants the matched principals the `admin` role, and it
+    # does so idempotently. This prevents a lockout on a fresh real OIDC install, where
+    # nobody holds `admin.*` without a mock and thus nobody could assign a role. An
+    # empty value turns the bootstrap off.
     bootstrap_admin_subjects: str = ""
     bootstrap_admin_emails: str = ""
 
@@ -95,36 +94,38 @@ class Settings(BaseSettings):
             e.strip().lower() for e in self.bootstrap_admin_emails.split(",") if e.strip()
         }
 
-    # Session/applicant cookie (HttpOnly+Secure+SameSite=Lax).
+    # Session and applicant cookie (HttpOnly + Secure + SameSite=Lax).
     session_cookie_name: str = "ap_session"
     applicant_cookie_name: str = "ap_applicant"
     oidc_tx_cookie_name: str = "ap_oidc_tx"
     session_ttl_hours: int = 12
-    # Applicant (magic-link) session: server-side (``applicant_session`` table),
-    # opaque signed ``sid``. Deliberately decoupled from ``session_ttl_hours`` so the
-    # applicant window can be tuned independently (shorter = smaller replay window).
+    # Applicant session from a magic link: server-side (`applicant_session` table)
+    # with an opaque signed `sid`. It is decoupled from `session_ttl_hours` on
+    # purpose, so the applicant window can be tuned on its own. A shorter window
+    # narrows the replay window.
     applicant_session_ttl_hours: int = 12
     cookie_secure: bool = True
 
-    # OAuth2 AS for native/MCP clients (browser grant + PKCE, RFC 7636). Public
-    # client (no secret); loopback redirects only. Tokens are opaque + scoped (see
-    # app.modules.auth.oauth). Active only when OIDC is configured.
+    # OAuth2 AS for native and MCP clients (browser grant + PKCE, RFC 7636). It is
+    # a public client with no secret, and it allows loopback redirects only. The
+    # tokens are opaque and scoped (see `app.modules.auth.oauth`). It is active only
+    # when OIDC is configured.
     oauth_mcp_client_id: str = "antragsplattform-mcp"
     oauth_tx_cookie_name: str = "ap_oauth_tx"
-    oauth_code_ttl_seconds: int = 300  # authorization code: 5 min
-    oauth_access_ttl_seconds: int = 3600  # access token: 1 h
-    oauth_refresh_ttl_seconds: int = 60 * 60 * 24 * 30  # refresh token: 30 d
-    # Source dir of the MCP package for the self-service download; None -> relative
-    # to the repo root (`<repo>/mcp`). In containers without a source tree -> 404.
+    oauth_code_ttl_seconds: int = 300
+    oauth_access_ttl_seconds: int = 3600
+    oauth_refresh_ttl_seconds: int = 60 * 60 * 24 * 30
+    # Source directory of the MCP package for the self-service download. None means
+    # relative to the repo root (`<repo>/mcp`). A container without a source tree
+    # answers 404.
     mcp_package_dir: str | None = None
 
-    # Magic-link lifetimes.
     magic_link_edit_ttl_days: int = 7
     magic_link_action_ttl_minutes: int = 15
 
-    # Mail/SMTP. Without `smtp_host` sending is off (worker logs + drops instead of
-    # sending) so DEV/tests run without a real MTA. The password is a secret and is
-    # never logged.
+    # Mail/SMTP. Without `smtp_host` the app sends nothing. The worker logs the mail
+    # and drops it, so DEV and the tests run without a real MTA. The password is a
+    # secret and never reaches the log.
     smtp_host: str | None = None
     smtp_port: int = 587
     smtp_user: str | None = None
@@ -135,82 +136,89 @@ class Settings(BaseSettings):
     mail_from: str = "noreply@antragsplattform.local"
     mail_from_name: str = "Antragsplattform"
     mail_default_lang: str = "de"
-    # Worker (arq) send retry: max tries + backoff base (seconds).
+    # Worker retry for arq send jobs: maximum tries and the backoff base in seconds.
     mail_max_tries: int = 5
     mail_retry_backoff_seconds: int = 30
 
     @property
     def smtp_enabled(self) -> bool:
-        """Real sending only with `smtp_host` set; otherwise worker no-op (DEV/test)."""
+        """Report whether the worker really sends mail.
+
+        Real sending needs `smtp_host`. Without it the worker logs the mail and
+        drops it, which suits DEV and the tests.
+        """
         return bool(self.smtp_host)
 
-    # Object storage / MinIO. Without `minio_endpoint` upload is off (POST
-    # /attachments -> 503); DEV/contract CI run without a bucket. The keys are
-    # secrets and are never logged.
+    # Object storage / MinIO. Without `minio_endpoint` upload is off, and POST
+    # /attachments answers 503. DEV and contract CI run without a bucket. The keys
+    # are secrets and never reach the log.
     minio_endpoint: str | None = None
     minio_access_key: str | None = None
     minio_secret_key: str | None = None
     minio_bucket: str = "attachments"
     minio_secure: bool = False  # TLS to the MinIO API (usually plain HTTP internally)
-    # Upload cap (data model: CHECK(size <= 10485760)) + signed-URL lifetime.
+    # Upload cap (the data model holds CHECK(size <= 10485760)) and signed-URL lifetime.
     attachment_max_bytes: int = 10 * 1024 * 1024
     attachment_url_ttl_seconds: int = 300
 
-    # ClamAV. Without `clamav_host` the scan is off: uploads stay `scanned=false`
-    # (quarantined, no download) — fail-closed (DEV/test).
+    # ClamAV. Without `clamav_host` the scan is off. An upload then stays
+    # `scanned=false`, which quarantines it and blocks the download. This is
+    # fail-closed (DEV/test).
     clamav_host: str | None = None
     clamav_port: int = 3310
     clamav_timeout_seconds: int = 60
-    # Worker (arq) scan retry: max tries + backoff base (seconds).
+    # Worker retry for arq scan jobs: maximum tries and the backoff base in seconds.
     scan_max_tries: int = 5
     scan_retry_backoff_seconds: int = 30
 
-    # Webhook dispatch. Delivery runs in the arq worker; the API only creates
-    # ``webhook_delivery`` rows + jobs. The SSRF guard is always active
-    # (private/loopback/link-local/metadata blocked); the optional host allowlist
-    # additionally restricts targets (empty = any public host). The per-webhook
-    # ``secret`` is never logged.
+    # Webhook dispatch. Delivery runs in the arq worker. The API only creates
+    # `webhook_delivery` rows and jobs. The SSRF guard is always active and blocks
+    # private, loopback, link-local and metadata targets. The optional host allowlist
+    # restricts the targets further (empty = any public host). The per-webhook
+    # `secret` never reaches the log.
     webhook_timeout_seconds: float = 10.0
     webhook_max_tries: int = 5
     webhook_retry_backoff_seconds: int = 30
-    # Optional host allowlist for webhook targets. Empty = any public host (the SSRF
-    # guard stays active regardless). Should be set in production; ``_strict_security_
-    # warnings`` warns loudly when it is empty under hardening.
+    # Optional host allowlist for webhook targets. Empty = any public host, and the
+    # SSRF guard stays active either way. Set it in production. Under hardening
+    # `_strict_security_warnings` warns loudly when it is empty.
     webhook_host_allowlist: list[str] = []
 
-    # Delegation. Vote delegation is subject to bylaws approval and defaults OFF: a
-    # delegation may transfer roles/rights, but `delegateVoting=true` is only
-    # accepted (else 422) once the operator explicitly enables vote delegation.
-    # Pure rights delegation stays free.
+    # Delegation. Vote delegation needs bylaws approval and defaults to OFF. A
+    # delegation may transfer roles and rights. The server accepts
+    # `delegateVoting=true` only after the operator enables vote delegation, and it
+    # answers 422 otherwise. Pure rights delegation stays free.
     delegation_voting_enabled: bool = False
-    # Local timezone for meeting times (`meeting.date`/`start_time` stored naive):
-    # basis of the delegation deadline.
+    # Local timezone for meeting times. `meeting.date` and `start_time` are naive, and
+    # this zone is the basis of the delegation deadline.
     local_timezone: str = "Europe/Berlin"
 
-    # Deadlines/cron. Lead time for the `deadline_approaching` reminder: sent once
-    # `due_at - lead <= now < due_at` (default 24 h).
+    # Deadlines/cron. Lead time for the `deadline_approaching` reminder. The app sends
+    # it once `due_at - lead <= now < due_at` holds (default 24 h).
     deadline_reminder_lead_minutes: int = 1440
 
-    # FinTS bank reconciliation. Online-banking fetch (PIN/TAN) to reconcile real
-    # transactions with bookings. Without ``fints_enc_key`` the feature is off
-    # (endpoints -> 503): the bank PIN is held encrypted at rest (Fernet, derived
-    # from this secret), so the key is required once FinTS is used.
-    # ``fints_product_id`` is the product id registered with the Deutsche
-    # Kreditwirtschaft (mandatory for production access since 2019); without it the
-    # lib uses its default id (DEV/sandbox, possibly rejected by real banks). The
-    # secret/PIN are never logged.
+    # FinTS bank reconciliation. The online-banking fetch (PIN/TAN) reconciles real
+    # transactions with the bookings. Without `fints_enc_key` the feature is off and
+    # the endpoints answer 503. The bank PIN stays encrypted at rest with Fernet,
+    # derived from this secret, so the key is mandatory once FinTS runs.
+    # `fints_product_id` is the product id registered with the Deutsche
+    # Kreditwirtschaft. It is mandatory for production access since 2019. Without it
+    # the library uses its default id, which suits DEV and sandbox but a real bank
+    # may reject it. The secret and the PIN never reach the log.
     fints_enc_key: str | None = Field(default=None, min_length=_MIN_SECRET_LEN)
     fints_product_id: str | None = None
-    # Cap on the fetch window (days) per sync. Larger windows force a fresh SCA at
-    # many banks; 90 days = PSD2 comfort window.
+    # Cap on the fetch window in days per sync. A larger window forces a fresh SCA at
+    # many banks. 90 days is the PSD2 comfort window.
     fints_max_days: int = 90
-    # Lifetime of a pending TAN session (between start-sync and TAN entry).
+    # Lifetime of a pending TAN session, between the start of the sync and the TAN
+    # entry.
     fints_tan_session_ttl_seconds: int = 600
-    # Lock cooldown: after a bank lock (FinTS 3938) or signature/PIN rejection (9340
-    # etc.) the service refuses any further sync for this bookkeeper+account for this
-    # many minutes. Guards against self-inflicted lock escalation (3 failed attempts
-    # -> full lock). The bank-side lock itself may last longer and may only be lifted
-    # via the bank (online-banking unlock/hotline).
+    # Lock cooldown. After a bank lock (FinTS 3938) or a signature or PIN rejection
+    # (9340 and similar), the service refuses any further sync for this bookkeeper and
+    # account for this many minutes. This guards against a self-inflicted lock
+    # escalation, where 3 failed attempts cause a full lock. The bank-side lock itself
+    # can last longer. Only the bank can lift it, through the online-banking unlock or
+    # the hotline.
     fints_lock_cooldown_minutes: int = 30
 
     @property
@@ -220,8 +228,10 @@ class Settings(BaseSettings):
 
     @property
     def fints_enabled(self) -> bool:
-        """FinTS is active only when an encryption key is set (the bank PIN must never
-        be persisted unencrypted)."""
+        """FinTS is active only when an encryption key is set.
+
+        The app must never persist the bank PIN unencrypted.
+        """
         return bool(self.fints_enc_key)
 
     @property
@@ -229,31 +239,31 @@ class Settings(BaseSettings):
         """ClamAV scan is active only when a clamd host is set."""
         return bool(self.clamav_host)
 
-    # pytex render container. `api` -> `pytex` only `/render`. `PYTEX_URL` points at
-    # the internal container; `trusted` enables the tectonic bundle (app-generated,
-    # first-party documents). The render can be slow (first build fetches the
-    # bundle) -> generous timeout.
+    # pytex render container. `api` calls only `/render` on `pytex`. `PYTEX_URL` points
+    # at the internal container. `trusted` enables the tectonic bundle for the
+    # app-generated first-party documents. The render can be slow, because the first
+    # build fetches the bundle. That is why the timeout is generous.
     pytex_url: str = "http://pytex:8099"
     pytex_trust: str = "trusted"
     pytex_timeout_seconds: int = 120
-    # Worker (arq) PDF render retry: max tries + backoff base (seconds).
+    # Worker retry for arq PDF render jobs: maximum tries and backoff base in seconds.
     pdf_max_tries: int = 4
     pdf_retry_backoff_seconds: int = 30
     # Lifetime of the signed result URL (GET /jobs/{id}).
     pdf_url_ttl_seconds: int = 300
 
-    # Application payload cap (public POST /applications, anti-DoS). Applies to the
-    # serialized field values (`data`) and as a Content-Length bound; above -> 413.
-    # 64 KiB covers every real form.
+    # Application payload cap for the public POST /applications (anti-DoS). It applies
+    # to the serialized field values (`data`) and as a Content-Length bound. A larger
+    # body gets 413. 64 KiB covers every real form.
     max_application_payload_bytes: int = 65536
 
-    # Body cap of the auth POSTs (magic-link / verify, anti-DoS). Auth bodies are
-    # tiny (mail/token) -> tight bound; above -> 413.
+    # Body cap of the auth POSTs (magic-link and verify, anti-DoS). An auth body holds
+    # only a mail address or a token, so the bound stays tight. A larger body gets 413.
     max_auth_payload_bytes: int = 8192
 
-    # Altcha (proof-of-work). Without a secret verification is off (dev/test); the
-    # field is then only passed through. The secret is shared with the Altcha
-    # sidecar (deploy/.env: ALTCHA_HMAC_SECRET).
+    # Altcha proof-of-work. Without a secret the verification is off (dev/test), and
+    # the field only passes through. The Altcha sidecar shares this secret
+    # (deploy/.env: ALTCHA_HMAC_SECRET).
     altcha_hmac_secret: str | None = Field(default=None, min_length=_MIN_SECRET_LEN)
     altcha_max_number: int = 100_000
     altcha_challenge_ttl_seconds: int = 300
@@ -264,21 +274,26 @@ class Settings(BaseSettings):
     rl_magic_link_mail_per_hour: int = 3
     rl_magic_link_verify_ip_per_hour: int = 20
     rl_applications_ip_per_hour: int = 10
-    rl_attachments_per_hour: int = 30  # POST /attachments: 30/h/applicant
-    # FinTS sync/TAN/import: per principal/h. Curbs SSRF port-scan attempts + bank-PIN
-    # lockout abuse via repeated syncs.
+    rl_attachments_per_hour: int = 30  # POST /attachments: 30 per hour per applicant
+    # FinTS sync, TAN and import: per principal and hour. This curbs SSRF port-scan
+    # attempts and bank-PIN lockout abuse through repeated syncs.
     rl_fints_per_hour: int = 60
-    # Default limit on all writing endpoints: IP key, generous — catches endpoints
-    # without their own (stricter) limit, defense-in-depth.
+    # Default limit on all writing endpoints. It keys on the IP and stays generous. It
+    # catches an endpoint without its own stricter limit (defense in depth).
     rl_default_write_per_hour: int = 100
 
     @model_validator(mode="after")
     def _no_wildcard_proxy_in_prod(self) -> "Settings":
-        """`production` must not set `FORWARDED_ALLOW_IPS` to "*".
+        """Refuse `FORWARDED_ALLOW_IPS` set to "*" in `production`.
 
-        "*" would make uvicorn trust any X-Forwarded-* source -> IP spoofing
-        (rate-limit bypass, wrong audit IP). Outside `production` (dev/CI/container
-        smoke) "*" stays allowed."""
+        With "*" uvicorn trusts any X-Forwarded-* source. An attacker can then spoof
+        the client IP, bypass the rate limit and poison the audit IP. Outside
+        `production` (dev, CI, container smoke) "*" stays allowed.
+
+        Raises:
+            ValueError: The environment is `production` and `forwarded_allow_ips`
+                contains "*".
+        """
         if self.environment == "production" and "*" in self.forwarded_allow_ips:
             raise ValueError(
                 'FORWARDED_ALLOW_IPS must not be "*" in production (security.md §3).'
@@ -287,25 +302,28 @@ class Settings(BaseSettings):
 
     @property
     def is_production(self) -> bool:
-        """Is the app running in the production profile (``ENVIRONMENT=production``)?"""
+        """Report whether the app runs the production profile (`ENVIRONMENT=production`)."""
         return self.environment == "production"
 
     @property
     def strict_security_enabled(self) -> bool:
-        """Should the strict hardening guards apply (fail-safe)?
+        """Report whether the strict hardening guards apply (fail-safe).
 
-        True as soon as ``strict_security`` is on OR ``environment == "production"``.
-        Consumers (invoice AV fail-closed, proxy guard) should query this instead of a
-        bare ``environment == "production"`` check, so a forgotten ENVIRONMENT=production
-        does not silently disable the guards."""
+        The value is True as soon as `strict_security` is on OR `environment` equals
+        "production". A consumer such as the invoice AV fail-closed path or the proxy
+        guard must query this instead of a bare `environment == "production"` check.
+        A forgotten ENVIRONMENT=production then does not silently disable the guards.
+        """
         return self.strict_security or self.is_production
 
     @model_validator(mode="after")
     def _strict_security_warnings(self) -> "Settings":
         """Warn loudly when the configuration stays weak under hardening.
 
-        Does NOT abort startup (DEV ergonomics / backward compat), but makes visible
-        in the log that production-critical guards are affected."""
+        The validator does NOT abort startup, to keep DEV ergonomics and backward
+        compatibility. It only makes visible in the log that production-critical
+        guards are affected.
+        """
         if not self.is_production:
             _log.warning(
                 "ENVIRONMENT=%r (not 'production'): production-only security guards "
@@ -345,7 +363,12 @@ class Settings(BaseSettings):
 
 
 def load_settings(**overrides: Any) -> Settings:
-    """Load settings; missing required fields -> `SettingsError` with a clear message."""
+    """Load the settings.
+
+    Raises:
+        SettingsError: A required field is missing, or the configuration is invalid.
+            The message names the fields.
+    """
     try:
         return Settings(**overrides)
     except ValidationError as exc:

@@ -9,7 +9,7 @@ export function stateDisplayLabel(s: StateDef): string {
   return s.label['de'] || s.label['en'] || s.key;
 }
 
-/** Lookup context for guard labels; values are read at call time so signal
+/** Lookup context for guard labels. The code reads the values at call time, so signal
  *  consumers stay reactive. */
 export interface GuardLabelContext {
   translate: (key: TranslationKey) => string;
@@ -22,8 +22,8 @@ function optionLabel(options: SelectOption[], value: string): string {
   return options.find((o) => o.value === value)?.label ?? value;
 }
 
-/** Resolve role key / gremium UUID / cost-centre UUID to a display name;
- *  unknown values stay visible raw. */
+/** Resolve a role key, a Gremium UUID or a cost center UUID to a display name. An
+ *  unknown value stays visible as raw text. */
 function resolveGuardValue(op: string, value: string, ctx: GuardLabelContext): string {
   if (!value) return value;
   const kind = guardValueKind(op);
@@ -34,8 +34,9 @@ function resolveGuardValue(op: string, value: string, ctx: GuardLabelContext): s
 }
 
 /**
- * Human-readable name of a guard group (operator + value; empty = catch-all).
- * Combinators use the `guardCombinator` keys, `compare` shows "field op value".
+ * Human-readable name of a guard group: the operator plus the value. An empty group is
+ * the catch-all. A combinator uses the `guardCombinator` keys. A `compare` guard shows
+ * "field op value".
  */
 export function guardGroupLabel(g: GuardGroup, ctx: GuardLabelContext): string {
   if (!g.sig) return ctx.translate('admin.flow.guardDefault');

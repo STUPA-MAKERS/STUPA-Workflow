@@ -43,10 +43,9 @@ describe('TransitionDetailComponent', () => {
         },
       ],
     });
-    // Label appears in the add-select option AND as the card title.
+    // The label appears in the add-select option and as the card title.
     expect(screen.getAllByText('Webhook auslösen').length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText('Zur nächsten Sitzung').length).toBeGreaterThanOrEqual(2);
-    // Params and recipients are read through the pure helpers.
     expect(c.actionParam({ type: 'assignBudget', budgetId: 'b1' }, 'budgetId')).toBe('b1');
     expect(c.actionParam({ type: 'assignBudget' }, 'budgetId')).toBe('');
     expect(c.recipientsOf({ type: 'notify' })).toEqual([]);

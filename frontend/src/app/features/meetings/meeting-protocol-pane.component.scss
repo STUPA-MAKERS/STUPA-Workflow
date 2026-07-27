@@ -56,7 +56,7 @@
   margin-top: var(--space-4);
   flex-wrap: wrap;
 }
-/* Taller writing surface; the editor encapsulates its styles → ::ng-deep. */
+/* Taller writing surface. The editor encapsulates its styles, so use ::ng-deep. */
 app-markdown-editor {
   display: block;
 }
@@ -67,7 +67,7 @@ app-markdown-editor ::ng-deep .mde__host .ProseMirror {
   min-height: 22rem;
 }
 @media (max-width: 48rem) {
-  /* More compact editor so attendance/agenda follow without a huge scroll. */
+  /* A more compact editor lets attendance and agenda follow without a long scroll. */
   app-markdown-editor ::ng-deep .mde__host {
     min-height: 16rem;
   }

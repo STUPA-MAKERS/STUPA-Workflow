@@ -1,8 +1,8 @@
-"""Integration: OAuth2-AS-Service gegen echtes Postgres — Code/Exchange/Refresh/Resolve.
+"""Integration: the OAuth2 server service against a real Postgres.
 
-Deckt den sicherheitskritischen Token-Pfad ab: PKCE-Bindung, Einmal-Code, Refresh-
-Rotation, Ablauf/Widerruf. Der Browser-/OIDC-Hop (authorize→finish) ist hier nicht
-abgebildet (bräuchte Keycloak); die Endpunkt-Validierung ist separat unit-getestet.
+The tests cover the security-critical token path: PKCE binding, single-use code, refresh
+rotation, expiry and revocation. The browser and OIDC hop (authorize to finish) needs
+Keycloak, so it is not covered here. Unit tests cover the endpoint validation.
 """
 
 from __future__ import annotations
@@ -167,11 +167,10 @@ async def test_refresh_rotates_and_revokes_old(session: AsyncSession) -> None:
         refresh_ttl=_REFRESH_TTL,
     )
     assert second.access_token != first.access_token
-    # alter Access-Token ist nach Rotation widerrufen
+    # The rotation revokes the old access token.
     assert await oauth_service.resolve_access_token(
         session, token=first.access_token, now=now
     ) is None
-    # alter Refresh-Token kann nicht erneut verwendet werden
     with pytest.raises(oauth.OAuthError):
         await oauth_service.refresh_tokens(
             session,
@@ -205,7 +204,7 @@ async def test_expired_access_token_not_resolved(session: AsyncSession) -> None:
 
 async def test_never_expiring_token_resolves_far_future(session: AsyncSession) -> None:
     pid = await _principal(session)
-    code = await _mint_code(session, pid, access_ttl_seconds=None)  # »läuft nie ab«
+    code = await _mint_code(session, pid, access_ttl_seconds=None)  # never expires
     now = datetime.now(UTC)
     issued = await oauth_service.exchange_code(
         session,
@@ -218,7 +217,7 @@ async def test_never_expiring_token_resolves_far_future(session: AsyncSession) -
         refresh_ttl=_REFRESH_TTL,
     )
     assert issued.expires_in is None
-    # Auch Jahre später noch gültig (nur Widerruf beendet es).
+    # The token stays valid years later. Only a revocation ends it.
     far = now + timedelta(days=3650)
     resolved = await oauth_service.resolve_access_token(
         session, token=issued.access_token, now=far

@@ -1,5 +1,8 @@
-"""Model aggregator: imports all module models so `Base.metadata` is fully
-populated (single source for Alembic and tests)."""
+"""Model aggregator.
+
+This module imports every module model, so `Base.metadata` is complete. That
+metadata is the single source for Alembic and for the tests.
+"""
 
 from __future__ import annotations
 

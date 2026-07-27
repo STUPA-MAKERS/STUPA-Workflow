@@ -4,9 +4,12 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { ButtonComponent } from '@stupa-makers/ui-kit';
 
 /**
- * Account calendar subscription: shows the personal iCal feed URL (meetings of the
- * user's own gremien) to copy, and allows rotating it (the old URL is invalidated).
- * The feed token is created only on first "generate" — until then `url` is null.
+ * Account calendar subscription page.
+ *
+ * The page shows the personal iCal feed URL to copy. The feed holds the meetings of the
+ * Gremien of the user. The user can rotate the URL, which invalidates the old one. The
+ * server creates the feed token only on the first "generate" action. Until then `url`
+ * is null.
  */
 @Component({
   selector: 'app-account-calendar',
@@ -38,7 +41,7 @@ export class AccountCalendarComponent {
     });
   }
 
-  /** Generate a new feed token — invalidates the previous URL. */
+  /** Generate a new feed token. This invalidates the previous URL. */
   rotate(): void {
     if (this.busy()) return;
     this.busy.set(true);
@@ -56,7 +59,7 @@ export class AccountCalendarComponent {
     });
   }
 
-  /** Copy the subscription URL to the clipboard (best-effort; Clipboard API optional). */
+  /** Copy the subscription URL to the clipboard. The Clipboard API can be absent. */
   copy(): void {
     const url = this.url();
     if (!url) return;

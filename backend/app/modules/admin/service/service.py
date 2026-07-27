@@ -1,13 +1,13 @@
 """Public facade of the admin config service.
 
-:class:`ConfigService` combines the concerns — the router and all callers bind
-to exactly this class. The implementation lives in the ops classes:
+``ConfigService`` combines the concerns. The router and every caller bind to
+exactly this class. The ops classes hold the implementation.
 
-* :class:`~.gremien.GremiumOps` — gremium CRUD + protocol mail recipients
-* :class:`~.application_types.ApplicationTypeOps` — application-type CRUD
-* :class:`~.flow.FlowOps` — active global flow graph, immutable flow versions
-* :class:`~.rbac.RbacOps` — roles, assignments, principals, group mappings
-* :class:`~.webhooks.WebhookOps` — webhook CRUD + delivery diagnostics
+``gremien.GremiumOps`` — gremium CRUD plus the protocol mail recipients.
+``application_types.ApplicationTypeOps`` — application-type CRUD.
+``flow.FlowOps`` — the active global flow graph and immutable flow versions.
+``rbac.RbacOps`` — roles, assignments, principals and group mappings.
+``webhooks.WebhookOps`` — webhook CRUD plus delivery diagnostics.
 """
 
 from __future__ import annotations

@@ -1,17 +1,17 @@
-"""Bank reconciliation — FinTS fetch, statement parsers, staging, reconcile.
+"""Bank reconciliation: FinTS fetch, statement parsers, staging, reconcile.
 
-Layout:
+Modules of this package:
 
-* :mod:`.statement`   — source-agnostic data types + format detection (file-import
-  entry point: :func:`~.statement.parse_statement_full`).
-* :mod:`.mt940_parse` — MT940 (``.sta``) to :class:`~.statement.StatementLine`.
-* :mod:`.camt_parse`  — CAMT.052/053 (XML) to StatementLine, incl. splitting batch
-  bookings (one ``Ntry``, n ``TxDtls``) into single transactions.
-* :mod:`.normalize`   — pure text/IBAN/counterparty normalization.
-* :mod:`.dedup`       — idempotency keys + raw-based dedup base.
-* :mod:`.client`      — FinTS network client (PIN/TAN SCA, CAMT-preferred fetch).
-* :mod:`.match`       — scoring of transaction vs. existing booking.
-* :mod:`.service`     — :class:`~.service.BankService` (HTTP facade, DB orchestration),
-  composed of ``credentials``/``sync``/``staging``/``reconcile``/``listing``.
-* :mod:`.maintenance` — idempotent cleanup routines for migrations.
+`statement` defines the source-agnostic data types and detects the format. Files enter
+through `statement.parse_statement_full`.
+`mt940_parse` maps MT940 (`.sta`) to `statement.StatementLine`.
+`camt_parse` maps CAMT.052/053 (XML) to StatementLine. It also splits a batch booking
+(one `Ntry` with n `TxDtls`) into single transactions.
+`normalize` holds the pure text, IBAN and counterparty normalization.
+`dedup` builds the idempotency keys and the raw dedup base.
+`client` is the FinTS network client (PIN/TAN SCA, CAMT-preferred fetch).
+`match` scores a transaction against an existing booking.
+`service` holds `service.BankService`, the HTTP facade and the DB orchestration. It is
+composed of `credentials`, `sync`, `staging`, `reconcile` and `listing`.
+`maintenance` holds the idempotent cleanup routines for migrations.
 """

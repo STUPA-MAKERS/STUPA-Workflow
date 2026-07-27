@@ -1,4 +1,4 @@
-"""TDD: Auth-Kern-Typen (Principal/Applicant)."""
+"""TDD: the core auth types Principal and Applicant."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ def test_principal_has_permission() -> None:
 
 
 def test_admin_role_has_all_permissions() -> None:
-    """#15: die admin-Rolle gewährt jedes Recht, auch ohne explizite Permission."""
+    """#15: the admin role grants every permission, even without an explicit grant."""
     p = Principal(sub="root", roles=["admin"], permissions=set())
     assert p.has("admin.config")
     assert p.has("vote.cast")

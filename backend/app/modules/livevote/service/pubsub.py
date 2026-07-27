@@ -1,7 +1,8 @@
-"""WS pub/sub glue: the ``meeting:{id}`` channel and the broker-backed publisher.
+"""WebSocket pub/sub glue: the `meeting:{id}` channel and the broker-backed publisher.
 
-Aggregate-only: tally/closed events carry only ``counts``/``quorumMet``/``leading``/
-``result`` — never voter identities — so the beamer stream is name-free by design.
+The events carry aggregates only. A tally event and a closed event hold `counts`,
+`quorumMet`, `leading`, and `result`, but never a voter identity. The beamer stream
+therefore carries no names.
 """
 
 from __future__ import annotations
@@ -21,15 +22,16 @@ from app.modules.voting.schemas import VoteClosed, VoteOut
 
 
 def meeting_channel(meeting_id: UUID) -> str:
-    """Pub/sub channel of a meeting."""
+    """Return the pub/sub channel of a meeting."""
     return f"meeting:{meeting_id}"
 
 
 class BrokerPublisher:
-    """Translates domain results into WS events and fans them out via the broker.
+    """Translate domain results into WebSocket events and send them over the broker.
 
-    Implements the leaf ``MeetingPublisher`` protocol the voting module hooks into
-    on open/close (avoids an import cycle).
+    This class implements the leaf `MeetingPublisher` protocol. The voting module
+    hooks into that protocol when it opens or closes a vote. The protocol avoids an
+    import cycle.
     """
 
     def __init__(self, broker: MeetingBroker) -> None:
@@ -58,8 +60,9 @@ class BrokerPublisher:
     async def vote_tally(self, vote: VoteOut) -> None:
         if vote.meeting_id is None:
             return
-        # ``from_vote`` hides choice counts while the vote is secret AND open (no
-        # interim leak to beamer/voters); only the participation travels along.
+        # `from_vote` hides the choice counts while the vote is secret and open.
+        # This prevents an interim leak to the beamer and to the voters. Only the
+        # participation count travels.
         event = VoteTallyEvent.from_vote(vote)
         await self._broker.publish(meeting_channel(vote.meeting_id), event.dump())
 

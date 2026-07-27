@@ -1,9 +1,10 @@
-"""arq worker: entry points + budget rollup refresh.
+"""arq worker: entry points and budget rollup refresh.
 
-No-op ``ping`` (container healthcheck) plus ``refresh_budget_stats``: refreshes the
-rollup MVs (``mv_budget_usage``/``mv_status_distribution``) ``CONCURRENTLY`` via a
-nightly cron. Status changes/vote-close trigger the same job. ``CONCURRENTLY`` needs
-an AUTOCOMMIT connection, hence a dedicated engine.
+`ping` does nothing and serves the container healthcheck. A nightly cron runs
+`refresh_budget_stats`, which refreshes the rollup materialized views
+`mv_budget_usage` and `mv_status_distribution` with `CONCURRENTLY`. A status change
+or a vote close triggers the same job. `CONCURRENTLY` needs an AUTOCOMMIT connection,
+so the module keeps a dedicated engine.
 """
 
 from __future__ import annotations
@@ -39,18 +40,19 @@ from worker.webhook import on_startup as webhook_on_startup
 
 
 async def ping(ctx: dict[str, object]) -> str:
-    """Placeholder task."""
+    """Do nothing and serve the container healthcheck."""
     return "pong"
 
 
-# Hard per-job deadline for ``deliver_webhook``: it shares the arq worker with mail,
-# scan, render and crons, so a slow/hostile target must not hold a slot to the arq
-# default (300 s). Second bound below the service's ``webhook_timeout_seconds`` cap.
+# Hard per-job deadline for `deliver_webhook`. The task shares the arq worker with mail,
+# scan, render and the crons. A slow or hostile target must not hold a slot for the
+# arq default of 300 s. This bound sits one level below the service cap
+# `webhook_timeout_seconds`.
 _WEBHOOK_JOB_TIMEOUT_SECONDS = 30.0
 
 
 async def _on_startup(ctx: dict[str, Any]) -> None:
-    """Worker init: mail, scan, PDF-render and webhook deps."""
+    """Set up the mail, scan, PDF render, webhook and deadline dependencies."""
     await mail_on_startup(ctx)
     await scan_on_startup(ctx)
     await pdf_on_startup(ctx)
@@ -60,8 +62,11 @@ async def _on_startup(ctx: dict[str, Any]) -> None:
 
 @lru_cache(maxsize=1)
 def _budget_engine() -> AsyncEngine:  # pragma: no cover
-    """Single AUTOCOMMIT engine (worker lifetime); ``REFRESH ... CONCURRENTLY`` must
-    not run in a transaction. Cached to avoid a pool leak per refresh."""
+    """Return the single AUTOCOMMIT engine for the worker lifetime.
+
+    `REFRESH ... CONCURRENTLY` must not run inside a transaction. The cache stops a
+    pool leak on every refresh.
+    """
     return create_async_engine(
         os.environ.get("DATABASE_URL", "postgresql+asyncpg://app:pw@db/antrag"),
         isolation_level="AUTOCOMMIT",
@@ -69,8 +74,10 @@ def _budget_engine() -> AsyncEngine:  # pragma: no cover
 
 
 def _budget_sessionmaker() -> async_sessionmaker[AsyncSession]:  # pragma: no cover
-    """Sessionmaker on the reused engine (injected in tests via
-    ``ctx['budget_sessionmaker']``)."""
+    """Return a sessionmaker on the reused engine.
+
+    Tests inject one through `ctx['budget_sessionmaker']`.
+    """
     return async_sessionmaker(_budget_engine(), expire_on_commit=False)
 
 
@@ -97,8 +104,6 @@ class WorkerSettings:
         scan_attachment,
         render_pdf,
         render_protocol,
-        # Short per-job timeout so a slow/hostile webhook target cannot hold a shared
-        # worker slot to the arq default (300 s).
         func(deliver_webhook, timeout=_WEBHOOK_JOB_TIMEOUT_SECONDS),
         process_deadlines,
         process_task_reminders,
@@ -106,13 +111,14 @@ class WorkerSettings:
     ]
     cron_jobs = [
         cron(refresh_budget_stats, hour=3, minute=0),
-        # GDPR retention: daily anonymize terminal applications + purge expired
-        # sessions/magic-links. Budget data is left untouched.
+        # GDPR retention: anonymize terminal applications once a day and purge expired
+        # sessions and magic links. The job does not touch budget data.
         cron(process_retention, hour=3, minute=30),
-        # Scan deadlines/votes every minute — idempotent + SKIP LOCKED.
+        # Scan deadlines and votes every minute. The scan is idempotent and uses
+        # SKIP LOCKED.
         cron(process_deadlines, second=0),
-        # Task reminders hourly — thresholds in days; task_reminder_log prevents
-        # duplicate sends.
+        # Task reminders run hourly. The thresholds are in days. The task_reminder_log
+        # table prevents duplicate sends.
         cron(process_task_reminders, minute=10),
     ]
     on_startup = _on_startup

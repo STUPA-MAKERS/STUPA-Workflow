@@ -7,12 +7,14 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 type AltchaState = 'idle' | 'verifying' | 'solved' | 'error';
 
 /**
- * Altcha widget. Fetches a server-signed PoW challenge
- * (`GET /altcha/challenge`), solves the proof-of-work locally (finds `number`
- * with `SHA-256(salt+number) == challenge` via Web Crypto) and emits the
- * base64 solution to the wizard. With Altcha unconfigured (404) the widget
- * signals `unavailable`, so the wizard requires no solution. Submit is only
- * possible after `solved` (or `unavailable`).
+ * Altcha widget.
+ *
+ * The widget gets a server-signed proof-of-work challenge from
+ * `GET /altcha/challenge`. It solves the proof of work locally with Web Crypto: it
+ * finds the `number` where `SHA-256(salt+number) == challenge`. It then emits the
+ * base64 solution to the wizard. If Altcha has no configuration, the endpoint answers
+ * 404 and the widget emits `unavailable`. The wizard then needs no solution. The
+ * wizard allows submit only after `solved` or `unavailable`.
  */
 @Component({
   selector: 'app-altcha',
@@ -25,9 +27,9 @@ type AltchaState = 'idle' | 'verifying' | 'solved' | 'error';
 export class AltchaComponent {
   private readonly api = inject(ApiClient);
 
-  /** Emits the base64 PoW solution once the challenge is solved. */
+  /** Emits the base64 proof-of-work solution after the widget solves the challenge. */
   readonly solved = output<string>();
-  /** Emits when Altcha is disabled server-side (no captcha needed). */
+  /** Emits when the server has Altcha off. The form then needs no captcha. */
   readonly unavailable = output<void>();
 
   readonly state = signal<AltchaState>('idle');
@@ -38,7 +40,7 @@ export class AltchaComponent {
     try {
       const challenge = await firstValueFrom(this.api.altchaChallenge());
       if (!challenge) {
-        // Altcha off (404) → no captcha required.
+        // A null challenge means the server answered 404: Altcha is off, no captcha.
         this.state.set('solved');
         this.unavailable.emit();
         return;
@@ -51,7 +53,7 @@ export class AltchaComponent {
     }
   }
 
-  /** Solve the proof-of-work: find `number` with `SHA-256(salt+number) == challenge`. */
+  /** Solve the proof of work: find `number` with `SHA-256(salt+number) == challenge`. */
   private async solveChallenge(c: AltchaChallenge): Promise<string> {
     for (let number = 0; number <= c.maxnumber; number++) {
       if ((await sha256Hex(`${c.salt}${number}`)) === c.challenge) {
@@ -62,7 +64,7 @@ export class AltchaComponent {
           salt: c.salt,
           signature: c.signature,
         };
-        // Standard base64 (btoa) — the payload is pure ASCII (hex/int/"SHA-256").
+        // Standard base64 (btoa) is safe here: the payload holds only ASCII.
         return btoa(JSON.stringify(payload));
       }
     }

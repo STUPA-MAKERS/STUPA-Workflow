@@ -1,9 +1,9 @@
-"""Unit-Tests für die Vollständigkeit der DSGVO-Auskunft (Art. 15, AUD-015).
+"""Unit tests for the completeness of the DSGVO Auskunft (Art. 15, AUD-015).
 
-Beweist ohne DB, dass ``AuskunftService.collect`` zusätzlich zu Anträgen/Versionen
-auch die vom Subjekt einsehbaren **Kommentare** (eigene/öffentliche) und die
-**Anhang-Metadaten** (Dateinamen = potenzielle PII) sammelt, und dass der
-modul-lokale ``build_auskunft_workbook`` daraus zwei zusätzliche Blätter rendert.
+The tests need no database. They prove that `AuskunftService.collect` gathers more
+than the applications and the versions. It also collects the comments the subject may
+read (own and public) and the attachment metadata. A filename can hold PII. The
+module-local `build_auskunft_workbook` then renders two extra sheets from that data.
 """
 
 from __future__ import annotations
@@ -52,14 +52,14 @@ async def test_collect_gathers_comments_and_attachments() -> None:
     )
     db = fake_session(
         scalars=[
-            result(applicant),  # applicants
-            result(application),  # apps
-            result(version),  # versions
-            result(comment),  # comments
-            result(attachment),  # attachments
+            result(applicant),
+            result(application),
+            result(version),
+            result(comment),
+            result(attachment),
         ],
-        execute=[result((type_id, {"de": "Typ"}))],  # type_names (kein State)
-        scalar=[None],  # kein Principal
+        execute=[result((type_id, {"de": "Typ"}))],  # type_names, no state
+        scalar=[None],  # no principal
     )
 
     data = await AuskunftService(db).collect("z@example.org", locale="de")
@@ -130,7 +130,7 @@ def test_build_workbook_renders_comment_and_attachment_sheets() -> None:
 
 
 def test_build_workbook_backward_compatible_without_new_kwargs() -> None:
-    """Defaults für comments/attachments → alte Aufrufer (nur 4 kwargs) bleiben gültig."""
+    """The comments and attachments defaults keep old callers with four kwargs valid."""
     from io import BytesIO
 
     from openpyxl import load_workbook
@@ -142,6 +142,6 @@ def test_build_workbook_backward_compatible_without_new_kwargs() -> None:
         principal=None,
     )
     wb = load_workbook(BytesIO(blob))
-    # leere, aber valide Zusatzblätter
+    # empty but valid extra sheets
     assert "Kommentare" in wb.sheetnames
     assert "Anhänge" in wb.sheetnames

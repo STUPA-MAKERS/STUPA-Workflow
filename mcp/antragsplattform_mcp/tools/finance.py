@@ -1,8 +1,7 @@
-"""Finance tools: flat expense listing, invoices, FinTS bank reconcile, staged
-statement lines, and sub-bookings.
+"""Finance tools for expenses, invoices, FinTS reconcile, statement lines, sub-bookings.
 
-FinTS acts under the booker's PERSONAL online-banking login; a `needs_tan` response
-requires a HUMAN to complete PSD2/SCA — an agent cannot finish a TAN flow alone.
+FinTS acts under the PERSONAL online-banking login of the booker. A `needs_tan` response
+needs a HUMAN to complete PSD2/SCA. An agent cannot finish a TAN flow alone.
 """
 
 from __future__ import annotations
@@ -22,7 +21,7 @@ group = ToolGroup()
 
 
 def _file_part(file_path: str) -> dict[str, Any]:
-    """Read a local file into an httpx multipart ``files=`` dict (backend field name ``file``)."""
+    """Read a local file into an httpx `files=` dict under the backend field name `file`."""
     p = Path(file_path).expanduser()
     if not p.is_file():
         raise ApiError(400, f"file not found: {file_path!r}")
@@ -46,8 +45,17 @@ async def list_expenses(
     limit: int = 50,
     offset: int = 0,
 ) -> dict:
-    """List bookings across all cost centres (flat, filtered, offset-paged). ``budget`` includes
-    the subtree; dates are ISO; amounts are decimal strings. Requires budget.view."""
+    """List the bookings of all cost centers as a flat, filtered, offset-paged list.
+
+    Requires budget.view.
+
+    Args:
+        budget: A cost center id. The list also covers its subtree.
+        amount_min: A decimal string.
+        amount_max: A decimal string.
+        created_from: An ISO date.
+        created_to: An ISO date.
+    """
     return await api().get(
         "/expenses",
         params=params(
@@ -61,13 +69,15 @@ async def list_expenses(
 
 @group.tool
 async def list_account_options() -> dict:
-    """List accounts as id+name for booking dropdowns (no IBAN). Shows ``fintsConfigured`` and
-    whether the requesting booker already has personal FinTS credentials. Readable for bookers
-    (budget.book/budget.view) without account-master rights."""
+    """List the accounts as id and name for the booking dropdowns, without the IBAN.
+
+    Each entry shows `fintsConfigured`. It also tells whether the booker who asks
+    already holds a personal FinTS credential. A booker with budget.book or
+    budget.view can read this without the account master permission.
+    """
     return await api().get("/accounts/options")
 
 
-# --- invoices
 @group.tool
 async def list_invoices(
     q: str | None = None,
@@ -81,8 +91,13 @@ async def list_invoices(
     limit: int = 50,
     offset: int = 0,
 ) -> dict:
-    """List invoices (fuzzy ``q`` over number/supplier/note; filter status/gross-range/date;
-    offset-paged, newest issue date first). Requires budget.view/.book."""
+    """List the invoices, offset-paged, with the newest issue date first.
+
+    Filter by status, by gross range and by date. Requires budget.view or budget.book.
+
+    Args:
+        q: A fuzzy search over the invoice number, the supplier and the note.
+    """
     return await api().get(
         "/invoices",
         params=params(
@@ -95,20 +110,26 @@ async def list_invoices(
 
 @group.tool
 async def get_invoice(invoice_id: str) -> dict:
-    """Fetch one invoice (header data + whether an original file is attached)."""
+    """Get one invoice with its header data and a flag for an attached original file."""
     return await api().get(f"/invoices/{invoice_id}")
 
 
 @group.tool
 async def create_invoice(invoice: S.InvoiceCreate) -> dict:
-    """Create an invoice (grossAmount required). ``fileToken`` from parse_invoice /
-    upload_invoice_file links the stored original PDF. Requires budget.book."""
+    """Create an invoice.
+
+    The field `grossAmount` is required. A `fileToken` from `parse_invoice` or
+    `upload_invoice_file` links the stored original PDF. Requires budget.book.
+    """
     return await api().post("/invoices", json=dump_create(invoice))
 
 
 @group.tool
 async def update_invoice(invoice_id: str, patch: S.InvoiceUpdate) -> dict:
-    """Patch an invoice (amount/status/dates/supplier/note). Requires budget.book."""
+    """Patch the amount, status, dates, supplier or note of an invoice.
+
+    Requires budget.book.
+    """
     return await api().patch(f"/invoices/{invoice_id}", json=dump_patch(patch))
 
 
@@ -120,31 +141,46 @@ async def delete_invoice(invoice_id: str) -> dict:
 
 @group.tool
 async def parse_invoice(file_path: str) -> dict:
-    """Parse a local ZUGFeRD/Factur-X PDF: extract header fields + store the original. Returns the
-    parsed fields plus a ``fileToken`` to pass to create_invoice. Requires budget.book."""
+    """Parse a local ZUGFeRD or Factur-X PDF and store the original.
+
+    The call reads the header fields out of the file. Requires budget.book.
+
+    Returns:
+        The parsed fields and a `fileToken` to pass to `create_invoice`.
+    """
     return await api().post("/invoices/parse", files=_file_part(file_path))
 
 
 @group.tool
 async def upload_invoice_file(file_path: str) -> dict:
-    """Upload a local invoice document (non-ZUGFeRD also fine); returns a ``fileToken`` for
-    create_invoice. Requires budget.book."""
+    """Upload a local invoice document.
+
+    The document does not have to be a ZUGFeRD file. Requires budget.book.
+
+    Returns:
+        A `fileToken` to pass to `create_invoice`.
+    """
     return await api().post("/invoices/file", files=_file_part(file_path))
 
 
-# --- FinTS bank reconcile
 @group.tool
 async def get_fints_credential(account_id: str) -> dict:
-    """Connection status for the requesting booker on an account: FinTS-capable? personal login
-    stored? lock cooldown? Requires budget.book."""
+    """Get the FinTS connection status of the booker who asks, for one account.
+
+    The answer tells whether the account speaks FinTS, whether a personal login is
+    stored, and whether a lock cooldown runs. Requires budget.book.
+    """
     return await api().get(f"/accounts/{account_id}/fints/credential")
 
 
 @group.tool
 async def set_fints_credential(account_id: str, credential: S.FintsCredentialIn) -> dict:
-    """Store/replace the booker's personal FinTS login+PIN for an account (PIN write-only, stored
-    encrypted). The account must already have a FinTS connection (endpoint+BLZ, set via
-    update_account). Requires budget.book."""
+    """Store or replace the personal FinTS login and PIN of the booker for an account.
+
+    The PIN is write-only and the server stores it encrypted. The account must already
+    hold a FinTS connection with an endpoint and a BLZ, set through `update_account`.
+    Requires budget.book.
+    """
     return await api().put(
         f"/accounts/{account_id}/fints/credential", json=dump_create(credential)
     )
@@ -152,23 +188,34 @@ async def set_fints_credential(account_id: str, credential: S.FintsCredentialIn)
 
 @group.tool
 async def delete_fints_credential(account_id: str) -> dict:
-    """Remove the booker's personal FinTS credential for an account. Requires budget.book."""
+    """Remove the personal FinTS credential of the booker for an account.
+
+    Requires budget.book.
+    """
     return await api().delete(f"/accounts/{account_id}/fints/credential")
 
 
 @group.tool
 async def fints_sync(account_id: str) -> dict:
-    """Start a FinTS transaction sync. Returns status='done' (imported/duplicates staged) OR
-    status='needs_tan' (sessionToken + challenge → a human approves/enters the TAN, then call
-    fints_submit_tan). 409 means the access is locked — do not retry. Requires budget.book +
-    a stored credential."""
+    """Start a FinTS transaction sync.
+
+    A status of `done` means the sync staged the imported and the duplicate
+    transactions. A status of `needs_tan` returns a `sessionToken` and a challenge. A
+    human then approves or enters the TAN. Call `fints_submit_tan` after that. A 409
+    means the access is locked. Do not retry after a 409. Requires budget.book and a
+    stored credential.
+    """
     return await api().post(f"/accounts/{account_id}/fints/sync")
 
 
 @group.tool
 async def fints_submit_tan(account_id: str, session_token: str, tan: str = "") -> dict:
-    """Resume a pending FinTS sync with the TAN (empty ``tan`` = decoupled pushTAN poll: 'approved
-    in the app yet?'). Returns done or needs_tan again. Requires budget.book."""
+    """Resume a pending FinTS sync with the TAN.
+
+    An empty `tan` polls a decoupled pushTAN and asks whether the human approved the
+    sync in the app. The call returns `done` or `needs_tan` again.
+    Requires budget.book.
+    """
     return await api().post(
         f"/accounts/{account_id}/fints/sessions/{session_token}/tan", json={"tan": tan}
     )
@@ -176,14 +223,16 @@ async def fints_submit_tan(account_id: str, session_token: str, tan: str = "") -
 
 @group.tool
 async def import_statement_file(account_id: str, file_path: str) -> dict:
-    """Import a local CAMT.053/MT940 statement file for an account → stages transactions
-    (idempotent). Returns imported/duplicates. No bank/TAN needed. Requires budget.book."""
+    """Import a local CAMT.053 or MT940 statement file for an account.
+
+    The import stages the transactions and is idempotent. It reports the imported and
+    the duplicate lines. It needs no bank connection and no TAN. Requires budget.book.
+    """
     return await api().post(
         f"/accounts/{account_id}/statement/import", files=_file_part(file_path)
     )
 
 
-# --- staged statement lines → bookings
 @group.tool
 async def list_statement_lines(
     account: str | None = None,
@@ -198,12 +247,21 @@ async def list_statement_lines(
     limit: int = 50,
     offset: int = 0,
 ) -> dict:
-    """List staged bank transactions, filtered + offset-paginated. Returns a page
-    ``{items, total, limit, offset}``; each item carries a signed amount, decoded counterparty
-    and a suggested cost centre. Filters: ``account``, ``state``, ``linked`` (true = already
-    booked, false = open), ``kind`` (expense/income), ``q`` (counterparty/IBAN/purpose),
-    ``date_from``/``date_to`` (YYYY-MM-DD over value/booking date); ``sort`` = date|amount.
-    Requires budget.view/.book."""
+    """List the staged bank transactions, filtered and offset-paged.
+
+    Each item carries a signed amount, a decoded counterparty and a suggested cost
+    center. Requires budget.view or budget.book.
+
+    Args:
+        linked: True lists the transactions that are already booked. False lists the
+            open ones.
+        q: A search over the counterparty, the IBAN and the purpose.
+        date_from: A YYYY-MM-DD date. It matches the value date and the booking date.
+        date_to: A YYYY-MM-DD date. It matches the value date and the booking date.
+
+    Returns:
+        A page of the shape `{items, total, limit, offset}`.
+    """
     return await api().get(
         "/statement-lines",
         params=params(
@@ -216,17 +274,24 @@ async def list_statement_lines(
 
 @group.tool
 async def get_statement_line(line_id: str) -> dict:
-    """One staged transaction incl. ``rawPayload`` (source-format parser fields, batch
-    metadata) and ``idempotencyKey`` — diagnostic detail view, e.g. to tell whether a line
-    was staged from MT940 or CAMT and whether a Sammelbuchung carried sub-transactions.
-    Requires budget.view/.book."""
+    """Get one staged transaction with its `rawPayload` and its `idempotencyKey`.
+
+    The `rawPayload` holds the parser fields of the source format and the batch
+    metadata. Use this diagnostic view to tell whether a line comes from MT940 or from
+    CAMT. It also shows whether a batch booking carried sub-transactions.
+    Requires budget.view or budget.book.
+    """
     return await api().get(f"/statement-lines/{line_id}")
 
 
 @group.tool
 async def confirm_statement_line(line_id: str, confirm: S.ConfirmLineRequest) -> dict:
-    """Book a staged transaction into a booking: new booking on ``budgetId`` OR attach to an
-    existing ``matchExpenseId`` (kind derives from the sign). Requires budget.book."""
+    """Turn a staged transaction into a booking.
+
+    Give a `budgetId` to create a new booking. Give a `matchExpenseId` to attach the
+    transaction to an existing booking. The sign of the amount gives the kind.
+    Requires budget.book.
+    """
     return await api().post(
         f"/statement-lines/{line_id}/confirm", json=dump_create(confirm)
     )
@@ -234,9 +299,15 @@ async def confirm_statement_line(line_id: str, confirm: S.ConfirmLineRequest) ->
 
 @group.tool
 async def ignore_statement_line(line_id: str, reason: str | None = None) -> dict:
-    """Mark a staged transaction as irrelevant (kept for idempotent re-import). ``reason`` is an
-    optional free-text note recorded in the audit log. Audit-sensitive — requires the dedicated
-    budget.reconcile_ignore permission."""
+    """Mark a staged transaction as irrelevant.
+
+    The server keeps the transaction so that a second import stays idempotent. This
+    action is audit-sensitive. It needs the dedicated budget.reconcile_ignore
+    permission.
+
+    Args:
+        reason: A free-text note. The audit log records it.
+    """
     return await api().post(
         f"/statement-lines/{line_id}/ignore", json={"reason": reason} if reason else None
     )
@@ -244,38 +315,53 @@ async def ignore_statement_line(line_id: str, reason: str | None = None) -> dict
 
 @group.tool
 async def reactivate_statement_line(line_id: str) -> dict:
-    """Undo an ignore (#konten): return an ignored transaction to the open reconcile queue
-    (``unmatched``). Requires budget.reconcile_ignore."""
+    """Undo an ignore (#konten).
+
+    The transaction goes back to the open reconcile queue in the state `unmatched`.
+    Requires budget.reconcile_ignore.
+    """
     return await api().post(f"/statement-lines/{line_id}/reactivate")
 
 
 @group.tool
 async def unlink_statement_line(line_id: str) -> dict:
-    """Undo a transaction↔booking link (#konten): removes the allocation and reopens the
-    transaction (``unmatched``). The booking itself is kept. Requires budget.book."""
+    """Undo the link between a transaction and a booking (#konten).
+
+    The call removes the allocation and reopens the transaction in the state
+    `unmatched`. The booking itself stays. Requires budget.book.
+    """
     return await api().post(f"/statement-lines/{line_id}/unlink")
 
 
-# --- sub-bookings
 @group.tool
 async def list_sub_bookings(expense_id: str) -> dict:
-    """List the sub-bookings of a booking (#subbookings). A booking can be broken down into
-    sub-bookings (same schema); they inherit cost-centre/account/fiscal-year/kind from the
-    parent and the parent amount equals their sum. Requires budget.view/.book."""
+    """List the sub-bookings of a booking (#subbookings).
+
+    A booking can break down into sub-bookings with the same schema. A sub-booking
+    inherits the cost center, the account, the fiscal year and the kind of the parent.
+    The amount of the parent equals the sum of the sub-bookings.
+    Requires budget.view or budget.book.
+    """
     return await api().get(f"/budget-expenses/{expense_id}/sub-bookings")
 
 
 @group.tool
 async def import_sub_bookings(expense_id: str, file_path: str) -> dict:
-    """Add sub-bookings to a booking from a local CAMT.053/MT940 file (#subbookings). Each
-    same-direction line becomes a child inheriting the parent's cost-centre/account/fiscal-year/
-    kind; the parent amount is recomputed to their sum. Idempotent (re-upload skips duplicates);
-    EUR-only; transfer/sub-booking parents are rejected. Requires budget.book."""
+    """Add sub-bookings to a booking from a local CAMT.053 or MT940 file (#subbookings).
+
+    Each line with the same direction becomes a child. A child inherits the cost
+    center, the account, the fiscal year and the kind of the parent. The server then
+    recomputes the parent amount to the sum of the children.
+
+    The import is idempotent and a second upload skips the duplicates. It accepts EUR
+    only. The server rejects a transfer or a sub-booking as the parent.
+    Requires budget.book.
+    """
     return await api().post(
         f"/budget-expenses/{expense_id}/sub-bookings/import", files=_file_part(file_path)
     )
 
 
 def register(mcp: FastMCP) -> None:
-    """Register the expenses/invoices/FinTS tool group."""
+    """Register the expenses, invoices and FinTS tool group."""
     group.register(mcp)

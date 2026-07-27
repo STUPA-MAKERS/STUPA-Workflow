@@ -12,7 +12,7 @@ from app.shared.config_schemas import VoteConfig
 
 
 class _CamelModel(BaseModel):
-    """camelCase aliases in JSON; fields also settable by name."""
+    """Give JSON the camelCase aliases. A field also accepts its Python name."""
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -22,11 +22,11 @@ class VoteCreate(_CamelModel):
 
     config: VoteConfig
     eligible_group: str = Field(alias="eligibleGroup", min_length=1)
-    # Resolution question, for the protocol.
+    # The resolution question, for the protocol.
     question: str | None = None
-    # Authoritative eligible-voter count (roster basis), the denominator of the
-    # percent quorum. NOT derived from logged-in users (that would be fail-open).
-    # Required for a percent quorum; if missing there, the quorum is fail-closed.
+    # Authoritative eligible-voter count (roster basis) and the denominator of the
+    # percent quorum. It does NOT come from the logged-in users, because that would be
+    # fail-open. A percent quorum requires it. Without it the quorum stays fail-closed.
     eligible_count: int | None = Field(default=None, alias="eligibleCount", ge=0)
     opens_state_id: UUID | None = Field(default=None, alias="opensStateId")
     closes_at: datetime | None = Field(default=None, alias="closesAt")
@@ -61,18 +61,20 @@ class TallyOut(_CamelModel):
 
     counts: dict[str, int]
     eligible: int
-    # Turnout progress (always visible, even secret/hidden): how many of the
-    # present members have already voted.
+    # Turnout progress (always visible, even when secret or hidden): how many present
+    # members have already voted.
     voted: int = 0
     present: int = 0
-    # ``counts``/``leading`` are only visible when ``revealed`` - i.e. closed, or
-    # (not secret and all present members have voted). Otherwise hidden.
+    # ``counts`` and ``leading`` are visible only when ``revealed``: the vote is closed,
+    # or the vote is not secret and all present members have voted. Otherwise they stay
+    # hidden.
     revealed: bool = True
     quorum_met: bool = Field(alias="quorumMet")
     leading: str | None = None
     result: Literal["passed", "rejected", "tie"] | None = None
     # Why the vote failed: ``quorum`` = quorum missed (fail-closed), ``majority`` =
-    # quorum met but majority missed. None while open or on passed/tie.
+    # quorum met but majority missed. It stays None while the vote is open, and on
+    # passed or tie.
     failed_reason: Literal["quorum", "majority"] | None = Field(
         default=None, alias="failedReason"
     )
@@ -82,15 +84,16 @@ class VoteOut(_CamelModel):
     """Vote state + tally (``GET /votes/{id}``)."""
 
     id: UUID
-    # None = generic resolution question (free-text TOP), no application.
+    # A None value marks a generic resolution question of a free-text agenda item with
+    # no application.
     application_id: UUID | None = Field(default=None, alias="applicationId")
-    # Meeting the vote hangs on (live vote); None for a pure async vote.
+    # The meeting that holds the vote (live vote). It is None for a pure async vote.
     meeting_id: UUID | None = Field(default=None, alias="meetingId")
     agenda_item_id: UUID | None = Field(default=None, alias="agendaItemId")
     question: str | None = None
     eligible_group: str = Field(alias="eligibleGroup")
     config: VoteConfig
-    # ``cancelled``: the application left the vote state manually (vote aborted).
+    # ``cancelled``: the application left the vote state manually and aborted the vote.
     status: Literal["draft", "open", "closed", "cancelled"]
     opens_at: datetime | None = Field(default=None, alias="opensAt")
     closes_at: datetime | None = Field(default=None, alias="closesAt")
@@ -106,7 +109,7 @@ class BallotAccepted(_CamelModel):
 
 
 class VoteClosed(_CamelModel):
-    """Result of closing (``POST /votes/{id}/close``)."""
+    """Result of a vote close (``POST /votes/{id}/close``)."""
 
     id: UUID
     meeting_id: UUID | None = Field(default=None, alias="meetingId")

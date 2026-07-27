@@ -26,8 +26,8 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* Dotted, light-green, compact connector lines to the years — a real tree:
-   the last row ends the vertical (no stray downward line). */
+/* Dotted, light-green, compact connector lines to the years. The last row ends the
+   vertical line, so no stray line points downward. */
 .byt__years {
   list-style: none;
   margin: 0 0 var(--space-1) 0;
@@ -36,7 +36,7 @@
 .byt__years > li {
   position: relative;
 }
-/* Vertical centred under the dot/node centre (cf. cost-centre-tree). */
+/* Vertical line centered under the center of the dot, as in cost-centre-tree. */
 .byt__years > li::before {
   content: '';
   position: absolute;
@@ -75,7 +75,7 @@
 .byt__empty {
   color: var(--color-text-muted);
   font-size: var(--fs-xs);
-  /* Match .byt__node--year padding so the connector ::after meets the text;
-     the old extra margin-left pushed it past the dotted line (misaligned). */
+  /* Match the .byt__node--year padding so that the ::after connector meets the text.
+     An extra margin-left pushes the text past the dotted line and misaligns it. */
   padding: 2px var(--space-2);
 }

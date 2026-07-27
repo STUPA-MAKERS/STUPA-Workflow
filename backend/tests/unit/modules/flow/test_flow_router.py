@@ -1,6 +1,6 @@
-"""TDD: Flow-Router-Verdrahtung (T-14) — Auth fail-closed + problem+json-Contract.
+"""Tests for the flow router wiring (T-14) — fail-closed auth and problem+json.
 
-Service via ``dependency_overrides`` ersetzt; DB-Pfade liegen in der Integration.
+`dependency_overrides` replaces the service. The integration suite covers the DB paths.
 """
 
 from __future__ import annotations
@@ -92,15 +92,12 @@ def _as_principal(app: FastAPI, *perms: str) -> None:
     app.dependency_overrides[get_current_applicant] = lambda: None
 
 
-# --------------------------------------------------------------------------- #
-# GET /transitions
-# --------------------------------------------------------------------------- #
 def test_list_transitions_requires_auth_401(client: TestClient) -> None:
     assert client.get(f"/api/applications/{uuid4()}/transitions").status_code == 401
 
 
 def test_list_transitions_missing_perm_403(app: FastAPI, client: TestClient) -> None:
-    _as_principal(app, "application.read")  # nicht .manage
+    _as_principal(app, "application.read")  # not .manage
     r = client.get(f"/api/applications/{uuid4()}/transitions")
     assert r.status_code == 403
     assert r.headers["content-type"] == "application/problem+json"
@@ -113,9 +110,6 @@ def test_list_transitions_ok(app: FastAPI, client: TestClient) -> None:
     assert len(r.json()) == 1
 
 
-# --------------------------------------------------------------------------- #
-# POST /transition
-# --------------------------------------------------------------------------- #
 def test_fire_requires_auth_401(client: TestClient) -> None:
     r = client.post(
         f"/api/applications/{uuid4()}/transition", json={"transitionId": str(uuid4())}
@@ -148,9 +142,7 @@ def test_fire_rejects_bad_body_422(app: FastAPI, client: TestClient) -> None:
     assert r.status_code == 422
 
 
-# --------------------------------------------------------------------------- #
-# Antragsteller-Übergänge (#applicant-actions) — Access via Magic-Link
-# --------------------------------------------------------------------------- #
+# Applicant transitions (#applicant-actions): access through a magic link.
 def test_list_applicant_transitions_ok(
     app: FastAPI, client: TestClient
 ) -> None:
@@ -180,9 +172,6 @@ def test_fire_applicant_transition_ok(
     assert fake_service.fired["note"] == "los"
 
 
-# --------------------------------------------------------------------------- #
-# DI factories
-# --------------------------------------------------------------------------- #
 def test_di_factories_build_real_objects() -> None:
     assert isinstance(get_action_dispatcher(), NullActionDispatcher)
     dispatcher = NullActionDispatcher()
@@ -191,9 +180,6 @@ def test_di_factories_build_real_objects() -> None:
     assert service.dispatcher is dispatcher
 
 
-# --------------------------------------------------------------------------- #
-# OpenAPI contract
-# --------------------------------------------------------------------------- #
 def test_openapi_declares_flow_error_responses(client: TestClient) -> None:
     spec = client.get("/openapi.json").json()
     get = spec["paths"]["/api/applications/{application_id}/transitions"]["get"]

@@ -1,15 +1,16 @@
 """pdf service: job lifecycle + application-document loading.
 
-Two deliberately separated responsibilities:
+The module keeps two responsibilities apart on purpose:
 
-* API side (bound to an ``AsyncSession``): ``create_application_job`` creates the
-  ``render_job`` row (``pending``); ``get_job`` reads the status and, on success,
-  builds a short-lived signed result URL. The actual render runs in the worker.
-* Data loading: ``load_application_doc`` pulls fields + values + timeline + optional
-  vote result from the DB into a plain ``ApplicationDoc`` that the worker hands to
-  ``app.modules.pdf.markdown`` (DB-free, unit-tested).
+* API side, bound to an ``AsyncSession``: ``create_application_job`` creates the
+  ``render_job`` row in state ``pending``. ``get_job`` reads the status and, on
+  success, builds a short-lived signed result URL. The render itself runs in the
+  worker.
+* Data loading: ``load_application_doc`` pulls fields, values, timeline and an optional
+  vote result from the DB. It returns a plain ``ApplicationDoc``. The worker hands that
+  document to ``app.modules.pdf.markdown``, which needs no DB and is unit-tested.
 
-The render-pipeline code (pytex → MinIO) lives in ``app.modules.pdf.render`` so the
+The render-pipeline code (pytex → MinIO) lives in ``app.modules.pdf.render``, so the
 infra dependencies are injected worker-side only.
 """
 
@@ -42,14 +43,17 @@ class PdfService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    # --------------------------------------------------------------- job-lifecycle
     async def create_application_job(
         self, application_id: UUID, *, idempotency_key: str | None = None
     ) -> RenderJob:
-        """Create a ``render_job`` (pending) for an application. 404 if it is missing.
+        """Create a ``render_job`` in state ``pending`` for an application.
 
-        With an ``idempotency_key`` set (flow action ``exportPdf``) an existing job of
-        the same key is reused (no double render)."""
+        With an ``idempotency_key`` set (flow action ``exportPdf``) the service reuses
+        an existing job that has the same key, so nothing renders twice.
+
+        Raises:
+            NotFoundError: The application does not exist.
+        """
         app = await self.session.get(Application, application_id)
         if app is None:
             raise NotFoundError(f"application {application_id} not found")
@@ -82,7 +86,11 @@ class PdfService:
         storage: ObjectStorage | None = None,
         settings: Settings | None = None,
     ) -> JobOut:
-        """Job → ``JobOut``; on ``done`` + storage attach a signed result URL."""
+        """Convert the job to ``JobOut``.
+
+        When the job is ``done`` and both storage and settings are present, the result
+        carries a short-lived signed URL.
+        """
         result_url: str | None = None
         if (
             job.status == "done"
@@ -104,9 +112,8 @@ class PdfService:
             error=job.error,
         )
 
-    # ------------------------------------------------------------- document loading
     async def load_application_doc(self, application_id: UUID) -> ApplicationDoc:
-        """Application + fields + values + timeline + optional vote result → ``ApplicationDoc``."""
+        """Load fields, values, timeline and an optional vote result into the document."""
         app = await self.session.get(Application, application_id)
         if app is None:
             raise NotFoundError(f"application {application_id} not found")

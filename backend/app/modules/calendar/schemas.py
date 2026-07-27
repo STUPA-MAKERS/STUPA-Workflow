@@ -6,6 +6,9 @@ from pydantic import BaseModel
 
 
 class CalendarFeedOut(BaseModel):
-    """Personal iCal subscription URL; ``None`` until a token is generated."""
+    """Personal iCal subscription URL.
+
+    The value is `None` until the principal generates a token.
+    """
 
     url: str | None = None

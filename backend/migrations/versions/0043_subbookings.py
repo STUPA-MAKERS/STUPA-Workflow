@@ -1,9 +1,10 @@
-"""subbookings: Unterbuchungen je Buchung (#subbookings).
+"""subbookings: sub-bookings per booking (#subbookings).
 
-``budget_expense.parent_expense_id`` (Self-FK, ON DELETE CASCADE) macht eine Buchung zur
-Unterbuchung einer Eltern-Buchung. Kinder erben Konto/Kostenstelle/HHJ/Art (kopierte Spalten);
-der Eltern-Betrag ist die Summe der Kinder. Der Budget-Rollup zählt nur Eltern
-(``parent_expense_id IS NULL``). Additiv + idempotent.
+``budget_expense.parent_expense_id`` (self FK, ON DELETE CASCADE) turns a booking into a
+sub-booking of a parent booking. A child copies the account, the cost center, the fiscal
+year and the kind from its parent. The amount of the parent is the sum of its children.
+The budget rollup counts parents only (``parent_expense_id IS NULL``). The migration only
+adds a column and an index, and it is idempotent.
 """
 
 from __future__ import annotations

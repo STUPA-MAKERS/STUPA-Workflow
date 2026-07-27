@@ -1,7 +1,8 @@
-"""Metadata-Introspektion des DB-Kerns (T-06) — ohne DB lauffähig.
+"""Introspect the metadata of the DB core (T-06) without a database.
 
-Prüft, dass `Base.metadata` Tabellen, FK-ON-DELETE, partial-unique-Indizes,
-GIN-Index und Checks gemäß data-model §1-3 abbildet (Single Source für Alembic).
+The tests check the tables, the FK ON DELETE rules, the partial unique indexes and the
+GIN index in `Base.metadata`. They also check the constraints of data-model §1-3. This
+metadata is the single source for Alembic.
 """
 
 from __future__ import annotations
@@ -9,7 +10,7 @@ from __future__ import annotations
 import pytest
 from sqlalchemy import ForeignKeyConstraint, Index, Table, UniqueConstraint
 
-import app.models  # noqa: F401  — befüllt Base.metadata
+import app.models  # noqa: F401  — populates Base.metadata
 from app.db import Base
 
 EXPECTED_TABLES = {
@@ -88,7 +89,7 @@ def test_partial_unique_one_active_form_version() -> None:
 
 
 def test_partial_unique_one_active_flow_version() -> None:
-    # #28-Abschluss: Typ-Flows entfernt — genau EIN aktiver globaler Flow.
+    # Issue #28 removed the per-type flows. Exactly one global flow stays active.
     idx = _index("flow_version", "uq_flow_version_one_active_global")
     assert idx.unique
     assert "active" in str(idx.dialect_options["postgresql"]["where"])
@@ -131,7 +132,7 @@ def test_role_permission_composite_pk() -> None:
 def test_versioned_unique_constraints() -> None:
     for table, cols in [
         ("form_version", {"application_type_id", "version"}),
-        # #28-Abschluss: der globale Flow versioniert nur noch über ``version``.
+        # Since issue #28 the global flow is unique by `version` alone.
         ("flow_version", {"version"}),
         ("submission_version", {"application_id", "version"}),
         ("form_field", {"form_version_id", "key"}),
@@ -148,8 +149,8 @@ def test_versioned_unique_constraints() -> None:
 
 
 def test_circular_fk_uses_alter() -> None:
-    # application_type ↔ form_version: zyklischer FK via use_alter
-    # (flow_version ist seit #28-Abschluss nicht mehr typ-gebunden).
+    # application_type ↔ form_version: circular FK through use_alter.
+    # Since issue #28 flow_version no longer binds to a type.
     circular = [
         c
         for c in _table("application_type").constraints

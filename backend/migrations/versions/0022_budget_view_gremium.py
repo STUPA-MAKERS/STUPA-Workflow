@@ -1,9 +1,10 @@
-"""Budget: ``view_gremium_id`` (#budget-scope).
+"""Budget: `view_gremium_id` (#budget-scope).
 
-Sichtbarkeits-Gremium je Kostenstelle: Mitglieder des zugeordneten Gremiums
-sehen diese Kostenstelle (+ Unterbaum) im Budget-Tab als Root — ohne globale
-``budget.*``-Permission. Unabhängig vom Top-Level-``gremium_id``
-(Klassifikation). Idempotent (``IF NOT EXISTS``).
+The column names the visibility Gremium of a cost center. A member of that
+Gremium sees the cost center and its subtree as a root in the budget tab. The
+member needs no global `budget.*` permission for this. The column is independent
+of the top-level `gremium_id`, which only classifies the cost center. The
+migration is idempotent (`IF NOT EXISTS`).
 """
 
 from __future__ import annotations

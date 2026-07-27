@@ -1,9 +1,9 @@
 """Fragment builders for the floating panels and the completion menu.
 
-All pure: each takes the data to show plus the mouse handlers to attach, and
-returns prompt_toolkit fragments. The pop-out detail simply re-emits an entry's
-pre-rendered record view with a close hint; the selector and form renderers
-window their rows around the cursor.
+Every builder is pure. It takes the data to show plus the mouse handlers to
+attach, and returns prompt_toolkit fragments. The pop-out detail re-emits the
+pre-rendered record view of an entry and adds a close hint. The selector and the
+form renderer window their rows around the cursor.
 """
 
 from __future__ import annotations
@@ -20,14 +20,14 @@ from .protocols import MouseHandler
 def detail_fragments(
     entry: LogEntry, consume: MouseHandler, close: MouseHandler
 ) -> StyleAndTextTuples:
-    """Popped-out record view: the entry's pre-rendered detail plus a close hint.
+    """Build the popped-out record view: the pre-rendered detail plus a close hint.
 
     Args:
-        entry: The clicked log entry (must carry a detail view).
-        consume: Handler attached to every fragment so clicks inside the panel
-            keep it open.
-        close: Handler attached to the "esc to close" line so clicking it also
-            dismisses the panel.
+        entry: The clicked log entry. It must carry a detail view.
+        consume: Handler attached to every fragment. A click inside the panel then
+            keeps the panel open.
+        close: Handler attached to the "esc to close" line. A click on that line
+            also dismisses the panel.
     """
     if entry.detail is None:
         return []
@@ -43,9 +43,10 @@ def selector_fragments(
 ) -> StyleAndTextTuples:
     """Render a scrolled window of the selector around its cursor.
 
-    Only *rows* options are shown at once (the caller keeps ``selector.scroll``
-    following the cursor); the first/last visible row gets a ``↑``/``↓`` marker
-    when more options lie off-screen, and the digit keys pick visible rows.
+    The panel shows only `rows` options at once. The caller keeps
+    ``selector.scroll`` on the cursor. The first or the last visible row gets a
+    ``↑`` or a ``↓`` marker when more options lie off screen. The digit keys pick
+    the visible rows.
     """
     options = selector.visible()
     start = selector.scroll
@@ -86,12 +87,12 @@ def selector_fragments(
     return fragments
 
 
-# Builds the mouse handler that cycles the field at an index by a step (±1).
+# Builds the mouse handler that cycles the field at an index by a step of ±1.
 ArrowHandler = Callable[[int, int], MouseHandler]
 
 
 def _form_value(field: FormField, active: bool) -> tuple[str, str]:
-    """The ``(style, text)`` shown for a form row's current value."""
+    """Return the ``(style, text)`` pair shown for the current value of a form row."""
     if field.kind == "bool":
         return (
             "class:on" if field.choice_index else "class:select-key",
@@ -110,7 +111,7 @@ def _form_value(field: FormField, active: bool) -> tuple[str, str]:
 
 
 def _form_hint(field: FormField) -> str:
-    """A short hint describing what the focused form row accepts."""
+    """Return a short hint that tells what the focused form row accepts."""
     base = (
         "space/←/→"
         if field.kind == "bool"
@@ -129,9 +130,9 @@ def form_fragments(
 ) -> StyleAndTextTuples:
     """Render a form dialog: a scrolled window of field rows plus a key hint.
 
-    Only *rows* fields show at once (the caller keeps ``form.scroll`` following
-    the cursor); the first/last visible row gets a ``↑``/``↓`` marker when more
-    fields lie off-screen.
+    The panel shows only `rows` fields at once. The caller keeps ``form.scroll``
+    on the cursor. The first or the last visible row gets a ``↑`` or a ``↓`` marker
+    when more fields lie off screen.
     """
     name_width = max((len(field.label) for field in form.fields), default=0)
     start = form.scroll
@@ -188,11 +189,11 @@ def completion_fragments(
     total: int,
     start: int,
 ) -> StyleAndTextTuples:
-    """Render a (possibly scrolled) slice of the completion menu.
+    """Render a slice of the completion menu, scrolled when needed.
 
-    *completions* is the visible window of a larger list of *total* entries
-    starting at *start*; edge rows get a ``↑``/``↓`` marker when more entries
-    lie off-screen. The selected entry is reversed and each entry is clickable.
+    The `completions` list is the visible window of `total` entries and starts at
+    `start`. An edge row gets a ``↑`` or a ``↓`` marker when more entries lie off
+    screen. The renderer reverses the selected entry. Every entry is clickable.
     """
     last = len(completions) - 1
     fragments: StyleAndTextTuples = []

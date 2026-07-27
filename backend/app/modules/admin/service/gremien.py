@@ -55,7 +55,7 @@ class GremiumOps(ConfigServiceBase):
         )
         self.session.add(row)
         await self.session.flush()
-        # Forced roles (chair/secretary) are created together with the gremium.
+        # Every new gremium gets the forced roles chair and secretary.
         await GremiumRoleService(self.session).ensure_forced_roles(row.id)
         await self._audit(actor, AuditAction.CONFIG_CHANGE, "gremium", row.id)
         await self.session.commit()
@@ -83,8 +83,8 @@ class GremiumOps(ConfigServiceBase):
             row.delegation_lead_minutes = payload.delegation_lead_minutes
         if payload.delegation_allow_external is not None:
             row.delegation_allow_external = payload.delegation_allow_external
-        # quorumPercent is explicitly clearable (→ NULL): model_fields_set
-        # distinguishes "not sent" from "set to null".
+        # quorumPercent is clearable to NULL. model_fields_set separates the case
+        # "not sent" from the case "set to null".
         if "quorum_percent" in payload.model_fields_set:
             row.quorum_percent = payload.quorum_percent
         await self._audit(actor, AuditAction.CONFIG_CHANGE, "gremium", row.id)
@@ -92,17 +92,22 @@ class GremiumOps(ConfigServiceBase):
         return _gremium_out(row)
 
     async def delete_gremium(self, gremium_id: UUID, actor: str) -> None:
-        """Delete a gremium; role assignments cascade (FK ON DELETE CASCADE).
+        """Delete a gremium.
 
-        404 for unknown ids.
+        Role assignments cascade through the FK ``ON DELETE CASCADE``.
+
+        Raises:
+            NotFoundError: No gremium has this id (404).
+            ConflictError: An application type of this gremium still has
+                applications (409).
         """
         row = await self.session.get(Gremium, gremium_id)
         if row is None:
             raise NotFoundError(f"gremium {gremium_id} not found")
-        # application_type.gremium_id cascades, but application.type_id is RESTRICT:
-        # deleting a gremium whose types still have applications would violate the FK
-        # (500). Pre-check and return 409 so no audit entry is written for a doomed
-        # delete.
+        # application_type.gremium_id cascades, but application.type_id is RESTRICT.
+        # A delete of a gremium whose types still hold applications breaks the FK and
+        # ends in a 500. This pre-check returns 409 instead, so no audit entry is
+        # written for a doomed delete.
         from app.modules.applications.models import Application
 
         in_use = await self.session.scalar(
@@ -128,7 +133,7 @@ class GremiumOps(ConfigServiceBase):
     async def get_gremium_mail_recipients(
         self, gremium_id: UUID
     ) -> GremiumMailRecipients:
-        """Extra protocol recipients of the gremium (union of all active lists)."""
+        """Return the extra protocol recipients (union of all active mail lists)."""
         if await self.session.get(Gremium, gremium_id) is None:
             raise NotFoundError(f"gremium {gremium_id} not found")
         lists = (
@@ -149,9 +154,9 @@ class GremiumOps(ConfigServiceBase):
     ) -> GremiumMailRecipients:
         """Replace the extra protocol recipients (idempotent PUT).
 
-        Canonically one ``mail_list`` row (``name='protocol'``) per gremium; all
-        old rows are replaced. Empty list ⇒ no extra recipients (members still
-        receive the protocol).
+        A gremium keeps one canonical ``mail_list`` row with ``name='protocol'``.
+        The method deletes all old rows first. An empty list means no extra
+        recipients. The members still receive the protocol.
         """
         if await self.session.get(Gremium, gremium_id) is None:
             raise NotFoundError(f"gremium {gremium_id} not found")

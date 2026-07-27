@@ -215,10 +215,10 @@ interface Built {
 }
 
 /**
- * Instantiate the component directly (constructor loads account options + cost-centre
- * tree). When accounts are provided, flush the account-selection effect via
- * `TestBed.tick()` right away (lines + connection status) — else it fires uncontrolled
- * on the next fake-timer tick.
+ * Instantiate the component directly. The constructor loads the account options and the
+ * cost-center tree. When the caller passes accounts, flush the account-selection effect
+ * with `TestBed.tick()` at once. That effect loads the lines and the connection status.
+ * Without the flush it fires uncontrolled on the next fake-timer tick.
  */
 function build(
   opts: {
@@ -236,7 +236,7 @@ function build(
       provideHttpClientTesting(),
       { provide: USE_MOCK_API, useValue: false },
       { provide: AuthService, useValue: fakeAuth(opts.perms ?? ['budget.view', 'budget.book']) },
-      // Host element for focusOtp() — without a fixture there's no native component element.
+      // Host element for focusOtp(). Without a fixture there is no native component element.
       { provide: ElementRef, useValue: new ElementRef(opts.host ?? document.createElement('div')) },
     ],
   });
@@ -265,7 +265,7 @@ function build(
   return { cmp, http };
 }
 
-/** Catch + answer the next GET /statement-lines (reload/fetch). */
+/** Catch and answer the next GET /statement-lines (reload or fetch). */
 function flushLines(http: HttpTestingController, body: StatementLinePage): void {
   http.expectOne((r) => r.url.endsWith('/statement-lines') && r.method === 'GET').flush(body);
 }
@@ -292,7 +292,6 @@ describe('KontenComponent (unit)', () => {
     jest.useRealTimers();
   });
 
-  // ------------------------------------------------------------ construction
   it('loads accounts on construction and selects the first one', () => {
     const { cmp } = build({ accounts: [ACC, ACC2], tree: ROOT_TREE });
     expect(cmp.accounts()).toEqual([ACC, ACC2]);
@@ -302,7 +301,7 @@ describe('KontenComponent (unit)', () => {
       { value: 'a-1', label: 'Hauptkonto' },
       { value: 'a-2', label: 'Sparkonto' },
     ]);
-    // Cost-centre tree → options (top + child)
+    // Cost-center tree → options (top + child)
     expect(cmp.costCentreOptions().length).toBe(2);
   });
 
@@ -332,7 +331,6 @@ describe('KontenComponent (unit)', () => {
     expect(no.cmp.canIgnore()).toBe(false);
   });
 
-  // ------------------------------------------------------------ account list
   it('selectAccount switches the account and discards a pending TAN session', () => {
     const { cmp } = build({ accounts: [ACC, ACC2] });
     cmp.sessionToken.set('tok-1');
@@ -352,7 +350,6 @@ describe('KontenComponent (unit)', () => {
     expect(cmp.accountBalance(ACC2)).toBe('');
   });
 
-  // ------------------------------------------------------------ lines/fetch
   it('reloadLines is a no-op without a selected account', () => {
     const { cmp, http } = build();
     cmp.reloadLines();
@@ -458,7 +455,6 @@ describe('KontenComponent (unit)', () => {
     http.expectNone((r) => r.url.endsWith('/statement-lines'));
   });
 
-  // ------------------------------------------------------------ formatting
   it('money/balanceMoney/signedMoney format EUR per locale and sign', () => {
     const { cmp } = build();
     expect(cmp.money('-42.5').replace(/\s/g, ' ')).toContain('42,50');
@@ -502,7 +498,6 @@ describe('KontenComponent (unit)', () => {
     });
   });
 
-  // ------------------------------------------------------------ filter/sort
   it('setKind and onDateFilter reload the list; activeFilterCount counts groups', () => {
     const { cmp, http } = build({ accounts: [ACC] });
     expect(cmp.activeFilterCount()).toBe(0);
@@ -541,8 +536,8 @@ describe('KontenComponent (unit)', () => {
     cmp.onSearch('miete');
     expect(cmp.searchQ()).toBe('miete');
     http.expectNone((r) => r.url.endsWith('/statement-lines'));
-    // The account effect also tracks searchQ (fetch runs in the effect context) and
-    // reloads once on the next scheduler tick — the debounced reload follows at 400 ms.
+    // The account effect also tracks searchQ, because fetch runs in the effect context.
+    // It reloads once on the next scheduler tick. The debounced reload follows at 400 ms.
     jest.advanceTimersByTime(399);
     http.expectOne((r) => r.url.endsWith('/statement-lines')).flush(linePage([]));
     http.expectOne((r) => r.url.endsWith('/fints/credential') && r.method === 'GET').flush(CRED);
@@ -577,7 +572,6 @@ describe('KontenComponent (unit)', () => {
     expect(cmp.ariaSort('date')).toBe('ascending');
   });
 
-  // ------------------------------------------------------------ credential / connect
   it('openConnect prefills the stored login and clears the PIN; closeConnect resets it', () => {
     const { cmp } = build();
     cmp.credStatus.set(CRED);
@@ -705,7 +699,6 @@ describe('KontenComponent (unit)', () => {
     expect(cmp.locked()).toBe(false);
   });
 
-  // ------------------------------------------------------------ sync / TAN
   it('startSync guards: no account, already syncing, locked', () => {
     const { cmp, http } = build({ accounts: [ACC] });
     cmp.credStatus.set(CRED);
@@ -900,7 +893,6 @@ describe('KontenComponent (unit)', () => {
     expect(cmp.otpDigits()).toEqual(['', '', '', '', '', '']);
   });
 
-  // ------------------------------------------------------------ OTP boxes
   it('tanReady requires 6 digits in OTP mode, any input in single-field mode', () => {
     const { cmp } = build();
     expect(cmp.tanReady()).toBe(false);
@@ -987,7 +979,6 @@ describe('KontenComponent (unit)', () => {
     expect(() => cmp.onOtpInput(0, { target: el } as unknown as Event)).not.toThrow();
   });
 
-  // ------------------------------------------------------------ Import-Dialog
   it('openImport prefills budget suggestion + purpose and loads fiscal years', () => {
     const { cmp, http } = build({ tree: ROOT_TREE });
     cmp.openImport({ ...LINE, suggestedBudgetId: 'child-1' });
@@ -1070,7 +1061,7 @@ describe('KontenComponent (unit)', () => {
     const error = jest.spyOn(priv(cmp).toast, 'error');
     cmp.confirmImport(); // no line
     cmp.importLine.set(LINE);
-    cmp.confirmImport(); // no cost centre
+    cmp.confirmImport(); // no cost center
     cmp.impBudgetId.set('child-1');
     cmp.booking.set(true);
     cmp.confirmImport(); // busy
@@ -1084,7 +1075,6 @@ describe('KontenComponent (unit)', () => {
     expect(error).toHaveBeenCalledWith(priv(cmp).i18n.translate('fints.errBankLocked'));
   });
 
-  // ------------------------------------------------------------ Link-Dialog
   it('candidateLabel joins description, amount and optional correspondent/pathKey', () => {
     const { cmp } = build();
     const full = cmp.candidateLabel(EXPENSE).replace(/\s/g, ' ');
@@ -1200,7 +1190,6 @@ describe('KontenComponent (unit)', () => {
     expect(error).toHaveBeenCalledWith(priv(cmp).i18n.translate('fints.errSync'));
   });
 
-  // ------------------------------------------------------------ Unlink
   it('unlink releases the match, toasts and reloads; guard + error path', () => {
     const { cmp, http } = build({ accounts: [ACC] });
     const success = jest.spyOn(priv(cmp).toast, 'success');
@@ -1285,11 +1274,10 @@ describe('KontenComponent (unit)', () => {
     expect(error).toHaveBeenCalled();
   });
 
-  // ------------------------------------------------------------ destroy
   it('ngOnDestroy cancels pending search and typeahead timers', () => {
     jest.useFakeTimers();
-    // Without an account the debounced reload would hit the guard anyway, but the link
-    // typeahead would fire an /expenses request after 300 ms without clearTimeout.
+    // Without an account the debounced reload hits the guard anyway. The link typeahead
+    // would still fire an /expenses request after 300 ms without clearTimeout.
     const { cmp, http } = build();
     cmp.onSearch('miete');
     cmp.linkLine.set(LINE);
@@ -1306,10 +1294,8 @@ describe('KontenComponent (unit)', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Rendered tests: account effect (selection → load lines + status), table,
-// permission gating and infinite scroll (IntersectionObserver branch).
-// ---------------------------------------------------------------------------
+// Rendered tests: the account effect (a selection loads lines and status), the table,
+// permission gating and infinite scroll (the IntersectionObserver branch).
 
 async function setup(
   opts: {
@@ -1352,7 +1338,7 @@ describe('KontenComponent (rendered)', () => {
     expect(screen.getByText('DE02120300000000202051')).toBeInTheDocument();
     expect(screen.getByText(/−.*42/)).toBeInTheDocument();
     expect(screen.getByText(/\+.*10/)).toBeInTheDocument();
-    // open row → link/import; linked → unlink
+    // open row → link/import, linked row → unlink
     expect(screen.getByRole('button', { name: 'Verknüpfen' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Importieren' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Trennen' })).toBeInTheDocument();
@@ -1414,10 +1400,8 @@ describe('KontenComponent (infinite scroll)', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Batch / bulk actions + cross-links (#expenses-ux): selection, unlink/ignore
-// in bulk, the match-state subset computeds and the bookingLink deep-link.
-// ---------------------------------------------------------------------------
+// Bulk actions and cross-links (#expenses-ux): selection, bulk unlink and ignore,
+// the match-state subset computeds and the bookingLink deep-link.
 
 const LINE_SUGGESTED: StatementLine = { ...LINE, id: 'l-4', matchState: 'suggested' };
 
@@ -1461,9 +1445,8 @@ describe('KontenComponent (batch/bulk #expenses-ux)', () => {
     cmp.toggleSelectAll(true);
     expect(cmp.selectedCount()).toBe(4);
     expect(cmp.allSelected()).toBe(true);
-    // subset computeds by match state
     expect(cmp.selectedMatched()).toBe(1); // l-2
-    expect(cmp.selectedIgnorable()).toBe(2); // l-1 unmatched + l-4 suggested
+    expect(cmp.selectedIgnorable()).toBe(2); // l-1 unmatched and l-4 suggested
     cmp.toggleSelectAll(false);
     expect(cmp.selectedCount()).toBe(0);
   });
@@ -1548,9 +1531,7 @@ describe('KontenComponent (batch/bulk #expenses-ux)', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// KontenLinesState.refresh() in isolation — the post-mutation window reload.
-// ---------------------------------------------------------------------------
+// `KontenLinesState.refresh()` in isolation: the post-mutation window reload.
 describe('KontenLinesState.refresh (#expenses-ux)', () => {
   afterEach(() => {
     try {

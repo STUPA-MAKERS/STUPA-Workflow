@@ -1,17 +1,17 @@
 """Visual theme for the admin CLI.
 
-A single :class:`~prompt_toolkit.styles.Style` plus the row-highlight colours
-kept as plain constants so the log renderer and the floating panels can agree
-on them. Palette: the platform's signature coral accent on a near-black base
-(same identity as the web frontend), applied to a UBS-style command REPL.
+The module holds one prompt_toolkit `Style` plus the row-highlight colors as plain
+constants. The log renderer and the floating panels then agree on those colors. The
+palette puts the coral accent of the platform on a near-black base. This keeps the
+identity of the web frontend in a command REPL.
 """
 
 from prompt_toolkit.styles import Style
 
 CORAL = "#d97757"
 
-# Row-highlight backgrounds. Hover uses a warm neutral; the popped-out detail a
-# deeper coral-tinted shade so the panel reads as belonging to its row.
+# Row-highlight backgrounds. Hover uses a warm neutral. The popped-out detail uses
+# a deeper coral-tinted shade, so the panel reads as a part of its row.
 HOVER_HIGHLIGHT = "#33302b"
 DETAIL_HIGHLIGHT = "#4a2e22"
 

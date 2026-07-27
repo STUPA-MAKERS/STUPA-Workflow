@@ -1,8 +1,9 @@
-"""account_balance: letzten Bank-Kontostand je Konto speichern (#fints-konten).
+"""account_balance: store the last bank balance per account (#fints-konten).
 
-Beim FinTS-Sync (HKSAL-Saldo) bzw. Datei-Import (``:62F:``/CLBD-Schlusssaldo) wird der
-Kontostand + Stichtag am Konto abgelegt — reiner Anzeige-/Abgleich-Wert für den Konten-Tab,
-NICHT Teil der Budget-Rechnung. Additiv + idempotent.
+A FinTS sync (HKSAL balance) or a file import (``:62F:`` or CLBD closing balance) writes
+the balance and its cut-off date to the account. The value only serves the display and the
+reconciliation in the accounts tab. It is NOT part of the budget calculation. The migration
+only adds columns and is idempotent.
 """
 
 from __future__ import annotations

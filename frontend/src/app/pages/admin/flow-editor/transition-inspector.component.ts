@@ -9,7 +9,7 @@ import {
 } from '@stupa-makers/ui-kit';
 import type { TransitionDef } from '../admin.models';
 
-/** Inspector panel for the selected transition: endpoints/labels/automatic/branch. */
+/** Inspector panel for the selected transition. It edits endpoints, labels and flags. */
 @Component({
   selector: 'app-transition-inspector',
   standalone: true,
@@ -21,7 +21,7 @@ import type { TransitionDef } from '../admin.models';
 export class TransitionInspectorComponent {
   readonly transition = input.required<TransitionDef>();
   readonly stateOptions = input.required<SelectOption[]>();
-  /** Result branches of the source state (empty ⇒ no branch select). */
+  /** Result branches of the source state. An empty list hides the branch select. */
   readonly branchOptions = input.required<SelectOption[]>();
 
   readonly fromChange = output<string>();

@@ -5,10 +5,10 @@ import type { BudgetTreeNode } from './budget-tree.api';
 import { PALETTE } from './budget-year-tree.component';
 
 /**
- * Reusable cost-centre tree picker. Same look as the budget→year tree
- * (`app-budget-year-tree`): coloured dots at the roots, dotted light-green
- * connector lines to sub-nodes, compact selection highlight. Recursive over the
- * whole hierarchy. Optional "all" node (value ``''``) at the top.
+ * Reusable cost-center tree picker. It looks like the budget-to-year tree
+ * (`app-budget-year-tree`): colored dots at the roots, dotted light-green connector
+ * lines to the sub-nodes, and a compact selection highlight. It recurses over the
+ * whole hierarchy. An optional "all" node with the value ``''`` sits at the top.
  */
 @Component({
   selector: 'app-cost-centre-tree',
@@ -19,15 +19,15 @@ import { PALETTE } from './budget-year-tree.component';
   styleUrl: './cost-centre-tree.component.scss',
 })
 export class CostCentreTreeComponent {
-  /** Full cost-centre tree (roots with ``children``). */
+  /** Full cost-center tree: the roots with their ``children``. */
   readonly nodes = input<BudgetTreeNode[]>([]);
   readonly selectedId = input<string>('');
-  /** Label of the "all" node; empty = none. */
+  /** Label of the "all" node. An empty string hides that node. */
   readonly allLabel = input<string>('');
   readonly ariaLabel = input<string>('');
   readonly emptyLabel = input<string>('');
 
-  /** Selected cost centre (``''`` = all). */
+  /** Selected cost center. The value ``''`` means all. */
   readonly picked = output<Uuid | ''>();
 
   private readonly rootIds = computed(() => this.nodes().map((n) => n.id));

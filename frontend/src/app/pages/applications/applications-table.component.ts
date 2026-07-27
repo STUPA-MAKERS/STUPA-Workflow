@@ -10,10 +10,10 @@ export interface ApplicationRow {
   id: string;
   /** Display title (already resolved with fallback). */
   title: string;
-  /** Application type (grey subline + type column); empty = hide. */
+  /** Application type in the gray subline and the type column. Empty hides it. */
   typeLabel?: string | null;
   stateLabel?: string | null;
-  /** Freely configured state color (hex); `null` → neutral badge. */
+  /** Freely configured state color as hex. `null` gives a neutral badge. */
   stateColor?: string | null;
   amount?: string | number | null;
   currency?: string | null;
@@ -27,10 +27,10 @@ export interface SortState {
 }
 
 /**
- * Shared applications table. One look for the application list (`/applications`)
- * **and** the applications table under budget. Pure presentation component: rows
- * arrive normalized, sorting is optional (header only clickable when ``sort`` is
- * set). Each row links to the application detail page.
+ * Shared applications table. It gives one look to the application list (`/applications`)
+ * and to the applications table under budget. This is a pure presentation component. The
+ * rows arrive normalized. Sorting is optional and the header is clickable only when `sort`
+ * is set. Each row links to the application detail page.
  */
 @Component({
   selector: 'app-applications-table',
@@ -45,7 +45,7 @@ export class ApplicationsTableComponent {
 
   readonly rows = input<ApplicationRow[]>([]);
   readonly emptyText = input<string>('');
-  /** Current sort; ``null`` → header not clickable. */
+  /** Current sort. `null` makes the header text plain and not clickable. */
   readonly sort = input<SortState | null>(null);
   readonly sortChange = output<SortState>();
 

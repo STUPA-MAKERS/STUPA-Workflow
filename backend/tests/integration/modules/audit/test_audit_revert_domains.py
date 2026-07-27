@@ -1,17 +1,15 @@
-"""Integration (echte Postgres, testcontainers): Audit-Log-Revert über Domänen hinweg
-(#config-versioning).
+"""Integration (real Postgres, testcontainers): audit log revert across domains.
 
-Beweist gegen ein echtes Schema, dass :class:`RevertService` nicht nur Config-Changes,
-sondern auch **Buchungen/Budget-Änderungen** und **Antrags-Zustandsübergänge**
-zurücknimmt:
+The tests prove against a real schema that `RevertService` takes back more than config
+changes (#config-versioning). It also takes back **bookings and budget changes** and
+**application state transitions**.
 
-* Buchung (``budget_expense_create``) → gelöscht, eine dadurch bezahlte Rechnung wieder
-  ``open``.
-* Umbuchung (``budget_transfer_create``) → beide Zeilen gelöscht.
-* Kostenstelle anlegen/ändern, Zuteilung setzen, Buchung ändern → Inverse / Vorwert.
-* Statuswechsel → Antrag zurück in den Vorzustand (+ Redo); ``stale_revert`` bei
-  zwischenzeitlichem Wechsel.
-* Löschungen sind **nicht** revertierbar (``not_revertable``).
+A revert deletes a booking (`budget_expense_create`) and returns an invoice that the
+booking paid to `open`. A revert of a transfer (`budget_transfer_create`) deletes both
+rows. A cost center create or update, an allocation set and a booking update go back to
+the inverse or to the prior value. A status change moves the application back to the
+prior state, and a second revert redoes that move. A change in between makes the entry
+stale (`stale_revert`). A delete is **not** revertable (`not_revertable`).
 """
 
 from __future__ import annotations
@@ -77,7 +75,7 @@ async def _gremium(session: AsyncSession) -> Gremium:
 
 
 async def _audit_id(session: AsyncSession, action: AuditAction, target_id: str) -> int:
-    """Jüngste Audit-Eintrags-Id für (action, target_id) — der zu revertierende Vorgang."""
+    """Return the newest audit entry id for (action, target_id), the operation to revert."""
     return (
         await session.execute(
             select(AuditEntry.id)
@@ -101,9 +99,6 @@ async def _top_with_fy(
     return top_row, fy.id
 
 
-# --------------------------------------------------------------------------- #
-# Buchungen (budget_expense_create)
-# --------------------------------------------------------------------------- #
 async def test_revert_booking_deletes_expense_and_reopens_invoice(
     session: AsyncSession,
 ) -> None:
@@ -124,19 +119,18 @@ async def test_revert_booking_deletes_expense_and_reopens_invoice(
         actor="tester",
     )
     inv_row = await session.get(Invoice, inv.id)
-    assert inv_row is not None and inv_row.status == "paid"  # Buchen → bezahlt
+    assert inv_row is not None and inv_row.status == "paid"  # the booking pays it
 
     audit_id = await _audit_id(
         session, AuditAction.BUDGET_EXPENSE_CREATE, str(booked.id)
     )
     await RevertService(session).revert(audit_id, "admin")
 
-    assert await session.get(BudgetExpense, booked.id) is None  # Buchung weg
-    assert inv_row.status == "open"  # Rechnung wieder offen
+    assert await session.get(BudgetExpense, booked.id) is None  # the booking is gone
+    assert inv_row.status == "open"  # the invoice is open again
 
-    # Aufräumen: die DB wird zwischen Integrationstests NICHT geleert; eine
-    # zurückgelassene offene Rechnung würde den globalen Rechnungs-Zähler eines
-    # anderen Tests verfälschen.
+    # Clean up. Nothing empties the DB between integration tests. A leftover open
+    # invoice would corrupt the global invoice counter of another test.
     await session.delete(inv_row)
     await session.commit()
 
@@ -175,9 +169,6 @@ async def test_revert_transfer_deletes_both_rows(session: AsyncSession) -> None:
     assert rows == []
 
 
-# --------------------------------------------------------------------------- #
-# Budget-Änderungen
-# --------------------------------------------------------------------------- #
 async def test_revert_node_create_deletes_node(session: AsyncSession) -> None:
     svc = BudgetTreeService(session, actor="tester")
     g = await _gremium(session)
@@ -212,7 +203,7 @@ async def test_revert_node_update_stale_when_changed_after(
     )
     await svc.update_node(node.id, BudgetNodeUpdate(name="Neu"))
     audit_id = await _audit_id(session, AuditAction.BUDGET_NODE_UPDATE, str(node.id))
-    # Nach der zu revertierenden Änderung erneut umbenannt → der alte Eintrag ist stale.
+    # A second rename after the change to revert makes the old entry stale.
     await svc.update_node(node.id, BudgetNodeUpdate(name="Neuer"))
     with pytest.raises(ConflictError) as ei:
         await RevertService(session).revert(audit_id, "admin")
@@ -254,7 +245,7 @@ async def test_revert_allocation_stale_when_changed_after(
     audit_id = await _audit_id(
         session, AuditAction.BUDGET_ALLOCATION_SET, str(top.id)
     )
-    # Nach der zu revertierenden Änderung erneut gesetzt → der alte Eintrag ist stale.
+    # A second set after the change to revert makes the old entry stale.
     await svc.set_allocation(top.id, fy_id, AllocationSet(allocated=Decimal("900")))
     with pytest.raises(ConflictError) as ei:
         await RevertService(session).revert(audit_id, "admin")
@@ -299,7 +290,7 @@ async def test_revert_expense_update_stale_when_changed_after(
     audit_id = await _audit_id(
         session, AuditAction.BUDGET_EXPENSE_UPDATE, str(booked.id)
     )
-    # Betrag nach der zu revertierenden Änderung erneut geändert → stale.
+    # A second amount change after the change to revert makes the entry stale.
     await svc.update_expense(booked.id, ExpenseUpdate(amount=Decimal("90")))
     with pytest.raises(ConflictError) as ei:
         await RevertService(session).revert(audit_id, "admin")
@@ -315,7 +306,7 @@ async def test_revert_delete_action_is_not_revertable(session: AsyncSession) -> 
         ),
         actor="tester",
     )
-    await svc.delete_expense(booked.id)  # erzeugt budget_expense_delete (nicht reversibel)
+    await svc.delete_expense(booked.id)  # writes budget_expense_delete (not revertable)
     audit_id = await _audit_id(
         session, AuditAction.BUDGET_EXPENSE_DELETE, str(booked.id)
     )
@@ -324,9 +315,6 @@ async def test_revert_delete_action_is_not_revertable(session: AsyncSession) -> 
     assert ei.value.code == "not_revertable"
 
 
-# --------------------------------------------------------------------------- #
-# Antrags-Zustandsübergänge (status_change)
-# --------------------------------------------------------------------------- #
 def _manager() -> Principal:
     return Principal(
         sub="mgr-1", roles=["reviewer"], permissions={"application.manage"}
@@ -421,7 +409,7 @@ async def test_revert_status_change_moves_back_and_redo(
     reverted = await session.get(Application, app.id)
     assert reverted is not None and reverted.current_state_id == states["draft"].id
 
-    # Ein umgekehrter StatusEvent (ohne transition) wurde geschrieben.
+    # The revert wrote an inverse StatusEvent without a transition.
     rev_events = (
         await session.execute(
             select(StatusEvent).where(
@@ -434,7 +422,7 @@ async def test_revert_status_change_moves_back_and_redo(
     ).scalars().all()
     assert len(rev_events) == 1
 
-    # Redo: den Revert-Eintrag selbst zurücknehmen → wieder im review-State.
+    # Redo: revert the revert entry itself, which moves back to the review state.
     redo_id = await _audit_id(session, AuditAction.STATUS_CHANGE, str(app.id))
     assert redo_id != audit_id
     await RevertService(session).revert(redo_id, "admin")
@@ -448,7 +436,7 @@ async def test_revert_status_change_stale_when_moved_on(
     app_type, states = await _seed_flow(session)
     app = await _fire_draft_to_review(session, app_type, states)
     audit_id = await _audit_id(session, AuditAction.STATUS_CHANGE, str(app.id))
-    # Antrag zieht weiter (manuell auf einen anderen State) → der alte Wechsel ist stale.
+    # The application moves on to another state by hand, so the old change is stale.
     app_row = await session.get(Application, app.id)
     assert app_row is not None
     app_row.current_state_id = states["draft"].id

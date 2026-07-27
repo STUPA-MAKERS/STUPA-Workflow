@@ -1,15 +1,17 @@
-"""Typ-Flow-Reste entfernen (#28-Abschluss): nur noch der globale Flow.
+"""Remove the rest of the per-type flow (#28 closure): only the global flow stays.
 
-Migration 0006 hat den Cutover erzwungen (eine globale ``flow_version``-Zeile,
-Alt-Versionen gelöscht); die Spalten/Constraints des alten Per-Typ-Modells
-existierten aber weiter. Jetzt fallen:
+Migration 0006 forced the cutover to one global `flow_version` row and deleted
+the old versions. The columns and constraints of the per-type model stayed in
+the schema. This migration drops them:
 
-* ``application_type.active_flow_version_id``
-* ``flow_version.application_type_id`` (abhängige Indizes/Constraints fallen mit)
+* `application_type.active_flow_version_id`
+* `flow_version.application_type_id` (dependent indexes and constraints drop
+  with the column).
 
-Neu: ``version`` unique + genau EIN aktiver Flow (partial unique auf ``active``).
-Bestands-Daten werden vorher passend gemacht (Aktiv-Duplikate deaktivieren,
-Versionsnummern-Duplikate neu durchnummerieren). Idempotent (``IF [NOT] EXISTS``).
+It then adds a unique `version` and a partial unique index on `active` that
+allows exactly ONE active flow. The migration prepares the existing data first.
+It deactivates duplicate active rows and renumbers duplicate version numbers.
+The migration is idempotent (`IF [NOT] EXISTS`).
 """
 
 from __future__ import annotations
@@ -30,10 +32,10 @@ DECLARE
     keep uuid;
     has_type_col boolean;
 BEGIN
-    -- Bestands-DBs können mehrere aktive Zeilen tragen (Per-Typ-Aktive aus der
-    -- Zeit vor dem 0006-Cutover bzw. einer älteren 0006-Variante). Vor dem
-    -- partial unique Index darf nur EINE aktive Zeile übrig sein: bevorzugt die
-    -- globale (application_type_id IS NULL), sonst die höchste Version.
+    -- Existing databases can hold more than one active row (per-type active rows
+    -- from the time before the 0006 cutover, or from an older 0006 variant). Before
+    -- the partial unique index, only ONE active row can stay. Keep the global row
+    -- (application_type_id IS NULL) first, else keep the highest version.
     SELECT EXISTS (
         SELECT 1 FROM information_schema.columns
          WHERE table_name = 'flow_version' AND column_name = 'application_type_id'
@@ -57,10 +59,11 @@ BEGIN
 END $$;
 """
 
-# UNIQUE (version) braucht eindeutige Versionsnummern; Per-Typ-Flows konnten
-# dieselbe Nummer mehrfach vergeben. Deterministisch neu durchnummerieren
-# (Reihenfolge bleibt: alte Nummer, dann Alter) — No-op ohne Duplikate. Läuft
-# NACH den Spalten-/Constraint-Drops, damit kein altes Unique transient bricht.
+# The unique constraint on `version` needs distinct version numbers. Per-type
+# flows could give the same number to several rows. The renumber step works in a
+# deterministic order: old number first, then age. It does nothing when there
+# are no duplicates. It runs AFTER the column and constraint drops, so that no
+# old unique constraint breaks in between.
 _RENUMBER = """
 DO $$
 BEGIN
@@ -81,16 +84,17 @@ END $$;
 _UPGRADE: tuple[str, ...] = (
     _DEDUPE,
     "ALTER TABLE application_type DROP COLUMN IF EXISTS active_flow_version_id",
-    # Abhängige Indizes/Unique-Constraints (…one_active_per_type, (type, version))
-    # fallen mit der Spalte.
+    # The dependent indexes and unique constraints drop with the column. This
+    # covers the one_active_per_type index and the unique on (type, version).
     "ALTER TABLE flow_version DROP COLUMN IF EXISTS application_type_id",
     "DROP INDEX IF EXISTS uq_flow_version_one_active_global",
     (
         "CREATE UNIQUE INDEX IF NOT EXISTS uq_flow_version_one_active_global "
         "ON flow_version (active) WHERE active"
     ),
-    # Beide möglichen Namen droppen (Bestands-DB: Postgres-Default-Name;
-    # frische DB: Namenskonvention der Models), dann kanonisch neu anlegen.
+    # Drop both possible names, then create the canonical one again. An old
+    # database carries the Postgres default name. A fresh database carries the
+    # name from the naming convention of the models.
     "ALTER TABLE flow_version DROP CONSTRAINT IF EXISTS flow_version_version_key",
     "ALTER TABLE flow_version DROP CONSTRAINT IF EXISTS uq_flow_version_version",
     _RENUMBER,
@@ -106,8 +110,9 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Nicht umkehrbar (wie 0006): die Typ-Flow-Daten sind seit dem 0006-Cutover
-    # weg; die Spalten wiederherzustellen brächte nur tote Strukturen zurück und
-    # bräche zudem den drop_all-Downgrade der Baseline (FK auf application_type,
-    # den die aktuellen Models nicht mehr kennen). Bewusst No-op.
+    # Not reversible, the same as 0006. The 0006 cutover deleted the per-type
+    # flow data. A restore of the columns would bring back dead structures only.
+    # It would also break the drop_all downgrade of the baseline. The current
+    # models no longer know the foreign key to application_type. This downgrade
+    # does nothing on purpose.
     pass

@@ -3,7 +3,7 @@
     <h1 class="mtg__title">{{ 'meetings.title' | t }}</h1>
     @if (!meeting()) {
       <div class="mtg__headActions">
-        <!-- Debounced live search; collapses the timeline into one relevance-sorted list. -->
+        <!-- Debounced live search. It collapses the timeline into one relevance-sorted list. -->
         @if (showOverview()) {
           <input
             class="mtg__headSearch"
@@ -83,13 +83,13 @@
   }
 
   @if (!beamerMode() && !isFollower()) {
-  <!-- Toolbar above the body: control + settings + delete. Pure readers have
-       no action → hide the bar instead of showing an empty box. -->
+  <!-- Toolbar above the body: control, settings and delete. Pure readers have no
+       action, so hide the bar instead of showing an empty box. -->
   @if (m.canControl || canWrite() || m.canManage) {
   <div class="mtg__toolbar" role="toolbar" [attr.aria-label]="'meetings.control.title' | t">
     <!-- "closed" is terminal: all control buttons disappear after closing. -->
     @if (m.canControl && m.status !== 'closed') {
-      <!-- Starting requires a protokollant (the protocol is created on start). -->
+      <!-- A start requires a protokollant. The backend creates the protocol on start. -->
       <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="m.status === 'live' || !m.protokollantId" [ariaLabel]="(m.protokollantId ? 'meetings.control.open' : 'meetings.control.needProtokollant') | t" [title]="(m.protokollantId ? 'meetings.control.open' : 'meetings.control.needProtokollant') | t" (click)="setStatus('live')"><app-icon name="play" /></app-button>
       @if (m.status === 'planned' && !m.protokollantId) {
         <span class="mtg__needProt text-text-muted">{{ 'meetings.control.needProtokollant' | t }}</span>
@@ -99,7 +99,7 @@
       </app-button>
     }
     <!-- Meeting closed but the protocol is a draft again: the render failed and
-         rolled back — explicit retry, otherwise no path to a final protocol. -->
+         rolled back. The explicit retry is the only path to a final protocol. -->
     @if (m.status === 'closed' && canWrite() && protocol(); as proto) {
       @if (!proto.isFinal && proto.status !== 'rendering') {
         <app-button variant="ghost" size="sm" [iconOnly]="true" [loading]="finalizing()" [ariaLabel]="'meetings.protocol.finalize' | t" [title]="'meetings.protocol.finalize' | t" (click)="finalize()"><app-icon name="repeat" /></app-button>
@@ -115,7 +115,6 @@
 
   <!-- 3-column shell: TOPs left, protocol body center, attendance right. -->
   <div class="mtg__shell">
-    <!-- LEFT: agenda -->
     <aside class="mtg__side mtg__side--left" [attr.aria-label]="'meetings.agenda.title' | t">
       <h2 class="mtg__sideH">{{ 'meetings.agenda.title' | t }}</h2>
       <ol class="mtg__tocList">
@@ -153,8 +152,9 @@
             @if (votesForTop(item.id).length) {
               <span class="mtg__tocNum" [attr.aria-label]="'meetings.vote.count' | t">⚖ {{ votesForTop(item.id).length }}</span>
             }
-            <!-- After closing, a right-aligned badge marks non-public TOPs — only
-                 when the editable checkbox below is NOT shown (no double display). -->
+            <!-- After the close, a right-aligned badge marks non-public TOPs. It
+                 shows only when the editable checkbox below stays hidden, so that
+                 the state never appears twice. -->
             @if (item.nonPublic && m.status === 'closed' && (!m.canWrite || protocol()?.isLocked)) {
               <app-badge class="mtg__tocNpBadge" variant="warning">{{ 'meetings.agenda.nonPublic' | t }}</app-badge>
             }
@@ -189,7 +189,6 @@
       }
     </aside>
 
-    <!-- CENTER: protocol body (per-TOP editor + vote questions) -->
     <div class="mtg__main">
       <app-meeting-protocol-pane
         [meeting]="m"
@@ -209,7 +208,6 @@
       />
     </div>
 
-    <!-- RIGHT: attendance -->
     <aside class="mtg__side mtg__side--right" [attr.aria-label]="'meetings.attendance.title' | t">
       <h2 class="mtg__sideH">{{ 'meetings.attendance.title' | t }}</h2>
       <app-meeting-attendance-table
@@ -220,10 +218,9 @@
         (statusChange)="setAttendance($event.member, $event.status)"
       />
 
-      <!-- Delegation for this meeting. -->
       <app-meeting-delegation-card [meetingId]="m.id" />
 
-      <!-- Live viewers: who has the meeting page open — protokollant/lead only. -->
+      <!-- Live viewers: who has the meeting page open. Protokollant and lead only. -->
       @if (m.canWrite) {
         <section class="mt-5" [attr.aria-label]="'meetings.viewers.title' | t">
           <h2 class="mtg__sideH">
@@ -241,7 +238,7 @@
     </aside>
   </div>
 
-  <!-- Meeting votes without a TOP binding (legacy/active) — control card. -->
+  <!-- Meeting votes without a TOP binding (legacy or active): the control card. -->
   @if (looseVotes().length) {
     <app-card [heading]="'meetings.control.title' | t">
       <ul class="mtg__votes">
@@ -296,7 +293,6 @@
     </app-card>
   }
 
-  <!-- Open a vote / decision question (dialog) -->
   <app-dialog
     [open]="voteDialogOpen()"
     [title]="'meetings.vote.dialogTitle' | t"
@@ -322,8 +318,8 @@
         [ngModel]="voteMajorityRule()"
         (ngModelChange)="voteMajorityRule.set($event)"
       />
-      <!-- Quorum/eligible voters are never set per vote — they come from the
-           committee configuration. -->
+      <!-- The quorum and the eligible voters are never set per vote. They come
+           from the Gremium configuration. -->
     </form>
     <div dialog-footer class="mtg__dialogFoot">
       <app-button size="sm" variant="ghost" (click)="closeVoteDialog()">{{ 'action.cancel' | t }}</app-button>
@@ -333,7 +329,7 @@
     </div>
   </app-dialog>
 
-  <!-- Close the session (irrevocable, finalizes the protocol). -->
+  <!-- Close the meeting. This is irrevocable and finalizes the protocol. -->
   <app-dialog
     [open]="closeConfirmOpen()"
     [title]="'meetings.closeConfirm.title' | t"
@@ -350,20 +346,21 @@
   </app-dialog>
   } <!-- /@if (!beamerMode() && !isFollower()) -->
 } @else {
-  <!-- Overview: existing meetings. Plain committee members see their
-       (server-side filtered) timeline too. -->
+  <!-- Overview of the existing meetings. Plain Gremium members also see their
+       timeline, filtered on the server. -->
   @if (showOverview()) {
     <section class="mtg__listSection">
       @if (loadingList()) {
         <p class="text-text-muted" aria-live="polite">{{ 'meetings.list.loading' | t }}</p>
       } @else {
-        <!-- Even without meetings the timeline shows the "now" bar — the empty
-             case is just an empty timeline. Past on top (lazy on scroll up),
-             upcoming below (lazy on scroll down). -->
+        <!-- The timeline shows the "now" bar even without meetings. The empty
+             case is an empty timeline. Past meetings go on top and load lazily
+             on scroll up. Upcoming meetings go below and load lazily on scroll
+             down. -->
         <div class="mtg__timeline" #tlScroll (scroll)="onTimelineScroll(tlScroll)">
           @if (searchActive()) {
-            <!-- Search mode: ONE relevance-sorted list, no past/upcoming split,
-                 no "now" marker. Offset paging on scroll down. -->
+            <!-- Search mode: ONE relevance-sorted list, no past and upcoming
+                 split, no "now" marker. Offset paging on scroll down. -->
             @for (m of searchItems(); track m.id) {
               <ng-container *ngTemplateOutlet="tlRow; context: { $implicit: m, past: false }" />
             }
@@ -447,8 +444,8 @@
     <p class="mtg__status">{{ 'meetings.empty' | t }}</p>
   }
 
-  <!-- Create (session leads only), two steps: 1 = committee/date/time,
-       2 = name + protokollant. -->
+  <!-- Create (meeting leads only), in two steps: step 1 = Gremium, date and time,
+       step 2 = name and protokollant. -->
   <app-dialog
     [open]="createOpen()"
     [title]="'meetings.create.title' | t"
@@ -469,7 +466,7 @@
         @if (!gremiumOptions().length) {
           <p class="text-text-muted text-sm self-center">{{ 'meetings.create.noGremien' | t }}</p>
         }
-        <!-- Date + time are required: no meeting without an appointment. -->
+        <!-- Date and time are required: no meeting without an appointment. -->
         <app-datepicker
           [label]="'meetings.create.date' | t"
           [required]="true"
@@ -477,7 +474,7 @@
           (ngModelChange)="newDate.set($event)"
           name="date"
         />
-        <!-- Forced 24h: native type="time" follows the browser locale (AM/PM). -->
+        <!-- Forced 24 h: the native type="time" follows the browser locale (AM/PM). -->
         <app-time-input
           id="mtg-new-time"
           [label]="'meetings.create.time' | t"
@@ -504,7 +501,7 @@
           (ngModelChange)="newTitle.set($event)"
           name="title"
         />
-        <!-- Protokollant selectable on create; required before start at the latest. -->
+        <!-- The protokollant is selectable here. It is required before the start. -->
         <app-select
           name="newProt"
           [label]="'meetings.protokollant.label' | t"
@@ -535,7 +532,7 @@
   </app-dialog>
 }
 
-<!-- Settings: protokollant + date/time (toolbar OR list edit), top-level. -->
+<!-- Settings: protokollant, date and time (toolbar OR list edit), top-level. -->
 <app-dialog
   [open]="settingsMeeting() !== null"
   [title]="'meetings.settings.title' | t"
@@ -543,8 +540,8 @@
   (closed)="closeSettings()"
 >
   <form class="mtg__createForm" (submit)="$event.preventDefault(); saveSettings()">
-    <!-- Closed meeting: fully locked. Protokollant additionally locked once
-         the protocol is finalized; the backend rejects both with 409. -->
+    <!-- A closed meeting is fully locked. The protokollant also locks after the
+         protocol is finalized. The backend rejects both with 409. -->
     <app-select
       name="setProt"
       [label]="'meetings.protokollant.label' | t"

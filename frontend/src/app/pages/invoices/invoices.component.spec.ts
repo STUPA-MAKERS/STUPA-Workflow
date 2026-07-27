@@ -15,7 +15,6 @@ import type {
   InvoiceParseResult,
 } from '../budget/budget-tree.api';
 
-// ---------------------------------------------------------------- fixtures
 function inv(over: Partial<Invoice> = {}): Invoice {
   return {
     id: 'i-1',
@@ -62,7 +61,7 @@ const FILE_RES: InvoiceFileResult = {
   fileMime: 'application/pdf',
 };
 
-// Controllable fake auth — `canManage()` = can('budget.book').
+// Fake auth with a switch. The component maps `canManage()` to can('budget.book').
 class FakeAuth {
   allowed = true;
   can(_perm: string): boolean {
@@ -71,10 +70,10 @@ class FakeAuth {
 }
 
 interface SetupOpts {
-  /** initial GET /invoices payload (default: one invoice). */
+  /** Payload of the initial GET /invoices. It defaults to one invoice. */
   initial?: Invoice[];
   total?: number;
-  /** fail the initial GET instead of flushing. */
+  /** Fail the initial GET instead of flushing it. */
   error?: boolean;
   canManage?: boolean;
 }
@@ -96,7 +95,7 @@ async function setup(opts: SetupOpts = {}) {
   const http = TestBed.inject(HttpTestingController);
   const toast = TestBed.inject(ToastService);
 
-  // Constructor calls reload() → GET /api/invoices.
+  // The constructor calls reload, which fires GET /api/invoices.
   const req = http.expectOne((r) => r.url.endsWith('/api/invoices') && r.method === 'GET');
   if (opts.error) {
     req.flush(null, { status: 500, statusText: 'Server Error' });
@@ -123,14 +122,13 @@ describe('InvoicesComponent (#invoices)', () => {
     http.verify();
   });
 
-  // ------------------------------------------------------------- loading
   it('loads the first page on init and clears loading flags', async () => {
     const { c } = await setup({ initial: [inv({ id: 'a' }), inv({ id: 'b' })], total: 5 });
     expect(c.items().length).toBe(2);
     expect(c.total()).toBe(5);
     expect(c.loading()).toBe(false);
     expect(c.loadingMore()).toBe(false);
-    expect(c.hasMore()).toBe(true); // 2 < 5
+    expect(c.hasMore()).toBe(true);
   });
 
   it('clears items/total on an initial load error', async () => {
@@ -145,14 +143,13 @@ describe('InvoicesComponent (#invoices)', () => {
     expect(c.hasMore()).toBe(false);
   });
 
-  // ------------------------------------------------------------- formatting
   it('money() formats in de-DE vs en-US per locale', async () => {
     const { c } = await setup();
     const de = c.money('119.00');
     expect(de).toContain('119');
-    expect(de).toContain('€'); // €
+    expect(de).toContain('€');
     localStorage.setItem('ap.locale', 'en');
-    TestBed.inject(AuthService); // noop, keep ref
+    TestBed.inject(AuthService); // This no-op call keeps the auth reference alive.
     const i18n = c.i18n;
     i18n.setLocale('en');
     const en = c.money('119.00');
@@ -166,13 +163,11 @@ describe('InvoicesComponent (#invoices)', () => {
     expect(c.statusLabel('open')).toBe('Offen');
   });
 
-  // ------------------------------------------------------------- search
   it('onSearch debounces and reloads with the q param', async () => {
     const { c, http } = await setup();
     jest.useFakeTimers();
     c.onSearch('acme');
     expect(c.q()).toBe('acme');
-    // not yet fired
     http.expectNone((r) => r.url.endsWith('/api/invoices') && r.method === 'GET');
     jest.advanceTimersByTime(400);
     jest.useRealTimers();
@@ -185,11 +180,11 @@ describe('InvoicesComponent (#invoices)', () => {
     const { c, http } = await setup();
     jest.useFakeTimers();
     c.onSearch('a');
-    c.onSearch('ab'); // clears the previous timer
+    c.onSearch('ab');
     jest.advanceTimersByTime(400);
     jest.useRealTimers();
     const reqs = http.match((r) => r.url.endsWith('/api/invoices') && r.method === 'GET');
-    expect(reqs.length).toBe(1); // only one reload
+    expect(reqs.length).toBe(1);
     reqs[0].flush(page([inv()]));
   });
 
@@ -204,7 +199,6 @@ describe('InvoicesComponent (#invoices)', () => {
     req.flush(page([]));
   });
 
-  // ------------------------------------------------------------- filters
   it('setStatus filters immediately (no debounce)', async () => {
     const { c, http } = await setup();
     c.setStatus('paid');
@@ -255,7 +249,7 @@ describe('InvoicesComponent (#invoices)', () => {
     expect(c.activeFilterCount()).toBe(0);
     c.statusFilter.set('open');
     c.grossMin.set(' 5 ');
-    c.grossMax.set('   '); // whitespace → not counted
+    c.grossMax.set('   '); // Whitespace does not count as an active filter.
     c.issueFrom.set('2026-01-01');
     expect(c.activeFilterCount()).toBe(3);
   });
@@ -272,11 +266,10 @@ describe('InvoicesComponent (#invoices)', () => {
     c.resetFilters();
     expect(c.activeFilterCount()).toBe(0);
     const req = lastInvoicesReq(http);
-    expect(req.request.params.keys().length).toBe(2); // only limit + offset
+    expect(req.request.params.keys().length).toBe(2); // Only limit and offset remain.
     req.flush(page([]));
   });
 
-  // ------------------------------------------------------------- loadMore
   it('loadMore appends the next page and advances the offset', async () => {
     const { c, http } = await setup({ initial: [inv({ id: 'a' })], total: 2 });
     c.loadMore();
@@ -313,11 +306,10 @@ describe('InvoicesComponent (#invoices)', () => {
     const { c, http } = await setup({ initial: [inv({ id: 'a' })], total: 2 });
     c.loadMore();
     lastInvoicesReq(http).flush(null, { status: 500, statusText: 'err' });
-    expect(c.items().map((x: Invoice) => x.id)).toEqual(['a']); // unchanged
+    expect(c.items().map((x: Invoice) => x.id)).toEqual(['a']);
     expect(c.loadingMore()).toBe(false);
   });
 
-  // ------------------------------------------------------------- drag&drop
   function dragEvent(types: string[], file?: File): DragEvent {
     return {
       preventDefault: jest.fn(),
@@ -353,7 +345,7 @@ describe('InvoicesComponent (#invoices)', () => {
 
   it('hasFiles tolerates a missing dataTransfer (no types)', async () => {
     const { c } = await setup();
-    // dataTransfer undefined → `?.types ?? []` → empty → no files
+    // dataTransfer is undefined. So `?.types ?? []` stays empty and reports no files.
     const ev = { preventDefault: jest.fn(), dataTransfer: undefined } as unknown as DragEvent;
     c.onDragEnter(ev);
     expect(c.dragActive()).toBe(false);
@@ -379,13 +371,13 @@ describe('InvoicesComponent (#invoices)', () => {
 
   it('onDragLeave decrements depth and deactivates at zero', async () => {
     const { c } = await setup();
-    c.onDragEnter(dragEvent(['Files'])); // depth 1, active
-    c.onDragEnter(dragEvent(['Files'])); // depth 2
+    c.onDragEnter(dragEvent(['Files'])); // Depth 1, active.
+    c.onDragEnter(dragEvent(['Files'])); // Depth 2.
     const leave1 = dragEvent(['Files']);
-    c.onDragLeave(leave1); // depth 1, still active
+    c.onDragLeave(leave1); // Depth 1, still active.
     expect(c.dragActive()).toBe(true);
     const leave2 = dragEvent(['Files']);
-    c.onDragLeave(leave2); // depth 0 → inactive
+    c.onDragLeave(leave2); // Depth 0, now inactive.
     expect(c.dragActive()).toBe(false);
   });
 
@@ -423,13 +415,12 @@ describe('InvoicesComponent (#invoices)', () => {
   it('onDrop without a file just resets the overlay', async () => {
     const { c, http } = await setup();
     c.onDragEnter(dragEvent(['Files']));
-    const ev = dragEvent(['Files']); // no file
+    const ev = dragEvent(['Files']); // No file.
     c.onDrop(ev);
     expect(c.dragActive()).toBe(false);
     http.expectNone((r) => r.url.includes('/invoices/parse'));
   });
 
-  // ------------------------------------------------------------- import / parse
   it('successful parse prefills the create dialog + success toast', async () => {
     const { c, http, toast } = await setup();
     const spy = jest.spyOn(toast, 'success');
@@ -468,7 +459,8 @@ describe('InvoicesComponent (#invoices)', () => {
     const { c, http } = await setup();
     const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
     c.onFilePicked({ target: { files: [file], value: 'x' } } as unknown as Event);
-    // grossAmount typed string but server may omit → `?? ''` defensive branch
+    // The type of grossAmount is string, but the server can omit it. This covers the
+    // fallback `?? ''` branch.
     http
       .expectOne((r) => r.url.endsWith('/api/invoices/parse'))
       .flush({ ...PARSE, grossAmount: null });
@@ -506,9 +498,9 @@ describe('InvoicesComponent (#invoices)', () => {
       .expectOne((r) => r.url.endsWith('/api/invoices/parse'))
       .flush({ code: 'invoice_not_zugferd' }, { status: 422, statusText: 'Unprocessable' });
     expect(c.createOpen()).toBe(true);
-    // openCreate cleared the fields
+    // The openCreate call cleared the fields.
     expect(c.newNumber()).toBe('');
-    // attachFile fired upload
+    // The attachFile call started the upload.
     const up = http.expectOne((r) => r.url.endsWith('/api/invoices/file'));
     up.flush(FILE_RES);
     expect(c.importToken()).toBe('tok-upload');
@@ -555,7 +547,6 @@ describe('InvoicesComponent (#invoices)', () => {
     http.expectNone((r) => r.url.includes('/invoices/parse'));
   });
 
-  // ------------------------------------------------------------- attach (create dialog)
   it('onCreateFilePicked uploads the chosen file', async () => {
     const { c, http } = await setup();
     const file = new File(['x'], 'm.pdf', { type: 'application/pdf' });
@@ -608,7 +599,6 @@ describe('InvoicesComponent (#invoices)', () => {
     expect(c.importFileName()).toBe('');
   });
 
-  // ------------------------------------------------------------- create
   it('openCreate resets every dialog field and opens it', async () => {
     const { c } = await setup();
     c.newNumber.set('x');
@@ -667,7 +657,7 @@ describe('InvoicesComponent (#invoices)', () => {
     expect(c.saving()).toBe(false);
     expect(c.createOpen()).toBe(false);
     expect(spy).toHaveBeenCalled();
-    // reload() fired a fresh GET
+    // The reload fired a fresh GET.
     lastInvoicesReq(http).flush(page([inv({ id: 'new' })]));
   });
 
@@ -675,7 +665,7 @@ describe('InvoicesComponent (#invoices)', () => {
     const { c, http } = await setup();
     c.openCreate();
     c.newGross.set('5');
-    // everything else blank, no importToken
+    // Every other field stays blank and there is no importToken.
     const ev = { preventDefault: jest.fn() } as unknown as Event;
     c.create(ev);
     const req = http.expectOne(
@@ -704,7 +694,7 @@ describe('InvoicesComponent (#invoices)', () => {
     c.newGross.set('5');
     c.importToken.set('tok');
     c.importFileName.set('f.pdf');
-    // importFileMime stays '' → fileMime: null branch
+    // The importFileMime value stays empty here. This covers the fileMime null branch.
     const ev = { preventDefault: jest.fn() } as unknown as Event;
     c.create(ev);
     const req = http.expectOne(
@@ -747,7 +737,6 @@ describe('InvoicesComponent (#invoices)', () => {
     expect(c.createOpen()).toBe(true);
   });
 
-  // ------------------------------------------------------------- edit
   it('openEdit loads the invoice into the edit signals (with nulls → empty)', async () => {
     const { c } = await setup();
     const target = inv({
@@ -880,7 +869,6 @@ describe('InvoicesComponent (#invoices)', () => {
     expect(c.saving()).toBe(false);
   });
 
-  // ------------------------------------------------------------- delete
   it('askDelete sets the confirm target', async () => {
     const { c } = await setup();
     const target = inv({ id: 'd1' });
@@ -943,7 +931,6 @@ describe('InvoicesComponent (#invoices)', () => {
     expect(c.saving()).toBe(false);
   });
 
-  // ------------------------------------------------------------- openFile
   it('openFile downloads the streamed blob with the invoice file name', async () => {
     const { c, http } = await setup();
     const dl = jest.spyOn(downloadUtil, 'downloadBlob').mockImplementation(() => undefined);
@@ -973,7 +960,6 @@ describe('InvoicesComponent (#invoices)', () => {
     expect(spy).toHaveBeenCalledWith('Aktion fehlgeschlagen.');
   });
 
-  // ------------------------------------------------------------- options
   it('statusOptions builds localized select options', async () => {
     const { c } = await setup();
     const opts = c.statusOptions();
@@ -984,7 +970,6 @@ describe('InvoicesComponent (#invoices)', () => {
   });
 });
 
-// ----------------------------------------------------------- IntersectionObserver
 describe('InvoicesComponent infinite-scroll effect', () => {
   class FakeAuth2 {
     can(): boolean {
@@ -992,7 +977,7 @@ describe('InvoicesComponent infinite-scroll effect', () => {
     }
   }
 
-  // Capture the observer so we can drive its callback manually.
+  // Capture the observer to drive its callback manually.
   let lastCb: ((entries: { isIntersecting: boolean }[]) => void) | null = null;
   let disconnected = false;
 
@@ -1005,7 +990,6 @@ describe('InvoicesComponent infinite-scroll effect', () => {
         lastCb = cb;
       }
       observe(): void {
-        /* noop */
       }
       disconnect(): void {
         disconnected = true;
@@ -1030,24 +1014,23 @@ describe('InvoicesComponent infinite-scroll effect', () => {
       ],
     });
     const http = TestBed.inject(HttpTestingController);
-    // initial load → still has more (1 of 2)
+    // The initial load returns 1 of 2, so more rows remain.
     http
       .expectOne((r) => r.url.endsWith('/api/invoices') && r.method === 'GET')
       .flush(page([inv({ id: 'a' })], 2));
     view.fixture.detectChanges();
 
     expect(lastCb).not.toBeNull();
-    // entries not intersecting → no load
+    // Entries that do not intersect load nothing.
     lastCb?.([{ isIntersecting: false }]);
     http.expectNone((r) => r.url.endsWith('/api/invoices') && r.method === 'GET');
 
-    // intersecting → loadMore fires the next page
+    // An intersecting entry makes loadMore fetch the next page.
     lastCb?.([{ isIntersecting: true }]);
     http
       .expectOne((r) => r.url.endsWith('/api/invoices') && r.method === 'GET')
       .flush(page([inv({ id: 'b' })], 2, 1));
 
-    // teardown disconnects the observer
     view.fixture.destroy();
     expect(disconnected).toBe(true);
   });

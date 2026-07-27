@@ -1,12 +1,13 @@
-# Dependency-Scan (pip-audit, security.md §10 / T-41) — aus dem PR-Gate
-# herausgelöst (CI-Diät 2026-07): neue Advisories erscheinen unabhängig vom
-# PR-Inhalt, darum reicht wöchentlich + jeder main-Push. Rot ⇒ Issue/Fix,
-# blockiert aber keine unbeteiligten PRs mehr.
+# Dependency scan with pip-audit (security.md §10 / T-41). The scan moved out of the
+# pull-request gate (CI slimming 2026-07). A new advisory appears independently of
+# the content of a pull request. A weekly run plus every main push is therefore
+# enough. A red run means: open an issue or fix it. It no longer blocks unrelated
+# pull requests.
 name: deps-audit
 
 on:
   schedule:
-    - cron: "0 6 * * 1" # montags 06:00 UTC
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
   push:
     branches: [main]
   workflow_dispatch:
@@ -32,17 +33,19 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
           cache-dependency-path: backend/pyproject.toml
-      # pip selbst aktuell halten (pip-Advisories sonst rot; pip ist kein Runtime-Dep).
+      # Keep pip itself current. A pip advisory otherwise turns the run red, and pip
+      # is not a runtime dependency.
       - run: python -m pip install --upgrade pip
       - run: pip install -e '.[dev]' pip-audit
       - name: pip-audit (bekannte CVEs in Abhängigkeiten)
-        # Scannt die aufgelöste Umgebung gegen die PyPI-Advisory-DB. Einzelne,
-        # geprüft-irrelevante Advisories mit `--ignore-vuln <ID>` (mit Begründung).
+        # The scan checks the resolved environment against the PyPI advisory database.
+        # Exclude a single advisory only after you checked that it does not apply.
+        # Use `--ignore-vuln <ID>` and write down the reason.
         #
-        # PYSEC-2026-87 (lxml<6.1 XXE-Local-File-Read): lxml kommt nur transitiv über
-        # fints/sepaxml/xmlschema und fints pinnt lxml~=6.0.2 (<6.1) hart — 6.1.0 ist
-        # daher nicht installierbar (#fints). lxml verarbeitet hier ausschließlich die
-        # authentifizierten Bank-Antworten; eigenes (untrusted) XML parsen wir mit der
-        # stdlib `ElementTree`. Risiko in diesem Kontext nicht erreichbar → ausgenommen,
-        # bis fints lxml>=6.1 zulässt.
+        # PYSEC-2026-87 (lxml<6.1, XXE local file read): lxml comes in only through
+        # fints, sepaxml and xmlschema. fints pins lxml~=6.0.2 (<6.1) hard, so 6.1.0
+        # cannot be installed (#fints). Here lxml parses the authenticated bank
+        # answers only. We parse our own untrusted XML with the stdlib `ElementTree`.
+        # The risk is unreachable in this context. It stays excluded until fints
+        # allows lxml>=6.1.
         run: pip-audit --skip-editable --desc --ignore-vuln PYSEC-2026-87

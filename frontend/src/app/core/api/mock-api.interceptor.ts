@@ -33,24 +33,25 @@ import type {
 } from './models';
 
 /**
- * In-memory mock backend for FE/skeleton operation. Active only when
- * `USE_MOCK_API` is true; applies only to `/api/*`.
+ * In-memory mock backend for FE and skeleton operation.
  *
- * Responses are in the backend wire form (`*Wire`, camelCase via `_CamelModel`)
- * — the `ApiClient` maps them like the real backend. This keeps the mock
- * contract-true and exercises the mapper layer too.
+ * It runs only when `USE_MOCK_API` is true. It answers only `/api/*`.
+ *
+ * Responses use the backend wire form (`*Wire`, camelCase via `_CamelModel`).
+ * The `ApiClient` maps them like a real backend response. This keeps the mock
+ * true to the contract and exercises the mapper layer.
  */
 const MOCK_PRINCIPAL: Principal = {
   sub: '00000000-0000-0000-0000-000000000001',
   display_name: 'Demo Mitglied',
   email: 'demo@stupa.example',
   roles: ['member'],
-  // application.manage for RBAC actions on the detail page;
-  // vote.manage/meeting.manage for beamer/manage views;
-  // protocol.write for the protocol editor;
-  // admin.site/gremien/types + form.configure/flow.configure/webhook.manage
-  // for the admin UIs — all set in the mock so FE dev/harness/demo shows the
-  // gated views.
+  // The mock grants every permission a gated view needs, so the dev, harness
+  // and demo builds show those views. `application.manage` drives the RBAC
+  // actions on the detail page. `vote.manage` and `meeting.manage` drive the
+  // beamer and manage views. `protocol.write` drives the protocol editor.
+  // `admin.site`, `admin.gremien`, `admin.types`, `form.configure`,
+  // `flow.configure` and `webhook.manage` drive the admin UIs.
   permissions: [
     'application.read',
     'application.manage',
@@ -66,7 +67,7 @@ const MOCK_PRINCIPAL: Principal = {
     'form.configure',
     'flow.configure',
     'webhook.manage',
-    // budget.view/budget.structure/budget.book for the budget stats dashboard.
+    // `budget.view`, `budget.structure` and `budget.book` drive the budget stats page.
     'budget.view',
     'budget.structure',
     'budget.book',
@@ -271,8 +272,10 @@ const MOCK_APPLICATIONS: Page<ApplicationOutWire> = {
 
 /**
  * Open decisions for the current role: GET /applications/tasks.
- * Only applications in vote states the principal may act on.
- * Approval rows carry inline accept/reject, vote rows open the detail.
+ *
+ * The list holds only applications in vote states the principal may act on. An
+ * approval row carries an inline accept and reject. A vote row opens the detail
+ * page.
  */
 const MOCK_TASKS: ApplicationListItemWire[] = [
   {
@@ -386,7 +389,7 @@ const MOCK_TRANSITIONS: TransitionOutWire[] = [
 
 const LOGOUT_OUT = { logout_url: null };
 
-// --- meetings + protocol — mutable in-memory state ------------------------- //
+// Meetings and protocol: mutable in-memory state.
 const MOCK_MEETING_ID = 'd0000000-0000-0000-0000-000000000001';
 const MOCK_PROTOCOL_ID = 'e0000000-0000-0000-0000-000000000099';
 
@@ -466,7 +469,7 @@ let MOCK_PROTOCOL: ProtocolOutWire = {
   sentAt: null,
 };
 
-/** Set a vote's status in the mock meeting (emits a result on close). */
+/** Set the status of a vote in the mock meeting. A close also emits a result. */
 function setVoteStatus(voteId: string, status: 'open' | 'closed'): void {
   MOCK_MEETING = {
     ...MOCK_MEETING,
@@ -483,10 +486,10 @@ function path(url: string): string {
 }
 
 export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
-  // Security: defense in depth — the mock may only take effect in the dev/demo
-  // build. In prod `isDevMode()` is false; even if the interceptor slipped into
-  // the chain, no runtime-attackable input (?mock=1, localStorage,
-  // __USE_MOCK_API__) can activate it.
+  // Security: defense in depth. The mock may take effect only in the dev or
+  // demo build. In prod `isDevMode()` returns false. Even if the interceptor
+  // reaches the chain there, no attacker-controlled input (?mock=1,
+  // localStorage, __USE_MOCK_API__) can activate it.
   if (!isDevMode()) return next(req);
   if (!inject(USE_MOCK_API)) return next(req);
   if (!req.url.includes('/api/')) return next(req);
@@ -497,15 +500,15 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
 
   if (req.method === 'GET') {
     if (p.endsWith('/auth/me')) return ok(MOCK_PRINCIPAL);
-    // Altcha off in mock mode → 404 (widget reports "unavailable", no captcha).
+    // ALTCHA is off in mock mode → 404. The widget then reports "unavailable".
     if (p.endsWith('/altcha/challenge')) {
       return throwError(() => new HttpErrorResponse({ status: 404, url: req.url }));
     }
     if (/\/application-types\/[^/]+\/form$/.test(p)) return ok(MOCK_EFFECTIVE_FORM);
     if (p.endsWith('/application-types')) return ok(MOCK_TYPES);
-    // Match the meeting timeline BEFORE the generic `/timeline` rule — otherwise
-    // that one captures `/meetings/timeline` and returns application status
-    // events instead of a MeetingPage.
+    // Match the meeting timeline BEFORE the generic `/timeline` rule. The
+    // generic rule otherwise captures `/meetings/timeline` and returns
+    // application status events instead of a MeetingPage.
     if (p.endsWith('/meetings/timeline')) {
       const direction = req.params.get('direction') ?? 'upcoming';
       const page: MeetingPageWire = {
@@ -525,7 +528,8 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
       };
       return ok(signed);
     }
-    // Expenses/income: empty page (no tree mock anyway) — avoids a console 404.
+    // Expenses and income: empty page. There is no tree mock, and this keeps a
+    // 404 out of the console.
     if (p.endsWith('/expenses')) return ok({ items: [], total: 0, limit: 20, offset: 0 });
     if (p.endsWith('/applications/tasks')) return ok([...MOCK_TASKS]);
     if (p.endsWith('/applications')) return ok(MOCK_APPLICATIONS);
@@ -543,14 +547,12 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
   }
 
   if (req.method === 'PUT') {
-    // Reorder agenda items (…/agenda/order).
     if (/\/meetings\/[^/]+\/agenda\/order$/.test(p)) {
       const ids = (req.body as { itemIds?: string[] } | null)?.itemIds ?? [];
       const byId = new Map(MOCK_AGENDA.map((a) => [a.id, a]));
       MOCK_AGENDA = ids.map((id, i) => ({ ...(byId.get(id) as MockAgendaItem), position: i }));
       return ok([...MOCK_AGENDA]);
     }
-    // Set attendance (…/attendance/me or …/attendance/{principalId}).
     const att = /\/meetings\/[^/]+\/attendance\/([^/]+)$/.exec(p);
     if (att) {
       const status = (req.body as { status?: string } | null)?.status ?? 'present';
@@ -568,7 +570,6 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
 
   if (req.method === 'POST') {
     if (p.endsWith('/auth/logout')) return ok(LOGOUT_OUT);
-    // Open a live vote for an application (motion).
     if (/\/meetings\/[^/]+\/votes$/.test(p)) {
       const body = req.body as { applicationId?: string; question?: string | null } | null;
       MOCK_MEETING = {
@@ -590,7 +591,6 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
       };
       return ok(MOCK_MEETING);
     }
-    // Put an application on the agenda.
     if (/\/meetings\/[^/]+\/agenda$/.test(p)) {
       const body = req.body as { applicationId?: string; title?: string } | null;
       const appId = body?.applicationId;
@@ -610,8 +610,8 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
       return ok([...MOCK_AGENDA]);
     }
     if (p.endsWith('/auth/magic-link/verify')) {
-      // Cookie model: the real server sets an HttpOnly applicant cookie; the
-      // mock returns only scope + app id, no session token.
+      // Cookie model: the real server sets an HttpOnly applicant cookie. The
+      // mock returns only the scope and the application id, no session token.
       const res: MagicLinkVerifyResult = { application_id: MOCK_APP_ID, scope: 'edit' };
       return ok(res);
     }
@@ -631,7 +631,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
       return ok(created, 201);
     }
     if (p.endsWith('/attachments')) {
-      // Multipart upload: the real server scans async → `scanned=false`.
+      // Multipart upload: the real server scans asynchronously → `scanned=false`.
       const created: AttachmentOutWire = {
         id: 'att00000-0000-0000-0000-000000000001',
         filename: 'mock-upload.pdf',
@@ -661,7 +661,6 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
       const res: BallotResult = { status: 'cast' };
       return ok(res, 201);
     }
-    // --- meetings + protocol ---
     if (p.endsWith('/finalize')) {
       MOCK_PROTOCOL = {
         ...MOCK_PROTOCOL,
@@ -684,7 +683,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     if (p.endsWith('/meetings')) {
       const body = (req.body as { title?: string; date?: string | null; startTime?: string | null } | null) ?? {};
       const title = body.title?.trim();
-      // BE creates new meetings with status `planned`.
+      // The backend creates a new meeting with status `planned`.
       MOCK_MEETING = {
         ...MOCK_MEETING,
         title: title || MOCK_MEETING.title,
@@ -717,7 +716,6 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
   }
 
   if (req.method === 'PATCH') {
-    // Set the markdown text of an agenda item (…/agenda/{itemId}).
     const body = /\/meetings\/[^/]+\/agenda\/([^/]+)$/.exec(p);
     if (body) {
       const text = (req.body as { body?: string } | null)?.body ?? '';

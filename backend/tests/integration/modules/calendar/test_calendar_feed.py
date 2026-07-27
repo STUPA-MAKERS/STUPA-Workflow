@@ -1,10 +1,11 @@
-"""Integration (echte Postgres, testcontainers): Kalender-Feed (#ics).
+"""Integration (real Postgres, testcontainers): the calendar feed (#ics).
 
-Beweist gegen das migrierte Schema:
-* ``calendar_token`` rotiert + Round-Trip ``principal_by_calendar_token`` /
-  ``get_calendar_token``.
-* ``member_meetings`` liefert **nur** datierte Sitzungen der Mitglieds-Gremien
-  (Fremd-Gremium + datumslose Sitzung werden ausgelassen) — echter SQL-Join.
+These tests run against the migrated schema. They prove:
+* `calendar_token` rotates. `principal_by_calendar_token` and `get_calendar_token`
+  resolve it back.
+* `member_meetings` returns **only** dated meetings of the Gremien the principal belongs
+  to. A meeting of another Gremium and a meeting without a date drop out. This is a real
+  SQL join.
 """
 
 from __future__ import annotations
@@ -65,9 +66,9 @@ async def test_calendar_token_round_trip(session: AsyncSession) -> None:
     assert await service.get_calendar_token(session, member.sub) == token
     resolved = await service.principal_by_calendar_token(session, token)
     assert resolved is not None and resolved.sub == member.sub
-    # Unbekannter Token → None.
+    # An unknown token gives None.
     assert await service.principal_by_calendar_token(session, "nope") is None
-    # Deaktivierter Principal → Feed gesperrt (kein Leak; Endpunkt antwortet 404).
+    # An inactive principal blocks the feed. Nothing leaks. The endpoint answers 404.
     resolved.active = False
     await session.flush()
     assert await service.principal_by_calendar_token(session, token) is None
@@ -88,9 +89,9 @@ async def test_member_meetings_filters(session: AsyncSession) -> None:
                 start_time=_time(18, 0),
                 status="planned",
             ),
-            # Datumslos → ausgelassen.
+            # No date, so it drops out.
             Meeting(gremium_id=home.id, title="ohne Datum", status="planned"),
-            # Fremd-Gremium → ausgelassen.
+            # Another Gremium, so it drops out.
             Meeting(
                 gremium_id=other.id,
                 title="fremd",

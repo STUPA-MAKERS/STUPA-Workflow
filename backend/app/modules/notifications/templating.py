@@ -1,9 +1,9 @@
 """Mail template rendering (Jinja2, i18n DE/EN, placeholders, preview).
 
-Pure render logic over `*_i18n` dicts; no DB. Language resolves with a DE fallback,
-then renders via a sandboxed Jinja2. Sandbox + `StrictUndefined`: unknown
-placeholders fail loudly and dangerous attributes stay inaccessible despite admin
-authorship.
+The render logic is pure and works on the `*_i18n` dicts. It never touches the DB. The
+module resolves the language with a DE fallback and then renders through a sandboxed
+Jinja2. The sandbox and `StrictUndefined` make an unknown placeholder fail loudly. They
+also keep a dangerous attribute out of reach, even though an admin writes the template.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ _env_html = SandboxedEnvironment(undefined=StrictUndefined, autoescape=True)
 
 
 class TemplateRenderError(Exception):
-    """Render failed (unknown placeholder, syntax error, ...)."""
+    """The render failed (unknown placeholder, syntax error, ...)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,7 +34,7 @@ class RenderedMail:
 
 
 def _resolve(value: I18nMap | None, lang: str, default_lang: str) -> tuple[str | None, str]:
-    """Return the text and the language actually used."""
+    """Return the text and the language that the resolver really used."""
     if not value:
         return None, lang
     if lang in value:
@@ -46,8 +46,11 @@ def _resolve(value: I18nMap | None, lang: str, default_lang: str) -> tuple[str |
 
 
 def _sanitize_subject(value: str) -> str:
-    """Strip CR/LF and other line breaks from the subject to block header injection;
-    context input could otherwise smuggle extra mail headers."""
+    """Remove CR, LF and other line breaks from the subject.
+
+    This blocks header injection. Context input could otherwise smuggle extra mail
+    headers into the message.
+    """
     return " ".join(value.splitlines()).strip()
 
 

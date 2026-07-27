@@ -1,21 +1,44 @@
 ---
 name: ui-patterns-and-backlog2
-description: "Second-wave UI requirements/patterns for the antragsplattform admin (dialogs, typeahead, dropdowns)"
+description: Second-wave UI patterns for the antragsplattform admin (dialogs, typeahead, dropdowns)
 metadata: 
   node_type: memory
   type: project
 ---
 
-Recurring UI rules + open work (tasks #18–#20, plus #13/#14/#16), branch `feat/admin-ux-flow-editor-fixes`:
+Recurring UI rules and open work (tasks #18–#20, plus #13, #14, #16), branch
+`feat/admin-ux-flow-editor-fixes`:
 
-- **Add via DIALOG, not inline-above-the-list — enforce everywhere** (#19). Applies to gremien members, budget tree nodes, user role-add, etc.
-- **Search = inline typeahead** (suggestions render directly under the search field; click adds). Separate result dropdowns are "müll" (#18).
-- **Constrained values = dropdowns** (CD-Variante, etc.), never free text. **Slugs auto-generate** from the name (#18).
-- **Per-entity management = its own subpage** (e.g. each Gremium → its own members-table subpage), not an inline panel (#18).
-- **No Expert/Simple split in the flow editor** — fold everything into one mode (#20). Flow **templates must be savable** (save current graph as a reusable preset). Add inline help explaining terms like "Akteur"/guards (#20).
-- **Everything is a SHARED component** (#26) — no page-local table/dialog/button markup. Build a capable shared data-table (columns, custom cell templates, tree indentation, row actions) in `shared/ui` and migrate all bespoke tables (users, gremien, gremium-members, budget-tree, budget-dashboard, admin-home forms, meetings). DialogComponent/ButtonComponent/SelectComponent already exist; reuse them everywhere. **AG-Grid decided AGAINST**: Community bundle is heavy and not token-aligned; tree-data/row-grouping are Enterprise-only. In-house shared table is the call.
-- **Meetings (#27)**: "Sitzung anlegen" as a dialog; the Sitzungen list as the shared table.
-- **Table display conventions**: boolean columns render a colored ✓/✗ (success/danger), narrow width — not a badge/word. Expandable/clickable rows need a visible cue (rotating chevron per row). All rows uniform height (shared DataTable forces 3rem) — action-button rows must not be taller than button-less rows.
-- **Form builder (#13)**: admin tile "Anträge" → list of Antragstypen/Forms (add via dialog) → edit each like **Nextcloud Forms** (title+md description, "+ Add a question" type menu: checkboxes/radio/dropdown/file/short answer/long text/date/time/linear scale/color; per-question title+description+options+drag-reorder+required+⋯; View/Edit toggle).
+- **Add through a DIALOG, not inline above the list. Enforce this everywhere** (#19). It
+  applies to Gremium members, budget tree nodes, the user role-add, and so on.
+- **Search is an inline typeahead.** Suggestions render directly under the search field, and
+  a click adds the entry. The user rejects a separate result dropdown as garbage (#18).
+- **Constrained values use dropdowns** (CD variant and so on), never free text. **Slugs
+  generate automatically** from the name (#18).
+- **Each entity gets its own management subpage.** For example, each Gremium gets its own
+  members-table subpage, not an inline panel (#18).
+- **No Expert/Simple split in the flow editor.** Fold everything into one mode (#20). Flow
+  **templates must be savable**, so the user can save the current graph as a reusable preset.
+  Add inline help that explains terms such as "Akteur" (actor) and guards (#20).
+- **Everything is a SHARED component** (#26). No page-local table, dialog or button markup.
+  Build one capable shared data table in `shared/ui` with columns, custom cell templates,
+  tree indentation and row actions. Then migrate all bespoke tables: users, gremien,
+  gremium-members, budget-tree, budget-dashboard, admin-home forms and meetings.
+  DialogComponent, ButtonComponent and SelectComponent already exist. Reuse them everywhere.
+  **AG-Grid is ruled out**: the Community bundle is heavy and not token-aligned, and
+  tree-data and row-grouping are Enterprise-only. The in-house shared table wins.
+- **Meetings (#27)**: create a meeting ("Sitzung anlegen") through a dialog. Render the
+  meeting list with the shared table.
+- **Table display conventions**: a boolean column renders a colored ✓ or ✗ (success or
+  danger) at a narrow width, not a badge or a word. An expandable or clickable row needs a
+  visible cue, which is a rotating chevron per row. All rows keep a uniform height, because
+  the shared DataTable forces 3rem. A row with action buttons must not be taller than a row
+  without buttons.
+- **Form builder (#13)**: the admin tile for applications ("Anträge") opens a list of
+  application types and forms, where a dialog adds a new one. Edit each one like **Nextcloud
+  Forms**: a title plus a Markdown description, and a "+ Add a question" type menu with
+  checkboxes, radio, dropdown, file, short answer, long text, date, time, linear scale and
+  color. Each question carries a title, a description, options, drag-reorder, a required flag
+  and a ⋯ menu. A View/Edit toggle switches the mode.
 
 See [[admin-domain-rules]], [[nextcloud-parity-ui]], [[antragsplattform-backlog]].

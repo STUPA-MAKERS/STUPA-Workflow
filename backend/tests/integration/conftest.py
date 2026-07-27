@@ -1,7 +1,8 @@
-"""Integration-Fixtures: echte Postgres-16 via testcontainers + Alembic-Upgrade.
+"""Integration fixtures: a real Postgres 16 from testcontainers plus an Alembic upgrade.
 
-Übersprungen, wenn keine Docker-Runtime erreichbar ist (lokal ohne Docker); in der
-CI-Integration-Stage (T-04) läuft Docker → Tests greifen. data-model §4 / testing.md §5.
+The tests skip when no Docker runtime is reachable, for example on a local machine
+without Docker. The CI integration stage (T-04) runs Docker, so the tests run there.
+See data-model §4 and testing.md §5.
 """
 
 from __future__ import annotations
@@ -23,7 +24,13 @@ def _make_alembic_config(async_url: str) -> Config:
 
 @pytest.fixture(scope="session")
 def _pg_urls() -> Iterator[tuple[str, str]]:
-    """Startet Postgres-16-Container; gibt (sync_url, async_url). Skip ohne Docker."""
+    """Start a Postgres 16 container.
+
+    The fixture skips the test when no Docker runtime is available.
+
+    Yields:
+        The sync URL first and the async URL second.
+    """
     try:
         from testcontainers.postgres import PostgresContainer
     except ImportError:  # pragma: no cover
@@ -35,7 +42,7 @@ def _pg_urls() -> Iterator[tuple[str, str]]:
     except Exception as exc:  # pragma: no cover - Umgebung ohne Docker
         pytest.skip(f"keine Docker-Runtime: {exc}")
 
-    sync_url = container.get_connection_url()  # postgresql+psycopg://…
+    sync_url = container.get_connection_url()
     async_url = sync_url.replace("postgresql+psycopg://", "postgresql+asyncpg://")
     try:
         yield sync_url, async_url
@@ -45,7 +52,13 @@ def _pg_urls() -> Iterator[tuple[str, str]]:
 
 @pytest.fixture(scope="session")
 def migrated(_pg_urls: tuple[str, str]) -> tuple[str, str]:
-    """Schema auf `head` migriert (idempotent). Gibt (sync_url, async_url)."""
+    """Migrate the schema to `head`.
+
+    The upgrade is idempotent.
+
+    Returns:
+        The sync URL first and the async URL second.
+    """
     sync_url, async_url = _pg_urls
     command.upgrade(_make_alembic_config(async_url), "head")
     return sync_url, async_url
@@ -58,7 +71,10 @@ def alembic_cfg(migrated: tuple[str, str]) -> Config:
 
 @pytest.fixture
 def engine(migrated: tuple[str, str]) -> Iterator[Engine]:
-    """Sync-Engine (psycopg) für Assertions/Inserts; säubert Test-Daten je Test."""
+    """Give a sync psycopg engine for assertions and inserts.
+
+    The fixture clears the test data before and after each test.
+    """
     eng = create_engine(migrated[0])
     _truncate(eng)
     try:
@@ -77,10 +93,10 @@ _DATA_TABLES = (
     "form_field",
     "form_version",
     "application_type",
-    # Sitzungs-/Abstimmungs-/Fristen-Domäne (#PII-Re-Add Test-Isolation): diese Tabellen
-    # werden nicht über die ``application``-CASCADE erreicht und leckten sonst zwischen
-    # Tests (z. B. ``uq_flow_version_version``/Vote-/Ballot-Kollisionen). CASCADE räumt
-    # die Kinder (agenda_item, attendance, protocol, ballot, …) mit ab.
+    # Meeting, vote and deadline domain (#PII-Re-Add test isolation). The `application`
+    # CASCADE does not reach these tables. Without this list they leak between tests, for
+    # example as `uq_flow_version_version`, vote or ballot collisions. CASCADE also clears
+    # the children: agenda_item, attendance, protocol, ballot and others.
     "meeting",
     "vote",
     "ballot",
@@ -92,14 +108,14 @@ _DATA_TABLES = (
 
 
 def clear_privacy_tables(eng: Engine) -> None:
-    """Privacy-/Auth-Stammtabellen leeren (für Test-Isolation der DSGVO-Suite).
+    """Clear the privacy and auth base tables for test isolation of the DSGVO suite.
 
-    Die ``engine``-Fixture säubert nur die Antrags-/Flow-Tabellen; ``principal``,
-    ``auth_session``, ``erasure_request`` und ``privacy_settings`` bleiben sonst über
-    die Session-Laufzeit erhalten und würden zwischen Tests lecken (z. B. ein Login-
-    Subjekt zu einer Antragsteller-Mail). Diese Helfer-Funktion stellt den sauberen
-    Ausgangszustand wieder her — ``audit_entry`` ist trigger-geschützt und wird von der
-    ``engine``-Fixture separat behandelt."""
+    The `engine` fixture clears only the application and flow tables. Without this
+    helper, `principal`, `auth_session`, `erasure_request` and `privacy_settings` stay
+    for the whole session and leak between tests. One example is a login subject that
+    keeps the mail address of an applicant. This helper restores the clean start state.
+    A trigger protects `audit_entry`, so the `engine` fixture clears it separately.
+    """
     with eng.begin() as conn:
         conn.execute(
             text(
@@ -111,10 +127,11 @@ def clear_privacy_tables(eng: Engine) -> None:
 
 def _truncate(eng: Engine) -> None:
     with eng.begin() as conn:
-        # `audit_entry` ist per Trigger append-only (auch gegen TRUNCATE, T-23). Für die
-        # Test-Isolation wird der Schutz nur in dieser Wartungs-Transaktion umgangen
-        # (`session_replication_role = replica` deaktiviert User-Trigger) — der Trigger
-        # selbst bleibt bestehen; ein eigener Test beweist die Ablehnung im Normalbetrieb.
+        # A trigger keeps `audit_entry` append-only, also against TRUNCATE (T-23). This
+        # maintenance transaction is the only place that bypasses the protection, because
+        # `session_replication_role = replica` turns off the user triggers. The trigger
+        # itself stays in place. A separate test proves that normal operation rejects the
+        # write.
         conn.execute(text("SET LOCAL session_replication_role = replica"))
         conn.execute(text("TRUNCATE audit_entry RESTART IDENTITY"))
         conn.execute(text("SET LOCAL session_replication_role = origin"))

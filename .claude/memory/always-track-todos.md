@@ -6,13 +6,13 @@ metadata:
   type: feedback
 ---
 
-Always track progress using the todos tool. For any multi-step task, maintain a live todo
-list — add items as work is scoped, mark in-progress/completed as you go, so progress is
-visible at all times.
+Always track progress with the todos tool. For a multi-step task, keep a live todo list. Add an
+item as soon as you scope the work. Mark it in-progress and then completed as you go, so the
+progress stays visible at all times.
 
-**Why:** User instruction ("ALWAYS TRACK YOUR PROGRESS USING THE TODOS TOOL"). They
-drip-feed work and don't want anything lost or progress opaque.
+**Why:** user instruction ("ALWAYS TRACK YOUR PROGRESS USING THE TODOS TOOL"). The user
+drip-feeds work and wants no lost item and no opaque progress.
 
-**How to apply:** Open a todo list at the start of substantive work; keep exactly one item
-in-progress; update immediately on state change. Combines with [[track-side-requests]]
-(every casual request → todo + memory) and [[work-autonomously]].
+**How to apply:** open a todo list at the start of substantive work. Keep exactly one item
+in-progress. Update the list at once on every state change. This combines with
+[[track-side-requests]] (every casual request → todo + memory) and [[work-autonomously]].

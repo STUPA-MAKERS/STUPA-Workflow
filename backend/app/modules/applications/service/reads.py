@@ -19,11 +19,13 @@ class ReadOps(ApplicationsServiceBase):
     async def effective_form(
         self, application_id: UUID, *, allow_unconfirmed: bool = True
     ) -> EffectiveFormOut:
-        """Effective form from the application's **pinned** version (+ pot fields).
+        """Build the effective form from the pinned version of the application.
 
-        The detail view renders/edits the same form the server validates against —
-        regardless of later changes to the active form version (running applications
-        keep their ``form_version_id``)."""
+        The result also holds the budget-pot fields. The detail view then renders and
+        edits the same form that the server validates against. A later change of the
+        active form version does not apply, because a running application keeps its
+        `form_version_id`.
+        """
         app = await self._get_app(application_id, allow_unconfirmed=allow_unconfirmed)
         return await FormsService(self.session).get_effective_form(
             app.type_id,
@@ -59,7 +61,8 @@ class ReadOps(ApplicationsServiceBase):
             )
         ).all()
         out: list[TimelineEventOut] = []
-        # Resolve actor sub → display name — never show raw UUIDs in the UI.
+        # Map the actor sub to a display name. The user interface must never show a
+        # raw UUID.
         names = await self._author_names({ev.actor for ev in events if ev.actor})
         for ev in events:
             to_state = await self._get_state(ev.to_state_id)

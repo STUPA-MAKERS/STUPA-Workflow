@@ -64,7 +64,8 @@ function item(id: string, typeId: string, state: StateOutWire): ApplicationListI
   };
 }
 
-// Two applications; one open (a task) + one closed (only "my applications").
+// One application is open and counts as a task. The other is closed and appears only
+// under "my applications".
 const PAGE: Page<ApplicationListItemWire> = {
   items: [item('app-1', 't1', OPEN_STATE), item('app-2', 't2', CLOSED_STATE)],
   total: 2,
@@ -72,7 +73,7 @@ const PAGE: Page<ApplicationListItemWire> = {
   offset: 0,
 };
 
-// Open tasks (GET /applications/tasks): only the actionable application app-1.
+// Fake response for GET /applications/tasks. Only the actionable application app-1 appears.
 const TASKS: ApplicationListItemWire[] = [item('app-1', 't1', OPEN_STATE)];
 
 async function setup(
@@ -110,7 +111,7 @@ async function setup(
   } else {
     appsReq.flush(PAGE);
   }
-  // "Open tasks" loads GET /applications/tasks separately from "my applications".
+  // The "Open tasks" panel loads GET /applications/tasks separately from "my applications".
   const tasksReq = http.expectOne((r) => r.url.endsWith('/api/applications/tasks'));
   if (opts.tasksError) {
     tasksReq.flush(null, { status: 500, statusText: 'Server Error' });
@@ -123,14 +124,12 @@ async function setup(
   } else {
     typesReq.flush(TYPES);
   }
-  // Meeting shortcuts load `/meetings`.
   http
     .match((r) => r.url.endsWith('/api/meetings') && r.method === 'GET')
     .forEach((req) => {
       if (opts.meetingsError) req.flush(null, { status: 500, statusText: 'Server Error' });
       else req.flush(opts.meetings ?? []);
     });
-  // Substitution card loads `/delegations`.
   http
     .match((r) => r.url.endsWith('/api/delegations') && r.method === 'GET')
     .forEach((req) => {
@@ -190,7 +189,7 @@ describe('DashboardComponent', () => {
   it('greets the signed-in member by name and shows their roles', async () => {
     const { http } = await setup(MEMBER);
     expect(screen.getByText('Willkommen, Mia Member')).toBeInTheDocument();
-    // Rolle 'member' lokalisiert (de → Mitglied).
+    // The i18n layer translates the 'member' role. German gives "Mitglied".
     expect(screen.getByText('Mitglied')).toBeInTheDocument();
     http.verify();
   });
@@ -207,16 +206,15 @@ describe('DashboardComponent', () => {
     expect(screen.getByText('Offene Aufgaben')).toBeInTheDocument();
     expect(screen.getByText('Meine Anträge')).toBeInTheDocument();
 
-    // Open task = the non-closed application; appears in BOTH panels (tasks = the
-    // actionable subset of my applications) and deep-links to its detail.
+    // The open task is the non-closed application. It appears in both panels, because
+    // tasks are the actionable subset of my applications. Each link points to the detail page.
     const openLinks = screen.getAllByRole('link', { name: 'Finanzantrag' });
     expect(openLinks.length).toBe(2);
     for (const l of openLinks) expect(l).toHaveAttribute('href', '/applications/app-1');
-    // The closed application is NOT a task — shows only under "my applications".
+    // The closed application is not a task. It appears only under "my applications".
     const closedLinks = screen.getAllByRole('link', { name: 'Veranstaltung' });
     expect(closedLinks.length).toBe(1);
     expect(closedLinks[0]).toHaveAttribute('href', '/applications/app-2');
-    // State labels are rendered as badges.
     expect(screen.getByText('Entschieden')).toBeInTheDocument();
     http.verify();
   });
@@ -247,7 +245,7 @@ describe('DashboardComponent', () => {
     expect(c.openTasks()).toEqual([]);
     expect(c.sessionShortcuts()).toEqual([]);
     expect(c.delegations()).toEqual([]);
-    // type name falls back to the raw id when types failed
+    // When the types request fails, the type name falls back to the raw id.
     expect(c.name({ typeId: 't1' })).toBe('t1');
     http.verify();
   });
@@ -274,14 +272,16 @@ describe('DashboardComponent', () => {
         meeting('c', 'closed'),
         meeting('d', 'planned', '2026-06-20'),
         meeting('e', 'planned', null),
-        // a non-live/planned/closed status survives the filter → rank's fallback (2) branch
+        // A status other than live, planned, or closed still passes the filter. It falls
+        // into the fallback branch of rank, which returns 2.
         meeting('z', 'paused'),
       ],
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
     const ids = c.sessionShortcuts().map((m: { id: string }) => m.id);
-    // closed dropped, live first, then planned by date asc (null sorts first), 'paused' last, capped at 4
+    // Closed items drop out. Live items come first, then planned items by date ascending,
+    // with a null date first. Status 'paused' sorts last. The list caps at 4 items.
     expect(ids).toEqual(['b', 'e', 'd', 'a']);
     expect(c.sessionStatusKey('live')).toBe('meetings.status.live');
     expect(c.sessionVariant('live')).toBe('success');
@@ -341,7 +341,7 @@ describe('DashboardComponent', () => {
     const { fixture, http } = await setup(MEMBER, { apps: 'error' });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
-    // applications() is null → the ?. / ?? fallbacks kick in
+    // The applications signal holds null here, so the optional chain and fallbacks apply.
     expect(c.total()).toBe(0);
     expect(c.applicationRows()).toEqual([]);
     expect(c.loading()).toBe(false);

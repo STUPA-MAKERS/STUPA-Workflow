@@ -1,8 +1,9 @@
-"""Domain operations as plain functions over a :class:`~antragsplattform_admin.db.Db`.
+"""Domain operations as plain functions over a `Db`.
 
-SQL uses ``%s`` placeholders (bind params in direct mode, quoted literals in docker mode). Writes
-go straight to the DB → NO audit_entry, NO RBAC guards. ``granted_by`` is tagged ``admin-cli`` so
-such rows are recognisable.
+SQL uses ``%s`` placeholders. Direct mode binds them as parameters. Docker mode
+substitutes quoted literals. Writes go straight to the database, so they create NO
+audit_entry row and pass NO RBAC guard. Such rows carry ``admin-cli`` in
+``granted_by``, which makes them recognizable.
 """
 
 from __future__ import annotations
@@ -14,7 +15,6 @@ from .db import Db
 _GRANTED_BY = "admin-cli"
 
 
-# --------------------------------------------------------------------------------- users
 def list_users(db: Db, search: str | None = None, *, limit: int = 500) -> list[dict[str, Any]]:
     where, params = "", []
     if search and search.strip():
@@ -40,7 +40,7 @@ def set_user_active(db: Db, principal_id: str, active: bool) -> int:
 
 
 def delete_user(db: Db, principal_id: str) -> int:
-    # FK ON DELETE CASCADE removes assignments/sessions/etc.
+    # FK ON DELETE CASCADE removes assignments, sessions and the other child rows.
     return db.execute("DELETE FROM principal WHERE id = %s", (principal_id,))
 
 
@@ -74,7 +74,7 @@ def revoke_assignment(db: Db, assignment_id: str) -> int:
 
 
 def list_role_users(db: Db, role_id: str) -> list[dict[str, Any]]:
-    """Principals holding the given role (one row per assignment)."""
+    """Return the principals that hold the role, one row per assignment."""
     return db.query(
         """
         SELECT ra.id AS assignment_id, p.id AS principal_id,
@@ -90,7 +90,6 @@ def list_role_users(db: Db, role_id: str) -> list[dict[str, Any]]:
     )
 
 
-# --------------------------------------------------------------------------------- roles
 def list_roles(db: Db) -> list[dict[str, Any]]:
     return db.query(
         """
@@ -115,7 +114,7 @@ def create_role(db: Db, key: str, name_de: str | None) -> int:
 
 
 def rename_role(db: Db, role_id: str, key: str) -> int:
-    """Change only the role key; the i18n display names stay untouched."""
+    """Change only the role key and leave the i18n display names untouched."""
     return db.execute("UPDATE role SET key = %s WHERE id = %s", (key, role_id))
 
 
@@ -132,8 +131,12 @@ def list_role_permissions(db: Db, role_id: str) -> list[str]:
 
 
 def set_role_permissions(db: Db, role_id: str, permissions: list[str]) -> None:
-    """Replace the role's permission set (delete-all + bulk insert). Two statements → run in both
-    backends sequentially (autocommit; acceptable for an admin tool)."""
+    """Replace the permission set of the role.
+
+    The function deletes all rows and then runs one bulk insert. Both backends run
+    the two statements one after the other in autocommit mode. This is acceptable
+    for an admin tool.
+    """
     db.execute("DELETE FROM role_permission WHERE role_id = %s", (role_id,))
     perms = sorted(set(permissions))
     if not perms:
@@ -149,7 +152,6 @@ def set_role_permissions(db: Db, role_id: str, permissions: list[str]) -> None:
     )
 
 
-# ----------------------------------------------------------------------- OIDC group mappings
 def list_mappings(db: Db) -> list[dict[str, Any]]:
     return db.query(
         """
@@ -184,12 +186,10 @@ def delete_mapping(db: Db, mapping_id: str) -> int:
     return db.execute("DELETE FROM group_mapping WHERE id = %s", (mapping_id,))
 
 
-# --------------------------------------------------------------------------------- gremien
 def list_gremien(db: Db) -> list[dict[str, Any]]:
     return db.query("SELECT id, name FROM gremium ORDER BY name")
 
 
-# --------------------------------------------------------------------------------- audit log
 def list_audit(
     db: Db,
     *,
@@ -199,10 +199,11 @@ def list_audit(
     target: str | None = None,
     limit: int = 50,
 ) -> list[dict[str, Any]]:
-    """Audit entries newest-first, with the actor resolved to a principal.
+    """Return audit entries newest first, with the actor resolved to a principal.
 
-    ``actor`` matches the raw sub as well as the resolved email/display name;
-    ``target`` matches ``target_type`` and ``target_id``.
+    Args:
+        actor: Matches the raw sub, and also the resolved email or display name.
+        target: Matches ``target_type`` and ``target_id``.
     """
     clauses, params = [], []
     if before_id is not None:
@@ -233,9 +234,8 @@ def list_audit(
     return db.query(sql, (*params, limit))
 
 
-# --------------------------------------------------------------------------------- counts
 def counts(db: Db) -> dict[str, Any]:
-    """Entity counts for the status toolbar (one round-trip)."""
+    """Return the entity counts for the status toolbar in one round trip."""
     rows = db.query(
         """
         SELECT (SELECT count(*) FROM principal)      AS users,

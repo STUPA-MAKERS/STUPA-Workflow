@@ -1,4 +1,7 @@
-"""TDD: OpenAPI ↔ Fehler-Contract (api.md §2) — Fehlerantworten als problem+json."""
+"""OpenAPI error contract (api.md §2).
+
+Error responses use the problem+json media type.
+"""
 
 from __future__ import annotations
 
@@ -15,7 +18,6 @@ def test_error_responses_are_problem_json() -> None:
     assert me["401"]["content"]["application/problem+json"]["schema"] == {
         "$ref": "#/components/schemas/ProblemDetail"
     }
-    # Erfolg bleibt application/json.
     assert list(me["200"]["content"]) == ["application/json"]
 
 
@@ -31,13 +33,13 @@ def test_openapi_served_and_cached() -> None:
     client = TestClient(app)
     first = client.get("/openapi.json")
     assert first.status_code == 200
-    # Zweiter Aufruf nutzt den Cache (app.openapi_schema gesetzt).
+    # The second call uses the cache because app.openapi_schema is set.
     assert client.get("/openapi.json").json() == first.json()
 
 
 def test_ensure_problem_components_idempotent() -> None:
     schema: dict[str, object] = {}
     _ensure_problem_components(schema)
-    _ensure_problem_components(schema)  # zweiter Lauf: early-return
+    _ensure_problem_components(schema)  # The second run returns early.
     schemas = schema["components"]["schemas"]  # type: ignore[index]
     assert "ProblemDetail" in schemas

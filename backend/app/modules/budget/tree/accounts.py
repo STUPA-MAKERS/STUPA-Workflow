@@ -32,19 +32,23 @@ class AccountOps(BudgetTreeServiceBase):
             active=a.active,
             fintsEndpoint=a.fints_endpoint,
             fintsBlz=a.fints_blz,
-            # FinTS-capable with endpoint + BLZ; personal logins/PINs are stored
-            # per principal and do not belong to the account master data.
+            # An account is FinTS-capable with an endpoint and a BLZ. A personal
+            # login or PIN belongs to a principal, not to the account master data.
             fintsConfigured=bool(a.fints_endpoint and a.fints_blz),
             fintsLastBalance=a.fints_last_balance,
             fintsBalanceAt=a.fints_balance_at,
         )
 
     def _apply_fints_config(self, acc: Account, payload: AccountCreate | AccountUpdate) -> bool:
-        """Apply the FinTS bank connection (endpoint + BLZ) from the payload.
+        """Apply the FinTS bank connection (endpoint and BLZ) from the payload.
 
-        Returns whether the connection changed — then the persisted dialog
-        states of all bookers are discarded (the account now points at a
-        different bank → fresh SCA required).
+        Returns:
+            True when the connection changed. The caller then discards the
+            persisted dialog state of every booker. The account now points at a
+            different bank and needs a fresh SCA.
+
+        Raises:
+            ValidationProblem: The endpoint fails the SSRF check.
         """
         fields = payload.model_fields_set
         changed = False
@@ -64,9 +68,11 @@ class AccountOps(BudgetTreeServiceBase):
         return changed
 
     async def _reset_fints_states(self, account_id: UUID) -> None:
-        """Discard the persisted SCA state of ALL bookers of this account: a
-        changed bank connection invalidates every ``system_id``/dialog state →
-        each booker's next sync forces a fresh SCA."""
+        """Discard the persisted SCA state of ALL bookers of this account.
+
+        A changed bank connection invalidates every ``system_id`` and dialog
+        state. The next sync of each booker then forces a fresh SCA.
+        """
         await self.session.execute(
             update(AccountFintsCredential)
             .where(AccountFintsCredential.account_id == account_id)
@@ -78,10 +84,10 @@ class AccountOps(BudgetTreeServiceBase):
         return [self._account_out(a) for a in rows]
 
     async def list_account_options(self) -> list[AccountOption]:
-        """Active accounts as id+name (no IBAN) for booking dropdowns.
+        """List active accounts as id and name (no IBAN) for booking dropdowns.
 
-        ``fintsHasCredential``/``fintsLastSyncAt`` resolve PER requesting booker:
-        an account can be FinTS-capable without this user having stored own
+        ``fintsHasCredential`` and ``fintsLastSyncAt`` resolve PER requesting
+        booker. An account can be FinTS-capable while this user has stored no own
         credentials yet.
         """
         from app.modules.auth.models import Principal as PrincipalRow
@@ -119,7 +125,7 @@ class AccountOps(BudgetTreeServiceBase):
         ]
 
     async def _audit_fints_config(self, acc: Account) -> None:
-        """Audit the FinTS config change — WITHOUT PIN/plaintext secrets."""
+        """Audit the FinTS config change WITHOUT any PIN or plaintext secret."""
         await self._audit(
             AuditAction.BANK_ACCOUNT_CONFIG,
             target_type="account",
@@ -144,7 +150,7 @@ class AccountOps(BudgetTreeServiceBase):
             if field in payload.model_fields_set and getattr(payload, field) is not None:
                 setattr(acc, field, getattr(payload, field))
         if self._apply_fints_config(acc, payload):
-            # Changed bank connection → discard all stored SCA states.
+            # The bank connection changed, so discard all stored SCA states.
             await self._reset_fints_states(acc.id)
             await self._audit_fints_config(acc)
         await self.session.commit()
@@ -154,5 +160,5 @@ class AccountOps(BudgetTreeServiceBase):
         acc = await self.session.get(Account, account_id)
         if acc is None:
             raise NotFoundError(f"account {account_id} not found")
-        await self.session.delete(acc)  # bookings keep account_id=NULL (SET NULL)
+        await self.session.delete(acc)  # ON DELETE SET NULL: bookings keep account_id NULL
         await self.session.commit()

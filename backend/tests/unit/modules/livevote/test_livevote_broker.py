@@ -1,9 +1,9 @@
-"""Broker-Fan-out (T-16, api.md §4): PubSub über simulierte Instanzen.
+"""Broker fan-out (T-16, api.md §4): pub/sub over simulated instances.
 
-Der In-Memory-Broker mit **geteiltem** Hub modelliert mehrere App-Instanzen an einem
-Redis: eine Nachricht, die Instanz A publiziert, muss alle Abonnenten — auch die von
-Instanz B — erreichen. Zusätzlich wird die Redis-Implementierung gegen einen
-Fake-Client auf Protokoll-Treue geprüft.
+The in-memory broker with a **shared** hub models several app instances on one Redis.
+A message that instance A publishes must reach every subscriber, also the subscribers
+of instance B. The tests also check the Redis implementation against a fake client for
+protocol fidelity.
 """
 
 from __future__ import annotations
@@ -52,13 +52,10 @@ async def test_unsubscribe_cleans_up_hub() -> None:
     broker = InMemoryBroker(hub)
     async with broker.subscribe("meeting:1"):
         pass
-    # Nach dem Verlassen des Context ist der Kanal abgeräumt (keine Leaks).
+    # The hub drops the channel when the context exits, so no subscription leaks.
     assert "meeting:1" not in hub._channels
 
 
-# --------------------------------------------------------------------------- #
-# Redis-Implementierung gegen Fake-Client (Protokoll-Treue ohne echtes Redis)
-# --------------------------------------------------------------------------- #
 class _FakePubSub:
     def __init__(self, messages: list[dict[str, object]]) -> None:
         self._messages = messages
@@ -69,7 +66,7 @@ class _FakePubSub:
         self.subscribed.append(channel)
 
     async def listen(self):  # noqa: ANN201
-        # Realistischer Strom: erst ein subscribe-Ack (ignoriert), dann Messages.
+        # A realistic stream: first a subscribe ack that the broker drops, then messages.
         yield {"type": "subscribe", "data": 1}
         for raw in self._messages:
             yield {"type": "message", "data": json.dumps(raw).encode("utf-8")}

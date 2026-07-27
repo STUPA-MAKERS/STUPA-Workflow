@@ -1,12 +1,12 @@
-"""Notification tables: mail_template, notification_preference,
-notification_settings, task_reminder_log.
+"""Tables of the notifications module.
 
-``mail_template`` holds i18n subject/body (Jinja2) + declared placeholders.
-``notification_preference`` stores the per-user opt-out of individual
-notification kinds: no row = enabled (opt-out default).
-``notification_settings`` is the admin-configurable platform config
-(single row); ``task_reminder_log`` remembers the last reminder send per
-application (once/repeat logic). Rendering/sending: service + worker.
+`mail_template` holds the i18n subject and body (Jinja2) and the declared
+placeholders. `notification_preference` stores the per-user opt-out of one
+notification kind. No row means enabled, so the default is opt-out.
+`notification_settings` holds the admin-configurable platform config in a
+single row. `task_reminder_log` remembers the last reminder send per
+application for the once-or-repeat logic. The service and the worker do the
+rendering and the sending.
 """
 
 from __future__ import annotations
@@ -29,13 +29,13 @@ from app.db import Base, CreatedAtMixin, UUIDPkMixin
 
 
 class MailTemplate(UUIDPkMixin, CreatedAtMixin, Base):
-    """Mail template: i18n subject/body (Jinja2) + declared placeholders."""
+    """Mail template: i18n subject and body (Jinja2), declared placeholders."""
 
     __tablename__ = "mail_template"
 
     key: Mapped[str] = mapped_column(Text, unique=True)
     subject_i18n: Mapped[dict] = mapped_column(JSONB, server_default="{}")
-    # Body as Jinja2/Markdown; optional per-language HTML body (body_html_i18n).
+    # Body as Jinja2 or Markdown. The per-language HTML body is optional.
     body_i18n: Mapped[dict] = mapped_column(JSONB, server_default="{}")
     body_html_i18n: Mapped[dict] = mapped_column(JSONB, server_default="{}")
     # Declared placeholders (docs/preview): {"name": "...", "applicationId": "..."}.
@@ -43,11 +43,12 @@ class MailTemplate(UUIDPkMixin, CreatedAtMixin, Base):
 
 
 class NotificationPreference(Base):
-    """Per-user switch per notification kind.
+    """Per-user switch for one notification kind.
 
-    Only **deviations** from the default are stored (all kinds are on by
-    default); essential mails (magic link) cannot be disabled and never
-    appear here. ``kind`` ∈ :data:`app.modules.notifications.kinds`.
+    The table stores only the **deviations** from the default. Every kind is on
+    by default. A user cannot switch off an essential mail such as the magic
+    link, so such a kind never appears here. The `kind` value comes from
+    `app.modules.notifications.kinds`.
     """
 
     __tablename__ = "notification_preference"
@@ -62,10 +63,11 @@ class NotificationPreference(Base):
 class NotificationSettings(Base):
     """Platform-wide notification config (single row, admin-maintained).
 
-    Task reminders: ``task_reminder_after_days`` = days without a status
-    change until a reminder is sent; ``task_reminder_repeat_days`` = repeat
-    every N days after that (``0`` = only once per state stay). Managed via
-    ``/admin/notification-settings`` (permission ``admin.notifications``).
+    `task_reminder_after_days` counts the days without a status change until
+    the first reminder goes out. `task_reminder_repeat_days` repeats the
+    reminder every N days after that. A value of `0` sends the reminder only
+    once per state stay. The admin manages this row under
+    `/admin/notification-settings` with the `admin.notifications` permission.
     """
 
     __tablename__ = "notification_settings"
@@ -82,7 +84,7 @@ class NotificationSettings(Base):
     )
 
     __table_args__ = (
-        # Single-row guarantee: exactly the row id=1 exists.
+        # Single-row guarantee: only the row with id 1 can exist.
         CheckConstraint("id = 1", name="notification_settings_singleton"),
         CheckConstraint(
             "task_reminder_after_days >= 1", name="task_reminder_after_days_min"
@@ -96,8 +98,9 @@ class NotificationSettings(Base):
 class TaskReminderLog(Base):
     """Last task-reminder send per application.
 
-    ``status_event_id`` binds the reminder to the state stay: when the
-    application changes state, the stay counts anew (row is overwritten).
+    `status_event_id` binds the reminder to the state stay. When the
+    application changes state, the stay starts again and the code overwrites
+    the row.
     """
 
     __tablename__ = "task_reminder_log"

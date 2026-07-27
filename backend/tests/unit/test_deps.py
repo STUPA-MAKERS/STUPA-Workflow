@@ -1,4 +1,4 @@
-"""TDD: Auth-Dependencies (api.md §1, security.md §1/§2) — reale Auflösung (T-10)."""
+"""TDD for the auth dependencies (api.md §1, security.md §1/§2) with real resolution (T-10)."""
 
 from __future__ import annotations
 
@@ -45,9 +45,6 @@ def _request(*, cookies: dict[str, str] | None = None,
     return Request({"type": "http", "headers": raw, "query_string": query.encode()})
 
 
-# --------------------------------------------------------------------------- #
-# require_principal / require_group / require_applicant (Factory-Logik)
-# --------------------------------------------------------------------------- #
 def test_require_principal_no_session_unauthorized() -> None:
     with pytest.raises(UnauthorizedError):
         require_principal("application.read")(principal=None)
@@ -96,9 +93,7 @@ def test_require_applicant_ok() -> None:
     assert require_applicant("view")(applicant=a) is a
 
 
-# --------------------------------------------------------------------------- #
-# get_current_applicant (serverseitige Session: signierte opake sid → DB-Zeile)
-# --------------------------------------------------------------------------- #
+# get_current_applicant: a signed opaque sid maps to a server-side session row.
 def _applicant_row(
     *, sid: str = "as1", application_id: str = "a1", scope: str = "edit",
     expired: bool = False, revoked: bool = False,
@@ -129,7 +124,7 @@ async def test_get_current_applicant_bearer() -> None:
 
 
 async def test_get_current_applicant_query_param_not_accepted() -> None:
-    # `?t=` wird bewusst NICHT mehr akzeptiert (Query-Token-Leak, security.md §1).
+    # The code rejects `?t=` on purpose. A token in the query string leaks (security.md §1).
     req = _request(query=f"t={_cookie()}")
     assert await get_current_applicant(req, fake_session(), _settings()) is None
 
@@ -152,7 +147,7 @@ async def test_get_current_applicant_invalid_token() -> None:
 
 
 async def test_get_current_applicant_forged_secret_no_row() -> None:
-    # KERN-REGRESSION (ISSUE_TOKEN): korrekt signierte sid, aber keine DB-Zeile → None.
+    # Core regression (ISSUE_TOKEN): a correctly signed sid without a database row gives None.
     req = _request(headers={"Authorization": f"Bearer {_cookie('forged')}"})
     assert await get_current_applicant(req, fake_session(result()), _settings()) is None
 
@@ -169,9 +164,6 @@ async def test_get_current_applicant_bad_scope() -> None:
     assert await get_current_applicant(req, db, _settings()) is None
 
 
-# --------------------------------------------------------------------------- #
-# get_current_principal (sessions/rbac gemockt)
-# --------------------------------------------------------------------------- #
 async def test_get_current_principal_no_cookie() -> None:
     assert await get_current_principal(_request(), fake_session(), _settings()) is None
 
@@ -191,7 +183,6 @@ async def test_get_current_principal_orphan_session(monkeypatch: pytest.MonkeyPa
 
     monkeypatch.setattr(deps.sessions, "load_principal_session", _sess)
     req = _request(cookies={_settings().session_cookie_name: "x"})
-    # Principal-Zeile fehlt → None.
     assert await get_current_principal(req, fake_session(result()), _settings()) is None
 
 
@@ -218,7 +209,7 @@ async def test_get_current_principal_deactivated(monkeypatch: pytest.MonkeyPatch
 
     monkeypatch.setattr(deps.sessions, "load_principal_session", _sess)
     req = _request(cookies={_settings().session_cookie_name: "x"})
-    # Deaktivierter Principal (active=False) → keine Auflösung (#30).
+    # A deactivated principal (active=False) does not resolve (#30).
     principal = await get_current_principal(
         req, fake_session(result(SimpleNamespace(active=False))), _settings()
     )

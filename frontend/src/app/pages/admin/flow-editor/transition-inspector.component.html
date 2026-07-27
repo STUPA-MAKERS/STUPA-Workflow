@@ -34,8 +34,8 @@
     {{ 'admin.flow.automatic' | t }}
   </app-checkbox>
 </div>
-<!-- "Requires action" only makes sense for manual transitions — automatic
-     ones are fired by the worker and never create a task. -->
+<!-- "Requires action" applies only to manual transitions. The worker fires an
+     automatic transition and never creates a task for it. -->
 @if (!transition().automatic) {
   <div class="p-3 border border-solid border-line rounded-md">
     <app-checkbox [ngModel]="transition().requiresAction !== false" (ngModelChange)="requiresActionChange.emit($event)" [hint]="'admin.flow.requiresActionHint' | t">
@@ -44,7 +44,7 @@
   </div>
 }
 
-<!-- Result branch only for vote source states (pass/fail). -->
+<!-- Show the result branch only for vote source states (pass or fail). -->
 @if (branchOptions().length) {
   <app-select
     [label]="'admin.flow.branch' | t"
@@ -55,5 +55,5 @@
   />
 }
 
-<!-- Guard + actions live in their own pane below the graph. -->
+<!-- The guard and the actions live in their own pane below the graph. -->
 <app-button variant="danger" size="sm" (click)="remove.emit()">{{ 'admin.flow.removeTransition' | t }}</app-button>

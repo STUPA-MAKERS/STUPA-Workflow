@@ -1,31 +1,36 @@
-# E2E-Overlay (T-40). NUR für die Playwright-E2E gegen den echten Stack — NICHT
-# für Prod. Zusammen mit dem Basis-Stack laden:
+# E2E overlay (T-40). Use it ONLY for the Playwright E2E run against the real stack.
+# Do NOT use it for production. Load it together with the base stack:
 #   docker compose -f docker-compose.yml -f docker-compose.e2e.yml up -d
-# Treiber: scripts/e2e.sh (eigener COMPOSE_PROJECT_NAME, eigenes .env, down -v).
+# Driver: scripts/e2e.sh (own COMPOSE_PROJECT_NAME, own .env, down -v).
 #
-# Ergänzt gegenüber dem Basis-Stack:
-#  * mailpit  — SMTP-Sink + HTTP-API (Magic-Link-Mails abfangen, testing.md §3/§5).
-#               Ersetzt das im SDS genannte „MailHog"; API-kompatibler Nachfolger.
-#  * seed     — One-Shot (Backend-Image): aktive Form-/Flow-Version für den Default-
-#               Antragstyp + Admin-Session + Budget-Topf. `profiles:[seed]` ⇒ startet
-#               NICHT bei `up`, sondern gezielt via `run --rm seed` NACH api-healthy.
-#  * web      — zusätzlicher Host-Port-Reuse (Basis bindet bereits 127.0.0.1:8080).
+# On top of the base stack this overlay adds:
+#  * mailpit — SMTP sink + HTTP API. It catches the magic-link mails (testing.md §3/§5).
+#              It replaces the "MailHog" named in the SDS and keeps the API compatible.
+#  * seed    — one-shot job on the backend image. It creates the active form version and
+#              the active flow version for the default application type, an admin session
+#              and a budget pot. `profiles:[seed]` keeps it out of `up`. Start it on
+#              purpose with `run --rm seed` AFTER api is healthy.
+#  * web     — reuses the host port that the base stack already binds (127.0.0.1:8080).
 #
-# Mock bleibt AUS (#101): kein Mock-Keycloak. OIDC bleibt unkonfiguriert → Login-
-# Redirect 404 (vom RBAC-Negativtest bewusst geprüft). OIDC-/Live-Vote-/PDF-Pfade
-# laufen im opt-in „full"-Tier (siehe scripts/e2e.sh, .github/workflows/ci.yml).
+# The mock stays OFF (#101): there is no mock Keycloak. OIDC stays unconfigured, so the
+# login redirect answers 404. The RBAC negative test checks this on purpose. The OIDC,
+# live-vote and PDF paths run in the opt-in "full" tier. See scripts/e2e.sh and
+# .github/workflows/ci.yml.
 
 services:
   web:
-    # Overlay-Override (Basis unberührt): zwei e2e-spezifische Anpassungen am web/nginx.
-    #  1. `:ro,z` statt `:ro` — SELinux-Relabel (Fedora/rootless podman lokal); ohne
-    #     `z` scheitert nginx mit „Permission denied" am gemounteten conf. Auf Nicht-
-    #     SELinux-Hosts (CI/ubuntu-docker) ist `z` ein No-op (wie beim backup-Service).
-    #  2. Healthcheck über `127.0.0.1` statt `localhost`: der nginx-Entrypoint kann die
-    #     IPv6-Listen-Direktive nicht ergänzen (conf read-only gemountet) → nginx
-    #     lauscht nur IPv4. `localhost` löst im Container teils auf `::1` auf →
-    #     busybox-`wget` schlägt fehl → web bleibt „unhealthy" (Stack-Timeout, kein
-    #     Playwright-Lauf). `127.0.0.1` erzwingt IPv4. Engeres Intervall fürs Gate.
+    # Overlay override, the base stack stays untouched. Two e2e-specific changes to
+    # web/nginx:
+    #  1. `:ro,z` instead of `:ro` for the SELinux relabel (local Fedora or rootless
+    #     podman). Without `z`, nginx fails with "Permission denied" on the mounted conf.
+    #     On hosts without SELinux (CI, ubuntu docker) `z` is a no-op, as for the backup
+    #     service.
+    #  2. The healthcheck uses `127.0.0.1` instead of `localhost`. The nginx entrypoint
+    #     cannot add the IPv6 listen directive, because compose mounts the conf read-only.
+    #     nginx then listens on IPv4 only. In the container `localhost` sometimes resolves
+    #     to `::1`, busybox `wget` fails and web stays "unhealthy". The stack then runs
+    #     into its timeout and no Playwright run happens. `127.0.0.1` forces IPv4. The
+    #     interval is tighter for the gate.
     volumes:
       - ./web/nginx.conf:/etc/nginx/conf.d/default.conf:ro,z
     healthcheck:
@@ -42,7 +47,8 @@ services:
       MP_SMTP_AUTH_ALLOW_INSECURE: "true"
       MP_MAX_MESSAGES: "5000"
     ports:
-      # HTTP-API nur lokal gebunden — Playwright (Host) scrapt hierüber den Token.
+      # The HTTP API binds to localhost only. Playwright runs on the host and scrapes the
+      # token through it.
       - "127.0.0.1:8025:8025"
     networks:
       - internal
@@ -69,7 +75,8 @@ services:
       postgres:
         condition: service_healthy
     volumes:
-      # `:z`/`,z` — SELinux-Relabel (Fedora/podman lokal); No-op auf CI/ubuntu-docker.
+      # `:z` and `,z` request the SELinux relabel (local Fedora or podman).
+      # They are a no-op on CI and on ubuntu docker.
       - ./e2e/seed.py:/seed/seed.py:ro,z
       - ./e2e/.artifacts:/artifacts:z
     networks:

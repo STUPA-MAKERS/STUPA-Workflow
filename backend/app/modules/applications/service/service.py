@@ -1,14 +1,14 @@
 """Public facade of the applications service.
 
-:class:`ApplicationsService` combines the concerns — the router and all callers
-bind to exactly this class. The implementation lives in the ops classes:
+`ApplicationsService` combines the concerns. The router and all other callers bind to
+exactly this class. The implementation lives in the ops classes:
 
-* :class:`~.create.CreateOps` — application creation (public + managed)
-* :class:`~.edits.EditOps` — versioned data edits + diff, version history, deletion
-* :class:`~.reads.ReadOps` — detail view, pinned effective form, status timeline
-* :class:`~.listing.ListingOps` — filtered listing, committee scope, tasks, name maps
-* :class:`~.comments.CommentOps` — internal/public comments
-* :class:`~.anonymize.AnonymizeOps` — GDPR anonymization
+* `create.CreateOps`: application creation, public and managed
+* `edits.EditOps`: versioned data edits with diff, version history, deletion
+* `reads.ReadOps`: detail view, pinned effective form, status timeline
+* `listing.ListingOps`: filtered listing, Gremium scope, tasks, name maps
+* `comments.CommentOps`: internal and public comments
+* `anonymize.AnonymizeOps`: GDPR anonymization
 """
 
 from __future__ import annotations
@@ -29,4 +29,4 @@ class ApplicationsService(
     CommentOps,
     AnonymizeOps,
 ):
-    """DB-backed application operations (bound to one ``AsyncSession``)."""
+    """DB-backed application operations, bound to one `AsyncSession`."""

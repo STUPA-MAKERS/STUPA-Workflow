@@ -1,7 +1,8 @@
-"""Test-Fakes für DB-nahe Auth-Logik (Unit-Suite ohne Docker).
+"""Test fakes for auth logic that touches the database (unit suite without Docker).
 
-Mockt `AsyncSession.execute` über eine vorab gefüllte Ergebnis-Queue, sodass
-service-/rbac-/session-Branches deterministisch und ohne echte DB geprüft werden.
+The fakes mock `AsyncSession.execute` with a pre-filled result queue. The tests then
+check the service, RBAC and session branches deterministically and without a real
+database.
 """
 
 from __future__ import annotations
@@ -11,7 +12,7 @@ from typing import Any
 
 
 class FakeResult:
-    """Minimaler `Result`-Ersatz (`scalar_one_or_none` / `scalars`)."""
+    """Minimal replacement for `Result` with `scalar_one_or_none` and `scalars`."""
 
     def __init__(self, items: Iterable[Any] = ()) -> None:
         self._items = list(items)
@@ -30,10 +31,11 @@ class FakeResult:
 
 
 class FakeSession:
-    """`AsyncSession`-Stub: `execute`/`scalars` liefern die Ergebnisse in Reihenfolge.
+    """Stub for `AsyncSession` that returns the queued results in order.
 
-    `get` zieht aus einer eigenen Queue (`gets`), da `AsyncSession.get` nicht über
-    `execute` läuft. Reicht für die DB-nahen Service-/RBAC-Branches ohne Docker.
+    `execute` and `scalars` pop from the result queue. `get` pops from a separate
+    queue (`gets`), because `AsyncSession.get` does not go through `execute`. This is
+    enough for the service and RBAC branches that touch the database, without Docker.
     """
 
     def __init__(
@@ -80,5 +82,8 @@ def result(*items: Any) -> FakeResult:
 
 
 def fake_session(*results: FakeResult, gets: Iterable[Any] = ()) -> Any:
-    """`AsyncSession`-kompatibler Fake (Rückgabe `Any` → ohne Cast einsetzbar)."""
+    """Make a fake that is compatible with `AsyncSession`.
+
+    The return type is `Any`, so the caller can use the fake without a cast.
+    """
     return FakeSession(list(results), gets=gets)

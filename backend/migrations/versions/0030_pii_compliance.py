@@ -1,19 +1,22 @@
-"""DSGVO/PII-Compliance: Anonymisierung, Löschanträge, Aufbewahrung, Auskunft.
+"""GDPR and PII compliance: anonymization, erasure, retention and data export.
 
-* Re-add ``applicant.anonymized_at`` + ``form_field.is_pii`` (in 0015 entfernt,
-  hier mit echtem Endpoint/Cron/UI wieder eingeführt — Branch ``feat/PII-Re-Add``).
-* ``application_type.retention_months`` — Aufbewahrungsfrist je Typ
-  (NULL = globaler Default aus ``privacy_settings``).
-* ``state.is_terminal`` — Endzustand (terminale Anträge sind aufbewahrungs-/
-  anonymisierungs-fähig, flows §).
-* ``privacy_settings`` — Single-Row (id=1): ``default_retention_months``
-  (Default 24, DSB-Platzhalter; admin-gepflegt über ``/admin/privacy``).
-* ``erasure_request`` — Löschantrags-Queue (DSGVO Art. 17): Selbstauskunft per
-  Magic-Link bzw. Admin-Anlage; ``status`` open/executed/rejected.
-* Neue Permission ``privacy.manage``: an alle Rollen verteilt, die ``admin.site``
-  halten (Bereichs-Logik wie Migration 0016/0018).
+* Re-add `applicant.anonymized_at` and `form_field.is_pii`. Migration 0015
+  removed both. Branch `feat/PII-Re-Add` brings them back with a real endpoint,
+  a cron job and a user interface.
+* `application_type.retention_months` is the retention period per type. NULL
+  means the global default from `privacy_settings`.
+* `state.is_terminal` marks a terminal state. Only an application in a terminal
+  state qualifies for retention and anonymization. See the flow module.
+* `privacy_settings` is a single row (id=1). It holds
+  `default_retention_months` (default 24) and the placeholder of the data
+  protection officer. An admin maintains it under `/admin/privacy`.
+* `erasure_request` is the erasure queue (GDPR Art. 17). A subject files a
+  request over a magic link, or an admin creates it. `status` is open, executed
+  or rejected.
+* The new permission `privacy.manage` goes to every role that holds
+  `admin.site`. This is the same scope logic as migration 0016 and 0018.
 
-Idempotent (``IF [NOT] EXISTS`` / ``ON CONFLICT DO NOTHING``).
+All statements are idempotent (`IF [NOT] EXISTS` or `ON CONFLICT DO NOTHING`).
 """
 
 from __future__ import annotations
@@ -29,13 +32,11 @@ depends_on: str | Sequence[str] | None = None
 
 
 _UPGRADE: tuple[str, ...] = (
-    # --- 0015 invertieren: PII-Spalten wieder anlegen -----------------------
     "ALTER TABLE applicant ADD COLUMN IF NOT EXISTS anonymized_at timestamptz",
     (
         "ALTER TABLE form_field ADD COLUMN IF NOT EXISTS "
         "is_pii boolean NOT NULL DEFAULT false"
     ),
-    # --- Aufbewahrungs-/Terminal-Metadaten ----------------------------------
     (
         "ALTER TABLE application_type ADD COLUMN IF NOT EXISTS "
         "retention_months integer"
@@ -44,7 +45,6 @@ _UPGRADE: tuple[str, ...] = (
         "ALTER TABLE state ADD COLUMN IF NOT EXISTS "
         "is_terminal boolean NOT NULL DEFAULT false"
     ),
-    # --- Plattform-Privacy-Config (Single-Row) ------------------------------
     (
         "CREATE TABLE IF NOT EXISTS privacy_settings ("
         "id integer PRIMARY KEY DEFAULT 1, "
@@ -54,7 +54,6 @@ _UPGRADE: tuple[str, ...] = (
         "CHECK (default_retention_months >= 1))"
     ),
     "INSERT INTO privacy_settings (id) VALUES (1) ON CONFLICT DO NOTHING",
-    # --- Löschantrags-Queue (DSGVO Art. 17) ---------------------------------
     (
         "CREATE TABLE IF NOT EXISTS erasure_request ("
         "id uuid PRIMARY KEY DEFAULT gen_random_uuid(), "
@@ -77,7 +76,6 @@ _UPGRADE: tuple[str, ...] = (
         "CREATE INDEX IF NOT EXISTS ix_erasure_request_status "
         "ON erasure_request (status)"
     ),
-    # --- Permission an admin.site-Rollen verteilen --------------------------
     (
         "INSERT INTO role_permission (role_id, permission) "
         "SELECT role_id, 'privacy.manage' FROM role_permission "

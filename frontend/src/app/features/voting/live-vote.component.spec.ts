@@ -140,7 +140,7 @@ describe('LiveVoteComponent', () => {
     channel.subject.next({ type: 'vote_closed', voteId: 'v1', result: 'passed', counts: { yes: 8, no: 1, abstain: 1 } });
     detectChanges();
     fixture.componentInstance.cast('yes');
-    // result() set → cast() is a no-op, no cast frame.
+    // A result is set, so cast() does nothing and sends no cast frame.
     expect(channel.sent.some((m) => m.type === 'cast')).toBe(false);
   });
 

@@ -1,10 +1,11 @@
-"""Flow action handlers for ``addToNextSession`` and ``assignBudget``.
+"""Flow action handlers for `addToNextSession` and `assignBudget`.
 
-``addToNextSession`` appends the application as an agenda item to the earliest
-upcoming meeting of the given gremium (logged + skipped if none exists);
-``assignBudget`` attaches a cost centre and derives the fiscal year from the
-single active one of the top-level node. Per-action errors are logged, never
-propagated — a failed action must not roll back the committed state change.
+`addToNextSession` appends the application as an agenda item to the earliest upcoming
+meeting of the given Gremium. If no such meeting exists, the handler logs the case and
+skips the action. `assignBudget` attaches a cost center. It derives the fiscal year
+from the single active fiscal year of the top-level node. The dispatcher logs an error
+of a single action and never propagates it. A failed action must not roll back the
+committed state change.
 """
 
 from __future__ import annotations
@@ -30,15 +31,19 @@ from app.shared.errors import ConflictError, NotFoundError
 
 logger = logging.getLogger("app.flow.actions")
 
-# Actor recorded for money mutations performed by the flow engine itself (no human
-# principal in scope on a transition's side-effect). Mirrors the house rule that all
-# budget mutations leave an audit trail (see BudgetTreeService.assign_budget).
+# Actor for the money mutations that the flow engine makes itself. A side effect of a
+# transition has no human principal in scope. The house rule says that every budget
+# mutation leaves an audit trail (see BudgetTreeService.assign_budget).
 _FLOW_ACTOR = "system:flow"
 
 
 @dataclass(slots=True)
 class FlowExtrasActionDispatcher:
-    """``ActionDispatcher`` for ``addToNextSession`` + ``assignBudget`` (else no-op)."""
+    """`ActionDispatcher` for the budget and agenda actions.
+
+    It handles `addToNextSession`, `assignBudget` and `assignBudgetFromField`. Every
+    other action type is a no-op.
+    """
 
     sessionmaker: async_sessionmaker[AsyncSession]
 
@@ -59,7 +64,6 @@ class FlowExtrasActionDispatcher:
                     action.idempotency_key,
                 )
 
-    # ---------------------------------------------------------- addToNextSession
     async def _add_to_next_session(self, action: DispatchedAction) -> None:
         gremium_ref = action.params.get("gremiumId")
         if not gremium_ref:
@@ -101,17 +105,17 @@ class FlowExtrasActionDispatcher:
                     exc,
                 )
 
-    # --------------------------------------------------------------- assignBudget
     async def _assign_budget(self, action: DispatchedAction) -> None:
         budget_id = _parse_budget_uuid("assignBudget", action.params.get("budgetId"))
         if budget_id is None:
             return
         await self._do_assign(action.application_id, budget_id, source="flow")
 
-    # ------------------------------------------------------ assignBudgetFromField
     async def _assign_budget_from_field(self, action: DispatchedAction) -> None:
-        """Assign the cost centre chosen in a form field (e.g. ``gremium_select``/
-        ``budget_select``) — one dynamic pick collapses many fixed triage edges into one.
+        """Assign the cost center that a form field holds.
+
+        The field is a picker such as `gremium_select` or `budget_select`. One dynamic
+        pick replaces many fixed triage edges in the flow graph.
         """
         field = action.params.get("field")
         if not field:
@@ -146,10 +150,12 @@ class FlowExtrasActionDispatcher:
     async def _assign_node(
         self, session: AsyncSession, app: Application, budget_id: UUID, *, source: str
     ) -> bool:
-        """Assign the cost centre + its single active fiscal year and write the audit.
+        """Assign the cost center and its single active fiscal year, then write the audit.
 
-        ``True`` when assigned (caller commits), ``False`` when the node is missing
-        (nothing mutated)."""
+        Returns:
+            `True` after the assignment. The caller commits. `False` when the node is
+            missing. Nothing changed in that case.
+        """
         node = await session.get(Budget, budget_id)
         if node is None:
             logger.warning("assignBudget: budget %s missing — skipped", budget_id)
@@ -164,10 +170,10 @@ class FlowExtrasActionDispatcher:
                 )
             )
         ).all()
-        # Set only an unambiguous active fiscal year; otherwise leave open.
+        # Set the active fiscal year only when it is unambiguous. Otherwise leave it open.
         if len(active_ids) == 1:
             app.fiscal_year_id = active_ids[0]
-        # Money mutation -> audit trail (house rule; mirrors BudgetTreeService).
+        # A money mutation needs an audit trail. House rule, mirrors BudgetTreeService.
         await audit_record(
             session,
             actor=_FLOW_ACTOR,
@@ -186,7 +192,7 @@ class FlowExtrasActionDispatcher:
 
     @staticmethod
     async def _top_level(session: AsyncSession, node: Budget) -> Budget:
-        """Walk the parent chain to the top-level node (``parent_id IS NULL``)."""
+        """Walk the parent chain up to the top-level node (`parent_id IS NULL`)."""
         current = node
         seen: set[UUID] = set()
         while current.parent_id is not None and current.parent_id not in seen:
@@ -199,10 +205,12 @@ class FlowExtrasActionDispatcher:
 
 
 def _parse_budget_uuid(label: str, ref: object) -> UUID | None:
-    """Parse a budget reference to ``UUID``; empty/invalid -> log + ``None`` (fail-closed).
+    """Parse a budget reference into a UUID.
 
-    A value read from a form field may be missing or garbage — then the application stays
-    without a cost centre (the budget guard is itself fail-closed)."""
+    An empty or invalid reference gives a log line and `None` (fail-closed). A value
+    from a form field can be missing or garbage. The application then stays without a
+    cost center. The budget guard is fail-closed itself.
+    """
     if not ref:
         logger.warning("%s: empty budget reference — skipped", label)
         return None
@@ -214,5 +222,5 @@ def _parse_budget_uuid(label: str, ref: object) -> UUID | None:
 
 
 def build_flow_extras_dispatcher(pool: object) -> FlowExtrasActionDispatcher:
-    """Build the dispatcher for app wiring; needs no arq pool."""
+    """Build the dispatcher for the app wiring. It needs no arq pool."""
     return FlowExtrasActionDispatcher(get_sessionmaker())

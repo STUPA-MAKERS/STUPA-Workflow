@@ -1,6 +1,7 @@
-"""TDD: Voting-Router-Verdrahtung (T-15) — Auth fail-closed + problem+json-Contract.
+"""Voting router wiring (T-15): fail-closed auth and the problem+json contract.
 
-Service via ``dependency_overrides`` ersetzt; DB-Pfade liegen in der Integration."""
+`dependency_overrides` replaces the service. The integration suite covers the DB paths.
+"""
 
 from __future__ import annotations
 
@@ -46,9 +47,9 @@ class _FakeService:
         self.cast_args: dict[str, object] | None = None
 
     async def assert_can_manage_group(self, eligible_group, meeting_id, principal):  # noqa: ANN001
-        # Spiegelt das echte Service-Gate (#AUD-027) auf dem Router-Pfad: Admin oder
-        # globale vote.manage passieren; die per-Gremium-Auflösung (DB) liegt im
-        # Integrationstest. Sonst fail-closed 403.
+        # Mirrors the real service gate (#AUD-027) on the router path. The admin role or
+        # a global vote.manage passes. The integration test covers the per-Gremium
+        # resolution against the DB. Everything else fails closed with a 403.
         if "admin" in principal.roles or principal.has("vote.manage"):
             return
         raise ForbiddenError("not allowed to manage this vote")
@@ -66,7 +67,7 @@ class _FakeService:
         return _vote_out("open")
 
     async def get_scoped(self, vote_id, principal):  # noqa: ANN001
-        # Scope-Gate liegt im echten Service; das Fake reicht durch wie get().
+        # The real service holds the scope gate. This fake passes through like get().
         return await self.get(vote_id)
 
     async def cast(
@@ -111,15 +112,13 @@ def _as_principal(app: FastAPI, *perms: str, groups: set[str] | None = None) -> 
     app.dependency_overrides[get_current_applicant] = lambda: None
 
 
-# --------------------------------------------------------------------------- #
-# create / open / close — vote.manage
-# --------------------------------------------------------------------------- #
+# create, open and close: vote.manage.
 def test_create_requires_auth_401(client: TestClient) -> None:
     assert client.post(f"/api/applications/{uuid4()}/votes", json={}).status_code == 401
 
 
 def test_create_missing_perm_403(app: FastAPI, client: TestClient) -> None:
-    _as_principal(app, "vote.cast")  # nicht .manage
+    _as_principal(app, "vote.cast")  # not .manage
     r = client.post(
         f"/api/applications/{uuid4()}/votes",
         json={"config": _CONFIG.model_dump(by_alias=True), "eligibleGroup": "stupa"},
@@ -158,8 +157,8 @@ def test_close_missing_perm_403(app: FastAPI, client: TestClient) -> None:
 
 
 def test_open_missing_perm_403(app: FastAPI, client: TestClient) -> None:
-    # #AUD-027: open ist gremium-scoped — eine reine vote.cast-Identität ohne
-    # (globale oder per-Gremium) vote.manage darf NICHT öffnen.
+    # #AUD-027: open is gremium-scoped. An identity with vote.cast alone, and without a
+    # global or per-Gremium vote.manage, must NOT open a vote.
     _as_principal(app, "vote.cast")
     r = client.post(f"/api/votes/{uuid4()}/open")
     assert r.status_code == 403
@@ -167,7 +166,7 @@ def test_open_missing_perm_403(app: FastAPI, client: TestClient) -> None:
 
 
 def test_cancel_missing_perm_403(app: FastAPI, client: TestClient) -> None:
-    # #AUD-027: cancel ist gremium-scoped, symmetrisch zu open/close.
+    # #AUD-027: cancel is gremium-scoped, symmetric to open and close.
     _as_principal(app, "vote.cast")
     assert client.post(f"/api/votes/{uuid4()}/cancel").status_code == 403
 
@@ -191,9 +190,7 @@ def test_cancel_ok_broadcasts(app: FastAPI, client: TestClient) -> None:
     assert len(pub.cancelled) == 1
 
 
-# --------------------------------------------------------------------------- #
-# ballot — vote.cast (Gruppe prüft der Service)
-# --------------------------------------------------------------------------- #
+# ballot: vote.cast. The service checks the group.
 def test_ballot_requires_auth_401(client: TestClient) -> None:
     r = client.post(f"/api/votes/{uuid4()}/ballot", json={"choice": "yes"})
     assert r.status_code == 401
@@ -202,10 +199,10 @@ def test_ballot_requires_auth_401(client: TestClient) -> None:
 def test_ballot_gate_is_auth_only(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
-    # #delegation-rework: das Gate prüft nur Auth — externe Stellvertreter haben
-    # kein globales vote.cast; die Autorisierung (vote.cast+Gruppe bzw.
-    # Delegations-Zeile) liegt im Service (Unit-Tests dort).
-    _as_principal(app, "vote.manage")  # nicht .cast
+    # #delegation-rework: the gate checks authentication only. An external substitute
+    # holds no global vote.cast. The service authorizes the cast through vote.cast plus
+    # the group, or through the delegation row. Its own unit tests cover that.
+    _as_principal(app, "vote.manage")  # not .cast
     r = client.post(f"/api/votes/{uuid4()}/ballot", json={"choice": "yes"})
     assert r.status_code == 200
     assert fake_service.cast_args is not None
@@ -233,22 +230,18 @@ def test_ballot_rejects_empty_choice_422(app: FastAPI, client: TestClient) -> No
     assert r.status_code == 422
 
 
-# --------------------------------------------------------------------------- #
-# get — jeder Principal
-# --------------------------------------------------------------------------- #
+# get: every principal.
 def test_get_requires_auth_401(client: TestClient) -> None:
     assert client.get(f"/api/votes/{uuid4()}").status_code == 401
 
 
 def test_get_ok(app: FastAPI, client: TestClient) -> None:
-    _as_principal(app)  # nur eingeloggt nötig
+    _as_principal(app)  # logged in is enough
     r = client.get(f"/api/votes/{uuid4()}")
     assert r.status_code == 200
 
 
-# --------------------------------------------------------------------------- #
-# DI factories + OpenAPI contract
-# --------------------------------------------------------------------------- #
+# DI factories and the OpenAPI contract.
 def test_di_factories_build_real_objects() -> None:
     assert isinstance(get_action_dispatcher(), NullActionDispatcher)
     dispatcher = NullActionDispatcher()
@@ -269,8 +262,11 @@ def test_openapi_declares_voting_error_responses(client: TestClient) -> None:
 def test_ballot_broadcasts_vote_tally(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
-    """#vote-progress: cast broadcastet den Live-Zähler — ohne Event blieb
-    »N von M abgestimmt« bei allen Clients bis zum Reload stale."""
+    """#vote-progress: cast broadcasts the live counter.
+
+    Without the event, the "N of M voted" display stayed stale on every client until a
+    reload.
+    """
     from app.modules.livevote.publisher import get_meeting_publisher
 
     class _RecordingPublisher:
@@ -291,4 +287,4 @@ def test_ballot_broadcasts_vote_tally(
     _as_principal(app, "vote.cast", groups={"stupa"})
     r = client.post(f"/api/votes/{uuid4()}/ballot", json={"choice": "yes"})
     assert r.status_code == 200
-    assert len(pub.tallies) == 1  # frischer Stand nach der Stimme
+    assert len(pub.tallies) == 1  # a fresh state after the ballot

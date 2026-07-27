@@ -1,4 +1,4 @@
-"""TDD: Magic-Link-Token-Primitive (security.md §1)."""
+"""TDD: magic-link token primitives (security.md §1)."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ def test_generate_token_is_random_and_urlsafe() -> None:
     b = tokens.generate_token()
     assert a != b
     assert len(a) >= 40
-    # URL-sicher: kein +/= aus Standard-base64.
+    # URL-safe: no + or = from standard base64.
     assert set(a) <= set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_")
 
 

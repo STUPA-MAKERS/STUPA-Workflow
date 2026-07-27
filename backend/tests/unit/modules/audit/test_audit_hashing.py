@@ -1,4 +1,4 @@
-"""TDD: kanonische Serialisierung + Hash-Kette (T-23, security.md §4)."""
+"""Unit tests for the canonical serialization and the hash chain (T-23, security.md §4)."""
 
 from __future__ import annotations
 
@@ -36,10 +36,10 @@ def test_canonical_nested_key_order_independent() -> None:
 
 def test_canonical_compact_and_sorted() -> None:
     raw = _payload({"b": 1, "a": 2}).decode("utf-8")
-    # Felder alphabetisch, kompakte Separatoren, action vor actor.
+    # The fields are alphabetical, the separators are compact and action precedes actor.
     assert raw.startswith('{"action":"status_change","actor":"admin-1"')
     assert ", " not in raw
-    assert raw.index('"a":2') < raw.index('"b":1')  # data-Keys sortiert
+    assert raw.index('"a":2') < raw.index('"b":1')  # data keys are sorted
 
 
 def test_canonical_at_is_iso() -> None:
@@ -53,7 +53,7 @@ def _payload_at(at: datetime) -> bytes:
 
 
 def test_canonical_normalizes_non_utc_timezone() -> None:
-    # Gleicher Zeitpunkt in +02:00 → identische Bytes wie in UTC (TZ-Determinismus).
+    # The same instant in +02:00 gives bytes identical to UTC (time-zone determinism).
     berlin = _payload_at(_AT.astimezone(timezone(timedelta(hours=2))))
     assert berlin == _payload_at(_AT)
 

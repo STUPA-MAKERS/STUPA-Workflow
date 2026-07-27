@@ -1,7 +1,8 @@
-"""Router-Tests Budget-Baum (CR #76/#78): Endpunkt-Verdrahtung ohne DB (Service-Fake).
+"""Router tests for the budget tree (CR #76/#78): endpoint wiring without a DB.
 
-Auth (Principal) + ``BudgetTreeService`` per ``dependency_overrides``; echte DB-Pfade
-liegen in der Integration. Deckt jede Route + den Service-Factory-Hook.
+The tests replace the auth principal and `BudgetTreeService` through `dependency_overrides`.
+The integration suite covers the real DB paths. This file covers every route and the service
+factory hook.
 """
 
 from __future__ import annotations
@@ -73,7 +74,7 @@ class _FakeAuditResult:
 
 
 class _FakeAuditSession:
-    """Minimal-Session für den Audit-Hook in Export-Endpunkten (kein DB-Zugriff)."""
+    """Minimal session for the audit hook in the export endpoints. It touches no DB."""
 
     def __init__(self) -> None:
         self.entries: list[Any] = []
@@ -332,8 +333,11 @@ def _app_as(fake: _FakeService, perms: set[str]) -> TestClient:
 
 
 def test_expense_list_readable_by_booker(fake: _FakeService) -> None:
-    """#5-2: Die Buchungsliste muss für jede Budget-Rolle lesbar sein (view/structure/
-    book), nicht nur budget.view — sonst sieht ein reiner Bucher eine leere Seite."""
+    """#5-2: every budget role can read the booking list.
+
+    The roles view, structure and book all get access, not only budget.view. Without that
+    rule a pure booker would see an empty page.
+    """
     assert _app_as(fake, {"budget.book"}).get("/api/expenses").status_code == 200
     assert _app_as(fake, {"budget.structure"}).get("/api/expenses").status_code == 200
 
@@ -343,16 +347,22 @@ def test_expense_list_forbidden_without_budget_perm(fake: _FakeService) -> None:
 
 
 def test_expense_list_id_filter_passthrough(fake: _FakeService) -> None:
-    """``id=`` (#expenses-ux2): exakter Buchungs-Deeplink (Konten → Buchungen) wird
-    als ``expense_id`` an den Service durchgereicht."""
+    """`id=` (#expenses-ux2) carries the exact booking deep link.
+
+    The deep link goes from the accounts tab to the bookings tab. The router passes it to
+    the service as `expense_id`.
+    """
     resp = _app_as(fake, {"budget.view"}).get("/api/expenses", params={"id": str(_EID)})
     assert resp.status_code == 200
     assert fake.calls["list_expenses_paged"]["expense_id"] == _EID
 
 
 def test_account_options_readable_by_booker(fake: _FakeService) -> None:
-    """#5-2/#2: Die Bankkonto-Auswahl (id+Name, ohne IBAN) ist für Bucher lesbar,
-    ohne account.manage — das war die Ursache, dass das Konto nicht setzbar war."""
+    """#5-2 and #2: a booker can read the bank account choice without account.manage.
+
+    The choice returns the id and the name, but no IBAN. The missing read right was the
+    reason why a booker could not set the account.
+    """
     resp = _app_as(fake, {"budget.book"}).get("/api/accounts/options")
     assert resp.status_code == 200
     assert resp.json()[0]["name"] == "Hauptkonto"
@@ -368,12 +378,12 @@ def test_account_options_forbidden_without_budget_or_account_perm(
 
 
 def test_full_accounts_list_still_requires_account_manage(fake: _FakeService) -> None:
-    """Volle Stammdaten (inkl. IBAN) bleiben account.manage vorbehalten."""
+    """The full master data, including the IBAN, stays reserved for account.manage."""
     assert _app_as(fake, {"budget.book"}).get("/api/accounts").status_code == 403
 
 
 def test_invoices_list_readable_by_view(fake: _FakeService) -> None:
-    """#invoices: Rechnungen-Liste (paged) für jede Budget-Rolle lesbar."""
+    """#invoices: every budget role can read the paged invoice list."""
     r = _app_as(fake, {"budget.view"}).get(
         "/api/invoices?q=Acme&status=open&grossMin=10&issueFrom=2026-01-01&limit=20"
     )
@@ -381,7 +391,7 @@ def test_invoices_list_readable_by_view(fake: _FakeService) -> None:
     body = r.json()
     assert body["total"] == 1
     assert body["items"][0]["number"] == "R-2026-1"
-    # Query-Params landen (alias-aufgelöst) im Service-Aufruf.
+    # The query parameters reach the service call with the aliases resolved.
     kwargs = fake.calls["list_invoices_paged"]
     assert kwargs["q"] == "Acme"
     assert kwargs["status"] == "open"
@@ -399,8 +409,11 @@ def test_invoice_create_requires_book(fake: _FakeService) -> None:
 def test_tree_without_permission_is_gremium_scoped(
     fake: _FakeService, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """#budget-scope: ohne budget.*-Permission liefert der Baum den Gremium-Scope
-    (Mitglieds-Gremien als visible_gremium_ids); ohne Mitgliedschaften leer."""
+    """#budget-scope: without a budget.* permission the tree returns the Gremium scope.
+
+    The router passes the member Gremien as visible_gremium_ids. Without a membership the
+    tree stays empty.
+    """
     import app.modules.admin.gremium_roles as gr
 
     async def _members(session, sub, now=None):  # noqa: ANN001, ANN202
@@ -456,7 +469,8 @@ def test_budget_export_xlsx(fake: _FakeService) -> None:
     assert resp.content[:2] == b"PK"  # xlsx = zip container
     assert fake.calls["tree"] == _GID
     assert fake.calls["fy_labels"] is True
-    # Export wird auditiert (#1): EXPORT-Eintrag + Commit in derselben Transaktion.
+    # The router audits the export (#1). It writes an export entry and commits in the same
+    # transaction.
     (entry,) = fake.session.entries
     assert entry.action == "export"
     assert entry.actor == "fin"
@@ -465,7 +479,7 @@ def test_budget_export_xlsx(fake: _FakeService) -> None:
 
 
 def test_get_budget_tree_service_factory() -> None:
-    # request.app.state.object_storage liefert den (optionalen) Storage (#15).
+    # request.app.state.object_storage supplies the optional storage (#15).
     request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(object_storage=None)))
     svc = get_budget_tree_service(
         session=object(),  # type: ignore[arg-type]

@@ -1,13 +1,13 @@
-"""FastMCP server exposing platform API actions as tools.
+"""FastMCP server that exposes platform API actions as tools.
 
-Auth is transparent (see :mod:`.client` / :mod:`.auth`): the first tool call triggers a
-browser login (OAuth2 + PKCE); the token is cached and refreshed automatically. All
-rights are capped server-side by the user's permissions intersected with the granted
-scope. Forbidden by design: there is no ``cast_ballot`` tool and ``vote.cast`` is never
-grantable to a token — agents manage votes but never vote.
+Auth is transparent. See `client` and `auth`. The first tool call starts a browser login
+with OAuth2 and PKCE. The server caches the token and refreshes it automatically. The
+platform caps every right server-side, at the permissions of the user intersected with
+the granted scope. One thing is forbidden by design. There is no `cast_ballot` tool and
+no token ever gets `vote.cast`. An agent manages votes but never votes.
 
-The tool definitions live in :mod:`.tools` (one module per domain group); request
-bodies are typed via :mod:`.schemas` (camelCase wire mirror of the backend).
+The tool definitions live in `tools`, one module per domain group. The `schemas` module
+types the request bodies as a camelCase wire mirror of the backend.
 """
 
 from __future__ import annotations

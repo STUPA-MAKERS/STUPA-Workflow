@@ -1,4 +1,4 @@
-"""Unit-Tests Protokoll-Markdown (T-22): DB-frei, injection-sicher, Vote-Snippets."""
+"""Unit tests for the protocol Markdown builder (T-22): no DB, injection-safe, snippets."""
 
 from __future__ import annotations
 
@@ -26,7 +26,6 @@ def _doc(**kw: object) -> ProtocolDoc:
     return ProtocolDoc(**base)  # type: ignore[arg-type]
 
 
-# ---------------------------------------------------------------- variant
 def test_variant_for_known_protocol_variants() -> None:
     assert protocol_variant_for("stupa") == "protocol-stupa"
     assert protocol_variant_for("asta") == "protocol-asta"
@@ -37,7 +36,6 @@ def test_variant_for_other_is_none_autodetect() -> None:
     assert protocol_variant_for(None) is None
 
 
-# -------------------------------------------------------------- frontmatter
 def test_document_has_protocol_frontmatter_then_body() -> None:
     md = build_protocol_document(_doc())
     assert md.startswith("---\n")
@@ -45,7 +43,7 @@ def test_document_has_protocol_frontmatter_then_body() -> None:
     assert "typ: protokoll" in md
     assert 'gremium: "StuPa"' in md
     assert 'date: "2026-06-12"' in md
-    # Editor-Body bleibt verbatim, nach dem Frontmatter.
+    # The editor body stays verbatim and follows the frontmatter.
     assert md.rstrip().endswith("# TOP 1\n\nText.")
 
 
@@ -59,20 +57,19 @@ def test_document_without_optional_fields() -> None:
 
 
 def test_frontmatter_injection_is_quoted() -> None:
-    # Ein Titel mit Doppelpunkt/Newline/--- darf das Frontmatter nicht sprengen.
+    # A title with a colon, a newline or --- must not break the frontmatter open.
     md = build_protocol_document(_doc(title='evil: \n---\ntyp: antrag'))
     lines = md.splitlines()
-    # Genau zwei `---`-Begrenzer (öffnend/schließend) — kein eingeschleustes drittes.
+    # Exactly two `---` delimiters, one open and one close. No injected third one.
     assert lines.count("---") == 2
     assert "typ: protokoll" in md
-    assert "typ: antrag" not in md.split("---")[1]  # nicht im Frontmatter-Block
+    assert "typ: antrag" not in md.split("---")[1]  # not inside the frontmatter block
 
 
-# ------------------------------------------------------------- vote snippet
 def test_vote_snippet_renders_abstimmung_callout_with_tally() -> None:
     snippet = build_vote_snippet("Antrag A", {"yes": 5, "no": 2, "abstain": 1})
-    # pytex-Protokoll-Callout → eingebaute Vote-Box; Titel fett, Tally-Zeile
-    # (yes/no/abstain), KEINE separate »Ergebnis:«-Zeile (#pdf-format).
+    # The pytex protocol callout renders the built-in vote box: a bold title plus a
+    # tally line (yes/no/abstain). It carries NO separate `Ergebnis:` line (#pdf-format).
     assert snippet.startswith("> [!abstimmung] **Antrag A**")
     assert "Ergebnis" not in snippet
     assert "> yes: 5, no: 2, abstain: 1" in snippet
@@ -86,18 +83,17 @@ def test_vote_snippet_question_overrides_title_and_omits_empty_tally() -> None:
 
 def test_vote_snippet_escapes_newlines() -> None:
     snippet = build_vote_snippet("Zeile1\nZeile2", None)
-    # Titel bleibt einzeilig (kein Markdown-Bruch im Callout-Marker).
+    # The title stays on one line, so the callout marker does not break.
     assert "> [!abstimmung] **Zeile1 Zeile2**" in snippet
 
 
-# ------------------------------------------------------------- pdf format
 def test_frontmatter_has_signatures_and_quorum_dataline() -> None:
     md = build_protocol_document(_doc(quorate=True, datalines=["Ort: R 1"]))
     block = md.split("---")[1]
     assert "unterschriften:" in block
     assert '- "Schriftführung"' in block and '- "Vorstand"' in block
-    # Beschlussfähigkeit als eigener Frontmatter-Key (der pytex-Wrapper rendert
-    # ihn als Titelseiten-Daten-Zeile, #protocol-quorum).
+    # The quorum gets its own frontmatter key. The pytex wrapper renders it as a
+    # data line on the title page (#protocol-quorum).
     assert 'beschlussfaehigkeit: "Gegeben"' in block
 
 
@@ -128,8 +124,8 @@ def test_demote_headings_shifts_levels_and_skips_fences() -> None:
     )
     out = demote_headings(md)
     assert "## A" in out and "### B" in out
-    assert "# nicht anfassen" in out  # Code-Fence unberührt
-    assert "###### F" in out  # Ebene 6 bleibt 6
+    assert "# nicht anfassen" in out  # the code fence stays untouched
+    assert "###### F" in out  # level 6 stays level 6
     assert "kein # heading" in out
 
 
@@ -139,8 +135,10 @@ def test_frontmatter_includes_protokollant_when_set() -> None:
 
 
 def test_frontmatter_start_end_time_lines() -> None:
-    """#14: Start/Ende reisen als ``beginn``/``ende`` — pytex rendert daraus die
-    »Zeit: Start – Ende«-Titelseiten-Zeile."""
+    """#14: the start time and the end time travel as `beginn` and `ende`.
+
+    pytex renders them into the `Zeit: Start - Ende` line of the title page.
+    """
     from datetime import time
 
     md = build_protocol_document(
@@ -155,9 +153,9 @@ def test_frontmatter_end_time_omitted_when_unknown() -> None:
     assert "ende:" not in md
 
 
-# ---------------------------------------------------- RCE-Defense-in-Depth (FIX 1b)
+# RCE defense in depth (FIX 1b).
 def test_sanitizer_strips_eval_comment_double_quotes() -> None:
-    """``[//]: # "EXPR"`` (pytex-``eval``-Escape) wird entfernt → kein RCE-Vektor."""
+    """The sanitizer strips the `[//]: # "EXPR"` pytex `eval` escape, so no RCE stays."""
     out = sanitize_user_markdown('# TOP\n[//]: # "__import__(\'os\').system(\'id\')"\nText')
     assert "__import__" not in out
     assert "[//]:" not in out
@@ -169,8 +167,8 @@ def test_sanitizer_strips_eval_comment_single_quotes_and_parens_and_bare() -> No
         "[//]: # 'evil'",
         "[//]: # (evil)",
         "[//]: # evil",
-        "   [//]: #  evil",  # führender Whitespace
-        "[comment]: # evil",  # anderes Label
+        "   [//]: #  evil",  # leading whitespace
+        "[comment]: # evil",  # a different label
     ]
     for line in variants:
         out = sanitize_user_markdown(f"# TOP\n{line}\nText")
@@ -200,7 +198,7 @@ def test_sanitizer_neutralizes_absolute_image_path() -> None:
     out = sanitize_user_markdown("![secret](/etc/passwd)")
     assert "/etc/passwd" not in out
     assert "Bild entfernt" in out
-    assert "secret" in out  # Alt-Text bleibt als Platzhalter-Label
+    assert "secret" in out  # the alt text stays as the placeholder label
 
 
 def test_sanitizer_neutralizes_traversal_image_path() -> None:
@@ -227,18 +225,18 @@ def test_sanitizer_keeps_relative_image_path() -> None:
 
 
 def test_build_document_applies_sanitizer_to_body() -> None:
-    """Defense-in-Depth: der Eval-Kommentar darf das finale Dokument nie erreichen."""
+    """Defense in depth: the eval comment must never reach the final document."""
     md = build_protocol_document(_doc(markdown='# TOP 1\n[//]: # "evil"\nText.'))
     assert "evil" not in md
     assert "# TOP 1" in md and "Text." in md
 
 
-# ----------------------------------------- AUD-001: Sanitizer-Bypass-Regression
-# Die alte zeilen-orientierte Regex ließ mehrzeilige, container-verschachtelte und
-# whitespace-im-Label-Formen der eval-fähigen Link-Referenz-Definition durch; diese
-# landeten als ``LinkRefDef(label='//', dest='#')`` bei pytex' ``eval`` → RCE.
+# AUD-001: sanitizer bypass regression.
+# The old line-oriented regex let through the multiline, the container-nested and the
+# whitespace-in-label forms of the eval-capable link reference definition. They reached
+# the pytex `eval` as `LinkRefDef(label='//', dest='#')` and gave an RCE.
 def test_sanitizer_strips_multiline_eval_comment() -> None:
-    """Mehrzeilige Form ``[//]:\\n#\\n"EXPR"`` (Ziel/Titel auf Folgezeilen)."""
+    r"""Multiline form `[//]:\n#\n"EXPR"` with the target and the title on later lines."""
     out = sanitize_user_markdown('# TOP\n[//]:\n#\n"__import__(\'os\').system(\'id\')"\nText')
     assert "__import__" not in out
     assert "[//]" not in out
@@ -259,7 +257,7 @@ def test_sanitizer_strips_whitespace_inside_label() -> None:
 
 
 def test_sanitizer_strips_container_nested_eval_comments() -> None:
-    """Blockquote-/Listen-verschachtelte Definitionen (``>``, ``-``, ``*``, ``1.``)."""
+    """Definitions nested in a blockquote or a list (`>`, `-`, `*`, `1.`)."""
     for prefix in ("> ", "- ", "* ", "1. "):
         out = sanitize_user_markdown(f'{prefix}[//]: # "evil"')
         assert "evil" not in out, prefix
@@ -267,23 +265,30 @@ def test_sanitizer_strips_container_nested_eval_comments() -> None:
 
 
 def test_sanitizer_keeps_anchor_reference_definition() -> None:
-    """Eine echte Anker-Referenz (``[foo]: #section``) ist KEIN eval-Trigger
-    (pytex feuert nur bei ``dest == '#'``) und bleibt unverändert."""
+    """A real anchor reference (`[foo]: #section`) is no eval trigger.
+
+    pytex fires only when `dest == '#'`, so the sanitizer keeps the line unchanged.
+    """
     src = '[foo]: #section "Title"'
     assert sanitize_user_markdown(src) == src
 
 
 def test_sanitizer_keeps_vote_callout_intact() -> None:
-    """Der Abstimmungs-Callout (``> [!abstimmung]`` + Tally-Zeile) wird mit dem
-    Body sanitiert (``embed_protocol_votes`` mischt ihn in ``protocol.markdown``)
-    und MUSS unangetastet bleiben — sonst bricht die pytex-Tally-Box."""
+    """The sanitizer must keep the vote callout unchanged.
+
+    `embed_protocol_votes` mixes the callout (`> [!abstimmung]` plus the tally line)
+    into `protocol.markdown`, so the sanitizer sees it together with the body. Any
+    change here breaks the pytex tally box.
+    """
     callout = build_vote_snippet("Antrag A", {"yes": 5, "no": 2, "abstain": 1})
     assert sanitize_user_markdown(callout) == callout
 
 
 def test_sanitizer_no_eval_refdef_survives_marko_parse() -> None:
-    """Strukturelle Verifikation: nach der Sanitierung parst marko (falls vorhanden)
-    KEINE eval-fähige ``LinkRefDef`` mehr — über alle Bypass-Formen hinweg."""
+    """Structural check: after the sanitizer, marko parses no eval-capable `LinkRefDef`.
+
+    The check covers every known bypass form. It applies only when marko is installed.
+    """
     from app.modules.protocol.markdown import _has_eval_refdef
 
     vectors = [
@@ -298,5 +303,4 @@ def test_sanitizer_no_eval_refdef_survives_marko_parse() -> None:
     ]
     for src in vectors:
         cleaned = sanitize_user_markdown(src)
-        # Wenn marko installiert ist, darf kein eval-Trigger überleben.
         assert not _has_eval_refdef(cleaned), src

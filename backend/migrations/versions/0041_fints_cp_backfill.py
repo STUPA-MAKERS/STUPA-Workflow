@@ -1,17 +1,17 @@
-"""fints_cp_backfill: Gegenkonto gestageter Umsätze aus ``raw_payload`` neu ableiten (#fints).
+"""fints_cp_backfill: derive the counterparty of staged rows from ``raw_payload`` (#fints).
 
-Vor dem Parser-Fix gestagete, **noch nicht gebuchte** Umsätze tragen im Namen oft nur ein
-Kürzel (z. B. „KRZL") und keine IBAN, obwohl der echte Gegenpart in den SEPA-Rohfeldern
-(``ABWE+``/``ABWA+`` → ``deviate_*``, ``IBAN+`` → ``gvc_applicant_iban``) im ``raw_payload``
-steckt. Diese Migration leitet ``counterparty_name``/``counterparty_iban`` für **offene**
-(``unmatched``/``suggested``) Zeilen einmalig neu ab — über dieselbe Logik wie der Parser
-(``bank.normalize.mt940_counterparty``).
+The old parser staged transactions that **nobody booked yet**. Such a row often carries
+only a short code in the name (for example ``KRZL``) and no IBAN. The real counterparty
+sits in the SEPA raw fields inside ``raw_payload`` (``ABWE+``/``ABWA+`` → ``deviate_*``,
+``IBAN+`` → ``gvc_applicant_iban``). This migration derives ``counterparty_name`` and
+``counterparty_iban`` once for **open** (``unmatched``/``suggested``) rows. It uses the
+same logic as the parser (``bank.normalize.mt940_counterparty``).
 
-Rein additiv: aktualisiert nur Zeilen, bei denen die Ableitung etwas Neues liefert; CAMT-/
-Datei-Zeilen ohne GVC-Felder bleiben unangetastet. Idempotent. Schon **gebuchte** Buchungen
-werden bewusst NICHT angefasst (deren Empfänger wird beim Buchen bereits bereinigt). Down-
-Migration: No-Op — der ursprüngliche, verschmolzene Rohwert ist weder rekonstruierbar noch
-erhaltenswert.
+The migration only adds information. It updates a row only when the derivation returns
+something new. CAMT rows and file rows without GVC fields stay untouched. The migration is
+idempotent. It leaves rows of **booked** transactions alone on purpose, because the
+booking step already cleans up their recipient. The down migration does nothing. The
+original merged raw value is neither reconstructable nor worth keeping.
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    # Parser-Logik wiederverwenden (läuft einmalig beim Deploy → App-Import unkritisch).
+    # Reuse the parser logic. This runs once at deploy time, so the app import is safe.
     from app.modules.budget.bank.normalize import mt940_counterparty
 
     conn = op.get_bind()
@@ -41,7 +41,7 @@ def upgrade() -> None:
     for row in rows:
         raw = row.raw_payload if isinstance(row.raw_payload, dict) else {}
         name, iban = mt940_counterparty(raw, credit=(row.amount or 0) > 0)
-        # Nur schreiben, wenn die Ableitung etwas liefert UND sich etwas ändert.
+        # Write only when the derivation returns a value AND that value differs.
         if (not name and not iban) or (
             name == row.counterparty_name and iban == row.counterparty_iban
         ):
@@ -56,5 +56,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Kein Rück-Mapping möglich (ursprünglicher Rohwert nicht gespeichert) — No-Op.
+    # The original raw value is gone, so no reverse mapping is possible.
     pass

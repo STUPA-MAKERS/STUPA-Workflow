@@ -1,7 +1,7 @@
-"""Shared base of the :class:`~.service.MeetingService` ops classes.
+"""Shared base of the `MeetingService` ops classes.
 
-Constructor plus the lookup/serialization helpers used by several concerns
-(permissions, votes, listing, lifecycle).
+This module holds the constructor and the lookup and serialization helpers. The
+permissions, votes, listing, and lifecycle concerns all use them.
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 
 
 class MeetingServiceBase:
-    """Meeting operations bound to one ``AsyncSession`` (+ optional publisher)."""
+    """Meeting operations bound to one `AsyncSession` and an optional publisher."""
 
     def __init__(self, session: AsyncSession, publisher: BrokerPublisher | None = None) -> None:
         self.session = session
@@ -61,8 +61,9 @@ class MeetingServiceBase:
             protokollantId=meeting.protokollant_id,
             protokollantName=protokollant_name,
             isProtokollant=is_protokollant,
-            # ``canControl`` = may run the meeting (protocol/TOPs/status): protokollant
-            # or session manager. Master flag for the FE editor gating.
+            # `canControl` marks the right to run the meeting: the protocol, the
+            # agenda items, and the status. The protokollant and the session manager
+            # hold it. The frontend gates the editor on this flag.
             canControl=can_write,
             canManage=can_manage,
             canWrite=can_write,
@@ -72,7 +73,7 @@ class MeetingServiceBase:
         )
 
     async def _principal_id(self, sub: str) -> UUID | None:
-        """``principal.id`` for an OIDC ``sub`` (protokollant comparison)."""
+        """Return the `principal.id` for an OIDC `sub`, used for the protokollant check."""
         return (
             await self.session.execute(select(PrincipalRow.id).where(PrincipalRow.sub == sub))
         ).scalar_one_or_none()
@@ -99,7 +100,7 @@ class MeetingServiceBase:
         return meeting
 
     async def _protocol_id(self, meeting_id: UUID) -> UUID | None:
-        """``protocol.id`` of the meeting (UNIQUE ``meeting_id``) or ``None``."""
+        """Return the `protocol.id` for the unique `meeting_id`, or `None`."""
         return (
             await self.session.execute(select(Protocol.id).where(Protocol.meeting_id == meeting_id))
         ).scalar_one_or_none()

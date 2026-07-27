@@ -30,7 +30,6 @@
     </div>
   }
 
-  <!-- Drill-down breadcrumbs: top level › group › sub-group. -->
   @if (breadcrumbs().length) {
     <nav class="flex items-center gap-1 flex-wrap" [attr.aria-label]="'admin.flow.group.inspector' | t">
       <button type="button" class="fe__crumb" (click)="navigateTo(null)">{{ 'admin.flow.group.rootCrumb' | t }}</button>
@@ -46,7 +45,7 @@
   }
 
   <div class="fe__work">
-    <!-- Scrollable wrapper → 1:1 rendering, no rescaling while dragging. -->
+    <!-- Scrollable wrapper: the SVG renders 1:1, so a drag never rescales it. -->
     <div class="fe__canvas-wrap">
     <svg
       #canvas
@@ -109,7 +108,7 @@
             <text [attr.x]="NODE_W / 2" y="-6" text-anchor="middle" class="fe__node-kind">{{ kindLabel(n.kind) }}</text>
           }
           <text [attr.x]="NODE_W / 2" [attr.y]="n.h / 2 + 5" text-anchor="middle" class="fe__node-text">{{ n.label }}</text>
-          <!-- Connector dots: dragging creates a transition; vote nodes show
+          <!-- Connector dots: a drag creates a transition. A vote node shows
                one labeled dot per branch. -->
           @for (d of n.dots; track d.id) {
             <g>
@@ -131,8 +130,8 @@
         </g>
       }
 
-      <!-- Group boxes: ONE box per (sub-)group; click opens it (drill-down),
-           dragging moves all members, shift-click selects for nesting. -->
+      <!-- Group boxes: ONE box per (sub-)group. A click opens it (drill-down).
+           A drag moves all members. Shift-click selects the box for nesting. -->
       @for (gb of groupBoxes(); track gb.id) {
         <g class="fe__groupbox-g" [class.fe__groupbox-g--multi]="gb.multi">
           <rect
@@ -153,8 +152,8 @@
         </g>
       }
 
-      <!-- Proxy nodes while drilled in: external sources left, targets right;
-           a click jumps to the original. -->
+      <!-- Proxy nodes while drilled in: external sources left, targets right.
+           A click jumps to the original node. -->
       @for (p of proxies().left; track p.pid) {
         <g class="fe__proxy-g" (pointerdown)="$event.stopPropagation()" (click)="onProxyClick(p.pid)">
           <rect [attr.x]="p.x" [attr.y]="p.y" [attr.width]="150" height="44" rx="10" class="fe__proxy" [class.fe__proxy--group]="p.isGroup" />
@@ -170,7 +169,6 @@
     </svg>
     </div>
 
-    <!-- Inspector -->
     <aside class="fe__panel" [attr.aria-label]="'admin.flow.inspector' | t">
       @if (selectedState(); as s) {
         <app-state-inspector

@@ -1,14 +1,16 @@
-"""OAuth2 authorization-server endpoints for native/MCP clients.
+"""OAuth2 authorization-server endpoints for native and MCP clients.
 
-Flow (authorization code + PKCE, RFC 6749/7636): ``/authorize`` validates
-client_id/redirect_uri (loopback only) plus the PKCE challenge, stores the
-request signed in the ``ap_oauth_tx`` cookie and sends the browser through the
-existing Keycloak login; after the OIDC callback, ``/finish`` leads to the
-consent screen which mints a one-time authorization code; ``/token`` exchanges
-code or refresh token for an opaque, scoped token pair.
+The flow is authorization code plus PKCE (RFC 6749 and RFC 7636).
 
-Tokens appear in plaintext only in the token response body; the DB holds
-SHA-256 hashes exclusively. Scopes cap permissions at runtime.
+1. `/authorize` validates the client_id, the redirect_uri (loopback only) and the PKCE
+   challenge. It stores the request signed in the `ap_oauth_tx` cookie. It then sends the
+   browser through the existing Keycloak login.
+2. `/finish` runs after the OIDC callback and leads to the consent screen. The consent
+   mints a one-time authorization code.
+3. `/token` exchanges a code or a refresh token for an opaque, scoped token pair.
+
+A plaintext token appears only in the body of the token response. The database holds
+SHA-256 hashes only. A scope caps the permissions at runtime.
 """
 
 from __future__ import annotations
@@ -31,11 +33,11 @@ from app.shared.errors import BadRequestError, ForbiddenError, NotFoundError, Pr
 router = APIRouter(prefix="/oauth", tags=["oauth"])
 well_known_router = APIRouter(tags=["oauth"])
 
-_TX_MAX_AGE = 600  # authorize -> finish across the OIDC hop: 10-minute window
+_TX_MAX_AGE = 600  # 10-minute window from authorize to finish across the OIDC hop
 _LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
 
-# AppError-based endpoints return problem+json; the token endpoint deliberately
-# follows the RFC 6749 OAuth error JSON instead (see below).
+# The AppError-based endpoints return problem+json. The token endpoint follows the RFC
+# 6749 OAuth error JSON instead. See below.
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 _REDIRECT = {"description": "Redirect (protocol error back to the loopback redirect_uri)."}
 
@@ -45,16 +47,19 @@ def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
 
 
 class OAuthError(BaseModel):
-    """RFC 6749 token error body (``{error, error_description}``). Deliberately NOT
-    problem+json — OAuth/MCP clients expect exactly this schema; the token
-    endpoint is exempted from the app-wide rewrite via ``x-error-contract``."""
+    """RFC 6749 token error body with `error` and `error_description`.
+
+    This body is not problem+json on purpose. OAuth and MCP clients expect exactly this
+    schema. The `x-error-contract` marker exempts the token endpoint from the app-wide
+    rewrite.
+    """
 
     error: str
     error_description: str | None = None
 
 
-# token documents its own 4xx (application/json + OAuthError); the 422 stays the
-# app-wide problem+json body of the global validation handler.
+# The token route documents its own 4xx as application/json with OAuthError. The 422 keeps
+# the app-wide problem+json body of the global validation handler.
 _OAUTH_ERR: dict[str, Any] = {"model": OAuthError}
 _PROBLEM_JSON: dict[str, Any] = {
     "description": "Validation Error",
@@ -74,7 +79,7 @@ def _cookie_kwargs(settings: SettingsDep) -> dict[str, object]:
 
 
 def _is_loopback_redirect(redirect_uri: str) -> bool:
-    """Allow only http loopback redirects (native-app pattern, RFC 8252)."""
+    """Allow only http loopback redirects, the native-app pattern of RFC 8252."""
     try:
         u = urlparse(redirect_uri)
     except ValueError:
@@ -108,16 +113,19 @@ def authorize(
     scope: Annotated[str, Query()] = "",
     state: Annotated[str, Query()] = "",
 ) -> RedirectResponse:
-    """Validate the authorize request, then start the OIDC login (request in the tx cookie)."""
+    """Validate the authorize request and start the OIDC login.
+
+    The signed `ap_oauth_tx` cookie carries the request across the OIDC hop.
+    """
     if not settings.oidc_enabled:
         raise NotFoundError("OAuth is not configured.")
-    # client_id + redirect_uri first: on an invalid redirect, do NOT redirect
-    # there (open redirect/spoofing) — answer 400 instead.
+    # Check the client_id and the redirect_uri first. Never redirect to an invalid
+    # redirect_uri, because that is an open redirect. Answer 400 instead.
     if client_id != settings.oauth_mcp_client_id:
         raise BadRequestError("Unknown client_id.")
     if not _is_loopback_redirect(redirect_uri):
         raise BadRequestError("redirect_uri must be an http loopback URI.")
-    # From here the redirect_uri is trusted -> report protocol errors to it.
+    # From here the code trusts the redirect_uri and reports protocol errors to it.
     if response_type != "code":
         return _redirect_error(redirect_uri, error="unsupported_response_type", state=state)
     if code_challenge_method != "S256" or not code_challenge:
@@ -137,8 +145,8 @@ def authorize(
             "state": state,
         },
     )
-    # Kick off the existing OIDC login; with an ap_oauth_tx cookie present, the
-    # callback redirects to /api/oauth/finish (see auth/router.callback).
+    # Start the existing OIDC login. When the ap_oauth_tx cookie is present, the callback
+    # redirects to /api/oauth/finish. See auth/router.callback.
     login_url = settings.public_base_url.rstrip("/") + "/api/auth/login"
     resp = RedirectResponse(login_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
     resp.set_cookie(
@@ -156,10 +164,11 @@ async def finish(
     settings: SettingsDep,
     _principal: Annotated[Principal, Depends(require_principal())],
 ) -> RedirectResponse:
-    """After OIDC login: redirect to the in-app consent screen (choose scope + lifetime).
+    """Redirect to the in-app consent screen after the OIDC login.
 
-    Nothing is minted here — the user first confirms scope/lifetime on
-    ``/oauth/consent``; ``POST /api/oauth/consent`` then mints the code."""
+    This route mints nothing. The user first confirms the scope and the lifetime on
+    `/oauth/consent`. `POST /api/oauth/consent` then mints the code.
+    """
     tx_cookie = request.cookies.get(settings.oauth_tx_cookie_name)
     if not tx_cookie or sessions.load_oauth_tx(
         settings.session_secret, tx_cookie, _TX_MAX_AGE
@@ -188,7 +197,10 @@ async def token(
     refresh_token: Annotated[str, Form()] = "",
     client_id: Annotated[str, Form()] = "",
 ) -> JSONResponse:
-    """Exchange authorization code or refresh token for an opaque, scoped token pair (RFC 6749)."""
+    """Exchange an authorization code or a refresh token for a scoped token pair.
+
+    The token pair is opaque. The endpoint follows RFC 6749.
+    """
     if not settings.oidc_enabled:
         return _token_error("invalid_request", "OAuth is not configured.", 404)
     if client_id != settings.oauth_mcp_client_id:
@@ -218,9 +230,9 @@ async def token(
         else:
             return _token_error("unsupported_grant_type", f"grant_type={grant_type!r}")
     except oauth.OAuthError as exc:
-        # Refresh-reuse detection may cascade-revoke a token family before
-        # raising ``invalid_grant`` — those writes must be persisted. For pure
-        # validation errors no changes are pending; the commit is a no-op.
+        # The refresh-reuse detection can cascade-revoke a token family before it raises
+        # `invalid_grant`. The commit must persist those writes. A pure validation error
+        # leaves no pending change, so the commit does nothing.
         await db.commit()
         return _token_error(exc.error, exc.description)
     await db.commit()
@@ -252,8 +264,11 @@ async def consent_request(
     settings: SettingsDep,
     principal: Annotated[Principal, Depends(require_principal())],
 ) -> dict[str, Any]:
-    """Return the pending authorize request for the consent UI: client, requested
-    scopes, selectable lifetimes; marks which scopes the user actually holds."""
+    """Return the pending authorize request for the consent UI.
+
+    The response holds the client, the requested scopes and the selectable lifetimes. It
+    also marks the scopes that the user holds.
+    """
     tx_cookie = request.cookies.get(settings.oauth_tx_cookie_name)
     tx = (
         sessions.load_oauth_tx(settings.session_secret, tx_cookie, _TX_MAX_AGE)
@@ -263,8 +278,8 @@ async def consent_request(
     if tx is None:
         raise BadRequestError("Invalid or expired OAuth transaction.")
     requested = oauth.parse_scope(tx["scope"])
-    # Which requested scopes the user can effectively exercise (UX hint only;
-    # the server caps at runtime anyway). Admin -> all.
+    # The requested scopes that the user can really exercise. This is a UX hint only,
+    # because the server caps the permissions at runtime. An admin holds all of them.
     held = {
         s
         for s in requested
@@ -298,9 +313,14 @@ async def consent(
     settings: SettingsDep,
     principal: Annotated[Principal, Depends(require_principal())],
 ) -> dict[str, str]:
-    """Process the consent: mint a code with the chosen scope+lifetime (approve) or
-    return ``error=access_denied`` to the loopback redirect_uri (deny). Returns
-    the redirect URL; the frontend performs the redirect."""
+    """Process the consent of the user.
+
+    On approval the endpoint mints a code with the chosen scope and lifetime. On denial it
+    reports `error=access_denied` to the loopback redirect_uri.
+
+    Returns:
+        The redirect URL. The frontend does the redirect.
+    """
     tx_cookie = request.cookies.get(settings.oauth_tx_cookie_name)
     tx = (
         sessions.load_oauth_tx(settings.session_secret, tx_cookie, _TX_MAX_AGE)
@@ -310,7 +330,7 @@ async def consent(
     if tx is None:
         raise BadRequestError("Invalid or expired OAuth transaction.")
     state = {"state": tx["state"]} if tx["state"] else {}
-    # The tx is single-use — delete the cookie in every case.
+    # The tx is single-use, so delete the cookie in every case.
     response.delete_cookie(settings.oauth_tx_cookie_name, path="/")
 
     if not body.approve:
@@ -323,7 +343,8 @@ async def consent(
     if not principal.has("mcp.use"):
         raise ForbiddenError("Missing permission: mcp.use")
     requested = set(oauth.parse_scope(tx["scope"]))
-    # Chosen scopes must be within requested and known (no escalation past the client request).
+    # The chosen scopes must be known and requested. This blocks an escalation past the
+    # request of the client.
     chosen = [s for s in body.scopes if s in requested and s in oauth.SCOPES]
     if not chosen:
         raise BadRequestError("Select at least one valid scope.")
@@ -351,7 +372,7 @@ async def list_grants(
     db: DbSession,
     principal: Annotated[Principal, Depends(require_principal())],
 ) -> list[dict[str, Any]]:
-    """List the logged-in user's active (non-revoked) OAuth grants (self-service)."""
+    """List the OAuth grants of the logged-in user that are not revoked (self-service)."""
     pid = await _principal_row_id(db, principal)
     if pid is None:
         return []
@@ -368,7 +389,7 @@ async def list_grants(
             "clientId": r.client_id,
             "scope": r.scope,
             "createdAt": r.created_at.isoformat() if r.created_at else None,
-            # None = never expires.
+            # None means the token never expires.
             "accessExpiresAt": (
                 r.access_expires_at.isoformat() if r.access_expires_at else None
             ),
@@ -390,7 +411,11 @@ async def revoke_grant(
     db: DbSession,
     principal: Annotated[Principal, Depends(require_principal())],
 ) -> None:
-    """Revoke an own grant (access+refresh immediately invalid); 404 if foreign."""
+    """Revoke a grant of the logged-in user.
+
+    The access token and the refresh token become invalid at once. A grant of another user
+    gives a 404.
+    """
     pid = await _principal_row_id(db, principal)
     row = (
         await db.execute(select(OAuthToken).where(OAuthToken.id == grant_id))
@@ -407,7 +432,10 @@ async def revoke_all_grants(
     db: DbSession,
     principal: Annotated[Principal, Depends(require_principal())],
 ) -> None:
-    """Revoke all own grants (kill switch for all of this user's agents)."""
+    """Revoke every grant of the logged-in user.
+
+    This is the kill switch for all agents of this user.
+    """
     pid = await _principal_row_id(db, principal)
     if pid is None:
         return
@@ -426,7 +454,7 @@ async def revoke_all_grants(
 
 @well_known_router.get("/.well-known/oauth-authorization-server")
 def authorization_server_metadata(settings: SettingsDep) -> JSONResponse:
-    """RFC 8414 AS metadata for client discovery."""
+    """Return the RFC 8414 authorization-server metadata for client discovery."""
     base = settings.public_base_url.rstrip("/")
     return JSONResponse(
         {
@@ -444,7 +472,7 @@ def authorization_server_metadata(settings: SettingsDep) -> JSONResponse:
 
 @well_known_router.get("/.well-known/oauth-protected-resource")
 def protected_resource_metadata(settings: SettingsDep) -> JSONResponse:
-    """RFC 9728 protected-resource metadata (MCP discovery)."""
+    """Return the RFC 9728 protected-resource metadata for MCP discovery."""
     base = settings.public_base_url.rstrip("/")
     return JSONResponse(
         {

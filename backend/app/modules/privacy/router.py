@@ -1,8 +1,8 @@
-"""Admin privacy router (``/admin/privacy``, gated by ``privacy.manage``).
+"""Admin privacy router (`/admin/privacy`, gated by `privacy.manage`).
 
-Erasure-request queue (list/execute/reject), direct principal erasure, GDPR access
-export (XLSX, Art. 15), and the global retention default. Erasure notifications are
-fired best-effort as background tasks.
+The router serves the erasure-request queue (list, execute, reject), the direct
+principal erasure, the GDPR access export (XLSX, Art. 15), and the global retention
+default. It sends the erasure notifications best-effort as background tasks.
 """
 
 from __future__ import annotations
@@ -44,10 +44,14 @@ _EMAIL_ADAPTER: TypeAdapter[str] = TypeAdapter(EmailStr)
 
 
 def _canonical_email(raw: str) -> str:
-    """Trim, RFC-validate and lowercase the email, else 422.
+    """Trim the address, validate it against the RFC, and lowercase it.
 
-    Keeps the ``pii_export`` audit ``target_id`` a valid canonical email and avoids
-    silently empty exports on typos.
+    This keeps the `pii_export` audit `target_id` a valid canonical email. It also
+    stops a typo from producing a silently empty export.
+
+    Raises:
+        ValidationProblem: The value is not a valid email address. The client gets
+            a 422 response.
     """
     try:
         return _EMAIL_ADAPTER.validate_python(raw.strip()).lower()
@@ -74,8 +78,10 @@ def get_settings_service(session: DbSession) -> PrivacySettingsService:
 
 
 def _files_with_storage(session: DbSession, request: Request) -> FilesService:
-    """FilesService wired to the app-state object storage so anonymization also
-    removes attachment objects."""
+    """Build a FilesService that uses the object storage of the app state.
+
+    Anonymization then also removes the attachment objects.
+    """
     storage = getattr(request.app.state, "object_storage", None)
     return FilesService(session, storage=storage)
 
@@ -88,7 +94,6 @@ def _out(request_row: Any) -> ErasureRequestOut:
     return ErasureRequestOut.model_validate(request_row, from_attributes=True)
 
 
-# erasure queue
 @router.get(
     "/erasures",
     response_model=list[ErasureRequestOut],
@@ -159,7 +164,6 @@ async def reject_erasure(
     return _out(result)
 
 
-# principal erasure
 @router.post(
     "/principals/{principal_id}/erase",
     status_code=204,
@@ -175,7 +179,6 @@ async def erase_principal(
     return Response(status_code=204)
 
 
-# settings
 @router.get(
     "/settings",
     response_model=PrivacySettingsOut,
@@ -202,17 +205,16 @@ async def put_settings(
     return PrivacySettingsOut.model_validate(settings, from_attributes=True)
 
 
-# access export
 @router.get("/auskunft", dependencies=[_CONFIG], responses=_errors(401, 403, 422))
 async def auskunft(
     session: DbSession,
     principal: ConfigPrincipal,
     email: Annotated[str, Query(min_length=1)],
 ) -> Response:
-    """GDPR Art. 15: export all personal data stored for ``email`` as XLSX.
+    """Export all personal data stored for `email` as XLSX (GDPR Art. 15).
 
-    Audited as ``pii_export`` with the canonical email as ``target_id`` so it stays
-    traceable whose data was exported.
+    The route writes a `pii_export` audit entry with the canonical email as
+    `target_id`. The audit log therefore shows whose data left the platform.
     """
     email = _canonical_email(email)
     data = await AuskunftService(session).collect(email)

@@ -1,8 +1,8 @@
-"""Unit-Verdrahtung + RBAC der config_revision-/Revert-Router (ohne DB).
+"""Wiring and RBAC of the config_revision and revert routers, without a DB.
 
-``get_current_principal`` + die Service-Dependency werden überschrieben; die schweren
-Pfade (``reapply_snapshot`` / ``RevertService``) sind gemockt — getestet wird die
-Router-Logik (Permission-Gating, 404, Response-Mapping), nicht die DB-Mutation.
+The tests override `get_current_principal` and the service dependency. They mock the
+heavy paths `reapply_snapshot` and `RevertService`. The subject is the router logic:
+permission gating, 404 and response mapping, not the DB mutation.
 """
 
 from __future__ import annotations
@@ -42,8 +42,8 @@ class _FakeService:
         self, *, revisions: list[ConfigRevision] | None = None, get: Any = None,
         diff: dict[str, Any] | None = None,
     ) -> None:
-        # ``session`` wird vom List-Handler an AuditService.resolve_actor_names gereicht;
-        # bei ``created_by=None`` macht das keinen DB-Zugriff (Kurzschluss).
+        # The list handler passes `session` to AuditService.resolve_actor_names. With
+        # `created_by=None` that call short-circuits and reads no DB.
         from tests._support.auth_fakes import fake_session
 
         self.session = fake_session()
@@ -68,9 +68,6 @@ def _client(principal: Principal, service: _FakeService) -> TestClient:
     return TestClient(app)
 
 
-# --------------------------------------------------------------------------- #
-# GET /admin/config-revisions  (Sidebar-Feed)
-# --------------------------------------------------------------------------- #
 def test_list_requires_a_readable_permission() -> None:
     client = _client(_principal(), _FakeService())
     r = client.get(
@@ -94,9 +91,6 @@ def test_list_returns_revisions_marking_head_current() -> None:
     assert body[1]["isCurrent"] is False
 
 
-# --------------------------------------------------------------------------- #
-# GET /admin/config-revisions/{id}/diff
-# --------------------------------------------------------------------------- #
 def test_diff_404_when_revision_missing() -> None:
     client = _client(_principal("audit.read"), _FakeService(get=None))
     r = client.get(f"/api/admin/config-revisions/{uuid.uuid4()}/diff")
@@ -112,9 +106,6 @@ def test_diff_returns_field_diff() -> None:
     assert r.json()["diff"]["changed"]["state:s"]["new"] == "b"
 
 
-# --------------------------------------------------------------------------- #
-# POST /admin/config-revisions/{id}/restore
-# --------------------------------------------------------------------------- #
 def test_restore_404_when_revision_missing() -> None:
     client = _client(_principal(admin=True), _FakeService(get=None))
     r = client.post(f"/api/admin/config-revisions/{uuid.uuid4()}/restore")
@@ -123,7 +114,7 @@ def test_restore_404_when_revision_missing() -> None:
 
 def test_restore_403_without_entity_permission() -> None:
     rev = _rev(entity_type="flow", created_by=None)
-    # Hat audit.read, aber NICHT flow.configure → Restore verweigert.
+    # The principal holds audit.read but not flow.configure, so the restore is refused.
     client = _client(_principal("audit.read"), _FakeService(get=rev))
     r = client.post(f"/api/admin/config-revisions/{rev.id}/restore")
     assert r.status_code == 403
@@ -145,9 +136,6 @@ def test_restore_calls_reapply_with_entity_permission(monkeypatch: pytest.Monkey
     assert calls and calls[0]["entity_type"] == "flow"
 
 
-# --------------------------------------------------------------------------- #
-# POST /admin/audit/{id}/revert
-# --------------------------------------------------------------------------- #
 def test_audit_revert_requires_audit_revert_permission() -> None:
     app = create_app()
     app.dependency_overrides[get_current_principal] = lambda: _principal("audit.read")
@@ -157,8 +145,8 @@ def test_audit_revert_requires_audit_revert_permission() -> None:
 
 
 def test_audit_revert_delegates_to_revert_service(monkeypatch: pytest.MonkeyPatch) -> None:
-    # #AUD-018: der Router reicht den Principal als 3. Argument durch, damit der
-    # RevertService die *granulare* Permission des Original-Vorgangs re-asserten kann.
+    # #AUD-018: the router passes the principal as the third argument. The RevertService
+    # then re-asserts the granular permission of the original operation.
     seen: list[Principal | None] = []
 
     class _FakeRevert:
@@ -172,7 +160,7 @@ def test_audit_revert_delegates_to_revert_service(monkeypatch: pytest.MonkeyPatc
 
     monkeypatch.setattr("app.modules.audit.router.RevertService", _FakeRevert)
     app = create_app()
-    # Happy-Path: audit.revert (Router-Gate) + die granulare flow.configure (AUD-018).
+    # Happy path: audit.revert for the router gate plus the granular flow.configure (AUD-018).
     app.dependency_overrides[get_current_principal] = lambda: _principal(
         "audit.revert", "flow.configure"
     )
@@ -182,6 +170,6 @@ def test_audit_revert_delegates_to_revert_service(monkeypatch: pytest.MonkeyPatc
     body = r.json()
     assert body["revertedAuditId"] == 7
     assert body["entityType"] == "flow"
-    # delegiert an den RevertService UND reicht den Principal für die Re-Assertion durch.
+    # The router delegates to the RevertService and passes the principal for the re-assertion.
     assert seen and seen[0] is not None
     assert seen[0].has("flow.configure")

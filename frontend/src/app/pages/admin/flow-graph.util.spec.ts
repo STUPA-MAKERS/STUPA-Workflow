@@ -86,7 +86,7 @@ describe('validateFlowGraph', () => {
 
   it('detects unreachable states', () => {
     const r = validateFlowGraph(
-      graph({ transitions: [{ from: 'draft', to: 'review' }] }), // 'done' unreachable
+      graph({ transitions: [{ from: 'draft', to: 'review' }] }), // 'done' stays unreachable
     );
     expect(r.errors.some((e) => e.includes('unreachable states: done'))).toBe(true);
   });
@@ -103,14 +103,14 @@ describe('validateFlowGraph', () => {
         { from: 'draft', to: 'voting' },
         { from: 'voting', to: 'passed', branch: 'pass' },
         { from: 'voting', to: 'failed', branch: 'fail' },
-        // Automatic non-branch exit: would fire immediately, bypassing the vote.
+        // An automatic non-branch exit fires at once and bypasses the vote.
         { from: 'voting', to: 'passed', automatic: true },
       ],
     });
     const v = validateFlowGraph(g);
     expect(v.valid).toBe(false);
     expect(v.errors.join(' ')).toContain('must not have automatic outgoing transitions');
-    // A manual exit (abort the vote), by contrast, stays allowed.
+    // A manual exit that aborts the vote stays allowed.
     g.transitions = g.transitions.filter((t) => !t.automatic);
     g.transitions.push({ from: 'voting', to: 'failed' });
     expect(validateFlowGraph(g).valid).toBe(true);
@@ -129,7 +129,7 @@ describe('validateFlowGraph', () => {
   });
 
   it('requires addToNextSession to lead into a vote state (#28)', () => {
-    // target "review" is a normal state → rejected
+    // The target "review" is a normal state, so the check rejects the graph.
     const bad = validateFlowGraph(
       graph({
         transitions: [
@@ -141,7 +141,7 @@ describe('validateFlowGraph', () => {
     expect(bad.valid).toBe(false);
     expect(bad.errors.some((e) => e.includes('must lead into a vote state'))).toBe(true);
 
-    // same action leading into a vote state passes (target.kind === 'vote')
+    // The same action passes when the target state has kind 'vote'.
     const ok = validateFlowGraph({
       states: [
         { key: 'draft', label: { de: 'D' }, isInitial: true },
@@ -162,7 +162,7 @@ describe('validateFlowGraph', () => {
     const r = validateFlowGraph({
       states: [
         { key: 'draft', label: { de: 'D' }, isInitial: true },
-        // no config.gremiumId, and only one outgoing branch (pass) → both errors
+        // No config.gremiumId and only one outgoing branch, so both errors fire.
         { key: 'voting', label: { de: 'V' }, kind: 'vote' },
         { key: 'passed', label: { de: 'P' } },
       ],
@@ -185,7 +185,8 @@ describe('validateFlowGraph', () => {
       ],
       transitions: [],
     });
-    // duplicate is reported, but unreachable is suppressed (guarded by duplicates===0)
+    // The check reports the duplicate. It skips the reachability test, because that test
+    // runs only when the duplicate count is zero.
     expect(r.errors.some((e) => e.includes('duplicate state keys'))).toBe(true);
     expect(r.errors.some((e) => e.includes('unreachable'))).toBe(false);
   });
@@ -217,7 +218,6 @@ describe('graph ↔ JSON round-trip', () => {
     const g = graph();
     const back = parseFlowGraph(serializeFlowGraph(g));
     expect(back).toEqual(normalizeFlowGraph(g));
-    // double round-trip stable
     expect(parseFlowGraph(serializeFlowGraph(back))).toEqual(back);
   });
 
@@ -290,10 +290,11 @@ describe('graph ↔ JSON round-trip', () => {
       layout: {
         positions: {},
         groups: [
-          // keeps existing key 'a', drops the dead 'ghost'; references a real sibling group + a self-ref + a missing one
+          // Keeps the live key 'a' and drops the dead 'ghost'. Also references a real
+          // sibling group, a self reference and a missing group.
           { id: 'g1', name: 'G1', stateKeys: ['a', 'ghost'], groupIds: ['g2', 'g1', 'missing'], color: '#111' },
           { id: 'g2', name: 'G2', stateKeys: ['b'] },
-          // empty group (no states, no sub-groups) is dropped entirely
+          // normalizeFlowGraph drops a group with no states and no sub-groups.
           { id: 'gEmpty', name: 'Empty', stateKeys: ['ghost'] },
         ],
       },
@@ -303,7 +304,7 @@ describe('graph ↔ JSON round-trip', () => {
       { id: 'g1', name: 'G1', stateKeys: ['a'], groupIds: ['g2'], color: '#111' },
       { id: 'g2', name: 'G2', stateKeys: ['b'] },
     ]);
-    // empty positions object → layout.positions omitted; only groups remain
+    // An empty positions object drops layout.positions. Only the groups remain.
     expect(n.layout?.positions).toBeUndefined();
   });
 
@@ -320,8 +321,8 @@ describe('graph ↔ JSON round-trip', () => {
 describe('autoLayout', () => {
   it('assigns layered positions and keeps existing ones', () => {
     const g = autoLayout(graph({ layout: { positions: { draft: { x: 5, y: 5 } } } }));
-    expect(g.layout!.positions!['draft']).toEqual({ x: 5, y: 5 }); // preserved
-    expect(g.layout!.positions!['review'].x).toBeGreaterThan(0); // column by depth
+    expect(g.layout!.positions!['draft']).toEqual({ x: 5, y: 5 });
+    expect(g.layout!.positions!['review'].x).toBeGreaterThan(0);
     expect(g.layout!.positions!['done'].x).toBeGreaterThan(g.layout!.positions!['review'].x);
   });
 
@@ -343,12 +344,13 @@ describe('autoLayout', () => {
       ],
     });
     const p = g.layout!.positions!;
-    // Columns: a | b,c | d — d NOT in column 1 (longest path, not BFS).
+    // Columns: a | b,c | d. The layout uses the longest path, not BFS, so d stays out
+    // of column 1.
     expect(p['b'].x).toBe(p['c'].x);
     expect(p['d'].x).toBeGreaterThan(p['b'].x);
     // b and c share the column without overlap.
     expect(p['b'].y).not.toBe(p['c'].y);
-    // Single-node layers (a, d) are centered against the 2-node layer.
+    // The layout centers the single-node layers (a, d) against the two-node layer.
     const mid = (p['b'].y + p['c'].y) / 2;
     expect(p['a'].y).toBe(mid);
     expect(p['d'].y).toBe(mid);
@@ -366,11 +368,12 @@ describe('autoLayout edge cases', () => {
       transitions: [
         { from: 'a', to: 'b' },
         { from: 'b', to: 'b' }, // self-loop is layout-neutral
-        { from: 'a', to: 'ghost' }, // dangling target ignored
+        { from: 'a', to: 'ghost' }, // the layout ignores this dangling target
       ],
     });
     const p = g.layout!.positions!;
-    // orphan has no incoming edge → pushed to maxDepth + 1, i.e. beyond b's column
+    // The orphan has no incoming edge. The layout puts it at maxDepth + 1, past the
+    // column of b.
     expect(p['orphan'].x).toBeGreaterThan(p['b'].x);
   });
 
@@ -398,7 +401,7 @@ describe('autoLayout edge cases', () => {
         { key: 'b', label: { de: 'B' } },
       ],
     } as unknown as FlowGraph;
-    // validate, normalize, serialize and autoLayout all default transitions to []
+    // validate, normalize, serialize and autoLayout all default transitions to [].
     expect(validateFlowGraph(noTransitions).errors.some((e) => e.includes('unreachable'))).toBe(
       true,
     );
@@ -444,14 +447,12 @@ describe('factories', () => {
   });
 
   it('blankState/blankTransition apply their default arguments', () => {
-    // No arguments → default key '', isInitial false (exercises the default-arg paths).
     expect(blankState()).toEqual({
       key: '',
       label: { de: '', en: '' },
       isInitial: false,
       editAllowed: true,
     });
-    // No arguments → default from/to '' (exercises both default-arg paths).
     expect(blankTransition()).toEqual({ from: '', to: '', actions: [] });
   });
 });

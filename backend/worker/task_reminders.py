@@ -1,14 +1,15 @@
-"""Task reminders (kind ``task_reminder``).
+"""Task reminders of the kind `task_reminder`.
 
-Hourly cron: finds applications sitting unchanged for ``task_reminder_after_days`` in
-an actionable state (at least one manual ``requires_action`` transition, or a ``vote``
-state) and reminds everyone who can act there. Thresholds come from the admin-managed
-platform config (``notification_settings``); ``repeat_days=0`` means once per state stay.
+An hourly cron finds the applications that stay unchanged for `task_reminder_after_days`
+in an actionable state. An actionable state has at least one manual `requires_action`
+transition, or it is a `vote` state. The cron reminds everyone who can act there. The
+thresholds come from the admin-managed platform config `notification_settings`. A
+`repeat_days` of 0 means one reminder per state stay.
 
-``task_reminder_log`` (one row per application, bound to the triggering
-``status_event``) prevents duplicate sends — a state change restarts the stay (and the
-reminder clock). Sends respect the per-user opt-out and use the ``task_reminder``
-template (DB override, builtin fallback).
+`task_reminder_log` holds one row per application, bound to the `status_event` that
+triggered the reminder. It prevents duplicate sends. A state change restarts the stay and
+the reminder clock. A send respects the per-user opt-out. It uses the `task_reminder`
+template, with the DB override first and the builtin as the fallback.
 """
 
 from __future__ import annotations
@@ -40,13 +41,16 @@ logger = logging.getLogger("worker.task_reminders")
 
 
 def _naive_utc(dt: datetime) -> datetime:
-    """Coerce to naive UTC. ``StatusEvent.at`` is TIMESTAMP WITHOUT TIME ZONE, so
-    asyncpg rejects a tz-aware bind and ``now - entered_at`` would mix naive/aware."""
+    """Convert a datetime to naive UTC.
+
+    `StatusEvent.at` is TIMESTAMP WITHOUT TIME ZONE. asyncpg rejects a tz-aware bind, and
+    `now - entered_at` would mix a naive value with an aware one.
+    """
     return dt.astimezone(UTC).replace(tzinfo=None) if dt.tzinfo is not None else dt
 
 
 def _sessionmaker(ctx: dict[str, Any]) -> Any:
-    """Injectable in tests via ``ctx['sessionmaker']`` (like worker/deadlines)."""
+    """Return the DB sessionmaker (tests inject one via `ctx['sessionmaker']`)."""
     maker = ctx.get("sessionmaker")
     if maker is not None:
         return maker
@@ -64,7 +68,13 @@ def _mail_queue(ctx: dict[str, Any]) -> Any:
 async def process_task_reminders(
     ctx: dict[str, Any], *, now: datetime | None = None
 ) -> int:
-    """Cron entry: send due reminders; returns the count."""
+    """Send the due task reminders.
+
+    This function is the arq cron entry point.
+
+    Returns:
+        The number of reminders sent.
+    """
     now = now or datetime.now(UTC)
     settings: Settings = ctx.get("settings") or load_settings()
     maker = _sessionmaker(ctx)
@@ -108,10 +118,11 @@ async def _due_applications(
     after: timedelta,
     repeat: timedelta | None,
 ) -> list[tuple[uuid.UUID, uuid.UUID | None, datetime, State | None]]:
-    """Due applications: (id, latest status_event, entered_at, state).
+    """Return the due applications as (id, latest status_event, entered_at, state).
 
-    Due = confirmed application, state stay older than ``after`` AND (never reminded
-    for this stay OR last reminder older than ``repeat``; ``repeat=None`` = once).
+    An application is due when the applicant confirmed it and the state stay is older
+    than `after`. The application must also have no reminder for this stay, or a last
+    reminder older than `repeat`. A `repeat` of `None` means one reminder per stay.
     """
     latest_event = (
         select(
@@ -172,7 +183,7 @@ async def _due_applications(
             .limit(1)
         )
         log = logs.get(app_id)
-        # Already reminded for this stay -> re-send only in repeat mode.
+        # Already reminded for this stay: send again only in repeat mode.
         if (
             log is not None
             and log.status_event_id == event_id
@@ -232,8 +243,9 @@ async def _remind_one(
             now.date().isoformat(),
         ),
     )
-    # Write the log even without a send (all recipients opted out), else every run
-    # re-checks the same opted-out set. ``sent`` counts only real mails.
+    # Write the log even without a send, for example when all recipients opted out.
+    # Without the log every run re-checks the same opted-out set. `sent` counts only
+    # the real mails.
     log = await session.get(TaskReminderLog, application_id)
     if log is None:
         session.add(

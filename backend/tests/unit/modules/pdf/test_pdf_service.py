@@ -1,7 +1,8 @@
-"""Unit-Tests PdfService (T-20): Job-Lebenszyklus + ``to_out``-Ergebnis-URL.
+"""Unit tests for PdfService (T-20): the job lifecycle and the `to_out` result URL.
 
-DB via ``FakePdfSession``; das Antrags-Dokument-Laden (``load_application_doc``) braucht
-echte Joins → integration/test_pdf_service.py.
+The tests use `FakePdfSession` as the database. The application document load
+(`load_application_doc`) needs real joins, so it lives in
+integration/test_pdf_service.py.
 """
 
 from __future__ import annotations
@@ -56,7 +57,7 @@ async def test_create_job_idempotency_key_reuses_existing() -> None:
     session._scalar = [existing]
     job = await _svc(session).create_application_job(app_id, idempotency_key="k1")
     assert job is existing
-    assert session.added == []  # kein zweiter Job
+    assert session.added == []  # no second job
 
 
 async def test_create_job_idempotency_key_new_when_none_existing() -> None:

@@ -1,4 +1,4 @@
-/** UI-String-Katalog. DE ist die Referenz; fehlende EN-Keys fallen auf DE zurück. */
+/** UI string catalog. DE is the reference. A missing EN key falls back to DE. */
 
 export type Locale = 'de' | 'en';
 
@@ -12,7 +12,7 @@ export const de = {
   'app.skipToContent': 'Zum Inhalt springen',
   'app.loading': 'Wird geladen…',
 
-  // Generische Filter-Leiste (app-filter-bar) — überall gleich.
+  // Generic filter bar (app-filter-bar). The same strings apply everywhere.
   'filter.button': 'Filter',
   'filter.apply': 'Anwenden',
   'filter.reset': 'Zurücksetzen',
@@ -166,10 +166,8 @@ export const de = {
   'action.confirm': 'Bestätigen',
   'action.more': 'mehr',
   'action.less': 'weniger',
-  // Spaltenkopf der (sticky) Aktions-Spalte in Tabellen (#expenses-ux2)
   'table.actions': 'Aktionen',
 
-  // Ausgaben/Einnahmen (#25)
   'expenses.title': 'Buchungen',
   'expenses.subtitle': 'Ausgaben & Einnahmen mit Filter und Suche.',
   'expenses.add': 'Buchung hinzufügen',
@@ -252,7 +250,6 @@ export const de = {
   'expenses.delete.title': 'Buchung löschen',
   'expenses.delete.body': 'Buchung „{description}" wirklich löschen?',
   'expenses.delete.confirm': 'Löschen',
-  // Sammel-Aktionen (#expenses-ux)
   'expenses.bulk.selectAll': 'Alle wählen',
   'expenses.bulk.selectedCount': '{count} ausgewählt',
   'expenses.bulk.clear': 'Auswahl aufheben',
@@ -280,7 +277,6 @@ export const de = {
   'expenses.toast.saved': 'Buchung gespeichert.',
   'expenses.toast.deleted': 'Buchung gelöscht.',
   'expenses.toast.failed': 'Aktion fehlgeschlagen.',
-  // Unterbuchungen (#subbookings)
   'expenses.sub.title': 'Unterbuchungen',
   'expenses.sub.toggle': 'Unterbuchungen ein-/ausklappen',
   'expenses.sub.import': 'Aus Datei (CAMT/MT940)',
@@ -293,7 +289,7 @@ export const de = {
   'expenses.sub.parentAmount': 'Betrag = Summe der Unterbuchungen',
   'expenses.sub.loadError': 'Unterbuchungen konnten nicht geladen werden.',
   'expenses.sub.importError': 'Import der Unterbuchungen fehlgeschlagen.',
-  // Globaler Datei-Import (Toolbar statt Zeilen-Aktion, #expenses-ux2)
+  // Global file import from the toolbar, not from a row action (#expenses-ux2).
   'expenses.sub.importTitle': 'Unterbuchungen aus Datei importieren',
   'expenses.sub.importHint':
     'Alle Umsätze der Datei werden als Unterbuchungen der gewählten Ziel-Buchung angelegt.',
@@ -527,7 +523,6 @@ export const de = {
   'dashboard.budget.title': 'Budget',
   'dashboard.admin.title': 'Verwaltung',
 
-  // --- applications (T-31): Liste/Detail/Historie/Kommentare/Aktionen ---
   'applications.list.title': 'Anträge',
   'applications.list.subtitle': 'Alle Anträge mit Filter und Suche.',
   'applications.list.search': 'Suche',
@@ -692,7 +687,6 @@ export const de = {
   'applications.attachments.download.error': 'Download fehlgeschlagen.',
   'applications.attachments.added': 'Anhang hochgeladen — Prüfung läuft.',
 
-  // --- meetings + Protokoll (T-33): Sitzungssteuerung + Protokoll-Editor ---
   'meetings.title': 'Sitzungen',
   'meetings.detailCrumb': 'Sitzung',
   'meetings.loading': 'Sitzung wird geladen …',
@@ -897,7 +891,6 @@ export const de = {
 
   'footer.coBranding': 'Eine Plattform des Studierendenparlaments',
 
-  // --- Voting / Live-Vote (T-32) ---------------------------------------------
   'vote.option.yes': 'Ja',
   'vote.option.no': 'Nein',
   'vote.option.abstain': 'Enthaltung',
@@ -957,7 +950,6 @@ export const de = {
   'voting.beamer.votesOf': '{cast} von {eligible} Stimmen',
   'voting.beamer.closed': 'Endergebnis',
 
-  // --- Admin (T-34) --------------------------------------------------------
   'admin.home.title': 'Verwaltung',
   'admin.home.subtitle': 'Formulare, Workflows und Konfiguration pflegen.',
   'admin.home.formBuilder': 'Formular-Builder',
@@ -1064,7 +1056,6 @@ export const de = {
   'fints.linked': 'Mit Buchung verknüpft.',
   'fints.unlinked': 'Verknüpfung gelöst.',
   'fints.credActive': 'Zugangsdaten hinterlegt.',
-  // Konten-Tab (#fints-konten)
   'konten.title': 'Konten',
   'konten.subtitle': 'Banktransaktionen mit Buchungen abgleichen.',
   'konten.viewBooking': 'Buchung ansehen',
@@ -1098,7 +1089,6 @@ export const de = {
   'konten.ignoreReasonPlaceholder': 'z. B. private Auslage, Doppelbuchung …',
   'konten.ignored': 'Transaktion ignoriert.',
   'konten.reactivated': 'Transaktion reaktiviert.',
-  // Sammel-Aktionen (#expenses-ux)
   'konten.bulk.selectedCount': '{count} ausgewählt',
   'konten.bulk.clear': 'Auswahl aufheben',
   'konten.bulk.unlinkSelected': 'Trennen',
@@ -1715,7 +1705,6 @@ export const de = {
     '{actor} hat einen Antrag einer Kostenstelle zugeordnet ({target}).',
   'admin.audit.msg.budget_move_fiscal_year': '{actor} hat ein Haushaltsjahr verschoben ({target}).',
   'admin.audit.msg.unknown': '{actor}: {action} ({target}).',
-  // --- Datenschutz / DSGVO (#PII-Re-Add) ---
   'admin.privacy.title': 'Datenschutz',
   'admin.privacy.subtitle': 'DSGVO-Verwaltung: Löschanträge, Auskunft, Aufbewahrung.',
   'admin.privacy.queueTitle': 'Löschanträge (Art. 17)',
@@ -1815,7 +1804,7 @@ export const de = {
   'admin.deleg.revoked': 'Delegation widerrufen.',
   'admin.deleg.revokeFailed': 'Widerruf fehlgeschlagen.',
 
-  // Stellvertreter-Pool (#delegation-rework, Gremium-Mitgliederverwaltung).
+  // Substitute pool (#delegation-rework), shown in the Gremium member administration.
   'admin.substitutes.title': 'Stellvertreter-Pool',
   'admin.substitutes.hint':
     'Gewählte/bestimmte Vertreter (z. B. der Fachschaften): an sie darf ohne Vorlauf bis Sitzungsbeginn delegiert werden — auch wenn sie nicht selbst Mitglied sind.',
@@ -1833,7 +1822,7 @@ export const de = {
   'admin.substitutes.duplicate': 'Dieser Eintrag existiert bereits.',
   'admin.substitutes.failed': 'Aktion fehlgeschlagen.',
 
-  // Sitzungs-Vertretung (#delegation-rework): Karte auf der Sitzungsseite + Dialog.
+  // Meeting delegation (#delegation-rework): card on the meeting page plus dialog.
   'delegation.card.title': 'Vertretung',
   'delegation.card.lead':
     'Du kannst dich für diese Sitzung vertreten lassen (optional inkl. Stimmrecht).',
@@ -1875,7 +1864,6 @@ export const de = {
   'admin.notif.rcpt.role': 'Rolle',
   'admin.notif.rcpt.group': 'Gruppe',
 
-  // Überblick aktiver Formulare (#75)
   'admin.forms.overviewTitle': 'Aktive Formulare',
   'admin.forms.overviewSubtitle': 'Veröffentlichte Antragsformulare mit Status und Version.',
   'admin.forms.col.name': 'Formular',
@@ -1894,7 +1882,6 @@ export const de = {
     'Antragsart „{name}" wirklich löschen? Formular und Verlauf werden mit entfernt.',
   'admin.forms.deleteFailed': 'Löschen fehlgeschlagen – ggf. existieren noch Anträge dieser Art.',
   'admin.forms.manage': 'Formulare verwalten',
-  // Formular-Builder NC-Forms-Stil (#13)
   'admin.forms.listTitle': 'Anträge & Formulare',
   'admin.forms.listSubtitle':
     'Antragstypen anlegen und ihre Formulare im Nextcloud-Forms-Stil bearbeiten.',
@@ -1941,7 +1928,7 @@ export const de = {
   'admin.forms.advanced': 'Erweiterte Optionen',
   'admin.forms.duplicate': 'Duplizieren',
 
-  // Frage-Gruppen (#13 — Gruppen-Container = je ein Wizard-Schritt)
+  // Question groups (#13). One group container is one wizard step.
   'admin.form.groupStep': 'Schritt {n}',
   'admin.form.groupTitleDe': 'Gruppen-Titel (DE)',
   'admin.form.groupTitleEn': 'Gruppen-Titel (EN)',
@@ -1953,7 +1940,6 @@ export const de = {
   'admin.form.moveGroupDown': 'Gruppe nach unten',
   'admin.form.dragGroup': 'Gruppe zum Umsortieren ziehen',
 
-  // Budget-Statistik-Dashboard (T-35)
   'budget.title': 'Budget-Statistik',
   'budget.subtitle': 'Auslastung der Kostenstellen und Anträge je Budget/HHJ.',
   'budget.export': 'Export',
@@ -1981,7 +1967,6 @@ export const de = {
   'budget.empty.body':
     'Für die aktuelle Auswahl gibt es keine Budgets oder Anträge. Anträge ohne Budget bleiben davon unberührt.',
 
-  // --- Budget-Töpfe verwalten (#76) ------------------------------------------
   'budget.pots.title': 'Budget-Töpfe',
   'budget.pots.subtitle': 'Töpfe anlegen und bearbeiten (Gremium, Limit, Währung, Zeitraum).',
   'budget.pots.create': 'Neuen Topf anlegen',
@@ -2402,11 +2387,9 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'action.confirm': 'Confirm',
   'action.more': 'more',
   'action.less': 'less',
-  // Column header of the (sticky) actions column in tables (#expenses-ux2)
   'table.actions': 'Actions',
   'action.close': 'Close',
 
-  // Expenses/Income (#25)
   'expenses.title': 'Bookings',
   'expenses.subtitle': 'Expenses & income with filter and search.',
   'expenses.add': 'Add booking',
@@ -2488,7 +2471,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'expenses.delete.title': 'Delete booking',
   'expenses.delete.body': 'Really delete booking “{description}”?',
   'expenses.delete.confirm': 'Delete',
-  // Bulk actions (#expenses-ux)
   'expenses.bulk.selectAll': 'Select all',
   'expenses.bulk.selectedCount': '{count} selected',
   'expenses.bulk.clear': 'Clear selection',
@@ -2516,7 +2498,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'expenses.toast.saved': 'Booking saved.',
   'expenses.toast.deleted': 'Booking deleted.',
   'expenses.toast.failed': 'Action failed.',
-  // Sub-bookings (#subbookings)
   'expenses.sub.title': 'Sub-bookings',
   'expenses.sub.toggle': 'Toggle sub-bookings',
   'expenses.sub.import': 'From file (CAMT/MT940)',
@@ -2529,7 +2510,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'expenses.sub.parentAmount': 'Amount = sum of sub-bookings',
   'expenses.sub.loadError': 'Could not load sub-bookings.',
   'expenses.sub.importError': 'Sub-booking import failed.',
-  // Global file import (toolbar instead of row action, #expenses-ux2)
+  // Global file import from the toolbar, not from a row action (#expenses-ux2).
   'expenses.sub.importTitle': 'Import sub-bookings from file',
   'expenses.sub.importHint':
     'All transactions in the file are created as sub-bookings of the chosen target booking.',
@@ -2761,7 +2742,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'dashboard.budget.title': 'Budget',
   'dashboard.admin.title': 'Administration',
 
-  // --- applications (T-31) ---
   'applications.list.title': 'Applications',
   'applications.list.subtitle': 'All applications with filtering and search.',
   'applications.list.search': 'Search',
@@ -2924,7 +2904,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'applications.attachments.download.error': 'Download failed.',
   'applications.attachments.added': 'Attachment uploaded — scan in progress.',
 
-  // --- meetings + protocol (T-33): session control + protocol editor ---
   'meetings.title': 'Meetings',
   'meetings.detailCrumb': 'Meeting',
   'meetings.loading': 'Loading meeting …',
@@ -3122,7 +3101,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
 
   'footer.coBranding': 'A platform of the Student Parliament',
 
-  // --- Voting / Live-Vote (T-32) ---------------------------------------------
   'vote.option.yes': 'Yes',
   'vote.option.no': 'No',
   'vote.option.abstain': 'Abstain',
@@ -3182,7 +3160,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'voting.beamer.votesOf': '{cast} of {eligible} votes',
   'voting.beamer.closed': 'Final result',
 
-  // --- Admin (T-34) --------------------------------------------------------
   'admin.home.title': 'Administration',
   'admin.home.subtitle': 'Manage forms, workflows and configuration.',
   'admin.home.formBuilder': 'Form builder',
@@ -3288,7 +3265,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'fints.linked': 'Linked to booking.',
   'fints.unlinked': 'Link removed.',
   'fints.credActive': 'Credentials stored.',
-  // Accounts tab (#fints-konten)
   'konten.title': 'Accounts',
   'konten.subtitle': 'Reconcile bank transactions with bookings.',
   'konten.viewBooking': 'View booking',
@@ -3322,7 +3298,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'konten.ignoreReasonPlaceholder': 'e.g. private expense, duplicate booking …',
   'konten.ignored': 'Transaction ignored.',
   'konten.reactivated': 'Transaction reactivated.',
-  // Bulk actions (#expenses-ux)
   'konten.bulk.selectedCount': '{count} selected',
   'konten.bulk.clear': 'Clear selection',
   'konten.bulk.unlinkSelected': 'Unlink',
@@ -3930,7 +3905,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.audit.msg.budget_assign': '{actor} assigned an application to a cost centre ({target}).',
   'admin.audit.msg.budget_move_fiscal_year': '{actor} moved a fiscal year ({target}).',
   'admin.audit.msg.unknown': '{actor}: {action} ({target}).',
-  // --- Privacy / GDPR (#PII-Re-Add) ---
   'admin.privacy.title': 'Privacy',
   'admin.privacy.subtitle': 'GDPR administration: erasure requests, data access, retention.',
   'admin.privacy.queueTitle': 'Erasure requests (Art. 17)',
@@ -4030,7 +4004,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.deleg.revoked': 'Delegation revoked.',
   'admin.deleg.revokeFailed': 'Revocation failed.',
 
-  // Substitute pool (#delegation-rework, body member administration).
+  // Substitute pool (#delegation-rework), shown in the Gremium member administration.
   'admin.substitutes.title': 'Substitute pool',
   'admin.substitutes.hint':
     'Elected/designated substitutes (e.g. of student councils): delegations to them are possible without lead time until the meeting starts — even if they are not members themselves.',
@@ -4048,7 +4022,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.substitutes.duplicate': 'This entry already exists.',
   'admin.substitutes.failed': 'Action failed.',
 
-  // Meeting proxy (#delegation-rework): card on the meeting page + dialog.
+  // Meeting delegation (#delegation-rework): card on the meeting page plus dialog.
   'delegation.card.title': 'Proxy',
   'delegation.card.lead':
     'You can arrange a proxy for this meeting (optionally including your voting right).',
@@ -4090,7 +4064,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.notif.rcpt.role': 'Role',
   'admin.notif.rcpt.group': 'Group',
 
-  // Active forms overview (#75)
   'admin.forms.overviewTitle': 'Active forms',
   'admin.forms.overviewSubtitle': 'Published application forms with status and version.',
   'admin.forms.col.name': 'Form',
@@ -4109,7 +4082,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
     'Really delete application type “{name}”? Its form and history are removed too.',
   'admin.forms.deleteFailed': 'Delete failed — applications of this type may still exist.',
   'admin.forms.manage': 'Manage forms',
-  // Form builder, Nextcloud Forms style (#13)
   'admin.forms.listTitle': 'Applications & forms',
   'admin.forms.listSubtitle':
     'Create application types and edit their forms in Nextcloud Forms style.',
@@ -4155,7 +4127,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.forms.advanced': 'Advanced options',
   'admin.forms.duplicate': 'Duplicate',
 
-  // Question groups (#13 — group containers = one wizard step each)
+  // Question groups (#13). One group container is one wizard step.
   'admin.form.groupStep': 'Step {n}',
   'admin.form.groupTitleDe': 'Group title (DE)',
   'admin.form.groupTitleEn': 'Group title (EN)',
@@ -4167,7 +4139,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.form.moveGroupDown': 'Move group down',
   'admin.form.dragGroup': 'Drag group to reorder',
 
-  // Budget statistics dashboard (T-35)
   'budget.title': 'Budget statistics',
   'budget.subtitle': 'Cost-centre utilisation and applications per budget/fiscal year.',
   'budget.export': 'Export',
@@ -4195,7 +4166,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'budget.empty.body':
     'There are no budgets or applications for the current selection. Applications without a budget are unaffected.',
 
-  // --- Manage budget pots (#76) ----------------------------------------------
   'budget.pots.title': 'Budget pots',
   'budget.pots.subtitle': 'Create and edit pots (committee, limit, currency, period).',
   'budget.pots.create': 'Create a new pot',

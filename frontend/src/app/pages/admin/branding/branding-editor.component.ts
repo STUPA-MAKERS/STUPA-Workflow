@@ -26,13 +26,14 @@ import {
 import { brandingLinkErrors } from '../branding.util';
 
 /**
- * Branding/site-config editor. Makes logos, footer and free texts editable via the UI
- * instead of in code. Logo upload with preview + mime/size guard, footer link columns,
- * i18n free texts, a live preview, and versioning (active vs. draft) with an activate
+ * Branding and site-config editor. It makes the logos, the footer and the free texts
+ * editable in the UI instead of in code. It holds a logo upload with a preview. The upload
+ * has a MIME guard and a size guard. It also holds footer link columns, i18n free texts and
+ * a live preview. It versions the active config against the draft and adds an activate
  * button.
  *
- * Works against `/api/admin/site-config` (not part of the API spec; served by the mock).
- * Produces valid `branding` JSON.
+ * It works against `/api/admin/site-config`. That route is not part of the API spec. The mock
+ * serves it. The editor writes valid `branding` JSON.
  */
 @Component({
   selector: 'app-branding-editor',
@@ -55,20 +56,19 @@ export class BrandingEditorComponent {
   protected readonly hasDraftChanges = signal(false);
   protected readonly draft = signal<Branding | null>(null);
 
-  /** Currently active language for the preview. */
   protected readonly lang = computed(() => this.i18n.locale());
 
-  /** Disallowed link URLs (scheme ≠ http(s)/mailto) — blocks saving. */
+  /** Disallowed link URLs. Their scheme is not http, https or mailto. They block a save. */
   protected readonly linkErrors = computed(() => brandingLinkErrors(this.draft()));
 
-  /** Version sidebar — reload after activate/restore. */
+  /** Version sidebar. Reload it after an activate or a restore. */
   protected readonly history = viewChild(VersionHistoryComponent);
 
   constructor() {
     this.loadConfig();
   }
 
-  /** Load active + draft branding (also after a version restore). */
+  /** Load the active branding and the draft, also after a version restore. */
   protected loadConfig(): void {
     this.api.getSiteConfig().subscribe((cfg) => {
       this.version.set(cfg.version);
@@ -85,7 +85,6 @@ export class BrandingEditorComponent {
     return this.i18n.translate(`admin.brand.logo.${slot}` as TranslationKey);
   }
 
-  // --- logos ---------------------------------------------------------------
   protected onLogoSelected(slot: LogoSlot, input: HTMLInputElement): void {
     const file = input.files?.[0];
     if (!file) return;
@@ -120,7 +119,6 @@ export class BrandingEditorComponent {
     });
   }
 
-  // --- footer --------------------------------------------------------------
   protected addColumn(): void {
     this.patch((d) => {
       d.footerColumns = [...d.footerColumns, { label: { de: '', en: '' }, links: [] }];
@@ -167,20 +165,20 @@ export class BrandingEditorComponent {
     });
   }
 
-  /** Lazy-init the apply info — existing configs don't have this field. */
+  /** Create the apply info on first use. An older config does not have this field. */
   protected applyInfo(d: Branding): I18nMap {
     d.freetexts.applyInfo ??= {};
     return d.freetexts.applyInfo;
   }
 
-  /** Re-emit the signal after an in-place `[(ngModel)]` mutation (preview). */
+  /** Emit the signal again after an in-place `[(ngModel)]` change, to refresh the preview. */
   protected reemit(): void {
     this.patch(() => {
       /* re-emit only */
     });
   }
 
-  /** Apply a mutation on the draft + re-emit the signal (preview/validation). */
+  /** Change the draft and emit the signal again, for the preview and the validation. */
   protected patch(fn: (d: Branding) => void): void {
     const d = this.draft();
     if (!d) return;
@@ -188,7 +186,6 @@ export class BrandingEditorComponent {
     this.draft.set({ ...d });
   }
 
-  // --- persistence ---------------------------------------------------------
   protected saveDraft(): void {
     const d = this.draft();
     if (!d) return;

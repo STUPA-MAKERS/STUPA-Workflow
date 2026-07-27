@@ -1,11 +1,12 @@
 """Live-vote publisher seam for the voting module.
 
-Session control runs through the voting REST endpoints, which must publish the
-matching WS events on the ``meeting:{id}`` channel. The voting module depends
-only on this leaf protocol so it doesn't couple to the broker (no import cycle).
-Default is :class:`NullPublisher` (no-op); the broker-backed implementation
-(:class:`app.modules.livevote.service.BrokerPublisher`) is injected in
-``create_app``.
+The voting REST endpoints control the session. They must publish the matching
+WebSocket events on the `meeting:{id}` channel. The voting module depends on
+this leaf protocol only, so it does not couple to the broker. This keeps the
+imports free of a cycle.
+
+The default is `NullPublisher`, which does nothing. `create_app` injects the
+broker-backed `app.modules.livevote.service.BrokerPublisher`.
 """
 
 from __future__ import annotations
@@ -19,7 +20,10 @@ if TYPE_CHECKING:
 
 
 class MeetingPublisher(Protocol):
-    """Publishes live-vote events; no-op when the vote isn't bound to a meeting."""
+    """Publish live-vote events.
+
+    A vote that is not bound to a meeting produces no event.
+    """
 
     async def vote_opened(self, vote: VoteOut) -> None: ...
 
@@ -31,7 +35,10 @@ class MeetingPublisher(Protocol):
 
 
 class NullPublisher:
-    """Default without a broker: drops events (the vote API stays functional)."""
+    """Default without a broker.
+
+    The publisher drops the events. The vote API keeps working.
+    """
 
     async def vote_opened(self, vote: VoteOut) -> None:
         return None
@@ -47,7 +54,10 @@ class NullPublisher:
 
 
 def get_meeting_publisher(request: Request) -> MeetingPublisher:
-    """Publisher from app state; falls back to :class:`NullPublisher` without a broker."""
+    """Return the publisher from the app state.
+
+    Without a broker the function falls back to `NullPublisher`.
+    """
     publisher = getattr(request.app.state, "meeting_publisher", None)
     if publisher is None:
         return NullPublisher()

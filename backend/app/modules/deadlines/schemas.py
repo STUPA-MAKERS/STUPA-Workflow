@@ -1,12 +1,14 @@
 """API schemas for the deadline-policy registry.
 
-A policy is ``absolute`` (fixed date), relative
-(``relative_submitted``/``relative_changed`` = application timestamp + days) or
-``recurring`` (a rolling window: the earliest of ``dates`` still ahead). The flow
-references it by ``key``; the server derives concrete deadlines.
+A policy is one of three forms. `absolute` is a fixed date. `relative_submitted`
+and `relative_changed` add a number of days to an application timestamp.
+`recurring` is a rolling window that takes the earliest of `dates` still ahead.
+The flow references a policy by `key`. The server derives the concrete
+deadlines.
 
-``atTime``/``timezone`` optionally anchor the wall-clock (``"HH:MM"`` local time,
-DST-correct) for every kind; both unset keeps the raw-instant behaviour.
+`atTime` and `timezone` anchor the wall clock for every kind. This is optional.
+`atTime` is a local `"HH:MM"` time and the result stays DST-correct. If both are
+unset, the raw-instant behavior stays.
 """
 
 from __future__ import annotations
@@ -65,19 +67,22 @@ def _check_dates(value: list[str] | None) -> list[str] | None:
 
 
 def _require_recurring_dates(kind: str | None, dates: list[str] | None) -> None:
-    """A ``recurring`` policy is meaningless without at least one date."""
+    """Reject a `recurring` policy that carries no date."""
     if kind == "recurring" and not dates:
         raise ValueError("recurring policy requires a non-empty 'dates' list")
 
 
 class _CamelModel(BaseModel):
-    """camelCase aliases in JSON; fields also settable by name."""
+    """Base model that uses camelCase aliases in JSON.
+
+    The caller can also set a field by its Python name.
+    """
 
     model_config = ConfigDict(populate_by_name=True)
 
 
 class _PolicyAnchor(_CamelModel):
-    """Wall-clock anchor + rolling schedule fields shared by create/update."""
+    """Wall-clock anchor and rolling-schedule fields shared by create and update."""
 
     at_time: str | None = Field(default=None, alias="atTime")
     timezone: str | None = Field(default=None)
@@ -92,8 +97,9 @@ class DeadlinePolicyCreate(_PolicyAnchor):
     key: str
     label: I18nMap
     kind: DeadlineKind
-    # tz-aware only: naive values would be interpreted in the DB session TZ and
-    # could fire hours off. ``AwareDatetime`` rejects naive input with 422.
+    # Timezone-aware values only: the database session reads a naive value in
+    # its own timezone, and the deadline can then fire hours off.
+    # `AwareDatetime` rejects naive input with 422.
     absolute_at: AwareDatetime | None = Field(default=None, alias="absoluteAt")
     offset_days: int | None = Field(default=None, alias="offsetDays")
 
@@ -104,7 +110,10 @@ class DeadlinePolicyCreate(_PolicyAnchor):
 
 
 class DeadlinePolicyUpdate(_PolicyAnchor):
-    """Partial update; set fields are applied (``key`` is immutable)."""
+    """Partial update of a policy.
+
+    The server applies the fields that the caller sets. `key` is immutable.
+    """
 
     label: I18nMap | None = None
     kind: DeadlineKind | None = None

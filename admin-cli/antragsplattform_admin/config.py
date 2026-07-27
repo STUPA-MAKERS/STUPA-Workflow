@@ -1,20 +1,20 @@
 """Runtime configuration: how to reach the database.
 
-Resolution order (first hit wins for the direct DSN):
+Resolution order for the direct DSN. The first hit wins:
 
-1. ``DATABASE_URL`` in the process environment — explicit override.
-2. ``deploy/.env`` — the stack's own ``DATABASE_URL`` (or, failing that, one
-   built from ``POSTGRES_USER``/``POSTGRES_PASSWORD``/``POSTGRES_DB``),
-   rewritten to ``localhost:<host port>``: the driver suffix (``+asyncpg``) is
-   stripped and host/port are replaced with the postgres host-port published in
-   ``deploy/docker-compose.yml`` (``127.0.0.1:5433:5432`` → ``5433``). That way
-   the CLI connects out of the box on the VM, and anywhere else once the port
-   is SSH-forwarded.
-3. No DSN at all → the caller falls back to
-   ``docker compose exec -T <service> psql`` (see :mod:`db`).
+1. `DATABASE_URL` in the process environment. This is the explicit override.
+2. `deploy/.env` — the stack's own `DATABASE_URL`, or, when that is missing, a DSN
+   built from `POSTGRES_USER`, `POSTGRES_PASSWORD` and `POSTGRES_DB`. The resolver
+   rewrites it to `localhost:<host port>`. It drops the driver suffix (`+asyncpg`).
+   It replaces host and port with the postgres host-port that
+   `deploy/docker-compose.yml` publishes (`127.0.0.1:5433:5432` → `5433`). The CLI
+   therefore connects out of the box on the VM, and anywhere else once you forward
+   the port over SSH.
+3. No DSN at all. The caller falls back to `docker compose exec -T <service> psql`.
+   See the `db` module.
 
-Everything here is stdlib-only and side-effect free; :func:`resolve` reports
-how it decided through :attr:`Config.notes`.
+This module uses the standard library only and has no side effect. `resolve` reports
+how it decided through `Config.notes`.
 """
 
 from __future__ import annotations
@@ -51,10 +51,14 @@ class Config:
 
 
 def parse_env_file(path: Path) -> dict[str, str]:
-    """Parse a ``KEY=VALUE`` env file (comments, blanks, quotes, ``export``).
+    """Parse a `KEY=VALUE` env file.
 
-    Inline comments are stripped only when preceded by whitespace, so values
-    containing ``#`` (e.g. passwords) survive.
+    The parser skips comments and blank lines. It removes the quotes and a leading
+    `export`. It strips an inline comment only when whitespace comes before the `#`.
+    A value that holds a `#`, a password for example, therefore survives.
+
+    Returns:
+        The parsed variables. An unreadable file yields an empty dict.
     """
     values: dict[str, str] = {}
     try:
@@ -73,8 +77,8 @@ def parse_env_file(path: Path) -> dict[str, str]:
             continue
         value = value.strip()
         if value[:1] in ("'", '"'):
-            # Quoted: cut at the matching closing quote (anything after it —
-            # e.g. an inline comment — is discarded).
+            # Quoted: cut at the matching closing quote. Text after that quote, an
+            # inline comment for example, goes away.
             closing = value.find(value[0], 1)
             value = value[1:closing] if closing != -1 else value[1:]
         else:
@@ -85,14 +89,18 @@ def parse_env_file(path: Path) -> dict[str, str]:
 
 
 def compose_host_port(compose_path: Path, service: str) -> int | None:
-    """The host port the *service* publishes for Postgres (container port 5432).
+    """Find the host port that the service publishes for Postgres.
 
-    A deliberately small line-scanner for the short ``ports:`` syntax — enough
-    for this repo's compose file, no YAML dependency:
+    The scanner reads the short `ports:` syntax line by line. It stays deliberately
+    small. It covers the compose file of this repository and needs no YAML dependency.
+    The container port is always 5432:
 
-    - ``- "127.0.0.1:5433:5432"`` → 5433
-    - ``- "5433:5432"``           → 5433
-    - ``- "5432"``                → 5432 (host == container)
+    - `- "127.0.0.1:5433:5432"` → 5433
+    - `- "5433:5432"`           → 5433
+    - `- "5432"`                → 5432 (host port equals container port)
+
+    Returns:
+        The host port, or `None` when the file holds no matching entry.
     """
     try:
         lines = compose_path.read_text(encoding="utf-8").splitlines()
@@ -135,11 +143,14 @@ def compose_host_port(compose_path: Path, service: str) -> int | None:
 
 
 def rewrite_dsn(dsn: str, host: str, port: int) -> str | None:
-    """Rewrite *dsn* to a plain-psycopg DSN pointing at ``host:port``.
+    """Rewrite a DSN into a plain psycopg DSN that points at `host:port`.
 
-    Strips an SQLAlchemy driver suffix (``postgresql+asyncpg`` → ``postgresql``)
-    and replaces the network location while keeping credentials, database and
-    query string. Returns ``None`` for something that is not a postgres URL.
+    The function drops an SQLAlchemy driver suffix (`postgresql+asyncpg` →
+    `postgresql`). It replaces the network location and keeps the credentials, the
+    database and the query string.
+
+    Returns:
+        The rewritten DSN, or `None` when the input is not a postgres URL.
     """
     try:
         split = urlsplit(dsn)
@@ -154,7 +165,7 @@ def rewrite_dsn(dsn: str, host: str, port: int) -> str | None:
 
 
 def build_dsn(user: str, password: str, db: str, host: str, port: int) -> str:
-    """Assemble a DSN from the discrete ``POSTGRES_*`` variables."""
+    """Assemble a DSN from the discrete `POSTGRES_*` variables."""
     from urllib.parse import quote
 
     auth = quote(user, safe="") + (f":{quote(password, safe='')}" if password else "")
@@ -162,10 +173,10 @@ def build_dsn(user: str, password: str, db: str, host: str, port: int) -> str:
 
 
 def mask_dsn(dsn: str) -> str:
-    """Replace the password part of *dsn* with ``•••`` for display.
+    """Replace the password part of a DSN with `•••` for display.
 
-    Handles URL DSNs (including passwords containing ``@``/``:`` and empty
-    usernames) and keyword-form conninfo strings (``password=…``).
+    The function handles URL DSNs. It covers a password that holds `@` or `:`, and an
+    empty user name. It also handles a keyword-form conninfo string (`password=…`).
     """
     masked = re.sub(r"(password\s*=\s*)\S+", r"\1•••", dsn)
     try:
@@ -184,10 +195,14 @@ def mask_dsn(dsn: str) -> str:
 
 
 def _locate(base: Path, relative: str) -> Path:
-    """Resolve *relative* against *base* or the nearest ancestor that has it.
+    """Resolve a relative path against a base directory or the nearest ancestor.
 
-    Lets the CLI run from anywhere inside the repo (or a subdirectory of it)
-    instead of only from the repo root.
+    The CLI can therefore run from anywhere inside the repository, and not only from
+    the repository root.
+
+    Returns:
+        The first candidate that exists, or the candidate under the base directory
+        when no candidate exists.
     """
     for parent in (base, *base.parents):
         candidate = parent / relative
@@ -197,11 +212,11 @@ def _locate(base: Path, relative: str) -> Path:
 
 
 def normalize_dsn(dsn: str) -> str:
-    """Strip an SQLAlchemy driver suffix (``postgresql+asyncpg`` → ``postgresql``).
+    """Strip an SQLAlchemy driver suffix (`postgresql+asyncpg` → `postgresql`).
 
-    Applied to explicit ``$DATABASE_URL`` overrides too, so the stack's
-    canonical ``postgresql+asyncpg://…`` form can be pasted verbatim.
-    Non-URL conninfo strings (``host=… password=…``) pass through untouched.
+    The CLI applies this to an explicit `$DATABASE_URL` override too. You can therefore
+    paste the canonical `postgresql+asyncpg://…` form of the stack without a change. A
+    non-URL conninfo string (`host=… password=…`) passes through unchanged.
     """
     try:
         split = urlsplit(dsn)
@@ -228,8 +243,8 @@ def resolve(*, read_only: bool = False, cwd: Path | None = None) -> Config:
     pg_user = os.environ.get("POSTGRES_USER") or stack_env.get("POSTGRES_USER")
     pg_db = os.environ.get("POSTGRES_DB") or stack_env.get("POSTGRES_DB") or "antrag"
 
-    # 1. Explicit override (driver suffix stripped so the stack's canonical
-    #    postgresql+asyncpg://… form works verbatim).
+    # 1. Explicit override. The driver suffix goes away, so the canonical
+    #    postgresql+asyncpg://… form of the stack works verbatim.
     override = os.environ.get("DATABASE_URL")
     if override:
         notes.append("DATABASE_URL taken from the environment")

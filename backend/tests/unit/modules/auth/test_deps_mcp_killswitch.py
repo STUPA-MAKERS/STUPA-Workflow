@@ -1,9 +1,9 @@
-"""Unit: ``mcp.use``-Kill-Switch im OAuth-Access-Token-Pfad (``app.deps``).
+"""Unit: the `mcp.use` kill switch in the OAuth access-token path (`app.deps`).
 
-Access-Tokens entstehen ausschließlich aus dem OAuth-Grant-Flow, der am Consent auf
-``mcp.use`` gegated ist. Wird die Permission später entzogen, müssen bereits
-ausgestellte Tokens sofort wirkungslos werden — geprüft gegen die UNGESCOPTE
-Permission-Menge (vor der Scope-Kappung). DB-frei über Fakes.
+Access tokens come only from the OAuth grant flow. That flow gates the consent step on
+`mcp.use`. If the permission goes away later, every token that is already issued must
+stop working at once. The check runs against the UNSCOPED permission set, before the
+scope narrows it. The suite uses fakes and needs no database.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ NOW = datetime(2026, 6, 16, 12, 0, tzinfo=UTC)
 
 
 class _DB:
-    """Minimaler ``AsyncSession``-Stub: liefert eine aktive Principal-Zeile."""
+    """Minimal `AsyncSession` stub that returns an active principal row."""
 
     async def execute(self, _stmt: object) -> Any:
         return SimpleNamespace(
@@ -44,7 +44,7 @@ def _patch(monkeypatch: pytest.MonkeyPatch, principal: Principal) -> None:
 async def test_killswitch_rejects_principal_without_mcp_use(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # Principal hält `mcp.use` NICHT (Permission entzogen) → Token wirkungslos.
+    # The principal does NOT hold `mcp.use`, so the token has no effect.
     _patch(monkeypatch, Principal(sub="agent", permissions={"application.read"}))
     out = await deps._principal_from_access_token(
         _DB(), "apat_x", NOW  # type: ignore[arg-type]
@@ -55,7 +55,7 @@ async def test_killswitch_rejects_principal_without_mcp_use(
 async def test_killswitch_allows_principal_with_mcp_use(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # Principal hält `mcp.use` explizit → Token bleibt gültig, Scope wird gekappt.
+    # The principal holds `mcp.use` explicitly. The token stays valid and the scope caps it.
     _patch(
         monkeypatch,
         Principal(sub="agent", permissions={"mcp.use", "application.read"}),
@@ -64,14 +64,14 @@ async def test_killswitch_allows_principal_with_mcp_use(
         _DB(), "apat_x", NOW  # type: ignore[arg-type]
     )
     assert out is not None
-    # Recheck lief gegen die UNGESCOPTE Menge; danach ist der Scope gesetzt.
+    # The recheck ran against the UNSCOPED set. The scope is set afterwards.
     assert out.scope_permissions is not None
 
 
 async def test_killswitch_admin_passes_via_bypass(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # Admin hat `mcp.use` über den Admin-Bypass (ungescopt) → Token gültig.
+    # The admin holds `mcp.use` through the unscoped admin bypass, so the token is valid.
     _patch(monkeypatch, Principal(sub="root", roles=["admin"]))
     out = await deps._principal_from_access_token(
         _DB(), "apat_x", NOW  # type: ignore[arg-type]

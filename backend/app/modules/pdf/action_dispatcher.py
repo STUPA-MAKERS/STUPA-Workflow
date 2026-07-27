@@ -1,12 +1,13 @@
 """Flow-action dispatcher with an ``exportPdf`` handler.
 
-The flow engine calls ``ActionDispatcher.dispatch(actions)`` after commit. This
-dispatcher handles ``exportPdf``: it creates a ``render_job`` (idempotent via
-``DispatchedAction.idempotency_key`` so one status event never double-renders) and
-enqueues it for the worker. Other action types are only logged.
+The flow engine calls ``ActionDispatcher.dispatch(actions)`` after the commit. This
+dispatcher handles ``exportPdf``. It creates a ``render_job`` and enqueues it for the
+worker. ``DispatchedAction.idempotency_key`` makes the creation idempotent, so one
+status event never renders twice. The dispatcher only logs the other action types.
 
-``ChainActionDispatcher`` chains several dispatchers (notify and exportPdf), since the
-app injects a single dispatcher; each ignores the types it does not handle.
+``ChainActionDispatcher`` chains several dispatchers, for example notify and
+``exportPdf``. The app injects one single dispatcher. Each dispatcher of the chain
+ignores the types it does not handle.
 """
 
 from __future__ import annotations

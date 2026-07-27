@@ -1,9 +1,11 @@
-"""Integration (echte Postgres, testcontainers): Admin-/Config-Service (T-24).
+"""Integration (real Postgres, testcontainers): admin and config service (T-24).
 
-Beweist gegen ein echtes Schema: Flow-Versions-Anlage (Graph→state/transition,
-Versionszählung, Aktiv-Eindeutigkeit via partial-unique), gremium/application-type/
-role/webhook-CRUD inkl. Konflikte, RBAC-Vertretung (role_assignment/group_mapping)
-und den Site-Config-Draft/Activate-Zyklus (#21) — jeweils mit Audit-Eintrag.
+The tests run against a real schema. Flow version creation maps the graph to state and
+transition rows. The version counter grows, and a partial unique index keeps exactly
+one version active. CRUD for Gremium, application type, role and webhook reports a
+conflict on a duplicate key. RBAC delegation runs through `role_assignment` and
+`group_mapping`. The site-config draft and activate cycle (#21) produces a new active
+version. Each of these steps writes an audit entry.
 """
 
 from __future__ import annotations
@@ -60,8 +62,11 @@ async def session(
 
 @pytest.fixture(autouse=True)
 def _clean_admin(migrated: tuple[str, str]) -> Iterator[None]:
-    """Admin-Tabellen je Test leeren (über die Kern-Truncation des ``engine``-Fixtures
-    hinaus). Rollen-Seeds bleiben; neue Rollen tragen eindeutige Keys."""
+    """Empty the admin tables for each test.
+
+    This truncation adds to the core truncation of the `engine` fixture. The seeded
+    roles stay. New roles carry unique keys.
+    """
     eng = create_engine(migrated[0])
     with eng.begin() as c:
         c.execute(
@@ -104,7 +109,6 @@ def _graph(*, with_action: bool = True) -> dict:
     }
 
 
-# --------------------------------------------------------------- flow-versions
 def _global_graph(*, with_accepted: bool = True) -> dict:
     states = [{"key": "created", "label": {"de": "Erstellt"}, "isInitial": True}]
     if with_accepted:
@@ -119,9 +123,11 @@ def _global_graph(*, with_accepted: bool = True) -> dict:
 async def test_global_flow_new_version_per_save_app_follows_newest(
     session: AsyncSession,
 ) -> None:
-    """Jeder Save legt eine NEUE, unveränderliche FlowVersion an (#config-versioning):
-    frühere Versionen bleiben erhalten; laufende Anträge folgen per State-KEY der
-    jüngsten (aktiven) Version — sind also NICHT gepinnt; ein entfernter Key ⇒ Initial.
+    """Prove that every save creates a NEW, immutable FlowVersion (#config-versioning).
+
+    Earlier versions stay. Open applications follow the newest active version by state
+    KEY, so they are NOT pinned. A key that the new version drops sends the application
+    to the initial state.
     """
     from app.modules.applications.models import Application
     from app.modules.forms.models import FormVersion
@@ -136,7 +142,7 @@ async def test_global_flow_new_version_per_save_app_follows_newest(
         )
     ).one()
 
-    # Antrag im (im neuen Graphen entfallenden) State »accepted« anlegen.
+    # Create an application in state "accepted". The new graph drops that state.
     app_type = await _make_type(session)
     fv = FormVersion(application_type_id=app_type.id, version=1)
     session.add(fv)
@@ -148,14 +154,14 @@ async def test_global_flow_new_version_per_save_app_follows_newest(
     session.add(app)
     await session.commit()
 
-    # Erneut speichern OHNE »accepted« → NEUE Version; die alte bleibt erhalten.
+    # Save again WITHOUT "accepted". This makes a NEW version and keeps the old one.
     g2 = await svc.create_global_flow_version(
         FlowVersionCreate.model_validate({"graph": _global_graph(with_accepted=False)}),
         _ACTOR,
     )
-    assert g2.id != g1.id  # neue, unveränderliche Version (kein In-place-Reuse)
+    assert g2.id != g1.id  # a new immutable version, no in-place reuse
 
-    # Append-only: beide Versionen existieren weiter, genau eine ist aktiv (g2).
+    # Append-only: both versions still exist and exactly one is active (g2).
     n_global = await session.scalar(select(func.count()).select_from(FlowVersion))
     assert n_global == 2
     n_active = await session.scalar(
@@ -165,7 +171,8 @@ async def test_global_flow_new_version_per_save_app_follows_newest(
     )
     assert n_active == 1
 
-    # Antrag folgt der jüngsten Version; entfernter State-Key ⇒ deren Initial-State.
+    # The application follows the newest version. A dropped state key maps to its
+    # initial state.
     new_initial = (
         await session.scalars(
             select(State).where(
@@ -181,9 +188,12 @@ async def test_global_flow_new_version_per_save_app_follows_newest(
 async def test_global_flow_save_keeps_prior_states_and_timeline(
     session: AsyncSession,
 ) -> None:
-    """Ein Save, der einen State weglässt, LÖSCHT die alte Version nicht (#config-
-    versioning): deren State-Zeilen — und damit die ``status_event``-Timeline — bleiben
-    gültig. Kein FK-Bruch, kein Repointing nötig (anders als im alten In-place-Flow)."""
+    """A save that omits a state does NOT delete the old version (#config-versioning).
+
+    The state rows of the old version stay valid, and so does the `status_event`
+    timeline. No foreign key breaks and no row needs a new target. The old in-place
+    flow needed both.
+    """
     from app.modules.applications.models import Application, StatusEvent
     from app.modules.forms.models import FormVersion
 
@@ -207,18 +217,18 @@ async def test_global_flow_save_keeps_prior_states_and_timeline(
     )
     session.add(app)
     await session.flush()
-    # Timeline-Eintrag auf »accepted« (bleibt in der alten Version erhalten).
+    # Timeline entry that points to "accepted". The old version keeps that state.
     ev = StatusEvent(application_id=app.id, from_state_id=None, to_state_id=accepted.id)
     session.add(ev)
     await session.commit()
 
-    # »accepted« im neuen Graphen weglassen → neue Version; alte behält »accepted«.
+    # Omit "accepted" in the new graph. The old version still holds it.
     await svc.create_global_flow_version(
         FlowVersionCreate.model_validate({"graph": _global_graph(with_accepted=False)}),
         _ACTOR,
     )
 
-    # Timeline bleibt unverändert gültig: »accepted« existiert weiter (in g1).
+    # The timeline stays valid because "accepted" still exists in g1.
     await session.refresh(ev)
     assert ev.to_state_id == accepted.id
     still_there = await session.scalar(
@@ -227,7 +237,6 @@ async def test_global_flow_save_keeps_prior_states_and_timeline(
     assert still_there == 1
 
 
-# --------------------------------------------------------------- gremium
 async def test_gremium_crud_and_slug_conflict(session: AsyncSession) -> None:
     svc = ConfigService(session)
     slug = f"asta-{uuid.uuid4().hex[:8]}"
@@ -243,7 +252,6 @@ async def test_gremium_crud_and_slug_conflict(session: AsyncSession) -> None:
     assert updated.name == "AStA neu"
 
 
-# --------------------------------------------------------------- application-type
 async def test_application_type_crud_and_conflict(session: AsyncSession) -> None:
     svc = ConfigService(session)
     key = f"grant-{uuid.uuid4().hex[:8]}"
@@ -270,7 +278,6 @@ async def test_application_type_crud_and_conflict(session: AsyncSession) -> None
     assert updated.has_budget is False
 
 
-# --------------------------------------------------------------- roles / rbac
 async def test_role_crud_and_listing(session: AsyncSession) -> None:
     svc = ConfigService(session)
     key = f"role-{uuid.uuid4().hex[:8]}"
@@ -287,9 +294,9 @@ async def test_role_crud_and_listing(session: AsyncSession) -> None:
     assert updated.permissions == ["budget.structure"]
     listed = await svc.list_roles()
     keys = {r.key for r in listed}
-    assert key in keys and "admin" in keys  # neue + geseedete Rollen
+    assert key in keys and "admin" in keys  # the new role and the seeded roles
 
-    # #38: löschbar — außer den geschützten admin/member.
+    # #38: a role is deletable, except the protected admin and member roles.
     await svc.delete_role(created.id, _ACTOR)
     assert key not in {r.key for r in await svc.list_roles()}
     admin = next(r for r in await svc.list_roles() if r.key == "admin")
@@ -320,7 +327,7 @@ async def test_role_assignment_and_group_mapping(session: AsyncSession) -> None:
     assert assignment.granted_by == _ACTOR
     assert assignment.valid_until is not None
 
-    # unbekannter Principal → 404
+    # An unknown principal gives 404.
     with pytest.raises(NotFoundError):
         await svc.create_role_assignment(
             RoleAssignmentCreate.model_validate(
@@ -338,7 +345,6 @@ async def test_role_assignment_and_group_mapping(session: AsyncSession) -> None:
     assert len(await svc.list_group_mappings()) == 1
 
 
-# --------------------------------------------------------------- webhooks
 async def test_webhook_crud_secret_not_exposed(session: AsyncSession, engine: Engine) -> None:
     svc = ConfigService(session)
     created = await svc.create_webhook(
@@ -353,7 +359,7 @@ async def test_webhook_crud_secret_not_exposed(session: AsyncSession, engine: En
     )
     assert created.active is True and "secret" not in created.model_dump()
 
-    # secret wurde serverseitig erzeugt (DB-Spalte), aber nie ausgeliefert.
+    # The server creates the secret in the DB column but never returns it.
     row = await session.get(Webhook, created.id)
     assert row is not None and row.secret is not None and len(row.secret) == 32
 
@@ -364,7 +370,6 @@ async def test_webhook_crud_secret_not_exposed(session: AsyncSession, engine: En
         await svc.update_webhook(uuid.uuid4(), WebhookUpdate(active=True), _ACTOR)
 
 
-# --------------------------------------------------------------- site-config
 async def test_site_config_draft_activate_cycle(session: AsyncSession) -> None:
     svc = SiteConfigService(session)
     empty = await svc.get()
@@ -373,13 +378,12 @@ async def test_site_config_draft_activate_cycle(session: AsyncSession) -> None:
     b1 = Branding.model_validate({"copyright": {"de": "© 2026 StuPa"}})
     after_draft = await svc.put_draft(b1, _ACTOR)
     assert after_draft.has_draft_changes is True
-    assert after_draft.version == 0  # noch nicht aktiviert
+    assert after_draft.version == 0  # not activated yet
 
     activated = await svc.activate(_ACTOR)
     assert activated.version == 1 and activated.has_draft_changes is False
     assert activated.active.copyright == {"de": "© 2026 StuPa"}
 
-    # zweiter Draft oberhalb der aktiven Version
     b2 = Branding.model_validate({"copyright": {"de": "© 2027"}})
     await svc.put_draft(b2, _ACTOR)
     mid = await svc.get()
@@ -393,7 +397,7 @@ async def test_site_config_draft_activate_cycle(session: AsyncSession) -> None:
     pub = await svc.public()
     assert pub.version == 2 and pub.branding.copyright == {"de": "© 2027"}
 
-    # genau eine aktive Version (partial-unique)
+    # Exactly one active version, held by the partial unique index.
     actives = (
         await session.scalars(
             select(func.count())
@@ -403,11 +407,11 @@ async def test_site_config_draft_activate_cycle(session: AsyncSession) -> None:
     ).all()
     assert actives[0] == 1
 
-    # Aktivierung ohne offenen Draft → Conflict
+    # Activation without an open draft raises a conflict.
     with pytest.raises(ConflictError):
         await svc.activate(_ACTOR)
 
-    # Audit: Aktivierung protokolliert
+    # Every activation writes an audit entry.
     acts = (
         await session.scalars(
             select(AuditEntry.action).where(AuditEntry.target_type == "site_config")

@@ -1,10 +1,10 @@
-"""fints_dedup_rerun: Dedup-Bereinigung erneut anstoßen (#fints-dedup).
+"""fints_dedup_rerun: start the deduplication cleanup again (#fints-dedup).
 
-Eine frühere Version von 0045 lief bereits auf der DB und ist in ``alembic_version`` als angewandt
-markiert — alembic führt sie NICHT erneut aus, auch nach korrigiertem Code. Damit die korrigierte,
-rohdaten-basierte Bereinigung (:func:`bank.maintenance.dedup_staged_lines`) auf bestehenden Daten
-greift, ruft sie diese **neue** Revision auf. Identische, idempotente Logik wie 0045 — kein
-dupliziertes Skript, nur ein erneuter Aufruf derselben Funktion.
+An earlier version of 0045 already ran on the database. ``alembic_version`` marks it as
+applied, so alembic does NOT run it again, even after a code fix. This **new** revision
+therefore calls the corrected raw-data cleanup ``bank.maintenance.dedup_staged_lines`` on
+the existing data. The logic is the same as in 0045 and stays idempotent. The revision
+duplicates no script. It only calls the same function again.
 """
 
 from __future__ import annotations

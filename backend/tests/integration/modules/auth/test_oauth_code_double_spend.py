@@ -1,12 +1,12 @@
-"""Integration: Authorization-Code ist auch bei NEBENLÄUFIGEM Tausch einmal-verwendbar.
+"""Integration: the authorization code stays single use under a CONCURRENT exchange.
 
-Regression für AUD-003: zwei Token-Requests mit demselben Code+Verifier dürfen nicht
-beide ein Token-Paar erhalten. ``exchange_code`` beansprucht die Code-Zeile atomar via
-``UPDATE ... WHERE used_at IS NULL RETURNING id`` — der Verlierer bekommt ``invalid_grant``.
+Regression for AUD-003. Two token requests with the same code and verifier must not both
+get a token pair. `exchange_code` claims the code row atomically with
+`UPDATE ... WHERE used_at IS NULL RETURNING id`. The loser gets `invalid_grant`.
 
-Wir simulieren den Race so eng, wie es deterministisch geht: zwei getrennte Sessions
-lesen die noch unverbrauchte Zeile (beide sehen ``used_at IS NULL``), erst danach
-committen sie nacheinander. Ohne den atomaren Guard würden beide ein Token minten.
+The test makes the race as tight as a deterministic test allows. Two separate sessions
+read the row while it is still unused, so both see `used_at IS NULL`. Only then do they
+commit one after the other. Without the atomic guard both would mint a token.
 """
 
 from __future__ import annotations
@@ -51,7 +51,6 @@ async def maker(
 async def test_concurrent_exchange_only_one_wins(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
-    # Setup: Principal + frischer Code in einer eigenen, committeten Session.
     async with maker() as setup:
         principal = PrincipalRow(
             sub=f"sub-{uuid.uuid4()}", email="u@example.com", active=True
@@ -84,9 +83,8 @@ async def test_concurrent_exchange_only_one_wins(
 
     winners = 0
     losers = 0
-    # Zwei getrennte Sessions: beide lesen die unverbrauchte Zeile, dann commit nacheinander.
     async with maker() as s1, maker() as s2:
-        # Beide sehen used_at IS NULL (klassisches Read-vor-Write-Race).
+        # Both sessions see used_at IS NULL. This is the classic read-before-write race.
         for s in (s1, s2):
             pre = (
                 await s.execute(
@@ -114,7 +112,7 @@ async def test_concurrent_exchange_only_one_wins(
     assert winners == 1, "exactly one exchange may mint a token family"
     assert losers == 1, "the second exchange must be rejected as invalid_grant"
 
-    # Genau EINE Token-Familie existiert in der DB — kein Double-Spend.
+    # There is no double spend. Exactly one token family exists in the database.
     async with maker() as check:
         tokens = (
             await check.execute(select(OAuthToken).where(OAuthToken.client_id == _CLIENT))

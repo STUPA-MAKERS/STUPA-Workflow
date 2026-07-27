@@ -21,9 +21,9 @@ class BudgetStatsService:
     async def refresh(self, *, concurrently: bool = False) -> None:
         """Recompute both rollup materialized views.
 
-        ``concurrently=True`` (worker) requires an AUTOCOMMIT connection plus a
-        unique index per view; ``False`` runs transactionally and briefly locks
-        the view.
+        ``concurrently=True`` is the worker path. It needs an AUTOCOMMIT
+        connection and a unique index per view. ``concurrently=False`` runs
+        inside the transaction and locks the view for a short time.
         """
         keyword = "CONCURRENTLY " if concurrently else ""
         for view in _REFRESH_VIEWS:
