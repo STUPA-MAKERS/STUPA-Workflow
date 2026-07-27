@@ -19,7 +19,7 @@ the current gremium_membership, present/excused/absent, source self or lead), GE
 /meetings/{id}/attendance, PUT …/attendance/me (member self), PUT …/attendance/{principalId}
 (lead), FE attendance card. **Protocol autosave** (#56): debounced PATCH, no manual save button,
 Saving/Saved status. **Markdown preview** upgraded without a new dependency: pipe tables, links,
-ordered lists and HR in meetings.util.renderMarkdown. **Altcha fix**: the widget was a stub that
+ordered lists and HR in meetings.util.renderMarkdown. **ALTCHA fix**: the widget was a stub that
 emitted 'altcha-stub-solution'. It is now a real PoW solver (GET /altcha/challenge + Web-Crypto
 SHA-256 brute force + base64), and 404 means unavailable. The stub caused the submit 422 "Altcha
 verification failed". Also: gremium-role dialog input styling, flow-editor edges start at the
@@ -152,15 +152,15 @@ That happened with models.ts and mappers.ts. Stage your own files explicitly and
 
 #24 LOGGED-IN APPLY DONE (2026-06-09, pushed f3f131c BE + 078fc19 FE): the user reframed #24 as
 the apply flow from the dashboard for logged-in users, NOT admin-on-behalf. (1) Logged-in users
-skip Altcha. (2) The email and the name come from the account. BE: a new
-require_altcha_unless_authenticated dependency on POST /applications skips altcha when a
+skip ALTCHA. (2) The email and the name come from the account. BE: a new
+require_altcha_unless_authenticated dependency on POST /applications skips ALTCHA when a
 principal is present and still checks anonymous callers. ApplicationCreate.applicant_email is now
 OPTIONAL. The router derives email = payload or principal.email, name = payload or
 principal.display_name, actor = principal.sub else "applicant", and an anonymous request without
 an email gives 422. ApplicationsService.create gained an actor parameter (StatusEvent +
 SubmissionVersion.changed_by). We dropped the earlier admin-on-behalf /admin/applications
 endpoint idea as redundant, because a logged-in manager passes applicantEmail. FE: the
-apply-wizard injects AuthService and drops the contact step and the altcha widget when loggedIn
+apply-wizard injects AuthService and drops the contact step and the ALTCHA widget when loggedIn
 (sectionBase 1 instead of 2). It sends a null email and a null altcha, since the backend derives
 them, and the review shows the account email. models.ts
 ApplicationCreateBody/NewApplication applicantEmail + altcha are now nullable, and the mapper
@@ -226,15 +226,15 @@ subtree filter, all-states list). GOTCHA: a type=number ngModel emits a NUMBER, 
 which broke v.trim() in the active-filter count → use String().
 
 GOTCHA — THE LOCAL .env ENABLES ALTCHA: backend/.env sets ALTCHA_HMAC_SECRET → altcha_enabled is
-True locally → about 6 to 8 tests that expect altcha "disabled"
+True locally → about 6 to 8 tests that expect ALTCHA "disabled"
 (test_antiabuse/test_applications_router/test_auth_router) FAIL locally but PASS in CI, which has
-no .env. conftest assumes altcha is OFF. To run those locally in the CI style, do
+no .env. conftest assumes ALTCHA is OFF. To run those locally in the CI style, do
 `mv backend/.env aside` and then run pytest. Do not chase these as bugs.
 
 #42 PROGRESS (2026-06-08): backend DONE — gremium_role + gremium_membership tables (migration
 0026), GremiumRoleService with the pure intervals_overlap helper (one active role per principal
 and gremium, consecutive non-overlapping terms OK), admin endpoints /admin/gremium-roles +
-/admin/gremien/{id}/memberships + /admin/gremium-memberships/{id}. The FE catalogue page
+/admin/gremien/{id}/memberships + /admin/gremium-memberships/{id}. The FE catalog page
 admin/gremium-roles is DONE (CRUD). REMAINING: the membership-assignment UI on the per-gremium
 members subpage (assign a gremium-role + term-of-office window through a dropdown, list and
 delete memberships). That page still uses the global RoleAssignment and needs the switch to the
@@ -326,7 +326,7 @@ SESSION 2026-06-09 (continuation, pushed):
   passes through normalizeFlowGraph wholesale, so no migration is needed. i18n
   admin.flow.cfgDeadline/cfgDeadlinePh/cfgDeadlineHint de+en. Tests: guard scanner,
   schedule-creates-row, and no-op-without-key (test_deadline_policies, 10 pass). The flow-editor
-  spec mock got listDeadlinePolicies. NOTE: the 3 local altcha-.env failures
+  spec mock got listDeadlinePolicies. NOTE: the 3 local ALTCHA-.env failures
   (test_antiabuse/test_applications_router) are the known GOTCHA and pass in the CI style.
 
 - **DEADLINE-POLICY REGISTRY** (2e76ba5): deadline_policy table (migration 0037) — key (unique) +
@@ -364,7 +364,7 @@ OLD QUEUE (now built above):
   policy, an admin Deadlines CRUD page (per-semester date edit, relative offsets), and the flow
   editor lets a node reference a policy key. Big BE + FE + migration.
 
-Stack: Angular 21 frontend (signals, standalone, Jest + testing-library, `npm test` = jest, needs
+Stack: Angular 20 frontend (signals, standalone, Jest + testing-library, `npm test` = jest, needs
 `npm install`, because the workspace ships partial node_modules). Backend: FastAPI + arq worker +
 SQLAlchemy/Alembic (the venv lacks pytest by default). i18n is a typed `de`/`en` catalog in
 `core/i18n/translations.ts`, so add every key to both.
@@ -392,4 +392,4 @@ SESSION 2026-06-09 (TASKS.md run, branch feat/admin-ux-flow-editor-fixes):
   applications.list.export de+en. Tests: 46 pass (test_budget_tree_router +
   test_applications_router).
 - GOTCHA: the .env MUST stay present for create_app, because the settings need database_url and
-  others. Move it aside only for altcha-sensitive pytest runs.
+  others. Move it aside only for ALTCHA-sensitive pytest runs.

@@ -17,7 +17,7 @@ description: Backend identity and access. Covers OIDC/Keycloak login (Auth Code 
 - `sessions.py` — signed cookies (itsdangerous): opaque `sid` principal session, stateless applicant token, OIDC-tx, OAuth-tx
 - `tokens.py` — magic-link token CSPRNG + HMAC-SHA256(pepper) hashing, constant-time verify
 - `bootstrap.py` — idempotent first-admin grant by `sub`/verified-email. It always grants the global `member` role
-- `oauth.py` — DB-free OAuth2 helpers: scope catalogue, PKCE S256 verify, token gen/SHA-256 hash, scope→permission mapping
+- `oauth.py` — DB-free OAuth2 helpers: scope catalog, PKCE S256 verify, token gen/SHA-256 hash, scope→permission mapping
 - `oauth_service.py` — OAuth2-AS I/O: mint authorization code, exchange code→tokens, refresh rotation, `resolve_access_token`
 - `oauth_models.py` — `OAuthAuthorizationCode`, `OAuthToken` (hashes only, never plaintext)
 - `oauth_router.py` — `/oauth` routes: authorize/finish/consent/token, grants list/revoke + `.well-known` AS/PR metadata

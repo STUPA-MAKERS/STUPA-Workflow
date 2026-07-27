@@ -19,7 +19,7 @@ the leaf guard value shapes. A state change always clears the flow deadlines and
 passes True).
 
 Project-wide (c54cf2a): a concurrent PATCH on an application gives 409, not 500. A vote row lock
-serializes cast and close. A gremium membership call with an unknown principal gives 404. The
+serializes cast and close. A Gremium membership call with an unknown principal gives 404. The
 deadline worker commits the marker atomically with the fire. The webhook SSRF log is redacted. The
 frontend guards the applications list and detail fetches with a sequence number. The flow editor
 guards save against a double click.

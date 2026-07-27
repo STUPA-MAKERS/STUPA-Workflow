@@ -8,7 +8,7 @@ specs, traps). Use them to orient fast instead of reading everything again.
 
 **STUPA-Workflow** (also called *antragsplattform*) — a web platform for the application, meeting,
 and budget work of a student government (StuPa/AStA). Applicants submit through a public form.
-Gremium members process applications, run meetings with live votes and minutes, and manage
+Gremium members process applications, run meetings with live votes and a protocol, and manage
 cost-center budgets and invoices. The platform versions and audits all of this work. Monorepo, one
 VM, `docker compose`.
 
@@ -45,9 +45,9 @@ Backend domain modules (`backend/app/modules/<module>`):
   *(critical)*
 - **be-deadlines** — named deadline policies referenced by the flow
 - **be-voting** — quorum/majority/secret ballot, tally, gremium-scoped reads *(critical)*
-- **be-livevote** — meetings, agenda (TOPs), attendance, live vote over WebSocket + beamer stream
-- **be-protocol** — meeting minutes (Markdown→PDF), vote snippets, finalize + mail
-- **be-delegations** — session-bound vote delegations + substitute pool
+- **be-livevote** — meetings, agenda items, attendance, live vote over WebSocket + beamer stream
+- **be-protocol** — meeting protocol (Markdown→PDF), vote snippets, finalize + mail
+- **be-delegations** — meeting-bound vote delegations + substitute pool
 - **be-budget** — cost-center tree, fiscal years, allocations, bookings/transfers, ZUGFeRD
   invoices *(critical)*
 - **be-notifications** — mail templates (Jinja2 sandboxed), rules, prefs, arq dispatch

@@ -54,7 +54,8 @@ The non-negotiables. Source of truth: `CONTRIBUTING.md`, `.github/pull_request_t
 
 ## Tests & coverage gates (CI blocks on these)
 
-- Backend ≥ **85 %** (lines + branches). Frontend ≥ **80 %**.
+- Backend ≥ **97 %** (lines + branches). Frontend: statements **98 %**, branches **96 %**, functions
+  **98 %**, lines **99 %**.
 - **100 % branch** for critical modules: `auth`, `voting`, `flow`, `budget`, `webhooks`, `audit`
   (`scripts/coverage_critical.py`).
 - Local (BE): `ruff check .` + `basedpyright` (0 errors) + `pytest`. Local (FE): `npm run lint`,

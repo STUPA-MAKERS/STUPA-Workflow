@@ -8,7 +8,7 @@ metadata:
 
 `ng build` (the Docker `web` stage, `frontend/npm run build`) enforces **budgets** that `tsc --noEmit` and `jest` do NOT catch. A CSS-heavy component change can pass all local specs/typecheck/eslint and still **fail the Docker build**.
 
-**Why:** angular.json budgets. `anyComponentStyle` errors at **18 kB** per component style block (warns at 12 kB). The initial bundle warns at 600 kB. 2026-06-13: a small timeline-CSS addition pushed `meetings.component.ts` styles to 18.07 kB → hard build error (67 bytes over). `meetings.component` styles sit ~17–18 kB, so it is the canary.
+**Why:** angular.json budgets. `anyComponentStyle` errors at **28 kB** per component style block (warns at 20 kB). The initial bundle warns at 600 kB. 2026-06-13: a small timeline-CSS addition pushed `meetings.component.ts` styles to 18.07 kB → a hard build error under the then-lower cap (67 bytes over). `meetings.component` was the canary at the time. Check the current size of any component you touch against the live budget in `frontend/angular.json`.
 
 **How to apply:** after any non-trivial **component CSS** change (especially meetings.component), run `cd frontend && npm run build`. Do this before you declare the work done and before the user deploys. Do not rely on jest+tsc alone. Keep duplicated CSS DRY (e.g. dedupe gradients into a `--var`). We also fixed NG8102 (`?? ''` on a `Record` index is flagged) and NG8113 (unused standalone imports). `ng build` surfaces both as warnings.
 

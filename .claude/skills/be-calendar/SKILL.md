@@ -1,11 +1,11 @@
 ---
 name: be-calendar
-description: Backend calendar/ICS module. It serves a personal token-authenticated iCal subscription feed (text/calendar, RFC5545 VCALENDAR) of the meetings of every gremium a principal belongs to. It also reads and rotates the feed token. Triggers: calendar_token, .ics feed, iCal subscription, MeetingEvent, build_calendar, /calendar routes. Use when working on the ICS calendar feed in backend/app/modules/calendar.
+description: Backend calendar/ICS module. It serves a personal token-authenticated iCal subscription feed (text/calendar, RFC5545 VCALENDAR) of the meetings of every Gremium a principal belongs to. It also reads and rotates the feed token. Triggers: calendar_token, .ics feed, iCal subscription, MeetingEvent, build_calendar, /calendar routes. Use when working on the ICS calendar feed in backend/app/modules/calendar.
 ---
 
 # Calendar / ICS Feed — `backend/app/modules/calendar`
 
-**Does:** Serves a personal token-authenticated iCal (`.ics`) subscription feed. The feed lists the dated meetings of every gremium the token owner belongs to. Calendar clients cannot do OIDC, so a rotatable per-principal feed token authenticates the public feed URL.
+**Does:** Serves a personal token-authenticated iCal (`.ics`) subscription feed. The feed lists the dated meetings of every Gremium the token owner belongs to. Calendar clients cannot do OIDC, so a rotatable per-principal feed token authenticates the public feed URL.
 
 **Key files:**
 - `router.py` — the `/calendar` `APIRouter` with the three endpoints, the `_feed_url`/`_uid_domain` helpers and the `text/calendar` response building.
@@ -16,8 +16,8 @@ description: Backend calendar/ICS module. It serves a personal token-authenticat
 
 **Domain / data model:**
 - The feed token lives on `Principal.calendar_token` (`auth/models.py`): `Text`, nullable, UNIQUE (`uq_principal_calendar_token`). The `Principal.active` bool gates feed access. The service resolves a `Principal` by `sub` (string), not by the DB `id`, so the service functions take `principal.sub`.
-- Token = `secrets.token_urlsafe(32)` (~43 URL-safe chars, no `.` or `/`). It is stored in cleartext on purpose. The token has low sensitivity, because it exposes only the titles and times of the meetings of the gremien the principal belongs to. A rotation invalidates the old URL.
-- The meetings come from `livevote.models.Meeting` (`id`, `title`, `gremium_id`, `date`, `start_time`, `end_time`, `created_at`). The query joins the gremium name from `admin.models.Gremium`. `member_meetings` filters `date IS NOT NULL`, orders by `date, start_time` and returns `(Meeting, gremium_name)` pairs. Membership comes from `admin.gremium_roles.gremium_member_ids(db, sub)`.
+- Token = `secrets.token_urlsafe(32)` (~43 URL-safe chars, no `.` or `/`). It is stored in cleartext on purpose. The token has low sensitivity, because it exposes only the titles and times of the meetings of the Gremien the principal belongs to. A rotation invalidates the old URL.
+- The meetings come from `livevote.models.Meeting` (`id`, `title`, `gremium_id`, `date`, `start_time`, `end_time`, `created_at`). The query joins the Gremium name from `admin.models.Gremium`. `member_meetings` filters `date IS NOT NULL`, orders by `date, start_time` and returns `(Meeting, gremium_name)` pairs. Membership comes from `admin.gremium_roles.gremium_member_ids(db, sub)`.
 - `MeetingEvent`: `uid`(=meeting id), `title`, `date`(required), `start_time|None`, `end_time|None`, `stamp`(=created_at → DTSTAMP), `gremium_name|None`.
 
 **API surface:**

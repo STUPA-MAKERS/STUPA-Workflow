@@ -36,7 +36,7 @@ app/
     antiabuse/       ALTCHA challenge/verify, rate limit, payload cap
     admin/           config CRUD (Gremien, roles, application types, branding, …),
                      one permission per /admin/ page
-migrations/          Alembic (0001–0026)
+migrations/          Alembic (0001–0048)
 worker/              arq WorkerSettings: mail/PDF/scan tasks + nightly budget cron
 tests/
 ```
@@ -52,7 +52,7 @@ pip install -e '.[dev]'
 ruff check .                       # lint
 basedpyright                       # types, 0 errors required
 pytest                             # unit suite (no Docker)
-pytest --cov --cov-report=term-missing   # with coverage (85 % gate)
+pytest --cov --cov-report=term-missing   # with coverage (97 % gate)
 pytest -m integration              # testcontainers (Docker required)
 ```
 

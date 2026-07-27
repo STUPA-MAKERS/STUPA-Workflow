@@ -32,14 +32,14 @@ head). That conflict must stay visible.
 
 ### The existing chain stays
 
-The existing chain `0001_core_extensions … 0017_role_assignment_deleg` keeps its names.
+The existing chain `0001_baseline … 0048_deadline_schedule` keeps its names.
 Only *new* revisions get hash IDs. `file_template` in `alembic.ini` is
 `%%(rev)s_%%(slug)s`. A hash ID gives `<hash>_<slug>.py`. The existing files keep
 `<nnnn>_<slug>.py`.
 
 ## Tables versus data
 
-`Base.metadata.create_all` in `0002_core_tables` creates the tables from the models
+`Base.metadata.create_all` in `0001_baseline` creates the tables from the models
 (single-source pattern: the models and the schema stay identical). A new table
 therefore needs no DDL migration of its own as a rule. It arrives with the metadata.
 Data, seed, constraint and index changes each get their own revision.

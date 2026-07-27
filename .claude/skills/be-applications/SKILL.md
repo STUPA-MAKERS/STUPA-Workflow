@@ -1,9 +1,9 @@
 ---
 name: be-applications
-description: Application (Antrag) lifecycle — public create with Altcha/magic-link, versioned data edits with diff, status timeline, internal/public comments, DSGVO anonymization, and dual Principal-or-Applicant access control. Use when working on application CRUD, submission versions, status_event timeline, comments, magic-link/owner/gremium read scope, or anonymization in backend/app/modules/applications.
+description: Application lifecycle — public create with Altcha/magic-link, versioned data edits with diff, status timeline, internal/public comments, DSGVO anonymization, and dual Principal-or-Applicant access control. Use when working on application CRUD, submission versions, status_event timeline, comments, magic-link/owner/gremium read scope, or anonymization in backend/app/modules/applications.
 ---
 
-# Applications (Anträge) — `backend/app/modules/applications`
+# Applications — `backend/app/modules/applications`
 
 **Does:** Full application lifecycle: anonymous/logged-in submission, versioned `data` edits with structured diffs, status timeline, internal/public comments, list/export/search, and DSGVO Art. 17 anonymization. Every read/write route accepts two identities (`A/P`): a session Principal with the permission, or the applicant with a scoped magic-link token.
 

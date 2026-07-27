@@ -1,8 +1,9 @@
 # deploy
 
 Compose stack for one VM. Internal traffic is plain HTTP. The external Nginx Proxy Manager
-terminates TLS. The only host port is `web` on `127.0.0.1:8080`. Every other service stays on
-the internal network, so the internet cannot reach it.
+terminates TLS. `web` publishes `127.0.0.1:8080`. `postgres` also publishes a loopback-only
+port for the admin CLI (see the service table). Every other service stays on the internal
+network, so the internet cannot reach it.
 
 ## Start
 
@@ -26,7 +27,7 @@ docker compose up -d --build
 | `migrate` | one-shot: `alembic upgrade head`, then exit | — |
 | `api` | FastAPI (uvicorn `--proxy-headers`) | — |
 | `worker` | arq (mail send, nightly budget rollup) | — |
-| `postgres` | PostgreSQL 16 | — |
+| `postgres` | PostgreSQL 16 | `127.0.0.1:5433` (admin CLI) |
 | `redis` | Redis 7 (arq broker, rate limit, ALTCHA replay) | — |
 | `minio` | S3 object store (attachments) | — |
 | `clamav` | virus scan (the first start is slow because it loads the signatures) | — |
@@ -124,8 +125,8 @@ BOOTSTRAP_ADMIN_EMAILS=admin@hochschule.example,vorstand@stupa.example
 
 ## Profiles
 
-- **prod** — behind NPM, with external Keycloak, SMTP and Nextcloud, ClamAV on, and **no**
-  host port except `web`. It also starts the `backup` service:
+- **prod** — behind NPM, with external Keycloak, SMTP and Nextcloud, ClamAV on. It also starts
+  the `backup` service:
   ```bash
   docker compose --profile prod up -d --build
   ```

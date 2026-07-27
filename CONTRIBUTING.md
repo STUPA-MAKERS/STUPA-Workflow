@@ -23,7 +23,7 @@ pip install -e '.[dev]'
 ruff check .                       # Lint
 basedpyright                       # Types (0 errors required)
 pytest                             # fast unit suite (no Docker)
-pytest --cov --cov-report=term-missing   # with coverage (gate 85 %)
+pytest --cov --cov-report=term-missing   # with coverage (gate 97 %)
 pytest -m integration              # integration (testcontainers, Docker required)
 ```
 
@@ -34,29 +34,33 @@ pytest --cov --cov-report=xml
 python -m scripts.coverage_critical coverage.xml pyproject.toml
 ```
 
-Frontend (`frontend/`, from T-03):
+Frontend (`frontend/`):
 
 ```bash
 npm ci
 npm run lint
 npx tsc --noEmit
-npm test -- --coverage          # Gate 80 %
+npm test -- --coverage          # Gate: statements 98 %, branches 96 %, functions 98 %, lines 99 %
 npx playwright test             # E2E against the compose stack
 ```
 
 ## Coverage gates (CI fails below the limit)
 
-- Backend total **≥ 85 %** (lines and branches) — `[tool.coverage.report] fail_under`.
-- Frontend total **≥ 80 %** — `jest.config` `coverageThreshold`.
+- Backend total **97 %** (lines and branches) — `[tool.coverage.report] fail_under`.
+- Frontend: statements **98 %**, branches **96 %**, functions **98 %**, lines **99 %** —
+  `jest.config` `coverageThreshold`.
 - **100 % branch** for the critical modules (`auth`, `voting`, `flow`, `budget`,
   `webhooks`, `audit`) — a separate gate through `scripts/coverage_critical.py`. It
   applies as soon as the module exists.
 
-## CI stages (order, the fast ones first)
+## CI stages (`.github/workflows/ci.yml`)
 
-`Lint → Typecheck → BE-Unit → BE-Integration → Contract (Schemathesis) →
-FE-Unit → E2E (Playwright vs Compose) → Coverage-Gate → Image-Build + Smoke`
-(`.github/workflows/ci.yml`). A red pull request stays blocked.
+The jobs start in parallel, as a flat fan-out, not one after another. The required jobs
+are `be-lint`, `be-typecheck`, `be-unit`, `be-integration`, `be-contract` (Schemathesis),
+`fe-unit`, `coverage-gate`, `image-build-smoke` (main pushes only), `pytex` and
+`compose`. `e2e` (Playwright against the compose stack), `restore-smoke` and
+`real-stack-smoke` stay opt-in. A label, a manual run or a repo variable starts them. A
+red pull request stays blocked.
 
 ## Definition of Done (per task or module)
 
@@ -130,7 +134,7 @@ merge conflict point. That conflict is visible on purpose.
 Rules:
 
 - **No `--rev-id`, no `000N` prefixes** any more. Alembic assigns the hash id.
-- **Existing migrations keep their names.** The `0001…0017` chain stays as it is. Only
+- **Existing migrations keep their names.** The `0001…0048` chain stays as it is. Only
   *new* revisions get hash ids.
 - `down_revision` points to the **current** head. `alembic revision` does this for you
   as long as exactly one head exists.
@@ -145,9 +149,9 @@ Set this for `main` under **Settings → Branches → Branch protection rule**:
 - ✅ **Require a pull request before merging** (≥ 1 review).
 - ✅ **Require status checks to pass before merging** → *Require branches up to date*.
   Required checks (job names from `ci.yml`):
-  `be-lint`, `be-typecheck`, `be-unit`, `be-integration`, `be-contract`,
+  `be-lint`, `be-typecheck`, `be-unit`, `be-integration`, `be-contract`, `fe-unit`,
   `coverage-gate`, `image-build-smoke`, `pytex`, `compose`.
-  Add the frontend checks (`fe-unit`, `e2e`) as required as soon as `frontend/` exists (T-03).
+  `e2e` stays opt-in (see "CI stages" above) and is not a required check.
 - ✅ **Require conversation resolution before merging**.
 - ✅ **Do not allow bypassing the above settings** (admins included).
 - 🚫 Turn off force push and branch deletion.

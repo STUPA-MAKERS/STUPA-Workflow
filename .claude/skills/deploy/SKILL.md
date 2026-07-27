@@ -29,7 +29,7 @@ description: Single-VM docker-compose stack (web/migrate/api/worker/postgres/red
 - **Networks:** `internal` (bridge, no published ports → no ingress, egress allowed for SMTP/WebDAV/Webhooks/OIDC), `pytex_net` (`internal:true` → NO egress, api/worker↔pytex render path, closes any compile-time exfil channel), `proxy` (in prod set `external:true` to reference the NPM-managed network).
 - **Volumes:** `pg_data`, `redis_data`, `minio_data`, `clamav_data`, `pytex_cache`, `backups`, `altcha_data`.
 - **Startup ordering:** `migrate` waits on `postgres` healthy. `api`/`worker` wait on `migrate` `service_completed_successfully` + datastores healthy. `web` waits on `api` healthy. `worker` only waits for `clamav` *started* (the scan task retries until clamd is ready).
-- **DB roles:** `migrator` (DDL, `DB_MIGRATION_URL`), `app` (DML runtime, `DATABASE_URL`), optional `audit_writer` (INSERT/SELECT only). Migration 0006 sets the append-only trigger + conditional audit grant.
+- **DB roles:** `migrator` (DDL, `DB_MIGRATION_URL`), `app` (DML runtime, `DATABASE_URL`), optional `audit_writer` (INSERT/SELECT only). Migration 0001 (the baseline) sets the append-only trigger + conditional audit grant.
 
 **API surface:** No router here. nginx routes (`web/nginx.conf`): `GET /healthz` (container liveness, returns `ok`). `/api/` → `api:8000` (body cap 1m). `/api/applications/{id}/attachments` and `/api/invoices/(parse|file)` → larger 11m body cap. `/api/ws/` → WS upgrade (3600s read timeout). `/.well-known/oauth-(authorization-server|protected-resource)` → api (MCP OAuth discovery). `/manifest.webmanifest` → `api:8000/api/manifest.webmanifest` (dynamic PWA manifest). `/` → SPA fallback (`try_files … /index.html`).
 

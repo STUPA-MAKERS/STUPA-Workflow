@@ -1,12 +1,12 @@
 ---
 name: sessions-protokollant-redesign
-description: "Session/Protokollant redesign — per-meeting protokollant, granular gremium-role perms (incl Vote), generic agenda-item votes, 3-pane session view, member follow + beamer. Adjusts meetings/dashboard/tasks/applications to the landed flow engine."
+description: "Meeting/Protokollant redesign — per-meeting protokollant, granular gremium-role perms (incl Vote), generic agenda-item votes, 3-pane meeting view, member follow + beamer. Adjusts meetings/dashboard/tasks/applications to the landed flow engine."
 metadata: 
   node_type: memory
   type: project
 ---
 
-Sessions redesign, branch feat/admin-ux-flow-editor-fixes (2026-06-09). The user confirmed all design decisions with the question tool. It adjusts tasks, meetings, applications and dashboard to the landed flow engine ([[flow-engine-redesign]]).
+Meetings redesign, branch feat/admin-ux-flow-editor-fixes (2026-06-09). The user confirmed all design decisions with the question tool. It adjusts tasks, meetings, applications and dashboard to the landed flow engine ([[flow-engine-redesign]]).
 
 ## Confirmed decisions (question tool)
 - Forced gremium roles → **vorstand, manager, member** (schriftfuehrung dropped). The migration reassigns existing schriftfuehrung memberships → **manager**.
@@ -16,13 +16,14 @@ Sessions redesign, branch feat/admin-ux-flow-editor-fixes (2026-06-09). The user
 
 ## Backend (all in backend/app/modules)
 - **admin/gremium_roles.py**: GREMIUM_PERMISSIONS catalog. FORCED_GREMIUM_ROLES carries the default perms (vorstand/manager=all, member=[vote.cast]). Helpers `active_gremium_roles` / `gremium_ids_with_permission` / `gremium_member_ids` / `_time_valid_clause`. LEAD_ROLE_KEYS REMOVED. `_sanitize_perms` whitelists. admin/models.py GremiumRole.permissions JSONB, admin/schemas GremiumRole{Out,Create,Update}.permissions.
-- **livevote/service.py MeetingService**: per-meeting flags can_manage(session.manage|global meeting.manage)/can_write(manage|protokollant|protocol.write)/can_manage_votes(manage|protokollant|vote.manage)/can_vote(admin|vote.cast)/is_member. `_emit` builds MeetingOut (no re-fetch in create/patch). `vote_eligible_count` (roster=members with vote.cast). `agenda_item_has_vote`. Meeting.protokollant_id FK principal.
+- **livevote/service/ MeetingService**: per-meeting flags can_manage(session.manage|global meeting.manage)/can_write(manage|protokollant|protocol.write)/can_manage_votes(manage|protokollant|vote.manage)/can_vote(admin|vote.cast)/is_member. `_emit` builds MeetingOut (no re-fetch in create/patch). `vote_eligible_count` (roster=members with vote.cast). `agenda_item_has_vote`. Meeting.protokollant_id FK principal.
 - **livevote/schemas MeetingOut**: protokollantId/protokollantName + canManage/canWrite/canManageVotes/canVote (canControl kept = canWrite, master FE flag). MeetingVoteOut + agendaItemId + options. MeetingCreate/Patch + protokollantId. MeetingVoteOpenBody now takes **agendaItemId** (not applicationId), options default [yes,no,abstain].
 - **livevote/router**: create/patch/agenda/attendance/votes endpoints switched ManagerDep→ReaderDep + service flag checks (per Gremium, not global meeting.manage). The WS voter channel is gated on is_member (members follow live). The beamer channel STAYS on meeting.manage. open_meeting_vote takes agendaItemId. An application agenda item rejects a 2nd vote (ConflictError), a generic agenda item takes many.
 - **voting**: Vote.application_id NULLABLE + Vote.agenda_item_id FK. create() app_id optional + agenda_item_id. close() fires the branch ONLY when application_id is present (generic votes = no flow). VoteOut/_to_out + agendaItemId (defensive getattr). events.VoteOpenedEvent applicationId optional + agendaItemId/question.
 - **auth/rbac.resolve_principal**: appends gremium_ids where an active membership-role grants vote.cast to Principal.groups (so in_group(gremium_id) == vote-eligible → gates the role's Vote perm at cast). This query runs LAST (the fake_session of the rbac unit tests returns empty when exhausted → no test change needed).
 - **protocol/service**: finalize assembles the markdown from the agenda item bodies + their vote snippets (`_assemble_from_agenda`), and falls back to protocol.markdown when there are no agenda items. _vote_title handles the generic case (question).
 - **migration 0040_sessions_rework**: adds gremium_role.permissions JSONB. It seeds a manager role per gremium with the default perms. It reassigns schriftfuehrung memberships→manager and deletes schriftfuehrung. It adds meeting.protokollant_id. It makes vote.application_id nullable and adds vote.agenda_item_id.
+- Note (added later): the migration chain was squashed into `0001_baseline.py` after this redesign landed. The numbers 0033, 0040 and 0041 below now belong to unrelated FinTS migrations. Read this section as a historical record of the change, not as a current migration index.
 
 ## Frontend
 - models/mappers/api-client: MeetingVote{applicationId nullable, agendaItemId, options}. Meeting{protokollantId, protokollantName, canManage/canWrite/canManageVotes/canVote}. MeetingCreate/PatchBody + protokollantId. openMeetingVote body agendaItemId. ws-messages VoteOpenedMsg + agendaItemId/question/optional applicationId.
@@ -39,10 +40,10 @@ Sessions redesign, branch feat/admin-ux-flow-editor-fixes (2026-06-09). The user
 
 ## Round 2 (layout feedback + freetext bug)
 - **Free-text agenda item add was failing**: dev DB drift. An early `create_all` created `meeting_agenda_item` with `application_id` NOT NULL and NO `title` column. The "table exists → skip" guard of migration 0033 never reconciled it. **migration 0041_agenda_freetext_fix** (idempotent inspector): ADD title + DROP NOT NULL on application_id. The user MUST run `alembic upgrade head` (we could not auto-apply it — the classifier blocked DDL on the shared dev DB).
-- **Layout**: the meetings detail is now a real 3-col page shell — left sidebar agenda items (add/reorder/remove), center body (markdown per agenda item + decision questions + finalize danger), right sidebar attendance. Toolbar ABOVE the body with icon-buttons: session live/close (power/check icons, canControl), settings (edit icon → dialog), delete (delete icon), beamer toggle. The standalone protokollant/plan cards are gone, and the status moved to the toolbar. Loose votes (no agendaItemId) stay in a "Sitzungssteuerung" (meeting control) card below the shell (legacy + spec).
+- **Layout**: the meetings detail is now a real 3-col page shell — left sidebar agenda items (add/reorder/remove), center body (markdown per agenda item + decision questions + finalize danger), right sidebar attendance. Toolbar ABOVE the body with icon-buttons: meeting live/close (power/check icons, canControl), settings (edit icon → dialog), delete (delete icon), beamer toggle. The standalone protokollant/plan cards are gone, and the status moved to the toolbar. Loose votes (no agendaItemId) stay in a "Sitzungssteuerung" (meeting control) card below the shell (legacy + spec).
 - **Combined settings dialog** (top-level): protokollant select (roster via listAttendance) + date + time, one PATCH. The user opens it from the toolbar edit-icon AND from the list-row edit-icon. **Delete**: toolbar icon + list-row icon + confirm dialog. New backend **DELETE /meetings/{id}** (MeetingService.delete, can_manage, cascades protocol/agenda/attendance, votes SET NULL) + FE api.deleteMeeting. The list actions column is now 9rem wide.
 - i18n added: meetings.settings.title, meetings.delete.{title,body,confirm}, meetings.attendance.empty, meetings.toast.{settingsSaved,deleted}.
-- Icons available: sun moon language edit delete add remove members roles user chevron-down power filter check (used power=open-session, check=close-session, edit=settings, delete=delete).
+- Icons available: sun moon language edit delete add remove members roles user chevron-down power filter check (used power=open-meeting, check=close-meeting, edit=settings, delete=delete).
 
 ## Round 3 (2026-06-14) — Protokollant-only manager view (committed 3f916bd, pushed)
 - Requirement: **only the assigned Protokollant gets the edit/manager view**. Everyone else (managers and chairs included) gets the live read-only and vote-only follower view.
