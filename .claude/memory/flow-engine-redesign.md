@@ -18,8 +18,8 @@ Flow-engine redesign, branch feat/admin-ux-flow-editor-fixes (2026-06-09, DONE, 
 
 ## Guard catalog (shared/guards.py, mirrored in guard-builder.util.ts)
 Single-operator dicts, whitelist, no eval. Leaf ops:
-- **Conditions (auto + manual):** `deadlinePassed`(bool), `applicantRoleIs`(global role key), `applicantCommitteeIs`(gremium id — ANY active membership), `budgetIs`(assigned cost center = application.budget_id), `budgetFitsApplication`(bool: amount ≤ allocation − Σ direct BudgetExpense of the assigned node+fiscal-year), `hasField`(field key present/non-empty), `compare`.
-- **Actor gates (MANUAL only):** `roleIs`(actor global role), `isInCommittee`(actor gremium id — ANY active membership). `validate_guard(allow_actor_ops=not t.automatic)` rejects these on automatic transitions.
+- **Conditions (auto + manual):** `deadlinePassed`(bool), `applicantRoleIs`(global role key), `applicantCommitteeIs`(Gremium id — ANY active membership), `budgetIs`(assigned cost center = application.budget_id), `budgetFitsApplication`(bool: amount ≤ allocation − Σ direct BudgetExpense of the assigned node+fiscal-year), `hasField`(field key present/non-empty), `compare`.
+- **Actor gates (MANUAL only):** `roleIs`(actor global role), `isInCommittee`(actor Gremium id — ANY active membership). `validate_guard(allow_actor_ops=not t.automatic)` rejects these on automatic transitions.
 - Combinators: `and`/`or`/`not`.
 - REMOVED: `permissionIs`, `voteResult` (→ vote branches), `manual` (→ automatic flag), `fieldsComplete` (→ hasField/fieldValueIs). The patch and submit endpoints still check submit-completeness.
 
@@ -38,8 +38,8 @@ The context carries:
 ## Actions (3 kept + 1 added, implemented properly — not stubs)
 ACTION_TYPES = `{webhook, notify, addToNextSession, assignBudget}`. Dropped exportPdf/setEditLock/budgetReserve/budgetBook/openVote/requeue. Dispatch chain in main.py: notify-dispatcher + webhook-dispatcher + FlowExtrasActionDispatcher (addToNextSession+assignBudget). Post-commit, idempotent via DispatchedAction.idempotency_key `app:statusEvent:index:type`.
 - **webhook**: `{webhookId}` references an existing admin/webhooks entry (NOT inline url, NOT event-fanout). `WebhookService.dispatch_to_webhook` creates one delivery for that hook, event `application.transition`, payload {applicationId,transitionId,statusEventId}, dedup on (webhook_id, idempotency_key).
-- **notify**: `{recipients:[{kind,ref?}]}`. Kinds: `gremium`(all current members' emails), `role`(global role holders), `applicant`, `email`(literal). RecipientResolver now also handles gremium + email. The action reuses `NotificationService.handle_notify_action`, which needs a templateKey to send a real mail.
-- **addToNextSession**: `{gremiumId}`. ONLY valid on a transition whose target state kind==vote (validated in the flow graph). Dispatch → earliest FUTURE Meeting of the gremium (date ≥ today, not finalized) → AgendaService.add. No upcoming meeting → log a warning + no-op (skip, do NOT auto-create).
+- **notify**: `{recipients:[{kind,ref?}]}`. Kinds: `gremium`(all current members' emails), `role`(global role holders), `applicant`, `email`(literal). RecipientResolver now also handles Gremium + email. The action reuses `NotificationService.handle_notify_action`, which needs a templateKey to send a real mail.
+- **addToNextSession**: `{gremiumId}`. ONLY valid on a transition whose target state kind==vote (validated in the flow graph). Dispatch → earliest FUTURE meeting of the Gremium (date ≥ today, not finalized) → AgendaService.add. No upcoming meeting → log a warning + no-op (skip, do NOT auto-create).
 - **assignBudget**: `{budgetId}`. The action sets application.budget_id to the cost center. It derives fiscal_year from the single active fiscal year of the top-level node. If there is no single active fiscal year, it leaves the field open.
 
 ## Permissions — reworked to 16 keys (shared/permissions.py)
@@ -50,9 +50,9 @@ The keys: application.read, application.create, application.transition, applicat
 GET /applications/{id}/transitions (guard-filtered, manual-only) + POST .../transition (application.transition). The detail view lists the available transitions, fires one on click, and reloads. This replaced the dropped approval accept/reject UI + the tasks-tab inline decide. The tasks tab now lists only vote tasks. The user acts on a vote task by opening the detail view.
 
 ## Frontend editor (admin/flow)
-State kinds are normal and vote. The guard builder has an op dropdown. It offers the actor ops only when the transition is manual. Each op gets a value control: role and committee selects, a bool checkbox, free text, or a compare sub-form with field, op and value. The editor has 4 action config forms: webhook select, notify recipient-list builder, addToNextSession committee select, assignBudget free-text id. `guard-builder.util.ts` mirrors the backend validation. Both assignBudget and budgetIs use a FREE-TEXT budget id. There is no cost center tree picker, so this stays a light spot.
+State kinds are normal and vote. The guard builder has an op dropdown. It offers the actor ops only when the transition is manual. Each op gets a value control: role and Gremium selects, a bool checkbox, free text, or a compare sub-form with field, op and value. The editor has 4 action config forms: webhook select, notify recipient-list builder, addToNextSession Gremium select, assignBudget free-text id. `guard-builder.util.ts` mirrors the backend validation. Both assignBudget and budgetIs use a FREE-TEXT budget id. There is no cost center tree picker, so this stays a light spot.
 
 ## Verification / caveats
-Backend unit tests green (pre-existing failures in antiabuse/auth/files/pdf_nextcloud/worker_mail are NOT ours — confirmed against the pre-work commit). Integration tests ported to the branch model but DB-gated → CI-verified only. Angular build clean. NO dedicated tests yet for FlowExtrasActionDispatcher or gremium/email recipients (webhook dispatch_to_webhook IS covered). The user must run migrations 0038/0039 + rebuild.
+Backend unit tests green (pre-existing failures in antiabuse/auth/files/pdf_nextcloud/worker_mail are NOT ours — confirmed against the pre-work commit). Integration tests ported to the branch model but DB-gated → CI-verified only. Angular build clean. NO dedicated tests yet for FlowExtrasActionDispatcher or Gremium/email recipients (webhook dispatch_to_webhook IS covered). The user must run migrations 0038/0039 + rebuild.
 
 See [[antragsplattform-backlog]], [[budget-kostenstellen-spec]]. Work autonomously [[work-autonomously]]. Write i18n strings in both de and en [[admin-domain-rules]].

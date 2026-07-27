@@ -1,6 +1,6 @@
 ---
 name: mcp
-description: The antragsplattform_mcp MCP server, a standalone FastMCP package. It exposes the platform HTTP API to agents as the logged-in user via an OAuth2 Authorization-Code + PKCE browser grant. It holds ~130 typed tools (applications/flow/forms/votes/meetings/protocols/budget/RBAC/audit) and atomic flow_*/form_* graph ops. Use when working on MCP tools, server.py, OAuth token caching, browser-grant auth, graphops, wire schemas, or the antragsplattform-mcp console entry in /mcp.
+description: The antragsplattform_mcp MCP server, a standalone FastMCP package. It exposes the platform HTTP API to agents as the logged-in user via an OAuth2 Authorization-Code + PKCE browser grant. It holds ~160 typed tools (applications/flow/forms/votes/meetings/protocols/budget/RBAC/audit) and atomic flow_*/form_* graph ops. Use when working on MCP tools, server.py, OAuth token caching, browser-grant auth, graphops, wire schemas, or the antragsplattform-mcp console entry in /mcp.
 ---
 
 # antragsplattform MCP Server — `mcp/`
@@ -8,7 +8,7 @@ description: The antragsplattform_mcp MCP server, a standalone FastMCP package. 
 **Does:** A standalone Python package (`antragsplattform_mcp`) that runs a FastMCP stdio server. Agents act on the platform through its `/api` HTTP surface as the logged-in user. The package authenticates with an OAuth2 Authorization-Code + PKCE browser grant, caches the token and refreshes it automatically. The server still authorizes every action against the RBAC permissions of the user ∩ the granted scope. No tool can cast a ballot.
 
 **Key files:**
-- `antragsplattform_mcp/server.py` — the FastMCP app plus all ~130 `@mcp.tool()` functions, each a thin wrapper around `ApiClient`. Holds the server `_INSTRUCTIONS` text and the `main()` stdio entry point.
+- `antragsplattform_mcp/server.py` — the FastMCP app plus all ~160 `@mcp.tool()` functions, each a thin wrapper around `ApiClient`. Holds the server `_INSTRUCTIONS` text and the `main()` stdio entry point.
 - `antragsplattform_mcp/auth.py` — OAuth2 + PKCE browser grant (RFC 7636/8252): discovery, loopback `/callback` capture, code exchange, refresh, disk token cache. Synchronous. Rejects cleartext non-loopback URLs.
 - `antragsplattform_mcp/client.py` — async `ApiClient` (httpx). It attaches the bearer token, retries once on 401 after a forced re-login and raises `ApiError`. The token fetch runs in a worker thread, so the event loop never blocks.
 - `antragsplattform_mcp/config.py` — `Config.from_env()`: base URL (`ANTRAGSPLATTFORM_URL` or baked `_baked.py:BASE_URL`), `scope`, per-URL token cache path. `CLIENT_ID = "antragsplattform-mcp"`.

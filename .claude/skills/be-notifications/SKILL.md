@@ -34,7 +34,7 @@ description: Email notifications backend — Jinja2 SandboxedEnvironment mail te
 - Mail template keys (catalog): status_update, task_new, task_reminder, deadline_approaching, comment_applicant, comment_team, meeting_created, role_assigned, role_revoked, delegation_granted, delegation_revoked, magic_link, erasure_requested, erasure_executed, erasure_rejected.
 
 **API surface:**
-- `GET /api/notifications/preferences` — own effective switches (full catalogue, default on). Any logged-in principal.
+- `GET /api/notifications/preferences` — own effective switches (full catalog, default on). Any logged-in principal.
 - `PUT /api/notifications/preferences` — bulk-set own switches (only deviations stored, unknown kinds → 422).
 - `GET /api/admin/notification-settings` — read the platform task-reminder config. Perm `admin.notifications`.
 - `PUT /api/admin/notification-settings` — partial update, audited as `CONFIG_CHANGE`. Perm `admin.notifications`.

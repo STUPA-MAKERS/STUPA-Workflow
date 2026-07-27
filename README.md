@@ -24,7 +24,7 @@ Full documentation in the [Wiki](https://github.com/STUPA-MAKERS/STUPA-Workflow/
 
 ## Features
 
-The backend works and has tests (about 1480 unit tests plus an integration suite).
+The backend works and has tests (about 3400 unit tests plus an integration suite).
 It implements:
 
 - **Auth & RBAC** — OIDC/Keycloak (authorization code + PKCE, server session) and a
@@ -75,8 +75,8 @@ docker compose up -d --build
 
 Migrations run on their own. A one-shot `migrate` service applies `alembic upgrade
 head` before `api` and `worker` start. The SPA then answers at
-<http://127.0.0.1:8080/>, the only host port. Liveness: `/healthz` (web) and
-`/api/health` (api).
+<http://127.0.0.1:8080/>. Postgres also exposes `127.0.0.1:5433`, for the admin CLI
+only. Liveness: `/healthz` (web) and `/api/health` (api).
 
 > On the first start, ClamAV downloads signatures for several minutes (long
 > `start_period`).

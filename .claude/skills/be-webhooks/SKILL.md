@@ -18,7 +18,7 @@ description: Outbound event webhooks — SSRF-guarded, HMAC-SHA256-signed HTTP P
 
 **Domain / data model:**
 - `Webhook` (table `webhook`): `name`, `url`, `events` (Text[] whitelist), `secret` (LargeBinary, server-generated `secrets.token_bytes(32)`, never returned/logged), `active`.
-- `WebhookDelivery` (table `webhook_delivery`): `webhook_id` (FK CASCADE), `event`, `payload` (JSONB), `status` ∈ `pending|ok|failed|dead` (CHECK), `attempts`, `idempotency_key`, `last_at`, `next_at`, `response_code`. Index `(status, next_at)` = worker pickup. Unique `(webhook_id, idempotency_key)` = dedup (NULL key = no dedup, migration 0012).
+- `WebhookDelivery` (table `webhook_delivery`): `webhook_id` (FK CASCADE), `event`, `payload` (JSONB), `status` ∈ `pending|ok|failed|dead` (CHECK), `attempts`, `idempotency_key`, `last_at`, `next_at`, `response_code`. Index `(status, next_at)` = worker pickup. Unique `(webhook_id, idempotency_key)` = dedup (NULL key = no dedup, present since the 0001 baseline).
 - `events` values are `EventName` from `app/shared/config_schemas.py`: `application_created`, `application_updated`, `status_changed`, `vote_opened`, `vote_closed`, `application_approved`, `application_rejected`, `comment_added`, `budget_reserved`, `budget_booked`, `protocol_finalized`, `deadline_approaching`, `deadline_passed`.
 
 **API surface:** (admin router, permission `webhook.manage`)

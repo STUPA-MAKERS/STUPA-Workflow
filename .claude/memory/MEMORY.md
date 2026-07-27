@@ -41,7 +41,7 @@ sibling memory here.
 - [budget-tab-redesign](budget-tab-redesign.md) — Budget tab: left Budget→Year tree, stacked pies, requested column, cost-center colors, URL sync
 - [budget-import-zugferd](budget-import-zugferd.md) — ZUGFeRD/Factur-X expense import, drag-into-window + drop-overlay
 - [flow-engine-redesign](flow-engine-redesign.md) — guard catalog + compare guard, 3 actions (webhook/notify/addToNextSession), 16-perm rework
-- [sessions-protokollant-redesign](sessions-protokollant-redesign.md) — per-meeting minute taker, granular gremium-role perms, 3-pane meeting view, beamer follow
+- [sessions-protokollant-redesign](sessions-protokollant-redesign.md) — per-meeting protokollant, granular Gremium-role perms, 3-pane meeting view, beamer follow
 - [delegation-rework](delegation-rework.md) — delegation bound to a meeting + substitute pool
 - [invoices-followups-2026-06-13](invoices-followups-2026-06-13.md) — receipt URL / manual-attach / centering / booking-prefill follow-ups
 - [be-fe-field-gaps-2026-06-13](be-fe-field-gaps-2026-06-13.md) — backend fields not yet exposed in the frontend (GroupMapping/MailTemplate/display gaps)

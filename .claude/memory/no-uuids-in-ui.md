@@ -15,7 +15,7 @@ backend serialized the actor as `principal.sub`.
 
 **How to apply:** resolve ids → names SERVER-SIDE in the serializer. The frontend renders
 what it gets. Backend helper: `ApplicationService._author_names(subs) ->
-{sub: display_name|email|sub}` (applications/service.py) maps `principal.sub` to a name.
+{sub: display_name|email|sub}` (applications/service/service_base.py) maps `principal.sub` to a name.
 We changed `timeline()` (actor) and `versions()` (changedBy) to use it (2026-06-14). The
 same class of bug hit meetings (protokollantId compared to sub) — see
 [[meetings-redesign]] and the `isProtokollant` flag. When you add any "by X", "owner" or

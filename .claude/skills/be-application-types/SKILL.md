@@ -1,9 +1,9 @@
 ---
 name: be-application-types
-description: Public read-only listing of application types (Antragstypen) — each binds an i18n name, a hasBudget flag, and an active form version that makes it submittable. Serves GET /api/application-types with a public view plus an admin view (key/gremiumId) gated by the form.configure permission. Use when working on the application-types list endpoint, ApplicationType submittability, or has_budget in backend/app/modules/application_types.
+description: Public read-only listing of application types — each binds an i18n name, a hasBudget flag, and an active form version that makes it submittable. Serves GET /api/application-types with a public view plus an admin view (key/gremiumId) gated by the form.configure permission. Use when working on the application-types list endpoint, ApplicationType submittability, or has_budget in backend/app/modules/application_types.
 ---
 
-# Application Types (Antragstypen) — `backend/app/modules/application_types`
+# Application Types — `backend/app/modules/application_types`
 
 **Does:** Exposes the public, paged listing of application types offered for submission (`GET /api/application-types`). An application type binds an i18n name, a budget flag, and the currently active form version. A type is "submittable/active" only when it has an active form version. CRUD lives elsewhere, in the admin module.
 

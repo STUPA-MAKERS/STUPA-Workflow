@@ -1,11 +1,11 @@
 ---
 name: be-budget
-description: Hierarchical Kostenstellen (cost center) budget tree with fiscal years, top-down allocations, bookings (expenses/income), cost-center transfers, accounts, and ZUGFeRD/Factur-X invoice import. The audit log records every money mutation, and most are revertable. Use when working on Budget, BudgetTreeService, cost centers, fiscal years, allocations, expenses/transfers, accounts, invoices, ZUGFeRD import, /api/budgets, /api/expenses, /api/invoices in backend/app/modules/budget.
+description: Hierarchical cost center budget tree with fiscal years, top-down allocations, bookings (expenses/income), cost-center transfers, accounts, and ZUGFeRD/Factur-X invoice import. The audit log records every money mutation, and most are revertable. Use when working on Budget, BudgetTreeService, cost centers, fiscal years, allocations, expenses/transfers, accounts, invoices, ZUGFeRD import, /api/budgets, /api/expenses, /api/invoices in backend/app/modules/budget.
 ---
 
 # Budget tree & bookings — `backend/app/modules/budget`
 
-**Does:** Hierarchical cost center (Kostenstellen) budgeting. The tree carries fiscal years per top-level node, top-down allocations, bookings (expenses/income), transfers, free-standing bank accounts, and invoices imported from ZUGFeRD/Factur-X PDFs. The append-only audit log records every money mutation. Most mutations are revertable.
+**Does:** Hierarchical cost center budgeting. The tree carries fiscal years per top-level node, top-down allocations, bookings (expenses/income), transfers, free-standing bank accounts, and invoices imported from ZUGFeRD/Factur-X PDFs. The append-only audit log records every money mutation. Most mutations are revertable.
 
 **Key files:**
 - `tree_models.py` — SQLAlchemy models for the tree: `Budget`, `FiscalYear`, `BudgetAllocation`, `BudgetExpense`, `Account`, `Invoice` (EUR-only, `Numeric(12,2)`).

@@ -9,7 +9,7 @@ description: Declarative application state-machine engine: global FlowVersion/St
 
 **Key files:**
 - `service.py` — `FlowService`: `available_transitions`, `fire`, `auto_advance`, `fire_branch`/`branch_transition`, `available_applicant_transitions`/`fire_as_applicant`, `schedule_state_deadline`, `revert_status`. The CRITICAL core.
-- `context.py` — `build_context()`: assembles the pure `GuardContext` from the DB (actor committees, applicant roles and committees, budget fit, field values and types).
+- `context.py` — `build_context()`: assembles the pure `GuardContext` from the DB (actor Gremien, applicant roles and Gremien, budget fit, field values and types).
 - `dispatch.py` — `DispatchedAction`, `build_dispatched_actions` (worker whitelist filter), `build_implicit_notifications` (auto applicant + task mail), `ActionDispatcher` protocol, `NullActionDispatcher` (log-only default).
 - `extras_dispatcher.py` — `FlowExtrasActionDispatcher`: in-process handlers for `addToNextSession` + `assignBudget`. `main.py` wires `build_flow_extras_dispatcher`.
 - `router.py` — the 4 application-transition routes. `MANAGE_PERMISSION = "application.transition"`.
@@ -41,7 +41,7 @@ description: Declarative application state-machine engine: global FlowVersion/St
 - `fire()` uses optimistic locking. The rowcount of `UPDATE … WHERE current_state_id = from_state_id` must be 1, else the call gives 409 for a concurrent transition. Always re-check the state, never assume it.
 - Only the vote outcome fires a branch transition (`pass`/`fail`), through `fire_branch` with `manual=False`. A manual `fire` of a branch transition gives 409, because nobody may set a vote result by hand. `voting.service` calls `fire_branch` on close.
 - `auto_advance` NEVER fires out of a `vote` state. This is fail-closed, and the validator also forbids an automatic non-branch exit from a vote state. Otherwise the engine would approve an application without a vote.
-- The engine fills the actor roles and committees only for a `manual=True` context. An automatic run sees empty actor sets, so an actor gate cannot pass.
+- The engine fills the actor roles and Gremien only for a `manual=True` context. An automatic run sees empty actor sets, so an actor gate cannot pass.
 - Worker actions dispatch AFTER the commit. They are idempotent and retryable and carry a stable `idempotency_key`. The engine logs an action failure and swallows it. An action must never roll back the committed state change. `build_dispatched_actions` filters again to the worker whitelist (`notify`, `webhook`, `addToNextSession`, `assignBudget`). It skips `setEditLock` and the rest.
 - Every fire emits implicit mails: a `notify` to the applicant and a `taskNotify` to the actors of the new state. An explicit applicant `notify` in the config replaces the implicit one.
 - Deadlines: on entry into a state, `schedule_state_deadline` deletes the `flow_deadline` rows of the state you leave. If `config.deadlinePolicyKey` resolves, it creates a new row. That row pins the `order`-first transition whose guard fires on the elapsed deadline alone (`_DEADLINE_ONLY_CTX`). The T-44 cron fires it. On a manual path the engine reads `deadlinePassed` from the DB.

@@ -1,6 +1,6 @@
 ---
 name: budget-kostenstellen-spec
-description: How hierarchical budgets and cost centers (Kostenstellen) must work in the antragsplattform (per the SRS)
+description: How hierarchical budgets and cost centers must work in the antragsplattform (per the SRS)
 metadata: 
   node_type: memory
   type: reference
@@ -10,7 +10,7 @@ Budget model the user wants, per the SRS. The spec lives in the project **wiki**
 spec there before you build.
 
 - **Top level = Budget** (for example "VS-Mittel", key `VS`).
-- Below it, **cost centers (Kostenstellen, KS) nest to any depth**: for example "Dezentrale
+- Below it, **cost centers (KS) nest to any depth**: for example "Dezentrale
   Einrichtungen" key `800` → "Fachschaft Informatik" key `40`.
 - The **full name of a cost center concatenates the key path**, for example
   `VS-800-40 – Fachschaft Informatik`.
@@ -19,7 +19,7 @@ spec there before you build.
 
 **Correction (2026-06-08): budgets are NOT tied to a Gremium.** A top-level budget needs no
 Gremium. The backend `create_node` makes `gremiumId` optional. "Above amount X, Gremium Y must
-vote" is a FLOW rule: an amount-threshold guard fires a gremium-scoped vote action. It is not a
+vote" is a FLOW rule: an amount-threshold guard fires a Gremium-scoped vote action. It is not a
 budget-to-Gremium binding (#23). **Fiscal years are created INSIDE a budget**, one set per
 top-level budget, never through a global dropdown. So the budget-tree editor must be budget-scoped
 (#22).

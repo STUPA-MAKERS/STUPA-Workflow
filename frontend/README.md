@@ -19,11 +19,11 @@ Feature routes load lazily and a permission gate protects them.
 | `npm start` | Dev server (`http://localhost:4200`) |
 | `npm run build` | Production build → `dist/antragsplattform/browser` |
 | `npm test` | Jest (jsdom and Angular Testing Library) |
-| `npm run test:cov` | Jest with the coverage gate (frontend ≥ 80 %) |
+| `npm run test:cov` | Jest with the coverage gate (statements 98 %, branches 96 %, functions 98 %, lines 99 %) |
 | `npm run lint` | ESLint (flat config, `@angular-eslint`) |
 | `npm run typecheck` | `tsc --strict --noEmit` |
 
-> Node ≥ 24.x. `npm install` fetches Angular 20 and the toolchain. You do not need `sudo`.
+> Node 22 or newer. `npm install` fetches Angular 20 and the toolchain. You do not need `sudo`.
 
 ## Project structure
 
@@ -53,7 +53,7 @@ src/
 
 ## Design system
 
-The CD tokens are CSS custom properties from the STUPA palette. `britishracinggreen` is the
+The CD tokens are CSS custom properties from the STUPA palette. British Racing Green is the
 primary color. The tokens have two levels: primitive and semantic. The `data-theme` attribute
 on `<html>` selects **light** or **dark**. `ThemeService` follows the operating system and
 remembers a manual toggle. For the full token reference, see
@@ -63,9 +63,10 @@ remembers a manual toggle. For the full token reference, see
   hosts it in `assets/fonts`. Change the token `--font-sans` to use another face. **DIN stays
   PDF only** (requirements N1, Q15b). There is no DIN web font.
 - **Logos:** The official STUPA CD assets come from Nextcloud and hold the mark and the word
-  mark. Use STUPA logos only. Do not use the logo of the university. The word mark has the
-  fixed color `#706f6f` (gray text) and does not follow `currentColor`, because the page
-  embeds it through `<img src>`. For details, see `assets/logos/README.md`.
+  mark. Use STUPA logos only. Do not use the logo of the university. The word mark has a light
+  variant (black text) and a dark variant (white text). `ShellComponent` picks the variant from
+  the active theme. Neither variant follows `currentColor`, because the page embeds it through
+  `<img src>`. For details, see `assets/logos/README.md`.
 
 ## i18n
 

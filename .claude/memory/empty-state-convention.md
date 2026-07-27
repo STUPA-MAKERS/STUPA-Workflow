@@ -28,7 +28,7 @@ follows this rule with `.grants__empty` inside its `.card`.
 user confirmed the FRAMED box (tasks and applications) as the wanted look. The convention is
 now a framed standalone card.
 
-Current consumers of `.empty-state`: invoices, expenses, applications-table. The data-table
+Current consumers of `.empty-state`: invoices, expenses, applications-table and konten. The data-table
 pages (tasks and admin) frame through `dt--boxed`. grants frames through its `.card`.
 INTENTIONAL exceptions, left alone because they are not no-results table empties:
 budget-dashboard `.bd__empty` (a dashed "create your first budget" onboarding panel with a

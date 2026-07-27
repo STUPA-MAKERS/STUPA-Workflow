@@ -10,7 +10,7 @@ Mobile pass SHIPPED 2026-06-10 — merged into main (last commit 90ce447), user 
 
 - Nav: hamburger button in header → slide-in drawer with backdrop (header nav already hidden <720px with no replacement before this).
 - Tables: shared data-table renders as stacked card list below breakpoint (label/value pairs from column defs).
-- Multi-pane views (budget 3-pane, meetings session view): stack vertically. The budget tree becomes collapsible on top.
+- Multi-pane views (budget 3-pane, meeting view): stack vertically. The budget tree becomes collapsible on top.
 - Scope: all pages incl. admin editors (basic usable), EXCEPT beamer view (projector-only).
 - Unified mobile breakpoint: 768px. Hard constraint: desktop looks must not change — additive max-width media queries only.
 - Dialogs: near-fullscreen sheet on mobile.
