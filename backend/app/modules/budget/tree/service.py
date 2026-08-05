@@ -8,8 +8,7 @@ exactly this class. The implementation lives in the ops classes:
 `allocations.AllocationOps` — top-down allocations (through `RevertOps`).
 `applications.AssignmentOps` — application to budget assignment.
 `expenses.ExpenseOps` — bookings (through `subbookings.SubBookingOps`).
-`subbookings.SubBookingOps` — sub-bookings and statement-file import.
-`accounts.AccountOps` — bank accounts and the FinTS connection.
+`subbookings.SubBookingOps` — sub-bookings of a booking.
 `invoices.InvoiceOps` — invoices and ZUGFeRD import.
 `transfers.TransferOps` — cost-center transfers.
 `revert.RevertOps` — audit-log revert of budget mutations.
@@ -18,7 +17,6 @@ exactly this class. The implementation lives in the ops classes:
 
 from __future__ import annotations
 
-from app.modules.budget.tree.accounts import AccountOps
 from app.modules.budget.tree.applications import AssignmentOps
 from app.modules.budget.tree.fiscal_years import FiscalYearOps
 from app.modules.budget.tree.invoices import InvoiceOps
@@ -32,7 +30,6 @@ class BudgetTreeService(
     FiscalYearOps,
     AssignmentOps,
     SubBookingOps,
-    AccountOps,
     InvoiceOps,
     TransferOps,
     RevertOps,

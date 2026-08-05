@@ -39,13 +39,6 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "budget.structure",
     "budget.book",
     "budget.export",
-    # Ignore a staged bank statement line and hide it from reconciliation. It stays
-    # SEPARATE from budget.book, because it removes a transaction from the
-    # to-reconcile view of the treasurer. The act is audit-sensitive: the log records
-    # every ignore and every reactivate as bank_line_ignore or bank_line_reactivate.
-    # Grant it deliberately.
-    "budget.reconcile_ignore",
-    "account.manage",
     "application.export",
     "webhook.manage",
     # audit.read is deliberately GLOBAL and carries no Gremium scope. The audit log is

@@ -56,16 +56,6 @@ TYPICAL FLOWS:
   `delete_invoice`. To attach an original PDF: `parse_invoice(file_path)` (ZUGFeRD/Factur-X →
   extracted fields + `fileToken`) or `upload_invoice_file(file_path)`, then pass `fileToken`
   to `create_invoice`.
-- Bank reconcile (#fints): the admin sets a Konto's FinTS connection (endpoint+BLZ) via
-  `update_account`; each booker stores their personal login with
-  `set_fints_credential(account_id, {fintsLogin, fintsPin})`. Then either
-  `import_statement_file(account_id, file_path)` (CAMT.053/MT940 — no bank/TAN) OR
-  `fints_sync(account_id)` (live). `fints_sync` may return `status='needs_tan'` (sessionToken +
-  challenge) — PSD2/SCA needs a HUMAN to approve/enter the TAN; relay it, then
-  `fints_submit_tan(account_id, session_token, tan)` (empty tan = decoupled pushTAN poll). A 409
-  means the bank locked the access — do NOT retry. Review staged rows with
-  `list_statement_lines` → book each via `confirm_statement_line(line_id, {budgetId})` (or
-  `{matchExpenseId}` to attach to an existing booking) or drop it with `ignore_statement_line`.
 
 SCHEMAS: tool parameters are typed and mirror the API (camelCase keys). For guard/action
 shapes and form-field types call `get_config_schemas` (authoritative JSON-Schemas).

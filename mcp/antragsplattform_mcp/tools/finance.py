@@ -1,8 +1,4 @@
-"""Finance tools for expenses, invoices, FinTS reconcile, statement lines, sub-bookings.
-
-FinTS acts under the PERSONAL online-banking login of the booker. A `needs_tan` response
-needs a HUMAN to complete PSD2/SCA. An agent cannot finish a TAN flow alone.
-"""
+"""Finance tools for expenses, invoices and sub-bookings."""
 
 from __future__ import annotations
 
@@ -65,17 +61,6 @@ async def list_expenses(
             limit=limit, offset=offset,
         ),
     )
-
-
-@group.tool
-async def list_account_options() -> dict:
-    """List the accounts as id and name for the booking dropdowns, without the IBAN.
-
-    Each entry shows `fintsConfigured`. It also tells whether the booker who asks
-    already holds a personal FinTS credential. A booker with budget.book or
-    budget.view can read this without the account master permission.
-    """
-    return await api().get("/accounts/options")
 
 
 @group.tool
@@ -164,204 +149,17 @@ async def upload_invoice_file(file_path: str) -> dict:
 
 
 @group.tool
-async def get_fints_credential(account_id: str) -> dict:
-    """Get the FinTS connection status of the booker who asks, for one account.
-
-    The answer tells whether the account speaks FinTS, whether a personal login is
-    stored, and whether a lock cooldown runs. Requires budget.book.
-    """
-    return await api().get(f"/accounts/{account_id}/fints/credential")
-
-
-@group.tool
-async def set_fints_credential(account_id: str, credential: S.FintsCredentialIn) -> dict:
-    """Store or replace the personal FinTS login and PIN of the booker for an account.
-
-    The PIN is write-only and the server stores it encrypted. The account must already
-    hold a FinTS connection with an endpoint and a BLZ, set through `update_account`.
-    Requires budget.book.
-    """
-    return await api().put(
-        f"/accounts/{account_id}/fints/credential", json=dump_create(credential)
-    )
-
-
-@group.tool
-async def delete_fints_credential(account_id: str) -> dict:
-    """Remove the personal FinTS credential of the booker for an account.
-
-    Requires budget.book.
-    """
-    return await api().delete(f"/accounts/{account_id}/fints/credential")
-
-
-@group.tool
-async def fints_sync(account_id: str) -> dict:
-    """Start a FinTS transaction sync.
-
-    A status of `done` means the sync staged the imported and the duplicate
-    transactions. A status of `needs_tan` returns a `sessionToken` and a challenge. A
-    human then approves or enters the TAN. Call `fints_submit_tan` after that. A 409
-    means the access is locked. Do not retry after a 409. Requires budget.book and a
-    stored credential.
-    """
-    return await api().post(f"/accounts/{account_id}/fints/sync")
-
-
-@group.tool
-async def fints_submit_tan(account_id: str, session_token: str, tan: str = "") -> dict:
-    """Resume a pending FinTS sync with the TAN.
-
-    An empty `tan` polls a decoupled pushTAN and asks whether the human approved the
-    sync in the app. The call returns `done` or `needs_tan` again.
-    Requires budget.book.
-    """
-    return await api().post(
-        f"/accounts/{account_id}/fints/sessions/{session_token}/tan", json={"tan": tan}
-    )
-
-
-@group.tool
-async def import_statement_file(account_id: str, file_path: str) -> dict:
-    """Import a local CAMT.053 or MT940 statement file for an account.
-
-    The import stages the transactions and is idempotent. It reports the imported and
-    the duplicate lines. It needs no bank connection and no TAN. Requires budget.book.
-    """
-    return await api().post(
-        f"/accounts/{account_id}/statement/import", files=_file_part(file_path)
-    )
-
-
-@group.tool
-async def list_statement_lines(
-    account: str | None = None,
-    state: Literal["unmatched", "suggested", "matched", "ignored"] | None = None,
-    linked: bool | None = None,
-    kind: Literal["expense", "income"] | None = None,
-    q: str | None = None,
-    date_from: str | None = None,
-    date_to: str | None = None,
-    sort: Literal["date", "amount"] | None = None,
-    order: Literal["asc", "desc"] | None = None,
-    limit: int = 50,
-    offset: int = 0,
-) -> dict:
-    """List the staged bank transactions, filtered and offset-paged.
-
-    Each item carries a signed amount, a decoded counterparty and a suggested cost
-    center. Requires budget.view or budget.book.
-
-    Args:
-        linked: True lists the transactions that are already booked. False lists the
-            open ones.
-        q: A search over the counterparty, the IBAN and the purpose.
-        date_from: A YYYY-MM-DD date. It matches the value date and the booking date.
-        date_to: A YYYY-MM-DD date. It matches the value date and the booking date.
-
-    Returns:
-        A page of the shape `{items, total, limit, offset}`.
-    """
-    return await api().get(
-        "/statement-lines",
-        params=params(
-            account=account, state=state, linked=linked, kind=kind, q=q,
-            dateFrom=date_from, dateTo=date_to, sort=sort, order=order,
-            limit=limit, offset=offset,
-        ),
-    )
-
-
-@group.tool
-async def get_statement_line(line_id: str) -> dict:
-    """Get one staged transaction with its `rawPayload` and its `idempotencyKey`.
-
-    The `rawPayload` holds the parser fields of the source format and the batch
-    metadata. Use this diagnostic view to tell whether a line comes from MT940 or from
-    CAMT. It also shows whether a batch booking carried sub-transactions.
-    Requires budget.view or budget.book.
-    """
-    return await api().get(f"/statement-lines/{line_id}")
-
-
-@group.tool
-async def confirm_statement_line(line_id: str, confirm: S.ConfirmLineRequest) -> dict:
-    """Turn a staged transaction into a booking.
-
-    Give a `budgetId` to create a new booking. Give a `matchExpenseId` to attach the
-    transaction to an existing booking. The sign of the amount gives the kind.
-    Requires budget.book.
-    """
-    return await api().post(
-        f"/statement-lines/{line_id}/confirm", json=dump_create(confirm)
-    )
-
-
-@group.tool
-async def ignore_statement_line(line_id: str, reason: str | None = None) -> dict:
-    """Mark a staged transaction as irrelevant.
-
-    The server keeps the transaction so that a second import stays idempotent. This
-    action is audit-sensitive. It needs the dedicated budget.reconcile_ignore
-    permission.
-
-    Args:
-        reason: A free-text note. The audit log records it.
-    """
-    return await api().post(
-        f"/statement-lines/{line_id}/ignore", json={"reason": reason} if reason else None
-    )
-
-
-@group.tool
-async def reactivate_statement_line(line_id: str) -> dict:
-    """Undo an ignore (#konten).
-
-    The transaction goes back to the open reconcile queue in the state `unmatched`.
-    Requires budget.reconcile_ignore.
-    """
-    return await api().post(f"/statement-lines/{line_id}/reactivate")
-
-
-@group.tool
-async def unlink_statement_line(line_id: str) -> dict:
-    """Undo the link between a transaction and a booking (#konten).
-
-    The call removes the allocation and reopens the transaction in the state
-    `unmatched`. The booking itself stays. Requires budget.book.
-    """
-    return await api().post(f"/statement-lines/{line_id}/unlink")
-
-
-@group.tool
 async def list_sub_bookings(expense_id: str) -> dict:
     """List the sub-bookings of a booking (#subbookings).
 
     A booking can break down into sub-bookings with the same schema. A sub-booking
-    inherits the cost center, the account, the fiscal year and the kind of the parent.
-    The amount of the parent equals the sum of the sub-bookings.
+    inherits the cost center, the fiscal year and the kind of the parent. The
+    amount of the parent equals the sum of the sub-bookings.
     Requires budget.view or budget.book.
     """
     return await api().get(f"/budget-expenses/{expense_id}/sub-bookings")
 
 
-@group.tool
-async def import_sub_bookings(expense_id: str, file_path: str) -> dict:
-    """Add sub-bookings to a booking from a local CAMT.053 or MT940 file (#subbookings).
-
-    Each line with the same direction becomes a child. A child inherits the cost
-    center, the account, the fiscal year and the kind of the parent. The server then
-    recomputes the parent amount to the sum of the children.
-
-    The import is idempotent and a second upload skips the duplicates. It accepts EUR
-    only. The server rejects a transfer or a sub-booking as the parent.
-    Requires budget.book.
-    """
-    return await api().post(
-        f"/budget-expenses/{expense_id}/sub-bookings/import", files=_file_part(file_path)
-    )
-
-
 def register(mcp: FastMCP) -> None:
-    """Register the expenses, invoices and FinTS tool group."""
+    """Register the expenses, invoices and sub-bookings tool group."""
     group.register(mcp)

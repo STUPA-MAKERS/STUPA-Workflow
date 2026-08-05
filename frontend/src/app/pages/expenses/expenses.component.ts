@@ -120,15 +120,11 @@ export class ExpensesComponent implements OnDestroy {
   readonly createdFrom = this.list.createdFrom;
   readonly createdTo = this.list.createdTo;
   readonly budgetId = this.list.budgetId;
-  readonly accountId = this.list.accountId;
   readonly expenseId = this.list.expenseId;
   readonly sortField = this.list.sortField;
   readonly sortOrder = this.list.sortOrder;
   readonly activeFilterCount = this.list.activeFilterCount;
   readonly costCentreOptions = this.list.costCentreOptions;
-  readonly accounts = this.list.accounts;
-  readonly accountOptions = this.list.accountOptions;
-  readonly accountFilterOptions = this.list.accountFilterOptions;
   readonly exporting = this.list.exporting;
   readonly refreshing = this.list.refreshing;
 
@@ -213,8 +209,8 @@ export class ExpensesComponent implements OnDestroy {
 
   constructor() {
     // Apply the URL filters first, then load data exactly once. The URL keeps the view
-    // shareable, survives a browser reload, and is the target of cross-links from Budget
-    // and Konten. The state module sends no request on its own. If the unfiltered
+    // shareable, survives a browser reload, and is the target of cross-links from
+    // Budget. The state module sends no request on its own. If the unfiltered
     // reload resolves last, it can overwrite the filtered one. See #expenses-ux2.
     this.applyQueryParams();
     this.list.reload();
@@ -223,7 +219,6 @@ export class ExpensesComponent implements OnDestroy {
       const queryParams = {
         id: this.expenseId() || null,
         budget: this.budgetId() || null,
-        account: this.accountId() || null,
         kind: this.kind() || null,
         q: this.q().trim() || null,
       };
@@ -258,28 +253,25 @@ export class ExpensesComponent implements OnDestroy {
     });
   }
 
-  /** Read the id, budget, account, kind, and q filters from the URL. Return true if
-   *  the URL carried at least one of them. `id` is a deep link to one exact booking,
-   *  used by the view-booking action of the Konten tab. It has no dedicated control,
-   *  but it counts as an active filter and resets with the others. */
+  /** Read the id, budget, kind, and q filters from the URL. Return true if the
+   *  URL carried at least one of them. `id` is a deep link to one exact booking.
+   *  It has no dedicated control, but it counts as an active filter and resets
+   *  with the others. */
   private applyQueryParams(): boolean {
     const qp = this.route.snapshot.queryParamMap;
     const id = qp.get('id');
     const budget = qp.get('budget');
-    const account = qp.get('account');
     const kind = qp.get('kind');
     const q = qp.get('q');
     if (id) this.expenseId.set(id);
     if (budget) this.budgetId.set(budget);
-    if (account) this.accountId.set(account);
     if (kind === 'expense' || kind === 'income') this.kind.set(kind);
     if (q) this.q.set(q);
-    return !!(id || budget || account || kind || q);
+    return !!(id || budget || kind || q);
   }
 
   ngOnDestroy(): void {
     this.list.dispose();
-    this.sub.dispose();
   }
 
   money(amount: string): string {
@@ -313,10 +305,6 @@ export class ExpensesComponent implements OnDestroy {
 
   setKind(k: '' | ExpenseKind): void {
     this.list.setKind(k);
-  }
-
-  selectAccount(id: string): void {
-    this.list.selectAccount(id);
   }
 
   selectBudget(id: string): void {
@@ -381,46 +369,6 @@ export class ExpensesComponent implements OnDestroy {
 
   createSub(event?: Event): void {
     this.sub.createSub(event);
-  }
-
-  // Global file import. See #expenses-ux2.
-  readonly importOpen = this.sub.importOpen;
-  readonly importQuery = this.sub.importQuery;
-  readonly importCandidates = this.sub.importCandidates;
-  readonly importTarget = this.sub.importTarget;
-  readonly importFile = this.sub.importFile;
-  readonly importBusy = this.sub.importBusy;
-
-  openImportDialog(): void {
-    this.sub.openImportDialog();
-  }
-
-  closeImportDialog(): void {
-    this.sub.closeImportDialog();
-  }
-
-  importCandidateLabel(e: Expense): string {
-    return this.sub.importCandidateLabel(e);
-  }
-
-  onImportSearch(q: string): void {
-    this.sub.onImportSearch(q);
-  }
-
-  pickImportTarget(e: Expense): void {
-    this.sub.pickImportTarget(e);
-  }
-
-  onImportFile(event: Event): void {
-    this.sub.onImportFile(event);
-  }
-
-  canSubmitImport(): boolean {
-    return this.sub.canSubmitImport();
-  }
-
-  submitImport(event?: Event): void {
-    this.sub.submitImport(event);
   }
 
   openCreate(): void {

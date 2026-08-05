@@ -30,40 +30,28 @@ from app.deps import (
 )
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
-from app.modules.budget.bank.service import BankService
 from app.modules.budget.invoice_import import (
     NotZugferdError,
     UnsupportedInvoiceCurrencyError,
 )
 from app.modules.budget.tree.service import BudgetTreeService
 from app.modules.budget.tree_schemas import (
-    AccountCreate,
-    AccountOption,
-    AccountOut,
-    AccountUpdate,
     AllocationOut,
     AllocationSet,
     AssignBudgetOut,
     AssignBudgetRequest,
-    BankImportResult,
-    BankSyncResult,
-    BankTanRequest,
     BudgetApplicationOut,
     BudgetNodeCreate,
     BudgetNodeOut,
     BudgetNodeUpdate,
     BudgetTreeNodeOut,
-    ConfirmLineRequest,
     ExpenseCreate,
     ExpenseKind,
     ExpenseOut,
     ExpenseUpdate,
-    FintsCredentialIn,
-    FintsCredentialStatus,
     FiscalYearCreate,
     FiscalYearOut,
     FiscalYearUpdate,
-    IgnoreLineRequest,
     InvoiceCreate,
     InvoiceFileResult,
     InvoiceOut,
@@ -71,13 +59,11 @@ from app.modules.budget.tree_schemas import (
     InvoiceStatus,
     InvoiceUpdate,
     MoveFiscalYearRequest,
-    StatementLineDetail,
-    StatementLineOut,
     SubBookingCreate,
     TransferCreate,
     TransferOut,
 )
-from app.shared.antiabuse import body_cap, rate_limit_fints
+from app.shared.antiabuse import body_cap
 from app.shared.errors import ForbiddenError, ProblemDetail, ValidationProblem
 from app.shared.paging import Page
 
@@ -109,31 +95,6 @@ def get_budget_tree_service(
 
 
 ServiceDep = Annotated[BudgetTreeService, Depends(get_budget_tree_service)]
-
-
-async def get_bank_service(
-    session: DbSession,
-    settings: SettingsDep,
-    principal: Annotated[Principal, Depends(require_principal())],
-) -> BankService:
-    """Build the bank service.
-
-    ``actor`` feeds the audit trail. ``principal_id`` scopes the personal
-    credentials and the TAN sessions.
-    """
-    from sqlalchemy import select
-
-    from app.modules.auth.models import Principal as PrincipalRow
-
-    principal_id = await session.scalar(
-        select(PrincipalRow.id).where(PrincipalRow.sub == principal.sub)
-    )
-    return BankService(
-        session, settings=settings, actor=principal.sub, principal_id=principal_id
-    )
-
-
-BankServiceDep = Annotated[BankService, Depends(get_bank_service)]
 
 
 # Global full view of the budget tab. Each of these permissions shows ALL nodes.
@@ -376,37 +337,10 @@ async def create_sub_booking(
 ) -> ExpenseOut:
     """Create a sub-booking by hand.
 
-    The sub-booking inherits account, cost center, fiscal year and kind from
+    The sub-booking inherits the cost center, the fiscal year and the kind from
     the parent booking.
     """
     return await service.create_sub_booking(expense_id, payload, actor=principal.sub)
-
-
-@router.post(
-    "/budget-expenses/{expense_id}/sub-bookings/import",
-    response_model=list[ExpenseOut],
-    status_code=status.HTTP_201_CREATED,
-    dependencies=[
-        Depends(require_principal("budget.book")),
-        Depends(_enforce_invoice_body),
-    ],
-    responses=_errors(401, 403, 404, 413, 422),
-)
-async def import_sub_bookings(
-    expense_id: UUID,
-    service: ServiceDep,
-    file: Annotated[UploadFile, File()],
-    principal: Annotated[Principal, Depends(require_principal("budget.book"))],
-) -> list[ExpenseOut]:
-    """Create sub-bookings from a CAMT.053/MT940 file.
-
-    Each child inherits account, cost center, fiscal year and kind from the
-    parent. The parent amount is the sum of its children.
-    """
-    data = await file.read()
-    return await service.import_sub_bookings(
-        expense_id, data, filename=file.filename, actor=principal.sub
-    )
 
 
 # Flat bookings tab: the next expense routes are not scoped to one node.
@@ -444,10 +378,8 @@ async def list_expenses(
     expense_id: Annotated[UUID | None, Query(alias="id")] = None,
     budget_id: Annotated[UUID | None, Query(alias="budget")] = None,
     fiscal_year_id: Annotated[UUID | None, Query(alias="fiscalYear")] = None,
-    account_id: Annotated[UUID | None, Query(alias="account")] = None,
     kind: Annotated[ExpenseKind | None, Query()] = None,
     application_id: Annotated[UUID | None, Query(alias="applicationId")] = None,
-    unallocated: Annotated[bool, Query()] = False,
     q: Annotated[str | None, Query()] = None,
     amount_min: Annotated[Decimal | None, Query(alias="amountMin", ge=0)] = None,
     amount_max: Annotated[Decimal | None, Query(alias="amountMax", ge=0)] = None,
@@ -462,7 +394,7 @@ async def list_expenses(
 ) -> Page[ExpenseOut]:
     """List bookings, filtered and sorted, with offset paging.
 
-    ``id`` selects the exact booking for the deep link from the accounts tab.
+    ``id`` selects the exact booking for the deep link.
     ``budget`` includes the subtree. ``kind`` is ``expense`` or ``income``.
     ``q`` searches the descriptions. ``amountMin`` and ``amountMax`` bound the
     amount. ``sort`` and ``order`` set the column sort.
@@ -471,10 +403,8 @@ async def list_expenses(
         expense_id=expense_id,
         budget_id=budget_id,
         fiscal_year_id=fiscal_year_id,
-        account_id=account_id,
         kind=kind,
         application_id=application_id,
-        unallocated=unallocated,
         q=q,
         amount_min=amount_min,
         amount_max=amount_max,
@@ -748,288 +678,6 @@ async def get_invoice_file(invoice_id: UUID, service: ServiceDep) -> Response:
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{safe}"'},
     )
-
-
-@router.get(
-    "/accounts/options",
-    response_model=list[AccountOption],
-    # Minimal choice with id and name and no IBAN, for the booking dropdowns. A
-    # booker may read this without account.manage. The full account data stays
-    # behind account.manage.
-    dependencies=[Depends(require_any_permission("account.manage", "budget.book", "budget.view"))],
-    responses=_errors(401, 403),
-)
-async def list_account_options(service: ServiceDep) -> list[AccountOption]:
-    """List the active accounts as id and name without IBAN, for the booking form."""
-    return await service.list_account_options()
-
-
-@router.get(
-    "/accounts",
-    response_model=list[AccountOut],
-    dependencies=[Depends(require_principal("account.manage"))],
-    responses=_errors(401, 403),
-)
-async def list_accounts(service: ServiceDep) -> list[AccountOut]:
-    """List the accounts with name and IBAN, gated by ``account.manage``."""
-    return await service.list_accounts()
-
-
-@router.post(
-    "/accounts",
-    response_model=AccountOut,
-    status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_principal("account.manage"))],
-    responses=_errors(400, 401, 403, 422),
-)
-async def create_account(payload: AccountCreate, service: ServiceDep) -> AccountOut:
-    return await service.create_account(payload)
-
-
-@router.patch(
-    "/accounts/{account_id}",
-    response_model=AccountOut,
-    dependencies=[Depends(require_principal("account.manage"))],
-    responses=_errors(400, 401, 403, 404, 422),
-)
-async def update_account(
-    account_id: UUID, payload: AccountUpdate, service: ServiceDep
-) -> AccountOut:
-    return await service.update_account(account_id, payload)
-
-
-@router.delete(
-    "/accounts/{account_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[Depends(require_principal("account.manage"))],
-    responses=_errors(401, 403, 404),
-)
-async def delete_account(account_id: UUID, service: ServiceDep) -> None:
-    await service.delete_account(account_id)
-
-
-# Bank reconcile. Fetch, import and book move money and need ``budget.book``.
-# Reading the staging list is open to every budget role. The admin sets the bank
-# connection on the account, the endpoint and the BLZ, with account.manage. Each
-# booker sets the personal credentials per account with budget.book.
-@router.get(
-    "/accounts/{account_id}/fints/credential",
-    response_model=FintsCredentialStatus,
-    dependencies=[Depends(require_principal("budget.book"))],
-    responses=_errors(401, 403, 404),
-)
-async def fints_credential_status(
-    account_id: UUID, service: BankServiceDep
-) -> FintsCredentialStatus:
-    """Check whether the booker already has own FinTS credentials for the account."""
-    return await service.credential_status(account_id)
-
-
-@router.put(
-    "/accounts/{account_id}/fints/credential",
-    response_model=FintsCredentialStatus,
-    dependencies=[
-        Depends(require_principal("budget.book")),
-        Depends(rate_limit_fints),
-    ],
-    responses=_errors(401, 403, 404, 422, 429, 503),
-)
-async def set_fints_credential(
-    account_id: UUID, payload: FintsCredentialIn, service: BankServiceDep
-) -> FintsCredentialStatus:
-    """Create or replace the personal FinTS credentials with login and PIN.
-
-    The booker runs this on the first connect in the booking tab. The PIN is
-    write-only and stored encrypted.
-    """
-    return await service.set_credential(account_id, payload)
-
-
-@router.delete(
-    "/accounts/{account_id}/fints/credential",
-    status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[Depends(require_principal("budget.book"))],
-    responses=_errors(401, 403, 404),
-)
-async def delete_fints_credential(account_id: UUID, service: BankServiceDep) -> None:
-    """Delete the FinTS credentials of the calling booker for the account."""
-    await service.delete_credential(account_id)
-
-
-@router.post(
-    "/accounts/{account_id}/fints/sync",
-    response_model=BankSyncResult,
-    dependencies=[
-        Depends(require_principal("budget.book")),
-        Depends(rate_limit_fints),
-    ],
-    responses=_errors(401, 403, 404, 409, 422, 429, 503),
-)
-async def fints_sync(account_id: UUID, service: BankServiceDep) -> BankSyncResult:
-    """Start a FinTS sync. It stages the transactions or requests a TAN (``needs_tan``)."""
-    return await service.sync_account(account_id)
-
-
-@router.post(
-    "/accounts/{account_id}/fints/sessions/{session_token}/tan",
-    response_model=BankSyncResult,
-    dependencies=[
-        Depends(require_principal("budget.book")),
-        Depends(rate_limit_fints),
-    ],
-    responses=_errors(401, 403, 404, 409, 422, 429, 503),
-)
-async def fints_submit_tan(
-    account_id: UUID,
-    session_token: UUID,
-    payload: BankTanRequest,
-    service: BankServiceDep,
-) -> BankSyncResult:
-    """Resume a pending TAN session. An empty ``tan`` makes a decoupled poll."""
-    return await service.submit_tan(account_id, session_token, payload.tan)
-
-
-@router.post(
-    "/accounts/{account_id}/statement/import",
-    response_model=BankImportResult,
-    dependencies=[
-        Depends(require_principal("budget.book")),
-        Depends(rate_limit_fints),
-        Depends(_enforce_invoice_body),
-    ],
-    responses=_errors(401, 403, 413, 422, 429, 503),
-)
-async def import_statement_file(
-    account_id: UUID,
-    service: BankServiceDep,
-    file: Annotated[UploadFile, File()],
-) -> BankImportResult:
-    """Upload a CAMT.053/MT940 file and stage its transactions."""
-    data = await file.read()
-    return await service.import_file(account_id, data, filename=file.filename)
-
-
-@router.get(
-    "/statement-lines",
-    response_model=Page[StatementLineOut],
-    dependencies=[
-        Depends(require_any_permission("budget.view", "budget.structure", "budget.book"))
-    ],
-    responses=_errors(401, 403),
-)
-async def list_statement_lines(
-    service: BankServiceDep,
-    account_id: Annotated[UUID | None, Query(alias="account")] = None,
-    state: Annotated[
-        Literal["unmatched", "suggested", "matched", "ignored"] | None, Query()
-    ] = None,
-    linked: Annotated[bool | None, Query()] = None,
-    include_ignored: Annotated[bool, Query(alias="includeIgnored")] = True,
-    kind: Annotated[ExpenseKind | None, Query()] = None,
-    q: Annotated[str | None, Query()] = None,
-    date_from: Annotated[str | None, Query(alias="dateFrom")] = None,
-    date_to: Annotated[str | None, Query(alias="dateTo")] = None,
-    sort: Annotated[Literal["date", "amount"] | None, Query()] = None,
-    order: Annotated[Literal["asc", "desc"] | None, Query()] = None,
-    limit: Annotated[int, Query(ge=1, le=200)] = 50,
-    offset: Annotated[int, Query(ge=0)] = 0,
-) -> Page[StatementLineOut]:
-    """List the staged bank transactions, filtered and offset-paged.
-
-    The filters are ``account``, ``state``, ``kind``, ``q`` (counterparty, IBAN
-    or purpose) and the date range ``dateFrom``/``dateTo``. ``sort`` takes date
-    or amount. ``includeIgnored`` = false hides the set-aside lines when the
-    request gives no explicit ``state``, which is the All view.
-    """
-    return await service.list_lines_paged(
-        account_id=account_id,
-        state=state,
-        linked=linked,
-        include_ignored=include_ignored,
-        kind=kind,
-        q=q,
-        date_from=date_from,
-        date_to=date_to,
-        sort=sort,
-        order=order,
-        limit=limit,
-        offset=offset,
-    )
-
-
-@router.get(
-    "/statement-lines/{line_id}",
-    response_model=StatementLineDetail,
-    dependencies=[
-        Depends(require_any_permission("budget.view", "budget.structure", "budget.book"))
-    ],
-    responses=_errors(401, 403, 404),
-)
-async def get_statement_line(line_id: UUID, service: BankServiceDep) -> StatementLineDetail:
-    """Return one staged transaction for the diagnostic detail view.
-
-    The response holds the raw parser payload and the idempotency key. It shows
-    the source format and the batch metadata.
-    """
-    return await service.get_line(line_id)
-
-
-@router.post(
-    "/statement-lines/{line_id}/confirm",
-    response_model=ExpenseOut,
-    status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_principal("budget.book"))],
-    responses=_errors(400, 401, 403, 404, 422),
-)
-async def confirm_statement_line(
-    line_id: UUID, payload: ConfirmLineRequest, service: BankServiceDep
-) -> ExpenseOut:
-    """Book a transaction: a new booking on ``budgetId`` or onto ``matchExpenseId``."""
-    return await service.confirm_line(line_id, payload)
-
-
-@router.post(
-    "/statement-lines/{line_id}/ignore",
-    status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[Depends(require_principal("budget.reconcile_ignore"))],
-    responses=_errors(401, 403, 404, 422),
-)
-async def ignore_statement_line(
-    line_id: UUID, service: BankServiceDep, payload: IgnoreLineRequest | None = None
-) -> None:
-    """Mark a transaction as irrelevant. The line stays for the idempotent import.
-
-    The dedicated ``budget.reconcile_ignore`` permission gates this route,
-    because the action is audit-sensitive. The audit log records the optional
-    ``reason``.
-    """
-    await service.ignore_line(line_id, reason=payload.reason if payload else None)
-
-
-@router.post(
-    "/statement-lines/{line_id}/reactivate",
-    response_model=StatementLineOut,
-    dependencies=[Depends(require_principal("budget.reconcile_ignore"))],
-    responses=_errors(401, 403, 404, 422),
-)
-async def reactivate_statement_line(line_id: UUID, service: BankServiceDep) -> StatementLineOut:
-    """Undo an ignore: return an ignored transaction to the open reconcile queue."""
-    return await service.reactivate_line(line_id)
-
-
-@router.post(
-    "/statement-lines/{line_id}/unlink",
-    response_model=StatementLineOut,
-    dependencies=[Depends(require_principal("budget.book"))],
-    responses=_errors(401, 403, 404),
-)
-async def unlink_statement_line(line_id: UUID, service: BankServiceDep) -> StatementLineOut:
-    """Unlink a transaction from a booking.
-
-    The route removes the allocation and reopens the transaction. The booking
-    remains.
-    """
-    return await service.unlink_line(line_id)
 
 
 @router.get(

@@ -29,7 +29,6 @@ from app.modules.applications.models import Application
 from app.modules.budget.tree.service import BudgetTreeService
 from app.modules.budget.tree_models import Budget
 from app.modules.budget.tree_schemas import (
-    AccountCreate,
     AllocationSet,
     BudgetNodeCreate,
     BudgetNodeUpdate,
@@ -148,28 +147,13 @@ async def test_rename_key_recomputes_descendant_paths(session: AsyncSession) -> 
         await svc.update_node(mid.id, BudgetNodeUpdate(key="900"))
 
 
-async def test_account_and_transfer(session: AsyncSession) -> None:
+async def test_transfer(session: AsyncSession) -> None:
     svc = BudgetTreeService(session)
     g = await _gremium(session)
     top = await svc.create_node(BudgetNodeCreate(key=f"TR{_suffix()}", name="Top", gremiumId=g.id))
     a = await svc.create_node(BudgetNodeCreate(key="01", name="A", parentId=top.id))
     b = await svc.create_node(BudgetNodeCreate(key="02", name="B", parentId=top.id))
     fy = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=2026))
-
-    # An account (name plus free-text IBAN) is not bound to a cost center. A booking has
-    # no manual account field. Only the account match sets it (#fints-konten).
-    acc = await svc.create_account(AccountCreate(name="Giro", iban="DE-frei-text"))
-    assert acc.name == "Giro"
-    booking = await svc.book_expense(
-        ExpenseCreate(
-            budgetId=a.id,
-            fiscalYearId=fy.id,
-            amount=Decimal("50"),
-            description="mit Konto",
-        ),
-        actor="tester",
-    )
-    assert booking.account_id is None and booking.account_name is None
 
     # A transfer of 200 from A to B books an expense on A and an income on B, same
     # fiscal year.
@@ -353,8 +337,8 @@ async def test_list_expenses_fuzzy_search(session: AsyncSession) -> None:
 async def test_list_expenses_exact_id_filter(session: AsyncSession) -> None:
     """The `id` filter (#expenses-ux2) returns exactly one booking.
 
-    The exact booking deeplink from the accounts page returns that one booking, even
-    without any other filter.
+    The exact booking deeplink returns that one booking, even without any other
+    filter.
     """
     svc = BudgetTreeService(session)
     g = await _gremium(session)

@@ -19,7 +19,7 @@ from app.shared.antiabuse import (
     get_rate_limiter,
     now_unix,
     rate_limit_applications,
-    rate_limit_fints,
+    rate_limit_attachments,
     rate_limit_magic_link,
     verify_altcha,
 )
@@ -187,8 +187,8 @@ def test_applications_rate_limit_blocks() -> None:
     assert client.post("/apps").status_code == 429
 
 
-async def test_rate_limit_fints_bypassed_for_oauth_principal() -> None:
-    """A logged-in MCP client bypasses the FinTS throttle (#mcp).
+async def test_rate_limit_bypassed_for_oauth_principal() -> None:
+    """A logged-in MCP client bypasses the upload throttle (#mcp).
 
     An OAuth token sets `scope_permissions` on the principal, which marks it as an
     agent. A session principal leaves `scope_permissions` at None and stays throttled.
@@ -197,14 +197,14 @@ async def test_rate_limit_fints_bypassed_for_oauth_principal() -> None:
 
     from app.modules.auth.principal import Principal
 
-    settings = _settings(rl_fints_per_hour=0)  # blocks every throttled caller
+    settings = _settings(rl_attachments_per_hour=0)  # blocks every throttled caller
     limiter = InMemoryRateLimiter(now=lambda: 0.0)
     req = SimpleNamespace(client=SimpleNamespace(host="1.2.3.4"), headers={})
-    mcp = Principal(sub="u-mcp", scope_permissions=frozenset({"budget.book"}))
-    await rate_limit_fints(req, settings, limiter, mcp)  # type: ignore[arg-type]
+    mcp = Principal(sub="u-mcp", scope_permissions=frozenset({"application.manage"}))
+    await rate_limit_attachments(req, settings, limiter, mcp, None)  # type: ignore[arg-type]
     session = Principal(sub="u-web")
     with pytest.raises(RateLimitedError):
-        await rate_limit_fints(req, settings, limiter, session)  # type: ignore[arg-type]
+        await rate_limit_attachments(req, settings, limiter, session, None)  # type: ignore[arg-type]
 
 
 def test_rate_limit_disabled_never_blocks() -> None:

@@ -1,17 +1,19 @@
-"""fints_dedup_rerun: start the deduplication cleanup again (#fints-dedup).
+"""fints_dedup_rerun: no-op — the FinTS feature is removed.
 
-An earlier version of 0045 already ran on the database. ``alembic_version`` marks it as
-applied, so alembic does NOT run it again, even after a code fix. This **new** revision
-therefore calls the corrected raw-data cleanup ``bank.maintenance.dedup_staged_lines`` on
-the existing data. The logic is the same as in 0045 and stays idempotent. The revision
-duplicates no script. It only calls the same function again.
+This revision was a data backfill for ``bank_statement_line``. That table (and
+the whole FinTS/Konten feature) is dropped in
+``b7c41d2e9f38_drop_fints_and_accounts``, so the backfill has no target any
+more. The revision id stays in the chain: databases that already ran it keep a
+valid ``alembic_version``, and a fresh database walks past it.
+
+The body is empty on purpose. The original code imported
+``app.modules.budget.bank``, which no longer exists — leaving the import in
+place would break ``alembic upgrade head``.
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
-
-from alembic import op
 
 revision: str = "0046_fints_dedup_rerun"
 down_revision: str | None = "0045_fints_dedup_staged"
@@ -20,10 +22,8 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    from app.modules.budget.bank.maintenance import dedup_staged_lines
-
-    dedup_staged_lines(op.get_bind())
+    """No-op — see the module docstring."""
 
 
 def downgrade() -> None:
-    pass
+    """No-op — see the module docstring."""

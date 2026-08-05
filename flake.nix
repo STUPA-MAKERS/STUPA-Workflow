@@ -27,7 +27,7 @@
 
       # Shared Python dev tooling. Project dependencies themselves are installed
       # per component with uv/pip into a virtualenv (see the shellHooks) rather
-      # than resolved through Nix — several backend deps (fints, pycheval,
+      # than resolved through Nix — several backend deps (pycheval,
       # clamd, python-magic, ...) are pinned tightly and not in nixpkgs.
       pyTools = [
         python

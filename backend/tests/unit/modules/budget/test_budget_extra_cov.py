@@ -46,7 +46,6 @@ from app.modules.budget.tree_router import (
     get_budget_tree_service,
 )
 from app.modules.budget.tree_schemas import (
-    AccountOut,
     AllocationOut,
     AssignBudgetOut,
     BudgetApplicationOut,
@@ -78,7 +77,6 @@ _ALL_PERMS = (
     "budget.book",
     "budget.view",
     "budget.export",
-    "account.manage",
     "application.manage",
 )
 
@@ -247,12 +245,6 @@ class _FakeService:
         self.calls["move"] = application_id
         return AssignBudgetOut(applicationId=application_id, budgetId=_BID, fiscalYearId=_FYID)
 
-    async def list_account_options(self) -> list[Any]:
-        from app.modules.budget.tree_schemas import AccountOption
-
-        self.calls["list_account_options"] = True
-        return [AccountOption(id=uuid.uuid4(), name="Hauptkonto")]
-
     async def list_invoices_paged(self, **kwargs: Any) -> Any:
         from app.shared.paging import Page
 
@@ -340,21 +332,6 @@ class _FakeService:
         # This returns an HTML MIME type that a client could inject. The router must not
         # trust it. The router always sends application/pdf as an attachment (#sec-audit).
         return (b"<html>polyglot</html>", "text/html", 'we"ird\r\nname.pdf')
-
-    async def list_accounts(self) -> list[AccountOut]:
-        self.calls["list_accounts"] = True
-        return [AccountOut(id=uuid.uuid4(), name="Hauptkonto", iban="DE00", active=True)]
-
-    async def create_account(self, payload: Any) -> AccountOut:
-        self.calls["create_account"] = payload
-        return AccountOut(id=uuid.uuid4(), name="Neu", iban="", active=True)
-
-    async def update_account(self, account_id: uuid.UUID, payload: Any) -> AccountOut:
-        self.calls["update_account"] = (account_id, payload)
-        return AccountOut(id=account_id, name="Geaendert", iban="DE11", active=False)
-
-    async def delete_account(self, account_id: uuid.UUID) -> None:
-        self.calls["delete_account"] = account_id
 
 
 @pytest.fixture
@@ -503,13 +480,6 @@ def test_move_fiscal_year(fake: _FakeService) -> None:
     )
     assert resp.status_code == 200
     assert fake.calls["move"] == _AID
-
-
-def test_list_account_options(fake: _FakeService) -> None:
-    resp = _client(fake, ("budget.book",)).get("/api/accounts/options")
-    assert resp.status_code == 200
-    assert resp.json()[0]["name"] == "Hauptkonto"
-    assert fake.calls["list_account_options"] is True
 
 
 def test_list_invoices_paged(fake: _FakeService) -> None:
@@ -744,11 +714,6 @@ def test_list_expenses_paged_sort_passthrough(fake: _FakeService) -> None:
     assert fake.calls["list_expenses_paged"]["sort"] == "invoiceDate"
     _client(fake).get("/api/expenses?sort=paymentDate&order=asc")
     assert fake.calls["list_expenses_paged"]["sort"] == "paymentDate"
-    # The account and unallocated filters find the link candidates in the accounts tab
-    # (#fints-konten).
-    _client(fake).get(f"/api/expenses?account={_BID}&unallocated=true")
-    assert fake.calls["list_expenses_paged"]["account_id"] == _BID
-    assert fake.calls["list_expenses_paged"]["unallocated"] is True
 
 
 # Router: invoice CRUD and file endpoints
@@ -837,37 +802,6 @@ def test_get_invoice_file_sanitises_filename(fake: _FakeService) -> None:
     assert '"' not in cd.split('filename="', 1)[1].rstrip().rstrip('"')
     assert "\r" not in cd and "\n" not in cd
     assert fake.calls["invoice_file_bytes"] == _IID
-
-
-# Router: account CRUD
-def test_list_accounts(fake: _FakeService) -> None:
-    resp = _client(fake, ("account.manage",)).get("/api/accounts")
-    assert resp.status_code == 200
-    assert resp.json()[0]["iban"] == "DE00"
-
-
-def test_create_account(fake: _FakeService) -> None:
-    resp = _client(fake, ("account.manage",)).post(
-        "/api/accounts", json={"name": "Neu"}
-    )
-    assert resp.status_code == 201
-    assert fake.calls["create_account"] is not None
-
-
-def test_update_account(fake: _FakeService) -> None:
-    aid = uuid.uuid4()
-    resp = _client(fake, ("account.manage",)).patch(
-        f"/api/accounts/{aid}", json={"active": False}
-    )
-    assert resp.status_code == 200
-    assert fake.calls["update_account"][0] == aid
-
-
-def test_delete_account(fake: _FakeService) -> None:
-    aid = uuid.uuid4()
-    resp = _client(fake, ("account.manage",)).delete(f"/api/accounts/{aid}")
-    assert resp.status_code == 204
-    assert fake.calls["delete_account"] == aid
 
 
 # Schemas: model validators, both sides of every branch

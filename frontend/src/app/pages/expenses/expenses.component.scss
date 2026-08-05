@@ -291,8 +291,8 @@ input.exp__input {
     font-weight: var(--fw-semibold);
   }
   /* Secondary data stays small and muted on its own wrapping row, so the card looks
-     less crowded. This covers the dates, the payee, the cost center, the application
-     and the account. */
+     less crowded. This covers the dates, the payee, the cost center and the
+     application. */
   .exp__cellDate,
   .exp__cellMeta {
     flex: 0 1 auto;

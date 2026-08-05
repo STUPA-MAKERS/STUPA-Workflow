@@ -243,7 +243,7 @@ def build_expenses_workbook(items: Iterable[Any], locale: str = "de") -> bytes:
         else {"expense": "Expense", "income": "Income"}
     )
     headers = [
-        "Datum", "Art", "Beschreibung", "Kostenstelle", "Antrag", "Konto", "Betrag", "Währung",
+        "Datum", "Art", "Beschreibung", "Kostenstelle", "Antrag", "Betrag", "Währung",
     ]
     wb = Workbook()
     ws = wb.active
@@ -259,7 +259,6 @@ def build_expenses_workbook(items: Iterable[Any], locale: str = "de") -> bytes:
                 e.description or "",
                 e.path_key or "",
                 e.application_title or "",
-                e.account_name or "",
                 _num(e.amount),
                 e.currency or "",
             ],

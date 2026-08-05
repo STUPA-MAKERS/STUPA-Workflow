@@ -49,7 +49,7 @@ It implements:
 - **Delegations** — meeting-bound vote and representation delegations plus a substitute
   pool.
 - **Budget** — a hierarchical cost center tree with fiscal years, top-down allocation,
-  bookings and transfers, accounts, and **invoices with ZUGFeRD/Factur-X import**. The
+  bookings and transfers, and **invoices with ZUGFeRD/Factur-X import**. The
   platform audits every money mutation.
 - **Notifications** — mail templates (Jinja2, sandboxed, DE/EN), rules
   (event→template→recipient), per-user preferences, dispatch through the arq worker.

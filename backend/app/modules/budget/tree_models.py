@@ -12,7 +12,7 @@ persisted, see ``tree_rules.rollup_committed``. The only currency is EUR
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal
 
 from sqlalchemy import (
@@ -20,7 +20,6 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     Date,
-    DateTime,
     ForeignKey,
     Index,
     Integer,
@@ -179,10 +178,6 @@ class BudgetExpense(UUIDPkMixin, CreatedAtMixin, Base):
     application_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("application.id", ondelete="SET NULL"), nullable=True
     )
-    # Optional bank account. An account is independent of the cost-center tree.
-    account_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("account.id", ondelete="SET NULL"), nullable=True
-    )
     # Optional invoice. One invoice can carry N bookings. SET NULL on invoice
     # delete keeps the booking.
     invoice_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -208,10 +203,10 @@ class BudgetExpense(UUIDPkMixin, CreatedAtMixin, Base):
     payment_method: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Free-text category or tag. It groups bookings beyond the cost center.
     category: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # Sub-booking: points at the parent booking. A child INHERITS account, cost
-    # center, fiscal year and kind from the parent. The child stores copies of
-    # these column values, so the rollups and the queries still apply. A child
-    # carries only its own amount, description, dates, receipt and bank link.
+    # Sub-booking: points at the parent booking. A child INHERITS the cost
+    # center, the fiscal year and the kind from the parent. The child stores
+    # copies of these column values, so the rollups and the queries still apply.
+    # A child carries only its own amount, description, dates and receipt.
     # The parent amount is the sum of its children. The budget rollup counts
     # parents only (parent_expense_id IS NULL). Children are a pure breakdown.
     # CASCADE: a delete of the parent deletes its children.
@@ -233,7 +228,6 @@ class BudgetExpense(UUIDPkMixin, CreatedAtMixin, Base):
         Index("ix_budget_expense_budget_id", "budget_id"),
         Index("ix_budget_expense_fiscal_year_id", "fiscal_year_id"),
         Index("ix_budget_expense_application_id", "application_id"),
-        Index("ix_budget_expense_account_id", "account_id"),
         Index("ix_budget_expense_transfer_id", "transfer_id"),
         Index("ix_budget_expense_invoice_date", "invoice_date"),
         Index("ix_budget_expense_invoice_id", "invoice_id"),
@@ -241,221 +235,11 @@ class BudgetExpense(UUIDPkMixin, CreatedAtMixin, Base):
     )
 
 
-class Account(UUIDPkMixin, CreatedAtMixin, Base):
-    """Account, for example a bank account. It is not bound to a cost center.
-
-    An admin manages the accounts freely. A booking can reference an account to
-    record which account moved the money. ``iban`` is free text. The platform
-    validates neither its format nor its checksum.
-    """
-
-    __tablename__ = "account"
-
-    name: Mapped[str] = mapped_column(Text)
-    iban: Mapped[str] = mapped_column(Text, server_default="")
-    active: Mapped[bool] = mapped_column(Boolean, server_default="true")
-
-    # FinTS: only the bank connection lives on the account, the endpoint and the
-    # BLZ. The admin sets it and all bookers share it. Personal credentials live
-    # per principal in ``AccountFintsCredential``. The SCA client state is bound
-    # to user and device, because a shared state would break the TAN and SCA
-    # flow. Without ``fints_endpoint`` and ``fints_blz`` the account cannot use
-    # FinTS.
-    fints_endpoint: Mapped[str | None] = mapped_column(Text, nullable=True)
-    fints_blz: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # Last known account balance. It comes from the closing balance of a sync
-    # (HKSAL) or from the ``:62F:``/CLBD balance of a file import.
-    # ``fints_balance_at`` is the as-of time of that balance. The value serves
-    # display and reconciliation only. It is not part of the budget math.
-    fints_last_balance: Mapped[Decimal | None] = mapped_column(
-        Numeric(14, 2), nullable=True
-    )
-    fints_balance_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-
-    __table_args__ = (Index("ix_account_name", "name"),)
-
-
-class AccountFintsCredential(UUIDPkMixin, CreatedAtMixin, Base):
-    """Personal FinTS credentials of one principal for one account.
-
-    Bookers share the bank account, but each booker has a separate
-    online-banking login. Therefore login and PIN belong to the user, not to the
-    account. The platform stores the PIN encrypted only (Fernet,
-    ``app.shared.crypto``) and never returns it in plaintext. ``fints_state``
-    holds the encrypted serialized FinTS client state (``system_id`` and more)
-    for the SCA window of about 90 days. That state is bound to user and
-    device, so each credential keeps its own copy. Both FKs use
-    ``ON DELETE CASCADE``: a delete of the account or of the principal removes
-    the secret.
-    """
-
-    __tablename__ = "account_fints_credential"
-
-    account_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("account.id", ondelete="CASCADE")
-    )
-    principal_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("principal.id", ondelete="CASCADE")
-    )
-    fints_login: Mapped[str] = mapped_column(Text)
-    fints_pin_encrypted: Mapped[str] = mapped_column(Text)
-    fints_tan_mechanism: Mapped[str | None] = mapped_column(Text, nullable=True)
-    fints_state: Mapped[str | None] = mapped_column(Text, nullable=True)
-    fints_last_sync_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    # Lock cooldown. The service sets it after a bank lock or after a rejected
-    # signature. Until that time the service refuses a sync, so that retries do
-    # not make the bank-side lock worse.
-    fints_locked_until: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-
-    __table_args__ = (
-        UniqueConstraint(
-            "account_id", "principal_id", name="uq_account_fints_credential_owner"
-        ),
-        Index("ix_account_fints_credential_account_id", "account_id"),
-        Index("ix_account_fints_credential_principal_id", "principal_id"),
-    )
-
-
-class BankStatementLine(UUIDPkMixin, CreatedAtMixin, Base):
-    """Single bank transaction, staged before it becomes a booking.
-
-    The line comes from a FinTS fetch or from a file import (CAMT.053/MT940).
-    ``idempotency_key`` makes a re-import idempotent
-    (``ON CONFLICT DO NOTHING``). ``amount`` is signed: above 0 for an inflow,
-    below 0 for an outflow. On confirm the line becomes a ``budget_expense``
-    with ``kind`` from the sign and ``amount = abs(...)``, because the DB CHECK
-    demands ``amount > 0``.
-    """
-
-    __tablename__ = "bank_statement_line"
-
-    account_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("account.id", ondelete="CASCADE")
-    )
-    idempotency_key: Mapped[str] = mapped_column(Text)
-    raw_payload: Mapped[dict] = mapped_column(JSONB, server_default="{}")
-    booking_date: Mapped[date | None] = mapped_column(Date, nullable=True)
-    value_date: Mapped[date | None] = mapped_column(Date, nullable=True)
-    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))
-    currency: Mapped[str] = mapped_column(CHAR(3), server_default="EUR")
-    purpose: Mapped[str | None] = mapped_column(Text, nullable=True)
-    counterparty_name: Mapped[str | None] = mapped_column(Text, nullable=True)
-    counterparty_iban: Mapped[str | None] = mapped_column(Text, nullable=True)
-    end_to_end_id: Mapped[str | None] = mapped_column(Text, nullable=True)
-    reference: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # 'unmatched' | 'suggested' | 'matched' | 'ignored'.
-    match_state: Mapped[str] = mapped_column(Text, server_default="unmatched")
-    # Matcher suggestion. It is a UI hint. Only a confirm makes it binding.
-    suggested_budget_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("budget.id", ondelete="SET NULL"), nullable=True
-    )
-    suggested_expense_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("budget_expense.id", ondelete="SET NULL"), nullable=True
-    )
-
-    __table_args__ = (
-        UniqueConstraint(
-            "account_id", "idempotency_key", name="uq_bank_statement_line_idem"
-        ),
-        CheckConstraint(
-            "currency = 'EUR'", name="bank_statement_line_currency_eur"
-        ),
-        CheckConstraint(
-            "match_state IN ('unmatched', 'suggested', 'matched', 'ignored')",
-            name="bank_statement_line_state_valid",
-        ),
-        Index("ix_bank_statement_line_account_id", "account_id"),
-        Index("ix_bank_statement_line_match_state", "match_state"),
-        Index("ix_bank_statement_line_booking_date", "booking_date"),
-    )
-
-
-class BankAllocation(UUIDPkMixin, CreatedAtMixin, Base):
-    """Bank line to booking link, N:M for partial and collective payments.
-
-    One transaction can split across several bookings. Several transactions can
-    pay one booking. ``allocated_amount`` is the allocated partial amount and
-    is positive. Both FKs use CASCADE.
-    """
-
-    __tablename__ = "bank_allocation"
-
-    statement_line_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("bank_statement_line.id", ondelete="CASCADE")
-    )
-    expense_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("budget_expense.id", ondelete="CASCADE")
-    )
-    allocated_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))
-
-    __table_args__ = (
-        UniqueConstraint(
-            "statement_line_id", "expense_id", name="uq_bank_allocation_pair"
-        ),
-        CheckConstraint(
-            "allocated_amount > 0", name="bank_allocation_amount_positive"
-        ),
-        Index("ix_bank_allocation_statement_line_id", "statement_line_id"),
-        Index("ix_bank_allocation_expense_id", "expense_id"),
-    )
-
-
-class BankSyncSession(UUIDPkMixin, CreatedAtMixin, Base):
-    """Pending FinTS TAN session with short-lived encrypted dialog state.
-
-    The state lives between the sync start and the TAN entry.
-    ``payload_encrypted`` is the Fernet-encrypted FinTS resume state. The
-    service deletes the session after a successful TAN or at ``expires_at``, so
-    that no sensitive data stays longer than needed. ``principal_id`` binds the
-    session to the booker who started the sync. Only that booker may submit the
-    TAN.
-    """
-
-    __tablename__ = "bank_sync_session"
-
-    account_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("account.id", ondelete="CASCADE")
-    )
-    principal_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("principal.id", ondelete="CASCADE")
-    )
-    payload_encrypted: Mapped[str] = mapped_column(Text)
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-
-    __table_args__ = (Index("ix_bank_sync_session_account_id", "account_id"),)
-
-
-class CounterpartyMemory(UUIDPkMixin, CreatedAtMixin, Base):
-    """Remembers the last chosen cost center per counterparty IBAN.
-
-    The matcher suggests this cost center for the next transaction of the same
-    payer or payee. A delete of the cost center sets ``budget_id`` to NULL
-    (``SET NULL``).
-    """
-
-    __tablename__ = "counterparty_memory"
-
-    counterparty_iban: Mapped[str] = mapped_column(Text)
-    budget_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("budget.id", ondelete="SET NULL"), nullable=True
-    )
-
-    __table_args__ = (
-        UniqueConstraint("counterparty_iban", name="uq_counterparty_memory_iban"),
-    )
-
-
 class Invoice(UUIDPkMixin, CreatedAtMixin, Base):
     """Invoice: a standalone receipt, optionally imported from ZUGFeRD/Factur-X.
 
     A booking references at most one invoice. One invoice can carry N bookings.
-    An invoice is not bound to a cost center or to a Gremium, like an account.
+    An invoice is not bound to a cost center or to a Gremium.
     """
 
     __tablename__ = "invoice"
@@ -488,13 +272,8 @@ class Invoice(UUIDPkMixin, CreatedAtMixin, Base):
 
 
 __all__ = [
-    "Account",
-    "BankAllocation",
-    "BankStatementLine",
-    "BankSyncSession",
     "Budget",
     "BudgetAllocation",
     "BudgetExpense",
-    "CounterpartyMemory",
     "FiscalYear",
 ]

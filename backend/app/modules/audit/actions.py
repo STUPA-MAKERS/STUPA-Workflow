@@ -66,18 +66,6 @@ class AuditAction(StrEnum):
     BUDGET_INVOICE_DELETE = "budget_invoice_delete"
     BUDGET_ASSIGN = "budget_assign"
     BUDGET_MOVE_FISCAL_YEAR = "budget_move_fiscal_year"
-    # FinTS bank reconciliation: connection and credential changes, sync runs,
-    # statement imports, and line reconcile, ignore or unlink. ``data`` carries only
-    # id references and counters. It never carries a PIN or other credential material.
-    BANK_ACCOUNT_CONFIG = "bank_account_config"
-    BANK_CREDENTIAL_SET = "bank_credential_set"
-    BANK_CREDENTIAL_DELETE = "bank_credential_delete"
-    BANK_SYNC = "bank_sync"
-    BANK_STATEMENT_IMPORT = "bank_statement_import"
-    BANK_LINE_RECONCILE = "bank_line_reconcile"
-    BANK_LINE_IGNORE = "bank_line_ignore"
-    BANK_LINE_REACTIVATE = "bank_line_reactivate"
-    BANK_LINE_UNLINK = "bank_line_unlink"
 
 
 # Budget mutations that the audit log can revert. A revert deletes an additive

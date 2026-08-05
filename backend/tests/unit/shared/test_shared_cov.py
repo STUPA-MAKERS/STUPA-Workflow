@@ -281,7 +281,6 @@ class _Expense:
         self.description = kw.get("description", "Druckkosten")
         self.path_key = kw.get("path_key", "VS-800-40")
         self.application_title = kw.get("application_title", "Plakate")
-        self.account_name = kw.get("account_name", "Konto A")
         self.amount = kw.get("amount", Decimal("42.00"))
         self.currency = kw.get("currency", "EUR")
 
@@ -292,7 +291,7 @@ def test_expenses_workbook_de_labels() -> None:
     ws = _load(data)["Buchungen"]
     assert ws.cell(row=2, column=2).value == "Ausgabe"
     assert ws.cell(row=3, column=2).value == "Einnahme"
-    assert ws.cell(row=2, column=7).value == 42.0
+    assert ws.cell(row=2, column=6).value == 42.0
 
 
 def test_expenses_workbook_en_labels_and_unknown_kind() -> None:
@@ -310,7 +309,6 @@ def test_expenses_workbook_none_fields() -> None:
             description=None,
             path_key=None,
             application_title=None,
-            account_name=None,
             amount=None,
             currency=None,
         )
@@ -318,7 +316,7 @@ def test_expenses_workbook_none_fields() -> None:
     data = xlsx.build_expenses_workbook(items)
     ws = _load(data)["Buchungen"]
     assert ws.cell(row=2, column=3).value is None or ws.cell(row=2, column=3).value == ""
-    assert ws.cell(row=2, column=7).value is None  # _num(None)
+    assert ws.cell(row=2, column=6).value is None  # _num(None)
 
 
 def test_auskunft_workbook_with_principal_and_rows() -> None:

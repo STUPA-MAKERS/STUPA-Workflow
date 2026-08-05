@@ -340,48 +340,6 @@ class TransferCreate(WireModel):
     description: str
 
 
-class AccountCreate(WireModel):
-    name: str
-    iban: str = ""
-    active: bool = True
-    # FinTS bank connection. All bookers share it. Each booker sets a personal login and
-    # PIN with set_fints_credential, not here (#fints-percred).
-    fintsEndpoint: str | None = Field(default=None, description="FinTS server URL (https)")
-    fintsBlz: str | None = Field(default=None, description="Bank code (BLZ)")
-
-
-class AccountUpdate(WireModel):
-    name: str | None = None
-    iban: str | None = None
-    active: bool | None = None
-    fintsEndpoint: str | None = Field(default=None, description="FinTS server URL; null/'' clears")
-    fintsBlz: str | None = Field(default=None, description="Bank code (BLZ); null/'' clears")
-
-
-# Bank reconcile and invoices (#fints).
-class FintsCredentialIn(WireModel):
-    """Personal FinTS login of the requesting booker for one account (#fints-percred).
-
-    fintsPin is write-only. The platform stores it encrypted and never returns it.
-    """
-
-    fintsLogin: str
-    fintsPin: str
-
-
-class ConfirmLineRequest(WireModel):
-    """Confirm a staged bank transaction into a booking.
-
-    Provide EITHER budgetId for a new booking on that cost center, OR matchExpenseId to
-    attach the transaction to a booking that exists.
-    """
-
-    budgetId: str | None = None
-    fiscalYearId: str | None = None
-    matchExpenseId: str | None = None
-    description: str | None = Field(default=None, description="Overrides the default (purpose)")
-
-
 class InvoiceCreate(WireModel):
     """Create an invoice (#invoices).
 

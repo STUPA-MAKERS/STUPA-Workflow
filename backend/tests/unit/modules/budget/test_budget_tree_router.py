@@ -22,7 +22,6 @@ from app.modules.auth.principal import Principal
 from app.modules.budget.tree.service import BudgetTreeService
 from app.modules.budget.tree_router import ServiceDep, get_budget_tree_service
 from app.modules.budget.tree_schemas import (
-    AccountOption,
     AllocationOut,
     AssignBudgetOut,
     BudgetNodeOut,
@@ -165,10 +164,6 @@ class _FakeService:
 
     async def delete_expense(self, expense_id: uuid.UUID) -> None:
         self.calls["delete_expense"] = expense_id
-
-    async def list_account_options(self) -> list[AccountOption]:
-        self.calls["list_account_options"] = True
-        return [AccountOption(id=uuid.uuid4(), name="Hauptkonto")]
 
     async def list_expenses_paged(self, **kwargs: Any) -> Page[ExpenseOut]:
         self.calls["list_expenses_paged"] = kwargs
@@ -349,37 +344,28 @@ def test_expense_list_forbidden_without_budget_perm(fake: _FakeService) -> None:
 def test_expense_list_id_filter_passthrough(fake: _FakeService) -> None:
     """`id=` (#expenses-ux2) carries the exact booking deep link.
 
-    The deep link goes from the accounts tab to the bookings tab. The router passes it to
-    the service as `expense_id`.
+    The router passes the deep link to the service as `expense_id`.
     """
     resp = _app_as(fake, {"budget.view"}).get("/api/expenses", params={"id": str(_EID)})
     assert resp.status_code == 200
     assert fake.calls["list_expenses_paged"]["expense_id"] == _EID
 
 
-def test_account_options_readable_by_booker(fake: _FakeService) -> None:
-    """#5-2 and #2: a booker can read the bank account choice without account.manage.
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/accounts",
+        "/api/accounts/options",
+        "/api/statement-lines",
+    ],
+)
+def test_account_and_statement_routes_are_gone(fake: _FakeService, path: str) -> None:
+    """The Konten tab and the FinTS match are removed, so the routes are gone.
 
-    The choice returns the id and the name, but no IBAN. The missing read right was the
-    reason why a booker could not set the account.
+    Every one answers 404, even for a booker who holds all budget permissions.
     """
-    resp = _app_as(fake, {"budget.book"}).get("/api/accounts/options")
-    assert resp.status_code == 200
-    assert resp.json()[0]["name"] == "Hauptkonto"
-    assert "iban" not in resp.json()[0]
-
-
-def test_account_options_forbidden_without_budget_or_account_perm(
-    fake: _FakeService,
-) -> None:
-    assert (
-        _app_as(fake, {"meeting.manage"}).get("/api/accounts/options").status_code == 403
-    )
-
-
-def test_full_accounts_list_still_requires_account_manage(fake: _FakeService) -> None:
-    """The full master data, including the IBAN, stays reserved for account.manage."""
-    assert _app_as(fake, {"budget.book"}).get("/api/accounts").status_code == 403
+    resp = _app_as(fake, {"budget.book", "budget.view", "budget.structure"}).get(path)
+    assert resp.status_code == 404
 
 
 def test_invoices_list_readable_by_view(fake: _FakeService) -> None:
