@@ -37,7 +37,6 @@ export class AdminHomeComponent {
     { link: 'group-mappings', title: 'admin.home.groupMappings', desc: 'admin.home.groupMappingsDesc', icon: 'key', permissions: ['admin.group_mappings'] },
     { link: 'gremien', title: 'admin.home.gremien', desc: 'admin.home.gremienDesc', icon: 'parliament', permissions: ['admin.gremien'] },
     { link: 'budget-pots', title: 'budget.tree.title', desc: 'admin.home.budgetPotsDesc', icon: 'euro', permissions: ['budget.structure'] },
-    { link: 'accounts', title: 'admin.accounts.title', desc: 'admin.accounts.desc', icon: 'building', permissions: ['account.manage'] },
     { link: 'forms', title: 'admin.home.formBuilder', desc: 'admin.home.formBuilderDesc', icon: 'form', permissions: ['form.configure'] },
     { link: 'flow', title: 'admin.home.flowEditor', desc: 'admin.home.flowEditorDesc', icon: 'flow', permissions: ['flow.configure'] },
     { link: 'branding', title: 'admin.home.branding', desc: 'admin.home.brandingDesc', icon: 'palette', permissions: ['admin.site'] },

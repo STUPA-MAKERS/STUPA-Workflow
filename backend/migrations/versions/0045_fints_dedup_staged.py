@@ -1,26 +1,19 @@
-"""fints_dedup_staged: resolve re-imported duplicates of staged rows from the RAW DATA.
+"""fints_dedup_staged: no-op — the FinTS feature is removed.
 
-Before the raw-data idempotency key (#fints-raw), parser-derived fields fed the hash
-(``counterparty_iban`` and the normalized purpose). A parser improvement moved that hash,
-so a new fetch created the same bank transaction a second time. The typical result is a
-booked ``matched`` row plus a freshly parsed ``unmatched`` duplicate.
+This revision was a data backfill for ``bank_statement_line``. That table (and
+the whole FinTS/Konten feature) is dropped in
+``b7c41d2e9f38_drop_fints_and_accounts``, so the backfill has no target any
+more. The revision id stays in the chain: databases that already ran it keep a
+valid ``alembic_version``, and a fresh database walks past it.
 
-This migration compares over ``raw_dedup_base`` only: value date, amount, E2E, canonical
-raw purpose and canonical raw counterparty block. All of these come from ``raw_payload``
-and never depend on the parser. Rows with the same raw base are the same transaction. The
-**booked** row survives, otherwise the oldest row survives. The booking itself stays
-untouched, because the display resolves live from the raw data. The migration deletes the
-unbooked copies. A group without a booked row AND without a true raw duplicate stays
-untouched. Five real payments of 80 EUR on the same day carry different raw originators,
-so they do NOT collapse. The surviving row gets the new raw key. The down migration does
-nothing.
+The body is empty on purpose. The original code imported
+``app.modules.budget.bank``, which no longer exists — leaving the import in
+place would break ``alembic upgrade head``.
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
-
-from alembic import op
 
 revision: str = "0045_fints_dedup_staged"
 down_revision: str | None = "0044_fints_purpose_backfill"
@@ -29,13 +22,8 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    # Call the shared idempotent routine, so one logic serves 0045 and 0046. The logic
-    # stays out of this file on purpose. Earlier versions of this revision already ran,
-    # so alembic skips them. Revision 0046 calls the same function to apply the fix.
-    from app.modules.budget.bank.maintenance import dedup_staged_lines
-
-    dedup_staged_lines(op.get_bind())
+    """No-op — see the module docstring."""
 
 
 def downgrade() -> None:
-    pass
+    """No-op — see the module docstring."""

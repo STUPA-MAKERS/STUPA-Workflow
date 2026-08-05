@@ -1,9 +1,7 @@
 import { computed, inject, signal } from '@angular/core';
-import { I18nService } from '@core/i18n/i18n.service';
 import type { SelectOption } from '@stupa-makers/ui-kit';
 import { downloadBlob } from '@shared/download.util';
 import {
-  type AccountOption,
   BudgetTreeApi,
   type BudgetTreeNode,
   type Expense,
@@ -15,12 +13,11 @@ export type ExpenseSortField = 'createdAt' | 'amount' | 'invoiceDate' | 'payment
 
 /**
  * Bookings list: server-side filters, sort and offset paging, plus the cost-center
- * tree and the account options behind the filters. This is a plain state module.
- * Construct it in an injection context, for example a component field initializer.
+ * tree behind the filters. This is a plain state module. Construct it in an
+ * injection context, for example a component field initializer.
  */
 export class ExpensesListState {
   private readonly api = inject(BudgetTreeApi);
-  private readonly i18n = inject(I18nService);
 
   private readonly PAGE = 20;
   private nextOffset = 0;
@@ -45,9 +42,7 @@ export class ExpensesListState {
   readonly createdFrom = signal('');
   readonly createdTo = signal('');
   readonly budgetId = signal('');
-  /** Account filter. An empty value means all accounts. */
-  readonly accountId = signal('');
-  /** Exact-booking filter for a deep link from the accounts page. Only the URL sets it,
+  /** Exact-booking filter for a deep link. Only the URL sets it,
    *  and no control shows it. It still counts as an active filter, so the reset button
    *  clears it. */
   readonly expenseId = signal('');
@@ -58,7 +53,6 @@ export class ExpensesListState {
     () =>
       [
         this.kind(),
-        this.accountId(),
         this.expenseId(),
         this.amountMin().trim(),
         this.amountMax().trim(),
@@ -71,27 +65,12 @@ export class ExpensesListState {
     flattenBudgetOptions(this.budgetTree()),
   );
 
-  readonly accounts = signal<AccountOption[]>([]);
-  readonly accountOptions = computed<SelectOption[]>(() =>
-    this.accounts().map((a) => ({ value: a.id, label: a.name })),
-  );
-  readonly accountFilterOptions = computed<SelectOption[]>(() => [
-    { value: '', label: this.i18n.translate('expenses.filter.allAccounts') },
-    ...this.accountOptions(),
-  ]);
-
   readonly exporting = signal(false);
 
   constructor() {
     this.api.tree().subscribe({
       next: (tree) => this.budgetTree.set(tree),
       error: () => this.budgetTree.set([]),
-    });
-    // Bookers may read account options without account.manage. The server returns
-    // active accounts only.
-    this.api.listAccountOptions().subscribe({
-      next: (accs) => this.accounts.set(accs),
-      error: () => this.accounts.set([]),
     });
     // Do not reload here. The component adopts the URL filters first, then fires
     // exactly one reload. A second, unfiltered request can resolve late and overwrite
@@ -100,11 +79,6 @@ export class ExpensesListState {
 
   setKind(k: '' | ExpenseKind): void {
     this.kind.set(k);
-    this.reload();
-  }
-
-  selectAccount(id: string): void {
-    this.accountId.set(id);
     this.reload();
   }
 
@@ -130,7 +104,6 @@ export class ExpensesListState {
 
   resetFilters(): void {
     this.kind.set('');
-    this.accountId.set('');
     this.expenseId.set('');
     this.amountMin.set('');
     this.amountMax.set('');
@@ -176,7 +149,6 @@ export class ExpensesListState {
     return {
       id: this.expenseId() || undefined,
       budget: this.budgetId() || undefined,
-      account: this.accountId() || undefined,
       kind: this.kind() || undefined,
       q: this.q().trim() || undefined,
       amountMin: this.amountMin().trim() ? Number(this.amountMin()) : undefined,

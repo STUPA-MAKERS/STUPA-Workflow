@@ -1,7 +1,7 @@
 """Budget tools.
 
 This group covers the cost center tree, fiscal years, allocations, bookings,
-transfers, accounts, and the binding between an application and a budget.
+transfers, and the binding between an application and a budget.
 """
 
 from __future__ import annotations
@@ -131,9 +131,6 @@ async def book_expense(
     correspondent, a note, a reference number, a payment method, a category and the
     invoice and payment dates. Requires budget.manage.
 
-    The bank account is no longer a field of a booking. Only the account
-    reconciliation sets it, see #fints-konten.
-
     Args:
         amount: The amount as a decimal string.
         invoice_date: The invoice date in ISO format.
@@ -176,30 +173,6 @@ async def create_budget_transfer(transfer: S.TransferCreate) -> dict:
     Requires budget.manage.
     """
     return await api().post("/budget-transfers", json=dump_create(transfer))
-
-
-@group.tool
-async def list_accounts() -> dict:
-    """List the bank accounts that a booking can use."""
-    return await api().get("/accounts")
-
-
-@group.tool
-async def create_account(account: S.AccountCreate) -> dict:
-    """Create a bank account. Requires budget.manage."""
-    return await api().post("/accounts", json=dump_create(account))
-
-
-@group.tool
-async def update_account(account_id: str, patch: S.AccountUpdate) -> dict:
-    """Patch a bank account. Requires budget.manage."""
-    return await api().patch(f"/accounts/{account_id}", json=dump_patch(patch))
-
-
-@group.tool
-async def delete_account(account_id: str) -> dict:
-    """Delete a bank account. Requires budget.manage."""
-    return await api().delete(f"/accounts/{account_id}")
 
 
 @group.tool

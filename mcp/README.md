@@ -51,7 +51,7 @@ clients.
 | `read` | read applications, budgets, votes, meetings, audit, exports |
 | `applications:write` | create / comment / transition applications |
 | `votes:write` | create / open / close / cancel / manage votes (NEVER cast a ballot — only a human may do that. `vote.cast` is in `FORBIDDEN_PERMISSIONS` and is never grantable) |
-| `budget:write` | book expenses, manage accounts, invoices & FinTS bank reconciliation |
+| `budget:write` | book expenses, manage cost centers & invoices |
 | `meetings:write` | manage meetings & agendas |
 
 ## Tools
@@ -63,18 +63,10 @@ Flow: `list_transitions`, `fire_transition`.
 Votes: `get_vote`, `create_application_vote`, `open_vote`, `close_vote`, `cancel_vote`,
 `create_meeting_vote`, `delete_meeting_vote`. There is no `cast_ballot` tool, because only
 a human may cast a ballot.
-Budget: `list_budgets`, `get_budget_applications`, `book_expense`, `list_expenses`,
-accounts (`list_accounts`/`list_account_options`/`create_account`/`update_account`,
-including the FinTS endpoint and the BLZ).
+Budget: `list_budgets`, `get_budget_applications`, `book_expense`, `list_expenses`.
 Invoices: `list_invoices`, `get_invoice`, `create_invoice`, `update_invoice`,
 `delete_invoice`, `parse_invoice` (ZUGFeRD/Factur-X PDF → fields + fileToken),
 `upload_invoice_file`.
-Bank reconcile (#fints): `get_/set_/delete_fints_credential`, `fints_sync`,
-`fints_submit_tan`, `import_statement_file` (CAMT.053/MT940), `list_statement_lines`,
-`get_statement_line`, `confirm_statement_line`, `ignore_statement_line`,
-`reactivate_statement_line`. `fints_sync` can return `needs_tan`, and then a human approves
-the TAN. `get_statement_line` also returns `rawPayload` for import diagnostics.
-`ignore_statement_line` takes an optional audit reason.
 Meetings: `list_meetings`, `get_meeting`.
 
 ## Token cache

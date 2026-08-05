@@ -14,7 +14,6 @@ const ALL_PERMS = [
   'admin.site',
   'admin.types',
   'admin.notifications',
-  'account.manage',
   'budget.structure',
   'form.configure',
   'flow.configure',

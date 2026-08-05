@@ -1,4 +1,4 @@
-"""Cost-center budget tree: CRUD, fiscal years, allocations, bookings, accounts, invoices.
+"""Cost-center budget tree: CRUD, fiscal years, allocations, bookings, invoices.
 
 Layout:
 
@@ -8,8 +8,7 @@ Layout:
 * `.allocations` — top-down allocation with parent and children constraints.
 * `.applications` — application to cost-center assignment plus subtree listing.
 * `.expenses` — expense and income bookings: create, update, filtered listing, delete.
-* `.subbookings` — sub-bookings of a booking, including CAMT/MT940 file import.
-* `.accounts` — bank accounts plus FinTS connection config.
+* `.subbookings` — sub-bookings of a booking.
 * `.invoices` — invoice CRUD plus ZUGFeRD import and file storage.
 * `.transfers` — cost-center to cost-center transfers (paired bookings).
 * `.revert` — audit-log revert of budget and money mutations.

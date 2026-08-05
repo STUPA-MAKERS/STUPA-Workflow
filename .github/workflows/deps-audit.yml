@@ -41,11 +41,4 @@ jobs:
         # The scan checks the resolved environment against the PyPI advisory database.
         # Exclude a single advisory only after you checked that it does not apply.
         # Use `--ignore-vuln <ID>` and write down the reason.
-        #
-        # PYSEC-2026-87 (lxml<6.1, XXE local file read): lxml comes in only through
-        # fints, sepaxml and xmlschema. fints pins lxml~=6.0.2 (<6.1) hard, so 6.1.0
-        # cannot be installed (#fints). Here lxml parses the authenticated bank
-        # answers only. We parse our own untrusted XML with the stdlib `ElementTree`.
-        # The risk is unreachable in this context. It stays excluded until fints
-        # allows lxml>=6.1.
-        run: pip-audit --skip-editable --desc --ignore-vuln PYSEC-2026-87
+        run: pip-audit --skip-editable --desc

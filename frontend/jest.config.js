@@ -35,10 +35,16 @@ module.exports = {
     '!src/app/app.config.ts',
     '!src/app/app.routes.ts',
   ],
-  // The specs now cover nearly all application code (stmts 99.7 / branches 98.2 /
-  // funcs 99.3 / lines 99.9). The thresholds sit just below the actual values. A real
-  // regression breaks the build, but a small variation does not. Keep or raise them.
+  // The specs cover nearly all application code. The thresholds sit just below
+  // the actual values. A real regression breaks the build, but a small variation
+  // does not. Keep or raise them.
+  //
+  // `lines` moved from 99 to 98.9 (#drop-fints). Removing the Konten tab and
+  // FinTS deleted 643 fully covered lines but only 1 uncovered line. The
+  // ABSOLUTE count of uncovered lines therefore fell (94 -> 92) while the ratio
+  // fell as well (99.04 % -> 98.98 %), because the deleted code was covered
+  // better than average. No file lost coverage.
   coverageThreshold: {
-    global: { statements: 98, branches: 96, functions: 98, lines: 99 },
+    global: { statements: 98, branches: 96, functions: 98, lines: 98.9 },
   },
 };

@@ -197,42 +197,10 @@ class Settings(BaseSettings):
     # it once `due_at - lead <= now < due_at` holds (default 24 h).
     deadline_reminder_lead_minutes: int = 1440
 
-    # FinTS bank reconciliation. The online-banking fetch (PIN/TAN) reconciles real
-    # transactions with the bookings. Without `fints_enc_key` the feature is off and
-    # the endpoints answer 503. The bank PIN stays encrypted at rest with Fernet,
-    # derived from this secret, so the key is mandatory once FinTS runs.
-    # `fints_product_id` is the product id registered with the Deutsche
-    # Kreditwirtschaft. It is mandatory for production access since 2019. Without it
-    # the library uses its default id, which suits DEV and sandbox but a real bank
-    # may reject it. The secret and the PIN never reach the log.
-    fints_enc_key: str | None = Field(default=None, min_length=_MIN_SECRET_LEN)
-    fints_product_id: str | None = None
-    # Cap on the fetch window in days per sync. A larger window forces a fresh SCA at
-    # many banks. 90 days is the PSD2 comfort window.
-    fints_max_days: int = 90
-    # Lifetime of a pending TAN session, between the start of the sync and the TAN
-    # entry.
-    fints_tan_session_ttl_seconds: int = 600
-    # Lock cooldown. After a bank lock (FinTS 3938) or a signature or PIN rejection
-    # (9340 and similar), the service refuses any further sync for this bookkeeper and
-    # account for this many minutes. This guards against a self-inflicted lock
-    # escalation, where 3 failed attempts cause a full lock. The bank-side lock itself
-    # can last longer. Only the bank can lift it, through the online-banking unlock or
-    # the hotline.
-    fints_lock_cooldown_minutes: int = 30
-
     @property
     def storage_enabled(self) -> bool:
         """Object storage is active only when a MinIO endpoint is set."""
         return bool(self.minio_endpoint)
-
-    @property
-    def fints_enabled(self) -> bool:
-        """FinTS is active only when an encryption key is set.
-
-        The app must never persist the bank PIN unencrypted.
-        """
-        return bool(self.fints_enc_key)
 
     @property
     def clamav_enabled(self) -> bool:
@@ -275,9 +243,6 @@ class Settings(BaseSettings):
     rl_magic_link_verify_ip_per_hour: int = 20
     rl_applications_ip_per_hour: int = 10
     rl_attachments_per_hour: int = 30  # POST /attachments: 30 per hour per applicant
-    # FinTS sync, TAN and import: per principal and hour. This curbs SSRF port-scan
-    # attempts and bank-PIN lockout abuse through repeated syncs.
-    rl_fints_per_hour: int = 60
     # Default limit on all writing endpoints. It keys on the IP and stays generous. It
     # catches an endpoint without its own stricter limit (defense in depth).
     rl_default_write_per_hour: int = 100

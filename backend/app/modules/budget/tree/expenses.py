@@ -6,7 +6,7 @@ import uuid
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import ColumnElement, exists, func, or_, select
+from sqlalchemy import ColumnElement, func, or_, select
 from sqlalchemy import Text as _Text
 
 from app.modules.applications.models import Application
@@ -14,8 +14,6 @@ from app.modules.applications.service.service_base import _title_of
 from app.modules.audit.actions import AuditAction
 from app.modules.budget.tree.service_base import BudgetTreeServiceBase, _json_safe
 from app.modules.budget.tree_models import (
-    Account,
-    BankAllocation,
     Budget,
     BudgetExpense,
     Invoice,
@@ -60,7 +58,6 @@ class ExpenseOps(BudgetTreeServiceBase):
         e: BudgetExpense,
         path_key: str | None,
         app_title: str | None = None,
-        account_name: str | None = None,
         invoice_number: str | None = None,
         actor_name: str | None = None,
         child_count: int = 0,
@@ -76,8 +73,6 @@ class ExpenseOps(BudgetTreeServiceBase):
             description=e.description,
             applicationId=e.application_id,
             applicationTitle=app_title,
-            accountId=e.account_id,
-            accountName=account_name,
             transferId=e.transfer_id,
             actor=e.actor,
             actorName=actor_name,
@@ -112,7 +107,6 @@ class ExpenseOps(BudgetTreeServiceBase):
         *,
         actor: str,
         commit: bool = True,
-        account_id: UUID | None = None,
     ) -> ExpenseOut:
         """Book an expense or an income.
 
@@ -141,15 +135,11 @@ class ExpenseOps(BudgetTreeServiceBase):
                 )
             node = await self._get_node(payload.budget_id)
             fy_id = await self._resolve_fiscal_year(node, payload.fiscal_year_id)
-        # The account is not a manual booking field. Only bank reconciliation
-        # sets it: confirm_line passes account_id explicitly.
-        account_name = await self._validate_account(account_id)
         expense = BudgetExpense(
             id=uuid.uuid4(),
             budget_id=node.id,
             fiscal_year_id=fy_id,
             application_id=payload.application_id,
-            account_id=account_id,
             kind=payload.kind,
             amount=payload.amount,
             currency=node.currency,
@@ -180,8 +170,7 @@ class ExpenseOps(BudgetTreeServiceBase):
         if payload.invoice_id is not None:
             await self._mark_invoice_paid(payload.invoice_id)
         # With commit=False the caller bundles the booking and its follow-up
-        # mutations in one transaction. A bank reconcile does the claim, the
-        # booking and the allocation together.
+        # mutations in one transaction.
         if commit:
             await self.session.commit()
         names = await self._actor_names({expense.actor} if expense.actor else set())
@@ -189,22 +178,8 @@ class ExpenseOps(BudgetTreeServiceBase):
             expense,
             node.path_key,
             app_title,
-            account_name,
             actor_name=names.get(expense.actor or ""),
         )
-
-    async def _validate_account(self, account_id: UUID | None) -> str | None:
-        """Return the name of the account, or `None` when no account is given.
-
-        Raises:
-            NotFoundError: The account does not exist.
-        """
-        if account_id is None:
-            return None
-        acc = await self.session.get(Account, account_id)
-        if acc is None:
-            raise NotFoundError(f"account {account_id} not found")
-        return acc.name
 
     async def _mark_invoice_paid(self, invoice_id: UUID) -> None:
         """Set the linked invoice to `paid` when a booking references it.
@@ -233,9 +208,9 @@ class ExpenseOps(BudgetTreeServiceBase):
     async def update_expense(self, expense_id: UUID, payload: ExpenseUpdate) -> ExpenseOut:
         """Update a booking.
 
-        The caller can change the amount, the description, the bank account, the
-        cost center and the extra metadata. The fiscal year and the application
-        binding stay fixed. The service writes only the fields that the payload
+        The caller can change the amount, the description, the cost center and
+        the extra metadata. The fiscal year and the application binding stay
+        fixed. The service writes only the fields that the payload
         sets. An explicit `null` clears an optional field.
         """
         expense = await self.session.get(BudgetExpense, expense_id)
@@ -319,20 +294,11 @@ class ExpenseOps(BudgetTreeServiceBase):
         if expense.application_id is not None:
             app = await self.session.get(Application, expense.application_id)
             app_title = _title_of(app.data) if app is not None else None
-        # Defensive: a parallel delete_account (FK SET NULL) can remove the
-        # account row between the booking and this re-read. Then get gives None.
-        acc = (
-            await self.session.get(Account, expense.account_id)
-            if expense.account_id is not None
-            else None
-        )
-        acc_name = acc.name if acc is not None else None
         names = await self._actor_names({expense.actor} if expense.actor else set())
         return self._expense_out(
             expense,
             node.path_key,
             app_title,
-            acc_name,
             actor_name=names.get(expense.actor or ""),
             child_count=child_n,
         )
@@ -355,10 +321,8 @@ class ExpenseOps(BudgetTreeServiceBase):
         expense_id: UUID | None = None,
         budget_id: UUID | None = None,
         fiscal_year_id: UUID | None = None,
-        account_id: UUID | None = None,
         kind: str | None = None,
         application_id: UUID | None = None,
-        unallocated: bool = False,
         q: str | None = None,
         amount_min: Decimal | None = None,
         amount_max: Decimal | None = None,
@@ -377,7 +341,7 @@ class ExpenseOps(BudgetTreeServiceBase):
         # expands its parent. It is no row of its own and no link candidate.
         filters: list[ColumnElement[bool]] = [BudgetExpense.parent_expense_id.is_(None)]
         if expense_id is not None:
-            # Deep link to one exact booking (accounts page "view booking", #expenses-ux).
+            # Deep link to one exact booking (#expenses-ux).
             filters.append(BudgetExpense.id == expense_id)
         if budget_id is not None:
             node = await self._get_node(budget_id)
@@ -390,19 +354,12 @@ class ExpenseOps(BudgetTreeServiceBase):
             filters.append(BudgetExpense.budget_id.in_(subtree))
         if fiscal_year_id is not None:
             filters.append(BudgetExpense.fiscal_year_id == fiscal_year_id)
-        if account_id is not None:
-            filters.append(BudgetExpense.account_id == account_id)
         if kind is not None:
             filters.append(BudgetExpense.kind == kind)
-        if unallocated:
-            # Only bookings without a bank allocation. These are the link candidates.
-            filters.append(
-                ~exists().where(BankAllocation.expense_id == BudgetExpense.id)
-            )
         if application_id is not None:
             filters.append(BudgetExpense.application_id == application_id)
         # Fuzzy search: a trigram rank over the free-text fields of the booking
-        # plus the joined texts of application, account and invoice. rank_expr
+        # plus the joined texts of application and invoice. rank_expr
         # orders the hits. The where clause goes into the shared filters list,
         # so the count query and the row query stay identical.
         rank_expr = None
@@ -417,7 +374,6 @@ class ExpenseOps(BudgetTreeServiceBase):
                     BudgetExpense.note,
                     Invoice.number,
                     Invoice.supplier,
-                    Account.name,
                     func.cast(Application.data, _Text),
                 ],
                 dialect=dialect_of(self.session),
@@ -443,17 +399,15 @@ class ExpenseOps(BudgetTreeServiceBase):
         # Nullable date columns: empty values go last regardless of direction.
         ordering = direction.nulls_last() if sort in ("invoiceDate", "paymentDate") else direction
 
-        # The search reads joined texts from application, account and invoice.
-        # The count query must carry the same joins as the row query. Otherwise
-        # the where clause over the foreign tables does not resolve, or it
-        # cross-joins. Without q the count query stays lean and adds no join.
+        # The search reads joined texts from application and invoice. The count
+        # query must carry the same joins as the row query. Otherwise the where
+        # clause over the foreign tables does not resolve, or it cross-joins.
+        # Without q the count query stays lean and adds no join.
         count_stmt = select(func.count()).select_from(BudgetExpense)
         if rank_expr is not None:
-            count_stmt = (
-                count_stmt.outerjoin(Application, Application.id == BudgetExpense.application_id)
-                .outerjoin(Account, Account.id == BudgetExpense.account_id)
-                .outerjoin(Invoice, Invoice.id == BudgetExpense.invoice_id)
-            )
+            count_stmt = count_stmt.outerjoin(
+                Application, Application.id == BudgetExpense.application_id
+            ).outerjoin(Invoice, Invoice.id == BudgetExpense.invoice_id)
         total = await self.session.scalar(count_stmt.where(*filters))
         # With an active search the most relevant hit comes first. The normal
         # ordering then acts as a deterministic tiebreak. Without a search
@@ -469,12 +423,10 @@ class ExpenseOps(BudgetTreeServiceBase):
                     BudgetExpense,
                     Budget.path_key,
                     Application.data,
-                    Account.name,
                     Invoice.number,
                 )
                 .join(Budget, Budget.id == BudgetExpense.budget_id)
                 .outerjoin(Application, Application.id == BudgetExpense.application_id)
-                .outerjoin(Account, Account.id == BudgetExpense.account_id)
                 .outerjoin(Invoice, Invoice.id == BudgetExpense.invoice_id)
                 .where(*filters)
                 .order_by(*order_by)
@@ -489,12 +441,11 @@ class ExpenseOps(BudgetTreeServiceBase):
                 e,
                 path_key,
                 _title_of(data) if data else None,
-                acc_name,
                 inv_number,
                 actor_name=names.get(e.actor or ""),
                 child_count=child_counts.get(e.id, 0),
             )
-            for (e, path_key, data, acc_name, inv_number) in rows
+            for (e, path_key, data, inv_number) in rows
         ]
         return Page(items=items, total=total or 0, limit=limit, offset=offset)
 

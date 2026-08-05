@@ -35,14 +35,9 @@ from app.modules.auth.models import (
 from app.modules.auth.oauth_models import OAuthAuthorizationCode, OAuthToken
 from app.modules.budget.models import BudgetEntry, BudgetField, BudgetPot
 from app.modules.budget.tree_models import (
-    Account,
-    BankAllocation,
-    BankStatementLine,
-    BankSyncSession,
     Budget,
     BudgetAllocation,
     BudgetExpense,
-    CounterpartyMemory,
     FiscalYear,
 )
 from app.modules.config_revision.models import ConfigRevision
@@ -72,11 +67,6 @@ __all__ = [
     "AuthSession",
     "Ballot",
     "Base",
-    "Account",
-    "BankAllocation",
-    "BankStatementLine",
-    "BankSyncSession",
-    "CounterpartyMemory",
     "Budget",
     "BudgetAllocation",
     "BudgetEntry",

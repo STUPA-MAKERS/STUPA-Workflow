@@ -248,8 +248,6 @@ class ExpenseCreate(_CamelModel):
     budget_id: UUID | None = Field(default=None, alias="budgetId")
     fiscal_year_id: UUID | None = Field(default=None, alias="fiscalYearId")
     application_id: UUID | None = Field(default=None, alias="applicationId")
-    # No `accountId` here. The account is not a manual booking field. Only the
-    # bank reconciliation sets it.
     invoice_date: date | None = Field(default=None, alias="invoiceDate")
     payment_date: date | None = Field(default=None, alias="paymentDate")
     correspondent: str | None = Field(default=None)
@@ -269,9 +267,9 @@ class ExpenseCreate(_CamelModel):
 class SubBookingCreate(_CamelModel):
     """Create a sub-booking by hand.
 
-    The sub-booking inherits the account, the cost center, the fiscal year and
-    the kind from the parent. This schema carries the own values only: amount,
-    description and metadata.
+    The sub-booking inherits the cost center, the fiscal year and the kind from
+    the parent. This schema carries the own values only: amount, description and
+    metadata.
     """
 
     amount: Decimal = Field(gt=0, le=_MAX_AMOUNT, allow_inf_nan=False)
@@ -327,8 +325,6 @@ class ExpenseOut(_CamelModel):
     description: str
     application_id: UUID | None = Field(default=None, alias="applicationId")
     application_title: str | None = Field(default=None, alias="applicationTitle")
-    account_id: UUID | None = Field(default=None, alias="accountId")
-    account_name: str | None = Field(default=None, alias="accountName")
     transfer_id: UUID | None = Field(default=None, alias="transferId")
     # `actor` is the principal `sub`, the raw identity for the audit log.
     # `actorName` is the display name the server resolves. Never show the raw
@@ -457,235 +453,6 @@ class InvoiceOut(_CamelModel):
     created_at: datetime = Field(alias="createdAt")
 
 
-class AccountCreate(_CamelModel):
-    """Create an account from a name and an IBAN as free text.
-
-    An account is not bound to a cost center. The FinTS bank connection
-    (`fintsEndpoint` and `fintsBlz`) is optional, and all bookers share it.
-    Each booker sets the personal credentials (login and PIN) in the booking
-    tab, not here.
-    """
-
-    name: str = Field(min_length=1, max_length=200)
-    iban: str = Field(default="", max_length=64)
-    active: bool = True
-    fints_endpoint: str | None = Field(default=None, alias="fintsEndpoint", max_length=500)
-    fints_blz: str | None = Field(default=None, alias="fintsBlz", max_length=20)
-
-
-class AccountUpdate(_CamelModel):
-    """Partially update an account.
-
-    For a FinTS connection field, `null` or an empty string clears the value. A
-    set value overwrites it. The login and the PIN are not part of the account
-    data.
-    """
-
-    name: str | None = Field(default=None, min_length=1, max_length=200)
-    iban: str | None = Field(default=None, max_length=64)
-    active: bool | None = None
-    fints_endpoint: str | None = Field(default=None, alias="fintsEndpoint", max_length=500)
-    fints_blz: str | None = Field(default=None, alias="fintsBlz", max_length=20)
-
-    @model_validator(mode="after")
-    def _at_least_one(self) -> AccountUpdate:
-        if not self.model_fields_set:
-            raise ValueError("at least one field required")
-        return self
-
-
-class AccountOut(_CamelModel):
-    """Account base data with the FinTS bank connection (endpoint and BLZ).
-
-    `fintsConfigured` means the connection is complete and the account is
-    FinTS-capable. A personal login or PIN never appears here.
-    """
-
-    id: UUID
-    name: str
-    iban: str
-    active: bool
-    fints_endpoint: str | None = Field(default=None, alias="fintsEndpoint")
-    fints_blz: str | None = Field(default=None, alias="fintsBlz")
-    # True once the endpoint and the BLZ are present. The account is then
-    # FinTS-syncable, as soon as a booker stores personal credentials.
-    fints_configured: bool = Field(default=False, alias="fintsConfigured")
-    # Last known bank balance and its as-of time. Null means never synced.
-    fints_last_balance: Decimal | None = Field(default=None, alias="fintsLastBalance")
-    fints_balance_at: datetime | None = Field(default=None, alias="fintsBalanceAt")
-
-
-class AccountOption(_CamelModel):
-    """Minimal account choice for booking dropdowns: id and name, NO IBAN.
-
-    A booker without the account-data permission can read this. `fintsConfigured`
-    is not a secret and means the account is FinTS-capable.
-    `fintsHasCredential` means the requesting booker already stored own
-    credentials. Without them the booker must connect on the first sync.
-    """
-
-    id: UUID
-    name: str
-    fints_configured: bool = Field(default=False, alias="fintsConfigured")
-    fints_has_credential: bool = Field(default=False, alias="fintsHasCredential")
-    fints_last_sync_at: datetime | None = Field(default=None, alias="fintsLastSyncAt")
-    # Last bank balance and its as-of time for the accounts tab.
-    fints_last_balance: Decimal | None = Field(default=None, alias="fintsLastBalance")
-    fints_balance_at: datetime | None = Field(default=None, alias="fintsBalanceAt")
-
-
-class FintsCredentialIn(_CamelModel):
-    """Personal FinTS credentials of the booker for an account.
-
-    `fintsPin` is write-only. The server stores it encrypted and never returns
-    it. The booker sets the credentials on the first connect in the booking
-    tab and replaces them on a change.
-    """
-
-    fints_login: str = Field(alias="fintsLogin", min_length=1, max_length=200)
-    fints_pin: str = Field(alias="fintsPin", min_length=1, max_length=200)
-
-
-class FintsCredentialStatus(_CamelModel):
-    """Connection status of a booker for an account.
-
-    `configured` means the account is FinTS-capable, so the endpoint and the
-    BLZ are set. `hasCredential` means the requesting booker stored own
-    credentials. `login` is the username of that booker and is not a secret.
-    The PIN never appears.
-    """
-
-    configured: bool = False
-    has_credential: bool = Field(default=False, alias="hasCredential")
-    fints_login: str | None = Field(default=None, alias="fintsLogin")
-    fints_last_sync_at: datetime | None = Field(default=None, alias="fintsLastSyncAt")
-    # Cooldown after a bank lock or a signature rejection. The server refuses a
-    # sync until this time. The UI disables the fetch button and warns against
-    # a retry.
-    fints_locked_until: datetime | None = Field(default=None, alias="fintsLockedUntil")
-
-
-BankLineState = Literal["unmatched", "suggested", "matched", "ignored"]
-BankSyncStatus = Literal["done", "needs_tan"]
-
-
-class StatementLineOut(_CamelModel):
-    """Staged bank transaction.
-
-    `amount` is signed: above 0 is an inflow and below 0 is an outflow. `kind`
-    is the booking kind derived from that sign.
-    """
-
-    id: UUID
-    account_id: UUID = Field(alias="accountId")
-    amount: Decimal
-    kind: ExpenseKind
-    currency: str
-    booking_date: date | None = Field(default=None, alias="bookingDate")
-    value_date: date | None = Field(default=None, alias="valueDate")
-    purpose: str | None = None
-    counterparty_name: str | None = Field(default=None, alias="counterpartyName")
-    counterparty_iban: str | None = Field(default=None, alias="counterpartyIban")
-    end_to_end_id: str | None = Field(default=None, alias="endToEndId")
-    reference: str | None = None
-    match_state: BankLineState = Field(alias="matchState")
-    suggested_budget_id: UUID | None = Field(default=None, alias="suggestedBudgetId")
-    suggested_path_key: str | None = Field(default=None, alias="suggestedPathKey")
-    suggested_expense_id: UUID | None = Field(default=None, alias="suggestedExpenseId")
-    # Booking of a `matched` line, taken from `bank_allocation`. A split payment
-    # uses the oldest one. This is the deep-link target for "view booking"
-    # (#expenses-ux).
-    matched_expense_id: UUID | None = Field(default=None, alias="matchedExpenseId")
-    created_at: datetime = Field(alias="createdAt")
-
-
-class StatementLineDetail(StatementLineOut):
-    """Detail view of a staged line.
-
-    The detail adds the raw parser payload with the source-format fields and
-    the batch metadata, plus the idempotency key. Both help to diagnose the
-    import and the dedup behavior. The read permission is the same as for the
-    list.
-    """
-
-    raw_payload: dict = Field(default_factory=dict, alias="rawPayload")
-    idempotency_key: str = Field(alias="idempotencyKey")
-
-
-class BankSyncResult(_CamelModel):
-    """Result of one FinTS sync step.
-
-    `status='done'` sets `imported` and `duplicates`. `status='needs_tan'` sets
-    `sessionToken` and `challenge` to signal that the bank wants a TAN. For a
-    `decoupled` challenge the booker approves in the banking app. The client
-    then polls `POST .../tan` without a code.
-    """
-
-    status: BankSyncStatus
-    account_id: UUID = Field(alias="accountId")
-    imported: int = 0
-    duplicates: int = 0
-    # The fields below are set for `status='needs_tan'` only.
-    session_token: UUID | None = Field(default=None, alias="sessionToken")
-    challenge: str | None = None
-    challenge_html: str | None = Field(default=None, alias="challengeHtml")
-    # Optical challenge (photoTAN or QR-TAN) as a data URL for direct display.
-    challenge_image: str | None = Field(default=None, alias="challengeImage")
-    decoupled: bool = False
-
-
-class BankTanRequest(_CamelModel):
-    """TAN to resume a pending sync session.
-
-    Leave the field empty for a decoupled pushTAN. The call is then a pure poll
-    that asks whether the booker approved in the app.
-    """
-
-    tan: str = Field(default="", max_length=100)
-
-
-class BankImportResult(_CamelModel):
-    """Result of a file import (CAMT.053 or MT940)."""
-
-    account_id: UUID = Field(alias="accountId")
-    imported: int = 0
-    duplicates: int = 0
-
-
-class ConfirmLineRequest(_CamelModel):
-    """Confirm a transaction into a booking.
-
-    Give either `matchExpenseId` to attach the line to an EXISTING booking or
-    `budgetId` to create a new booking against that cost center. The sign of
-    the amount then sets the kind. `fiscalYearId` is optional. Without it the
-    server takes the single active fiscal year. `description` overrides the
-    default, which is the purpose text.
-    """
-
-    budget_id: UUID | None = Field(default=None, alias="budgetId")
-    fiscal_year_id: UUID | None = Field(default=None, alias="fiscalYearId")
-    match_expense_id: UUID | None = Field(default=None, alias="matchExpenseId")
-    description: str | None = Field(default=None, min_length=1)
-
-    @model_validator(mode="after")
-    def _target_required(self) -> ConfirmLineRequest:
-        if self.budget_id is None and self.match_expense_id is None:
-            raise ValueError("either budgetId or matchExpenseId is required")
-        if self.budget_id is not None and self.match_expense_id is not None:
-            raise ValueError("budgetId and matchExpenseId are mutually exclusive")
-        return self
-
-
-class IgnoreLineRequest(_CamelModel):
-    """Ignore a staged transaction.
-
-    `reason` is optional free text. The platform keeps it in the audit log
-    (bank_line_ignore) only and does not store it on the line.
-    """
-
-    reason: str | None = Field(default=None, max_length=500)
-
-
 class TransferCreate(_CamelModel):
     """Transfer from one cost center to another in the same fiscal year.
 
@@ -718,20 +485,6 @@ class TransferOut(_CamelModel):
 BudgetTreeNodeOut.model_rebuild()
 
 __all__ = [
-    "AccountCreate",
-    "AccountOption",
-    "AccountOut",
-    "AccountUpdate",
-    "BankImportResult",
-    "BankLineState",
-    "BankSyncResult",
-    "BankSyncStatus",
-    "BankTanRequest",
-    "ConfirmLineRequest",
-    "FintsCredentialIn",
-    "FintsCredentialStatus",
-    "StatementLineDetail",
-    "StatementLineOut",
     "TransferCreate",
     "TransferOut",
     "BudgetApplicationOut",

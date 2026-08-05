@@ -39,8 +39,6 @@ export interface Expense {
   description: string;
   applicationId: Uuid | null;
   applicationTitle: string | null;
-  accountId: Uuid | null;
-  accountName: string | null;
   transferId: Uuid | null;
   // `actor` = raw principal `sub` (audit). `actorName` = server-resolved display
   // name. Always show `actorName` in the UI, never the UUID.
@@ -65,121 +63,6 @@ export interface Expense {
   createdAt: string;
 }
 
-/** Account (name and free-text IBAN). It is not bound to cost centers. */
-export interface Account {
-  id: Uuid;
-  name: string;
-  iban: string;
-  active: boolean;
-  // FinTS bank connection: only endpoint and BLZ. They are the same for all bookers
-  // and the admin sets them. `fintsConfigured` = both set -> the account is
-  // FinTS-capable. Each booker keeps a personal login and PIN that never appear here.
-  fintsEndpoint: string | null;
-  fintsBlz: string | null;
-  fintsConfigured: boolean;
-}
-
-export interface AccountBody {
-  name: string;
-  iban?: string;
-  active?: boolean;
-  // FinTS bank connection: `null` or `""` clears it. The login and the PIN are not
-  // part of the account master data. Each booker sets them in the bookings tab.
-  fintsEndpoint?: string | null;
-  fintsBlz?: string | null;
-}
-
-/** Personal FinTS credentials of a booker. `fintsPin` is write-only. */
-export interface FintsCredentialBody {
-  fintsLogin: string;
-  fintsPin: string;
-}
-
-/** Connection status of a booker for an account. */
-export interface FintsCredentialStatus {
-  /** Account is FinTS-capable (endpoint + BLZ set on the account). */
-  configured: boolean;
-  /** The requesting booker has stored their own credentials. */
-  hasCredential: boolean;
-  /** Login name of the booker. It is not a secret. `null` means no credential. */
-  fintsLogin: string | null;
-  fintsLastSyncAt: string | null;
-  /**
-   * Lock cooldown as an ISO timestamp. The server rejects every sync until this
-   * time after a bank lock or a signature rejection. `null` means not locked. Until
-   * then the frontend disables the fetch button and warns NOT to retry. A retry
-   * risks a full bank lock.
-   */
-  fintsLockedUntil: string | null;
-}
-
-/** Staged account statement line. `amount` is signed and a value >0 means incoming. */
-export interface StatementLine {
-  id: Uuid;
-  accountId: Uuid;
-  amount: string;
-  kind: ExpenseKind;
-  currency: string;
-  bookingDate: string | null;
-  valueDate: string | null;
-  purpose: string | null;
-  counterpartyName: string | null;
-  counterpartyIban: string | null;
-  endToEndId: string | null;
-  reference: string | null;
-  matchState: 'unmatched' | 'suggested' | 'matched' | 'ignored';
-  suggestedBudgetId: Uuid | null;
-  suggestedPathKey: string | null;
-  suggestedExpenseId: Uuid | null;
-  /** Booking of a `matched` line — deep-link target for "view booking". */
-  matchedExpenseId: Uuid | null;
-  createdAt: string;
-}
-
-/** Result of a FinTS sync step: done or TAN required. */
-export interface BankSyncResult {
-  status: 'done' | 'needs_tan';
-  accountId: Uuid;
-  imported: number;
-  duplicates: number;
-  sessionToken: Uuid | null;
-  challenge: string | null;
-  challengeHtml: string | null;
-  /** Visual challenge (photoTAN/QR-TAN) as a data URL for direct display. */
-  challengeImage: string | null;
-  decoupled: boolean;
-}
-
-/** Result of the CAMT.053/MT940 file import (option D). */
-export interface BankImportResult {
-  accountId: Uuid;
-  imported: number;
-  duplicates: number;
-}
-
-/** Confirm a statement line: new booking against `budgetId` OR to `matchExpenseId`. */
-export interface ConfirmLineBody {
-  budgetId?: Uuid | null;
-  fiscalYearId?: Uuid | null;
-  matchExpenseId?: Uuid | null;
-  description?: string | null;
-}
-
-/** Minimal account choice (id + name, no IBAN) for booking dropdowns. */
-export interface AccountOption {
-  id: Uuid;
-  name: string;
-  /** Account is FinTS-capable (endpoint + BLZ set). It is not a secret and stays
-   *  visible without account.manage. */
-  fintsConfigured: boolean;
-  /** The requesting booker has already stored their own credentials. */
-  fintsHasCredential: boolean;
-  fintsLastSyncAt: string | null;
-  /** Last bank balance and its as-of date. `null` means never synced. */
-  fintsLastBalance: string | null;
-  fintsBalanceAt: string | null;
-}
-
 /** Transfer from cost center to cost center inside the same fiscal year. */
 export interface TransferCreate {
   fromBudgetId: Uuid;
@@ -192,14 +75,6 @@ export interface TransferCreate {
 /** Offset page of booked expenses/income. */
 export interface ExpensePage {
   items: Expense[];
-  total: number;
-  limit: number;
-  offset: number;
-}
-
-/** Page of staged account statement lines. */
-export interface StatementLinePage {
-  items: StatementLine[];
   total: number;
   limit: number;
   offset: number;
@@ -226,8 +101,6 @@ export interface ExpenseCreate extends ExpenseMetadata {
   budgetId?: Uuid | null;
   fiscalYearId?: Uuid | null;
   applicationId?: Uuid | null;
-  // No `accountId`: the account is not a manual booking field. Only the account
-  // reconciliation sets it.
 }
 
 /** Update a booking: amount, description, cost center and extra metadata. */
@@ -349,13 +222,10 @@ export interface InvoicePage {
 
 /** Filter/paging of the bookings list. */
 export interface ExpenseQuery {
-  /** Exact booking (deep link from the accounts tab). */
+  /** Exact booking (deep link). */
   id?: Uuid;
   budget?: Uuid;
   fiscalYear?: Uuid;
-  account?: Uuid;
-  /** Only bookings without a bank link (link candidates in the accounts tab). */
-  unallocated?: boolean;
   kind?: ExpenseKind;
   applicationId?: Uuid;
   q?: string;
@@ -560,22 +430,11 @@ export class BudgetTreeApi {
   listSubBookings(expenseId: Uuid): Observable<Expense[]> {
     return this.http.get<Expense[]>(`${this.base}/budget-expenses/${expenseId}/sub-bookings`);
   }
-  /** Manually create a sub-booking. It inherits account, cost center, fiscal year
-   *  and kind from the parent. */
+  /** Manually create a sub-booking. It inherits the cost center, the fiscal year
+   *  and the kind from the parent. */
   createSubBooking(expenseId: Uuid, body: SubBookingBody): Observable<Expense> {
     return this.http.post<Expense>(`${this.base}/budget-expenses/${expenseId}/sub-bookings`, body);
   }
-  /** Create sub-bookings from a CAMT.053/MT940 file. They inherit account, cost
-   *  center, fiscal year and kind. */
-  importSubBookings(expenseId: Uuid, file: File): Observable<Expense[]> {
-    const form = new FormData();
-    form.append('file', file);
-    return this.http.post<Expense[]>(
-      `${this.base}/budget-expenses/${expenseId}/sub-bookings/import`,
-      form,
-    );
-  }
-
   /** Transfer from cost center to cost center. It books an expense and an income in
    *  the same fiscal year. */
   createTransfer(body: TransferCreate): Observable<unknown> {
@@ -633,121 +492,6 @@ export class BudgetTreeApi {
    *  reachable only internally, so a presigned URL would carry an internal host. */
   invoiceFileBlob(id: Uuid): Observable<Blob> {
     return this.http.get(`${this.base}/invoices/${id}/file`, { responseType: 'blob' });
-  }
-
-  listAccounts(): Observable<Account[]> {
-    return this.http.get<Account[]>(`${this.base}/accounts`);
-  }
-  /** Active accounts as id and name (no IBAN) for booking dropdowns. Bookers may
-   *  call this without account.manage. */
-  listAccountOptions(): Observable<AccountOption[]> {
-    return this.http.get<AccountOption[]>(`${this.base}/accounts/options`, {
-      context: skipLoading(),
-    });
-  }
-  createAccount(body: AccountBody): Observable<Account> {
-    return this.http.post<Account>(`${this.base}/accounts`, body);
-  }
-  updateAccount(id: Uuid, body: Partial<AccountBody>): Observable<Account> {
-    return this.http.patch<Account>(`${this.base}/accounts/${id}`, body);
-  }
-  deleteAccount(id: Uuid): Observable<void> {
-    return this.http.delete<void>(`${this.base}/accounts/${id}`);
-  }
-
-  // Bank reconciliation.
-  /** Connection status of a booker for an account: FinTS-capable and own credentials
-   *  stored. It skips the global loading overlay because the dialog shows its own. */
-  fintsCredentialStatus(accountId: Uuid): Observable<FintsCredentialStatus> {
-    return this.http.get<FintsCredentialStatus>(
-      `${this.base}/accounts/${accountId}/fints/credential`,
-      { context: skipLoading() },
-    );
-  }
-  /** Create or replace the personal FinTS credentials (login and PIN). */
-  setFintsCredential(accountId: Uuid, body: FintsCredentialBody): Observable<FintsCredentialStatus> {
-    return this.http.put<FintsCredentialStatus>(
-      `${this.base}/accounts/${accountId}/fints/credential`,
-      body,
-    );
-  }
-  /** Delete own FinTS credentials for the account. */
-  deleteFintsCredential(accountId: Uuid): Observable<void> {
-    return this.http.delete<void>(`${this.base}/accounts/${accountId}/fints/credential`);
-  }
-  /** Start a FinTS sync: stage statement lines or request a TAN (`needs_tan`). */
-  fintsSync(accountId: Uuid): Observable<BankSyncResult> {
-    return this.http.post<BankSyncResult>(`${this.base}/accounts/${accountId}/fints/sync`, {});
-  }
-  /** Continue a pending TAN session. An empty `tan` is a decoupled poll. The poll
-   *  skips the global loading overlay. */
-  fintsSubmitTan(accountId: Uuid, sessionToken: Uuid, tan: string): Observable<BankSyncResult> {
-    return this.http.post<BankSyncResult>(
-      `${this.base}/accounts/${accountId}/fints/sessions/${sessionToken}/tan`,
-      { tan },
-      { context: skipLoading() },
-    );
-  }
-  /** Option D: upload a CAMT.053/MT940 file -> stage statement lines. */
-  importStatementFile(accountId: Uuid, file: File): Observable<BankImportResult> {
-    const form = new FormData();
-    form.append('file', file);
-    return this.http.post<BankImportResult>(
-      `${this.base}/accounts/${accountId}/statement/import`,
-      form,
-    );
-  }
-  /** Staged statement lines, filtered and paginated. */
-  listStatementLines(
-    opts: {
-      account?: Uuid;
-      state?: string;
-      linked?: boolean;
-      includeIgnored?: boolean;
-      kind?: ExpenseKind;
-      q?: string;
-      dateFrom?: string;
-      dateTo?: string;
-      sort?: 'date' | 'amount';
-      order?: 'asc' | 'desc';
-      limit?: number;
-      offset?: number;
-    } = {},
-  ): Observable<StatementLinePage> {
-    const params: Record<string, string> = {};
-    if (opts.account) params['account'] = opts.account;
-    if (opts.state) params['state'] = opts.state;
-    if (opts.linked !== undefined) params['linked'] = String(opts.linked);
-    if (opts.includeIgnored !== undefined) params['includeIgnored'] = String(opts.includeIgnored);
-    if (opts.kind) params['kind'] = opts.kind;
-    if (opts.q) params['q'] = opts.q;
-    if (opts.dateFrom) params['dateFrom'] = opts.dateFrom;
-    if (opts.dateTo) params['dateTo'] = opts.dateTo;
-    if (opts.sort) params['sort'] = opts.sort;
-    if (opts.order) params['order'] = opts.order;
-    params['limit'] = String(opts.limit ?? 50);
-    params['offset'] = String(opts.offset ?? 0);
-    return this.http.get<StatementLinePage>(`${this.base}/statement-lines`, { params });
-  }
-  /** Book a statement line. */
-  confirmStatementLine(lineId: Uuid, body: ConfirmLineBody): Observable<Expense> {
-    return this.http.post<Expense>(`${this.base}/statement-lines/${lineId}/confirm`, body);
-  }
-  /** Mark a statement line as irrelevant (P(``budget.reconcile_ignore``)). The audit
-   * reason is optional. */
-  ignoreStatementLine(lineId: Uuid, reason?: string): Observable<void> {
-    return this.http.post<void>(`${this.base}/statement-lines/${lineId}/ignore`, {
-      reason: reason?.trim() || undefined,
-    });
-  }
-  /** Undo an ignore. The line returns to the open reconcile queue
-   * (P(``budget.reconcile_ignore``)). */
-  reactivateStatementLine(lineId: Uuid): Observable<StatementLine> {
-    return this.http.post<StatementLine>(`${this.base}/statement-lines/${lineId}/reactivate`, {});
-  }
-  /** Remove the statement-line<->booking link. The booking stays and the line reopens. */
-  unlinkStatementLine(lineId: Uuid): Observable<StatementLine> {
-    return this.http.post<StatementLine>(`${this.base}/statement-lines/${lineId}/unlink`, {});
   }
 
   /** Filtered bookings as ``.xlsx`` (P(``budget.export``)). The content matches the

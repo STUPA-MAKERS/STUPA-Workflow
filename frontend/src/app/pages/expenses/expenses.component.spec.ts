@@ -30,8 +30,6 @@ const EXPENSE: Expense = {
   description: 'Druckkosten Flyer',
   applicationId: null,
   applicationTitle: null,
-  accountId: null,
-  accountName: null,
   transferId: null,
   actor: 'admin',
   actorName: 'Admin',
@@ -67,10 +65,9 @@ async function setup(opts: { perms?: string[]; page?: ExpensePage } = {}) {
     ],
   });
   const http = view.fixture.debugElement.injector.get(HttpTestingController);
-  // The constructor loads the cost center tree, the accounts, the invoices and the
-  // first page of bookings.
+  // The constructor loads the cost center tree, the invoices and the first page of
+  // bookings.
   http.match((r) => r.url.endsWith('/budgets')).forEach((req) => req.flush([]));
-  http.match((r) => r.url.endsWith('/accounts/options')).forEach((req) => req.flush([]));
   // `listInvoices` reads a page, so the answer must be a paged shape and not an array.
   // Otherwise `page.items` is undefined and the `invoiceOptions` computed throws.
   http
@@ -213,19 +210,17 @@ interface Built {
 }
 
 /**
- * Instantiate the component directly. The constructor fires the tree, accounts,
- * invoices and expenses requests. The caller can answer that first load with custom
- * data. The default answer is empty.
+ * Instantiate the component directly. The constructor fires the tree, invoices
+ * and expenses requests. The caller can answer that first load with custom data.
+ * The default answer is empty.
  */
 function build(
   opts: {
     perms?: string[];
     tree?: BudgetTreeNode[];
-    accounts?: { id: string; name: string }[];
     invoices?: Invoice[];
     expenses?: ExpensePage;
     treeError?: boolean;
-    accountsError?: boolean;
     invoicesError?: boolean;
     expensesError?: boolean;
   } = {},
@@ -246,10 +241,6 @@ function build(
   const treeReq = http.expectOne((r) => r.url.endsWith('/budgets'));
   if (opts.treeError) treeReq.error(new ProgressEvent('err'));
   else treeReq.flush(opts.tree ?? []);
-
-  const accReq = http.expectOne((r) => r.url.endsWith('/accounts/options'));
-  if (opts.accountsError) accReq.error(new ProgressEvent('err'));
-  else accReq.flush(opts.accounts ?? []);
 
   const invReq = http.expectOne((r) => r.url.endsWith('/invoices') && r.method === 'GET');
   if (opts.invoicesError) invReq.error(new ProgressEvent('err'));
@@ -280,21 +271,18 @@ describe('ExpensesComponent (unit)', () => {
     jest.useRealTimers();
   });
 
-  it('loads tree, accounts and invoices on construction (success)', () => {
+  it('loads tree and invoices on construction (success)', () => {
     const { cmp } = build({
       tree: ROOT_TREE,
-      accounts: [{ id: 'a-1', name: 'Hauptkonto' }],
       invoices: [INVOICE],
       expenses: page([EXPENSE], 1),
     });
     expect(cmp.budgetTree()).toEqual(ROOT_TREE);
-    expect(cmp.accounts()).toEqual([{ id: 'a-1', name: 'Hauptkonto' }]);
     expect(cmp.invoices()).toEqual([INVOICE]);
     expect(cmp.items()).toEqual([EXPENSE]);
     expect(cmp.total()).toBe(1);
     expect(cmp.loading()).toBe(false);
     expect(cmp.costCentreOptions().length).toBe(2);
-    expect(cmp.accountOptions()).toEqual([{ value: 'a-1', label: 'Hauptkonto' }]);
     const label = cmp.invoiceOptions()[0];
     expect(label.value).toBe('inv-1');
     // Intl separates with a narrow no-break space, so normalize to plain whitespace.
@@ -304,12 +292,10 @@ describe('ExpensesComponent (unit)', () => {
   it('resets each list to empty on construction errors', () => {
     const { cmp } = build({
       treeError: true,
-      accountsError: true,
       invoicesError: true,
       expensesError: true,
     });
     expect(cmp.budgetTree()).toEqual([]);
-    expect(cmp.accounts()).toEqual([]);
     expect(cmp.invoices()).toEqual([]);
     expect(cmp.loading()).toBe(false);
     expect(cmp.loadingMore()).toBe(false);
@@ -825,7 +811,6 @@ describe('ExpensesComponent (unit)', () => {
     const { cmp } = build();
     const e: Expense = {
       ...EXPENSE,
-      accountId: null,
       invoiceId: null,
       invoiceDate: null,
       paymentDate: null,
@@ -851,7 +836,7 @@ describe('ExpensesComponent (unit)', () => {
 
   it('openEdit keeps populated metadata fields', () => {
     const { cmp } = build();
-    cmp.openEdit({ ...EXPENSE, accountId: 'a-1', invoiceId: 'inv-1' });
+    cmp.openEdit({ ...EXPENSE, invoiceId: 'inv-1' });
     expect(cmp.editInvoiceId()).toBe('inv-1');
     expect(cmp.editPaymentMethod()).toBe('ueberweisung');
     expect(cmp.editCategory()).toBe('Werbung');
@@ -1166,7 +1151,7 @@ describe('ExpensesComponent (unit)', () => {
   });
 });
 
-// Sub-bookings, the account filter, the description expand and the invoice detail dialog.
+// Sub-bookings, the description expand and the invoice detail dialog.
 
 /** Parent booking with children. Its amount is the sum of the children and read-only
  *  on the server. */
@@ -1179,20 +1164,12 @@ const SUB: Expense = {
   description: 'Teilzahlung',
 };
 
-/** Fake a file-input change event. jsdom does not allow a script to set the file list. */
-function fileEvent(file: File | null): Event {
-  const input = document.createElement('input');
-  input.type = 'file';
-  Object.defineProperty(input, 'files', { value: file ? [file] : [], configurable: true });
-  return { target: input } as unknown as Event;
-}
-
 function toastSpies(cmp: ExpensesComponent): { success: jest.SpyInstance; error: jest.SpyInstance } {
   const toast = (cmp as unknown as { toast: { success: (m: string) => void; error: (m: string) => void } }).toast;
   return { success: jest.spyOn(toast, 'success'), error: jest.spyOn(toast, 'error') };
 }
 
-describe('ExpensesComponent (descriptions & account filter)', () => {
+describe('ExpensesComponent (descriptions)', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
   afterEach(() => {
     try {
@@ -1220,22 +1197,6 @@ describe('ExpensesComponent (descriptions & account filter)', () => {
     expect(cmp.descExpanded('e-1')).toBe(false);
   });
 
-  it('selectAccount reloads with the account filter param', () => {
-    const { cmp, http } = build();
-    cmp.selectAccount('a-1');
-    const req = http.expectOne((r) => r.url.endsWith('/expenses') && r.method === 'GET');
-    expect(req.request.params.get('account')).toBe('a-1');
-    req.flush(page([]));
-    expect(cmp.accountId()).toBe('a-1');
-  });
-
-  it('accountFilterOptions prepends the "all accounts" option', () => {
-    const { cmp } = build({ accounts: [{ id: 'a-1', name: 'Hauptkonto' }] });
-    expect(cmp.accountFilterOptions()).toEqual([
-      { value: '', label: 'Alle Konten' },
-      { value: 'a-1', label: 'Hauptkonto' },
-    ]);
-  });
 });
 
 describe('ExpensesComponent (sub-bookings #subbookings)', () => {
@@ -1279,96 +1240,6 @@ describe('ExpensesComponent (sub-bookings #subbookings)', () => {
       .error(new ProgressEvent('err'));
     expect(cmp.isLoadingSub('parent-1')).toBe(false);
     expect(error).toHaveBeenCalledWith('Unterbuchungen konnten nicht geladen werden.');
-  });
-
-  it('submitImport without a target or file is a no-op', () => {
-    const { cmp, http } = build({ expenses: page([PARENT], 1) });
-    cmp.openImportDialog();
-    cmp.onImportFile(fileEvent(null));
-    expect(cmp.canSubmitImport()).toBe(false);
-    cmp.submitImport();
-    http.expectNone((r) => r.url.includes('/sub-bookings'));
-  });
-
-  it('import dialog: open resets state, debounced search lists candidates, pick fills the query', () => {
-    jest.useFakeTimers();
-    const { cmp, http } = build({ expenses: page([PARENT], 1) });
-    cmp.importQuery.set('stale');
-    cmp.openImportDialog();
-    expect(cmp.importOpen()).toBe(true);
-    expect(cmp.importQuery()).toBe('');
-    expect(cmp.importTarget()).toBeNull();
-    cmp.onImportSearch('Druck');
-    jest.advanceTimersByTime(300);
-    http
-      .expectOne(
-        (r) =>
-          r.url.endsWith('/expenses') && r.method === 'GET' && r.params.get('q') === 'Druck',
-      )
-      .flush(page([PARENT], 1));
-    expect(cmp.importCandidates().length).toBe(1);
-    cmp.pickImportTarget(PARENT);
-    expect(cmp.importTarget()).toBe(PARENT);
-    expect(cmp.importCandidates()).toEqual([]);
-    expect(cmp.importQuery()).toContain('Druckkosten Flyer');
-    // search errors clear the candidate list
-    cmp.onImportSearch('kaputt');
-    jest.advanceTimersByTime(300);
-    http
-      .expectOne((r) => r.url.endsWith('/expenses') && r.method === 'GET')
-      .error(new ProgressEvent('err'));
-    expect(cmp.importCandidates()).toEqual([]);
-    cmp.closeImportDialog();
-    expect(cmp.importOpen()).toBe(false);
-    jest.useRealTimers();
-  });
-
-  it('submitImport imports into the target, expands it, reloads children + list and toasts', () => {
-    const { cmp, http } = build({ expenses: page([PARENT], 1) });
-    const { success } = toastSpies(cmp);
-    cmp.openImportDialog();
-    cmp.pickImportTarget(PARENT);
-    cmp.onImportFile(fileEvent(new File(['camt'], 'auszug.xml', { type: 'text/xml' })));
-    expect(cmp.canSubmitImport()).toBe(true);
-    cmp.submitImport();
-    expect(cmp.importBusy()).toBe(true);
-    const req = http.expectOne(
-      (r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings/import') && r.method === 'POST',
-    );
-    expect(req.request.body).toBeInstanceOf(FormData);
-    req.flush([SUB, { ...SUB, id: 'sub-2' }]);
-    expect(cmp.importBusy()).toBe(false);
-    expect(cmp.importOpen()).toBe(false);
-    expect(cmp.isSubExpanded('parent-1')).toBe(true);
-    expect(success).toHaveBeenCalledWith('2 Unterbuchung(en) importiert.');
-    // the response holds the import batch only, so reload the child list and the parent
-    http
-      .expectOne((r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings') && r.method === 'GET')
-      .flush([SUB, { ...SUB, id: 'sub-2' }]);
-    flushList(http, page([PARENT], 1));
-    expect(cmp.subOf('parent-1').length).toBe(2);
-  });
-
-  it('submitImport maps bank_statement_unparseable to the FinTS file error, otherwise generic', () => {
-    const { cmp, http } = build({ expenses: page([PARENT], 1) });
-    const { error } = toastSpies(cmp);
-    cmp.openImportDialog();
-    cmp.pickImportTarget(PARENT);
-    cmp.onImportFile(fileEvent(new File(['?'], 'kaputt.bin')));
-    cmp.submitImport();
-    http
-      .expectOne((r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings/import'))
-      .flush({ code: 'bank_statement_unparseable' }, { status: 422, statusText: 'Unprocessable' });
-    expect(cmp.importBusy()).toBe(false);
-    // dialog stays open so the user can fix the file
-    expect(cmp.importOpen()).toBe(true);
-    expect(error).toHaveBeenCalledWith('Datei ist weder gültiges CAMT.053 noch MT940.');
-
-    cmp.submitImport();
-    http
-      .expectOne((r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings/import'))
-      .flush(null, { status: 500, statusText: 'Server Error' });
-    expect(error).toHaveBeenLastCalledWith('Import der Unterbuchungen fehlgeschlagen.');
   });
 
   it('openCreateSub seeds an empty dialog; closeCreateSub clears the parent', () => {
@@ -1629,7 +1500,6 @@ describe('ExpensesComponent (infinite scroll)', () => {
     });
     const http = view.fixture.debugElement.injector.get(HttpTestingController);
     http.match((r) => r.url.endsWith('/budgets')).forEach((req) => req.flush([]));
-    http.match((r) => r.url.endsWith('/accounts/options')).forEach((req) => req.flush([]));
     http
       .match((r) => r.url.endsWith('/invoices') && r.method === 'GET')
       .forEach((req) => req.flush({ items: [], total: 0, limit: 200, offset: 0 }));
@@ -1914,21 +1784,20 @@ describe('ExpensesComponent (batch/bulk #expenses-ux)', () => {
     expect(nav).toHaveBeenLastCalledWith(
       [],
       expect.objectContaining({
-        queryParams: { id: null, budget: null, account: null, kind: null, q: null },
+        queryParams: { id: null, budget: null, kind: null, q: null },
         queryParamsHandling: 'merge',
         replaceUrl: true,
       }),
     );
     cmp.expenseId.set('e-9');
     cmp.budgetId.set('b-1');
-    cmp.accountId.set('a-2');
     cmp.kind.set('income');
     cmp.q.set('  flyer  ');
     TestBed.tick();
     expect(nav).toHaveBeenLastCalledWith(
       [],
       expect.objectContaining({
-        queryParams: { id: 'e-9', budget: 'b-1', account: 'a-2', kind: 'income', q: 'flyer' },
+        queryParams: { id: 'e-9', budget: 'b-1', kind: 'income', q: 'flyer' },
       }),
     );
     nav.mockRestore();
@@ -1975,7 +1844,6 @@ describe('ExpensesComponent (query-param adoption #expenses-ux)', () => {
     const http = TestBed.inject(HttpTestingController);
     const cmp = TestBed.runInInjectionContext(() => new ExpensesComponent());
     http.expectOne((r) => r.url.endsWith('/budgets')).flush([]);
-    http.expectOne((r) => r.url.endsWith('/accounts/options')).flush([]);
     http
       .expectOne((r) => r.url.endsWith('/invoices') && r.method === 'GET')
       .flush({ items: [], total: 0, limit: 200, offset: 0 });
@@ -1987,15 +1855,13 @@ describe('ExpensesComponent (query-param adoption #expenses-ux)', () => {
     return { cmp, http };
   }
 
-  it('adopts budget/account/kind/q filters from the URL and reloads', () => {
+  it('adopts budget/kind/q filters from the URL and reloads', () => {
     const { cmp } = buildWithQuery([
       ['budget', 'b-1'],
-      ['account', 'a-9'],
       ['kind', 'income'],
       ['q', 'foo'],
     ]);
     expect(cmp.budgetId()).toBe('b-1');
-    expect(cmp.accountId()).toBe('a-9');
     expect(cmp.kind()).toBe('income');
     expect(cmp.q()).toBe('foo');
   });
@@ -2043,7 +1909,6 @@ describe('ExpensesListState.refresh (#expenses-ux)', () => {
     const http = TestBed.inject(HttpTestingController);
     const state = TestBed.runInInjectionContext(() => new ExpensesListState());
     http.expectOne((r) => r.url.endsWith('/budgets')).flush([]);
-    http.expectOne((r) => r.url.endsWith('/accounts/options')).flush([]);
     // The state no longer loads on its own (#expenses-ux2). The component fires the
     // first reload after it adopts the URL filters. Mirror that here.
     state.reload();
@@ -2094,5 +1959,32 @@ describe('ExpensesListState.refresh (#expenses-ux)', () => {
     state.refresh();
     http.expectOne((r) => r.url.endsWith('/expenses') && r.method === 'GET').error(new ProgressEvent('err'));
     expect(state.refreshing()).toBe(false);
+  });
+
+  it('a stale fetch ERROR leaves the loading flags of the newer request alone', () => {
+    const { state, http } = buildState();
+    state.reload(); // request A, the old filter state
+    state.expenseId.set('e-1');
+    state.reload(); // request B, the new filter state, so A is stale from here on
+    const [reqA, reqB] = http.match((r) => r.url.endsWith('/expenses') && r.method === 'GET');
+    // A fails late. Its error handler must return early on the epoch mismatch.
+    // Otherwise it clears `loading` while B is still in flight.
+    reqA.error(new ProgressEvent('err'));
+    expect(state.loading()).toBe(true);
+    // Settle B so the test ends with no outstanding request.
+    reqB.flush(page([]));
+    expect(state.loading()).toBe(false);
+  });
+
+  it('clears the exporting flag when the xlsx export fails', () => {
+    const { state, http } = buildState();
+    state.onExport();
+    expect(state.exporting()).toBe(true);
+    // A second call while one is in flight returns early and fires no request.
+    state.onExport();
+    const reqs = http.match((r) => r.url.endsWith('/expenses/export.xlsx'));
+    expect(reqs.length).toBe(1);
+    reqs[0].error(new ProgressEvent('err'));
+    expect(state.exporting()).toBe(false);
   });
 });

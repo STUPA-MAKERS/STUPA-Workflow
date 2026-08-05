@@ -53,20 +53,6 @@ dependencies = [
     # iCal subscription (#ics): RFC5545 feed of the meetings of the user. Loads lazily,
     # only on the feed path. Pure Python package.
     "icalendar>=6.0",
-    # FinTS bank reconciliation (#fints): PIN/TAN online banking client, for example
-    # Sparkasse, to fetch real account transactions. It pulls `mt-940` in transitively as
-    # the MT940 parser. Loads lazily, only on the sync path or the import path. The
-    # contract CI never loads it.
-    "fints>=5.0",
-    # fints pins lxml~=6.0.2 (<6.1). We therefore cannot force the lxml XXE fix (6.1.0,
-    # PYSEC-2026-87) here, because pip reports ResolutionImpossible. Only fints, sepaxml
-    # and xmlschema use lxml transitively. They parse the authenticated bank answers. Our
-    # own CAMT parsing uses the stdlib `ElementTree`. pip-audit therefore excludes this
-    # advisory on purpose, with a reason (CI job be-deps-audit).
-    # PIN encryption at rest (Fernet) for the FinTS credentials. pyjwt[crypto] pulled
-    # cryptography in transitively before. app.shared.crypto now uses it directly, so the
-    # dependency is explicit.
-    "cryptography>=44.0",
 ]
 
 [project.optional-dependencies]

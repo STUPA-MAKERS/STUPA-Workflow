@@ -70,7 +70,7 @@ input.inv__input { height: var(--control-height); }
 }
 .inv__fileLink:hover { text-decoration: underline; }
 .inv__actions { display: inline-flex; gap: var(--space-1); justify-content: flex-end; }
-/* Sticky actions column, like the bookings and account tables. See #expenses-ux2. It
+/* Sticky actions column, like the bookings table. See #expenses-ux2. It
    pins the rightmost column on desktop only. On mobile, the card reflow below wins. */
 @media (min-width: 769px) {
   .inv__table th.inv__stickyCol,
