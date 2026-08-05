@@ -46,7 +46,15 @@ input.inv__input { height: var(--control-height); }
 .inv__num { text-align: end; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .inv__cellDate { color: var(--color-text-muted); white-space: nowrap; }
 .inv__cellNumber { font-weight: var(--fw-medium); white-space: nowrap; }
-.inv__cellSupplier { min-width: 10rem; }
+.inv__cellSupplier { min-width: 10rem; max-width: 14rem; overflow-wrap: anywhere; }
+/* The receipt name is user-supplied and can be long without a space. It is the only
+   elastic column, because every other cell is `nowrap`. Without a floor, auto table
+   layout gives it the whole shortfall: the column shrinks to a few characters, the
+   name wraps one letter per line and the row grows to several hundred pixels. The
+   floor keeps the column readable and pushes the table past the wrapper, so
+   `overflow-x` and the mirrored scrollbar take the rest. The cap stops a long name
+   from claiming the whole table. Same recipe as the bookings table. */
+.inv__cellFile { min-width: 12rem; max-width: 20rem; }
 .inv__mono { font-variant-numeric: tabular-nums; color: var(--color-text-muted); }
 .inv__amount { font-variant-numeric: tabular-nums; font-weight: var(--fw-semibold); white-space: nowrap; }
 .inv__fileLink {
@@ -158,11 +166,14 @@ input.inv__input { height: var(--control-height); }
     font-size: var(--fs-xs);
     color: var(--color-text-muted);
   }
-  /* The file link sits on its own full-width row. Long names then wrap inside the card. */
+  /* The file link sits on its own full-width row. Long names then wrap inside the card.
+     The desktop column floor and cap do not apply to a card. */
   .inv__cellFile {
     flex: 1 1 100%;
     min-width: 0;
+    max-width: none;
   }
+  .inv__cellSupplier { min-width: 0; max-width: none; }
   .inv__cellNumber {
     min-width: 0;
     white-space: normal;
