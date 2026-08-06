@@ -14,6 +14,7 @@ import {
 import { findTopBudgetNode, formatEur, problemDetail } from '../budget/expense-display.util';
 import type { ExpensesListState } from './expenses-list.state';
 import type { ExpenseSubBookingsState } from './expense-sub-bookings.state';
+import type { ExpenseTransfersState } from './expense-transfers.state';
 
 /**
  * Booking dialogs: create (standalone or application-bound), edit, delete, transfer
@@ -117,6 +118,7 @@ export class ExpenseDialogsState {
   constructor(
     private readonly list: ExpensesListState,
     private readonly sub: ExpenseSubBookingsState,
+    private readonly transfers: ExpenseTransfersState,
   ) {
     this.loadInvoices();
   }
@@ -440,6 +442,9 @@ export class ExpenseDialogsState {
           this.transferOpen.set(false);
           this.toast.success(this.i18n.translate('expenses.transferToast'));
           this.list.refresh();
+          // The transfers tab holds the new row too. Refresh it if it already
+          // loaded, so the two views never disagree.
+          if (this.transfers.loaded()) this.transfers.reload();
         },
         error: (err) => {
           this.list.saving.set(false);

@@ -1988,3 +1988,254 @@ describe('ExpensesListState.refresh (#expenses-ux)', () => {
     expect(state.exporting()).toBe(false);
   });
 });
+
+// --- transfers tab ---------------------------------------------------------
+
+const TRANSFER = {
+  transferId: 'tr-1',
+  expenseId: 'e-a',
+  incomeId: 'e-b',
+  fromBudgetId: 'b-1',
+  fromPathKey: 'VS-800',
+  toBudgetId: 'b-2',
+  toPathKey: 'VS-900',
+  fiscalYearId: 'fy-1',
+  amount: '50.00',
+  currency: 'EUR',
+  description: 'Umbuchung Fest',
+  note: null,
+  invoiceDate: null,
+  paymentDate: '2026-05-28',
+  actor: 'admin',
+  actorName: 'Admin',
+  createdAt: '2026-05-30T09:00:00Z',
+};
+
+function transferPage(items: unknown[] = [TRANSFER], total = items.length) {
+  return { items, total, limit: 20, offset: 0 };
+}
+
+/** Open the transfers tab and answer the first page. */
+async function openTransfers(
+  ctx: Awaited<ReturnType<typeof setup>>,
+  body: unknown = transferPage(),
+) {
+  await userEvent.click(await screen.findByRole('tab', { name: 'Überträge' }));
+  ctx.http.expectOne((r) => r.url.endsWith('/budget-transfers') && r.method === 'GET').flush(body);
+  ctx.detectChanges();
+}
+
+describe('ExpensesComponent — transfers tab', () => {
+  beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+
+  it('lists a transfer as one row with both cost centres', async () => {
+    const ctx = await setup();
+    await openTransfers(ctx);
+    expect(screen.getByText('Umbuchung Fest')).toBeInTheDocument();
+    expect(screen.getByText('VS-800')).toBeInTheDocument();
+    expect(screen.getByText('VS-900')).toBeInTheDocument();
+    ctx.http.verify();
+  });
+
+  it('shows an empty state and reports a failed load', async () => {
+    const ctx = await setup();
+    await openTransfers(ctx, transferPage([], 0));
+    expect(screen.getByText('Keine Überträge gefunden.')).toBeInTheDocument();
+    ctx.http.verify();
+  });
+
+  it('hides the row actions for a viewer without budget.book', async () => {
+    const ctx = await setup({ perms: ['budget.view'] });
+    await openTransfers(ctx);
+    expect(screen.getByText('Umbuchung Fest')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Löschen' })).not.toBeInTheDocument();
+    ctx.http.verify();
+  });
+
+  it('patches a transfer without the cost-centre pair', async () => {
+    const ctx = await setup();
+    await openTransfers(ctx);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = ctx.fixture.componentInstance as any;
+    c.openTransferEdit(TRANSFER);
+    c.tEditAmount.set('75.00');
+    c.tEditDescription.set('  Korrigiert  ');
+    c.saveTransferEdit(new Event('submit'));
+
+    const patch = ctx.http.expectOne('/api/budget-transfers/tr-1');
+    expect(patch.request.method).toBe('PATCH');
+    expect(patch.request.body).toEqual({
+      amount: '75.00',
+      description: 'Korrigiert',
+      note: null,
+      invoiceDate: null,
+      paymentDate: '2026-05-28',
+    });
+    patch.flush({ ...TRANSFER, amount: '75.00', description: 'Korrigiert' });
+    // The two legs are rows in the bookings list, so it refreshes too.
+    ctx.http
+      .match((r) => r.url.endsWith('/expenses') && r.method === 'GET')
+      .forEach((r) => r.flush(page([])));
+    ctx.detectChanges();
+
+    expect(c.transferItems()[0].description).toBe('Korrigiert');
+    expect(c.editingTransfer()).toBeNull();
+    ctx.http.verify();
+  });
+
+  it('explains the 409 on a changed cost-centre pair and reloads', async () => {
+    const ctx = await setup();
+    await openTransfers(ctx);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = ctx.fixture.componentInstance as any;
+    c.openTransferEdit(TRANSFER);
+    c.saveTransferEdit(new Event('submit'));
+    ctx.http.expectOne('/api/budget-transfers/tr-1').flush(
+      {
+        type: 'app://error/transfer_cost_centres_immutable',
+        title: 'Conflict',
+        status: 409,
+        code: 'transfer_cost_centres_immutable',
+        detail: 'The cost centres of a transfer are immutable; book a new transfer instead.',
+      },
+      { status: 409, statusText: 'Conflict' },
+    );
+    // The reload gets the server truth back on screen.
+    ctx.http
+      .expectOne((r) => r.url.endsWith('/budget-transfers') && r.method === 'GET')
+      .flush(transferPage());
+    expect(c.transferSaving()).toBe(false);
+    ctx.http.verify();
+  });
+
+  it('reports any other patch failure', async () => {
+    const ctx = await setup();
+    await openTransfers(ctx);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = ctx.fixture.componentInstance as any;
+    c.openTransferEdit(TRANSFER);
+    c.saveTransferEdit(new Event('submit'));
+    ctx.http
+      .expectOne('/api/budget-transfers/tr-1')
+      .flush({ title: 'e' }, { status: 500, statusText: 'Server Error' });
+    expect(c.transferSaving()).toBe(false);
+    ctx.http.verify();
+  });
+
+  it('deletes a transfer with both of its bookings', async () => {
+    const ctx = await setup();
+    await openTransfers(ctx);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = ctx.fixture.componentInstance as any;
+    c.askDeleteTransfer(TRANSFER);
+    c.doDeleteTransfer();
+    const del = ctx.http.expectOne('/api/budget-transfers/tr-1');
+    expect(del.request.method).toBe('DELETE');
+    del.flush(null, { status: 204, statusText: 'No Content' });
+    ctx.http
+      .match((r) => r.url.endsWith('/expenses') && r.method === 'GET')
+      .forEach((r) => r.flush(page([])));
+    ctx.detectChanges();
+    expect(c.transferItems()).toEqual([]);
+    expect(c.confirmDeleteTransfer()).toBeNull();
+    ctx.http.verify();
+  });
+
+  it('reports a failed delete and keeps the row', async () => {
+    const ctx = await setup();
+    await openTransfers(ctx);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = ctx.fixture.componentInstance as any;
+    c.askDeleteTransfer(TRANSFER);
+    c.doDeleteTransfer();
+    ctx.http
+      .expectOne('/api/budget-transfers/tr-1')
+      .flush({ title: 'e' }, { status: 500, statusText: 'Server Error' });
+    expect(c.transferItems().length).toBe(1);
+    ctx.http.verify();
+  });
+
+  it('loads a second page and stops when the list is complete', async () => {
+    const ctx = await setup();
+    await openTransfers(ctx, transferPage([TRANSFER], 2));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = ctx.fixture.componentInstance as any;
+    expect(c.transferHasMore()).toBe(true);
+    c.loadMoreTransfers();
+    ctx.http
+      .expectOne((r) => r.url.endsWith('/budget-transfers') && r.method === 'GET')
+      .flush({ items: [{ ...TRANSFER, transferId: 'tr-2' }], total: 2, limit: 20, offset: 1 });
+    expect(c.transferItems().length).toBe(2);
+    // No further page: the call returns early and fires no request.
+    c.loadMoreTransfers();
+    ctx.http.verify();
+  });
+
+  it('reports a failed load and shows the empty state', async () => {
+    const ctx = await setup();
+    await userEvent.click(await screen.findByRole('tab', { name: 'Überträge' }));
+    ctx.http
+      .expectOne((r) => r.url.endsWith('/budget-transfers') && r.method === 'GET')
+      .flush({ title: 'e' }, { status: 500, statusText: 'Server Error' });
+    ctx.detectChanges();
+    expect(screen.getByText('Keine Überträge gefunden.')).toBeInTheDocument();
+    ctx.http.verify();
+  });
+
+  it('ignores an edit and a delete without a target or while one runs', async () => {
+    const ctx = await setup();
+    await openTransfers(ctx);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = ctx.fixture.componentInstance as any;
+    c.saveTransferEdit(new Event('submit'));
+    c.doDeleteTransfer();
+
+    c.openTransferEdit(TRANSFER);
+    c.tEditDescription.set('   ');
+    c.saveTransferEdit(new Event('submit'));
+    c.tEditDescription.set('ok');
+    c.transferSaving.set(true);
+    c.saveTransferEdit(new Event('submit'));
+    c.closeTransferEdit();
+    expect(c.editingTransfer()).toBeNull();
+
+    c.askDeleteTransfer(TRANSFER);
+    c.doDeleteTransfer();
+    c.transferSaving.set(false);
+    c.closeDeleteTransfer();
+    expect(c.confirmDeleteTransfer()).toBeNull();
+    ctx.http.verify();
+  });
+
+  it('refreshes the transfers after a new transfer once the tab has loaded', async () => {
+    const ctx = await setup();
+    await openTransfers(ctx);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = ctx.fixture.componentInstance as any;
+    c.tFromId.set('b-1');
+    c.tToId.set('b-2');
+    c.tFiscalYearId.set('fy-1');
+    c.tAmount.set('10');
+    c.tDescription.set('Neu');
+    c.createTransfer(new Event('submit'));
+    ctx.http
+      .expectOne((r) => r.url.endsWith('/budget-transfers') && r.method === 'POST')
+      .flush({ transferId: 'tr-9', expenseId: 'x', incomeId: 'y' });
+    ctx.http
+      .match((r) => r.url.endsWith('/expenses') && r.method === 'GET')
+      .forEach((r) => r.flush(page([])));
+    ctx.http
+      .expectOne((r) => r.url.endsWith('/budget-transfers') && r.method === 'GET')
+      .flush(transferPage());
+    ctx.http.verify();
+  });
+
+  it('switches back to the bookings tab without a further transfer request', async () => {
+    const ctx = await setup();
+    await openTransfers(ctx);
+    await userEvent.click(screen.getByRole('tab', { name: 'Buchungen' }));
+    ctx.detectChanges();
+    expect(screen.getByText('Keine Buchungen gefunden.')).toBeInTheDocument();
+    ctx.http.verify();
+  });
+});

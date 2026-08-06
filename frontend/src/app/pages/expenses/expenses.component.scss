@@ -35,6 +35,13 @@ input.exp__input {
   max-height: 75vh;
   overflow-y: auto;
 }
+/* Bookings / transfers switch above the table. */
+.exp__tabs {
+  display: inline-flex;
+  gap: var(--space-1);
+  margin-bottom: var(--space-3);
+}
+
 .exp__main { min-width: 0; }
 @media (max-width: 60rem) {
   .exp__layout { grid-template-columns: minmax(11rem, 14rem) minmax(0, 1fr); }

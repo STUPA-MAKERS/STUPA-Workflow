@@ -34,6 +34,7 @@ import { ToastService } from '@stupa-makers/ui-kit';
 import { CostCentreTreeComponent } from '../budget/cost-centre-tree.component';
 import {
   BudgetTreeApi,
+  type BudgetTransfer,
   type Expense,
   type ExpenseKind,
   type ExpenseUpdate,
@@ -54,7 +55,11 @@ import { PageHeaderComponent } from '@shared/ui/page-header/page-header.componen
 import { PressSelectDirective } from '@shared/press-select.directive';
 import { ExpenseDialogsState } from './expense-dialogs.state';
 import { ExpenseSubBookingsState } from './expense-sub-bookings.state';
+import { ExpenseTransfersState } from './expense-transfers.state';
 import { ExpensesListState, type ExpenseSortField } from './expenses-list.state';
+
+/** The two views of the page. Bookings are the default. */
+export type ExpensesTab = 'bookings' | 'transfers';
 
 /**
  * Bookings tab. It shows, creates, and manages expense and income bookings.
@@ -103,7 +108,8 @@ export class ExpensesComponent implements OnDestroy {
 
   private readonly list = new ExpensesListState();
   private readonly sub = new ExpenseSubBookingsState(this.list);
-  private readonly dialogs = new ExpenseDialogsState(this.list, this.sub);
+  private readonly transfers = new ExpenseTransfersState(this.list);
+  private readonly dialogs = new ExpenseDialogsState(this.list, this.sub, this.transfers);
 
   readonly canManage = computed(() => this.auth.can('budget.book'));
   readonly canExport = computed(() => this.auth.can('budget.export'));
@@ -196,6 +202,24 @@ export class ExpensesComponent implements OnDestroy {
   readonly transferFyOptions = this.dialogs.transferFyOptions;
   readonly canSubmitTransfer = this.dialogs.canSubmitTransfer;
   readonly canSubmitCreate = this.dialogs.canSubmitCreate;
+
+  // Transfers tab. `budget.book` gates the whole route, so the list, the edit
+  // and the delete follow the same permission as the create.
+  readonly tab = signal<ExpensesTab>('bookings');
+  readonly transferItems = this.transfers.items;
+  readonly transferTotal = this.transfers.total;
+  readonly transferLoading = this.transfers.loading;
+  readonly transferLoadingMore = this.transfers.loadingMore;
+  readonly transferHasMore = this.transfers.hasMore;
+  readonly transferSaving = this.transfers.saving;
+  readonly editingTransfer = this.transfers.editing;
+  readonly tEditAmount = this.transfers.editAmount;
+  readonly tEditDescription = this.transfers.editDescription;
+  readonly tEditNote = this.transfers.editNote;
+  readonly tEditInvoiceDate = this.transfers.editInvoiceDate;
+  readonly tEditPaymentDate = this.transfers.editPaymentDate;
+  readonly confirmDeleteTransfer = this.transfers.confirmDelete;
+  readonly canSubmitTransferEdit = this.transfers.canSubmitEdit;
 
   readonly subParent = this.sub.subParent;
   readonly subAmount = this.sub.subAmount;
@@ -443,6 +467,41 @@ export class ExpensesComponent implements OnDestroy {
 
   createTransfer(event: Event): void {
     this.dialogs.createTransfer(event);
+  }
+
+  /** Switch the view. The transfers load lazily on the first visit and then
+   *  again on every visit, because a booking change can remove a leg. */
+  setTab(tab: ExpensesTab): void {
+    this.tab.set(tab);
+    if (tab === 'transfers') this.transfers.reload();
+  }
+
+  loadMoreTransfers(): void {
+    this.transfers.loadMore();
+  }
+
+  openTransferEdit(t: BudgetTransfer): void {
+    this.transfers.openEdit(t);
+  }
+
+  closeTransferEdit(): void {
+    this.transfers.closeEdit();
+  }
+
+  saveTransferEdit(event: Event): void {
+    this.transfers.saveEdit(event);
+  }
+
+  askDeleteTransfer(t: BudgetTransfer): void {
+    this.transfers.askDelete(t);
+  }
+
+  closeDeleteTransfer(): void {
+    this.transfers.closeDelete();
+  }
+
+  doDeleteTransfer(): void {
+    this.transfers.doDelete();
   }
 
   /** Deep-link target for the cost-center cell. It opens the Budget tab drilled into

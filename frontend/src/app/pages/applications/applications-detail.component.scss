@@ -365,6 +365,31 @@ formly-form {
   outline-offset: 1px;
 }
 
+/* Edit and delete of one comment. The buttons stay in the message meta line, so
+   a row with actions keeps the height of a row without them. */
+.det__msgActions {
+  display: inline-flex;
+  gap: 2px;
+  margin-inline-start: auto;
+}
+
+/* Progress of the PDF render job. */
+.det__pdf {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.det__pdfLink {
+  color: var(--color-primary);
+  font-weight: var(--fw-medium);
+}
+.det__pdfBar {
+  width: 100%;
+  height: var(--space-1);
+  accent-color: var(--color-primary);
+}
+
+.det__commentEdit,
 .det__forceReason {
   display: flex;
   flex-direction: column;

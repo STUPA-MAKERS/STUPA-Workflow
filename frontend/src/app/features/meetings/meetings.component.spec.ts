@@ -2588,4 +2588,94 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.meeting()).toBeNull();
     });
   });
+
+  describe('discard the draft minutes', () => {
+    it('deletes a draft protocol and clears the pane', async () => {
+      const { cmp, http, fixture } = await loaded();
+      cmp.askDeleteProtocol();
+      expect(cmp.confirmDeleteProtocol()).toBe(true);
+      fixture.detectChanges();
+
+      cmp.doDeleteProtocol();
+      const req = http.expectOne('/api/protocols/p-1');
+      expect(req.request.method).toBe('DELETE');
+      req.flush(null, { status: 204, statusText: 'No Content' });
+
+      expect(cmp.protocol()).toBeNull();
+      expect(cmp.confirmDeleteProtocol()).toBe(false);
+    });
+
+    it('offers the delete only for a draft the user may write', async () => {
+      const { cmp, fixture } = await loaded();
+      fixture.detectChanges();
+      expect(
+        screen.getByRole('button', { name: 'Protokollentwurf verwerfen' }),
+      ).toBeInTheDocument();
+
+      // `rendering` and `final` lock the protocol. The server answers 409 for
+      // both, so the control disappears.
+      cmp.protocol.set({ ...cmp.protocol()!, status: 'rendering', isLocked: true });
+      fixture.detectChanges();
+      expect(
+        screen.queryByRole('button', { name: 'Protokollentwurf verwerfen' }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('hides the delete without the write scope of the meeting', async () => {
+      const { cmp, fixture } = await loaded();
+      cmp.meeting.set({ ...MEETING_MODEL, canWrite: false });
+      fixture.detectChanges();
+      expect(
+        screen.queryByRole('button', { name: 'Protokollentwurf verwerfen' }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('explains a 409 with the server reason and reloads the protocol', async () => {
+      const { cmp, http } = await loaded();
+      cmp.doDeleteProtocol();
+      http.expectOne('/api/protocols/p-1').flush(
+        {
+          type: 'app://error/conflict',
+          title: 'Conflict',
+          status: 409,
+          code: 'conflict',
+          detail: 'Protocol is finalized and read-only.',
+        },
+        { status: 409, statusText: 'Conflict' },
+      );
+      // The refresh reads the current state instead of leaving a stale draft.
+      http
+        .expectOne('/api/meetings/m-1/protocol')
+        .flush({ ...PROTOCOL, status: 'final', pdfUrl: 'x.pdf' });
+      expect(cmp.protocol()?.isFinal).toBe(true);
+      expect(cmp.confirmDeleteProtocol()).toBe(false);
+    });
+
+    it('reports any other failure and keeps the protocol', async () => {
+      const { cmp, http } = await loaded();
+      cmp.doDeleteProtocol();
+      http
+        .expectOne('/api/protocols/p-1')
+        .flush({ title: 'e' }, { status: 500, statusText: 'Server Error' });
+      expect(cmp.protocol()).not.toBeNull();
+      expect(cmp.deletingProtocol()).toBe(false);
+    });
+
+    it('ignores the ask and the delete when there is no draft or one runs', async () => {
+      const { cmp, http } = await loaded();
+      cmp.protocol.set(null);
+      cmp.askDeleteProtocol();
+      expect(cmp.confirmDeleteProtocol()).toBe(false);
+      cmp.doDeleteProtocol();
+
+      cmp.protocol.set({ ...PROTOCOL, isFinal: false, isLocked: false, publicPdfUrl: null });
+      cmp.deletingProtocol.set(true);
+      cmp.doDeleteProtocol();
+      cmp.deletingProtocol.set(false);
+      cmp.askDeleteProtocol();
+      cmp.closeDeleteProtocol();
+      expect(cmp.confirmDeleteProtocol()).toBe(false);
+      http.verify();
+    });
+  });
 });

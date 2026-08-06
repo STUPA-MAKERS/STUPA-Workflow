@@ -196,6 +196,7 @@
         [saveState]="saveState()"
         [casting]="casting()"
         [deletingVote]="deletingVote()"
+        [deletingProtocol]="deletingProtocol()"
         [choices]="myChoices()"
         (bodyChange)="onTopBodyChange($event.itemId, $event.body)"
         (castVote)="cast($event.voteId, $event.choice)"
@@ -203,6 +204,7 @@
         (voteCancel)="cancelVote($event)"
         (voteDelete)="deleteVote($event)"
         (voteDialog)="openVoteDialog($event)"
+        (protocolDelete)="askDeleteProtocol()"
       />
     </div>
 
@@ -582,5 +584,19 @@
   <div dialog-footer class="mtg__dialogFoot">
     <app-button size="sm" variant="ghost" (click)="confirmDeleteMeeting.set(null)">{{ 'action.cancel' | t }}</app-button>
     <app-button size="sm" variant="danger" [loading]="deletingMeeting()" (click)="doDeleteMeeting()">{{ 'meetings.delete.confirm' | t }}</app-button>
+  </div>
+</app-dialog>
+
+<!-- Discard the draft minutes (confirmation), top-level. -->
+<app-dialog
+  [open]="confirmDeleteProtocol()"
+  [title]="'meetings.protocol.deleteTitle' | t"
+  [closeLabel]="'action.cancel' | t"
+  (closed)="closeDeleteProtocol()"
+>
+  <p>{{ 'meetings.protocol.deleteBody' | t }}</p>
+  <div dialog-footer class="mtg__dialogFoot">
+    <app-button size="sm" variant="ghost" (click)="closeDeleteProtocol()">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" variant="danger" [loading]="deletingProtocol()" (click)="doDeleteProtocol()">{{ 'meetings.protocol.delete' | t }}</app-button>
   </div>
 </app-dialog>

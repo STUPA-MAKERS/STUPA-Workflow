@@ -188,6 +188,11 @@ describe('AdminApiService — real mode (contract)', () => {
     s.revokeRole('a-9').subscribe();
     expect(http.expectOne('/api/admin/role-assignments/a-9').request.method).toBe('DELETE');
 
+    s.updateRoleAssignment('a-9', { roleId: 'r2' }).subscribe();
+    const patch = http.expectOne('/api/admin/role-assignments/a-9');
+    expect(patch.request.method).toBe('PATCH');
+    expect(patch.request.body).toEqual({ roleId: 'r2' });
+
     s.saveRolePermissions('r-9', ['flow.configure']).subscribe();
     expect(http.expectOne('/api/admin/roles/r-9').request.method).toBe('PATCH');
   });
@@ -632,6 +637,26 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     // over all principals.
     await firstValueFrom(s.revokeRole('not-real'));
     expect((await firstValueFrom(s.listPrincipals())).find((p) => p.id === target.id)!.assignments.length).toBe(1);
+  });
+
+  it('updateRoleAssignment merges into the mock store and tolerates an unknown id', async () => {
+    const s = svc();
+    const target = (await firstValueFrom(s.listPrincipals())).find((p) => p.assignments.length === 0)!;
+    const created = await firstValueFrom(s.assignRole({ principalId: target.id, roleId: 'r-member' }));
+
+    const patched = await firstValueFrom(
+      s.updateRoleAssignment(created.id, { validUntil: '2026-12-31T00:00:00Z' }),
+    );
+    expect(patched.validUntil).toBe('2026-12-31T00:00:00Z');
+    expect(patched.roleId).toBe('r-member');
+    const after = await firstValueFrom(s.listPrincipals());
+    expect(after.find((p) => p.id === target.id)!.assignments[0].validUntil).toBe(
+      '2026-12-31T00:00:00Z',
+    );
+
+    // An unknown id echoes the patch instead of crashing.
+    const echo = await firstValueFrom(s.updateRoleAssignment('nope', { roleId: 'r-member' }));
+    expect(echo.id).toBe('nope');
   });
 
   it('returns an empty principal list when search matches nothing', async () => {

@@ -31,8 +31,11 @@ const PRINCIPALS: AdminPrincipal[] = [
   { id: 'p-3', sub: 'kc|sam', email: null, displayName: 'Sam Neu', lastLogin: null, assignments: [] },
 ];
 
-function makeAuth(sub: string | null) {
-  return { principal: () => (sub === null ? null : { sub }) } as unknown as AuthService;
+function makeAuth(sub: string | null, canManage = true) {
+  return {
+    principal: () => (sub === null ? null : { sub }),
+    can: (p: string) => canManage && p === 'admin.users',
+  } as unknown as AuthService;
 }
 
 function makeApi(over: Partial<Record<string, jest.Mock>> = {}) {
@@ -266,5 +269,99 @@ describe('UsersComponent (#70/#72/#73)', () => {
     await setup();
     expect(screen.getByRole('table')).toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: 'OIDC-Subject' })).not.toBeInTheDocument();
+  });
+
+  describe('edit a role assignment (#g-role-edit)', () => {
+    it('offers the edit control only with admin.users', async () => {
+      await setup(makeApi(), makeAuth(null, false));
+      expect(
+        screen.queryByRole('button', { name: /Zuweisung bearbeiten/ }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('shows an edit control per assigned role', async () => {
+      await setup();
+      expect(
+        screen.getAllByRole('button', { name: /Zuweisung bearbeiten/ }).length,
+      ).toBeGreaterThan(0);
+    });
+
+    it('prefills the dialog from the assignment and cuts the date to YYYY-MM-DD', async () => {
+      const { inst } = await setup();
+      inst.openEdit({ ...ADMIN_ASSIGN, validUntil: '2026-12-31T00:00:00Z' });
+      expect(inst.editDraft()).toEqual({
+        roleId: 'r-admin',
+        validFrom: '',
+        validUntil: '2026-12-31',
+      });
+      inst.closeEdit();
+      expect(inst.editing()).toBeNull();
+    });
+
+    it('sends only the changed fields and reloads the list', async () => {
+      const api = makeApi({
+        updateRoleAssignment: jest.fn(() => of({ ...ADMIN_ASSIGN, roleId: 'r-ref' })),
+      });
+      const { inst, toast } = await setup(api);
+      inst.openEdit(ADMIN_ASSIGN);
+      inst.patchEdit({ roleId: 'r-ref', validUntil: '2026-12-31' });
+      inst.saveEdit();
+      expect(api.updateRoleAssignment).toHaveBeenCalledWith('a-1', {
+        roleId: 'r-ref',
+        validUntil: '2026-12-31T00:00:00Z',
+      });
+      expect(toast.success).toHaveBeenCalledWith('Zuweisung aktualisiert.');
+      expect(inst.editing()).toBeNull();
+      // The list reloads: once on init and once after the save.
+      expect(api.listPrincipals).toHaveBeenCalledTimes(2);
+    });
+
+    it('keeps an already set expiry when the field is cleared', async () => {
+      const api = makeApi({ updateRoleAssignment: jest.fn(() => of(ADMIN_ASSIGN)) });
+      const { inst } = await setup(api);
+      inst.openEdit({ ...ADMIN_ASSIGN, validUntil: '2026-12-31T00:00:00Z' });
+      inst.patchEdit({ roleId: 'r-ref', validUntil: '' });
+      inst.saveEdit();
+      // No `validUntil` in the body: the route reads null as "do not touch",
+      // so sending it would be a silent no-op instead of a clear.
+      expect(api.updateRoleAssignment).toHaveBeenCalledWith('a-1', { roleId: 'r-ref' });
+    });
+
+    it('closes without a request when nothing changed', async () => {
+      const api = makeApi({ updateRoleAssignment: jest.fn(() => of(ADMIN_ASSIGN)) });
+      const { inst } = await setup(api);
+      inst.openEdit(ADMIN_ASSIGN);
+      inst.saveEdit();
+      expect(api.updateRoleAssignment).not.toHaveBeenCalled();
+      expect(inst.editing()).toBeNull();
+    });
+
+    it.each([
+      [403, 'Die eigene Admin-Zuweisung lässt sich nicht ändern.'],
+      [500, 'Zuweisung konnte nicht geändert werden.'],
+    ])('explains a %s answer', async (status, message) => {
+      const api = makeApi({
+        updateRoleAssignment: jest.fn(() => throwError(() => ({ status }))),
+      });
+      const { inst, toast } = await setup(api);
+      inst.openEdit(ADMIN_ASSIGN);
+      inst.patchEdit({ roleId: 'r-ref' });
+      inst.saveEdit();
+      expect(toast.error).toHaveBeenCalledWith(message);
+      expect(inst.savingEdit()).toBe(false);
+    });
+
+    it('ignores a save without a target, without a role, or while one runs', async () => {
+      const api = makeApi({ updateRoleAssignment: jest.fn(() => of(ADMIN_ASSIGN)) });
+      const { inst } = await setup(api);
+      inst.saveEdit();
+      inst.openEdit(ADMIN_ASSIGN);
+      inst.patchEdit({ roleId: '' });
+      inst.saveEdit();
+      inst.patchEdit({ roleId: 'r-ref' });
+      inst.savingEdit.set(true);
+      inst.saveEdit();
+      expect(api.updateRoleAssignment).not.toHaveBeenCalled();
+    });
   });
 });

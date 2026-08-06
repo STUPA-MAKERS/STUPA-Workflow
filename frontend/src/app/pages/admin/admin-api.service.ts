@@ -53,6 +53,7 @@ import {
   type MailTemplateUpsertBody,
   type Role,
   type RoleAssignment,
+  type RoleAssignmentPatch,
   type RoleAssignmentInput,
   type SiteConfig,
   type WebhookConfig,
@@ -426,6 +427,29 @@ export class AdminApiService {
       return of(structuredCopy(assignment));
     }
     return this.http.post<RoleAssignment>(`${this.base}/admin/role-assignments`, input);
+  }
+
+  /**
+   * Change an existing assignment — PATCH /admin/role-assignments/{id}.
+   *
+   * The route touches only the fields the body carries. It cannot clear a
+   * validity window, and it never moves the assignment to another user.
+   */
+  updateRoleAssignment(assignmentId: Uuid, patch: RoleAssignmentPatch): Observable<RoleAssignment> {
+    if (this.mock) {
+      for (const p of this.store.principals) {
+        const found = p.assignments.find((a) => a.id === assignmentId);
+        if (!found) continue;
+        const merged: RoleAssignment = { ...found, ...patch };
+        p.assignments = p.assignments.map((a) => (a.id === assignmentId ? merged : a));
+        return of(structuredCopy(merged));
+      }
+      return of(structuredCopy({ id: assignmentId, ...patch } as unknown as RoleAssignment));
+    }
+    return this.http.patch<RoleAssignment>(
+      `${this.base}/admin/role-assignments/${assignmentId}`,
+      patch,
+    );
   }
 
   /** Revoke a role — DELETE /admin/role-assignments/{id}. */

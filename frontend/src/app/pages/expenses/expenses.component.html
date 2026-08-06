@@ -69,7 +69,83 @@
   </aside>
 
   <div class="exp__main">
-    @if (loading() && !items().length) {
+    <!-- Bookings and transfers are two views of the same money. A transfer is
+         two bookings, so it appears in the bookings table as its two legs. Only
+         this tab shows it as ONE row with an identity, which is what an edit and
+         a delete need. -->
+    <div class="exp__tabs" role="tablist" [attr.aria-label]="'expenses.title' | t">
+      <app-button
+        role="tab"
+        [attr.aria-selected]="tab() === 'bookings'"
+        [variant]="tab() === 'bookings' ? 'primary' : 'ghost'"
+        size="sm"
+        (click)="setTab('bookings')"
+      >{{ 'expenses.tab.bookings' | t }}</app-button>
+      <app-button
+        role="tab"
+        [attr.aria-selected]="tab() === 'transfers'"
+        [variant]="tab() === 'transfers' ? 'primary' : 'ghost'"
+        size="sm"
+        (click)="setTab('transfers')"
+      >{{ 'expenses.tab.transfers' | t }}</app-button>
+    </div>
+
+    @if (tab() === 'transfers') {
+      @if (transferLoading() && !transferItems().length) {
+        <p class="exp__status" aria-live="polite">{{ 'expenses.loading' | t }}</p>
+      } @else if (transferItems().length) {
+        <div class="exp__tableWrap" appHScrollSync>
+          <table class="exp__table">
+            <thead>
+              <tr>
+                <th scope="col">{{ 'expenses.col.paymentDate' | t }}</th>
+                <th scope="col">{{ 'expenses.col.invoiceDate' | t }}</th>
+                <th scope="col">{{ 'expenses.col.description' | t }}</th>
+                <th scope="col">{{ 'expenses.transfers.from' | t }}</th>
+                <th scope="col">{{ 'expenses.transfers.to' | t }}</th>
+                <th scope="col" class="exp__num">{{ 'expenses.col.amount' | t }}</th>
+                @if (canManage()) { <th scope="col" class="exp__num exp__stickyCol">{{ 'table.actions' | t }}</th> }
+              </tr>
+            </thead>
+            <tbody>
+              @for (t of transferItems(); track t.transferId) {
+                <tr [attr.title]="t.actorName ? ('expenses.bookedBy' | t: { actor: t.actorName }) : null">
+                  <td class="exp__cellDate">{{ t.paymentDate ? (t.paymentDate | ldate: 'mediumDate') : '—' }}</td>
+                  <td class="exp__cellDate">{{ t.invoiceDate ? (t.invoiceDate | ldate: 'mediumDate') : '—' }}</td>
+                  <td class="exp__cellDesc">
+                    {{ t.description }}
+                    @if (t.note) { <span class="block text-muted text-sm">{{ t.note }}</span> }
+                  </td>
+                  <td class="exp__mono exp__cellMeta">{{ t.fromPathKey ? (t.fromPathKey | simplifyPath) : '—' }}</td>
+                  <td class="exp__mono exp__cellMeta">{{ t.toPathKey ? (t.toPathKey | simplifyPath) : '—' }}</td>
+                  <td class="exp__num exp__amount">{{ money(t.amount) }}</td>
+                  @if (canManage()) {
+                    <td class="exp__num exp__stickyCol">
+                      <span class="exp__actions">
+                        <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'action.edit' | t" [title]="'action.edit' | t" (click)="openTransferEdit(t)"><app-icon name="edit" /></app-button>
+                        <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'action.delete' | t" [title]="'action.delete' | t" (click)="askDeleteTransfer(t)"><app-icon name="delete" /></app-button>
+                      </span>
+                    </td>
+                  }
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        @if (transferHasMore()) {
+          <div class="flex justify-center mt-4">
+            @if (transferLoadingMore()) {
+              <span class="exp__status">{{ 'expenses.loadingMore' | t }}</span>
+            } @else {
+              <app-button variant="secondary" size="sm" (click)="loadMoreTransfers()">{{ 'expenses.loadMore' | t }}</app-button>
+            }
+          </div>
+        }
+        <p class="text-center text-muted text-sm mt-3">{{ 'expenses.count' | t: { count: transferItems().length, total: transferTotal() } }}</p>
+      } @else {
+        <div class="empty-state">{{ 'expenses.transfers.empty' | t }}</div>
+      }
+    } @else if (loading() && !items().length) {
       <p class="exp__status" aria-live="polite">{{ 'expenses.loading' | t }}</p>
     } @else if (items().length) {
       <!-- Floating bulk bar: fixed at the bottom center while a selection exists (#expenses-ux2). -->
@@ -451,6 +527,41 @@
   <div dialog-footer class="flex justify-end gap-3">
     <app-button size="sm" variant="ghost" (click)="transferOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
     <app-button size="sm" [disabled]="!canSubmitTransfer()" [loading]="saving()" (click)="createTransfer($event)">{{ 'expenses.transferConfirm' | t }}</app-button>
+  </div>
+</app-dialog>
+
+<!-- Correct a transfer. The two cost centres are immutable on the server, so
+     they show read-only. A change of the pair is a new transfer. -->
+<app-dialog [open]="editingTransfer() !== null" [title]="'expenses.transfers.editTitle' | t" [closeLabel]="'action.cancel' | t" (closed)="closeTransferEdit()">
+  @if (editingTransfer(); as t) {
+    <form class="flex flex-col gap-2" (submit)="saveTransferEdit($event)">
+      <p class="text-sm text-muted m-0">
+        {{ 'expenses.transfers.pairLocked' | t }}
+      </p>
+      <p class="exp__mono m-0">
+        {{ (t.fromPathKey ? (t.fromPathKey | simplifyPath) : '—') }} → {{ (t.toPathKey ? (t.toPathKey | simplifyPath) : '—') }}
+      </p>
+      <label class="text-sm font-medium mt-2" for="exp-tedesc">{{ 'expenses.field.description' | t }}</label>
+      <input id="exp-tedesc" class="exp__input" name="tedesc" [ngModel]="tEditDescription()" (ngModelChange)="tEditDescription.set($event)" />
+      <label class="text-sm font-medium mt-2" for="exp-teamount">{{ 'expenses.field.amount' | t }}</label>
+      <app-currency-input name="teamount" [ngModel]="tEditAmount()" (ngModelChange)="tEditAmount.set($event)" [ariaLabel]="'expenses.field.amount' | t" />
+      <app-datepicker name="teinv" [label]="'expenses.field.invoiceDate' | t" [ngModel]="tEditInvoiceDate()" (ngModelChange)="tEditInvoiceDate.set($event)" />
+      <app-datepicker name="tepay" [label]="'expenses.field.paymentDate' | t" [ngModel]="tEditPaymentDate()" (ngModelChange)="tEditPaymentDate.set($event)" />
+      <label class="text-sm font-medium mt-2" for="exp-tenote">{{ 'expenses.field.note' | t }}</label>
+      <input id="exp-tenote" class="exp__input" name="tenote" [ngModel]="tEditNote()" (ngModelChange)="tEditNote.set($event)" />
+    </form>
+  }
+  <div dialog-footer class="flex justify-end gap-3">
+    <app-button size="sm" variant="ghost" (click)="closeTransferEdit()">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" [disabled]="!canSubmitTransferEdit()" [loading]="transferSaving()" (click)="saveTransferEdit($event)">{{ 'action.save' | t }}</app-button>
+  </div>
+</app-dialog>
+
+<app-dialog [open]="confirmDeleteTransfer() !== null" [title]="'expenses.transfers.deleteTitle' | t" [closeLabel]="'action.cancel' | t" (closed)="closeDeleteTransfer()">
+  <p>{{ 'expenses.transfers.deleteBody' | t }}</p>
+  <div dialog-footer class="flex justify-end gap-3">
+    <app-button size="sm" variant="ghost" (click)="closeDeleteTransfer()">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" variant="danger" [loading]="transferSaving()" (click)="doDeleteTransfer()">{{ 'action.delete' | t }}</app-button>
   </div>
 </app-dialog>
 

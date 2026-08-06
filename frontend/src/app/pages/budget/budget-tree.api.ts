@@ -72,6 +72,72 @@ export interface TransferCreate {
   description: string;
 }
 
+/**
+ * One transfer as a single row (`TransferRowOut`).
+ *
+ * A transfer is two bookings, an expense on the source and an income on the
+ * target. This row assembles both, so a transfer has one identity that can be
+ * corrected or removed. `actorName` is the resolved display name. Never show
+ * `actor`, it is the raw principal id.
+ */
+export interface BudgetTransfer {
+  transferId: Uuid;
+  expenseId: Uuid;
+  incomeId: Uuid;
+  fromBudgetId: Uuid;
+  fromPathKey: string | null;
+  toBudgetId: Uuid;
+  toPathKey: string | null;
+  fiscalYearId: Uuid;
+  amount: string;
+  currency: string;
+  description: string;
+  note: string | null;
+  invoiceDate: string | null;
+  paymentDate: string | null;
+  actor: string | null;
+  actorName: string | null;
+  createdAt: string;
+}
+
+/** Offset page of transfers. */
+export interface TransferPage {
+  items: BudgetTransfer[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+/** Query of `GET /budget-transfers`. `budget` matches either cost centre. */
+export interface TransferQuery {
+  id?: Uuid;
+  budget?: Uuid;
+  fiscalYear?: Uuid;
+  q?: string;
+  amountMin?: number | string;
+  amountMax?: number | string;
+  createdFrom?: string;
+  createdTo?: string;
+  sort?: 'createdAt' | 'amount' | 'invoiceDate' | 'paymentDate';
+  order?: 'asc' | 'desc';
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * Patch of a transfer. It writes both legs at once.
+ *
+ * The two cost centres are immutable. Sending a different pair answers 409, so
+ * this body never carries them. The fiscal year is not patchable at all.
+ */
+export interface TransferUpdate {
+  amount?: string;
+  description?: string;
+  note?: string | null;
+  invoiceDate?: string | null;
+  paymentDate?: string | null;
+}
+
 /** Offset page of booked expenses/income. */
 export interface ExpensePage {
   items: Expense[];
@@ -460,6 +526,31 @@ export class BudgetTreeApi {
    *  the same fiscal year. */
   createTransfer(body: TransferCreate): Observable<unknown> {
     return this.http.post(`${this.base}/budget-transfers`, body);
+  }
+
+  /** Transfers as their own paged list. Mirrors {@link listExpenses}. */
+  listTransfers(query: TransferQuery = {}): Observable<TransferPage> {
+    const params: Record<string, string> = {};
+    for (const [key, value] of Object.entries(query)) {
+      if (value !== undefined && value !== null && value !== '') {
+        params[key] = String(value);
+      }
+    }
+    return this.http.get<TransferPage>(`${this.base}/budget-transfers`, {
+      params,
+      context: skipLoading(),
+    });
+  }
+
+  /** Correct a transfer. Both legs change together. A different cost-centre
+   *  pair answers 409, so the body never carries the pair. */
+  updateTransfer(transferId: Uuid, body: TransferUpdate): Observable<BudgetTransfer> {
+    return this.http.patch<BudgetTransfer>(`${this.base}/budget-transfers/${transferId}`, body);
+  }
+
+  /** Delete a transfer with both of its bookings. */
+  deleteTransfer(transferId: Uuid): Observable<void> {
+    return this.http.delete<void>(`${this.base}/budget-transfers/${transferId}`);
   }
 
   /** Invoices, fuzzy-searched, filtered and offset-paginated. Mirrors

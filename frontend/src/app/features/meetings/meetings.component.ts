@@ -138,6 +138,8 @@ export class MeetingsComponent implements OnDestroy {
   readonly finalizing = this.session.finalizing;
   readonly casting = this.session.casting;
   readonly deletingVote = this.session.deletingVote;
+  readonly confirmDeleteProtocol = this.session.confirmDeleteProtocol;
+  readonly deletingProtocol = this.session.deletingProtocol;
   protected readonly myChoices = this.session.myChoices;
   readonly voteDialogOpen = this.session.voteDialogOpen;
   readonly voteQuestion = this.session.voteQuestion;
@@ -454,6 +456,18 @@ export class MeetingsComponent implements OnDestroy {
 
   finalize(): void {
     this.session.finalize();
+  }
+
+  askDeleteProtocol(): void {
+    this.session.askDeleteProtocol();
+  }
+
+  closeDeleteProtocol(): void {
+    this.session.closeDeleteProtocol();
+  }
+
+  doDeleteProtocol(): void {
+    this.session.doDeleteProtocol();
   }
 
   protected refreshProtocol(): void {

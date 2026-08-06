@@ -38,6 +38,13 @@
             @if (delegation()?.exercising) {
               <app-badge variant="info">{{ 'voting.cast.delegation.badge' | t }}</app-badge>
             }
+            @if (canDelete()) {
+              <!-- Only a draft with no ballots and no meeting can be deleted. An
+                   open vote is cancelled instead. -->
+              <app-button variant="danger" size="sm" (click)="confirmDelete.set(true)">
+                {{ 'voting.delete.action' | t }}
+              </app-button>
+            }
           </div>
         </app-page-header>
 
@@ -141,3 +148,18 @@
     }
   }
 }
+
+<app-dialog
+  [open]="confirmDelete()"
+  [title]="'voting.delete.title' | t"
+  [closeLabel]="'action.cancel' | t"
+  (closed)="confirmDelete.set(false)"
+>
+  <p>{{ 'voting.delete.body' | t }}</p>
+  <div dialog-footer class="flex justify-end gap-3">
+    <app-button size="sm" variant="ghost" (click)="confirmDelete.set(false)">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" variant="danger" [loading]="deleting()" (click)="doDelete()">
+      {{ 'voting.delete.action' | t }}
+    </app-button>
+  </div>
+</app-dialog>

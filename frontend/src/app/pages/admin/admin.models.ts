@@ -384,6 +384,21 @@ export interface RoleAssignmentInput {
   delegateVoting?: boolean;
 }
 
+/**
+ * Patch of an existing assignment (`PATCH /admin/role-assignments/{id}`).
+ *
+ * Every field is optional and `null` means "do not touch". The route therefore
+ * cannot clear a validity window back to open-ended. The UI says so.
+ * `principalId` is not patchable: an assignment never moves to another user.
+ */
+export interface RoleAssignmentPatch {
+  roleId?: Uuid;
+  gremiumId?: Uuid;
+  validFrom?: string;
+  validUntil?: string;
+  delegateVoting?: boolean;
+}
+
 /** OIDC principal (user) incl. its role assignments (admin API `/principals`). */
 export interface AdminPrincipal {
   id: Uuid;

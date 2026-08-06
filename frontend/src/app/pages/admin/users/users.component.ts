@@ -13,6 +13,7 @@ import {
   type ColumnDef,
   DataTableComponent,
   DatepickerComponent,
+  DialogComponent,
   IconComponent,
   RowDetailDirective,
   SelectComponent,
@@ -20,7 +21,12 @@ import {
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
-import type { AdminPrincipal, Role, RoleAssignment } from '../admin.models';
+import type {
+  AdminPrincipal,
+  Role,
+  RoleAssignment,
+  RoleAssignmentPatch,
+} from '../admin.models';
 
 /** Local form state for assigning a role per user. */
 interface AssignDraft {
@@ -58,6 +64,7 @@ function emptyDraft(): AssignDraft {
     DatepickerComponent,
     DataTableComponent,
     CellDirective,
+    DialogComponent,
     RowDetailDirective,
     IconComponent,
     PageHeaderComponent,
@@ -82,6 +89,15 @@ export class UsersComponent {
   protected readonly drafts = signal<Record<string, AssignDraft>>({});
   /** The rows that show the expanded assign-role form. */
   protected readonly expanded = signal<Set<string>>(new Set());
+
+  /** The assignment being edited, plus its dialog form state. */
+  protected readonly editing = signal<RoleAssignment | null>(null);
+  protected readonly editDraft = signal<AssignDraft>(emptyDraft());
+  protected readonly savingEdit = signal(false);
+
+  /** `admin.users` gates the whole page server-side. The controls follow it, so
+   *  no row action is offered that would answer 403. */
+  protected readonly canManageUsers = computed(() => this.auth.can('admin.users'));
 
   protected readonly rolesById = computed(() => new Map(this.roles().map((r) => [r.id, r])));
 
@@ -200,6 +216,65 @@ export class UsersComponent {
         this.search();
       },
       error: () => this.toast.error(this.i18n.translate('admin.users.actionFailed')),
+    });
+  }
+
+  /** Open the edit dialog for one assignment. A date arrives as ISO. The
+   *  datepicker needs the `YYYY-MM-DD` part only. */
+  protected openEdit(assignment: RoleAssignment): void {
+    this.editDraft.set({
+      roleId: assignment.roleId,
+      validFrom: (assignment.validFrom ?? '').slice(0, 10),
+      validUntil: (assignment.validUntil ?? '').slice(0, 10),
+    });
+    this.editing.set(assignment);
+  }
+
+  protected closeEdit(): void {
+    this.editing.set(null);
+  }
+
+  protected patchEdit(patch: Partial<AssignDraft>): void {
+    this.editDraft.update((d) => ({ ...d, ...patch }));
+  }
+
+  /**
+   * Save the changed assignment.
+   *
+   * The route treats a missing field as "do not touch", so an emptied date is
+   * left out instead of sent as null. The dialog states that, because clearing
+   * an expiry needs a revoke and a fresh assignment.
+   */
+  protected saveEdit(): void {
+    const assignment = this.editing();
+    const draft = this.editDraft();
+    if (!assignment || !draft.roleId || this.savingEdit()) return;
+    const patch: RoleAssignmentPatch = {};
+    if (draft.roleId !== assignment.roleId) patch.roleId = draft.roleId;
+    const from = isoOrNull(draft.validFrom);
+    if (from) patch.validFrom = from;
+    const until = isoOrNull(draft.validUntil);
+    if (until) patch.validUntil = until;
+    if (!Object.keys(patch).length) {
+      this.editing.set(null);
+      return;
+    }
+    this.savingEdit.set(true);
+    this.api.updateRoleAssignment(assignment.id, patch).subscribe({
+      next: () => {
+        this.savingEdit.set(false);
+        this.editing.set(null);
+        this.toast.success(this.i18n.translate('admin.users.editSaved'));
+        this.search();
+      },
+      error: (err: { status?: number }) => {
+        this.savingEdit.set(false);
+        // 403 = the self-lockout guard. An admin must not change their own
+        // admin assignment. Name that reason instead of a generic failure.
+        const key =
+          err.status === 403 ? 'admin.users.editSelfBlocked' : 'admin.users.editFailed';
+        this.toast.error(this.i18n.translate(key));
+      },
     });
   }
 
