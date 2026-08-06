@@ -29,6 +29,7 @@ from app.modules.budget.tree_schemas import (
     ExpenseOut,
     FiscalYearOut,
     InvoiceOut,
+    TransferRowOut,
 )
 from app.settings import load_settings
 from app.shared.paging import Page
@@ -38,6 +39,7 @@ _GID = uuid.uuid4()
 _FYID = uuid.uuid4()
 _AID = uuid.uuid4()
 _EID = uuid.uuid4()
+_TID = uuid.uuid4()
 _PERMS = ("budget.structure", "budget.book", "budget.view", "application.manage")
 
 
@@ -57,6 +59,17 @@ def _invoice_out() -> InvoiceOut:
     return InvoiceOut(
         id=uuid.uuid4(), number="R-2026-1", grossAmount=Decimal("119.00"),
         currency="EUR", status="open", createdAt=datetime(2026, 6, 9, tzinfo=UTC),
+    )
+
+
+def _transfer_row() -> TransferRowOut:
+    from datetime import datetime
+
+    return TransferRowOut(
+        transferId=_TID, expenseId=_EID, incomeId=uuid.uuid4(),
+        fromBudgetId=_BID, fromPathKey="VS", toBudgetId=uuid.uuid4(), toPathKey="VS-800",
+        fiscalYearId=_FYID, amount=Decimal("42.00"), currency="EUR",
+        description="Umbuchung", createdAt=datetime(2026, 6, 9, tzinfo=UTC),
     )
 
 
@@ -133,6 +146,24 @@ class _FakeService:
     ) -> FiscalYearOut:
         self.calls["update_fy"] = (budget_id, fiscal_year_id)
         return _fy_out()
+
+    async def delete_fiscal_year(
+        self, budget_id: uuid.UUID, fiscal_year_id: uuid.UUID
+    ) -> None:
+        self.calls["delete_fy"] = (budget_id, fiscal_year_id)
+
+    async def list_transfers_paged(self, **kwargs: Any) -> Page[TransferRowOut]:
+        self.calls["list_transfers_paged"] = kwargs
+        return Page(items=[_transfer_row()], total=1, limit=50, offset=0)
+
+    async def update_transfer(
+        self, transfer_id: uuid.UUID, payload: object
+    ) -> TransferRowOut:
+        self.calls["update_transfer"] = (transfer_id, payload)
+        return _transfer_row()
+
+    async def delete_transfer(self, transfer_id: uuid.UUID) -> None:
+        self.calls["delete_transfer"] = transfer_id
 
     async def set_allocation(
         self, budget_id: uuid.UUID, fiscal_year_id: uuid.UUID, payload: object
@@ -477,3 +508,93 @@ def test_get_budget_tree_service_factory() -> None:
     assert svc.storage is None
     assert svc.actor == "tester"
     assert ServiceDep is not None
+
+
+# Fiscal-year delete (budget.structure) and the transfer entity routes (budget.book).
+
+
+def test_delete_fiscal_year(client: TestClient, fake: _FakeService) -> None:
+    resp = client.delete(f"/api/budgets/{_BID}/fiscal-years/{_FYID}")
+    assert resp.status_code == 204
+    assert fake.calls["delete_fy"] == (_BID, _FYID)
+
+
+def test_delete_fiscal_year_requires_structure(fake: _FakeService) -> None:
+    resp = _app_as(fake, {"budget.book"}).delete(
+        f"/api/budgets/{_BID}/fiscal-years/{_FYID}"
+    )
+    assert resp.status_code == 403
+
+
+def test_delete_fiscal_year_requires_auth(fake: _FakeService) -> None:
+    app = create_app()
+    app.dependency_overrides[get_budget_tree_service] = lambda: fake
+    resp = TestClient(app).delete(f"/api/budgets/{_BID}/fiscal-years/{_FYID}")
+    assert resp.status_code == 401
+
+
+def test_list_transfers_passes_filters(client: TestClient, fake: _FakeService) -> None:
+    resp = client.get(
+        "/api/budget-transfers",
+        params={
+            "id": str(_TID),
+            "budget": str(_BID),
+            "fiscalYear": str(_FYID),
+            "q": "Umbuchung",
+            "amountMin": "1",
+            "amountMax": "999",
+            "createdFrom": "2026-01-01",
+            "createdTo": "2026-12-31",
+            "sort": "amount",
+            "order": "asc",
+            "limit": 20,
+            "offset": 5,
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total"] == 1
+    assert body["items"][0]["fromPathKey"] == "VS"
+    kwargs = fake.calls["list_transfers_paged"]
+    assert kwargs["transfer_id"] == _TID
+    assert kwargs["budget_id"] == _BID
+    assert kwargs["fiscal_year_id"] == _FYID
+    assert kwargs["q"] == "Umbuchung"
+    assert kwargs["sort"] == "amount" and kwargs["order"] == "asc"
+    assert kwargs["limit"] == 20 and kwargs["offset"] == 5
+
+
+def test_list_transfers_requires_book(fake: _FakeService) -> None:
+    assert _app_as(fake, {"budget.view"}).get("/api/budget-transfers").status_code == 403
+
+
+def test_update_transfer(client: TestClient, fake: _FakeService) -> None:
+    resp = client.patch(
+        f"/api/budget-transfers/{_TID}",
+        json={"amount": "50.00", "note": "korrigiert", "paymentDate": "2026-06-10"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["transferId"] == str(_TID)
+    assert fake.calls["update_transfer"][0] == _TID
+
+
+def test_update_transfer_requires_book(fake: _FakeService) -> None:
+    resp = _app_as(fake, {"budget.structure"}).patch(
+        f"/api/budget-transfers/{_TID}", json={"amount": "50.00"}
+    )
+    assert resp.status_code == 403
+
+
+def test_update_transfer_empty_body_422(client: TestClient) -> None:
+    assert client.patch(f"/api/budget-transfers/{_TID}", json={}).status_code == 422
+
+
+def test_delete_transfer(client: TestClient, fake: _FakeService) -> None:
+    resp = client.delete(f"/api/budget-transfers/{_TID}")
+    assert resp.status_code == 204
+    assert fake.calls["delete_transfer"] == _TID
+
+
+def test_delete_transfer_requires_book(fake: _FakeService) -> None:
+    resp = _app_as(fake, {"budget.view"}).delete(f"/api/budget-transfers/{_TID}")
+    assert resp.status_code == 403

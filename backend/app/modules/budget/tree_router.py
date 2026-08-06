@@ -62,6 +62,8 @@ from app.modules.budget.tree_schemas import (
     SubBookingCreate,
     TransferCreate,
     TransferOut,
+    TransferRowOut,
+    TransferUpdate,
 )
 from app.shared.antiabuse import body_cap
 from app.shared.errors import ForbiddenError, ProblemDetail, ValidationProblem
@@ -510,6 +512,85 @@ async def create_transfer(
     return await service.create_transfer(payload, actor=principal.sub)
 
 
+@router.get(
+    "/budget-transfers",
+    response_model=Page[TransferRowOut],
+    dependencies=[Depends(require_principal("budget.book"))],
+    responses=_errors(401, 403, 404),
+)
+async def list_transfers(
+    service: ServiceDep,
+    transfer_id: Annotated[UUID | None, Query(alias="id")] = None,
+    budget_id: Annotated[UUID | None, Query(alias="budget")] = None,
+    fiscal_year_id: Annotated[UUID | None, Query(alias="fiscalYear")] = None,
+    q: Annotated[str | None, Query()] = None,
+    amount_min: Annotated[Decimal | None, Query(alias="amountMin", ge=0)] = None,
+    amount_max: Annotated[Decimal | None, Query(alias="amountMax", ge=0)] = None,
+    created_from: Annotated[str | None, Query(alias="createdFrom")] = None,
+    created_to: Annotated[str | None, Query(alias="createdTo")] = None,
+    sort: Annotated[
+        Literal["createdAt", "amount", "invoiceDate", "paymentDate"] | None, Query()
+    ] = None,
+    order: Annotated[Literal["asc", "desc"] | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> Page[TransferRowOut]:
+    """List transfers as single rows, filtered and sorted, with offset paging.
+
+    The filters mirror ``GET /expenses``. ``id`` selects the exact transfer for
+    a deep link. ``budget`` matches EITHER cost centre and includes the
+    subtree. ``q`` searches the description and the note.
+    """
+    return await service.list_transfers_paged(
+        transfer_id=transfer_id,
+        budget_id=budget_id,
+        fiscal_year_id=fiscal_year_id,
+        q=q,
+        amount_min=amount_min,
+        amount_max=amount_max,
+        created_from=created_from,
+        created_to=created_to,
+        sort=sort,
+        order=order,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.patch(
+    "/budget-transfers/{transfer_id}",
+    response_model=TransferRowOut,
+    dependencies=[Depends(require_principal("budget.book"))],
+    responses=_errors(400, 401, 403, 404, 409, 422),
+)
+async def update_transfer(
+    transfer_id: UUID, payload: TransferUpdate, service: ServiceDep
+) -> TransferRowOut:
+    """Patch both legs of a transfer at once.
+
+    The amount, the description, the note and the two business dates apply to
+    the source expense and to the target income together. The two cost centres
+    are immutable: a request that names a different pair answers 409, because a
+    different pair is a new transfer.
+    """
+    return await service.update_transfer(transfer_id, payload)
+
+
+@router.delete(
+    "/budget-transfers/{transfer_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_principal("budget.book"))],
+    responses=_errors(401, 403, 404),
+)
+async def delete_transfer(transfer_id: UUID, service: ServiceDep) -> None:
+    """Delete a transfer, that is both of its bookings.
+
+    ``DELETE /budget-expenses/{id}`` on either leg removes the pair too and
+    stays supported.
+    """
+    await service.delete_transfer(transfer_id)
+
+
 # Every budget role may read an invoice. A write needs budget.book.
 _INVOICE_READ = Depends(require_any_permission("budget.view", "budget.structure", "budget.book"))
 
@@ -731,6 +812,24 @@ async def update_fiscal_year(
 ) -> FiscalYearOut:
     """Update a fiscal year. The route checks the disjointness again."""
     return await service.update_fiscal_year(budget_id, fiscal_year_id, payload)
+
+
+@router.delete(
+    "/budgets/{budget_id}/fiscal-years/{fiscal_year_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_principal("budget.structure"))],
+    responses=_errors(401, 403, 404, 409, 422),
+)
+async def delete_fiscal_year(
+    budget_id: UUID, fiscal_year_id: UUID, service: ServiceDep
+) -> None:
+    """Delete a fiscal year of a top-level budget.
+
+    A fiscal year that still carries bookings, allocations or assigned
+    applications answers 409. Those rows must go first, because the delete
+    would otherwise drop or orphan money data.
+    """
+    await service.delete_fiscal_year(budget_id, fiscal_year_id)
 
 
 @router.put(

@@ -46,6 +46,7 @@ class FakeSession:
         self._results = list(results)
         self.scalar_results: list[Any] = []
         self.added: list[Any] = []
+        self.deleted: list[Any] = []
         self.flushed = 0
         self.committed = 0
 
@@ -83,6 +84,9 @@ class FakeSession:
         if getattr(obj, "id", None) is None:
             obj.id = uuid.uuid4()
         self.added.append(obj)
+
+    async def delete(self, obj: Any) -> None:
+        self.deleted.append(obj)
 
     async def flush(self) -> None:
         self.flushed += 1

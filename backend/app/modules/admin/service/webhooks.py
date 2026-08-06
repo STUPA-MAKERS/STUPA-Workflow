@@ -160,6 +160,24 @@ class WebhookOps(ConfigServiceBase):
         await self.session.commit()
         return _webhook_out(row)
 
+    async def delete_webhook(self, webhook_id: UUID, actor: str) -> None:
+        """Delete a webhook and its delivery history.
+
+        The ``webhook_delivery`` rows hang on the webhook with ``ON DELETE
+        CASCADE``, so the delete needs no guard and answers no 409. Until this
+        route existed, the only way to stop a webhook was ``active: false``,
+        which kept the target URL and the secret in the database.
+
+        Raises:
+            NotFoundError: No webhook has this id (404).
+        """
+        row = await self.session.get(Webhook, webhook_id)
+        if row is None:
+            raise NotFoundError(f"webhook {webhook_id} not found")
+        await self._audit(actor, AuditAction.WEBHOOK_CONFIG, "webhook", webhook_id)
+        await self.session.delete(row)
+        await self.session.commit()
+
     async def list_webhook_delivery_status(self) -> list[WebhookDeliveryStatusOut]:
         """Report the latest delivery state per webhook.
 

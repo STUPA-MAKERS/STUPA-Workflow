@@ -48,6 +48,7 @@ from app.modules.budget.tree_schemas import (
     InvoiceUpdate,
     SubBookingCreate,
     TransferCreate,
+    TransferUpdate,
 )
 from app.modules.files.mime import MimeRejected
 from app.modules.files.scanner import ScannerError, ScanVerdict
@@ -1832,3 +1833,297 @@ async def test_update_expense_child_amount_recomputes_parent() -> None:
     out = await svc.update_expense(child.id, ExpenseUpdate(amount=Decimal("35.00")))
     assert out.amount == Decimal("35.00")
     assert parent.amount == Decimal("35.00")
+
+
+# --------------------------------------------------------------------------
+# Fiscal-year delete: the 409 guard keeps money rows from being dropped.
+# --------------------------------------------------------------------------
+
+
+async def test_delete_fiscal_year_ok() -> None:
+    top = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
+    fy = _fy(id=uuid.uuid4(), budget_id=top.id)
+    # Queue: the node, the fiscal year, then the three guard probes (all empty).
+    sess = fake_session(result(top), result(fy), result(), result(), result())
+    svc = BudgetTreeService(sess, actor="u")
+    await svc.delete_fiscal_year(top.id, fy.id)
+    assert sess.deleted == [fy]
+    assert sess.committed == 1
+
+
+async def test_delete_fiscal_year_not_top_level_422() -> None:
+    child = _budget(id=uuid.uuid4(), parent_id=uuid.uuid4(), path_key="VS-1", key="1")
+    svc = BudgetTreeService(fake_session(result(child)))
+    with pytest.raises(ValidationProblem):
+        await svc.delete_fiscal_year(child.id, uuid.uuid4())
+
+
+async def test_delete_fiscal_year_of_other_budget_404() -> None:
+    top = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
+    foreign = _fy(id=uuid.uuid4(), budget_id=uuid.uuid4())
+    svc = BudgetTreeService(fake_session(result(top), result(foreign)))
+    with pytest.raises(NotFoundError):
+        await svc.delete_fiscal_year(top.id, foreign.id)
+
+
+async def test_delete_fiscal_year_with_bookings_409() -> None:
+    top = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
+    fy = _fy(id=uuid.uuid4(), budget_id=top.id)
+    sess = fake_session(
+        result(top), result(fy), result(uuid.uuid4()), result(), result()
+    )
+    svc = BudgetTreeService(sess)
+    with pytest.raises(ConflictError) as ei:
+        await svc.delete_fiscal_year(top.id, fy.id)
+    assert "bookings" in str(ei.value)
+    assert sess.deleted == []
+
+
+async def test_delete_fiscal_year_with_allocations_409() -> None:
+    top = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
+    fy = _fy(id=uuid.uuid4(), budget_id=top.id)
+    sess = fake_session(
+        result(top), result(fy), result(), result(uuid.uuid4()), result()
+    )
+    svc = BudgetTreeService(sess)
+    with pytest.raises(ConflictError) as ei:
+        await svc.delete_fiscal_year(top.id, fy.id)
+    assert "allocations" in str(ei.value)
+
+
+async def test_delete_fiscal_year_with_applications_409() -> None:
+    # `application.fiscal_year_id` has no cascade, so an unguarded delete would
+    # fail on the foreign key with a 500.
+    top = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
+    fy = _fy(id=uuid.uuid4(), budget_id=top.id)
+    sess = fake_session(
+        result(top), result(fy), result(), result(), result(uuid.uuid4())
+    )
+    svc = BudgetTreeService(sess)
+    with pytest.raises(ConflictError) as ei:
+        await svc.delete_fiscal_year(top.id, fy.id)
+    assert "applications" in str(ei.value)
+
+
+# --------------------------------------------------------------------------
+# Transfers as a first-class entity: read, patch and delete both legs.
+# --------------------------------------------------------------------------
+
+
+def _transfer_pair(*, transfer_id=None, src=None, dst=None, fy=None, actor=None):  # noqa: ANN001
+    tid = transfer_id or uuid.uuid4()
+    out = _expense(
+        budget_id=src or uuid.uuid4(), fy_id=fy or uuid.uuid4(), kind="expense",
+        amount="100.00", transfer_id=tid, actor=actor,
+    )
+    income = _expense(
+        budget_id=dst or uuid.uuid4(), fy_id=out.fiscal_year_id, kind="income",
+        amount="100.00", transfer_id=tid, actor=actor,
+    )
+    return tid, out, income
+
+
+async def test_get_transfer_joins_both_legs() -> None:
+    tid, out, income = _transfer_pair(actor="u")
+    sess = fake_session(
+        result(out, income),  # _legs
+        result((out.budget_id, "VS-1"), (income.budget_id, "VS-2")),  # _path_keys
+        result(("u", "Uwe", None)),  # _actor_names
+    )
+    row = await BudgetTreeService(sess).get_transfer(tid)
+    assert row.transfer_id == tid
+    assert row.expense_id == out.id and row.income_id == income.id
+    assert row.from_path_key == "VS-1" and row.to_path_key == "VS-2"
+    assert row.actor_name == "Uwe"
+
+
+async def test_get_transfer_missing_leg_404() -> None:
+    # A single booking without its counterpart is not a transfer entity.
+    _tid, out, _income = _transfer_pair()
+    svc = BudgetTreeService(fake_session(result(out)))
+    with pytest.raises(NotFoundError):
+        await svc.get_transfer(uuid.uuid4())
+
+
+async def test_get_transfer_missing_expense_leg_404() -> None:
+    _tid, _out, income = _transfer_pair()
+    svc = BudgetTreeService(fake_session(result(income)))
+    with pytest.raises(NotFoundError):
+        await svc.get_transfer(uuid.uuid4())
+
+
+async def test_path_keys_empty_set_skips_query() -> None:
+    svc = BudgetTreeService(fake_session())
+    assert await svc._path_keys(set()) == {}
+
+
+async def test_list_transfers_unfiltered() -> None:
+    tid, out, income = _transfer_pair()
+    sess = fake_session(
+        result(1),  # count
+        result(out),  # source legs
+        result(income),  # income legs
+        result((out.budget_id, "VS-1"), (income.budget_id, "VS-2")),  # path keys
+    )
+    page = await BudgetTreeService(sess).list_transfers_paged()
+    assert page.total == 1 and page.limit == 50
+    assert page.items[0].transfer_id == tid
+    assert page.items[0].actor_name is None
+
+
+async def test_list_transfers_all_filters_and_search() -> None:
+    node = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
+    tid, out, income = _transfer_pair(actor="u")
+    sess = fake_session(
+        result(node),  # _get_node for the budget filter
+        result(1),  # count
+        result(out),
+        result(income),
+        result((out.budget_id, "VS-1"), (income.budget_id, "VS-2")),
+        result(("u", "Uwe", None)),
+    )
+    page = await BudgetTreeService(sess).list_transfers_paged(
+        transfer_id=tid,
+        budget_id=node.id,
+        fiscal_year_id=out.fiscal_year_id,
+        q="Umbuchung",
+        amount_min=Decimal("1"),
+        amount_max=Decimal("999"),
+        created_from="2026-01-01",
+        created_to="2026-12-31",
+        sort="amount",
+        order="asc",
+        limit=10,
+        offset=0,
+    )
+    assert page.items[0].transfer_id == tid
+
+
+async def test_list_transfers_blank_q_and_nullable_date_sort() -> None:
+    # A blank `q` adds no search clause, and a nullable date column sorts nulls last.
+    _tid, out, income = _transfer_pair()
+    sess = fake_session(
+        result(1),
+        result(out),
+        result(income),
+        result((out.budget_id, "VS-1"), (income.budget_id, "VS-2")),
+    )
+    page = await BudgetTreeService(sess).list_transfers_paged(
+        q="   ", sort="invoiceDate", order="desc"
+    )
+    assert page.total == 1
+
+
+async def test_list_transfers_empty_page() -> None:
+    # No count row and no source leg: `total` falls back to 0 and the assembly
+    # returns early without a second query.
+    sess = fake_session(result(), result())
+    page = await BudgetTreeService(sess).list_transfers_paged()
+    assert page.total == 0 and page.items == []
+
+
+async def test_list_transfers_skips_leg_without_counterpart() -> None:
+    # A source leg whose income row is gone is no transfer and drops out of the page.
+    _tid, out, _income = _transfer_pair()
+    sess = fake_session(result(1), result(out), result())
+    page = await BudgetTreeService(sess).list_transfers_paged()
+    assert page.total == 1 and page.items == []
+
+
+async def test_update_transfer_patches_both_legs() -> None:
+    tid, out, income = _transfer_pair(actor="u")
+    sess = fake_session(
+        result(out, income),  # _legs
+        result((out.budget_id, "VS-1"), (income.budget_id, "VS-2")),  # path keys
+        result(("u", "Uwe", None)),  # actor names
+    )
+    row = await BudgetTreeService(sess, actor="u").update_transfer(
+        tid,
+        TransferUpdate(
+            amount=Decimal("55.00"),
+            description="Korrektur",
+            note="Beleg nachgereicht",
+            invoiceDate=date(2026, 6, 1),
+            paymentDate=date(2026, 6, 2),
+            fromBudgetId=out.budget_id,  # repeating the pair is allowed
+            toBudgetId=income.budget_id,
+        ),
+    )
+    assert row.amount == Decimal("55.00") and row.note == "Beleg nachgereicht"
+    # Both legs carry the same values, so the pair never drifts apart.
+    assert income.amount == Decimal("55.00")
+    assert income.description == "Korrektur" and income.note == "Beleg nachgereicht"
+    assert income.invoice_date == date(2026, 6, 1)
+    assert income.payment_date == date(2026, 6, 2)
+    assert sess.committed == 1
+
+
+async def test_update_transfer_audit_entry_is_not_revertable() -> None:
+    # The entry records the prior values under `prior`, NOT under `before`. A
+    # one-sided revert would desync the pair, so the log must not offer it.
+    from app.modules.audit.service import AuditService
+
+    tid, out, income = _transfer_pair()
+    entries: list[Any] = []
+    sess = fake_session(
+        result(out, income),
+        result((out.budget_id, "VS-1"), (income.budget_id, "VS-2")),
+    )
+    original_add = sess.add
+
+    def _capture(obj: Any) -> None:
+        entries.append(obj)
+        original_add(obj)
+
+    sess.add = _capture
+    await BudgetTreeService(sess, actor="u").update_transfer(
+        tid, TransferUpdate(amount=Decimal("7.00"))
+    )
+    audit = [e for e in entries if isinstance(e, AuditEntry)]
+    assert len(audit) == 1
+    assert audit[0].action == AuditAction.BUDGET_EXPENSE_UPDATE
+    assert audit[0].target_type == "budget_transfer"
+    assert "before" not in audit[0].data
+    assert audit[0].data["prior"]["amount"] == "100.00"
+    flags = await AuditService(cast("Any", sess)).revertable_flags([audit[0]])
+    assert flags[audit[0].id] is False
+
+
+async def test_update_transfer_rejects_new_source_409() -> None:
+    tid, out, income = _transfer_pair()
+    sess = fake_session(result(out, income))
+    with pytest.raises(ConflictError) as ei:
+        await BudgetTreeService(sess).update_transfer(
+            tid, TransferUpdate(fromBudgetId=uuid.uuid4())
+        )
+    assert ei.value.code == "transfer_cost_centres_immutable"
+    assert sess.committed == 0
+
+
+async def test_update_transfer_rejects_new_target_409() -> None:
+    tid, out, income = _transfer_pair()
+    sess = fake_session(result(out, income))
+    with pytest.raises(ConflictError):
+        await BudgetTreeService(sess).update_transfer(
+            tid, TransferUpdate(toBudgetId=uuid.uuid4())
+        )
+
+
+async def test_update_transfer_unknown_404() -> None:
+    svc = BudgetTreeService(fake_session(result()))
+    with pytest.raises(NotFoundError):
+        await svc.update_transfer(uuid.uuid4(), TransferUpdate(amount=Decimal("1")))
+
+
+async def test_delete_transfer_removes_both_legs() -> None:
+    tid, out, income = _transfer_pair(actor="u")
+    sess = fake_session(result(out, income))
+    await BudgetTreeService(sess, actor="u").delete_transfer(tid)
+    assert sess.deleted == [out, income]
+    assert sess.committed == 1
+
+
+async def test_delete_transfer_unknown_404() -> None:
+    svc = BudgetTreeService(fake_session(result()))
+    with pytest.raises(NotFoundError):
+        await svc.delete_transfer(uuid.uuid4())

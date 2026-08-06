@@ -1283,6 +1283,20 @@ async def test_update_webhook_not_found() -> None:
         await s.update_webhook(uuid.uuid4(), WebhookUpdate(name="x"), "admin")
 
 
+async def test_delete_webhook_ok() -> None:
+    row = webhook_row()
+    s, session = svc([*audit_results()], gets=[row])
+    await s.delete_webhook(row.id, "admin")
+    assert session.deleted == [row]
+    assert session.committed == 1
+
+
+async def test_delete_webhook_not_found() -> None:
+    s, _ = svc(gets=[None])
+    with pytest.raises(NotFoundError):
+        await s.delete_webhook(uuid.uuid4(), "admin")
+
+
 # AUD-062: the advisory SSRF check of the webhook URL at CRUD time.
 def test_webhook_url_advisory_blocks_internal_ip_literal() -> None:
     # The link-local metadata IP is not global, so this is a 400 and no silent dead-letter.

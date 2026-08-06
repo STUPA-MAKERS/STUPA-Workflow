@@ -766,3 +766,73 @@ async def test_get_scoped_checks_then_returns_tally() -> None:
     p = Principal(sub="u", permissions={"application.read"})
     out = await VotingService(db).get_scoped(vote.id, p)
     assert out.tally.counts == {"yes": 1, "no": 0, "abstain": 0}
+
+
+# DELETE /votes/{id}: a standalone draft vote that never ran. Everything further
+# along stays with `cancel`, so the record keeps every vote that ever opened.
+
+
+async def test_delete_standalone_draft_ok() -> None:
+    from app.modules.audit.models import AuditEntry
+
+    vote = _vote(meeting_id=None, status="draft")
+    db = fake_session(result(vote))
+    await VotingService(db).delete_standalone(vote.id, actor="mgr")
+    assert vote in db.deleted
+    assert db.committed == 1
+    entries = [o for o in db.added if isinstance(o, AuditEntry)]
+    assert [e.action for e in entries] == ["vote_delete"]
+    assert entries[0].data["eligibleGroup"] == "stupa"
+
+
+async def test_delete_standalone_without_application_records_null() -> None:
+    vote = _vote(meeting_id=None, status="draft", application_id=None)
+    db = fake_session(result(vote))
+    await VotingService(db).delete_standalone(vote.id, actor="mgr")
+    entry = db.added[0]
+    assert entry.data["applicationId"] is None
+
+
+async def test_delete_standalone_unknown_404() -> None:
+    db = fake_session(result())
+    with pytest.raises(NotFoundError):
+        await VotingService(db).delete_standalone(uuid4(), actor="mgr")
+
+
+async def test_delete_standalone_meeting_bound_409() -> None:
+    # The meeting route owns this vote and applies the meeting-scoped check.
+    vote = _vote(meeting_id=uuid4(), status="draft")
+    db = fake_session(result(vote))
+    with pytest.raises(ConflictError) as ei:
+        await VotingService(db).delete_standalone(vote.id, actor="mgr")
+    assert ei.value.code == "vote_meeting_bound"
+    assert db.deleted == []
+
+
+async def test_delete_standalone_open_vote_409() -> None:
+    vote = _vote(meeting_id=None, status="open")
+    db = fake_session(result(vote))
+    with pytest.raises(ConflictError) as ei:
+        await VotingService(db).delete_standalone(vote.id, actor="mgr")
+    assert ei.value.code == "vote_not_draft"
+    assert db.deleted == []
+
+
+async def test_delete_standalone_with_ballots_409() -> None:
+    vote = _vote(meeting_id=None, status="draft")
+    db = fake_session(result(vote))
+    # An open ballot, no secret ballot, no marker: the first count already blocks.
+    db.scalar_results = [1, 0, 0]
+    with pytest.raises(ConflictError) as ei:
+        await VotingService(db).delete_standalone(vote.id, actor="mgr")
+    assert ei.value.code == "vote_has_ballots"
+    assert db.deleted == []
+
+
+async def test_delete_standalone_with_secret_marker_409() -> None:
+    vote = _vote(meeting_id=None, status="draft")
+    db = fake_session(result(vote))
+    # A secret vote leaves only the voted_marker as a trace, and that blocks too.
+    db.scalar_results = [0, 0, 2]
+    with pytest.raises(ConflictError):
+        await VotingService(db).delete_standalone(vote.id, actor="mgr")

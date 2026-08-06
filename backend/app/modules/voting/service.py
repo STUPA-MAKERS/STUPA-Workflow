@@ -101,6 +101,71 @@ class VotingService:
         await self.session.flush()
         await self.session.commit()
 
+    async def _ballot_count(self, vote_id: UUID) -> int:
+        """Count every recorded participation of a vote, open and secret.
+
+        The ``voted_marker`` rows count too. A secret vote splits the identity
+        from the choice, so the marker is the only trace that somebody voted.
+        """
+        total = 0
+        for model in (Ballot, SecretBallot, VotedMarker):
+            total += (
+                await self.session.scalar(
+                    select(func.count()).select_from(model).where(model.vote_id == vote_id)
+                )
+            ) or 0
+        return total
+
+    async def delete_standalone(self, vote_id: UUID, *, actor: str) -> None:
+        """Delete a standalone application-bound vote that never ran.
+
+        The vote must still be ``draft`` and must hold no ballot. Anything
+        further along stays with ``cancel``: an opened vote is part of the
+        record of the Gremium, and its result may already have fired a flow
+        branch. A vote that belongs to a meeting is not reachable here. That
+        one has its own route, ``DELETE /meetings/{id}/votes/{id}``, with the
+        meeting-scoped ``canManageVotes`` check. Duplicating it here would give
+        a second, weaker path to the same row.
+
+        The caller (router) runs the gremium-scoped ``vote.manage`` check, like
+        open, close and cancel.
+
+        Raises:
+            NotFoundError: No vote has this id (404).
+            ConflictError: The vote belongs to a meeting, is no longer a draft,
+                or already holds ballots (409).
+        """
+        vote = await self._get_vote(vote_id)
+        if vote.meeting_id is not None:
+            raise ConflictError(
+                "This vote belongs to a meeting; delete it through the meeting.",
+                code="vote_meeting_bound",
+            )
+        if vote.status != "draft":
+            raise ConflictError(
+                "Only a vote that never opened can be deleted; cancel it instead.",
+                code="vote_not_draft",
+            )
+        if await self._ballot_count(vote_id) > 0:
+            raise ConflictError(
+                "This vote already holds ballots and cannot be deleted.",
+                code="vote_has_ballots",
+            )
+        await audit_record(
+            self.session,
+            actor=actor,
+            action=AuditAction.VOTE_DELETE,
+            target_type="vote",
+            target_id=str(vote_id),
+            data={
+                "applicationId": str(vote.application_id) if vote.application_id else None,
+                "eligibleGroup": vote.eligible_group,
+            },
+        )
+        await self.session.delete(vote)
+        await self.session.flush()
+        await self.session.commit()
+
     async def _get_application(self, application_id: UUID) -> Application:
         app = (
             await self.session.execute(select(Application).where(Application.id == application_id))

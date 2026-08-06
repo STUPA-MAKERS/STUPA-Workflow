@@ -22,6 +22,11 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "application.manage",
     # Edit application data in ANY flow state. This overrides the state edit lock.
     "application.edit_any",
+    # Delete an application permanently, with its versions, comments and timeline.
+    # This is destructive and irreversible: no revert brings the record back. It
+    # stays SEPARATE from application.manage, which covers the edit only. Grant it
+    # deliberately.
+    "application.delete",
     "form.configure",
     "flow.configure",
     "vote.cast",

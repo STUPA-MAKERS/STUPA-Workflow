@@ -31,6 +31,10 @@ MANAGE_PERMISSION = "application.manage"
 # The edit right also lifts the state edit lock in the service.
 READ_ALL_PERMISSION = "application.read_all"
 EDIT_ANY_PERMISSION = "application.edit_any"
+# Delete an application permanently. This is a separate, destructive right. An admin
+# holds it through the role bypass in `Principal.has`. Any other role holds it only
+# through an explicit grant.
+DELETE_PERMISSION = "application.delete"
 
 
 @dataclass(slots=True)

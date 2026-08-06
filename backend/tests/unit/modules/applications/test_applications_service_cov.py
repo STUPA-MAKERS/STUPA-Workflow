@@ -34,7 +34,12 @@ from app.modules.applications.service.service_base import (
     _whitelist,
 )
 from app.shared.config_schemas import FormFieldDef
-from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
+from app.shared.errors import (
+    ConflictError,
+    ForbiddenError,
+    NotFoundError,
+    ValidationProblem,
+)
 
 NOW = datetime(2026, 6, 16, 12, 0, tzinfo=UTC)
 
@@ -1256,3 +1261,183 @@ async def test_current_version_value() -> None:
     session = _Session(scalar_results=[5])
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     assert await svc._current_version(uuid4()) == 5
+
+
+# PATCH/DELETE on one comment. The author check is server-side and the audit log
+# records both operations, because a comment keeps no version history.
+
+
+def _comment(**over: Any) -> Any:
+    base: dict[str, Any] = {
+        "id": uuid4(),
+        "application_id": uuid4(),
+        "author": "sub-1",
+        "author_kind": "principal",
+        "body": "alt",
+        "visibility": "internal",
+        "at": NOW,
+    }
+    base.update(over)
+    return _Obj(**base)
+
+
+def test_is_comment_author_rules() -> None:
+    from app.modules.applications.service.comments import is_comment_author
+
+    # A principal matches on the stored sub, and only with a session sub.
+    assert is_comment_author("s1", "principal", viewer_sub="s1", viewer_is_applicant=False)
+    assert not is_comment_author("s1", "principal", viewer_sub="s2", viewer_is_applicant=False)
+    assert not is_comment_author("s1", "principal", viewer_sub=None, viewer_is_applicant=True)
+    # An applicant comment stores no sub, so the magic-link applicant owns it.
+    assert is_comment_author(None, "applicant", viewer_sub=None, viewer_is_applicant=True)
+    assert not is_comment_author(None, "applicant", viewer_sub="s1", viewer_is_applicant=False)
+
+
+async def test_update_comment_by_author() -> None:
+    app = _app()
+    c = _comment(application_id=app.id)
+    session = _Session(
+        get_results=[app],
+        execute_results=[[c], [], [], [("sub-1", "Alice", None)]],
+    )
+    svc = ApplicationsService(session)  # type: ignore[arg-type]
+    out = await svc.update_comment(
+        app.id,
+        c.id,
+        body="neu",
+        actor="sub-1",
+        viewer_sub="sub-1",
+        viewer_is_applicant=False,
+        can_manage=False,
+    )
+    assert out.body == "neu" and c.body == "neu"
+    assert out.author == "Alice" and out.is_own is True
+    assert session.committed == 1
+    entries = [o for o in session.added if type(o).__name__ == "AuditEntry"]
+    assert [e.action for e in entries] == ["comment_update"]
+    # The audit payload carries metadata only, never the comment text.
+    assert entries[0].data == {
+        "applicationId": str(app.id),
+        "authorKind": "principal",
+        "visibility": "internal",
+    }
+
+
+async def test_update_comment_by_manager_of_foreign_comment() -> None:
+    app = _app()
+    c = _comment(application_id=app.id, author="other")
+    session = _Session(get_results=[app], execute_results=[[c], [], [], []])
+    svc = ApplicationsService(session)  # type: ignore[arg-type]
+    out = await svc.update_comment(
+        app.id,
+        c.id,
+        body="neu",
+        actor="mgr",
+        viewer_sub="mgr",
+        viewer_is_applicant=False,
+        can_manage=True,
+    )
+    # The manager is not the author, so the response is not marked as own.
+    assert out.is_own is False and out.author == "other"
+
+
+async def test_update_comment_of_applicant_by_applicant() -> None:
+    app = _app()
+    c = _comment(application_id=app.id, author=None, author_kind="applicant")
+    session = _Session(get_results=[app], execute_results=[[c], [], []])
+    svc = ApplicationsService(session)  # type: ignore[arg-type]
+    out = await svc.update_comment(
+        app.id,
+        c.id,
+        body="neu",
+        actor="applicant",
+        viewer_sub=None,
+        viewer_is_applicant=True,
+        can_manage=False,
+    )
+    assert out.author is None and out.is_own is True
+
+
+async def test_update_comment_foreign_author_403() -> None:
+    app = _app()
+    c = _comment(application_id=app.id, author="somebody-else")
+    session = _Session(get_results=[app], execute_results=[[c]])
+    svc = ApplicationsService(session)  # type: ignore[arg-type]
+    with pytest.raises(ForbiddenError):
+        await svc.update_comment(
+            app.id,
+            c.id,
+            body="neu",
+            actor="sub-1",
+            viewer_sub="sub-1",
+            viewer_is_applicant=False,
+            can_manage=False,
+        )
+    assert session.committed == 0
+
+
+async def test_update_comment_unknown_404() -> None:
+    app = _app()
+    session = _Session(get_results=[app], execute_results=[[]])
+    svc = ApplicationsService(session)  # type: ignore[arg-type]
+    with pytest.raises(NotFoundError):
+        await svc.update_comment(
+            app.id,
+            uuid4(),
+            body="x",
+            actor="s",
+            viewer_sub="s",
+            viewer_is_applicant=False,
+            can_manage=True,
+        )
+
+
+async def test_delete_comment_by_author() -> None:
+    app = _app()
+    c = _comment(application_id=app.id)
+    session = _Session(get_results=[app], execute_results=[[c], [], []])
+    svc = ApplicationsService(session)  # type: ignore[arg-type]
+    await svc.delete_comment(
+        app.id,
+        c.id,
+        actor="sub-1",
+        viewer_sub="sub-1",
+        viewer_is_applicant=False,
+        can_manage=False,
+    )
+    assert session.deleted == [c]
+    assert session.committed == 1
+    entries = [o for o in session.added if type(o).__name__ == "AuditEntry"]
+    assert [e.action for e in entries] == ["comment_delete"]
+
+
+async def test_delete_comment_foreign_author_403() -> None:
+    app = _app()
+    c = _comment(application_id=app.id, author="other")
+    session = _Session(get_results=[app], execute_results=[[c]])
+    svc = ApplicationsService(session)  # type: ignore[arg-type]
+    with pytest.raises(ForbiddenError):
+        await svc.delete_comment(
+            app.id,
+            c.id,
+            actor="sub-1",
+            viewer_sub="sub-1",
+            viewer_is_applicant=False,
+            can_manage=False,
+        )
+    assert session.deleted == []
+
+
+async def test_delete_comment_unknown_404() -> None:
+    app = _app()
+    session = _Session(get_results=[app], execute_results=[[]])
+    svc = ApplicationsService(session)  # type: ignore[arg-type]
+    with pytest.raises(NotFoundError):
+        await svc.delete_comment(
+            app.id,
+            uuid4(),
+            actor="s",
+            viewer_sub="s",
+            viewer_is_applicant=False,
+            can_manage=True,
+        )

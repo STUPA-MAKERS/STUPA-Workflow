@@ -157,6 +157,30 @@ async def cancel_vote(
     return vote
 
 
+@router.delete(
+    "/votes/{vote_id}",
+    status_code=204,
+    responses=_errors(401, 403, 404, 409),
+)
+async def delete_vote(
+    vote_id: UUID,
+    service: ServiceDep,
+    principal: ReaderDep,
+) -> None:
+    """Delete a standalone application-bound vote that never ran.
+
+    The vote must still be ``draft`` and must hold no ballot. Everything
+    further along stays with ``cancel``, so the record of the Gremium keeps
+    every vote that ever opened. A meeting-bound vote answers 409 and belongs
+    to ``DELETE /meetings/{meeting_id}/votes/{vote_id}``, which applies the
+    meeting-scoped check.
+
+    Gremium-scoped ``vote.manage``, like open, close and cancel.
+    """
+    await service.assert_can_manage_vote(vote_id, principal)
+    await service.delete_standalone(vote_id, actor=principal.sub)
+
+
 @router.post(
     "/votes/{vote_id}/ballot",
     response_model=BallotAccepted,

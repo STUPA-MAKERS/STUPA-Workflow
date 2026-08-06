@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.modules.admin.branding import Branding
 from app.modules.admin.cd_logos import CdBaseVariant, LogoSlot, VendoredLogoName
@@ -225,6 +225,26 @@ class GremiumMembershipCreate(_CamelModel):
     gremium_role_id: UUID = Field(alias="gremiumRoleId")
     valid_from: str | None = Field(default=None, alias="validFrom")
     valid_until: str | None = Field(default=None, alias="validUntil")
+
+
+class GremiumMembershipUpdate(_CamelModel):
+    """Change the role or the term of office of one membership.
+
+    The member and the Gremium stay immutable. A different member or a
+    different Gremium is a different membership. Only the fields that the
+    payload sets change. ``validFrom`` or ``validUntil`` set to ``null`` opens
+    that end of the term.
+    """
+
+    gremium_role_id: UUID | None = Field(default=None, alias="gremiumRoleId")
+    valid_from: str | None = Field(default=None, alias="validFrom")
+    valid_until: str | None = Field(default=None, alias="validUntil")
+
+    @model_validator(mode="after")
+    def _at_least_one(self) -> GremiumMembershipUpdate:
+        if not self.model_fields_set:
+            raise ValueError("at least one field required")
+        return self
 
 
 class ApplicationTypeOut(_CamelModel):

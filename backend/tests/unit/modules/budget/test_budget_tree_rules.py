@@ -230,3 +230,26 @@ def test_scope_forest_outer_assignment_wins_and_empty_scope() -> None:
     assert [n["id"] for n in scoped] == ["top"]  # the outer subtree wins, with no duplicate
     assert r.scope_forest(forest, set()) == []
     assert r.scope_forest(forest, {uuid.uuid4()}) == []
+
+
+def test_fiscal_year_delete_blocker_reports_first_reason() -> None:
+    assert r.fiscal_year_delete_blocker(False, False, False) is None
+    assert r.fiscal_year_delete_blocker(True, False, False) == "bookings"
+    assert r.fiscal_year_delete_blocker(False, True, False) == "allocations"
+    assert r.fiscal_year_delete_blocker(False, False, True) == "applications"
+    # Bookings win over the other two, so the message names the strongest reason.
+    assert r.fiscal_year_delete_blocker(True, True, True) == "bookings"
+    assert r.fiscal_year_delete_blocker(False, True, True) == "allocations"
+
+
+def test_transfer_pair_changed() -> None:
+    a, b = uuid.uuid4(), uuid.uuid4()
+    # Omitting both ends changes nothing, and repeating the pair changes nothing.
+    assert not r.transfer_pair_changed(a, b, None, None)
+    assert not r.transfer_pair_changed(a, b, a, b)
+    assert not r.transfer_pair_changed(a, b, a, None)
+    assert not r.transfer_pair_changed(a, b, None, b)
+    # A different source or a different target is a different transfer.
+    assert r.transfer_pair_changed(a, b, b, None)
+    assert r.transfer_pair_changed(a, b, None, a)
+    assert r.transfer_pair_changed(a, b, b, a)

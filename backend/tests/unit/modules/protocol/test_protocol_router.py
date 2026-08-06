@@ -111,6 +111,13 @@ class _FakeService:
         self.calls.append(f"revert:{protocol_id}")
         self.status = "draft"
 
+    async def delete_protocol(self, protocol_id: UUID, *, actor: str) -> None:
+        from app.shared.errors import ConflictError
+
+        self.calls.append(f"delete:{protocol_id}:{actor}")
+        if self.status != "draft":
+            raise ConflictError("Protocol is finalized and read-only.")
+
 
 @pytest.fixture
 def fake_service() -> _FakeService:
@@ -300,3 +307,41 @@ def test_get_protocol_service_wires_state_infra() -> None:
 def test_mail_queue_none_without_pool() -> None:
     request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(arq_pool=None)))
     assert _mail_queue(request) is None  # type: ignore[arg-type]
+
+
+# DELETE /protocols/{id}: draft only, gated by the write scope (not protocol.finalize).
+
+
+def test_delete_protocol_requires_auth_401(client: TestClient) -> None:
+    assert client.delete(f"/api/protocols/{PROTOCOL_ID}").status_code == 401
+
+
+def test_delete_draft_protocol_204(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    _writer(app, "meeting.manage")
+    r = client.delete(f"/api/protocols/{PROTOCOL_ID}")
+    assert r.status_code == 204
+    # The gate is the write scope of the PATCH, not the finalize scope.
+    assert fake_service.authz == [f"write:{PROTOCOL_ID}"]
+    assert fake_service.calls == [f"delete:{PROTOCOL_ID}:p"]
+
+
+def test_delete_protocol_without_finalize_permission_still_works(
+    app: FastAPI, client: TestClient
+) -> None:
+    """Discarding a draft needs no `protocol.finalize`.
+
+    That permission gates publishing. The same caller can already empty the body
+    through the PATCH, so a stricter gate here would protect nothing.
+    """
+    _writer(app)  # authenticated only; the service holds the per-Gremium check
+    assert client.delete(f"/api/protocols/{PROTOCOL_ID}").status_code == 204
+
+
+def test_delete_final_protocol_409(app: FastAPI, client: TestClient) -> None:
+    app.dependency_overrides[get_protocol_service] = lambda: _FakeService(status="final")
+    _writer(app, "meeting.manage")
+    r = client.delete(f"/api/protocols/{PROTOCOL_ID}")
+    assert r.status_code == 409
+    assert r.headers["content-type"].startswith("application/problem+json")

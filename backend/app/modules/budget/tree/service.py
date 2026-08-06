@@ -10,7 +10,7 @@ exactly this class. The implementation lives in the ops classes:
 `expenses.ExpenseOps` — bookings (through `subbookings.SubBookingOps`).
 `subbookings.SubBookingOps` — sub-bookings of a booking.
 `invoices.InvoiceOps` — invoices and ZUGFeRD import.
-`transfers.TransferOps` — cost-center transfers.
+`transfers.TransferOps` — cost-center transfers as one entity (through `ExpenseOps`).
 `revert.RevertOps` — audit-log revert of budget mutations.
 `view.TreeViewOps` — scoped tree view with roll-up.
 """

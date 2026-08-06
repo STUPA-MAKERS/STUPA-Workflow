@@ -97,6 +97,7 @@ class _FakeService:
         self.created_actor: str | None = None
         self.last_include_pii: bool | None = None
         self.comment_args: dict[str, object] | None = None
+        self.comment_write_args: dict[str, object] | None = None
         self.session = _FakeAuditSession()
 
     async def create(self, payload, *, actor="applicant"):  # noqa: ANN001
@@ -179,6 +180,53 @@ class _FakeService:
         self.last_viewer_sub = viewer_sub
         self.last_viewer_is_applicant = viewer_is_applicant
         return []
+
+    async def update_comment(  # noqa: ANN001
+        self,
+        application_id,
+        comment_id,
+        *,
+        body,
+        actor,
+        viewer_sub,
+        viewer_is_applicant,
+        can_manage,
+        allow_unconfirmed=True,
+    ):
+        self.comment_write_args = {
+            "comment_id": comment_id,
+            "actor": actor,
+            "viewer_sub": viewer_sub,
+            "viewer_is_applicant": viewer_is_applicant,
+            "can_manage": can_manage,
+        }
+        return CommentOut(
+            id=comment_id,
+            author=viewer_sub,
+            authorKind="principal" if viewer_sub else "applicant",
+            body=body,
+            visibility="internal",
+            at=_NOW,
+        )
+
+    async def delete_comment(  # noqa: ANN001
+        self,
+        application_id,
+        comment_id,
+        *,
+        actor,
+        viewer_sub,
+        viewer_is_applicant,
+        can_manage,
+        allow_unconfirmed=True,
+    ):
+        self.comment_write_args = {
+            "comment_id": comment_id,
+            "actor": actor,
+            "viewer_sub": viewer_sub,
+            "viewer_is_applicant": viewer_is_applicant,
+            "can_manage": can_manage,
+        }
 
 
 @pytest.fixture
@@ -376,11 +424,34 @@ def test_delete_application_admin(
     assert fake_service.deleted == app_id
 
 
+def test_delete_application_permission_holder(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    """#g9: a NON-admin role that holds ``application.delete`` may delete.
+
+    The route gates on the permission and not on the literal ``admin`` role string,
+    so the capability is delegable to any role.
+    """
+    app_id = uuid4()
+    app.dependency_overrides[get_current_principal] = lambda: Principal(
+        sub="office", roles=["office"], permissions={"application.delete"}
+    )
+    app.dependency_overrides[get_current_applicant] = lambda: None
+    r = client.delete(f"/api/applications/{app_id}")
+    assert r.status_code == 204
+    assert fake_service.deleted == app_id
+
+
 def test_delete_application_manager_forbidden(app: FastAPI, client: TestClient) -> None:
-    # A manager without the admin role must NOT delete. Only an admin may (#delete).
+    """#g9: a principal without ``application.delete`` must NOT delete.
+
+    ``application.manage`` covers the editing only. The delete needs the own key.
+    """
     _as_principal(app, "application.manage")
     r = client.delete(f"/api/applications/{uuid4()}")
     assert r.status_code == 403
+    assert r.headers["content-type"].startswith("application/problem+json")
+    assert r.json()["code"] == "forbidden"
 
 
 def test_delete_application_applicant_unauthorized(app: FastAPI, client: TestClient) -> None:
@@ -663,3 +734,94 @@ def test_openapi_declares_error_responses(client: TestClient) -> None:
     assert "application/problem+json" in patch["responses"]["409"]["content"]
     comments = spec["paths"]["/api/applications/{application_id}/comments"]["post"]
     assert {"400", "401", "403", "404", "422"} <= set(comments["responses"])
+
+
+# PATCH/DELETE on one comment: the author or a principal with application.manage.
+
+
+def test_patch_comment_passes_session_identity(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    """The author and the manage flag come from the session, never from the body."""
+    _as_principal(app, "application.read")
+    cid = uuid4()
+    r = client.patch(
+        f"/api/applications/{uuid4()}/comments/{cid}",
+        # The body carries a foreign author on purpose. The server ignores it.
+        json={"body": "korrigiert", "author": "someone-else"},
+    )
+    assert r.status_code == 200
+    assert r.json()["body"] == "korrigiert"
+    assert fake_service.comment_write_args == {
+        "comment_id": cid,
+        "actor": "admin",
+        "viewer_sub": "admin",
+        "viewer_is_applicant": False,
+        "can_manage": False,
+    }
+
+
+def test_patch_comment_sets_can_manage_for_manager(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    _as_principal(app, "application.read", "application.manage")
+    r = client.patch(
+        f"/api/applications/{uuid4()}/comments/{uuid4()}", json={"body": "x"}
+    )
+    assert r.status_code == 200
+    assert fake_service.comment_write_args is not None
+    assert fake_service.comment_write_args["can_manage"] is True
+
+
+def test_patch_comment_applicant_identity(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    app_id = uuid4()
+    _as_applicant(app, app_id, "view")
+    r = client.patch(f"/api/applications/{app_id}/comments/{uuid4()}", json={"body": "y"})
+    assert r.status_code == 200
+    assert fake_service.comment_write_args is not None
+    assert fake_service.comment_write_args["viewer_is_applicant"] is True
+    assert fake_service.comment_write_args["viewer_sub"] is None
+    assert fake_service.comment_write_args["can_manage"] is False
+
+
+def test_patch_comment_requires_read_access_403(app: FastAPI, client: TestClient) -> None:
+    """A magic link for ANOTHER application gives no access to these comments."""
+    _as_applicant(app, uuid4(), "view")
+    r = client.patch(f"/api/applications/{uuid4()}/comments/{uuid4()}", json={"body": "x"})
+    assert r.status_code == 403
+
+
+def test_patch_comment_requires_auth_401(client: TestClient) -> None:
+    r = client.patch(f"/api/applications/{uuid4()}/comments/{uuid4()}", json={"body": "x"})
+    assert r.status_code == 401
+
+
+def test_patch_comment_empty_body_422(app: FastAPI, client: TestClient) -> None:
+    _as_principal(app, "application.read")
+    r = client.patch(f"/api/applications/{uuid4()}/comments/{uuid4()}", json={"body": ""})
+    assert r.status_code == 422
+
+
+def test_delete_comment_204(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    _as_principal(app, "application.read")
+    cid = uuid4()
+    r = client.delete(f"/api/applications/{uuid4()}/comments/{cid}")
+    assert r.status_code == 204
+    assert fake_service.comment_write_args is not None
+    assert fake_service.comment_write_args["comment_id"] == cid
+
+
+def test_delete_comment_requires_read_access_403(app: FastAPI, client: TestClient) -> None:
+    _as_applicant(app, uuid4(), "view")
+    r = client.delete(f"/api/applications/{uuid4()}/comments/{uuid4()}")
+    assert r.status_code == 403
+
+
+def test_delete_comment_requires_auth_401(client: TestClient) -> None:
+    assert (
+        client.delete(f"/api/applications/{uuid4()}/comments/{uuid4()}").status_code == 401
+    )

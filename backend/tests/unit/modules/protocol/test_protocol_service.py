@@ -592,3 +592,39 @@ async def test_get_by_meeting_404_without_protocol() -> None:
     session = FakeSession(results=[result()])
     with pytest.raises(NotFoundError):
         await _service(session).get_by_meeting(MID)
+
+
+# delete_protocol: draft only. A finalized protocol is a signed record.
+
+
+async def test_delete_protocol_draft_ok() -> None:
+    from app.modules.audit.models import AuditEntry
+
+    proto = _protocol()
+    session = FakeSession(results=[result(proto)])
+    await _service(session).delete_protocol(PID, actor="p1")
+    assert session.deleted == [proto]
+    assert session.committed == 1
+    entries = [o for o in session.added if isinstance(o, AuditEntry)]
+    assert [e.action for e in entries] == ["protocol_delete"]
+    assert entries[0].target_type == "protocol"
+    assert entries[0].data == {"meetingId": str(MID), "gremiumId": str(GID)}
+
+
+async def test_delete_protocol_final_conflict() -> None:
+    session = FakeSession(results=[result(_protocol(status="final"))])
+    with pytest.raises(ConflictError):
+        await _service(session).delete_protocol(PID, actor="p1")
+    assert session.deleted == []
+
+
+async def test_delete_protocol_while_rendering_conflict() -> None:
+    session = FakeSession(results=[result(_protocol(status="rendering"))])
+    with pytest.raises(ConflictError):
+        await _service(session).delete_protocol(PID, actor="p1")
+
+
+async def test_delete_protocol_unknown_404() -> None:
+    session = FakeSession(results=[result()])
+    with pytest.raises(NotFoundError):
+        await _service(session).delete_protocol(PID, actor="p1")

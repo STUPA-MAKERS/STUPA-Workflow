@@ -59,6 +59,7 @@ from app.modules.admin.schemas import (
     GremiumMailRecipients,
     GremiumMembershipCreate,
     GremiumMembershipOut,
+    GremiumMembershipUpdate,
     GremiumOut,
     GremiumRoleCreate,
     GremiumRoleOut,
@@ -154,6 +155,10 @@ UsersAdmin = Annotated[Principal, Depends(require_principal("admin.users"))]
 GroupMappingsAdmin = Annotated[Principal, Depends(require_principal("admin.group_mappings"))]
 GremiumRolesAdmin = Annotated[Principal, Depends(require_principal("admin.gremium_roles"))]
 CdVariantsAdmin = Annotated[Principal, Depends(require_principal("admin.cd_variants"))]
+# The global flow save accepts EITHER key. See `create_global_flow` for the reason.
+FlowVersionAdmin = Annotated[
+    Principal, Depends(require_any_permission("admin.types", "flow.configure"))
+]
 
 # All admin area permissions (for ANY-of reads plus the admin landing page).
 _ALL_ADMIN_AREAS = (
@@ -371,6 +376,27 @@ async def create_gremium_membership(
     principal: GremienAdmin,
 ) -> GremiumMembershipOut:
     return await service.create_membership(gremium_id, payload, principal.sub)
+
+
+@router.patch(
+    "/gremium-memberships/{membership_id}",
+    response_model=GremiumMembershipOut,
+    responses=_errors(400, 401, 403, 404, 409, 422),
+)
+async def update_gremium_membership(
+    membership_id: UUID,
+    payload: GremiumMembershipUpdate,
+    service: GremiumRoleServiceDep,
+    principal: GremienAdmin,
+) -> GremiumMembershipOut:
+    """Change the role or the term of office of a membership.
+
+    The member and the Gremium stay immutable. A role of another Gremium and a
+    term that overlaps another term of the same member both give 409, exactly
+    as on the create. A ``validFrom`` that is not before ``validUntil`` gives
+    422.
+    """
+    return await service.update_membership(membership_id, payload, principal.sub)
 
 
 @router.delete(
@@ -626,9 +652,21 @@ async def get_global_flow(service: ServiceDep) -> FlowGraph | None:
     responses=_errors(400, 401, 403, 422),
 )
 async def create_global_flow(
-    payload: FlowVersionCreate, service: ServiceDep, principal: TypesAdmin
+    payload: FlowVersionCreate, service: ServiceDep, principal: FlowVersionAdmin
 ) -> FlowVersionOut:
-    """Create the global flow as a new version (applies to ALL application types)."""
+    """Create the global flow as a new version (applies to ALL application types).
+
+    The gate accepts EITHER ``flow.configure`` OR ``admin.types`` (#g7). It is an
+    any-of gate and not a switch to ``flow.configure`` alone, for two reasons.
+
+    1. ``flow.configure`` is the permission the flow editor route gates on. Without
+       it in this gate, the holder builds a graph and then gets a 403 on save.
+    2. A switch would REMOVE the save from every current ``admin.types`` holder.
+       An any-of gate only adds, so no installation loses a capability.
+
+    ``_FLOW_READABLE`` already reads with either key, so the read and the write now
+    match.
+    """
     return await service.create_global_flow_version(payload, principal.sub)
 
 
@@ -860,6 +898,22 @@ async def update_webhook(
     principal: WebhookAdmin,
 ) -> WebhookOut:
     return await service.update_webhook(webhook_id, payload, principal.sub)
+
+
+@router.delete(
+    "/webhooks/{webhook_id}",
+    status_code=204,
+    responses=_errors(401, 403, 404),
+)
+async def delete_webhook(
+    webhook_id: UUID, service: ServiceDep, principal: WebhookAdmin
+) -> None:
+    """Delete a webhook and its delivery history.
+
+    The delete cascades to ``webhook_delivery``, so there is no 409 guard. The
+    audit log records the removal as ``webhook_config``.
+    """
+    await service.delete_webhook(webhook_id, principal.sub)
 
 
 @router.get(

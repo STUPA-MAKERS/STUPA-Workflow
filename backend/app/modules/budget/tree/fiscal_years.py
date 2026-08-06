@@ -6,12 +6,15 @@ import uuid
 from uuid import UUID
 
 from sqlalchemy import select
+from sqlalchemy.orm import InstrumentedAttribute
 
+from app.modules.applications.models import Application
+from app.modules.audit.actions import AuditAction
 from app.modules.budget import tree_rules
 from app.modules.budget.tree.service_base import BudgetTreeServiceBase
-from app.modules.budget.tree_models import Budget, FiscalYear
+from app.modules.budget.tree_models import Budget, BudgetAllocation, BudgetExpense, FiscalYear
 from app.modules.budget.tree_schemas import FiscalYearCreate, FiscalYearOut, FiscalYearUpdate
-from app.shared.errors import ValidationProblem
+from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 
 
 def _fy_out(f: FiscalYear, start_month: int, start_day: int) -> FiscalYearOut:
@@ -121,3 +124,63 @@ class FiscalYearOps(BudgetTreeServiceBase):
             fy.active = provided["active"]
         await self.session.commit()
         return _fy_out(fy, top.fiscal_start_month, top.fiscal_start_day)
+
+    async def _uses_fiscal_year(
+        self,
+        id_col: InstrumentedAttribute[UUID],
+        fy_col: InstrumentedAttribute[UUID] | InstrumentedAttribute[UUID | None],
+        fiscal_year_id: UUID,
+    ) -> bool:
+        """Tell whether at least one row of that table references this fiscal year."""
+        found = (
+            await self.session.execute(
+                select(id_col).where(fy_col == fiscal_year_id).limit(1)
+            )
+        ).scalar_one_or_none()
+        return found is not None
+
+    async def delete_fiscal_year(self, budget_id: UUID, fiscal_year_id: UUID) -> None:
+        """Delete a fiscal year of a top-level budget.
+
+        The delete refuses with 409 while money still hangs on the year:
+        bookings, allocations, or applications assigned to it. `budget_expense`
+        and `budget_allocation` cascade on the foreign key, so an unguarded
+        delete would drop them without a trace. `application.fiscal_year_id`
+        has no cascade and would fail on the constraint. The guard mirrors
+        `NodeOps.delete_node`, which refuses for the same reason.
+
+        Raises:
+            NotFoundError: The budget or the fiscal year does not exist, or the
+                fiscal year belongs to another top-level budget (404).
+            ValidationProblem: `budget_id` is not a top-level budget (422).
+            ConflictError: Money rows still reference the fiscal year (409).
+        """
+        top = await self._require_top_level(budget_id)
+        fy = await self._get_fiscal_year(fiscal_year_id)
+        if fy.budget_id != top.id:
+            raise NotFoundError(
+                f"fiscal year {fiscal_year_id} does not belong to budget {budget_id}"
+            )
+        blocker = tree_rules.fiscal_year_delete_blocker(
+            await self._uses_fiscal_year(
+                BudgetExpense.id, BudgetExpense.fiscal_year_id, fiscal_year_id
+            ),
+            await self._uses_fiscal_year(
+                BudgetAllocation.id, BudgetAllocation.fiscal_year_id, fiscal_year_id
+            ),
+            await self._uses_fiscal_year(
+                Application.id, Application.fiscal_year_id, fiscal_year_id
+            ),
+        )
+        if blocker is not None:
+            raise ConflictError(
+                f"fiscal year still has {blocker}; remove them first"
+            )
+        await self._audit(
+            AuditAction.BUDGET_FISCAL_YEAR_DELETE,
+            target_type="fiscal_year",
+            target_id=str(fiscal_year_id),
+            data={"budgetId": str(top.id), "year": fy.year},
+        )
+        await self.session.delete(fy)
+        await self.session.commit()

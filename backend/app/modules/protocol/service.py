@@ -40,6 +40,8 @@ from app.modules.admin.cd_resolver import (
 )
 from app.modules.admin.gremium_roles import gremium_ids_with_permission
 from app.modules.admin.models import Gremium, GremiumMembership, MailList
+from app.modules.audit.actions import AuditAction
+from app.modules.audit.service import record as audit_record
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.files.storage import ObjectStorage, StorageError
@@ -352,6 +354,46 @@ class ProtocolService:
         await self.session.flush()
         await self.session.commit()
         return self._to_out(protocol)
+
+    async def delete_protocol(self, protocol_id: UUID, *, actor: str) -> None:
+        """Delete a protocol while it is still a draft.
+
+        The draft gate is the whole guard. A `final` protocol is a signed
+        record that went out to the Gremium by mail, and a `rendering`
+        protocol is frozen while the worker builds the PDF. Both answer 409,
+        exactly as `update_markdown` does.
+
+        Permission: the same `authorize_write` scope that the PATCH already
+        enforces, and NOT `protocol.finalize`. `protocol.finalize` gates
+        publishing, a different axis: it decides who may turn a draft into a
+        signed record and mail it out. Discarding a draft is the opposite
+        direction and touches nothing that ever left the platform. The holder
+        of the write scope can already empty the body with
+        `PATCH markdown=""`, so a stricter gate here would protect nothing and
+        would only strand a draft that the protokollant wants to restart.
+
+        The `protocol_vote_ref` rows cascade on the foreign key. The audit log
+        records the removal, because the draft text itself is not recoverable.
+
+        Raises:
+            NotFoundError: No protocol has this id (404).
+            ConflictError: The protocol is final or under render (409).
+        """
+        protocol = await self._get(protocol_id)
+        self._ensure_draft(protocol)
+        await audit_record(
+            self.session,
+            actor=actor,
+            action=AuditAction.PROTOCOL_DELETE,
+            target_type="protocol",
+            target_id=str(protocol_id),
+            data={
+                "meetingId": str(protocol.meeting_id),
+                "gremiumId": str(protocol.gremium_id),
+            },
+        )
+        await self.session.delete(protocol)
+        await self.session.commit()
 
     async def embed_votes(
         self, protocol_id: UUID, vote_ids: list[UUID]

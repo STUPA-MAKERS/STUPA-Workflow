@@ -79,6 +79,46 @@ def overlaps_any(
     )
 
 
+def fiscal_year_delete_blocker(
+    has_bookings: bool, has_allocations: bool, has_applications: bool
+) -> str | None:
+    """Name the first reason that blocks the delete of a fiscal year.
+
+    A fiscal year carries money rows. `budget_allocation` and `budget_expense`
+    hang on it with `ON DELETE CASCADE`, so a delete would silently drop the
+    planning figures and the bookings. `application.fiscal_year_id` has no
+    cascade at all, so a delete would fail on the foreign key. All three cases
+    therefore refuse the delete with 409, and the user clears the rows first.
+
+    Returns:
+        The blocking reason, or `None` when the delete may proceed.
+    """
+    if has_bookings:
+        return "bookings"
+    if has_allocations:
+        return "allocations"
+    if has_applications:
+        return "applications"
+    return None
+
+
+def transfer_pair_changed(
+    current_from: object,
+    current_to: object,
+    requested_from: object | None,
+    requested_to: object | None,
+) -> bool:
+    """Tell whether a transfer patch asks for a different pair of cost centres.
+
+    The two cost centres of a transfer are immutable. A different pair is a
+    different transfer, so the caller books a new one instead. A patch that
+    repeats the current pair, or that omits both fields, changes nothing.
+    """
+    if requested_from is not None and requested_from != current_from:
+        return True
+    return requested_to is not None and requested_to != current_to
+
+
 def as_amount(value: Decimal | None) -> Decimal:
     """Return 0 for `None`, else the amount."""
     return value if value is not None else _ZERO
