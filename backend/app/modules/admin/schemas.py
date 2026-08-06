@@ -442,12 +442,12 @@ class WebhookDeliveryStatusOut(_CamelModel):
     ``pending``, ``sent`` or ``dead``.
     """
 
-    webhook_id: UUID
-    last_state: str
-    reason_class: str
-    response_code: int | None = None
+    webhook_id: UUID = Field(serialization_alias="webhookId")
+    last_state: str = Field(serialization_alias="lastState")
+    reason_class: str = Field(serialization_alias="reasonClass")
+    response_code: int | None = Field(default=None, serialization_alias="responseCode")
     attempts: int = 0
-    last_at: str | None = None
+    last_at: str | None = Field(default=None, serialization_alias="lastAt")
 
 
 class SiteConfigOut(_CamelModel):
