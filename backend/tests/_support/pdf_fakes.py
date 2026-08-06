@@ -9,6 +9,7 @@ raises a configured error. `FakeRenderQueue` collects the enqueued job ids.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Mapping
 from typing import Any
 
 
@@ -73,6 +74,10 @@ class FakePytex:
         # falls back to `trusted`. The protocol path keeps that fallback. The RCE
         # protection lives in the sanitizer, not in the trust level.
         self.trust_levels: list[str | None] = []
+        # The corporate-design config and the logo assets of each call. A render
+        # without a CD variant records `None` for both.
+        self.configs: list[Mapping[str, object] | None] = []
+        self.assets: list[Mapping[str, bytes] | None] = []
 
     async def render_pdf(
         self,
@@ -80,9 +85,13 @@ class FakePytex:
         *,
         variant: str | None = None,
         trust_level: str | None = None,
+        config: Mapping[str, object] | None = None,
+        assets: Mapping[str, bytes] | None = None,
     ) -> bytes:
         self.calls.append((markdown, variant))
         self.trust_levels.append(trust_level)
+        self.configs.append(config)
+        self.assets.append(assets)
         if self.error is not None:
             raise self.error
         return self.pdf

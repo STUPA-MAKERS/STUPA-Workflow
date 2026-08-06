@@ -33,7 +33,11 @@ from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.admin.cd_resolver import cd_variant_key_for_gremium
+from app.modules.admin.cd_resolver import (
+    cd_render_config,
+    cd_variant_key_for_gremium,
+    resolve_cd_variant_by_key,
+)
 from app.modules.admin.gremium_roles import gremium_ids_with_permission
 from app.modules.admin.models import Gremium, GremiumMembership, MailList
 from app.modules.auth.models import Principal as PrincipalRow
@@ -701,7 +705,14 @@ class ProtocolService:
         if self.storage is None or self.pytex is None:
             return None
         try:
-            variant = protocol_variant_for(protocol.cd_variant)
+            # The protocol snapshots the CD key of its Gremium at creation, so it
+            # keeps its design even after the Gremium moves to another one.
+            cd = await resolve_cd_variant_by_key(
+                self.session, self.storage, protocol.cd_variant
+            )
+            variant = cd.base_variant if cd else protocol_variant_for(protocol.cd_variant)
+            config = cd_render_config(cd) if cd else None
+            assets = cd.assets if cd else None
             # RCE protection: the user-written body can carry the Markdown `eval`
             # escape of pytex (`[//]: # "EXPR"` runs eval in the container).
             # `sanitize_user_markdown` removes that escape UNCONDITIONALLY during the
@@ -714,7 +725,9 @@ class ProtocolService:
             # `PytexClient.render_pdf` checks the structure before the trusted render
             # and proves that no eval trigger survived. A bypass of the sanitizer then
             # becomes a contained error instead of an RCE.
-            pdf = await self.pytex.render_pdf(markdown, variant=variant)
+            pdf = await self.pytex.render_pdf(
+                markdown, variant=variant, config=config, assets=assets
+            )
         except PytexError as exc:
             # A 4xx is a permanent input or compile error, for example invalid LaTeX.
             # Do not retry it. Show the scrubbed reason instead of a misleading 503. A

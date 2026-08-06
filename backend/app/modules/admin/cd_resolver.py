@@ -87,7 +87,39 @@ async def resolve_cd_variant(
     variant = await db.get(CdVariant, variant_id)
     if variant is None:  # pragma: no cover - the FK is RESTRICT, so this cannot happen
         return None
+    return await _resolve(db, storage, variant)
 
+
+async def resolve_cd_variant_by_key(
+    db: AsyncSession, storage: ObjectStorage | None, key: str | None
+) -> ResolvedCdVariant | None:
+    """Resolve a corporate design by its key.
+
+    A protocol snapshots the key of its Gremium when it is created, so the
+    document keeps its design even after the Gremium moves to another one. That
+    path must resolve the snapshot, never the Gremium of today.
+
+    Returns:
+        The resolved variant, or ``None`` when no key is given or no variant
+        carries it.
+
+    Raises:
+        ServiceUnavailableError: The variant holds an uploaded logo and the
+            object storage is off or unreachable.
+    """
+    if key is None:
+        return None
+    variant = await db.scalar(select(CdVariant).where(CdVariant.key == key))
+    if variant is None:
+        return None
+    return await _resolve(db, storage, variant)
+
+
+async def _resolve(
+    db: AsyncSession, storage: ObjectStorage | None, variant: CdVariant
+) -> ResolvedCdVariant:
+    """Load the logo rows of a variant and turn them into names plus bytes."""
+    variant_id = variant.id
     rows = (
         await db.scalars(
             select(CdVariantLogo)
@@ -112,6 +144,21 @@ async def resolve_cd_variant(
         footer_logos=tuple(logos["footer"]),
         assets=assets,
     )
+
+
+def cd_render_config(cd: ResolvedCdVariant) -> dict[str, object]:
+    """Return the pytex `config` object that carries the logos of a design.
+
+    pytex reads the keys `logos` and `footer_logos`. An empty tuple stays out of
+    the object, because an empty list would override the default of the document
+    shape with nothing instead of leaving it alone.
+    """
+    config: dict[str, object] = {}
+    if cd.title_logos:
+        config["logos"] = list(cd.title_logos)
+    if cd.footer_logos:
+        config["footer_logos"] = list(cd.footer_logos)
+    return config
 
 
 def _base_variant(value: str) -> CdBaseVariant:

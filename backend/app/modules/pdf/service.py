@@ -146,6 +146,7 @@ class PdfService:
             type_name=type_name,
             gremium_slug=gremium.slug if gremium is not None else None,
             cd_variant=await cd_variant_key_for_gremium(self.session, gremium),
+            gremium_id=gremium.id if gremium is not None else None,
             lang=lang,
             default_lang=default_lang,
             fields=fields,

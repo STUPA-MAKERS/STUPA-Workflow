@@ -724,7 +724,7 @@ async def test_load_application_doc_full_with_gremium_timeline_vote() -> None:
     )
     app_type = SimpleNamespace(name_i18n={"de": "Finanzantrag"}, key="finanz")
     gremium = SimpleNamespace(
-        default_lang="de", slug="stupa", cd_variant_id=uuid4()
+        id=gremium_id, default_lang="de", slug="stupa", cd_variant_id=uuid4()
     )
     state = SimpleNamespace(label_i18n={"de": "Bewilligt"}, key="approved")
     event = SimpleNamespace(at=NOW, to_state_id=uuid4(), note="ok")

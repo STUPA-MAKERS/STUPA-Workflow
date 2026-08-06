@@ -21,6 +21,9 @@ from tests._support.pdf_fakes import FakePdfSession, FakePytex, FakeSessionmaker
 
 class _DocStub:
     variant = "report"
+    # No Gremium, so the render falls back to the variant name instead of
+    # resolving a corporate design.
+    gremium_id = None
 
 
 class _SvcStub:

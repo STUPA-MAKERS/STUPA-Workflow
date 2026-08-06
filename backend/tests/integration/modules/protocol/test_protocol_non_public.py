@@ -19,7 +19,7 @@ deterministic backend that records the Markdown bytes it gets.
 from __future__ import annotations
 
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Mapping
 from datetime import UTC, datetime
 from typing import cast
 
@@ -102,6 +102,8 @@ class _FakePytex:
         *,
         variant: str | None = None,
         trust_level: str | None = None,
+        config: Mapping[str, object] | None = None,
+        assets: Mapping[str, bytes] | None = None,
     ) -> bytes:
         self.calls.append(markdown)
         self.trust_levels.append(trust_level)
