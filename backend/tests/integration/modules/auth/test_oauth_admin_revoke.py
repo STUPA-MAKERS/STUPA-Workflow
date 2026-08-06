@@ -36,7 +36,11 @@ from app.shared.errors import NotFoundError
 
 pytestmark = pytest.mark.integration
 
-_CLIENT = "antragsplattform-mcp"
+# A client id of this test alone. The integration suite shares one Postgres, and
+# `test_oauth_code_double_spend` asserts the number of token rows for the real MCP
+# client. Minting tokens under that id here would make an unrelated test fail. The
+# service takes any id, because only the router pins it to `oauth_mcp_client_id`.
+_CLIENT = "antragsplattform-mcp-admin-revoke-test"
 _REDIRECT = "http://127.0.0.1:7777/callback"
 _VERIFIER = "v" * 64
 _ACCESS_TTL = 3600
