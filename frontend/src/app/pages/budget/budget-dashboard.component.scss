@@ -4,18 +4,6 @@
   gap: var(--space-5);
 }
 
-.bd__head {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: var(--space-4);
-  flex-wrap: wrap;
-  /* Center the title at body width. It then aligns with the middle column. */
-  width: 100%;
-  max-width: var(--layout-max-width);
-  margin-inline: auto;
-}
-
 .bd__status,
 .bd__empty {
   width: 100%;
@@ -59,11 +47,6 @@
 .bd__ovTab--active:hover {
   color: var(--color-primary);
   background: var(--color-primary-subtle);
-}
-
-.bd__subtitle {
-  color: var(--color-text-muted);
-  margin: var(--space-1) 0 0;
 }
 
 .bd__filter {

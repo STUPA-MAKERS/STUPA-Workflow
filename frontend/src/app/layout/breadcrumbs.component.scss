@@ -1,8 +1,11 @@
-/* The host must be a block. The `.container` nav then centers with
-   margin-inline:auto. With the default inline host the bar moves far left and
-   loses the alignment with the centered header logo. */
+/* The host must be a block, so the bar takes the full width of the page header
+   that holds it. `app-page-header` owns the width and the outer spacing. This
+   component only draws the crumb row. */
 :host {
   display: block;
+}
+.bc {
+  margin-bottom: var(--space-2);
 }
 .bc__crumb {
   color: var(--color-primary);

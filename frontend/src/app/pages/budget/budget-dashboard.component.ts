@@ -60,11 +60,14 @@ interface UsageRow {
  * direct sub cost centers. The query params hold the selection, so the view is
  * shareable as a link.
  */
+import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
+
 @Component({
   selector: 'app-budget-dashboard',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    PageHeaderComponent,
     FormsModule,
     TranslatePipe,
     SimplifyPathPipe,

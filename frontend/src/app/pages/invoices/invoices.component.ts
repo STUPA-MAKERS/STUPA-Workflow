@@ -30,6 +30,7 @@ import {
 import { ToastService } from '@stupa-makers/ui-kit';
 import { downloadBlob } from '@shared/download.util';
 import { HScrollSyncDirective } from '@shared/h-scroll-sync.directive';
+import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import {
   BudgetTreeApi,
   type Invoice,
@@ -65,6 +66,7 @@ import {
     IconComponent,
     SelectComponent,
     HScrollSyncDirective,
+    PageHeaderComponent,
   ],
   templateUrl: './invoices.component.html',
   styleUrl: './invoices.component.scss',

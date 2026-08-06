@@ -26,7 +26,6 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { Locale } from '@core/i18n/translations';
 import { resolveI18n } from '@shared/forms/i18n-text';
 import { IconComponent, LoadingOverlayComponent, ToastComponent } from '@stupa-makers/ui-kit';
-import { BreadcrumbsComponent } from './breadcrumbs.component';
 import { AdminApiService } from '../pages/admin/admin-api.service';
 import type { FooterLink } from '../pages/admin/admin.models';
 
@@ -61,7 +60,6 @@ interface NavItem {
     IconComponent,
     ToastComponent,
     LoadingOverlayComponent,
-    BreadcrumbsComponent,
   ],
   templateUrl: './shell.component.html',
   styleUrl: './shell.component.scss',

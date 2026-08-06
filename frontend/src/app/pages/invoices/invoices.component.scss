@@ -1,7 +1,5 @@
 :host { display: block; }
 .inv { position: relative; min-height: 60vh; }
-.inv__title { margin: 0; }
-.inv__subtitle { color: var(--color-text-muted); margin: var(--space-1) 0 0; }
 .inv__search, .inv__input {
   padding: var(--space-2) var(--space-3);
   border: var(--border-width) solid var(--color-border);

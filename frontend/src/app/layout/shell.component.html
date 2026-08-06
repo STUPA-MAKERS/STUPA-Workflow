@@ -1,7 +1,7 @@
 <a class="skip-link" href="#main">{{ 'app.skipToContent' | t }}</a>
 
 <header class="header">
-  <div class="container header__inner">
+  <div class="page-shell header__inner">
     @if (visibleNav().length > 0) {
       <button
         type="button"
@@ -144,14 +144,12 @@
   </nav>
 }
 
-<app-breadcrumbs />
-
-<main id="main" class="main container" [class.main--wide]="wide()" tabindex="-1">
+<main id="main" class="main page-shell" [class.main--wide]="wide()" tabindex="-1">
   <router-outlet />
 </main>
 
 <footer class="footer">
-  <div class="container flex items-center flex-wrap gap-4 py-6 text-muted text-sm">
+  <div class="page-shell flex items-center flex-wrap gap-4 py-6 text-muted text-sm">
     <img class="footer__logo" [src]="logoSrc()" alt="" aria-hidden="true" />
     <span class="footer__text">{{ footerCopyright() || ('footer.coBranding' | t) }}</span>
     @if (footerLinks().length > 0) {

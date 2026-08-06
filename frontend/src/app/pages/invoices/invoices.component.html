@@ -5,12 +5,8 @@
   (dragleave)="onDragLeave($event)"
   (drop)="onDrop($event)"
 >
-  <header class="flex items-start justify-between gap-4 flex-wrap mb-5">
-    <div>
-      <h1 class="inv__title">{{ 'invoices.title' | t }}</h1>
-      <p class="inv__subtitle">{{ 'invoices.subtitle' | t }}</p>
-    </div>
-    <div class="flex items-center gap-2 flex-wrap">
+  <app-page-header [title]="'invoices.title' | t" [subtitle]="'invoices.subtitle' | t">
+    <div actions class="flex items-center gap-2 flex-wrap">
       <input
         class="inv__search"
         type="search"
@@ -64,7 +60,7 @@
         </app-button>
       }
     </div>
-  </header>
+  </app-page-header>
 
   @if (loading()) {
     <p class="inv__status" aria-live="polite">{{ 'invoices.loading' | t }}</p>

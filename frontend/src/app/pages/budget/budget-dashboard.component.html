@@ -1,9 +1,5 @@
-<header class="bd__head">
-  <div class="bd__head-text">
-    <h1 class="m-0">{{ 'budget.title' | t }}</h1>
-    <p class="bd__subtitle">{{ 'budget.subtitle' | t }}</p>
-  </div>
-  <div class="inline-flex items-center gap-2">
+<app-page-header [title]="'budget.title' | t" [subtitle]="'budget.subtitle' | t">
+  <div actions class="inline-flex items-center gap-2">
     <app-button variant="secondary" size="sm" (click)="overviewOpen.set(true)">
       <span class="inline-flex items-center gap-2">
         <app-icon name="chart-pie" [size]="16" />
@@ -19,7 +15,7 @@
       </app-button>
     }
   </div>
-</header>
+</app-page-header>
 
 @if (loading()) {
   <p class="bd__status" aria-live="polite">{{ 'budget.loading' | t }}</p>
