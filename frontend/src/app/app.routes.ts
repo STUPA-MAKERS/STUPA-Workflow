@@ -328,6 +328,20 @@ export const routes: Routes = [
           ),
       },
       {
+        // Agent tokens (OAuth grants) of every principal, with a kill switch.
+        path: 'admin/oauth-grants',
+        data: {
+          title: 'admin.oauthGrants.title',
+          permission: 'admin.users',
+          parent: ['admin'],
+        },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./pages/admin/oauth-grants/oauth-grants.component').then(
+            (m) => m.AdminOAuthGrantsComponent,
+          ),
+      },
+      {
         path: 'admin/audit',
         data: { title: 'admin.audit.title', permission: 'audit.read', parent: ['admin'] },
         canActivate: [authGuard],

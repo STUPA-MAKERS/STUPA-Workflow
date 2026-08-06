@@ -11,7 +11,7 @@ import { Injectable, inject } from '@angular/core';
 import { type Observable, map, of } from 'rxjs';
 import { API_BASE_URL, USE_MOCK_API } from '@core/api/api.config';
 import { mapDiff } from '@core/api/mappers';
-import type { I18nMap, Uuid } from '@core/api/models';
+import type { I18nMap, Page, Uuid } from '@core/api/models';
 import type { FormFieldDef } from '@core/api/models';
 import {
   type AdminPrincipal,
@@ -51,6 +51,8 @@ import {
   type MailPreviewPayload,
   type MailTemplate,
   type MailTemplateUpsertBody,
+  type OAuthGrantAdmin,
+  type OAuthGrantQuery,
   type Role,
   type RoleAssignment,
   type RoleAssignmentPatch,
@@ -109,6 +111,7 @@ export class AdminApiService {
     webhooks: structuredCopy(MOCK_WEBHOOKS),
     roles: structuredCopy(MOCK_ROLES),
     principals: structuredCopy(MOCK_PRINCIPALS),
+    oauthGrants: structuredCopy(MOCK_OAUTH_GRANTS),
     site: <SiteConfig>{
       version: 1,
       active: structuredCopy(MOCK_BRANDING),
@@ -461,6 +464,47 @@ export class AdminApiService {
       return of(void 0);
     }
     return this.http.delete<void>(`${this.base}/admin/role-assignments/${assignmentId}`);
+  }
+
+  // OAuth grants of ANY principal. Both routes need P(`admin.users`). The
+  // self-service twins under `/oauth/grants` reach the caller's own grants only, so a
+  // leaked agent token of somebody else can be killed here and nowhere else.
+
+  /**
+   * GET /admin/oauth-grants — live (not revoked) grants, newest first.
+   *
+   * `principalId` narrows the list to one owner. The list drives its own status line,
+   * so it opts out of the global loading overlay.
+   */
+  listOAuthGrants(query: OAuthGrantQuery = {}): Observable<Page<OAuthGrantAdmin>> {
+    const limit = query.limit ?? 50;
+    const offset = query.offset ?? 0;
+    if (this.mock) {
+      const all = this.store.oauthGrants.filter(
+        (g) => !query.principalId || g.principalId === query.principalId,
+      );
+      return of({
+        items: structuredCopy(all.slice(offset, offset + limit)),
+        total: all.length,
+        limit,
+        offset,
+      });
+    }
+    let params = new HttpParams().set('limit', String(limit)).set('offset', String(offset));
+    if (query.principalId) params = params.set('principalId', query.principalId);
+    return this.http.get<Page<OAuthGrantAdmin>>(`${this.base}/admin/oauth-grants`, {
+      params,
+      context: skipLoading(),
+    });
+  }
+
+  /** DELETE /admin/oauth-grants/{id} — 204. A 404 means the grant is gone already. */
+  revokeOAuthGrant(grantId: Uuid): Observable<void> {
+    if (this.mock) {
+      this.store.oauthGrants = this.store.oauthGrants.filter((g) => g.id !== grantId);
+      return of(void 0);
+    }
+    return this.http.delete<void>(`${this.base}/admin/oauth-grants/${grantId}`);
   }
 
   /** Application types as an edit view (id + i18n name + gremium + budget flag). */
@@ -973,6 +1017,35 @@ function hashString(value: string): number {
   for (let i = 0; i < value.length; i++) h = (Math.imul(31, h) + value.charCodeAt(i)) | 0;
   return h;
 }
+
+/**
+ * Agent-token stubs for mock mode. The second row has no owner name and no expiry, so
+ * the placeholder and the "never expires" rendering are visible without a backend.
+ */
+const MOCK_OAUTH_GRANTS: OAuthGrantAdmin[] = [
+  {
+    id: 'grant-1',
+    principalId: 'p-1',
+    principalName: 'Alex Admin',
+    principalEmail: 'alex@stupa.example',
+    clientId: 'antragsplattform-mcp',
+    scope: 'mcp:read mcp:write',
+    createdAt: '2026-06-01T10:00:00+00:00',
+    accessExpiresAt: '2026-09-01T10:00:00+00:00',
+    refreshExpiresAt: '2026-12-01T10:00:00+00:00',
+  },
+  {
+    id: 'grant-2',
+    principalId: 'p-2',
+    principalName: null,
+    principalEmail: null,
+    clientId: 'antragsplattform-mcp',
+    scope: 'mcp:read',
+    createdAt: '2026-05-02T08:30:00+00:00',
+    accessExpiresAt: null,
+    refreshExpiresAt: null,
+  },
+];
 
 /** CD-variant stubs for mock mode — the real list comes from the backend. */
 const MOCK_CD_VARIANT_OPTIONS: CdVariantOption[] = [

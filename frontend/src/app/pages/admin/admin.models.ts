@@ -599,6 +599,38 @@ export interface DeadlinePolicy {
   dates?: string[] | null;
 }
 
+/**
+ * One live OAuth grant (agent/MCP token pair) of any principal — the admin view of
+ * `GET /admin/oauth-grants` (P `admin.users`).
+ *
+ * The server resolves the owner to a name, so the UI never renders an id.
+ * `principalName` is `null` when the owner carries neither a display name nor an
+ * email; the page then shows a localized placeholder. `principalId` exists for the
+ * filter and for a deep link only, never for display. The item holds no token and no
+ * token hash.
+ */
+export interface OAuthGrantAdmin {
+  id: Uuid;
+  principalId: Uuid;
+  /** Display name, else email, else `null`. NEVER an id. */
+  principalName: string | null;
+  principalEmail: string | null;
+  clientId: string;
+  scope: string;
+  createdAt: string;
+  /** `null` means the access token never expires. Only a revoke ends it. */
+  accessExpiresAt: string | null;
+  /** `null` means the refresh token never expires. Only a revoke ends it. */
+  refreshExpiresAt: string | null;
+}
+
+/** Query of the admin grant list: offset paging plus the owner filter. */
+export interface OAuthGrantQuery {
+  limit?: number;
+  offset?: number;
+  principalId?: Uuid | null;
+}
+
 /** Time-bounded gremium membership (term of office). */
 export interface GremiumMembership {
   id: Uuid;

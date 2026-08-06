@@ -1765,6 +1765,38 @@ export const de = {
   'admin.deadlines.kind.relative_changed': 'Letzte Änderung + X Tage',
   'admin.deadlines.kind.recurring': 'Wiederkehrende Termine',
 
+  // Agent-Tokens (OAuth-Zugänge) aller Personen — Verwaltungssicht mit Not-Aus.
+  'admin.oauthGrants.title': 'Agent-Zugänge',
+  'admin.oauthGrants.subtitle': 'OAuth-Zugänge aller Personen ansehen und widerrufen.',
+  'admin.oauthGrants.intro':
+    'Ein Agent-Zugang ist ein Token, mit dem ein Programm im Namen einer Person auf die Plattform zugreift. Widerrufen Sie einen Zugang, wenn ein Token abhandengekommen ist.',
+  'admin.oauthGrants.loading': 'Zugänge werden geladen…',
+  'admin.oauthGrants.error': 'Die Zugänge konnten nicht geladen werden.',
+  'admin.oauthGrants.empty': 'Keine aktiven Agent-Zugänge.',
+  'admin.oauthGrants.col.owner': 'Person',
+  'admin.oauthGrants.col.client': 'Anwendung',
+  'admin.oauthGrants.col.scope': 'Berechtigungen',
+  'admin.oauthGrants.col.created': 'Erstellt',
+  'admin.oauthGrants.col.expires': 'Läuft ab',
+  'admin.oauthGrants.accessToken': 'Zugriff',
+  'admin.oauthGrants.refreshToken': 'Erneuerung',
+  'admin.oauthGrants.neverExpires': 'Läuft nie ab',
+  'admin.oauthGrants.unknownOwner': 'Person ohne Namen',
+  'admin.oauthGrants.filter.principal': 'Person',
+  'admin.oauthGrants.filter.allPrincipals': 'Alle Personen',
+  'admin.oauthGrants.range': '{from}–{to} von {total}',
+  'admin.oauthGrants.prevPage': 'Zurück',
+  'admin.oauthGrants.nextPage': 'Weiter',
+  'admin.oauthGrants.revoke': 'Widerrufen',
+  'admin.oauthGrants.revokeTitle': 'Zugang widerrufen',
+  'admin.oauthGrants.revokeConfirm':
+    'Zugang von {owner} für die Anwendung „{client}" wirklich widerrufen?',
+  'admin.oauthGrants.revokeWarning':
+    'Der Agent verliert den Zugriff sofort. Ein neuer Zugang ist nur über eine neue Anmeldung möglich.',
+  'admin.oauthGrants.revoked': 'Zugang widerrufen.',
+  'admin.oauthGrants.alreadyGone': 'Dieser Zugang bestand nicht mehr.',
+  'admin.oauthGrants.revokeFailed': 'Der Zugang konnte nicht widerrufen werden.',
+
   // Corporate-design variants: the logo sets of the rendered documents.
   'admin.cdVariants.title': 'CD-Varianten',
   'admin.cdVariants.subtitle':
@@ -2217,6 +2249,7 @@ export const de = {
   'admin.home.rolesDesc': 'Berechtigungen je Rolle pflegen.',
   'admin.home.groupMappings': 'Gruppen-Mappings',
   'admin.home.groupMappingsDesc': 'OIDC-Gruppen auf Rollen abbilden.',
+  'admin.home.oauthGrantsDesc': 'Agent-Zugänge ansehen und widerrufen.',
   'admin.home.mailTemplates': 'E-Mail-Vorlagen',
   'admin.home.mailTemplatesDesc': 'Betreff/Text der Benachrichtigungs-Mails anpassen.',
   'admin.mailTemplates.title': 'E-Mail-Vorlagen',
@@ -4001,6 +4034,38 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.deadlines.kind.relative_changed': 'Last change + X days',
   'admin.deadlines.kind.recurring': 'Recurring dates',
 
+  // Agent tokens (OAuth grants) of every principal — the admin view with a kill switch.
+  'admin.oauthGrants.title': 'Agent access',
+  'admin.oauthGrants.subtitle': 'See and revoke the OAuth grants of every person.',
+  'admin.oauthGrants.intro':
+    'An agent grant is a token that lets a program use the platform for a person. Revoke a grant when a token is lost.',
+  'admin.oauthGrants.loading': 'Loading grants…',
+  'admin.oauthGrants.error': 'The grants did not load.',
+  'admin.oauthGrants.empty': 'No live agent grants.',
+  'admin.oauthGrants.col.owner': 'Person',
+  'admin.oauthGrants.col.client': 'Application',
+  'admin.oauthGrants.col.scope': 'Permissions',
+  'admin.oauthGrants.col.created': 'Created',
+  'admin.oauthGrants.col.expires': 'Expires',
+  'admin.oauthGrants.accessToken': 'Access',
+  'admin.oauthGrants.refreshToken': 'Refresh',
+  'admin.oauthGrants.neverExpires': 'Never expires',
+  'admin.oauthGrants.unknownOwner': 'Person without a name',
+  'admin.oauthGrants.filter.principal': 'Person',
+  'admin.oauthGrants.filter.allPrincipals': 'All persons',
+  'admin.oauthGrants.range': '{from}–{to} of {total}',
+  'admin.oauthGrants.prevPage': 'Back',
+  'admin.oauthGrants.nextPage': 'Next',
+  'admin.oauthGrants.revoke': 'Revoke',
+  'admin.oauthGrants.revokeTitle': 'Revoke the grant',
+  'admin.oauthGrants.revokeConfirm':
+    'Really revoke the grant of {owner} for the application “{client}”?',
+  'admin.oauthGrants.revokeWarning':
+    'The agent loses access immediately. A new grant is possible only through a new login.',
+  'admin.oauthGrants.revoked': 'The grant is revoked.',
+  'admin.oauthGrants.alreadyGone': 'This grant did not exist any more.',
+  'admin.oauthGrants.revokeFailed': 'The grant did not revoke.',
+
   // Corporate-design variants: the logo sets of the rendered documents.
   'admin.cdVariants.title': 'CD variants',
   'admin.cdVariants.subtitle': 'Logo sets a committee renders its documents with.',
@@ -4447,6 +4512,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.home.rolesDesc': 'Maintain permissions per role.',
   'admin.home.groupMappings': 'Group mappings',
   'admin.home.groupMappingsDesc': 'Map OIDC groups to roles.',
+  'admin.home.oauthGrantsDesc': 'See and revoke agent grants.',
   'admin.home.mailTemplates': 'Email templates',
   'admin.home.mailTemplatesDesc': 'Customise subject/body of notification emails.',
   'admin.mailTemplates.title': 'Email templates',

@@ -197,6 +197,22 @@ describe('AdminApiService — real mode (contract)', () => {
     expect(http.expectOne('/api/admin/roles/r-9').request.method).toBe('PATCH');
   });
 
+  it('wires the admin OAuth-grant list and the kill switch', () => {
+    // Defaults: the documented page size, no owner filter.
+    s.listOAuthGrants().subscribe();
+    const all = http.expectOne('/api/admin/oauth-grants?limit=50&offset=0');
+    expect(all.request.method).toBe('GET');
+    all.flush({ items: [], total: 0, limit: 50, offset: 0 });
+
+    s.listOAuthGrants({ limit: 25, offset: 25, principalId: 'p-1' }).subscribe();
+    http
+      .expectOne('/api/admin/oauth-grants?limit=25&offset=25&principalId=p-1')
+      .flush({ items: [], total: 0, limit: 25, offset: 25 });
+
+    s.revokeOAuthGrant('grant-9').subscribe();
+    expect(http.expectOne('/api/admin/oauth-grants/grant-9').request.method).toBe('DELETE');
+  });
+
   it('GETs gremium options from the public /gremien path (#68)', () => {
     s.listGremienOptions().subscribe();
     http.expectOne('/api/gremien').flush([]);
@@ -579,6 +595,31 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect((await firstValueFrom(s.listForms())).length).toBeGreaterThan(0);
     expect((await firstValueFrom(s.listApplicationTypes())).length).toBe(2);
     expect((await firstValueFrom(s.listApplicationTypesFull())).length).toBeGreaterThan(0);
+  });
+
+  it('pages, filters and revokes OAuth grants in the mock store', async () => {
+    const s = svc();
+    const all = await firstValueFrom(s.listOAuthGrants());
+    expect(all.total).toBe(2);
+    expect(all.items[0].principalName).toBe('Alex Admin');
+    // The second stub carries no owner name and no expiry.
+    expect(all.items[1].principalName).toBeNull();
+    expect(all.items[1].accessExpiresAt).toBeNull();
+
+    // Paging slices the store.
+    const secondPage = await firstValueFrom(s.listOAuthGrants({ limit: 1, offset: 1 }));
+    expect(secondPage.items).toHaveLength(1);
+    expect(secondPage.offset).toBe(1);
+    expect(secondPage.total).toBe(2);
+
+    // The owner filter narrows the list.
+    const mine = await firstValueFrom(s.listOAuthGrants({ principalId: 'p-1' }));
+    expect(mine.items.map((g) => g.id)).toEqual(['grant-1']);
+
+    await firstValueFrom(s.revokeOAuthGrant('grant-1'));
+    const after = await firstValueFrom(s.listOAuthGrants());
+    expect(after.items.some((g) => g.id === 'grant-1')).toBe(false);
+    expect(after.total).toBe(1);
   });
 
   it('deletes a gremium and returns empty mail recipients', async () => {
