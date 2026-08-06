@@ -64,6 +64,9 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "admin.group_mappings",
     # /admin/gremien/:id/roles: Gremium role definitions.
     "admin.gremium_roles",
+    # /admin/cd-variants: corporate-design variants (document logos) that a Gremium
+    # selects. The key also covers the logo upload and the logo download.
+    "admin.cd_variants",
     # /admin/delegations: manage the delegations and the substitute pool platform-wide.
     "admin.delegations",
     # /admin/deadlines: deadline policies.

@@ -63,7 +63,7 @@ class _FakeConfig:
                 id=uuid4(),
                 name="StuPa",
                 slug="stupa",
-                cd_variant="stupa",
+                cd_variant_id=None,
                 default_lang="de",
                 allow_vote_delegation=False,
             )
@@ -74,7 +74,7 @@ class _FakeConfig:
             id=uuid4(),
             name=payload.name,
             slug=payload.slug,
-            cd_variant=payload.cd_variant,
+            cd_variant_id=payload.cd_variant_id,
             default_lang=payload.default_lang,
             allow_vote_delegation=payload.allow_vote_delegation,
         )
@@ -86,7 +86,7 @@ class _FakeConfig:
             id=gremium_id,
             name=payload.name or "X",
             slug="stupa",
-            cd_variant="stupa",
+            cd_variant_id=None,
             default_lang="de",
             allow_vote_delegation=False,
         )
@@ -392,7 +392,7 @@ def test_config_schemas_includes_branding(app: FastAPI, client: TestClient) -> N
 
 def test_list_create_update_gremium(app: FastAPI, client: TestClient) -> None:
     _as_admin(app)
-    assert client.get("/api/admin/gremien").json()[0]["cdVariant"] == "stupa"
+    assert client.get("/api/admin/gremien").json()[0]["cdVariantId"] is None
     r = client.post("/api/admin/gremien", json={"name": "AStA", "slug": "asta"})
     assert r.status_code == 201 and r.json()["defaultLang"] == "de"
     patched = client.patch(f"/api/admin/gremien/{uuid4()}", json={"name": "Neu"})
@@ -439,7 +439,7 @@ def test_gremien_authed_list_without_admin_perm(app: FastAPI, client: TestClient
     _as(app, set())  # logged in, but without any permission
     r = client.get("/api/gremien")
     assert r.status_code == 200
-    assert r.json()[0]["cdVariant"] == "stupa"
+    assert r.json()[0]["cdVariantId"] is None
 
 
 def test_gremien_authed_requires_auth_401(client: TestClient) -> None:

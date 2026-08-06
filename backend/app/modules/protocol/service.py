@@ -33,6 +33,7 @@ from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.admin.cd_resolver import cd_variant_key_for_gremium
 from app.modules.admin.gremium_roles import gremium_ids_with_permission
 from app.modules.admin.models import Gremium, GremiumMembership, MailList
 from app.modules.auth.models import Principal as PrincipalRow
@@ -263,11 +264,13 @@ class ProtocolService:
 
     @staticmethod
     def _insert_values(
-        meeting: Meeting, gremium: Gremium | None, author: str | None
+        meeting: Meeting, cd_variant: str | None, author: str | None
     ) -> dict[str, object]:
         """Build the column values of a new `protocol` row.
 
-        The `cd_variant` comes from the Gremium.
+        `cd_variant` is the key of the CD variant of the Gremium. The protocol
+        snapshots it, so a later change of the Gremium does not rewrite the
+        design of a protocol that already exists.
         """
         return {
             "meeting_id": meeting.id,
@@ -275,7 +278,7 @@ class ProtocolService:
             "markdown": "",
             "status": "draft",
             "author": author,
-            "cd_variant": gremium.cd_variant if gremium is not None else None,
+            "cd_variant": cd_variant,
         }
 
     async def get_by_meeting(self, meeting_id: UUID) -> ProtocolOut:
@@ -320,9 +323,10 @@ class ProtocolService:
                 "the meeting has not started — its minutes are created on start"
             )
         gremium = await self.session.get(Gremium, meeting.gremium_id)
+        cd_variant = await cd_variant_key_for_gremium(self.session, gremium)
         await self.session.execute(
             pg_insert(Protocol)
-            .values(**self._insert_values(meeting, gremium, author))
+            .values(**self._insert_values(meeting, cd_variant, author))
             .on_conflict_do_nothing(constraint="uq_protocol_meeting")
         )
         await self.session.commit()

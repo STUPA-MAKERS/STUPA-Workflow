@@ -48,6 +48,7 @@ SCOPES: dict[str, frozenset[str]] = {
             "admin.users",
             "admin.group_mappings",
             "admin.gremium_roles",
+            "admin.cd_variants",
             "admin.delegations",
             "admin.deadlines",
             "webhook.manage",

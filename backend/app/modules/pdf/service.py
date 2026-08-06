@@ -21,6 +21,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.admin.cd_resolver import cd_variant_key_for_gremium
 from app.modules.admin.models import ApplicationType, Gremium
 from app.modules.applications.models import Applicant, Application, StatusEvent
 from app.modules.applications.service.service_base import _field_from_row
@@ -144,7 +145,7 @@ class PdfService:
             application_id=str(application_id),
             type_name=type_name,
             gremium_slug=gremium.slug if gremium is not None else None,
-            cd_variant=gremium.cd_variant if gremium is not None else None,
+            cd_variant=await cd_variant_key_for_gremium(self.session, gremium),
             lang=lang,
             default_lang=default_lang,
             fields=fields,

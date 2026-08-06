@@ -55,8 +55,11 @@ def _norm_mime(mime: str) -> str:
     return _MIME_ALIASES.get(mime, mime)
 
 
-def _sniff_image(data: bytes) -> str | None:
-    """Sniff the image type from the magic bytes.
+def sniff_raster_image(data: bytes) -> str | None:
+    """Sniff the raster image type from the magic bytes.
+
+    ``admin.cd_logos`` reuses this sniffer and adds the SVG and PDF cases that
+    only the LaTeX renderer accepts. Do not widen the set here.
 
     Returns:
         The sniffed MIME type. ``None`` means unknown or not in the whitelist,
@@ -153,7 +156,7 @@ class BrandingAsset(_CamelModel):
         # Check the real size against the cap. The client `size` field is untrusted.
         if len(decoded) > MAX_LOGO_BYTES:
             raise ValueError(f"logo exceeds {MAX_LOGO_BYTES} bytes")
-        sniffed = _sniff_image(decoded)
+        sniffed = sniff_raster_image(decoded)
         if sniffed is None:
             raise ValueError("logo payload is not a recognized image (no SVG / image-only)")
         if _norm_mime(sniffed) != _norm_mime(self.mime):

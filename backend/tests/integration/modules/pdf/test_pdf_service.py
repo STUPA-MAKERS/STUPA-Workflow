@@ -12,10 +12,10 @@ import uuid
 from collections.abc import AsyncIterator
 
 import pytest
-from sqlalchemy import Engine
+from sqlalchemy import Engine, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.modules.admin.models import ApplicationType, Gremium
+from app.modules.admin.models import ApplicationType, CdVariant, Gremium
 from app.modules.applications.schemas import ApplicationCreate
 from app.modules.applications.service import ApplicationsService
 from app.modules.flow.models import FlowVersion, State
@@ -50,7 +50,13 @@ def _fields() -> list[FormFieldDef]:
 
 
 async def _seed_type(session: AsyncSession, *, cd_variant: str = "makers") -> ApplicationType:
-    gremium = Gremium(name="StuPa", slug=f"stupa-{uuid.uuid4()}", cd_variant=cd_variant)
+    # The five CD variants come from the seed migration. Resolve the row by key.
+    variant_id = await session.scalar(
+        select(CdVariant.id).where(CdVariant.key == cd_variant)
+    )
+    gremium = Gremium(
+        name="StuPa", slug=f"stupa-{uuid.uuid4()}", cd_variant_id=variant_id
+    )
     session.add(gremium)
     await session.flush()
     app_type = ApplicationType(

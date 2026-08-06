@@ -5,6 +5,12 @@ The client sends the server-generated Markdown as the raw request body to
 ``trust_level=trusted``, ``variant=<per gremium>``) and returns the PDF bytes. There is
 no shell call. The Markdown is never part of a command line.
 
+A render that carries a document config or binary assets (for example the uploaded
+Corporate-Design logos) goes over ``multipart/form-data`` instead: the Markdown in the
+``source`` field, the config as a JSON object in the ``config`` field, and one file
+part per asset in the repeated ``assets`` field. Without a config and without assets
+the client keeps the raw-body shape, so nothing changes for the existing callers.
+
 Errors map to ``PytexError``, which carries only the status and a short reason. The
 pytex container scrubs paths and stacktraces itself, so no internal path leaks out. A
 4xx is a permanent input or policy error and gets no retry. A 5xx or a transport error
@@ -13,7 +19,9 @@ is transient, so the worker retries.
 
 from __future__ import annotations
 
+import json
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 import httpx
@@ -23,6 +31,17 @@ from app.settings import Settings
 # pytex signals a PDF through the Content-Type. Any other body breaks the contract.
 _PDF_CONTENT_TYPE = "application/pdf"
 _MAX_ERROR_DETAIL = 300
+_MARKDOWN_CONTENT_TYPE = "text/markdown; charset=utf-8"
+# The multipart field names of the pytex ``/render`` contract.
+_SOURCE_FIELD = "source"
+_CONFIG_FIELD = "config"
+_ASSETS_FIELD = "assets"
+# pytex reads the asset name from the file name of the part, so the part needs one.
+# The bytes are opaque to pytex; it writes them next to the rendered ``.tex`` file.
+_ASSET_CONTENT_TYPE = "application/octet-stream"
+
+# One multipart file part: ``(field, (filename, content, content_type))``.
+type _FilePart = tuple[str, tuple[str, bytes, str]]
 
 # Live pytex ``eval`` trigger: pytex ``_eval_comment`` fires ONLY for a link-reference
 # with ``label == "//"`` AND a bare-``#`` target (``[//]: # "EXPR"``). CommonMark
@@ -80,6 +99,36 @@ class PytexError(RuntimeError):
         self.retryable = retryable
 
 
+def _config_part(config: Mapping[str, object] | None) -> dict[str, str]:
+    """Serialize ``config`` into the ``config`` form field (empty when there is none).
+
+    Raises:
+        PytexError: The config holds a value that JSON cannot represent. That is a
+            permanent caller error, so it gets no retry.
+    """
+    if not config:
+        return {}
+    try:
+        return {_CONFIG_FIELD: json.dumps(dict(config))}
+    except (TypeError, ValueError) as exc:
+        raise PytexError(
+            f"pytex config is not JSON-serializable ({type(exc).__name__})",
+            retryable=False,
+        ) from exc
+
+
+def _file_parts(markdown: str, assets: Mapping[str, bytes] | None) -> list[_FilePart]:
+    """Build the ``source`` part and one ``assets`` part per uploaded file."""
+    parts: list[_FilePart] = [
+        (_SOURCE_FIELD, ("source.md", markdown.encode("utf-8"), _MARKDOWN_CONTENT_TYPE))
+    ]
+    parts.extend(
+        (_ASSETS_FIELD, (name, data, _ASSET_CONTENT_TYPE))
+        for name, data in (assets or {}).items()
+    )
+    return parts
+
+
 @dataclass(slots=True)
 class PytexClient:
     """Thin async HTTP client around the pytex ``/render`` endpoint."""
@@ -94,6 +143,8 @@ class PytexClient:
         *,
         variant: str | None = None,
         trust_level: str | None = None,
+        config: Mapping[str, object] | None = None,
+        assets: Mapping[str, bytes] | None = None,
     ) -> bytes:
         """Render Markdown to PDF bytes.
 
@@ -103,6 +154,13 @@ class PytexClient:
         this call only. For example ``trust_level="untrusted"`` fits user-written
         Markdown such as a protocol or an agenda body. It locks the pytex Markdown
         ``eval`` escape and sandboxes the build, which protects against RCE.
+
+        ``config`` holds the document-class parameters, which override the
+        frontmatter. ``assets`` holds binary files keyed by their plain file name;
+        pytex writes each one next to the rendered ``.tex`` file. A ``logos`` or
+        ``footer_logos`` entry of ``config`` that names an asset then selects that
+        uploaded file. With both empty the client sends the raw body as before.
+        pytex owns the asset-name rule and answers 400 for a bad name.
 
         Defense in depth: the protocol and report variants must render ``trusted``,
         because the template machinery blocks ``untrusted`` and ``sandboxed``. The only
@@ -134,14 +192,25 @@ class PytexClient:
         if variant is not None:
             params["variant"] = variant
         url = self.base_url.rstrip("/") + "/render"
+        # Only a config or an asset needs the multipart shape. Everything else keeps
+        # the raw body, so an existing caller sends the exact same request as before.
+        multipart = bool(config) or bool(assets)
         try:
             async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
-                response = await client.post(
-                    url,
-                    params=params,
-                    content=markdown.encode("utf-8"),
-                    headers={"Content-Type": "text/markdown; charset=utf-8"},
-                )
+                if multipart:
+                    response = await client.post(
+                        url,
+                        params=params,
+                        data=_config_part(config),
+                        files=_file_parts(markdown, assets),
+                    )
+                else:
+                    response = await client.post(
+                        url,
+                        params=params,
+                        content=markdown.encode("utf-8"),
+                        headers={"Content-Type": _MARKDOWN_CONTENT_TYPE},
+                    )
         except httpx.HTTPError as exc:
             raise PytexError(
                 f"pytex unreachable ({type(exc).__name__})", retryable=True

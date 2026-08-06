@@ -15,12 +15,15 @@ Layout:
 `.flow`: the active global flow graph and the immutable flow versions.
 `.rbac`: roles, role assignments, principals and group mappings.
 `.webhooks`: webhook CRUD and the delivery diagnostics.
+`.cd_variants`: the corporate-design variants and their logos. It is a separate
+service, because it also needs the object storage.
 `.service`: the `ConfigService` facade that combines the ops.
 
 This module re-exports the facade, so ``from app.modules.admin.service import
 ConfigService`` keeps working.
 """
 
+from app.modules.admin.service.cd_variants import CdVariantService
 from app.modules.admin.service.service import ConfigService
 
-__all__ = ["ConfigService"]
+__all__ = ["CdVariantService", "ConfigService"]

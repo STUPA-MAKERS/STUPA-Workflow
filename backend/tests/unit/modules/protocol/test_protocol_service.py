@@ -62,8 +62,8 @@ def _real_meeting() -> Meeting:
     return meeting
 
 
-def _real_gremium(cd_variant: str = "stupa") -> Gremium:
-    gremium = Gremium(name="StuPa", slug="stupa", cd_variant=cd_variant)
+def _real_gremium() -> Gremium:
+    gremium = Gremium(name="StuPa", slug="stupa")
     gremium.id = GID
     return gremium
 
@@ -99,7 +99,7 @@ def _service(session: Any, **infra: Any) -> ProtocolService:
 
 def test_insert_values_inherits_cd_variant_and_gremium() -> None:
     meeting = _real_meeting()
-    values = ProtocolService._insert_values(meeting, _real_gremium("asta"), "p1")
+    values = ProtocolService._insert_values(meeting, "asta", "p1")
     assert values == {
         "meeting_id": MID,
         "gremium_id": GID,
@@ -118,7 +118,7 @@ def test_insert_values_without_gremium_has_null_variant() -> None:
 async def test_get_or_create_new_reselects_after_insert() -> None:
     created = _protocol(markdown="", status="draft")
     session = FakeSession(
-        store={MID: _real_meeting(), GID: _real_gremium("asta")},
+        store={MID: _real_meeting(), GID: _real_gremium()},
         # execute order: _by_meeting is empty, pg_insert is ignored, _by_meeting is new
         results=[result(), result(), result(created)],
     )

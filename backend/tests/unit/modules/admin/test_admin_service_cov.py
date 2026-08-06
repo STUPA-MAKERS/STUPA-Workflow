@@ -171,7 +171,7 @@ def gremium_row(**kw: Any) -> Any:
         "id": uuid.uuid4(),
         "name": "Gremium",
         "slug": "g",
-        "cd_variant": "stupa",
+        "cd_variant_id": None,
         "default_lang": "de",
         "allow_vote_delegation": False,
         "delegation_lead_minutes": 0,
@@ -344,7 +344,6 @@ async def test_update_gremium_all_fields() -> None:
         GremiumUpdate(
             name="Neu",
             slug="neu",
-            cdVariant="asta",
             defaultLang="en",
             allowVoteDelegation=True,
             delegationLeadMinutes=5,
