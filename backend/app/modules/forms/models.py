@@ -27,6 +27,12 @@ class FormVersion(UUIDPkMixin, CreatedAtMixin, Base):
     """One form version of an application type.
 
     A partial unique index allows at most one `active` version per type.
+
+    A version carries no update and no delete route, and that is deliberate. Every
+    submitted application points at the version it was filled in under, so an edit
+    would change the meaning of answers already given. An editor saves a NEW version
+    instead, and `POST /admin/config-revisions/{id}/restore` rolls back to an earlier
+    one.
     """
 
     __tablename__ = "form_version"

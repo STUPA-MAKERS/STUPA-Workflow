@@ -35,6 +35,7 @@ sibling memory here.
 - [positions-field-shape](positions-field-shape.md) — Kostenaufstellung/positions field: offers = {label,value,preferred}, exactly one preferred
 - [alembic-revision-id-limit](alembic-revision-id-limit.md) — alembic revision ids MUST be ≤32 chars (alembic_version varchar(32))
 - [revert-feature-scope](revert-feature-scope.md) — audit-log revert covers config+status+budget/bookings, deletes & assign/move excluded
+- [crud-completeness-rules](crud-completeness-rules.md) — full CRUD behind a permission; the five entities that stay immutable on purpose
 
 ## Feature specs & designs
 
