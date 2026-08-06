@@ -517,6 +517,28 @@ export interface WebhookConfig {
   active: boolean;
 }
 
+/** Coarse state of the most recent delivery of one webhook. */
+export type WebhookDeliveryState = 'never' | 'pending' | 'sent' | 'dead';
+
+/**
+ * Delivery diagnostics of one webhook (`GET /admin/webhooks/delivery-status`).
+ *
+ * The backend reduces the newest `webhook_delivery` row to a coarse state plus a
+ * coarse reason class. It sends no resolved IP, no host topology and no response
+ * body, so an operator can diagnose a mistyped or internal target without a leak.
+ */
+export interface WebhookDeliveryStatus {
+  webhookId: Uuid;
+  lastState: WebhookDeliveryState;
+  /** `delivered`, `in_progress`, `no_deliveries`, `rejected_by_target`,
+   *  `target_server_error`, `transient_transport_error`, `unreachable_or_blocked`
+   *  or `unknown`. */
+  reasonClass: string;
+  responseCode?: number | null;
+  attempts: number;
+  lastAt?: string | null;
+}
+
 /** Gremium role — a separate role set, distinct from the global roles. */
 export interface GremiumRole {
   id: Uuid;

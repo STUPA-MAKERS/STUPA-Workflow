@@ -56,6 +56,7 @@ import {
   type RoleAssignmentInput,
   type SiteConfig,
   type WebhookConfig,
+  type WebhookDeliveryStatus,
 } from './admin.models';
 import {
   MOCK_APP_TYPES,
@@ -601,6 +602,25 @@ export class AdminApiService {
       : this.http.post<WebhookConfig>(`${this.base}/admin/webhooks`, hook);
   }
 
+  /** Delete a webhook and its delivery history. Needs P(`webhook.manage`). */
+  deleteWebhook(id: Uuid): Observable<void> {
+    if (this.mock) {
+      this.store.webhooks = this.store.webhooks.filter((h) => h.id !== id);
+      return of(void 0);
+    }
+    return this.http.delete<void>(`${this.base}/admin/webhooks/${id}`);
+  }
+
+  /** Latest delivery state per webhook. Needs P(`webhook.manage`). The overlay stays
+   *  off, because the call only decorates the list. */
+  listWebhookDeliveryStatus(): Observable<WebhookDeliveryStatus[]> {
+    if (this.mock) return of([]);
+    return this.http.get<WebhookDeliveryStatus[]>(
+      `${this.base}/admin/webhooks/delivery-status`,
+      { context: skipLoading() },
+    );
+  }
+
   listGremiumRoles(gremiumId: Uuid): Observable<GremiumRole[]> {
     if (this.mock) return of(structuredCopy(this.store.gremiumRoles.filter((r) => r.gremiumId === gremiumId)));
     return this.http.get<GremiumRole[]>(`${this.base}/admin/gremien/${gremiumId}/roles`);
@@ -684,6 +704,23 @@ export class AdminApiService {
     body: { principalId: Uuid; gremiumRoleId: Uuid; validFrom: string | null; validUntil: string | null },
   ): Observable<GremiumMembership> {
     return this.http.post<GremiumMembership>(`${this.base}/admin/gremien/${gremiumId}/memberships`, body);
+  }
+
+  /**
+   * Change the role or the term of office of one membership.
+   *
+   * The member and the Gremium stay immutable — a different member is a different
+   * membership. The backend answers 409 when the new term overlaps another term of
+   * the same member, and 422 when `validFrom` is not before `validUntil`.
+   */
+  updateGremiumMembership(
+    id: Uuid,
+    body: { gremiumRoleId?: Uuid; validFrom?: string | null; validUntil?: string | null },
+  ): Observable<GremiumMembership> {
+    return this.http.patch<GremiumMembership>(
+      `${this.base}/admin/gremium-memberships/${id}`,
+      body,
+    );
   }
 
   deleteGremiumMembership(id: Uuid): Observable<void> {

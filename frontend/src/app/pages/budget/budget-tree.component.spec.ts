@@ -3,6 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
+import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin/admin-api.service';
@@ -89,6 +90,8 @@ const TREE: BudgetTreeNode[] = [
 interface Mocks {
   gremien?: 'ok' | 'error';
   flow?: 'states' | 'null' | 'error';
+  /** Front-end `budget.structure` gate. `false` hides the fiscal-year row actions. */
+  can?: boolean;
 }
 
 function makeAdminMock(m: Mocks) {
@@ -124,6 +127,7 @@ async function setup(m: Mocks = { gremien: 'ok', flow: 'null' }) {
       provideHttpClientTesting(),
       { provide: AdminApiService, useValue: makeAdminMock(m) },
       { provide: ToastService, useValue: toastSpy },
+      { provide: AuthService, useValue: { can: () => m.can !== false } },
     ],
   });
   const http = TestBed.inject(HttpTestingController);
@@ -838,5 +842,185 @@ describe('BudgetTreeComponent (#9)', () => {
       .expectOne((r) => r.url.endsWith('/budgets/b-vs/fiscal-years') && r.method === 'POST')
       .flush(null, { status: 500, statusText: 'err' });
     expect(toast.error).toHaveBeenCalled();
+  });
+
+  // --- edit a fiscal year ---------------------------------------------------
+
+  it('openFyEdit closes the manage dialog and seeds the form', async () => {
+    const { c } = await setup();
+    c.openFy();
+    c.openFyEdit(FY);
+    expect(c.fyOpen()).toBe(false);
+    expect(c.fyEdit()).toEqual(FY);
+    expect(c.fyEditYear()).toBe(2026);
+    expect(c.fyEditActive()).toBe(true);
+    // Closing the edit hands control back to the manage dialog.
+    c.closeFyEdit();
+    expect(c.fyEdit()).toBeNull();
+    expect(c.fyOpen()).toBe(true);
+  });
+
+  it('patchFyEditYear truncates and defaults a non-number to the current year', async () => {
+    const { c } = await setup();
+    c.patchFyEditYear('2027.9');
+    expect(c.fyEditYear()).toBe(2027);
+    c.patchFyEditYear('abc');
+    expect(c.fyEditYear()).toBe(new Date().getFullYear());
+  });
+
+  it('saveFyEdit PATCHes the year and the active flag, then reloads', async () => {
+    const { c, http, toast } = await setup();
+    c.openFyEdit(FY);
+    c.patchFyEditYear('2027');
+    c.fyEditActive.set(false);
+    c.saveFyEdit();
+    const patch = http.expectOne(
+      (r) => r.url.endsWith('/budgets/b-vs/fiscal-years/fy-1') && r.method === 'PATCH',
+    );
+    expect(patch.request.body).toEqual({ year: 2027, active: false });
+    patch.flush({ ...FY, year: 2027, active: false });
+    expect(toast.success).toHaveBeenCalledWith('Haushaltsjahr gespeichert.');
+    expect(c.fyEdit()).toBeNull();
+    expect(c.fyOpen()).toBe(true);
+    http
+      .expectOne((r) => r.url.endsWith('/budgets/b-vs/fiscal-years'))
+      .flush([{ ...FY, year: 2027, display: '2027' }]);
+    // The left navigation follows the correction.
+    expect(c.fiscalYearsByBudget()['b-vs'][0].display).toBe('2027');
+  });
+
+  it('saveFyEdit names the duplicate year on 422', async () => {
+    const { c, http, toast } = await setup();
+    c.openFyEdit(FY);
+    c.saveFyEdit();
+    http
+      .expectOne((r) => r.method === 'PATCH')
+      .flush(null, { status: 422, statusText: 'unprocessable' });
+    expect(toast.error).toHaveBeenCalledWith('Dieses Jahr gibt es in diesem Budget bereits.');
+  });
+
+  it('saveFyEdit falls back to the generic error on any other status', async () => {
+    const { c, http, toast } = await setup();
+    c.openFyEdit(FY);
+    c.saveFyEdit();
+    http.expectOne((r) => r.method === 'PATCH').flush(null, { status: 500, statusText: 'err' });
+    expect(toast.error).toHaveBeenCalledWith(
+      'Haushaltsjahr konnte nicht angelegt werden (bereits vorhanden?).',
+    );
+  });
+
+  it('saveFyEdit is a no-op without a year under edit or without a top', async () => {
+    const { c, http } = await setup();
+    c.saveFyEdit(); // nothing under edit
+    c.openFyEdit(FY);
+    c.selectedTopId.set('');
+    c.saveFyEdit(); // no top budget
+    http.verify();
+  });
+
+  // --- delete a fiscal year -------------------------------------------------
+
+  it('askFyDelete closes the manage dialog and clears an earlier block reason', async () => {
+    const { c } = await setup();
+    c.openFy();
+    c.fyDeleteBlocked.set('stale');
+    c.askFyDelete(FY);
+    expect(c.fyOpen()).toBe(false);
+    expect(c.fyDelete()).toEqual(FY);
+    expect(c.fyDeleteBlocked()).toBeNull();
+    c.closeFyDelete();
+    expect(c.fyDelete()).toBeNull();
+    expect(c.fyOpen()).toBe(true);
+  });
+
+  it('doFyDelete DELETEs, toasts and reloads the fiscal years', async () => {
+    const { c, http, toast } = await setup();
+    c.askFyDelete(FY);
+    c.doFyDelete();
+    http
+      .expectOne((r) => r.url.endsWith('/budgets/b-vs/fiscal-years/fy-1') && r.method === 'DELETE')
+      .flush(null, { status: 204, statusText: 'no content' });
+    expect(toast.success).toHaveBeenCalledWith('Haushaltsjahr gelöscht.');
+    expect(c.fyDelete()).toBeNull();
+    http.expectOne((r) => r.url.endsWith('/budgets/b-vs/fiscal-years')).flush([]);
+    expect(c.fiscalYears()).toEqual([]);
+  });
+
+  it.each([
+    ['fiscal year still has bookings; remove them first', 'budget.tree.fyBlocked.bookings'],
+    ['fiscal year still has allocations; remove them first', 'budget.tree.fyBlocked.allocations'],
+    ['fiscal year still has applications; remove them first', 'budget.tree.fyBlocked.applications'],
+    ['fiscal year is busy', 'budget.tree.fyBlocked.generic'],
+  ])('409 "%s" explains the blocker in the dialog', async (detail, key) => {
+    const { c, http, toast, fixture } = await setup();
+    const expected = TestBed.inject(I18nService).translate(
+      key as Parameters<I18nService['translate']>[0],
+    );
+    c.askFyDelete(FY);
+    c.doFyDelete();
+    http
+      .expectOne((r) => r.method === 'DELETE')
+      .flush({ detail }, { status: 409, statusText: 'conflict' });
+    // The dialog stays open and shows the reason. A toast repeats it.
+    expect(c.fyDelete()).not.toBeNull();
+    expect(c.fyDeleteBlocked()).toBe(expected);
+    expect(toast.error).toHaveBeenCalledWith(expected);
+    fixture.detectChanges();
+    expect(screen.getByRole('alert')).toHaveTextContent(expected);
+  });
+
+  it('a 409 without a problem body still reads as the generic blocker', async () => {
+    const { c, http } = await setup();
+    c.askFyDelete(FY);
+    c.doFyDelete();
+    http.expectOne((r) => r.method === 'DELETE').flush(null, { status: 409, statusText: 'c' });
+    expect(c.fyDeleteBlocked()).toBe(
+      TestBed.inject(I18nService).translate('budget.tree.fyBlocked.generic'),
+    );
+  });
+
+  it('any other delete failure toasts the generic message', async () => {
+    const { c, http, toast } = await setup();
+    c.askFyDelete(FY);
+    c.doFyDelete();
+    http.expectOne((r) => r.method === 'DELETE').flush(null, { status: 500, statusText: 'err' });
+    expect(toast.error).toHaveBeenCalledWith('Haushaltsjahr konnte nicht gelöscht werden.');
+    expect(c.fyDeleteBlocked()).toBeNull();
+  });
+
+  it('doFyDelete is a no-op without a confirmed year or without a top', async () => {
+    const { c, http } = await setup();
+    c.doFyDelete(); // nothing confirmed
+    c.askFyDelete(FY);
+    c.selectedTopId.set('');
+    c.doFyDelete(); // no top budget
+    http.verify();
+  });
+
+  // --- permission gating ----------------------------------------------------
+
+  it('hides the fiscal-year row actions without budget.structure', async () => {
+    const { c } = await setup({ gremien: 'ok', flow: 'null', can: false });
+    expect(c.canStructure()).toBe(false);
+    expect(c.fyColumns().map((col: { key: string }) => col.key)).toEqual(['display', 'active']);
+  });
+
+  it('shows the fiscal-year row actions with budget.structure', async () => {
+    const { c } = await setup();
+    expect(c.canStructure()).toBe(true);
+    expect(c.fyColumns().map((col: { key: string }) => col.key)).toEqual([
+      'display',
+      'active',
+      'actions',
+    ]);
+    expect(c.fyRowId(FY)).toBe('fy-1');
+  });
+
+  it('offers an edit and a delete button per fiscal year in the manage dialog', async () => {
+    const { c, fixture } = await setup();
+    c.openFy();
+    fixture.detectChanges();
+    expect(screen.getByRole('button', { name: 'Haushaltsjahr bearbeiten' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Haushaltsjahr löschen' })).toBeInTheDocument();
   });
 });

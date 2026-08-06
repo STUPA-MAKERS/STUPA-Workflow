@@ -2,8 +2,10 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
+import type { TranslationKey } from '@core/i18n/translations';
 import type { Uuid } from '@core/api/models';
 import {
   BadgeComponent,
@@ -29,6 +31,10 @@ interface Member {
   email: string | null;
   roleLabel: string;
   term: string;
+  /** Raw membership fields. The edit dialog seeds its form from them. */
+  gremiumRoleId: string;
+  validFrom: string;
+  validUntil: string;
 }
 
 /**
@@ -63,6 +69,11 @@ export class GremiumMembersComponent {
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
   private readonly route = inject(ActivatedRoute);
+  private readonly auth = inject(AuthService);
+
+  /** `admin.gremien` as a front-end gate for add, edit and remove. The backend stays
+   *  authoritative. The value is reactive, because the principal loads asynchronously. */
+  readonly canManage = computed(() => this.auth.can('admin.gremien'));
 
   private readonly gremiumId = this.route.snapshot.paramMap.get('id') ?? '';
   protected readonly gremiumIdRef = this.gremiumId;
@@ -84,13 +95,25 @@ export class GremiumMembersComponent {
     this.gremiumRoles().map((r) => ({ value: r.id, label: this.roleName(r) })),
   );
 
-  readonly columns = computed<ColumnDef[]>(() => [
-    { key: 'name', label: this.i18n.translate('admin.users.col.name') },
-    { key: 'email', label: this.i18n.translate('admin.users.col.email') },
-    { key: 'roleLabel', label: this.i18n.translate('admin.gremien.memberRole') },
-    { key: 'term', label: this.i18n.translate('admin.gremien.term') },
-    { key: 'actions', label: this.i18n.translate('admin.users.col.actions'), align: 'end' },
-  ]);
+  /** Edit dialog for one membership: the role plus the from/until window. */
+  readonly editOpen = signal(false);
+  readonly editMember = signal<Member | null>(null);
+  readonly editRoleId = signal('');
+  readonly editFrom = signal('');
+  readonly editUntil = signal('');
+
+  readonly columns = computed<ColumnDef[]>(() => {
+    const cols: ColumnDef[] = [
+      { key: 'name', label: this.i18n.translate('admin.users.col.name') },
+      { key: 'email', label: this.i18n.translate('admin.users.col.email') },
+      { key: 'roleLabel', label: this.i18n.translate('admin.gremien.memberRole') },
+      { key: 'term', label: this.i18n.translate('admin.gremien.term') },
+    ];
+    if (this.canManage()) {
+      cols.push({ key: 'actions', label: this.i18n.translate('admin.users.col.actions'), align: 'end' });
+    }
+    return cols;
+  });
   readonly rowId = (m: unknown): string => (m as Member).assignmentId;
 
   readonly members = computed<Member[]>(() => {
@@ -105,6 +128,9 @@ export class GremiumMembersComponent {
         email: p?.email ?? null,
         roleLabel: role ? this.roleName(role) : m.gremiumRoleId,
         term: this.term(m),
+        gremiumRoleId: m.gremiumRoleId,
+        validFrom: m.validFrom ? m.validFrom.slice(0, 10) : '',
+        validUntil: m.validUntil ? m.validUntil.slice(0, 10) : '',
       };
     });
   });
@@ -278,13 +304,54 @@ export class GremiumMembersComponent {
           this.refresh();
         },
         // 409 means an overlapping term. A member holds one role per point in time.
+        // 422 means validFrom is not before validUntil.
         error: (err: { status?: number }) =>
-          this.toast.error(
-            this.i18n.translate(
-              err.status === 409 ? 'admin.gremien.memberOverlap' : 'admin.gremien.memberFailed',
-            ),
-          ),
+          this.toast.error(this.i18n.translate(this.memberErrorKey(err.status))),
       });
+  }
+
+  /** Open the edit dialog for one membership. The member and the Gremium stay fixed —
+   *  only the role and the term of office change. */
+  openEdit(m: Member): void {
+    this.editMember.set(m);
+    this.editRoleId.set(m.gremiumRoleId);
+    this.editFrom.set(m.validFrom);
+    this.editUntil.set(m.validUntil);
+    this.editOpen.set(true);
+  }
+
+  closeEdit(): void {
+    this.editOpen.set(false);
+    this.editMember.set(null);
+  }
+
+  saveEdit(): void {
+    const m = this.editMember();
+    const roleId = this.editRoleId();
+    if (!m || !roleId) return;
+    this.api
+      .updateGremiumMembership(m.assignmentId as Uuid, {
+        gremiumRoleId: roleId as Uuid,
+        validFrom: this.editFrom() || null,
+        validUntil: this.editUntil() || null,
+      })
+      .subscribe({
+        next: () => {
+          this.toast.success(this.i18n.translate('admin.gremien.memberSaved'));
+          this.closeEdit();
+          this.refresh();
+        },
+        // 409 = the term overlaps another term of this member. 422 = validFrom is not
+        // before validUntil. Both need their own words, not a generic failure.
+        error: (err: { status?: number }) =>
+          this.toast.error(this.i18n.translate(this.memberErrorKey(err.status))),
+      });
+  }
+
+  private memberErrorKey(status: number | undefined): TranslationKey {
+    if (status === 409) return 'admin.gremien.memberOverlap';
+    if (status === 422) return 'admin.gremien.memberBadTerm';
+    return 'admin.gremien.memberFailed';
   }
 
   removeMember(membershipId: string): void {

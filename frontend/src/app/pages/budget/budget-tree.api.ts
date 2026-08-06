@@ -326,6 +326,12 @@ export interface FiscalYearCreate {
   year: number;
 }
 
+/** Partial update of a fiscal year. Only the year and the active flag are editable. */
+export interface FiscalYearUpdate {
+  year?: number;
+  active?: boolean;
+}
+
 /** An application inside a cost center and its subtree. Used for budget statistics. */
 export interface BudgetApplication {
   applicationId: Uuid;
@@ -383,6 +389,21 @@ export class BudgetTreeApi {
 
   createFiscalYear(topId: Uuid, body: FiscalYearCreate): Observable<FiscalYear> {
     return this.http.post<FiscalYear>(`${this.base}/budgets/${topId}/fiscal-years`, body);
+  }
+
+  /** Correct the year or the active flag. Needs P(`budget.structure`). A year that
+   *  already exists in the same top budget answers 422. */
+  updateFiscalYear(topId: Uuid, fyId: Uuid, body: FiscalYearUpdate): Observable<FiscalYear> {
+    return this.http.patch<FiscalYear>(
+      `${this.base}/budgets/${topId}/fiscal-years/${fyId}`,
+      body,
+    );
+  }
+
+  /** Delete a fiscal year. Needs P(`budget.structure`). The route answers 409 while
+   *  bookings, allocations or applications still reference the year. */
+  deleteFiscalYear(topId: Uuid, fyId: Uuid): Observable<void> {
+    return this.http.delete<void>(`${this.base}/budgets/${topId}/fiscal-years/${fyId}`);
   }
 
   setAllocation(id: Uuid, fiscalYearId: Uuid, allocated: string): Observable<unknown> {

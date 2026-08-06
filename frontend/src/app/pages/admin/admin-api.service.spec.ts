@@ -34,6 +34,16 @@ describe('AdminApiService — mock mode', () => {
     });
   });
 
+  it('deletes a webhook and reports no delivery status in mock mode', async () => {
+    const s = svc();
+    const before = await firstValueFrom(s.listWebhooks());
+    await firstValueFrom(s.deleteWebhook(before[0].id));
+    const after = await firstValueFrom(s.listWebhooks());
+    expect(after.some((h) => h.id === before[0].id)).toBe(false);
+    // The mock backend records no deliveries.
+    expect(await firstValueFrom(s.listWebhookDeliveryStatus())).toEqual([]);
+  });
+
   it('covers schemas, versions, gremien, roles and rule upsert in mock mode', async () => {
     const s = svc();
     const schemas = await firstValueFrom(s.configSchemas());
@@ -134,6 +144,16 @@ describe('AdminApiService — real mode (contract)', () => {
 
     s.saveWebhook({ id: 'wh-9', name: 'n', url: 'https://h', events: ['vote_opened'], active: true }).subscribe();
     expect(http.expectOne('/api/admin/webhooks/wh-9').request.method).toBe('PATCH');
+  });
+
+  it('DELETEs a webhook and GETs the delivery status', () => {
+    s.deleteWebhook('wh-9').subscribe();
+    expect(http.expectOne('/api/admin/webhooks/wh-9').request.method).toBe('DELETE');
+
+    s.listWebhookDeliveryStatus().subscribe();
+    const status = http.expectOne('/api/admin/webhooks/delivery-status');
+    expect(status.request.method).toBe('GET');
+    status.flush([]);
   });
 
   it('wires the remaining admin endpoints to their documented paths', () => {
@@ -416,6 +436,15 @@ describe('AdminApiService — real mode (contract)', () => {
 
     s.createGremiumMembership('g1', { principalId: 'p1', gremiumRoleId: 'gr1', validFrom: null, validUntil: null }).subscribe();
     expect(http.expectOne('/api/admin/gremien/g1/memberships').request.method).toBe('POST');
+
+    s.updateGremiumMembership('gm-9', { gremiumRoleId: 'gr2', validFrom: '2027-01-01', validUntil: null }).subscribe();
+    const patch = http.expectOne('/api/admin/gremium-memberships/gm-9');
+    expect(patch.request.method).toBe('PATCH');
+    expect(patch.request.body).toEqual({
+      gremiumRoleId: 'gr2',
+      validFrom: '2027-01-01',
+      validUntil: null,
+    });
 
     s.deleteGremiumMembership('gm-9').subscribe();
     expect(http.expectOne('/api/admin/gremium-memberships/gm-9').request.method).toBe('DELETE');

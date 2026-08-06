@@ -4,7 +4,7 @@ import { render, screen } from '@testing-library/angular';
 import { I18nService } from '@core/i18n/i18n.service';
 import type { AuditActor, AuditEntry, AuditPage } from '../admin.models';
 import { AdminApiService } from '../admin-api.service';
-import { AuditLogComponent } from './audit-log.component';
+import { AUDIT_ACTIONS, AuditLogComponent } from './audit-log.component';
 
 /**
  * Typed view on the protected surface of the component. The tests call the filter setters
@@ -357,6 +357,30 @@ describe('AuditLogComponent (#45)', () => {
     const { cmp } = await setup();
     expect(cmp.actionLabel('status_change')).toBe('Statuswechsel');
     expect(cmp.actionLabel('made_up_action')).toBe('made_up_action');
+  });
+
+  it('reads the newly recorded actions instead of the unknown fallback', async () => {
+    localStorage.setItem('ap.locale', 'de');
+    const { cmp } = await setup();
+    const fresh = [
+      'comment_update',
+      'comment_delete',
+      'protocol_delete',
+      'vote_delete',
+      'budget_fiscal_year_delete',
+    ] as const;
+    for (const action of fresh) {
+      // Every one of them is in the catalog, so the filter offers it.
+      expect(AUDIT_ACTIONS).toContain(action);
+      // Neither the label nor the sentence falls back to the raw key.
+      expect(cmp.actionLabel(action)).not.toBe(action);
+      const msg = cmp.message(entry(1, { action, targetType: 'comment', targetId: 'c-1' }));
+      expect(msg).not.toMatch(/comment_update|comment_delete|protocol_delete|vote_delete|budget_fiscal_year_delete/);
+      expect(cmp.icon(action)).not.toBe('audit');
+    }
+    expect(cmp.targetTypeLabel('fiscal_year')).toBe('Haushaltsjahr');
+    expect(cmp.targetTypeLabel('protocol')).toBe('Protokoll');
+    expect(cmp.targetTypeLabel('comment')).toBe('Kommentar');
   });
 
   it('targetTypeLabel localizes known types and echoes unknown ones', async () => {
