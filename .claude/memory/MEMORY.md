@@ -16,6 +16,7 @@ sibling memory here.
 - [track-side-requests](track-side-requests.md) — track every casual request as a todo + memory
 - [repo-ship-workflow](repo-ship-workflow.md) — always finish: branch+commit+push+PR, then watch CI + fix failures
 - [python-strong-typing](python-strong-typing.md) — always strongly-typed Python ≥3.13: full annotations, no bare Any
+- [nix-dev-shells](nix-dev-shells.md) — run every dev command in `nix develop .#<component> -c …`, never hand-patch LD_LIBRARY_PATH
 - [admin-domain-rules](admin-domain-rules.md) — admin=all-rights, vote-delegation per-Gremium, edit all i18n values in EN too
 
 ## UI / frontend conventions
