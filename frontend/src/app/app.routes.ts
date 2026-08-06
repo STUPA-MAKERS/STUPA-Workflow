@@ -133,11 +133,12 @@ export const routes: Routes = [
       },
       {
         path: 'meetings',
-        // A Gremium member can reach their own meetings without meeting.manage or
-        // protocol.write.
+        // A Gremium member can reach their own meetings without meeting.manage.
+        // `protocol.write` is NOT listed: it is a GREMIUM-role permission and never
+        // enters the global permission set, so it could never match here (#g10).
         data: {
           title: 'nav.meetings',
-          permission: ['meeting.manage', 'protocol.write'],
+          permission: ['meeting.manage'],
           allowCommitteeMember: true,
         },
         canActivate: [authGuard],
@@ -147,11 +148,12 @@ export const routes: Routes = [
       {
         path: 'meetings/:id',
         // `allowAuthenticated`: a delegation recipient can be neither a member nor
-        // permitted. The server scopes the meeting view.
+        // permitted. The server scopes the meeting view. `protocol.write` is a
+        // GREMIUM-role permission and never matches globally, so it is not listed (#g10).
         data: {
           title: 'meetings.detailCrumb',
           parent: ['meetings'],
-          permission: ['meeting.manage', 'protocol.write'],
+          permission: ['meeting.manage'],
           allowCommitteeMember: true,
           allowAuthenticated: true,
           wide: true,
@@ -252,7 +254,14 @@ export const routes: Routes = [
       },
       {
         path: 'admin/flow',
-        data: { title: 'admin.flow.title', permission: 'flow.configure', parent: ['admin'] },
+        // The save (POST /admin/flow-versions/global) accepts either key. The route
+        // gate must list both, or a holder of one of them opens an editor it cannot
+        // save, or cannot open an editor it may save (#g7).
+        data: {
+          title: 'admin.flow.title',
+          permission: ['flow.configure', 'admin.types'],
+          parent: ['admin'],
+        },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/admin/flow-editor/flow-editor.component').then(

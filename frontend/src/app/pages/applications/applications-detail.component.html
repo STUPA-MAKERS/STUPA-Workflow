@@ -16,7 +16,7 @@
         @if (canForceStatus()) {
           <app-button variant="secondary" size="sm" (click)="openForceDialog()">{{ 'applications.detail.forceStatus' | t }}</app-button>
         }
-        @if (isAdmin()) {
+        @if (canDelete()) {
           <app-button variant="danger" size="sm" (click)="confirmDelete.set(true)">{{ 'applications.detail.delete' | t }}</app-button>
         }
         @if (application.isOwner && !application.applicant?.anonymized) {

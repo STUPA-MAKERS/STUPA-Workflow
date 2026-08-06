@@ -225,8 +225,12 @@ export class ApplicationsDetailComponent {
 
   private readonly router = inject(Router);
   readonly canManage = computed(() => this.auth.can('application.manage'));
-  /** Delete is admin-only (irreversible). */
-  readonly isAdmin = computed(() => this.auth.roles().includes('admin'));
+  /**
+   * Delete is irreversible and needs `application.delete` (#g9). An admin holds it
+   * through the role bypass. Any other role holds it through an explicit grant. The
+   * server gates on the same key.
+   */
+  readonly canDelete = computed(() => this.auth.can('application.delete'));
   readonly fmt = formatFieldValue;
 
   private id: Uuid = '';

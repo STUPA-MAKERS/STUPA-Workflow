@@ -21,6 +21,7 @@ export const MOCK_PERMISSIONS: string[] = [
   'application.update',
   'application.transition',
   'application.manage',
+  'application.delete',
   'form.configure',
   'flow.configure',
   'vote.manage',

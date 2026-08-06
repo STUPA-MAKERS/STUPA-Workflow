@@ -1,5 +1,8 @@
+<!-- Create posts an application type, so the button needs admin.types (#g8). -->
 <app-page-header [title]="'admin.forms.listTitle' | t" [subtitle]="'admin.forms.listSubtitle' | t">
-  <app-button actions size="sm" (click)="openCreate()">{{ 'admin.forms.add' | t }}</app-button>
+  @if (canCreate()) {
+    <app-button actions size="sm" (click)="openCreate()">{{ 'admin.forms.add' | t }}</app-button>
+  }
 </app-page-header>
 
 <section class="fl__list" [attr.aria-label]="'admin.forms.listTitle' | t">
