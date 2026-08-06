@@ -19,6 +19,7 @@ import {
 } from '@stupa-makers/ui-kit';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { type DelegationSubstitute, DelegationsApiService } from '@core/api/delegations.service';
+import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { AdminApiService } from '../admin-api.service';
 import type { AdminPrincipal, Gremium, GremiumMembership, GremiumRole } from '../admin.models';
 
@@ -52,6 +53,7 @@ interface Member {
     DataTableComponent,
     CellDirective,
     IconComponent,
+    PageHeaderComponent,
   ],
   templateUrl: './gremium-members.component.html',
   styleUrl: './gremium-members.component.scss',

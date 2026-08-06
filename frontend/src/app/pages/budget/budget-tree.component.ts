@@ -20,6 +20,7 @@ import { AdminApiService } from '../admin/admin-api.service';
 import { BudgetTreeApi, type BudgetTreeNode, type FiscalYear } from './budget-tree.api';
 import { SimplifyPathPipe } from '@shared/budget-path';
 import { BudgetYearTreeComponent, type BudgetYearSelection } from './budget-year-tree.component';
+import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 
 /** A tree row: a node plus the depth for the indentation. */
 interface Row {
@@ -41,7 +42,7 @@ interface Row {
   selector: 'app-budget-tree',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, SimplifyPathPipe, ButtonComponent, DialogComponent, DataTableComponent, CellDirective, RowDetailDirective, IconComponent, CurrencyInputComponent, SelectComponent, BudgetYearTreeComponent],
+  imports: [PageHeaderComponent, FormsModule, TranslatePipe, SimplifyPathPipe, ButtonComponent, DialogComponent, DataTableComponent, CellDirective, RowDetailDirective, IconComponent, CurrencyInputComponent, SelectComponent, BudgetYearTreeComponent],
   templateUrl: './budget-tree.component.html',
   styleUrl: './budget-tree.component.scss',
 })

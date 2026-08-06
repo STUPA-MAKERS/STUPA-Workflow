@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { CapitalizePipe } from '@shared/pipes/capitalize.pipe';
+import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import {
   ButtonComponent,
   CellDirective,
@@ -49,6 +50,7 @@ interface RoleDraft {
     RowDetailDirective,
     IconComponent,
     InputComponent,
+    PageHeaderComponent,
   ],
   providers: [CapitalizePipe],
   templateUrl: './roles.component.html',

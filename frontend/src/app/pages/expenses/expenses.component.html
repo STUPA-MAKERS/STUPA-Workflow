@@ -1,55 +1,49 @@
-<header class="exp__head">
-  <div class="flex items-start justify-between gap-4 flex-wrap">
-    <div>
-      <h1 class="exp__title">{{ 'expenses.title' | t }}</h1>
-      <p class="exp__subtitle">{{ 'expenses.subtitle' | t }}</p>
-    </div>
-    <div class="flex items-center gap-2 flex-wrap">
-      <input
-        class="exp__search"
-        type="search"
-        [placeholder]="'expenses.search' | t"
-        [ngModel]="q()"
-        (ngModelChange)="onSearch($event)"
-        [attr.aria-label]="'expenses.search' | t"
-      />
-      <app-filter-bar [live]="true" [activeCount]="activeFilterCount()" (reset)="resetFilters()">
-        <app-filter-field [label]="'expenses.filter.kind' | t">
-          <div class="inline-flex gap-1">
-            <app-button [variant]="kind() === '' ? 'primary' : 'ghost'" size="sm" (click)="setKind('')">{{ 'expenses.filter.all' | t }}</app-button>
-            <app-button [variant]="kind() === 'expense' ? 'primary' : 'ghost'" size="sm" (click)="setKind('expense')">{{ 'expenses.kind.expense' | t }}</app-button>
-            <app-button [variant]="kind() === 'income' ? 'primary' : 'ghost'" size="sm" (click)="setKind('income')">{{ 'expenses.kind.income' | t }}</app-button>
-          </div>
-        </app-filter-field>
-        <app-filter-field [label]="'expenses.filter.amountRange' | t">
-          <app-filter-range>
-            <app-currency-input start [placeholder]="'expenses.filter.amountMin' | t" [ariaLabel]="'expenses.filter.amountMin' | t" [ngModel]="amountMin()" (ngModelChange)="onAmountFilter('min', $event)" />
-            <app-currency-input end [placeholder]="'expenses.filter.amountMax' | t" [ariaLabel]="'expenses.filter.amountMax' | t" [ngModel]="amountMax()" (ngModelChange)="onAmountFilter('max', $event)" />
-          </app-filter-range>
-        </app-filter-field>
-        <app-filter-field [label]="'expenses.filter.dateRange' | t">
-          <app-filter-range>
-            <app-datepicker start [ariaLabel]="'expenses.filter.dateFrom' | t" [ngModel]="createdFrom()" (ngModelChange)="onDateFilter('from', $event)" />
-            <app-datepicker end [ariaLabel]="'expenses.filter.dateTo' | t" [ngModel]="createdTo()" (ngModelChange)="onDateFilter('to', $event)" />
-          </app-filter-range>
-        </app-filter-field>
-      </app-filter-bar>
-      @if (canExport()) {
-        <app-button variant="secondary" size="sm" (click)="onExport()" [loading]="exporting()">
-          <span class="inline-flex items-center gap-2"><app-icon name="export" [size]="16" /> {{ 'expenses.export' | t }}</span>
-        </app-button>
-      }
-      @if (canManage()) {
-        <app-button variant="secondary" size="sm" (click)="openTransfer()">
-          <span class="inline-flex items-center gap-2"><app-icon name="repeat" [size]="16" /> {{ 'expenses.transfer' | t }}</span>
-        </app-button>
-        <app-button size="sm" (click)="openCreate()">
-          <span class="inline-flex items-center gap-2"><app-icon name="add" [size]="16" /> {{ 'expenses.add' | t }}</span>
-        </app-button>
-      }
-    </div>
+<app-page-header [title]="'expenses.title' | t" [subtitle]="'expenses.subtitle' | t">
+  <div actions class="flex items-center gap-2 flex-wrap">
+    <input
+      class="exp__search"
+      type="search"
+      [placeholder]="'expenses.search' | t"
+      [ngModel]="q()"
+      (ngModelChange)="onSearch($event)"
+      [attr.aria-label]="'expenses.search' | t"
+    />
+    <app-filter-bar [live]="true" [activeCount]="activeFilterCount()" (reset)="resetFilters()">
+      <app-filter-field [label]="'expenses.filter.kind' | t">
+        <div class="inline-flex gap-1">
+          <app-button [variant]="kind() === '' ? 'primary' : 'ghost'" size="sm" (click)="setKind('')">{{ 'expenses.filter.all' | t }}</app-button>
+          <app-button [variant]="kind() === 'expense' ? 'primary' : 'ghost'" size="sm" (click)="setKind('expense')">{{ 'expenses.kind.expense' | t }}</app-button>
+          <app-button [variant]="kind() === 'income' ? 'primary' : 'ghost'" size="sm" (click)="setKind('income')">{{ 'expenses.kind.income' | t }}</app-button>
+        </div>
+      </app-filter-field>
+      <app-filter-field [label]="'expenses.filter.amountRange' | t">
+        <app-filter-range>
+          <app-currency-input start [placeholder]="'expenses.filter.amountMin' | t" [ariaLabel]="'expenses.filter.amountMin' | t" [ngModel]="amountMin()" (ngModelChange)="onAmountFilter('min', $event)" />
+          <app-currency-input end [placeholder]="'expenses.filter.amountMax' | t" [ariaLabel]="'expenses.filter.amountMax' | t" [ngModel]="amountMax()" (ngModelChange)="onAmountFilter('max', $event)" />
+        </app-filter-range>
+      </app-filter-field>
+      <app-filter-field [label]="'expenses.filter.dateRange' | t">
+        <app-filter-range>
+          <app-datepicker start [ariaLabel]="'expenses.filter.dateFrom' | t" [ngModel]="createdFrom()" (ngModelChange)="onDateFilter('from', $event)" />
+          <app-datepicker end [ariaLabel]="'expenses.filter.dateTo' | t" [ngModel]="createdTo()" (ngModelChange)="onDateFilter('to', $event)" />
+        </app-filter-range>
+      </app-filter-field>
+    </app-filter-bar>
+    @if (canExport()) {
+      <app-button variant="secondary" size="sm" (click)="onExport()" [loading]="exporting()">
+        <span class="inline-flex items-center gap-2"><app-icon name="export" [size]="16" /> {{ 'expenses.export' | t }}</span>
+      </app-button>
+    }
+    @if (canManage()) {
+      <app-button variant="secondary" size="sm" (click)="openTransfer()">
+        <span class="inline-flex items-center gap-2"><app-icon name="repeat" [size]="16" /> {{ 'expenses.transfer' | t }}</span>
+      </app-button>
+      <app-button size="sm" (click)="openCreate()">
+        <span class="inline-flex items-center gap-2"><app-icon name="add" [size]="16" /> {{ 'expenses.add' | t }}</span>
+      </app-button>
+    }
   </div>
-</header>
+</app-page-header>
 
 <div class="exp__layout">
   <!-- The tree toggle is mobile only. Desktop always shows the tree. -->

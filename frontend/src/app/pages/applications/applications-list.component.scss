@@ -1,11 +1,5 @@
-/* The body (head and table) stays centered at normal width. The tree sits in
-   the left margin outside the body (breakout), like the budget tab. */
-.apps__head {
-  width: 100%;
-  max-width: var(--layout-max-width);
-  margin-inline: auto;
-  margin-bottom: var(--space-5);
-}
+/* The body (table) stays centered at normal width. The tree sits in the left
+   margin outside the body (breakout), like the budget tab. */
 .apps__layout {
   display: grid;
   grid-template-columns:
@@ -31,9 +25,6 @@
 @media (max-width: 60rem) {
   .apps__layout {
     grid-template-columns: minmax(11rem, 14rem) minmax(0, 1fr);
-  }
-  .apps__head {
-    max-width: none;
   }
 }
 @media (max-width: 40rem) {

@@ -1,8 +1,5 @@
 <section class="flex flex-col gap-6">
-  <header class="users__head">
-    <h1>{{ 'admin.users.title' | t }}</h1>
-    <p class="text-muted">{{ 'admin.users.subtitle' | t }}</p>
-  </header>
+  <app-page-header [title]="'admin.users.title' | t" [subtitle]="'admin.users.subtitle' | t" />
 
   <form class="users__search" (submit)="$event.preventDefault(); search()" role="search">
     <label class="users__search-lbl" for="user-search">{{ 'admin.users.search' | t }}</label>

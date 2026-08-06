@@ -21,18 +21,8 @@
     }
     @if (vote(); as v) {
       <section class="vote">
-        <header class="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <h1 class="m-0">{{ 'voting.cast.heading' | t }}</h1>
-            <p class="mt-1 text-muted text-sm">
-              {{ majorityKey() | t }}
-              @if (v.config.quorum) {
-                · {{ 'vote.tally.quorum' | t }} {{ v.config.quorum.value
-                }}{{ v.config.quorum.type === 'percent' ? '%' : '' }}
-              }
-            </p>
-          </div>
-          <div class="inline-flex gap-2 flex-wrap">
+        <app-page-header [title]="'voting.cast.heading' | t" [subtitle]="subtitle()">
+          <div actions class="inline-flex gap-2 flex-wrap">
             @if (isOpen()) {
               <app-badge variant="success">{{ 'vote.option.yes' | t }}</app-badge>
             }
@@ -49,7 +39,7 @@
               <app-badge variant="info">{{ 'voting.cast.delegation.badge' | t }}</app-badge>
             }
           </div>
-        </header>
+        </app-page-header>
 
         @if (delegation(); as deleg) {
           @if (deleg.blocked) {

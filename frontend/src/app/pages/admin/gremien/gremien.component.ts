@@ -17,6 +17,7 @@ import {
   type SelectOption,
 } from '@stupa-makers/ui-kit';
 import { ToastService } from '@stupa-makers/ui-kit';
+import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { AdminApiService } from '../admin-api.service';
 import {
   CD_VARIANTS,
@@ -86,6 +87,7 @@ function parseRecipients(raw: string): string[] {
     DataTableComponent,
     CellDirective,
     IconComponent,
+    PageHeaderComponent,
   ],
   templateUrl: './gremien.component.html',
   styleUrl: './gremien.component.scss',

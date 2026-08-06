@@ -3,11 +3,12 @@
   flex-direction: column;
   gap: var(--space-5);
 }
-.det__head {
+/* Summary block below the page header. It carries the centering itself, so the
+   status line and the fact grid align with the center column. */
+.det__summary {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  /* Center at body width, so the header aligns with the center column. */
   width: 100%;
   max-width: var(--layout-max-width);
   margin-inline: auto;

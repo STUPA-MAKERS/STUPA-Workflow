@@ -15,6 +15,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
+import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import {
   BadgeComponent,
   ButtonComponent,
@@ -175,6 +176,7 @@ interface DayGroup {
     DatepickerComponent,
     IconComponent,
     SelectComponent,
+    PageHeaderComponent,
   ],
   templateUrl: './audit-log.component.html',
   styleUrl: './audit-log.component.scss',

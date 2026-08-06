@@ -7,6 +7,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { ProblemDetail, Vote } from '@core/api/models';
+import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { BadgeComponent } from '@stupa-makers/ui-kit';
 import { ButtonComponent } from '@stupa-makers/ui-kit';
 import { CardComponent } from '@stupa-makers/ui-kit';
@@ -30,7 +31,15 @@ type Phase = 'loading' | 'error' | 'ready';
   selector: 'app-vote-cast',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, BadgeComponent, ButtonComponent, CardComponent, TranslatePipe, VoteBarsComponent],
+  imports: [
+    RouterLink,
+    BadgeComponent,
+    ButtonComponent,
+    CardComponent,
+    PageHeaderComponent,
+    TranslatePipe,
+    VoteBarsComponent,
+  ],
   templateUrl: './vote-cast.component.html',
   styleUrl: './vote-cast.component.scss',
 })
@@ -71,6 +80,14 @@ export class VoteCastComponent {
   readonly resultKey = computed(
     () => `vote.result.${this.vote()?.result ?? 'tie'}` as TranslationKey,
   );
+  /** Page-header subtitle: the majority rule, plus the quorum when the vote has one. */
+  readonly subtitle = computed(() => {
+    const majority = this.i18n.translate(this.majorityKey());
+    const quorum = this.vote()?.config.quorum;
+    if (!quorum) return majority;
+    const unit = quorum.type === 'percent' ? '%' : '';
+    return `${majority} · ${this.i18n.translate('vote.tally.quorum')} ${quorum.value}${unit}`;
+  });
 
   constructor() {
     const id = this.route.snapshot.paramMap.get('id');

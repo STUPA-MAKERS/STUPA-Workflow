@@ -13,7 +13,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -40,6 +40,7 @@ import {
   TimeInputComponent,
 } from '@stupa-makers/ui-kit';
 import type { TranslationKey } from '@core/i18n/translations';
+import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { MeetingAgendaService } from './meeting-agenda.service';
 import { MeetingAttendanceTableComponent } from './meeting-attendance-table.component';
 import { MeetingBeamerComponent } from './meeting-beamer.component';
@@ -85,7 +86,6 @@ import {
   ],
   imports: [
     FormsModule,
-    RouterLink,
     TranslatePipe,
     BadgeComponent,
     ButtonComponent,
@@ -97,6 +97,7 @@ import {
     DialogComponent,
     IconComponent,
     LocalizedDatePipe,
+    PageHeaderComponent,
     MeetingDelegationCardComponent,
     MeetingAttendanceTableComponent,
     MeetingBeamerComponent,

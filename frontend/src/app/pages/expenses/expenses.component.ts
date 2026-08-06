@@ -50,6 +50,7 @@ import {
 import { SimplifyPathPipe } from '@shared/budget-path';
 import { downloadBlob } from '@shared/download.util';
 import { HScrollSyncDirective } from '@shared/h-scroll-sync.directive';
+import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { PressSelectDirective } from '@shared/press-select.directive';
 import { ExpenseDialogsState } from './expense-dialogs.state';
 import { ExpenseSubBookingsState } from './expense-sub-bookings.state';
@@ -67,6 +68,7 @@ import { ExpensesListState, type ExpenseSortField } from './expenses-list.state'
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    PageHeaderComponent,
     FormsModule,
     LocalizedDatePipe,
     TranslatePipe,

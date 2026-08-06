@@ -1,8 +1,5 @@
 <section class="flex flex-col gap-7">
-  <header class="admin-home__head">
-    <h1>{{ 'admin.home.title' | t }}</h1>
-    <p class="text-muted">{{ 'admin.home.subtitle' | t }}</p>
-  </header>
+  <app-page-header [title]="'admin.home.title' | t" [subtitle]="'admin.home.subtitle' | t" />
 
   <div class="admin-home__grid">
     @for (tile of visibleTiles(); track tile.link) {

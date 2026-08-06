@@ -1,8 +1,8 @@
 <section class="cal">
-  <header class="cal__head">
-    <h1>{{ 'account.calendar.title' | t }}</h1>
-    <p class="m-0 text-muted">{{ 'account.calendar.intro' | t }}</p>
-  </header>
+  <app-page-header
+    [title]="'account.calendar.title' | t"
+    [subtitle]="'account.calendar.intro' | t"
+  />
 
   @if (error()) {
     <p class="text-danger m-0" role="alert">{{ 'account.calendar.error' | t }}</p>

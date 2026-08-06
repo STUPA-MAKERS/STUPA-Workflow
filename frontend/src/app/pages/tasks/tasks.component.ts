@@ -10,6 +10,7 @@ import {
   type ColumnDef,
   DataTableComponent,
 } from '@stupa-makers/ui-kit';
+import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 
 /**
  * Tasks: applications that wait for a decision from the role of the user. These are the
@@ -20,7 +21,13 @@ import {
   selector: 'app-tasks',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, BadgeComponent, DataTableComponent, CellDirective],
+  imports: [
+    TranslatePipe,
+    BadgeComponent,
+    DataTableComponent,
+    CellDirective,
+    PageHeaderComponent,
+  ],
   templateUrl: './tasks.component.html',
   styleUrl: './tasks.component.scss',
 })

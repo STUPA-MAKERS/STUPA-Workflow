@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
+import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import {
   BadgeComponent,
   ButtonComponent,
@@ -42,6 +43,7 @@ function emptyHook(): WebhookConfig {
     DialogComponent,
     IconComponent,
     InputComponent,
+    PageHeaderComponent,
   ],
   templateUrl: './webhooks.component.html',
   styleUrl: './config.shared.scss',

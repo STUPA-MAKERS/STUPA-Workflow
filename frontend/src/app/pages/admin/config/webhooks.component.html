@@ -1,11 +1,7 @@
 <section class="cfg">
-  <header class="cfg__head">
-    <div>
-      <h1>{{ 'admin.webhook.title' | t }}</h1>
-      <p class="cfg__desc">{{ 'admin.webhook.desc' | t }}</p>
-    </div>
-    <app-button size="sm" (click)="openAdd()">{{ 'admin.webhook.add' | t }}</app-button>
-  </header>
+  <app-page-header [title]="'admin.webhook.title' | t" [subtitle]="'admin.webhook.desc' | t">
+    <app-button actions size="sm" (click)="openAdd()">{{ 'admin.webhook.add' | t }}</app-button>
+  </app-page-header>
 
   <app-data-table [columns]="columns()" [rows]="hooks()" [emptyText]="'admin.webhook.none' | t">
     <ng-template appCell="active" let-h>

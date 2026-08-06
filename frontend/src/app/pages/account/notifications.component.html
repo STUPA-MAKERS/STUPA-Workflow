@@ -1,8 +1,8 @@
 <section class="notif">
-  <header class="notif__head">
-    <h1>{{ 'account.notifications.title' | t }}</h1>
-    <p class="m-0 text-muted">{{ 'account.notifications.intro' | t }}</p>
-  </header>
+  <app-page-header
+    [title]="'account.notifications.title' | t"
+    [subtitle]="'account.notifications.intro' | t"
+  />
 
   @if (error()) {
     <p class="text-danger m-0" role="alert">{{ $any(error()) | t }}</p>

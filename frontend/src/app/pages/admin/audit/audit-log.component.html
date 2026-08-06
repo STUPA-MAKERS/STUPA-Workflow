@@ -1,10 +1,6 @@
 <section class="audit">
-  <header class="flex justify-between items-start gap-3 flex-wrap">
-    <div>
-      <h1>{{ 'admin.audit.title' | t }}</h1>
-      <p class="text-muted text-sm mt-1">{{ 'admin.audit.desc' | t }}</p>
-    </div>
-    <app-filter-bar [live]="true" [activeCount]="activeFilterCount()" (reset)="resetFilters()">
+  <app-page-header [title]="'admin.audit.title' | t" [subtitle]="'admin.audit.desc' | t">
+    <app-filter-bar actions [live]="true" [activeCount]="activeFilterCount()" (reset)="resetFilters()">
       <app-select
         [label]="'admin.audit.filter.action' | t"
         [placeholder]="'admin.audit.filter.allActions' | t"
@@ -26,7 +22,7 @@
         <app-datepicker [ngModel]="until()" (ngModelChange)="setUntil($event)" />
       </app-filter-field>
     </app-filter-bar>
-  </header>
+  </app-page-header>
 
   @if (loadError()) {
     <p class="audit__status--error text-muted text-center" role="alert">{{ 'admin.audit.error' | t }}</p>

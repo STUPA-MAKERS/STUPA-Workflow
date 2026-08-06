@@ -917,7 +917,8 @@ export interface OAuthGrant {
   clientId: string;
   scope: string;
   createdAt: IsoDateTime | null;
-  accessExpiresAt: IsoDateTime;
+  /** `null` means the access token never expires. Only a revocation ends it. */
+  accessExpiresAt: IsoDateTime | null;
   refreshExpiresAt: IsoDateTime | null;
 }
 

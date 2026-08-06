@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
+import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { ButtonComponent, CheckboxComponent } from '@stupa-makers/ui-kit';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -19,7 +20,7 @@ import type { NotificationSettings } from '../admin.models';
   selector: 'app-notification-settings',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, ButtonComponent, CheckboxComponent],
+  imports: [FormsModule, TranslatePipe, ButtonComponent, CheckboxComponent, PageHeaderComponent],
   templateUrl: './notification-settings.component.html',
   styleUrl: './notification-settings.component.scss',
 })

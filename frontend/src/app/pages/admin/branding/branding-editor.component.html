@@ -1,14 +1,13 @@
 @if (draft(); as d) {
   <section class="flex flex-col gap-5">
-    <header class="flex items-center justify-between gap-4 flex-wrap">
-      <h1>{{ 'admin.brand.title' | t }}</h1>
-      <div class="inline-flex gap-2">
+    <app-page-header [title]="'admin.brand.title' | t">
+      <div actions class="inline-flex gap-2">
         <span class="py-1 px-3 rounded-full text-xs font-semibold bg-surface-sunken text-muted">{{ 'admin.brand.version' | t: { n: version() } }}</span>
         @if (hasDraftChanges()) {
           <span class="py-1 px-3 rounded-full text-xs font-semibold bg-surface-sunken text-muted bg-warning-subtle text-warning">{{ 'admin.brand.draftDirty' | t }}</span>
         }
       </div>
-    </header>
+    </app-page-header>
 
     <p class="br__desc">{{ 'admin.brand.desc' | t }}</p>
 

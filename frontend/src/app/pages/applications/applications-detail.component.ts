@@ -43,6 +43,7 @@ import { CostCentreTreeComponent } from '../budget/cost-centre-tree.component';
 import { MarkdownViewComponent } from '@shared/markdown/markdown-view.component';
 import { AttachmentsPanelComponent } from './attachments-panel.component';
 import { applicationTitle, formatFieldValue } from './applications.util';
+import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 
 /** Comparison offer / cost position for the structured detail view. */
 interface DetailOffer {
@@ -70,6 +71,7 @@ interface DetailPosition {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    PageHeaderComponent,
     FormsModule,
     FormlyForm,
     LocalizedDatePipe,

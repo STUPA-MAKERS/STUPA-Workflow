@@ -13,6 +13,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { LiveVoteService, type LiveVoteSession } from '@core/ws/live-vote.service';
+import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { BadgeComponent } from '@stupa-makers/ui-kit';
 import { ButtonComponent } from '@stupa-makers/ui-kit';
 import { VoteBarsComponent } from './vote-bars.component';
@@ -28,7 +29,14 @@ import { VoteBarsComponent } from './vote-bars.component';
   selector: 'app-live-vote',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, BadgeComponent, ButtonComponent, TranslatePipe, VoteBarsComponent],
+  imports: [
+    RouterLink,
+    BadgeComponent,
+    ButtonComponent,
+    PageHeaderComponent,
+    TranslatePipe,
+    VoteBarsComponent,
+  ],
   templateUrl: './live-vote.component.html',
   styleUrl: './live-vote.component.scss',
 })

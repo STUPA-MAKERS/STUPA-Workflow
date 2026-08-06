@@ -1,8 +1,8 @@
 <section class="grants">
-  <header class="grants__head">
-    <h1>{{ 'account.grants.title' | t }}</h1>
-    <p class="m-0 text-muted">{{ 'account.grants.intro' | t }}</p>
-  </header>
+  <app-page-header
+    [title]="'account.grants.title' | t"
+    [subtitle]="'account.grants.intro' | t"
+  />
 
   @if (canUseMcp()) {
     <section class="card mcp">

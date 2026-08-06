@@ -4,25 +4,6 @@
   gap: var(--space-5);
 }
 
-.fe__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  flex-wrap: wrap;
-}
-
-.fe__head-left {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-}
-
-
-.fe__title {
-  margin: 0;
-}
-
 .fe__head-tools {
   display: flex;
   gap: var(--space-3);

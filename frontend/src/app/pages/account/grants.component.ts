@@ -5,6 +5,7 @@ import { AuthService } from '@core/auth/auth.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { IconComponent } from '@stupa-makers/ui-kit';
 import { downloadBlob } from '@shared/download.util';
+import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 
 /**
  * Account API access page.
@@ -17,7 +18,7 @@ import { downloadBlob } from '@shared/download.util';
   selector: 'app-account-grants',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, IconComponent],
+  imports: [TranslatePipe, IconComponent, PageHeaderComponent],
   templateUrl: './grants.component.html',
   styleUrl: './grants.component.scss',
 })

@@ -6,6 +6,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { I18nService } from '@core/i18n/i18n.service';
 import type { TranslationKey } from '@core/i18n/translations';
 import { CheckboxComponent } from '@stupa-makers/ui-kit';
+import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 
 /**
  * Account notification preferences page.
@@ -18,7 +19,7 @@ import { CheckboxComponent } from '@stupa-makers/ui-kit';
   selector: 'app-account-notifications',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, CheckboxComponent],
+  imports: [FormsModule, TranslatePipe, CheckboxComponent, PageHeaderComponent],
   templateUrl: './notifications.component.html',
   styleUrl: './notifications.component.scss',
 })

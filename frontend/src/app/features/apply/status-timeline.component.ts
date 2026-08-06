@@ -22,6 +22,7 @@ import type {
 import { resolveI18n } from '@shared/forms/i18n-text';
 import { toFormlyFields } from '@shared/forms/formly-mapper';
 import { isFieldVisible } from '@shared/forms/jsonlogic';
+import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { BadgeComponent } from '@stupa-makers/ui-kit';
 import { CardComponent } from '@stupa-makers/ui-kit';
 import { ButtonComponent } from '@stupa-makers/ui-kit';
@@ -59,6 +60,7 @@ interface ReadonlyRow {
     ButtonComponent,
     DialogComponent,
     IconComponent,
+    PageHeaderComponent,
     AttachmentsPanelComponent,
     TranslatePipe,
   ],

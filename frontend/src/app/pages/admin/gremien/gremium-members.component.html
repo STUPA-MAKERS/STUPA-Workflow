@@ -1,11 +1,10 @@
 
-<header class="flex items-center justify-between gap-4 flex-wrap">
-  <div>
-    <h1 class="m-0">{{ 'admin.gremien.membersOf' | t }}: {{ gremium()?.name ?? '…' }}</h1>
-    <p class="text-muted mt-1">{{ 'admin.gremien.membersHint' | t }}</p>
-  </div>
-  <app-button size="sm" (click)="openAdd()">{{ 'admin.gremien.addMember' | t }}</app-button>
-</header>
+<app-page-header
+  [title]="('admin.gremien.membersOf' | t) + ': ' + (gremium()?.name ?? '…')"
+  [subtitle]="'admin.gremien.membersHint' | t"
+>
+  <app-button actions size="sm" (click)="openAdd()">{{ 'admin.gremien.addMember' | t }}</app-button>
+</app-page-header>
 
 <app-data-table [columns]="columns()" [rows]="members()" [rowKey]="rowId" [emptyText]="'admin.gremien.membersEmpty' | t">
   <ng-template appCell="email" let-m>{{ $any(m).email || '—' }}</ng-template>

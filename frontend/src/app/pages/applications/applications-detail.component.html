@@ -7,26 +7,28 @@
     {{ 'applications.detail.error' | t }}
   </p>
 } @else if (app(); as application) {
-  <header class="det__head">
-    <div class="flex items-start justify-between gap-4 flex-wrap">
-      <h1 class="m-0">{{ title() }}</h1>
+  <app-page-header [title]="title()">
+    <div actions class="det__ownerActions">
       @if ((application.canEdit || canForceStatus()) && !editing()) {
-        <div class="det__ownerActions">
-          @if (application.canEdit && application.state?.editAllowed) {
-            <app-button variant="secondary" size="sm" (click)="startEdit(application)">{{ 'applications.detail.edit' | t }}</app-button>
-          }
-          @if (canForceStatus()) {
-            <app-button variant="secondary" size="sm" (click)="openForceDialog()">{{ 'applications.detail.forceStatus' | t }}</app-button>
-          }
-          @if (isAdmin()) {
-            <app-button variant="danger" size="sm" (click)="confirmDelete.set(true)">{{ 'applications.detail.delete' | t }}</app-button>
-          }
-          @if (application.isOwner && !application.applicant?.anonymized) {
-            <app-button variant="danger" size="sm" (click)="confirmErase.set(true)">{{ 'applications.detail.eraseRequest' | t }}</app-button>
-          }
-        </div>
+        @if (application.canEdit && application.state?.editAllowed) {
+          <app-button variant="secondary" size="sm" (click)="startEdit(application)">{{ 'applications.detail.edit' | t }}</app-button>
+        }
+        @if (canForceStatus()) {
+          <app-button variant="secondary" size="sm" (click)="openForceDialog()">{{ 'applications.detail.forceStatus' | t }}</app-button>
+        }
+        @if (isAdmin()) {
+          <app-button variant="danger" size="sm" (click)="confirmDelete.set(true)">{{ 'applications.detail.delete' | t }}</app-button>
+        }
+        @if (application.isOwner && !application.applicant?.anonymized) {
+          <app-button variant="danger" size="sm" (click)="confirmErase.set(true)">{{ 'applications.detail.eraseRequest' | t }}</app-button>
+        }
       }
     </div>
+  </app-page-header>
+
+  <!-- Status, budget and the fact grid. They sit below the page header and keep
+       the body width of the center column. -->
+  <section class="det__summary">
     <div class="det__meta">
       @if (application.state) {
         <app-badge [color]="application.state.color">
@@ -83,7 +85,7 @@
         <dd>{{ amount(application) }}</dd>
       </div>
     </dl>
-  </header>
+  </section>
 
   <div class="det__layout" [class.det__layout--editing]="editing()">
   <aside class="det__rail det__rail--left">

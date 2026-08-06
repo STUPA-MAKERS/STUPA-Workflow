@@ -1,61 +1,59 @@
-<header class="mtg__head" [class.mtg__head--detail]="meeting()">
-  <div class="mtg__headRow">
-    <h1 class="mtg__title">{{ 'meetings.title' | t }}</h1>
+<app-page-header [title]="'meetings.title' | t">
+  <div actions class="mtg__headActions">
     @if (!meeting()) {
-      <div class="mtg__headActions">
-        <!-- Debounced live search. It collapses the timeline into one relevance-sorted list. -->
-        @if (showOverview()) {
-          <input
-            class="mtg__headSearch"
-            type="search"
-            [placeholder]="'meetings.list.searchPlaceholder' | t"
-            [attr.aria-label]="'meetings.list.searchPlaceholder' | t"
-            [ngModel]="searchQuery()"
-            (ngModelChange)="onSearch($event)"
-            name="meetingSearch"
-          />
-        }
-        @if (showOverview() && filterGremiumOptions().length > 2) {
-          <app-select
-            class="mtg__headFilter"
-            name="gremiumFilter"
-            [ariaLabel]="'meetings.list.committeeFilter' | t"
-            [options]="filterGremiumOptions()"
-            [ngModel]="gremiumFilter()"
-            (ngModelChange)="selectGremiumFilter($event)"
-          />
-        }
-        @if (canCreate()) {
-          <app-button size="sm" (click)="openCreate()">
-            <span class="inline-flex items-center gap-2"><app-icon name="add" [size]="16" /> {{ 'meetings.list.new' | t }}</span>
-          </app-button>
-        }
-      </div>
+      <!-- Debounced live search. It collapses the timeline into one relevance-sorted list. -->
+      @if (showOverview()) {
+        <input
+          class="mtg__headSearch"
+          type="search"
+          [placeholder]="'meetings.list.searchPlaceholder' | t"
+          [attr.aria-label]="'meetings.list.searchPlaceholder' | t"
+          [ngModel]="searchQuery()"
+          (ngModelChange)="onSearch($event)"
+          name="meetingSearch"
+        />
+      }
+      @if (showOverview() && filterGremiumOptions().length > 2) {
+        <app-select
+          class="mtg__headFilter"
+          name="gremiumFilter"
+          [ariaLabel]="'meetings.list.committeeFilter' | t"
+          [options]="filterGremiumOptions()"
+          [ngModel]="gremiumFilter()"
+          (ngModelChange)="selectGremiumFilter($event)"
+        />
+      }
+      @if (canCreate()) {
+        <app-button size="sm" (click)="openCreate()">
+          <span class="inline-flex items-center gap-2"><app-icon name="add" [size]="16" /> {{ 'meetings.list.new' | t }}</span>
+        </app-button>
+      }
     }
   </div>
-  @if (meeting(); as m) {
-    <div class="mtg__meta">
-      <span class="font-semibold">{{ m.title }}</span>
-      @if (m.date) {
-        <span class="text-text-muted">{{ m.date | ldate: 'mediumDate' }}{{ m.startTime ? ', ' + m.startTime : '' }}</span>
-      }
-      <app-badge [variant]="statusVariant(m.status)">
-        {{ statusKey(m.status) | t }}
-      </app-badge>
-      @if (m.protokollantName) {
-        <span class="text-text-muted">{{ 'meetings.protokollant.label' | t }}: {{ m.protokollantName }}</span>
-      }
-      <app-button
-        variant="ghost"
-        size="sm"
-        class="mtg__beamerToggle"
-        (click)="beamerMode.set(!beamerMode())"
-      >
-        {{ (beamerMode() ? 'meetings.beamer.exit' : 'meetings.beamer.enter') | t }}
-      </app-button>
-    </div>
-  }
-</header>
+</app-page-header>
+
+@if (meeting(); as m) {
+  <div class="mtg__meta">
+    <span class="font-semibold">{{ m.title }}</span>
+    @if (m.date) {
+      <span class="text-text-muted">{{ m.date | ldate: 'mediumDate' }}{{ m.startTime ? ', ' + m.startTime : '' }}</span>
+    }
+    <app-badge [variant]="statusVariant(m.status)">
+      {{ statusKey(m.status) | t }}
+    </app-badge>
+    @if (m.protokollantName) {
+      <span class="text-text-muted">{{ 'meetings.protokollant.label' | t }}: {{ m.protokollantName }}</span>
+    }
+    <app-button
+      variant="ghost"
+      size="sm"
+      class="mtg__beamerToggle"
+      (click)="beamerMode.set(!beamerMode())"
+    >
+      {{ (beamerMode() ? 'meetings.beamer.exit' : 'meetings.beamer.enter') | t }}
+    </app-button>
+  </div>
+}
 
 @if (showForbidden()) {
   <p class="mtg__status" role="alert">{{ 'rbac.forbidden' | t }}</p>

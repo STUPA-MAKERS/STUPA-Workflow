@@ -4,20 +4,6 @@
   gap: var(--space-4);
 }
 
-.cfg__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  flex-wrap: wrap;
-}
-
-.cfg__desc {
-  color: var(--color-text-muted);
-  font-size: var(--fs-sm);
-  margin: 0;
-}
-
 .cfg__empty {
   color: var(--color-text-muted);
 }

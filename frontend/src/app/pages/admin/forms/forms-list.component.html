@@ -1,10 +1,6 @@
-<header class="flex items-center justify-between gap-4 flex-wrap">
-  <div>
-    <h1 class="m-0">{{ 'admin.forms.listTitle' | t }}</h1>
-    <p class="text-muted mt-1">{{ 'admin.forms.listSubtitle' | t }}</p>
-  </div>
-  <app-button size="sm" (click)="openCreate()">{{ 'admin.forms.add' | t }}</app-button>
-</header>
+<app-page-header [title]="'admin.forms.listTitle' | t" [subtitle]="'admin.forms.listSubtitle' | t">
+  <app-button actions size="sm" (click)="openCreate()">{{ 'admin.forms.add' | t }}</app-button>
+</app-page-header>
 
 <section class="fl__list" [attr.aria-label]="'admin.forms.listTitle' | t">
   @if (loading()) {

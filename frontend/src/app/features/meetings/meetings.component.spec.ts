@@ -7,7 +7,7 @@ import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { Subject } from 'rxjs';
-import { of } from 'rxjs';
+import { EMPTY, of } from 'rxjs';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { USE_MOCK_API } from '@core/api/api.config';
@@ -133,6 +133,19 @@ function fakeAuth(perms: string[], userId: string | null = 'pr-1'): Partial<Auth
   };
 }
 
+/**
+ * Router double. `navigate` is the only method the component calls. The rest is
+ * the read-only surface that the breadcrumbs of `app-page-header` read.
+ */
+function routerStub(navigate: jest.Mock = jest.fn(() => Promise.resolve(true))) {
+  return {
+    navigate,
+    events: EMPTY,
+    config: [],
+    routerState: { snapshot: { root: { url: [], data: {}, firstChild: null } } },
+  };
+}
+
 async function setup(
   opts: {
     perms?: string[];
@@ -156,7 +169,7 @@ async function setup(
       { provide: USE_MOCK_API, useValue: false },
       { provide: AuthService, useValue: fakeAuth(perms, userId) },
       { provide: WsService, useValue: ws },
-      { provide: Router, useValue: { navigate } },
+      { provide: Router, useValue: routerStub(navigate) },
       {
         provide: ActivatedRoute,
         useValue: { paramMap: of(convertToParamMap(id ? { id } : {})) },
@@ -1996,7 +2009,7 @@ describe('MeetingsComponent — methods', () => {
           { provide: USE_MOCK_API, useValue: false },
           { provide: AuthService, useValue: fakeAuth([], null) },
           { provide: WsService, useValue: ws },
-          { provide: Router, useValue: { navigate } },
+          { provide: Router, useValue: routerStub(navigate) },
           { provide: ActivatedRoute, useValue: { paramMap: of(convertToParamMap({})) } },
         ],
       });
@@ -2025,7 +2038,7 @@ describe('MeetingsComponent — methods', () => {
           { provide: USE_MOCK_API, useValue: false },
           { provide: AuthService, useValue: auth },
           { provide: WsService, useValue: ws },
-          { provide: Router, useValue: { navigate: jest.fn(() => Promise.resolve(true)) } },
+          { provide: Router, useValue: routerStub() },
           { provide: ActivatedRoute, useValue: { paramMap: of(convertToParamMap({})) } },
         ],
       });
@@ -2064,7 +2077,7 @@ describe('MeetingsComponent — methods', () => {
           { provide: USE_MOCK_API, useValue: false },
           { provide: AuthService, useValue: auth },
           { provide: WsService, useValue: ws },
-          { provide: Router, useValue: { navigate: jest.fn(() => Promise.resolve(true)) } },
+          { provide: Router, useValue: routerStub() },
           { provide: ActivatedRoute, useValue: { paramMap: of(convertToParamMap({})) } },
         ],
       });
@@ -2344,7 +2357,7 @@ describe('MeetingsComponent — methods', () => {
           { provide: USE_MOCK_API, useValue: true },
           { provide: AuthService, useValue: fakeAuth(['meeting.manage', 'protocol.write']) },
           { provide: WsService, useValue: ws },
-          { provide: Router, useValue: { navigate: jest.fn(() => Promise.resolve(true)) } },
+          { provide: Router, useValue: routerStub() },
           { provide: ActivatedRoute, useValue: { paramMap: of(convertToParamMap({ id: 'm-1' })) } },
         ],
       });

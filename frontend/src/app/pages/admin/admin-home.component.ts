@@ -3,6 +3,7 @@ import { RouterLink } from '@angular/router';
 import { AuthService } from '@core/auth/auth.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
+import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { type IconName, IconComponent } from '@stupa-makers/ui-kit';
 
 interface AdminTile {
@@ -24,7 +25,7 @@ interface AdminTile {
   selector: 'app-admin-home',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, TranslatePipe, IconComponent],
+  imports: [RouterLink, TranslatePipe, IconComponent, PageHeaderComponent],
   templateUrl: './admin-home.component.html',
   styleUrl: './admin-home.component.scss',
 })

@@ -270,9 +270,9 @@ describe('VoteCastComponent', () => {
         },
       }),
     });
-    const header = container.querySelector('header p') as HTMLElement;
-    expect(header.textContent).toMatch(/Quorum\s*7/);
-    expect(header.textContent).not.toContain('7%');
+    const subtitle = container.querySelector('.ph__subtitle') as HTMLElement;
+    expect(subtitle.textContent).toMatch(/Quorum\s*7/);
+    expect(subtitle.textContent).not.toContain('7%');
   });
 
   it('does nothing when casting an already-chosen, change-locked option', async () => {

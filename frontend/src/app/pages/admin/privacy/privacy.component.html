@@ -1,7 +1,4 @@
-<header class="pv__header">
-  <h1 class="m-0">{{ 'admin.privacy.title' | t }}</h1>
-  <p class="text-muted text-sm mt-1">{{ 'admin.privacy.subtitle' | t }}</p>
-</header>
+<app-page-header [title]="'admin.privacy.title' | t" [subtitle]="'admin.privacy.subtitle' | t" />
 
 <!-- Erasure-request queue (GDPR Art. 17) -->
 <app-card [heading]="'admin.privacy.queueTitle' | t" [headingLevel]="2">
