@@ -26,6 +26,12 @@ import {
   type NotificationSettings,
   type AuditPage,
   type Branding,
+  type CdLogoSlot,
+  type CdVariant,
+  type CdVariantCreateBody,
+  type CdVariantLogo,
+  type CdVariantOption,
+  type CdVariantUpdateBody,
   type FlowGraph,
   type FormDraft,
   type FormOverviewItem,
@@ -176,6 +182,85 @@ export class AdminApiService {
       `${this.base}/admin/gremien/${id}/mail-recipients`,
       { recipients },
     );
+  }
+
+  // Corporate-design variants. Every `/admin/cd-variants` route needs
+  // P `admin.cd_variants`. The page shows its own loading indicator, so the
+  // list GET opts out of the global overlay.
+
+  /** GET /admin/cd-variants — the variants with their title and footer logos. */
+  listCdVariants(): Observable<CdVariant[]> {
+    return this.http.get<CdVariant[]>(`${this.base}/admin/cd-variants`, {
+      context: skipLoading(),
+    });
+  }
+
+  /** POST /admin/cd-variants — 409 when the key already exists. */
+  createCdVariant(body: CdVariantCreateBody): Observable<CdVariant> {
+    return this.http.post<CdVariant>(`${this.base}/admin/cd-variants`, body);
+  }
+
+  /** PATCH /admin/cd-variants/{id} — name and base variant only. The key is immutable. */
+  updateCdVariant(id: Uuid, body: CdVariantUpdateBody): Observable<CdVariant> {
+    return this.http.patch<CdVariant>(`${this.base}/admin/cd-variants/${id}`, body);
+  }
+
+  /** DELETE /admin/cd-variants/{id} — 409 while a gremium still references it. */
+  deleteCdVariant(id: Uuid): Observable<void> {
+    return this.http.delete<void>(`${this.base}/admin/cd-variants/${id}`);
+  }
+
+  /** POST /admin/cd-variants/{id}/logos — multipart upload into a slot. */
+  uploadCdVariantLogo(id: Uuid, slot: CdLogoSlot, file: File): Observable<CdVariantLogo> {
+    const form = new FormData();
+    form.append('slot', slot);
+    form.append('file', file);
+    return this.http.post<CdVariantLogo>(`${this.base}/admin/cd-variants/${id}/logos`, form);
+  }
+
+  /** POST /admin/cd-variants/{id}/logos/vendored — append a logo that pytex ships. */
+  addCdVariantVendoredLogo(
+    id: Uuid,
+    slot: CdLogoSlot,
+    vendoredName: string,
+  ): Observable<CdVariantLogo> {
+    return this.http.post<CdVariantLogo>(`${this.base}/admin/cd-variants/${id}/logos/vendored`, {
+      slot,
+      vendoredName,
+    });
+  }
+
+  /** PUT /admin/cd-variants/{id}/logos/order — full new order of ONE slot. */
+  reorderCdVariantLogos(
+    id: Uuid,
+    slot: CdLogoSlot,
+    logoIds: Uuid[],
+  ): Observable<CdVariantLogo[]> {
+    return this.http.put<CdVariantLogo[]>(`${this.base}/admin/cd-variants/${id}/logos/order`, {
+      slot,
+      logoIds,
+    });
+  }
+
+  /** DELETE /admin/cd-variant-logos/{id} — an uploaded object goes with the entry. */
+  deleteCdVariantLogo(logoId: Uuid): Observable<void> {
+    return this.http.delete<void>(`${this.base}/admin/cd-variant-logos/${logoId}`);
+  }
+
+  /** Download URL of an uploaded logo. The server always answers `attachment`. */
+  cdVariantLogoFileUrl(logoId: Uuid): string {
+    return `${this.base}/admin/cd-variant-logos/${logoId}/file`;
+  }
+
+  /**
+   * GET /cd-variants — slim list (id, key, name) as the source of the gremium
+   * dropdown. `admin.gremien` is enough for it, `admin.cd_variants` is not needed.
+   */
+  listCdVariantOptions(): Observable<CdVariantOption[]> {
+    if (this.mock) return of(structuredCopy(MOCK_CD_VARIANT_OPTIONS));
+    return this.http.get<CdVariantOption[]>(`${this.base}/cd-variants`, {
+      context: skipLoading(),
+    });
   }
 
   listRoles(): Observable<Role[]> {
@@ -827,6 +912,12 @@ function hashString(value: string): number {
   for (let i = 0; i < value.length; i++) h = (Math.imul(31, h) + value.charCodeAt(i)) | 0;
   return h;
 }
+
+/** CD-variant stubs for mock mode — the real list comes from the backend. */
+const MOCK_CD_VARIANT_OPTIONS: CdVariantOption[] = [
+  { id: 'cd-stupa', key: 'stupa', name: 'StuPa' },
+  { id: 'cd-asta', key: 'asta', name: 'AStA' },
+];
 
 /** Application-type stubs for mock mode — real types come from the backend. */
 const MOCK_APP_TYPE_OPTIONS: ApplicationTypeOption[] = [

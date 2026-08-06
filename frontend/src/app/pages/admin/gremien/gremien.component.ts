@@ -20,7 +20,7 @@ import { ToastService } from '@stupa-makers/ui-kit';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { AdminApiService } from '../admin-api.service';
 import {
-  CD_VARIANTS,
+  type CdVariantOption,
   type Gremium,
   type GremiumCreateBody,
   type GremiumUpdateBody,
@@ -30,7 +30,8 @@ import {
 /** Edit form state of a gremium. The page builds the slug automatically. */
 interface GremiumForm {
   name: string;
-  cdVariant: string;
+  /** Id of the chosen CD variant. `''` = none, which sends `null`. */
+  cdVariantId: string;
   defaultLang: string;
   allowVoteDelegation: boolean;
   /** Lead time in minutes before meeting start for non-pool delegations. */
@@ -46,7 +47,7 @@ interface GremiumForm {
 function emptyForm(): GremiumForm {
   return {
     name: '',
-    cdVariant: 'stupa',
+    cdVariantId: '',
     defaultLang: 'de',
     allowVoteDelegation: false,
     delegationLeadMinutes: 0,
@@ -106,6 +107,8 @@ export class AdminGremienComponent {
   readonly form = signal<GremiumForm>(emptyForm());
   readonly confirmDelete = signal<Gremium | null>(null);
   readonly deleting = signal(false);
+  /** CD variants from `GET /cd-variants` — the source of the dropdown. */
+  readonly cdVariants = signal<CdVariantOption[]>([]);
 
   readonly columns = computed<ColumnDef[]>(() => [
     { key: 'name', label: this.i18n.translate('admin.gremien.name') },
@@ -117,7 +120,9 @@ export class AdminGremienComponent {
   ]);
   readonly rowId = (g: unknown): string => (g as Gremium).id;
 
-  readonly cdOptions: SelectOption[] = CD_VARIANTS.map((v) => ({ value: v, label: v }));
+  readonly cdOptions = computed<SelectOption[]>(() =>
+    this.cdVariants().map((v) => ({ value: v.id, label: v.name })),
+  );
   readonly langOptions = computed<SelectOption[]>(() => [
     { value: 'de', label: this.i18n.translate('admin.gremien.langDe') },
     { value: 'en', label: this.i18n.translate('admin.gremien.langEn') },
@@ -127,6 +132,16 @@ export class AdminGremienComponent {
 
   constructor() {
     this.reload();
+    this.api.listCdVariantOptions().subscribe({
+      next: (v) => this.cdVariants.set(v),
+      error: () => this.cdVariants.set([]),
+    });
+  }
+
+  /** Resolve a gremium's CD-variant id to its name. Never show the raw id. */
+  cdVariantName(g: Gremium): string {
+    const hit = this.cdVariants().find((v) => v.id === g.cdVariantId);
+    return hit ? hit.name : '—';
   }
 
   patch<K extends keyof GremiumForm>(key: K, value: GremiumForm[K]): void {
@@ -164,7 +179,7 @@ export class AdminGremienComponent {
     this.editingId.set(g.id);
     this.form.set({
       name: g.name,
-      cdVariant: g.cdVariant,
+      cdVariantId: g.cdVariantId ?? '',
       defaultLang: g.defaultLang,
       allowVoteDelegation: g.allowVoteDelegation,
       delegationLeadMinutes: g.delegationLeadMinutes ?? 0,
@@ -193,7 +208,7 @@ export class AdminGremienComponent {
     if (id) {
       const body: GremiumUpdateBody = {
         name: f.name.trim(),
-        cdVariant: f.cdVariant,
+        cdVariantId: f.cdVariantId || null,
         defaultLang: f.defaultLang,
         allowVoteDelegation: f.allowVoteDelegation,
         delegationLeadMinutes: f.delegationLeadMinutes,
@@ -208,7 +223,7 @@ export class AdminGremienComponent {
       const body: GremiumCreateBody = {
         name: f.name.trim(),
         slug: slugify(f.name) || f.name.trim().toLowerCase(),
-        cdVariant: f.cdVariant,
+        cdVariantId: f.cdVariantId || null,
         defaultLang: f.defaultLang,
         allowVoteDelegation: f.allowVoteDelegation,
         delegationLeadMinutes: f.delegationLeadMinutes,

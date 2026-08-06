@@ -41,6 +41,7 @@ export class AdminHomeComponent {
     { link: 'forms', title: 'admin.home.formBuilder', desc: 'admin.home.formBuilderDesc', icon: 'form', permissions: ['form.configure'] },
     { link: 'flow', title: 'admin.home.flowEditor', desc: 'admin.home.flowEditorDesc', icon: 'flow', permissions: ['flow.configure'] },
     { link: 'branding', title: 'admin.home.branding', desc: 'admin.home.brandingDesc', icon: 'palette', permissions: ['admin.site'] },
+    { link: 'cd-variants', title: 'admin.cdVariants.title', desc: 'admin.home.cdVariantsDesc', icon: 'document', permissions: ['admin.cd_variants'] },
     { link: 'webhooks', title: 'admin.home.webhooks', desc: 'admin.home.webhooksDesc', icon: 'webhook', permissions: ['webhook.manage'] },
     { link: 'delegations', title: 'admin.home.delegations', desc: 'admin.home.delegationsDesc', icon: 'repeat', permissions: ['admin.delegations'] },
     { link: 'audit', title: 'admin.audit.title', desc: 'admin.audit.desc', icon: 'audit', permissions: ['audit.read'] },

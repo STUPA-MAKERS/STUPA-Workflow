@@ -30,7 +30,7 @@ const MEMBERSHIPS: GremiumMembership[] = [
 function makeApi(over: Partial<Record<string, jest.Mock>> = {}) {
   return {
     listGremien: jest.fn(() =>
-      of([{ id: 'g-1', name: 'StuPa', slug: 'stupa', cdVariant: 'stupa', defaultLang: 'de', allowVoteDelegation: false }]),
+      of([{ id: 'g-1', name: 'StuPa', slug: 'stupa', cdVariantId: 'cd-stupa', defaultLang: 'de', allowVoteDelegation: false }]),
     ),
     listGremiumRoles: jest.fn(() => of([...ROLES])),
     listPrincipals: jest.fn(() => of([...PRINCIPALS])),

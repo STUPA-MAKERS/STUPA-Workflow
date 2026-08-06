@@ -1,0 +1,247 @@
+<app-page-header
+  [title]="'admin.cdVariants.title' | t"
+  [subtitle]="'admin.cdVariants.subtitle' | t"
+>
+  <app-button actions size="sm" (click)="openCreate()">{{ 'admin.cdVariants.add' | t }}</app-button>
+</app-page-header>
+
+<section class="cdv__list" [attr.aria-label]="'admin.cdVariants.title' | t">
+  @if (loading()) {
+    <p class="text-muted py-4" aria-live="polite">{{ 'admin.cdVariants.loading' | t }}</p>
+  } @else if (loadError()) {
+    <p class="text-muted py-4 text-danger" role="alert">{{ 'admin.cdVariants.error' | t }}</p>
+  } @else {
+    <app-data-table
+      [columns]="columns()"
+      [rows]="variants()"
+      [rowKey]="rowId"
+      [isExpanded]="rowExpanded"
+      [emptyText]="'admin.cdVariants.empty' | t"
+    >
+      <ng-template appCell="name" let-v><span class="font-medium">{{ $any(v).name }}</span></ng-template>
+      <ng-template appCell="key" let-v><span class="cdv__mono">{{ $any(v).key }}</span></ng-template>
+      <ng-template appCell="baseVariant" let-v>{{ baseLabel($any(v).baseVariant) }}</ng-template>
+      <ng-template appCell="logos" let-v><span class="text-muted text-sm">{{ logoSummary($any(v)) }}</span></ng-template>
+      <ng-template appCell="actions" let-v>
+        <span class="cdv__rowActions">
+          <app-button
+            variant="ghost"
+            size="sm"
+            [iconOnly]="true"
+            [ariaLabel]="'admin.cdVariants.toggleLogos' | t"
+            [attr.aria-expanded]="isExpanded($any(v).id)"
+            (click)="toggle($any(v).id)"
+          >
+            <app-icon [name]="isExpanded($any(v).id) ? 'chevron-up' : 'chevron-down'" />
+          </app-button>
+          <app-button
+            variant="ghost"
+            size="sm"
+            [iconOnly]="true"
+            [ariaLabel]="'admin.common.edit' | t"
+            (click)="openEdit($any(v))"
+          >
+            <app-icon name="edit" />
+          </app-button>
+          <app-button
+            variant="ghost"
+            size="sm"
+            [iconOnly]="true"
+            [ariaLabel]="'admin.common.remove' | t"
+            (click)="askDelete($any(v))"
+          >
+            <app-icon name="delete" />
+          </app-button>
+        </span>
+      </ng-template>
+
+      <ng-template appRowDetail let-v>
+        <div class="cdv__detail">
+          @for (slot of slots; track slot) {
+            <section class="cdv__slot">
+              <header class="cdv__slotHead">
+                <h3 class="cdv__slotTitle">{{ slotLabel(slot) }}</h3>
+                <app-button
+                  variant="ghost"
+                  size="sm"
+                  (click)="openLogoDialog($any(v).id, slot)"
+                >
+                  <app-icon name="add" />
+                  {{ 'admin.cdVariants.addLogo' | t }}
+                </app-button>
+              </header>
+              @if (logosOf($any(v), slot); as logos) {
+                @if (logos.length) {
+                  <ol class="cdv__logos">
+                    @for (logo of logos; track logo.id; let i = $index) {
+                      <li class="cdv__logo">
+                        <span class="cdv__logoPos">{{ i + 1 }}</span>
+                        <span class="cdv__logoName">{{ logoLabel(logo) }}</span>
+                        <span class="cdv__logoKind">
+                          {{ (logo.vendoredName ? 'admin.cdVariants.vendored' : 'admin.cdVariants.uploaded') | t }}
+                        </span>
+                        @if (logo.fileName) {
+                          <a
+                            class="cdv__logoLink"
+                            [href]="fileUrl(logo)"
+                            [attr.aria-label]="'admin.cdVariants.download' | t"
+                            [attr.title]="'admin.cdVariants.download' | t"
+                            download
+                          ><app-icon name="document" /></a>
+                        }
+                        <app-button
+                          variant="ghost"
+                          size="sm"
+                          [iconOnly]="true"
+                          [disabled]="i === 0"
+                          [ariaLabel]="'admin.common.moveUp' | t"
+                          (click)="moveLogo($any(v), slot, i, -1)"
+                        >
+                          <app-icon name="chevron-up" />
+                        </app-button>
+                        <app-button
+                          variant="ghost"
+                          size="sm"
+                          [iconOnly]="true"
+                          [disabled]="i === logos.length - 1"
+                          [ariaLabel]="'admin.common.moveDown' | t"
+                          (click)="moveLogo($any(v), slot, i, 1)"
+                        >
+                          <app-icon name="chevron-down" />
+                        </app-button>
+                        <app-button
+                          variant="ghost"
+                          size="sm"
+                          [iconOnly]="true"
+                          [ariaLabel]="'admin.cdVariants.removeLogo' | t"
+                          (click)="removeLogo($any(v), logo)"
+                        >
+                          <app-icon name="delete" />
+                        </app-button>
+                      </li>
+                    }
+                  </ol>
+                } @else {
+                  <p class="cdv__slotEmpty">{{ 'admin.cdVariants.noLogos' | t }}</p>
+                }
+              }
+            </section>
+          }
+        </div>
+      </ng-template>
+    </app-data-table>
+  }
+</section>
+
+<app-dialog
+  [open]="dialogOpen()"
+  [title]="(editingId() ? 'admin.cdVariants.edit' : 'admin.cdVariants.create') | t"
+  [closeLabel]="'action.cancel' | t"
+  (closed)="closeDialog()"
+>
+  <form id="cdv-form" class="flex flex-col gap-4" (submit)="submit($event)">
+    <app-input
+      [label]="'admin.cdVariants.name' | t"
+      [required]="true"
+      name="name"
+      [ngModel]="form().name"
+      (ngModelChange)="patchName($event)"
+    />
+    <app-input
+      [label]="'admin.common.key' | t"
+      [hint]="(editingId() ? 'admin.cdVariants.keyLocked' : 'admin.cdVariants.keyHint') | t"
+      name="key"
+      [disabled]="editingId() !== null"
+      [ngModel]="form().key"
+      (ngModelChange)="patchKey($event)"
+    />
+    <app-select
+      [label]="'admin.cdVariants.base' | t"
+      [options]="baseOptions()"
+      [hint]="'admin.cdVariants.baseHint' | t"
+      name="baseVariant"
+      [ngModel]="form().baseVariant"
+      (ngModelChange)="patch('baseVariant', $event)"
+    />
+    @if (formError(); as err) {
+      <p class="cdv__error" role="alert">{{ err | t }}</p>
+    }
+  </form>
+  <div dialog-footer class="flex justify-end gap-3">
+    <app-button size="sm" variant="ghost" (click)="closeDialog()">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" [disabled]="!canSave()" [loading]="saving()" (click)="submit($event)">
+      {{ (editingId() ? 'action.save' : 'admin.common.add') | t }}
+    </app-button>
+  </div>
+</app-dialog>
+
+<app-dialog
+  [open]="logoDraft() !== null"
+  [title]="'admin.cdVariants.addLogo' | t"
+  [closeLabel]="'action.cancel' | t"
+  (closed)="closeLogoDialog()"
+>
+  @if (logoDraft(); as draft) {
+    <form class="flex flex-col gap-4" (submit)="$event.preventDefault(); saveLogo()">
+      <p class="text-sm text-muted m-0">
+        {{ 'admin.cdVariants.slot' | t }}: <strong>{{ slotLabel(draft.slot) }}</strong>
+      </p>
+      <app-select
+        [label]="'admin.cdVariants.source' | t"
+        [options]="sourceOptions()"
+        name="source"
+        [ngModel]="draft.source"
+        (ngModelChange)="patchLogo('source', $event)"
+      />
+      @if (draft.source === 'vendored') {
+        <app-select
+          [label]="'admin.cdVariants.vendoredName' | t"
+          [options]="vendoredOptions"
+          [hint]="'admin.cdVariants.vendoredHint' | t"
+          name="vendoredName"
+          [ngModel]="draft.vendoredName"
+          (ngModelChange)="patchLogo('vendoredName', $event)"
+        />
+      } @else {
+        <div class="flex flex-col gap-2">
+          <label class="text-sm font-medium" for="cdv-file">{{ 'admin.cdVariants.file' | t }}</label>
+          <input
+            id="cdv-file"
+            #logoFile
+            type="file"
+            [accept]="accept"
+            (change)="onFileSelected(logoFile)"
+          />
+          <p class="text-xs text-muted m-0">{{ 'admin.cdVariants.fileHint' | t: { mb: maxMb } }}</p>
+        </div>
+      }
+      @if (logoError(); as err) {
+        <p class="cdv__error" role="alert">{{ err | t }}</p>
+      }
+    </form>
+  }
+  <div dialog-footer class="flex justify-end gap-3">
+    <app-button size="sm" variant="ghost" (click)="closeLogoDialog()">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" [disabled]="!canSaveLogo()" [loading]="logoSaving()" (click)="saveLogo()">
+      {{ 'admin.common.add' | t }}
+    </app-button>
+  </div>
+</app-dialog>
+
+<app-dialog
+  [open]="confirmDelete() !== null"
+  [title]="'admin.cdVariants.deleteTitle' | t"
+  [closeLabel]="'action.cancel' | t"
+  (closed)="confirmDelete.set(null)"
+>
+  <p>{{ 'admin.cdVariants.deleteConfirm' | t: { name: confirmDelete()?.name ?? '' } }}</p>
+  @if (deleteError(); as err) {
+    <p class="cdv__error" role="alert">{{ err | t }}</p>
+  }
+  <div dialog-footer class="flex justify-end gap-3">
+    <app-button size="sm" variant="ghost" (click)="confirmDelete.set(null)">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" variant="danger" [loading]="deleting()" (click)="doDelete()">
+      {{ 'admin.common.remove' | t }}
+    </app-button>
+  </div>
+</app-dialog>

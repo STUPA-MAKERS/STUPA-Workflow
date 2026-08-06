@@ -43,13 +43,15 @@ describe('AdminApiService — mock mode', () => {
     // #105 — create and edit gremien in the mock store.
     const before = (await firstValueFrom(s.listGremien())).length;
     const newGremium = await firstValueFrom(
-      s.createGremium({ name: 'Neu', slug: 'neu', cdVariant: 'stupa', defaultLang: 'de' }),
+      s.createGremium({ name: 'Neu', slug: 'neu', cdVariantId: 'cd-stupa', defaultLang: 'de' }),
     );
     expect(newGremium.name).toBe('Neu');
     expect((await firstValueFrom(s.listGremien())).length).toBe(before + 1);
     const edited = await firstValueFrom(s.updateGremium(newGremium.id, { name: 'Geändert' }));
     expect(edited.name).toBe('Geändert');
     expect((await firstValueFrom(s.listRoles())).length).toBeGreaterThan(0);
+    // The gremium dropdown gets stub CD variants in mock mode.
+    expect((await firstValueFrom(s.listCdVariantOptions())).length).toBeGreaterThan(0);
 
     // An existing webhook takes the update branch of upsert.
     const hooks = await firstValueFrom(s.listWebhooks());
@@ -182,7 +184,7 @@ describe('AdminApiService — real mode (contract)', () => {
     s.deleteGremium('g-9').subscribe();
     expect(http.expectOne('/api/admin/gremien/g-9').request.method).toBe('DELETE');
 
-    s.createGremium({ name: 'X', slug: 'x', cdVariant: 'stupa', defaultLang: 'de' }).subscribe();
+    s.createGremium({ name: 'X', slug: 'x', cdVariantId: 'cd-stupa', defaultLang: 'de' }).subscribe();
     expect(http.expectOne('/api/admin/gremien').request.method).toBe('POST');
 
     s.getGremiumMailRecipients('g-9').subscribe();
@@ -195,6 +197,46 @@ describe('AdminApiService — real mode (contract)', () => {
     expect(put.request.body).toEqual({ recipients: ['a@b.org'] });
     put.flush({ recipients: ['a@b.org'] });
     expect(recv).toEqual(['a@b.org']);
+  });
+
+  it('wires the CD-variant endpoints incl. logo upload, order and file URL', () => {
+    s.listCdVariants().subscribe();
+    expect(http.expectOne('/api/admin/cd-variants').request.method).toBe('GET');
+
+    s.createCdVariant({ key: 'stupa', name: 'StuPa', baseVariant: 'report' }).subscribe();
+    expect(http.expectOne('/api/admin/cd-variants').request.method).toBe('POST');
+
+    s.updateCdVariant('cd-1', { name: 'Neu' }).subscribe();
+    expect(http.expectOne('/api/admin/cd-variants/cd-1').request.method).toBe('PATCH');
+
+    s.deleteCdVariant('cd-1').subscribe();
+    expect(http.expectOne('/api/admin/cd-variants/cd-1').request.method).toBe('DELETE');
+
+    const file = new File(['x'], 'logo.png', { type: 'image/png' });
+    s.uploadCdVariantLogo('cd-1', 'title', file).subscribe();
+    const upload = http.expectOne('/api/admin/cd-variants/cd-1/logos');
+    expect(upload.request.method).toBe('POST');
+    expect(upload.request.body instanceof FormData).toBe(true);
+    expect((upload.request.body as FormData).get('slot')).toBe('title');
+    expect((upload.request.body as FormData).get('file')).toBe(file);
+
+    s.addCdVariantVendoredLogo('cd-1', 'footer', 'HSRT').subscribe();
+    const vendored = http.expectOne('/api/admin/cd-variants/cd-1/logos/vendored');
+    expect(vendored.request.method).toBe('POST');
+    expect(vendored.request.body).toEqual({ slot: 'footer', vendoredName: 'HSRT' });
+
+    s.reorderCdVariantLogos('cd-1', 'title', ['l-2', 'l-1']).subscribe();
+    const order = http.expectOne('/api/admin/cd-variants/cd-1/logos/order');
+    expect(order.request.method).toBe('PUT');
+    expect(order.request.body).toEqual({ slot: 'title', logoIds: ['l-2', 'l-1'] });
+
+    s.deleteCdVariantLogo('l-1').subscribe();
+    expect(http.expectOne('/api/admin/cd-variant-logos/l-1').request.method).toBe('DELETE');
+
+    expect(s.cdVariantLogoFileUrl('l-1')).toBe('/api/admin/cd-variant-logos/l-1/file');
+
+    s.listCdVariantOptions().subscribe();
+    http.expectOne('/api/cd-variants').flush([]);
   });
 
   it('wires OIDC group-mapping CRUD endpoints (#5-4)', () => {

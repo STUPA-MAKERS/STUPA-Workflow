@@ -177,7 +177,8 @@ export interface Gremium {
   id: Uuid;
   name: string;
   slug: string;
-  cdVariant: string;
+  /** CD variant the gremium renders its documents with. `null` = the pytex default. */
+  cdVariantId: Uuid | null;
   defaultLang: string;
   allowVoteDelegation: boolean;
   /** Lead time in minutes before the meeting starts, for non-pool delegations.
@@ -193,7 +194,7 @@ export interface Gremium {
 export interface GremiumCreateBody {
   name: string;
   slug: string;
-  cdVariant: string;
+  cdVariantId: Uuid | null;
   defaultLang: string;
   allowVoteDelegation?: boolean;
   delegationLeadMinutes?: number;
@@ -205,7 +206,7 @@ export interface GremiumCreateBody {
 export interface GremiumUpdateBody {
   name?: string;
   slug?: string;
-  cdVariant?: string;
+  cdVariantId?: Uuid | null;
   defaultLang?: string;
   allowVoteDelegation?: boolean;
   delegationLeadMinutes?: number;
@@ -213,8 +214,79 @@ export interface GremiumUpdateBody {
   quorumPercent?: number | null;
 }
 
-/** CD variants (pytex) as a dropdown instead of free text. */
-export const CD_VARIANTS: readonly string[] = ['stupa', 'asta', 'echo', 'makers', 'report'];
+// Corporate-design variants — mirror of `admin/cd_logos.py` and the CD schemas.
+// A variant only controls the logos of a rendered document. It carries no color
+// and no font.
+
+/** pytex document shape a variant builds on. */
+export type CdBaseVariant = 'report' | 'protocol';
+export const CD_BASE_VARIANTS: readonly CdBaseVariant[] = ['report', 'protocol'] as const;
+
+/** Where a logo appears: on the title page or in the page footer. */
+export type CdLogoSlot = 'title' | 'footer';
+export const CD_LOGO_SLOTS: readonly CdLogoSlot[] = ['title', 'footer'] as const;
+
+/** Logo names that pytex ships (`VendoredLogoName`). They need no upload. */
+export const VENDORED_LOGO_NAMES: readonly string[] = [
+  'HSRT',
+  'INF',
+  'ASTA',
+  'STUPA',
+  'ECHO',
+  'MAKERS',
+  'MAKERS-RAlign',
+  'MAKERS-Icon',
+  'Skyline',
+] as const;
+
+/** Types the server accepts for an uploaded logo (`ALLOWED_CD_LOGO_MIME`). */
+export const CD_LOGO_ACCEPT = 'image/png,image/jpeg,image/webp,image/svg+xml,application/pdf';
+/** Size cap of an uploaded logo (`MAX_CD_LOGO_BYTES`). */
+export const MAX_CD_LOGO_BYTES = 2 * 1024 * 1024;
+
+/** Key pattern of a CD variant (`CD_VARIANT_KEY_PATTERN`). The key is a slug. */
+export const CD_VARIANT_KEY_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+export const CD_VARIANT_KEY_MAX = 64;
+
+/** One logo of a variant. Exactly one of `vendoredName` / `fileName` is set. */
+export interface CdVariantLogo {
+  id: Uuid;
+  slot: CdLogoSlot;
+  position: number;
+  vendoredName?: string | null;
+  fileName?: string | null;
+  mime?: string | null;
+  size?: number | null;
+}
+
+/** A CD variant with its logos, ordered by slot and position. */
+export interface CdVariant {
+  id: Uuid;
+  key: string;
+  name: string;
+  baseVariant: CdBaseVariant;
+  logos: CdVariantLogo[];
+}
+
+/** Slim option for the gremium dropdown — `GET /cd-variants`. */
+export interface CdVariantOption {
+  id: Uuid;
+  key: string;
+  name: string;
+}
+
+/** Body for `POST /admin/cd-variants`. */
+export interface CdVariantCreateBody {
+  key: string;
+  name: string;
+  baseVariant: CdBaseVariant;
+}
+
+/** Body for `PATCH /admin/cd-variants/{id}`. The key is immutable (409). */
+export interface CdVariantUpdateBody {
+  name?: string;
+  baseVariant?: CdBaseVariant;
+}
 
 /** Name → URL slug (auto-generated). */
 export function slugify(name: string): string {

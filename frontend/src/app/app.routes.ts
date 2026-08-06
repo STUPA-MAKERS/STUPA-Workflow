@@ -197,7 +197,7 @@ export const routes: Routes = [
         data: {
           title: 'nav.admin',
           // Every area-admin role can reach the admin overview.
-          permission: ['admin.site', 'admin.gremien', 'admin.types', 'admin.roles', 'admin.users', 'admin.group_mappings', 'admin.gremium_roles', 'admin.delegations', 'admin.deadlines', 'admin.notifications', 'privacy.manage', 'webhook.manage', 'audit.read'],
+          permission: ['admin.site', 'admin.gremien', 'admin.types', 'admin.roles', 'admin.users', 'admin.group_mappings', 'admin.gremium_roles', 'admin.cd_variants', 'admin.delegations', 'admin.deadlines', 'admin.notifications', 'privacy.manage', 'webhook.manage', 'audit.read'],
         },
         canActivate: [authGuard],
         loadComponent: () =>
@@ -291,6 +291,15 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./pages/admin/branding/branding-editor.component').then(
             (m) => m.BrandingEditorComponent,
+          ),
+      },
+      {
+        path: 'admin/cd-variants',
+        data: { title: 'admin.cdVariants.title', permission: 'admin.cd_variants', parent: ['admin'] },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./pages/admin/cd-variants/cd-variants.component').then(
+            (m) => m.AdminCdVariantsComponent,
           ),
       },
       {
