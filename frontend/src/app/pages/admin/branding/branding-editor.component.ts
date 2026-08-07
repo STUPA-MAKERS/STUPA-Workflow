@@ -11,6 +11,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { resolveI18n } from '@shared/forms/i18n-text';
+import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { ButtonComponent } from '@stupa-makers/ui-kit';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
@@ -39,7 +40,13 @@ import { brandingLinkErrors } from '../branding.util';
   selector: 'app-branding-editor',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, ButtonComponent, VersionHistoryComponent],
+  imports: [
+    FormsModule,
+    TranslatePipe,
+    ButtonComponent,
+    VersionHistoryComponent,
+    PageHeaderComponent,
+  ],
   templateUrl: './branding-editor.component.html',
   styleUrl: './branding-editor.component.scss',
 })

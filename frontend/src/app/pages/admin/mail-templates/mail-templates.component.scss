@@ -3,13 +3,6 @@
   flex-direction: column;
   gap: var(--space-5);
 }
-.mt__title {
-  margin: 0;
-}
-.mt__subtitle {
-  color: var(--color-text-muted);
-  margin: var(--space-1) 0 0;
-}
 .mt__layout {
   display: grid;
   grid-template-columns: minmax(10rem, 14rem) 1fr;

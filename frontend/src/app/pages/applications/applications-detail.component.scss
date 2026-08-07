@@ -3,11 +3,12 @@
   flex-direction: column;
   gap: var(--space-5);
 }
-.det__head {
+/* Summary block below the page header. It carries the centering itself, so the
+   status line and the fact grid align with the center column. */
+.det__summary {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  /* Center at body width, so the header aligns with the center column. */
   width: 100%;
   max-width: var(--layout-max-width);
   margin-inline: auto;
@@ -364,6 +365,31 @@ formly-form {
   outline-offset: 1px;
 }
 
+/* Edit and delete of one comment. The buttons stay in the message meta line, so
+   a row with actions keeps the height of a row without them. */
+.det__msgActions {
+  display: inline-flex;
+  gap: 2px;
+  margin-inline-start: auto;
+}
+
+/* Progress of the PDF render job. */
+.det__pdf {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.det__pdfLink {
+  color: var(--color-primary);
+  font-weight: var(--fw-medium);
+}
+.det__pdfBar {
+  width: 100%;
+  height: var(--space-1);
+  accent-color: var(--color-primary);
+}
+
+.det__commentEdit,
 .det__forceReason {
   display: flex;
   flex-direction: column;

@@ -15,6 +15,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
+import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import {
   BadgeComponent,
   ButtonComponent,
@@ -65,6 +66,11 @@ export const AUDIT_ACTIONS = [
   'webhook_config',
   'attachment_quarantine',
   'attachment_delete',
+  // Content mutations that leave a trace outside the flow: comments, protocols, votes.
+  'comment_update',
+  'comment_delete',
+  'protocol_delete',
+  'vote_delete',
   // Budget and money mutations. They mirror the BUDGET_* values in actions.py.
   'budget_node_create',
   'budget_node_update',
@@ -79,6 +85,7 @@ export const AUDIT_ACTIONS = [
   'budget_invoice_delete',
   'budget_assign',
   'budget_move_fiscal_year',
+  'budget_fiscal_year_delete',
 ] as const;
 
 const KNOWN_ACTIONS = new Set<string>(AUDIT_ACTIONS);
@@ -101,6 +108,10 @@ const ACTION_ICONS: Record<string, IconName> = {
   webhook_config: 'webhook',
   attachment_quarantine: 'paperclip',
   attachment_delete: 'paperclip',
+  comment_update: 'form',
+  comment_delete: 'form',
+  protocol_delete: 'document',
+  vote_delete: 'check',
   // Money mutations use the euro glyph. The cost center structure uses the pie glyph of the
   // budget tab.
   budget_node_create: 'chart-pie',
@@ -116,6 +127,7 @@ const ACTION_ICONS: Record<string, IconName> = {
   budget_invoice_delete: 'euro',
   budget_assign: 'euro',
   budget_move_fiscal_year: 'euro',
+  budget_fiscal_year_delete: 'euro',
 };
 
 /** Target type to router target: the detail page or the admin list that owns the target. */
@@ -175,6 +187,7 @@ interface DayGroup {
     DatepickerComponent,
     IconComponent,
     SelectComponent,
+    PageHeaderComponent,
   ],
   templateUrl: './audit-log.component.html',
   styleUrl: './audit-log.component.scss',

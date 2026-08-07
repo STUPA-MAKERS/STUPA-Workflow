@@ -1,8 +1,5 @@
 <section class="cfg">
-  <header class="cfg__head">
-    <h1>{{ 'admin.deleg.title' | t }}</h1>
-  </header>
-  <p class="cfg__empty">{{ 'admin.deleg.subtitle' | t }}</p>
+  <app-page-header [title]="'admin.deleg.title' | t" [subtitle]="'admin.deleg.subtitle' | t" />
 
   @if (loading()) {
     <p class="cfg__empty" aria-live="polite">{{ 'admin.deleg.loading' | t }}</p>

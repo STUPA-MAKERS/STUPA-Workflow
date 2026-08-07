@@ -66,6 +66,7 @@ import type {
   PublicSiteConfig,
   ProtocolOutWire,
   ProtocolVotesBody,
+  RenderJob,
   SignedUrl,
   SignedUrlOutWire,
   StateOutWire,
@@ -302,6 +303,38 @@ export class ApiClient {
     return this.http
       .post<CommentOutWire>(`${this.base}/applications/${id}/comments`, payload)
       .pipe(map(mapComment));
+  }
+
+  /**
+   * PATCH /applications/{id}/comments/{commentId} — replace the body.
+   *
+   * The visibility is deliberately not patchable. Allowed for the author of the
+   * comment and for a holder of `application.manage`. The server decides.
+   */
+  updateComment(id: Uuid, commentId: Uuid, body: string): Observable<ApplicationComment> {
+    return this.http
+      .patch<CommentOutWire>(`${this.base}/applications/${id}/comments/${commentId}`, { body })
+      .pipe(map(mapComment));
+  }
+
+  /** DELETE /applications/{id}/comments/{commentId} — author or `application.manage`. */
+  deleteComment(id: Uuid, commentId: Uuid): Observable<void> {
+    return this.http.delete<void>(`${this.base}/applications/${id}/comments/${commentId}`);
+  }
+
+  /**
+   * POST /applications/{id}/pdf — start an async PDF render.
+   *
+   * The answer is 202 with a job in the `pending` state. Poll it with
+   * {@link getJob}. Access follows the read scope of the application.
+   */
+  createApplicationPdf(id: Uuid): Observable<RenderJob> {
+    return this.http.post<RenderJob>(`${this.base}/applications/${id}/pdf`, {});
+  }
+
+  /** GET /jobs/{jobId} — poll a render job. A poll never shows the overlay. */
+  getJob(jobId: Uuid): Observable<RenderJob> {
+    return this.http.get<RenderJob>(`${this.base}/jobs/${jobId}`, { context: skipLoading() });
   }
 
   transitions(id: Uuid): Observable<Transition[]> {
@@ -657,6 +690,16 @@ export class ApiClient {
     return this.http.post<void>(`${this.base}/votes/${voteId}/cancel`, {});
   }
 
+  /**
+   * DELETE /votes/{id} — remove a standalone vote that never opened.
+   *
+   * The server answers 409 with `vote_meeting_bound`, `vote_not_draft` or
+   * `vote_has_ballots`. Use `cancel` for a vote that is already open.
+   */
+  deleteVote(voteId: Uuid): Observable<void> {
+    return this.http.delete<void>(`${this.base}/votes/${voteId}`);
+  }
+
   /** GET /site-config — public (auth-free) active branding config. */
   publicSiteConfig(): Observable<PublicSiteConfig> {
     return this.http.get<PublicSiteConfig>(`${this.base}/site-config`);
@@ -701,6 +744,16 @@ export class ApiClient {
     return this.http
       .post<ProtocolOutWire>(`${this.base}/protocols/${protocolId}/finalize`, {})
       .pipe(map(mapProtocol));
+  }
+
+  /**
+   * DELETE /protocols/{id} — discard a draft protocol.
+   *
+   * The scope is the same as the PATCH: whoever may write the minutes may drop
+   * them. The server answers 409 once the protocol is `final` or `rendering`.
+   */
+  deleteProtocol(protocolId: Uuid): Observable<void> {
+    return this.http.delete<void>(`${this.base}/protocols/${protocolId}`);
   }
 
   /** GET /notifications/preferences — own toggles (full catalog). */

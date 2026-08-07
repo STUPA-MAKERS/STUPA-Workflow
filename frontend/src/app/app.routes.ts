@@ -133,11 +133,12 @@ export const routes: Routes = [
       },
       {
         path: 'meetings',
-        // A Gremium member can reach their own meetings without meeting.manage or
-        // protocol.write.
+        // A Gremium member can reach their own meetings without meeting.manage.
+        // `protocol.write` is NOT listed: it is a GREMIUM-role permission and never
+        // enters the global permission set, so it could never match here (#g10).
         data: {
           title: 'nav.meetings',
-          permission: ['meeting.manage', 'protocol.write'],
+          permission: ['meeting.manage'],
           allowCommitteeMember: true,
         },
         canActivate: [authGuard],
@@ -147,11 +148,12 @@ export const routes: Routes = [
       {
         path: 'meetings/:id',
         // `allowAuthenticated`: a delegation recipient can be neither a member nor
-        // permitted. The server scopes the meeting view.
+        // permitted. The server scopes the meeting view. `protocol.write` is a
+        // GREMIUM-role permission and never matches globally, so it is not listed (#g10).
         data: {
           title: 'meetings.detailCrumb',
           parent: ['meetings'],
-          permission: ['meeting.manage', 'protocol.write'],
+          permission: ['meeting.manage'],
           allowCommitteeMember: true,
           allowAuthenticated: true,
           wide: true,
@@ -197,7 +199,7 @@ export const routes: Routes = [
         data: {
           title: 'nav.admin',
           // Every area-admin role can reach the admin overview.
-          permission: ['admin.site', 'admin.gremien', 'admin.types', 'admin.roles', 'admin.users', 'admin.group_mappings', 'admin.gremium_roles', 'admin.delegations', 'admin.deadlines', 'admin.notifications', 'privacy.manage', 'webhook.manage', 'audit.read'],
+          permission: ['admin.site', 'admin.gremien', 'admin.types', 'admin.roles', 'admin.users', 'admin.group_mappings', 'admin.gremium_roles', 'admin.cd_variants', 'admin.delegations', 'admin.deadlines', 'admin.notifications', 'privacy.manage', 'webhook.manage', 'audit.read'],
         },
         canActivate: [authGuard],
         loadComponent: () =>
@@ -252,7 +254,14 @@ export const routes: Routes = [
       },
       {
         path: 'admin/flow',
-        data: { title: 'admin.flow.title', permission: 'flow.configure', parent: ['admin'] },
+        // The save (POST /admin/flow-versions/global) accepts either key. The route
+        // gate must list both, or a holder of one of them opens an editor it cannot
+        // save, or cannot open an editor it may save (#g7).
+        data: {
+          title: 'admin.flow.title',
+          permission: ['flow.configure', 'admin.types'],
+          parent: ['admin'],
+        },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/admin/flow-editor/flow-editor.component').then(
@@ -294,6 +303,15 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'admin/cd-variants',
+        data: { title: 'admin.cdVariants.title', permission: 'admin.cd_variants', parent: ['admin'] },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./pages/admin/cd-variants/cd-variants.component').then(
+            (m) => m.AdminCdVariantsComponent,
+          ),
+      },
+      {
         path: 'admin/webhooks',
         data: { title: 'admin.webhook.title', permission: 'webhook.manage', parent: ['admin'] },
         canActivate: [authGuard],
@@ -307,6 +325,20 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./pages/admin/gremium-roles/gremium-roles.component').then(
             (m) => m.GremiumRolesComponent,
+          ),
+      },
+      {
+        // Agent tokens (OAuth grants) of every principal, with a kill switch.
+        path: 'admin/oauth-grants',
+        data: {
+          title: 'admin.oauthGrants.title',
+          permission: 'admin.users',
+          parent: ['admin'],
+        },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./pages/admin/oauth-grants/oauth-grants.component').then(
+            (m) => m.AdminOAuthGrantsComponent,
           ),
       },
       {

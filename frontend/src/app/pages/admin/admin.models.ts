@@ -177,7 +177,8 @@ export interface Gremium {
   id: Uuid;
   name: string;
   slug: string;
-  cdVariant: string;
+  /** CD variant the gremium renders its documents with. `null` = the pytex default. */
+  cdVariantId: Uuid | null;
   defaultLang: string;
   allowVoteDelegation: boolean;
   /** Lead time in minutes before the meeting starts, for non-pool delegations.
@@ -193,7 +194,7 @@ export interface Gremium {
 export interface GremiumCreateBody {
   name: string;
   slug: string;
-  cdVariant: string;
+  cdVariantId: Uuid | null;
   defaultLang: string;
   allowVoteDelegation?: boolean;
   delegationLeadMinutes?: number;
@@ -205,7 +206,7 @@ export interface GremiumCreateBody {
 export interface GremiumUpdateBody {
   name?: string;
   slug?: string;
-  cdVariant?: string;
+  cdVariantId?: Uuid | null;
   defaultLang?: string;
   allowVoteDelegation?: boolean;
   delegationLeadMinutes?: number;
@@ -213,8 +214,79 @@ export interface GremiumUpdateBody {
   quorumPercent?: number | null;
 }
 
-/** CD variants (pytex) as a dropdown instead of free text. */
-export const CD_VARIANTS: readonly string[] = ['stupa', 'asta', 'echo', 'makers', 'report'];
+// Corporate-design variants — mirror of `admin/cd_logos.py` and the CD schemas.
+// A variant only controls the logos of a rendered document. It carries no color
+// and no font.
+
+/** pytex document shape a variant builds on. */
+export type CdBaseVariant = 'report' | 'protocol';
+export const CD_BASE_VARIANTS: readonly CdBaseVariant[] = ['report', 'protocol'] as const;
+
+/** Where a logo appears: on the title page or in the page footer. */
+export type CdLogoSlot = 'title' | 'footer';
+export const CD_LOGO_SLOTS: readonly CdLogoSlot[] = ['title', 'footer'] as const;
+
+/** Logo names that pytex ships (`VendoredLogoName`). They need no upload. */
+export const VENDORED_LOGO_NAMES: readonly string[] = [
+  'HSRT',
+  'INF',
+  'ASTA',
+  'STUPA',
+  'ECHO',
+  'MAKERS',
+  'MAKERS-RAlign',
+  'MAKERS-Icon',
+  'Skyline',
+] as const;
+
+/** Types the server accepts for an uploaded logo (`ALLOWED_CD_LOGO_MIME`). */
+export const CD_LOGO_ACCEPT = 'image/png,image/jpeg,image/webp,image/svg+xml,application/pdf';
+/** Size cap of an uploaded logo (`MAX_CD_LOGO_BYTES`). */
+export const MAX_CD_LOGO_BYTES = 2 * 1024 * 1024;
+
+/** Key pattern of a CD variant (`CD_VARIANT_KEY_PATTERN`). The key is a slug. */
+export const CD_VARIANT_KEY_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+export const CD_VARIANT_KEY_MAX = 64;
+
+/** One logo of a variant. Exactly one of `vendoredName` / `fileName` is set. */
+export interface CdVariantLogo {
+  id: Uuid;
+  slot: CdLogoSlot;
+  position: number;
+  vendoredName?: string | null;
+  fileName?: string | null;
+  mime?: string | null;
+  size?: number | null;
+}
+
+/** A CD variant with its logos, ordered by slot and position. */
+export interface CdVariant {
+  id: Uuid;
+  key: string;
+  name: string;
+  baseVariant: CdBaseVariant;
+  logos: CdVariantLogo[];
+}
+
+/** Slim option for the gremium dropdown — `GET /cd-variants`. */
+export interface CdVariantOption {
+  id: Uuid;
+  key: string;
+  name: string;
+}
+
+/** Body for `POST /admin/cd-variants`. */
+export interface CdVariantCreateBody {
+  key: string;
+  name: string;
+  baseVariant: CdBaseVariant;
+}
+
+/** Body for `PATCH /admin/cd-variants/{id}`. The key is immutable (409). */
+export interface CdVariantUpdateBody {
+  name?: string;
+  baseVariant?: CdBaseVariant;
+}
 
 /** Name → URL slug (auto-generated). */
 export function slugify(name: string): string {
@@ -309,6 +381,21 @@ export interface RoleAssignmentInput {
   gremiumId?: Uuid | null;
   validFrom?: string | null;
   validUntil?: string | null;
+  delegateVoting?: boolean;
+}
+
+/**
+ * Patch of an existing assignment (`PATCH /admin/role-assignments/{id}`).
+ *
+ * Every field is optional and `null` means "do not touch". The route therefore
+ * cannot clear a validity window back to open-ended. The UI says so.
+ * `principalId` is not patchable: an assignment never moves to another user.
+ */
+export interface RoleAssignmentPatch {
+  roleId?: Uuid;
+  gremiumId?: Uuid;
+  validFrom?: string;
+  validUntil?: string;
   delegateVoting?: boolean;
 }
 
@@ -445,6 +532,28 @@ export interface WebhookConfig {
   active: boolean;
 }
 
+/** Coarse state of the most recent delivery of one webhook. */
+export type WebhookDeliveryState = 'never' | 'pending' | 'sent' | 'dead';
+
+/**
+ * Delivery diagnostics of one webhook (`GET /admin/webhooks/delivery-status`).
+ *
+ * The backend reduces the newest `webhook_delivery` row to a coarse state plus a
+ * coarse reason class. It sends no resolved IP, no host topology and no response
+ * body, so an operator can diagnose a mistyped or internal target without a leak.
+ */
+export interface WebhookDeliveryStatus {
+  webhookId: Uuid;
+  lastState: WebhookDeliveryState;
+  /** `delivered`, `in_progress`, `no_deliveries`, `rejected_by_target`,
+   *  `target_server_error`, `transient_transport_error`, `unreachable_or_blocked`
+   *  or `unknown`. */
+  reasonClass: string;
+  responseCode?: number | null;
+  attempts: number;
+  lastAt?: string | null;
+}
+
 /** Gremium role — a separate role set, distinct from the global roles. */
 export interface GremiumRole {
   id: Uuid;
@@ -488,6 +597,38 @@ export interface DeadlinePolicy {
   timezone?: string | null;
   /** Only for `recurring`: ordered list of `YYYY-MM-DD` dates (rolling window). */
   dates?: string[] | null;
+}
+
+/**
+ * One live OAuth grant (agent/MCP token pair) of any principal — the admin view of
+ * `GET /admin/oauth-grants` (P `admin.users`).
+ *
+ * The server resolves the owner to a name, so the UI never renders an id.
+ * `principalName` is `null` when the owner carries neither a display name nor an
+ * email; the page then shows a localized placeholder. `principalId` exists for the
+ * filter and for a deep link only, never for display. The item holds no token and no
+ * token hash.
+ */
+export interface OAuthGrantAdmin {
+  id: Uuid;
+  principalId: Uuid;
+  /** Display name, else email, else `null`. NEVER an id. */
+  principalName: string | null;
+  principalEmail: string | null;
+  clientId: string;
+  scope: string;
+  createdAt: string;
+  /** `null` means the access token never expires. Only a revoke ends it. */
+  accessExpiresAt: string | null;
+  /** `null` means the refresh token never expires. Only a revoke ends it. */
+  refreshExpiresAt: string | null;
+}
+
+/** Query of the admin grant list: offset paging plus the owner filter. */
+export interface OAuthGrantQuery {
+  limit?: number;
+  offset?: number;
+  principalId?: Uuid | null;
 }
 
 /** Time-bounded gremium membership (term of office). */

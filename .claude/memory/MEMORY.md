@@ -16,6 +16,8 @@ sibling memory here.
 - [track-side-requests](track-side-requests.md) — track every casual request as a todo + memory
 - [repo-ship-workflow](repo-ship-workflow.md) — always finish: branch+commit+push+PR, then watch CI + fix failures
 - [python-strong-typing](python-strong-typing.md) — always strongly-typed Python ≥3.13: full annotations, no bare Any
+- [nix-dev-shells](nix-dev-shells.md) — run every dev command in `nix develop .#<component> -c …`, never hand-patch LD_LIBRARY_PATH
+- [run-integration-before-push](run-integration-before-push.md) — `pytest` deselects integration; run `-m integration` too, the suite shares one Postgres
 - [admin-domain-rules](admin-domain-rules.md) — admin=all-rights, vote-delegation per-Gremium, edit all i18n values in EN too
 
 ## UI / frontend conventions
@@ -34,6 +36,7 @@ sibling memory here.
 - [positions-field-shape](positions-field-shape.md) — Kostenaufstellung/positions field: offers = {label,value,preferred}, exactly one preferred
 - [alembic-revision-id-limit](alembic-revision-id-limit.md) — alembic revision ids MUST be ≤32 chars (alembic_version varchar(32))
 - [revert-feature-scope](revert-feature-scope.md) — audit-log revert covers config+status+budget/bookings, deletes & assign/move excluded
+- [crud-completeness-rules](crud-completeness-rules.md) — full CRUD behind a permission; the five entities that stay immutable on purpose
 
 ## Feature specs & designs
 

@@ -13,6 +13,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { ButtonComponent, ToastService, type SelectOption } from '@stupa-makers/ui-kit';
+import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { AdminApiService } from '../admin-api.service';
 import {
   COMPARE_OPS,
@@ -90,6 +91,7 @@ import { TransitionListsComponent } from './transition-lists.component';
     GroupInspectorComponent,
     TransitionListsComponent,
     TransitionDetailComponent,
+    PageHeaderComponent,
   ],
   templateUrl: './flow-editor.component.html',
   styleUrl: './flow-editor.component.scss',

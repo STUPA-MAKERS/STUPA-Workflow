@@ -171,7 +171,7 @@ def gremium_row(**kw: Any) -> Any:
         "id": uuid.uuid4(),
         "name": "Gremium",
         "slug": "g",
-        "cd_variant": "stupa",
+        "cd_variant_id": None,
         "default_lang": "de",
         "allow_vote_delegation": False,
         "delegation_lead_minutes": 0,
@@ -344,7 +344,6 @@ async def test_update_gremium_all_fields() -> None:
         GremiumUpdate(
             name="Neu",
             slug="neu",
-            cdVariant="asta",
             defaultLang="en",
             allowVoteDelegation=True,
             delegationLeadMinutes=5,
@@ -1282,6 +1281,20 @@ async def test_update_webhook_not_found() -> None:
     s, _ = svc(gets=[None])
     with pytest.raises(NotFoundError):
         await s.update_webhook(uuid.uuid4(), WebhookUpdate(name="x"), "admin")
+
+
+async def test_delete_webhook_ok() -> None:
+    row = webhook_row()
+    s, session = svc([*audit_results()], gets=[row])
+    await s.delete_webhook(row.id, "admin")
+    assert session.deleted == [row]
+    assert session.committed == 1
+
+
+async def test_delete_webhook_not_found() -> None:
+    s, _ = svc(gets=[None])
+    with pytest.raises(NotFoundError):
+        await s.delete_webhook(uuid.uuid4(), "admin")
 
 
 # AUD-062: the advisory SSRF check of the webhook URL at CRUD time.

@@ -7,7 +7,7 @@ from uuid import UUID
 from sqlalchemy import delete, select
 
 from app.modules.admin.gremium_roles import GremiumRoleService
-from app.modules.admin.models import ApplicationType, Gremium, MailList
+from app.modules.admin.models import ApplicationType, CdVariant, Gremium, MailList
 from app.modules.admin.schemas import (
     GremiumCreate,
     GremiumMailRecipients,
@@ -16,7 +16,7 @@ from app.modules.admin.schemas import (
 )
 from app.modules.admin.service.service_base import ConfigServiceBase
 from app.modules.audit.actions import AuditAction
-from app.shared.errors import ConflictError, NotFoundError
+from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 
 
 def _gremium_out(row: Gremium) -> GremiumOut:
@@ -24,7 +24,7 @@ def _gremium_out(row: Gremium) -> GremiumOut:
         id=row.id,
         name=row.name,
         slug=row.slug,
-        cd_variant=row.cd_variant,
+        cd_variant_id=row.cd_variant_id,
         default_lang=row.default_lang,
         allow_vote_delegation=row.allow_vote_delegation,
         delegation_lead_minutes=row.delegation_lead_minutes,
@@ -43,10 +43,11 @@ class GremiumOps(ConfigServiceBase):
     async def create_gremium(self, payload: GremiumCreate, actor: str) -> GremiumOut:
         if await self._gremium_by_slug(payload.slug) is not None:
             raise ConflictError(f"gremium slug {payload.slug!r} already exists")
+        await self._require_cd_variant(payload.cd_variant_id)
         row = Gremium(
             name=payload.name,
             slug=payload.slug,
-            cd_variant=payload.cd_variant,
+            cd_variant_id=payload.cd_variant_id,
             default_lang=payload.default_lang,
             allow_vote_delegation=payload.allow_vote_delegation,
             delegation_lead_minutes=payload.delegation_lead_minutes,
@@ -73,8 +74,10 @@ class GremiumOps(ConfigServiceBase):
             row.slug = payload.slug
         if payload.name is not None:
             row.name = payload.name
-        if payload.cd_variant is not None:
-            row.cd_variant = payload.cd_variant
+        # cdVariantId is clearable to null, so "not sent" and "set to null" differ.
+        if "cd_variant_id" in payload.model_fields_set:
+            await self._require_cd_variant(payload.cd_variant_id)
+            row.cd_variant_id = payload.cd_variant_id
         if payload.default_lang is not None:
             row.default_lang = payload.default_lang
         if payload.allow_vote_delegation is not None:
@@ -124,6 +127,20 @@ class GremiumOps(ConfigServiceBase):
         await self.session.delete(row)
         await self._audit(actor, AuditAction.CONFIG_CHANGE, "gremium", gremium_id)
         await self.session.commit()
+
+    async def _require_cd_variant(self, variant_id: UUID | None) -> None:
+        """Check the CD variant server-side. The client id is untrusted.
+
+        Raises:
+            ValidationProblem: No CD variant has this id (422).
+        """
+        if variant_id is None:
+            return
+        if await self.session.get(CdVariant, variant_id) is None:
+            raise ValidationProblem(
+                "Unknown CD variant.",
+                errors=[{"field": "cdVariantId", "msg": f"{variant_id} does not exist"}],
+            )
 
     async def _gremium_by_slug(self, slug: str) -> Gremium | None:
         return (

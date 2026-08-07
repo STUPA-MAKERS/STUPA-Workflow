@@ -17,6 +17,19 @@
     } @else if (proto.pdfUrl) {
       <a class="text-primary text-sm font-medium" [href]="proto.pdfUrl" target="_blank" rel="noopener">{{ 'meetings.protocol.pdf' | t }}</a>
     }
+    @if (!proto.isLocked && meeting().canWrite) {
+      <!-- Only a draft may be discarded. The server answers 409 once the protocol
+           is final or renders, and the pane says so if the click races. -->
+      <app-button
+        variant="ghost"
+        size="sm"
+        [iconOnly]="true"
+        [ariaLabel]="'meetings.protocol.delete' | t"
+        [title]="'meetings.protocol.delete' | t"
+        [disabled]="deletingProtocol()"
+        (click)="protocolDelete.emit()"
+      ><app-icon name="delete" /></app-button>
+    }
     @if (!proto.isLocked) {
       <!-- A locked protocol, so rendering or final, makes the editor read-only. No
            autosave runs then, so a save indicator would refer to the draft only. -->

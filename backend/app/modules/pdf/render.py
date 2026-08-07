@@ -26,6 +26,7 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.modules.admin.cd_resolver import cd_render_config, resolve_cd_variant
 from app.modules.files.storage import ObjectStorage, StorageError
 from app.modules.pdf.markdown import build_application_markdown
 from app.modules.pdf.models import RenderJob
@@ -105,7 +106,15 @@ class RenderPipeline:
         assert job.application_id is not None
         doc = await PdfService(session).load_application_doc(job.application_id)
         markdown = build_application_markdown(doc)
-        return await self.pytex.render_pdf(markdown, variant=doc.variant)
+        cd = await resolve_cd_variant(session, self.storage, doc.gremium_id)
+        if cd is None:
+            return await self.pytex.render_pdf(markdown, variant=doc.variant)
+        return await self.pytex.render_pdf(
+            markdown,
+            variant=cd.base_variant,
+            config=cd_render_config(cd),
+            assets=cd.assets,
+        )
 
     async def _fail(self, session: AsyncSession, job: RenderJob, code: str) -> str:
         """Set the job permanently to ``failed`` (path-free short code)."""

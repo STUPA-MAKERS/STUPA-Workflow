@@ -482,6 +482,55 @@ class TransferOut(_CamelModel):
     income_id: UUID = Field(alias="incomeId")
 
 
+class TransferUpdate(_CamelModel):
+    """Update both legs of a transfer at once.
+
+    `amount`, `description`, `note`, `invoiceDate` and `paymentDate` apply to
+    the source expense and to the target income together. The two cost centres
+    stay immutable: a different pair is a different transfer. `fromBudgetId`
+    and `toBudgetId` are accepted only to repeat the current pair, so a
+    round-trip of the read model does not fail. A different value gives 409.
+    """
+
+    amount: Decimal | None = Field(default=None, gt=0, le=_MAX_AMOUNT, allow_inf_nan=False)
+    description: str | None = Field(default=None, min_length=1)
+    note: str | None = Field(default=None)
+    invoice_date: date | None = Field(default=None, alias="invoiceDate")
+    payment_date: date | None = Field(default=None, alias="paymentDate")
+    from_budget_id: UUID | None = Field(default=None, alias="fromBudgetId")
+    to_budget_id: UUID | None = Field(default=None, alias="toBudgetId")
+
+    @model_validator(mode="after")
+    def _at_least_one(self) -> TransferUpdate:
+        if not self.model_fields_set:
+            raise ValueError("at least one field required")
+        return self
+
+
+class TransferRowOut(_CamelModel):
+    """One transfer as a single row, assembled from its two bookings."""
+
+    transfer_id: UUID = Field(alias="transferId")
+    expense_id: UUID = Field(alias="expenseId")
+    income_id: UUID = Field(alias="incomeId")
+    from_budget_id: UUID = Field(alias="fromBudgetId")
+    from_path_key: str | None = Field(default=None, alias="fromPathKey")
+    to_budget_id: UUID = Field(alias="toBudgetId")
+    to_path_key: str | None = Field(default=None, alias="toPathKey")
+    fiscal_year_id: UUID = Field(alias="fiscalYearId")
+    amount: Decimal
+    currency: str
+    description: str
+    note: str | None = None
+    invoice_date: date | None = Field(default=None, alias="invoiceDate")
+    payment_date: date | None = Field(default=None, alias="paymentDate")
+    # `actor` is the principal `sub`. `actorName` is the resolved display name.
+    # Never show the raw id in the UI.
+    actor: str | None = None
+    actor_name: str | None = Field(default=None, alias="actorName")
+    created_at: datetime = Field(alias="createdAt")
+
+
 BudgetTreeNodeOut.model_rebuild()
 
 __all__ = [

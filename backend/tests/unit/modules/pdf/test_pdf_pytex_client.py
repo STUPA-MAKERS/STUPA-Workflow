@@ -1,10 +1,16 @@
 """Unit tests for the pytex client (T-20): a respx mock of `POST /render`.
 
 The tests cover success (PDF bytes), 4xx (permanent, no retry), 5xx (transient),
-a transport error (transient), and an unexpected content type.
+a transport error (transient), and an unexpected content type. They also cover the
+two wire shapes: the raw body without a config and without assets, and the
+multipart form that carries the config object plus the binary assets.
 """
 
 from __future__ import annotations
+
+import json
+from email import message_from_bytes
+from email.message import Message
 
 import httpx
 import pytest
@@ -18,6 +24,35 @@ BASE = "http://pytex:8099"
 
 def _client() -> PytexClient:
     return PytexClient(base_url=BASE, trust_level="trusted", timeout_seconds=5)
+
+
+def _parts(request: httpx.Request) -> list[tuple[str, str | None, bytes]]:
+    """Parse a recorded multipart body into `(field name, file name, bytes)` triples."""
+    raw = (
+        b"Content-Type: "
+        + request.headers["content-type"].encode()
+        + b"\r\n\r\n"
+        + request.content
+    )
+    payload = message_from_bytes(raw).get_payload()
+    assert isinstance(payload, list), "the request body is not multipart"
+    out: list[tuple[str, str | None, bytes]] = []
+    for part in payload:
+        assert isinstance(part, Message)
+        name = part.get_param("name", header="content-disposition")
+        body = part.get_payload(decode=True)
+        out.append(
+            (str(name), part.get_filename(), body if isinstance(body, bytes) else b"")
+        )
+    return out
+
+
+def _pdf_route() -> respx.Route:
+    return respx.post(f"{BASE}/render").mock(
+        return_value=httpx.Response(
+            200, content=b"%PDF", headers={"content-type": "application/pdf"}
+        )
+    )
 
 
 @respx.mock
@@ -105,6 +140,87 @@ async def test_render_unexpected_content_type_permanent() -> None:
     assert ei.value.retryable is False
 
 
+# Config + assets channel: the caller pushes uploaded Corporate-Design logos into a
+# render. Only such a call switches the wire shape to multipart.
+
+LOGO = b"\x89PNG\r\n\x1a\nfake-logo"
+CONFIG: dict[str, object] = {"logos": ["stupa.png"], "footer_logos": "asta.png"}
+
+
+@respx.mock
+async def test_render_without_config_or_assets_keeps_the_raw_body() -> None:
+    """No config and no assets means the exact request the client sent before."""
+    route = _pdf_route()
+    await _client().render_pdf("# doc", variant="report")
+    req = route.calls.last.request
+    assert req.content == b"# doc"
+    assert req.headers["content-type"] == "text/markdown; charset=utf-8"
+
+
+@respx.mock
+async def test_render_with_empty_config_and_assets_keeps_the_raw_body() -> None:
+    """An empty mapping carries nothing, so it must not force a multipart request."""
+    route = _pdf_route()
+    await _client().render_pdf("# doc", config={}, assets={})
+    req = route.calls.last.request
+    assert req.content == b"# doc"
+    assert req.headers["content-type"] == "text/markdown; charset=utf-8"
+
+
+@respx.mock
+async def test_render_with_assets_and_config_sends_multipart() -> None:
+    route = _pdf_route()
+    out = await _client().render_pdf(
+        "# doc",
+        variant="report",
+        config=CONFIG,
+        assets={"stupa.png": LOGO, "asta.png": b"second"},
+    )
+    assert out == b"%PDF"
+    req = route.calls.last.request
+    assert req.headers["content-type"].startswith("multipart/form-data")
+    # The query params keep working next to the multipart body.
+    assert req.url.params["variant"] == "report"
+    assert req.url.params["trust_level"] == "trusted"
+    assert req.url.params["output_kind"] == "pdf"
+
+    parts = _parts(req)
+    source = [p for p in parts if p[0] == "source"]
+    assert source == [("source", "source.md", b"# doc")]
+    config = [p for p in parts if p[0] == "config"]
+    assert len(config) == 1
+    assert json.loads(config[0][2]) == CONFIG
+    # pytex reads the asset name from the file name of the part.
+    assets = {name: data for field, name, data in parts if field == "assets"}
+    assert assets == {"stupa.png": LOGO, "asta.png": b"second"}
+
+
+@respx.mock
+async def test_render_with_assets_only_sends_no_config_part() -> None:
+    route = _pdf_route()
+    await _client().render_pdf("# doc", assets={"logo.png": LOGO})
+    fields = [field for field, _, _ in _parts(route.calls.last.request)]
+    assert fields == ["source", "assets"]
+
+
+@respx.mock
+async def test_render_with_config_only_sends_no_asset_part() -> None:
+    route = _pdf_route()
+    await _client().render_pdf("# doc", config={"title": "Bericht"})
+    fields = [field for field, _, _ in _parts(route.calls.last.request)]
+    assert sorted(fields) == ["config", "source"]
+
+
+@respx.mock
+async def test_render_rejects_a_config_that_is_not_json_serializable() -> None:
+    """A permanent caller error. The request never leaves the process."""
+    route = _pdf_route()
+    with pytest.raises(PytexError) as ei:
+        await _client().render_pdf("# doc", config={"when": object()})
+    assert ei.value.retryable is False
+    assert not route.called
+
+
 def test_build_pytex_client_from_settings() -> None:
     settings = load_settings(pytex_url="http://px:1", pytex_trust="sandboxed")
     client = build_pytex_client(settings)
@@ -146,6 +262,18 @@ async def test_nontrusted_render_passes_eval_trigger_to_pytex() -> None:
     out = await _client().render_pdf(_EVAL_BODY, trust_level="untrusted")
     assert out == b"%PDF"
     assert route.called
+
+
+@respx.mock
+async def test_trusted_multipart_render_refuses_live_eval_trigger() -> None:
+    """The gate applies to the Markdown, whatever the wire shape is."""
+    route = _pdf_route()
+    with pytest.raises(PytexError) as ei:
+        await _client().render_pdf(
+            _EVAL_BODY, variant="report", assets={"logo.png": LOGO}, config=CONFIG
+        )
+    assert ei.value.retryable is False
+    assert not route.called
 
 
 @respx.mock

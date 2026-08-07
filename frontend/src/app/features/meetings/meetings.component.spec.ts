@@ -7,7 +7,7 @@ import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { Subject } from 'rxjs';
-import { of } from 'rxjs';
+import { EMPTY, of } from 'rxjs';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { USE_MOCK_API } from '@core/api/api.config';
@@ -133,6 +133,19 @@ function fakeAuth(perms: string[], userId: string | null = 'pr-1'): Partial<Auth
   };
 }
 
+/**
+ * Router double. `navigate` is the only method the component calls. The rest is
+ * the read-only surface that the breadcrumbs of `app-page-header` read.
+ */
+function routerStub(navigate: jest.Mock = jest.fn(() => Promise.resolve(true))) {
+  return {
+    navigate,
+    events: EMPTY,
+    config: [],
+    routerState: { snapshot: { root: { url: [], data: {}, firstChild: null } } },
+  };
+}
+
 async function setup(
   opts: {
     perms?: string[];
@@ -156,7 +169,7 @@ async function setup(
       { provide: USE_MOCK_API, useValue: false },
       { provide: AuthService, useValue: fakeAuth(perms, userId) },
       { provide: WsService, useValue: ws },
-      { provide: Router, useValue: { navigate } },
+      { provide: Router, useValue: routerStub(navigate) },
       {
         provide: ActivatedRoute,
         useValue: { paramMap: of(convertToParamMap(id ? { id } : {})) },
@@ -1996,7 +2009,7 @@ describe('MeetingsComponent — methods', () => {
           { provide: USE_MOCK_API, useValue: false },
           { provide: AuthService, useValue: fakeAuth([], null) },
           { provide: WsService, useValue: ws },
-          { provide: Router, useValue: { navigate } },
+          { provide: Router, useValue: routerStub(navigate) },
           { provide: ActivatedRoute, useValue: { paramMap: of(convertToParamMap({})) } },
         ],
       });
@@ -2025,7 +2038,7 @@ describe('MeetingsComponent — methods', () => {
           { provide: USE_MOCK_API, useValue: false },
           { provide: AuthService, useValue: auth },
           { provide: WsService, useValue: ws },
-          { provide: Router, useValue: { navigate: jest.fn(() => Promise.resolve(true)) } },
+          { provide: Router, useValue: routerStub() },
           { provide: ActivatedRoute, useValue: { paramMap: of(convertToParamMap({})) } },
         ],
       });
@@ -2064,7 +2077,7 @@ describe('MeetingsComponent — methods', () => {
           { provide: USE_MOCK_API, useValue: false },
           { provide: AuthService, useValue: auth },
           { provide: WsService, useValue: ws },
-          { provide: Router, useValue: { navigate: jest.fn(() => Promise.resolve(true)) } },
+          { provide: Router, useValue: routerStub() },
           { provide: ActivatedRoute, useValue: { paramMap: of(convertToParamMap({})) } },
         ],
       });
@@ -2344,7 +2357,7 @@ describe('MeetingsComponent — methods', () => {
           { provide: USE_MOCK_API, useValue: true },
           { provide: AuthService, useValue: fakeAuth(['meeting.manage', 'protocol.write']) },
           { provide: WsService, useValue: ws },
-          { provide: Router, useValue: { navigate: jest.fn(() => Promise.resolve(true)) } },
+          { provide: Router, useValue: routerStub() },
           { provide: ActivatedRoute, useValue: { paramMap: of(convertToParamMap({ id: 'm-1' })) } },
         ],
       });
@@ -2573,6 +2586,96 @@ describe('MeetingsComponent — methods', () => {
       cmp.meeting.set(null);
       http.expectOne('/api/votes/v-2/open').flush(null, { status: 204, statusText: 'No Content' });
       expect(cmp.meeting()).toBeNull();
+    });
+  });
+
+  describe('discard the draft minutes', () => {
+    it('deletes a draft protocol and clears the pane', async () => {
+      const { cmp, http, fixture } = await loaded();
+      cmp.askDeleteProtocol();
+      expect(cmp.confirmDeleteProtocol()).toBe(true);
+      fixture.detectChanges();
+
+      cmp.doDeleteProtocol();
+      const req = http.expectOne('/api/protocols/p-1');
+      expect(req.request.method).toBe('DELETE');
+      req.flush(null, { status: 204, statusText: 'No Content' });
+
+      expect(cmp.protocol()).toBeNull();
+      expect(cmp.confirmDeleteProtocol()).toBe(false);
+    });
+
+    it('offers the delete only for a draft the user may write', async () => {
+      const { cmp, fixture } = await loaded();
+      fixture.detectChanges();
+      expect(
+        screen.getByRole('button', { name: 'Protokollentwurf verwerfen' }),
+      ).toBeInTheDocument();
+
+      // `rendering` and `final` lock the protocol. The server answers 409 for
+      // both, so the control disappears.
+      cmp.protocol.set({ ...cmp.protocol()!, status: 'rendering', isLocked: true });
+      fixture.detectChanges();
+      expect(
+        screen.queryByRole('button', { name: 'Protokollentwurf verwerfen' }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('hides the delete without the write scope of the meeting', async () => {
+      const { cmp, fixture } = await loaded();
+      cmp.meeting.set({ ...MEETING_MODEL, canWrite: false });
+      fixture.detectChanges();
+      expect(
+        screen.queryByRole('button', { name: 'Protokollentwurf verwerfen' }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('explains a 409 with the server reason and reloads the protocol', async () => {
+      const { cmp, http } = await loaded();
+      cmp.doDeleteProtocol();
+      http.expectOne('/api/protocols/p-1').flush(
+        {
+          type: 'app://error/conflict',
+          title: 'Conflict',
+          status: 409,
+          code: 'conflict',
+          detail: 'Protocol is finalized and read-only.',
+        },
+        { status: 409, statusText: 'Conflict' },
+      );
+      // The refresh reads the current state instead of leaving a stale draft.
+      http
+        .expectOne('/api/meetings/m-1/protocol')
+        .flush({ ...PROTOCOL, status: 'final', pdfUrl: 'x.pdf' });
+      expect(cmp.protocol()?.isFinal).toBe(true);
+      expect(cmp.confirmDeleteProtocol()).toBe(false);
+    });
+
+    it('reports any other failure and keeps the protocol', async () => {
+      const { cmp, http } = await loaded();
+      cmp.doDeleteProtocol();
+      http
+        .expectOne('/api/protocols/p-1')
+        .flush({ title: 'e' }, { status: 500, statusText: 'Server Error' });
+      expect(cmp.protocol()).not.toBeNull();
+      expect(cmp.deletingProtocol()).toBe(false);
+    });
+
+    it('ignores the ask and the delete when there is no draft or one runs', async () => {
+      const { cmp, http } = await loaded();
+      cmp.protocol.set(null);
+      cmp.askDeleteProtocol();
+      expect(cmp.confirmDeleteProtocol()).toBe(false);
+      cmp.doDeleteProtocol();
+
+      cmp.protocol.set({ ...PROTOCOL, isFinal: false, isLocked: false, publicPdfUrl: null });
+      cmp.deletingProtocol.set(true);
+      cmp.doDeleteProtocol();
+      cmp.deletingProtocol.set(false);
+      cmp.askDeleteProtocol();
+      cmp.closeDeleteProtocol();
+      expect(cmp.confirmDeleteProtocol()).toBe(false);
+      http.verify();
     });
   });
 });

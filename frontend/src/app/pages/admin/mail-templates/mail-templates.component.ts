@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
 import type { TranslationKey } from '@core/i18n/translations';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
+import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { ButtonComponent } from '@stupa-makers/ui-kit';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
@@ -21,7 +22,7 @@ type Lang = (typeof LANGS)[number];
   selector: 'app-mail-templates',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, ButtonComponent],
+  imports: [FormsModule, TranslatePipe, ButtonComponent, PageHeaderComponent],
   templateUrl: './mail-templates.component.html',
   styleUrl: './mail-templates.component.scss',
 })

@@ -1,9 +1,6 @@
 <section class="fe">
-  <header class="fe__head">
-    <div class="fe__head-left">
-      <h1 class="fe__title">{{ resolved(title()) || ('admin.forms.untitled' | t) }}</h1>
-    </div>
-    <div class="fe__head-tools">
+  <app-page-header [title]="resolved(title()) || ('admin.forms.untitled' | t)">
+    <div actions class="fe__head-tools">
       @if (formVersion(); as v) {
         <span class="inline-flex items-center py-1 px-3 rounded-full text-xs font-semibold bg-surface-sunken text-muted">{{ 'admin.forms.versionLabel' | t: { n: v } }}</span>
       }
@@ -22,7 +19,7 @@
         {{ 'admin.forms.save' | t }}
       </app-button>
     </div>
-  </header>
+  </app-page-header>
 
   @if (loading()) {
     <p class="py-4 text-muted" aria-live="polite">{{ 'admin.forms.overviewLoading' | t }}</p>

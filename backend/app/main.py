@@ -29,6 +29,7 @@ from app.modules.application_types.router import router as application_types_rou
 from app.modules.applications.router import router as applications_router
 from app.modules.audit.router import router as audit_router
 from app.modules.auth.mcp_router import router as mcp_router
+from app.modules.auth.oauth_admin_router import router as oauth_admin_router
 from app.modules.auth.oauth_router import router as oauth_router
 from app.modules.auth.oauth_router import well_known_router as oauth_well_known_router
 from app.modules.auth.router import router as auth_router
@@ -79,6 +80,8 @@ def health() -> dict[str, str]:
 # calls in the tests then do not register them twice.
 api_router.include_router(auth_router)
 api_router.include_router(oauth_router)
+# Admin view over the grants of every principal (kill switch for a leaked agent token).
+api_router.include_router(oauth_admin_router)
 api_router.include_router(mcp_router)
 # Mirror OAuth discovery under /api. The RFC location is the root, but /api always
 # stays reachable through the edge proxy and gives MCP clients a fallback.

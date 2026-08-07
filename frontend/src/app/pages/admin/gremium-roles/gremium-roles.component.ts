@@ -5,6 +5,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { Uuid } from '@core/api/models';
 import { CapitalizePipe } from '@shared/pipes/capitalize.pipe';
+import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import {
   ButtonComponent,
   CellDirective,
@@ -47,6 +48,7 @@ function emptyDraft(): RoleDraft {
     FormsModule,
     TranslatePipe,
     CapitalizePipe,
+    PageHeaderComponent,
     ButtonComponent,
     DataTableComponent,
     CellDirective,

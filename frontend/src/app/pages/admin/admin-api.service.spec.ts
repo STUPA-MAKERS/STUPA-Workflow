@@ -34,6 +34,16 @@ describe('AdminApiService — mock mode', () => {
     });
   });
 
+  it('deletes a webhook and reports no delivery status in mock mode', async () => {
+    const s = svc();
+    const before = await firstValueFrom(s.listWebhooks());
+    await firstValueFrom(s.deleteWebhook(before[0].id));
+    const after = await firstValueFrom(s.listWebhooks());
+    expect(after.some((h) => h.id === before[0].id)).toBe(false);
+    // The mock backend records no deliveries.
+    expect(await firstValueFrom(s.listWebhookDeliveryStatus())).toEqual([]);
+  });
+
   it('covers schemas, versions, gremien, roles and rule upsert in mock mode', async () => {
     const s = svc();
     const schemas = await firstValueFrom(s.configSchemas());
@@ -43,13 +53,15 @@ describe('AdminApiService — mock mode', () => {
     // #105 — create and edit gremien in the mock store.
     const before = (await firstValueFrom(s.listGremien())).length;
     const newGremium = await firstValueFrom(
-      s.createGremium({ name: 'Neu', slug: 'neu', cdVariant: 'stupa', defaultLang: 'de' }),
+      s.createGremium({ name: 'Neu', slug: 'neu', cdVariantId: 'cd-stupa', defaultLang: 'de' }),
     );
     expect(newGremium.name).toBe('Neu');
     expect((await firstValueFrom(s.listGremien())).length).toBe(before + 1);
     const edited = await firstValueFrom(s.updateGremium(newGremium.id, { name: 'Geändert' }));
     expect(edited.name).toBe('Geändert');
     expect((await firstValueFrom(s.listRoles())).length).toBeGreaterThan(0);
+    // The gremium dropdown gets stub CD variants in mock mode.
+    expect((await firstValueFrom(s.listCdVariantOptions())).length).toBeGreaterThan(0);
 
     // An existing webhook takes the update branch of upsert.
     const hooks = await firstValueFrom(s.listWebhooks());
@@ -134,6 +146,16 @@ describe('AdminApiService — real mode (contract)', () => {
     expect(http.expectOne('/api/admin/webhooks/wh-9').request.method).toBe('PATCH');
   });
 
+  it('DELETEs a webhook and GETs the delivery status', () => {
+    s.deleteWebhook('wh-9').subscribe();
+    expect(http.expectOne('/api/admin/webhooks/wh-9').request.method).toBe('DELETE');
+
+    s.listWebhookDeliveryStatus().subscribe();
+    const status = http.expectOne('/api/admin/webhooks/delivery-status');
+    expect(status.request.method).toBe('GET');
+    status.flush([]);
+  });
+
   it('wires the remaining admin endpoints to their documented paths', () => {
     s.createFormVersion('t2', []).subscribe();
     expect(http.expectOne('/api/admin/application-types/t2/form-versions').request.method).toBe('POST');
@@ -166,8 +188,29 @@ describe('AdminApiService — real mode (contract)', () => {
     s.revokeRole('a-9').subscribe();
     expect(http.expectOne('/api/admin/role-assignments/a-9').request.method).toBe('DELETE');
 
+    s.updateRoleAssignment('a-9', { roleId: 'r2' }).subscribe();
+    const patch = http.expectOne('/api/admin/role-assignments/a-9');
+    expect(patch.request.method).toBe('PATCH');
+    expect(patch.request.body).toEqual({ roleId: 'r2' });
+
     s.saveRolePermissions('r-9', ['flow.configure']).subscribe();
     expect(http.expectOne('/api/admin/roles/r-9').request.method).toBe('PATCH');
+  });
+
+  it('wires the admin OAuth-grant list and the kill switch', () => {
+    // Defaults: the documented page size, no owner filter.
+    s.listOAuthGrants().subscribe();
+    const all = http.expectOne('/api/admin/oauth-grants?limit=50&offset=0');
+    expect(all.request.method).toBe('GET');
+    all.flush({ items: [], total: 0, limit: 50, offset: 0 });
+
+    s.listOAuthGrants({ limit: 25, offset: 25, principalId: 'p-1' }).subscribe();
+    http
+      .expectOne('/api/admin/oauth-grants?limit=25&offset=25&principalId=p-1')
+      .flush({ items: [], total: 0, limit: 25, offset: 25 });
+
+    s.revokeOAuthGrant('grant-9').subscribe();
+    expect(http.expectOne('/api/admin/oauth-grants/grant-9').request.method).toBe('DELETE');
   });
 
   it('GETs gremium options from the public /gremien path (#68)', () => {
@@ -182,7 +225,7 @@ describe('AdminApiService — real mode (contract)', () => {
     s.deleteGremium('g-9').subscribe();
     expect(http.expectOne('/api/admin/gremien/g-9').request.method).toBe('DELETE');
 
-    s.createGremium({ name: 'X', slug: 'x', cdVariant: 'stupa', defaultLang: 'de' }).subscribe();
+    s.createGremium({ name: 'X', slug: 'x', cdVariantId: 'cd-stupa', defaultLang: 'de' }).subscribe();
     expect(http.expectOne('/api/admin/gremien').request.method).toBe('POST');
 
     s.getGremiumMailRecipients('g-9').subscribe();
@@ -195,6 +238,46 @@ describe('AdminApiService — real mode (contract)', () => {
     expect(put.request.body).toEqual({ recipients: ['a@b.org'] });
     put.flush({ recipients: ['a@b.org'] });
     expect(recv).toEqual(['a@b.org']);
+  });
+
+  it('wires the CD-variant endpoints incl. logo upload, order and file URL', () => {
+    s.listCdVariants().subscribe();
+    expect(http.expectOne('/api/admin/cd-variants').request.method).toBe('GET');
+
+    s.createCdVariant({ key: 'stupa', name: 'StuPa', baseVariant: 'report' }).subscribe();
+    expect(http.expectOne('/api/admin/cd-variants').request.method).toBe('POST');
+
+    s.updateCdVariant('cd-1', { name: 'Neu' }).subscribe();
+    expect(http.expectOne('/api/admin/cd-variants/cd-1').request.method).toBe('PATCH');
+
+    s.deleteCdVariant('cd-1').subscribe();
+    expect(http.expectOne('/api/admin/cd-variants/cd-1').request.method).toBe('DELETE');
+
+    const file = new File(['x'], 'logo.png', { type: 'image/png' });
+    s.uploadCdVariantLogo('cd-1', 'title', file).subscribe();
+    const upload = http.expectOne('/api/admin/cd-variants/cd-1/logos');
+    expect(upload.request.method).toBe('POST');
+    expect(upload.request.body instanceof FormData).toBe(true);
+    expect((upload.request.body as FormData).get('slot')).toBe('title');
+    expect((upload.request.body as FormData).get('file')).toBe(file);
+
+    s.addCdVariantVendoredLogo('cd-1', 'footer', 'HSRT').subscribe();
+    const vendored = http.expectOne('/api/admin/cd-variants/cd-1/logos/vendored');
+    expect(vendored.request.method).toBe('POST');
+    expect(vendored.request.body).toEqual({ slot: 'footer', vendoredName: 'HSRT' });
+
+    s.reorderCdVariantLogos('cd-1', 'title', ['l-2', 'l-1']).subscribe();
+    const order = http.expectOne('/api/admin/cd-variants/cd-1/logos/order');
+    expect(order.request.method).toBe('PUT');
+    expect(order.request.body).toEqual({ slot: 'title', logoIds: ['l-2', 'l-1'] });
+
+    s.deleteCdVariantLogo('l-1').subscribe();
+    expect(http.expectOne('/api/admin/cd-variant-logos/l-1').request.method).toBe('DELETE');
+
+    expect(s.cdVariantLogoFileUrl('l-1')).toBe('/api/admin/cd-variant-logos/l-1/file');
+
+    s.listCdVariantOptions().subscribe();
+    http.expectOne('/api/cd-variants').flush([]);
   });
 
   it('wires OIDC group-mapping CRUD endpoints (#5-4)', () => {
@@ -375,6 +458,15 @@ describe('AdminApiService — real mode (contract)', () => {
     s.createGremiumMembership('g1', { principalId: 'p1', gremiumRoleId: 'gr1', validFrom: null, validUntil: null }).subscribe();
     expect(http.expectOne('/api/admin/gremien/g1/memberships').request.method).toBe('POST');
 
+    s.updateGremiumMembership('gm-9', { gremiumRoleId: 'gr2', validFrom: '2027-01-01', validUntil: null }).subscribe();
+    const patch = http.expectOne('/api/admin/gremium-memberships/gm-9');
+    expect(patch.request.method).toBe('PATCH');
+    expect(patch.request.body).toEqual({
+      gremiumRoleId: 'gr2',
+      validFrom: '2027-01-01',
+      validUntil: null,
+    });
+
     s.deleteGremiumMembership('gm-9').subscribe();
     expect(http.expectOne('/api/admin/gremium-memberships/gm-9').request.method).toBe('DELETE');
   });
@@ -505,6 +597,31 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect((await firstValueFrom(s.listApplicationTypesFull())).length).toBeGreaterThan(0);
   });
 
+  it('pages, filters and revokes OAuth grants in the mock store', async () => {
+    const s = svc();
+    const all = await firstValueFrom(s.listOAuthGrants());
+    expect(all.total).toBe(2);
+    expect(all.items[0].principalName).toBe('Alex Admin');
+    // The second stub carries no owner name and no expiry.
+    expect(all.items[1].principalName).toBeNull();
+    expect(all.items[1].accessExpiresAt).toBeNull();
+
+    // Paging slices the store.
+    const secondPage = await firstValueFrom(s.listOAuthGrants({ limit: 1, offset: 1 }));
+    expect(secondPage.items).toHaveLength(1);
+    expect(secondPage.offset).toBe(1);
+    expect(secondPage.total).toBe(2);
+
+    // The owner filter narrows the list.
+    const mine = await firstValueFrom(s.listOAuthGrants({ principalId: 'p-1' }));
+    expect(mine.items.map((g) => g.id)).toEqual(['grant-1']);
+
+    await firstValueFrom(s.revokeOAuthGrant('grant-1'));
+    const after = await firstValueFrom(s.listOAuthGrants());
+    expect(after.items.some((g) => g.id === 'grant-1')).toBe(false);
+    expect(after.total).toBe(1);
+  });
+
   it('deletes a gremium and returns empty mail recipients', async () => {
     const s = svc();
     const first = (await firstValueFrom(s.listGremien()))[0];
@@ -561,6 +678,26 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     // over all principals.
     await firstValueFrom(s.revokeRole('not-real'));
     expect((await firstValueFrom(s.listPrincipals())).find((p) => p.id === target.id)!.assignments.length).toBe(1);
+  });
+
+  it('updateRoleAssignment merges into the mock store and tolerates an unknown id', async () => {
+    const s = svc();
+    const target = (await firstValueFrom(s.listPrincipals())).find((p) => p.assignments.length === 0)!;
+    const created = await firstValueFrom(s.assignRole({ principalId: target.id, roleId: 'r-member' }));
+
+    const patched = await firstValueFrom(
+      s.updateRoleAssignment(created.id, { validUntil: '2026-12-31T00:00:00Z' }),
+    );
+    expect(patched.validUntil).toBe('2026-12-31T00:00:00Z');
+    expect(patched.roleId).toBe('r-member');
+    const after = await firstValueFrom(s.listPrincipals());
+    expect(after.find((p) => p.id === target.id)!.assignments[0].validUntil).toBe(
+      '2026-12-31T00:00:00Z',
+    );
+
+    // An unknown id echoes the patch instead of crashing.
+    const echo = await firstValueFrom(s.updateRoleAssignment('nope', { roleId: 'r-member' }));
+    expect(echo.id).toBe('nope');
   });
 
   it('returns an empty principal list when search matches nothing', async () => {

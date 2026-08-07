@@ -25,12 +25,11 @@
   @case ('ready') {
     @if (application(); as app) {
       <section class="status">
-        <header class="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <h1 class="m-0">{{ 'status.heading' | t }}</h1>
-            <p class="status__id">{{ 'status.case' | t: { id: app.id } }}</p>
-          </div>
-          <div class="flex flex-col items-end gap-2">
+        <app-page-header
+          [title]="'status.heading' | t"
+          [subtitle]="'status.case' | t: { id: app.id }"
+        >
+          <div actions class="flex flex-col items-end gap-2">
             <div class="inline-flex gap-2 flex-wrap">
               <app-badge variant="primary">{{ app.state?.label }}</app-badge>
               @if (!canEdit()) {
@@ -39,7 +38,7 @@
             </div>
             <app-button variant="danger" size="sm" (click)="confirmErase.set(true)">{{ 'applications.detail.eraseRequest' | t }}</app-button>
           </div>
-        </header>
+        </app-page-header>
 
         <!-- Three columns, as on the internal application detail page: actions left,
              history and application data center, comments (chat) right. -->

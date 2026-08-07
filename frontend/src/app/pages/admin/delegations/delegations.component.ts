@@ -4,6 +4,7 @@ import { type Delegation, DelegationsApiService } from '@core/api/delegations.se
 import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
+import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import {
   BadgeComponent,
   ButtonComponent,
@@ -34,6 +35,7 @@ import { ToastService } from '@stupa-makers/ui-kit';
     DataTableComponent,
     CellDirective,
     DialogComponent,
+    PageHeaderComponent,
   ],
   templateUrl: './delegations.component.html',
   styleUrl: '../config/config.shared.scss',

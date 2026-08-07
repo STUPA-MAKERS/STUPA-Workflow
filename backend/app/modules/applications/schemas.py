@@ -148,6 +148,17 @@ class CommentCreate(_CamelModel):
     visibility: Literal["internal", "public"] = "public"
 
 
+class CommentPatch(_CamelModel):
+    """Replace the body of a comment in place.
+
+    The visibility is not patchable. A public comment is already out, so
+    switching it to internal hides it only from the applicant who read it. The
+    delete is the path for that case.
+    """
+
+    body: str = Field(min_length=1, max_length=10_000)
+
+
 class CommentOut(_CamelModel):
     id: UUID
     author: str | None = None

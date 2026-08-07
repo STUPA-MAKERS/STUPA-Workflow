@@ -47,6 +47,7 @@ description: Backend identity and access. Covers OIDC/Keycloak login (Auth Code 
 - `POST /api/oauth/consent` — mint code with chosen scope/lifetime (approve) or `access_denied` (deny). Requires `mcp.use`
 - `POST /api/oauth/token` — `authorization_code`/`refresh_token` → scoped opaque token pair (RFC-6749 §5.2 error JSON, NOT problem+json)
 - `GET /api/oauth/grants`, `DELETE /api/oauth/grants/{id}`, `DELETE /api/oauth/grants` — self-service grant list / revoke / revoke-all
+- `GET /api/admin/oauth-grants`, `DELETE /api/admin/oauth-grants/{id}` — grants of ANY principal, `admin.users`. This is how an admin kills a leaked agent token. Both routes and the self-service ones share one revocation path in `oauth_service.py` (`load_grant`, `revoke_grant`, `revoke_all_grants`), so a second path cannot drift.
 - `GET /.well-known/oauth-authorization-server`, `GET /.well-known/oauth-protected-resource` — RFC 8414 / 9728 discovery
 - `GET /api/mcp/config`, `GET /api/mcp/package` — MCP client config + source tarball (gated `mcp.use`)
 

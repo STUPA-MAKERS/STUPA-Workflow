@@ -5,7 +5,10 @@ description = "MCP server exposing the antragsplattform API to agents via browse
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "mcp>=1.2.0",
+    # Cap below 2.0: that release moved `mcp.server.fastmcp` into the separate
+    # `fastmcp` distribution, so an uncapped install resolves to a version this
+    # server cannot import.
+    "mcp>=1.2.0,<2",
     "httpx>=0.27",
     "pydantic>=2.7",
 ]

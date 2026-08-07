@@ -39,12 +39,7 @@ module.exports = {
   // the actual values. A real regression breaks the build, but a small variation
   // does not. Keep or raise them.
   //
-  // `lines` moved from 99 to 98.9 (#drop-fints). Removing the Konten tab and
-  // FinTS deleted 643 fully covered lines but only 1 uncovered line. The
-  // ABSOLUTE count of uncovered lines therefore fell (94 -> 92) while the ratio
-  // fell as well (99.04 % -> 98.98 %), because the deleted code was covered
-  // better than average. No file lost coverage.
   coverageThreshold: {
-    global: { statements: 98, branches: 96, functions: 98, lines: 98.9 },
+    global: { statements: 98, branches: 96, functions: 98, lines: 99 },
   },
 };

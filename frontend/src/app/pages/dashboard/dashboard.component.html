@@ -1,17 +1,18 @@
-<header class="flex flex-col">
-  <h1 class="mb-2">{{ 'dashboard.greeting' | t: { name: auth.displayName() } }}</h1>
-  <p class="text-muted text-lg">{{ 'dashboard.subtitle' | t }}</p>
-  @if (roles().length || gremien().length) {
-    <div class="flex flex-wrap gap-2 mt-4">
-      @for (role of roles(); track role) {
-        <app-badge variant="primary">{{ roleLabel(role) | capitalize }}</app-badge>
-      }
-      @for (g of gremien(); track g.id) {
-        <app-badge variant="neutral">{{ g.name }}</app-badge>
-      }
-    </div>
-  }
-</header>
+<app-page-header
+  [title]="'dashboard.greeting' | t: { name: auth.displayName() }"
+  [subtitle]="'dashboard.subtitle' | t"
+>
+  <!-- The roles and Gremien of the user ride in the actions slot. They are status, not
+       a control, so they stay in the header instead of taking a block of their own. -->
+  <div actions class="flex flex-wrap gap-2">
+    @for (role of roles(); track role) {
+      <app-badge variant="primary">{{ roleLabel(role) | capitalize }}</app-badge>
+    }
+    @for (g of gremien(); track g.id) {
+      <app-badge variant="neutral">{{ g.name }}</app-badge>
+    }
+  </div>
+</app-page-header>
 
 <a class="dash__cta" routerLink="/apply">
   <div class="dash__cta-text">

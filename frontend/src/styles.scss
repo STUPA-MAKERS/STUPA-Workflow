@@ -10,19 +10,22 @@
 @tailwind components;
 @tailwind utilities;
 
-// Bank-reconcile dialog: wider than `lg` (44rem) on desktop to give the transactions
-// table room. This stays a global rule instead of a new ui-kit `xl` size, to avoid a
-// dependency on a submodule release. Below 769px the dialog keeps the full width from
-// its own ui-kit media rule, so this rule starts at 769px.
-//
-// The `.dialog__backdrop` ancestor raises the specificity above the `.dialog--lg` rule
-// of the ui-kit, which carries a view-encapsulation attribute. Without the ancestor the
-// two rules tie, source order decides, and 44rem wins.
-@media (min-width: 769px) {
-  // Use a child combinator, not a bare `:has(.bank)`. On expand and collapse the style
-  // re-evaluation then checks only the direct children, not the whole large table subtree.
-  .dialog__backdrop .dialog:has(> .dialog__body > .bank) {
-    max-width: 64rem;
+// The layout box of a page. The ui-kit ships the same rules under `.container`, but
+// Tailwind emits a `.container` utility of its own with breakpoint max-widths
+// (640/768/1024/1280/1536px). That utility comes later and wins, so the page width
+// followed Tailwind instead of `--layout-max-width`, while every page header centered
+// on the token. The two disagreed and the header alignment moved with the viewport.
+// A name Tailwind does not use ends the collision and keeps `.container` free for
+// utility use.
+.page-shell {
+  width: 100%;
+  max-width: var(--layout-max-width);
+  margin-inline: auto;
+  padding-inline: var(--layout-gutter);
+}
+@media (max-width: 768px) {
+  .page-shell {
+    padding-inline: var(--space-4);
   }
 }
 

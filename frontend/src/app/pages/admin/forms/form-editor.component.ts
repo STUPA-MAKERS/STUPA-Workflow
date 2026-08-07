@@ -15,6 +15,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { FieldType, FormFieldDef, I18nMap, Uuid } from '@core/api/models';
 import { resolveI18n } from '@shared/forms/i18n-text';
+import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import {
   ButtonComponent,
   CheckboxComponent,
@@ -73,6 +74,7 @@ interface QPos {
     SelectComponent,
     IconComponent,
     VersionHistoryComponent,
+    PageHeaderComponent,
   ],
   templateUrl: './form-editor.component.html',
   styleUrl: './form-editor.component.scss',

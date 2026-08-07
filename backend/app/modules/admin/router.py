@@ -1,12 +1,14 @@
 """Admin/config API router.
 
 Endpoints for versioned config CRUD (gremien, application types, the global
-flow), RBAC (roles/role-assignments/group-mappings), webhooks, config-schemas
-and site-config/branding, plus a public auth-free branding read.
+flow), RBAC (roles/role-assignments/group-mappings), webhooks, corporate-design
+variants, config-schemas and site-config/branding, plus a public auth-free
+branding read.
 
 RBAC is server-side authoritative. ``require_principal`` answers 401 or 403.
 The frontend is only a UX gate. Per-area permissions: ``admin.gremien``,
-``admin.types``, ``admin.site``, ``admin.roles``, ``webhook.manage``.
+``admin.types``, ``admin.site``, ``admin.roles``, ``admin.cd_variants``,
+``webhook.manage``.
 
 ``notification-rules`` and ``mail-templates`` live in the notifications module.
 ``/admin/audit`` lives in audit and the form versions live in forms. This
@@ -18,7 +20,17 @@ from __future__ import annotations
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, Response
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Form,
+    Query,
+    Request,
+    Response,
+    UploadFile,
+)
 
 from app.deps import (
     DbSession,
@@ -28,17 +40,26 @@ from app.deps import (
     require_principal,
 )
 from app.modules.admin.branding import Branding
+from app.modules.admin.cd_logos import LogoSlot
 from app.modules.admin.gremium_roles import GremiumRoleService
 from app.modules.admin.schemas import (
     ApplicationTypeCreate,
     ApplicationTypeOut,
     ApplicationTypeUpdate,
+    CdVariantCreate,
+    CdVariantLogoOut,
+    CdVariantLogoReorder,
+    CdVariantLogoVendoredCreate,
+    CdVariantOptionOut,
+    CdVariantOut,
+    CdVariantUpdate,
     FlowVersionCreate,
     FlowVersionOut,
     GremiumCreate,
     GremiumMailRecipients,
     GremiumMembershipCreate,
     GremiumMembershipOut,
+    GremiumMembershipUpdate,
     GremiumOut,
     GremiumRoleCreate,
     GremiumRoleOut,
@@ -62,13 +83,14 @@ from app.modules.admin.schemas import (
     WebhookOut,
     WebhookUpdate,
 )
-from app.modules.admin.service import ConfigService
+from app.modules.admin.service import CdVariantService, ConfigService
 from app.modules.admin.site_config_service import SiteConfigService
 from app.modules.notifications.auto import (
     AutoMailer,
     assignment_mail_info,
     get_auto_mailer,
 )
+from app.shared.antiabuse import body_cap
 from app.shared.config_schemas import FlowGraph, export_json_schemas
 from app.shared.errors import ProblemDetail
 
@@ -98,9 +120,22 @@ def get_gremium_role_service(session: DbSession) -> GremiumRoleService:
     return GremiumRoleService(session)
 
 
+def get_cd_variant_service(session: DbSession, request: Request) -> CdVariantService:
+    # Only the logo upload and download touch the object storage. Without MinIO
+    # (development, contract CI) those two routes answer 503.
+    storage = getattr(request.app.state, "object_storage", None)
+    return CdVariantService(session, storage=storage)
+
+
 ServiceDep = Annotated[ConfigService, Depends(get_config_service)]
 SiteServiceDep = Annotated[SiteConfigService, Depends(get_site_config_service)]
 GremiumRoleServiceDep = Annotated[GremiumRoleService, Depends(get_gremium_role_service)]
+CdVariantServiceDep = Annotated[CdVariantService, Depends(get_cd_variant_service)]
+
+# Body cap on Content-Length for a logo upload, applied before FastAPI buffers
+# the body. It adds defense in depth next to the nginx cap and the authoritative
+# in-service size check.
+_enforce_cd_logo_body = body_cap("attachment_max_bytes")
 
 AutoMailerDep = Annotated[AutoMailer, Depends(get_auto_mailer)]
 
@@ -119,6 +154,11 @@ WebhookAdmin = Annotated[Principal, Depends(require_principal("webhook.manage"))
 UsersAdmin = Annotated[Principal, Depends(require_principal("admin.users"))]
 GroupMappingsAdmin = Annotated[Principal, Depends(require_principal("admin.group_mappings"))]
 GremiumRolesAdmin = Annotated[Principal, Depends(require_principal("admin.gremium_roles"))]
+CdVariantsAdmin = Annotated[Principal, Depends(require_principal("admin.cd_variants"))]
+# The global flow save accepts EITHER key. See `create_global_flow` for the reason.
+FlowVersionAdmin = Annotated[
+    Principal, Depends(require_any_permission("admin.types", "flow.configure"))
+]
 
 # All admin area permissions (for ANY-of reads plus the admin landing page).
 _ALL_ADMIN_AREAS = (
@@ -129,6 +169,7 @@ _ALL_ADMIN_AREAS = (
     "admin.users",
     "admin.group_mappings",
     "admin.gremium_roles",
+    "admin.cd_variants",
     "admin.delegations",
     "admin.deadlines",
 )
@@ -140,6 +181,10 @@ _ROLES = Depends(require_principal("admin.roles"))
 _USERS = Depends(require_principal("admin.users"))
 _GROUP_MAPPINGS = Depends(require_principal("admin.group_mappings"))
 _WEBHOOK = Depends(require_principal("webhook.manage"))
+_CD_VARIANTS = Depends(require_principal("admin.cd_variants"))
+# The gremien page needs the CD-variant list as a dropdown source. It does not
+# hold the matching write permission.
+_CD_VARIANT_OPTIONS = Depends(require_any_permission("admin.gremien", "admin.cd_variants"))
 # Shared reads serving several admin areas (ANY-of).
 _ANY_ADMIN_AREA = Depends(require_any_permission(*_ALL_ADMIN_AREAS))
 # The gremium-members subpage (admin.gremien) needs read access to the gremium
@@ -333,6 +378,27 @@ async def create_gremium_membership(
     return await service.create_membership(gremium_id, payload, principal.sub)
 
 
+@router.patch(
+    "/gremium-memberships/{membership_id}",
+    response_model=GremiumMembershipOut,
+    responses=_errors(400, 401, 403, 404, 409, 422),
+)
+async def update_gremium_membership(
+    membership_id: UUID,
+    payload: GremiumMembershipUpdate,
+    service: GremiumRoleServiceDep,
+    principal: GremienAdmin,
+) -> GremiumMembershipOut:
+    """Change the role or the term of office of a membership.
+
+    The member and the Gremium stay immutable. A role of another Gremium and a
+    term that overlaps another term of the same member both give 409, exactly
+    as on the create. A ``validFrom`` that is not before ``validUntil`` gives
+    422.
+    """
+    return await service.update_membership(membership_id, payload, principal.sub)
+
+
 @router.delete(
     "/gremium-memberships/{membership_id}", status_code=204, responses=_errors(401, 403, 404)
 )
@@ -357,6 +423,162 @@ async def list_gremien_authed(
     id, name and variant. Create and update stay on ``admin.gremien``.
     """
     return await service.list_gremien()
+
+
+# Corporate-design variants: the logo sets that a Gremium renders its documents
+# with. Every route gates on `admin.cd_variants`.
+@router.get(
+    "/cd-variants",
+    response_model=list[CdVariantOut],
+    dependencies=[_CD_VARIANTS],
+    responses=_errors(401, 403),
+)
+async def list_cd_variants(service: CdVariantServiceDep) -> list[CdVariantOut]:
+    """List the CD variants with their title and footer logos."""
+    return await service.list_variants()
+
+
+@router.post(
+    "/cd-variants",
+    response_model=CdVariantOut,
+    status_code=201,
+    responses=_errors(400, 401, 403, 409, 422),
+)
+async def create_cd_variant(
+    payload: CdVariantCreate, service: CdVariantServiceDep, principal: CdVariantsAdmin
+) -> CdVariantOut:
+    """Create a CD variant. A duplicate key answers 409."""
+    return await service.create_variant(payload, principal.sub)
+
+
+@router.patch(
+    "/cd-variants/{variant_id}",
+    response_model=CdVariantOut,
+    responses=_errors(400, 401, 403, 404, 409, 422),
+)
+async def update_cd_variant(
+    variant_id: UUID,
+    payload: CdVariantUpdate,
+    service: CdVariantServiceDep,
+    principal: CdVariantsAdmin,
+) -> CdVariantOut:
+    """Patch name or base variant. The key is immutable and a change answers 409."""
+    return await service.update_variant(variant_id, payload, principal.sub)
+
+
+@router.delete(
+    "/cd-variants/{variant_id}",
+    status_code=204,
+    responses=_errors(401, 403, 404, 409),
+)
+async def delete_cd_variant(
+    variant_id: UUID, service: CdVariantServiceDep, principal: CdVariantsAdmin
+) -> None:
+    """Delete a CD variant. A Gremium that still references it answers 409."""
+    await service.delete_variant(variant_id, principal.sub)
+
+
+@router.post(
+    "/cd-variants/{variant_id}/logos",
+    response_model=CdVariantLogoOut,
+    status_code=201,
+    dependencies=[Depends(_enforce_cd_logo_body)],
+    responses=_errors(401, 403, 404, 413, 415, 422, 503),
+)
+async def upload_cd_variant_logo(
+    variant_id: UUID,
+    service: CdVariantServiceDep,
+    principal: CdVariantsAdmin,
+    slot: Annotated[LogoSlot, Form()],
+    file: Annotated[UploadFile, File()],
+) -> CdVariantLogoOut:
+    """Upload a logo file into the object storage and append it to the slot.
+
+    The server decides the type from the magic bytes. PNG, JPEG, WebP, SVG and
+    PDF pass. SVG and PDF pass here, and only here, because these bytes reach
+    the LaTeX renderer and never the browser.
+    """
+    data = await file.read()
+    return await service.upload_logo(
+        variant_id, data, slot=slot, filename=file.filename, actor=principal.sub
+    )
+
+
+@router.post(
+    "/cd-variants/{variant_id}/logos/vendored",
+    response_model=CdVariantLogoOut,
+    status_code=201,
+    responses=_errors(400, 401, 403, 404, 422),
+)
+async def add_cd_variant_vendored_logo(
+    variant_id: UUID,
+    payload: CdVariantLogoVendoredCreate,
+    service: CdVariantServiceDep,
+    principal: CdVariantsAdmin,
+) -> CdVariantLogoOut:
+    """Append a logo that pytex ships. No upload and no object storage involved."""
+    return await service.add_vendored_logo(variant_id, payload, principal.sub)
+
+
+@router.put(
+    "/cd-variants/{variant_id}/logos/order",
+    response_model=list[CdVariantLogoOut],
+    responses=_errors(400, 401, 403, 404, 422),
+)
+async def reorder_cd_variant_logos(
+    variant_id: UUID,
+    payload: CdVariantLogoReorder,
+    service: CdVariantServiceDep,
+    principal: CdVariantsAdmin,
+) -> list[CdVariantLogoOut]:
+    """Set the order inside one slot. The list must name every logo of that slot."""
+    return await service.reorder_logos(variant_id, payload, principal.sub)
+
+
+@router.get(
+    "/cd-variant-logos/{logo_id}/file",
+    dependencies=[_CD_VARIANTS],
+    responses=_errors(401, 403, 404, 503),
+    response_class=Response,
+)
+async def get_cd_variant_logo_file(logo_id: UUID, service: CdVariantServiceDep) -> Response:
+    """Stream an uploaded logo back from the server.
+
+    Hardening: the route does NOT echo the stored ``mime``. A stored SVG would
+    otherwise render inline in the app origin and execute script. The route
+    therefore forces ``application/octet-stream`` plus ``Content-Disposition:
+    attachment``, the same rule as ``get_invoice_file`` in the budget module.
+    """
+    data, name = await service.logo_file_bytes(logo_id)
+    safe = "".join(c for c in name if c.isprintable() and c not in '"\\\r\n')
+    return Response(
+        content=data,
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": f'attachment; filename="{safe}"'},
+    )
+
+
+@router.delete(
+    "/cd-variant-logos/{logo_id}",
+    status_code=204,
+    responses=_errors(401, 403, 404),
+)
+async def delete_cd_variant_logo(
+    logo_id: UUID, service: CdVariantServiceDep, principal: CdVariantsAdmin
+) -> None:
+    """Delete a logo entry. An uploaded object goes with it."""
+    await service.delete_logo(logo_id, principal.sub)
+
+
+@authed_router.get(
+    "/cd-variants",
+    response_model=list[CdVariantOptionOut],
+    dependencies=[_CD_VARIANT_OPTIONS],
+    responses=_errors(401, 403),
+)
+async def list_cd_variant_options(service: CdVariantServiceDep) -> list[CdVariantOptionOut]:
+    """Slim CD-variant list (id, key, name) as the source of the Gremium dropdown."""
+    return await service.list_variant_options()
 
 
 @router.get(
@@ -430,9 +652,21 @@ async def get_global_flow(service: ServiceDep) -> FlowGraph | None:
     responses=_errors(400, 401, 403, 422),
 )
 async def create_global_flow(
-    payload: FlowVersionCreate, service: ServiceDep, principal: TypesAdmin
+    payload: FlowVersionCreate, service: ServiceDep, principal: FlowVersionAdmin
 ) -> FlowVersionOut:
-    """Create the global flow as a new version (applies to ALL application types)."""
+    """Create the global flow as a new version (applies to ALL application types).
+
+    The gate accepts EITHER ``flow.configure`` OR ``admin.types`` (#g7). It is an
+    any-of gate and not a switch to ``flow.configure`` alone, for two reasons.
+
+    1. ``flow.configure`` is the permission the flow editor route gates on. Without
+       it in this gate, the holder builds a graph and then gets a 403 on save.
+    2. A switch would REMOVE the save from every current ``admin.types`` holder.
+       An any-of gate only adds, so no installation loses a capability.
+
+    ``_FLOW_READABLE`` already reads with either key, so the read and the write now
+    match.
+    """
     return await service.create_global_flow_version(payload, principal.sub)
 
 
@@ -664,6 +898,22 @@ async def update_webhook(
     principal: WebhookAdmin,
 ) -> WebhookOut:
     return await service.update_webhook(webhook_id, payload, principal.sub)
+
+
+@router.delete(
+    "/webhooks/{webhook_id}",
+    status_code=204,
+    responses=_errors(401, 403, 404),
+)
+async def delete_webhook(
+    webhook_id: UUID, service: ServiceDep, principal: WebhookAdmin
+) -> None:
+    """Delete a webhook and its delivery history.
+
+    The delete cascades to ``webhook_delivery``, so there is no 409 guard. The
+    audit log records the removal as ``webhook_config``.
+    """
+    await service.delete_webhook(webhook_id, principal.sub)
 
 
 @router.get(

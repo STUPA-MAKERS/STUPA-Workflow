@@ -44,6 +44,8 @@ export class MeetingProtocolPaneComponent {
   readonly saveState = input.required<SaveState>();
   readonly casting = input.required<Uuid | null>();
   readonly deletingVote = input.required<Uuid | null>();
+  /** True while the protocol delete runs. It blocks a second click. */
+  readonly deletingProtocol = input.required<boolean>();
   /** Own choice per vote id (highlights the picked option). */
   readonly choices = input.required<Record<string, string>>();
 
@@ -53,6 +55,8 @@ export class MeetingProtocolPaneComponent {
   readonly voteCancel = output<Uuid>();
   readonly voteDelete = output<Uuid>();
   readonly voteDialog = output<AgendaItem>();
+  /** Discard the draft minutes. The parent asks for a confirmation. */
+  readonly protocolDelete = output<void>();
 
   protected readonly voteVariant = voteStatusVariant;
   protected readonly voteStatusKey = voteStatusKey;

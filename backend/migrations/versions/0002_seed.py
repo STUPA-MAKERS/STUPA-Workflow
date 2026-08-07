@@ -53,8 +53,23 @@ _gremium = sa.table(
     sa.column("id", sa.Uuid),
     sa.column("name", sa.Text),
     sa.column("slug", sa.Text),
-    sa.column("cd_variant", sa.Text),
+    sa.column("cd_variant_id", sa.Uuid),
     sa.column("default_lang", sa.Text),
+)
+_cd_variant = sa.table(
+    "cd_variant",
+    sa.column("id", sa.Uuid),
+    sa.column("key", sa.Text),
+    sa.column("name", sa.Text),
+    sa.column("base_variant", sa.Text),
+)
+_cd_variant_logo = sa.table(
+    "cd_variant_logo",
+    sa.column("id", sa.Uuid),
+    sa.column("variant_id", sa.Uuid),
+    sa.column("slot", sa.Text),
+    sa.column("position", sa.Integer),
+    sa.column("vendored_name", sa.Text),
 )
 _gremium_role = sa.table(
     "gremium_role",
@@ -152,6 +167,25 @@ ROLE_PERMISSIONS = {
         "account.manage",
     ],
 }
+
+# Corporate-design variants (#cd-variants). A variant selects only the document
+# logos. The seeded set reproduces the five hardcoded variants of before. Each
+# logo is a vendored pytex name, so the seed writes nothing into MinIO.
+# (key, display name, base variant, title logos, footer logos)
+CD_VARIANT_IDS = {
+    "stupa": "00000000-0000-0000-0000-0000000000d1",
+    "asta": "00000000-0000-0000-0000-0000000000d2",
+    "echo": "00000000-0000-0000-0000-0000000000d3",
+    "makers": "00000000-0000-0000-0000-0000000000d4",
+    "report": "00000000-0000-0000-0000-0000000000d5",
+}
+CD_VARIANTS: list[tuple[str, str, str, tuple[str, ...], tuple[str, ...]]] = [
+    ("stupa", "StuPa", "protocol", ("STUPA",), ("STUPA",)),
+    ("asta", "AStA", "protocol", ("ASTA",), ("ASTA",)),
+    ("echo", "ECHO", "protocol", ("ECHO",), ("ECHO",)),
+    ("makers", "MAKERS", "report", ("MAKERS",), ("MAKERS-RAlign",)),
+    ("report", "HSRT INF", "report", ("INF",), ()),
+]
 
 _STUPA_ID = "00000000-0000-0000-0000-0000000060e1"
 _ASTA_ID = "00000000-0000-0000-0000-0000000060e3"
@@ -343,13 +377,41 @@ def upgrade() -> None:
     )
 
     op.bulk_insert(
+        _cd_variant,
+        [
+            {
+                "id": CD_VARIANT_IDS[key],
+                "key": key,
+                "name": name,
+                "base_variant": base,
+            }
+            for key, name, base, _title, _footer in CD_VARIANTS
+        ],
+    )
+    op.bulk_insert(
+        _cd_variant_logo,
+        [
+            {
+                "id": str(uuid.uuid5(_NS, f"cdlogo:{key}:{slot}:{index}")),
+                "variant_id": CD_VARIANT_IDS[key],
+                "slot": slot,
+                "position": index,
+                "vendored_name": logo,
+            }
+            for key, _name, _base, title, footer in CD_VARIANTS
+            for slot, names in (("title", title), ("footer", footer))
+            for index, logo in enumerate(names)
+        ],
+    )
+
+    op.bulk_insert(
         _gremium,
         [
             {
                 "id": gid,
                 "name": name,
                 "slug": slug,
-                "cd_variant": variant,
+                "cd_variant_id": CD_VARIANT_IDS[variant],
                 "default_lang": "de",
             }
             for gid, name, slug, variant in _GREMIEN
@@ -419,6 +481,11 @@ def downgrade() -> None:
         sa.text(
             "DELETE FROM gremium WHERE id IN (CAST(:s AS uuid), CAST(:a AS uuid))"
         ).bindparams(s=_STUPA_ID, a=_ASTA_ID)
+    )
+    # The CD variants go AFTER the Gremien, because `gremium.cd_variant_id` is
+    # RESTRICT. The delete cascades to `cd_variant_logo`.
+    op.execute(
+        sa.delete(_cd_variant).where(_cd_variant.c.id.in_(list(CD_VARIANT_IDS.values())))
     )
     role_ids = list(ROLE_IDS.values())
     op.execute(

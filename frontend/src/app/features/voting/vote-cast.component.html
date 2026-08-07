@@ -21,18 +21,8 @@
     }
     @if (vote(); as v) {
       <section class="vote">
-        <header class="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <h1 class="m-0">{{ 'voting.cast.heading' | t }}</h1>
-            <p class="mt-1 text-muted text-sm">
-              {{ majorityKey() | t }}
-              @if (v.config.quorum) {
-                · {{ 'vote.tally.quorum' | t }} {{ v.config.quorum.value
-                }}{{ v.config.quorum.type === 'percent' ? '%' : '' }}
-              }
-            </p>
-          </div>
-          <div class="inline-flex gap-2 flex-wrap">
+        <app-page-header [title]="'voting.cast.heading' | t" [subtitle]="subtitle()">
+          <div actions class="inline-flex gap-2 flex-wrap">
             @if (isOpen()) {
               <app-badge variant="success">{{ 'vote.option.yes' | t }}</app-badge>
             }
@@ -48,8 +38,15 @@
             @if (delegation()?.exercising) {
               <app-badge variant="info">{{ 'voting.cast.delegation.badge' | t }}</app-badge>
             }
+            @if (canDelete()) {
+              <!-- Only a draft with no ballots and no meeting can be deleted. An
+                   open vote is cancelled instead. -->
+              <app-button variant="danger" size="sm" (click)="confirmDelete.set(true)">
+                {{ 'voting.delete.action' | t }}
+              </app-button>
+            }
           </div>
-        </header>
+        </app-page-header>
 
         @if (delegation(); as deleg) {
           @if (deleg.blocked) {
@@ -151,3 +148,18 @@
     }
   }
 }
+
+<app-dialog
+  [open]="confirmDelete()"
+  [title]="'voting.delete.title' | t"
+  [closeLabel]="'action.cancel' | t"
+  (closed)="confirmDelete.set(false)"
+>
+  <p>{{ 'voting.delete.body' | t }}</p>
+  <div dialog-footer class="flex justify-end gap-3">
+    <app-button size="sm" variant="ghost" (click)="confirmDelete.set(false)">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" variant="danger" [loading]="deleting()" (click)="doDelete()">
+      {{ 'voting.delete.action' | t }}
+    </app-button>
+  </div>
+</app-dialog>

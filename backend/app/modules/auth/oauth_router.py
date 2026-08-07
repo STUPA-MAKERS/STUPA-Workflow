@@ -414,16 +414,14 @@ async def revoke_grant(
     """Revoke a grant of the logged-in user.
 
     The access token and the refresh token become invalid at once. A grant of another user
-    gives a 404.
+    gives a 404. An administrator revokes a grant of another user through
+    `DELETE /api/admin/oauth-grants/{grant_id}`, which uses the same service call.
     """
     pid = await _principal_row_id(db, principal)
-    row = (
-        await db.execute(select(OAuthToken).where(OAuthToken.id == grant_id))
-    ).scalar_one_or_none()
+    row = await oauth_service.load_grant(db, grant_id)
     if row is None or pid is None or row.principal_id != pid:
         raise NotFoundError("Grant not found.")
-    if row.revoked_at is None:
-        row.revoked_at = datetime.now(UTC)
+    if oauth_service.revoke_grant(row, datetime.now(UTC)):
         await db.commit()
 
 
@@ -439,16 +437,7 @@ async def revoke_all_grants(
     pid = await _principal_row_id(db, principal)
     if pid is None:
         return
-    rows = (
-        await db.execute(
-            select(OAuthToken).where(
-                OAuthToken.principal_id == pid, OAuthToken.revoked_at.is_(None)
-            )
-        )
-    ).scalars().all()
-    now = datetime.now(UTC)
-    for r in rows:
-        r.revoked_at = now
+    await oauth_service.revoke_all_grants(db, principal_id=pid, now=datetime.now(UTC))
     await db.commit()
 
 

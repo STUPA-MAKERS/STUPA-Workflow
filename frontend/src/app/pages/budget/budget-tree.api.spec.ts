@@ -112,6 +112,21 @@ describe('BudgetTreeApi', () => {
     req.flush({});
   });
 
+  it('updateFiscalYear PATCHes /budgets/:id/fiscal-years/:fy', () => {
+    api.updateFiscalYear('n-1', 'fy-1', { year: 2028, active: false }).subscribe();
+    const req = http.expectOne(`${BASE}/budgets/n-1/fiscal-years/fy-1`);
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({ year: 2028, active: false });
+    req.flush({});
+  });
+
+  it('deleteFiscalYear DELETEs /budgets/:id/fiscal-years/:fy', () => {
+    api.deleteFiscalYear('n-1', 'fy-1').subscribe();
+    const req = http.expectOne(`${BASE}/budgets/n-1/fiscal-years/fy-1`);
+    expect(req.request.method).toBe('DELETE');
+    req.flush(null);
+  });
+
   it('setAllocation PUTs /budgets/:id/allocations/:fy', () => {
     api.setAllocation('n-1', 'fy-1', '500').subscribe();
     const req = http.expectOne(`${BASE}/budgets/n-1/allocations/fy-1`);

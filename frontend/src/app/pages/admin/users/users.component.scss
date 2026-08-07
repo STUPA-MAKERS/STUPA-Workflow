@@ -120,6 +120,15 @@
   color: var(--color-danger);
 }
 
+.users__tag-x + .users__tag-x {
+  margin-left: 2px;
+}
+
+/* The edit pencil is not destructive, so it must not hover in the danger color. */
+.users__tag-edit:hover {
+  color: var(--color-primary);
+}
+
 .users__col-actions {
   text-align: end;
   white-space: nowrap;

@@ -1,0 +1,138 @@
+<app-page-header
+  [title]="'admin.oauthGrants.title' | t"
+  [subtitle]="'admin.oauthGrants.subtitle' | t"
+>
+  <app-filter-bar
+    actions
+    [live]="true"
+    [activeCount]="activeFilterCount()"
+    (reset)="resetFilters()"
+  >
+    <app-filter-field [label]="'admin.oauthGrants.filter.principal' | t">
+      <app-select
+        [ariaLabel]="'admin.oauthGrants.filter.principal' | t"
+        [options]="principalOptions()"
+        [ngModel]="principalId()"
+        (ngModelChange)="setPrincipal($event)"
+        name="principalId"
+      />
+    </app-filter-field>
+  </app-filter-bar>
+</app-page-header>
+
+<section class="grants" [attr.aria-label]="'admin.oauthGrants.title' | t">
+  <p class="text-muted text-sm m-0">{{ 'admin.oauthGrants.intro' | t }}</p>
+
+  @if (loading()) {
+    <p class="text-muted py-4" aria-live="polite">{{ 'admin.oauthGrants.loading' | t }}</p>
+  } @else if (loadError()) {
+    <p class="grants__error py-4" role="alert">{{ 'admin.oauthGrants.error' | t }}</p>
+  } @else {
+    <app-data-table
+      [columns]="columns()"
+      [rows]="grants()"
+      [rowKey]="rowId"
+      [emptyText]="'admin.oauthGrants.empty' | t"
+    >
+      <ng-template appCell="owner" let-g>
+        <span class="grants__owner">
+          <span class="font-medium">{{ ownerName($any(g)) }}</span>
+          @if (ownerEmail($any(g)); as mail) {
+            <span class="text-muted text-xs">{{ mail }}</span>
+          }
+        </span>
+      </ng-template>
+
+      <ng-template appCell="client" let-g>
+        <span class="grants__mono">{{ $any(g).clientId }}</span>
+      </ng-template>
+
+      <ng-template appCell="scope" let-g>
+        <span class="grants__scopes">
+          @for (s of scopes($any(g)); track s) {
+            <app-badge variant="neutral">{{ s }}</app-badge>
+          }
+        </span>
+      </ng-template>
+
+      <ng-template appCell="created" let-g>{{ $any(g).createdAt | ldate }}</ng-template>
+
+      <ng-template appCell="expires" let-g>
+        <span class="grants__expiry">
+          <span>
+            <span class="text-muted text-xs">{{ 'admin.oauthGrants.accessToken' | t }}</span>
+            @if ($any(g).accessExpiresAt; as at) {
+              <span>{{ at | ldate }}</span>
+            } @else {
+              <app-badge variant="warning">{{ 'admin.oauthGrants.neverExpires' | t }}</app-badge>
+            }
+          </span>
+          <span>
+            <span class="text-muted text-xs">{{ 'admin.oauthGrants.refreshToken' | t }}</span>
+            @if ($any(g).refreshExpiresAt; as at) {
+              <span>{{ at | ldate }}</span>
+            } @else {
+              <app-badge variant="warning">{{ 'admin.oauthGrants.neverExpires' | t }}</app-badge>
+            }
+          </span>
+        </span>
+      </ng-template>
+
+      <ng-template appCell="actions" let-g>
+        <app-button
+          variant="ghost"
+          size="sm"
+          [iconOnly]="true"
+          [ariaLabel]="'admin.oauthGrants.revoke' | t"
+          [title]="'admin.oauthGrants.revoke' | t"
+          (click)="askRevoke($any(g))"
+        >
+          <app-icon name="delete" />
+        </app-button>
+      </ng-template>
+    </app-data-table>
+
+    <div class="grants__pager">
+      <span class="text-muted text-sm">{{ rangeLabel() }}</span>
+      <span class="grants__pagerButtons">
+        <app-button
+          variant="secondary"
+          size="sm"
+          [disabled]="!hasPrev()"
+          (click)="prevPage()"
+        >{{ 'admin.oauthGrants.prevPage' | t }}</app-button>
+        <app-button
+          variant="secondary"
+          size="sm"
+          [disabled]="!hasNext()"
+          (click)="nextPage()"
+        >{{ 'admin.oauthGrants.nextPage' | t }}</app-button>
+      </span>
+    </div>
+  }
+</section>
+
+<app-dialog
+  [open]="confirmRevoke() !== null"
+  [title]="'admin.oauthGrants.revokeTitle' | t"
+  [closeLabel]="'action.cancel' | t"
+  (closed)="confirmRevoke.set(null)"
+>
+  @if (confirmRevoke(); as g) {
+    <p>
+      {{
+        'admin.oauthGrants.revokeConfirm'
+          | t: { owner: ownerName(g), client: g.clientId }
+      }}
+    </p>
+    <p class="grants__warning" role="alert">{{ 'admin.oauthGrants.revokeWarning' | t }}</p>
+  }
+  <div dialog-footer class="flex justify-end gap-3">
+    <app-button size="sm" variant="ghost" (click)="confirmRevoke.set(null)">
+      {{ 'action.cancel' | t }}
+    </app-button>
+    <app-button size="sm" variant="danger" [loading]="revoking()" (click)="doRevoke()">
+      {{ 'admin.oauthGrants.revoke' | t }}
+    </app-button>
+  </div>
+</app-dialog>

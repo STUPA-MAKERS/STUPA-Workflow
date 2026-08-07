@@ -1,9 +1,6 @@
-<section class="ns">
-  <header class="ns__head">
-    <h1>{{ 'admin.notifications.title' | t }}</h1>
-    <p class="ns__intro">{{ 'admin.notifications.intro' | t }}</p>
-  </header>
+<app-page-header [title]="'admin.notifications.title' | t" [subtitle]="'admin.notifications.intro' | t" />
 
+<section class="ns">
   @if (error()) {
     <p class="ns__error" role="alert">{{ $any(error()) | t }}</p>
   }

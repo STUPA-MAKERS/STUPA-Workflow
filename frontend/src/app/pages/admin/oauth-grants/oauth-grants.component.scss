@@ -1,0 +1,63 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.grants {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.grants__error {
+  color: var(--color-danger);
+}
+
+.grants__mono {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--fs-xs);
+}
+
+.grants__owner {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.grants__scopes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.grants__expiry {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  line-height: 1.25;
+
+  > span {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+}
+
+.grants__pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.grants__pagerButtons {
+  display: inline-flex;
+  gap: var(--space-2);
+}
+
+.grants__warning {
+  color: var(--color-danger);
+  margin: var(--space-2) 0 0;
+}

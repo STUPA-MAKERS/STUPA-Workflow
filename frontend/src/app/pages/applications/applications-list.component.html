@@ -1,79 +1,76 @@
-<header class="apps__head">
-  <div class="flex items-start justify-between gap-4 flex-wrap">
-    <div>
-      <h1 class="apps__title">{{ 'applications.list.title' | t }}</h1>
-      <p class="text-muted">{{ 'applications.list.subtitle' | t }}</p>
-    </div>
-    <div class="apps__headActions">
-      <!-- The header search is debounced. It writes the q query parameter. -->
-      <input
-        class="apps__search"
-        type="search"
-        [placeholder]="'applications.list.search.placeholder' | t"
-        [attr.aria-label]="'applications.list.search.placeholder' | t"
-        [ngModel]="q()"
-        (ngModelChange)="onSearch($event)"
-        name="qHeader"
+<app-page-header
+  [title]="'applications.list.title' | t"
+  [subtitle]="'applications.list.subtitle' | t"
+>
+  <div actions class="apps__headActions">
+    <!-- The header search is debounced. It writes the q query parameter. -->
+    <input
+      class="apps__search"
+      type="search"
+      [placeholder]="'applications.list.search.placeholder' | t"
+      [attr.aria-label]="'applications.list.search.placeholder' | t"
+      [ngModel]="q()"
+      (ngModelChange)="onSearch($event)"
+      name="qHeader"
+    />
+    @if (canExport()) {
+      <app-button variant="secondary" size="sm" (click)="onExport()" [loading]="exporting()">
+        <span class="inline-flex items-center gap-2">
+          <app-icon name="export" [size]="16" />
+          {{ 'applications.list.export' | t }}
+        </span>
+      </app-button>
+    }
+    <app-filter-bar
+      [activeCount]="activeFilterCount()"
+      [label]="'applications.list.filter.button' | t"
+      [applyLabel]="'applications.list.filter.apply' | t"
+      [resetLabel]="'applications.list.filter.reset' | t"
+      (apply)="applyFilters()"
+      (reset)="reset()"
+    >
+      <app-filter-field [label]="'applications.list.search' | t">
+        <input
+          type="search"
+          [placeholder]="'applications.list.search.placeholder' | t"
+          [ngModel]="q()"
+          (ngModelChange)="q.set($event)"
+          name="q"
+        />
+      </app-filter-field>
+      <app-select
+        id="apps-type"
+        name="type"
+        [label]="'applications.list.filter.type' | t"
+        [placeholder]="'applications.list.filter.all' | t"
+        [options]="typeOptions()"
+        [ngModel]="typeId()"
+        (ngModelChange)="typeId.set($event)"
       />
-      @if (canExport()) {
-        <app-button variant="secondary" size="sm" (click)="onExport()" [loading]="exporting()">
-          <span class="inline-flex items-center gap-2">
-            <app-icon name="export" [size]="16" />
-            {{ 'applications.list.export' | t }}
-          </span>
-        </app-button>
-      }
-      <app-filter-bar
-        [activeCount]="activeFilterCount()"
-        [label]="'applications.list.filter.button' | t"
-        [applyLabel]="'applications.list.filter.apply' | t"
-        [resetLabel]="'applications.list.filter.reset' | t"
-        (apply)="applyFilters()"
-        (reset)="reset()"
-      >
-        <app-filter-field [label]="'applications.list.search' | t">
-          <input
-            type="search"
-            [placeholder]="'applications.list.search.placeholder' | t"
-            [ngModel]="q()"
-            (ngModelChange)="q.set($event)"
-            name="q"
-          />
-        </app-filter-field>
-        <app-select
-          id="apps-type"
-          name="type"
-          [label]="'applications.list.filter.type' | t"
-          [placeholder]="'applications.list.filter.all' | t"
-          [options]="typeOptions()"
-          [ngModel]="typeId()"
-          (ngModelChange)="typeId.set($event)"
-        />
-        <app-select
-          id="apps-state"
-          name="state"
-          [label]="'applications.list.filter.state' | t"
-          [placeholder]="'applications.list.filter.all' | t"
-          [options]="stateOptions()"
-          [ngModel]="state()"
-          (ngModelChange)="state.set($event)"
-        />
-        <app-filter-field [label]="'applications.list.filter.amount' | t">
-          <app-filter-range>
-            <app-currency-input start name="amountMin" [placeholder]="'applications.list.filter.min' | t" [ariaLabel]="'applications.list.filter.min' | t" [ngModel]="amountMin()" (ngModelChange)="amountMin.set($event)" />
-            <app-currency-input end name="amountMax" [placeholder]="'applications.list.filter.max' | t" [ariaLabel]="'applications.list.filter.max' | t" [ngModel]="amountMax()" (ngModelChange)="amountMax.set($event)" />
-          </app-filter-range>
-        </app-filter-field>
-        <app-filter-field [label]="'applications.list.filter.date' | t">
-          <app-filter-range>
-            <app-datepicker start [ariaLabel]="'applications.list.filter.from' | t" [ngModel]="createdFrom()" (ngModelChange)="createdFrom.set($event)" name="createdFrom" />
-            <app-datepicker end [ariaLabel]="'applications.list.filter.to' | t" [ngModel]="createdTo()" (ngModelChange)="createdTo.set($event)" name="createdTo" />
-          </app-filter-range>
-        </app-filter-field>
-      </app-filter-bar>
-    </div>
+      <app-select
+        id="apps-state"
+        name="state"
+        [label]="'applications.list.filter.state' | t"
+        [placeholder]="'applications.list.filter.all' | t"
+        [options]="stateOptions()"
+        [ngModel]="state()"
+        (ngModelChange)="state.set($event)"
+      />
+      <app-filter-field [label]="'applications.list.filter.amount' | t">
+        <app-filter-range>
+          <app-currency-input start name="amountMin" [placeholder]="'applications.list.filter.min' | t" [ariaLabel]="'applications.list.filter.min' | t" [ngModel]="amountMin()" (ngModelChange)="amountMin.set($event)" />
+          <app-currency-input end name="amountMax" [placeholder]="'applications.list.filter.max' | t" [ariaLabel]="'applications.list.filter.max' | t" [ngModel]="amountMax()" (ngModelChange)="amountMax.set($event)" />
+        </app-filter-range>
+      </app-filter-field>
+      <app-filter-field [label]="'applications.list.filter.date' | t">
+        <app-filter-range>
+          <app-datepicker start [ariaLabel]="'applications.list.filter.from' | t" [ngModel]="createdFrom()" (ngModelChange)="createdFrom.set($event)" name="createdFrom" />
+          <app-datepicker end [ariaLabel]="'applications.list.filter.to' | t" [ngModel]="createdTo()" (ngModelChange)="createdTo.set($event)" name="createdTo" />
+        </app-filter-range>
+      </app-filter-field>
+    </app-filter-bar>
   </div>
-</header>
+</app-page-header>
 
 <div class="apps__layout">
 <!-- The toggle appears on mobile only (max 768px). The desktop layout always shows

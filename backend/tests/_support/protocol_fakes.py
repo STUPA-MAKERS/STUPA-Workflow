@@ -46,6 +46,7 @@ class FakeSession:
         self._results = list(results)
         self.scalar_results: list[Any] = []
         self.added: list[Any] = []
+        self.deleted: list[Any] = []
         self.flushed = 0
         self.committed = 0
 
@@ -66,6 +67,12 @@ class FakeSession:
         This method uses its own queue and returns `None` by default. It keeps the order
         of the `execute` queue unchanged.
         """
+        # The render path resolves the corporate design of the protocol. That query
+        # has no entry in the queue either. Answer it with `None`, so the render
+        # falls back to the variant name and the query does not eat the result of
+        # another one. Same reason as the attendance case in `execute`.
+        if "cd_variant" in str(_stmt).lower():
+            return None
         if self.scalar_results:
             return self.scalar_results.pop(0)
         return None
@@ -77,6 +84,9 @@ class FakeSession:
         if getattr(obj, "id", None) is None:
             obj.id = uuid.uuid4()
         self.added.append(obj)
+
+    async def delete(self, obj: Any) -> None:
+        self.deleted.append(obj)
 
     async def flush(self) -> None:
         self.flushed += 1

@@ -12,6 +12,7 @@ import type { TranslationKey } from '@core/i18n/translations';
 import type { ApplicationListItem, ApplicationType, Meeting, Uuid } from '@core/api/models';
 import { BadgeComponent } from '@stupa-makers/ui-kit';
 import { CapitalizePipe } from '@shared/pipes/capitalize.pipe';
+import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 
 /** Max number of application rows shown per panel. */
 const PREVIEW_ROWS = 5;
@@ -30,7 +31,14 @@ const PREVIEW_ROWS = 5;
   selector: 'app-dashboard',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, LocalizedDatePipe, TranslatePipe, BadgeComponent, CapitalizePipe],
+  imports: [
+    RouterLink,
+    LocalizedDatePipe,
+    TranslatePipe,
+    BadgeComponent,
+    CapitalizePipe,
+    PageHeaderComponent,
+  ],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss',
 })

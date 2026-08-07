@@ -255,6 +255,53 @@ async def refresh_tokens(
     )
 
 
+async def load_grant(db: AsyncSession, grant_id: str | UUID) -> OAuthToken | None:
+    """Load one grant row by id, whoever owns it.
+
+    The caller decides who may see or revoke the row. The self-service route compares
+    the owner. The admin route checks `admin.users` instead.
+    """
+    return (
+        await db.execute(select(OAuthToken).where(OAuthToken.id == grant_id))
+    ).scalar_one_or_none()
+
+
+def revoke_grant(row: OAuthToken, now: datetime) -> bool:
+    """Revoke one grant, so that its access and refresh token die at once.
+
+    This is the ONE revocation path of the platform. The self-service route and the
+    admin route both call it. A second path would drift away from this one.
+    `resolve_access_token` rejects a row with `revoked_at`, so the next request with
+    that access token already fails. The caller commits.
+
+    Returns:
+        True when this call revoked the grant. False when it was revoked before, which
+        makes a repeated revoke a no-op.
+    """
+    if row.revoked_at is not None:
+        return False
+    row.revoked_at = now
+    return True
+
+
+async def revoke_all_grants(db: AsyncSession, *, principal_id: UUID, now: datetime) -> int:
+    """Revoke every grant of one principal. The caller commits.
+
+    Returns:
+        The number of revoked grants.
+    """
+    rows = (
+        await db.execute(
+            select(OAuthToken).where(
+                OAuthToken.principal_id == principal_id, OAuthToken.revoked_at.is_(None)
+            )
+        )
+    ).scalars().all()
+    for row in rows:
+        revoke_grant(row, now)
+    return len(rows)
+
+
 async def resolve_access_token(
     db: AsyncSession, *, token: str, now: datetime
 ) -> tuple[UUID, str] | None:

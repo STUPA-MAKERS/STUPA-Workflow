@@ -19,6 +19,7 @@ const ALL_PERMS = [
   'flow.configure',
   'webhook.manage',
   'audit.read',
+  'admin.cd_variants',
 ];
 
 async function setup(perms: string[] = ALL_PERMS) {
@@ -33,7 +34,7 @@ describe('AdminHomeComponent', () => {
   it('shows a navigation tile per admin area', async () => {
     await setup();
     expect(screen.getByRole('heading', { name: 'Verwaltung', level: 1 })).toBeInTheDocument();
-    for (const name of ['Formular-Builder', 'Flow-Editor', 'Branding & Texte', 'Webhooks']) {
+    for (const name of ['Formular-Builder', 'Flow-Editor', 'Branding & Texte', 'Webhooks', 'CD-Varianten']) {
       expect(screen.getByRole('link', { name: new RegExp(name) })).toBeInTheDocument();
     }
   });

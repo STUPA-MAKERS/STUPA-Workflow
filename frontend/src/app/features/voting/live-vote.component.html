@@ -1,8 +1,7 @@
 <section class="live">
-  <header class="flex items-baseline justify-between gap-3 flex-wrap">
-    <h1 class="m-0">{{ 'voting.live.heading' | t }}</h1>
-    <a routerLink="/voting/beamer" class="live__beamer">{{ 'voting.live.toBeamer' | t }}</a>
-  </header>
+  <app-page-header [title]="'voting.live.heading' | t">
+    <a actions routerLink="/voting/beamer" class="live__beamer">{{ 'voting.live.toBeamer' | t }}</a>
+  </app-page-header>
 
   @if (connection() === 'reconnecting') {
     <p class="m-0 py-2 px-4 rounded-md bg-surface-sunken text-muted text-sm text-center bg-warning-subtle text-text" role="status">

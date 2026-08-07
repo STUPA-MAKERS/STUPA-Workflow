@@ -10,12 +10,17 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.modules.admin.branding import Branding
+from app.modules.admin.cd_logos import CdBaseVariant, LogoSlot, VendoredLogoName
 from app.shared.config_schemas import ComparisonOffers, EventName, FlowGraph
 from app.shared.i18n import I18nMap
 from app.shared.permissions import PERMISSION_CATALOGUE
+
+# A CD-variant key is a slug. It is the stable handle of the variant and never
+# changes after the create.
+CD_VARIANT_KEY_PATTERN = r"^[a-z0-9]+(?:-[a-z0-9]+)*$"
 
 
 def _validate_permissions(perms: list[str] | None) -> list[str] | None:
@@ -40,11 +45,69 @@ class _CamelModel(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 
+class CdVariantLogoOut(_CamelModel):
+    """One logo of a CD variant. Exactly one of vendoredName / fileName is set."""
+
+    id: UUID
+    slot: LogoSlot
+    position: int
+    vendored_name: str | None = Field(default=None, serialization_alias="vendoredName")
+    file_name: str | None = Field(default=None, serialization_alias="fileName")
+    mime: str | None = None
+    size: int | None = None
+
+
+class CdVariantOut(_CamelModel):
+    """A CD variant with its logos, ordered by slot and position."""
+
+    id: UUID
+    key: str
+    name: str
+    base_variant: CdBaseVariant = Field(serialization_alias="baseVariant")
+    logos: list[CdVariantLogoOut] = Field(default_factory=list)
+
+
+class CdVariantOptionOut(_CamelModel):
+    """Slim option for the Gremium dropdown."""
+
+    id: UUID
+    key: str
+    name: str
+
+
+class CdVariantCreate(_CamelModel):
+    key: str = Field(min_length=1, max_length=64, pattern=CD_VARIANT_KEY_PATTERN)
+    name: str = Field(min_length=1, max_length=200)
+    base_variant: CdBaseVariant = Field(default="report", alias="baseVariant")
+
+
+class CdVariantUpdate(_CamelModel):
+    """Patch of a CD variant. ``key`` is immutable — a different value gives 409."""
+
+    key: str | None = Field(default=None, max_length=64)
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    base_variant: CdBaseVariant | None = Field(default=None, alias="baseVariant")
+
+
+class CdVariantLogoVendoredCreate(_CamelModel):
+    """Add a logo that pytex ships. No upload and no object storage involved."""
+
+    slot: LogoSlot
+    vendored_name: VendoredLogoName = Field(alias="vendoredName")
+
+
+class CdVariantLogoReorder(_CamelModel):
+    """Full new order of one slot. The list must name every logo of that slot."""
+
+    slot: LogoSlot
+    logo_ids: list[UUID] = Field(alias="logoIds")
+
+
 class GremiumOut(_CamelModel):
     id: UUID
     name: str
     slug: str
-    cd_variant: str = Field(serialization_alias="cdVariant")
+    cd_variant_id: UUID | None = Field(default=None, serialization_alias="cdVariantId")
     default_lang: str = Field(serialization_alias="defaultLang")
     allow_vote_delegation: bool = Field(serialization_alias="allowVoteDelegation")
     # Lead time in minutes before the meeting start, for non-pool delegations.
@@ -66,7 +129,7 @@ class GremiumOut(_CamelModel):
 class GremiumCreate(_CamelModel):
     name: str = Field(min_length=1)
     slug: str = Field(min_length=1)
-    cd_variant: str = Field(default="stupa", alias="cdVariant")
+    cd_variant_id: UUID | None = Field(default=None, alias="cdVariantId")
     default_lang: str = Field(default="de", alias="defaultLang")
     allow_vote_delegation: bool = Field(default=False, alias="allowVoteDelegation")
     delegation_lead_minutes: int = Field(
@@ -83,7 +146,8 @@ class GremiumCreate(_CamelModel):
 class GremiumUpdate(_CamelModel):
     name: str | None = None
     slug: str | None = None
-    cd_variant: str | None = Field(default=None, alias="cdVariant")
+    # Clearable to null: `model_fields_set` separates "not sent" from "set to null".
+    cd_variant_id: UUID | None = Field(default=None, alias="cdVariantId")
     default_lang: str | None = Field(default=None, alias="defaultLang")
     allow_vote_delegation: bool | None = Field(default=None, alias="allowVoteDelegation")
     delegation_lead_minutes: int | None = Field(
@@ -161,6 +225,26 @@ class GremiumMembershipCreate(_CamelModel):
     gremium_role_id: UUID = Field(alias="gremiumRoleId")
     valid_from: str | None = Field(default=None, alias="validFrom")
     valid_until: str | None = Field(default=None, alias="validUntil")
+
+
+class GremiumMembershipUpdate(_CamelModel):
+    """Change the role or the term of office of one membership.
+
+    The member and the Gremium stay immutable. A different member or a
+    different Gremium is a different membership. Only the fields that the
+    payload sets change. ``validFrom`` or ``validUntil`` set to ``null`` opens
+    that end of the term.
+    """
+
+    gremium_role_id: UUID | None = Field(default=None, alias="gremiumRoleId")
+    valid_from: str | None = Field(default=None, alias="validFrom")
+    valid_until: str | None = Field(default=None, alias="validUntil")
+
+    @model_validator(mode="after")
+    def _at_least_one(self) -> GremiumMembershipUpdate:
+        if not self.model_fields_set:
+            raise ValueError("at least one field required")
+        return self
 
 
 class ApplicationTypeOut(_CamelModel):
@@ -358,12 +442,12 @@ class WebhookDeliveryStatusOut(_CamelModel):
     ``pending``, ``sent`` or ``dead``.
     """
 
-    webhook_id: UUID
-    last_state: str
-    reason_class: str
-    response_code: int | None = None
+    webhook_id: UUID = Field(serialization_alias="webhookId")
+    last_state: str = Field(serialization_alias="lastState")
+    reason_class: str = Field(serialization_alias="reasonClass")
+    response_code: int | None = Field(default=None, serialization_alias="responseCode")
     attempts: int = 0
-    last_at: str | None = None
+    last_at: str | None = Field(default=None, serialization_alias="lastAt")
 
 
 class SiteConfigOut(_CamelModel):

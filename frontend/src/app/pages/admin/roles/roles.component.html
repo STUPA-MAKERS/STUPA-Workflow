@@ -1,11 +1,7 @@
 <section class="flex flex-col gap-5">
-  <header class="flex items-center justify-between gap-4 flex-wrap">
-    <div>
-      <h1>{{ 'admin.roles.title' | t }}</h1>
-      <p class="text-muted">{{ 'admin.roles.subtitle' | t }}</p>
-    </div>
-    <app-button size="sm" (click)="openAdd()">{{ 'admin.roles.addGlobalRole' | t }}</app-button>
-  </header>
+  <app-page-header [title]="'admin.roles.title' | t" [subtitle]="'admin.roles.subtitle' | t">
+    <app-button actions size="sm" (click)="openAdd()">{{ 'admin.roles.addGlobalRole' | t }}</app-button>
+  </app-page-header>
 
   <app-data-table [columns]="columns()" [rows]="roles()" [rowKey]="rowId" [isExpanded]="rowExpanded" [clickable]="true" (rowClick)="onRowClick($event)">
     <ng-template appCell="name" let-r>

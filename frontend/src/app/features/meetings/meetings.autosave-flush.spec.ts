@@ -5,7 +5,7 @@ import {
 } from '@angular/common/http/testing';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { render } from '@testing-library/angular';
-import { of } from 'rxjs';
+import { EMPTY, of } from 'rxjs';
 import { AuthService } from '@core/auth/auth.service';
 import { USE_MOCK_API } from '@core/api/api.config';
 import type { MeetingOutWire, ProtocolOutWire } from '@core/api/models';
@@ -74,6 +74,19 @@ function fakeAuth(perms: string[]): Partial<AuthService> {
 
 type Cmp = InstanceType<typeof MeetingsComponent>;
 
+/**
+ * Router double. `navigate` is the only method the component calls. The rest is
+ * the read-only surface that the breadcrumbs of `app-page-header` read.
+ */
+function routerStub() {
+  return {
+    navigate: jest.fn(() => Promise.resolve(true)),
+    events: EMPTY,
+    config: [],
+    routerState: { snapshot: { root: { url: [], data: {}, firstChild: null } } },
+  };
+}
+
 async function loaded() {
   const view = await render(MeetingsComponent, {
     providers: [
@@ -82,7 +95,7 @@ async function loaded() {
       { provide: USE_MOCK_API, useValue: false },
       { provide: AuthService, useValue: fakeAuth(['meeting.manage', 'protocol.write']) },
       { provide: WsService, useValue: new FakeWs() },
-      { provide: Router, useValue: { navigate: jest.fn(() => Promise.resolve(true)) } },
+      { provide: Router, useValue: routerStub() },
       {
         provide: ActivatedRoute,
         useValue: { paramMap: of(convertToParamMap({ id: 'm-1' })) },

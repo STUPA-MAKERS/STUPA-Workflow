@@ -22,6 +22,11 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "application.manage",
     # Edit application data in ANY flow state. This overrides the state edit lock.
     "application.edit_any",
+    # Delete an application permanently, with its versions, comments and timeline.
+    # This is destructive and irreversible: no revert brings the record back. It
+    # stays SEPARATE from application.manage, which covers the edit only. Grant it
+    # deliberately.
+    "application.delete",
     "form.configure",
     "flow.configure",
     "vote.cast",
@@ -64,6 +69,9 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "admin.group_mappings",
     # /admin/gremien/:id/roles: Gremium role definitions.
     "admin.gremium_roles",
+    # /admin/cd-variants: corporate-design variants (document logos) that a Gremium
+    # selects. The key also covers the logo upload and the logo download.
+    "admin.cd_variants",
     # /admin/delegations: manage the delegations and the substitute pool platform-wide.
     "admin.delegations",
     # /admin/deadlines: deadline policies.

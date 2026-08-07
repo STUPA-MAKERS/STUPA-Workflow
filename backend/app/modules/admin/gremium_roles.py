@@ -22,6 +22,7 @@ from app.modules.admin.models import GremiumMembership, GremiumRole
 from app.modules.admin.schemas import (
     GremiumMembershipCreate,
     GremiumMembershipOut,
+    GremiumMembershipUpdate,
     GremiumRoleCreate,
     GremiumRoleOut,
     GremiumRoleUpdate,
@@ -124,9 +125,25 @@ def intervals_overlap(
 
 
 def _parse_dt(value: str | None) -> datetime | None:
+    """Parse a term bound into a tz-aware UTC ``datetime``. Empty means open.
+
+    A naive input counts as UTC, so a term compares correctly against
+    ``datetime.now(UTC)`` in the RBAC resolver.
+
+    Raises:
+        ValidationProblem: The value is no ISO-8601 datetime. Without this the
+            request would end as an unhandled ``ValueError`` and a 500, instead
+            of problem+json (422).
+    """
     if value is None or value == "":
         return None
-    dt = datetime.fromisoformat(value)
+    try:
+        dt = datetime.fromisoformat(value)
+    except ValueError as exc:
+        raise ValidationProblem(
+            "Invalid datetime.",
+            errors=[{"field": "validFrom/validUntil", "msg": str(exc)}],
+        ) from exc
     return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
 
 
@@ -309,29 +326,12 @@ class GremiumRoleService:
             raise NotFoundError(f"principal {payload.principal_id} not found")
         new_from = _parse_dt(payload.valid_from)
         new_until = _parse_dt(payload.valid_until)
-        if new_from is not None and new_until is not None and new_from >= new_until:
-            raise ValidationProblem(
-                "validFrom must be before validUntil.",
-                errors=[{"field": "validUntil", "msg": "must be after validFrom"}],
-            )
+        self._assert_ordered(new_from, new_until)
         # Overlap invariant: no time-overlapping entry for the same principal in
-        # THIS gremium. This Python check is only a fast path with a clear error.
-        # The EXCLUDE constraint ``ex_gremium_membership_no_overlap`` enforces the
-        # invariant authoritatively and closes the TOCTOU gap on parallel inserts.
-        existing = (
-            await self.session.scalars(
-                select(GremiumMembership).where(
-                    GremiumMembership.gremium_id == gremium_id,
-                    GremiumMembership.principal_id == payload.principal_id,
-                )
-            )
-        ).all()
-        for m in existing:
-            if intervals_overlap(new_from, new_until, m.valid_from, m.valid_until):
-                raise ConflictError(
-                    "overlapping membership for this member in this gremium",
-                    code="conflict",
-                )
+        # THIS gremium.
+        await self._assert_no_overlap(
+            gremium_id, payload.principal_id, new_from, new_until
+        )
         row = GremiumMembership(
             principal_id=payload.principal_id,
             gremium_id=gremium_id,
@@ -344,6 +344,109 @@ class GremiumRoleService:
         # concurrent race therefore surfaces here. Guard the flush, the audit and
         # the commit together and translate the IntegrityError into a 409 instead
         # of a 500.
+        try:
+            await self.session.flush()
+            await self._audit(actor, "gremium_membership", row.id)
+            await self.session.commit()
+        except IntegrityError as exc:
+            await self.session.rollback()
+            raise ConflictError(
+                "overlapping membership for this member in this gremium",
+                code="conflict",
+            ) from exc
+        return _membership_out(row)
+
+    async def _assert_no_overlap(
+        self,
+        gremium_id: UUID,
+        principal_id: UUID,
+        new_from: datetime | None,
+        new_until: datetime | None,
+        *,
+        exclude_id: UUID | None = None,
+    ) -> None:
+        """Check the overlap invariant for one (principal, gremium) pair.
+
+        This Python check is only a fast path with a clear error message. The
+        EXCLUDE constraint ``ex_gremium_membership_no_overlap`` stays the
+        authoritative guard and closes the TOCTOU gap on parallel writes.
+        ``exclude_id`` leaves the row under edit out of the comparison, so a
+        patch never conflicts with itself.
+
+        Raises:
+            ConflictError: Another term of this member overlaps (409).
+        """
+        existing = (
+            await self.session.scalars(
+                select(GremiumMembership).where(
+                    GremiumMembership.gremium_id == gremium_id,
+                    GremiumMembership.principal_id == principal_id,
+                )
+            )
+        ).all()
+        for m in existing:
+            if m.id == exclude_id:
+                continue
+            if intervals_overlap(new_from, new_until, m.valid_from, m.valid_until):
+                raise ConflictError(
+                    "overlapping membership for this member in this gremium",
+                    code="conflict",
+                )
+
+    @staticmethod
+    def _assert_ordered(new_from: datetime | None, new_until: datetime | None) -> None:
+        """Reject a term that ends before it starts.
+
+        Raises:
+            ValidationProblem: ``validFrom`` is not before ``validUntil`` (422).
+        """
+        if new_from is not None and new_until is not None and new_from >= new_until:
+            raise ValidationProblem(
+                "validFrom must be before validUntil.",
+                errors=[{"field": "validUntil", "msg": "must be after validFrom"}],
+            )
+
+    async def update_membership(
+        self, membership_id: UUID, payload: GremiumMembershipUpdate, actor: str
+    ) -> GremiumMembershipOut:
+        """Change the role or the term of office of a membership.
+
+        The member and the Gremium stay immutable. A new role must belong to the
+        same Gremium. The overlap invariant applies exactly as on the create: a
+        bad term gives 422 and an overlap with another term of the same member
+        gives 409, from the Python fast path or from the EXCLUDE constraint.
+
+        Raises:
+            NotFoundError: The membership or the new role does not exist (404).
+            ConflictError: The role belongs to another Gremium, or the new term
+                overlaps another term of this member (409).
+            ValidationProblem: ``validFrom`` is not before ``validUntil`` (422).
+        """
+        row = await self.session.get(GremiumMembership, membership_id)
+        if row is None:
+            raise NotFoundError(f"gremium membership {membership_id} not found")
+        provided = payload.model_fields_set
+        if payload.gremium_role_id is not None:
+            role = await self.session.get(GremiumRole, payload.gremium_role_id)
+            if role is None:
+                raise NotFoundError(f"gremium role {payload.gremium_role_id} not found")
+            if role.gremium_id != row.gremium_id:
+                raise ConflictError("gremium role does not belong to this gremium")
+        new_from = _parse_dt(payload.valid_from) if "valid_from" in provided else row.valid_from
+        new_until = (
+            _parse_dt(payload.valid_until) if "valid_until" in provided else row.valid_until
+        )
+        self._assert_ordered(new_from, new_until)
+        await self._assert_no_overlap(
+            row.gremium_id, row.principal_id, new_from, new_until, exclude_id=row.id
+        )
+        if payload.gremium_role_id is not None:
+            row.gremium_role_id = payload.gremium_role_id
+        row.valid_from = new_from
+        row.valid_until = new_until
+        # The EXCLUDE constraint fires on the UPDATE flush, not on the commit. A
+        # concurrent write therefore surfaces here. Guard the flush, the audit
+        # and the commit together and answer 409 instead of 500.
         try:
             await self.session.flush()
             await self._audit(actor, "gremium_membership", row.id)

@@ -34,6 +34,9 @@ async function setup(opts: {
   delegation?: VoteDelegationStatus;
   delegationError?: boolean;
   routeId?: string | null;
+  deleteError?: unknown;
+  /** Permissions the stubbed principal holds. `true` grants everything. */
+  permissions?: string[] | true;
 }) {
   const getVote = opts.getError
     ? jest.fn(() => throwError(() => opts.getError))
@@ -41,8 +44,15 @@ async function setup(opts: {
   const castBallot = opts.castError
     ? jest.fn(() => throwError(() => opts.castError))
     : jest.fn(() => of(opts.castResult ?? { status: 'cast' as const }));
-  const api = { getVote, castBallot };
-  const auth = { can: () => opts.canVote ?? true };
+  const deleteVote = opts.deleteError
+    ? jest.fn(() => throwError(() => opts.deleteError))
+    : jest.fn(() => of(void 0));
+  const api = { getVote, castBallot, deleteVote };
+  const perms = opts.permissions;
+  const auth = {
+    can: (p: string) =>
+      perms === undefined || perms === true ? (opts.canVote ?? true) : perms.includes(p),
+  };
   const voteStatus = opts.delegationError
     ? jest.fn(() => throwError(() => new Error('boom')))
     : jest.fn(() =>
@@ -61,7 +71,11 @@ async function setup(opts: {
   const id = opts.routeId === undefined ? 'v1' : opts.routeId;
   const r = await render(VoteCastComponent, {
     providers: [
-      provideRouter([]),
+      // The delete navigates away, so both target routes must resolve.
+      provideRouter([
+        { path: 'voting', children: [] },
+        { path: 'applications/:id', children: [] },
+      ]),
       { provide: ApiClient, useValue: api },
       { provide: DelegationsApiService, useValue: { voteStatus } },
       { provide: AuthService, useValue: auth },
@@ -74,7 +88,17 @@ async function setup(opts: {
       },
     ],
   });
-  return { ...r, getVote, castBallot, voteStatus, toast };
+  return { ...r, getVote, castBallot, deleteVote, voteStatus, toast };
+}
+
+/** A draft standalone vote: the only shape the delete route accepts. */
+function draftVote(overrides: Partial<Vote> = {}): Vote {
+  return vote({ status: 'draft', meetingId: null, ...overrides });
+}
+
+/** Conflict answer of `DELETE /votes/{id}` with its machine code. */
+function conflict(code: string) {
+  return { status: 409, error: { type: `app://error/${code}`, title: 'Conflict', status: 409, code } };
 }
 
 describe('VoteCastComponent', () => {
@@ -270,9 +294,9 @@ describe('VoteCastComponent', () => {
         },
       }),
     });
-    const header = container.querySelector('header p') as HTMLElement;
-    expect(header.textContent).toMatch(/Quorum\s*7/);
-    expect(header.textContent).not.toContain('7%');
+    const subtitle = container.querySelector('.ph__subtitle') as HTMLElement;
+    expect(subtitle.textContent).toMatch(/Quorum\s*7/);
+    expect(subtitle.textContent).not.toContain('7%');
   });
 
   it('does nothing when casting an already-chosen, change-locked option', async () => {
@@ -423,5 +447,99 @@ describe('VoteCastComponent', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Ja' }));
     expect(castBallot).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('button', { name: 'Nein' })).toBeDisabled();
+  });
+
+  describe('delete', () => {
+    it('deletes a draft standalone vote after the confirmation', async () => {
+      const { deleteVote, toast } = await setup({
+        vote: draftVote(),
+        permissions: ['vote.manage'],
+      });
+      await userEvent.click(screen.getAllByRole('button', { name: 'Abstimmung löschen' })[0]);
+      const buttons = screen.getAllByRole('button', { name: 'Abstimmung löschen' });
+      await userEvent.click(buttons[buttons.length - 1]);
+      expect(deleteVote).toHaveBeenCalledWith('v1');
+      expect(toast.success).toHaveBeenCalledWith('Abstimmung gelöscht.');
+    });
+
+    it('falls back to the vote overview when the vote carries no application', async () => {
+      const v = draftVote();
+      (v as { applicationId?: string | null }).applicationId = null;
+      const { fixture, deleteVote } = await setup({ vote: v, permissions: ['vote.manage'] });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (fixture.componentInstance as any).doDelete();
+      expect(deleteVote).toHaveBeenCalledWith('v1');
+    });
+
+    it('offers no delete without vote.manage', async () => {
+      await setup({ vote: draftVote(), permissions: ['vote.cast'] });
+      expect(
+        screen.queryByRole('button', { name: 'Abstimmung löschen' }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('offers no delete for a vote that already opened', async () => {
+      await setup({ vote: vote({ status: 'open' }), permissions: ['vote.manage'] });
+      expect(
+        screen.queryByRole('button', { name: 'Abstimmung löschen' }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('offers no delete for a meeting-bound draft', async () => {
+      await setup({ vote: draftVote({ meetingId: 'm1' }), permissions: ['vote.manage'] });
+      expect(
+        screen.queryByRole('button', { name: 'Abstimmung löschen' }),
+      ).not.toBeInTheDocument();
+    });
+
+    it.each([
+      ['vote_not_draft', 'Die Abstimmung war bereits geöffnet. Statt zu löschen, brich sie ab.'],
+      [
+        'vote_has_ballots',
+        'Es liegen bereits Stimmen vor. Die Abstimmung lässt sich nicht mehr löschen.',
+      ],
+      [
+        'vote_meeting_bound',
+        'Diese Abstimmung gehört zu einer Sitzung. Sie wird dort gelöscht.',
+      ],
+      ['something_else', 'Die Abstimmung ist in einem Zustand, der das Löschen ausschließt.'],
+    ])('explains the 409 code %s and reloads the vote', async (code, message) => {
+      const { fixture, toast, getVote } = await setup({
+        vote: draftVote(),
+        permissions: ['vote.manage'],
+        deleteError: conflict(code),
+      });
+      getVote.mockClear();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (fixture.componentInstance as any).doDelete();
+      expect(toast.error).toHaveBeenCalledWith(message);
+      expect(getVote).toHaveBeenCalledWith('v1', { quiet: true });
+    });
+
+    it.each([
+      [403, 'Keine Berechtigung, diese Abstimmung zu löschen.'],
+      [500, 'Die Abstimmung konnte nicht gelöscht werden.'],
+    ])('reports a %s failure with its own message', async (status, message) => {
+      const { fixture, toast } = await setup({
+        vote: draftVote(),
+        permissions: ['vote.manage'],
+        deleteError: { status },
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (fixture.componentInstance as any).doDelete();
+      expect(toast.error).toHaveBeenCalledWith(message);
+    });
+
+    it('ignores a second delete while one runs', async () => {
+      const { fixture, deleteVote } = await setup({
+        vote: draftVote(),
+        permissions: ['vote.manage'],
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const c = fixture.componentInstance as any;
+      c.deleting.set(true);
+      c.doDelete();
+      expect(deleteVote).not.toHaveBeenCalled();
+    });
   });
 });

@@ -33,8 +33,15 @@ from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.admin.cd_resolver import (
+    cd_render_config,
+    cd_variant_key_for_gremium,
+    resolve_cd_variant_by_key,
+)
 from app.modules.admin.gremium_roles import gremium_ids_with_permission
 from app.modules.admin.models import Gremium, GremiumMembership, MailList
+from app.modules.audit.actions import AuditAction
+from app.modules.audit.service import record as audit_record
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.files.storage import ObjectStorage, StorageError
@@ -263,11 +270,13 @@ class ProtocolService:
 
     @staticmethod
     def _insert_values(
-        meeting: Meeting, gremium: Gremium | None, author: str | None
+        meeting: Meeting, cd_variant: str | None, author: str | None
     ) -> dict[str, object]:
         """Build the column values of a new `protocol` row.
 
-        The `cd_variant` comes from the Gremium.
+        `cd_variant` is the key of the CD variant of the Gremium. The protocol
+        snapshots it, so a later change of the Gremium does not rewrite the
+        design of a protocol that already exists.
         """
         return {
             "meeting_id": meeting.id,
@@ -275,7 +284,7 @@ class ProtocolService:
             "markdown": "",
             "status": "draft",
             "author": author,
-            "cd_variant": gremium.cd_variant if gremium is not None else None,
+            "cd_variant": cd_variant,
         }
 
     async def get_by_meeting(self, meeting_id: UUID) -> ProtocolOut:
@@ -320,9 +329,10 @@ class ProtocolService:
                 "the meeting has not started — its minutes are created on start"
             )
         gremium = await self.session.get(Gremium, meeting.gremium_id)
+        cd_variant = await cd_variant_key_for_gremium(self.session, gremium)
         await self.session.execute(
             pg_insert(Protocol)
-            .values(**self._insert_values(meeting, gremium, author))
+            .values(**self._insert_values(meeting, cd_variant, author))
             .on_conflict_do_nothing(constraint="uq_protocol_meeting")
         )
         await self.session.commit()
@@ -344,6 +354,46 @@ class ProtocolService:
         await self.session.flush()
         await self.session.commit()
         return self._to_out(protocol)
+
+    async def delete_protocol(self, protocol_id: UUID, *, actor: str) -> None:
+        """Delete a protocol while it is still a draft.
+
+        The draft gate is the whole guard. A `final` protocol is a signed
+        record that went out to the Gremium by mail, and a `rendering`
+        protocol is frozen while the worker builds the PDF. Both answer 409,
+        exactly as `update_markdown` does.
+
+        Permission: the same `authorize_write` scope that the PATCH already
+        enforces, and NOT `protocol.finalize`. `protocol.finalize` gates
+        publishing, a different axis: it decides who may turn a draft into a
+        signed record and mail it out. Discarding a draft is the opposite
+        direction and touches nothing that ever left the platform. The holder
+        of the write scope can already empty the body with
+        `PATCH markdown=""`, so a stricter gate here would protect nothing and
+        would only strand a draft that the protokollant wants to restart.
+
+        The `protocol_vote_ref` rows cascade on the foreign key. The audit log
+        records the removal, because the draft text itself is not recoverable.
+
+        Raises:
+            NotFoundError: No protocol has this id (404).
+            ConflictError: The protocol is final or under render (409).
+        """
+        protocol = await self._get(protocol_id)
+        self._ensure_draft(protocol)
+        await audit_record(
+            self.session,
+            actor=actor,
+            action=AuditAction.PROTOCOL_DELETE,
+            target_type="protocol",
+            target_id=str(protocol_id),
+            data={
+                "meetingId": str(protocol.meeting_id),
+                "gremiumId": str(protocol.gremium_id),
+            },
+        )
+        await self.session.delete(protocol)
+        await self.session.commit()
 
     async def embed_votes(
         self, protocol_id: UUID, vote_ids: list[UUID]
@@ -697,7 +747,14 @@ class ProtocolService:
         if self.storage is None or self.pytex is None:
             return None
         try:
-            variant = protocol_variant_for(protocol.cd_variant)
+            # The protocol snapshots the CD key of its Gremium at creation, so it
+            # keeps its design even after the Gremium moves to another one.
+            cd = await resolve_cd_variant_by_key(
+                self.session, self.storage, protocol.cd_variant
+            )
+            variant = cd.base_variant if cd else protocol_variant_for(protocol.cd_variant)
+            config = cd_render_config(cd) if cd else None
+            assets = cd.assets if cd else None
             # RCE protection: the user-written body can carry the Markdown `eval`
             # escape of pytex (`[//]: # "EXPR"` runs eval in the container).
             # `sanitize_user_markdown` removes that escape UNCONDITIONALLY during the
@@ -710,7 +767,9 @@ class ProtocolService:
             # `PytexClient.render_pdf` checks the structure before the trusted render
             # and proves that no eval trigger survived. A bypass of the sanitizer then
             # becomes a contained error instead of an RCE.
-            pdf = await self.pytex.render_pdf(markdown, variant=variant)
+            pdf = await self.pytex.render_pdf(
+                markdown, variant=variant, config=config, assets=assets
+            )
         except PytexError as exc:
             # A 4xx is a permanent input or compile error, for example invalid LaTeX.
             # Do not retry it. Show the scrubbed reason instead of a misleading 503. A

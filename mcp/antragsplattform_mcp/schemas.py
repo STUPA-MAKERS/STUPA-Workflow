@@ -162,7 +162,9 @@ class FormFieldPatch(WireModel):
 class GremiumCreate(WireModel):
     name: str
     slug: str
-    cdVariant: str = "stupa"
+    # The corporate design is a row now, not a name. `list_cd_variants`
+    # returns the ids.
+    cdVariantId: str | None = None
     defaultLang: str = "de"
     allowVoteDelegation: bool = False
     delegationLeadMinutes: int = 0
@@ -173,12 +175,32 @@ class GremiumCreate(WireModel):
 class GremiumUpdate(WireModel):
     name: str | None = None
     slug: str | None = None
-    cdVariant: str | None = None
+    cdVariantId: str | None = None
     defaultLang: str | None = None
     allowVoteDelegation: bool | None = None
     delegationLeadMinutes: int | None = None
     delegationAllowExternal: bool | None = None
     quorumPercent: int | None = None
+
+
+class CdVariantCreate(WireModel):
+    key: str
+    name: str
+    baseVariant: str = "report"
+
+
+class CdVariantUpdate(WireModel):
+    """Patch of a CD variant. `key` is immutable — a different value gives 409."""
+
+    name: str | None = None
+    baseVariant: str | None = None
+
+
+class CdVariantLogoVendoredCreate(WireModel):
+    """Add a logo that pytex ships. Upload a file through the web UI instead."""
+
+    slot: str
+    vendoredName: str
 
 
 class GremiumRoleCreate(WireModel):

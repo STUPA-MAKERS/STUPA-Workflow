@@ -241,9 +241,9 @@ async def test_gremium_crud_and_slug_conflict(session: AsyncSession) -> None:
     svc = ConfigService(session)
     slug = f"asta-{uuid.uuid4().hex[:8]}"
     created = await svc.create_gremium(
-        GremiumCreate(name="AStA", slug=slug, cdVariant="asta"), _ACTOR
+        GremiumCreate(name="AStA", slug=slug), _ACTOR
     )
-    assert created.cd_variant == "asta"
+    assert created.cd_variant_id is None
     with pytest.raises(ConflictError):
         await svc.create_gremium(GremiumCreate(name="Dup", slug=slug), _ACTOR)
     updated = await svc.update_gremium(

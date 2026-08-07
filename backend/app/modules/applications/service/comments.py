@@ -9,10 +9,32 @@ from sqlalchemy import select
 from app.modules.applications.models import Comment
 from app.modules.applications.schemas import CommentOut
 from app.modules.applications.service.service_base import ApplicationsServiceBase
+from app.modules.audit.actions import AuditAction
+from app.modules.audit.service import record as audit_record
+from app.shared.errors import ForbiddenError, NotFoundError
+
+
+def is_comment_author(
+    comment_author: str | None,
+    comment_author_kind: str,
+    *,
+    viewer_sub: str | None,
+    viewer_is_applicant: bool,
+) -> bool:
+    """Tell whether the viewer wrote this comment.
+
+    A principal matches on the stored author ``sub``. The magic-link applicant
+    of the application owns every applicant comment on it, because an applicant
+    comment stores no ``sub``. This is the same rule that ``isOwn`` uses in the
+    listing, so the frontend never offers an edit that the server refuses.
+    """
+    if comment_author_kind == "principal":
+        return viewer_sub is not None and comment_author == viewer_sub
+    return viewer_is_applicant
 
 
 class CommentOps(ApplicationsServiceBase):
-    """Add and list application comments."""
+    """Add, list, edit and remove application comments."""
 
     async def add_comment(
         self,
@@ -74,11 +96,161 @@ class CommentOps(ApplicationsServiceBase):
                 body=c.body,
                 visibility=c.visibility,  # type: ignore[arg-type]
                 at=c.at,
-                isOwn=(
-                    c.author == viewer_sub
-                    if c.author_kind == "principal" and viewer_sub is not None
-                    else c.author_kind == "applicant" and viewer_is_applicant
+                isOwn=is_comment_author(
+                    c.author,
+                    c.author_kind,
+                    viewer_sub=viewer_sub,
+                    viewer_is_applicant=viewer_is_applicant,
                 ),
             )
             for c in rows
         ]
+
+    async def _get_comment(self, application_id: UUID, comment_id: UUID) -> Comment:
+        """Load one comment of this application.
+
+        Raises:
+            NotFoundError: The comment does not exist, or it belongs to another
+                application (404). The path binds both ids, so a mismatch must
+                not leak the existence of a foreign comment.
+        """
+        comment = (
+            await self.session.execute(
+                select(Comment).where(
+                    Comment.id == comment_id, Comment.application_id == application_id
+                )
+            )
+        ).scalar_one_or_none()
+        if comment is None:
+            raise NotFoundError(f"comment {comment_id} not found")
+        return comment
+
+    @staticmethod
+    def _assert_may_write(
+        comment: Comment,
+        *,
+        viewer_sub: str | None,
+        viewer_is_applicant: bool,
+        can_manage: bool,
+    ) -> None:
+        """Gate the edit and the delete of one comment, server-side.
+
+        The author may fix or withdraw the own comment. A principal with
+        ``application.manage`` may do it for anybody, because an internal
+        comment posted as public needs a fast removal. The author identity
+        comes from the session, never from the request body.
+
+        Raises:
+            ForbiddenError: The caller neither wrote the comment nor manages
+                applications (403).
+        """
+        if can_manage:
+            return
+        if is_comment_author(
+            comment.author,
+            comment.author_kind,
+            viewer_sub=viewer_sub,
+            viewer_is_applicant=viewer_is_applicant,
+        ):
+            return
+        raise ForbiddenError("Only the author or an application manager may change a comment.")
+
+    async def _audit_comment(
+        self, comment: Comment, action: AuditAction, *, actor: str
+    ) -> None:
+        """Record a comment mutation. ``data`` holds no comment text, only metadata."""
+        await audit_record(
+            self.session,
+            actor=actor,
+            action=action,
+            target_type="comment",
+            target_id=str(comment.id),
+            data={
+                "applicationId": str(comment.application_id),
+                "authorKind": comment.author_kind,
+                "visibility": comment.visibility,
+            },
+        )
+
+    async def update_comment(
+        self,
+        application_id: UUID,
+        comment_id: UUID,
+        *,
+        body: str,
+        actor: str,
+        viewer_sub: str | None,
+        viewer_is_applicant: bool,
+        can_manage: bool,
+        allow_unconfirmed: bool = True,
+    ) -> CommentOut:
+        """Replace the body of a comment in place.
+
+        A comment keeps no version history, so the new text overwrites the old
+        one and the audit log is the only record that the text changed. The
+        visibility stays fixed: a public comment is already out, and switching
+        it to internal would only hide it from the applicant who read it. Use
+        the delete for that case.
+
+        Raises:
+            NotFoundError: The application or the comment does not exist (404).
+            ForbiddenError: The caller is neither the author nor a manager (403).
+        """
+        await self._get_app(application_id, allow_unconfirmed=allow_unconfirmed)
+        comment = await self._get_comment(application_id, comment_id)
+        self._assert_may_write(
+            comment,
+            viewer_sub=viewer_sub,
+            viewer_is_applicant=viewer_is_applicant,
+            can_manage=can_manage,
+        )
+        comment.body = body
+        await self._audit_comment(comment, AuditAction.COMMENT_UPDATE, actor=actor)
+        await self.session.commit()
+        names = await self._author_names({comment.author} if comment.author else set())
+        return CommentOut(
+            id=comment.id,
+            author=names.get(comment.author, comment.author) if comment.author else None,
+            authorKind=comment.author_kind,  # type: ignore[arg-type] — validated against CHECK
+            body=comment.body,
+            visibility=comment.visibility,  # type: ignore[arg-type]
+            at=comment.at,
+            isOwn=is_comment_author(
+                comment.author,
+                comment.author_kind,
+                viewer_sub=viewer_sub,
+                viewer_is_applicant=viewer_is_applicant,
+            ),
+        )
+
+    async def delete_comment(
+        self,
+        application_id: UUID,
+        comment_id: UUID,
+        *,
+        actor: str,
+        viewer_sub: str | None,
+        viewer_is_applicant: bool,
+        can_manage: bool,
+        allow_unconfirmed: bool = True,
+    ) -> None:
+        """Remove a comment for good.
+
+        Until this route existed, an internal comment posted as public could
+        only be removed by anonymizing the whole application.
+
+        Raises:
+            NotFoundError: The application or the comment does not exist (404).
+            ForbiddenError: The caller is neither the author nor a manager (403).
+        """
+        await self._get_app(application_id, allow_unconfirmed=allow_unconfirmed)
+        comment = await self._get_comment(application_id, comment_id)
+        self._assert_may_write(
+            comment,
+            viewer_sub=viewer_sub,
+            viewer_is_applicant=viewer_is_applicant,
+            can_manage=can_manage,
+        )
+        await self._audit_comment(comment, AuditAction.COMMENT_DELETE, actor=actor)
+        await self.session.delete(comment)
+        await self.session.commit()

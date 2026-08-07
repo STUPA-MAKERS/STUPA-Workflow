@@ -1,8 +1,4 @@
 :host { display: block; }
-/* Center the header at normal body width, like applications. The tree sits in the left margin. */
-.exp__head { width: 100%; max-width: var(--layout-max-width); margin: 0 auto var(--space-5); }
-.exp__title { margin: 0; }
-.exp__subtitle { color: var(--color-text-muted); margin: var(--space-1) 0 0; }
 .exp__search, .exp__input {
   padding: var(--space-2) var(--space-3);
   border: var(--border-width) solid var(--color-border);
@@ -39,10 +35,16 @@ input.exp__input {
   max-height: 75vh;
   overflow-y: auto;
 }
+/* Bookings / transfers switch above the table. */
+.exp__tabs {
+  display: inline-flex;
+  gap: var(--space-1);
+  margin-bottom: var(--space-3);
+}
+
 .exp__main { min-width: 0; }
 @media (max-width: 60rem) {
   .exp__layout { grid-template-columns: minmax(11rem, 14rem) minmax(0, 1fr); }
-  .exp__head { max-width: none; }
 }
 @media (max-width: 40rem) {
   .exp__layout { grid-template-columns: 1fr; }

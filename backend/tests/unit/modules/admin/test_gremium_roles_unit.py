@@ -15,8 +15,8 @@ from sqlalchemy.exc import IntegrityError
 
 from app.modules.admin.gremium_roles import GremiumRoleService, intervals_overlap
 from app.modules.admin.models import GremiumMembership, GremiumRole
-from app.modules.admin.schemas import GremiumMembershipCreate
-from app.shared.errors import ConflictError, NotFoundError
+from app.modules.admin.schemas import GremiumMembershipCreate, GremiumMembershipUpdate
+from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 from tests._support.auth_fakes import fake_session, result
 
 
@@ -151,3 +151,146 @@ async def test_create_membership_db_constraint_overlap_409() -> None:
     with pytest.raises(ConflictError):
         await GremiumRoleService(db).create_membership(gid, payload, "admin")
     assert rollbacks["n"] == 1
+
+
+# PATCH /admin/gremium-memberships/{id}: role change plus term change under the
+# same overlap invariant as the create.
+
+
+def _flush_with_ids(db) -> None:  # noqa: ANN001
+    async def _flush_assign() -> None:
+        for o in db.added:
+            if getattr(o, "id", None) is None:
+                o.id = uuid4()
+        db.flushed += 1
+
+    db.flush = _flush_assign
+
+
+async def test_update_membership_not_found_404() -> None:
+    db = fake_session()  # get() returns None
+    with pytest.raises(NotFoundError):
+        await GremiumRoleService(db).update_membership(
+            uuid4(), GremiumMembershipUpdate(validFrom=None), "admin"
+        )
+
+
+async def test_update_membership_unknown_role_404() -> None:
+    pid, gid = uuid4(), uuid4()
+    row = _membership(pid, gid, None, None)
+    db = fake_session(gets=[row, None])  # the membership, then no role
+    with pytest.raises(NotFoundError):
+        await GremiumRoleService(db).update_membership(
+            row.id, GremiumMembershipUpdate(gremiumRoleId=uuid4()), "admin"
+        )
+
+
+async def test_update_membership_foreign_role_409() -> None:
+    pid, gid = uuid4(), uuid4()
+    row = _membership(pid, gid, None, None)
+    db = fake_session(gets=[row, _role(uuid4())])  # role of ANOTHER gremium
+    with pytest.raises(ConflictError):
+        await GremiumRoleService(db).update_membership(
+            row.id, GremiumMembershipUpdate(gremiumRoleId=uuid4()), "admin"
+        )
+
+
+async def test_update_membership_inverted_window_422() -> None:
+    pid, gid = uuid4(), uuid4()
+    row = _membership(pid, gid, None, None)
+    db = fake_session(gets=[row])
+    with pytest.raises(ValidationProblem):
+        await GremiumRoleService(db).update_membership(
+            row.id,
+            GremiumMembershipUpdate(validFrom="2027-01-01", validUntil="2026-01-01"),
+            "admin",
+        )
+
+
+async def test_update_membership_overlap_409() -> None:
+    pid, gid = uuid4(), uuid4()
+    row = _membership(pid, gid, _dt("2026-01-01"), _dt("2026-06-01"))
+    other = _membership(pid, gid, _dt("2026-06-01"), _dt("2026-12-01"))
+    db = fake_session(result(row, other), gets=[row])
+    with pytest.raises(ConflictError):
+        await GremiumRoleService(db).update_membership(
+            row.id, GremiumMembershipUpdate(validUntil="2026-09-01"), "admin"
+        )
+
+
+async def test_update_membership_ignores_own_row_and_commits() -> None:
+    # The row under edit must not conflict with itself, so the patch passes.
+    pid, gid = uuid4(), uuid4()
+    row = _membership(pid, gid, _dt("2026-01-01"), _dt("2026-06-01"))
+    new_role = _role(gid)
+    db = fake_session(
+        result(row),  # only the row itself exists
+        result(),  # audit advisory lock
+        result(),  # audit prev-hash
+        gets=[row, new_role],
+    )
+    _flush_with_ids(db)
+    out = await GremiumRoleService(db).update_membership(
+        row.id,
+        GremiumMembershipUpdate(gremiumRoleId=new_role.id, validUntil="2026-09-01"),
+        "admin",
+    )
+    assert out.gremium_role_id == new_role.id
+    assert out.valid_until is not None and out.valid_until.startswith("2026-09-01")
+    assert row.valid_from == _dt("2026-01-01")  # untouched fields survive
+    assert db.committed == 1
+
+
+async def test_update_membership_clears_open_end() -> None:
+    pid, gid = uuid4(), uuid4()
+    row = _membership(pid, gid, _dt("2026-01-01"), _dt("2026-06-01"))
+    db = fake_session(result(row), result(), result(), gets=[row])
+    _flush_with_ids(db)
+    out = await GremiumRoleService(db).update_membership(
+        row.id, GremiumMembershipUpdate(validUntil=None), "admin"
+    )
+    assert out.valid_until is None and row.valid_until is None
+
+
+async def test_update_membership_db_constraint_overlap_409() -> None:
+    # The Python fast path sees no overlap. A concurrent write then fires the
+    # EXCLUDE constraint on the flush, and that must give 409, not 500.
+    pid, gid = uuid4(), uuid4()
+    row = _membership(pid, gid, None, None)
+    db = fake_session(result(row), gets=[row])
+    rollbacks = {"n": 0}
+
+    async def _raise_integrity() -> None:
+        raise IntegrityError("UPDATE", {}, Exception("ex_gremium_membership_no_overlap"))
+
+    async def _rollback() -> None:
+        rollbacks["n"] += 1
+
+    db.flush = _raise_integrity
+    db.rollback = _rollback
+    with pytest.raises(ConflictError):
+        await GremiumRoleService(db).update_membership(
+            row.id, GremiumMembershipUpdate(validFrom="2026-01-01"), "admin"
+        )
+    assert rollbacks["n"] == 1
+
+
+def test_parse_dt_invalid_gives_422_not_500() -> None:
+    from app.modules.admin.gremium_roles import _parse_dt
+
+    assert _parse_dt(None) is None
+    assert _parse_dt("") is None
+    assert _parse_dt("2026-01-01") == _dt("2026-01-01")
+    with pytest.raises(ValidationProblem) as ei:
+        _parse_dt("not-a-date")
+    assert ei.value.status == 422
+
+
+async def test_update_membership_invalid_date_422() -> None:
+    pid, gid = uuid4(), uuid4()
+    row = _membership(pid, gid, None, None)
+    db = fake_session(gets=[row])
+    with pytest.raises(ValidationProblem):
+        await GremiumRoleService(db).update_membership(
+            row.id, GremiumMembershipUpdate(validFrom="not-a-date"), "admin"
+        )

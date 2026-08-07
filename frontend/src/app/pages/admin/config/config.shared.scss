@@ -4,20 +4,6 @@
   gap: var(--space-4);
 }
 
-.cfg__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  flex-wrap: wrap;
-}
-
-.cfg__desc {
-  color: var(--color-text-muted);
-  font-size: var(--fs-sm);
-  margin: 0;
-}
-
 .cfg__empty {
   color: var(--color-text-muted);
 }
@@ -116,6 +102,61 @@
 }
 .cfg__no {
   color: var(--color-danger);
+}
+
+.cfg__muted {
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+}
+
+/* Delivery badge in the table: a bare button, so the badge stays the whole target. */
+.cfg__status-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  line-height: 1;
+  border-radius: var(--radius-md);
+}
+
+.cfg__status-btn:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.cfg__status {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.cfg__status-name {
+  margin: 0;
+  font-weight: var(--fw-semibold);
+  overflow-wrap: anywhere;
+}
+
+.cfg__status-grid {
+  display: grid;
+  grid-template-columns: minmax(8rem, auto) 1fr;
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+}
+
+.cfg__status-grid dt {
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+}
+
+.cfg__status-grid dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.cfg__status-alert {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--fs-sm);
 }
 
 input,

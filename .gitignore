@@ -47,3 +47,4 @@ frontend/.angular/
 
 # Internal audit report — kept local per CLAUDE.md, never mirrored into repo
 AUDIT-REPORT.md
+.playwright-mcp/

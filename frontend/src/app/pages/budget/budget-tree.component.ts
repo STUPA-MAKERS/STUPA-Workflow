@@ -1,7 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
+import type { TranslationKey } from '@core/i18n/translations';
 import type { Uuid } from '@core/api/models';
 import {
   ButtonComponent,
@@ -20,6 +22,7 @@ import { AdminApiService } from '../admin/admin-api.service';
 import { BudgetTreeApi, type BudgetTreeNode, type FiscalYear } from './budget-tree.api';
 import { SimplifyPathPipe } from '@shared/budget-path';
 import { BudgetYearTreeComponent, type BudgetYearSelection } from './budget-year-tree.component';
+import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 
 /** A tree row: a node plus the depth for the indentation. */
 interface Row {
@@ -41,7 +44,7 @@ interface Row {
   selector: 'app-budget-tree',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, SimplifyPathPipe, ButtonComponent, DialogComponent, DataTableComponent, CellDirective, RowDetailDirective, IconComponent, CurrencyInputComponent, SelectComponent, BudgetYearTreeComponent],
+  imports: [PageHeaderComponent, FormsModule, TranslatePipe, SimplifyPathPipe, ButtonComponent, DialogComponent, DataTableComponent, CellDirective, RowDetailDirective, IconComponent, CurrencyInputComponent, SelectComponent, BudgetYearTreeComponent],
   templateUrl: './budget-tree.component.html',
   styleUrl: './budget-tree.component.scss',
 })
@@ -50,6 +53,12 @@ export class BudgetTreeComponent {
   private readonly adminApi = inject(AdminApiService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
+  private readonly auth = inject(AuthService);
+
+  /** `budget.structure` as a front-end gate for the fiscal-year edit and delete. The
+   *  backend stays authoritative. The value is reactive, because the principal loads
+   *  asynchronously. */
+  readonly canStructure = computed(() => this.auth.can('budget.structure'));
 
   readonly tree = signal<BudgetTreeNode[]>([]);
   readonly fiscalYears = signal<FiscalYear[]>([]);
@@ -100,6 +109,14 @@ export class BudgetTreeComponent {
   readonly gremiumOptions = signal<SelectOption[]>([]);
   /** Create a fiscal year inside the selected budget. It takes only the year. */
   readonly newFy = signal<{ year: number }>({ year: new Date().getFullYear() });
+  /** Fiscal year under edit. Its dialog corrects the year and the active flag. */
+  readonly fyEdit = signal<FiscalYear | null>(null);
+  readonly fyEditYear = signal<number>(new Date().getFullYear());
+  readonly fyEditActive = signal(true);
+  /** Fiscal year whose delete the user confirms now. */
+  readonly fyDelete = signal<FiscalYear | null>(null);
+  /** Translated reason why the delete was refused (409), else `null`. */
+  readonly fyDeleteBlocked = signal<string | null>(null);
 
   readonly selectedTop = computed<BudgetTreeNode | null>(
     () => this.tree().find((n) => n.id === this.selectedTopId()) ?? null,
@@ -134,6 +151,25 @@ export class BudgetTreeComponent {
   ]);
   readonly rowId = (r: unknown): string => (r as Row).node.id;
   readonly childExpanded = (r: unknown): boolean => this.addingChildOf() === (r as Row).node.id;
+
+  /** Fiscal-year table inside the manage dialog. The action column appears only with
+   *  `budget.structure`, so a read-only user never sees an edit or a delete button. */
+  readonly fyColumns = computed<ColumnDef[]>(() => {
+    const cols: ColumnDef[] = [
+      { key: 'display', label: this.i18n.translate('budget.tree.fyYear') },
+      { key: 'active', label: this.i18n.translate('budget.tree.fyActive'), align: 'start', width: '5rem' },
+    ];
+    if (this.canStructure()) {
+      cols.push({
+        key: 'actions',
+        label: this.i18n.translate('budget.tree.col.actions'),
+        align: 'end',
+        width: '6rem',
+      });
+    }
+    return cols;
+  });
+  readonly fyRowId = (r: unknown): string => (r as FiscalYear).id;
 
   constructor() {
     this.reload();
@@ -231,6 +267,8 @@ export class BudgetTreeComponent {
       next: (fys) => {
         if (seq !== this.reloadSeq) return;
         this.fiscalYears.set(fys);
+        // Keep the left navigation in sync after a fiscal-year edit or delete.
+        this.fiscalYearsByBudget.update((m) => ({ ...m, [topId]: fys }));
         if (!fys.some((fy) => fy.id === this.selectedFyId())) this.selectedFyId.set(fys[0]?.id ?? '');
       },
       error: () => {
@@ -494,6 +532,90 @@ export class BudgetTreeComponent {
       },
       error: () => this.toast.error(this.i18n.translate('budget.tree.toast.fyFailed')),
     });
+  }
+
+  // Correct or remove a fiscal year. Each runs in its own dialog. The manage dialog
+  // closes first and opens again afterwards, so no two dialogs stack.
+  openFyEdit(fy: FiscalYear): void {
+    this.fyOpen.set(false);
+    this.fyEdit.set(fy);
+    this.fyEditYear.set(fy.year);
+    this.fyEditActive.set(fy.active);
+  }
+
+  patchFyEditYear(value: string): void {
+    this.fyEditYear.set(Math.trunc(Number(value)) || new Date().getFullYear());
+  }
+
+  closeFyEdit(): void {
+    this.fyEdit.set(null);
+    this.fyOpen.set(true);
+  }
+
+  saveFyEdit(): void {
+    const fy = this.fyEdit();
+    const top = this.selectedTopId();
+    if (!fy || !top) return;
+    this.api
+      .updateFiscalYear(top as Uuid, fy.id, { year: this.fyEditYear(), active: this.fyEditActive() })
+      .subscribe({
+        next: () => {
+          this.toast.success(this.i18n.translate('budget.tree.toast.fySaved'));
+          this.closeFyEdit();
+          this.loadFiscalYears(top);
+        },
+        // 422 means the year already exists in this budget. Name that reason.
+        error: (err: { status?: number }) =>
+          this.toast.error(
+            this.i18n.translate(
+              err?.status === 422 ? 'budget.tree.toast.fyDuplicate' : 'budget.tree.toast.fyFailed',
+            ),
+          ),
+      });
+  }
+
+  askFyDelete(fy: FiscalYear): void {
+    this.fyOpen.set(false);
+    this.fyDeleteBlocked.set(null);
+    this.fyDelete.set(fy);
+  }
+
+  closeFyDelete(): void {
+    this.fyDelete.set(null);
+    this.fyDeleteBlocked.set(null);
+    this.fyOpen.set(true);
+  }
+
+  doFyDelete(): void {
+    const fy = this.fyDelete();
+    const top = this.selectedTopId();
+    if (!fy || !top) return;
+    this.api.deleteFiscalYear(top as Uuid, fy.id).subscribe({
+      next: () => {
+        this.toast.success(this.i18n.translate('budget.tree.toast.fyDeleted'));
+        this.closeFyDelete();
+        this.loadFiscalYears(top);
+      },
+      error: (err: { status?: number; error?: { detail?: string } }) => {
+        // 409 keeps the dialog open and names the rows that still hang on the year.
+        if (err?.status === 409) {
+          const msg = this.i18n.translate(this.fyBlockerKey(err.error?.detail));
+          this.fyDeleteBlocked.set(msg);
+          this.toast.error(msg);
+          return;
+        }
+        this.toast.error(this.i18n.translate('budget.tree.toast.fyDeleteFailed'));
+      },
+    });
+  }
+
+  /** Map the 409 problem detail to the concrete blocker. The backend names exactly one
+   *  of `bookings`, `allocations` or `applications`. An unknown wording reads generic. */
+  private fyBlockerKey(detail: string | undefined): TranslationKey {
+    if (detail?.includes('bookings')) return 'budget.tree.fyBlocked.bookings';
+    if (detail?.includes('allocations')) return 'budget.tree.fyBlocked.allocations';
+    if (detail?.includes('applications')) return 'budget.tree.fyBlocked.applications';
+    return 'budget.tree.fyBlocked.generic';
   }
 }
 

@@ -4,6 +4,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
+import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import {
   ButtonComponent,
   CardComponent,
@@ -40,6 +41,7 @@ import type { ErasureRequest } from '../admin.models';
     DialogComponent,
     IconComponent,
     InputComponent,
+    PageHeaderComponent,
   ],
   templateUrl: './privacy.component.html',
   styleUrl: './privacy.component.scss',

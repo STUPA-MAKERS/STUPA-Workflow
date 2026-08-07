@@ -6,6 +6,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { I18nMap, Uuid } from '@core/api/models';
 import { resolveI18n } from '@shared/forms/i18n-text';
+import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import {
   BadgeComponent,
   ButtonComponent,
@@ -57,6 +58,7 @@ function emptyForm(): NewForm {
     CellDirective,
     IconComponent,
     InputComponent,
+    PageHeaderComponent,
   ],
   templateUrl: './forms-list.component.html',
   styleUrl: './forms-list.component.scss',
@@ -67,6 +69,14 @@ export class FormsListComponent {
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
+
+  /**
+   * Create posts to `POST /api/admin/application-types`, which needs `admin.types`.
+   * The page itself opens on `form.configure`, so a form manager reaches it without
+   * that key. Without this gate the button is offered and the save answers 403 (#g8).
+   * The gate is UX only. The server stays authoritative.
+   */
+  protected readonly canCreate = computed(() => this.auth.can('admin.types'));
 
   /** Delete needs its own permission. This gate is UX only. The server is authoritative. */
   protected readonly canDelete = computed(() => this.auth.can('admin.types_delete'));
@@ -132,6 +142,7 @@ export class FormsListComponent {
   }
 
   protected openCreate(): void {
+    if (!this.canCreate()) return;
     this.form.set(emptyForm());
     this.dialogOpen.set(true);
   }

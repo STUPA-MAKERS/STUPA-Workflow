@@ -87,6 +87,13 @@ class _FakeService:
     async def cancel(self, vote_id):  # noqa: ANN001
         return _vote_out("cancelled")
 
+    async def delete_standalone(self, vote_id, *, actor):  # noqa: ANN001
+        from app.shared.errors import ConflictError
+
+        if str(vote_id).startswith("00000000"):
+            raise ConflictError("not a draft", code="vote_not_draft")
+        self.deleted = (vote_id, actor)
+
 
 @pytest.fixture
 def fake_service() -> _FakeService:
@@ -288,3 +295,29 @@ def test_ballot_broadcasts_vote_tally(
     r = client.post(f"/api/votes/{uuid4()}/ballot", json={"choice": "yes"})
     assert r.status_code == 200
     assert len(pub.tallies) == 1  # a fresh state after the ballot
+
+
+# DELETE /votes/{id}: gremium-scoped vote.manage, like open/close/cancel.
+
+
+def test_delete_vote_requires_auth_401(client: TestClient) -> None:
+    assert client.delete(f"/api/votes/{uuid4()}").status_code == 401
+
+
+def test_delete_vote_missing_perm_403(app: FastAPI, client: TestClient) -> None:
+    _as_principal(app, "vote.cast")
+    assert client.delete(f"/api/votes/{uuid4()}").status_code == 403
+
+
+def test_delete_vote_204(app: FastAPI, client: TestClient, fake_service: _FakeService) -> None:
+    _as_principal(app, "vote.manage")
+    vid = uuid4()
+    assert client.delete(f"/api/votes/{vid}").status_code == 204
+    assert fake_service.deleted == (vid, "p")
+
+
+def test_delete_vote_conflict_409(app: FastAPI, client: TestClient) -> None:
+    _as_principal(app, "vote.manage")
+    r = client.delete("/api/votes/00000000-0000-0000-0000-000000000000")
+    assert r.status_code == 409
+    assert r.headers["content-type"].startswith("application/problem+json")

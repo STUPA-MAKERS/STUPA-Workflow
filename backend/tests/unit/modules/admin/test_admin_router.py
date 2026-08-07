@@ -27,6 +27,7 @@ from app.modules.admin.router import (
 )
 from app.modules.admin.schemas import (
     ApplicationTypeOut,
+    FlowVersionOut,
     GremiumMailRecipients,
     GremiumMembershipOut,
     GremiumOut,
@@ -63,7 +64,7 @@ class _FakeConfig:
                 id=uuid4(),
                 name="StuPa",
                 slug="stupa",
-                cd_variant="stupa",
+                cd_variant_id=None,
                 default_lang="de",
                 allow_vote_delegation=False,
             )
@@ -74,7 +75,7 @@ class _FakeConfig:
             id=uuid4(),
             name=payload.name,
             slug=payload.slug,
-            cd_variant=payload.cd_variant,
+            cd_variant_id=payload.cd_variant_id,
             default_lang=payload.default_lang,
             allow_vote_delegation=payload.allow_vote_delegation,
         )
@@ -86,7 +87,7 @@ class _FakeConfig:
             id=gremium_id,
             name=payload.name or "X",
             slug="stupa",
-            cd_variant="stupa",
+            cd_variant_id=None,
             default_lang="de",
             allow_vote_delegation=False,
         )
@@ -148,6 +149,9 @@ class _FakeConfig:
 
     async def get_active_global_flow(self):
         return None  # an empty flow is enough for the gate tests (#5-2)
+
+    async def create_global_flow_version(self, payload, actor):  # noqa: ANN001
+        return FlowVersionOut(id=uuid4(), version=2, active=True)
 
     async def create_role(self, payload, actor):  # noqa: ANN001
         return RoleOut(
@@ -274,6 +278,11 @@ class _FakeConfig:
             active=False,
         )
 
+    async def delete_webhook(self, webhook_id, actor):  # noqa: ANN001
+        if str(webhook_id).startswith("00000000"):
+            raise NotFoundError("nope")
+        self.deleted_webhook = webhook_id
+
 
 class _FakeSite:
     def __init__(self) -> None:
@@ -334,6 +343,18 @@ class _FakeGremiumRoles:
             )
         ]
 
+    async def update_membership(self, membership_id, payload, actor):  # noqa: ANN001
+        if str(membership_id).startswith("00000000"):
+            raise NotFoundError("nope")
+        return GremiumMembershipOut(
+            id=membership_id,
+            principal_id=uuid4(),
+            gremium_id=uuid4(),
+            gremium_role_id=payload.gremium_role_id or uuid4(),
+            valid_from=payload.valid_from,
+            valid_until=payload.valid_until,
+        )
+
 
 @pytest.fixture
 def app() -> FastAPI:
@@ -392,7 +413,7 @@ def test_config_schemas_includes_branding(app: FastAPI, client: TestClient) -> N
 
 def test_list_create_update_gremium(app: FastAPI, client: TestClient) -> None:
     _as_admin(app)
-    assert client.get("/api/admin/gremien").json()[0]["cdVariant"] == "stupa"
+    assert client.get("/api/admin/gremien").json()[0]["cdVariantId"] is None
     r = client.post("/api/admin/gremien", json={"name": "AStA", "slug": "asta"})
     assert r.status_code == 201 and r.json()["defaultLang"] == "de"
     patched = client.patch(f"/api/admin/gremien/{uuid4()}", json={"name": "Neu"})
@@ -439,7 +460,7 @@ def test_gremien_authed_list_without_admin_perm(app: FastAPI, client: TestClient
     _as(app, set())  # logged in, but without any permission
     r = client.get("/api/gremien")
     assert r.status_code == 200
-    assert r.json()[0]["cdVariant"] == "stupa"
+    assert r.json()[0]["cdVariantId"] is None
 
 
 def test_gremien_authed_requires_auth_401(client: TestClient) -> None:
@@ -554,6 +575,36 @@ def test_flow_editor_can_read_its_sources_without_admin_types(
     assert client.get("/api/admin/webhooks").status_code == 200
 
 
+_FLOW_GRAPH = {"graph": {"states": [], "transitions": [], "layout": None}}
+
+
+def test_flow_save_accepts_flow_configure(app: FastAPI, client: TestClient) -> None:
+    """#g7: `flow.configure` opens the editor AND saves it.
+
+    Before the fix the route gate and the save gate disagreed: the editor opened on
+    `flow.configure` and the save answered 403 without `admin.types`.
+    """
+    _as(app, {"flow.configure"})
+    r = client.post("/api/admin/flow-versions/global", json=_FLOW_GRAPH)
+    assert r.status_code == 201
+
+
+def test_flow_save_still_accepts_admin_types(app: FastAPI, client: TestClient) -> None:
+    """#g7: the gate is any-of, so an existing `admin.types` holder keeps the save."""
+    _as(app, {"admin.types"})
+    r = client.post("/api/admin/flow-versions/global", json=_FLOW_GRAPH)
+    assert r.status_code == 201
+
+
+def test_flow_save_forbidden_without_either(app: FastAPI, client: TestClient) -> None:
+    """#g7: neither key means 403 as problem+json. A read-only key is not enough."""
+    _as(app, {"budget.structure"})
+    r = client.post("/api/admin/flow-versions/global", json=_FLOW_GRAPH)
+    assert r.status_code == 403
+    assert r.headers["content-type"].startswith("application/problem+json")
+    assert r.json()["code"] == "forbidden"
+
+
 def test_global_flow_readable_by_budget_structure(app: FastAPI, client: TestClient) -> None:
     """#5-2: the budget tree (budget.structure) reads the global flow.
 
@@ -641,6 +692,47 @@ def test_webhooks_crud_and_validation(app: FastAPI, client: TestClient) -> None:
     assert withid.status_code == 201
     patched = client.patch(f"/api/admin/webhooks/{uuid4()}", json={"active": False})
     assert patched.status_code == 200
+
+
+def test_webhook_delete_204_404_and_gate(app: FastAPI, client: TestClient) -> None:
+    """DELETE /admin/webhooks/{id}: 204 happy path, 404 unknown, 403 without the gate."""
+    assert client.delete(f"/api/admin/webhooks/{uuid4()}").status_code == 401
+    _as_admin(app)
+    assert client.delete(f"/api/admin/webhooks/{uuid4()}").status_code == 204
+    missing = "00000000-0000-0000-0000-000000000000"
+    assert client.delete(f"/api/admin/webhooks/{missing}").status_code == 404
+    _as(app, {"admin.gremien"})  # the wrong area permission, so 403
+    assert client.delete(f"/api/admin/webhooks/{uuid4()}").status_code == 403
+
+
+def test_gremium_membership_patch_and_gate(app: FastAPI, client: TestClient) -> None:
+    """PATCH /admin/gremium-memberships/{id}: 200, 404, 422 empty body, 403 gate."""
+    app.dependency_overrides[get_gremium_role_service] = lambda: _FakeGremiumRoles()
+    mid = uuid4()
+    assert client.patch(f"/api/admin/gremium-memberships/{mid}", json={}).status_code == 401
+    _as_admin(app)
+    role_id = uuid4()
+    ok = client.patch(
+        f"/api/admin/gremium-memberships/{mid}",
+        json={"gremiumRoleId": str(role_id), "validUntil": "2027-01-01T00:00:00+00:00"},
+    )
+    assert ok.status_code == 200
+    assert ok.json()["gremiumRoleId"] == str(role_id)
+    assert ok.json()["validUntil"] == "2027-01-01T00:00:00+00:00"
+    # An empty body sets no field and fails the schema with 422.
+    assert client.patch(f"/api/admin/gremium-memberships/{mid}", json={}).status_code == 422
+    missing = "00000000-0000-0000-0000-000000000000"
+    gone = client.patch(
+        f"/api/admin/gremium-memberships/{missing}", json={"validFrom": None}
+    )
+    assert gone.status_code == 404
+    _as(app, {"admin.gremium_roles"})  # the neighbouring area permission is not enough
+    assert (
+        client.patch(
+            f"/api/admin/gremium-memberships/{mid}", json={"validFrom": None}
+        ).status_code
+        == 403
+    )
 
 
 def test_site_config_draft_activate_cycle(app: FastAPI, client: TestClient) -> None:

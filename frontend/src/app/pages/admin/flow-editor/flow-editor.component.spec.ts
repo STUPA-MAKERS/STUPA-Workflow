@@ -45,7 +45,7 @@ async function setup(over: Overrides = {}) {
   const getGlobalFlow = over.getGlobalFlow ?? jest.fn(() => of(null));
   const createGlobalFlowVersion = over.createGlobalFlowVersion ?? jest.fn(() => of({ id: 'gfv1' }));
   const listApplicationTypes = jest.fn(() => of([{ id: 't1', name: 'Finanzantrag' }]));
-  const listGremienOptions = over.listGremienOptions ?? jest.fn(() => of([{ id: 'g1', name: 'StuPa', slug: 'stupa', cdVariant: 'stupa', defaultLang: 'de' }]));
+  const listGremienOptions = over.listGremienOptions ?? jest.fn(() => of([{ id: 'g1', name: 'StuPa', slug: 'stupa', cdVariantId: 'cd-stupa', defaultLang: 'de' }]));
   const listGremiumRoles = jest.fn(() => of([{ id: 'gr1', key: 'vorsitz', name: { de: 'Vorsitz' } }]));
   const listRoles = over.listRoles ?? jest.fn(() => of([{ id: 'r1', key: 'finance', label: { de: 'Finanzen' }, permissions: [] }]));
   const listDeadlinePolicies = over.listDeadlinePolicies ?? jest.fn(() => of([{ id: 'dp1', key: 'semester', label: { de: 'Semesterfrist' }, kind: 'absolute' }]));

@@ -1,10 +1,6 @@
-<header class="flex items-center justify-between gap-4 flex-wrap">
-  <div>
-    <h1 class="m-0">{{ 'admin.gremien.title' | t }}</h1>
-    <p class="text-muted mt-1">{{ 'admin.gremien.subtitle' | t }}</p>
-  </div>
-  <app-button size="sm" (click)="openCreate()">{{ 'admin.gremien.addGremium' | t }}</app-button>
-</header>
+<app-page-header [title]="'admin.gremien.title' | t" [subtitle]="'admin.gremien.subtitle' | t">
+  <app-button actions size="sm" (click)="openCreate()">{{ 'admin.gremien.addGremium' | t }}</app-button>
+</app-page-header>
 
 <section class="grem__list" [attr.aria-label]="'admin.gremien.title' | t">
   @if (loading()) {
@@ -14,6 +10,7 @@
   } @else {
     <app-data-table [columns]="columns()" [rows]="gremien()" [rowKey]="rowId" [emptyText]="'admin.gremien.empty' | t">
       <ng-template appCell="slug" let-g><span class="grem__mono">{{ $any(g).slug }}</span></ng-template>
+      <ng-template appCell="cdVariant" let-g>{{ cdVariantName($any(g)) }}</ng-template>
       <ng-template appCell="delegation" let-g>
         @if ($any(g).allowVoteDelegation) {
           <span class="grem__yes" [attr.title]="'admin.gremien.delegation' | t" aria-label="✓">✓</span>
@@ -52,10 +49,12 @@
     </div>
     <app-select
       [label]="'admin.gremien.cdVariant' | t"
-      [options]="cdOptions"
-      [ngModel]="form().cdVariant"
-      (ngModelChange)="patch('cdVariant', $event)"
-      name="cdVariant"
+      [placeholder]="'admin.gremien.cdVariantNone' | t"
+      [options]="cdOptions()"
+      [hint]="'admin.gremien.cdVariantHint' | t"
+      [ngModel]="form().cdVariantId"
+      (ngModelChange)="patch('cdVariantId', $event)"
+      name="cdVariantId"
     />
     <app-select
       [label]="'admin.gremien.defaultLang' | t"

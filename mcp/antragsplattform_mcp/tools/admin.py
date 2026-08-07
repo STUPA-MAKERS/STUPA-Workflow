@@ -42,6 +42,52 @@ async def delete_gremium(gremium_id: str) -> dict:
 
 
 @group.tool
+async def list_cd_variants() -> dict:
+    """List the corporate-design variants. Requires admin.cd_variants or admin.gremien.
+
+    Use the returned id as `cdVariantId` when you create or patch a Gremium.
+    """
+    return await api().get("/admin/cd-variants")
+
+
+@group.tool
+async def create_cd_variant(variant: S.CdVariantCreate) -> dict:
+    """Create a corporate-design variant. Requires admin.cd_variants."""
+    return await api().post("/admin/cd-variants", json=dump_create(variant))
+
+
+@group.tool
+async def update_cd_variant(variant_id: str, patch: S.CdVariantUpdate) -> dict:
+    """Patch a corporate-design variant. Requires admin.cd_variants."""
+    return await api().patch(f"/admin/cd-variants/{variant_id}", json=dump_patch(patch))
+
+
+@group.tool
+async def delete_cd_variant(variant_id: str) -> dict:
+    """Delete a corporate-design variant. Requires admin.cd_variants.
+
+    The call gives 409 while a Gremium still uses the variant.
+    """
+    return await api().delete(f"/admin/cd-variants/{variant_id}")
+
+
+@group.tool
+async def add_cd_variant_vendored_logo(
+    variant_id: str, logo: S.CdVariantLogoVendoredCreate
+) -> dict:
+    """Add a logo that pytex ships to a variant. Requires admin.cd_variants."""
+    return await api().post(
+        f"/admin/cd-variants/{variant_id}/logos/vendored", json=dump_create(logo)
+    )
+
+
+@group.tool
+async def delete_cd_variant_logo(logo_id: str) -> dict:
+    """Remove one logo from a corporate-design variant. Requires admin.cd_variants."""
+    return await api().delete(f"/admin/cd-variant-logos/{logo_id}")
+
+
+@group.tool
 async def get_gremium_mail_recipients(gremium_id: str) -> dict:
     """List the extra protocol recipients of a Gremium.
 

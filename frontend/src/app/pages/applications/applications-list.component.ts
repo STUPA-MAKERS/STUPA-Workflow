@@ -41,6 +41,7 @@ import {
 } from './applications-table.component';
 import { AuthService } from '@core/auth/auth.service';
 import { downloadBlob } from '@shared/download.util';
+import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 
 /**
  * Application list with filter and search (`state/gremium/type/topf/q`) and offset paging.
@@ -53,7 +54,7 @@ import { downloadBlob } from '@shared/download.util';
   selector: 'app-applications-list',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, ButtonComponent, IconComponent, SelectComponent, CurrencyInputComponent, DatepickerComponent, FilterBarComponent, FilterFieldComponent, FilterRangeComponent, CostCentreTreeComponent, ApplicationsTableComponent],
+  imports: [PageHeaderComponent, FormsModule, TranslatePipe, ButtonComponent, IconComponent, SelectComponent, CurrencyInputComponent, DatepickerComponent, FilterBarComponent, FilterFieldComponent, FilterRangeComponent, CostCentreTreeComponent, ApplicationsTableComponent],
   templateUrl: './applications-list.component.html',
   styleUrl: './applications-list.component.scss',
 })

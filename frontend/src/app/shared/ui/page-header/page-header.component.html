@@ -1,0 +1,13 @@
+<app-breadcrumbs />
+
+<div class="ph__bar">
+  <div class="ph__text">
+    <h1 class="ph__title">{{ title() }}</h1>
+    @if (subtitle()) {
+      <p class="ph__subtitle">{{ subtitle() }}</p>
+    }
+  </div>
+  <div class="ph__actions">
+    <ng-content select="[actions]" />
+  </div>
+</div>

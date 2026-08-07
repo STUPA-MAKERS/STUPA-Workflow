@@ -4,19 +4,6 @@
   gap: var(--space-5);
 }
 
-.bt__head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-4);
-  /* Center the header at normal body width, like applications. The tree sits in
-     the left margin outside the body (breakout). */
-  width: 100%;
-  max-width: var(--layout-max-width);
-  margin-inline: auto;
-}
-
 .bt__head-actions {
   display: flex;
   flex-wrap: wrap;
@@ -71,9 +58,6 @@
 @media (max-width: 60rem) {
   .bt__layout {
     grid-template-columns: minmax(11rem, 14rem) minmax(0, 1fr);
-  }
-  .bt__head {
-    max-width: none;
   }
 }
 @media (max-width: 40rem) {
@@ -302,14 +286,37 @@
   align-items: baseline;
 }
 
+/* Fiscal-year management inside the dialog: the create form sits above, the existing
+   years below with their row actions. */
+.bt__fy-manage {
+  margin-top: var(--space-4);
+}
+
+.bt__fy-head {
+  margin: 0 0 var(--space-2);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--color-text-muted);
+}
+
+/* Boolean column: a colored check or cross, the same as in the admin views. */
+.bt__yes,
+.bt__no {
+  font-weight: var(--fw-bold);
+  line-height: 1;
+}
+.bt__yes {
+  color: var(--color-success);
+}
+.bt__no {
+  color: var(--color-danger);
+}
+
 /* Mobile (<=768px = 48rem): single column, rows may wrap, actions stay tappable
    (min. 2.5rem). The desktop layout does not change. */
 @media (max-width: 48rem) {
   .bt__layout {
     grid-template-columns: 1fr;
-  }
-  .bt__head {
-    max-width: none;
   }
   .bt__nav {
     position: static;

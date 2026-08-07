@@ -1,20 +1,26 @@
 
-<header class="flex items-center justify-between gap-4 flex-wrap">
-  <div>
-    <h1 class="m-0">{{ 'admin.gremien.membersOf' | t }}: {{ gremium()?.name ?? '…' }}</h1>
-    <p class="text-muted mt-1">{{ 'admin.gremien.membersHint' | t }}</p>
-  </div>
-  <app-button size="sm" (click)="openAdd()">{{ 'admin.gremien.addMember' | t }}</app-button>
-</header>
+<app-page-header
+  [title]="('admin.gremien.membersOf' | t) + ': ' + (gremium()?.name ?? '…')"
+  [subtitle]="'admin.gremien.membersHint' | t"
+>
+  @if (canManage()) {
+    <app-button actions size="sm" (click)="openAdd()">{{ 'admin.gremien.addMember' | t }}</app-button>
+  }
+</app-page-header>
 
 <app-data-table [columns]="columns()" [rows]="members()" [rowKey]="rowId" [emptyText]="'admin.gremien.membersEmpty' | t">
   <ng-template appCell="email" let-m>{{ $any(m).email || '—' }}</ng-template>
   <ng-template appCell="roleLabel" let-m><app-badge variant="primary">{{ $any(m).roleLabel }}</app-badge></ng-template>
   <ng-template appCell="term" let-m><span class="text-muted text-sm">{{ $any(m).term }}</span></ng-template>
   <ng-template appCell="actions" let-m>
-    <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.gremien.memberRemove' | t" (click)="removeMember($any(m).assignmentId)">
-      <app-icon name="delete" />
-    </app-button>
+    <span class="inline-flex items-center gap-1 justify-end">
+      <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.gremien.memberEdit' | t" (click)="openEdit($any(m))">
+        <app-icon name="edit" />
+      </app-button>
+      <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.gremien.memberRemove' | t" (click)="removeMember($any(m).assignmentId)">
+        <app-icon name="delete" />
+      </app-button>
+    </span>
   </ng-template>
 </app-data-table>
 
@@ -160,5 +166,39 @@
   <div dialog-footer class="flex gap-3">
     <app-button size="sm" variant="ghost" (click)="closeAdd()">{{ 'admin.gremien.cancel' | t }}</app-button>
     <app-button size="sm" [disabled]="!selected() || !addRoleId()" (click)="addMember()">{{ 'admin.gremien.memberAdd' | t }}</app-button>
+  </div>
+</app-dialog>
+
+<!-- Edit one membership. The member and the Gremium stay fixed. Only the role and the
+     term of office change, so no delete plus re-create is necessary. -->
+<app-dialog
+  [open]="editOpen()"
+  [title]="'admin.gremien.memberEdit' | t"
+  [closeLabel]="'admin.gremien.cancel' | t"
+  (closed)="closeEdit()"
+>
+  @if (editMember(); as m) {
+    <div class="flex flex-col gap-4">
+      <p class="m-0 text-sm">{{ 'admin.gremien.memberEditFor' | t }}: <strong>{{ m.name }}</strong></p>
+      <app-select
+        [label]="'admin.gremien.memberRole' | t"
+        [placeholder]="'admin.gremien.memberRolePlaceholder' | t"
+        [options]="roleOptions()"
+        [ngModel]="editRoleId()"
+        (ngModelChange)="editRoleId.set($event)"
+        name="editMemberRole"
+      />
+      <div class="gm__term">
+        <label class="gm__lbl">{{ 'admin.gremien.termFrom' | t }}
+          <app-datepicker [ngModel]="editFrom()" (ngModelChange)="editFrom.set($event)" name="editFrom" /></label>
+        <label class="gm__lbl">{{ 'admin.gremien.termUntil' | t }}
+          <app-datepicker [ngModel]="editUntil()" (ngModelChange)="editUntil.set($event)" name="editUntil" /></label>
+      </div>
+      <p class="text-muted m-0 text-xs">{{ 'admin.gremien.memberTermHint' | t }}</p>
+    </div>
+  }
+  <div dialog-footer class="flex gap-3">
+    <app-button size="sm" variant="ghost" (click)="closeEdit()">{{ 'admin.gremien.cancel' | t }}</app-button>
+    <app-button size="sm" [disabled]="!editRoleId()" (click)="saveEdit()">{{ 'action.save' | t }}</app-button>
   </div>
 </app-dialog>

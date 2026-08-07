@@ -4,17 +4,27 @@ import { provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { USE_MOCK_API } from '@core/api/api.config';
-import type { Gremium } from '../admin.models';
+import type { CdVariantOption, Gremium } from '../admin.models';
 import { AdminGremienComponent } from './gremien.component';
 
 const GREMIUM: Gremium = {
   id: 'g-1',
   name: 'Studierendenparlament',
   slug: 'stupa',
-  cdVariant: 'stupa',
+  cdVariantId: 'cd-1',
   defaultLang: 'de',
   allowVoteDelegation: false,
 };
+
+const CD_VARIANTS: CdVariantOption[] = [
+  { id: 'cd-1', key: 'stupa', name: 'StuPa' },
+  { id: 'cd-2', key: 'asta', name: 'AStA' },
+];
+
+/** Flush the CD-variant dropdown source the page loads on construction. */
+function flushCdVariants(http: HttpTestingController, options: CdVariantOption[] = CD_VARIANTS) {
+  http.expectOne((r) => r.url.endsWith('/api/cd-variants') && r.method === 'GET').flush(options);
+}
 
 async function setup(gremien: Gremium[] = [GREMIUM]) {
   const view = await render(AdminGremienComponent, {
@@ -27,6 +37,7 @@ async function setup(gremien: Gremium[] = [GREMIUM]) {
   });
   const http = view.fixture.debugElement.injector.get(HttpTestingController);
   http.expectOne((r) => r.url.endsWith('/admin/gremien') && r.method === 'GET').flush(gremien);
+  flushCdVariants(http);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const c = view.fixture.componentInstance as any;
   return { ...view, http, c };
@@ -62,11 +73,26 @@ describe('AdminGremienComponent (#18)', () => {
     http
       .expectOne((r) => r.url.endsWith('/admin/gremien') && r.method === 'GET')
       .flush('boom', { status: 500, statusText: 'Server Error' });
+    // The dropdown source fails too: the page keeps an empty variant list.
+    http
+      .expectOne((r) => r.url.endsWith('/api/cd-variants') && r.method === 'GET')
+      .flush('boom', { status: 500, statusText: 'Server Error' });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = view.fixture.componentInstance as any;
     expect(c.loadError()).toBe(true);
     expect(c.loading()).toBe(false);
+    expect(c.cdVariants()).toEqual([]);
     http.verify();
+  });
+
+  it('resolves the CD-variant id to its name and shows a dash without one', async () => {
+    const { c } = await setup();
+    expect(c.cdVariantName(GREMIUM)).toBe('StuPa');
+    expect(c.cdVariantName({ ...GREMIUM, cdVariantId: null })).toBe('—');
+    expect(c.cdOptions()).toEqual([
+      { value: 'cd-1', label: 'StuPa' },
+      { value: 'cd-2', label: 'AStA' },
+    ]);
   });
 
   it('slugPreview shows a dash for an empty name and the slug otherwise', async () => {
@@ -116,13 +142,14 @@ describe('AdminGremienComponent (#18)', () => {
     const { http } = await setup([]);
     await userEvent.click(screen.getByRole('button', { name: 'Gremium hinzufügen' }));
     await userEvent.type(screen.getByLabelText(/^Name/), 'AStA Vorstand');
+    await userEvent.selectOptions(screen.getByLabelText(/CD-Variante/), 'cd-2');
     await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
 
     const post = http.expectOne((r) => r.url.endsWith('/admin/gremien') && r.method === 'POST');
     expect(post.request.body).toEqual({
       name: 'AStA Vorstand',
       slug: 'asta-vorstand',
-      cdVariant: 'stupa',
+      cdVariantId: 'cd-2',
       defaultLang: 'de',
       allowVoteDelegation: false,
       delegationLeadMinutes: 0,
@@ -177,7 +204,7 @@ describe('AdminGremienComponent (#18)', () => {
     const patch = http.expectOne((r) => r.url.endsWith('/admin/gremien/g-1') && r.method === 'PATCH');
     expect(patch.request.body).toEqual({
       name: 'StuPa 2026',
-      cdVariant: 'stupa',
+      cdVariantId: 'cd-1',
       defaultLang: 'en',
       allowVoteDelegation: false,
       delegationLeadMinutes: 0,
@@ -211,7 +238,7 @@ describe('AdminGremienComponent (#18)', () => {
     expect(c.editingId()).toBe('g-1');
     expect(c.form()).toEqual({
       name: 'Studierendenparlament',
-      cdVariant: 'stupa',
+      cdVariantId: 'cd-1',
       defaultLang: 'de',
       allowVoteDelegation: true,
       delegationLeadMinutes: 30,
@@ -224,10 +251,11 @@ describe('AdminGremienComponent (#18)', () => {
 
   it('openEdit defaults optional fields when absent and ignores recipient load errors', async () => {
     const { http, c } = await setup();
-    c.openEdit(GREMIUM);
+    c.openEdit({ ...GREMIUM, cdVariantId: null });
     http
       .expectOne((r) => r.url.endsWith('/admin/gremien/g-1/mail-recipients') && r.method === 'GET')
       .flush('no', { status: 500, statusText: 'err' });
+    expect(c.form().cdVariantId).toBe(''); // no variant → the placeholder option
     expect(c.form().delegationLeadMinutes).toBe(0);
     expect(c.form().delegationAllowExternal).toBe(false);
     expect(c.form().quorumPercent).toBeNull();

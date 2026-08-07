@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ApiClient } from '@core/api/api-client.service';
 import { DelegationsApiService, type VoteDelegationStatus } from '@core/api/delegations.service';
 import { AuthService } from '@core/auth/auth.service';
@@ -7,13 +7,22 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { ProblemDetail, Vote } from '@core/api/models';
+import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { BadgeComponent } from '@stupa-makers/ui-kit';
 import { ButtonComponent } from '@stupa-makers/ui-kit';
 import { CardComponent } from '@stupa-makers/ui-kit';
+import { DialogComponent } from '@stupa-makers/ui-kit';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { VoteBarsComponent } from './vote-bars.component';
 
 type Phase = 'loading' | 'error' | 'ready';
+
+/** 409 codes of `DELETE /votes/{id}`, mapped to their explanation. */
+const DELETE_CONFLICT_KEYS: Record<string, TranslationKey> = {
+  vote_meeting_bound: 'voting.delete.conflict.meetingBound',
+  vote_not_draft: 'voting.delete.conflict.notDraft',
+  vote_has_ballots: 'voting.delete.conflict.hasBallots',
+};
 
 /**
  * Vote UI: load a single vote and cast a ballot.
@@ -30,7 +39,16 @@ type Phase = 'loading' | 'error' | 'ready';
   selector: 'app-vote-cast',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, BadgeComponent, ButtonComponent, CardComponent, TranslatePipe, VoteBarsComponent],
+  imports: [
+    RouterLink,
+    BadgeComponent,
+    ButtonComponent,
+    CardComponent,
+    DialogComponent,
+    PageHeaderComponent,
+    TranslatePipe,
+    VoteBarsComponent,
+  ],
   templateUrl: './vote-cast.component.html',
   styleUrl: './vote-cast.component.scss',
 })
@@ -41,6 +59,7 @@ export class VoteCastComponent {
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
 
   readonly phase = signal<Phase>('loading');
   readonly vote = signal<Vote | null>(null);
@@ -60,6 +79,21 @@ export class VoteCastComponent {
   readonly showBars = computed(() => Boolean(this.vote()) && (!this.secret() || this.isClosed()));
   readonly locked = computed(() => this.myChoice() !== null && !this.allowChange());
 
+  // Delete a standalone vote. The route accepts it only while the vote is a
+  // draft with no ballots, and it refuses a meeting-bound vote: that one is
+  // deleted through its meeting. `cancel` stays the path for an open vote.
+  readonly confirmDelete = signal(false);
+  readonly deleting = signal(false);
+  readonly canDelete = computed(() => {
+    const vote = this.vote();
+    return (
+      !!vote &&
+      vote.status === 'draft' &&
+      !vote.meetingId &&
+      this.auth.can('vote.manage')
+    );
+  });
+
   readonly castCount = computed(() => {
     const tally = this.vote()?.tally;
     return tally ? Object.values(tally.counts).reduce((a, b) => a + b, 0) : 0;
@@ -71,6 +105,14 @@ export class VoteCastComponent {
   readonly resultKey = computed(
     () => `vote.result.${this.vote()?.result ?? 'tie'}` as TranslationKey,
   );
+  /** Page-header subtitle: the majority rule, plus the quorum when the vote has one. */
+  readonly subtitle = computed(() => {
+    const majority = this.i18n.translate(this.majorityKey());
+    const quorum = this.vote()?.config.quorum;
+    if (!quorum) return majority;
+    const unit = quorum.type === 'percent' ? '%' : '';
+    return `${majority} · ${this.i18n.translate('vote.tally.quorum')} ${quorum.value}${unit}`;
+  });
 
   constructor() {
     const id = this.route.snapshot.paramMap.get('id');
@@ -112,6 +154,46 @@ export class VoteCastComponent {
     const key = `vote.option.${option}` as TranslationKey;
     const label = this.i18n.translate(key);
     return label === key ? option : label;
+  }
+
+  /**
+   * Delete the vote for good (`DELETE /votes/{id}`).
+   *
+   * A 409 is a real state, not a generic failure: the vote opened, it already
+   * holds ballots, or it belongs to a meeting. Name the reason and reload, so
+   * the page shows the state the server has.
+   */
+  doDelete(): void {
+    const vote = this.vote();
+    if (!vote || this.deleting()) return;
+    this.deleting.set(true);
+    this.api.deleteVote(vote.id).subscribe({
+      next: () => {
+        this.deleting.set(false);
+        this.confirmDelete.set(false);
+        this.toast.success(this.i18n.translate('voting.delete.done'));
+        // The vote is gone, so this route 404s from now on. Go back to the
+        // application that carried it, or to the vote overview without one.
+        void this.router.navigate(
+          vote.applicationId ? ['/applications', vote.applicationId] : ['/voting'],
+        );
+      },
+      error: (err: { status?: number; error?: ProblemDetail }) => {
+        this.deleting.set(false);
+        this.confirmDelete.set(false);
+        if (err.status === 409) {
+          const key = DELETE_CONFLICT_KEYS[err.error?.code ?? ''] ?? 'voting.delete.conflict.other';
+          this.toast.error(this.i18n.translate(key));
+          this.api.getVote(vote.id, { quiet: true }).subscribe((v) => this.vote.set(v));
+          return;
+        }
+        this.toast.error(
+          this.i18n.translate(
+            err.status === 403 ? 'voting.delete.forbidden' : 'voting.delete.failed',
+          ),
+        );
+      },
+    });
   }
 
   cast(choice: string, asDelegation = false): void {

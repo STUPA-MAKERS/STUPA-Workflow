@@ -21,6 +21,7 @@ export const MOCK_PERMISSIONS: string[] = [
   'application.update',
   'application.transition',
   'application.manage',
+  'application.delete',
   'form.configure',
   'flow.configure',
   'vote.manage',
@@ -94,8 +95,8 @@ export const MOCK_PRINCIPALS: AdminPrincipal[] = [
 ];
 
 export const MOCK_GREMIEN: Gremium[] = [
-  { id: 'g-stupa', name: 'Studierendenparlament', slug: 'stupa', cdVariant: 'stupa', defaultLang: 'de', allowVoteDelegation: true },
-  { id: 'g-asta', name: 'AStA', slug: 'asta', cdVariant: 'asta', defaultLang: 'de', allowVoteDelegation: false },
+  { id: 'g-stupa', name: 'Studierendenparlament', slug: 'stupa', cdVariantId: 'cd-stupa', defaultLang: 'de', allowVoteDelegation: true },
+  { id: 'g-asta', name: 'AStA', slug: 'asta', cdVariantId: 'cd-asta', defaultLang: 'de', allowVoteDelegation: false },
 ];
 
 /**

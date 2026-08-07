@@ -94,7 +94,13 @@ class Vote(UUIDPkMixin, CreatedAtMixin, Base):
 
 
 class Ballot(UUIDPkMixin, Base):
-    """One (open) ballot. ``choice`` is NULL when ``secret=true`` (see SecretBallot)."""
+    """One (open) ballot. ``choice`` is NULL when ``secret=true`` (see SecretBallot).
+
+    A ballot carries no update and no delete route, and that is deliberate. A cast
+    vote is a record of a decision. An edit would rewrite the result after the fact,
+    and a delete of a single row would break the tally against the voted markers.
+    Use ``cancel`` on the vote to void a whole ballot round.
+    """
 
     __tablename__ = "ballot"
 

@@ -26,7 +26,9 @@ from app.deps import (
     require_principal,
 )
 from app.modules.applications.access import (
+    DELETE_PERMISSION,
     EDIT_ANY_PERMISSION,
+    MANAGE_PERMISSION,
     READ_ALL_PERMISSION,
     Access,
     require_app_edit,
@@ -40,6 +42,7 @@ from app.modules.applications.schemas import (
     ApplicationPatch,
     CommentCreate,
     CommentOut,
+    CommentPatch,
     TimelineEventOut,
     VersionOut,
 )
@@ -403,15 +406,15 @@ async def patch_application(
 async def delete_application(
     application_id: UUID,
     service: ServiceDep,
-    principal: Annotated[Principal, Depends(require_principal())],
+    principal: Annotated[Principal, Depends(require_principal(DELETE_PERMISSION))],
 ) -> None:
     """Delete an application.
 
-    Only an admin may delete. A manager and the creator may not. The delete is
-    irreversible.
+    The route gates on ``application.delete``. An admin holds that permission
+    through the role bypass, and any other role holds it through an explicit
+    grant. ``application.manage`` alone is not enough, and the creator may not
+    delete either. The delete is irreversible.
     """
-    if "admin" not in principal.roles:
-        raise ForbiddenError("Only an admin may delete applications.")
     await service.delete(application_id, actor=principal.sub)
 
 
@@ -560,6 +563,68 @@ async def list_comments(
         allow_unconfirmed=access.is_owning_applicant,
         viewer_sub=access.principal.sub if access.principal is not None else None,
         viewer_is_applicant=access.is_owning_applicant,
+    )
+
+
+@router.patch(
+    "/applications/{application_id}/comments/{comment_id}",
+    response_model=CommentOut,
+    responses=_errors(400, 401, 403, 404, 422),
+)
+async def update_comment(
+    comment_id: UUID,
+    payload: CommentPatch,
+    service: ServiceDep,
+    # ``require_app_read`` like the create: a comment is communication, not a
+    # data change. The per-comment author check runs in the service.
+    access: Annotated[Access, Depends(require_app_read)],
+) -> CommentOut:
+    """Replace the body of a comment.
+
+    Only the AUTHOR of the comment or a principal with ``application.manage``
+    may do this. The author comes from the session, never from the body. A
+    comment keeps no version history, so the new text replaces the old one and
+    the audit log records the change.
+    """
+    return await service.update_comment(
+        access.application_id,
+        comment_id,
+        body=payload.body,
+        actor=access.actor,
+        viewer_sub=access.principal.sub if access.principal is not None else None,
+        viewer_is_applicant=access.is_owning_applicant,
+        can_manage=access.principal is not None
+        and access.principal.has(MANAGE_PERMISSION),
+        allow_unconfirmed=access.is_owning_applicant,
+    )
+
+
+@router.delete(
+    "/applications/{application_id}/comments/{comment_id}",
+    status_code=204,
+    responses=_errors(401, 403, 404),
+)
+async def delete_comment(
+    comment_id: UUID,
+    service: ServiceDep,
+    access: Annotated[Access, Depends(require_app_read)],
+) -> None:
+    """Delete a comment.
+
+    Only the AUTHOR of the comment or a principal with ``application.manage``
+    may do this. The delete is final and the audit log records it. Before this
+    route existed, a comment posted with the wrong visibility could only be
+    removed by anonymizing the whole application.
+    """
+    await service.delete_comment(
+        access.application_id,
+        comment_id,
+        actor=access.actor,
+        viewer_sub=access.principal.sub if access.principal is not None else None,
+        viewer_is_applicant=access.is_owning_applicant,
+        can_manage=access.principal is not None
+        and access.principal.has(MANAGE_PERMISSION),
+        allow_unconfirmed=access.is_owning_applicant,
     )
 
 

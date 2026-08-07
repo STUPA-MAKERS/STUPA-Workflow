@@ -38,6 +38,17 @@ class AuditAction(StrEnum):
     WEBHOOK_CONFIG = "webhook_config"
     ATTACHMENT_QUARANTINE = "attachment_quarantine"
     ATTACHMENT_DELETE = "attachment_delete"
+    # Application comment edited or removed in place. A comment keeps no version
+    # history, so the log is the only record that the text changed. ``data``
+    # carries the application id, the visibility and the author kind. It never
+    # carries the comment text, because a comment can hold PII.
+    COMMENT_UPDATE = "comment_update"
+    COMMENT_DELETE = "comment_delete"
+    # Draft protocol removed. A finalized protocol is a signed record and the
+    # route refuses to delete it.
+    PROTOCOL_DELETE = "protocol_delete"
+    # Vote removed before it ever opened. A vote with ballots is not deletable.
+    VOTE_DELETE = "vote_delete"
     # GDPR/PII: access (Art. 15), erasure/anonymization (Art. 17), retention
     # (Art. 5(1)(e)) plus the erasure-request queue. ``data`` carries only
     # id/email references and metadata, never raw PII values.
@@ -56,6 +67,7 @@ class AuditAction(StrEnum):
     BUDGET_NODE_CREATE = "budget_node_create"
     BUDGET_NODE_UPDATE = "budget_node_update"
     BUDGET_NODE_DELETE = "budget_node_delete"
+    BUDGET_FISCAL_YEAR_DELETE = "budget_fiscal_year_delete"
     BUDGET_ALLOCATION_SET = "budget_allocation_set"
     BUDGET_EXPENSE_CREATE = "budget_expense_create"
     BUDGET_EXPENSE_UPDATE = "budget_expense_update"

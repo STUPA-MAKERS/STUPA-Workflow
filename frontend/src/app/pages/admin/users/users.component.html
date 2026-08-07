@@ -1,8 +1,5 @@
 <section class="flex flex-col gap-6">
-  <header class="users__head">
-    <h1>{{ 'admin.users.title' | t }}</h1>
-    <p class="text-muted">{{ 'admin.users.subtitle' | t }}</p>
-  </header>
+  <app-page-header [title]="'admin.users.title' | t" [subtitle]="'admin.users.subtitle' | t" />
 
   <form class="users__search" (submit)="$event.preventDefault(); search()" role="search">
     <label class="users__search-lbl" for="user-search">{{ 'admin.users.search' | t }}</label>
@@ -34,6 +31,14 @@
             <span class="users__tag">
               <app-badge variant="primary">
                 <span class="users__tag-label">{{ roleLabel(a.roleId) | capitalize }}</span>
+                @if (canManageUsers()) {
+                  <button
+                    type="button"
+                    class="users__tag-x users__tag-edit"
+                    [attr.aria-label]="('admin.users.editAssignment' | t) + ': ' + (roleLabel(a.roleId) | capitalize)"
+                    (click)="openEdit(a)"
+                  ><app-icon name="edit" [size]="11" /></button>
+                }
                 @if (!isAdminRole(a.roleId)) {
                   <button
                     type="button"
@@ -96,3 +101,43 @@
       </ng-template>
     </app-data-table>
 </section>
+
+<!-- Change an existing assignment: the role and its validity window. The route
+     ignores a field that the body leaves out, so an emptied date stays as it
+     is. The hint says that. -->
+<app-dialog
+  [open]="editing() !== null"
+  [title]="'admin.users.editAssignment' | t"
+  [closeLabel]="'action.cancel' | t"
+  (closed)="closeEdit()"
+>
+  <form class="flex flex-col gap-4" (submit)="$event.preventDefault(); saveEdit()">
+    <app-select
+      [label]="'admin.users.role' | t"
+      [placeholder]="'admin.users.selectRole' | t"
+      [options]="roleOptions()"
+      name="editRole"
+      [ngModel]="editDraft().roleId"
+      (ngModelChange)="patchEdit({ roleId: $event })"
+    />
+    <app-datepicker
+      [label]="'admin.users.validFrom' | t"
+      name="editValidFrom"
+      [ngModel]="editDraft().validFrom"
+      (ngModelChange)="patchEdit({ validFrom: $event })"
+    />
+    <app-datepicker
+      [label]="'admin.users.validUntil' | t"
+      name="editValidUntil"
+      [ngModel]="editDraft().validUntil"
+      (ngModelChange)="patchEdit({ validUntil: $event })"
+    />
+    <p class="text-muted text-sm m-0">{{ 'admin.users.editHint' | t }}</p>
+  </form>
+  <div dialog-footer class="flex justify-end gap-3">
+    <app-button size="sm" variant="ghost" (click)="closeEdit()">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" [disabled]="!editDraft().roleId" [loading]="savingEdit()" (click)="saveEdit()">
+      {{ 'action.save' | t }}
+    </app-button>
+  </div>
+</app-dialog>

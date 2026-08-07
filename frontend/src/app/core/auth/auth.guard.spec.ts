@@ -115,13 +115,15 @@ describe('authGuard', () => {
       permissions: [],
       gremien: [{ id: 'g1', name: 'StuPa', slug: 'stupa' }],
     };
-    const data = { permission: ['meeting.manage', 'protocol.write'], allowCommitteeMember: true };
+    // Mirrors the real /meetings route data. `protocol.write` is a gremium-role
+    // permission and is deliberately not listed there (#g10).
+    const data = { permission: ['meeting.manage'], allowCommitteeMember: true };
     expect(run(data, inCommittee)).toBe(true);
   });
 
   it('still forbids allowCommitteeMember routes when the user is in no committee', () => {
     const noCommittee: Principal = { ...MEMBER, permissions: [], gremien: [] };
-    const data = { permission: ['meeting.manage', 'protocol.write'], allowCommitteeMember: true };
+    const data = { permission: ['meeting.manage'], allowCommitteeMember: true };
     expect(run(data, noCommittee)).toBeInstanceOf(UrlTree);
   });
 

@@ -1,9 +1,5 @@
-<header class="bt__head">
-  <div>
-    <h1 class="m-0">{{ 'budget.tree.title' | t }}</h1>
-    <p class="text-muted mt-1">{{ 'budget.tree.subtitle' | t }}</p>
-  </div>
-  <div class="bt__head-actions">
+<app-page-header [title]="'budget.tree.title' | t" [subtitle]="'budget.tree.subtitle' | t">
+  <div actions class="bt__head-actions">
     <app-button size="sm" (click)="openTop()">{{ 'budget.tree.createTop' | t }}</app-button>
     <app-button size="sm" variant="secondary" [disabled]="!selectedTopId()" (click)="openFy()">
       {{ 'budget.tree.fyTitle' | t }}
@@ -15,7 +11,7 @@
       {{ 'budget.tree.stateConfig' | t }}
     </app-button>
   </div>
-</header>
+</app-page-header>
 
 @if (loading()) {
   <p class="bt__status" aria-live="polite">{{ 'budget.tree.loading' | t }}</p>
@@ -176,7 +172,8 @@
   </div>
 </app-dialog>
 
-<!-- Create a fiscal year inside the selected budget. The header button opens this dialog. -->
+<!-- Manage the fiscal years of the selected budget: create one, and correct or remove an
+     existing one. The header button opens this dialog. -->
 <app-dialog
   [open]="fyOpen()"
   [title]="'budget.tree.fyTitle' | t"
@@ -189,9 +186,81 @@
       <input type="number" min="1900" max="2200" [ngModel]="newFy().year" (ngModelChange)="patchFyYear($event)" name="fyYear" /></label>
     <p class="text-muted bt__form-full">{{ 'budget.tree.fyYearHint' | t }}</p>
   </form>
+
+  <section class="bt__fy-manage" [attr.aria-label]="'budget.tree.fyExisting' | t">
+    <h3 class="bt__fy-head">{{ 'budget.tree.fyExisting' | t }}</h3>
+    <app-data-table
+      [columns]="fyColumns()"
+      [rows]="fiscalYears()"
+      [rowKey]="fyRowId"
+      [emptyText]="'budget.tree.fyEmpty' | t"
+    >
+      <ng-template appCell="display" let-fy>{{ $any(fy).display }}</ng-template>
+      <ng-template appCell="active" let-fy>
+        @if ($any(fy).active) {
+          <span class="bt__yes" aria-label="✓">✓</span>
+        } @else {
+          <span class="bt__no" aria-label="✗">✗</span>
+        }
+      </ng-template>
+      <ng-template appCell="actions" let-fy>
+        <span class="bt__col-actions">
+          <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'budget.tree.fyEdit' | t" (click)="openFyEdit($any(fy))"><app-icon name="edit" /></app-button>
+          <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'budget.tree.fyDelete' | t" (click)="askFyDelete($any(fy))"><app-icon name="delete" /></app-button>
+        </span>
+      </ng-template>
+    </app-data-table>
+  </section>
+
   <div dialog-footer class="flex gap-3">
     <app-button size="sm" variant="ghost" (click)="closeFy()">{{ 'budget.tree.cancel' | t }}</app-button>
     <app-button size="sm" [disabled]="!newFy().year" (click)="createFiscalYear($event)">{{ 'budget.tree.add' | t }}</app-button>
+  </div>
+</app-dialog>
+
+<!-- Correct a fiscal year. Only the year and the active flag change. The server derives
+     the start and the end date again from the budget cutoff. -->
+<app-dialog
+  [open]="!!fyEdit()"
+  [title]="'budget.tree.fyEdit' | t"
+  [closeLabel]="'budget.tree.cancel' | t"
+  (closed)="closeFyEdit()"
+>
+  @if (fyEdit(); as fy) {
+    <form id="bt-fy-edit-form" class="bt__form bt__form--dialog" (submit)="$event.preventDefault(); saveFyEdit()">
+      <p class="text-muted bt__form-full">{{ 'budget.tree.fyTop' | t }}: <strong>{{ selectedTopLabel() }}</strong></p>
+      <label class="bt__lbl">{{ 'budget.tree.fyYear' | t }}
+        <input type="number" min="1900" max="2200" [ngModel]="fyEditYear()" (ngModelChange)="patchFyEditYear($event)" name="fyEditYear" /></label>
+      <label class="flex items-center gap-2 bt__form-full">
+        <input type="checkbox" [checked]="fyEditActive()" (change)="fyEditActive.set($any($event.target).checked)" />
+        <span>{{ 'budget.tree.fyActive' | t }}</span>
+      </label>
+      <p class="text-muted bt__form-full">{{ 'budget.tree.fyEditHint' | t }}</p>
+    </form>
+  }
+  <div dialog-footer class="flex gap-3">
+    <app-button size="sm" variant="ghost" (click)="closeFyEdit()">{{ 'budget.tree.cancel' | t }}</app-button>
+    <app-button size="sm" [disabled]="!fyEditYear()" (click)="saveFyEdit()">{{ 'budget.tree.save' | t }}</app-button>
+  </div>
+</app-dialog>
+
+<!-- Delete a fiscal year. The server refuses with 409 while bookings, allocations or
+     applications still hang on the year. That reason stays visible in the dialog. -->
+<app-dialog
+  [open]="!!fyDelete()"
+  [title]="'budget.tree.fyDeleteTitle' | t"
+  [closeLabel]="'budget.tree.cancel' | t"
+  (closed)="closeFyDelete()"
+>
+  @if (fyDelete(); as fy) {
+    <p>{{ 'budget.tree.fyDeleteConfirm' | t: { year: fy.display } }}</p>
+  }
+  @if (fyDeleteBlocked(); as reason) {
+    <p class="bt__status--error" role="alert">{{ reason }}</p>
+  }
+  <div dialog-footer class="flex gap-3">
+    <app-button size="sm" variant="ghost" (click)="closeFyDelete()">{{ 'budget.tree.cancel' | t }}</app-button>
+    <app-button size="sm" variant="danger" (click)="doFyDelete()">{{ 'budget.tree.fyDelete' | t }}</app-button>
   </div>
 </app-dialog>
 

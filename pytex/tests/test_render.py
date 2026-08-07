@@ -96,6 +96,17 @@ def test_variant_query_is_forwarded(
         assert render.last.variant == name
 
 
+def test_raw_body_sends_no_config_and_no_assets(
+    client: TestClient, render: RenderRecorder
+) -> None:
+    """The raw-body shape stays exactly as it was: no config, no assets."""
+    render.returns(make_result())
+    resp = client.post("/render", content=b"# Hi")
+    assert resp.status_code == 200
+    assert render.last.config == {}
+    assert render.last.assets == {}
+
+
 def test_empty_body_400(client: TestClient, render: RenderRecorder) -> None:
     resp = client.post("/render", content=b"")
     assert resp.status_code == 400

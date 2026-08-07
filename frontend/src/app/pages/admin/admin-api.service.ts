@@ -11,7 +11,7 @@ import { Injectable, inject } from '@angular/core';
 import { type Observable, map, of } from 'rxjs';
 import { API_BASE_URL, USE_MOCK_API } from '@core/api/api.config';
 import { mapDiff } from '@core/api/mappers';
-import type { I18nMap, Uuid } from '@core/api/models';
+import type { I18nMap, Page, Uuid } from '@core/api/models';
 import type { FormFieldDef } from '@core/api/models';
 import {
   type AdminPrincipal,
@@ -26,6 +26,12 @@ import {
   type NotificationSettings,
   type AuditPage,
   type Branding,
+  type CdLogoSlot,
+  type CdVariant,
+  type CdVariantCreateBody,
+  type CdVariantLogo,
+  type CdVariantOption,
+  type CdVariantUpdateBody,
   type FlowGraph,
   type FormDraft,
   type FormOverviewItem,
@@ -45,11 +51,15 @@ import {
   type MailPreviewPayload,
   type MailTemplate,
   type MailTemplateUpsertBody,
+  type OAuthGrantAdmin,
+  type OAuthGrantQuery,
   type Role,
   type RoleAssignment,
+  type RoleAssignmentPatch,
   type RoleAssignmentInput,
   type SiteConfig,
   type WebhookConfig,
+  type WebhookDeliveryStatus,
 } from './admin.models';
 import {
   MOCK_APP_TYPES,
@@ -101,6 +111,7 @@ export class AdminApiService {
     webhooks: structuredCopy(MOCK_WEBHOOKS),
     roles: structuredCopy(MOCK_ROLES),
     principals: structuredCopy(MOCK_PRINCIPALS),
+    oauthGrants: structuredCopy(MOCK_OAUTH_GRANTS),
     site: <SiteConfig>{
       version: 1,
       active: structuredCopy(MOCK_BRANDING),
@@ -176,6 +187,85 @@ export class AdminApiService {
       `${this.base}/admin/gremien/${id}/mail-recipients`,
       { recipients },
     );
+  }
+
+  // Corporate-design variants. Every `/admin/cd-variants` route needs
+  // P `admin.cd_variants`. The page shows its own loading indicator, so the
+  // list GET opts out of the global overlay.
+
+  /** GET /admin/cd-variants — the variants with their title and footer logos. */
+  listCdVariants(): Observable<CdVariant[]> {
+    return this.http.get<CdVariant[]>(`${this.base}/admin/cd-variants`, {
+      context: skipLoading(),
+    });
+  }
+
+  /** POST /admin/cd-variants — 409 when the key already exists. */
+  createCdVariant(body: CdVariantCreateBody): Observable<CdVariant> {
+    return this.http.post<CdVariant>(`${this.base}/admin/cd-variants`, body);
+  }
+
+  /** PATCH /admin/cd-variants/{id} — name and base variant only. The key is immutable. */
+  updateCdVariant(id: Uuid, body: CdVariantUpdateBody): Observable<CdVariant> {
+    return this.http.patch<CdVariant>(`${this.base}/admin/cd-variants/${id}`, body);
+  }
+
+  /** DELETE /admin/cd-variants/{id} — 409 while a gremium still references it. */
+  deleteCdVariant(id: Uuid): Observable<void> {
+    return this.http.delete<void>(`${this.base}/admin/cd-variants/${id}`);
+  }
+
+  /** POST /admin/cd-variants/{id}/logos — multipart upload into a slot. */
+  uploadCdVariantLogo(id: Uuid, slot: CdLogoSlot, file: File): Observable<CdVariantLogo> {
+    const form = new FormData();
+    form.append('slot', slot);
+    form.append('file', file);
+    return this.http.post<CdVariantLogo>(`${this.base}/admin/cd-variants/${id}/logos`, form);
+  }
+
+  /** POST /admin/cd-variants/{id}/logos/vendored — append a logo that pytex ships. */
+  addCdVariantVendoredLogo(
+    id: Uuid,
+    slot: CdLogoSlot,
+    vendoredName: string,
+  ): Observable<CdVariantLogo> {
+    return this.http.post<CdVariantLogo>(`${this.base}/admin/cd-variants/${id}/logos/vendored`, {
+      slot,
+      vendoredName,
+    });
+  }
+
+  /** PUT /admin/cd-variants/{id}/logos/order — full new order of ONE slot. */
+  reorderCdVariantLogos(
+    id: Uuid,
+    slot: CdLogoSlot,
+    logoIds: Uuid[],
+  ): Observable<CdVariantLogo[]> {
+    return this.http.put<CdVariantLogo[]>(`${this.base}/admin/cd-variants/${id}/logos/order`, {
+      slot,
+      logoIds,
+    });
+  }
+
+  /** DELETE /admin/cd-variant-logos/{id} — an uploaded object goes with the entry. */
+  deleteCdVariantLogo(logoId: Uuid): Observable<void> {
+    return this.http.delete<void>(`${this.base}/admin/cd-variant-logos/${logoId}`);
+  }
+
+  /** Download URL of an uploaded logo. The server always answers `attachment`. */
+  cdVariantLogoFileUrl(logoId: Uuid): string {
+    return `${this.base}/admin/cd-variant-logos/${logoId}/file`;
+  }
+
+  /**
+   * GET /cd-variants — slim list (id, key, name) as the source of the gremium
+   * dropdown. `admin.gremien` is enough for it, `admin.cd_variants` is not needed.
+   */
+  listCdVariantOptions(): Observable<CdVariantOption[]> {
+    if (this.mock) return of(structuredCopy(MOCK_CD_VARIANT_OPTIONS));
+    return this.http.get<CdVariantOption[]>(`${this.base}/cd-variants`, {
+      context: skipLoading(),
+    });
   }
 
   listRoles(): Observable<Role[]> {
@@ -342,6 +432,29 @@ export class AdminApiService {
     return this.http.post<RoleAssignment>(`${this.base}/admin/role-assignments`, input);
   }
 
+  /**
+   * Change an existing assignment — PATCH /admin/role-assignments/{id}.
+   *
+   * The route touches only the fields the body carries. It cannot clear a
+   * validity window, and it never moves the assignment to another user.
+   */
+  updateRoleAssignment(assignmentId: Uuid, patch: RoleAssignmentPatch): Observable<RoleAssignment> {
+    if (this.mock) {
+      for (const p of this.store.principals) {
+        const found = p.assignments.find((a) => a.id === assignmentId);
+        if (!found) continue;
+        const merged: RoleAssignment = { ...found, ...patch };
+        p.assignments = p.assignments.map((a) => (a.id === assignmentId ? merged : a));
+        return of(structuredCopy(merged));
+      }
+      return of(structuredCopy({ id: assignmentId, ...patch } as unknown as RoleAssignment));
+    }
+    return this.http.patch<RoleAssignment>(
+      `${this.base}/admin/role-assignments/${assignmentId}`,
+      patch,
+    );
+  }
+
   /** Revoke a role — DELETE /admin/role-assignments/{id}. */
   revokeRole(assignmentId: Uuid): Observable<void> {
     if (this.mock) {
@@ -351,6 +464,47 @@ export class AdminApiService {
       return of(void 0);
     }
     return this.http.delete<void>(`${this.base}/admin/role-assignments/${assignmentId}`);
+  }
+
+  // OAuth grants of ANY principal. Both routes need P(`admin.users`). The
+  // self-service twins under `/oauth/grants` reach the caller's own grants only, so a
+  // leaked agent token of somebody else can be killed here and nowhere else.
+
+  /**
+   * GET /admin/oauth-grants — live (not revoked) grants, newest first.
+   *
+   * `principalId` narrows the list to one owner. The list drives its own status line,
+   * so it opts out of the global loading overlay.
+   */
+  listOAuthGrants(query: OAuthGrantQuery = {}): Observable<Page<OAuthGrantAdmin>> {
+    const limit = query.limit ?? 50;
+    const offset = query.offset ?? 0;
+    if (this.mock) {
+      const all = this.store.oauthGrants.filter(
+        (g) => !query.principalId || g.principalId === query.principalId,
+      );
+      return of({
+        items: structuredCopy(all.slice(offset, offset + limit)),
+        total: all.length,
+        limit,
+        offset,
+      });
+    }
+    let params = new HttpParams().set('limit', String(limit)).set('offset', String(offset));
+    if (query.principalId) params = params.set('principalId', query.principalId);
+    return this.http.get<Page<OAuthGrantAdmin>>(`${this.base}/admin/oauth-grants`, {
+      params,
+      context: skipLoading(),
+    });
+  }
+
+  /** DELETE /admin/oauth-grants/{id} — 204. A 404 means the grant is gone already. */
+  revokeOAuthGrant(grantId: Uuid): Observable<void> {
+    if (this.mock) {
+      this.store.oauthGrants = this.store.oauthGrants.filter((g) => g.id !== grantId);
+      return of(void 0);
+    }
+    return this.http.delete<void>(`${this.base}/admin/oauth-grants/${grantId}`);
   }
 
   /** Application types as an edit view (id + i18n name + gremium + budget flag). */
@@ -516,6 +670,25 @@ export class AdminApiService {
       : this.http.post<WebhookConfig>(`${this.base}/admin/webhooks`, hook);
   }
 
+  /** Delete a webhook and its delivery history. Needs P(`webhook.manage`). */
+  deleteWebhook(id: Uuid): Observable<void> {
+    if (this.mock) {
+      this.store.webhooks = this.store.webhooks.filter((h) => h.id !== id);
+      return of(void 0);
+    }
+    return this.http.delete<void>(`${this.base}/admin/webhooks/${id}`);
+  }
+
+  /** Latest delivery state per webhook. Needs P(`webhook.manage`). The overlay stays
+   *  off, because the call only decorates the list. */
+  listWebhookDeliveryStatus(): Observable<WebhookDeliveryStatus[]> {
+    if (this.mock) return of([]);
+    return this.http.get<WebhookDeliveryStatus[]>(
+      `${this.base}/admin/webhooks/delivery-status`,
+      { context: skipLoading() },
+    );
+  }
+
   listGremiumRoles(gremiumId: Uuid): Observable<GremiumRole[]> {
     if (this.mock) return of(structuredCopy(this.store.gremiumRoles.filter((r) => r.gremiumId === gremiumId)));
     return this.http.get<GremiumRole[]>(`${this.base}/admin/gremien/${gremiumId}/roles`);
@@ -599,6 +772,23 @@ export class AdminApiService {
     body: { principalId: Uuid; gremiumRoleId: Uuid; validFrom: string | null; validUntil: string | null },
   ): Observable<GremiumMembership> {
     return this.http.post<GremiumMembership>(`${this.base}/admin/gremien/${gremiumId}/memberships`, body);
+  }
+
+  /**
+   * Change the role or the term of office of one membership.
+   *
+   * The member and the Gremium stay immutable — a different member is a different
+   * membership. The backend answers 409 when the new term overlaps another term of
+   * the same member, and 422 when `validFrom` is not before `validUntil`.
+   */
+  updateGremiumMembership(
+    id: Uuid,
+    body: { gremiumRoleId?: Uuid; validFrom?: string | null; validUntil?: string | null },
+  ): Observable<GremiumMembership> {
+    return this.http.patch<GremiumMembership>(
+      `${this.base}/admin/gremium-memberships/${id}`,
+      body,
+    );
   }
 
   deleteGremiumMembership(id: Uuid): Observable<void> {
@@ -827,6 +1017,41 @@ function hashString(value: string): number {
   for (let i = 0; i < value.length; i++) h = (Math.imul(31, h) + value.charCodeAt(i)) | 0;
   return h;
 }
+
+/**
+ * Agent-token stubs for mock mode. The second row has no owner name and no expiry, so
+ * the placeholder and the "never expires" rendering are visible without a backend.
+ */
+const MOCK_OAUTH_GRANTS: OAuthGrantAdmin[] = [
+  {
+    id: 'grant-1',
+    principalId: 'p-1',
+    principalName: 'Alex Admin',
+    principalEmail: 'alex@stupa.example',
+    clientId: 'antragsplattform-mcp',
+    scope: 'mcp:read mcp:write',
+    createdAt: '2026-06-01T10:00:00+00:00',
+    accessExpiresAt: '2026-09-01T10:00:00+00:00',
+    refreshExpiresAt: '2026-12-01T10:00:00+00:00',
+  },
+  {
+    id: 'grant-2',
+    principalId: 'p-2',
+    principalName: null,
+    principalEmail: null,
+    clientId: 'antragsplattform-mcp',
+    scope: 'mcp:read',
+    createdAt: '2026-05-02T08:30:00+00:00',
+    accessExpiresAt: null,
+    refreshExpiresAt: null,
+  },
+];
+
+/** CD-variant stubs for mock mode — the real list comes from the backend. */
+const MOCK_CD_VARIANT_OPTIONS: CdVariantOption[] = [
+  { id: 'cd-stupa', key: 'stupa', name: 'StuPa' },
+  { id: 'cd-asta', key: 'asta', name: 'AStA' },
+];
 
 /** Application-type stubs for mock mode — real types come from the backend. */
 const MOCK_APP_TYPE_OPTIONS: ApplicationTypeOption[] = [

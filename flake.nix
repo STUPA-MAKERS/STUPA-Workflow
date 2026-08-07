@@ -71,10 +71,21 @@
         };
       };
 
+      # Native libraries the backend loads at run time through ctypes or a
+      # compiled extension, and which a plain `pip install` cannot supply:
+      #   * libstdc++ — greenlet, which SQLAlchemy needs for every async call.
+      #   * libmagic  — python-magic, the MIME sniff on every upload.
+      # Without them `pytest` fails with "the greenlet library is required" and
+      # "failed to find libmagic". Append instead of overwrite: a bare
+      # assignment breaks the Nix binaries in the same shell.
+      pyNativeLibs = [ pkgs.stdenv.cc.cc.lib pkgs.file ];
+      pyLibPath = pkgs.lib.makeLibraryPath pyNativeLibs;
+
       mkPyShell = name: extraPkgs: hint:
         pkgs.mkShell {
-          packages = pyTools ++ extraPkgs;
+          packages = pyTools ++ pyNativeLibs ++ extraPkgs;
           shellHook = ''
+            export LD_LIBRARY_PATH="${pyLibPath}''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
             echo "STUPA-Workflow ${name} dev shell — python ${python.version}, uv, ruff, basedpyright"
             ${hint}
             ${zshExec}

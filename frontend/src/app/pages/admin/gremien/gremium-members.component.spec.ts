@@ -1,7 +1,9 @@
 import { ActivatedRoute } from '@angular/router';
 import { of, throwError } from 'rxjs';
-import { render } from '@testing-library/angular';
+import { render, screen } from '@testing-library/angular';
+import userEvent from '@testing-library/user-event';
 import { provideRouter } from '@angular/router';
+import { AuthService } from '@core/auth/auth.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { DelegationsApiService } from '@core/api/delegations.service';
 import type { AdminPrincipal, GremiumMembership, GremiumRole } from '../admin.models';
@@ -30,12 +32,13 @@ const MEMBERSHIPS: GremiumMembership[] = [
 function makeApi(over: Partial<Record<string, jest.Mock>> = {}) {
   return {
     listGremien: jest.fn(() =>
-      of([{ id: 'g-1', name: 'StuPa', slug: 'stupa', cdVariant: 'stupa', defaultLang: 'de', allowVoteDelegation: false }]),
+      of([{ id: 'g-1', name: 'StuPa', slug: 'stupa', cdVariantId: 'cd-stupa', defaultLang: 'de', allowVoteDelegation: false }]),
     ),
     listGremiumRoles: jest.fn(() => of([...ROLES])),
     listPrincipals: jest.fn(() => of([...PRINCIPALS])),
     listGremiumMemberships: jest.fn(() => of([...MEMBERSHIPS])),
     createGremiumMembership: jest.fn(() => of({ id: 'm-new' })),
+    updateGremiumMembership: jest.fn(() => of({ id: 'm-1' })),
     deleteGremiumMembership: jest.fn(() => of(void 0)),
     ...over,
   };
@@ -54,13 +57,19 @@ function makeToast() {
   return { success: jest.fn(), error: jest.fn() };
 }
 
-async function setup(api = makeApi(), delegations = makeDelegationsApi(), toast = makeToast()) {
+async function setup(
+  api = makeApi(),
+  delegations = makeDelegationsApi(),
+  toast = makeToast(),
+  can = true,
+) {
   const view = await render(GremiumMembersComponent, {
     providers: [
       provideRouter([]),
       { provide: AdminApiService, useValue: api },
       { provide: DelegationsApiService, useValue: delegations },
       { provide: ToastService, useValue: toast },
+      { provide: AuthService, useValue: { can: () => can } },
       { provide: ActivatedRoute, useValue: { snapshot: { paramMap: { get: () => 'g-1' } } } },
     ],
   });
@@ -395,6 +404,142 @@ describe('GremiumMembersComponent (#18/#62)', () => {
     const { c, toast } = await setup(makeApi(), dErr);
     c.removeSub('sub-1');
     expect(toast.error).toHaveBeenCalled();
+  });
+
+  // --- edit a membership ----------------------------------------------------
+
+  it('openEdit seeds the dialog from the row and closeEdit clears it', async () => {
+    const { c } = await setup();
+    const m1 = c.members().find((m: { assignmentId: string }) => m.assignmentId === 'm-1');
+    c.openEdit(m1);
+    expect(c.editOpen()).toBe(true);
+    expect(c.editMember()).toEqual(m1);
+    expect(c.editRoleId()).toBe('gr-1');
+    expect(c.editFrom()).toBe('2026-01-01');
+    expect(c.editUntil()).toBe('2026-12-31');
+    c.closeEdit();
+    expect(c.editOpen()).toBe(false);
+    expect(c.editMember()).toBeNull();
+  });
+
+  it('seeds empty dates for an open-ended term', async () => {
+    const { c } = await setup();
+    const m2 = c.members().find((m: { assignmentId: string }) => m.assignmentId === 'm-2');
+    c.openEdit(m2);
+    expect(c.editFrom()).toBe('');
+    expect(c.editUntil()).toBe('');
+  });
+
+  it('saves the new role and term, then reloads', async () => {
+    const { api, c, toast } = await setup();
+    c.openEdit(c.members()[0]);
+    c.editRoleId.set('gr-2');
+    c.editFrom.set('2027-01-01');
+    c.editUntil.set('2027-12-31');
+    c.saveEdit();
+    expect(api.updateGremiumMembership).toHaveBeenCalledWith('m-1', {
+      gremiumRoleId: 'gr-2',
+      validFrom: '2027-01-01',
+      validUntil: '2027-12-31',
+    });
+    expect(c.editOpen()).toBe(false);
+    expect(toast.success).toHaveBeenCalledWith('Mitgliedschaft gespeichert.');
+    // The reload re-reads the memberships.
+    expect(api.listGremiumMemberships).toHaveBeenCalledTimes(2);
+  });
+
+  it('sends null for an emptied term end', async () => {
+    const { api, c } = await setup();
+    c.openEdit(c.members()[0]);
+    c.editFrom.set('');
+    c.editUntil.set('');
+    c.saveEdit();
+    expect(api.updateGremiumMembership).toHaveBeenCalledWith('m-1', {
+      gremiumRoleId: 'gr-1',
+      validFrom: null,
+      validUntil: null,
+    });
+  });
+
+  it('saveEdit is a no-op without a member or without a role', async () => {
+    const { api, c } = await setup();
+    c.saveEdit(); // no member under edit
+    expect(api.updateGremiumMembership).not.toHaveBeenCalled();
+    c.openEdit(c.members()[0]);
+    c.editRoleId.set('');
+    c.saveEdit(); // no role picked
+    expect(api.updateGremiumMembership).not.toHaveBeenCalled();
+  });
+
+  it('saveEdit 409 names the overlapping term', async () => {
+    const api409 = makeApi({
+      updateGremiumMembership: jest.fn(() => throwError(() => ({ status: 409 }))),
+    });
+    const { c, toast } = await setup(api409);
+    c.openEdit(c.members()[0]);
+    c.saveEdit();
+    expect(toast.error).toHaveBeenCalledWith(
+      'Überlappende Amtszeit: pro Zeitpunkt nur eine Rolle möglich.',
+    );
+    // The dialog stays open, so the user can correct the term.
+    expect(c.editOpen()).toBe(true);
+  });
+
+  it('saveEdit 422 names the wrong date order', async () => {
+    const api422 = makeApi({
+      updateGremiumMembership: jest.fn(() => throwError(() => ({ status: 422 }))),
+    });
+    const { c, toast } = await setup(api422);
+    c.openEdit(c.members()[0]);
+    c.saveEdit();
+    expect(toast.error).toHaveBeenCalledWith('Das Von-Datum muss vor dem Bis-Datum liegen.');
+  });
+
+  it('saveEdit falls back to the generic error for any other status', async () => {
+    const api500 = makeApi({
+      updateGremiumMembership: jest.fn(() => throwError(() => ({ status: 500 }))),
+    });
+    const { c, toast } = await setup(api500);
+    c.openEdit(c.members()[0]);
+    c.saveEdit();
+    expect(toast.error).toHaveBeenCalledWith('Aktion fehlgeschlagen.');
+  });
+
+  it('addMember 422 names the wrong date order too', async () => {
+    const api422 = makeApi({
+      createGremiumMembership: jest.fn(() => throwError(() => ({ status: 422 }))),
+    });
+    const { c, toast } = await setup(api422);
+    c.selected.set(PRINCIPALS[1]);
+    c.addRoleId.set('gr-1');
+    c.addMember();
+    expect(toast.error).toHaveBeenCalledWith('Das Von-Datum muss vor dem Bis-Datum liegen.');
+  });
+
+  it('the edit control opens the dialog with the member name', async () => {
+    await setup();
+    await userEvent.click(screen.getAllByRole('button', { name: 'Mitgliedschaft bearbeiten' })[0]);
+    expect(screen.getByRole('dialog', { name: 'Mitgliedschaft bearbeiten' })).toBeInTheDocument();
+  });
+
+  // --- permission gating ----------------------------------------------------
+
+  it('hides add, edit and remove without admin.gremien', async () => {
+    const { c } = await setup(makeApi(), makeDelegationsApi(), makeToast(), false);
+    expect(c.canManage()).toBe(false);
+    expect(c.columns().map((col: { key: string }) => col.key)).toEqual([
+      'name',
+      'email',
+      'roleLabel',
+      'term',
+    ]);
+    expect(screen.queryByRole('button', { name: 'Mitglied hinzufügen' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Mitgliedschaft bearbeiten' })).toBeNull();
+  });
+
+  it('shows the action column with admin.gremien', async () => {
+    const { c } = await setup();
+    expect(c.columns().map((col: { key: string }) => col.key)).toContain('actions');
   });
 
   it('lists substitutes when present', async () => {

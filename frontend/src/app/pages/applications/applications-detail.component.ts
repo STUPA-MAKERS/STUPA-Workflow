@@ -2,6 +2,7 @@ import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import {
   ChangeDetectionStrategy,
   Component,
+  type OnDestroy,
   computed,
   inject,
   signal,
@@ -14,6 +15,7 @@ import { ApiClient } from '@core/api/api-client.service';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
+import type { TranslationKey } from '@core/i18n/translations';
 import type {
   Application,
   ApplicationComment,
@@ -21,6 +23,7 @@ import type {
   ApplicationVersion,
   CommentVisibility,
   FormFieldDef,
+  RenderJob,
   Transition,
   Uuid,
 } from '@core/api/models';
@@ -43,6 +46,7 @@ import { CostCentreTreeComponent } from '../budget/cost-centre-tree.component';
 import { MarkdownViewComponent } from '@shared/markdown/markdown-view.component';
 import { AttachmentsPanelComponent } from './attachments-panel.component';
 import { applicationTitle, formatFieldValue } from './applications.util';
+import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 
 /** Comparison offer / cost position for the structured detail view. */
 interface DetailOffer {
@@ -58,6 +62,18 @@ interface DetailPosition {
   noOffersReason?: string;
 }
 
+/** Delay between two polls of the render job, in milliseconds. */
+const PDF_POLL_MS = 2000;
+/** Number of polls before the dialog stops and offers a manual retry. */
+const PDF_POLL_MAX = 60;
+
+/** Short failure codes the render worker writes to `RenderJob.error`. */
+const PDF_ERROR_KEYS: Record<string, TranslationKey> = {
+  no_application: 'applications.pdf.error.noApplication',
+  render_error: 'applications.pdf.error.render',
+  render_unavailable: 'applications.pdf.error.unavailable',
+};
+
 /**
  * Application detail: fields, version history with diff, comments, and status actions.
  *
@@ -70,6 +86,7 @@ interface DetailPosition {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    PageHeaderComponent,
     FormsModule,
     FormlyForm,
     LocalizedDatePipe,
@@ -87,7 +104,7 @@ interface DetailPosition {
   templateUrl: './applications-detail.component.html',
   styleUrl: './applications-detail.component.scss',
 })
-export class ApplicationsDetailComponent {
+export class ApplicationsDetailComponent implements OnDestroy {
   private readonly api = inject(ApiClient);
   private readonly budgetApi = inject(BudgetTreeApi);
   private readonly auth = inject(AuthService);
@@ -108,6 +125,30 @@ export class ApplicationsDetailComponent {
   readonly newComment = signal('');
   readonly visibility = signal<CommentVisibility>('public');
   readonly posting = signal(false);
+
+  // Edit and delete of one comment. Both run in a dialog. The server allows the
+  // author of the comment and a holder of `application.manage`. `isOwn` carries
+  // the same author check the server makes, so the UI offers nothing that gives
+  // a 403. Only the body changes. The visibility stays as written.
+  readonly editingComment = signal<ApplicationComment | null>(null);
+  readonly commentDraft = signal('');
+  readonly savingComment = signal(false);
+  readonly deletingComment = signal<ApplicationComment | null>(null);
+  readonly removingComment = signal(false);
+
+  // PDF render. `POST /applications/{id}/pdf` starts an async job. The dialog
+  // polls `GET /jobs/{id}` until the job reaches `done` or `failed`, and it
+  // gives up after PDF_POLL_MAX tries instead of spinning forever.
+  readonly pdfOpen = signal(false);
+  readonly pdfJob = signal<RenderJob | null>(null);
+  /** True while a request is in flight or the next poll is scheduled. */
+  readonly pdfPolling = signal(false);
+  /** Set when the start or a poll failed at HTTP level. */
+  readonly pdfError = signal<TranslationKey | null>(null);
+  /** The poll window ran out. The job may still finish, so the dialog says so. */
+  readonly pdfTimedOut = signal(false);
+  private pdfTimer: ReturnType<typeof setTimeout> | null = null;
+  private pdfTries = 0;
 
   /** The version history starts collapsed. The card header holds the toggle. */
   readonly historyOpen = signal(false);
@@ -223,8 +264,12 @@ export class ApplicationsDetailComponent {
 
   private readonly router = inject(Router);
   readonly canManage = computed(() => this.auth.can('application.manage'));
-  /** Delete is admin-only (irreversible). */
-  readonly isAdmin = computed(() => this.auth.roles().includes('admin'));
+  /**
+   * Delete is irreversible and needs `application.delete` (#g9). An admin holds it
+   * through the role bypass. Any other role holds it through an explicit grant. The
+   * server gates on the same key.
+   */
+  readonly canDelete = computed(() => this.auth.can('application.delete'));
   readonly fmt = formatFieldValue;
 
   private id: Uuid = '';
@@ -262,6 +307,12 @@ export class ApplicationsDetailComponent {
     this.confirmDelete.set(false);
     this.notFound.set(false);
     this.error.set(false);
+    this.editingComment.set(null);
+    this.deletingComment.set(null);
+    // A render job belongs to one application. Drop it with the page state, so
+    // no poll of the previous application keeps running.
+    this.closePdf();
+    this.pdfJob.set(null);
 
     if (!id) {
       this.notFound.set(true);
@@ -658,6 +709,167 @@ export class ApplicationsDetailComponent {
         this.toast.error(this.i18n.translate('applications.comments.error'));
       },
     });
+  }
+
+  // --- edit / delete of a comment -----------------------------------------
+
+  /** The author of the comment, or a manager, may change it. The server checks
+   *  the same rule, so no visible control ends in a 403. */
+  protected canEditComment(comment: ApplicationComment): boolean {
+    return comment.isOwn || this.canManage();
+  }
+
+  protected openEditComment(comment: ApplicationComment): void {
+    this.commentDraft.set(comment.body);
+    this.editingComment.set(comment);
+  }
+
+  protected closeEditComment(): void {
+    this.editingComment.set(null);
+  }
+
+  /** Translation key for a failed comment change. 403 and 404 read as reasons. */
+  private commentErrorKey(status: number | undefined): TranslationKey {
+    if (status === 403) return 'applications.comments.forbidden';
+    if (status === 404) return 'applications.comments.gone';
+    return 'applications.comments.error';
+  }
+
+  /** PATCH the body of the comment. The visibility is not patchable. */
+  protected saveComment(): void {
+    const comment = this.editingComment();
+    const body = this.commentDraft().trim();
+    if (!comment || !body || this.savingComment()) return;
+    this.savingComment.set(true);
+    this.api.updateComment(this.id, comment.id, body).subscribe({
+      next: (updated) => {
+        this.savingComment.set(false);
+        this.editingComment.set(null);
+        this.comments.update((list) => list.map((c) => (c.id === updated.id ? updated : c)));
+        this.toast.success(this.i18n.translate('applications.comments.updated'));
+      },
+      error: (err: { status?: number }) => {
+        this.savingComment.set(false);
+        this.toast.error(this.i18n.translate(this.commentErrorKey(err.status)));
+      },
+    });
+  }
+
+  protected askDeleteComment(comment: ApplicationComment): void {
+    this.deletingComment.set(comment);
+  }
+
+  protected doDeleteComment(): void {
+    const comment = this.deletingComment();
+    if (!comment || this.removingComment()) return;
+    this.removingComment.set(true);
+    this.api.deleteComment(this.id, comment.id).subscribe({
+      next: () => {
+        this.removingComment.set(false);
+        this.deletingComment.set(null);
+        this.comments.update((list) => list.filter((c) => c.id !== comment.id));
+        this.toast.success(this.i18n.translate('applications.comments.deleted'));
+      },
+      error: (err: { status?: number }) => {
+        this.removingComment.set(false);
+        this.toast.error(this.i18n.translate(this.commentErrorKey(err.status)));
+      },
+    });
+  }
+
+  // --- PDF render ----------------------------------------------------------
+
+  /** True while the job waits or runs. The dialog then shows the progress. */
+  readonly pdfRunning = computed(() => {
+    const status = this.pdfJob()?.status;
+    return this.pdfPolling() || status === 'pending' || status === 'running';
+  });
+  readonly pdfDone = computed(() => this.pdfJob()?.status === 'done');
+  readonly pdfFailed = computed(() => this.pdfJob()?.status === 'failed');
+
+  /** Explanation of the short failure code the worker wrote to the job. */
+  protected pdfFailureText(): string {
+    const code = this.pdfJob()?.error ?? '';
+    return this.i18n.translate(PDF_ERROR_KEYS[code] ?? 'applications.pdf.error.generic');
+  }
+
+  /** Start a render and open the progress dialog. */
+  protected startPdf(): void {
+    if (this.pdfPolling()) return;
+    this.stopPdfPoll();
+    this.pdfJob.set(null);
+    this.pdfError.set(null);
+    this.pdfTimedOut.set(false);
+    this.pdfTries = 0;
+    this.pdfOpen.set(true);
+    this.pdfPolling.set(true);
+    this.api.createApplicationPdf(this.id).subscribe({
+      next: (job) => this.applyJob(job),
+      error: (err: { status?: number }) => {
+        this.pdfPolling.set(false);
+        this.pdfError.set(
+          err.status === 403 ? 'applications.pdf.forbidden' : 'applications.pdf.startFailed',
+        );
+      },
+    });
+  }
+
+  /** Take a job answer. An end state stops the poll. Anything else schedules
+   *  the next one, until the poll window runs out. */
+  private applyJob(job: RenderJob): void {
+    this.pdfJob.set(job);
+    if (job.status === 'done' || job.status === 'failed') {
+      this.pdfPolling.set(false);
+      return;
+    }
+    if (this.pdfTries >= PDF_POLL_MAX) {
+      this.pdfPolling.set(false);
+      this.pdfTimedOut.set(true);
+      return;
+    }
+    this.pdfTries += 1;
+    this.pdfTimer = setTimeout(() => this.pollPdf(), PDF_POLL_MS);
+  }
+
+  /** One poll step of the running job. */
+  protected pollPdf(): void {
+    const job = this.pdfJob();
+    this.pdfTimer = null;
+    if (!job) return;
+    this.pdfPolling.set(true);
+    this.pdfError.set(null);
+    this.pdfTimedOut.set(false);
+    this.api.getJob(job.id).subscribe({
+      next: (updated) => this.applyJob(updated),
+      error: () => {
+        this.pdfPolling.set(false);
+        this.pdfError.set('applications.pdf.pollFailed');
+      },
+    });
+  }
+
+  /** "Check again" after the poll gave up or a poll failed. */
+  protected retryPdf(): void {
+    this.pdfTries = 0;
+    this.pollPdf();
+  }
+
+  /** Close the dialog and drop the poll. The job keeps running on the server. */
+  protected closePdf(): void {
+    this.stopPdfPoll();
+    this.pdfPolling.set(false);
+    this.pdfOpen.set(false);
+  }
+
+  private stopPdfPoll(): void {
+    if (this.pdfTimer !== null) {
+      clearTimeout(this.pdfTimer);
+      this.pdfTimer = null;
+    }
+  }
+
+  ngOnDestroy(): void {
+    this.stopPdfPoll();
   }
 
   /** Fire a manual transition with POST /transition, then reload the application.

@@ -73,7 +73,8 @@ const COMMENTS: CommentOutWire[] = [
 
 function fakeAuth(permissions: string[], roles: string[] = []): Partial<AuthService> {
   return {
-    can: (p: string) => permissions.includes(p),
+    // Mirrors the real AuthService: the admin role holds every permission.
+    can: (p: string) => roles.includes('admin') || permissions.includes(p),
     roles: (() => roles) as unknown as AuthService['roles'],
   };
 }
@@ -1042,7 +1043,26 @@ describe('ApplicationsDetailComponent', () => {
     http.verify();
   });
 
-  // Only an admin may delete an application.
+  // #g9: delete is gated on `application.delete`, not on the literal admin role.
+  it('offers delete to a non-admin role that holds application.delete', async () => {
+    const { cmp } = await setup(
+      ['application.read', 'application.delete'],
+      new BehaviorSubject(convertToParamMap({ id: 'app-1' })),
+      ['office'],
+    );
+    expect(cmp.canDelete()).toBe(true);
+  });
+
+  it('hides delete from a manager without application.delete', async () => {
+    const { cmp } = await setup(
+      ['application.read', 'application.manage'],
+      new BehaviorSubject(convertToParamMap({ id: 'app-1' })),
+      ['manager'],
+    );
+    expect(cmp.canDelete()).toBe(false);
+  });
+
+  // An admin holds `application.delete` through the role bypass.
   it('deletes the application and navigates to the list', async () => {
     const { http, detectChanges, cmp, toast, router } = await setup(
       ['application.read', 'application.manage'],
@@ -1050,11 +1070,14 @@ describe('ApplicationsDetailComponent', () => {
       ['admin'],
     );
     flushAll(http);
+    // The admin role holds every permission, so the aux load also asks for the
+    // transitions. An empty answer is fine.
+    http.expectOne(url('/transitions')).flush([]);
     detectChanges();
     flushAttachments(http);
     const success = jest.spyOn(toast, 'success');
     const nav = jest.spyOn(router, 'navigate').mockResolvedValue(true);
-    expect(cmp.isAdmin()).toBe(true);
+    expect(cmp.canDelete()).toBe(true);
 
     cmp.doDelete();
     http

@@ -1,11 +1,9 @@
 <section class="cfg">
-  <header class="cfg__head">
-    <div>
-      <h1>{{ 'admin.webhook.title' | t }}</h1>
-      <p class="cfg__desc">{{ 'admin.webhook.desc' | t }}</p>
-    </div>
-    <app-button size="sm" (click)="openAdd()">{{ 'admin.webhook.add' | t }}</app-button>
-  </header>
+  <app-page-header [title]="'admin.webhook.title' | t" [subtitle]="'admin.webhook.desc' | t">
+    @if (canManage()) {
+      <app-button actions size="sm" (click)="openAdd()">{{ 'admin.webhook.add' | t }}</app-button>
+    }
+  </app-page-header>
 
   <app-data-table [columns]="columns()" [rows]="hooks()" [emptyText]="'admin.webhook.none' | t">
     <ng-template appCell="active" let-h>
@@ -18,10 +16,32 @@
     <ng-template appCell="events" let-h>
       <app-badge variant="neutral">{{ $any(h).events.length }}</app-badge>
     </ng-template>
+    <!-- Delivery state of the newest attempt. A click opens the diagnosis. -->
+    <ng-template appCell="delivery" let-h>
+      @if (statusOf($any(h).id); as s) {
+        <button
+          type="button"
+          class="cfg__status-btn"
+          [attr.aria-label]="'admin.webhook.delivery.open' | t"
+          (click)="openStatus($any(h))"
+        >
+          <app-badge [variant]="stateVariant(s.lastState)">{{ stateLabel(s.lastState) }}</app-badge>
+        </button>
+      } @else {
+        <span class="cfg__muted">—</span>
+      }
+    </ng-template>
     <ng-template appCell="actions" let-h let-i="index">
-      <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.edit' | t" (click)="openEdit(i)">
-        <app-icon name="edit" />
-      </app-button>
+      <span class="inline-flex items-center gap-1 justify-end">
+        @if (canManage()) {
+          <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.edit' | t" (click)="openEdit(i)">
+            <app-icon name="edit" />
+          </app-button>
+          <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" (click)="askDelete($any(h))">
+            <app-icon name="delete" />
+          </app-button>
+        }
+      </span>
     </ng-template>
   </app-data-table>
 </section>
@@ -71,5 +91,60 @@
   <div dialog-footer class="cfg__dialog-foot">
     <app-button size="sm" variant="ghost" (click)="close()">{{ 'action.cancel' | t }}</app-button>
     <app-button size="sm" [disabled]="errors().length > 0" (click)="save()">{{ 'action.save' | t }}</app-button>
+  </div>
+</app-dialog>
+
+<!-- Delivery diagnosis. The backend keeps one condensed record per webhook: the state
+     of the newest attempt, its failure class, the HTTP code and the attempt count. -->
+<app-dialog
+  [open]="statusDetail() !== null"
+  [title]="'admin.webhook.delivery.title' | t"
+  [closeLabel]="'action.close' | t"
+  (closed)="closeStatus()"
+>
+  @if (statusDetail(); as hook) {
+    <div class="cfg__status">
+      <p class="cfg__status-name">{{ hook.name || hook.url }}</p>
+      @if (statusOf(hook.id); as s) {
+        <dl class="cfg__status-grid">
+          <dt>{{ 'admin.webhook.delivery.state' | t }}</dt>
+          <dd><app-badge [variant]="stateVariant(s.lastState)">{{ stateLabel(s.lastState) }}</app-badge></dd>
+
+          <dt>{{ 'admin.webhook.delivery.reason' | t }}</dt>
+          <dd>{{ reasonLabel(s.reasonClass) }}</dd>
+
+          <dt>{{ 'admin.webhook.delivery.responseCode' | t }}</dt>
+          <dd>{{ s.responseCode ?? ('admin.webhook.delivery.noResponse' | t) }}</dd>
+
+          <dt>{{ 'admin.webhook.delivery.attempts' | t }}</dt>
+          <dd>{{ s.attempts }}</dd>
+
+          <dt>{{ 'admin.webhook.delivery.lastAt' | t }}</dt>
+          <dd>{{ s.lastAt ? (s.lastAt | ldate) : '—' }}</dd>
+        </dl>
+        @if (s.lastState === 'dead') {
+          <p class="cfg__status-alert" role="alert">{{ 'admin.webhook.delivery.deadHint' | t }}</p>
+        }
+        <p class="cfg__hint">{{ 'admin.webhook.delivery.hint' | t }}</p>
+      } @else {
+        <p class="cfg__muted">{{ 'admin.webhook.delivery.none' | t }}</p>
+      }
+    </div>
+  }
+  <div dialog-footer class="cfg__dialog-foot">
+    <app-button size="sm" (click)="closeStatus()">{{ 'action.close' | t }}</app-button>
+  </div>
+</app-dialog>
+
+<app-dialog
+  [open]="confirmDelete() !== null"
+  [title]="'admin.webhook.deleteTitle' | t"
+  [closeLabel]="'action.cancel' | t"
+  (closed)="confirmDelete.set(null)"
+>
+  <p>{{ 'admin.webhook.deleteConfirm' | t: { name: confirmDelete()?.name || confirmDelete()?.url || '' } }}</p>
+  <div dialog-footer class="cfg__dialog-foot">
+    <app-button size="sm" variant="ghost" (click)="confirmDelete.set(null)">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" variant="danger" (click)="doDelete()">{{ 'admin.common.remove' | t }}</app-button>
   </div>
 </app-dialog>
