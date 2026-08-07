@@ -133,13 +133,8 @@ async def delete_protocol(
 ) -> None:
     """Delete a protocol while it is still a draft.
 
-    A finalized protocol is a signed record that already went out, so it
-    answers 409. A protocol under render is frozen and answers 409 too.
-
-    The gate is `authorize_write`, the same scope as the PATCH, and NOT
-    `protocol.finalize`. That permission gates publishing, not discarding: the
-    same caller can already empty the body through the PATCH, so a stricter
-    gate here would protect nothing.
+    A final or rendering protocol answers 409. The gate is `authorize_write`,
+    the same scope as the PATCH.
     """
     await service.authorize_write(protocol_id, principal)
     await service.delete_protocol(protocol_id, actor=principal.sub)

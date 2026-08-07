@@ -270,8 +270,9 @@ class ListingOps(ApplicationsServiceBase):
         from app.modules.flow.service import FlowService
 
         flow = FlowService(self.session)
+        # Task VISIBILITY only, no right to act: an admin has no gremium membership.
         is_admin = "admin" in principal.roles
-        can_transition = is_admin or principal.has("application.transition")
+        can_transition = principal.has("application.transition")
 
         apps = (
             await self.session.scalars(

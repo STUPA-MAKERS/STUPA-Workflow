@@ -133,9 +133,8 @@ export const routes: Routes = [
       },
       {
         path: 'meetings',
-        // A Gremium member can reach their own meetings without meeting.manage.
-        // `protocol.write` is NOT listed: it is a GREMIUM-role permission and never
-        // enters the global permission set, so it could never match here (#g10).
+        // A Gremium member reaches their own meetings without meeting.manage.
+        // `protocol.write` is gremium-scoped and can never match here (#g10).
         data: {
           title: 'nav.meetings',
           permission: ['meeting.manage'],
@@ -147,9 +146,8 @@ export const routes: Routes = [
       },
       {
         path: 'meetings/:id',
-        // `allowAuthenticated`: a delegation recipient can be neither a member nor
-        // permitted. The server scopes the meeting view. `protocol.write` is a
-        // GREMIUM-role permission and never matches globally, so it is not listed (#g10).
+        // `allowAuthenticated`: a delegation recipient is neither a member nor
+        // permitted; the server scopes the meeting view (#g10).
         data: {
           title: 'meetings.detailCrumb',
           parent: ['meetings'],
@@ -254,14 +252,7 @@ export const routes: Routes = [
       },
       {
         path: 'admin/flow',
-        // The save (POST /admin/flow-versions/global) accepts either key. The route
-        // gate must list both, or a holder of one of them opens an editor it cannot
-        // save, or cannot open an editor it may save (#g7).
-        data: {
-          title: 'admin.flow.title',
-          permission: ['flow.configure', 'admin.types'],
-          parent: ['admin'],
-        },
+        data: { title: 'admin.flow.title', permission: 'admin.types', parent: ['admin'] },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/admin/flow-editor/flow-editor.component').then(
@@ -328,7 +319,6 @@ export const routes: Routes = [
           ),
       },
       {
-        // Agent tokens (OAuth grants) of every principal, with a kill switch.
         path: 'admin/oauth-grants',
         data: {
           title: 'admin.oauthGrants.title',

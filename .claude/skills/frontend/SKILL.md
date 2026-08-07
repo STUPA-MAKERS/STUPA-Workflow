@@ -1,6 +1,6 @@
 ---
 name: frontend
-description: Angular 20 standalone SPA for STUPA-Workflow — apply wizard, meetings/live-vote/beamer, voting, budget/expenses/invoices, dashboard, tasks, account, and the whole admin config (forms/flow/gremien/roles/branding/mail-templates). Covers core (ApiClient, authGuard+authInterceptor, i18n DE/EN, theme, ws live-vote, loading overlay, branding, pwa), shared ui-kit + formly, lazy permission-gated routes, DESIGN_SYSTEM tokens. Use when working on any component, route, service, interceptor, UI-kit element, i18n string, theme/branding, or build in frontend/.
+description: Angular 20 standalone SPA for STUPA-Workflow — apply wizard, meetings/live-vote/beamer, voting, budget/expenses/invoices, dashboard, tasks, account, and the whole admin config (forms/flow/gremien/roles/branding/cd-variants/oauth-grants/mail-templates). Covers core (ApiClient, authGuard+authInterceptor, i18n DE/EN, theme, ws live-vote, loading overlay, branding, pwa), shared ui-kit + formly, lazy permission-gated routes, DESIGN_SYSTEM tokens. Use when working on any component, route, service, interceptor, UI-kit element, i18n string, theme/branding, or build in frontend/.
 ---
 
 # Frontend — Angular 20 SPA — `frontend`
@@ -10,6 +10,8 @@ description: Angular 20 standalone SPA for STUPA-Workflow — apply wizard, meet
 **Key files:**
 - `src/app/app.config.ts` — composition root: interceptor chain `[loading, auth, mock?]` (mock added only in `isDevMode()`), `provideFormly`, `provideAppInitializer` (theme/i18n/branding/auth/sw), service worker (prod only), `LIVE_VOTE_SOURCE` factory.
 - `src/app/app.routes.ts` — all routes sit under `ShellComponent`. Each route uses lazy `loadComponent`, `canActivate: [authGuard]`, `data.permission` and flags (`allowAuthenticated`, `allowCommitteeMember`, `allowScopedBudgetView`, `wide`, `parent`, `title`).
+- `src/app/pages/admin/cd-variants/cd-variants.component.ts` — corporate-design variants: base variant, title/footer logo slots, vendored names and multipart logo upload (2 MB cap). Route `admin/cd-variants`, permission `admin.cd_variants`.
+- `src/app/pages/admin/oauth-grants/oauth-grants.component.ts` — the OAuth2 grants that MCP agents hold, with revoke. Route `admin/oauth-grants`, permission `admin.users`.
 - `src/app/core/api/api-client.service.ts` — typed HTTP facade (`ApiClient`) that returns `Observable<…>`. One method per backend route.
 - `src/app/core/api/api.config.ts` — `API_BASE_URL` token (`/api`) and `USE_MOCK_API` token (default false). Opt in to the mock with `?mock=1`, `localStorage['useMockApi']` or `window.__USE_MOCK_API__`.
 - `src/app/core/api/models.ts` — all DTO interfaces + `*Wire` raw shapes. `mappers.ts` converts wire→domain. `delegations.service.ts` = delegation API.

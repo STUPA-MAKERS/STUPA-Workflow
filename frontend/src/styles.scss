@@ -10,13 +10,8 @@
 @tailwind components;
 @tailwind utilities;
 
-// The layout box of a page. The ui-kit ships the same rules under `.container`, but
-// Tailwind emits a `.container` utility of its own with breakpoint max-widths
-// (640/768/1024/1280/1536px). That utility comes later and wins, so the page width
-// followed Tailwind instead of `--layout-max-width`, while every page header centered
-// on the token. The two disagreed and the header alignment moved with the viewport.
-// A name Tailwind does not use ends the collision and keeps `.container` free for
-// utility use.
+// The layout box of a page. Do NOT name this `.container`: Tailwind emits its own
+// `.container` utility with breakpoint max-widths, which comes later and wins.
 .page-shell {
   width: 100%;
   max-width: var(--layout-max-width);

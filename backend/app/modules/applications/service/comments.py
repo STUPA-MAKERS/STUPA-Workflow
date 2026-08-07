@@ -23,10 +23,8 @@ def is_comment_author(
 ) -> bool:
     """Tell whether the viewer wrote this comment.
 
-    A principal matches on the stored author ``sub``. The magic-link applicant
-    of the application owns every applicant comment on it, because an applicant
-    comment stores no ``sub``. This is the same rule that ``isOwn`` uses in the
-    listing, so the frontend never offers an edit that the server refuses.
+    An applicant comment stores no ``sub``, so the magic-link applicant of the
+    application owns every applicant comment on it.
     """
     if comment_author_kind == "principal":
         return viewer_sub is not None and comment_author == viewer_sub
@@ -111,8 +109,7 @@ class CommentOps(ApplicationsServiceBase):
 
         Raises:
             NotFoundError: The comment does not exist, or it belongs to another
-                application (404). The path binds both ids, so a mismatch must
-                not leak the existence of a foreign comment.
+                application (404).
         """
         comment = (
             await self.session.execute(
@@ -135,10 +132,7 @@ class CommentOps(ApplicationsServiceBase):
     ) -> None:
         """Gate the edit and the delete of one comment, server-side.
 
-        The author may fix or withdraw the own comment. A principal with
-        ``application.manage`` may do it for anybody, because an internal
-        comment posted as public needs a fast removal. The author identity
-        comes from the session, never from the request body.
+        The identity comes from the session, never from the request body.
 
         Raises:
             ForbiddenError: The caller neither wrote the comment nor manages
@@ -186,11 +180,8 @@ class CommentOps(ApplicationsServiceBase):
     ) -> CommentOut:
         """Replace the body of a comment in place.
 
-        A comment keeps no version history, so the new text overwrites the old
-        one and the audit log is the only record that the text changed. The
-        visibility stays fixed: a public comment is already out, and switching
-        it to internal would only hide it from the applicant who read it. Use
-        the delete for that case.
+        A comment keeps no version history, so the audit log is the only record
+        that the text changed. The visibility stays fixed.
 
         Raises:
             NotFoundError: The application or the comment does not exist (404).
@@ -235,9 +226,6 @@ class CommentOps(ApplicationsServiceBase):
         allow_unconfirmed: bool = True,
     ) -> None:
         """Remove a comment for good.
-
-        Until this route existed, an internal comment posted as public could
-        only be removed by anonymizing the whole application.
 
         Raises:
             NotFoundError: The application or the comment does not exist (404).

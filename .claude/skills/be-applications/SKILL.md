@@ -32,11 +32,14 @@ description: Application lifecycle — public create with Altcha/magic-link, ver
 - `GET /api/applications/{id}` — A/P read. PII and internal data go to Principals only. It sets `canEdit`/`isOwner`.
 - `GET /api/applications/{id}/form` — effective form from the *pinned* version.
 - `PATCH /api/applications/{id}` — A(edit)/P. A `data` change writes a new version plus a diff. A locked state gives 409 unless the caller holds `application.edit_any`.
-- `DELETE /api/applications/{id}` — **admin only**, irreversible (manager/creator cannot).
+- `PATCH /api/applications/{id}/applicant` — correct the applicant `email`/`name`, Principal only (`application.manage`). An omitted field stays unchanged. An anonymized applicant answers 409 `applicant_anonymized`. The route refuses a magic-link holder, because a leaked link must not repoint the address it is delivered to. The audit entry names the changed fields, never their values.
+- `DELETE /api/applications/{id}` — Principal with `application.delete`; `application.manage` is not enough. Irreversible.
 - `GET /api/applications/{id}/timeline` — A/P status history.
 - `GET /api/applications/{id}/versions` — Principal (`application.read`). Version history plus diff.
 - `POST /api/applications/{id}/comments` — A(public)/P. It triggers comment mails. Applicants may write only `public` comments.
 - `GET /api/applications/{id}/comments` — A/P. Applicants see only `public` comments.
+- `PATCH /api/applications/{id}/comments/{comment_id}` — replace the body. Read scope like the create; the service then allows the author of the comment or a Principal with `application.manage` only.
+- `DELETE /api/applications/{id}/comments/{comment_id}` — 204, same author-or-`application.manage` rule.
 - `POST /api/applications/{id}/erasure-request` — DSGVO Art. 17 request → privacy queue, and it notifies the data-protection officers (202).
 
 **Conventions & gotchas:**

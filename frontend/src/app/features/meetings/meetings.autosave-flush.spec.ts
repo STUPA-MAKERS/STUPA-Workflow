@@ -74,10 +74,7 @@ function fakeAuth(perms: string[]): Partial<AuthService> {
 
 type Cmp = InstanceType<typeof MeetingsComponent>;
 
-/**
- * Router double. `navigate` is the only method the component calls. The rest is
- * the read-only surface that the breadcrumbs of `app-page-header` read.
- */
+/** Router double: `navigate` plus the read-only surface the breadcrumbs read. */
 function routerStub() {
   return {
     navigate: jest.fn(() => Promise.resolve(true)),

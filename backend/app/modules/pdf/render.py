@@ -32,6 +32,7 @@ from app.modules.pdf.markdown import build_application_markdown
 from app.modules.pdf.models import RenderJob
 from app.modules.pdf.pytex_client import PytexClient, PytexError
 from app.modules.pdf.service import PdfService
+from app.shared.errors import ServiceUnavailableError
 
 logger = logging.getLogger("app.pdf")
 
@@ -88,6 +89,9 @@ class RenderPipeline:
                 if exc.retryable:
                     raise RenderRetry(str(exc)) from exc
                 return await self._fail(session, job, "render_error")
+            except ServiceUnavailableError as exc:
+                # Already committed as `running`; without this the job never leaves it.
+                raise RenderRetry(str(exc)) from exc
 
             key = _storage_key(job.application_id, job.id)
             try:
@@ -109,9 +113,10 @@ class RenderPipeline:
         cd = await resolve_cd_variant(session, self.storage, doc.gremium_id)
         if cd is None:
             return await self.pytex.render_pdf(markdown, variant=doc.variant)
+        # Shape comes from the document kind, not the design; the design adds logos.
         return await self.pytex.render_pdf(
             markdown,
-            variant=cd.base_variant,
+            variant=doc.variant,
             config=cd_render_config(cd),
             assets=cd.assets,
         )

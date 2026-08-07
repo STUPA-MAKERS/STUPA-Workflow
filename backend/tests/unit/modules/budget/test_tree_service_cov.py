@@ -1818,6 +1818,33 @@ async def test_update_expense_subbooking_inherited_rejected() -> None:
         await svc.update_expense(child.id, ExpenseUpdate(budgetId=uuid.uuid4()))
 
 
+@pytest.mark.parametrize(
+    "payload",
+    [
+        ExpenseUpdate(amount=Decimal("500.00")),
+        ExpenseUpdate(budgetId=uuid.uuid4()),
+        ExpenseUpdate(invoiceId=uuid.uuid4()),
+    ],
+)
+async def test_update_expense_on_transfer_leg_409(payload: ExpenseUpdate) -> None:
+    # One leg alone would desync the pair: 100 out of A, 500 into B.
+    leg = _expense(id=uuid.uuid4(), transfer_id=uuid.uuid4(), amount="100.00")
+    sess = fake_session(gets=[leg])
+    with pytest.raises(ConflictError) as ei:
+        await BudgetTreeService(sess).update_expense(leg.id, payload)
+    assert ei.value.code == "transfer_leg_readonly"
+    assert str(leg.transfer_id) in str(ei.value)
+    assert sess.committed == 0
+
+
+async def test_update_expense_on_transfer_leg_allows_metadata() -> None:
+    node = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
+    leg = _expense(id=uuid.uuid4(), budget_id=node.id, transfer_id=uuid.uuid4())
+    sess = fake_session(result(node), result(), gets=[leg])
+    out = await BudgetTreeService(sess).update_expense(leg.id, ExpenseUpdate(note="Beleg"))
+    assert out.note == "Beleg"
+
+
 async def test_update_expense_child_amount_recomputes_parent() -> None:
     node = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     parent = _expense(id=uuid.uuid4(), amount="20.00")
@@ -1835,9 +1862,7 @@ async def test_update_expense_child_amount_recomputes_parent() -> None:
     assert parent.amount == Decimal("35.00")
 
 
-# --------------------------------------------------------------------------
-# Fiscal-year delete: the 409 guard keeps money rows from being dropped.
-# --------------------------------------------------------------------------
+# --- fiscal-year delete: the 409 guard keeps money rows from being dropped ---
 
 
 async def test_delete_fiscal_year_ok() -> None:
@@ -1875,7 +1900,7 @@ async def test_delete_fiscal_year_with_bookings_409() -> None:
     svc = BudgetTreeService(sess)
     with pytest.raises(ConflictError) as ei:
         await svc.delete_fiscal_year(top.id, fy.id)
-    assert "bookings" in str(ei.value)
+    assert ei.value.code == "fiscal_year_has_bookings"
     assert sess.deleted == []
 
 
@@ -1888,12 +1913,11 @@ async def test_delete_fiscal_year_with_allocations_409() -> None:
     svc = BudgetTreeService(sess)
     with pytest.raises(ConflictError) as ei:
         await svc.delete_fiscal_year(top.id, fy.id)
-    assert "allocations" in str(ei.value)
+    assert ei.value.code == "fiscal_year_has_allocations"
 
 
 async def test_delete_fiscal_year_with_applications_409() -> None:
-    # `application.fiscal_year_id` has no cascade, so an unguarded delete would
-    # fail on the foreign key with a 500.
+    # `application.fiscal_year_id` has no cascade, so an unguarded delete would 500.
     top = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     fy = _fy(id=uuid.uuid4(), budget_id=top.id)
     sess = fake_session(
@@ -1902,12 +1926,10 @@ async def test_delete_fiscal_year_with_applications_409() -> None:
     svc = BudgetTreeService(sess)
     with pytest.raises(ConflictError) as ei:
         await svc.delete_fiscal_year(top.id, fy.id)
-    assert "applications" in str(ei.value)
+    assert ei.value.code == "fiscal_year_has_applications"
 
 
-# --------------------------------------------------------------------------
-# Transfers as a first-class entity: read, patch and delete both legs.
-# --------------------------------------------------------------------------
+# --- transfers as one entity: read, patch and delete both legs ---
 
 
 def _transfer_pair(*, transfer_id=None, src=None, dst=None, fy=None, actor=None):  # noqa: ANN001
@@ -2015,8 +2037,7 @@ async def test_list_transfers_blank_q_and_nullable_date_sort() -> None:
 
 
 async def test_list_transfers_empty_page() -> None:
-    # No count row and no source leg: `total` falls back to 0 and the assembly
-    # returns early without a second query.
+    # No count row and no source leg: `total` falls back to 0, no second query.
     sess = fake_session(result(), result())
     page = await BudgetTreeService(sess).list_transfers_paged()
     assert page.total == 0 and page.items == []
@@ -2059,8 +2080,7 @@ async def test_update_transfer_patches_both_legs() -> None:
 
 
 async def test_update_transfer_audit_entry_is_not_revertable() -> None:
-    # The entry records the prior values under `prior`, NOT under `before`. A
-    # one-sided revert would desync the pair, so the log must not offer it.
+    # `prior`, not `before`: a one-sided revert would desync the pair.
     from app.modules.audit.service import AuditService
 
     tid, out, income = _transfer_pair()
@@ -2087,6 +2107,28 @@ async def test_update_transfer_audit_entry_is_not_revertable() -> None:
     assert audit[0].data["prior"]["amount"] == "100.00"
     flags = await AuditService(cast("Any", sess)).revertable_flags([audit[0]])
     assert flags[audit[0].id] is False
+
+
+@pytest.mark.parametrize(
+    ("field", "payload"),
+    [
+        ("amount", TransferUpdate(amount=None)),
+        ("description", TransferUpdate(description=None)),
+    ],
+)
+async def test_update_transfer_rejects_explicit_null_422(
+    field: str, payload: TransferUpdate
+) -> None:
+    # `budget_expense.amount` and `.description` are NOT NULL: 422, not an
+    # IntegrityError at commit time.
+    tid, out, income = _transfer_pair()
+    sess = fake_session(result(out, income))
+    with pytest.raises(ValidationProblem) as ei:
+        await BudgetTreeService(sess).update_transfer(tid, payload)
+    assert ei.value.code == "transfer_field_not_nullable"
+    assert ei.value.errors is not None and ei.value.errors[0].field == field
+    assert sess.committed == 0
+    assert out.amount == Decimal("100.00") and out.description == "x"
 
 
 async def test_update_transfer_rejects_new_source_409() -> None:

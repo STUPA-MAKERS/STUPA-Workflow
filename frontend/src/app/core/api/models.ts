@@ -522,20 +522,14 @@ export interface SignedUrl {
   expiresIn: number;
 }
 
-/**
- * Status of an async render job (`JobOut.status`).
- *
- * `pending` means the job waits for the worker. `running` means the worker
- * renders. `done` and `failed` are the two end states. Nothing else follows.
- */
+/** Status of an async render job: `pending` → `running` → `done` or `failed`. */
 export type RenderJobStatus = 'pending' | 'running' | 'done' | 'failed';
 
 /**
  * Async render job (`POST /applications/{id}/pdf`, `GET /jobs/{id}`).
  *
- * `resultUrl` holds a signed, short-lived MinIO link. It is set only on `done`,
- * and only when the deployment has an object store. `error` holds a short code,
- * for example `render_error`, and only on `failed`.
+ * `resultUrl` is a short-lived signed link, set on `done` only; `error` is a
+ * short code, set on `failed` only.
  */
 export interface RenderJob {
   id: Uuid;
@@ -696,9 +690,7 @@ export interface Tally {
 export interface Vote {
   id: Uuid;
   applicationId: Uuid;
-  /** The meeting that holds the vote. `null` marks a standalone (async) vote.
-   *  A meeting-bound vote is deleted through its meeting, never through
-   *  `DELETE /votes/{id}` (that route answers 409). */
+  /** The meeting that holds the vote; `null` marks a standalone (async) vote. */
   meetingId?: Uuid | null;
   eligibleGroup: string;
   config: VoteConfig;

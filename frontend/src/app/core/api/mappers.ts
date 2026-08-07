@@ -65,7 +65,7 @@ export function mapState(
   };
 }
 
-function mapApplicant(wire: ApplicantOutWire | null | undefined): Applicant | null {
+export function mapApplicant(wire: ApplicantOutWire | null | undefined): Applicant | null {
   if (!wire) return null;
   return {
     email: wire.email ?? null,

@@ -414,8 +414,7 @@ async def revoke_grant(
     """Revoke a grant of the logged-in user.
 
     The access token and the refresh token become invalid at once. A grant of another user
-    gives a 404. An administrator revokes a grant of another user through
-    `DELETE /api/admin/oauth-grants/{grant_id}`, which uses the same service call.
+    gives a 404; an administrator uses `DELETE /api/admin/oauth-grants/{grant_id}`.
     """
     pid = await _principal_row_id(db, principal)
     row = await oauth_service.load_grant(db, grant_id)

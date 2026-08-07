@@ -6,12 +6,9 @@ variant with query params. The service answers with `application/pdf`, or with
 `text/plain` for `.tex`. Every build runs in a per-request temp directory inside
 the library. The caller reaches no filesystem.
 
-`POST /render` also accepts `multipart/form-data`. That form carries the same
-source in the `source` field, a JSON object in the `config` field, and one file
-part per binary asset in the repeated `assets` field. The name of an asset is
-the file name of its part. A caller uploads the logos of a document this way and
-names them in the `logos` or `footer_logos` config key. The query params stay
-the same for both request shapes, so a raw-body caller needs no change.
+`POST /render` also accepts `multipart/form-data`: the source in the `source`
+field, a JSON object in `config`, and one file part per binary asset in the
+repeated `assets` field, named after the file name of its part.
 
 The service is internal-only and it renders first-party, app-generated documents
 only, so the default trust level is `trusted`. `variant` defaults to `None`,
@@ -46,7 +43,7 @@ from pytex_api import (
 )
 from python_multipart.exceptions import FormParserError
 from starlette.datastructures import UploadFile
-from starlette.formparsers import MultiPartException
+from starlette.exceptions import HTTPException
 
 # App-generated documents are first-party, so default to a real PDF at full trust.
 _DEFAULT_OUTPUT = os.environ.get("PYTEX_DEFAULT_OUTPUT", "pdf").lower()
@@ -55,11 +52,12 @@ _DEFAULT_TRUST = os.environ.get("PYTEX_DEFAULT_TRUST", "trusted").lower()
 # the library. It keeps a giant upload out of memory. The code aligns the library
 # cap with it below.
 _MAX_BODY_BYTES = int(os.environ.get("PYTEX_MAX_BODY_BYTES", str(4 * 1024 * 1024)))
-# Caps on the asset channel of a multipart request. They sit under the total cap
-# above, so one huge logo cannot eat the whole budget of a document, and a caller
-# cannot turn the render service into a file dump with thousands of small parts.
+# Caps on the asset channel, under the total cap above.
 _MAX_ASSETS = int(os.environ.get("PYTEX_MAX_ASSETS", "16"))
 _MAX_ASSET_BYTES = int(os.environ.get("PYTEX_MAX_ASSET_BYTES", str(2 * 1024 * 1024)))
+# Above the asset cap, so the count check below still answers its clear 413.
+_MAX_PARTS = _MAX_ASSETS + 2
+_MAX_FIELDS = 8
 # Compile wall-clock and cpu kill (seconds). The 30 s default of the library kills
 # the first trusted build during the bundle download. 120 s lets that warm-up
 # finish, and a cached build takes a few seconds anyway.
@@ -140,8 +138,7 @@ def _parse_enum[E: (InputKind, OutputKind, TrustLevel)](
         ) from None
 
 
-# The multipart contract. The service accepts these three field names and no
-# other, so the accepted surface stays as narrow as the raw-body one.
+# The multipart contract: these three field names and no other.
 _MULTIPART_TYPE: Final[str] = "multipart/form-data"
 _SOURCE_FIELD: Final[str] = "source"
 _CONFIG_FIELD: Final[str] = "config"
@@ -187,8 +184,9 @@ def _parse_config(raw: bytes) -> dict[str, object]:
 def _asset_name(value: UploadFile | str) -> str:
     """Return the file name of an asset part.
 
-    The service does not check the name itself. `pytex_api.validate_asset_name`
-    owns that rule, and the route maps its `TrustError` to a 400.
+    The private `pytex_api._security.validate_asset_name` owns the name rule
+    (the exported `filter_assets` applies it); the route maps its `TrustError`
+    to a 400.
 
     Raises:
         _BadRequest: The part is a plain field, or it carries no file name.
@@ -208,16 +206,17 @@ async def _read_multipart(request: Request) -> _Payload:
             `config` part is not a JSON object.
     """
     try:
-        # `max_part_size` keeps a single part inside the total body cap even when
-        # the request declares no Content-Length (chunked upload).
-        form = await request.form(max_part_size=_MAX_BODY_BYTES)
-    except MultiPartException as exc:
-        # starlette raises this for a missing boundary, a part without a name,
-        # and its own count/size caps.
-        raise _BadRequest(f"malformed multipart body: {exc.message}") from None
+        # Starlette defaults to 1000 files and 1000 fields; this contract needs neither.
+        form = await request.form(
+            max_part_size=_MAX_BODY_BYTES,
+            max_files=_MAX_PARTS,
+            max_fields=_MAX_FIELDS,
+        )
+    except HTTPException as exc:
+        # Inside an app, starlette rewrites `MultiPartException` to a 400 `HTTPException`.
+        raise _BadRequest(f"malformed multipart body: {exc.detail}") from None
     except FormParserError as exc:
-        # The parser under starlette raises this for a broken part header. It
-        # does not pass through the starlette wrapper, so catch it here.
+        # A broken part header does not pass through the starlette wrapper.
         raise _BadRequest(f"malformed multipart body: {exc}") from None
     try:
         source = b""
@@ -298,9 +297,8 @@ async def render(
 ) -> Response:
     """Render the request source (Markdown) to a PDF or LaTeX blob.
 
-    The source is the raw request body, or the `source` field of a
-    `multipart/form-data` body. The multipart shape also carries a `config`
-    JSON object and the repeated `assets` file parts.
+    The source is the raw request body, or the `source` field of a multipart
+    body that may also carry `config` and repeated `assets` parts.
     """
     # Reject an oversized upload from the declared Content-Length before the
     # service buffers the body. A missing or malformed header falls through to

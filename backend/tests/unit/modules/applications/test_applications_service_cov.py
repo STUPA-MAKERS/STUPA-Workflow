@@ -22,6 +22,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from app.modules.applications.schemas import ApplicantPatch
 from app.modules.applications.service import ApplicationsService
 from app.modules.applications.service import create as create_mod
 from app.modules.applications.service import listing as listing_mod
@@ -1263,8 +1264,7 @@ async def test_current_version_value() -> None:
     assert await svc._current_version(uuid4()) == 5
 
 
-# PATCH/DELETE on one comment. The author check is server-side and the audit log
-# records both operations, because a comment keeps no version history.
+# PATCH/DELETE on one comment: server-side author check plus an audit entry.
 
 
 def _comment(**over: Any) -> Any:
@@ -1440,4 +1440,75 @@ async def test_delete_comment_unknown_404() -> None:
             viewer_sub="s",
             viewer_is_applicant=False,
             can_manage=True,
+        )
+
+
+# update_applicant: correct the PII that the magic link and the mails target.
+
+
+async def test_update_applicant_changes_email_and_name_and_audits() -> None:
+    from app.modules.audit.models import AuditEntry
+
+    applicant = _Obj(id=uuid4(), email="typo@x.de", name="Alice", anonymized_at=None)
+    session = _Session(get_results=[_app()], execute_results=[[applicant]])
+    out = await ApplicationsService(session).update_applicant(  # type: ignore[arg-type]
+        uuid4(), ApplicantPatch(email="alice@x.de", name="Alice B."), actor="mgr"
+    )
+    assert (applicant.email, applicant.name) == ("alice@x.de", "Alice B.")
+    assert out.email == "alice@x.de" and out.anonymized is False
+    entries = [o for o in session.added if isinstance(o, AuditEntry)]
+    assert [e.action for e in entries] == ["applicant_update"]
+    assert entries[0].data["fields"] == ["email", "name"]
+    # The audit entry names the fields, never the addresses themselves.
+    assert "alice@x.de" not in str(entries[0].data)
+    assert session.committed == 1
+
+
+async def test_update_applicant_omitted_and_unchanged_fields_write_no_audit() -> None:
+    from app.modules.audit.models import AuditEntry
+
+    applicant = _Obj(id=uuid4(), email="a@x.de", name="Alice", anonymized_at=None)
+    session = _Session(get_results=[_app()], execute_results=[[applicant]])
+    await ApplicationsService(session).update_applicant(  # type: ignore[arg-type]
+        uuid4(), ApplicantPatch(email="a@x.de"), actor="mgr"
+    )
+    assert applicant.name == "Alice"
+    assert [o for o in session.added if isinstance(o, AuditEntry)] == []
+    assert session.committed == 1
+
+
+async def test_update_applicant_on_an_anonymized_row_409() -> None:
+    """A write-back would undo a GDPR Art. 17 erasure."""
+    applicant = _Obj(id=uuid4(), email=None, name=None, anonymized_at=NOW)
+    session = _Session(get_results=[_app()], execute_results=[[applicant]])
+    with pytest.raises(ConflictError) as ei:
+        await ApplicationsService(session).update_applicant(  # type: ignore[arg-type]
+            uuid4(), ApplicantPatch(email="back@x.de"), actor="mgr"
+        )
+    assert ei.value.code == "applicant_anonymized"
+    assert applicant.email is None and session.committed == 0
+
+
+async def test_update_applicant_without_a_row_404() -> None:
+    session = _Session(get_results=[_app()], execute_results=[[]])
+    with pytest.raises(NotFoundError):
+        await ApplicationsService(session).update_applicant(  # type: ignore[arg-type]
+            uuid4(), ApplicantPatch(name="X"), actor="mgr"
+        )
+
+
+async def test_update_applicant_unknown_application_404() -> None:
+    session = _Session(get_results=[None])
+    with pytest.raises(NotFoundError):
+        await ApplicationsService(session).update_applicant(  # type: ignore[arg-type]
+            uuid4(), ApplicantPatch(name="X"), actor="mgr"
+        )
+
+
+async def test_update_applicant_on_an_unconfirmed_submission_404() -> None:
+    """The invisible-until-confirmed rule holds here too, so there is no oracle."""
+    session = _Session(get_results=[_app(email_confirmed_at=None)])
+    with pytest.raises(NotFoundError):
+        await ApplicationsService(session).update_applicant(  # type: ignore[arg-type]
+            uuid4(), ApplicantPatch(name="X"), actor="mgr"
         )

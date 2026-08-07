@@ -1,34 +1,12 @@
 """cd_variants: admin-managed corporate-design variants (#cd-variants).
 
-A CD variant controls the logos of a rendered document — the title-page set and
-the footer set — plus a display name. It controls no color and no font. The
-platform can hold arbitrarily many of them.
+Creates `cd_variant` and `cd_variant_logo`, seeds the five variants that were
+hardcoded before, replaces the free-text `gremium.cd_variant` with the RESTRICT
+FK `gremium.cd_variant_id`, and grants `admin.cd_variants` to the `admin` role.
 
-* `cd_variant` — key (slug, unique, immutable), display name, base variant
-  (`report` or `protocol`, the pytex document shape).
-* `cd_variant_logo` — one logo per row, in a slot (`title` or `footer`) at a
-  position. A row is EITHER a vendored pytex logo name OR an uploaded object in
-  MinIO. `ck_cd_variant_logo_source` holds that exactly-one-of rule.
-* `gremium.cd_variant_id` replaces the free-text `gremium.cd_variant`. The FK is
-  RESTRICT, so a variant that a Gremium still uses cannot be deleted.
-* The seed reproduces the five variants of before with vendored logo names only,
-  so it writes nothing into the object storage. The mapping matches
-  `pytex_hsrtreport.variants` (DEFAULT_LOGOS / FOOTER_LOGOS): stupa, asta and
-  echo are protocols with their own logo, makers is a report with MAKERS on the
-  title page and MAKERS-RAlign in the footer, report is the plain INF report.
-* `admin.cd_variants` gates the new admin page. The migration seeds it to the
-  `admin` role, which holds the full catalog.
-
-Every statement is idempotent (`IF NOT EXISTS`, `ON CONFLICT DO NOTHING` or a
-guarded `DO` block). On a fresh database `0001_baseline` already creates the two
-tables and the column through `Base.metadata.create_all`, and `0002_seed`
-already writes the five rows. On an installed database this revision creates and
-backfills them.
-
-`downgrade` restores the free-text column and drops `cd_variant_id`. It leaves
-the two tables in place on purpose: they belong to the model metadata, so
-`0001_baseline.downgrade` (`drop_all`) owns them, and `0002_seed.downgrade`
-still needs them to delete its own seeded rows.
+Every statement is idempotent, because `0001_baseline` and `0002_seed` already
+build the tables and the rows on a fresh database. `downgrade` leaves the two
+tables in place: `0002_seed.downgrade` still deletes its own rows from them.
 """
 
 from __future__ import annotations
@@ -57,12 +35,9 @@ _SEED: tuple[tuple[str, str, str, tuple[str, ...], tuple[str, ...]], ...] = (
 def _seed_statements() -> tuple[str, ...]:
     """Build the idempotent INSERTs for the five variants and their logos.
 
-    Every literal comes from the constant above, so no user input reaches the
-    statement text.
-
-    All logos of one variant go in ONE statement. The ``NOT EXISTS`` guard would
-    otherwise see the row that the previous statement wrote and skip the rest of
-    the set.
+    Every literal comes from the constant above; no user input reaches the SQL.
+    All logos of one variant go in ONE statement, or the ``NOT EXISTS`` guard
+    sees the row that the previous statement wrote and skips the rest.
     """
     stmts: list[str] = [
         "INSERT INTO cd_variant (key, name, base_variant) "
@@ -77,8 +52,7 @@ def _seed_statements() -> tuple[str, ...]:
         ]
         if not rows:  # pragma: no cover - every seeded variant carries a logo
             continue
-        # Seed the logos only for a variant that has none yet. On a fresh database
-        # 0002_seed already wrote them.
+        # Only for a variant that carries no logo yet.
         stmts.append(
             'INSERT INTO cd_variant_logo (variant_id, slot, "position", vendored_name) '
             "SELECT v.id, x.slot, x.pos, x.name FROM cd_variant v "
@@ -142,9 +116,7 @@ BEGIN
 END $$;
 """
 
-# Backfill from the free-text column. The DO block guards it, because a fresh
-# database never had that column: create_all builds `gremium` from the current
-# model, and the model no longer holds it.
+# A fresh database never had `gremium.cd_variant`, so the DO block guards the backfill.
 _BACKFILL = """
 DO $$
 BEGIN

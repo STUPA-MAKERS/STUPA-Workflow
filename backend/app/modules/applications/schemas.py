@@ -110,6 +110,18 @@ class ApplicationPatch(_CamelModel):
     data: dict[str, Any]
 
 
+class ApplicantPatch(_CamelModel):
+    """Correct the applicant name or email.
+
+    An omitted field stays unchanged. The email is the magic-link and
+    notification target, so a typo locks the applicant out of the application.
+    An anonymized applicant is not patchable.
+    """
+
+    email: EmailStr | None = None
+    name: str | None = Field(default=None, max_length=256)
+
+
 class TimelineEventOut(_CamelModel):
     from_state_id: UUID | None = Field(default=None, alias="fromStateId")
     to_state_id: UUID = Field(alias="toStateId")
@@ -151,9 +163,8 @@ class CommentCreate(_CamelModel):
 class CommentPatch(_CamelModel):
     """Replace the body of a comment in place.
 
-    The visibility is not patchable. A public comment is already out, so
-    switching it to internal hides it only from the applicant who read it. The
-    delete is the path for that case.
+    The visibility is not patchable: a public comment is already out, so use
+    the delete instead.
     """
 
     body: str = Field(min_length=1, max_length=10_000)

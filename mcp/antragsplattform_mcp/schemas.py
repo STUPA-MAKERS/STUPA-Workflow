@@ -162,8 +162,7 @@ class FormFieldPatch(WireModel):
 class GremiumCreate(WireModel):
     name: str
     slug: str
-    # The corporate design is a row now, not a name. `list_cd_variants`
-    # returns the ids.
+    # Ids come from `list_cd_variants`.
     cdVariantId: str | None = None
     defaultLang: str = "de"
     allowVoteDelegation: bool = False
@@ -183,24 +182,38 @@ class GremiumUpdate(WireModel):
     quorumPercent: int | None = None
 
 
+CdBaseVariant = Literal["report", "protocol"]
+CdLogoSlot = Literal["title", "footer"]
+VendoredLogoName = Literal[
+    "HSRT",
+    "INF",
+    "ASTA",
+    "STUPA",
+    "ECHO",
+    "MAKERS",
+    "MAKERS-RAlign",
+    "MAKERS-Icon",
+    "Skyline",
+]
+
+
 class CdVariantCreate(WireModel):
     key: str
     name: str
-    baseVariant: str = "report"
+    baseVariant: CdBaseVariant = "report"
 
 
 class CdVariantUpdate(WireModel):
-    """Patch of a CD variant. `key` is immutable — a different value gives 409."""
+    """Patch of a CD variant. `key` and `baseVariant` are create-only."""
 
     name: str | None = None
-    baseVariant: str | None = None
 
 
 class CdVariantLogoVendoredCreate(WireModel):
     """Add a logo that pytex ships. Upload a file through the web UI instead."""
 
-    slot: str
-    vendoredName: str
+    slot: CdLogoSlot
+    vendoredName: VendoredLogoName
 
 
 class GremiumRoleCreate(WireModel):
@@ -399,8 +412,11 @@ class InvoiceUpdate(WireModel):
 class MeetingCreate(WireModel):
     gremiumId: str
     title: str
-    date: str | None = Field(default=None, description="ISO date")
-    startTime: str | None = Field(default=None, description="HH:MM")
+    date: str = Field(description="ISO date")
+    startTime: str = Field(description="HH:MM")
+    endTime: str | None = Field(
+        default=None, description="HH:MM, after startTime. The ICS feed else assumes one hour."
+    )
     protokollantId: str | None = None
 
 
@@ -409,6 +425,7 @@ class MeetingPatch(WireModel):
     status: Literal["planned", "live", "closed"] | None = None
     date: str | None = None
     startTime: str | None = None
+    endTime: str | None = None
     protokollantId: str | None = None
 
 
@@ -418,7 +435,7 @@ class MeetingVoteOpenBody(WireModel):
     options: list[str] = Field(default_factory=lambda: ["yes", "no", "abstain"])
     majorityRule: Literal["simple", "absolute", "two_thirds"] = "simple"
     secret: bool = False
-    eligibleCount: int | None = None
+    # The server derives the quorum denominator from the roster; a client value is ignored.
     quorumPercent: int | None = None
 
 

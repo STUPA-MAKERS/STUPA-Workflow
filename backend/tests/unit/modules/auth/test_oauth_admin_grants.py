@@ -1,8 +1,6 @@
 """Admin view and kill switch for the OAuth grants of every principal.
 
-The tests run without a database. The router uses the FastAPI `TestClient` with
-`dependency_overrides` and `FakeSession` from `tests._support.flow_fakes`. `auth` is a
-critical module, so every branch of the new router has a test.
+Runs without a database: `TestClient` with `dependency_overrides` and `FakeSession`.
 """
 
 from __future__ import annotations
@@ -280,11 +278,7 @@ def test_revoke_rejects_a_non_uuid_grant_id() -> None:
 
 
 async def test_revoked_grant_no_longer_authenticates() -> None:
-    """The revoke ends the token at once, checked with the runtime resolution path.
-
-    `oauth_service.resolve_access_token` is the function `app.deps` calls for every
-    `Bearer apat_…` request. It must reject the row that the admin revoke touched.
-    """
+    """The revoke ends the token at once, checked through `resolve_access_token`."""
     row = _token_row()
     db = fake_session(result(row))
     client = _build_client(db=db)

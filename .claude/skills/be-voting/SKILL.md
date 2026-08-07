@@ -32,6 +32,8 @@ description: Standalone vote lifecycle (Vote/Ballot/SecretBallot/VotedMarker) wi
 
 **API surface:**
 - `POST /api/applications/{application_id}/votes` — `vote.manage`. Create vote (draft).
+- `PATCH /api/votes/{vote_id}` — `vote.manage`. Correct a `draft` vote that holds no ballot; anything further along answers 409. A move to another `eligibleGroup` also needs manage rights in the target gremium.
+- `DELETE /api/votes/{vote_id}` — `vote.manage`, 204. Only a standalone application-bound vote that is still `draft` and holds no ballot. A meeting-bound vote answers 409 and belongs to `DELETE /api/meetings/{meeting_id}/votes/{vote_id}`. Anything past `draft` uses `cancel` instead.
 - `POST /api/votes/{vote_id}/open` — `vote.manage`. draft→open. Broadcasts `vote_opened` if meeting-bound. 409 if not draft.
 - `POST /api/votes/{vote_id}/close` — `vote.manage`. Tally → result → fire `pass`/`fail` branch atomically. Broadcasts `vote_closed`. 409 if quorum unmet (unless window expired via Cron `now`), or if no matching branch transition.
 - `POST /api/votes/{vote_id}/cancel` — `vote.manage`. open→cancelled, no result and no branch.

@@ -160,7 +160,8 @@ export class ShellComponent {
     {
       path: '/admin',
       labelKey: 'nav.admin',
-      permissions: ['admin.site', 'admin.gremien', 'admin.types', 'admin.roles', 'admin.notifications', 'webhook.manage', 'audit.read'],
+      // Keep in step with the `admin` route gate in app.routes.ts.
+      permissions: ['admin.site', 'admin.gremien', 'admin.types', 'admin.roles', 'admin.users', 'admin.group_mappings', 'admin.gremium_roles', 'admin.cd_variants', 'admin.delegations', 'admin.deadlines', 'admin.notifications', 'privacy.manage', 'webhook.manage', 'audit.read'],
     },
   ];
 

@@ -32,8 +32,7 @@
     min-width: 0;
   }
 }
-/* Meeting meta line, detail view only. It sits below the page header and keeps
-   the body width of the toolbar and of the center column of the shell. */
+/* Meeting meta line, detail view only, at the body width of the center column. */
 .mtg__meta {
   display: flex;
   align-items: center;

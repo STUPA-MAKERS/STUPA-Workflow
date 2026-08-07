@@ -163,10 +163,7 @@ class WebhookOps(ConfigServiceBase):
     async def delete_webhook(self, webhook_id: UUID, actor: str) -> None:
         """Delete a webhook and its delivery history.
 
-        The ``webhook_delivery`` rows hang on the webhook with ``ON DELETE
-        CASCADE``, so the delete needs no guard and answers no 409. Until this
-        route existed, the only way to stop a webhook was ``active: false``,
-        which kept the target URL and the secret in the database.
+        The ``webhook_delivery`` rows cascade, so the delete needs no guard.
 
         Raises:
             NotFoundError: No webhook has this id (404).

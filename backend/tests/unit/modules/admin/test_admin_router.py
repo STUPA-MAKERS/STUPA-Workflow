@@ -578,19 +578,14 @@ def test_flow_editor_can_read_its_sources_without_admin_types(
 _FLOW_GRAPH = {"graph": {"states": [], "transitions": [], "layout": None}}
 
 
-def test_flow_save_accepts_flow_configure(app: FastAPI, client: TestClient) -> None:
-    """#g7: `flow.configure` opens the editor AND saves it.
-
-    Before the fix the route gate and the save gate disagreed: the editor opened on
-    `flow.configure` and the save answered 403 without `admin.types`.
-    """
+def test_flow_save_refuses_flow_configure(app: FastAPI, client: TestClient) -> None:
+    """A transition action mails an arbitrary address, so the save stays on admin.types."""
     _as(app, {"flow.configure"})
     r = client.post("/api/admin/flow-versions/global", json=_FLOW_GRAPH)
-    assert r.status_code == 201
+    assert r.status_code == 403
 
 
-def test_flow_save_still_accepts_admin_types(app: FastAPI, client: TestClient) -> None:
-    """#g7: the gate is any-of, so an existing `admin.types` holder keeps the save."""
+def test_flow_save_accepts_admin_types(app: FastAPI, client: TestClient) -> None:
     _as(app, {"admin.types"})
     r = client.post("/api/admin/flow-versions/global", json=_FLOW_GRAPH)
     assert r.status_code == 201

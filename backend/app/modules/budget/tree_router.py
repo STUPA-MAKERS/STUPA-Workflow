@@ -482,7 +482,7 @@ async def export_expenses_xlsx(
 @router.patch(
     "/budget-expenses/{expense_id}",
     response_model=ExpenseOut,
-    responses=_errors(400, 401, 403, 404, 422),
+    responses=_errors(400, 401, 403, 404, 409, 422),
 )
 async def update_budget_expense(
     expense_id: UUID,
@@ -490,7 +490,11 @@ async def update_budget_expense(
     service: ServiceDep,
     principal: Annotated[Principal, Depends(require_principal("budget.book"))],
 ) -> ExpenseOut:
-    """Update the amount or the description of a booking."""
+    """Update the amount or the description of a booking.
+
+    A booking that is a transfer leg answers 409 for the paired fields; patch
+    the transfer instead.
+    """
     return await service.update_expense(expense_id, payload)
 
 
@@ -515,7 +519,10 @@ async def create_transfer(
 @router.get(
     "/budget-transfers",
     response_model=Page[TransferRowOut],
-    dependencies=[Depends(require_principal("budget.book"))],
+    # Aligned with GET /expenses: both legs already show up there for a viewer.
+    dependencies=[
+        Depends(require_any_permission("budget.view", "budget.structure", "budget.book"))
+    ],
     responses=_errors(401, 403, 404),
 )
 async def list_transfers(
@@ -537,9 +544,7 @@ async def list_transfers(
 ) -> Page[TransferRowOut]:
     """List transfers as single rows, filtered and sorted, with offset paging.
 
-    The filters mirror ``GET /expenses``. ``id`` selects the exact transfer for
-    a deep link. ``budget`` matches EITHER cost centre and includes the
-    subtree. ``q`` searches the description and the note.
+    ``budget`` matches either cost centre and includes the subtree.
     """
     return await service.list_transfers_paged(
         transfer_id=transfer_id,
@@ -568,10 +573,7 @@ async def update_transfer(
 ) -> TransferRowOut:
     """Patch both legs of a transfer at once.
 
-    The amount, the description, the note and the two business dates apply to
-    the source expense and to the target income together. The two cost centres
-    are immutable: a request that names a different pair answers 409, because a
-    different pair is a new transfer.
+    The two cost centres are immutable: a different pair answers 409.
     """
     return await service.update_transfer(transfer_id, payload)
 
@@ -583,11 +585,7 @@ async def update_transfer(
     responses=_errors(401, 403, 404),
 )
 async def delete_transfer(transfer_id: UUID, service: ServiceDep) -> None:
-    """Delete a transfer, that is both of its bookings.
-
-    ``DELETE /budget-expenses/{id}`` on either leg removes the pair too and
-    stays supported.
-    """
+    """Delete a transfer, that is both of its bookings."""
     await service.delete_transfer(transfer_id)
 
 
@@ -825,9 +823,7 @@ async def delete_fiscal_year(
 ) -> None:
     """Delete a fiscal year of a top-level budget.
 
-    A fiscal year that still carries bookings, allocations or assigned
-    applications answers 409. Those rows must go first, because the delete
-    would otherwise drop or orphan money data.
+    Remaining bookings, allocations or assigned applications answer 409.
     """
     await service.delete_fiscal_year(budget_id, fiscal_year_id)
 
@@ -846,6 +842,22 @@ async def set_allocation(
 ) -> AllocationOut:
     """Set the top-down allocation. A children sum above the parent gives 422."""
     return await service.set_allocation(budget_id, fiscal_year_id, payload)
+
+
+@router.delete(
+    "/budgets/{budget_id}/allocations/{fiscal_year_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_principal("budget.structure"))],
+    responses=_errors(401, 403, 404, 422),
+)
+async def delete_allocation(
+    budget_id: UUID, fiscal_year_id: UUID, service: ServiceDep
+) -> None:
+    """Remove the allocation of a cost centre for one fiscal year.
+
+    Children that still hold allocations answer 422.
+    """
+    await service.delete_allocation(budget_id, fiscal_year_id)
 
 
 @router.post(

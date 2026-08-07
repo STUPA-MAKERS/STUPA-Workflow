@@ -60,6 +60,8 @@ export class MeetingDelegationCardComponent {
 
   protected readonly ctx = signal<MeetingDelegationContext | null>(null);
   protected readonly dialogOpen = signal(false);
+  /** Id of the delegation the dialog rewrites, or null while it creates one. */
+  protected readonly editingId = signal<Uuid | null>(null);
   protected readonly busy = signal(false);
   protected readonly delegateId = signal<Uuid | ''>('');
   protected readonly delegateVoting = signal(false);
@@ -126,8 +128,18 @@ export class MeetingDelegationCardComponent {
   }
 
   protected openDialog(): void {
+    this.editingId.set(null);
     this.delegateId.set('');
     this.delegateVoting.set(false);
+    this.query.set('');
+    this.searched.set(null);
+    this.dialogOpen.set(true);
+  }
+
+  protected openEdit(d: Delegation): void {
+    this.editingId.set(d.id);
+    this.delegateId.set(d.delegateId);
+    this.delegateVoting.set(d.delegateVoting);
     this.query.set('');
     this.searched.set(null);
     this.dialogOpen.set(true);
@@ -138,24 +150,38 @@ export class MeetingDelegationCardComponent {
     this.query$.next(q);
   }
 
-  protected create(): void {
+  /** Create a delegation, or rewrite the one the dialog opened on. */
+  protected submit(): void {
     const id = this.delegateId();
     if (!id || this.busy()) return;
+    const editing = this.editingId();
     this.busy.set(true);
-    this.api
-      .create({ meetingId: this.meetingId(), delegateId: id, delegateVoting: this.delegateVoting() })
-      .subscribe({
-        next: () => {
-          this.busy.set(false);
-          this.dialogOpen.set(false);
-          this.toast.success(this.i18n.translate('delegation.toast.created'));
-          this.reload();
-        },
-        error: (err: { error?: { detail?: string } }) => {
-          this.busy.set(false);
-          this.toast.error(err.error?.detail ?? this.i18n.translate('delegation.toast.createFailed'));
-        },
-      });
+    const request = editing
+      ? this.api.update(editing, { delegateId: id, delegateVoting: this.delegateVoting() })
+      : this.api.create({
+          meetingId: this.meetingId(),
+          delegateId: id,
+          delegateVoting: this.delegateVoting(),
+        });
+    request.subscribe({
+      next: () => {
+        this.busy.set(false);
+        this.dialogOpen.set(false);
+        this.toast.success(
+          this.i18n.translate(editing ? 'delegation.toast.updated' : 'delegation.toast.created'),
+        );
+        this.reload();
+      },
+      error: (err: { error?: { detail?: string } }) => {
+        this.busy.set(false);
+        this.toast.error(
+          err.error?.detail ??
+            this.i18n.translate(
+              editing ? 'delegation.toast.updateFailed' : 'delegation.toast.createFailed',
+            ),
+        );
+      },
+    });
   }
 
   protected revoke(d: Delegation): void {

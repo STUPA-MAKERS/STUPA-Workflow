@@ -1,9 +1,8 @@
 /**
  * Comment edit/delete and the PDF render job of the application detail page.
  *
- * These live in their own spec file. The base spec of the same component is
- * already large, and one file with both blocks pushes the first TestBed compile
- * of this component over the default jest timeout under `--coverage`.
+ * Split off the base spec: both blocks in one file push the first TestBed compile
+ * over the jest timeout under `--coverage`.
  */
 import { provideHttpClient } from '@angular/common/http';
 import {
@@ -436,6 +435,20 @@ describe('ApplicationsDetailComponent — PDF render', () => {
     ctx.detectChanges();
     flushAttachments(ctx.http);
     ctx.http.verify();
+  });
+
+  it('"check again" starts a new job when the start itself failed', async () => {
+    const { http, detectChanges } = await startRender();
+    http.expectOne(url('/pdf')).flush({ title: 'e' }, { status: 502, statusText: 'x' });
+    detectChanges();
+    expect(screen.getByText('Der PDF-Auftrag konnte nicht gestartet werden.')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Erneut prüfen' }), {
+      advanceTimers: jest.advanceTimersByTime,
+    });
+    http.expectOne(url('/pdf')).flush(PENDING_JOB, { status: 202, statusText: 'Accepted' });
+    detectChanges();
+    expect(screen.getByText('Der Auftrag wartet auf die Bearbeitung …')).toBeInTheDocument();
   });
 
   it('ignores a second start while one runs and a poll without a job', async () => {

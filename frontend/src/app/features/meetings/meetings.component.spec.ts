@@ -12,6 +12,7 @@ import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { USE_MOCK_API } from '@core/api/api.config';
 import type { Meeting, MeetingOutWire, ProtocolOutWire } from '@core/api/models';
+import { ToastService } from '@stupa-makers/ui-kit';
 import { WsService, type MeetingChannel } from '@core/ws/ws.service';
 import type { ServerMessage } from '@core/ws/ws-messages';
 import { MeetingsComponent } from './meetings.component';
@@ -133,10 +134,7 @@ function fakeAuth(perms: string[], userId: string | null = 'pr-1'): Partial<Auth
   };
 }
 
-/**
- * Router double. `navigate` is the only method the component calls. The rest is
- * the read-only surface that the breadcrumbs of `app-page-header` read.
- */
+/** Router double: `navigate` plus the read-only surface the breadcrumbs read. */
 function routerStub(navigate: jest.Mock = jest.fn(() => Promise.resolve(true))) {
   return {
     navigate,
@@ -1419,6 +1417,41 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.finalizing()).toBe(false);
     });
 
+    it('names the lock from the 409 code when the save races a finalize', async () => {
+      const { cmp, http, fixture } = await loaded();
+      const toast = fixture.debugElement.injector.get(ToastService);
+      const spy = jest.spyOn(toast, 'error');
+      cmp.finalize();
+      http
+        .expectOne('/api/protocols/p-1')
+        .flush(
+          { code: 'protocol_rendering', detail: 'Protocol is being rendered and is read-only.' },
+          { status: 409, statusText: 'conflict' },
+        );
+      expect(spy).toHaveBeenCalledWith(
+        'Das PDF des Protokolls wird gerade erzeugt. Solange bleibt der Text gesperrt.',
+      );
+    });
+
+    it('names the lock from the 409 code when the finalize itself races', async () => {
+      const { cmp, http, fixture } = await loaded();
+      const toast = fixture.debugElement.injector.get(ToastService);
+      const spy = jest.spyOn(toast, 'error');
+      cmp.finalize();
+      http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
+      http
+        .expectOne('/api/protocols/p-1/finalize')
+        .flush(
+          { code: 'protocol_finalized', detail: 'Protocol is finalized and read-only.' },
+          { status: 409, statusText: 'conflict' },
+        );
+      expect(spy).toHaveBeenCalledWith(
+        'Das Protokoll ist bereits final und lässt sich nicht mehr ändern.',
+      );
+      // The reload brings the view back in step with the server.
+      http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
+    });
+
     it('reports a finalize error with the server detail', async () => {
       const { cmp, http } = await loaded();
       cmp.finalize();
@@ -2612,8 +2645,7 @@ describe('MeetingsComponent — methods', () => {
         screen.getByRole('button', { name: 'Protokollentwurf verwerfen' }),
       ).toBeInTheDocument();
 
-      // `rendering` and `final` lock the protocol. The server answers 409 for
-      // both, so the control disappears.
+      // `rendering` and `final` lock the protocol, so the control disappears.
       cmp.protocol.set({ ...cmp.protocol()!, status: 'rendering', isLocked: true });
       fixture.detectChanges();
       expect(
@@ -2630,19 +2662,22 @@ describe('MeetingsComponent — methods', () => {
       ).not.toBeInTheDocument();
     });
 
-    it('explains a 409 with the server reason and reloads the protocol', async () => {
-      const { cmp, http } = await loaded();
+    it.each([
+      ['protocol_finalized', 'Das Protokoll ist bereits final und lässt sich nicht mehr verwerfen.'],
+      [
+        'protocol_rendering',
+        'Das PDF des Protokolls wird gerade erzeugt. Bitte danach erneut versuchen.',
+      ],
+      ['conflict', 'Das Protokoll ist kein Entwurf mehr und lässt sich nicht mehr verwerfen.'],
+    ])('names the 409 %s and reloads the protocol', async (code, message) => {
+      const { cmp, http, fixture } = await loaded();
+      const spy = jest.spyOn(fixture.debugElement.injector.get(ToastService), 'error');
       cmp.doDeleteProtocol();
       http.expectOne('/api/protocols/p-1').flush(
-        {
-          type: 'app://error/conflict',
-          title: 'Conflict',
-          status: 409,
-          code: 'conflict',
-          detail: 'Protocol is finalized and read-only.',
-        },
+        { type: 'app://error/conflict', title: 'Conflict', status: 409, code },
         { status: 409, statusText: 'Conflict' },
       );
+      expect(spy).toHaveBeenCalledWith(message);
       // The refresh reads the current state instead of leaving a stale draft.
       http
         .expectOne('/api/meetings/m-1/protocol')

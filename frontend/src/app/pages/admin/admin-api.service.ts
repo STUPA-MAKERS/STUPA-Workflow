@@ -30,6 +30,7 @@ import {
   type CdVariant,
   type CdVariantCreateBody,
   type CdVariantLogo,
+  type CdVariantLogoUpdateBody,
   type CdVariantOption,
   type CdVariantUpdateBody,
   type FlowGraph,
@@ -189,9 +190,8 @@ export class AdminApiService {
     );
   }
 
-  // Corporate-design variants. Every `/admin/cd-variants` route needs
-  // P `admin.cd_variants`. The page shows its own loading indicator, so the
-  // list GET opts out of the global overlay.
+  // Corporate-design variants: P(`admin.cd_variants`). The list GET opts out of
+  // the global overlay, because the page shows its own indicator.
 
   /** GET /admin/cd-variants — the variants with their title and footer logos. */
   listCdVariants(): Observable<CdVariant[]> {
@@ -247,6 +247,17 @@ export class AdminApiService {
     });
   }
 
+  /** PATCH /admin/cd-variant-logos/{id} — move a logo; the stored file stays. */
+  updateCdVariantLogo(
+    logoId: Uuid,
+    patch: CdVariantLogoUpdateBody,
+  ): Observable<CdVariantLogo> {
+    return this.http.patch<CdVariantLogo>(
+      `${this.base}/admin/cd-variant-logos/${logoId}`,
+      patch,
+    );
+  }
+
   /** DELETE /admin/cd-variant-logos/{id} — an uploaded object goes with the entry. */
   deleteCdVariantLogo(logoId: Uuid): Observable<void> {
     return this.http.delete<void>(`${this.base}/admin/cd-variant-logos/${logoId}`);
@@ -257,10 +268,7 @@ export class AdminApiService {
     return `${this.base}/admin/cd-variant-logos/${logoId}/file`;
   }
 
-  /**
-   * GET /cd-variants — slim list (id, key, name) as the source of the gremium
-   * dropdown. `admin.gremien` is enough for it, `admin.cd_variants` is not needed.
-   */
+  /** GET /cd-variants — slim dropdown source; `admin.gremien` is enough for it. */
   listCdVariantOptions(): Observable<CdVariantOption[]> {
     if (this.mock) return of(structuredCopy(MOCK_CD_VARIANT_OPTIONS));
     return this.http.get<CdVariantOption[]>(`${this.base}/cd-variants`, {
@@ -435,8 +443,7 @@ export class AdminApiService {
   /**
    * Change an existing assignment — PATCH /admin/role-assignments/{id}.
    *
-   * The route touches only the fields the body carries. It cannot clear a
-   * validity window, and it never moves the assignment to another user.
+   * Only the fields the body carries change, so a validity window cannot be cleared.
    */
   updateRoleAssignment(assignmentId: Uuid, patch: RoleAssignmentPatch): Observable<RoleAssignment> {
     if (this.mock) {
@@ -466,16 +473,10 @@ export class AdminApiService {
     return this.http.delete<void>(`${this.base}/admin/role-assignments/${assignmentId}`);
   }
 
-  // OAuth grants of ANY principal. Both routes need P(`admin.users`). The
-  // self-service twins under `/oauth/grants` reach the caller's own grants only, so a
-  // leaked agent token of somebody else can be killed here and nowhere else.
+  // OAuth grants of ANY principal, P(`admin.users`). The `/oauth/grants` twins
+  // reach the caller's own grants only.
 
-  /**
-   * GET /admin/oauth-grants — live (not revoked) grants, newest first.
-   *
-   * `principalId` narrows the list to one owner. The list drives its own status line,
-   * so it opts out of the global loading overlay.
-   */
+  /** GET /admin/oauth-grants — live grants, newest first; `principalId` filters by owner. */
   listOAuthGrants(query: OAuthGrantQuery = {}): Observable<Page<OAuthGrantAdmin>> {
     const limit = query.limit ?? 50;
     const offset = query.offset ?? 0;
@@ -679,8 +680,7 @@ export class AdminApiService {
     return this.http.delete<void>(`${this.base}/admin/webhooks/${id}`);
   }
 
-  /** Latest delivery state per webhook. Needs P(`webhook.manage`). The overlay stays
-   *  off, because the call only decorates the list. */
+  /** Latest delivery state per webhook. Needs P(`webhook.manage`). */
   listWebhookDeliveryStatus(): Observable<WebhookDeliveryStatus[]> {
     if (this.mock) return of([]);
     return this.http.get<WebhookDeliveryStatus[]>(
@@ -777,9 +777,7 @@ export class AdminApiService {
   /**
    * Change the role or the term of office of one membership.
    *
-   * The member and the Gremium stay immutable — a different member is a different
-   * membership. The backend answers 409 when the new term overlaps another term of
-   * the same member, and 422 when `validFrom` is not before `validUntil`.
+   * The member and the Gremium stay immutable. An overlapping term answers 409.
    */
   updateGremiumMembership(
     id: Uuid,
@@ -1018,10 +1016,7 @@ function hashString(value: string): number {
   return h;
 }
 
-/**
- * Agent-token stubs for mock mode. The second row has no owner name and no expiry, so
- * the placeholder and the "never expires" rendering are visible without a backend.
- */
+/** Agent-token stubs for mock mode; the second row has no owner name and no expiry. */
 const MOCK_OAUTH_GRANTS: OAuthGrantAdmin[] = [
   {
     id: 'grant-1',

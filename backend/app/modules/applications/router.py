@@ -35,6 +35,8 @@ from app.modules.applications.access import (
     require_app_read,
 )
 from app.modules.applications.schemas import (
+    ApplicantOut,
+    ApplicantPatch,
     ApplicationCreate,
     ApplicationCreated,
     ApplicationListItem,
@@ -228,15 +230,11 @@ async def list_applications(
 ) -> Page[ApplicationListItem]:
     """List applications with filters, sorting and paging.
 
-    A principal without ``application.read`` and without the admin role sees the
-    own applications (``created_by``) plus the committee read scope.
+    A principal without ``application.read`` sees the own applications
+    (``created_by``) plus the committee read scope.
     ``mine=true`` forces the pure owner filter, also for an authorized reader.
     """
-    can_read = (
-        "admin" in principal.roles
-        or principal.has("application.read")
-        or principal.has(READ_ALL_PERMISSION)
-    )
+    can_read = principal.has("application.read") or principal.has(READ_ALL_PERMISSION)
     restricted = not can_read and not mine
     return await service.list_applications(
         state_id=state_id,
@@ -398,6 +396,28 @@ async def patch_application(
     )
 
 
+@router.patch(
+    "/applications/{application_id}/applicant",
+    response_model=ApplicantOut,
+    responses=_errors(400, 401, 403, 404, 409, 422),
+)
+async def patch_applicant(
+    application_id: UUID,
+    payload: ApplicantPatch,
+    service: ServiceDep,
+    # A principal only. A magic-link holder must not repoint the address the link
+    # is delivered to, which would turn a leaked link into a takeover.
+    principal: Annotated[Principal, Depends(require_principal(MANAGE_PERMISSION))],
+) -> ApplicantOut:
+    """Correct the applicant name or email.
+
+    An anonymized applicant answers 409 (``applicant_anonymized``).
+    """
+    return await service.update_applicant(
+        application_id, payload, actor=principal.sub
+    )
+
+
 @router.delete(
     "/applications/{application_id}",
     status_code=204,
@@ -410,10 +430,8 @@ async def delete_application(
 ) -> None:
     """Delete an application.
 
-    The route gates on ``application.delete``. An admin holds that permission
-    through the role bypass, and any other role holds it through an explicit
-    grant. ``application.manage`` alone is not enough, and the creator may not
-    delete either. The delete is irreversible.
+    Gated on ``application.delete``; ``application.manage`` is not enough. The
+    delete is irreversible.
     """
     await service.delete(application_id, actor=principal.sub)
 
@@ -575,16 +593,12 @@ async def update_comment(
     comment_id: UUID,
     payload: CommentPatch,
     service: ServiceDep,
-    # ``require_app_read`` like the create: a comment is communication, not a
-    # data change. The per-comment author check runs in the service.
+    # Read scope like the create; the per-comment author check runs in the service.
     access: Annotated[Access, Depends(require_app_read)],
 ) -> CommentOut:
     """Replace the body of a comment.
 
-    Only the AUTHOR of the comment or a principal with ``application.manage``
-    may do this. The author comes from the session, never from the body. A
-    comment keeps no version history, so the new text replaces the old one and
-    the audit log records the change.
+    Only the author of the comment or a principal with ``application.manage``.
     """
     return await service.update_comment(
         access.application_id,
@@ -611,10 +625,7 @@ async def delete_comment(
 ) -> None:
     """Delete a comment.
 
-    Only the AUTHOR of the comment or a principal with ``application.manage``
-    may do this. The delete is final and the audit log records it. Before this
-    route existed, a comment posted with the wrong visibility could only be
-    removed by anonymizing the whole application.
+    Only the author of the comment or a principal with ``application.manage``.
     """
     await service.delete_comment(
         access.application_id,

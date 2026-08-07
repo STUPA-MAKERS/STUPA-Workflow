@@ -410,6 +410,18 @@ describe('ApplicationsDetailComponent', () => {
     http.verify();
   });
 
+  it('keeps the header and its breadcrumb on 404, so the page is no dead end', async () => {
+    const { http, detectChanges, container } = await setup();
+    http.expectOne(url('')).flush({ title: 'Not found' }, { status: 404, statusText: 'Not Found' });
+    detectChanges();
+    expect(screen.getByRole('heading', { level: 1, name: 'Antrag' })).toBeInTheDocument();
+    expect(container.querySelector('app-page-header app-breadcrumbs')).not.toBeNull();
+    // No action belongs to an application that is not there.
+    expect(screen.queryByRole('button', { name: /PDF/ })).not.toBeInTheDocument();
+    flushAttachments(http);
+    http.verify();
+  });
+
   it('treats an empty route id as not-found without firing a request', async () => {
     const paramMap$ = new BehaviorSubject(convertToParamMap({}));
     const { http, detectChanges, cmp } = await setup(['application.read'], paramMap$);
@@ -1070,8 +1082,7 @@ describe('ApplicationsDetailComponent', () => {
       ['admin'],
     );
     flushAll(http);
-    // The admin role holds every permission, so the aux load also asks for the
-    // transitions. An empty answer is fine.
+    // The admin role holds every permission, so the aux load asks for transitions too.
     http.expectOne(url('/transitions')).flush([]);
     detectChanges();
     flushAttachments(http);
@@ -1142,6 +1153,85 @@ describe('ApplicationsDetailComponent', () => {
       .flush({ title: 'e' }, { status: 500, statusText: 'Server Error' });
     expect(error).toHaveBeenCalledWith('Löschantrag fehlgeschlagen.');
     expect(cmp.requestingErasure()).toBe(false);
+    http.verify();
+  });
+
+  // The applicant email is the magic-link and notification target, so a typo has to
+  // be correctable in place.
+
+  it('corrects the applicant name and email through the dialog', async () => {
+    const { http, detectChanges, toast, cmp } = await setup();
+    flushAll(http);
+    detectChanges();
+    flushAttachments(http);
+    const success = jest.spyOn(toast, 'success');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = cmp as any;
+    c.openApplicantDialog();
+    expect(c.applicantEmail()).toBe('a@stupa');
+    expect(c.canSaveApplicant()).toBe(true);
+    c.applicantEmail.set('mia@stupa.de');
+    c.applicantName.set('Mia M.');
+    c.saveApplicant();
+    const req = http.expectOne(url('/applicant'));
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({ email: 'mia@stupa.de', name: 'Mia M.' });
+    req.flush({ email: 'mia@stupa.de', name: 'Mia M.', anonymized: false });
+    expect(c.applicantOpen()).toBe(false);
+    expect(cmp.app()?.applicant?.email).toBe('mia@stupa.de');
+    expect(success).toHaveBeenCalledWith('Antragstellende Person aktualisiert.');
+    http.verify();
+  });
+
+  it('reads the 409 of an anonymized applicant as its own message', async () => {
+    const { http, detectChanges, toast, cmp } = await setup();
+    flushAll(http);
+    detectChanges();
+    flushAttachments(http);
+    const error = jest.spyOn(toast, 'error');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = cmp as any;
+    c.openApplicantDialog();
+    c.applicantEmail.set('back@stupa.de');
+    c.saveApplicant();
+    http.expectOne(url('/applicant')).flush(null, { status: 409, statusText: 'Conflict' });
+    expect(error).toHaveBeenCalledWith(
+      'Die Daten sind anonymisiert und lassen sich nicht wiederherstellen.',
+    );
+    expect(c.applicantOpen()).toBe(true);
+    http.verify();
+  });
+
+  it('blocks the save without an email and closes the dialog on cancel', async () => {
+    const { http, detectChanges, toast, cmp } = await setup();
+    flushAll(http);
+    detectChanges();
+    flushAttachments(http);
+    const success = jest.spyOn(toast, 'success');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = cmp as any;
+    c.openApplicantDialog();
+    c.applicantEmail.set('   ');
+    expect(c.canSaveApplicant()).toBe(false);
+    c.saveApplicant();
+    c.closeApplicantDialog();
+    expect(c.applicantOpen()).toBe(false);
+    expect(success).not.toHaveBeenCalled();
+    http.verify();
+  });
+
+  it('toasts a generic failure when the applicant patch breaks', async () => {
+    const { http, detectChanges, toast, cmp } = await setup();
+    flushAll(http);
+    detectChanges();
+    flushAttachments(http);
+    const error = jest.spyOn(toast, 'error');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = cmp as any;
+    c.openApplicantDialog();
+    c.saveApplicant();
+    http.expectOne(url('/applicant')).flush(null, { status: 500, statusText: 'Server Error' });
+    expect(error).toHaveBeenCalledWith('Speichern fehlgeschlagen.');
     http.verify();
   });
 

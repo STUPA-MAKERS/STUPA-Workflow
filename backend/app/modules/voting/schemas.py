@@ -45,6 +45,25 @@ class VoteCreate(_CamelModel):
         return self
 
 
+class VoteUpdate(_CamelModel):
+    """``PATCH /votes/{id}`` - correct a vote that is still a draft.
+
+    An omitted or null field stays unchanged. The service re-checks the
+    percent-quorum rule against the merged state, so a patch cannot leave the
+    vote fail-open.
+    """
+
+    config: VoteConfig | None = None
+    eligible_group: str | None = Field(default=None, alias="eligibleGroup", min_length=1)
+    question: str | None = None
+    eligible_count: int | None = Field(default=None, alias="eligibleCount", ge=0)
+    opens_state_id: UUID | None = Field(default=None, alias="opensStateId")
+    closes_at: datetime | None = Field(default=None, alias="closesAt")
+    result_branch_transition_id: UUID | None = Field(
+        default=None, alias="resultBranchTransitionId"
+    )
+
+
 class BallotIn(_CamelModel):
     """``POST /votes/{id}/ballot`` - cast a vote (``choice`` in ``config.options``).
 

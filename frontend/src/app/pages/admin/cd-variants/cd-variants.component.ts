@@ -29,7 +29,9 @@ import {
   type CdLogoSlot,
   type CdVariant,
   type CdVariantLogo,
+  MAX_CD_LOGOS_PER_VARIANT,
   MAX_CD_LOGO_BYTES,
+  MAX_CD_LOGO_TOTAL_BYTES,
   VENDORED_LOGO_NAMES,
   slugify,
 } from '../admin.models';
@@ -63,14 +65,17 @@ function errorStatus(err: unknown): number {
   return 0;
 }
 
+/** Machine code of a problem+json body, or '' when the error carries none. */
+function errorCode(err: unknown): string {
+  const code = (err as { error?: { code?: unknown } } | null)?.error?.code;
+  return typeof code === 'string' ? code : '';
+}
+
 /**
  * Corporate-design variants: the logo sets a Gremium renders its documents with.
  *
- * A variant carries no color and no font. It only holds an ordered list of logos per
- * slot (title page, page footer) on top of a pytex base variant. A logo is either a
- * name that pytex ships or a file an admin uploaded. Create, edit and "add a logo" all
- * run in a dialog. The key is a slug that the name generates, and it is immutable after
- * the create, because the renderer refers to it.
+ * A logo is either a name pytex ships or an uploaded file. The key is a generated
+ * slug and immutable after the create, because the renderer refers to it.
  */
 @Component({
   selector: 'app-admin-cd-variants',
@@ -122,6 +127,8 @@ export class AdminCdVariantsComponent {
   readonly slots = CD_LOGO_SLOTS;
   readonly accept = CD_LOGO_ACCEPT;
   readonly maxMb = Math.round(MAX_CD_LOGO_BYTES / (1024 * 1024));
+  readonly maxLogos = MAX_CD_LOGOS_PER_VARIANT;
+  readonly maxTotalMb = Math.round(MAX_CD_LOGO_TOTAL_BYTES / (1024 * 1024));
 
   readonly baseOptions = computed<SelectOption[]>(() =>
     CD_BASE_VARIANTS.map((v) => ({ value: v, label: this.baseLabel(v) })),
@@ -265,7 +272,7 @@ export class AdminCdVariantsComponent {
     this.formError.set(null);
     const id = this.editingId();
     const request = id
-      ? this.api.updateCdVariant(id, { name: f.name.trim(), baseVariant: f.baseVariant })
+      ? this.api.updateCdVariant(id, { name: f.name.trim() })
       : this.api.createCdVariant({
           key: f.key,
           name: f.name.trim(),
@@ -282,8 +289,12 @@ export class AdminCdVariantsComponent {
       },
       error: (err: unknown) => {
         this.saving.set(false);
+        // Only the create carries a key, so only there can a 409 mean a taken key.
+        const conflict: TranslationKey = id
+          ? 'admin.cdVariants.conflict'
+          : 'admin.cdVariants.keyExists';
         const key: TranslationKey =
-          errorStatus(err) === 409 ? 'admin.cdVariants.keyExists' : 'admin.common.saveFailed';
+          errorStatus(err) === 409 ? conflict : 'admin.common.saveFailed';
         this.formError.set(key);
         this.toast.error(this.i18n.translate(key));
       },
@@ -311,8 +322,7 @@ export class AdminCdVariantsComponent {
       },
       error: (err: unknown) => {
         this.deleting.set(false);
-        // 409 = a Gremium still points at this variant. Name that reason, so the
-        // admin knows the delete needs a change on the Gremium first.
+        // 409 = a Gremium still points at this variant.
         const key: TranslationKey =
           errorStatus(err) === 409 ? 'admin.cdVariants.inUse' : 'admin.common.saveFailed';
         this.deleteError.set(key);
@@ -383,9 +393,12 @@ export class AdminCdVariantsComponent {
       error: (err: unknown) => {
         this.logoSaving.set(false);
         const status = errorStatus(err);
+        const code = errorCode(err);
         let key: TranslationKey = 'admin.common.saveFailed';
         if (status === 413) key = 'admin.cdVariants.logoTooLarge';
         else if (status === 415) key = 'admin.cdVariants.logoType';
+        else if (code === 'cd_logo_count_limit') key = 'admin.cdVariants.logoCountLimit';
+        else if (code === 'cd_logo_total_limit') key = 'admin.cdVariants.logoTotalLimit';
         this.logoError.set(key);
         this.toast.error(this.i18n.translate(key));
       },
@@ -401,6 +414,44 @@ export class AdminCdVariantsComponent {
           ),
         );
         this.toast.success(this.i18n.translate('admin.cdVariants.logoRemoved'));
+      },
+      error: () => this.toast.error(this.i18n.translate('admin.common.saveFailed')),
+    });
+  }
+
+  /** The slot a logo moves to: title and footer are the only two. */
+  otherSlot(slot: CdLogoSlot): CdLogoSlot {
+    return slot === 'title' ? 'footer' : 'title';
+  }
+
+  moveSlotLabel(slot: CdLogoSlot): string {
+    return this.i18n.translate('admin.cdVariants.moveToSlot', {
+      slot: this.slotLabel(this.otherSlot(slot)),
+    });
+  }
+
+  /** Move a logo to the other slot without re-uploading the file. */
+  moveLogoToSlot(variant: CdVariant, logo: CdVariantLogo): void {
+    const slot = this.otherSlot(logo.slot);
+    this.api.updateCdVariantLogo(logo.id, { slot }).subscribe({
+      next: (moved) => {
+        // The server renumbers both slots densely; mirror that instead of reloading.
+        this.variants.update((list) =>
+          list.map((v) => {
+            if (v.id !== variant.id) return v;
+            const source = this.logosOf(v, logo.slot).filter((l) => l.id !== logo.id);
+            const target = this.logosOf(v, slot);
+            return {
+              ...v,
+              logos: [
+                ...source.map((l, i) => ({ ...l, position: i })),
+                ...target.map((l, i) => ({ ...l, position: i })),
+                moved,
+              ],
+            };
+          }),
+        );
+        this.toast.success(this.i18n.translate('admin.cdVariants.logoMoved'));
       },
       error: () => this.toast.error(this.i18n.translate('admin.common.saveFailed')),
     });

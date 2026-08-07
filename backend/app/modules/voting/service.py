@@ -41,6 +41,7 @@ from app.modules.voting.schemas import (
     VoteClosed,
     VoteCreate,
     VoteOut,
+    VoteUpdate,
 )
 from app.shared.config_schemas import VoteConfig
 from app.shared.errors import ConflictError, ForbiddenError, NotFoundError, ValidationProblem
@@ -104,8 +105,7 @@ class VotingService:
     async def _ballot_count(self, vote_id: UUID) -> int:
         """Count every recorded participation of a vote, open and secret.
 
-        The ``voted_marker`` rows count too. A secret vote splits the identity
-        from the choice, so the marker is the only trace that somebody voted.
+        A secret vote leaves only a ``voted_marker``, so those rows count too.
         """
         total = 0
         for model in (Ballot, SecretBallot, VotedMarker):
@@ -119,16 +119,8 @@ class VotingService:
     async def delete_standalone(self, vote_id: UUID, *, actor: str) -> None:
         """Delete a standalone application-bound vote that never ran.
 
-        The vote must still be ``draft`` and must hold no ballot. Anything
-        further along stays with ``cancel``: an opened vote is part of the
-        record of the Gremium, and its result may already have fired a flow
-        branch. A vote that belongs to a meeting is not reachable here. That
-        one has its own route, ``DELETE /meetings/{id}/votes/{id}``, with the
-        meeting-scoped ``canManageVotes`` check. Duplicating it here would give
-        a second, weaker path to the same row.
-
-        The caller (router) runs the gremium-scoped ``vote.manage`` check, like
-        open, close and cancel.
+        A meeting-bound vote stays with ``DELETE /meetings/{id}/votes/{id}``,
+        which applies the meeting-scoped check. The caller runs ``vote.manage``.
 
         Raises:
             NotFoundError: No vote has this id (404).
@@ -351,6 +343,81 @@ class VotingService:
             vote, config, await self._tally_out(vote, config, empty, vote.eligible_count or 0)
         )
 
+    async def update(self, vote_id: UUID, payload: VoteUpdate, *, actor: str) -> VoteOut:
+        """Correct a draft vote that holds no ballot.
+
+        Past ``draft`` the question and the rules are part of the recorded round.
+        An omitted field stays unchanged. Unlike ``delete_standalone`` this also
+        serves a meeting-bound vote: no meeting-scoped PATCH exists, and
+        ``assert_can_manage_vote`` already resolves the gremium of the meeting.
+
+        Raises:
+            NotFoundError: No vote has this id (404).
+            ConflictError: The vote is no longer a draft, or it already holds
+                ballots (409).
+            ValidationProblem: The merged state configures a percent quorum
+                without an eligible-voter count (422).
+        """
+        vote = await self._get_vote(vote_id)
+        if vote.status != "draft":
+            raise ConflictError(
+                "Only a vote that never opened can be edited; cancel it instead.",
+                code="vote_not_draft",
+            )
+        if await self._ballot_count(vote_id) > 0:
+            raise ConflictError(
+                "This vote already holds ballots and cannot be edited.",
+                code="vote_has_ballots",
+            )
+        config = payload.config or self._config(vote)
+        eligible_count = (
+            vote.eligible_count if payload.eligible_count is None else payload.eligible_count
+        )
+        if (
+            config.quorum is not None
+            and config.quorum.type == "percent"
+            and eligible_count is None
+        ):
+            raise ValidationProblem(
+                "eligibleCount is required when a percent quorum is configured.",
+                errors=[{"field": "eligibleCount", "msg": "required for a percent quorum"}],
+            )
+
+        if payload.config is not None:
+            vote.config = payload.config.model_dump(by_alias=True)
+        if payload.eligible_group is not None:
+            vote.eligible_group = payload.eligible_group
+        if payload.question is not None:
+            vote.question = payload.question
+        if payload.eligible_count is not None:
+            vote.eligible_count = payload.eligible_count
+        if payload.opens_state_id is not None:
+            vote.opens_state_id = payload.opens_state_id
+        if payload.closes_at is not None:
+            vote.closes_at = payload.closes_at
+        if payload.result_branch_transition_id is not None:
+            vote.result_branch_transition_id = payload.result_branch_transition_id
+
+        await audit_record(
+            self.session,
+            actor=actor,
+            action=AuditAction.VOTE_UPDATE,
+            target_type="vote",
+            target_id=str(vote_id),
+            data={
+                "fields": sorted(
+                    VoteUpdate.model_fields[name].alias or name
+                    for name in payload.model_fields_set
+                )
+            },
+        )
+        await self.session.flush()
+        await self.session.commit()
+        empty = {opt: 0 for opt in config.options}
+        return self._to_out(
+            vote, config, await self._tally_out(vote, config, empty, vote.eligible_count or 0)
+        )
+
     async def open(self, vote_id: UUID, *, now: datetime) -> VoteOut:
         """Move the vote from ``draft`` to ``open`` and open the time window.
 
@@ -526,8 +593,6 @@ class VotingService:
         Raises:
             ForbiddenError: The principal cannot view this vote.
         """
-        if "admin" in principal.roles:
-            return
         if vote.meeting_id is not None:
             from app.modules.livevote.service import MeetingService
 
@@ -578,7 +643,8 @@ class VotingService:
 
         The check is fail-closed and gremium-scoped, symmetric to
         ``assert_can_read``. It covers create, open, close and cancel. Access goes to
-        an admin or to a holder of the GLOBAL ``vote.manage`` permission. A gremium
+        a holder of the GLOBAL ``vote.manage`` permission, which the admin role also
+        holds and an out-of-scope OAuth token does not. A gremium
         role with ``vote.manage`` for the gremium of the vote also grants access. The
         last case works like ``MeetingService.can_manage_votes``. It unblocks a
         legitimate per-gremium manager. At the same time it stops an org-wide
@@ -588,8 +654,6 @@ class VotingService:
         Raises:
             ForbiddenError: The principal cannot manage this vote.
         """
-        if "admin" in principal.roles:
-            return
         if principal.has("vote.manage"):
             return
         gremium_id = await self._vote_gremium_id(

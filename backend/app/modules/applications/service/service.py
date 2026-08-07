@@ -8,12 +8,14 @@ exactly this class. The implementation lives in the ops classes:
 * `reads.ReadOps`: detail view, pinned effective form, status timeline
 * `listing.ListingOps`: filtered listing, Gremium scope, tasks, name maps
 * `comments.CommentOps`: internal and public comments
+* `applicant.ApplicantOps`: correction of the applicant name and email
 * `anonymize.AnonymizeOps`: GDPR anonymization
 """
 
 from __future__ import annotations
 
 from app.modules.applications.service.anonymize import AnonymizeOps
+from app.modules.applications.service.applicant import ApplicantOps
 from app.modules.applications.service.comments import CommentOps
 from app.modules.applications.service.create import CreateOps
 from app.modules.applications.service.edits import EditOps
@@ -27,6 +29,7 @@ class ApplicationsService(
     ReadOps,
     ListingOps,
     CommentOps,
+    ApplicantOps,
     AnonymizeOps,
 ):
     """DB-backed application operations, bound to one `AsyncSession`."""

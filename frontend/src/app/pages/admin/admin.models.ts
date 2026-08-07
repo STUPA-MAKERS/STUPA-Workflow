@@ -215,8 +215,6 @@ export interface GremiumUpdateBody {
 }
 
 // Corporate-design variants — mirror of `admin/cd_logos.py` and the CD schemas.
-// A variant only controls the logos of a rendered document. It carries no color
-// and no font.
 
 /** pytex document shape a variant builds on. */
 export type CdBaseVariant = 'report' | 'protocol';
@@ -240,9 +238,13 @@ export const VENDORED_LOGO_NAMES: readonly string[] = [
 ] as const;
 
 /** Types the server accepts for an uploaded logo (`ALLOWED_CD_LOGO_MIME`). */
-export const CD_LOGO_ACCEPT = 'image/png,image/jpeg,image/webp,image/svg+xml,application/pdf';
+export const CD_LOGO_ACCEPT = 'image/png,image/jpeg,image/webp,application/pdf';
 /** Size cap of an uploaded logo (`MAX_CD_LOGO_BYTES`). */
 export const MAX_CD_LOGO_BYTES = 2 * 1024 * 1024;
+/** Count cap of the uploaded logos of one variant (`MAX_CD_LOGOS_PER_VARIANT`). */
+export const MAX_CD_LOGOS_PER_VARIANT = 8;
+/** Aggregate size cap of the uploaded logos of one variant (`MAX_CD_LOGO_TOTAL_BYTES`). */
+export const MAX_CD_LOGO_TOTAL_BYTES = 3 * 1024 * 1024;
 
 /** Key pattern of a CD variant (`CD_VARIANT_KEY_PATTERN`). The key is a slug. */
 export const CD_VARIANT_KEY_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -282,10 +284,15 @@ export interface CdVariantCreateBody {
   baseVariant: CdBaseVariant;
 }
 
-/** Body for `PATCH /admin/cd-variants/{id}`. The key is immutable (409). */
+/** Body for `PATCH /admin/cd-variants/{id}`. Key and base variant are create-only. */
 export interface CdVariantUpdateBody {
   name?: string;
-  baseVariant?: CdBaseVariant;
+}
+
+/** Body for `PATCH /admin/cd-variant-logos/{id}` — move only, never the bytes. */
+export interface CdVariantLogoUpdateBody {
+  slot?: CdLogoSlot;
+  position?: number;
 }
 
 /** Name → URL slug (auto-generated). */
@@ -387,9 +394,7 @@ export interface RoleAssignmentInput {
 /**
  * Patch of an existing assignment (`PATCH /admin/role-assignments/{id}`).
  *
- * Every field is optional and `null` means "do not touch". The route therefore
- * cannot clear a validity window back to open-ended. The UI says so.
- * `principalId` is not patchable: an assignment never moves to another user.
+ * `null` means "do not touch", so a validity window cannot be cleared here.
  */
 export interface RoleAssignmentPatch {
   roleId?: Uuid;
@@ -538,9 +543,7 @@ export type WebhookDeliveryState = 'never' | 'pending' | 'sent' | 'dead';
 /**
  * Delivery diagnostics of one webhook (`GET /admin/webhooks/delivery-status`).
  *
- * The backend reduces the newest `webhook_delivery` row to a coarse state plus a
- * coarse reason class. It sends no resolved IP, no host topology and no response
- * body, so an operator can diagnose a mistyped or internal target without a leak.
+ * Coarse state plus reason class only: no resolved IP, no host topology, no body.
  */
 export interface WebhookDeliveryStatus {
   webhookId: Uuid;
@@ -600,14 +603,11 @@ export interface DeadlinePolicy {
 }
 
 /**
- * One live OAuth grant (agent/MCP token pair) of any principal — the admin view of
+ * One live OAuth grant (agent/MCP token pair) of any principal —
  * `GET /admin/oauth-grants` (P `admin.users`).
  *
- * The server resolves the owner to a name, so the UI never renders an id.
- * `principalName` is `null` when the owner carries neither a display name nor an
- * email; the page then shows a localized placeholder. `principalId` exists for the
- * filter and for a deep link only, never for display. The item holds no token and no
- * token hash.
+ * Holds no token and no token hash. `principalId` is for the filter and a deep
+ * link, never for display.
  */
 export interface OAuthGrantAdmin {
   id: Uuid;

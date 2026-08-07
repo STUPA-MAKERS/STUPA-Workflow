@@ -127,13 +127,10 @@ def intervals_overlap(
 def _parse_dt(value: str | None) -> datetime | None:
     """Parse a term bound into a tz-aware UTC ``datetime``. Empty means open.
 
-    A naive input counts as UTC, so a term compares correctly against
-    ``datetime.now(UTC)`` in the RBAC resolver.
+    A naive input counts as UTC.
 
     Raises:
-        ValidationProblem: The value is no ISO-8601 datetime. Without this the
-            request would end as an unhandled ``ValueError`` and a 500, instead
-            of problem+json (422).
+        ValidationProblem: The value is no ISO-8601 datetime (422).
     """
     if value is None or value == "":
         return None
@@ -367,11 +364,9 @@ class GremiumRoleService:
     ) -> None:
         """Check the overlap invariant for one (principal, gremium) pair.
 
-        This Python check is only a fast path with a clear error message. The
-        EXCLUDE constraint ``ex_gremium_membership_no_overlap`` stays the
-        authoritative guard and closes the TOCTOU gap on parallel writes.
-        ``exclude_id`` leaves the row under edit out of the comparison, so a
-        patch never conflicts with itself.
+        Only a fast path with a clear message; ``ex_gremium_membership_no_overlap``
+        stays the authoritative guard. ``exclude_id`` leaves the row under edit
+        out, so a patch never conflicts with itself.
 
         Raises:
             ConflictError: Another term of this member overlaps (409).
@@ -411,10 +406,8 @@ class GremiumRoleService:
     ) -> GremiumMembershipOut:
         """Change the role or the term of office of a membership.
 
-        The member and the Gremium stay immutable. A new role must belong to the
-        same Gremium. The overlap invariant applies exactly as on the create: a
-        bad term gives 422 and an overlap with another term of the same member
-        gives 409, from the Python fast path or from the EXCLUDE constraint.
+        The member and the Gremium stay immutable; a new role must belong to the
+        same Gremium.
 
         Raises:
             NotFoundError: The membership or the new role does not exist (404).
@@ -444,9 +437,8 @@ class GremiumRoleService:
             row.gremium_role_id = payload.gremium_role_id
         row.valid_from = new_from
         row.valid_until = new_until
-        # The EXCLUDE constraint fires on the UPDATE flush, not on the commit. A
-        # concurrent write therefore surfaces here. Guard the flush, the audit
-        # and the commit together and answer 409 instead of 500.
+        # The EXCLUDE constraint fires on the UPDATE flush, so a concurrent write
+        # surfaces here and must become a 409, not a 500.
         try:
             await self.session.flush()
             await self._audit(actor, "gremium_membership", row.id)

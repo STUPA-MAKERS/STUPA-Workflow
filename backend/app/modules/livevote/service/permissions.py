@@ -70,7 +70,8 @@ class PermissionOps(MeetingServiceBase):
         of this meeting that names the principal also passes. The last case covers an
         external substitute.
         """
-        if "admin" in principal.roles:
+        # `has` applies the OAuth scope cap; `vote.cast` is in no scope, so no agent votes.
+        if "admin" in principal.roles and principal.has("vote.cast"):
             return True
         if meeting.gremium_id in await gremium_ids_with_permission(
             self.session, principal.sub, "vote.cast"
@@ -151,11 +152,7 @@ class PermissionOps(MeetingServiceBase):
         Returns:
             The visible gremium ids, or `None` for all gremien.
         """
-        if (
-            "admin" in principal.roles
-            or principal.has("meeting.manage")
-            or principal.has("meeting.view_all")
-        ):
+        if principal.has("meeting.manage") or principal.has("meeting.view_all"):
             return None
         member = await gremium_member_ids(self.session, principal.sub)
         pool = await self._substitute_pool_gremium_ids(principal.sub)

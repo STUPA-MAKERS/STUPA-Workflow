@@ -1,9 +1,7 @@
 """Integration: an administrator revokes the agent token of another principal.
 
-The test drives the real route function against a real Postgres. It checks the whole
-chain: the grant appears in the admin list with a resolved owner name, the revoke writes
-the audit entry, and the access token stops authenticating at once. The last check runs
-through `app.deps.get_current_principal`, the function that every request uses.
+Drives the real routes against a real Postgres, up to the point where
+`app.deps.get_current_principal` refuses the revoked access token.
 """
 
 from __future__ import annotations
@@ -36,10 +34,8 @@ from app.shared.errors import NotFoundError
 
 pytestmark = pytest.mark.integration
 
-# A client id of this test alone. The integration suite shares one Postgres, and
-# `test_oauth_code_double_spend` asserts the number of token rows for the real MCP
-# client. Minting tokens under that id here would make an unrelated test fail. The
-# service takes any id, because only the router pins it to `oauth_mcp_client_id`.
+# Own client id: the suite shares one Postgres and `test_oauth_code_double_spend`
+# counts the token rows of the real MCP client.
 _CLIENT = "antragsplattform-mcp-admin-revoke-test"
 _REDIRECT = "http://127.0.0.1:7777/callback"
 _VERIFIER = "v" * 64

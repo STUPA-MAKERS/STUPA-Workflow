@@ -14,7 +14,10 @@
               }
             </p>
             @if (d.revocable) {
-              <div class="flex mt-1">
+              <div class="flex mt-1 gap-2">
+                <app-button variant="ghost" size="sm" [disabled]="busy()" (click)="openEdit(d)">
+                  {{ 'delegation.card.change' | t }}
+                </app-button>
                 <app-button variant="ghost" size="sm" [loading]="busy()" (click)="revoke(d)">
                   {{ 'delegation.card.revoke' | t }}
                 </app-button>
@@ -56,7 +59,7 @@
 
   <app-dialog
     [open]="dialogOpen()"
-    [title]="'delegation.dialog.title' | t"
+    [title]="(editingId() ? 'delegation.dialog.editTitle' : 'delegation.dialog.title') | t"
     [closeLabel]="'delegation.dialog.cancel' | t"
     (closed)="dialogOpen.set(false)"
   >
@@ -103,8 +106,8 @@
       <app-button size="sm" variant="ghost" (click)="dialogOpen.set(false)">
         {{ 'delegation.dialog.cancel' | t }}
       </app-button>
-      <app-button size="sm" [disabled]="!delegateId()" [loading]="busy()" (click)="create()">
-        {{ 'delegation.dialog.submit' | t }}
+      <app-button size="sm" [disabled]="!delegateId()" [loading]="busy()" (click)="submit()">
+        {{ (editingId() ? 'delegation.dialog.saveSubmit' : 'delegation.dialog.submit') | t }}
       </app-button>
     </div>
   </app-dialog>

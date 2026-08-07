@@ -94,8 +94,7 @@
   </div>
 </app-dialog>
 
-<!-- Delivery diagnosis. The backend keeps one condensed record per webhook: the state
-     of the newest attempt, its failure class, the HTTP code and the attempt count. -->
+<!-- Delivery diagnosis: one condensed record per webhook, the newest attempt only. -->
 <app-dialog
   [open]="statusDetail() !== null"
   [title]="'admin.webhook.delivery.title' | t"

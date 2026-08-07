@@ -89,7 +89,7 @@ async def update_meeting(meeting_id: str, patch: S.MeetingPatch) -> dict:
     """Patch a meeting.
 
     The fields are `status` (planned, live or closed), `date`, `startTime`,
-    `protokollantId` and `activeApplicationId`. Requires meeting.manage.
+    `endTime`, `protokollantId` and `activeApplicationId`. Requires meeting.manage.
     """
     return await api().patch(f"/meetings/{meeting_id}", json=dump_patch(patch))
 

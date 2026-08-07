@@ -1,14 +1,7 @@
 """Database invariants of the corporate-design tables on a real Postgres 16.
 
-These are the rules that only the database can hold. The service checks them
-too, but the constraint is the last line: no code path, no migration and no
-manual SQL can write a broken row.
-
-* `ck_cd_variant_logo_source` — a logo is EITHER vendored OR uploaded.
-* `ck_cd_variant_logo_slot` and `ck_cd_variant_base_variant` — closed value sets.
-* `fk_gremium_cd_variant_id_cd_variant` is RESTRICT — a variant that a Gremium
-  still uses cannot be deleted, so the Gremium is never orphaned.
-* The seed reproduces the five variants of before with vendored logos only.
+Covers the rules only the database can hold: the exactly-one-of logo source, the
+closed value sets, the RESTRICT FK from `gremium`, and the seeded variants.
 """
 
 from __future__ import annotations
@@ -172,13 +165,7 @@ def test_old_free_text_column_is_gone(engine: Engine) -> None:
 
 
 def test_upgrade_from_an_installed_database(engine: Engine) -> None:
-    """Drive the branch that the normal chain never reaches.
-
-    On a fresh database `0001_baseline` creates the two tables from the model
-    metadata and `0002_seed` writes the five rows, so the raw DDL of the revision
-    is a no-op there. An installed database has neither. This test rebuilds that
-    state — free-text column back, tables gone — and then runs `_UPGRADE`.
-    """
+    """Run `_UPGRADE` against a rebuilt pre-revision schema, where the DDL is no no-op."""
     import importlib.util
     from pathlib import Path
 
@@ -224,8 +211,7 @@ def test_upgrade_from_an_installed_database(engine: Engine) -> None:
                 "WHERE table_name = 'gremium' AND column_name = 'cd_variant')"
             )
         ).scalar_one()
-    # Both slots of every variant survive. A per-logo guard would have kept the
-    # title row only.
+    # Both slots of every variant survive, not only the title row.
     assert [tuple(r) for r in logos] == [
         ("asta", "footer", "ASTA"),
         ("asta", "title", "ASTA"),

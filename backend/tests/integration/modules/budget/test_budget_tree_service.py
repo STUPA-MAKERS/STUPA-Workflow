@@ -21,18 +21,19 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import Engine
+from sqlalchemy import Engine, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.modules.admin.models import ApplicationType, Gremium
 from app.modules.applications.models import Application
 from app.modules.budget.tree.service import BudgetTreeService
-from app.modules.budget.tree_models import Budget
+from app.modules.budget.tree_models import Budget, BudgetAllocation, BudgetExpense
 from app.modules.budget.tree_schemas import (
     AllocationSet,
     BudgetNodeCreate,
     BudgetNodeUpdate,
     ExpenseCreate,
+    ExpenseUpdate,
     FiscalYearCreate,
     InvoiceCreate,
     TransferCreate,
@@ -176,6 +177,90 @@ async def test_transfer(session: AsyncSession) -> None:
     await svc.delete_expense(transfer.expense_id)
     page = await svc.list_expenses_paged(budget_id=top.id, fiscal_year_id=fy.id)
     assert not [e for e in page.items if e.transfer_id == transfer.transfer_id]
+
+
+async def test_transfer_leg_amount_is_readonly(session: AsyncSession) -> None:
+    """A single leg cannot move on its own, or the pair drifts apart."""
+    svc = BudgetTreeService(session)
+    g = await _gremium(session)
+    top = await svc.create_node(BudgetNodeCreate(key=f"TL{_suffix()}", name="Top", gremiumId=g.id))
+    a = await svc.create_node(BudgetNodeCreate(key="01", name="A", parentId=top.id))
+    b = await svc.create_node(BudgetNodeCreate(key="02", name="B", parentId=top.id))
+    fy = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=2026))
+    transfer = await svc.create_transfer(
+        TransferCreate(
+            fromBudgetId=a.id, toBudgetId=b.id, fiscalYearId=fy.id,
+            amount=Decimal("100"), description="Umbuchung",
+        ),
+        actor="tester",
+    )
+
+    with pytest.raises(ConflictError) as ei:
+        await svc.update_expense(transfer.expense_id, ExpenseUpdate(amount=Decimal("500")))
+    assert ei.value.code == "transfer_leg_readonly"
+
+    with pytest.raises(ConflictError):
+        await svc.update_expense(transfer.expense_id, ExpenseUpdate(budgetId=b.id))
+
+    leg = await session.get(BudgetExpense, transfer.expense_id)
+    assert leg is not None and leg.amount == Decimal("100") and leg.budget_id == a.id
+
+
+async def test_list_transfers_total_matches_reachable_rows(session: AsyncSession) -> None:
+    """A source leg without its income row drops out of the rows and out of `total`."""
+    svc = BudgetTreeService(session)
+    g = await _gremium(session)
+    top = await svc.create_node(BudgetNodeCreate(key=f"TC{_suffix()}", name="Top", gremiumId=g.id))
+    a = await svc.create_node(BudgetNodeCreate(key="01", name="A", parentId=top.id))
+    b = await svc.create_node(BudgetNodeCreate(key="02", name="B", parentId=top.id))
+    fy = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=2026))
+    transfer = await svc.create_transfer(
+        TransferCreate(
+            fromBudgetId=a.id, toBudgetId=b.id, fiscalYearId=fy.id,
+            amount=Decimal("100"), description="Umbuchung",
+        ),
+        actor="tester",
+    )
+    page = await svc.list_transfers_paged(transfer_id=transfer.transfer_id)
+    assert page.total == 1 and len(page.items) == 1
+
+    income = await session.get(BudgetExpense, transfer.income_id)
+    assert income is not None
+    await session.delete(income)
+    await session.commit()
+
+    page = await svc.list_transfers_paged(transfer_id=transfer.transfer_id)
+    assert page.total == 0 and page.items == []
+
+
+async def test_delete_allocation_unblocks_fiscal_year_delete(session: AsyncSession) -> None:
+    """An allocated fiscal year stays deletable: drop the allocation, then the year."""
+    svc = BudgetTreeService(session)
+    g = await _gremium(session)
+    top = await svc.create_node(BudgetNodeCreate(key=f"DQ{_suffix()}", name="Top", gremiumId=g.id))
+    child = await svc.create_node(BudgetNodeCreate(key="01", name="K", parentId=top.id))
+    fy = await svc.create_fiscal_year(top.id, FiscalYearCreate(year=2026))
+    await svc.set_allocation(top.id, fy.id, AllocationSet(allocated=Decimal("1000")))
+    await svc.set_allocation(child.id, fy.id, AllocationSet(allocated=Decimal("400")))
+
+    with pytest.raises(ConflictError) as ei:
+        await svc.delete_fiscal_year(top.id, fy.id)
+    assert ei.value.code == "fiscal_year_has_allocations"
+
+    # The parent still covers 400 of children, so its allocation cannot go first.
+    with pytest.raises(ValidationProblem):
+        await svc.delete_allocation(top.id, fy.id)
+
+    await svc.delete_allocation(child.id, fy.id)
+    await svc.delete_allocation(top.id, fy.id)
+    left = (
+        await session.execute(
+            select(BudgetAllocation.id).where(BudgetAllocation.fiscal_year_id == fy.id)
+        )
+    ).all()
+    assert left == []
+
+    await svc.delete_fiscal_year(top.id, fy.id)
 
 
 async def test_expense_actor_resolved_to_display_name(session: AsyncSession) -> None:

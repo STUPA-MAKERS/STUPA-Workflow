@@ -13,7 +13,7 @@ from app.modules.budget import tree_rules
 from app.modules.budget.tree.service_base import _ZERO, BudgetTreeServiceBase
 from app.modules.budget.tree_models import Budget, BudgetAllocation
 from app.modules.budget.tree_schemas import AllocationOut, AllocationSet
-from app.shared.errors import ValidationProblem
+from app.shared.errors import NotFoundError, ValidationProblem
 
 
 class AllocationOps(BudgetTreeServiceBase):
@@ -144,3 +144,48 @@ class AllocationOps(BudgetTreeServiceBase):
             fiscalYearId=fiscal_year_id,
             allocated=payload.allocated,
         )
+
+    async def delete_allocation(self, budget_id: UUID, fiscal_year_id: UUID) -> None:
+        """Remove the allocation of a cost center for one fiscal year.
+
+        A reset to 0 keeps the row. This is the only way to remove it, and it is
+        what frees a fiscal year for deletion.
+
+        Raises:
+            NotFoundError: The cost center, the fiscal year, or the allocation
+                does not exist (404).
+            ValidationProblem: The fiscal year belongs to another top-level
+                budget, or the children still hold allocations (422).
+        """
+        node = await self._get_node(budget_id)
+        fy = await self._get_fiscal_year(fiscal_year_id)
+        top = await self._top_level(node)
+        if fy.budget_id != top.id:
+            raise ValidationProblem(
+                "Fiscal year does not belong to this budget's top-level.",
+                errors=[{"field": "fiscalYearId", "msg": "wrong top-level budget"}],
+            )
+        await self._lock_budget(node.id)
+        alloc = await self._allocation(budget_id, fiscal_year_id)
+        if alloc is None:
+            raise NotFoundError(
+                f"budget {budget_id} has no allocation for fiscal year {fiscal_year_id}"
+            )
+        own_children = await self._children_alloc_sum(node.id, fiscal_year_id)
+        if tree_rules.parent_allocation_below_children(_ZERO, own_children):
+            raise ValidationProblem(
+                "Children still hold allocations from this budget.",
+                code="parent_allocation_below_children",
+                errors=[{"field": "allocated", "msg": "below children allocations"}],
+            )
+        await self._audit(
+            AuditAction.BUDGET_ALLOCATION_DELETE,
+            target_type="budget_allocation",
+            target_id=str(budget_id),
+            data={
+                "fiscalYearId": str(fiscal_year_id),
+                "previousAllocated": str(alloc.allocated),
+            },
+        )
+        await self.session.delete(alloc)
+        await self.session.commit()

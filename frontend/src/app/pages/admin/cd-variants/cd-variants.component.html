@@ -113,6 +113,16 @@
                           variant="ghost"
                           size="sm"
                           [iconOnly]="true"
+                          [ariaLabel]="moveSlotLabel(slot)"
+                          [attr.title]="moveSlotLabel(slot)"
+                          (click)="moveLogoToSlot($any(v), logo)"
+                        >
+                          <app-icon name="repeat" />
+                        </app-button>
+                        <app-button
+                          variant="ghost"
+                          size="sm"
+                          [iconOnly]="true"
                           [ariaLabel]="'admin.cdVariants.removeLogo' | t"
                           (click)="removeLogo($any(v), logo)"
                         >
@@ -158,8 +168,9 @@
     <app-select
       [label]="'admin.cdVariants.base' | t"
       [options]="baseOptions()"
-      [hint]="'admin.cdVariants.baseHint' | t"
+      [hint]="(editingId() ? 'admin.cdVariants.baseLocked' : 'admin.cdVariants.baseHint') | t"
       name="baseVariant"
+      [disabled]="editingId() !== null"
       [ngModel]="form().baseVariant"
       (ngModelChange)="patch('baseVariant', $event)"
     />
@@ -212,7 +223,7 @@
             [accept]="accept"
             (change)="onFileSelected(logoFile)"
           />
-          <p class="text-xs text-muted m-0">{{ 'admin.cdVariants.fileHint' | t: { mb: maxMb } }}</p>
+          <p class="text-xs text-muted m-0">{{ 'admin.cdVariants.fileHint' | t: { mb: maxMb, max: maxLogos, totalMb: maxTotalMb } }}</p>
         </div>
       }
       @if (logoError(); as err) {

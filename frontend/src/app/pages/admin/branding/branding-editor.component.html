@@ -1,14 +1,20 @@
-@if (draft(); as d) {
-  <section class="flex flex-col gap-5">
-    <app-page-header [title]="'admin.brand.title' | t">
-      <div actions class="inline-flex gap-2">
-        <span class="py-1 px-3 rounded-full text-xs font-semibold bg-surface-sunken text-muted">{{ 'admin.brand.version' | t: { n: version() } }}</span>
-        @if (hasDraftChanges()) {
-          <span class="py-1 px-3 rounded-full text-xs font-semibold bg-surface-sunken text-muted bg-warning-subtle text-warning">{{ 'admin.brand.draftDirty' | t }}</span>
-        }
-      </div>
-    </app-page-header>
+<!-- Outside the draft guard: the crumb has to survive loading and a failed request. -->
+<app-page-header [title]="'admin.brand.title' | t">
+  <div actions class="inline-flex gap-2">
+    @if (draft()) {
+      <span class="py-1 px-3 rounded-full text-xs font-semibold bg-surface-sunken text-muted">{{ 'admin.brand.version' | t: { n: version() } }}</span>
+      @if (hasDraftChanges()) {
+        <span class="py-1 px-3 rounded-full text-xs font-semibold bg-surface-sunken text-muted bg-warning-subtle text-warning">{{ 'admin.brand.draftDirty' | t }}</span>
+      }
+    }
+  </div>
+</app-page-header>
 
+@if (loadFailed()) {
+  <p class="br__alert" role="alert">{{ 'admin.brand.loadFailed' | t }}</p>
+  <app-button size="sm" variant="secondary" (click)="loadConfig()">{{ 'admin.common.retry' | t }}</app-button>
+} @else if (draft(); as d) {
+  <section class="flex flex-col gap-5">
     <p class="br__desc">{{ 'admin.brand.desc' | t }}</p>
 
     @if (linkErrors().length > 0) {

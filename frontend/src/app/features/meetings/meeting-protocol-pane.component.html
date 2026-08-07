@@ -18,8 +18,7 @@
       <a class="text-primary text-sm font-medium" [href]="proto.pdfUrl" target="_blank" rel="noopener">{{ 'meetings.protocol.pdf' | t }}</a>
     }
     @if (!proto.isLocked && meeting().canWrite) {
-      <!-- Only a draft may be discarded. The server answers 409 once the protocol
-           is final or renders, and the pane says so if the click races. -->
+      <!-- Only a draft may be discarded; a racing click gets a 409. -->
       <app-button
         variant="ghost"
         size="sm"

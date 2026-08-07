@@ -24,6 +24,7 @@ class AuditAction(StrEnum):
     CONFIG_REVERT = "config_revert"
     ROLE_CHANGE = "role_change"
     DELEGATION_GRANT = "delegation_grant"
+    DELEGATION_UPDATE = "delegation_update"
     DELEGATION_REVOKE = "delegation_revoke"
     DELEGATION_USE = "delegation_use"
     DELEGATION_SUBSTITUTE_ADD = "delegation_substitute_add"
@@ -38,17 +39,16 @@ class AuditAction(StrEnum):
     WEBHOOK_CONFIG = "webhook_config"
     ATTACHMENT_QUARANTINE = "attachment_quarantine"
     ATTACHMENT_DELETE = "attachment_delete"
-    # Application comment edited or removed in place. A comment keeps no version
-    # history, so the log is the only record that the text changed. ``data``
-    # carries the application id, the visibility and the author kind. It never
-    # carries the comment text, because a comment can hold PII.
+    # A comment keeps no version history, so ``data`` records the metadata of the
+    # change but never the text, which can hold PII.
     COMMENT_UPDATE = "comment_update"
     COMMENT_DELETE = "comment_delete"
-    # Draft protocol removed. A finalized protocol is a signed record and the
-    # route refuses to delete it.
     PROTOCOL_DELETE = "protocol_delete"
-    # Vote removed before it ever opened. A vote with ballots is not deletable.
     VOTE_DELETE = "vote_delete"
+    VOTE_UPDATE = "vote_update"
+    # Correction of the applicant name or email. ``data`` records which fields
+    # changed, never the old or the new value, which are PII.
+    APPLICANT_UPDATE = "applicant_update"
     # GDPR/PII: access (Art. 15), erasure/anonymization (Art. 17), retention
     # (Art. 5(1)(e)) plus the erasure-request queue. ``data`` carries only
     # id/email references and metadata, never raw PII values.
@@ -69,6 +69,7 @@ class AuditAction(StrEnum):
     BUDGET_NODE_DELETE = "budget_node_delete"
     BUDGET_FISCAL_YEAR_DELETE = "budget_fiscal_year_delete"
     BUDGET_ALLOCATION_SET = "budget_allocation_set"
+    BUDGET_ALLOCATION_DELETE = "budget_allocation_delete"
     BUDGET_EXPENSE_CREATE = "budget_expense_create"
     BUDGET_EXPENSE_UPDATE = "budget_expense_update"
     BUDGET_EXPENSE_DELETE = "budget_expense_delete"

@@ -11,6 +11,7 @@ import { ApiClient } from '@core/api/api-client.service';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
+import type { TranslationKey } from '@core/i18n/translations';
 import type {
   AgendaItem,
   Attendance,
@@ -27,10 +28,24 @@ import { MeetingAgendaService } from './meeting-agenda.service';
 import {
   FIXED_VOTE_OPTIONS,
   assembleProtocolMarkdown,
+  errorCode,
   errorDetail,
   liveOpenedVote,
   pickBeamerVote,
 } from './meetings-display.util';
+
+/** Server `code` of a protocol 409 to the message that explains it. */
+const PROTOCOL_CONFLICT: Readonly<Record<string, TranslationKey>> = {
+  protocol_finalized: 'meetings.protocol.deleteConflictFinal',
+  protocol_rendering: 'meetings.protocol.deleteConflictRendering',
+};
+const DEFAULT_KEY: TranslationKey = 'meetings.protocol.deleteConflict';
+
+/** Same codes on a write (save or finalize), where the wording differs. */
+const PROTOCOL_WRITE_CONFLICT: Readonly<Record<string, TranslationKey>> = {
+  protocol_finalized: 'meetings.protocol.conflictFinal',
+  protocol_rendering: 'meetings.protocol.conflictRendering',
+};
 
 /**
  * State and actions of the loaded meeting (detail route): meeting control,
@@ -419,15 +434,20 @@ export class MeetingSessionService implements OnDestroy {
         this.protocol.set(saved);
         this.doFinalize(saved.id);
       },
-      error: () => {
+      error: (err: unknown) => {
         this.finalizing.set(false);
-        this.toast.error(this.i18n.translate('meetings.toast.saveFailed'));
+        this.toast.error(this.i18n.translate(this.protocolWriteErrorKey(err, 'meetings.toast.saveFailed')));
       },
     });
   }
 
-  /** A draft protocol may be discarded. `isLocked` covers `rendering` and
-   *  `final`, and the server answers 409 for both. */
+  /** Message for a failed protocol write. A 409 names the exact lock. */
+  private protocolWriteErrorKey(err: unknown, fallback: TranslationKey): TranslationKey {
+    if ((err as { status?: number } | null)?.status !== 409) return fallback;
+    return PROTOCOL_WRITE_CONFLICT[errorCode(err)] ?? fallback;
+  }
+
+  /** A draft protocol may be discarded; `isLocked` covers `rendering` and `final`. */
   readonly canDeleteProtocol = computed(() => {
     const proto = this.protocol();
     return !!proto && !proto.isLocked && this.canWrite();
@@ -445,9 +465,7 @@ export class MeetingSessionService implements OnDestroy {
   /**
    * Discard the draft minutes (`DELETE /protocols/{id}`).
    *
-   * A race is real: another person can finalize between the render of the button
-   * and the click. The server then answers 409. Say what happened, and reload
-   * the protocol so that the pane shows the new state instead of a stale draft.
+   * A concurrent finalize answers 409; name it and reload the protocol.
    */
   doDeleteProtocol(): void {
     const proto = this.protocol();
@@ -465,11 +483,7 @@ export class MeetingSessionService implements OnDestroy {
         this.confirmDeleteProtocol.set(false);
         const status = (err as { status?: number }).status;
         if (status === 409) {
-          // The protocol left the draft state in the meantime. The 409 detail
-          // says whether it is final or still rendering.
-          const detail = errorDetail(err);
-          const base = this.i18n.translate('meetings.protocol.deleteConflict');
-          this.toast.error(detail ? `${base}: ${detail}` : base);
+          this.toast.error(this.i18n.translate(PROTOCOL_CONFLICT[errorCode(err)] ?? DEFAULT_KEY));
           this.refreshProtocol();
           return;
         }
@@ -495,6 +509,12 @@ export class MeetingSessionService implements OnDestroy {
       },
       error: (err: unknown) => {
         this.finalizing.set(false);
+        if ((err as { status?: number } | null)?.status === 409) {
+          const key = this.protocolWriteErrorKey(err, 'meetings.toast.finalizeFailed');
+          this.toast.error(this.i18n.translate(key));
+          this.refreshProtocol();
+          return;
+        }
         // Render and compile errors (400) carry a concrete reason. Show it.
         const detail = errorDetail(err);
         this.toast.error(

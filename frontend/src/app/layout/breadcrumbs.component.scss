@@ -1,6 +1,4 @@
-/* The host must be a block, so the bar takes the full width of the page header
-   that holds it. `app-page-header` owns the width and the outer spacing. This
-   component only draws the crumb row. */
+/* Block host: `app-page-header` owns the width, this component only draws the row. */
 :host {
   display: block;
 }

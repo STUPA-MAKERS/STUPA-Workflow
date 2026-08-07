@@ -18,7 +18,7 @@ from app.modules.auth.principal import Principal
 from app.modules.auth.rbac import vote_group_key
 from app.modules.flow.schemas import TransitionOut, TransitionResult
 from app.modules.voting import service as voting_service
-from app.modules.voting.schemas import VoteCreate
+from app.modules.voting.schemas import VoteCreate, VoteUpdate
 from app.modules.voting.service import VotingService, open_tally_revealed
 from app.shared.config_schemas import VoteConfig
 from app.shared.errors import (
@@ -724,10 +724,43 @@ async def test_absent_delegated_count_none_scalar_is_zero() -> None:
 
 
 # Object-level authorization lives in assert_can_read and get_scoped (#sec-audit).
-async def test_assert_can_read_admin_bypasses() -> None:
+async def test_assert_can_read_admin_without_meeting_passes() -> None:
     svc = VotingService(fake_session())
     admin = Principal(sub="a", roles=["admin"])
-    await svc.assert_can_read(_vote(meeting_id=uuid4()), admin)  # pyright: ignore[reportArgumentType]
+    await svc.assert_can_read(_vote(meeting_id=None), admin)  # pyright: ignore[reportArgumentType]
+
+
+# An OAuth scope caps an admin too. `Principal.has` applies the cap before the
+# admin bypass, so the guards must never read `roles` directly.
+_READ_SCOPE = frozenset({"application.read"})
+
+
+async def test_assert_can_read_admin_read_scope_still_reads() -> None:
+    svc = VotingService(fake_session())
+    admin = Principal(sub="a", roles=["admin"], scope_permissions=_READ_SCOPE)
+    await svc.assert_can_read(_vote(meeting_id=None), admin)  # pyright: ignore[reportArgumentType]
+
+
+async def test_assert_can_manage_admin_cookie_session_passes() -> None:
+    svc = VotingService(fake_session())
+    admin = Principal(sub="a", roles=["admin"])
+    await svc.assert_can_manage(_vote(meeting_id=None), admin)  # pyright: ignore[reportArgumentType]
+
+
+async def test_assert_can_manage_refuses_a_read_scoped_admin_token() -> None:
+    """A `read`-scoped agent token must not delete, open, close or cancel a vote."""
+    svc = VotingService(fake_session())
+    admin = Principal(sub="a", roles=["admin"], scope_permissions=_READ_SCOPE)
+    with pytest.raises(ForbiddenError):
+        await svc.assert_can_manage(_vote(meeting_id=None), admin)  # pyright: ignore[reportArgumentType]
+
+
+async def test_assert_can_manage_admin_with_votes_write_scope_passes() -> None:
+    svc = VotingService(fake_session())
+    admin = Principal(
+        sub="a", roles=["admin"], scope_permissions=frozenset({"vote.manage"})
+    )
+    await svc.assert_can_manage(_vote(meeting_id=None), admin)  # pyright: ignore[reportArgumentType]
 
 
 async def test_assert_can_read_sessionless_with_permission() -> None:
@@ -768,8 +801,7 @@ async def test_get_scoped_checks_then_returns_tally() -> None:
     assert out.tally.counts == {"yes": 1, "no": 0, "abstain": 0}
 
 
-# DELETE /votes/{id}: a standalone draft vote that never ran. Everything further
-# along stays with `cancel`, so the record keeps every vote that ever opened.
+# DELETE /votes/{id}: a standalone draft vote that never ran.
 
 
 async def test_delete_standalone_draft_ok() -> None:
@@ -836,3 +868,103 @@ async def test_delete_standalone_with_secret_marker_409() -> None:
     db.scalar_results = [0, 0, 2]
     with pytest.raises(ConflictError):
         await VotingService(db).delete_standalone(vote.id, actor="mgr")
+
+
+# PATCH /votes/{id}: draft-only correction, same guard as the delete.
+
+
+def _percent(**over: Any) -> dict[str, Any]:
+    return _config(quorum={"type": "percent", "value": 50}, **over)
+
+
+async def test_update_draft_applies_every_field() -> None:
+    from app.modules.audit.models import AuditEntry
+
+    vote = _vote(status="draft", question="typo", eligible_count=None)
+    db = fake_session(result(vote))
+    state_id, transition_id = uuid4(), uuid4()
+    closes = NOW + timedelta(days=1)
+    payload = VoteUpdate.model_validate(
+        {
+            "config": _percent(secret=True),
+            "eligibleGroup": "asta",
+            "question": "Wird der Antrag angenommen?",
+            "eligibleCount": 12,
+            "opensStateId": str(state_id),
+            "closesAt": closes.isoformat(),
+            "resultBranchTransitionId": str(transition_id),
+        }
+    )
+    out = await VotingService(db).update(vote.id, payload, actor="mgr")
+    assert vote.question == "Wird der Antrag angenommen?"
+    assert vote.eligible_group == "asta"
+    assert vote.eligible_count == 12
+    assert vote.opens_state_id == state_id
+    assert vote.closes_at == closes
+    assert vote.result_branch_transition_id == transition_id
+    assert out.secret is True
+    assert db.committed == 1
+    entries = [o for o in db.added if isinstance(o, AuditEntry)]
+    assert [e.action for e in entries] == ["vote_update"]
+    assert "eligibleGroup" in entries[0].data["fields"]
+
+
+async def test_update_with_an_empty_payload_changes_nothing() -> None:
+    vote = _vote(status="draft", question="keep", opens_state_id=None)
+    db = fake_session(result(vote))
+    out = await VotingService(db).update(vote.id, VoteUpdate(), actor="mgr")
+    assert vote.question == "keep"
+    assert vote.eligible_group == "stupa"
+    assert out.tally.counts == {"yes": 0, "no": 0, "abstain": 0}
+    assert db.committed == 1
+
+
+async def test_update_percent_quorum_reuses_the_stored_eligible_count() -> None:
+    vote = _vote(status="draft", eligible_count=10)
+    db = fake_session(result(vote))
+    payload = VoteUpdate.model_validate({"config": _percent()})
+    out = await VotingService(db).update(vote.id, payload, actor="mgr")
+    assert out.tally.eligible == 10
+
+
+async def test_update_percent_quorum_without_any_eligible_count_422() -> None:
+    # Fail-closed like the create: a percent quorum needs a roster denominator.
+    vote = _vote(status="draft", eligible_count=None)
+    db = fake_session(result(vote))
+    payload = VoteUpdate.model_validate({"config": _percent()})
+    with pytest.raises(ValidationProblem, match="eligibleCount"):
+        await VotingService(db).update(vote.id, payload, actor="mgr")
+    assert db.committed == 0
+
+
+async def test_update_count_quorum_needs_no_eligible_count() -> None:
+    vote = _vote(status="draft", eligible_count=None)
+    db = fake_session(result(vote))
+    payload = VoteUpdate.model_validate({"config": _config(quorum={"type": "count", "value": 3})})
+    out = await VotingService(db).update(vote.id, payload, actor="mgr")
+    assert out.tally.eligible == 0
+
+
+async def test_update_open_vote_409() -> None:
+    vote = _vote(status="open")
+    db = fake_session(result(vote))
+    with pytest.raises(ConflictError) as ei:
+        await VotingService(db).update(vote.id, VoteUpdate(), actor="mgr")
+    assert ei.value.code == "vote_not_draft"
+    assert db.committed == 0
+
+
+async def test_update_with_ballots_409() -> None:
+    vote = _vote(status="draft")
+    db = fake_session(result(vote))
+    db.scalar_results = [1, 0, 0]
+    with pytest.raises(ConflictError) as ei:
+        await VotingService(db).update(vote.id, VoteUpdate(), actor="mgr")
+    assert ei.value.code == "vote_has_ballots"
+    assert db.committed == 0
+
+
+async def test_update_unknown_404() -> None:
+    db = fake_session(result())
+    with pytest.raises(NotFoundError):
+        await VotingService(db).update(uuid4(), VoteUpdate(), actor="mgr")

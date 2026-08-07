@@ -69,10 +69,8 @@
   </aside>
 
   <div class="exp__main">
-    <!-- Bookings and transfers are two views of the same money. A transfer is
-         two bookings, so it appears in the bookings table as its two legs. Only
-         this tab shows it as ONE row with an identity, which is what an edit and
-         a delete need. -->
+    <!-- Two views of the same money: the bookings table shows a transfer as its
+         two legs, this tab as one row with an identity. -->
     <div class="exp__tabs" role="tablist" [attr.aria-label]="'expenses.title' | t">
       <app-button
         role="tab"
@@ -81,13 +79,16 @@
         size="sm"
         (click)="setTab('bookings')"
       >{{ 'expenses.tab.bookings' | t }}</app-button>
-      <app-button
-        role="tab"
-        [attr.aria-selected]="tab() === 'transfers'"
-        [variant]="tab() === 'transfers' ? 'primary' : 'ghost'"
-        size="sm"
-        (click)="setTab('transfers')"
-      >{{ 'expenses.tab.transfers' | t }}</app-button>
+      <!-- GET /budget-transfers needs budget.book; the route also admits budget.view. -->
+      @if (canManage()) {
+        <app-button
+          role="tab"
+          [attr.aria-selected]="tab() === 'transfers'"
+          [variant]="tab() === 'transfers' ? 'primary' : 'ghost'"
+          size="sm"
+          (click)="setTab('transfers')"
+        >{{ 'expenses.tab.transfers' | t }}</app-button>
+      }
     </div>
 
     @if (tab() === 'transfers') {
@@ -530,8 +531,7 @@
   </div>
 </app-dialog>
 
-<!-- Correct a transfer. The two cost centres are immutable on the server, so
-     they show read-only. A change of the pair is a new transfer. -->
+<!-- Correct a transfer; the cost centres are immutable, so they show read-only. -->
 <app-dialog [open]="editingTransfer() !== null" [title]="'expenses.transfers.editTitle' | t" [closeLabel]="'action.cancel' | t" (closed)="closeTransferEdit()">
   @if (editingTransfer(); as t) {
     <form class="flex flex-col gap-2" (submit)="saveTransferEdit($event)">

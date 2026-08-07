@@ -1,9 +1,9 @@
 """Delegations router.
 
-Member self-service for meeting-bound delegations. A member lists, creates and
-revokes the own delegations. A member also reads the meeting context with the
-deadline and the recipients, reads the vote status, and manages the substitute
-pool of a gremium.
+Member self-service for meeting-bound delegations. A member lists, creates,
+changes and revokes the own delegations. A member also reads the meeting context
+with the deadline and the recipients, reads the vote status, and manages the
+substitute pool of a gremium.
 
 The server is authoritative for RBAC. Every route needs a session. The service
 checks the domain rules: gates, deadline, recipient circle and chains. A holder
@@ -23,6 +23,7 @@ from app.deps import DbSession, Principal, SettingsDep, require_principal
 from app.modules.delegations.schemas import (
     DelegationCreate,
     DelegationOut,
+    DelegationUpdate,
     MeetingDelegationContext,
     RecipientOut,
     SubstituteCreate,
@@ -86,6 +87,33 @@ async def create_delegation(
     info = await meeting_delegation_mail_info(getattr(service, "session", None), out.id)
     pool = getattr(request.app.state, "arq_pool", None)
     background.add_task(mailer.delegation_changed, settings, info, granted=True, pool=pool)
+    return out
+
+
+@router.patch(
+    "/{delegation_id}",
+    response_model=DelegationOut,
+    responses=_errors(400, 401, 403, 404, 409, 422),
+)
+async def update_delegation(
+    delegation_id: UUID,
+    payload: DelegationUpdate,
+    service: ServiceDep,
+    principal: Member,
+    settings: SettingsDep,
+    background: BackgroundTasks,
+    request: Request,
+    mailer: AutoMailerDep,
+) -> DelegationOut:
+    """Change the recipient or the vote transfer while keeping the row identity."""
+    # The former recipient loses the delegation, so collect their mail data first.
+    before = await meeting_delegation_mail_info(getattr(service, "session", None), delegation_id)
+    out = await service.update(delegation_id, payload, principal)
+    after = await meeting_delegation_mail_info(getattr(service, "session", None), delegation_id)
+    pool = getattr(request.app.state, "arq_pool", None)
+    if before is not None and before.email != (after.email if after else None):
+        background.add_task(mailer.delegation_changed, settings, before, granted=False, pool=pool)
+    background.add_task(mailer.delegation_changed, settings, after, granted=True, pool=pool)
     return out
 
 

@@ -35,6 +35,7 @@ import { SelectComponent, type SelectOption } from '@stupa-makers/ui-kit';
 import { CardComponent } from '@stupa-makers/ui-kit';
 import { DialogComponent } from '@stupa-makers/ui-kit';
 import { IconComponent } from '@stupa-makers/ui-kit';
+import { InputComponent } from '@stupa-makers/ui-kit';
 import { ToastService } from '@stupa-makers/ui-kit';
 import {
   BudgetTreeApi,
@@ -96,6 +97,7 @@ const PDF_ERROR_KEYS: Record<string, TranslationKey> = {
     CardComponent,
     DialogComponent,
     IconComponent,
+    InputComponent,
     SelectComponent,
     CostCentreTreeComponent,
     AttachmentsPanelComponent,
@@ -126,19 +128,21 @@ export class ApplicationsDetailComponent implements OnDestroy {
   readonly visibility = signal<CommentVisibility>('public');
   readonly posting = signal(false);
 
-  // Edit and delete of one comment. Both run in a dialog. The server allows the
-  // author of the comment and a holder of `application.manage`. `isOwn` carries
-  // the same author check the server makes, so the UI offers nothing that gives
-  // a 403. Only the body changes. The visibility stays as written.
+  // Edit and delete of one comment: the author or `application.manage`, body only.
   readonly editingComment = signal<ApplicationComment | null>(null);
   readonly commentDraft = signal('');
   readonly savingComment = signal(false);
   readonly deletingComment = signal<ApplicationComment | null>(null);
   readonly removingComment = signal(false);
 
-  // PDF render. `POST /applications/{id}/pdf` starts an async job. The dialog
-  // polls `GET /jobs/{id}` until the job reaches `done` or `failed`, and it
-  // gives up after PDF_POLL_MAX tries instead of spinning forever.
+  // Correction of the applicant PII. The email is the magic-link target, so a
+  // typo locks the applicant out of their own application.
+  readonly applicantOpen = signal(false);
+  readonly applicantName = signal('');
+  readonly applicantEmail = signal('');
+  readonly savingApplicant = signal(false);
+
+  // PDF render: the dialog polls `GET /jobs/{id}` up to PDF_POLL_MAX times.
   readonly pdfOpen = signal(false);
   readonly pdfJob = signal<RenderJob | null>(null);
   /** True while a request is in flight or the next poll is scheduled. */
@@ -264,11 +268,7 @@ export class ApplicationsDetailComponent implements OnDestroy {
 
   private readonly router = inject(Router);
   readonly canManage = computed(() => this.auth.can('application.manage'));
-  /**
-   * Delete is irreversible and needs `application.delete` (#g9). An admin holds it
-   * through the role bypass. Any other role holds it through an explicit grant. The
-   * server gates on the same key.
-   */
+  /** Delete is irreversible and needs `application.delete` (#g9). */
   readonly canDelete = computed(() => this.auth.can('application.delete'));
   readonly fmt = formatFieldValue;
 
@@ -309,8 +309,7 @@ export class ApplicationsDetailComponent implements OnDestroy {
     this.error.set(false);
     this.editingComment.set(null);
     this.deletingComment.set(null);
-    // A render job belongs to one application. Drop it with the page state, so
-    // no poll of the previous application keeps running.
+    // Drop the job with the page state, so no poll of the old application survives.
     this.closePdf();
     this.pdfJob.set(null);
 
@@ -713,8 +712,49 @@ export class ApplicationsDetailComponent implements OnDestroy {
 
   // --- edit / delete of a comment -----------------------------------------
 
-  /** The author of the comment, or a manager, may change it. The server checks
-   *  the same rule, so no visible control ends in a 403. */
+  protected openApplicantDialog(): void {
+    const applicant = this.app()?.applicant;
+    this.applicantName.set(applicant?.name ?? '');
+    this.applicantEmail.set(applicant?.email ?? '');
+    this.applicantOpen.set(true);
+  }
+
+  protected closeApplicantDialog(): void {
+    this.applicantOpen.set(false);
+  }
+
+  protected canSaveApplicant(): boolean {
+    return !this.savingApplicant() && this.applicantEmail().trim().length > 0;
+  }
+
+  /** PATCH the applicant name and email. An anonymized applicant gives 409. */
+  protected saveApplicant(): void {
+    if (!this.canSaveApplicant()) return;
+    this.savingApplicant.set(true);
+    this.api
+      .updateApplicant(this.id, {
+        email: this.applicantEmail().trim(),
+        name: this.applicantName().trim(),
+      })
+      .subscribe({
+        next: (applicant) => {
+          this.savingApplicant.set(false);
+          this.applicantOpen.set(false);
+          this.app.update((a) => (a ? { ...a, applicant } : a));
+          this.toast.success(this.i18n.translate('applications.applicant.saved'));
+        },
+        error: (err: { status?: number }) => {
+          this.savingApplicant.set(false);
+          const key: TranslationKey =
+            err.status === 409
+              ? 'applications.applicant.anonymized'
+              : 'applications.applicant.saveFailed';
+          this.toast.error(this.i18n.translate(key));
+        },
+      });
+  }
+
+  /** The author of the comment, or a manager, may change it. */
   protected canEditComment(comment: ApplicationComment): boolean {
     return comment.isOwn || this.canManage();
   }
@@ -814,8 +854,7 @@ export class ApplicationsDetailComponent implements OnDestroy {
     });
   }
 
-  /** Take a job answer. An end state stops the poll. Anything else schedules
-   *  the next one, until the poll window runs out. */
+  /** Take a job answer: an end state stops the poll, anything else reschedules it. */
   private applyJob(job: RenderJob): void {
     this.pdfJob.set(job);
     if (job.status === 'done' || job.status === 'failed') {
@@ -850,6 +889,11 @@ export class ApplicationsDetailComponent implements OnDestroy {
 
   /** "Check again" after the poll gave up or a poll failed. */
   protected retryPdf(): void {
+    // A failed start leaves no job, so there is nothing to poll — ask for a new one.
+    if (!this.pdfJob()) {
+      this.startPdf();
+      return;
+    }
     this.pdfTries = 0;
     this.pollPdf();
   }

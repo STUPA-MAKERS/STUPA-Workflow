@@ -62,6 +62,7 @@ export class BrandingEditorComponent {
   protected readonly version = signal(0);
   protected readonly hasDraftChanges = signal(false);
   protected readonly draft = signal<Branding | null>(null);
+  protected readonly loadFailed = signal(false);
 
   protected readonly lang = computed(() => this.i18n.locale());
 
@@ -77,10 +78,14 @@ export class BrandingEditorComponent {
 
   /** Load the active branding and the draft, also after a version restore. */
   protected loadConfig(): void {
-    this.api.getSiteConfig().subscribe((cfg) => {
-      this.version.set(cfg.version);
-      this.hasDraftChanges.set(cfg.hasDraftChanges);
-      this.draft.set(cfg.draft);
+    this.loadFailed.set(false);
+    this.api.getSiteConfig().subscribe({
+      next: (cfg) => {
+        this.version.set(cfg.version);
+        this.hasDraftChanges.set(cfg.hasDraftChanges);
+        this.draft.set(cfg.draft);
+      },
+      error: () => this.loadFailed.set(true),
     });
   }
 

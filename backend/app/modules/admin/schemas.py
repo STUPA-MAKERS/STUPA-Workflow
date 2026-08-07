@@ -18,8 +18,6 @@ from app.shared.config_schemas import ComparisonOffers, EventName, FlowGraph
 from app.shared.i18n import I18nMap
 from app.shared.permissions import PERMISSION_CATALOGUE
 
-# A CD-variant key is a slug. It is the stable handle of the variant and never
-# changes after the create.
 CD_VARIANT_KEY_PATTERN = r"^[a-z0-9]+(?:-[a-z0-9]+)*$"
 
 
@@ -82,18 +80,32 @@ class CdVariantCreate(_CamelModel):
 
 
 class CdVariantUpdate(_CamelModel):
-    """Patch of a CD variant. ``key`` is immutable — a different value gives 409."""
+    """Patch of a CD variant. ``key`` is immutable — a different value gives 409.
+
+    ``baseVariant`` is create-only: the render paths pin the document shape per
+    document kind, so a later flip would change nothing but suggest otherwise.
+    """
 
     key: str | None = Field(default=None, max_length=64)
     name: str | None = Field(default=None, min_length=1, max_length=200)
-    base_variant: CdBaseVariant | None = Field(default=None, alias="baseVariant")
 
 
 class CdVariantLogoVendoredCreate(_CamelModel):
-    """Add a logo that pytex ships. No upload and no object storage involved."""
+    """Add a logo that pytex ships."""
 
     slot: LogoSlot
     vendored_name: VendoredLogoName = Field(alias="vendoredName")
+
+
+class CdVariantLogoUpdate(_CamelModel):
+    """Move one logo between slots or inside a slot. The bytes stay untouched.
+
+    An omitted ``position`` appends at the end of the target slot, and keeps the
+    current place when the slot does not change.
+    """
+
+    slot: LogoSlot | None = None
+    position: int | None = Field(default=None, ge=0)
 
 
 class CdVariantLogoReorder(_CamelModel):
@@ -230,10 +242,7 @@ class GremiumMembershipCreate(_CamelModel):
 class GremiumMembershipUpdate(_CamelModel):
     """Change the role or the term of office of one membership.
 
-    The member and the Gremium stay immutable. A different member or a
-    different Gremium is a different membership. Only the fields that the
-    payload sets change. ``validFrom`` or ``validUntil`` set to ``null`` opens
-    that end of the term.
+    Only the fields the payload sets change; ``null`` opens that end of the term.
     """
 
     gremium_role_id: UUID | None = Field(default=None, alias="gremiumRoleId")

@@ -21,6 +21,10 @@ const SCOPED_ASSIGN: RoleAssignment = {
   id: 'a-2', principalId: 'p-1', roleId: 'r-ref', gremiumId: 'g-1',
   grantedBy: 'bootstrap', validFrom: null, validUntil: null, delegateVoting: false,
 };
+const GLOBAL_REF_ASSIGN: RoleAssignment = {
+  id: 'a-3', principalId: 'p-4', roleId: 'r-ref', gremiumId: null,
+  grantedBy: 'bootstrap', validFrom: null, validUntil: null, delegateVoting: false,
+};
 
 const PRINCIPALS: AdminPrincipal[] = [
   {
@@ -29,6 +33,10 @@ const PRINCIPALS: AdminPrincipal[] = [
     assignments: [ADMIN_ASSIGN, SCOPED_ASSIGN],
   },
   { id: 'p-3', sub: 'kc|sam', email: null, displayName: 'Sam Neu', lastLogin: null, assignments: [] },
+  {
+    id: 'p-4', sub: 'kc|robin', email: 'robin@x.de', displayName: 'Robin Referent',
+    lastLogin: null, assignments: [GLOBAL_REF_ASSIGN],
+  },
 ];
 
 function makeAuth(sub: string | null, canManage = true) {
@@ -279,11 +287,12 @@ describe('UsersComponent (#70/#72/#73)', () => {
       ).not.toBeInTheDocument();
     });
 
-    it('shows an edit control per assigned role', async () => {
+    it('shows an edit control per editable assignment, never on the admin badge', async () => {
       await setup();
-      expect(
-        screen.getAllByRole('button', { name: /Zuweisung bearbeiten/ }).length,
-      ).toBeGreaterThan(0);
+      const labels = screen
+        .getAllByRole('button', { name: /Zuweisung bearbeiten/ })
+        .map((b) => b.getAttribute('aria-label'));
+      expect(labels).toEqual(['Zuweisung bearbeiten: Referent']);
     });
 
     it('prefills the dialog from the assignment and cuts the date to YYYY-MM-DD', async () => {
@@ -322,8 +331,7 @@ describe('UsersComponent (#70/#72/#73)', () => {
       inst.openEdit({ ...ADMIN_ASSIGN, validUntil: '2026-12-31T00:00:00Z' });
       inst.patchEdit({ roleId: 'r-ref', validUntil: '' });
       inst.saveEdit();
-      // No `validUntil` in the body: the route reads null as "do not touch",
-      // so sending it would be a silent no-op instead of a clear.
+      // No `validUntil` in the body: the route reads null as "do not touch".
       expect(api.updateRoleAssignment).toHaveBeenCalledWith('a-1', { roleId: 'r-ref' });
     });
 

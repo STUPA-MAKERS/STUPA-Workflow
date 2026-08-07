@@ -1,16 +1,8 @@
-@if (loading()) {
-  <p class="text-muted py-5" aria-live="polite">{{ 'applications.detail.loading' | t }}</p>
-} @else if (notFound()) {
-  <p class="text-muted py-5" role="alert">{{ 'applications.detail.notFound' | t }}</p>
-} @else if (error()) {
-  <p class="text-muted py-5 text-danger" role="alert">
-    {{ 'applications.detail.error' | t }}
-  </p>
-} @else if (app(); as application) {
-  <app-page-header [title]="title()">
-    <div actions class="det__ownerActions">
-      <!-- The PDF follows the read scope of the application: whoever sees this
-           page may render it. -->
+<!-- Outside the state chain: the crumb has to survive loading, 404 and error. -->
+<app-page-header [title]="app() ? title() : ('applications.detail.crumb' | t)">
+  <div actions class="det__ownerActions">
+    @if (app(); as application) {
+      <!-- The PDF follows the read scope of the application. -->
       <app-button variant="secondary" size="sm" [disabled]="pdfPolling()" (click)="startPdf()">
         <span class="inline-flex items-center gap-2">
           <app-icon name="document" [size]="15" />
@@ -31,11 +23,20 @@
           <app-button variant="danger" size="sm" (click)="confirmErase.set(true)">{{ 'applications.detail.eraseRequest' | t }}</app-button>
         }
       }
-    </div>
-  </app-page-header>
+    }
+  </div>
+</app-page-header>
 
-  <!-- Status, budget and the fact grid. They sit below the page header and keep
-       the body width of the center column. -->
+@if (loading()) {
+  <p class="text-muted py-5" aria-live="polite">{{ 'applications.detail.loading' | t }}</p>
+} @else if (notFound()) {
+  <p class="text-muted py-5" role="alert">{{ 'applications.detail.notFound' | t }}</p>
+} @else if (error()) {
+  <p class="text-muted py-5 text-danger" role="alert">
+    {{ 'applications.detail.error' | t }}
+  </p>
+} @else if (app(); as application) {
+  <!-- Status, budget and the fact grid, at the body width of the center column. -->
   <section class="det__summary">
     <div class="det__meta">
       @if (application.state) {
@@ -78,6 +79,18 @@
               {{ 'applications.detail.anonymized' | t }}
             } @else {
               {{ application.applicant.name || ('applications.detail.notProvided' | t) }}
+              @if (canManage()) {
+                <app-button
+                  variant="ghost"
+                  size="sm"
+                  [iconOnly]="true"
+                  [ariaLabel]="'applications.applicant.edit' | t"
+                  [attr.title]="'applications.applicant.edit' | t"
+                  (click)="openApplicantDialog()"
+                >
+                  <app-icon name="edit" />
+                </app-button>
+              }
             }
           </dd>
         </div>
@@ -419,8 +432,41 @@
   </div>
 </app-dialog>
 
-<!-- Comment edit. Only the body changes. The visibility stays as written, so a
-     public comment cannot silently turn internal after the applicant read it. -->
+<!-- Comment edit: the body only, so a public comment cannot turn internal. -->
+<app-dialog
+  [open]="applicantOpen()"
+  [title]="'applications.applicant.editTitle' | t"
+  [closeLabel]="'applications.detail.cancel' | t"
+  (closed)="closeApplicantDialog()"
+>
+  <div class="flex flex-col gap-4">
+    <app-input
+      [label]="'applications.detail.applicant' | t"
+      name="applicantName"
+      [ngModel]="applicantName()"
+      (ngModelChange)="applicantName.set($event)"
+    />
+    <app-input
+      [label]="'applications.detail.email' | t"
+      [hint]="'applications.applicant.emailHint' | t"
+      type="email"
+      [required]="true"
+      name="applicantEmail"
+      [ngModel]="applicantEmail()"
+      (ngModelChange)="applicantEmail.set($event)"
+    />
+  </div>
+  <div dialog-footer>
+    <app-button variant="ghost" size="sm" (click)="closeApplicantDialog()">{{ 'applications.detail.cancel' | t }}</app-button>
+    <app-button
+      size="sm"
+      [loading]="savingApplicant()"
+      [disabled]="!canSaveApplicant()"
+      (click)="saveApplicant()"
+    >{{ 'applications.detail.save' | t }}</app-button>
+  </div>
+</app-dialog>
+
 <app-dialog
   [open]="editingComment() !== null"
   [title]="'applications.comments.editTitle' | t"
@@ -464,8 +510,7 @@
   </div>
 </app-dialog>
 
-<!-- PDF render. The job runs in the worker, so the dialog polls it and shows
-     the real state: running, finished with a link, or failed with a reason. -->
+<!-- PDF render: the job runs in the worker, so the dialog polls it. -->
 <app-dialog
   [open]="pdfOpen()"
   [title]="'applications.pdf.title' | t"

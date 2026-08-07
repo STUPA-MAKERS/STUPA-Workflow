@@ -31,10 +31,13 @@ description: Hierarchical cost center budget tree with fiscal years, top-down al
 - `POST/PATCH/DELETE /api/budgets[/{id}]` — node CRUD, `budget.structure`. Delete blocked (409) if children or allocations exist.
 - `GET /api/budget/export.xlsx`, `GET /api/expenses/export.xlsx` — `budget.export`.
 - `GET /api/budgets/{id}/applications` — applications in the node and its subtree (#17), optional `fiscalYear`.
-- `GET/POST /api/budgets/{id}/expenses`, `POST /api/expenses`, `GET /api/expenses` (paged, filtered and sorted), `PATCH/DELETE /api/budget-expenses/{id}` — bookings, `budget.book`. A list read allows any budget permission.
+- `GET/POST /api/budgets/{id}/expenses`, `POST /api/expenses`, `GET /api/expenses` (paged, filtered and sorted), `PATCH/DELETE /api/budget-expenses/{id}` — bookings, `budget.book`. A list read allows any budget permission. A PATCH of `amount`, `budgetId` or `invoiceId` on a transfer leg answers 409 `transfer_leg_readonly`.
 - `POST /api/budget-transfers` — cost center to cost center transfer (expense + income, same fiscal year), `budget.book`.
+- `GET /api/budget-transfers` — one row per transfer, paged and sorted. Filters: `id`, `budget` (either cost centre, subtree included), `fiscalYear`, `q`, `amountMin`/`amountMax`, `createdFrom`/`createdTo`. Any budget permission, like `GET /expenses`. A source leg without its income row counts for neither `total` nor the rows.
+- `PATCH /api/budget-transfers/{id}` — patch both legs at once. The two cost centres are immutable, so a different pair answers 409 `transfer_cost_centres_immutable`. An explicit null for `amount` or `description` answers 422 `transfer_field_not_nullable`. `budget.book`.
+- `DELETE /api/budget-transfers/{id}` — 204, deletes both bookings. `budget.book`.
 - `GET/POST/PATCH/DELETE /api/invoices`, `POST /api/invoices/parse` (ZUGFeRD), `POST /api/invoices/file`, `GET /api/invoices/{id}/file` — invoices. Write needs `budget.book`, read needs any budget permission.
-- `GET/POST/PATCH /api/budgets/{id}/fiscal-years[/{fyId}]`, `PUT /api/budgets/{id}/allocations/{fyId}` — `budget.structure`.
+- `GET/POST/PATCH/DELETE /api/budgets/{id}/fiscal-years[/{fyId}]`, `PUT/DELETE /api/budgets/{id}/allocations/{fyId}` — `budget.structure`. The fiscal-year DELETE takes a fiscal year of a top-level budget and answers 409 `fiscal_year_has_{bookings,allocations,applications}` while those rows remain. The allocation DELETE is the only way to remove an allocation row, and so the only remedy for `fiscal_year_has_allocations`. It answers 204, 404 when the cost centre holds no allocation row for that fiscal year, and 422 `parent_allocation_below_children` while the children still hold allocations.
 - `POST /api/applications/{id}/assign-budget`, `POST /api/applications/{id}/move-fiscal-year` — `application.manage`.
 
 **Conventions & gotchas:**

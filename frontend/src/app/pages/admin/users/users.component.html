@@ -31,7 +31,7 @@
             <span class="users__tag">
               <app-badge variant="primary">
                 <span class="users__tag-label">{{ roleLabel(a.roleId) | capitalize }}</span>
-                @if (canManageUsers()) {
+                @if (canManageUsers() && !isAdminRole(a.roleId)) {
                   <button
                     type="button"
                     class="users__tag-x users__tag-edit"
@@ -102,9 +102,8 @@
     </app-data-table>
 </section>
 
-<!-- Change an existing assignment: the role and its validity window. The route
-     ignores a field that the body leaves out, so an emptied date stays as it
-     is. The hint says that. -->
+<!-- Change an existing assignment: the role and its validity window. An omitted
+     field stays as it is. -->
 <app-dialog
   [open]="editing() !== null"
   [title]="'admin.users.editAssignment' | t"

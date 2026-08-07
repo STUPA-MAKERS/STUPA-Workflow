@@ -153,8 +153,7 @@ async def test_create_membership_db_constraint_overlap_409() -> None:
     assert rollbacks["n"] == 1
 
 
-# PATCH /admin/gremium-memberships/{id}: role change plus term change under the
-# same overlap invariant as the create.
+# PATCH /admin/gremium-memberships/{id}: same overlap invariant as the create.
 
 
 def _flush_with_ids(db) -> None:  # noqa: ANN001
@@ -253,8 +252,7 @@ async def test_update_membership_clears_open_end() -> None:
 
 
 async def test_update_membership_db_constraint_overlap_409() -> None:
-    # The Python fast path sees no overlap. A concurrent write then fires the
-    # EXCLUDE constraint on the flush, and that must give 409, not 500.
+    # A concurrent write fires the EXCLUDE constraint on the flush: 409, not 500.
     pid, gid = uuid4(), uuid4()
     row = _membership(pid, gid, None, None)
     db = fake_session(result(row), gets=[row])

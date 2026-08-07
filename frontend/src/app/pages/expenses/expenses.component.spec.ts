@@ -2044,11 +2044,10 @@ describe('ExpensesComponent — transfers tab', () => {
     ctx.http.verify();
   });
 
-  it('hides the row actions for a viewer without budget.book', async () => {
+  it('hides the tab for a viewer without budget.book, who would only get a 403', async () => {
     const ctx = await setup({ perms: ['budget.view'] });
-    await openTransfers(ctx);
-    expect(screen.getByText('Umbuchung Fest')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Löschen' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Überträge' })).not.toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Buchungen' })).toBeInTheDocument();
     ctx.http.verify();
   });
 

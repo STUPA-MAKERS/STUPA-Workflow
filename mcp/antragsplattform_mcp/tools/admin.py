@@ -43,11 +43,21 @@ async def delete_gremium(gremium_id: str) -> dict:
 
 @group.tool
 async def list_cd_variants() -> dict:
-    """List the corporate-design variants. Requires admin.cd_variants or admin.gremien.
+    """List the corporate-design variants with their logos. Requires admin.cd_variants.
 
-    Use the returned id as `cdVariantId` when you create or patch a Gremium.
+    Use `list_cd_variant_options` instead when you only need the id for a Gremium.
     """
     return await api().get("/admin/cd-variants")
+
+
+@group.tool
+async def list_cd_variant_options() -> dict:
+    """List id, key and name of the corporate-design variants.
+
+    Requires admin.gremien or admin.cd_variants. Use the returned id as `cdVariantId`
+    when you create or patch a Gremium.
+    """
+    return await api().get("/cd-variants")
 
 
 @group.tool
@@ -343,7 +353,7 @@ async def delete_deadline_policy(policy_id: str) -> dict:
 @group.tool
 async def get_notification_settings() -> dict:
     """Get the platform notification settings, such as the task reminder cadence. Admin."""
-    return await api().get("/admin/notifications")
+    return await api().get("/admin/notification-settings")
 
 
 @group.tool
@@ -353,7 +363,7 @@ async def update_notification_settings(patch: S.NotificationSettingsUpdate) -> d
     The fields are `taskReminderEnabled`, `taskReminderAfterDays` and
     `taskReminderRepeatDays`. Admin.
     """
-    return await api().put("/admin/notifications", json=dump_patch(patch))
+    return await api().put("/admin/notification-settings", json=dump_patch(patch))
 
 
 @group.tool

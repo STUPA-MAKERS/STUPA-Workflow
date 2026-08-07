@@ -3,8 +3,7 @@
   flex-direction: column;
   gap: var(--space-5);
 }
-/* Summary block below the page header. It carries the centering itself, so the
-   status line and the fact grid align with the center column. */
+/* Summary block below the page header; it carries the centering itself. */
 .det__summary {
   display: flex;
   flex-direction: column;
@@ -365,8 +364,7 @@ formly-form {
   outline-offset: 1px;
 }
 
-/* Edit and delete of one comment. The buttons stay in the message meta line, so
-   a row with actions keeps the height of a row without them. */
+/* Comment actions stay in the meta line, so the row height does not change. */
 .det__msgActions {
   display: inline-flex;
   gap: 2px;

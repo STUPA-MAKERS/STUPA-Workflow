@@ -24,6 +24,24 @@ import { SimplifyPathPipe } from '@shared/budget-path';
 import { BudgetYearTreeComponent, type BudgetYearSelection } from './budget-year-tree.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 
+/** Server `code` of the fiscal-year delete 409 to the row kind that still blocks it. */
+const FY_BLOCKER_KEYS: Readonly<Record<string, TranslationKey>> = {
+  fiscal_year_has_bookings: 'budget.tree.fyBlocked.bookings',
+  fiscal_year_has_allocations: 'budget.tree.fyBlocked.allocations',
+  fiscal_year_has_applications: 'budget.tree.fyBlocked.applications',
+};
+
+/** Server `code` of the allocation delete refusal to the reason shown in the dialog. */
+const ALLOC_BLOCKER_KEYS: Readonly<Record<string, TranslationKey>> = {
+  parent_allocation_below_children: 'budget.tree.allocBlocked.children',
+};
+
+/** Problem+json shape the fiscal-year and allocation handlers read. */
+interface ApiError {
+  status?: number;
+  error?: { code?: string; errors?: { field?: string }[] };
+}
+
 /** A tree row: a node plus the depth for the indentation. */
 interface Row {
   node: BudgetTreeNode;
@@ -55,9 +73,7 @@ export class BudgetTreeComponent {
   private readonly toast = inject(ToastService);
   private readonly auth = inject(AuthService);
 
-  /** `budget.structure` as a front-end gate for the fiscal-year edit and delete. The
-   *  backend stays authoritative. The value is reactive, because the principal loads
-   *  asynchronously. */
+  /** `budget.structure` as a front-end gate; the backend stays authoritative. */
   readonly canStructure = computed(() => this.auth.can('budget.structure'));
 
   readonly tree = signal<BudgetTreeNode[]>([]);
@@ -117,6 +133,10 @@ export class BudgetTreeComponent {
   readonly fyDelete = signal<FiscalYear | null>(null);
   /** Translated reason why the delete was refused (409), else `null`. */
   readonly fyDeleteBlocked = signal<string | null>(null);
+  /** Cost center whose allocation removal the user confirms now. */
+  readonly allocDelete = signal<BudgetTreeNode | null>(null);
+  /** Translated reason why the removal was refused (404/422), else `null`. */
+  readonly allocDeleteBlocked = signal<string | null>(null);
 
   readonly selectedTop = computed<BudgetTreeNode | null>(
     () => this.tree().find((n) => n.id === this.selectedTopId()) ?? null,
@@ -127,6 +147,11 @@ export class BudgetTreeComponent {
     const t = this.selectedTop();
     return t ? `${t.key} – ${t.name}` : '';
   });
+
+  /** Display of the selected fiscal year (for the allocation-removal confirm). */
+  readonly selectedFyLabel = computed<string>(
+    () => this.fiscalYears().find((fy) => fy.id === this.selectedFyId())?.display ?? '',
+  );
 
   /** Subtree of the selected budget -> flat rows (pre-order) with depth. */
   readonly rows = computed<Row[]>(() => {
@@ -152,8 +177,7 @@ export class BudgetTreeComponent {
   readonly rowId = (r: unknown): string => (r as Row).node.id;
   readonly childExpanded = (r: unknown): boolean => this.addingChildOf() === (r as Row).node.id;
 
-  /** Fiscal-year table inside the manage dialog. The action column appears only with
-   *  `budget.structure`, so a read-only user never sees an edit or a delete button. */
+  /** Fiscal-year table; the action column needs `budget.structure`. */
   readonly fyColumns = computed<ColumnDef[]>(() => {
     const cols: ColumnDef[] = [
       { key: 'display', label: this.i18n.translate('budget.tree.fyYear') },
@@ -503,6 +527,50 @@ export class BudgetTreeComponent {
     });
   }
 
+  // Remove the allocation row; the limit dialog closes first, so none stack.
+  askAllocDelete(): void {
+    const node = this.limitNode();
+    if (!node) return;
+    this.limitNode.set(null);
+    this.allocDeleteBlocked.set(null);
+    this.allocDelete.set(node);
+  }
+
+  closeAllocDelete(): void {
+    const node = this.allocDelete();
+    this.allocDelete.set(null);
+    this.allocDeleteBlocked.set(null);
+    if (node) this.openLimit(node);
+  }
+
+  doAllocDelete(): void {
+    const node = this.allocDelete();
+    const fy = this.selectedFyId();
+    if (!node || !fy) return;
+    this.api.deleteAllocation(node.id, fy as Uuid).subscribe({
+      next: () => {
+        this.toast.success(this.i18n.translate('budget.tree.toast.allocDeleted'));
+        this.allocDelete.set(null);
+        this.allocDeleteBlocked.set(null);
+        this.reload();
+      },
+      error: (err: ApiError) => {
+        // 404 and 422 keep the dialog open and name the reason.
+        if (err?.status === 404 || err?.status === 422) {
+          const key =
+            err.status === 404
+              ? 'budget.tree.allocBlocked.missing'
+              : (ALLOC_BLOCKER_KEYS[err.error?.code ?? ''] ?? 'budget.tree.allocBlocked.generic');
+          const msg = this.i18n.translate(key);
+          this.allocDeleteBlocked.set(msg);
+          this.toast.error(msg);
+          return;
+        }
+        this.toast.error(this.i18n.translate('budget.tree.allocBlocked.generic'));
+      },
+    });
+  }
+
   // Fiscal years, which live inside the budget.
   patchFyYear(value: string): void {
     const year = Math.trunc(Number(value)) || new Date().getFullYear();
@@ -530,12 +598,20 @@ export class BudgetTreeComponent {
         this.fyOpen.set(false);
         this.loadFiscalYears(top);
       },
-      error: () => this.toast.error(this.i18n.translate('budget.tree.toast.fyFailed')),
+      error: (err: ApiError) => this.toast.error(this.i18n.translate(this.fyWriteErrorKey(err))),
     });
   }
 
-  // Correct or remove a fiscal year. Each runs in its own dialog. The manage dialog
-  // closes first and opens again afterwards, so no two dialogs stack.
+  /** A 422 is a duplicate year only where the service flagged the bare `year` field.
+   *  Body validation reports the dotted Pydantic path instead. */
+  private fyWriteErrorKey(err: ApiError): TranslationKey {
+    if (err?.status !== 422) return 'budget.tree.toast.fyFailed';
+    return err.error?.errors?.some((e) => e.field === 'year')
+      ? 'budget.tree.toast.fyDuplicate'
+      : 'budget.tree.toast.fyInvalid';
+  }
+
+  // Correct or remove a fiscal year; the manage dialog closes first, so none stack.
   openFyEdit(fy: FiscalYear): void {
     this.fyOpen.set(false);
     this.fyEdit.set(fy);
@@ -564,13 +640,7 @@ export class BudgetTreeComponent {
           this.closeFyEdit();
           this.loadFiscalYears(top);
         },
-        // 422 means the year already exists in this budget. Name that reason.
-        error: (err: { status?: number }) =>
-          this.toast.error(
-            this.i18n.translate(
-              err?.status === 422 ? 'budget.tree.toast.fyDuplicate' : 'budget.tree.toast.fyFailed',
-            ),
-          ),
+        error: (err: ApiError) => this.toast.error(this.i18n.translate(this.fyWriteErrorKey(err))),
       });
   }
 
@@ -596,10 +666,11 @@ export class BudgetTreeComponent {
         this.closeFyDelete();
         this.loadFiscalYears(top);
       },
-      error: (err: { status?: number; error?: { detail?: string } }) => {
+      error: (err: ApiError) => {
         // 409 keeps the dialog open and names the rows that still hang on the year.
         if (err?.status === 409) {
-          const msg = this.i18n.translate(this.fyBlockerKey(err.error?.detail));
+          const key = FY_BLOCKER_KEYS[err.error?.code ?? ''] ?? 'budget.tree.fyBlocked.generic';
+          const msg = this.i18n.translate(key);
           this.fyDeleteBlocked.set(msg);
           this.toast.error(msg);
           return;
@@ -607,15 +678,6 @@ export class BudgetTreeComponent {
         this.toast.error(this.i18n.translate('budget.tree.toast.fyDeleteFailed'));
       },
     });
-  }
-
-  /** Map the 409 problem detail to the concrete blocker. The backend names exactly one
-   *  of `bookings`, `allocations` or `applications`. An unknown wording reads generic. */
-  private fyBlockerKey(detail: string | undefined): TranslationKey {
-    if (detail?.includes('bookings')) return 'budget.tree.fyBlocked.bookings';
-    if (detail?.includes('allocations')) return 'budget.tree.fyBlocked.allocations';
-    if (detail?.includes('applications')) return 'budget.tree.fyBlocked.applications';
-    return 'budget.tree.fyBlocked.generic';
   }
 }
 

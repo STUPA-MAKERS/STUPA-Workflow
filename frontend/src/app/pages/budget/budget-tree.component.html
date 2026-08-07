@@ -101,7 +101,29 @@
   }
   <div dialog-footer class="flex gap-3">
     <app-button size="sm" variant="ghost" (click)="closeLimit()">{{ 'budget.tree.cancel' | t }}</app-button>
+    @if (canStructure() && limitNode() && alloc(limitNode()!)) {
+      <app-button size="sm" variant="danger" (click)="askAllocDelete()">{{ 'budget.tree.allocDelete' | t }}</app-button>
+    }
     <app-button size="sm" [disabled]="!limitValue().trim()" (click)="saveLimit()">{{ 'budget.tree.setLimit' | t }}</app-button>
+  </div>
+</app-dialog>
+
+<!-- Remove the allocation row. A value of 0 keeps it, so only this frees the fiscal year. -->
+<app-dialog
+  [open]="!!allocDelete()"
+  [title]="'budget.tree.allocDeleteTitle' | t"
+  [closeLabel]="'budget.tree.cancel' | t"
+  (closed)="closeAllocDelete()"
+>
+  @if (allocDelete(); as node) {
+    <p>{{ 'budget.tree.allocDeleteConfirm' | t: { node: node.name, year: selectedFyLabel() } }}</p>
+  }
+  @if (allocDeleteBlocked(); as reason) {
+    <p class="bt__status--error" role="alert">{{ reason }}</p>
+  }
+  <div dialog-footer class="flex gap-3">
+    <app-button size="sm" variant="ghost" (click)="closeAllocDelete()">{{ 'budget.tree.cancel' | t }}</app-button>
+    <app-button size="sm" variant="danger" (click)="doAllocDelete()">{{ 'budget.tree.allocDelete' | t }}</app-button>
   </div>
 </app-dialog>
 
@@ -172,8 +194,7 @@
   </div>
 </app-dialog>
 
-<!-- Manage the fiscal years of the selected budget: create one, and correct or remove an
-     existing one. The header button opens this dialog. -->
+<!-- Manage the fiscal years of the selected budget: create, correct or remove one. -->
 <app-dialog
   [open]="fyOpen()"
   [title]="'budget.tree.fyTitle' | t"
@@ -218,8 +239,7 @@
   </div>
 </app-dialog>
 
-<!-- Correct a fiscal year. Only the year and the active flag change. The server derives
-     the start and the end date again from the budget cutoff. -->
+<!-- Correct a fiscal year; the server derives the dates from the budget cutoff. -->
 <app-dialog
   [open]="!!fyEdit()"
   [title]="'budget.tree.fyEdit' | t"
@@ -244,8 +264,7 @@
   </div>
 </app-dialog>
 
-<!-- Delete a fiscal year. The server refuses with 409 while bookings, allocations or
-     applications still hang on the year. That reason stays visible in the dialog. -->
+<!-- Delete a fiscal year; rows that still hang on it answer 409. -->
 <app-dialog
   [open]="!!fyDelete()"
   [title]="'budget.tree.fyDeleteTitle' | t"

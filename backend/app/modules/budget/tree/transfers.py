@@ -1,8 +1,7 @@
 """Transfers between cost centers as a paired expense and income booking.
 
-A transfer is two `budget_expense` rows joined by `transfer_id`: an expense on
-the source and an income on the target. The read, the update and the delete all
-treat that pair as ONE entity, so the two legs never drift apart.
+A transfer is two `budget_expense` rows joined by `transfer_id`. The read, the
+update and the delete treat that pair as one entity, so the legs never drift.
 """
 
 from __future__ import annotations
@@ -30,7 +29,7 @@ from app.search import dialect_of, trigram_rank
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 from app.shared.paging import Page
 
-# The fields a transfer patch may write. Both legs get the same value.
+# Patchable fields; both legs get the same value.
 _PATCHABLE: tuple[str, ...] = (
     "amount",
     "description",
@@ -38,6 +37,8 @@ _PATCHABLE: tuple[str, ...] = (
     "invoice_date",
     "payment_date",
 )
+# NOT NULL in `budget_expense`: a patch may change them but never clear them.
+_NOT_NULLABLE: frozenset[str] = frozenset({"amount", "description"})
 
 
 class TransferOps(ExpenseOps):
@@ -102,8 +103,6 @@ class TransferOps(ExpenseOps):
 
         Raises:
             NotFoundError: No transfer has this id, or one leg is missing (404).
-                A half transfer is unreachable through this entity. The single
-                booking is still visible and removable under `/budget-expenses`.
         """
         rows = (
             (
@@ -177,13 +176,20 @@ class TransferOps(ExpenseOps):
         """List transfers, filtered and paginated, in the style of `GET /expenses`.
 
         The source expense anchors the query, so every transfer appears exactly
-        once. `budget_id` matches EITHER cost centre and includes the subtree,
-        because a transfer is interesting from both ends. `q` searches the
-        description and the note.
+        once. `budget_id` matches either cost centre and includes the subtree.
+        A source leg without its income row is no transfer entity, so it counts
+        for neither `total` nor the rows.
         """
+        income_leg = aliased(BudgetExpense)
         filters: list[ColumnElement[bool]] = [
             BudgetExpense.transfer_id.is_not(None),
             BudgetExpense.kind == "expense",
+            select(income_leg.id)
+            .where(
+                income_leg.transfer_id == BudgetExpense.transfer_id,
+                income_leg.kind == "income",
+            )
+            .exists(),
         ]
         if transfer_id is not None:
             filters.append(BudgetExpense.transfer_id == transfer_id)
@@ -300,22 +306,15 @@ class TransferOps(ExpenseOps):
     ) -> TransferRowOut:
         """Patch both legs of a transfer in one transaction.
 
-        The amount, the description, the note and the two business dates apply
-        to the source expense and to the target income together, so the pair
-        never drifts. The cost centres and the fiscal year stay fixed.
-
-        The audit entry uses the existing `budget_expense_update` action with
-        `target_type='budget_transfer'`, the same shape that the transfer
-        revert already writes. It records the prior values under `prior`
-        instead of `before` ON PURPOSE: the audit revert restores exactly one
-        `budget_expense` row, and a one-sided revert would desync the pair.
-        `AuditService.revertable_flags` therefore reports the entry as not
-        revertable, and the operator deletes and re-books instead.
+        The cost centres and the fiscal year stay fixed. The audit data holds
+        the old values under `prior`, not `before`, which keeps the entry
+        non-revertable: a one-sided revert would desync the pair.
 
         Raises:
             NotFoundError: No transfer has this id (404).
             ConflictError: The patch asks for a different pair of cost centres
                 (409).
+            ValidationProblem: The patch clears `amount` or `description` (422).
         """
         out, income = await self._legs(transfer_id)
         if tree_rules.transfer_pair_changed(
@@ -326,6 +325,13 @@ class TransferOps(ExpenseOps):
                 code="transfer_cost_centres_immutable",
             )
         fields = [f for f in _PATCHABLE if f in payload.model_fields_set]
+        cleared = [f for f in fields if f in _NOT_NULLABLE and getattr(payload, f) is None]
+        if cleared:
+            raise ValidationProblem(
+                "Amount and description of a transfer cannot be cleared.",
+                code="transfer_field_not_nullable",
+                errors=[{"field": f, "msg": "must not be null"} for f in cleared],
+            )
         prior = {f: _json_safe(getattr(out, f)) for f in fields}
         for field in fields:
             value = getattr(payload, field)
@@ -352,10 +358,7 @@ class TransferOps(ExpenseOps):
     async def delete_transfer(self, transfer_id: UUID) -> None:
         """Delete both legs of a transfer.
 
-        `DELETE /budget-expenses/{id}` on a single leg already removes the pair.
-        This route is the entity-level path and does the same thing from the
-        transfer id. The audit entry reuses `budget_expense_delete` with
-        `target_type='budget_transfer'`, exactly like the transfer revert.
+        `DELETE /budget-expenses/{id}` on a single leg removes the pair as well.
 
         Raises:
             NotFoundError: No transfer has this id (404).

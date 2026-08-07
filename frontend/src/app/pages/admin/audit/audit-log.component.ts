@@ -66,6 +66,8 @@ export const AUDIT_ACTIONS = [
   'webhook_config',
   'attachment_quarantine',
   'attachment_delete',
+  'application_delete',
+  'meeting_delete',
   // Content mutations that leave a trace outside the flow: comments, protocols, votes.
   'comment_update',
   'comment_delete',
@@ -76,6 +78,7 @@ export const AUDIT_ACTIONS = [
   'budget_node_update',
   'budget_node_delete',
   'budget_allocation_set',
+  'budget_allocation_delete',
   'budget_expense_create',
   'budget_expense_update',
   'budget_expense_delete',
@@ -108,6 +111,8 @@ const ACTION_ICONS: Record<string, IconName> = {
   webhook_config: 'webhook',
   attachment_quarantine: 'paperclip',
   attachment_delete: 'paperclip',
+  application_delete: 'form',
+  meeting_delete: 'parliament',
   comment_update: 'form',
   comment_delete: 'form',
   protocol_delete: 'document',
@@ -118,6 +123,7 @@ const ACTION_ICONS: Record<string, IconName> = {
   budget_node_update: 'chart-pie',
   budget_node_delete: 'chart-pie',
   budget_allocation_set: 'chart-pie',
+  budget_allocation_delete: 'chart-pie',
   budget_expense_create: 'euro',
   budget_expense_update: 'euro',
   budget_expense_delete: 'euro',
@@ -498,11 +504,17 @@ export class AuditLogComponent {
     return e.actorName ?? e.actor ?? this.i18n.translate('admin.audit.system');
   }
 
-  /** Target in the sentence. The label resolved by the backend wins, else `type:id`. */
+  /** Target in the sentence. The backend label wins, then anything readable the `data`
+   *  carries, then the target type. A deleted row has no label, and a raw UUID means
+   *  nothing to a user. */
   private targetLabel(e: AuditEntry): string {
     if (e.targetLabel) return `„${e.targetLabel}“`;
-    if (e.targetType && e.targetId) return `${e.targetType}:${e.targetId}`;
-    return e.targetType ?? e.targetId ?? '—';
+    const year = e.data?.['year'];
+    if (e.targetType === 'fiscal_year' && (typeof year === 'number' || typeof year === 'string')) {
+      return `„${year}“`;
+    }
+    if (e.targetType) return this.targetTypeLabel(e.targetType);
+    return '—';
   }
 
   /** The `data` content as (key, value) pairs for the detail chips. A UUID value with a

@@ -1,6 +1,6 @@
 ---
 name: mcp
-description: The antragsplattform_mcp MCP server, a standalone FastMCP package. It exposes the platform HTTP API to agents as the logged-in user via an OAuth2 Authorization-Code + PKCE browser grant. It holds ~160 typed tools (applications/flow/forms/votes/meetings/protocols/budget/RBAC/audit) and atomic flow_*/form_* graph ops. Use when working on MCP tools, server.py, OAuth token caching, browser-grant auth, graphops, wire schemas, or the antragsplattform-mcp console entry in /mcp.
+description: The antragsplattform_mcp MCP server, a standalone FastMCP package. It exposes the platform HTTP API to agents as the logged-in user via an OAuth2 Authorization-Code + PKCE browser grant. It holds 147 typed tools in antragsplattform_mcp/tools/*.py (applications/flow/forms/votes/meetings/protocols/budget/RBAC/audit) and atomic flow_*/form_* graph ops. Use when working on MCP tools, server.py, OAuth token caching, browser-grant auth, graphops, wire schemas, or the antragsplattform-mcp console entry in /mcp.
 ---
 
 # antragsplattform MCP Server — `mcp/`
@@ -8,7 +8,8 @@ description: The antragsplattform_mcp MCP server, a standalone FastMCP package. 
 **Does:** A standalone Python package (`antragsplattform_mcp`) that runs a FastMCP stdio server. Agents act on the platform through its `/api` HTTP surface as the logged-in user. The package authenticates with an OAuth2 Authorization-Code + PKCE browser grant, caches the token and refreshes it automatically. The server still authorizes every action against the RBAC permissions of the user ∩ the granted scope. No tool can cast a ballot.
 
 **Key files:**
-- `antragsplattform_mcp/server.py` — the FastMCP app plus all ~160 `@mcp.tool()` functions, each a thin wrapper around `ApiClient`. Holds the server `_INSTRUCTIONS` text and the `main()` stdio entry point.
+- `antragsplattform_mcp/server.py` — the FastMCP app, the server `_INSTRUCTIONS` text and the `main()` stdio entry point. It declares NO tool of its own; it calls `tools.register_all(mcp)`.
+- `antragsplattform_mcp/tools/` — the 147 tools, each a thin wrapper around `ApiClient`, split by domain: `session` (4), `applications` (15), `flow_forms` (19), `meetings` (31), `budget` (16), `finance` (9), `admin` (53). A tool carries `@group.tool`, and `tools/_common.py` holds the `ToolGroup` registrar plus the lazy `cfg()`/`api()` singletons. `tools/__init__.py` fixes the module order, which keeps the served tool list stable for agents.
 - `antragsplattform_mcp/auth.py` — OAuth2 + PKCE browser grant (RFC 7636/8252): discovery, loopback `/callback` capture, code exchange, refresh, disk token cache. Synchronous. Rejects cleartext non-loopback URLs.
 - `antragsplattform_mcp/client.py` — async `ApiClient` (httpx). It attaches the bearer token, retries once on 401 after a forced re-login and raises `ApiError`. The token fetch runs in a worker thread, so the event loop never blocks.
 - `antragsplattform_mcp/config.py` — `Config.from_env()`: base URL (`ANTRAGSPLATTFORM_URL` or baked `_baked.py:BASE_URL`), `scope`, per-URL token cache path. `CLIENT_ID = "antragsplattform-mcp"`.
@@ -36,7 +37,8 @@ description: The antragsplattform_mcp MCP server, a standalone FastMCP package. 
 - Budget: `list_budgets`(tree)/`create_/update_/delete_budget` · `get_budget_applications` · `list_/create_/update_fiscal_year` · `set_allocation` · `book_expense`(incl. invoice/payment dates, correspondent, note, paymentMethod, invoiceId)/`list_budget_expenses`/`list_expenses`(flat,paged)/`update_/delete_expense` · `create_budget_transfer` · `assign_application_budget`/`move_application_fiscal_year`.
 - Invoices (#invoices): `list_/get_/create_/update_/delete_invoice` · `parse_invoice(file_path)` (ZUGFeRD/Factur-X → fields + `fileToken`) / `upload_invoice_file(file_path)` → pass `fileToken` to `create_invoice`.
 - Binary downloads (invoice PDF, xlsx exports) and applicant magic-link / OAuth browser routes stay unexposed by design.
-- Admin/RBAC: gremien, gremium-roles, gremium-memberships, roles, role-assignments, principals, group-mappings, permissions, application-types, webhooks, deadline-policies, gremium mail-recipients, notification settings/preferences (all under `/admin/...`).
+- Admin/RBAC: gremien, gremium-roles, gremium-memberships, roles, role-assignments, principals, group-mappings, permissions, application-types, webhooks, deadline-policies, gremium mail-recipients, notification settings (`/admin/notification-settings`) and per-user preferences (`/notifications/preferences`).
+- Corporate design: `list_cd_variants`/`create_`/`update_`/`delete_cd_variant`, `add_cd_variant_vendored_logo`, `delete_cd_variant_logo` — all `admin.cd_variants`. `list_cd_variant_options` hits `GET /cd-variants` instead and takes `admin.gremien` OR `admin.cd_variants`, so a gremien admin can read `cdVariantId` without the CD permission. A logo **upload** has no tool (multipart); use the web UI or a vendored name.
 - Site config: `get_site_config`/`set_site_config_draft` (PUT draft)/`activate_site_config`.
 - Audit: `list_audit` `GET /admin/audit` (keyset-paged via `before`) · `verify_audit_chain` `GET /admin/audit/verify`.
 

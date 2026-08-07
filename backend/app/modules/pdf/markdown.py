@@ -68,9 +68,8 @@ class ApplicationDoc:
     data: dict[str, object]
     applicant_name: str | None = None
     created_at: datetime | None = None
-    # The render pipeline resolves the corporate design of this Gremium into logo
-    # names and asset bytes. `cd_variant` above stays the key, which the
-    # frontmatter carries and which the fallback variant mapping reads.
+    # The render pipeline resolves the logos of this Gremium; `cd_variant` above
+    # stays the key that the frontmatter carries.
     gremium_id: UUID | None = None
     timeline: list[TimelineItem] = field(default_factory=list)
     vote: VoteResult | None = None

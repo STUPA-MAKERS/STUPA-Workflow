@@ -73,12 +73,9 @@ export interface TransferCreate {
 }
 
 /**
- * One transfer as a single row (`TransferRowOut`).
+ * One transfer as a single row (`TransferRowOut`) assembled from its two bookings.
  *
- * A transfer is two bookings, an expense on the source and an income on the
- * target. This row assembles both, so a transfer has one identity that can be
- * corrected or removed. `actorName` is the resolved display name. Never show
- * `actor`, it is the raw principal id.
+ * Show `actorName`; `actor` is the raw principal id.
  */
 export interface BudgetTransfer {
   transferId: Uuid;
@@ -127,8 +124,7 @@ export interface TransferQuery {
 /**
  * Patch of a transfer. It writes both legs at once.
  *
- * The two cost centres are immutable. Sending a different pair answers 409, so
- * this body never carries them. The fiscal year is not patchable at all.
+ * The cost centres and the fiscal year are immutable, so the body omits them.
  */
 export interface TransferUpdate {
   amount?: string;
@@ -457,8 +453,7 @@ export class BudgetTreeApi {
     return this.http.post<FiscalYear>(`${this.base}/budgets/${topId}/fiscal-years`, body);
   }
 
-  /** Correct the year or the active flag. Needs P(`budget.structure`). A year that
-   *  already exists in the same top budget answers 422. */
+  /** Correct the year or the active flag. Needs P(`budget.structure`); duplicate = 422. */
   updateFiscalYear(topId: Uuid, fyId: Uuid, body: FiscalYearUpdate): Observable<FiscalYear> {
     return this.http.patch<FiscalYear>(
       `${this.base}/budgets/${topId}/fiscal-years/${fyId}`,
@@ -466,14 +461,20 @@ export class BudgetTreeApi {
     );
   }
 
-  /** Delete a fiscal year. Needs P(`budget.structure`). The route answers 409 while
-   *  bookings, allocations or applications still reference the year. */
+  /** Delete a fiscal year. Needs P(`budget.structure`); still-referenced = 409. */
   deleteFiscalYear(topId: Uuid, fyId: Uuid): Observable<void> {
     return this.http.delete<void>(`${this.base}/budgets/${topId}/fiscal-years/${fyId}`);
   }
 
   setAllocation(id: Uuid, fiscalYearId: Uuid, allocated: string): Observable<unknown> {
     return this.http.put(`${this.base}/budgets/${id}/allocations/${fiscalYearId}`, { allocated });
+  }
+
+  /** Drop the allocation row. Needs P(`budget.structure`); no row = 404, children that
+   *  still hold funds = 422. A value of 0 keeps the row, so only this frees the
+   *  fiscal year for deletion. */
+  deleteAllocation(id: Uuid, fiscalYearId: Uuid): Observable<void> {
+    return this.http.delete<void>(`${this.base}/budgets/${id}/allocations/${fiscalYearId}`);
   }
 
   /** Applications of a cost center and its subtree, optionally filtered by fiscal year. */
@@ -542,8 +543,7 @@ export class BudgetTreeApi {
     });
   }
 
-  /** Correct a transfer. Both legs change together. A different cost-centre
-   *  pair answers 409, so the body never carries the pair. */
+  /** Correct a transfer; both legs change together, the cost-centre pair cannot. */
   updateTransfer(transferId: Uuid, body: TransferUpdate): Observable<BudgetTransfer> {
     return this.http.patch<BudgetTransfer>(`${this.base}/budget-transfers/${transferId}`, body);
   }

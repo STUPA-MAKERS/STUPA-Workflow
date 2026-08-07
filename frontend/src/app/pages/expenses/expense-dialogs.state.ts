@@ -442,8 +442,7 @@ export class ExpenseDialogsState {
           this.transferOpen.set(false);
           this.toast.success(this.i18n.translate('expenses.transferToast'));
           this.list.refresh();
-          // The transfers tab holds the new row too. Refresh it if it already
-          // loaded, so the two views never disagree.
+          // The transfers tab holds the new row too, so refresh it if it loaded.
           if (this.transfers.loaded()) this.transfers.reload();
         },
         error: (err) => {

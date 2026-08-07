@@ -67,10 +67,7 @@ class FakeSession:
         This method uses its own queue and returns `None` by default. It keeps the order
         of the `execute` queue unchanged.
         """
-        # The render path resolves the corporate design of the protocol. That query
-        # has no entry in the queue either. Answer it with `None`, so the render
-        # falls back to the variant name and the query does not eat the result of
-        # another one. Same reason as the attendance case in `execute`.
+        # The CD lookup has no queue entry; answer it without eating another result.
         if "cd_variant" in str(_stmt).lower():
             return None
         if self.scalar_results:
@@ -102,6 +99,7 @@ class FakeStorage:
         self.url = url
         self.puts: list[tuple[str, int, str]] = []
         self.blobs: dict[str, bytes] = {}
+        self.removed: list[str] = []
 
     async def put(self, key: str, data: bytes, content_type: str) -> None:
         self.puts.append((key, len(data), content_type))
@@ -109,6 +107,10 @@ class FakeStorage:
 
     async def get(self, key: str) -> bytes:
         return self.blobs[key]
+
+    async def remove(self, key: str) -> None:
+        self.removed.append(key)
+        self.blobs.pop(key, None)
 
     def presigned_get_url(
         self, key: str, *, expires_seconds: int, download_name: str | None = None

@@ -485,11 +485,8 @@ class TransferOut(_CamelModel):
 class TransferUpdate(_CamelModel):
     """Update both legs of a transfer at once.
 
-    `amount`, `description`, `note`, `invoiceDate` and `paymentDate` apply to
-    the source expense and to the target income together. The two cost centres
-    stay immutable: a different pair is a different transfer. `fromBudgetId`
-    and `toBudgetId` are accepted only to repeat the current pair, so a
-    round-trip of the read model does not fail. A different value gives 409.
+    `fromBudgetId` and `toBudgetId` are accepted only to repeat the current
+    pair, so a round-trip of the read model works; a different value gives 409.
     """
 
     amount: Decimal | None = Field(default=None, gt=0, le=_MAX_AMOUNT, allow_inf_nan=False)
@@ -524,8 +521,7 @@ class TransferRowOut(_CamelModel):
     note: str | None = None
     invoice_date: date | None = Field(default=None, alias="invoiceDate")
     payment_date: date | None = Field(default=None, alias="paymentDate")
-    # `actor` is the principal `sub`. `actorName` is the resolved display name.
-    # Never show the raw id in the UI.
+    # `actor` is the raw principal `sub`; show `actorName` in the UI.
     actor: str | None = None
     actor_name: str | None = Field(default=None, alias="actorName")
     created_at: datetime = Field(alias="createdAt")

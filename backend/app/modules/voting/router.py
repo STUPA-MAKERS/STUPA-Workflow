@@ -1,6 +1,7 @@
 """Voting API router.
 
 * ``POST /api/applications/{id}/votes`` - create a vote. P(vote.manage).
+* ``PATCH /api/votes/{id}``             - correct a draft vote. P(vote.manage).
 * ``POST /api/votes/{id}/open``         - open a vote. P(vote.manage).
 * ``POST /api/votes/{id}/close``        - close -> result -> flow. P(vote.manage).
 * ``POST /api/votes/{id}/ballot``       - cast a vote. P(vote.cast) plus group.
@@ -30,6 +31,7 @@ from app.modules.voting.schemas import (
     VoteClosed,
     VoteCreate,
     VoteOut,
+    VoteUpdate,
 )
 from app.modules.voting.service import VotingService
 from app.shared.errors import ProblemDetail
@@ -84,6 +86,29 @@ async def create_vote(
     """
     await service.assert_can_manage_group(payload.eligible_group, None, principal)
     return await service.create(application_id, payload)
+
+
+@router.patch(
+    "/votes/{vote_id}",
+    response_model=VoteOut,
+    responses=_errors(400, 401, 403, 404, 409, 422),
+)
+async def update_vote(
+    vote_id: UUID,
+    payload: VoteUpdate,
+    service: ServiceDep,
+    principal: ReaderDep,
+) -> VoteOut:
+    """Correct a draft vote that holds no ballot.
+
+    Gremium-scoped ``vote.manage``, like the other lifecycle routes. A vote past
+    ``draft`` or with ballots answers 409, as the delete does. A move to another
+    ``eligibleGroup`` also needs manage rights in the target gremium.
+    """
+    await service.assert_can_manage_vote(vote_id, principal)
+    if payload.eligible_group is not None:
+        await service.assert_can_manage_group(payload.eligible_group, None, principal)
+    return await service.update(vote_id, payload, actor=principal.sub)
 
 
 @router.post(
@@ -169,13 +194,9 @@ async def delete_vote(
 ) -> None:
     """Delete a standalone application-bound vote that never ran.
 
-    The vote must still be ``draft`` and must hold no ballot. Everything
-    further along stays with ``cancel``, so the record of the Gremium keeps
-    every vote that ever opened. A meeting-bound vote answers 409 and belongs
-    to ``DELETE /meetings/{meeting_id}/votes/{vote_id}``, which applies the
-    meeting-scoped check.
-
-    Gremium-scoped ``vote.manage``, like open, close and cancel.
+    The vote must still be ``draft`` and hold no ballot; anything further along
+    stays with ``cancel``. A meeting-bound vote answers 409 and belongs to
+    ``DELETE /meetings/{meeting_id}/votes/{vote_id}``.
     """
     await service.assert_can_manage_vote(vote_id, principal)
     await service.delete_standalone(vote_id, actor=principal.sub)

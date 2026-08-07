@@ -1,15 +1,6 @@
 """Permission `application.delete` (#g9).
 
-This global permission deletes an application permanently, with its versions, its
-comments and its timeline. Before this revision the route gated on the literal
-`admin` role string, so no role could hold the capability.
-
-The migration seeds the permission to the `admin` role, which holds all permissions.
-An admin already gets the permission through the role-key bypass. The row follows the
-house convention and makes the grant explicit for non-admin roles. Nothing changes
-for a current installation.
-
-The insert is idempotent through `ON CONFLICT DO NOTHING`.
+Seeds the new permission to the `admin` role. The insert is idempotent.
 
 Revision ID: ad9651a045a8
 Revises: ec167d091656

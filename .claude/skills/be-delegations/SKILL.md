@@ -18,11 +18,12 @@ description: Meeting-bound vote and representation delegations (MeetingDelegatio
 - `MeetingDelegation` (`meeting_delegation`): `meeting_id`, `gremium_id` (denormalized = `meeting.gremium_id`, avoids a join in the hot vote-cast path), `delegator_principal_id`, `delegate_principal_id`, `delegate_voting` (bool, transfers the vote), `via_pool` (bool, legitimated through the pool → no lead deadline), `created_by` (actor `sub`), `created_at`. Constraints: unique `(meeting_id, delegator)`. A partial unique `(meeting_id, delegate)` WHERE `delegate_voting` allows at most one received vote transfer per meeting.
 - `DelegationSubstitute` (`delegation_substitute`): `gremium_id`, `member_principal_id` (NULL = Gremium-wide substitute for *any* member), `substitute_principal_id`, `created_by`. Unique `(gremium, member, substitute)` + partial unique `(gremium, substitute)` WHERE `member IS NULL`.
 - Config gates live on **`Gremium`** (`admin/models.py`): `allow_vote_delegation`, `delegation_lead_minutes`, `delegation_allow_external`. More gates live on **`Settings`**: `delegation_voting_enabled` (global vote-transfer switch) and `local_timezone`.
-- Audit actions (`audit/actions.py`): `DELEGATION_GRANT`, `DELEGATION_REVOKE`, `DELEGATION_USE`, `DELEGATION_SUBSTITUTE_ADD`, `DELEGATION_SUBSTITUTE_REMOVE`.
+- Audit actions (`audit/actions.py`): `DELEGATION_GRANT`, `DELEGATION_UPDATE`, `DELEGATION_REVOKE`, `DELEGATION_USE`, `DELEGATION_SUBSTITUTE_ADD`, `DELEGATION_SUBSTITUTE_REMOVE`.
 
 **API surface:** (prefix `/api/delegations`)
 - `GET /api/delegations?meetingId=` — the own incoming and outgoing delegations. An admin with `admin.delegations` sees all of them.
 - `POST /api/delegations` — create a meeting delegation (`{meetingId, delegateId, delegateVoting}`). It mails the delegate.
+- `PATCH /api/delegations/{id}` — change the recipient or the vote transfer (`{delegateId?, delegateVoting?}`). The delegator or `admin.delegations`. The meeting is fixed. The row keeps its identity, so the audit trail stays one thread. Every gate of the create applies again, with the row itself left out of the chain scan. The new recipient gets a grant mail. The former recipient gets a revoke mail only when the recipient really changed.
 - `DELETE /api/delegations/{id}` — revoke, a hard delete that applies at once. The delegator may revoke until the meeting starts, an admin always. It mails the delegate.
 - `GET /api/delegations/meetings/{meeting_id}/context` — full dialog state: gates, deadline, my delegations, incoming delegations, recipients.
 - `GET /api/delegations/meetings/{meeting_id}/recipients?q=` — typeahead recipient list (members, pool, external if enabled).

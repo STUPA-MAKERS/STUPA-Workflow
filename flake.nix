@@ -71,21 +71,18 @@
         };
       };
 
-      # Native libraries the backend loads at run time through ctypes or a
-      # compiled extension, and which a plain `pip install` cannot supply:
-      #   * libstdc++ — greenlet, which SQLAlchemy needs for every async call.
-      #   * libmagic  — python-magic, the MIME sniff on every upload.
-      # Without them `pytest` fails with "the greenlet library is required" and
-      # "failed to find libmagic". Append instead of overwrite: a bare
-      # assignment breaks the Nix binaries in the same shell.
+      # Native libraries a plain `pip install` cannot supply: libstdc++ for
+      # greenlet (SQLAlchemy async) and libmagic for python-magic. Append to
+      # LD_LIBRARY_PATH; a bare assignment breaks the Nix binaries in the shell.
       pyNativeLibs = [ pkgs.stdenv.cc.cc.lib pkgs.file ];
       pyLibPath = pkgs.lib.makeLibraryPath pyNativeLibs;
+      pyLibHook = ''export LD_LIBRARY_PATH="${pyLibPath}''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"'';
 
       mkPyShell = name: extraPkgs: hint:
         pkgs.mkShell {
           packages = pyTools ++ pyNativeLibs ++ extraPkgs;
           shellHook = ''
-            export LD_LIBRARY_PATH="${pyLibPath}''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+            ${pyLibHook}
             echo "STUPA-Workflow ${name} dev shell — python ${python.version}, uv, ruff, basedpyright"
             ${hint}
             ${zshExec}
@@ -101,12 +98,12 @@
       devShells.${system} = {
         # Everything at once: Node + Python toolchains for the whole monorepo.
         default = pkgs.mkShell {
-          packages = pyTools ++ [
+          packages = pyTools ++ pyNativeLibs ++ [
             nodejs
-            pkgs.file # libmagic for backend python-magic
             pkgs.postgresql # psql for the admin CLI / local DB
           ];
           shellHook = ''
+            ${pyLibHook}
             echo "STUPA-Workflow dev shell — node $(node --version), python ${python.version}, uv"
             echo "Per-component shells: nix develop .#backend | .#frontend | .#mcp | .#admin-cli | .#pytex"
             ${zshExec}

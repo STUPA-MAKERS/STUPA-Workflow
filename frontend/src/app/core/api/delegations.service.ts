@@ -43,6 +43,12 @@ export interface DelegationInput {
   delegateVoting: boolean;
 }
 
+/** Body of `PATCH /delegations/{id}`. The meeting is fixed. */
+export interface DelegationPatch {
+  delegateId?: Uuid;
+  delegateVoting?: boolean;
+}
+
 /** Selectable recipient (typeahead source). */
 export interface DelegationRecipient {
   readonly principalId: Uuid;
@@ -112,6 +118,11 @@ export class DelegationsApiService {
 
   create(input: DelegationInput): Observable<Delegation> {
     return this.http.post<Delegation>(`${this.base}/delegations`, input);
+  }
+
+  /** Change the recipient or the vote transfer. The row keeps its identity. */
+  update(id: Uuid, patch: DelegationPatch): Observable<Delegation> {
+    return this.http.patch<Delegation>(`${this.base}/delegations/${id}`, patch);
   }
 
   revoke(id: Uuid): Observable<void> {

@@ -16,10 +16,15 @@ from uuid import uuid4
 import pytest
 
 from app.modules.admin.models import Gremium
+from app.modules.files.storage import StorageError
 from app.modules.livevote.models import Meeting
 from app.modules.pdf.pytex_client import PytexError
 from app.modules.protocol.models import Protocol
-from app.modules.protocol.service import ProtocolService, protocol_storage_key
+from app.modules.protocol.service import (
+    ProtocolService,
+    protocol_public_storage_key,
+    protocol_storage_key,
+)
 from app.settings import get_settings
 from app.shared.errors import ConflictError, NotFoundError, ServiceUnavailableError
 from tests._support.pdf_fakes import FakePytex
@@ -609,6 +614,39 @@ async def test_delete_protocol_draft_ok() -> None:
     assert [e.action for e in entries] == ["protocol_delete"]
     assert entries[0].target_type == "protocol"
     assert entries[0].data == {"meetingId": str(MID), "gremiumId": str(GID)}
+
+
+async def test_delete_protocol_removes_the_rendered_pdfs() -> None:
+    """The key derives from the id, so a leftover object could never be reached again."""
+    proto = _protocol(
+        pdf_storage_key=protocol_storage_key(PID),
+        public_pdf_storage_key=protocol_public_storage_key(PID),
+    )
+    storage = FakeStorage()
+    session = FakeSession(results=[result(proto)])
+    await _service(session, storage=storage).delete_protocol(PID, actor="p1")
+    assert storage.removed == [
+        protocol_storage_key(PID),
+        protocol_public_storage_key(PID),
+    ]
+
+
+async def test_delete_protocol_survives_a_storage_outage() -> None:
+    class _BoomStorage(FakeStorage):
+        async def remove(self, key: str) -> None:
+            raise StorageError("gone")
+
+    proto = _protocol(pdf_storage_key=protocol_storage_key(PID))
+    session = FakeSession(results=[result(proto)])
+    await _service(session, storage=_BoomStorage()).delete_protocol(PID, actor="p1")
+    assert session.deleted == [proto] and session.committed == 1
+
+
+async def test_delete_protocol_without_storage_skips_the_cleanup() -> None:
+    proto = _protocol(pdf_storage_key=protocol_storage_key(PID))
+    session = FakeSession(results=[result(proto)])
+    await _service(session).delete_protocol(PID, actor="p1")
+    assert session.deleted == [proto]
 
 
 async def test_delete_protocol_final_conflict() -> None:

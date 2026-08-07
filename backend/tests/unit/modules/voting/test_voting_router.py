@@ -87,6 +87,14 @@ class _FakeService:
     async def cancel(self, vote_id):  # noqa: ANN001
         return _vote_out("cancelled")
 
+    async def update(self, vote_id, payload, *, actor):  # noqa: ANN001
+        from app.shared.errors import ConflictError
+
+        if str(vote_id).startswith("00000000"):
+            raise ConflictError("not a draft", code="vote_not_draft")
+        self.updated = (vote_id, payload.question, actor)
+        return _vote_out("draft")
+
     async def delete_standalone(self, vote_id, *, actor):  # noqa: ANN001
         from app.shared.errors import ConflictError
 
@@ -319,5 +327,45 @@ def test_delete_vote_204(app: FastAPI, client: TestClient, fake_service: _FakeSe
 def test_delete_vote_conflict_409(app: FastAPI, client: TestClient) -> None:
     _as_principal(app, "vote.manage")
     r = client.delete("/api/votes/00000000-0000-0000-0000-000000000000")
+    assert r.status_code == 409
+    assert r.headers["content-type"].startswith("application/problem+json")
+
+
+# PATCH /votes/{id}: gremium-scoped vote.manage, like the delete.
+
+
+def test_update_vote_requires_auth_401(client: TestClient) -> None:
+    assert client.patch(f"/api/votes/{uuid4()}", json={}).status_code == 401
+
+
+def test_update_vote_missing_perm_403(app: FastAPI, client: TestClient) -> None:
+    _as_principal(app, "vote.cast")
+    r = client.patch(f"/api/votes/{uuid4()}", json={"question": "x"})
+    assert r.status_code == 403
+    assert r.headers["content-type"] == "application/problem+json"
+
+
+def test_update_vote_ok(app: FastAPI, client: TestClient, fake_service: _FakeService) -> None:
+    _as_principal(app, "vote.manage")
+    vid = uuid4()
+    r = client.patch(f"/api/votes/{vid}", json={"question": "Neue Frage"})
+    assert r.status_code == 200
+    assert fake_service.updated == (vid, "Neue Frage", "p")
+
+
+def test_update_vote_group_move_checks_the_target_gremium(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    """A move to another eligibleGroup needs manage rights there, not only here."""
+    _as_principal(app, "vote.manage")
+    vid = uuid4()
+    r = client.patch(f"/api/votes/{vid}", json={"eligibleGroup": "asta"})
+    assert r.status_code == 200
+    assert fake_service.updated == (vid, None, "p")
+
+
+def test_update_vote_conflict_409(app: FastAPI, client: TestClient) -> None:
+    _as_principal(app, "vote.manage")
+    r = client.patch("/api/votes/00000000-0000-0000-0000-000000000000", json={})
     assert r.status_code == 409
     assert r.headers["content-type"].startswith("application/problem+json")

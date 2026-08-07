@@ -786,6 +786,110 @@ describe('BudgetTreeComponent (#9)', () => {
     expect(toast.error).toHaveBeenCalled();
   });
 
+  // --- remove an allocation -------------------------------------------------
+
+  it('askAllocDelete hands the node over from the limit dialog and back on cancel', async () => {
+    const { c } = await setup();
+    c.openLimit(TREE[0]);
+    c.allocDeleteBlocked.set('stale');
+    c.askAllocDelete();
+    expect(c.limitNode()).toBeNull();
+    expect(c.allocDelete()).toBe(TREE[0]);
+    expect(c.allocDeleteBlocked()).toBeNull();
+    c.closeAllocDelete();
+    expect(c.allocDelete()).toBeNull();
+    expect(c.limitNode()).toBe(TREE[0]);
+  });
+
+  it('askAllocDelete and closeAllocDelete are no-ops without a node', async () => {
+    const { c } = await setup();
+    c.askAllocDelete(); // no limit dialog open
+    expect(c.allocDelete()).toBeNull();
+    c.closeAllocDelete(); // nothing confirmed
+    expect(c.limitNode()).toBeNull();
+  });
+
+  it('selectedFyLabel shows the display of the selected fiscal year', async () => {
+    const { c } = await setup();
+    expect(c.selectedFyLabel()).toBe('2026');
+    c.selectedFyId.set('other-fy');
+    expect(c.selectedFyLabel()).toBe('');
+  });
+
+  it('doAllocDelete DELETEs the allocation, toasts and reloads', async () => {
+    const { c, http, toast } = await setup();
+    c.openLimit(TREE[0].children[0]);
+    c.askAllocDelete();
+    c.doAllocDelete();
+    http
+      .expectOne((r) => r.url.endsWith('/budgets/b-800/allocations/fy-1') && r.method === 'DELETE')
+      .flush(null, { status: 204, statusText: 'no content' });
+    expect(toast.success).toHaveBeenCalledWith('Zuteilung entfernt.');
+    expect(c.allocDelete()).toBeNull();
+    flushReload(http);
+  });
+
+  it.each([
+    [404, 'conflict', 'budget.tree.allocBlocked.missing'],
+    [422, 'parent_allocation_below_children', 'budget.tree.allocBlocked.children'],
+    [422, 'something_else', 'budget.tree.allocBlocked.generic'],
+  ])('status %s code "%s" explains the refusal in the dialog', async (status, code, key) => {
+    const { c, http, toast, fixture } = await setup();
+    const expected = TestBed.inject(I18nService).translate(
+      key as Parameters<I18nService['translate']>[0],
+    );
+    c.openLimit(TREE[0]);
+    c.askAllocDelete();
+    c.doAllocDelete();
+    http
+      .expectOne((r) => r.method === 'DELETE')
+      .flush({ code, detail: 'refused' }, { status: status as number, statusText: 'refused' });
+    // The dialog stays open and names the reason. A toast repeats it.
+    expect(c.allocDelete()).not.toBeNull();
+    expect(c.allocDeleteBlocked()).toBe(expected);
+    expect(toast.error).toHaveBeenCalledWith(expected);
+    fixture.detectChanges();
+    expect(screen.getByRole('alert')).toHaveTextContent(expected);
+  });
+
+  it('any other allocation delete failure toasts the generic message', async () => {
+    const { c, http, toast } = await setup();
+    c.openLimit(TREE[0]);
+    c.askAllocDelete();
+    c.doAllocDelete();
+    http.expectOne((r) => r.method === 'DELETE').flush(null, { status: 500, statusText: 'err' });
+    expect(toast.error).toHaveBeenCalledWith('Zuteilung konnte nicht entfernt werden.');
+    expect(c.allocDeleteBlocked()).toBeNull();
+  });
+
+  it('doAllocDelete is a no-op without a confirmed node or without a fiscal year', async () => {
+    const { c, http } = await setup();
+    c.doAllocDelete(); // nothing confirmed
+    c.openLimit(TREE[0]);
+    c.askAllocDelete();
+    c.selectedFyId.set('');
+    c.doAllocDelete(); // no fiscal year
+    http.verify();
+  });
+
+  it('offers the removal only with budget.structure and an existing allocation', async () => {
+    const { c, fixture } = await setup();
+    c.openLimit(TREE[0]);
+    fixture.detectChanges();
+    expect(screen.getByRole('button', { name: 'Zuteilung entfernen' })).toBeInTheDocument();
+    // No allocation row for the picked year, so there is nothing to remove.
+    c.selectedFyId.set('other-fy');
+    fixture.detectChanges();
+    expect(screen.queryByRole('button', { name: 'Zuteilung entfernen' })).toBeNull();
+  });
+
+  it('hides the removal without budget.structure', async () => {
+    const { c, fixture } = await setup({ gremien: 'ok', flow: 'null', can: false });
+    c.openLimit(TREE[0]);
+    fixture.detectChanges();
+    expect(screen.queryByRole('button', { name: 'Zuteilung entfernen' })).toBeNull();
+  });
+
   it('patchFyYear truncates the year and defaults non-numbers to the current year', async () => {
     const { c } = await setup();
     c.patchFyYear('2027.9');
@@ -889,14 +993,30 @@ describe('BudgetTreeComponent (#9)', () => {
     expect(c.fiscalYearsByBudget()['b-vs'][0].display).toBe('2027');
   });
 
-  it('saveFyEdit names the duplicate year on 422', async () => {
+  it('saveFyEdit names the duplicate year only when the service flagged `year`', async () => {
     const { c, http, toast } = await setup();
     c.openFyEdit(FY);
     c.saveFyEdit();
     http
       .expectOne((r) => r.method === 'PATCH')
-      .flush(null, { status: 422, statusText: 'unprocessable' });
+      .flush(
+        { errors: [{ field: 'year', msg: 'fiscal year already exists' }] },
+        { status: 422, statusText: 'unprocessable' },
+      );
     expect(toast.error).toHaveBeenCalledWith('Dieses Jahr gibt es in diesem Budget bereits.');
+  });
+
+  it('saveFyEdit reads plain body validation as an invalid entry, not a duplicate', async () => {
+    const { c, http, toast } = await setup();
+    c.openFyEdit(FY);
+    c.saveFyEdit();
+    http
+      .expectOne((r) => r.method === 'PATCH')
+      .flush(
+        { errors: [{ field: 'body.year', msg: 'Input should be a valid integer' }] },
+        { status: 422, statusText: 'unprocessable' },
+      );
+    expect(toast.error).toHaveBeenCalledWith('Bitte das Jahr prüfen.');
   });
 
   it('saveFyEdit falls back to the generic error on any other status', async () => {
@@ -947,11 +1067,11 @@ describe('BudgetTreeComponent (#9)', () => {
   });
 
   it.each([
-    ['fiscal year still has bookings; remove them first', 'budget.tree.fyBlocked.bookings'],
-    ['fiscal year still has allocations; remove them first', 'budget.tree.fyBlocked.allocations'],
-    ['fiscal year still has applications; remove them first', 'budget.tree.fyBlocked.applications'],
-    ['fiscal year is busy', 'budget.tree.fyBlocked.generic'],
-  ])('409 "%s" explains the blocker in the dialog', async (detail, key) => {
+    ['fiscal_year_has_bookings', 'budget.tree.fyBlocked.bookings'],
+    ['fiscal_year_has_allocations', 'budget.tree.fyBlocked.allocations'],
+    ['fiscal_year_has_applications', 'budget.tree.fyBlocked.applications'],
+    ['conflict', 'budget.tree.fyBlocked.generic'],
+  ])('409 code "%s" explains the blocker in the dialog', async (code, key) => {
     const { c, http, toast, fixture } = await setup();
     const expected = TestBed.inject(I18nService).translate(
       key as Parameters<I18nService['translate']>[0],
@@ -960,7 +1080,10 @@ describe('BudgetTreeComponent (#9)', () => {
     c.doFyDelete();
     http
       .expectOne((r) => r.method === 'DELETE')
-      .flush({ detail }, { status: 409, statusText: 'conflict' });
+      .flush(
+        { code, detail: 'fiscal year still has rows; remove them first' },
+        { status: 409, statusText: 'conflict' },
+      );
     // The dialog stays open and shows the reason. A toast repeats it.
     expect(c.fyDelete()).not.toBeNull();
     expect(c.fyDeleteBlocked()).toBe(expected);

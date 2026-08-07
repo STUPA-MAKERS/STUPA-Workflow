@@ -39,8 +39,8 @@ const VARIANT: CdVariant = {
 };
 
 /** HTTP error stub — only the status matters to the page. */
-function httpError(status: number) {
-  return throwError(() => ({ status }));
+function httpError(status: number, code?: string) {
+  return throwError(() => ({ status, error: code ? { code } : undefined }));
 }
 
 function makeApi(over: Partial<Record<string, unknown>> = {}) {
@@ -60,6 +60,9 @@ function makeApi(over: Partial<Record<string, unknown>> = {}) {
         { ...TITLE_UPLOAD, position: 0 },
         { ...TITLE_LOGO, position: 1 },
       ]),
+    ),
+    updateCdVariantLogo: jest.fn((id: string, patch: { slot?: string }) =>
+      of({ ...TITLE_LOGO, id, slot: patch.slot ?? 'title', position: 1 }),
     ),
     deleteCdVariantLogo: jest.fn(() => of(void 0)),
     cdVariantLogoFileUrl: jest.fn((id: string) => `/api/admin/cd-variant-logos/${id}/file`),
@@ -202,7 +205,7 @@ describe('AdminCdVariantsComponent', () => {
     expect(api.createCdVariant).not.toHaveBeenCalled();
   });
 
-  it('edits a variant: the key stays read-only and only name/base go out', async () => {
+  it('edits a variant: key and base variant stay read-only, only the name goes out', async () => {
     const { api, c, fixture } = await setup();
     await userEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }));
     expect(c.editingId()).toBe('cd-1');
@@ -210,12 +213,12 @@ describe('AdminCdVariantsComponent', () => {
     await fixture.whenStable();
     fixture.detectChanges();
     expect(screen.getByLabelText(/^Schlüssel/)).toBeDisabled();
+    // The render paths pin the document shape per document kind, so a later flip
+    // would change nothing.
+    expect(screen.getByLabelText(/^Basis-Variante/)).toBeDisabled();
     c.patch('name', 'StuPa 2026');
     c.submit(new Event('submit'));
-    expect(api.updateCdVariant).toHaveBeenCalledWith('cd-1', {
-      name: 'StuPa 2026',
-      baseVariant: 'protocol',
-    });
+    expect(api.updateCdVariant).toHaveBeenCalledWith('cd-1', { name: 'StuPa 2026' });
     expect(c.variants()[0].name).toBe('StuPa 2026');
   });
 
@@ -345,13 +348,18 @@ describe('AdminCdVariantsComponent', () => {
   });
 
   it.each([
-    [413, 'admin.cdVariants.logoTooLarge'],
-    [415, 'admin.cdVariants.logoType'],
-    [500, 'admin.common.saveFailed'],
-  ])('maps upload status %i to its own message', async (status, key) => {
-    const file = new File(['x'], 'neu.svg', { type: 'image/svg+xml' });
+    [413, undefined, 'admin.cdVariants.logoTooLarge'],
+    [415, undefined, 'admin.cdVariants.logoType'],
+    [409, 'cd_logo_count_limit', 'admin.cdVariants.logoCountLimit'],
+    [409, 'cd_logo_total_limit', 'admin.cdVariants.logoTotalLimit'],
+    [409, undefined, 'admin.common.saveFailed'],
+    [500, undefined, 'admin.common.saveFailed'],
+  ])('maps upload status %i / code %s to its own message', async (status, code, key) => {
+    const file = new File(['x'], 'neu.png', { type: 'image/png' });
     const { c, toast } = await setup(
-      makeApi({ uploadCdVariantLogo: jest.fn(() => httpError(status as number)) }),
+      makeApi({
+        uploadCdVariantLogo: jest.fn(() => httpError(status as number, code as string | undefined)),
+      }),
     );
     c.openLogoDialog('cd-1', 'title');
     c.onFileSelected({ files: [file] } as unknown as HTMLInputElement);
@@ -391,6 +399,32 @@ describe('AdminCdVariantsComponent', () => {
     expect(c.variants()[0].logos).toHaveLength(3);
   });
 
+  it('moves a logo to the other slot and renumbers both slots', async () => {
+    const { api, c, toast } = await setup();
+    c.moveLogoToSlot(VARIANT, TITLE_LOGO);
+    expect(api.updateCdVariantLogo).toHaveBeenCalledWith('l-1', { slot: 'footer' });
+    const variant = c.variants()[0];
+    expect(c.logosOf(variant, 'title').map((l: CdVariantLogo) => l.id)).toEqual(['l-2']);
+    expect(c.logosOf(variant, 'footer').map((l: CdVariantLogo) => l.id)).toEqual(['l-3', 'l-1']);
+    expect(c.logosOf(variant, 'title')[0].position).toBe(0);
+    expect(toast.success).toHaveBeenCalledWith('Logo verschoben.');
+  });
+
+  it('names the target slot on the move control', async () => {
+    const { c } = await setup();
+    expect(c.moveSlotLabel('title')).toBe('Nach Fußzeile verschieben');
+    expect(c.moveSlotLabel('footer')).toBe('Nach Titelseite verschieben');
+  });
+
+  it('toasts and keeps the slot when the move fails', async () => {
+    const { c, toast } = await setup(
+      makeApi({ updateCdVariantLogo: jest.fn(() => httpError(500)) }),
+    );
+    c.moveLogoToSlot(VARIANT, TITLE_LOGO);
+    expect(toast.error).toHaveBeenCalledWith('Speichern fehlgeschlagen.');
+    expect(c.logosOf(c.variants()[0], 'title')).toHaveLength(2);
+  });
+
   it('reorders inside a slot and keeps the other slot untouched', async () => {
     const { api, c } = await setup();
     c.moveLogo(VARIANT, 'title', 1, -1);
@@ -424,8 +458,7 @@ describe('AdminCdVariantsComponent', () => {
     expect(c.variants()[0].logos).toEqual([]);
   });
 
-  // A thrown string carries no status, and a non-numeric one is unusable. Both
-  // must fall back to the generic message instead of matching 409 by accident.
+  // A status that is missing or non-numeric must not match 409 by accident.
   it.each([['boom'], [{ status: 'nope' }]])(
     'reads an error without a usable status as "no status" (%p)',
     async (thrown) => {

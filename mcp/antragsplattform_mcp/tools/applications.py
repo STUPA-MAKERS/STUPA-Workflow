@@ -105,7 +105,11 @@ async def update_application(application_id: str, data: dict[str, Any]) -> dict:
 
 @group.tool
 async def delete_application(application_id: str) -> dict:
-    """Delete an application. Admin only. You cannot undo this."""
+    """Delete an application. Admin only. You cannot undo this.
+
+    An agent token can never call this: an irreversible delete sits in no OAuth
+    scope, so it needs a browser session.
+    """
     return await api().delete(f"/applications/{application_id}")
 
 

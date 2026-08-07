@@ -21,8 +21,12 @@ from app.modules.budget.tree_models import (
 from app.modules.budget.tree_rules import _SEP
 from app.modules.budget.tree_schemas import ExpenseCreate, ExpenseOut, ExpenseUpdate
 from app.search import dialect_of, trigram_rank
-from app.shared.errors import NotFoundError, ValidationProblem
+from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 from app.shared.paging import Page
+
+# A transfer leg carries these together with its counterpart, so only the
+# transfer entity may change them.
+_TRANSFER_PAIRED: frozenset[str] = frozenset({"amount", "budget_id", "invoice_id"})
 
 
 class ExpenseOps(BudgetTreeServiceBase):
@@ -212,11 +216,22 @@ class ExpenseOps(BudgetTreeServiceBase):
         the extra metadata. The fiscal year and the application binding stay
         fixed. The service writes only the fields that the payload
         sets. An explicit `null` clears an optional field.
+
+        Raises:
+            NotFoundError: No booking has this id (404).
+            ConflictError: The booking is a transfer leg and the patch touches a
+                field that both legs share (409).
         """
         expense = await self.session.get(BudgetExpense, expense_id)
         if expense is None:
             raise NotFoundError(f"budget expense {expense_id} not found")
         fields = payload.model_fields_set
+        if expense.transfer_id is not None and fields & _TRANSFER_PAIRED:
+            raise ConflictError(
+                "Amount, cost centre and invoice belong to both legs; patch "
+                f"/budget-transfers/{expense.transfer_id} instead.",
+                code="transfer_leg_readonly",
+            )
         # Sub-booking invariant: never set the parent amount directly while
         # children exist. It equals the sum of the children. Count the children
         # only when the payload sets an amount, to save one query.

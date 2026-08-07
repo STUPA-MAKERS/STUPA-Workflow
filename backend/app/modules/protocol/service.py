@@ -24,6 +24,7 @@ then rolls back, the protocol stays draft and the caller can repeat the call.
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 from datetime import time as _time
 from uuid import UUID
@@ -80,6 +81,8 @@ from app.shared.errors import (
     NotFoundError,
     ServiceUnavailableError,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def protocol_storage_key(protocol_id: UUID) -> str:
@@ -274,9 +277,8 @@ class ProtocolService:
     ) -> dict[str, object]:
         """Build the column values of a new `protocol` row.
 
-        `cd_variant` is the key of the CD variant of the Gremium. The protocol
-        snapshots it, so a later change of the Gremium does not rewrite the
-        design of a protocol that already exists.
+        `cd_variant` is a snapshot of the CD key of the Gremium, so a later
+        change of the Gremium does not rewrite an existing protocol.
         """
         return {
             "meeting_id": meeting.id,
@@ -358,22 +360,7 @@ class ProtocolService:
     async def delete_protocol(self, protocol_id: UUID, *, actor: str) -> None:
         """Delete a protocol while it is still a draft.
 
-        The draft gate is the whole guard. A `final` protocol is a signed
-        record that went out to the Gremium by mail, and a `rendering`
-        protocol is frozen while the worker builds the PDF. Both answer 409,
-        exactly as `update_markdown` does.
-
-        Permission: the same `authorize_write` scope that the PATCH already
-        enforces, and NOT `protocol.finalize`. `protocol.finalize` gates
-        publishing, a different axis: it decides who may turn a draft into a
-        signed record and mail it out. Discarding a draft is the opposite
-        direction and touches nothing that ever left the platform. The holder
-        of the write scope can already empty the body with
-        `PATCH markdown=""`, so a stricter gate here would protect nothing and
-        would only strand a draft that the protokollant wants to restart.
-
-        The `protocol_vote_ref` rows cascade on the foreign key. The audit log
-        records the removal, because the draft text itself is not recoverable.
+        The `protocol_vote_ref` rows cascade. The caller authorizes the write.
 
         Raises:
             NotFoundError: No protocol has this id (404).
@@ -381,6 +368,13 @@ class ProtocolService:
         """
         protocol = await self._get(protocol_id)
         self._ensure_draft(protocol)
+        # The key derives from the protocol id, so a re-created protocol gets a
+        # new one and the old object would be orphaned for ever.
+        keys = [
+            key
+            for key in (protocol.pdf_storage_key, protocol.public_pdf_storage_key)
+            if key is not None
+        ]
         await audit_record(
             self.session,
             actor=actor,
@@ -394,6 +388,17 @@ class ProtocolService:
         )
         await self.session.delete(protocol)
         await self.session.commit()
+        for key in keys:
+            await self._remove_object(key)
+
+    async def _remove_object(self, object_key: str) -> None:
+        """Drop a stored PDF after the row is gone; a storage failure must not fail the delete."""
+        if self.storage is None:
+            return
+        try:
+            await self.storage.remove(object_key)
+        except StorageError:
+            logger.warning("could not remove protocol PDF object", exc_info=True)
 
     async def embed_votes(
         self, protocol_id: UUID, vote_ids: list[UUID]
@@ -747,12 +752,11 @@ class ProtocolService:
         if self.storage is None or self.pytex is None:
             return None
         try:
-            # The protocol snapshots the CD key of its Gremium at creation, so it
-            # keeps its design even after the Gremium moves to another one.
             cd = await resolve_cd_variant_by_key(
                 self.session, self.storage, protocol.cd_variant
             )
-            variant = cd.base_variant if cd else protocol_variant_for(protocol.cd_variant)
+            # Shape comes from the document kind, not the design; the design adds logos.
+            variant = "protocol" if cd else protocol_variant_for(protocol.cd_variant)
             config = cd_render_config(cd) if cd else None
             assets = cd.assets if cd else None
             # RCE protection: the user-written body can carry the Markdown `eval`
@@ -914,13 +918,13 @@ class ProtocolService:
     def _ensure_draft(protocol: Protocol) -> None:
         if protocol.status == "final":
             raise ConflictError(
-                "Protocol is finalized and read-only.", code="conflict"
+                "Protocol is finalized and read-only.", code="protocol_finalized"
             )
         if protocol.status == "rendering":
             # The content is frozen during the background render. The PDF would
             # otherwise show a different state than the editor.
             raise ConflictError(
-                "Protocol is being rendered and is read-only.", code="conflict"
+                "Protocol is being rendered and is read-only.", code="protocol_rendering"
             )
 
     async def _get_vote(self, vote_id: UUID) -> Vote:

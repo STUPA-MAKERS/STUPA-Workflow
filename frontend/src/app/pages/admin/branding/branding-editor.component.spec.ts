@@ -243,6 +243,23 @@ describe('BrandingEditorComponent (#21)', () => {
     expect(c.slotLabel('favicon').length).toBeGreaterThan(0);
   });
 
+  it('a failed load keeps the crumb and offers a retry', async () => {
+    const getSiteConfig = jest
+      .fn()
+      .mockReturnValueOnce(throwError(() => new Error('boom')))
+      .mockReturnValueOnce(of(STUB_CFG));
+    const { fixture } = await setupWithStub({ getSiteConfig });
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Die Branding-Konfiguration konnte nicht geladen werden.',
+    );
+    expect(screen.getByRole('heading', { name: 'Branding & Texte' })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Erneut versuchen' }));
+    fixture.detectChanges();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByText('Version 3')).toBeInTheDocument();
+  });
+
   it('patch/reemit are no-ops without a draft', async () => {
     const { fixture } = await setupWithStub({ getSiteConfig: jest.fn(() => of({ ...STUB_CFG, draft: null as unknown as Branding })) });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

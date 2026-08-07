@@ -95,8 +95,7 @@ export class UsersComponent {
   protected readonly editDraft = signal<AssignDraft>(emptyDraft());
   protected readonly savingEdit = signal(false);
 
-  /** `admin.users` gates the whole page server-side. The controls follow it, so
-   *  no row action is offered that would answer 403. */
+  /** `admin.users` gates the page server-side; the controls follow it. */
   protected readonly canManageUsers = computed(() => this.auth.can('admin.users'));
 
   protected readonly rolesById = computed(() => new Map(this.roles().map((r) => [r.id, r])));
@@ -241,9 +240,7 @@ export class UsersComponent {
   /**
    * Save the changed assignment.
    *
-   * The route treats a missing field as "do not touch", so an emptied date is
-   * left out instead of sent as null. The dialog states that, because clearing
-   * an expiry needs a revoke and a fresh assignment.
+   * A missing field means "do not touch", so an emptied date is left out.
    */
   protected saveEdit(): void {
     const assignment = this.editing();
@@ -269,8 +266,7 @@ export class UsersComponent {
       },
       error: (err: { status?: number }) => {
         this.savingEdit.set(false);
-        // 403 = the self-lockout guard. An admin must not change their own
-        // admin assignment. Name that reason instead of a generic failure.
+        // 403 = the self-lockout guard on the own admin assignment.
         const key =
           err.status === 403 ? 'admin.users.editSelfBlocked' : 'admin.users.editFailed';
         this.toast.error(this.i18n.translate(key));

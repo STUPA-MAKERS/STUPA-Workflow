@@ -1,15 +1,8 @@
-"""Resolve the corporate design of a Gremium for the render path.
+"""Resolve the corporate design of a Gremium into the logo tuples pytex expects.
 
-This module is the seam between the admin CRUD and the PDF renderers. It turns
-the ``cd_variant`` rows of a Gremium into the two logo tuples that pytex expects
-plus the asset bytes that go with them.
-
-A vendored logo contributes only its name (``INF``, ``MAKERS``, ...). pytex ships
-that file. An uploaded logo contributes a plain asset file name to the tuple AND
-its bytes to ``assets``. The caller writes those bytes next to the document
-before the render, under exactly the returned name. The name holds no path
-separator, because pytex refuses one, and it carries the logo row id, so two
-uploads of the same original name never collide.
+A vendored logo contributes only its name; an uploaded one contributes an asset
+file name plus its bytes, which the caller must write next to the document under
+exactly that name before the render.
 """
 
 from __future__ import annotations
@@ -73,9 +66,8 @@ async def resolve_cd_variant(
         no variant, or the referenced variant is gone.
 
     Raises:
-        ServiceUnavailableError: The variant holds an uploaded logo, but the
-            object storage is off or unreachable. The render must fail loudly
-            instead of producing a document with a missing logo.
+        ServiceUnavailableError: The variant holds an uploaded logo and the
+            object storage is off or unreachable.
     """
     if gremium_id is None:
         return None
@@ -95,9 +87,8 @@ async def resolve_cd_variant_by_key(
 ) -> ResolvedCdVariant | None:
     """Resolve a corporate design by its key.
 
-    A protocol snapshots the key of its Gremium when it is created, so the
-    document keeps its design even after the Gremium moves to another one. That
-    path must resolve the snapshot, never the Gremium of today.
+    A protocol snapshots the key of its Gremium at creation and must resolve
+    that snapshot, never the variant the Gremium holds today.
 
     Returns:
         The resolved variant, or ``None`` when no key is given or no variant
@@ -149,9 +140,8 @@ async def _resolve(
 def cd_render_config(cd: ResolvedCdVariant) -> dict[str, object]:
     """Return the pytex `config` object that carries the logos of a design.
 
-    pytex reads the keys `logos` and `footer_logos`. An empty tuple stays out of
-    the object, because an empty list would override the default of the document
-    shape with nothing instead of leaving it alone.
+    An empty tuple stays out of the object, because an empty list would override
+    the default of the document shape instead of leaving it alone.
     """
     config: dict[str, object] = {}
     if cd.title_logos:

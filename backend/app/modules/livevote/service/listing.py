@@ -245,7 +245,7 @@ class ListingOps(PermissionOps, VoteReadOps):
             if prot_ids
             else {}
         )
-        if "admin" in principal.roles or principal.has("meeting.manage"):
+        if principal.has("meeting.manage"):
             manage_ids = write_ids = votes_mgmt_ids = vote_ids = all_gids
             my_id: UUID | None = None
         else:

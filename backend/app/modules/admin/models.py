@@ -35,13 +35,8 @@ from app.db import Base, CreatedAtMixin, UUIDPkMixin
 class CdVariant(UUIDPkMixin, CreatedAtMixin, Base):
     """Corporate-design variant — an admin-managed set of document logos.
 
-    A variant controls the title-page logos and the footer logos of a rendered
-    document plus its display name. It controls no color and no font. The
-    platform can hold arbitrarily many variants.
-
-    ``key`` is the stable slug. It is immutable after the create, because the
-    render path and the seed data reference it. ``base_variant`` names the pytex
-    document shape that the variant builds on.
+    ``key`` is immutable after the create, because the render path and the seed
+    data reference it. ``base_variant`` names the pytex document shape.
     """
 
     __tablename__ = "cd_variant"
@@ -60,12 +55,9 @@ class CdVariant(UUIDPkMixin, CreatedAtMixin, Base):
 class CdVariantLogo(UUIDPkMixin, CreatedAtMixin, Base):
     """One logo of a corporate-design variant, in one slot at one position.
 
-    A row is EITHER a vendored pytex logo (``vendored_name``) OR an uploaded
-    object in MinIO (``object_key`` with ``file_name``, ``mime`` and ``size``).
-    The check constraint ``ck_cd_variant_logo_source`` holds the exactly-one-of
-    rule in the database, so no code path can write a row with both or neither.
-
-    ``position`` orders the logos inside one slot, lowest first.
+    A row is either a vendored pytex logo (``vendored_name``) or an uploaded
+    object (``object_key``); ``ck_cd_variant_logo_source`` holds that
+    exactly-one-of rule in the database.
     """
 
     __tablename__ = "cd_variant_logo"
@@ -100,9 +92,7 @@ class Gremium(UUIDPkMixin, CreatedAtMixin, Base):
 
     name: Mapped[str] = mapped_column(Text)
     slug: Mapped[str] = mapped_column(Text, unique=True)
-    # Corporate design of the rendered documents. NULL = no variant, so the
-    # render path falls back to the pytex default. The FK is RESTRICT: a variant
-    # that a gremium still references cannot be deleted (the service answers 409).
+    # NULL = no variant, so the render path falls back to the pytex default.
     cd_variant_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("cd_variant.id", ondelete="RESTRICT"), nullable=True
     )

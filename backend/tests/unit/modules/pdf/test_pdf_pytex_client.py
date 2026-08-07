@@ -140,8 +140,7 @@ async def test_render_unexpected_content_type_permanent() -> None:
     assert ei.value.retryable is False
 
 
-# Config + assets channel: the caller pushes uploaded Corporate-Design logos into a
-# render. Only such a call switches the wire shape to multipart.
+# Config + assets channel: only such a call switches the wire shape to multipart.
 
 LOGO = b"\x89PNG\r\n\x1a\nfake-logo"
 CONFIG: dict[str, object] = {"logos": ["stupa.png"], "footer_logos": "asta.png"}

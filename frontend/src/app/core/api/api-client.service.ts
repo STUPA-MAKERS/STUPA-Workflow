@@ -5,6 +5,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { skipLoading } from '@core/loading/loading.interceptor';
 import { API_BASE_URL } from './api.config';
 import {
+  mapApplicant,
   mapApplication,
   mapApplicationCreated,
   mapApplicationListItem,
@@ -27,6 +28,8 @@ import type {
   McpSetup,
   NotificationPreference,
   OAuthGrant,
+  Applicant,
+  ApplicantOutWire,
   Application,
   ApplicationComment,
   ApplicationCreated,
@@ -305,16 +308,26 @@ export class ApiClient {
       .pipe(map(mapComment));
   }
 
-  /**
-   * PATCH /applications/{id}/comments/{commentId} — replace the body.
-   *
-   * The visibility is deliberately not patchable. Allowed for the author of the
-   * comment and for a holder of `application.manage`. The server decides.
-   */
+  /** PATCH /applications/{id}/comments/{commentId} — the body only, not the visibility. */
   updateComment(id: Uuid, commentId: Uuid, body: string): Observable<ApplicationComment> {
     return this.http
       .patch<CommentOutWire>(`${this.base}/applications/${id}/comments/${commentId}`, { body })
       .pipe(map(mapComment));
+  }
+
+  /**
+   * PATCH /applications/{id}/applicant — correct the applicant name or email.
+   *
+   * Needs `application.manage`. The email is the magic-link and notification
+   * target, so a typo locks the applicant out. An anonymized applicant gives 409.
+   */
+  updateApplicant(
+    id: Uuid,
+    patch: { email?: string; name?: string },
+  ): Observable<Applicant | null> {
+    return this.http
+      .patch<ApplicantOutWire>(`${this.base}/applications/${id}/applicant`, patch)
+      .pipe(map(mapApplicant));
   }
 
   /** DELETE /applications/{id}/comments/{commentId} — author or `application.manage`. */
@@ -322,12 +335,7 @@ export class ApiClient {
     return this.http.delete<void>(`${this.base}/applications/${id}/comments/${commentId}`);
   }
 
-  /**
-   * POST /applications/{id}/pdf — start an async PDF render.
-   *
-   * The answer is 202 with a job in the `pending` state. Poll it with
-   * {@link getJob}. Access follows the read scope of the application.
-   */
+  /** POST /applications/{id}/pdf — 202 with a `pending` job; poll it with {@link getJob}. */
   createApplicationPdf(id: Uuid): Observable<RenderJob> {
     return this.http.post<RenderJob>(`${this.base}/applications/${id}/pdf`, {});
   }
@@ -693,8 +701,7 @@ export class ApiClient {
   /**
    * DELETE /votes/{id} — remove a standalone vote that never opened.
    *
-   * The server answers 409 with `vote_meeting_bound`, `vote_not_draft` or
-   * `vote_has_ballots`. Use `cancel` for a vote that is already open.
+   * 409 carries `vote_meeting_bound`, `vote_not_draft` or `vote_has_ballots`.
    */
   deleteVote(voteId: Uuid): Observable<void> {
     return this.http.delete<void>(`${this.base}/votes/${voteId}`);
@@ -746,12 +753,7 @@ export class ApiClient {
       .pipe(map(mapProtocol));
   }
 
-  /**
-   * DELETE /protocols/{id} — discard a draft protocol.
-   *
-   * The scope is the same as the PATCH: whoever may write the minutes may drop
-   * them. The server answers 409 once the protocol is `final` or `rendering`.
-   */
+  /** DELETE /protocols/{id} — discard a draft; 409 once it is `final` or `rendering`. */
   deleteProtocol(protocolId: Uuid): Observable<void> {
     return this.http.delete<void>(`${this.base}/protocols/${protocolId}`);
   }

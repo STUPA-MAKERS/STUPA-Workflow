@@ -188,6 +188,9 @@ export const de = {
   'expenses.transfers.saved': 'Übertrag gespeichert.',
   'expenses.transfers.immutablePair':
     'Die Kostenstellen eines Übertrags lassen sich nicht ändern. Buche stattdessen einen neuen Übertrag.',
+  'expenses.transfers.forbidden': 'Für Überträge fehlt dir die Berechtigung.',
+  'expenses.transfers.gone': 'Dieser Übertrag existiert nicht mehr.',
+  'expenses.transfers.invalid': 'Betrag und Beschreibung sind Pflicht.',
   'expenses.transfers.deleteTitle': 'Übertrag löschen',
   'expenses.transfers.deleteBody':
     'Der Übertrag wird mit beiden Buchungen gelöscht. Das lässt sich nicht rückgängig machen.',
@@ -357,6 +360,14 @@ export const de = {
   'invoices.toast.saved': 'Rechnung gespeichert.',
   'invoices.toast.deleted': 'Rechnung gelöscht.',
   'invoices.toast.failed': 'Aktion fehlgeschlagen.',
+  'invoices.error.currency': 'Nur Rechnungen in Euro werden unterstützt.',
+  'invoices.error.notZugferd': 'Diese PDF enthält keine ZUGFeRD-Daten.',
+  'invoices.error.forbidden': 'Für Rechnungen fehlt dir die Berechtigung.',
+  'invoices.error.gone': 'Diese Rechnung existiert nicht mehr.',
+  'invoices.error.tooLarge': 'Die Datei ist zu groß.',
+  'invoices.error.badFile': 'Nur PDF-Dateien sind erlaubt. Der Virenscan kann die Datei auch abgelehnt haben.',
+  'invoices.error.invalid': 'Bitte die Eingaben prüfen. Der Bruttobetrag ist Pflicht.',
+  'invoices.error.unavailable': 'Der Dienst ist gerade nicht erreichbar. Bitte später erneut versuchen.',
   'action.close': 'Schließen',
 
   'theme.toggle': 'Erscheinungsbild wechseln',
@@ -580,6 +591,14 @@ export const de = {
   'applications.detail.deleteConfirm':
     'Diesen Antrag endgültig löschen? Das kann nicht rückgängig gemacht werden.',
   'applications.detail.anonymized': 'Anonymisiert',
+  'applications.applicant.edit': 'Antragstellende Person bearbeiten',
+  'applications.applicant.editTitle': 'Antragstellende Person bearbeiten',
+  'applications.applicant.emailHint':
+    'An diese Adresse gehen der Magic-Link und alle Benachrichtigungen.',
+  'applications.applicant.saved': 'Antragstellende Person aktualisiert.',
+  'applications.applicant.anonymized':
+    'Die Daten sind anonymisiert und lassen sich nicht wiederherstellen.',
+  'applications.applicant.saveFailed': 'Speichern fehlgeschlagen.',
   'applications.detail.eraseRequest': 'Anonymisierung beantragen',
   'applications.detail.eraseTitle': 'Anonymisierung beantragen',
   'applications.detail.eraseConfirm':
@@ -846,7 +865,15 @@ export const de = {
     'Der Entwurf des Protokolls wird endgültig gelöscht. Der TOP-Text bleibt erhalten, das Protokoll muss danach neu angelegt werden.',
   'meetings.protocol.deleted': 'Protokollentwurf verworfen.',
   'meetings.protocol.deleteConflict':
-    'Das Protokoll ist kein Entwurf mehr und lässt sich nicht mehr verwerfen',
+    'Das Protokoll ist kein Entwurf mehr und lässt sich nicht mehr verwerfen.',
+  'meetings.protocol.deleteConflictFinal':
+    'Das Protokoll ist bereits final und lässt sich nicht mehr verwerfen.',
+  'meetings.protocol.deleteConflictRendering':
+    'Das PDF des Protokolls wird gerade erzeugt. Bitte danach erneut versuchen.',
+  'meetings.protocol.conflictFinal':
+    'Das Protokoll ist bereits final und lässt sich nicht mehr ändern.',
+  'meetings.protocol.conflictRendering':
+    'Das PDF des Protokolls wird gerade erzeugt. Solange bleibt der Text gesperrt.',
   'meetings.protocol.deleteFailed': 'Der Protokollentwurf konnte nicht verworfen werden.',
   'meetings.create.title': 'Sitzung anlegen',
   'meetings.create.lead': 'Lege eine neue Sitzung an, um Anträge und Abstimmungen zu steuern.',
@@ -1023,6 +1050,17 @@ export const de = {
   'budget.tree.setLimit': 'Limit setzen',
   'budget.tree.limitTitle': 'Limit (Zuteilung) setzen',
   'budget.tree.limitFor': 'Zugeteiltes Budget (für gewähltes HHJ)',
+  'budget.tree.allocDelete': 'Zuteilung entfernen',
+  'budget.tree.allocDeleteTitle': 'Zuteilung entfernen?',
+  'budget.tree.allocDeleteConfirm':
+    'Die Zuteilung von {node} für {year} wird entfernt. Erst danach lässt sich das Haushaltsjahr löschen.',
+  'budget.tree.toast.allocDeleted': 'Zuteilung entfernt.',
+  // Fehlercodes des Servers: 404 (keine Zuteilung) und 422 (Kinder halten noch Mittel).
+  'budget.tree.allocBlocked.missing':
+    'Für diese Kostenstelle und dieses Haushaltsjahr gibt es keine Zuteilung mehr.',
+  'budget.tree.allocBlocked.children':
+    'Unter-Kostenstellen halten noch Mittel aus dieser Zuteilung. Bitte deren Zuteilungen zuerst entfernen.',
+  'budget.tree.allocBlocked.generic': 'Zuteilung konnte nicht entfernt werden.',
   'budget.tree.gremiumFilter': 'Gremium',
   'budget.tree.allGremien': 'Alle Gremien',
   'budget.tree.fiscalYear': 'Haushaltsjahr',
@@ -1117,6 +1155,7 @@ export const de = {
   'budget.tree.toast.fyFailed': 'Haushaltsjahr konnte nicht angelegt werden (bereits vorhanden?).',
   'budget.tree.toast.fySaved': 'Haushaltsjahr gespeichert.',
   'budget.tree.toast.fyDuplicate': 'Dieses Jahr gibt es in diesem Budget bereits.',
+  'budget.tree.toast.fyInvalid': 'Bitte das Jahr prüfen.',
   'budget.tree.toast.fyDeleted': 'Haushaltsjahr gelöscht.',
   'budget.tree.toast.fyDeleteFailed': 'Haushaltsjahr konnte nicht gelöscht werden.',
   'budget.tree.fyExisting': 'Vorhandene Haushaltsjahre',
@@ -1132,7 +1171,7 @@ export const de = {
   'budget.tree.fyBlocked.bookings':
     'Auf diesem Haushaltsjahr liegen noch Buchungen. Bitte diese zuerst löschen oder in ein anderes Jahr umbuchen.',
   'budget.tree.fyBlocked.allocations':
-    'Auf diesem Haushaltsjahr liegen noch Mittel-Zuteilungen. Bitte diese zuerst auf 0 setzen oder entfernen.',
+    'Auf diesem Haushaltsjahr liegen noch Mittel-Zuteilungen. Bitte diese zuerst über »Zuteilung entfernen« löschen; ein Wert von 0 genügt nicht.',
   'budget.tree.fyBlocked.applications':
     'Diesem Haushaltsjahr sind noch Anträge zugeordnet. Bitte diese zuerst in ein anderes Jahr verschieben.',
   'budget.tree.fyBlocked.generic':
@@ -1158,6 +1197,7 @@ export const de = {
   'admin.common.required': 'Pflichtfeld',
   'admin.common.saved': 'Gespeichert.',
   'admin.common.saveFailed': 'Speichern fehlgeschlagen.',
+  'admin.common.retry': 'Erneut versuchen',
   'admin.common.invalid': 'Bitte Fehler beheben, bevor gespeichert wird.',
   'admin.common.preview': 'Vorschau',
   'admin.common.cancel': 'Abbrechen',
@@ -1447,6 +1487,7 @@ export const de = {
   'admin.brand.activate': 'Entwurf aktivieren',
   'admin.brand.activated': 'Branding aktiviert (Version {n}).',
   'admin.brand.badUrl': 'Unzulässige Link-URL — nur http(s):// oder mailto: erlaubt.',
+  'admin.brand.loadFailed': 'Die Branding-Konfiguration konnte nicht geladen werden.',
   'admin.brand.previewHeader': 'Kopf-Vorschau',
   'admin.brand.previewFooter': 'Fuß-Vorschau',
 
@@ -1562,6 +1603,8 @@ export const de = {
   'admin.audit.action.webhook_config': 'Webhook-Konfiguration',
   'admin.audit.action.attachment_quarantine': 'Anhang-Quarantäne',
   'admin.audit.action.attachment_delete': 'Anhang gelöscht',
+  'admin.audit.action.application_delete': 'Antrag gelöscht',
+  'admin.audit.action.meeting_delete': 'Sitzung gelöscht',
   'admin.audit.action.comment_update': 'Kommentar geändert',
   'admin.audit.action.comment_delete': 'Kommentar gelöscht',
   'admin.audit.action.protocol_delete': 'Protokoll gelöscht',
@@ -1570,6 +1613,7 @@ export const de = {
   'admin.audit.action.budget_node_update': 'Kostenstelle geändert',
   'admin.audit.action.budget_node_delete': 'Kostenstelle gelöscht',
   'admin.audit.action.budget_allocation_set': 'Mittel-Zuteilung gesetzt',
+  'admin.audit.action.budget_allocation_delete': 'Mittel-Zuteilung entfernt',
   'admin.audit.action.budget_expense_create': 'Buchung erfasst',
   'admin.audit.action.budget_expense_update': 'Buchung geändert',
   'admin.audit.action.budget_expense_delete': 'Buchung gelöscht',
@@ -1601,6 +1645,7 @@ export const de = {
   'admin.audit.targetType.budget_transfer': 'Umbuchung',
   'admin.audit.targetType.budget_expense': 'Buchung',
   'admin.audit.targetType.invoice': 'Rechnung',
+  'admin.audit.targetType.meeting': 'Sitzung',
   'admin.audit.targetType.comment': 'Kommentar',
   'admin.audit.targetType.protocol': 'Protokoll',
   'admin.audit.targetType.fiscal_year': 'Haushaltsjahr',
@@ -1661,6 +1706,8 @@ export const de = {
   'admin.audit.msg.attachment_quarantine':
     '{actor} hat einen Anhang in Quarantäne verschoben ({target}).',
   'admin.audit.msg.attachment_delete': '{actor} hat einen Anhang gelöscht ({target}).',
+  'admin.audit.msg.application_delete': '{actor} hat einen Antrag gelöscht ({target}).',
+  'admin.audit.msg.meeting_delete': '{actor} hat eine Sitzung gelöscht ({target}).',
   'admin.audit.msg.comment_update': '{actor} hat einen Kommentar geändert ({target}).',
   'admin.audit.msg.comment_delete': '{actor} hat einen Kommentar gelöscht ({target}).',
   'admin.audit.msg.protocol_delete': '{actor} hat ein Protokoll gelöscht ({target}).',
@@ -1669,6 +1716,8 @@ export const de = {
   'admin.audit.msg.budget_node_update': '{actor} hat eine Kostenstelle geändert ({target}).',
   'admin.audit.msg.budget_node_delete': '{actor} hat eine Kostenstelle gelöscht ({target}).',
   'admin.audit.msg.budget_allocation_set': '{actor} hat eine Mittel-Zuteilung gesetzt ({target}).',
+  'admin.audit.msg.budget_allocation_delete':
+    '{actor} hat eine Mittel-Zuteilung entfernt ({target}).',
   'admin.audit.msg.budget_expense_create': '{actor} hat eine Buchung erfasst ({target}).',
   'admin.audit.msg.budget_expense_update': '{actor} hat eine Buchung geändert ({target}).',
   'admin.audit.msg.budget_expense_delete': '{actor} hat eine Buchung gelöscht ({target}).',
@@ -1814,6 +1863,8 @@ export const de = {
   'admin.cdVariants.keyExists': 'Dieser Schlüssel ist bereits vergeben.',
   'admin.cdVariants.base': 'Basis-Variante',
   'admin.cdVariants.baseHint': 'Die pytex-Dokumentform, auf der die Variante aufbaut.',
+  'admin.cdVariants.baseLocked':
+    'Die Dokumentform wird beim Anlegen festgelegt und ist danach unveränderlich.',
   'admin.cdVariants.base.report': 'Bericht',
   'admin.cdVariants.base.protocol': 'Protokoll',
   'admin.cdVariants.col.name': 'Name',
@@ -1827,6 +1878,8 @@ export const de = {
   'admin.cdVariants.addLogo': 'Logo hinzufügen',
   'admin.cdVariants.removeLogo': 'Logo entfernen',
   'admin.cdVariants.logoRemoved': 'Logo entfernt.',
+  'admin.cdVariants.moveToSlot': 'Nach {slot} verschieben',
+  'admin.cdVariants.logoMoved': 'Logo verschoben.',
   'admin.cdVariants.source': 'Quelle',
   'admin.cdVariants.sourceUpload': 'Datei hochladen',
   'admin.cdVariants.sourceVendored': 'Mitgeliefertes Logo',
@@ -1835,7 +1888,12 @@ export const de = {
   'admin.cdVariants.vendoredName': 'Logo',
   'admin.cdVariants.vendoredHint': 'Diese Logos liefert pytex mit. Ein Upload ist nicht nötig.',
   'admin.cdVariants.file': 'Datei',
-  'admin.cdVariants.fileHint': 'PNG, JPEG, WebP, SVG oder PDF, höchstens {mb} MB.',
+  'admin.cdVariants.fileHint':
+    'PNG, JPEG, WebP oder PDF, höchstens {mb} MB. Je Variante höchstens {max} Dateien und {totalMb} MB zusammen.',
+  'admin.cdVariants.logoCountLimit':
+    'Diese Variante hat die höchste Zahl hochgeladener Logos erreicht. Bitte zuerst eines entfernen.',
+  'admin.cdVariants.logoTotalLimit':
+    'Die hochgeladenen Logos dieser Variante überschreiten zusammen die zulässige Gesamtgröße. Bitte zuerst eines entfernen.',
   'admin.cdVariants.logoTooLarge': 'Die Datei ist zu groß.',
   'admin.cdVariants.logoType': 'Dieser Dateityp ist nicht erlaubt.',
   'admin.cdVariants.download': 'Datei herunterladen',
@@ -1844,6 +1902,8 @@ export const de = {
   'admin.cdVariants.deleted': 'CD-Variante gelöscht.',
   'admin.cdVariants.inUse':
     'Diese Variante ist noch einem Gremium zugewiesen. Ändern Sie zuerst das Gremium.',
+  'admin.cdVariants.conflict':
+    'Die Variante hat sich zwischenzeitlich geändert. Bitte die Seite neu laden.',
   'admin.deleg.title': 'Vertretung / Delegation',
   'admin.deleg.subtitle':
     'Sitzungsgebundene Vertretungen im Überblick. Mitglieder richten ihre Vertretung selbst auf der Sitzungsseite ein; der Stellvertreter-Pool wird je Gremium in der Mitgliederverwaltung gepflegt.',
@@ -1892,7 +1952,10 @@ export const de = {
   'delegation.card.votingBadge': 'Stimmrecht',
   'delegation.card.poolBadge': 'Pool',
   'delegation.card.revoke': 'Vertretung widerrufen',
+  'delegation.card.change': 'Vertretung ändern',
   'delegation.dialog.title': 'Vertretung einrichten',
+  'delegation.dialog.editTitle': 'Vertretung ändern',
+  'delegation.dialog.saveSubmit': 'Änderung speichern',
   'delegation.dialog.cancel': 'Abbrechen',
   'delegation.dialog.submit': 'Vertretung einrichten',
   'delegation.dialog.recipient': 'Vertreten durch',
@@ -1910,6 +1973,8 @@ export const de = {
     'Die Übertragung des Stimmrechts ist serverseitig deaktiviert (satzungsrechtlicher Vorbehalt) — die Vertretung gilt ohne Stimmrecht.',
   'delegation.toast.created': 'Vertretung eingerichtet.',
   'delegation.toast.createFailed': 'Vertretung konnte nicht eingerichtet werden.',
+  'delegation.toast.updated': 'Vertretung geändert.',
+  'delegation.toast.updateFailed': 'Vertretung konnte nicht geändert werden.',
   'delegation.toast.revoked': 'Vertretung widerrufen.',
   'delegation.toast.revokeFailed': 'Widerruf fehlgeschlagen.',
   'delegation.dash.title': 'Vertretung',
@@ -2482,6 +2547,9 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'expenses.transfers.saved': 'Transfer saved.',
   'expenses.transfers.immutablePair':
     'The cost centres of a transfer cannot change. Book a new transfer instead.',
+  'expenses.transfers.forbidden': 'You do not have the permission for transfers.',
+  'expenses.transfers.gone': 'This transfer no longer exists.',
+  'expenses.transfers.invalid': 'The amount and the description are mandatory.',
   'expenses.transfers.deleteTitle': 'Delete transfer',
   'expenses.transfers.deleteBody':
     'The transfer is deleted with both of its bookings. This cannot be undone.',
@@ -2650,6 +2718,14 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'invoices.toast.saved': 'Invoice saved.',
   'invoices.toast.deleted': 'Invoice deleted.',
   'invoices.toast.failed': 'Action failed.',
+  'invoices.error.currency': 'Only invoices in euro are supported.',
+  'invoices.error.notZugferd': 'This PDF holds no ZUGFeRD data.',
+  'invoices.error.forbidden': 'You do not have the permission for invoices.',
+  'invoices.error.gone': 'This invoice no longer exists.',
+  'invoices.error.tooLarge': 'The file is too large.',
+  'invoices.error.badFile': 'Only PDF files are allowed. The virus scan can also have rejected the file.',
+  'invoices.error.invalid': 'Check the entries. The gross amount is mandatory.',
+  'invoices.error.unavailable': 'The service is not available now. Try again later.',
 
   'theme.toggle': 'Toggle appearance',
   'theme.light': 'Light',
@@ -2871,6 +2947,14 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'applications.detail.deleteConfirm':
     'Permanently delete this application? This cannot be undone.',
   'applications.detail.anonymized': 'Anonymised',
+  'applications.applicant.edit': 'Edit the applicant',
+  'applications.applicant.editTitle': 'Edit the applicant',
+  'applications.applicant.emailHint':
+    'The magic link and every notification go to this address.',
+  'applications.applicant.saved': 'Applicant updated.',
+  'applications.applicant.anonymized':
+    'The data is anonymised and cannot be restored.',
+  'applications.applicant.saveFailed': 'Could not save.',
   'applications.detail.eraseRequest': 'Request anonymisation',
   'applications.detail.eraseTitle': 'Request anonymisation',
   'applications.detail.eraseConfirm':
@@ -3129,7 +3213,15 @@ export const en: Partial<Record<TranslationKey, string>> = {
     'The draft of the minutes is deleted permanently. The agenda-item text stays, but the minutes must be created again.',
   'meetings.protocol.deleted': 'Draft minutes discarded.',
   'meetings.protocol.deleteConflict':
-    'The minutes are no longer a draft and cannot be discarded',
+    'The minutes are no longer a draft and cannot be discarded.',
+  'meetings.protocol.deleteConflictFinal':
+    'The minutes are already final and cannot be discarded.',
+  'meetings.protocol.deleteConflictRendering':
+    'The PDF of the minutes is being built. Try again afterwards.',
+  'meetings.protocol.conflictFinal':
+    'The minutes are already final and cannot be changed.',
+  'meetings.protocol.conflictRendering':
+    'The PDF of the minutes is being built. The text stays locked until it is done.',
   'meetings.protocol.deleteFailed': 'Could not discard the draft minutes.',
   'meetings.create.title': 'Create meeting',
   'meetings.create.lead': 'Create a new meeting to steer applications and votes.',
@@ -3303,6 +3395,17 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'budget.tree.setLimit': 'Set limit',
   'budget.tree.limitTitle': 'Set limit (allocation)',
   'budget.tree.limitFor': 'Allocated budget (for the selected fiscal year)',
+  'budget.tree.allocDelete': 'Remove allocation',
+  'budget.tree.allocDeleteTitle': 'Remove allocation?',
+  'budget.tree.allocDeleteConfirm':
+    'The allocation of {node} for {year} is removed. Only then can you delete the fiscal year.',
+  'budget.tree.toast.allocDeleted': 'Allocation removed.',
+  // Server error codes: 404 (no allocation) and 422 (children still hold funds).
+  'budget.tree.allocBlocked.missing':
+    'This cost centre has no allocation for this fiscal year any more.',
+  'budget.tree.allocBlocked.children':
+    'Sub-cost-centres still hold funds from this allocation. Remove their allocations first.',
+  'budget.tree.allocBlocked.generic': 'Could not remove the allocation.',
   'budget.tree.gremiumFilter': 'Committee',
   'budget.tree.allGremien': 'All committees',
   'budget.tree.fiscalYear': 'Fiscal year',
@@ -3396,6 +3499,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'budget.tree.toast.fyFailed': 'Fiscal year could not be created (already exists?).',
   'budget.tree.toast.fySaved': 'Fiscal year saved.',
   'budget.tree.toast.fyDuplicate': 'This year already exists in this budget.',
+  'budget.tree.toast.fyInvalid': 'Check the year.',
   'budget.tree.toast.fyDeleted': 'Fiscal year deleted.',
   'budget.tree.toast.fyDeleteFailed': 'Could not delete the fiscal year.',
   'budget.tree.fyExisting': 'Existing fiscal years',
@@ -3410,7 +3514,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'budget.tree.fyBlocked.bookings':
     'This fiscal year still carries bookings. Delete them first, or move them to another year.',
   'budget.tree.fyBlocked.allocations':
-    'This fiscal year still carries allocations. Set them to 0 first, or remove them.',
+    'This fiscal year still carries allocations. Remove them with “Remove allocation” first; a value of 0 is not enough.',
   'budget.tree.fyBlocked.applications':
     'Applications are still assigned to this fiscal year. Move them to another year first.',
   'budget.tree.fyBlocked.generic':
@@ -3435,6 +3539,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.common.required': 'Required',
   'admin.common.saved': 'Saved.',
   'admin.common.saveFailed': 'Save failed.',
+  'admin.common.retry': 'Try again',
   'admin.common.invalid': 'Please fix the errors before saving.',
   'admin.common.preview': 'Preview',
   'admin.common.cancel': 'Cancel',
@@ -3724,6 +3829,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.brand.activate': 'Activate draft',
   'admin.brand.activated': 'Branding activated (version {n}).',
   'admin.brand.badUrl': 'Disallowed link URL — only http(s):// or mailto: are allowed.',
+  'admin.brand.loadFailed': 'Could not load the branding configuration.',
   'admin.brand.previewHeader': 'Header preview',
   'admin.brand.previewFooter': 'Footer preview',
 
@@ -3839,6 +3945,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.audit.action.webhook_config': 'Webhook configuration',
   'admin.audit.action.attachment_quarantine': 'Attachment quarantine',
   'admin.audit.action.attachment_delete': 'Attachment deleted',
+  'admin.audit.action.application_delete': 'Application deleted',
+  'admin.audit.action.meeting_delete': 'Meeting deleted',
   'admin.audit.action.comment_update': 'Comment changed',
   'admin.audit.action.comment_delete': 'Comment deleted',
   'admin.audit.action.protocol_delete': 'Protocol deleted',
@@ -3847,6 +3955,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.audit.action.budget_node_update': 'Cost centre updated',
   'admin.audit.action.budget_node_delete': 'Cost centre deleted',
   'admin.audit.action.budget_allocation_set': 'Allocation set',
+  'admin.audit.action.budget_allocation_delete': 'Allocation removed',
   'admin.audit.action.budget_expense_create': 'Expense booked',
   'admin.audit.action.budget_expense_update': 'Expense updated',
   'admin.audit.action.budget_expense_delete': 'Expense deleted',
@@ -3878,6 +3987,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.audit.targetType.budget_transfer': 'Transfer',
   'admin.audit.targetType.budget_expense': 'Expense',
   'admin.audit.targetType.invoice': 'Invoice',
+  'admin.audit.targetType.meeting': 'Meeting',
   'admin.audit.targetType.comment': 'Comment',
   'admin.audit.targetType.protocol': 'Protocol',
   'admin.audit.targetType.fiscal_year': 'Fiscal year',
@@ -3932,6 +4042,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.audit.msg.webhook_config': '{actor} configured a webhook ({target}).',
   'admin.audit.msg.attachment_quarantine': '{actor} quarantined an attachment ({target}).',
   'admin.audit.msg.attachment_delete': '{actor} deleted an attachment ({target}).',
+  'admin.audit.msg.application_delete': '{actor} deleted an application ({target}).',
+  'admin.audit.msg.meeting_delete': '{actor} deleted a meeting ({target}).',
   'admin.audit.msg.comment_update': '{actor} changed a comment ({target}).',
   'admin.audit.msg.comment_delete': '{actor} deleted a comment ({target}).',
   'admin.audit.msg.protocol_delete': '{actor} deleted a protocol ({target}).',
@@ -3940,6 +4052,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.audit.msg.budget_node_update': '{actor} updated a cost centre ({target}).',
   'admin.audit.msg.budget_node_delete': '{actor} deleted a cost centre ({target}).',
   'admin.audit.msg.budget_allocation_set': '{actor} set a budget allocation ({target}).',
+  'admin.audit.msg.budget_allocation_delete': '{actor} removed a budget allocation ({target}).',
   'admin.audit.msg.budget_expense_create': '{actor} booked an expense ({target}).',
   'admin.audit.msg.budget_expense_update': '{actor} updated an expense ({target}).',
   'admin.audit.msg.budget_expense_delete': '{actor} deleted an expense ({target}).',
@@ -4081,6 +4194,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.cdVariants.keyExists': 'This key is already in use.',
   'admin.cdVariants.base': 'Base variant',
   'admin.cdVariants.baseHint': 'The pytex document shape the variant builds on.',
+  'admin.cdVariants.baseLocked': 'The document shape is set at creation and cannot change.',
   'admin.cdVariants.base.report': 'Report',
   'admin.cdVariants.base.protocol': 'Protocol',
   'admin.cdVariants.col.name': 'Name',
@@ -4094,6 +4208,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.cdVariants.addLogo': 'Add logo',
   'admin.cdVariants.removeLogo': 'Remove logo',
   'admin.cdVariants.logoRemoved': 'Logo removed.',
+  'admin.cdVariants.moveToSlot': 'Move to {slot}',
+  'admin.cdVariants.logoMoved': 'Logo moved.',
   'admin.cdVariants.source': 'Source',
   'admin.cdVariants.sourceUpload': 'Upload a file',
   'admin.cdVariants.sourceVendored': 'Bundled logo',
@@ -4102,7 +4218,12 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.cdVariants.vendoredName': 'Logo',
   'admin.cdVariants.vendoredHint': 'pytex ships these logos. No upload is necessary.',
   'admin.cdVariants.file': 'File',
-  'admin.cdVariants.fileHint': 'PNG, JPEG, WebP, SVG or PDF, {mb} MB at most.',
+  'admin.cdVariants.fileHint':
+    'PNG, JPEG, WebP or PDF, {mb} MB at most. A variant holds {max} files at most and {totalMb} MB in total.',
+  'admin.cdVariants.logoCountLimit':
+    'This variant holds the maximum number of uploaded logos. Remove one first.',
+  'admin.cdVariants.logoTotalLimit':
+    'The uploaded logos of this variant exceed the total size limit. Remove one first.',
   'admin.cdVariants.logoTooLarge': 'The file is too large.',
   'admin.cdVariants.logoType': 'This file type is not allowed.',
   'admin.cdVariants.download': 'Download the file',
@@ -4111,6 +4232,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.cdVariants.deleted': 'CD variant deleted.',
   'admin.cdVariants.inUse':
     'A committee still uses this variant. Change the committee first.',
+  'admin.cdVariants.conflict': 'The variant changed in the meantime. Reload the page.',
   'admin.deleg.title': 'Proxy / Delegation',
   'admin.deleg.subtitle':
     'Overview of meeting-bound proxies. Members set up their proxy on the meeting page; the substitute pool is maintained per body in the member administration.',
@@ -4159,7 +4281,10 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'delegation.card.votingBadge': 'Voting right',
   'delegation.card.poolBadge': 'Pool',
   'delegation.card.revoke': 'Revoke proxy',
+  'delegation.card.change': 'Change proxy',
   'delegation.dialog.title': 'Arrange proxy',
+  'delegation.dialog.editTitle': 'Change proxy',
+  'delegation.dialog.saveSubmit': 'Save the change',
   'delegation.dialog.cancel': 'Cancel',
   'delegation.dialog.submit': 'Arrange proxy',
   'delegation.dialog.recipient': 'Represented by',
@@ -4177,6 +4302,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
     'Transferring the voting right is disabled on the server (subject to bylaws) — the proxy applies without voting right.',
   'delegation.toast.created': 'Proxy arranged.',
   'delegation.toast.createFailed': 'Could not arrange proxy.',
+  'delegation.toast.updated': 'Proxy changed.',
+  'delegation.toast.updateFailed': 'Could not change the proxy.',
   'delegation.toast.revoked': 'Proxy revoked.',
   'delegation.toast.revokeFailed': 'Revocation failed.',
   'delegation.dash.title': 'Proxy',

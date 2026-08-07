@@ -74,8 +74,7 @@ class FakePytex:
         # falls back to `trusted`. The protocol path keeps that fallback. The RCE
         # protection lives in the sanitizer, not in the trust level.
         self.trust_levels: list[str | None] = []
-        # The corporate-design config and the logo assets of each call. A render
-        # without a CD variant records `None` for both.
+        # `None` for a render without a CD variant.
         self.configs: list[Mapping[str, object] | None] = []
         self.assets: list[Mapping[str, bytes] | None] = []
 

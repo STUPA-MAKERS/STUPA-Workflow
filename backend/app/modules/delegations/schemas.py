@@ -31,6 +31,17 @@ class DelegationCreate(_CamelModel):
     delegate_voting: bool = Field(default=False, alias="delegateVoting")
 
 
+class DelegationUpdate(_CamelModel):
+    """Change the recipient or the vote transfer of an existing delegation.
+
+    An omitted field stays unchanged. The meeting is fixed: a delegation for
+    another meeting is a new delegation.
+    """
+
+    delegate_id: UUID | None = Field(default=None, alias="delegateId")
+    delegate_voting: bool | None = Field(default=None, alias="delegateVoting")
+
+
 class DelegationOut(_CamelModel):
     """Delegation view with resolved display names."""
 

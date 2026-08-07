@@ -1,5 +1,4 @@
-/* The body (table) stays centered at normal width. The tree sits in the left
-   margin outside the body (breakout), like the budget tab. */
+/* The table stays centered; the tree breaks out into the left margin. */
 .apps__layout {
   display: grid;
   grid-template-columns:

@@ -38,18 +38,9 @@ function errorStatus(err: unknown): number {
 /**
  * Agent tokens (OAuth grants) of EVERY principal, with a kill switch.
  *
- * `/account/grants` is the self-service twin: it shows the grants of the caller only.
- * A leaked or compromised token of somebody else can therefore be killed here and
- * nowhere else. The page lists the live grants newest first, filters them by owner and
- * revokes one grant after a confirmation.
- *
- * Two rules shape the rendering. An owner without a display name and without an email
- * arrives as `principalName: null`; the row then shows a localized placeholder, never
- * the id. An expiry of `null` means the token never expires, which the row states in
- * words instead of leaving the cell empty.
- *
- * The page and the revoke control both need `admin.users`. That gate is UX only — the
- * server enforces the same permission.
+ * `/account/grants` is the self-service twin, which reaches the caller's own
+ * grants only. A `null` name renders as a placeholder, never as the id, and a
+ * `null` expiry reads as "never expires".
  */
 @Component({
   selector: 'app-admin-oauth-grants',
@@ -230,8 +221,7 @@ export class AdminOAuthGrantsComponent {
     this.api.revokeOAuthGrant(grant.id).subscribe({
       next: () => this.afterRevoke('admin.oauthGrants.revoked'),
       error: (err: unknown) => {
-        // 404 = the grant died between the list and the click. That is the wanted
-        // end state, so the page reports it and refreshes instead of failing.
+        // 404 = already revoked, which is the wanted end state.
         if (errorStatus(err) === 404) {
           this.afterRevoke('admin.oauthGrants.alreadyGone');
           return;

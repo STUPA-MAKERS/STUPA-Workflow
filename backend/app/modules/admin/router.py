@@ -49,6 +49,7 @@ from app.modules.admin.schemas import (
     CdVariantCreate,
     CdVariantLogoOut,
     CdVariantLogoReorder,
+    CdVariantLogoUpdate,
     CdVariantLogoVendoredCreate,
     CdVariantOptionOut,
     CdVariantOut,
@@ -121,8 +122,7 @@ def get_gremium_role_service(session: DbSession) -> GremiumRoleService:
 
 
 def get_cd_variant_service(session: DbSession, request: Request) -> CdVariantService:
-    # Only the logo upload and download touch the object storage. Without MinIO
-    # (development, contract CI) those two routes answer 503.
+    # Without MinIO only the logo upload and download are affected; they answer 503.
     storage = getattr(request.app.state, "object_storage", None)
     return CdVariantService(session, storage=storage)
 
@@ -132,9 +132,8 @@ SiteServiceDep = Annotated[SiteConfigService, Depends(get_site_config_service)]
 GremiumRoleServiceDep = Annotated[GremiumRoleService, Depends(get_gremium_role_service)]
 CdVariantServiceDep = Annotated[CdVariantService, Depends(get_cd_variant_service)]
 
-# Body cap on Content-Length for a logo upload, applied before FastAPI buffers
-# the body. It adds defense in depth next to the nginx cap and the authoritative
-# in-service size check.
+# Rejects on Content-Length before FastAPI buffers the body; the in-service
+# size check stays authoritative.
 _enforce_cd_logo_body = body_cap("attachment_max_bytes")
 
 AutoMailerDep = Annotated[AutoMailer, Depends(get_auto_mailer)]
@@ -155,10 +154,8 @@ UsersAdmin = Annotated[Principal, Depends(require_principal("admin.users"))]
 GroupMappingsAdmin = Annotated[Principal, Depends(require_principal("admin.group_mappings"))]
 GremiumRolesAdmin = Annotated[Principal, Depends(require_principal("admin.gremium_roles"))]
 CdVariantsAdmin = Annotated[Principal, Depends(require_principal("admin.cd_variants"))]
-# The global flow save accepts EITHER key. See `create_global_flow` for the reason.
-FlowVersionAdmin = Annotated[
-    Principal, Depends(require_any_permission("admin.types", "flow.configure"))
-]
+# A transition action mails an arbitrary address, so the write gate stays narrow.
+FlowVersionAdmin = Annotated[Principal, Depends(require_principal("admin.types"))]
 
 # All admin area permissions (for ANY-of reads plus the admin landing page).
 _ALL_ADMIN_AREAS = (
@@ -182,8 +179,7 @@ _USERS = Depends(require_principal("admin.users"))
 _GROUP_MAPPINGS = Depends(require_principal("admin.group_mappings"))
 _WEBHOOK = Depends(require_principal("webhook.manage"))
 _CD_VARIANTS = Depends(require_principal("admin.cd_variants"))
-# The gremien page needs the CD-variant list as a dropdown source. It does not
-# hold the matching write permission.
+# The gremien page needs the dropdown source without holding the write permission.
 _CD_VARIANT_OPTIONS = Depends(require_any_permission("admin.gremien", "admin.cd_variants"))
 # Shared reads serving several admin areas (ANY-of).
 _ANY_ADMIN_AREA = Depends(require_any_permission(*_ALL_ADMIN_AREAS))
@@ -391,10 +387,7 @@ async def update_gremium_membership(
 ) -> GremiumMembershipOut:
     """Change the role or the term of office of a membership.
 
-    The member and the Gremium stay immutable. A role of another Gremium and a
-    term that overlaps another term of the same member both give 409, exactly
-    as on the create. A ``validFrom`` that is not before ``validUntil`` gives
-    422.
+    The member and the Gremium stay immutable.
     """
     return await service.update_membership(membership_id, payload, principal.sub)
 
@@ -425,8 +418,6 @@ async def list_gremien_authed(
     return await service.list_gremien()
 
 
-# Corporate-design variants: the logo sets that a Gremium renders its documents
-# with. Every route gates on `admin.cd_variants`.
 @router.get(
     "/cd-variants",
     response_model=list[CdVariantOut],
@@ -462,7 +453,7 @@ async def update_cd_variant(
     service: CdVariantServiceDep,
     principal: CdVariantsAdmin,
 ) -> CdVariantOut:
-    """Patch name or base variant. The key is immutable and a change answers 409."""
+    """Patch the name. The key is immutable and a change answers 409."""
     return await service.update_variant(variant_id, payload, principal.sub)
 
 
@@ -483,7 +474,7 @@ async def delete_cd_variant(
     response_model=CdVariantLogoOut,
     status_code=201,
     dependencies=[Depends(_enforce_cd_logo_body)],
-    responses=_errors(401, 403, 404, 413, 415, 422, 503),
+    responses=_errors(401, 403, 404, 409, 413, 415, 422, 503),
 )
 async def upload_cd_variant_logo(
     variant_id: UUID,
@@ -494,9 +485,8 @@ async def upload_cd_variant_logo(
 ) -> CdVariantLogoOut:
     """Upload a logo file into the object storage and append it to the slot.
 
-    The server decides the type from the magic bytes. PNG, JPEG, WebP, SVG and
-    PDF pass. SVG and PDF pass here, and only here, because these bytes reach
-    the LaTeX renderer and never the browser.
+    The type comes from the magic bytes: PNG, JPEG, WebP or PDF. A variant
+    holds a bounded number of uploaded logos and a bounded total size.
     """
     data = await file.read()
     return await service.upload_logo(
@@ -516,7 +506,7 @@ async def add_cd_variant_vendored_logo(
     service: CdVariantServiceDep,
     principal: CdVariantsAdmin,
 ) -> CdVariantLogoOut:
-    """Append a logo that pytex ships. No upload and no object storage involved."""
+    """Append a logo that pytex ships."""
     return await service.add_vendored_logo(variant_id, payload, principal.sub)
 
 
@@ -542,12 +532,10 @@ async def reorder_cd_variant_logos(
     response_class=Response,
 )
 async def get_cd_variant_logo_file(logo_id: UUID, service: CdVariantServiceDep) -> Response:
-    """Stream an uploaded logo back from the server.
+    """Stream an uploaded logo back as an attachment.
 
-    Hardening: the route does NOT echo the stored ``mime``. A stored SVG would
-    otherwise render inline in the app origin and execute script. The route
-    therefore forces ``application/octet-stream`` plus ``Content-Disposition:
-    attachment``, the same rule as ``get_invoice_file`` in the budget module.
+    The route must not echo the stored ``mime``: an inline render of a stored
+    object in the app origin is an XSS vector.
     """
     data, name = await service.logo_file_bytes(logo_id)
     safe = "".join(c for c in name if c.isprintable() and c not in '"\\\r\n')
@@ -556,6 +544,21 @@ async def get_cd_variant_logo_file(logo_id: UUID, service: CdVariantServiceDep) 
         media_type="application/octet-stream",
         headers={"Content-Disposition": f'attachment; filename="{safe}"'},
     )
+
+
+@router.patch(
+    "/cd-variant-logos/{logo_id}",
+    response_model=CdVariantLogoOut,
+    responses=_errors(400, 401, 403, 404, 422),
+)
+async def update_cd_variant_logo(
+    logo_id: UUID,
+    payload: CdVariantLogoUpdate,
+    service: CdVariantServiceDep,
+    principal: CdVariantsAdmin,
+) -> CdVariantLogoOut:
+    """Move a logo to another slot or place. The stored file stays untouched."""
+    return await service.update_logo(logo_id, payload, principal.sub)
 
 
 @router.delete(
@@ -656,16 +659,8 @@ async def create_global_flow(
 ) -> FlowVersionOut:
     """Create the global flow as a new version (applies to ALL application types).
 
-    The gate accepts EITHER ``flow.configure`` OR ``admin.types`` (#g7). It is an
-    any-of gate and not a switch to ``flow.configure`` alone, for two reasons.
-
-    1. ``flow.configure`` is the permission the flow editor route gates on. Without
-       it in this gate, the holder builds a graph and then gets a 403 on save.
-    2. A switch would REMOVE the save from every current ``admin.types`` holder.
-       An any-of gate only adds, so no installation loses a capability.
-
-    ``_FLOW_READABLE`` already reads with either key, so the read and the write now
-    match.
+    The gate is ``admin.types``. ``flow.configure`` reads the graph but does not
+    write it.
     """
     return await service.create_global_flow_version(payload, principal.sub)
 
@@ -908,11 +903,7 @@ async def update_webhook(
 async def delete_webhook(
     webhook_id: UUID, service: ServiceDep, principal: WebhookAdmin
 ) -> None:
-    """Delete a webhook and its delivery history.
-
-    The delete cascades to ``webhook_delivery``, so there is no 409 guard. The
-    audit log records the removal as ``webhook_config``.
-    """
+    """Delete a webhook and its delivery history."""
     await service.delete_webhook(webhook_id, principal.sub)
 
 

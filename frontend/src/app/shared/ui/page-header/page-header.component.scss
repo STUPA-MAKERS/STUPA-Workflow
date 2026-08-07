@@ -4,13 +4,9 @@
   margin-bottom: var(--space-5);
 }
 
-/* A `wide` route drops the max-width on `.main` so the content can use two
-   sidebars. The header must not follow it, or the title would sit further left
-   than on every normal page. `.main` still adds one gutter on each side inside
-   the wide box, so subtract both to land on the same content edge as a page
-   inside `.container`. */
+/* A `wide` route drops the max-width on `.main`; match the centred body column instead. */
 :host-context(.main--wide) {
-  max-width: calc(var(--layout-max-width) - 2 * var(--layout-gutter));
+  max-width: var(--layout-max-width);
   margin-inline: auto;
 }
 
@@ -35,8 +31,7 @@
   color: var(--color-text-muted);
 }
 
-/* The slot stays in the flow only when a page fills it. An empty slot would
-   otherwise take the gap and push the title off center. */
+/* An empty slot would take the gap and push the title off center. */
 .ph__actions:empty {
   display: none;
 }

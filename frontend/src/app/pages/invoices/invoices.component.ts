@@ -37,6 +37,23 @@ import {
   type InvoiceParseResult,
   type InvoiceStatus,
 } from '../budget/budget-tree.api';
+import type { TranslationKey } from '@core/i18n/translations';
+
+/** Machine `code` of a problem+json answer to the reason it names. */
+const INVOICE_ERROR_KEYS: Readonly<Record<string, TranslationKey>> = {
+  invoice_currency_unsupported: 'invoices.error.currency',
+  invoice_not_zugferd: 'invoices.error.notZugferd',
+};
+
+/** Fallback per status, where the backend names no code. */
+const INVOICE_STATUS_KEYS: Readonly<Record<number, TranslationKey>> = {
+  403: 'invoices.error.forbidden',
+  404: 'invoices.error.gone',
+  413: 'invoices.error.tooLarge',
+  415: 'invoices.error.badFile',
+  422: 'invoices.error.invalid',
+  503: 'invoices.error.unavailable',
+};
 
 /**
  * Invoices tab. It shows, creates, and manages invoices. An invoice is a standalone
@@ -343,7 +360,7 @@ export class InvoicesComponent implements OnDestroy {
           this.attachFile(file);
           this.toast.show(this.i18n.translate('invoices.toast.notZugferd'), 'info');
         } else {
-          this.toast.error(this.problemDetail(err));
+          this.toast.error(this.errorText(err));
         }
       },
     });
@@ -386,7 +403,7 @@ export class InvoicesComponent implements OnDestroy {
       },
       error: (err) => {
         this.attaching.set(false);
-        this.toast.error(this.problemDetail(err));
+        this.toast.error(this.errorText(err));
       },
     });
   }
@@ -448,7 +465,7 @@ export class InvoicesComponent implements OnDestroy {
         },
         error: (err) => {
           this.saving.set(false);
-          this.toast.error(this.problemDetail(err));
+          this.toast.error(this.errorText(err));
         },
       });
   }
@@ -492,7 +509,7 @@ export class InvoicesComponent implements OnDestroy {
         },
         error: (err) => {
           this.saving.set(false);
-          this.toast.error(this.problemDetail(err));
+          this.toast.error(this.errorText(err));
         },
       });
   }
@@ -530,8 +547,14 @@ export class InvoicesComponent implements OnDestroy {
     });
   }
 
-  private problemDetail(err: unknown): string {
-    const detail = (err as { error?: { detail?: string } } | null)?.error?.detail;
-    return detail || this.i18n.translate('invoices.toast.failed');
+  /** Translated reason for a failed invoice call. The backend `detail` is English
+   *  prose, so map the machine code first and the status second. */
+  private errorText(err: unknown): string {
+    const e = err as { status?: number; error?: { code?: string } } | null;
+    const key =
+      INVOICE_ERROR_KEYS[e?.error?.code ?? ''] ??
+      INVOICE_STATUS_KEYS[e?.status ?? 0] ??
+      'invoices.toast.failed';
+    return this.i18n.translate(key);
   }
 }

@@ -1,14 +1,9 @@
 """CRUD for the corporate-design variants and their logos (`admin.cd_variants`).
 
-Every mutation writes an audit entry (`AuditAction.CONFIG_CHANGE`, target type
-``cd_variant``) in the same transaction as the change, like the other admin
-services.
-
-The upload path is authoritative about the bytes. It caps the real size, sniffs
-the magic bytes and compares them against the declared type. The allowlist adds
-SVG and PDF, because these bytes only ever reach the LaTeX renderer. The
-download path therefore forces an attachment disposition and never answers with
-``image/svg+xml`` — see `app.modules.admin.router.get_cd_variant_logo_file`.
+Every mutation writes an audit entry in the same transaction as the change.
+The upload path decides the type from the magic bytes and allows PDF, so the
+download path must force an attachment disposition — see
+`app.modules.admin.router.get_cd_variant_logo_file`.
 """
 
 from __future__ import annotations
@@ -22,6 +17,8 @@ from sqlalchemy import func, select
 from app.modules.admin.cd_logos import (
     ALLOWED_CD_LOGO_MIME,
     MAX_CD_LOGO_BYTES,
+    MAX_CD_LOGO_TOTAL_BYTES,
+    MAX_CD_LOGOS_PER_VARIANT,
     LogoSlot,
     sniff_cd_logo,
 )
@@ -30,6 +27,7 @@ from app.modules.admin.schemas import (
     CdVariantCreate,
     CdVariantLogoOut,
     CdVariantLogoReorder,
+    CdVariantLogoUpdate,
     CdVariantLogoVendoredCreate,
     CdVariantOptionOut,
     CdVariantOut,
@@ -39,6 +37,7 @@ from app.modules.admin.service.service_base import ConfigServiceBase
 from app.modules.audit.actions import AuditAction
 from app.modules.files.mime import sanitize_filename
 from app.modules.files.storage import StorageError
+from app.modules.protocol.models import Protocol
 from app.shared.errors import (
     ConflictError,
     NotFoundError,
@@ -55,8 +54,6 @@ if TYPE_CHECKING:
 
     from app.modules.files.storage import ObjectStorage
 
-# Prefix of every CD-logo object in the bucket. It keeps the logos apart from the
-# attachments and the invoices.
 CD_LOGO_PREFIX = "cd-logos/"
 
 
@@ -130,7 +127,7 @@ class CdVariantService(ConfigServiceBase):
     async def update_variant(
         self, variant_id: UUID, payload: CdVariantUpdate, actor: str
     ) -> CdVariantOut:
-        """Patch the display name or the base variant.
+        """Patch the display name.
 
         Raises:
             NotFoundError: No variant has this id (404).
@@ -138,11 +135,9 @@ class CdVariantService(ConfigServiceBase):
         """
         row = await self._get_or_404(variant_id)
         if payload.key is not None and payload.key != row.key:
-            raise ConflictError("cd variant key is immutable")
+            raise ConflictError("cd variant key is immutable", code="cd_variant_key_immutable")
         if payload.name is not None:
             row.name = payload.name
-        if payload.base_variant is not None:
-            row.base_variant = payload.base_variant
         await self._audit(actor, AuditAction.CONFIG_CHANGE, "cd_variant", row.id)
         await self.session.commit()
         return _variant_out(row, await self._logos_of(row.id))
@@ -152,16 +147,27 @@ class CdVariantService(ConfigServiceBase):
 
         Raises:
             NotFoundError: No variant has this id (404).
-            ConflictError: A Gremium still references the variant (409). The FK
-                is RESTRICT, so this pre-check keeps the Gremium intact and
-                writes no audit entry for a doomed delete.
+            ConflictError: A Gremium or a protocol still references the variant (409).
         """
         row = await self._get_or_404(variant_id)
         in_use = await self.session.scalar(
             select(Gremium.id).where(Gremium.cd_variant_id == variant_id).limit(1)
         )
         if in_use is not None:
-            raise ConflictError("cd variant is still referenced by a gremium")
+            raise ConflictError(
+                "cd variant is still referenced by a gremium",
+                code="cd_variant_in_use_gremium",
+            )
+        # A protocol snapshots the KEY without a foreign key. A deleted variant
+        # would silently fall back to auto-detect on the next render.
+        snapshot = await self.session.scalar(
+            select(Protocol.id).where(Protocol.cd_variant == row.key).limit(1)
+        )
+        if snapshot is not None:
+            raise ConflictError(
+                "cd variant is still referenced by a protocol",
+                code="cd_variant_in_use_protocol",
+            )
         keys = [
             logo.object_key
             for logo in await self._logos_of(variant_id)
@@ -210,6 +216,9 @@ class CdVariantService(ConfigServiceBase):
         Raises:
             NotFoundError: No variant has this id (404).
             PayloadTooLargeError: The bytes exceed the cap (413).
+            ConflictError: The variant already holds the maximum number of
+                uploaded logos, or the upload would push their total size over
+                the cap (409).
             UnsupportedMediaTypeError: The magic bytes are not one of the
                 accepted types (415).
             ServiceUnavailableError: The object storage is off or the write
@@ -223,8 +232,9 @@ class CdVariantService(ConfigServiceBase):
         mime = sniff_cd_logo(data)
         if mime is None or mime not in ALLOWED_CD_LOGO_MIME:
             raise UnsupportedMediaTypeError(
-                "Logo must be PNG, JPEG, WebP, SVG or PDF (checked from the bytes)."
+                "Logo must be PNG, JPEG, WebP or PDF (checked from the bytes)."
             )
+        await self._assert_upload_budget(variant_id, len(data))
         if self.storage is None:
             raise ServiceUnavailableError("Object storage unavailable.")
         safe_name = sanitize_filename(filename)
@@ -269,6 +279,44 @@ class CdVariantService(ConfigServiceBase):
         except StorageError as exc:
             raise ServiceUnavailableError("Could not read CD logo.") from exc
         return data, row.file_name or "logo"
+
+    async def update_logo(
+        self, logo_id: UUID, payload: CdVariantLogoUpdate, actor: str
+    ) -> CdVariantLogoOut:
+        """Move a logo to another slot or to another place inside its slot.
+
+        The stored bytes and the file name stay untouched. Both the source and
+        the target slot come out densely numbered from 0.
+
+        Raises:
+            NotFoundError: No logo has this id (404).
+        """
+        row = await self.session.get(CdVariantLogo, logo_id)
+        if row is None:
+            raise NotFoundError(f"cd variant logo {logo_id} not found")
+        source_slot = row.slot
+        target_slot: LogoSlot = payload.slot or ("footer" if source_slot == "footer" else "title")
+        others = [
+            logo for logo in await self._logos_of(row.variant_id) if logo.id != row.id
+        ]
+        siblings = [logo for logo in others if logo.slot == target_slot]
+        if payload.position is not None:
+            index = min(payload.position, len(siblings))
+        elif target_slot == source_slot:
+            index = min(row.position, len(siblings))
+        else:
+            index = len(siblings)
+        row.slot = target_slot
+        for position, logo in enumerate([*siblings[:index], row, *siblings[index:]]):
+            logo.position = position
+        if target_slot != source_slot:
+            for position, logo in enumerate(
+                [logo for logo in others if logo.slot == source_slot]
+            ):
+                logo.position = position
+        await self._audit(actor, AuditAction.CONFIG_CHANGE, "cd_variant", row.variant_id)
+        await self.session.commit()
+        return _logo_out(row)
 
     async def delete_logo(self, logo_id: UUID, actor: str) -> None:
         """Delete a logo entry and its object.
@@ -336,6 +384,37 @@ class CdVariantService(ConfigServiceBase):
             ).all()
         )
 
+    async def _assert_upload_budget(self, variant_id: UUID, incoming: int) -> None:
+        """Check the uploaded logos of a variant against the pytex asset budget.
+
+        A vendored logo travels as a name and carries no asset, so it does not count.
+
+        Raises:
+            ConflictError: The count cap or the aggregate size cap is reached (409).
+        """
+        count, total = (
+            await self.session.execute(
+                select(
+                    func.count(CdVariantLogo.id),
+                    func.coalesce(func.sum(CdVariantLogo.size), 0),
+                ).where(
+                    CdVariantLogo.variant_id == variant_id,
+                    CdVariantLogo.object_key.is_not(None),
+                )
+            )
+        ).one()
+        if count >= MAX_CD_LOGOS_PER_VARIANT:
+            raise ConflictError(
+                f"A variant carries at most {MAX_CD_LOGOS_PER_VARIANT} uploaded logos.",
+                code="cd_logo_count_limit",
+            )
+        if total + incoming > MAX_CD_LOGO_TOTAL_BYTES:
+            raise ConflictError(
+                f"The uploaded logos of a variant must stay under "
+                f"{MAX_CD_LOGO_TOTAL_BYTES} bytes in total.",
+                code="cd_logo_total_limit",
+            )
+
     async def _next_position(self, variant_id: UUID, slot: str) -> int:
         highest = await self.session.scalar(
             select(func.max(CdVariantLogo.position)).where(
@@ -345,10 +424,8 @@ class CdVariantService(ConfigServiceBase):
         return 0 if highest is None else highest + 1
 
     async def _remove_object(self, object_key: str) -> None:
-        """Drop the object after the row is gone. A storage error must not fail the delete."""
+        """Drop the object after the row is gone; an orphan object must not fail the delete."""
         if self.storage is None:
             return
-        # The row is already gone and the transaction is committed. An orphan object
-        # in the bucket is harmless, so the delete stays successful.
         with contextlib.suppress(StorageError):
             await self.storage.remove(object_key)

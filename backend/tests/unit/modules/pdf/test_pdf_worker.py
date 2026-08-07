@@ -22,8 +22,7 @@ from worker.pdf import render_pdf
 
 class _DocStub:
     variant = "report"
-    # No Gremium, so the render falls back to the variant name instead of
-    # resolving a corporate design.
+    # No Gremium, so the render falls back to the variant name.
     gremium_id = None
 
 

@@ -89,6 +89,12 @@ export function errorDetail(err: unknown): string {
   return typeof body?.detail === 'string' ? body.detail : '';
 }
 
+/** The problem+json machine `code` of an HTTP error, or an empty string. */
+export function errorCode(err: unknown): string {
+  const body = (err as { error?: { code?: string } } | null)?.error;
+  return typeof body?.code === 'string' ? body.code : '';
+}
+
 /**
  * Assemble the protocol markdown from the ordered TOPs.
  * Top-level `#` headings are required. The protocol variant of pytex numbers them

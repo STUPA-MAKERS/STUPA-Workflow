@@ -1,16 +1,4 @@
-"""Router wiring and RBAC of the corporate-design routes, with a faked service.
-
-The tests prove four things.
-
-1. Every `/admin/cd-variants*` route gates on `admin.cd_variants`. Without the
-   key the answer is 403 problem+json, without a session it is 401.
-2. The slim option list `/api/cd-variants` also opens to `admin.gremien`, so the
-   Gremien page can fill its dropdown without the write permission.
-3. The DTOs serialize to camelCase.
-4. The logo download never echoes the stored type. A stored SVG comes back as an
-   attachment with `application/octet-stream`, so it cannot render in the app
-   origin.
-"""
+"""Router wiring and RBAC of the corporate-design routes, with a faked service."""
 
 from __future__ import annotations
 
@@ -95,6 +83,13 @@ class _FakeCdVariants:
     ) -> list[CdVariantLogoOut]:
         return [self._logo()]
 
+    async def update_logo(self, logo_id: UUID, payload: Any, actor: str) -> CdVariantLogoOut:
+        if str(logo_id).startswith("00000000"):
+            raise NotFoundError("nope")
+        return CdVariantLogoOut(
+            id=logo_id, slot=payload.slot or "title", position=payload.position or 0
+        )
+
     async def delete_logo(self, logo_id: UUID, actor: str) -> None:
         if str(logo_id).startswith("00000000"):
             raise NotFoundError("nope")
@@ -143,6 +138,7 @@ _WRITE_CALLS: tuple[tuple[str, str, dict[str, Any]], ...] = (
     ),
     ("get", f"/api/admin/cd-variant-logos/{LOGO_ID}/file", {}),
     ("delete", f"/api/admin/cd-variant-logos/{LOGO_ID}", {}),
+    ("patch", f"/api/admin/cd-variant-logos/{LOGO_ID}", {"json": {"slot": "footer"}}),
 )
 
 
@@ -298,3 +294,29 @@ def test_options_list_forbidden_without_either_key(app: FastAPI, client: TestCli
 
 def test_options_list_requires_auth_401(client: TestClient) -> None:
     assert client.get("/api/cd-variants").status_code == 401
+
+
+def test_update_logo_moves_a_slot_200(app: FastAPI, client: TestClient) -> None:
+    _as(app, "admin.cd_variants")
+    r = client.patch(
+        f"/api/admin/cd-variant-logos/{LOGO_ID}", json={"slot": "footer", "position": 2}
+    )
+    assert r.status_code == 200
+    assert r.json()["slot"] == "footer"
+    assert r.json()["position"] == 2
+
+
+def test_update_logo_unknown_404(app: FastAPI, client: TestClient) -> None:
+    _as(app, "admin.cd_variants")
+    r = client.patch(
+        "/api/admin/cd-variant-logos/00000000-0000-0000-0000-000000000000",
+        json={"slot": "footer"},
+    )
+    assert r.status_code == 404
+    assert r.headers["content-type"].startswith("application/problem+json")
+
+
+def test_update_logo_rejects_an_unknown_slot_422(app: FastAPI, client: TestClient) -> None:
+    _as(app, "admin.cd_variants")
+    r = client.patch(f"/api/admin/cd-variant-logos/{LOGO_ID}", json={"slot": "middle"})
+    assert r.status_code == 422

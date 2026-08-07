@@ -48,6 +48,7 @@ from app.modules.delegations.models import DelegationSubstitute, MeetingDelegati
 from app.modules.delegations.schemas import (
     DelegationCreate,
     DelegationOut,
+    DelegationUpdate,
     MeetingDelegationContext,
     RecipientOut,
     SubstituteCreate,
@@ -419,6 +420,121 @@ class DelegationService:
         ).all()
         return [(d, m, g) for d, m, g in rows]
 
+    def _check_gates(
+        self, meeting: Meeting, gremium: Gremium, delegate_voting: bool
+    ) -> None:
+        """Enforce the gremium switch, the global vote-transfer flag and the meeting status."""
+        if not gremium.allow_vote_delegation:
+            raise ForbiddenError("Delegation is not enabled for this gremium.")
+        if delegate_voting and not self.settings.delegation_voting_enabled:
+            raise ValidationProblem(
+                "Voting-right delegation is disabled.",
+                errors=[{"field": "delegateVoting", "msg": "disabled by configuration"}],
+            )
+        if meeting.status != "planned":
+            raise ValidationProblem(
+                "Meeting has already started.",
+                errors=[{"field": "meetingId", "msg": "meeting is not planned"}],
+            )
+
+    async def _check_recipient(
+        self,
+        *,
+        meeting: Meeting,
+        gremium: Gremium,
+        delegator: PrincipalRow,
+        delegate_id: UUID,
+        now: datetime,
+    ) -> tuple[PrincipalRow, bool]:
+        """Run the recipient, eligibility and deadline rules of a delegation.
+
+        `create` and `update` share this method, so both enforce the same
+        invariants.
+
+        Returns:
+            The recipient row and the `via_pool` flag.
+        """
+        delegate = await self._principal_row(pid=delegate_id)
+        if delegate is None:
+            raise NotFoundError(f"principal {delegate_id} not found")
+        if delegate.id == delegator.id:
+            raise ValidationProblem(
+                "Cannot delegate to yourself.",
+                errors=[{"field": "delegateId", "msg": "must differ from delegator"}],
+            )
+
+        if not await _independently_eligible(self.session, delegator.id, gremium.id, now):
+            raise ForbiddenError("Only voting members of the meeting's gremium may delegate.")
+
+        pool_ids = await self._pool_substitute_ids(gremium.id, delegator.id)
+        member_ids = await self._member_ids(gremium.id, now)
+        via_pool = delegate.id in pool_ids
+        if not via_pool and delegate.id not in member_ids and not gremium.delegation_allow_external:
+            raise ForbiddenError("Recipient must be a gremium member or a designated substitute.")
+
+        start = meeting_start_utc(meeting, self.settings.local_timezone)
+        if start is not None:
+            deadline = (
+                start if via_pool else start - timedelta(minutes=gremium.delegation_lead_minutes)
+            )
+            if now >= deadline:
+                raise ValidationProblem(
+                    "Delegation deadline for this meeting has passed.",
+                    errors=[{"field": "meetingId", "msg": "deadline passed"}],
+                )
+        return delegate, via_pool
+
+    async def _check_no_chain(
+        self,
+        *,
+        meeting: Meeting,
+        delegator_id: UUID,
+        delegate_id: UUID,
+        delegate_voting: bool,
+        exclude_id: UUID | None = None,
+    ) -> None:
+        """Enforce the no-chain and one-voting-delegation rules for a meeting.
+
+        `exclude_id` leaves the row that an update rewrites out of the scan, so
+        it does not collide with itself.
+        """
+        # A transaction-scoped advisory lock serializes the write per meeting.
+        # Without the lock, a concurrent insert of A to B and B to C could race the
+        # read-then-insert check. The second int4 argument is a stable 32-bit
+        # derivation of the meeting id.
+        meeting_lock_arg = int.from_bytes(meeting.id.bytes[:4], "big") - 0x8000_0000
+        await self.session.execute(
+            text("SELECT pg_advisory_xact_lock(:k1, :k2)").bindparams(
+                k1=_CREATE_LOCK_KEY, k2=meeting_lock_arg
+            )
+        )
+        stmt = select(
+            MeetingDelegation.delegator_principal_id,
+            MeetingDelegation.delegate_principal_id,
+            MeetingDelegation.delegate_voting,
+        ).where(MeetingDelegation.meeting_id == meeting.id)
+        if exclude_id is not None:
+            stmt = stmt.where(MeetingDelegation.id != exclude_id)
+        existing = (await self.session.execute(stmt)).all()
+        for other_delegator_id, other_delegate_id, voting in existing:
+            if other_delegator_id == delegator_id:
+                raise ConflictError("You already delegated for this meeting.", code="conflict")
+            if other_delegate_id == delegator_id:
+                raise ValidationProblem(
+                    "You receive a delegation for this meeting and cannot delegate on.",
+                    errors=[{"field": "meetingId", "msg": "no re-delegation chains"}],
+                )
+            if other_delegator_id == delegate_id:
+                raise ValidationProblem(
+                    "Recipient has delegated their own vote for this meeting.",
+                    errors=[{"field": "delegateId", "msg": "no re-delegation chains"}],
+                )
+            if delegate_voting and voting and other_delegate_id == delegate_id:
+                raise ConflictError(
+                    "Recipient already carries a delegated vote for this meeting.",
+                    code="conflict",
+                )
+
     async def create(self, payload: DelegationCreate, actor: Principal) -> DelegationOut:
         """Create a meeting delegation.
 
@@ -435,90 +551,23 @@ class DelegationService:
         now = datetime.now(UTC)
         meeting = await self._meeting(payload.meeting_id)
         gremium = await self._gremium(meeting.gremium_id)
-
-        if not gremium.allow_vote_delegation:
-            raise ForbiddenError("Delegation is not enabled for this gremium.")
-        if payload.delegate_voting and not self.settings.delegation_voting_enabled:
-            raise ValidationProblem(
-                "Voting-right delegation is disabled.",
-                errors=[{"field": "delegateVoting", "msg": "disabled by configuration"}],
-            )
-        if meeting.status != "planned":
-            raise ValidationProblem(
-                "Meeting has already started.",
-                errors=[{"field": "meetingId", "msg": "meeting is not planned"}],
-            )
-
+        self._check_gates(meeting, gremium, payload.delegate_voting)
         me = await self._principal_row(sub=actor.sub)
         if me is None:
             raise ForbiddenError("Delegator principal not found.")
-        delegate = await self._principal_row(pid=payload.delegate_id)
-        if delegate is None:
-            raise NotFoundError(f"principal {payload.delegate_id} not found")
-        if delegate.id == me.id:
-            raise ValidationProblem(
-                "Cannot delegate to yourself.",
-                errors=[{"field": "delegateId", "msg": "must differ from delegator"}],
-            )
-
-        if not await _independently_eligible(self.session, me.id, gremium.id, now):
-            raise ForbiddenError("Only voting members of the meeting's gremium may delegate.")
-
-        pool_ids = await self._pool_substitute_ids(gremium.id, me.id)
-        member_ids = await self._member_ids(gremium.id, now)
-        via_pool = delegate.id in pool_ids
-        if not via_pool and delegate.id not in member_ids and not gremium.delegation_allow_external:
-            raise ForbiddenError("Recipient must be a gremium member or a designated substitute.")
-
-        start = meeting_start_utc(meeting, self.settings.local_timezone)
-        if start is not None:
-            deadline = (
-                start if via_pool else start - timedelta(minutes=gremium.delegation_lead_minutes)
-            )
-            if now >= deadline:
-                raise ValidationProblem(
-                    "Delegation deadline for this meeting has passed.",
-                    errors=[{"field": "meetingId", "msg": "deadline passed"}],
-                )
-
-        # No chains: per meeting a principal is either delegator or recipient. A
-        # transaction-scoped advisory lock serializes the insert per meeting.
-        # Without the lock, a concurrent insert of A to B and B to C could race the
-        # read-then-insert check. The second int4 argument is a stable 32-bit
-        # derivation of the meeting id.
-        meeting_lock_arg = int.from_bytes(meeting.id.bytes[:4], "big") - 0x8000_0000
-        await self.session.execute(
-            text("SELECT pg_advisory_xact_lock(:k1, :k2)").bindparams(
-                k1=_CREATE_LOCK_KEY, k2=meeting_lock_arg
-            )
+        delegate, via_pool = await self._check_recipient(
+            meeting=meeting,
+            gremium=gremium,
+            delegator=me,
+            delegate_id=payload.delegate_id,
+            now=now,
         )
-        existing = (
-            await self.session.execute(
-                select(
-                    MeetingDelegation.delegator_principal_id,
-                    MeetingDelegation.delegate_principal_id,
-                    MeetingDelegation.delegate_voting,
-                ).where(MeetingDelegation.meeting_id == meeting.id)
-            )
-        ).all()
-        for delegator_id, delegate_id, voting in existing:
-            if delegator_id == me.id:
-                raise ConflictError("You already delegated for this meeting.", code="conflict")
-            if delegate_id == me.id:
-                raise ValidationProblem(
-                    "You receive a delegation for this meeting and cannot delegate on.",
-                    errors=[{"field": "meetingId", "msg": "no re-delegation chains"}],
-                )
-            if delegator_id == delegate.id:
-                raise ValidationProblem(
-                    "Recipient has delegated their own vote for this meeting.",
-                    errors=[{"field": "delegateId", "msg": "no re-delegation chains"}],
-                )
-            if payload.delegate_voting and voting and delegate_id == delegate.id:
-                raise ConflictError(
-                    "Recipient already carries a delegated vote for this meeting.",
-                    code="conflict",
-                )
+        await self._check_no_chain(
+            meeting=meeting,
+            delegator_id=me.id,
+            delegate_id=delegate.id,
+            delegate_voting=payload.delegate_voting,
+        )
 
         row = MeetingDelegation(
             meeting_id=meeting.id,
@@ -547,6 +596,78 @@ class DelegationService:
         )
         await self.session.commit()
         return (await self._out([(row, meeting, gremium)], now, me.id))[0]
+
+    async def update(
+        self, delegation_id: UUID, payload: DelegationUpdate, actor: Principal
+    ) -> DelegationOut:
+        """Change the recipient or the vote transfer of an existing delegation.
+
+        The row keeps its identity, so the audit trail stays one thread instead
+        of a revoke plus a create. Every invariant of `create` applies again,
+        with the row itself left out of the chain scan.
+
+        Raises:
+            NotFoundError: The delegation or the new recipient does not exist (404).
+            ForbiddenError: The actor is neither the delegator nor an admin, the
+                gremium gate blocks the delegation, or the recipient is not
+                eligible (403).
+            ConflictError: The recipient already carries a delegated vote (409).
+            ValidationProblem: The vote transfer is disabled, the meeting is not
+                planned, the deadline has passed, the delegator picked
+                themselves, or the change would build a chain (422).
+        """
+        now = datetime.now(UTC)
+        row = await self.session.get(MeetingDelegation, delegation_id)
+        if row is None:
+            raise NotFoundError(f"delegation {delegation_id} not found")
+        me = await self._principal_row(sub=actor.sub)
+        is_owner = me is not None and row.delegator_principal_id == me.id
+        if not is_owner and not actor.has(_ADMIN_PERM):
+            raise ForbiddenError("Only the delegator (or an admin) may change a delegation.")
+
+        meeting = await self._meeting(row.meeting_id)
+        gremium = await self._gremium(meeting.gremium_id)
+        delegate_voting = (
+            row.delegate_voting if payload.delegate_voting is None else payload.delegate_voting
+        )
+        self._check_gates(meeting, gremium, delegate_voting)
+        delegator = await self._principal_row(pid=row.delegator_principal_id)
+        if delegator is None:
+            raise ForbiddenError("Delegator principal not found.")
+        delegate, via_pool = await self._check_recipient(
+            meeting=meeting,
+            gremium=gremium,
+            delegator=delegator,
+            delegate_id=payload.delegate_id or row.delegate_principal_id,
+            now=now,
+        )
+        await self._check_no_chain(
+            meeting=meeting,
+            delegator_id=delegator.id,
+            delegate_id=delegate.id,
+            delegate_voting=delegate_voting,
+            exclude_id=row.id,
+        )
+
+        row.delegate_principal_id = delegate.id
+        row.delegate_voting = delegate_voting
+        row.via_pool = via_pool
+        await audit_record(
+            self.session,
+            actor=actor.sub,
+            action=AuditAction.DELEGATION_UPDATE,
+            target_type="meeting_delegation",
+            target_id=str(row.id),
+            data={
+                "meetingId": str(meeting.id),
+                "gremiumId": str(gremium.id),
+                "delegateId": str(delegate.id),
+                "delegateVoting": delegate_voting,
+                "viaPool": via_pool,
+            },
+        )
+        await self.session.commit()
+        return (await self._out([(row, meeting, gremium)], now, me.id if me else None))[0]
 
     async def list(self, actor: Principal, meeting_id: UUID | None = None) -> list[DelegationOut]:
         """Return the own outgoing and incoming delegations.

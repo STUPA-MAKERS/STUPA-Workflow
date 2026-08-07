@@ -6,19 +6,22 @@ import {
   type BudgetTransfer,
   type TransferUpdate,
 } from '../budget/budget-tree.api';
-import { problemDetail } from '../budget/expense-display.util';
+import type { TranslationKey } from '@core/i18n/translations';
 import type { ExpensesListState } from './expenses-list.state';
 
+/** Reason per status. The backend `detail` is English prose, so never show it. */
+const TRANSFER_ERROR_KEYS: Readonly<Record<number, TranslationKey>> = {
+  403: 'expenses.transfers.forbidden',
+  404: 'expenses.transfers.gone',
+  409: 'expenses.transfers.immutablePair',
+  422: 'expenses.transfers.invalid',
+};
+
 /**
- * Cost-centre transfers as a first-class list.
+ * Cost-centre transfers as a first-class list: one row per pair of bookings.
  *
- * A transfer is two bookings that belong together. The bookings tab shows the
- * two legs but cannot correct them as a pair, so this module lists the
- * transfers themselves and offers an edit and a delete per row.
- *
- * The two cost centres are immutable on the server. The edit dialog therefore
- * shows the pair read-only and patches only amount, description, note and the
- * two dates. It is a plain state module. Construct it in an injection context.
+ * The cost centres are immutable on the server, so the edit dialog shows the
+ * pair read-only. Construct this state module in an injection context.
  */
 export class ExpenseTransfersState {
   private readonly api = inject(BudgetTreeApi);
@@ -27,8 +30,7 @@ export class ExpenseTransfersState {
 
   private readonly PAGE = 20;
   private nextOffset = 0;
-  /** Monotone request generation. A late response of an older filter state is
-   *  dropped, exactly as in the bookings list. */
+  /** Monotone request generation: a late response of an older filter state is dropped. */
   private fetchEpoch = 0;
 
   readonly items = signal<BudgetTransfer[]>([]);
@@ -55,11 +57,11 @@ export class ExpenseTransfersState {
   constructor(private readonly list: ExpensesListState) {}
 
   private failureText(err: unknown): string {
-    return problemDetail(err) ?? this.i18n.translate('expenses.toast.failed');
+    const status = (err as { status?: number } | null)?.status ?? 0;
+    return this.i18n.translate(TRANSFER_ERROR_KEYS[status] ?? 'expenses.toast.failed');
   }
 
-  /** The cost-centre filter and the search of the bookings tab also narrow the
-   *  transfers. `budget` matches the source or the target cost centre. */
+  /** The bookings-tab filters narrow the transfers; `budget` matches either leg. */
   private filterParams() {
     return {
       budget: this.list.budgetId() || undefined,
@@ -126,9 +128,8 @@ export class ExpenseTransfersState {
   /**
    * Save the corrected transfer.
    *
-   * The body carries no cost centre. The pair is immutable, and a different
-   * pair answers 409. The bookings list refreshes too, because both legs of the
-   * transfer are rows there.
+   * The body carries no cost centre. The bookings list refreshes too, because
+   * both legs are rows there.
    */
   saveEdit(event: Event): void {
     event.preventDefault();
@@ -154,8 +155,7 @@ export class ExpenseTransfersState {
       },
       error: (err: { status?: number }) => {
         this.saving.set(false);
-        // 409 = the cost-centre pair changed under us. Name the reason instead
-        // of a generic failure, and reload so the row shows the server truth.
+        // 409 = the cost-centre pair changed under us; reload for the server truth.
         if (err.status === 409) {
           this.toast.error(this.i18n.translate('expenses.transfers.immutablePair'));
           this.reload();

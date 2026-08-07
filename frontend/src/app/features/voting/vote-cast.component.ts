@@ -79,9 +79,7 @@ export class VoteCastComponent {
   readonly showBars = computed(() => Boolean(this.vote()) && (!this.secret() || this.isClosed()));
   readonly locked = computed(() => this.myChoice() !== null && !this.allowChange());
 
-  // Delete a standalone vote. The route accepts it only while the vote is a
-  // draft with no ballots, and it refuses a meeting-bound vote: that one is
-  // deleted through its meeting. `cancel` stays the path for an open vote.
+  // Delete a standalone vote: draft, no ballots, no meeting. Else `cancel`.
   readonly confirmDelete = signal(false);
   readonly deleting = signal(false);
   readonly canDelete = computed(() => {
@@ -159,9 +157,8 @@ export class VoteCastComponent {
   /**
    * Delete the vote for good (`DELETE /votes/{id}`).
    *
-   * A 409 is a real state, not a generic failure: the vote opened, it already
-   * holds ballots, or it belongs to a meeting. Name the reason and reload, so
-   * the page shows the state the server has.
+   * A 409 names a real state (opened, has ballots, meeting-bound), so report it
+   * and reload.
    */
   doDelete(): void {
     const vote = this.vote();
@@ -172,8 +169,7 @@ export class VoteCastComponent {
         this.deleting.set(false);
         this.confirmDelete.set(false);
         this.toast.success(this.i18n.translate('voting.delete.done'));
-        // The vote is gone, so this route 404s from now on. Go back to the
-        // application that carried it, or to the vote overview without one.
+        // The vote is gone, so this route 404s from now on.
         void this.router.navigate(
           vote.applicationId ? ['/applications', vote.applicationId] : ['/voting'],
         );

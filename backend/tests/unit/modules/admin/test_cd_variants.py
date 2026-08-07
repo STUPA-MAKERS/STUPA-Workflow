@@ -1,15 +1,5 @@
 """Corporate-design variants without a database (`app/modules/admin/cd_*`).
 
-The tests cover four areas.
-
-1. The upload policy `sniff_cd_logo`: SVG and PDF pass here, because these bytes
-   only reach the LaTeX renderer. A mismatched magic byte is rejected.
-2. The asset name that pytex sees: plain, unique per logo row and with the
-   extension of the SNIFFED type.
-3. `CdVariantService`: CRUD, the immutable key, the 409 on a delete while a
-   Gremium still references the variant, and the storage error paths.
-4. `resolve_cd_variant` for a vendored-only, an upload-only and a mixed variant.
-
 The session fake follows `test_admin_service_cov`: `execute` and `scalars` share
 one ordered queue, `scalar` and `get` have their own. Every audit write consumes
 two `execute` results (the advisory lock and the `prev_hash` select).
@@ -27,6 +17,8 @@ from sqlalchemy import CheckConstraint, Table
 from app.modules.admin.cd_logos import (
     ALLOWED_CD_LOGO_MIME,
     MAX_CD_LOGO_BYTES,
+    MAX_CD_LOGO_TOTAL_BYTES,
+    MAX_CD_LOGOS_PER_VARIANT,
     VENDORED_LOGO_NAMES,
     asset_file_name,
     sniff_cd_logo,
@@ -36,6 +28,7 @@ from app.modules.admin.models import CdVariant, CdVariantLogo, Gremium
 from app.modules.admin.schemas import (
     CdVariantCreate,
     CdVariantLogoReorder,
+    CdVariantLogoUpdate,
     CdVariantLogoVendoredCreate,
     CdVariantUpdate,
     GremiumCreate,
@@ -82,9 +75,17 @@ class FakeResult:
     def scalar_one_or_none(self) -> Any:
         return self._items[0] if self._items else None
 
+    def one(self) -> Any:
+        return self._items[0]
+
 
 def res(*items: Any) -> FakeResult:
     return FakeResult(items)
+
+
+def budget_res(count: int = 0, total: int = 0) -> FakeResult:
+    """The COUNT/SUM row that `_assert_upload_budget` reads before an upload."""
+    return res((count, total))
 
 
 def audit_results() -> list[FakeResult]:
@@ -201,15 +202,20 @@ def logo_row(**kw: Any) -> CdVariantLogo:
         (PNG, "image/png"),
         (JPEG, "image/jpeg"),
         (WEBP, "image/webp"),
-        (SVG, "image/svg+xml"),
-        (SVG_XML, "image/svg+xml"),
         (PDF, "application/pdf"),
     ],
 )
 def test_sniff_accepts_the_whole_allowlist(data: bytes, expected: str) -> None:
-    """SVG and PDF pass here, unlike the site branding, and every hit is on the list."""
+    """PDF passes here, unlike the site branding, and every hit is on the list."""
     assert sniff_cd_logo(data) == expected
     assert expected in ALLOWED_CD_LOGO_MIME
+
+
+@pytest.mark.parametrize("data", [SVG, SVG_XML])
+def test_sniff_rejects_svg(data: bytes) -> None:
+    """The renderer converts an SVG in an unsandboxed subprocess with no timeout."""
+    assert sniff_cd_logo(data) is None
+    assert "image/svg+xml" not in ALLOWED_CD_LOGO_MIME
 
 
 @pytest.mark.parametrize(
@@ -228,7 +234,6 @@ def test_sniff_rejects_a_mismatched_magic_byte(data: bytes) -> None:
 
 
 def test_sniff_rejects_an_svg_hidden_behind_a_long_prologue() -> None:
-    """The sniff reads a bounded head only, so a padded file cannot smuggle a root tag."""
     assert sniff_cd_logo(b"<" + b" " * 4096 + b"<svg/>") is None
 
 
@@ -251,11 +256,11 @@ def test_vendored_names_match_the_pytex_catalog() -> None:
 
 def test_asset_name_is_plain_unique_and_typed_by_the_sniffed_mime() -> None:
     first, second = uuid.uuid4(), uuid.uuid4()
-    a = asset_file_name(first, "logo.png", "image/svg+xml")
-    b = asset_file_name(second, "logo.png", "image/svg+xml")
+    a = asset_file_name(first, "logo.png", "application/pdf")
+    b = asset_file_name(second, "logo.png", "application/pdf")
     assert a != b  # two uploads of the same name never collide
     assert "/" not in a and "\\" not in a
-    assert a.endswith(".svg")  # the extension follows the sniffed type, not the name
+    assert a.endswith(".pdf")  # the extension follows the sniffed type, not the name
 
 
 @pytest.mark.parametrize(
@@ -319,13 +324,12 @@ async def test_create_variant_duplicate_key_conflicts() -> None:
     assert sess.committed == 0
 
 
-async def test_update_variant_changes_name_and_base_variant() -> None:
+async def test_update_variant_changes_the_name_and_keeps_the_base_variant() -> None:
+    """``baseVariant`` is create-only, so a patch cannot move the document shape."""
     row = variant_row(key="stupa", name="StuPa", base_variant="protocol")
     s, sess = svc([*audit_results(), res()], gets=[row])
-    out = await s.update_variant(
-        row.id, CdVariantUpdate(name="StuPa neu", baseVariant="report"), "admin"
-    )
-    assert out.name == "StuPa neu" and out.base_variant == "report"
+    out = await s.update_variant(row.id, CdVariantUpdate(name="StuPa neu"), "admin")
+    assert out.name == "StuPa neu" and out.base_variant == "protocol"
     assert sess.committed == 1
 
 
@@ -420,16 +424,26 @@ async def test_add_vendored_logo_unknown_variant_404() -> None:
         )
 
 
-@pytest.mark.parametrize(("data", "mime"), [(SVG, "image/svg+xml"), (PDF, "application/pdf")])
-async def test_upload_logo_accepts_svg_and_pdf(data: bytes, mime: str) -> None:
-    """These bytes only reach LaTeX, never the browser, so the allowlist keeps them."""
+@pytest.mark.parametrize(("data", "mime"), [(PNG, "image/png"), (PDF, "application/pdf")])
+async def test_upload_logo_accepts_raster_and_pdf(data: bytes, mime: str) -> None:
+    """A PDF only reaches LaTeX, never the browser, so the allowlist keeps it."""
     row = variant_row()
     storage = FakeStorage()
-    s, sess = svc([*audit_results()], gets=[row], storage=storage)
+    s, sess = svc([budget_res(), *audit_results()], gets=[row], storage=storage)
     out = await s.upload_logo(row.id, data, slot="title", filename="logo.bin", actor="a")
     assert out.mime == mime and out.size == len(data)
     assert storage.put_calls[0].startswith(CD_LOGO_PREFIX)
     assert sess.committed == 1
+
+
+async def test_upload_logo_rejects_svg() -> None:
+    """pytex converts an SVG in an unsandboxed subprocess that carries no timeout."""
+    row = variant_row()
+    storage = FakeStorage()
+    s, _ = svc(gets=[row], storage=storage)
+    with pytest.raises(UnsupportedMediaTypeError):
+        await s.upload_logo(row.id, SVG, slot="title", filename="logo.svg", actor="a")
+    assert storage.put_calls == []
 
 
 async def test_upload_logo_rejects_a_mismatched_magic_byte() -> None:
@@ -469,7 +483,7 @@ async def test_upload_logo_unknown_variant_404() -> None:
 
 
 async def test_upload_logo_without_storage_is_unavailable() -> None:
-    s, _ = svc(gets=[variant_row()])
+    s, _ = svc([budget_res()], gets=[variant_row()])
     with pytest.raises(ServiceUnavailableError):
         await s.upload_logo(uuid.uuid4(), PNG, slot="title", filename="a.png", actor="a")
 
@@ -479,10 +493,33 @@ async def test_upload_logo_storage_write_failure_is_unavailable() -> None:
         async def put(self, key: str, data: bytes, content_type: str) -> None:
             raise StorageError("boom")
 
-    s, sess = svc(gets=[variant_row()], storage=Failing())
+    s, sess = svc([budget_res()], gets=[variant_row()], storage=Failing())
     with pytest.raises(ServiceUnavailableError):
         await s.upload_logo(uuid.uuid4(), PNG, slot="title", filename="a.png", actor="a")
     assert sess.committed == 0
+
+
+async def test_upload_logo_refuses_a_full_variant() -> None:
+    """pytex answers 413 without a retry, so a full variant would break every PDF."""
+    row = variant_row()
+    storage = FakeStorage()
+    s, _ = svc([budget_res(count=MAX_CD_LOGOS_PER_VARIANT)], gets=[row], storage=storage)
+    with pytest.raises(ConflictError) as exc:
+        await s.upload_logo(row.id, PNG, slot="title", filename="a.png", actor="a")
+    assert exc.value.code == "cd_logo_count_limit"
+    assert storage.put_calls == []
+
+
+async def test_upload_logo_refuses_an_upload_over_the_total_size() -> None:
+    row = variant_row()
+    storage = FakeStorage()
+    s, _ = svc(
+        [budget_res(count=1, total=MAX_CD_LOGO_TOTAL_BYTES)], gets=[row], storage=storage
+    )
+    with pytest.raises(ConflictError) as exc:
+        await s.upload_logo(row.id, PNG, slot="title", filename="a.png", actor="a")
+    assert exc.value.code == "cd_logo_total_limit"
+    assert storage.put_calls == []
 
 
 async def test_logo_file_bytes_returns_the_object_and_name() -> None:
@@ -794,3 +831,85 @@ async def test_resolve_storage_error_is_unavailable() -> None:
         await resolve_cd_variant(
             _resolver_session(variant, [logo]), Failing(), uuid.uuid4()  # type: ignore[arg-type]
         )
+
+
+# --- delete guard: the protocol snapshot ----------------------------------
+
+
+async def test_delete_variant_referenced_by_a_protocol_conflicts() -> None:
+    """A protocol snapshots the KEY without an FK, so the delete needs its own guard."""
+    row = variant_row(key="stupa")
+    s, sess = svc(gets=[row], scalars=[None, uuid.uuid4()])
+    with pytest.raises(ConflictError, match="protocol") as ei:
+        await s.delete_variant(row.id, "admin")
+    assert ei.value.code == "cd_variant_in_use_protocol"
+    assert sess.deleted == [] and sess.committed == 0
+
+
+# --- update_logo: move between slots and inside a slot --------------------
+
+
+def _slot_logos(variant_id: uuid.UUID, slot: str, count: int) -> list[CdVariantLogo]:
+    return [
+        logo_row(variant_id=variant_id, slot=slot, position=i, vendored_name=f"{slot}{i}")
+        for i in range(count)
+    ]
+
+
+async def test_update_logo_moves_to_the_other_slot_and_renumbers_both() -> None:
+    vid = uuid.uuid4()
+    title = _slot_logos(vid, "title", 3)
+    footer = _slot_logos(vid, "footer", 1)
+    moved = title[1]
+    s, sess = svc([res(*title, *footer), *audit_results()], gets=[moved])
+    out = await s.update_logo(moved.id, CdVariantLogoUpdate(slot="footer"), "admin")
+    assert out.slot == "footer" and out.position == 1
+    assert [logo.position for logo in (title[0], title[2])] == [0, 1]
+    assert sess.committed == 1
+
+
+async def test_update_logo_inserts_at_the_requested_position() -> None:
+    vid = uuid.uuid4()
+    title = _slot_logos(vid, "title", 3)
+    moved = title[2]
+    s, _ = svc([res(*title), *audit_results()], gets=[moved])
+    out = await s.update_logo(moved.id, CdVariantLogoUpdate(position=0), "admin")
+    assert out.position == 0
+    assert [title[0].position, title[1].position] == [1, 2]
+
+
+async def test_update_logo_clamps_a_position_past_the_end() -> None:
+    vid = uuid.uuid4()
+    title = _slot_logos(vid, "title", 2)
+    moved = title[0]
+    s, _ = svc([res(*title), *audit_results()], gets=[moved])
+    out = await s.update_logo(moved.id, CdVariantLogoUpdate(position=99), "admin")
+    assert out.position == 1
+
+
+async def test_update_logo_without_a_position_keeps_the_place_in_the_slot() -> None:
+    vid = uuid.uuid4()
+    title = _slot_logos(vid, "title", 3)
+    moved = title[1]
+    s, _ = svc([res(*title), *audit_results()], gets=[moved])
+    out = await s.update_logo(moved.id, CdVariantLogoUpdate(slot="title"), "admin")
+    assert out.position == 1
+
+
+async def test_update_logo_keeps_the_stored_file() -> None:
+    vid = uuid.uuid4()
+    moved = logo_row(
+        variant_id=vid, slot="title", object_key="cd-logos/a/x.png", file_name="x.png"
+    )
+    storage = FakeStorage()
+    s, _ = svc([res(moved), *audit_results()], gets=[moved], storage=storage)
+    out = await s.update_logo(moved.id, CdVariantLogoUpdate(slot="footer"), "admin")
+    assert out.file_name == "x.png"
+    assert moved.object_key == "cd-logos/a/x.png"
+    assert storage.removed == []
+
+
+async def test_update_logo_unknown_404() -> None:
+    s, _ = svc()
+    with pytest.raises(NotFoundError):
+        await s.update_logo(uuid.uuid4(), CdVariantLogoUpdate(slot="footer"), "admin")

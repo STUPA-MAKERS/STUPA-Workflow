@@ -36,8 +36,7 @@ async function setup(opts: { api?: Api; perms?: string[] } = {}) {
   const view = await render(FormsListComponent, {
     providers: [
       { provide: AdminApiService, useValue: api },
-      // The page opens on form.configure, but create and delete each need their own
-      // admin key. The default grants both so the dialog tests reach the button.
+      // The default grants the admin keys too, so the dialog tests reach the button.
       {
         provide: AuthService,
         useValue: fakeAuth(opts.perms ?? ['admin.types', 'admin.types_delete']),
@@ -227,8 +226,7 @@ describe('FormsListComponent — create gate (#g8)', () => {
   });
 
   it('hides the create button for a form manager without admin.types', async () => {
-    // The page itself opens on form.configure. The create posts an application type,
-    // which needs admin.types, so the button must not be offered.
+    // The create needs admin.types, so the button must not be offered.
     const { c } = await setup({ perms: ['form.configure'] });
     expect(c.canCreate()).toBe(false);
     expect(screen.queryByRole('button', { name: 'Formular anlegen' })).toBeNull();

@@ -39,9 +39,11 @@ no change.
 pytex writes every asset next to the rendered `.tex` file before the render
 step. A `logos` or `footer_logos` entry of `config` that names an asset then
 selects that uploaded file. Any other logo name still picks the bundled logo.
-The service does not check an asset name itself: `pytex_api.validate_asset_name`
-owns that rule (no path separator, no `..`, no absolute path) and its error maps
-to a 400. Any field name other than the three above is a 400.
+The service does not check an asset name itself. The private
+`pytex_api._security.validate_asset_name` owns that rule (no path separator, no
+`..`, no absolute path). The exported `pytex_api.filter_assets` applies it, and
+its error maps to a 400. `validate_asset_name` is not a public export — do not
+import it directly. Any field name other than the three above is a 400.
 
 Caps: `source` plus every asset together must fit in `PYTEX_MAX_BODY_BYTES`. On
 top of that, `PYTEX_MAX_ASSETS` caps the number of assets and

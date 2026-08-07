@@ -386,6 +386,52 @@ async def test_set_allocation_top_not_found() -> None:
         await svc.set_allocation(node.id, fy.id, AllocationSet(allocated=Decimal("1")))
 
 
+async def test_delete_allocation_removes_row() -> None:
+    top = _budget(path_key="VS")
+    fy = _fy(budget_id=top.id)
+    alloc = _alloc(budget_id=top.id, fy_id=fy.id, allocated="500")
+    # node, fy, top, _lock(self), own allocation, own children (none)
+    sess = fake_session(
+        result(top), result(fy), result(top), result(), result(alloc), result()
+    )
+    svc = BudgetTreeService(sess, actor="u")
+    await svc.delete_allocation(top.id, fy.id)
+    assert sess.deleted == [alloc] and sess.committed == 1
+
+
+async def test_delete_allocation_fy_mismatch_422() -> None:
+    node = _budget(path_key="VS")
+    fy = _fy(budget_id=uuid.uuid4())  # belongs to another top budget
+    sess = fake_session(result(node), result(fy), result(node))
+    svc = BudgetTreeService(sess)
+    with pytest.raises(ValidationProblem):
+        await svc.delete_allocation(node.id, fy.id)
+
+
+async def test_delete_allocation_missing_row_404() -> None:
+    top = _budget(path_key="VS")
+    fy = _fy(budget_id=top.id)
+    sess = fake_session(result(top), result(fy), result(top), result(), result())
+    svc = BudgetTreeService(sess)
+    with pytest.raises(NotFoundError):
+        await svc.delete_allocation(top.id, fy.id)
+
+
+async def test_delete_allocation_with_children_allocations_422() -> None:
+    top = _budget(path_key="VS")
+    fy = _fy(budget_id=top.id)
+    alloc = _alloc(budget_id=top.id, fy_id=fy.id, allocated="500")
+    children = result((uuid.uuid4(), Decimal("200")))
+    sess = fake_session(
+        result(top), result(fy), result(top), result(), result(alloc), children
+    )
+    svc = BudgetTreeService(sess)
+    with pytest.raises(ValidationProblem) as ei:
+        await svc.delete_allocation(top.id, fy.id)
+    assert ei.value.code == "parent_allocation_below_children"
+    assert sess.deleted == []
+
+
 async def test_children_alloc_sum_excludes_self() -> None:
     # The sibling sum ignores the row of the node itself. This covers the exclude_id branch.
     parent = _budget(path_key="VS")

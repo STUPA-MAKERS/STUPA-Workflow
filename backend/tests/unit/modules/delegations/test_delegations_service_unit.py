@@ -25,7 +25,11 @@ import pytest
 from app.modules.auth.principal import Principal
 from app.modules.delegations import service as delegations_service
 from app.modules.delegations.models import DelegationSubstitute, MeetingDelegation
-from app.modules.delegations.schemas import DelegationCreate, SubstituteCreate
+from app.modules.delegations.schemas import (
+    DelegationCreate,
+    DelegationUpdate,
+    SubstituteCreate,
+)
 from app.modules.delegations.service import (
     DelegationService,
     meeting_start_utc,
@@ -551,3 +555,155 @@ def test_module_exposes_voting_hook() -> None:
 def test_gremium_id_constant_is_uuid() -> None:
     assert isinstance(GREMIUM_ID, UUID)
     _ = timedelta  # future window tests use it, this keeps the import stable
+
+
+# PATCH /delegations/{id}: keep the row identity instead of revoke + create.
+#
+# Order of `execute` in `update`: me, delegator, delegate, eligibility, pool,
+# members, chain lock, existing rows, audit lock, audit prev, names.
+# Order of `get`: delegation row, meeting, gremium.
+
+
+def _row(me: Any, delegate: Any, *, voting: bool = False) -> MeetingDelegation:
+    row = MeetingDelegation(
+        meeting_id=MEETING_ID,
+        gremium_id=GREMIUM_ID,
+        delegator_principal_id=me.id,
+        delegate_principal_id=delegate.id,
+        delegate_voting=voting,
+        via_pool=False,
+        created_by="deleg",
+    )
+    row.id = uuid4()
+    row.created_at = NOW
+    return row
+
+
+def _update_db(
+    *,
+    row: MeetingDelegation,
+    me: SimpleNamespace,
+    new_delegate: SimpleNamespace,
+    actor_row: SimpleNamespace | None = None,
+    meeting: SimpleNamespace | None = None,
+    gremium: SimpleNamespace | None = None,
+    pool_ids: list[Any] | None = None,
+    member_ids: list[Any] | None = None,
+    existing: list[tuple[Any, Any, bool]] | None = None,
+) -> Any:
+    db = fake_session(
+        result(actor_row if actor_row is not None else me),  # _principal_row(sub) of the actor
+        result(me),  # _principal_row(pid) of the delegator
+        result(new_delegate),  # _principal_row(pid) of the recipient
+        result(["vote.cast"]),  # eligibility of the delegator
+        result(*(pool_ids or [])),
+        result(*(member_ids if member_ids is not None else [new_delegate.id])),
+        result(),  # chain advisory lock
+        result(*(existing or [])),
+        result(),  # audit advisory lock
+        result(),  # audit prev-hash
+        _names((me.id, "Me", None), (new_delegate.id, "New", None)),
+    )
+    db.get_results = [row, meeting or _meeting(), gremium or _gremium()]
+    return db
+
+
+async def test_update_swaps_the_recipient_and_keeps_the_row() -> None:
+    me, old, new = _me(), _delegate("old"), _delegate("new")
+    row = _row(me, old)
+    db = _update_db(row=row, me=me, new_delegate=new)
+    out = await _svc(db, voting=True).update(
+        row.id, DelegationUpdate(delegateId=new.id, delegateVoting=True), _actor()
+    )
+    assert out.id == row.id
+    assert row.delegate_principal_id == new.id
+    assert row.delegate_voting is True
+    assert db.deleted == [] and db.committed == 1
+    entries = [a for a in db.added if type(a).__name__ == "AuditEntry"]
+    assert [e.action for e in entries] == ["delegation_update"]
+    assert entries[0].target_id == str(row.id)
+
+
+async def test_update_leaves_the_edited_row_out_of_the_chain_scan() -> None:
+    """Without the exclusion the row would collide with itself on 'already delegated'."""
+    me, new = _me(), _delegate("new")
+    row = _row(me, _delegate("old"))
+    db = _update_db(row=row, me=me, new_delegate=new)
+    await _svc(db).update(row.id, DelegationUpdate(delegateId=new.id), _actor())
+    chain_stmt = next(s for s in db.statements if "meeting_delegation" in str(s).lower())
+    assert "!=" in str(chain_stmt)
+
+
+async def test_update_keeps_the_unchanged_fields() -> None:
+    me, delegate = _me(), _delegate()
+    row = _row(me, delegate, voting=True)
+    db = _update_db(row=row, me=me, new_delegate=delegate)
+    out = await _svc(db, voting=True).update(row.id, DelegationUpdate(), _actor())
+    assert out.delegate_id == delegate.id and row.delegate_voting is True
+
+
+async def test_update_by_a_stranger_403() -> None:
+    me, new = _me(), _delegate("new")
+    row = _row(me, _delegate("old"))
+    db = _update_db(row=row, me=me, new_delegate=new, actor_row=_me("stranger"))
+    with pytest.raises(ForbiddenError, match="delegator"):
+        await _svc(db).update(row.id, DelegationUpdate(delegateId=new.id), _actor("stranger"))
+    assert db.committed == 0
+
+
+async def test_update_by_an_admin_is_allowed() -> None:
+    me, new = _me(), _delegate("new")
+    row = _row(me, _delegate("old"))
+    db = _update_db(row=row, me=me, new_delegate=new, actor_row=_me("boss"))
+    out = await _svc(db).update(
+        row.id,
+        DelegationUpdate(delegateId=new.id),
+        _actor("boss", {"admin.delegations"}),
+    )
+    assert out.delegate_id == new.id
+
+
+async def test_update_unknown_404() -> None:
+    db = fake_session()
+    with pytest.raises(NotFoundError):
+        await _svc(db).update(uuid4(), DelegationUpdate(), _actor())
+
+
+async def test_update_without_a_delegator_row_403() -> None:
+    me, new = _me(), _delegate("new")
+    row = _row(me, _delegate("old"))
+    db = _update_db(row=row, me=me, new_delegate=new)
+    db._results[1] = result()  # the delegator principal is gone
+    with pytest.raises(ForbiddenError, match="Delegator principal"):
+        await _svc(db).update(row.id, DelegationUpdate(delegateId=new.id), _actor())
+
+
+async def test_update_after_the_meeting_started_422() -> None:
+    me, new = _me(), _delegate("new")
+    row = _row(me, _delegate("old"))
+    db = _update_db(row=row, me=me, new_delegate=new, meeting=_meeting(status="live"))
+    with pytest.raises(ValidationProblem, match="already started"):
+        await _svc(db).update(row.id, DelegationUpdate(delegateId=new.id), _actor())
+
+
+async def test_update_to_a_recipient_with_a_voting_delegation_409() -> None:
+    me, new = _me(), _delegate("new")
+    row = _row(me, _delegate("old"))
+    db = _update_db(
+        row=row,
+        me=me,
+        new_delegate=new,
+        existing=[(uuid4(), new.id, True)],
+    )
+    with pytest.raises(ConflictError, match="already carries"):
+        await _svc(db, voting=True).update(
+            row.id, DelegationUpdate(delegateId=new.id, delegateVoting=True), _actor()
+        )
+
+
+async def test_update_to_a_non_member_without_the_external_gate_403() -> None:
+    me, new = _me(), _delegate("new")
+    row = _row(me, _delegate("old"))
+    db = _update_db(row=row, me=me, new_delegate=new, member_ids=[], pool_ids=[])
+    with pytest.raises(ForbiddenError, match="gremium member"):
+        await _svc(db).update(row.id, DelegationUpdate(delegateId=new.id), _actor())

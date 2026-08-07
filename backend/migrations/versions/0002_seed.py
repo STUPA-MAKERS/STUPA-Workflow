@@ -168,10 +168,8 @@ ROLE_PERMISSIONS = {
     ],
 }
 
-# Corporate-design variants (#cd-variants). A variant selects only the document
-# logos. The seeded set reproduces the five hardcoded variants of before. Each
-# logo is a vendored pytex name, so the seed writes nothing into MinIO.
-# (key, display name, base variant, title logos, footer logos)
+# Corporate-design variants; every logo is a vendored pytex name, so the seed
+# writes nothing into MinIO.
 CD_VARIANT_IDS = {
     "stupa": "00000000-0000-0000-0000-0000000000d1",
     "asta": "00000000-0000-0000-0000-0000000000d2",
@@ -179,6 +177,7 @@ CD_VARIANT_IDS = {
     "makers": "00000000-0000-0000-0000-0000000000d4",
     "report": "00000000-0000-0000-0000-0000000000d5",
 }
+# (key, display name, base variant, title logos, footer logos)
 CD_VARIANTS: list[tuple[str, str, str, tuple[str, ...], tuple[str, ...]]] = [
     ("stupa", "StuPa", "protocol", ("STUPA",), ("STUPA",)),
     ("asta", "AStA", "protocol", ("ASTA",), ("ASTA",)),
@@ -482,8 +481,7 @@ def downgrade() -> None:
             "DELETE FROM gremium WHERE id IN (CAST(:s AS uuid), CAST(:a AS uuid))"
         ).bindparams(s=_STUPA_ID, a=_ASTA_ID)
     )
-    # The CD variants go AFTER the Gremien, because `gremium.cd_variant_id` is
-    # RESTRICT. The delete cascades to `cd_variant_logo`.
+    # After the Gremien: `gremium.cd_variant_id` is RESTRICT.
     op.execute(
         sa.delete(_cd_variant).where(_cd_variant.c.id.in_(list(CD_VARIANT_IDS.values())))
     )

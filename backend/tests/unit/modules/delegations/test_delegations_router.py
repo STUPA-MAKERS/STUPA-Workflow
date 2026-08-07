@@ -60,6 +60,17 @@ class _FakeService:
             delegate_voting=payload.delegate_voting,
         )
 
+    async def update(self, delegation_id, payload, actor):  # noqa: ANN001
+        if str(delegation_id).startswith("00000000"):
+            raise NotFoundError("nope")
+        if str(delegation_id).startswith("11111111"):
+            raise ForbiddenError("not yours")
+        return _out(
+            id=delegation_id,
+            delegate_id=payload.delegate_id or uuid4(),
+            delegate_voting=bool(payload.delegate_voting),
+        )
+
     async def revoke(self, delegation_id, actor):  # noqa: ANN001
         if str(delegation_id).startswith("00000000"):
             raise NotFoundError("nope")
@@ -264,3 +275,38 @@ def test_substitute_create_201() -> None:
 def test_substitute_delete_204() -> None:
     r = _client(_MEMBER).delete(f"/api/delegations/substitutes/{uuid4()}")
     assert r.status_code == 204
+
+
+# PATCH /delegations/{id}: change the recipient without losing the row identity.
+
+
+def test_update_requires_session_401() -> None:
+    r = _client(None).patch(f"/api/delegations/{uuid4()}", json={})
+    assert r.status_code == 401
+
+
+def test_update_returns_200_camelcase() -> None:
+    did, new = uuid4(), str(uuid4())
+    r = _client(_MEMBER).patch(
+        f"/api/delegations/{did}", json={"delegateId": new, "delegateVoting": True}
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["id"] == str(did)
+    assert data["delegateId"] == new
+    assert data["delegateVoting"] is True
+
+
+def test_update_unknown_404_problem_json() -> None:
+    r = _client(_MEMBER).patch(
+        "/api/delegations/00000000-0000-0000-0000-000000000000", json={}
+    )
+    assert r.status_code == 404
+    assert r.headers["content-type"].startswith("application/problem+json")
+
+
+def test_update_foreign_delegation_403() -> None:
+    r = _client(_MEMBER).patch(
+        "/api/delegations/11111111-1111-1111-1111-111111111111", json={}
+    )
+    assert r.status_code == 403

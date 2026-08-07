@@ -80,7 +80,6 @@ def health() -> dict[str, str]:
 # calls in the tests then do not register them twice.
 api_router.include_router(auth_router)
 api_router.include_router(oauth_router)
-# Admin view over the grants of every principal (kill switch for a leaked agent token).
 api_router.include_router(oauth_admin_router)
 api_router.include_router(mcp_router)
 # Mirror OAuth discovery under /api. The RFC location is the root, but /api always

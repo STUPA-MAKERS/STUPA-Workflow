@@ -1,20 +1,8 @@
 """Administrative view and kill switch for the OAuth grants of every principal.
 
-`GET /api/oauth/grants` and its siblings are self-service: they show and revoke the
-grants of the caller only. That leaves no way to kill a leaked agent token of somebody
-else. These two routes close that gap.
-
-**Permission: `admin.users`.** The `/admin/users` page is the user and access
-management of the platform. Its holder can already deactivate a principal, which is a
-strictly stronger act than killing one of the agent tokens of that principal. So this
-route grants no new power, it only makes a finer cut possible. The other candidate keys
-do not fit: `mcp.use` is the self-service key that every agent owner holds, `admin.roles`
-covers the role DEFINITIONS and not the users, and `privacy.manage` is the GDPR area.
-A new permission key would leave the `admin.users` holder with a blind spot on the very
-page where the access of a user is managed.
-
-A response never carries a token or a token hash. The database holds SHA-256 hashes
-only, and this module maps the row to an explicit schema, so no hash column can leak.
+`/api/oauth/grants` is self-service and reaches the grants of the caller only. These
+two routes let an `admin.users` holder kill a leaked agent token of somebody else.
+A response never carries a token or a token hash.
 """
 
 from __future__ import annotations
@@ -45,15 +33,11 @@ def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
     return {code: _PROBLEM for code in codes}
 
 
-# The permission gate. It injects the principal, which the audit entry needs as actor.
 UsersAdmin = Annotated[Principal, Depends(require_principal("admin.users"))]
 
 
 class GrantListQuery(PageParams):
-    """Query parameters of the grant list: paging plus a filter by principal.
-
-    `extra="forbid"` answers 422 on an unknown parameter instead of ignoring it.
-    """
+    """Query parameters of the grant list: paging plus a filter by principal."""
 
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
@@ -61,12 +45,7 @@ class GrantListQuery(PageParams):
 
 
 class OAuthGrantAdminOut(BaseModel):
-    """One live grant (agent token pair) with its owner.
-
-    `principalName` is the resolved display name or, without one, the email. It is never
-    a UUID. `principalId` is there for the filter and for a deep link, not for display.
-    The schema holds no token and no token hash.
-    """
+    """One live grant (agent token pair) with its owner. Holds no token and no hash."""
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -77,7 +56,7 @@ class OAuthGrantAdminOut(BaseModel):
     client_id: str = Field(alias="clientId")
     scope: str
     created_at: datetime = Field(alias="createdAt")
-    # `null` means that the token never expires. Only a revoke ends it.
+    # `null` = never expires; only a revoke ends it.
     access_expires_at: datetime | None = Field(alias="accessExpiresAt")
     refresh_expires_at: datetime | None = Field(alias="refreshExpiresAt")
 
@@ -109,9 +88,7 @@ async def list_oauth_grants_admin(
 ) -> Page[OAuthGrantAdminOut]:
     """List the live agent tokens of every principal, newest first.
 
-    The list holds the grants that are not revoked. A revoked grant is dead already and
-    the audit log keeps its record. The filter `principalId` narrows the list to one
-    owner.
+    Revoked grants stay out; `principalId` narrows the list to one owner.
     """
     stmt = (
         select(OAuthToken, PrincipalRow)
@@ -148,19 +125,14 @@ async def revoke_oauth_grant_admin(
 ) -> None:
     """Revoke the grant of any principal, for example after a token leak.
 
-    The call uses the same service function as the self-service revoke, so the access
-    token and the refresh token die at once: `resolve_access_token` rejects a revoked
-    row on the next request. The audit log records the revoke. A repeated call on an
-    already revoked grant changes nothing and writes no second entry.
+    The access token and the refresh token die at once. A repeated call is a no-op.
     """
     row = await oauth_service.load_grant(db, grant_id)
     if row is None:
         raise NotFoundError("Grant not found.")
     if not oauth_service.revoke_grant(row, datetime.now(UTC)):
         return
-    # `role_change` is the existing action for every access change that `admin.users`
-    # covers (activation, role assignment). The `event` key separates this one in a
-    # query. The payload holds id references and metadata, never a token or an email.
+    # `role_change` is the catch-all action for access changes; `event` separates this one.
     await record_audit(
         db,
         actor=admin.sub,

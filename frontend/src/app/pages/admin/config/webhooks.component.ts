@@ -94,8 +94,7 @@ export class WebhooksComponent {
   /** Delivery state per webhook id, from `GET /admin/webhooks/delivery-status`. */
   protected readonly delivery = signal<ReadonlyMap<string, WebhookDeliveryStatus>>(new Map());
 
-  /** `webhook.manage` as a front-end gate. The backend stays authoritative. The value
-   *  is reactive, because the principal loads asynchronously. */
+  /** `webhook.manage` as a front-end gate; the backend stays authoritative. */
   protected readonly canManage = computed(() => this.auth.can('webhook.manage'));
   /** The delivery status loads one time, as soon as the permission is known. */
   private statusRequested = false;
@@ -135,8 +134,7 @@ export class WebhooksComponent {
 
   constructor() {
     this.api.listWebhooks().subscribe((h) => this.hooks.set(h));
-    // The diagnosis route needs webhook.manage. Ask for it only once the principal
-    // shows the permission, so a user without it never triggers a 403.
+    // Ask only once the principal shows webhook.manage, so nobody triggers a 403.
     effect(() => {
       if (!this.canManage() || this.statusRequested) return;
       this.statusRequested = true;
@@ -147,7 +145,7 @@ export class WebhooksComponent {
   private loadDeliveryStatus(): void {
     this.api.listWebhookDeliveryStatus().subscribe({
       next: (list) => this.delivery.set(new Map(list.map((s) => [s.webhookId, s]))),
-      // A failure here must not hide the list itself. The rows then show no state.
+      // A failure here must not hide the list itself.
       error: () => this.delivery.set(new Map()),
     });
   }

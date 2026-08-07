@@ -5,11 +5,9 @@ The client sends the server-generated Markdown as the raw request body to
 ``trust_level=trusted``, ``variant=<per gremium>``) and returns the PDF bytes. There is
 no shell call. The Markdown is never part of a command line.
 
-A render that carries a document config or binary assets (for example the uploaded
-Corporate-Design logos) goes over ``multipart/form-data`` instead: the Markdown in the
-``source`` field, the config as a JSON object in the ``config`` field, and one file
-part per asset in the repeated ``assets`` field. Without a config and without assets
-the client keeps the raw-body shape, so nothing changes for the existing callers.
+A render with a document config or binary assets goes over ``multipart/form-data``
+instead: ``source`` for the Markdown, ``config`` for a JSON object, and one repeated
+``assets`` part per file. Without both the client keeps the raw-body shape.
 
 Errors map to ``PytexError``, which carries only the status and a short reason. The
 pytex container scrubs paths and stacktraces itself, so no internal path leaks out. A
@@ -37,7 +35,6 @@ _SOURCE_FIELD = "source"
 _CONFIG_FIELD = "config"
 _ASSETS_FIELD = "assets"
 # pytex reads the asset name from the file name of the part, so the part needs one.
-# The bytes are opaque to pytex; it writes them next to the rendered ``.tex`` file.
 _ASSET_CONTENT_TYPE = "application/octet-stream"
 
 # One multipart file part: ``(field, (filename, content, content_type))``.
@@ -103,8 +100,7 @@ def _config_part(config: Mapping[str, object] | None) -> dict[str, str]:
     """Serialize ``config`` into the ``config`` form field (empty when there is none).
 
     Raises:
-        PytexError: The config holds a value that JSON cannot represent. That is a
-            permanent caller error, so it gets no retry.
+        PytexError: The config holds a value that JSON cannot represent.
     """
     if not config:
         return {}
@@ -155,12 +151,9 @@ class PytexClient:
         Markdown such as a protocol or an agenda body. It locks the pytex Markdown
         ``eval`` escape and sandboxes the build, which protects against RCE.
 
-        ``config`` holds the document-class parameters, which override the
-        frontmatter. ``assets`` holds binary files keyed by their plain file name;
-        pytex writes each one next to the rendered ``.tex`` file. A ``logos`` or
-        ``footer_logos`` entry of ``config`` that names an asset then selects that
-        uploaded file. With both empty the client sends the raw body as before.
-        pytex owns the asset-name rule and answers 400 for a bad name.
+        ``config`` holds document-class parameters, which override the frontmatter.
+        ``assets`` holds binary files keyed by their plain file name, which pytex
+        writes next to the rendered ``.tex`` file so ``config`` can name them.
 
         Defense in depth: the protocol and report variants must render ``trusted``,
         because the template machinery blocks ``untrusted`` and ``sandboxed``. The only
@@ -192,8 +185,7 @@ class PytexClient:
         if variant is not None:
             params["variant"] = variant
         url = self.base_url.rstrip("/") + "/render"
-        # Only a config or an asset needs the multipart shape. Everything else keeps
-        # the raw body, so an existing caller sends the exact same request as before.
+        # Only a config or an asset needs the multipart shape.
         multipart = bool(config) or bool(assets)
         try:
             async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:

@@ -1,8 +1,7 @@
 """The corporate design of a Gremium must reach the renderer.
 
-The resolver and the CRUD around it are covered elsewhere. These tests cover the
-seam: the render paths must turn a resolved design into the pytex `config` and
-the asset bytes, and they must keep working when a Gremium carries no design.
+Covers the seam: a resolved design becomes the pytex `config` plus asset bytes,
+and a Gremium without a design still renders.
 """
 
 from __future__ import annotations
@@ -75,8 +74,8 @@ def test_a_resolved_design_reaches_pytex_as_config_and_assets(
 ) -> None:
     pytex = _run(monkeypatch, _resolved())
 
-    # The base shape replaces the old per-design variant name.
-    assert pytex.calls[0][1] == "protocol"
+    # Shape comes from the document kind, not the design; the design adds logos.
+    assert pytex.calls[0][1] == "report"
     assert pytex.configs[0] == {
         "logos": ["STUPA", "brand.png"],
         "footer_logos": ["brand.png"],

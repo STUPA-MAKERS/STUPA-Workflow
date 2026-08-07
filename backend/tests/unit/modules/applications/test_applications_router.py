@@ -124,6 +124,12 @@ class _FakeService:
         self.last_bypass_state_lock = bypass_state_lock
         return _out(application_id, with_pii=False)
 
+    async def update_applicant(self, application_id, payload, *, actor):  # noqa: ANN001
+        from app.modules.applications.schemas import ApplicantOut
+
+        self.applicant_args = (application_id, payload.email, payload.name, actor)
+        return ApplicantOut(email=payload.email, name=payload.name, anonymized=False)
+
     async def delete(self, application_id, *, actor=None):  # noqa: ANN001
         self.deleted = application_id
         self.deleted_actor = actor
@@ -427,11 +433,7 @@ def test_delete_application_admin(
 def test_delete_application_permission_holder(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
-    """#g9: a NON-admin role that holds ``application.delete`` may delete.
-
-    The route gates on the permission and not on the literal ``admin`` role string,
-    so the capability is delegable to any role.
-    """
+    """#g9: a non-admin role that holds ``application.delete`` may delete."""
     app_id = uuid4()
     app.dependency_overrides[get_current_principal] = lambda: Principal(
         sub="office", roles=["office"], permissions={"application.delete"}
@@ -443,10 +445,7 @@ def test_delete_application_permission_holder(
 
 
 def test_delete_application_manager_forbidden(app: FastAPI, client: TestClient) -> None:
-    """#g9: a principal without ``application.delete`` must NOT delete.
-
-    ``application.manage`` covers the editing only. The delete needs the own key.
-    """
+    """#g9: ``application.manage`` alone must NOT delete."""
     _as_principal(app, "application.manage")
     r = client.delete(f"/api/applications/{uuid4()}")
     assert r.status_code == 403
@@ -825,3 +824,51 @@ def test_delete_comment_requires_auth_401(client: TestClient) -> None:
     assert (
         client.delete(f"/api/applications/{uuid4()}/comments/{uuid4()}").status_code == 401
     )
+
+
+# PATCH /applications/{id}/applicant: application.manage, principal only.
+
+
+def test_patch_applicant_requires_auth_401(client: TestClient) -> None:
+    r = client.patch(f"/api/applications/{uuid4()}/applicant", json={"name": "X"})
+    assert r.status_code == 401
+
+
+def test_patch_applicant_rejects_the_magic_link_applicant(
+    app: FastAPI, client: TestClient
+) -> None:
+    """A magic-link holder must not repoint the address the link is delivered to."""
+    aid = uuid4()
+    _as_applicant(app, aid)
+    r = client.patch(f"/api/applications/{aid}/applicant", json={"email": "new@x.de"})
+    assert r.status_code == 401
+    assert r.headers["content-type"] == "application/problem+json"
+
+
+def test_patch_applicant_missing_perm_403(app: FastAPI, client: TestClient) -> None:
+    _as_principal(app, "application.read")
+    r = client.patch(f"/api/applications/{uuid4()}/applicant", json={"name": "X"})
+    assert r.status_code == 403
+
+
+def test_patch_applicant_ok(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    _as_principal(app, "application.manage")
+    aid = uuid4()
+    r = client.patch(
+        f"/api/applications/{aid}/applicant",
+        json={"email": "alice@x.de", "name": "Alice"},
+    )
+    assert r.status_code == 200
+    assert r.json() == {"email": "alice@x.de", "name": "Alice", "anonymized": False}
+    assert fake_service.applicant_args == (aid, "alice@x.de", "Alice", "admin")
+
+
+def test_patch_applicant_rejects_a_malformed_email_422(
+    app: FastAPI, client: TestClient
+) -> None:
+    _as_principal(app, "application.manage")
+    r = client.patch(f"/api/applications/{uuid4()}/applicant", json={"email": "nope"})
+    assert r.status_code == 422
+    assert r.headers["content-type"] == "application/problem+json"

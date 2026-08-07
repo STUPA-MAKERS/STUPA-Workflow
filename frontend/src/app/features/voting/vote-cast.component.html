@@ -39,8 +39,7 @@
               <app-badge variant="info">{{ 'voting.cast.delegation.badge' | t }}</app-badge>
             }
             @if (canDelete()) {
-              <!-- Only a draft with no ballots and no meeting can be deleted. An
-                   open vote is cancelled instead. -->
+              <!-- Only a draft with no ballots and no meeting can be deleted. -->
               <app-button variant="danger" size="sm" (click)="confirmDelete.set(true)">
                 {{ 'voting.delete.action' | t }}
               </app-button>

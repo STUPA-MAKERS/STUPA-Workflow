@@ -142,18 +142,13 @@ class FiscalYearOps(BudgetTreeServiceBase):
     async def delete_fiscal_year(self, budget_id: UUID, fiscal_year_id: UUID) -> None:
         """Delete a fiscal year of a top-level budget.
 
-        The delete refuses with 409 while money still hangs on the year:
-        bookings, allocations, or applications assigned to it. `budget_expense`
-        and `budget_allocation` cascade on the foreign key, so an unguarded
-        delete would drop them without a trace. `application.fiscal_year_id`
-        has no cascade and would fail on the constraint. The guard mirrors
-        `NodeOps.delete_node`, which refuses for the same reason.
-
         Raises:
             NotFoundError: The budget or the fiscal year does not exist, or the
                 fiscal year belongs to another top-level budget (404).
             ValidationProblem: `budget_id` is not a top-level budget (422).
-            ConflictError: Money rows still reference the fiscal year (409).
+            ConflictError: Money rows still reference the fiscal year (409),
+                with `fiscal_year_has_{bookings,allocations,applications}` as
+                the code.
         """
         top = await self._require_top_level(budget_id)
         fy = await self._get_fiscal_year(fiscal_year_id)
@@ -174,7 +169,8 @@ class FiscalYearOps(BudgetTreeServiceBase):
         )
         if blocker is not None:
             raise ConflictError(
-                f"fiscal year still has {blocker}; remove them first"
+                f"fiscal year still has {blocker}; remove them first",
+                code=f"fiscal_year_has_{blocker}",
             )
         await self._audit(
             AuditAction.BUDGET_FISCAL_YEAR_DELETE,

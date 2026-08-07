@@ -330,11 +330,7 @@ def test_delete_draft_protocol_204(
 def test_delete_protocol_without_finalize_permission_still_works(
     app: FastAPI, client: TestClient
 ) -> None:
-    """Discarding a draft needs no `protocol.finalize`.
-
-    That permission gates publishing. The same caller can already empty the body
-    through the PATCH, so a stricter gate here would protect nothing.
-    """
+    """Discarding a draft needs no `protocol.finalize`."""
     _writer(app)  # authenticated only; the service holds the per-Gremium check
     assert client.delete(f"/api/protocols/{PROTOCOL_ID}").status_code == 204
 

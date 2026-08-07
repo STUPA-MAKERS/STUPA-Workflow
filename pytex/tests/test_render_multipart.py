@@ -1,12 +1,7 @@
 """Contract tests for the `multipart/form-data` shape of `POST /render`.
 
-The multipart shape is the channel that pushes binary assets (Corporate-Design
-logos) and a config object into a render. The tests cover the forwarding
-contract: `source`, `config` and every `assets` part reach `BuildRequest`
-unchanged, and the query params still apply. They also cover the guards: a
-malformed `config`, an unknown field, an asset part without a file name, a
-duplicate asset name, too many assets, one oversize asset and an oversize
-total. The render backend stays mocked, so no test touches tectonic.
+Covers the forwarding of `source`, `config` and `assets` into `BuildRequest`
+plus every guard around them. The render backend stays mocked.
 """
 
 from __future__ import annotations
@@ -19,8 +14,7 @@ from fastapi.testclient import TestClient
 import app as app_module
 from tests.conftest import RenderRecorder, make_result
 
-# httpx builds a multipart body from `files=` (file parts) plus `data=` (plain
-# fields). A file part is `(field, (filename, bytes, content_type))`.
+# httpx file part: `(field, (filename, bytes, content_type))`.
 type FilePart = tuple[str, tuple[str | None, bytes, str]]
 
 SOURCE_MD = b"# Bericht\n\nText."
@@ -138,6 +132,32 @@ def test_too_many_assets_413(
     resp = client.post("/render", files=files)
     assert resp.status_code == 413
     assert "assets" in resp.json()["error"]
+    assert not render.calls
+
+
+def test_part_count_backstop_400(
+    client: TestClient, render: RenderRecorder, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Starlette caps the part count, which bounds a chunked body with no length."""
+    monkeypatch.setattr(app_module, "_MAX_PARTS", 2)
+    files = [_source_part(), *(_asset_part(f"l{i}.png") for i in range(3))]
+    resp = client.post("/render", files=files)
+    assert resp.status_code == 400
+    assert "malformed multipart body" in resp.json()["error"]
+    assert not render.calls
+
+
+def test_field_count_backstop_400(
+    client: TestClient, render: RenderRecorder, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(app_module, "_MAX_FIELDS", 1)
+    resp = client.post(
+        "/render",
+        files=[_source_part()],
+        data={"config": "{}", "extra": "x"},
+    )
+    assert resp.status_code == 400
+    assert "malformed multipart body" in resp.json()["error"]
     assert not render.calls
 
 

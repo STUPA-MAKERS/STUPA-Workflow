@@ -508,15 +508,32 @@ describe('InvoicesComponent (#invoices)', () => {
     expect(showSpy).toHaveBeenCalledWith(expect.any(String), 'info');
   });
 
-  it('other parse errors surface a problem-detail error toast', async () => {
+  it('a parse error names the machine code in the UI language, never the English detail', async () => {
     const { c, http, toast } = await setup();
     const spy = jest.spyOn(toast, 'error');
     const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
     c.onFilePicked({ target: { files: [file], value: 'x' } } as unknown as Event);
     http
       .expectOne((r) => r.url.endsWith('/api/invoices/parse'))
-      .flush({ detail: 'kaputt' }, { status: 500, statusText: 'err' });
-    expect(spy).toHaveBeenCalledWith('kaputt');
+      .flush(
+        { code: 'invoice_currency_unsupported', detail: 'Only EUR invoices are supported.' },
+        { status: 422, statusText: 'err' },
+      );
+    expect(spy).toHaveBeenCalledWith('Nur Rechnungen in Euro werden unterstützt.');
+    expect(c.importing()).toBe(false);
+  });
+
+  it('a parse error without a code falls back to the status message', async () => {
+    const { c, http, toast } = await setup();
+    const spy = jest.spyOn(toast, 'error');
+    const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
+    c.onFilePicked({ target: { files: [file], value: 'x' } } as unknown as Event);
+    http
+      .expectOne((r) => r.url.endsWith('/api/invoices/parse'))
+      .flush({ detail: 'Invoice import expects a PDF.' }, { status: 415, statusText: 'err' });
+    expect(spy).toHaveBeenCalledWith(
+      'Nur PDF-Dateien sind erlaubt. Der Virenscan kann die Datei auch abgelehnt haben.',
+    );
     expect(c.importing()).toBe(false);
   });
 
@@ -576,7 +593,7 @@ describe('InvoicesComponent (#invoices)', () => {
     http.expectNone((r) => r.url.endsWith('/api/invoices/file'));
   });
 
-  it('attachFile error toasts the problem detail', async () => {
+  it('attachFile toasts a translated message for the status', async () => {
     const { c, http, toast } = await setup();
     const spy = jest.spyOn(toast, 'error');
     const file = new File(['x'], 'm.pdf', { type: 'application/pdf' });
@@ -585,8 +602,10 @@ describe('InvoicesComponent (#invoices)', () => {
     } as unknown as Event);
     http
       .expectOne((r) => r.url.endsWith('/api/invoices/file'))
-      .flush({ detail: 'upload failed' }, { status: 500, statusText: 'err' });
-    expect(spy).toHaveBeenCalledWith('upload failed');
+      .flush({ detail: 'Object storage unavailable.' }, { status: 503, statusText: 'err' });
+    expect(spy).toHaveBeenCalledWith(
+      'Der Dienst ist gerade nicht erreichbar. Bitte später erneut versuchen.',
+    );
     expect(c.attaching()).toBe(false);
   });
 
@@ -723,7 +742,7 @@ describe('InvoicesComponent (#invoices)', () => {
     http.expectNone((r) => r.url.endsWith('/api/invoices') && r.method === 'POST');
   });
 
-  it('create() error toasts the problem detail and keeps the dialog open', async () => {
+  it('create() toasts a translated message and keeps the dialog open', async () => {
     const { c, http, toast } = await setup();
     const spy = jest.spyOn(toast, 'error');
     c.openCreate();
@@ -732,7 +751,7 @@ describe('InvoicesComponent (#invoices)', () => {
     http
       .expectOne((r) => r.url.endsWith('/api/invoices') && r.method === 'POST')
       .flush({ detail: 'nope' }, { status: 400, statusText: 'Bad' });
-    expect(spy).toHaveBeenCalledWith('nope');
+    expect(spy).toHaveBeenCalledWith('Aktion fehlgeschlagen.');
     expect(c.saving()).toBe(false);
     expect(c.createOpen()).toBe(true);
   });

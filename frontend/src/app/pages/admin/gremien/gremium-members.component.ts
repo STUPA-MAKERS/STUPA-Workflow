@@ -71,8 +71,7 @@ export class GremiumMembersComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly auth = inject(AuthService);
 
-  /** `admin.gremien` as a front-end gate for add, edit and remove. The backend stays
-   *  authoritative. The value is reactive, because the principal loads asynchronously. */
+  /** `admin.gremien` as a front-end gate; the backend stays authoritative. */
   readonly canManage = computed(() => this.auth.can('admin.gremien'));
 
   private readonly gremiumId = this.route.snapshot.paramMap.get('id') ?? '';
@@ -310,8 +309,7 @@ export class GremiumMembersComponent {
       });
   }
 
-  /** Open the edit dialog for one membership. The member and the Gremium stay fixed —
-   *  only the role and the term of office change. */
+  /** Open the edit dialog: the role and the term of office, never the member. */
   openEdit(m: Member): void {
     this.editMember.set(m);
     this.editRoleId.set(m.gremiumRoleId);
@@ -341,8 +339,7 @@ export class GremiumMembersComponent {
           this.closeEdit();
           this.refresh();
         },
-        // 409 = the term overlaps another term of this member. 422 = validFrom is not
-        // before validUntil. Both need their own words, not a generic failure.
+        // 409 = the term overlaps another term of this member; 422 = bad order.
         error: (err: { status?: number }) =>
           this.toast.error(this.i18n.translate(this.memberErrorKey(err.status))),
       });

@@ -254,7 +254,7 @@ describe('MeetingDelegationCardComponent', () => {
   it('does nothing on create without a selected recipient', async () => {
     const { http, cmp } = await setup();
     flushContext(http, ctx());
-    cmp.create(); // delegateId is empty, so the card sends no request
+    cmp.submit(); // delegateId is empty, so the card sends no request
     http.verify();
     expect(cmp.busy()).toBe(false);
   });
@@ -264,7 +264,7 @@ describe('MeetingDelegationCardComponent', () => {
     flushContext(http, ctx());
     cmp.delegateId.set('r-1');
     cmp.busy.set(true);
-    cmp.create();
+    cmp.submit();
     http.verify();
   });
 
@@ -275,7 +275,7 @@ describe('MeetingDelegationCardComponent', () => {
     cmp.delegateVoting.set(true);
     cmp.openDialog();
     cmp.delegateId.set('r-1');
-    cmp.create();
+    cmp.submit();
     const req = http.expectOne(`${BASE}/delegations`);
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual({ meetingId: 'm-1', delegateId: 'r-1', delegateVoting: false });
@@ -292,7 +292,7 @@ describe('MeetingDelegationCardComponent', () => {
     const { http, cmp } = await setup();
     flushContext(http, ctx());
     cmp.delegateId.set('r-1');
-    cmp.create();
+    cmp.submit();
     http
       .expectOne(`${BASE}/delegations`)
       .flush({ detail: 'Frist abgelaufen' }, { status: 409, statusText: 'Conflict' });
@@ -304,13 +304,53 @@ describe('MeetingDelegationCardComponent', () => {
     const { http, cmp } = await setup();
     flushContext(http, ctx());
     cmp.delegateId.set('r-1');
-    cmp.create();
+    cmp.submit();
     http
       .expectOne(`${BASE}/delegations`)
       .flush(null, { status: 500, statusText: 'Server Error' });
     expect(toast.error).toHaveBeenCalledTimes(1);
     // Without a detail message the card shows the generic i18n key.
     expect(toast.error).not.toHaveBeenCalledWith('Frist abgelaufen');
+  });
+
+  it('rewrites the delegation in place instead of revoke plus create', async () => {
+    const { http, cmp } = await setup();
+    flushContext(http, ctx({ myDelegation: delegation() }));
+    cmp.openEdit(delegation({ delegateVoting: true }));
+    expect(cmp.editingId()).toBe('d-1');
+    expect(cmp.delegateId()).toBe('r-1');
+    expect(cmp.delegateVoting()).toBe(true);
+    cmp.delegateId.set('r-2');
+    cmp.submit();
+    const req = http.expectOne(`${BASE}/delegations/d-1`);
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({ delegateId: 'r-2', delegateVoting: true });
+    req.flush(delegation({ delegateId: 'r-2' }));
+    expect(cmp.dialogOpen()).toBe(false);
+    expect(toast.success).toHaveBeenCalledWith('Vertretung geändert.');
+    http.expectOne(`${BASE}/delegations/meetings/m-1/context`).flush(ctx());
+  });
+
+  it('toasts the update failure of a change', async () => {
+    const { http, cmp } = await setup();
+    flushContext(http, ctx({ myDelegation: delegation() }));
+    cmp.openEdit(delegation());
+    cmp.delegateId.set('r-2');
+    cmp.submit();
+    http
+      .expectOne(`${BASE}/delegations/d-1`)
+      .flush(null, { status: 500, statusText: 'Server Error' });
+    expect(cmp.busy()).toBe(false);
+    expect(toast.error).toHaveBeenCalledWith('Vertretung konnte nicht geändert werden.');
+  });
+
+  it('leaves the edit mode when the create dialog opens again', async () => {
+    const { http, cmp } = await setup();
+    flushContext(http, ctx());
+    cmp.openEdit(delegation());
+    cmp.openDialog();
+    expect(cmp.editingId()).toBeNull();
+    expect(cmp.delegateId()).toBe('');
   });
 
   it('does nothing on revoke while busy', async () => {

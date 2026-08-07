@@ -83,7 +83,7 @@ describe('AuditLogComponent (#45)', () => {
       expect.objectContaining({ limit: 50, before: undefined }),
     );
     expect(
-      screen.getByText(/Root Admin hat Rollen\/Rechte geändert \(principal:p-1\)\./),
+      screen.getByText(/Root Admin hat Rollen\/Rechte geändert \(Benutzer\)\./),
     ).toBeInTheDocument();
     screen.getByRole('button', { expanded: false }).click();
     fixture.detectChanges();
@@ -94,7 +94,7 @@ describe('AuditLogComponent (#45)', () => {
     await setup({
       page: { items: [entry(1, { action: 'mystery_event', actorName: null })], nextCursor: null, hasMore: false },
     });
-    expect(screen.getByText(/mystery_event \(principal:p-1\)/)).toBeInTheDocument();
+    expect(screen.getByText(/mystery_event \(Benutzer\)/)).toBeInTheDocument();
   });
 
   it('shows the empty state when there are no entries', async () => {
@@ -368,6 +368,7 @@ describe('AuditLogComponent (#45)', () => {
       'protocol_delete',
       'vote_delete',
       'budget_fiscal_year_delete',
+      'budget_allocation_delete',
     ] as const;
     for (const action of fresh) {
       // Every one of them is in the catalog, so the filter offers it.
@@ -375,7 +376,9 @@ describe('AuditLogComponent (#45)', () => {
       // Neither the label nor the sentence falls back to the raw key.
       expect(cmp.actionLabel(action)).not.toBe(action);
       const msg = cmp.message(entry(1, { action, targetType: 'comment', targetId: 'c-1' }));
-      expect(msg).not.toMatch(/comment_update|comment_delete|protocol_delete|vote_delete|budget_fiscal_year_delete/);
+      expect(msg).not.toMatch(
+        /comment_update|comment_delete|protocol_delete|vote_delete|budget_fiscal_year_delete|budget_allocation_delete/,
+      );
       expect(cmp.icon(action)).not.toBe('audit');
     }
     expect(cmp.targetTypeLabel('fiscal_year')).toBe('Haushaltsjahr');
@@ -454,24 +457,41 @@ describe('AuditLogComponent (#45)', () => {
     expect(link.getAttribute('href')).toBe('/applications/a-1');
   });
 
-  it('message falls back to type:id when no resolved label is present', async () => {
+  it('message falls back to the translated target type, never a raw id', async () => {
     const { cmp } = await setup();
-    expect(cmp.message(entry(1, { targetLabel: null }))).toMatch(/principal:p-1/);
+    const msg = cmp.message(entry(1, { targetLabel: null }));
+    expect(msg).toMatch(/Benutzer/);
+    expect(msg).not.toMatch(/p-1/);
   });
 
-  it('targetLabel uses just the target type when no id is present', async () => {
+  it('message names the year of a deleted fiscal year from the audit data', async () => {
+    const { cmp } = await setup();
+    const msg = cmp.message(
+      entry(1, {
+        action: 'budget_fiscal_year_delete',
+        targetType: 'fiscal_year',
+        targetId: 'fy-1',
+        targetLabel: null,
+        data: { year: 2026 },
+      }),
+    );
+    expect(msg).toMatch(/2026/);
+    expect(msg).not.toMatch(/fy-1/);
+  });
+
+  it('targetLabel uses the translated target type when no id is present', async () => {
     const { cmp } = await setup();
     // An unknown action uses the fallback message, and the target holds the type only.
     expect(
       cmp.message(entry(1, { action: 'mystery', targetType: 'principal', targetId: null })),
-    ).toMatch(/\(principal\)/);
+    ).toMatch(/\(Benutzer\)/);
   });
 
-  it('targetLabel uses just the target id when no type is present', async () => {
+  it('targetLabel uses an em-dash when only an id is present', async () => {
     const { cmp } = await setup();
     expect(
       cmp.message(entry(1, { action: 'mystery', targetType: null, targetId: 'only-id' })),
-    ).toMatch(/\(only-id\)/);
+    ).toMatch(/\(—\)/);
   });
 
   it('targetLabel uses an em-dash when neither type nor id is present', async () => {

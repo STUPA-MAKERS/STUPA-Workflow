@@ -173,6 +173,11 @@ class _FakeService:
             budgetId=budget_id, fiscalYearId=fiscal_year_id, allocated=Decimal("500")
         )
 
+    async def delete_allocation(
+        self, budget_id: uuid.UUID, fiscal_year_id: uuid.UUID
+    ) -> None:
+        self.calls["delete_alloc"] = (budget_id, fiscal_year_id)
+
     async def assign_budget(self, application_id: uuid.UUID, payload: object) -> AssignBudgetOut:
         self.calls["assign"] = application_id
         return AssignBudgetOut(applicationId=application_id, budgetId=_BID, fiscalYearId=_FYID)
@@ -295,6 +300,24 @@ def test_set_allocation(client: TestClient, fake: _FakeService) -> None:
     assert resp.status_code == 200
     assert resp.json()["allocated"] == "500"
     assert fake.calls["alloc"] == (_BID, _FYID)
+
+
+def test_delete_allocation(client: TestClient, fake: _FakeService) -> None:
+    resp = client.delete(f"/api/budgets/{_BID}/allocations/{_FYID}")
+    assert resp.status_code == 204
+    assert fake.calls["delete_alloc"] == (_BID, _FYID)
+
+
+def test_delete_allocation_requires_structure(fake: _FakeService) -> None:
+    resp = _app_as(fake, {"budget.book"}).delete(f"/api/budgets/{_BID}/allocations/{_FYID}")
+    assert resp.status_code == 403
+
+
+def test_delete_allocation_requires_auth(fake: _FakeService) -> None:
+    app = create_app()
+    app.dependency_overrides[get_budget_tree_service] = lambda: fake
+    resp = TestClient(app).delete(f"/api/budgets/{_BID}/allocations/{_FYID}")
+    assert resp.status_code == 401
 
 
 def test_assign_budget(client: TestClient, fake: _FakeService) -> None:
@@ -564,8 +587,13 @@ def test_list_transfers_passes_filters(client: TestClient, fake: _FakeService) -
     assert kwargs["limit"] == 20 and kwargs["offset"] == 5
 
 
-def test_list_transfers_requires_book(fake: _FakeService) -> None:
-    assert _app_as(fake, {"budget.view"}).get("/api/budget-transfers").status_code == 403
+def test_list_transfers_allows_any_budget_permission(fake: _FakeService) -> None:
+    # The sibling GET /expenses shows both legs to a viewer, so the read aligns.
+    assert _app_as(fake, {"budget.view"}).get("/api/budget-transfers").status_code == 200
+
+
+def test_list_transfers_requires_a_budget_permission(fake: _FakeService) -> None:
+    assert _app_as(fake, {"application.manage"}).get("/api/budget-transfers").status_code == 403
 
 
 def test_update_transfer(client: TestClient, fake: _FakeService) -> None:
