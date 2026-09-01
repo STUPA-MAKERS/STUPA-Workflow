@@ -15,7 +15,9 @@ import secrets
 
 # Permissions that no agent gets, whatever the scope or the admin status says. To cast a
 # ballot with `vote.cast` stays strictly human. Every scope resolution removes it.
-FORBIDDEN_PERMISSIONS: frozenset[str] = frozenset({"vote.cast"})
+# `backup.manage` joins it for the same reason: a backup holds the whole database in
+# readable form, and a restore replaces it. Both stay with a human at a browser.
+FORBIDDEN_PERMISSIONS: frozenset[str] = frozenset({"vote.cast", "backup.manage"})
 
 # Scope key to the allowed permission keys. `read` covers every reading endpoint. The
 # `*:write` scopes add the mutations. `votes:write` covers vote management only, that is
@@ -138,9 +140,9 @@ def parse_scope(raw: str | None) -> list[str]:
 def scope_permissions(scopes: list[str]) -> frozenset[str]:
     """Return the union of the permission sets of the scopes, minus the forbidden ones.
 
-    The function subtracts `FORBIDDEN_PERMISSIONS`, so it always removes `vote.cast`. The
-    removal holds even when a scope ever contains it, and it holds for an admin. The scope
-    cap in `Principal.has` stops the admin bypass.
+    The function subtracts `FORBIDDEN_PERMISSIONS`, so it always removes `vote.cast` and
+    `backup.manage`. The removal holds even when a scope ever contains one of them, and it
+    holds for an admin. The scope cap in `Principal.has` stops the admin bypass.
     """
     perms: set[str] = set()
     for s in scopes:
