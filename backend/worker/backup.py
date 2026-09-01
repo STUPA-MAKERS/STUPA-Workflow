@@ -50,9 +50,22 @@ def _settings(ctx: dict[str, Any]) -> Settings:
     return settings if isinstance(settings, Settings) else load_settings()
 
 
-def _service(ctx: dict[str, Any], session: AsyncSession) -> BackupService:
+async def _dispose_engine(ctx: dict[str, Any]) -> None:
+    """Drop every pooled connection this worker holds to the database.
+
+    A restore replaces the whole schema. Any connection left in the pool blocks the
+    drop, so the pool has to go before `pg_restore` starts. SQLAlchemy opens a fresh one
+    on the next use, which is what the audit write afterwards relies on.
+    """
+    bind = getattr(_sessionmaker(ctx), "kw", {}).get("bind")
+    dispose = getattr(bind, "dispose", None)
+    if dispose is not None:
+        await dispose()
+
+
+def _service(ctx: dict[str, Any], session: AsyncSession | None) -> BackupService:
     return BackupService(
-        session,
+        session,  # type: ignore[arg-type]  # the restore path needs no session
         _settings(ctx),
         attachments=ctx.get("backup_attachments"),
         archives=ctx.get("backup_archives"),
@@ -172,27 +185,44 @@ async def restore_backup(ctx: dict[str, Any], backup_id: str, actor: str | None)
         logger.error("restore aborted: the safety backup failed")
         return "failed"
 
+    # Read what the restore needs, then LET THE SESSION GO. `pg_restore --clean` drops
+    # every table, and a session still open here holds a lock on the very rows it just
+    # read, so the drop waits on this task's own transaction and the restore hangs for
+    # ever. Nothing may hold a connection to the database while the restore runs.
     async with _sessionmaker(ctx)() as session:
         service = _service(ctx, session)
         row = await service.get(UUID(backup_id))
         if row is None or not row.storage_key:
             logger.info("restore target %s gone — skipped", backup_id)
             return "gone"
-        archives = ctx.get("backup_archives")
-        if archives is None:
-            return "failed"
+        storage_key = row.storage_key
+        # Take the catalogue with us. The archive predates the safety copy, so the
+        # restore would otherwise erase the row that points at it and leave the one
+        # archive that makes this undoable invisible to the admin page.
+        catalogue = await service.snapshot_catalogue()
 
-        try:
-            with temp_file(".age") as local:
-                await archives.get_file(row.storage_key, local.name)
-                manifest = await service.apply_archive(local.name)
-        except (BackupError, ArchiveError) as exc:
-            logger.error("restore %s failed: %s", backup_id, exc)
-            return "failed"
+    archives = ctx.get("backup_archives")
+    if archives is None:
+        return "failed"
+
+    # The session is closed, but its connection is still in the engine pool and still
+    # counts as a client. Dispose the pool so the restore has the database to itself.
+    await _dispose_engine(ctx)
+
+    service = _service(ctx, None)
+    try:
+        with temp_file(".age") as local:
+            await archives.get_file(storage_key, local.name)
+            manifest = await service.apply_archive(local.name)
+    except (BackupError, ArchiveError) as exc:
+        logger.error("restore %s failed: %s", backup_id, exc)
+        return "failed"
 
     # A new session: the one above talks to a database that no longer exists in the
     # form it was opened against.
     async with _sessionmaker(ctx)() as session:
+        reseeded = await _service(ctx, session).reseed_catalogue(catalogue)
+        logger.info("restore %s put %d catalogue rows back", backup_id, reseeded)
         await audit_record(
             session,
             actor=actor,
@@ -206,6 +236,7 @@ async def restore_backup(ctx: dict[str, Any], backup_id: str, actor: str | None)
                 "archiveAppVersion": manifest.app_version,
                 "archiveSchemaRevision": manifest.schema_revision,
                 "objectCount": manifest.object_count,
+                "catalogueRowsRestored": reseeded,
             },
         )
         await session.commit()

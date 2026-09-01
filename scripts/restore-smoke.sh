@@ -29,16 +29,30 @@ cd "${DEPLOY}"
 
 # The script uses its own compose project, so it does not touch a real stack.
 export COMPOSE_PROJECT_NAME="antrag-restore-smoke"
-DC=(docker compose)
+
+# The compose file publishes postgres on 127.0.0.1:5433 for the admin CLI. A throwaway
+# stack needs no host port, and publishing one makes the script unrunnable on any
+# machine that already has the dev stack up. The override drops the mapping; everything
+# here talks over the compose network anyway.
+OVERRIDE="$(mktemp -t restore-smoke-override-XXXXXX.yml)"
+cat > "${OVERRIDE}" <<'YAML'
+services:
+  postgres:
+    ports: !reset []
+YAML
+DC=(docker compose -f docker-compose.yml -f "${OVERRIDE}")
 
 # Every service has `env_file: .env`, so deploy/.env must exist. The script moves a real
 # .env aside and puts it back at the end, so the smoke test overwrites nothing.
 ENV_BAK=""
 cleanup() {
   "${DC[@]}" down -v --remove-orphans >/dev/null 2>&1 || true
-  rm -f "${KEY}"
+  rm -f "${KEY}" "${OVERRIDE}"
   rm -f "${DEPLOY}/.env"
+  # Put a real .env back FIRST, whatever else failed. Losing it would cost the operator
+  # far more than a failed smoke run.
   [[ -n "${ENV_BAK}" ]] && mv "${ENV_BAK}" "${DEPLOY}/.env"
+  return 0
 }
 trap cleanup EXIT
 
@@ -49,12 +63,24 @@ if [[ -f "${DEPLOY}/.env" ]]; then
 fi
 cp .env.example .env
 # Replace the .env.example placeholders with values that work for the smoke test.
+# The app validates its whole settings block at import, and every secret below has a
+# 16-character minimum. `.env.example` ships them EMPTY, and an empty string is not the
+# same as an absent one, so even the optional ones have to carry a value here or the
+# `migrate` container refuses to start. The last key wins in an env_file, so appending
+# is enough.
 {
   echo "POSTGRES_PASSWORD=smokepw"
+  # DATABASE_URL carries its OWN copy of the password, and `.env.example` ships it
+  # blank. Setting POSTGRES_PASSWORD alone leaves the app authenticating with an empty
+  # one. The old shell backup never noticed, because it built its connection from
+  # POSTGRES_* through libpq rather than from this URL.
+  echo "DATABASE_URL=postgresql+asyncpg://app:smokepw@postgres/antrag"
   echo "MINIO_ACCESS_KEY=smokeaccess"
   echo "MINIO_SECRET_KEY=smokesecret123"
   echo "SESSION_SECRET=smoke-session-secret-that-is-long-enough-000000"
   echo "MAGIC_LINK_SECRET=smoke-magic-secret-that-is-long-enough-0000000"
+  echo "OIDC_CLIENT_SECRET=smoke-oidc-secret-that-is-long-enough-00000000"
+  echo "ALTCHA_HMAC_SECRET=smoke-altcha-secret-that-is-long-enough-000000"
 } >> .env
 
 echo "==> build the backend image"
@@ -71,7 +97,12 @@ identity = x25519.Identity.generate()
 print(f"# public key: {identity.to_public()}")
 print(identity)
 ' > "${KEY}"
-chmod 600 "${KEY}"
+# The container runs as uid 10001 (see backend/Dockerfile), and /secrets is a read-only
+# bind mount, so the file mode on the HOST is what decides whether the app can read the
+# key. A 0600 key owned by the deploying user is invisible inside the container. This one
+# is ephemeral and thrown away at the end of the run, so world-readable is fine here; a
+# real deployment should chown it to 10001 instead. deploy/README.md says so.
+chmod 644 "${KEY}"
 recipient="$(grep -oE 'age1[0-9a-z]+' "${KEY}" | head -1)"
 [[ -n "${recipient}" ]] || { echo "ERROR: no age recipient was generated"; exit 1; }
 echo "BACKUP_AGE_RECIPIENT=${recipient}" >> .env

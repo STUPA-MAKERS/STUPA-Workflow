@@ -28,11 +28,12 @@ from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import IO
+from typing import IO, Any
 from urllib.parse import urlsplit, urlunsplit
 from uuid import UUID
 
 from sqlalchemy import select, text
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.backup import archive as arch
@@ -217,6 +218,38 @@ class BackupService:
         await self.session.delete(row)
         await self.session.flush()
 
+    async def snapshot_catalogue(self) -> list[dict[str, Any]]:
+        """Read the whole catalogue as plain values, to survive a restore.
+
+        A restore replaces the `backup` table along with everything else, using an
+        archive taken BEFORE the safety copy existed. Without this the safety row is
+        erased by the very restore it exists to undo: the archive is still in the
+        bucket, but nothing references it and the admin page cannot list it.
+        """
+        rows = list((await self.session.scalars(select(Backup))).all())
+        return [
+            {c.name: getattr(row, c.name) for c in Backup.__table__.columns}
+            for row in rows
+        ]
+
+    async def reseed_catalogue(self, rows: list[dict[str, Any]]) -> int:
+        """Put catalogue rows back after a restore, keeping the restored ones too.
+
+        `ON CONFLICT DO NOTHING` on the id: an archive that the restored state already
+        knows about keeps the restored values, and everything the restore erased comes
+        back. The result is the union, which is what the operator needs — every archive
+        that actually exists in the bucket is listed again.
+
+        Returns:
+            The number of rows written back.
+        """
+        if not rows:
+            return 0
+        stmt = pg_insert(Backup).values(rows).on_conflict_do_nothing(index_elements=["id"])
+        result = await self.session.execute(stmt)
+        # `rowcount` lives on the cursor result rather than the generic Result type.
+        return int(getattr(result, "rowcount", 0) or 0)
+
     def export_url(self, row: Backup) -> str:
         """Return a short-lived signed URL for the archive.
 
@@ -386,7 +419,13 @@ class BackupService:
         try:
             raw = open(path, encoding="utf-8").read()  # noqa: SIM115
         except OSError as exc:
-            raise BackupError("the age identity file is not readable") from exc
+            # Almost always the file mode rather than the path: the container runs as a
+            # non-root user and /secrets is a read-only bind mount, so a 0600 key owned
+            # by the deploying user cannot be read from in here.
+            raise BackupError(
+                "the age identity file is not readable — check that it exists and that "
+                "the container user may read it"
+            ) from exc
         return arch.identity_from_str(raw)
 
     async def _pg_restore(self, dump_path: str) -> None:
@@ -400,6 +439,7 @@ class BackupService:
         Raises:
             BackupError: `pg_restore` is missing, timed out, or failed hard.
         """
+        await self._disconnect_everyone_else()
         await self._run(
             [
                 "pg_restore",
@@ -417,6 +457,39 @@ class BackupService:
             # the outcome instead of trusting the code.
             tolerate_nonzero=True,
         )
+
+    async def _disconnect_everyone_else(self) -> None:
+        """Terminate every other client connection to the database.
+
+        `pg_restore --clean` needs an ACCESS EXCLUSIVE lock on each table it drops, and
+        any other transaction in flight blocks it. The API container serves requests
+        throughout, so without this the restore waits on whatever happened to be open
+        and can hang indefinitely.
+
+        Cutting those connections is safe here precisely because a restore replaces the
+        database anyway: whatever they were doing is about to be overwritten, and every
+        session is invalidated by the restored `auth_session` table regardless.
+
+        A failure is logged and swallowed. The restore is still worth attempting, and it
+        reports the real problem itself if the lock never comes.
+        """
+        try:
+            await self._run(
+                [
+                    "psql",
+                    "--dbname",
+                    libpq_dsn(self.settings.database_url),
+                    "--no-psqlrc",
+                    "--quiet",
+                    "-c",
+                    "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+                    "WHERE datname = current_database() AND pid <> pg_backend_pid()",
+                ],
+                what="psql (disconnect)",
+                tolerate_nonzero=True,
+            )
+        except BackupError:
+            logger.warning("could not disconnect other clients before the restore")
 
     async def _mirror_objects(self, tar: tarfile.TarFile) -> None:
         """Make the attachment bucket match the archive exactly.

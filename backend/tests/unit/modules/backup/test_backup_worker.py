@@ -55,11 +55,27 @@ class _FakeSession:
     async def __aexit__(self, *_exc: object) -> None: ...
 
 
+class _FakeEngine:
+    """Stands in for the async engine, so the pool dispose can be observed."""
+
+    def __init__(self) -> None:
+        self.disposed = 0
+
+    async def dispose(self) -> None:
+        self.disposed += 1
+
+
 class _Sessionmaker:
-    """Callable that hands out one shared fake session."""
+    """Callable that hands out one shared fake session.
+
+    It carries a `kw["bind"]` like a real `async_sessionmaker`, because the restore has
+    to dispose that engine's pool before `pg_restore` runs.
+    """
 
     def __init__(self) -> None:
         self.session = _FakeSession()
+        self.engine = _FakeEngine()
+        self.kw = {"bind": self.engine}
 
     def __call__(self) -> _FakeSession:
         return self.session
@@ -75,6 +91,8 @@ class _FakeService:
         self.failed_with: str | None = None
         self.pruned: list[Backup] = []
         self.created: list[str] = []
+        self.snapshots = 0
+        self.reseeded: list[dict[str, Any]] | None = None
 
     async def get(self, _backup_id: UUID) -> Backup | None:
         return self.row
@@ -103,6 +121,14 @@ class _FakeService:
 
     async def prune(self) -> list[Backup]:
         return self.pruned
+
+    async def snapshot_catalogue(self) -> list[dict[str, Any]]:
+        self.snapshots += 1
+        return [{"id": self.row.id} if self.row else {}]
+
+    async def reseed_catalogue(self, rows: list[dict[str, Any]]) -> int:
+        self.reseeded = rows
+        return len(rows)
 
     async def apply_archive(self, path: str) -> Any:
         if self.apply_error is not None:
@@ -139,8 +165,9 @@ def _ctx(
     *,
     settings: Settings | None = None,
     archives: object | None = None,
+    maker: _Sessionmaker | None = None,
 ) -> dict[str, Any]:
-    maker = _Sessionmaker()
+    maker = maker or _Sessionmaker()
     ctx: dict[str, Any] = {
         "backup_sessionmaker": maker,
         "backup_settings": settings or _settings(),
@@ -286,6 +313,38 @@ async def test_restore_records_the_safety_backup_id_in_the_audit_entry(
     entry = next(e for e in _silence_audit if str(e["action"]) == "backup_restore")
     assert entry["data"]["safetyBackupId"]
     assert entry["data"]["objectCount"] == 3
+
+
+@pytest.mark.asyncio
+async def test_restore_releases_the_database_before_it_replaces_it() -> None:
+    """Regression: the restore used to hang for ever on its own lock.
+
+    `pg_restore --clean` drops every table, which needs an ACCESS EXCLUSIVE lock. The
+    task used to keep its own session open across that call, so the drop waited on the
+    transaction that had just read the catalogue row, and the restore never returned.
+    Nothing may hold a connection to the database once `apply_archive` starts.
+    """
+    service = _FakeService(_row(status="done", storage_key="k"))
+    maker = _Sessionmaker()
+    ctx = _ctx(service, archives=_FakeArchives(), maker=maker)
+    assert await task.restore_backup(ctx, str(BACKUP_ID), "sub") == "done"
+    assert maker.engine.disposed >= 1, "the connection pool was not released"
+
+
+@pytest.mark.asyncio
+async def test_restore_puts_the_backup_catalogue_back() -> None:
+    """Regression: the safety archive used to vanish from the list it belongs in.
+
+    The archive being restored predates the safety copy, so restoring it erased the
+    catalogue row that points at that copy. The object stayed in the bucket, but nothing
+    referenced it and the admin page could not list it — which quietly broke the one
+    promise that makes a restore reversible.
+    """
+    service = _FakeService(_row(status="done", storage_key="k"))
+    ctx = _ctx(service, archives=_FakeArchives())
+    assert await task.restore_backup(ctx, str(BACKUP_ID), "sub") == "done"
+    assert service.snapshots == 1, "the catalogue was never captured"
+    assert service.reseeded, "the catalogue was never put back"
 
 
 @pytest.mark.asyncio

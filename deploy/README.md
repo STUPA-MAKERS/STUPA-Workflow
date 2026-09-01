@@ -151,9 +151,17 @@ permission and is unreachable through an OAuth agent token.
    ```
    `deploy/secrets/` is gitignored. The `# public key: age1...` line in that file is the
    recipient.
-2. Put the recipient in `.env` as `BACKUP_AGE_RECIPIENT`. Leave
-   `BACKUP_AGE_IDENTITY_FILE=/secrets/backup-age.key` as it is; compose mounts
-   `./secrets` read-only into `api` and `worker`.
+2. Make the key readable by the container user:
+   ```bash
+   sudo chown 10001:10001 deploy/secrets/backup-age.key
+   chmod 400 deploy/secrets/backup-age.key
+   ```
+   `age-keygen` writes 0600 owned by you. The containers run as uid 10001 and mount
+   `./secrets` read-only, so the mode on the HOST decides whether the app can read the
+   key at all. Skip this and backups still work, but a restore fails with *the age
+   identity file is not readable*.
+3. Put the recipient in `.env` as `BACKUP_AGE_RECIPIENT`. Leave
+   `BACKUP_AGE_IDENTITY_FILE=/secrets/backup-age.key` as it is.
 
 Without a recipient the page answers 503 and the nightly job does nothing. Without the
 identity the page still lists and creates, but import and restore stay off, because the
