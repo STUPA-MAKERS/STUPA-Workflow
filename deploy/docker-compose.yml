@@ -36,7 +36,11 @@ services:
       - internal
       - proxy
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost/healthz >/dev/null 2>&1 || exit 1"]
+      # 127.0.0.1, NOT localhost. The config is mounted read-only, which stops nginx's
+      # `10-listen-on-ipv6-by-default.sh` from adding the IPv6 listener, so nginx binds
+      # IPv4 only. busybox wget tries ::1 first for `localhost` and gets a refused
+      # connection, which left this container permanently unhealthy.
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/healthz >/dev/null 2>&1 || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
