@@ -204,4 +204,161 @@ describe('BackupsComponent', () => {
     const cmp = fixture.componentInstance as unknown as { loading: () => boolean };
     expect(cmp.loading()).toBe(false);
   });
+  describe('import', () => {
+    function fileEvent(file?: File): Event {
+      const input = document.createElement('input');
+      Object.defineProperty(input, 'files', {
+        value: file ? [file] : [],
+        configurable: true,
+      });
+      return { target: input } as unknown as Event;
+    }
+
+    it('uploads the chosen file and clears the picker', async () => {
+      const { fixture, api } = await setup();
+      const cmp = fixture.componentInstance as unknown as { upload: (e: Event) => void };
+      const file = new File(['x'], 'archive.tar.age');
+      const event = fileEvent(file);
+      cmp.upload(event);
+      expect(api.importBackup).toHaveBeenCalledWith(file);
+      expect((event.target as HTMLInputElement).value).toBe('');
+    });
+
+    it('does nothing when the picker was dismissed', async () => {
+      const { fixture, api } = await setup();
+      const cmp = fixture.componentInstance as unknown as { upload: (e: Event) => void };
+      cmp.upload(fileEvent());
+      expect(api.importBackup).not.toHaveBeenCalled();
+    });
+
+    it('releases the busy flag when the upload is rejected', async () => {
+      const api = makeApi({ importBackup: jest.fn(() => throwError(() => new Error('422'))) });
+      const { fixture } = await setup(api);
+      const cmp = fixture.componentInstance as unknown as {
+        upload: (e: Event) => void;
+        busy: () => boolean;
+      };
+      cmp.upload(fileEvent(new File(['x'], 'a.age')));
+      expect(cmp.busy()).toBe(false);
+    });
+  });
+
+  describe('failures release the UI', () => {
+    it('after a failed create', async () => {
+      const api = makeApi({ createBackup: jest.fn(() => throwError(() => new Error('503'))) });
+      const { fixture } = await setup(api);
+      const cmp = fixture.componentInstance as unknown as {
+        create: () => void;
+        creating: () => boolean;
+      };
+      cmp.create();
+      expect(cmp.creating()).toBe(false);
+    });
+
+    it('after a failed restore', async () => {
+      const api = makeApi({ restoreBackup: jest.fn(() => throwError(() => new Error('503'))) });
+      const { fixture } = await setup(api);
+      const cmp = fixture.componentInstance as unknown as {
+        askRestore: (r: Backup) => void;
+        restoreConfirmText: { set: (v: string) => void };
+        doRestore: () => void;
+        busy: () => boolean;
+      };
+      cmp.askRestore(DONE);
+      cmp.restoreConfirmText.set('RESTORE');
+      cmp.doRestore();
+      expect(cmp.busy()).toBe(false);
+    });
+
+    it('after a failed delete', async () => {
+      const api = makeApi({ deleteBackup: jest.fn(() => throwError(() => new Error('409'))) });
+      const { fixture } = await setup(api);
+      const cmp = fixture.componentInstance as unknown as {
+        askDelete: (r: Backup) => void;
+        doDelete: () => void;
+        busy: () => boolean;
+      };
+      cmp.askDelete(DONE);
+      cmp.doDelete();
+      expect(cmp.busy()).toBe(false);
+    });
+  });
+
+  describe('guards that stop a destructive action firing on nothing', () => {
+    it('restore does nothing without a target', async () => {
+      const { fixture, api } = await setup();
+      const cmp = fixture.componentInstance as unknown as { doRestore: () => void };
+      cmp.doRestore();
+      expect(api.restoreBackup).not.toHaveBeenCalled();
+    });
+
+    it('delete does nothing without a target', async () => {
+      const { fixture, api } = await setup();
+      const cmp = fixture.componentInstance as unknown as { doDelete: () => void };
+      cmp.doDelete();
+      expect(api.deleteBackup).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('polling', () => {
+    it('reports a job that ends in failure', async () => {
+      jest.useFakeTimers();
+      const api = makeApi({
+        listBackups: jest.fn(() => of(list({ items: [RUNNING] }))),
+        getBackup: jest.fn(() => of({ ...RUNNING, status: 'failed' as const, error: 'pg_dump failed' })),
+      });
+      const toast = { success: jest.fn(), error: jest.fn(), show: jest.fn() };
+      const view = await render(BackupsComponent, {
+        providers: [
+          { provide: AdminApiService, useValue: api },
+          { provide: ToastService, useValue: toast },
+        ],
+      });
+      jest.advanceTimersByTime(3000);
+      expect(toast.error).toHaveBeenCalled();
+      view.fixture.destroy();
+    });
+
+    it('gives up rather than polling for ever behind a stuck worker', async () => {
+      jest.useFakeTimers();
+      const getBackup = jest.fn(() => of(RUNNING));
+      const api = makeApi({
+        listBackups: jest.fn(() => of(list({ items: [RUNNING] }))),
+        getBackup,
+      });
+      const toast = { success: jest.fn(), error: jest.fn(), show: jest.fn() };
+      const view = await render(BackupsComponent, {
+        providers: [
+          { provide: AdminApiService, useValue: api },
+          { provide: ToastService, useValue: toast },
+        ],
+      });
+      jest.advanceTimersByTime(31 * 60 * 1000);
+      getBackup.mockClear();
+      jest.advanceTimersByTime(9000);
+      expect(getBackup).not.toHaveBeenCalled();
+      view.fixture.destroy();
+    });
+
+    it('stops polling when a poll request fails', async () => {
+      jest.useFakeTimers();
+      const getBackup = jest.fn(() => throwError(() => new Error('500')));
+      const api = makeApi({
+        listBackups: jest.fn(() => of(list({ items: [RUNNING] }))),
+        getBackup,
+      });
+      const toast = { success: jest.fn(), error: jest.fn(), show: jest.fn() };
+      const view = await render(BackupsComponent, {
+        providers: [
+          { provide: AdminApiService, useValue: api },
+          { provide: ToastService, useValue: toast },
+        ],
+      });
+      jest.advanceTimersByTime(3000);
+      getBackup.mockClear();
+      jest.advanceTimersByTime(9000);
+      expect(getBackup).not.toHaveBeenCalled();
+      view.fixture.destroy();
+    });
+  });
 });

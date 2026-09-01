@@ -51,15 +51,24 @@ class ObjectStorage(Protocol):
 
     async def remove(self, key: str) -> None: ...
 
+    def presigned_get_url(
+        self, key: str, *, expires_seconds: int, download_name: str | None = None
+    ) -> str: ...
+
+
+class BulkObjectStorage(ObjectStorage, Protocol):
+    """Whole-bucket operations, on top of the per-object interface.
+
+    Only the backup module needs these. They stay OUT of ``ObjectStorage`` on purpose:
+    that protocol is structural, so every extra method would force each of the existing
+    storage doubles to grow one, for a capability their subject never calls.
+    """
+
     async def list_keys(self) -> list[str]: ...
 
     async def put_file(self, key: str, path: str, content_type: str) -> None: ...
 
     async def get_file(self, key: str, path: str) -> None: ...
-
-    def presigned_get_url(
-        self, key: str, *, expires_seconds: int, download_name: str | None = None
-    ) -> str: ...
 
 
 @dataclass(slots=True)
@@ -212,7 +221,7 @@ def _safe_disposition(name: str) -> str:
 
 def build_object_storage(
     settings: Settings, *, bucket: str | None = None
-) -> ObjectStorage | None:
+) -> BulkObjectStorage | None:
     """Build the MinIO storage from the settings.
 
     Without ``minio_endpoint`` (development or contract CI) uploads stay off and give
@@ -224,7 +233,9 @@ def build_object_storage(
             archives never share a namespace with the attachments.
 
     Returns:
-        The storage, or ``None`` when storage is off.
+        The storage, or ``None`` when storage is off. The concrete MinIO backend
+        satisfies ``BulkObjectStorage``, so a caller that needs only the
+        per-object ``ObjectStorage`` can still take the result.
     """
     if not settings.storage_enabled:
         return None

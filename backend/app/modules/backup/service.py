@@ -37,7 +37,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.backup import archive as arch
 from app.modules.backup.models import Backup
-from app.modules.files.storage import ObjectStorage, StorageError
+from app.modules.files.storage import BulkObjectStorage, StorageError
 from app.settings import Settings
 
 logger = logging.getLogger(__name__)
@@ -117,8 +117,8 @@ class BackupService:
         session: AsyncSession,
         settings: Settings,
         *,
-        attachments: ObjectStorage | None = None,
-        archives: ObjectStorage | None = None,
+        attachments: BulkObjectStorage | None = None,
+        archives: BulkObjectStorage | None = None,
     ) -> None:
         self.session = session
         self.settings = settings
