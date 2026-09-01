@@ -61,7 +61,11 @@ from app.modules.pdf.markdown import _md_escape, _yaml_scalar
 # wherever CommonMark allows them. A real reference link (`[foo]: #section`), an
 # inline link, an image and the vote callout (`> [!abstimmung]`) stay untouched.
 _EVAL_REFDEF_RE = re.compile(
-    r"\[[^\]]*\]\s*:\s*#"  # definition head, target exactly `#`
+    # The label excludes BOTH brackets (`[^\][]`, not `[^\]]`). A CommonMark
+    # reference definition never carries an unescaped `[` in its label, and without
+    # that exclusion a long run of `[` without a `]` rescans the label from EVERY `[`
+    # position, which is O(N**2) backtracking (ReDoS).
+    r"\[[^\][]*\]\s*:\s*#"  # definition head, target exactly `#`
     r"(?=[ \t\r\n\"'(]|$)"  # bare `#`: whitespace, a title delimiter or the line end follows
     r"[ \t]*"  # whitespace before the optional title
     r"(?:\r?\n[ \t]*)?"  # multi-line form may put the title on the next line
