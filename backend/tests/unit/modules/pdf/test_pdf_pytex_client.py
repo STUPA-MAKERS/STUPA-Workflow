@@ -9,6 +9,7 @@ multipart form that carries the config object plus the binary assets.
 from __future__ import annotations
 
 import json
+import time
 from email import message_from_bytes
 from email.message import Message
 
@@ -16,7 +17,12 @@ import httpx
 import pytest
 import respx
 
-from app.modules.pdf.pytex_client import PytexClient, PytexError, build_pytex_client
+from app.modules.pdf.pytex_client import (
+    PytexClient,
+    PytexError,
+    _markdown_has_eval_trigger,
+    build_pytex_client,
+)
 from app.settings import load_settings
 
 BASE = "http://pytex:8099"
@@ -293,3 +299,16 @@ async def test_trusted_render_allows_clean_markdown() -> None:
     out = await _client().render_pdf(clean, variant="protocol-stupa")
     assert out == b"%PDF"
     assert route.called
+
+
+def test_eval_trigger_check_is_linear_on_adversarial_marker() -> None:
+    r"""ReDoS regression: a long whitespace run must not backtrack catastrophically.
+
+    ``\iffalse`` plus a long whitespace run WITHOUT a following ``pytex(`` made the
+    marker regex split that run O(N**2) ways, which hung the contract-test job. The
+    check must find no trigger and must finish in milliseconds.
+    """
+    adversarial = "\\iffalse" + " " * 200_000 + "{"
+    start = time.perf_counter()
+    assert _markdown_has_eval_trigger(adversarial) is False
+    assert time.perf_counter() - start < 1.0

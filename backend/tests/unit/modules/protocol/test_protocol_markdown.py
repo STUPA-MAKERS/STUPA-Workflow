@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from datetime import date
 
 from app.modules.protocol.markdown import (
@@ -304,3 +305,18 @@ def test_sanitizer_no_eval_refdef_survives_marko_parse() -> None:
     for src in vectors:
         cleaned = sanitize_user_markdown(src)
         assert not _has_eval_refdef(cleaned), src
+
+
+def test_sanitizer_is_linear_on_adversarial_open_brackets() -> None:
+    """ReDoS regression: a long run of `[` must not backtrack catastrophically.
+
+    A run of `[` without a closing bracket made the label scan restart at every `[`
+    position, which is O(N**2) and hung the contract-test job. The run matches no
+    reference definition, so the text stays unchanged, and it must finish in
+    milliseconds.
+    """
+    adversarial = "[" * 200_000
+    start = time.perf_counter()
+    out = sanitize_user_markdown(adversarial)
+    assert time.perf_counter() - start < 1.0
+    assert out == adversarial
