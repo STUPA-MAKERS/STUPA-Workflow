@@ -78,6 +78,15 @@ class AuditAction(StrEnum):
     BUDGET_INVOICE_DELETE = "budget_invoice_delete"
     BUDGET_ASSIGN = "budget_assign"
     BUDGET_MOVE_FISCAL_YEAR = "budget_move_fiscal_year"
+    # Whole-platform backup and restore, gated by ``backup.manage``. ``data`` carries
+    # the backup id, the kind and size metadata, never archive contents. A restore
+    # replaces the database, so the entry for BACKUP_RESTORE lands in the chain of the
+    # restored state, after the safety backup that the restore takes first.
+    BACKUP_CREATE = "backup_create"
+    BACKUP_DELETE = "backup_delete"
+    BACKUP_EXPORT = "backup_export"
+    BACKUP_IMPORT = "backup_import"
+    BACKUP_RESTORE = "backup_restore"
 
 
 # Budget mutations that the audit log can revert. A revert deletes an additive
