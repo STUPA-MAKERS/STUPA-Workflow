@@ -30,6 +30,7 @@ CREATED_AT = datetime(2026, 9, 1, 22, 5, 0, tzinfo=UTC)
 
 
 def _row(backup_id: UUID = BACKUP_ID, **kw: object) -> Backup:
+    # The model defaults apply at flush, and a double never flushes for real.
     defaults: dict[str, object] = {"kind": "manual", "status": "pending", "pinned": False}
     row = Backup(**{**defaults, **kw})  # type: ignore[arg-type]
     row.id = backup_id

@@ -45,8 +45,12 @@ class Backup(UUIDPkMixin, TimestampMixin, Base):
 
     __tablename__ = "backup"
 
-    kind: Mapped[str] = mapped_column(Text, server_default="manual")
-    status: Mapped[str] = mapped_column(Text, server_default="pending")
+    # Each of these carries a Python-side `default` next to the `server_default`. The
+    # server default alone only materializes on INSERT, and SQLAlchemy would then have
+    # to re-SELECT the row to answer `row.pinned` in the same request. The routes read
+    # these fields straight after the flush, so the value has to be there already.
+    kind: Mapped[str] = mapped_column(Text, default="manual", server_default="manual")
+    status: Mapped[str] = mapped_column(Text, default="pending", server_default="pending")
     # OIDC ``sub`` of whoever pressed the button. NULL for the nightly cron, which has
     # no principal. It is a sub rather than a principal id on purpose: a restore
     # replaces the principal table, and a catalogue row must survive an actor that the
@@ -65,7 +69,7 @@ class Backup(UUIDPkMixin, TimestampMixin, Base):
     # the head the code expects, because the schema then does not match.
     schema_revision: Mapped[str | None] = mapped_column(Text, nullable=True)
     # A pinned archive survives every retention run.
-    pinned: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    pinned: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 

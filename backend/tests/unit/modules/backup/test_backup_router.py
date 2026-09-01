@@ -57,8 +57,9 @@ class _Empty:
 def _row(**kw: object) -> Backup:
     """Build a catalogue row as it looks after the insert.
 
-    `id`, `created_at`, `kind`, `status` and `pinned` are server defaults, so the plain
-    constructor leaves them None. Every row a route ever sees carries them.
+    The model defaults for `kind`, `status` and `pinned` apply at FLUSH, not at
+    construction, and `id`/`created_at` come from the database. A double never flushes
+    for real, so the helper fills all of them in.
     """
     defaults: dict[str, object] = {"kind": "manual", "status": "pending", "pinned": False}
     row = Backup(**{**defaults, **kw})  # type: ignore[arg-type]
