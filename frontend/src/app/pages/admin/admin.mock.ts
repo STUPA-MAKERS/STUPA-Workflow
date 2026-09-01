@@ -5,6 +5,7 @@
  */
 import type {
   AdminPrincipal,
+  Backup,
   ApplicationTypeFull,
   Branding,
   FormDraft,
@@ -187,3 +188,31 @@ export const MOCK_BRANDING: Branding = {
     applyInfo: {},
   },
 };
+
+/** Seed for the backup catalogue in mock mode. */
+export const MOCK_BACKUPS: Backup[] = [
+  {
+    id: 'b-nightly',
+    kind: 'scheduled',
+    status: 'done',
+    createdAt: '2026-09-01T04:00:00Z',
+    finishedAt: '2026-09-01T04:03:12Z',
+    createdBy: null,
+    sizeBytes: 48_234_496,
+    objectCount: 137,
+    checksum: '3f5a9c1e2b7d4088a1c6e0f2b8d4a7c19e3f5b8d2a6c0e4f7b1d9a3c5e7f0b2d',
+    pinned: false,
+  },
+  {
+    id: 'b-before-vote',
+    kind: 'manual',
+    status: 'done',
+    createdAt: '2026-08-28T18:12:00Z',
+    finishedAt: '2026-08-28T18:15:41Z',
+    createdBy: 'admin-sub',
+    sizeBytes: 47_112_192,
+    objectCount: 131,
+    note: 'Vor der Haushaltsabstimmung',
+    pinned: true,
+  },
+];

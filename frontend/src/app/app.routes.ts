@@ -199,7 +199,7 @@ export const routes: Routes = [
         data: {
           title: 'nav.admin',
           // Every area-admin role can reach the admin overview.
-          permission: ['admin.site', 'admin.gremien', 'admin.types', 'admin.roles', 'admin.users', 'admin.group_mappings', 'admin.gremium_roles', 'admin.cd_variants', 'admin.delegations', 'admin.deadlines', 'admin.notifications', 'privacy.manage', 'webhook.manage', 'audit.read'],
+          permission: ['admin.site', 'admin.gremien', 'admin.types', 'admin.roles', 'admin.users', 'admin.group_mappings', 'admin.gremium_roles', 'admin.cd_variants', 'admin.delegations', 'admin.deadlines', 'admin.notifications', 'privacy.manage', 'webhook.manage', 'audit.read', 'backup.manage'],
         },
         canActivate: [authGuard],
         loadComponent: () =>
@@ -266,6 +266,15 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./pages/admin/flow-editor/flow-editor.component').then(
             (m) => m.FlowEditorComponent,
+          ),
+      },
+      {
+        path: 'admin/backups',
+        data: { title: 'admin.backups.title', permission: 'backup.manage', parent: ['admin'] },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./pages/admin/backups/backups.component').then(
+            (m) => m.BackupsComponent,
           ),
       },
       {

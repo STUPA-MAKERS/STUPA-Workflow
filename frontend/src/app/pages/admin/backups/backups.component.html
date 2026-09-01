@@ -1,0 +1,175 @@
+<app-page-header [title]="'admin.backups.title' | t" />
+
+@if (!enabled()) {
+  <app-card [heading]="'admin.backups.offTitle' | t" [headingLevel]="2">
+    <p class="text-muted text-sm mt-0">{{ 'admin.backups.offHint' | t }}</p>
+  </app-card>
+}
+
+<!-- Create + import -->
+<app-card [heading]="'admin.backups.createTitle' | t" [headingLevel]="2">
+  <p class="text-muted text-sm mt-0">{{ 'admin.backups.createHint' | t }}</p>
+  <div class="bk__row">
+    <app-input
+      class="bk__grow"
+      [label]="'admin.backups.note' | t"
+      [placeholder]="'admin.backups.notePlaceholder' | t"
+      [ngModel]="createNote()"
+      (ngModelChange)="createNote.set($event)"
+      [disabled]="!enabled()"
+    />
+    <app-button size="sm" [disabled]="!enabled() || creating()" (click)="create()">
+      <app-icon name="add" /> {{ 'admin.backups.create' | t }}
+    </app-button>
+  </div>
+
+  <div class="bk__row bk__row--import">
+    <div>
+      <p class="bk__label">{{ 'admin.backups.importTitle' | t }}</p>
+      <p class="text-muted text-sm mt-0">{{ 'admin.backups.importHint' | t }}</p>
+    </div>
+    <label class="bk__file">
+      <input
+        type="file"
+        accept=".age,application/octet-stream"
+        [disabled]="!restoreEnabled() || busy()"
+        (change)="upload($event)"
+      />
+      <span>{{ 'admin.backups.import' | t }}</span>
+    </label>
+  </div>
+</app-card>
+
+<!-- Catalogue -->
+<app-card [heading]="'admin.backups.listTitle' | t" [headingLevel]="2">
+  <p class="text-muted text-sm mt-0">
+    {{ 'admin.backups.retentionHint' | t: { count: retentionCount() } }}
+  </p>
+  <!-- The shared table has no loading state yet, so an empty first paint reads as
+       "no backups". `emptyText` therefore says "loading" until the list arrives. -->
+  <app-data-table
+    [columns]="columns()"
+    [rows]="rows()"
+    [emptyText]="(loading() ? 'common.loading' : 'admin.backups.empty') | t"
+  >
+    <ng-template appCell="createdAt" let-r>
+      {{ $any(r).createdAt | ldate: 'medium' }}
+    </ng-template>
+
+    <ng-template appCell="kind" let-r>
+      <span class="bk__kind">{{ kindLabel($any(r).kind) }}</span>
+      @if ($any(r).pinned) {
+        <app-icon name="key" [title]="'admin.backups.pinnedHint' | t" />
+      }
+    </ng-template>
+
+    <ng-template appCell="status" let-r>
+      <span class="bk__status bk__status--{{ $any(r).status }}">
+        {{ statusLabel($any(r).status) }}
+      </span>
+      @if ($any(r).status === 'failed' && $any(r).error) {
+        <span class="bk__error">{{ $any(r).error }}</span>
+      }
+    </ng-template>
+
+    <ng-template appCell="size" let-r>{{ sizeLabel($any(r).sizeBytes) }}</ng-template>
+
+    <ng-template appCell="contents" let-r>
+      @if ($any(r).objectCount !== null && $any(r).objectCount !== undefined) {
+        {{ 'admin.backups.objectCount' | t: { count: $any(r).objectCount } }}
+      } @else {
+        —
+      }
+    </ng-template>
+
+    <ng-template appCell="note" let-r>{{ $any(r).note || '—' }}</ng-template>
+
+    <ng-template appCell="actions" let-r>
+      @if ($any(r).status === 'done') {
+        <span class="inline-flex items-center gap-1 justify-end">
+          <app-button variant="ghost" size="sm" (click)="download($any(r))">
+            {{ 'admin.backups.download' | t }}
+          </app-button>
+          <app-button variant="ghost" size="sm" (click)="togglePin($any(r))">
+            {{ ($any(r).pinned ? 'admin.backups.unpin' : 'admin.backups.pin') | t }}
+          </app-button>
+          @if (restoreEnabled()) {
+            <app-button variant="ghost" size="sm" (click)="askRestore($any(r))">
+              {{ 'admin.backups.restore' | t }}
+            </app-button>
+          }
+          <app-button
+            variant="ghost"
+            size="sm"
+            [disabled]="$any(r).pinned"
+            [title]="$any(r).pinned ? ('admin.backups.pinnedHint' | t) : ''"
+            (click)="askDelete($any(r))"
+          >
+            {{ 'admin.common.delete' | t }}
+          </app-button>
+        </span>
+      }
+    </ng-template>
+  </app-data-table>
+</app-card>
+
+<!-- Restore confirmation. Destructive, so it asks for the word rather than a click. -->
+@if (confirmRestore(); as target) {
+  <app-dialog
+    [open]="true"
+    [title]="'admin.backups.restoreTitle' | t"
+    (closed)="confirmRestore.set(null)"
+  >
+    <p class="bk__warn">{{ 'admin.backups.restoreWarning' | t }}</p>
+    <ul class="bk__list">
+      <li>{{ 'admin.backups.restorePoint1' | t }}</li>
+      <li>{{ 'admin.backups.restorePoint2' | t }}</li>
+      <li>{{ 'admin.backups.restorePoint3' | t }}</li>
+    </ul>
+    <p class="text-sm">
+      {{ 'admin.backups.restoreTarget' | t }}
+      <strong>{{ target.createdAt | ldate: 'medium' }}</strong>
+    </p>
+    <app-input
+      [label]="'admin.backups.restoreConfirmLabel' | t"
+      placeholder="RESTORE"
+      [ngModel]="restoreConfirmText()"
+      (ngModelChange)="restoreConfirmText.set($event)"
+    />
+    <div class="bk__actions">
+      <app-button variant="ghost" size="sm" (click)="confirmRestore.set(null)">
+        {{ 'admin.common.cancel' | t }}
+      </app-button>
+      <app-button
+        variant="danger"
+        size="sm"
+        [disabled]="!restoreArmed() || busy()"
+        (click)="doRestore()"
+      >
+        {{ 'admin.backups.restore' | t }}
+      </app-button>
+    </div>
+  </app-dialog>
+}
+
+<!-- Delete confirmation -->
+@if (confirmDelete(); as target) {
+  <app-dialog
+    [open]="true"
+    [title]="'admin.backups.deleteTitle' | t"
+    (closed)="confirmDelete.set(null)"
+  >
+    <p>
+      {{ 'admin.backups.deleteWarning' | t }}
+      <strong>{{ target.createdAt | ldate: 'medium' }}</strong>
+    </p>
+    <div class="bk__actions">
+      <app-button variant="ghost" size="sm" (click)="confirmDelete.set(null)">
+        {{ 'admin.common.cancel' | t }}
+      </app-button>
+      <app-button variant="danger" size="sm" [disabled]="busy()" (click)="doDelete()">
+        {{ 'admin.common.delete' | t }}
+      </app-button>
+    </div>
+  </app-dialog>
+}

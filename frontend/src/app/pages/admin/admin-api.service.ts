@@ -14,7 +14,11 @@ import { mapDiff } from '@core/api/mappers';
 import type { I18nMap, Page, Uuid } from '@core/api/models';
 import type { FormFieldDef } from '@core/api/models';
 import {
+  BACKUP_RESTORE_CONFIRMATION,
   type AdminPrincipal,
+  type Backup,
+  type BackupExport,
+  type BackupList,
   type ApplicationTypeCreateBody,
   type ApplicationTypeFull,
   type ApplicationTypeUpdateBody,
@@ -63,6 +67,7 @@ import {
 } from './admin.models';
 import {
   MOCK_APP_TYPES,
+  MOCK_BACKUPS,
   MOCK_BRANDING,
   MOCK_FORM_DRAFTS,
   MOCK_FORMS,
@@ -107,6 +112,7 @@ export class AdminApiService {
     gremiumRoles: [] as GremiumRole[],
     deadlinePolicies: [] as DeadlinePolicy[],
     erasures: [] as ErasureRequest[],
+    backups: [...MOCK_BACKUPS] as Backup[],
     privacySettings: <PrivacySettings>{ defaultRetentionMonths: 24 },
     webhooks: structuredCopy(MOCK_WEBHOOKS),
     roles: structuredCopy(MOCK_ROLES),
@@ -956,6 +962,104 @@ export class AdminApiService {
       return of(structuredCopy(this.store.privacySettings));
     }
     return this.http.put<PrivacySettings>(`${this.base}/admin/privacy/settings`, settings);
+  }
+
+  // Backups (P backup.manage). The archive itself never passes through the browser
+  // except as a signed download; these calls move metadata only.
+
+  /** GET /admin/backups — the catalogue plus what this installation can do. */
+  listBackups(): Observable<BackupList> {
+    if (this.mock) {
+      return of({
+        items: structuredCopy(this.store.backups),
+        enabled: true,
+        restoreEnabled: true,
+        retentionCount: 14,
+      });
+    }
+    return this.http.get<BackupList>(`${this.base}/admin/backups`);
+  }
+
+  /** GET /admin/backups/{id} — one row. The page polls this while a job runs. */
+  getBackup(id: Uuid): Observable<Backup> {
+    if (this.mock) {
+      const row = this.store.backups.find((b) => b.id === id);
+      return of(structuredCopy(row ?? ({ id } as Backup)));
+    }
+    return this.http.get<Backup>(`${this.base}/admin/backups/${id}`, {
+      // The poll runs on a timer, so it must not raise the global loading overlay.
+      context: skipLoading(),
+    });
+  }
+
+  /** POST /admin/backups — 202. The worker builds the archive. */
+  createBackup(note?: string | null): Observable<Backup> {
+    if (this.mock) {
+      const row: Backup = {
+        id: `b-${this.store.backups.length + 1}`,
+        kind: 'manual',
+        status: 'done',
+        createdAt: new Date().toISOString(),
+        finishedAt: new Date().toISOString(),
+        sizeBytes: 12_582_912,
+        objectCount: 8,
+        note: note ?? null,
+        pinned: false,
+      };
+      this.store.backups.unshift(row);
+      return of(structuredCopy(row));
+    }
+    return this.http.post<Backup>(`${this.base}/admin/backups`, { note: note ?? null });
+  }
+
+  /** PATCH /admin/backups/{id} — edit the note, or pin against retention. */
+  updateBackup(id: Uuid, patch: { note?: string | null; pinned?: boolean }): Observable<Backup> {
+    if (this.mock) {
+      const row = this.store.backups.find((b) => b.id === id);
+      if (row) Object.assign(row, patch);
+      return of(structuredCopy(row ?? ({ id } as Backup)));
+    }
+    return this.http.patch<Backup>(`${this.base}/admin/backups/${id}`, patch);
+  }
+
+  /** GET /admin/backups/{id}/export — a short-lived signed download URL. */
+  exportBackup(id: Uuid): Observable<BackupExport> {
+    if (this.mock) return of({ url: '#mock-archive', expiresIn: 300 });
+    return this.http.get<BackupExport>(`${this.base}/admin/backups/${id}/export`);
+  }
+
+  /** POST /admin/backups/import — take an uploaded archive into the catalogue. */
+  importBackup(file: File): Observable<Backup> {
+    if (this.mock) return this.createBackup(file.name);
+    const body = new FormData();
+    body.append('file', file);
+    return this.http.post<Backup>(`${this.base}/admin/backups/import`, body);
+  }
+
+  /**
+   * POST /admin/backups/{id}/restore — 202. DESTRUCTIVE.
+   *
+   * The worker takes a `pre_restore` safety archive first, then replaces the database
+   * and the attachment bucket. Everybody is logged out, the caller included, because
+   * the session table comes from the archive too.
+   */
+  restoreBackup(id: Uuid): Observable<Backup> {
+    if (this.mock) {
+      const row = this.store.backups.find((b) => b.id === id);
+      return of(structuredCopy(row ?? ({ id } as Backup)));
+    }
+    return this.http.post<Backup>(`${this.base}/admin/backups/${id}/restore`, {
+      confirm: BACKUP_RESTORE_CONFIRMATION,
+    });
+  }
+
+  /** DELETE /admin/backups/{id} — refused while the archive is pinned. */
+  deleteBackup(id: Uuid): Observable<void> {
+    if (this.mock) {
+      this.store.backups = this.store.backups.filter((b) => b.id !== id);
+      return of(void 0);
+    }
+    return this.http.delete<void>(`${this.base}/admin/backups/${id}`);
   }
 
   /** DSGVO data export (Art. 15) as an XLSX blob (by email). */
