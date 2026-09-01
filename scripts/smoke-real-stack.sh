@@ -75,6 +75,13 @@ ALTCHA_HMAC_SECRET=smoke-altcha-hmac-secret-0123456789
 OIDC_CLIENT_SECRET=smoke-oidc-client-secret-0123456789
 BOOTSTRAP_ADMIN_EMAILS=admin@smoke.example
 BOOTSTRAP_ADMIN_SUBJECTS=smoke-admin-subject
+# `.env.example` sets ENVIRONMENT=production, and production forbids a wildcard
+# FORWARDED_ALLOW_IPS: with "*" uvicorn trusts any X-Forwarded-* source, so a client IP
+# can be spoofed. The smoke stack reaches the app through the compose proxy from the
+# runner, which needs the wildcard, and the settings guard documents exactly this case
+# as allowed outside production ("dev, CI, container smoke"). So the environment moves
+# with it rather than the guard being weakened.
+ENVIRONMENT=ci
 FORWARDED_ALLOW_IPS=*
 PUBLIC_BASE_URL=http://127.0.0.1:8080
 EOF
