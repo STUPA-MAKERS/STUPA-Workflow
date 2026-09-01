@@ -379,5 +379,10 @@ jobs:
       || vars.RUN_REAL_STACK_SMOKE == 'true'
     steps:
       - uses: actions/checkout@v7
+        with:
+          # The job builds the `web` image, which compiles the Angular app against the
+          # `@stupa-makers/ui-kit` submodule. Without this the build cannot resolve the
+          # package and the job fails before it reaches a single smoke assertion.
+          submodules: recursive
       - name: Real-Stack-Smoke (compose up -> HTTP/WS-Kernflüsse)
         run: scripts/smoke-real-stack.sh

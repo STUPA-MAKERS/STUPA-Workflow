@@ -68,6 +68,13 @@ FORWARDED_ALLOW_IPS=*
 PUBLIC_BASE_URL=http://127.0.0.1:8080
 EOF
 
+# The web image compiles the Angular app against the ui-kit submodule, so a fresh
+# clone has to sync it first. `deploy/deploy.sh` does the same before it builds. Without
+# this the build fails on an unresolvable `@stupa-makers/ui-kit`.
+echo "==> git submodule sync + update --init --recursive"
+git -C "${ROOT}" submodule sync --recursive
+git -C "${ROOT}" submodule update --init --recursive
+
 echo "==> docker compose config (Validierung)"
 docker compose config -q
 
