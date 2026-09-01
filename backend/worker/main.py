@@ -24,6 +24,8 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from app.modules.budget.stats import BudgetStatsService
+from worker.backup import create_backup, restore_backup, scheduled_backup
+from worker.backup import on_startup as backup_on_startup
 from worker.deadlines import on_startup as deadlines_on_startup
 from worker.deadlines import process_deadlines
 from worker.mail import on_startup as mail_on_startup
@@ -50,6 +52,11 @@ async def ping(ctx: dict[str, object]) -> str:
 # `webhook_timeout_seconds`.
 _WEBHOOK_JOB_TIMEOUT_SECONDS = 30.0
 
+# A backup dumps the whole database and mirrors the attachment bucket, and a restore
+# puts both back. Neither fits the arq default of 300 s on a real dataset. The bound
+# sits one level above the subprocess timeout `backup_subprocess_timeout_seconds`.
+_BACKUP_JOB_TIMEOUT_SECONDS = 7200.0
+
 
 async def _on_startup(ctx: dict[str, Any]) -> None:
     """Set up the mail, scan, PDF render, webhook and deadline dependencies."""
@@ -58,6 +65,7 @@ async def _on_startup(ctx: dict[str, Any]) -> None:
     await pdf_on_startup(ctx)
     await webhook_on_startup(ctx)
     await deadlines_on_startup(ctx)
+    await backup_on_startup(ctx)
 
 
 @lru_cache(maxsize=1)
@@ -108,6 +116,9 @@ class WorkerSettings:
         process_deadlines,
         process_task_reminders,
         process_retention,
+        func(create_backup, timeout=_BACKUP_JOB_TIMEOUT_SECONDS),
+        func(restore_backup, timeout=_BACKUP_JOB_TIMEOUT_SECONDS),
+        func(scheduled_backup, timeout=_BACKUP_JOB_TIMEOUT_SECONDS),
     ]
     cron_jobs = [
         cron(refresh_budget_stats, hour=3, minute=0),
@@ -120,6 +131,9 @@ class WorkerSettings:
         # Task reminders run hourly. The thresholds are in days. The task_reminder_log
         # table prevents duplicate sends.
         cron(process_task_reminders, minute=10),
+        # Nightly backup. It runs after the retention job, so the archive holds the
+        # already-anonymized state rather than PII that retention is about to drop.
+        cron(scheduled_backup, hour=4, minute=0),
     ]
     on_startup = _on_startup
     on_shutdown = _shutdown
