@@ -161,6 +161,27 @@ class Settings(BaseSettings):
     attachment_max_bytes: int = 10 * 1024 * 1024
     attachment_url_ttl_seconds: int = 300
 
+    # Whole-platform backups (/admin/backups). An archive holds the pg_dump plus a
+    # mirror of the attachment bucket, age-encrypted, in its own MinIO bucket. Without
+    # `backup_age_recipient` the feature is off and every route answers 503. DEV and
+    # contract CI run without it.
+    backup_bucket: str = "backups"
+    # age public key. The API encrypts every archive to it and can do nothing else
+    # with it.
+    backup_age_recipient: str | None = None
+    # Path to the age private key inside the container, mounted read-only. A restore
+    # and a download of a decrypted archive need it. Keep the disaster-recovery key
+    # that lives off host SEPARATE from this one: a stack compromise then exposes only
+    # the archives that the app itself wrote.
+    backup_age_identity_file: str | None = None
+    # Retention: keep this many archives and drop the oldest beyond it. A pinned
+    # archive never counts and is never pruned. 0 disables the pruning.
+    backup_retention_count: int = 14
+    backup_url_ttl_seconds: int = 300
+    # Cap for an uploaded archive (import) and for the pg_dump/restore subprocess.
+    backup_max_upload_bytes: int = 2 * 1024 * 1024 * 1024
+    backup_subprocess_timeout_seconds: int = 3600
+
     # ClamAV. Without `clamav_host` the scan is off. An upload then stays
     # `scanned=false`, which quarantines it and blocks the download. This is
     # fail-closed (DEV/test).
@@ -201,6 +222,16 @@ class Settings(BaseSettings):
     def storage_enabled(self) -> bool:
         """Object storage is active only when a MinIO endpoint is set."""
         return bool(self.minio_endpoint)
+
+    @property
+    def backup_enabled(self) -> bool:
+        """Backups need object storage and the age recipient the API encrypts to."""
+        return bool(self.minio_endpoint) and bool(self.backup_age_recipient)
+
+    @property
+    def backup_restore_enabled(self) -> bool:
+        """A restore also needs the private key, so the API can decrypt an archive."""
+        return self.backup_enabled and bool(self.backup_age_identity_file)
 
     @property
     def clamav_enabled(self) -> bool:
