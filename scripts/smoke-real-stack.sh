@@ -35,8 +35,15 @@ cleanup() {
   # smoke failure that prints only "service migrate didn't complete successfully" costs
   # the next person a full round trip to find out what actually broke.
   if [[ "${SMOKE_OK:-0}" != "1" ]]; then
-    echo "==> Container logs (smoke failed)"
-    docker compose logs --no-color --tail 40 migrate api worker web 2>&1 | tail -120 || true
+    # `ps` first: it names which service is unhealthy, which is usually the answer.
+    echo "==> Container status (smoke failed)"
+    docker compose ps || true
+    # One block per service. A single combined `logs ... | tail` lets a chatty service
+    # such as migrate crowd out the one that actually failed.
+    for svc in migrate api worker web; do
+      echo "--- logs: ${svc} ---"
+      docker compose logs --no-color --tail 30 "${svc}" 2>&1 | tail -30 || true
+    done
   fi
   echo "==> Teardown (down -v)"
   docker compose down -v --remove-orphans >/dev/null 2>&1 || true
