@@ -51,6 +51,12 @@ class ObjectStorage(Protocol):
 
     async def remove(self, key: str) -> None: ...
 
+    async def list_keys(self) -> list[str]: ...
+
+    async def put_file(self, key: str, path: str, content_type: str) -> None: ...
+
+    async def get_file(self, key: str, path: str) -> None: ...
+
     def presigned_get_url(
         self, key: str, *, expires_seconds: int, download_name: str | None = None
     ) -> str: ...
@@ -137,6 +143,48 @@ class MinioStorage:
         except Exception as exc:  # noqa: BLE001
             raise StorageError(f"remove failed: {type(exc).__name__}") from exc
 
+    async def list_keys(self) -> list[str]:
+        """Return every object key in the bucket.
+
+        A backup walks the whole attachment bucket, and a restore compares against it
+        to find the objects the archive does not hold. A missing bucket lists empty
+        rather than raising, because a stack that never uploaded anything is not an
+        error state.
+        """
+
+        def _list() -> list[str]:
+            if not self.client.bucket_exists(self.bucket):
+                return []
+            return [
+                obj.object_name
+                for obj in self.client.list_objects(self.bucket, recursive=True)
+                if obj.object_name is not None
+            ]
+
+        try:
+            return await asyncio.to_thread(_list)
+        except Exception as exc:  # noqa: BLE001
+            raise StorageError(f"list failed: {type(exc).__name__}") from exc
+
+    async def put_file(self, key: str, path: str, content_type: str) -> None:
+        """Upload straight from a file on disk, so a large archive never buffers."""
+
+        def _put() -> None:
+            self._ensure_bucket()
+            self.client.fput_object(self.bucket, key, path, content_type=content_type)
+
+        try:
+            await asyncio.to_thread(_put)
+        except Exception as exc:  # noqa: BLE001
+            raise StorageError(f"put_file failed: {type(exc).__name__}") from exc
+
+    async def get_file(self, key: str, path: str) -> None:
+        """Download straight to a file on disk, the read counterpart of `put_file`."""
+        try:
+            await asyncio.to_thread(self.client.fget_object, self.bucket, key, path)
+        except Exception as exc:  # noqa: BLE001
+            raise StorageError(f"get_file failed: {type(exc).__name__}") from exc
+
     def presigned_get_url(
         self, key: str, *, expires_seconds: int, download_name: str | None = None
     ) -> str:
@@ -162,11 +210,18 @@ def _safe_disposition(name: str) -> str:
     return "".join(c for c in name if c.isprintable() and c not in '"\\\r\n')
 
 
-def build_object_storage(settings: Settings) -> ObjectStorage | None:
+def build_object_storage(
+    settings: Settings, *, bucket: str | None = None
+) -> ObjectStorage | None:
     """Build the MinIO storage from the settings.
 
     Without ``minio_endpoint`` (development or contract CI) uploads stay off and give
     503.
+
+    Args:
+        settings: Runtime settings holding the MinIO endpoint and credentials.
+        bucket: Bucket override. The backup module passes its own bucket, so the
+            archives never share a namespace with the attachments.
 
     Returns:
         The storage, or ``None`` when storage is off.
@@ -182,4 +237,4 @@ def build_object_storage(settings: Settings) -> ObjectStorage | None:
         secret_key=settings.minio_secret_key,
         secure=settings.minio_secure,
     )
-    return MinioStorage(client=client, bucket=settings.minio_bucket)
+    return MinioStorage(client=client, bucket=bucket or settings.minio_bucket)
