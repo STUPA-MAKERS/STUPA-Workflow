@@ -31,6 +31,13 @@ export COMPOSE_PROJECT_NAME="antrag-real-smoke"
 cd "${DEPLOY}"
 
 cleanup() {
+  # Show the logs of anything that did not come up BEFORE tearing the stack down. A
+  # smoke failure that prints only "service migrate didn't complete successfully" costs
+  # the next person a full round trip to find out what actually broke.
+  if [[ "${SMOKE_OK:-0}" != "1" ]]; then
+    echo "==> Container logs (smoke failed)"
+    docker compose logs --no-color --tail 40 migrate api worker web 2>&1 | tail -120 || true
+  fi
   echo "==> Teardown (down -v)"
   docker compose down -v --remove-orphans >/dev/null 2>&1 || true
   if [[ -n "${ENV_BACKUP}" && -f "${ENV_BACKUP}" ]]; then
@@ -62,6 +69,10 @@ MINIO_SECRET_KEY=smoke-minio-secret-key
 SESSION_SECRET=smoke-session-secret-0123456789
 MAGIC_LINK_SECRET=smoke-magic-link-secret-0123456789
 ALTCHA_HMAC_SECRET=smoke-altcha-hmac-secret-0123456789
+# `.env.example` ships this EMPTY, and an empty string is not an absent one, so the
+# 16-character minimum rejects it and every app container refuses to start. The stack
+# needs no working OIDC here; it only has to satisfy the settings validation.
+OIDC_CLIENT_SECRET=smoke-oidc-client-secret-0123456789
 BOOTSTRAP_ADMIN_EMAILS=admin@smoke.example
 BOOTSTRAP_ADMIN_SUBJECTS=smoke-admin-subject
 FORWARDED_ALLOW_IPS=*
@@ -157,4 +168,5 @@ if [[ "${fails}" -ne 0 ]]; then
   docker compose logs --no-color --tail=80 api web || true
   exit 1
 fi
+SMOKE_OK=1
 echo "==> Real-Stack-Smoke grün."
