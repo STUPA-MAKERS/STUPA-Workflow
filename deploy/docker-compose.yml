@@ -74,6 +74,10 @@ services:
     # only, so that directory is not in the image. MCP_PACKAGE_DIR points to the mount.
     volumes:
       - ../mcp:/opt/mcp:ro
+      # The private age key for /admin/backups. Read-only, and absent by default: a
+      # stack without it still lists and creates backups, but cannot import or restore
+      # one. `:z` relabels for SELinux hosts and is a no-op elsewhere.
+      - ./secrets:/secrets:ro,z
     environment:
       MCP_PACKAGE_DIR: /opt/mcp
     depends_on:
@@ -105,6 +109,9 @@ services:
     <<: *restart
     command: ["arq", "worker.main.WorkerSettings"]
     env_file: .env
+    volumes:
+      # The worker is what actually dumps and restores, so it needs the same key.
+      - ./secrets:/secrets:ro,z
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -260,38 +267,6 @@ services:
     security_opt:
       - no-new-privileges:true
 
-  backup:
-    # Daily encrypted backup (T-42, deployment.md §4): pg_dump (custom) and mc mirror
-    # (MinIO) write one age-encrypted artifact into the backups volume, with retention.
-    # This is a separate job instead of a cron in the worker, so it stays free of the app
-    # lifecycle. It is active in the prod profile only. The default stack leaves it off to
-    # keep the smoke run small. The `backup` profile allows a backup or a restore without
-    # the rest of the prod profile.
-    # Manual run: docker compose --profile backup run --rm backup backup.sh
-    build:
-      context: ./backup
-    profiles: ["prod", "backup"]
-    <<: *restart
-    env_file: .env
-    depends_on:
-      postgres:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-    volumes:
-      # A restore needs the private age key, which lives off-host. In normal operation
-      # the default path does NOT exist, and the encrypt-only backup still runs. For a
-      # restore only, put a key file at ./backup/secrets/age.key (gitignored).
-      - backups:/backups
-      # `:z` relabels for SELinux hosts (Fedora, rootless podman). It is a no-op on a
-      # host without SELinux, such as CI or ubuntu. Without it, the read of the age key
-      # fails with "Permission denied".
-      - ./backup/secrets:/secrets:ro,z
-    networks:
-      - internal
-    security_opt:
-      - no-new-privileges:true
-
   # TODO T-04/e2e: add dev profile services here to enable e2e (T-10 auth, captcha and
   # Playwright specs). Add MailHog (SMTP sink) and a dev Keycloak mock under
   # `profiles: [dev]`, so the prod stack stays untouched. They are absent on purpose,
@@ -303,7 +278,6 @@ volumes:
   redis_data:
   clamav_data:
   pytex_cache:
-  backups:
   altcha_data:
 
 networks:
