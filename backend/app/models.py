@@ -33,6 +33,7 @@ from app.modules.auth.models import (
     RolePermission,
 )
 from app.modules.auth.oauth_models import OAuthAuthorizationCode, OAuthToken
+from app.modules.backup.models import Backup
 from app.modules.budget.models import BudgetEntry, BudgetField, BudgetPot
 from app.modules.budget.tree_models import (
     Budget,
@@ -98,6 +99,7 @@ __all__ = [
     "OAuthToken",
     "ErasureRequest",
     "Principal",
+    "Backup",
     "PrivacySettings",
     "Protocol",
     "ProtocolVoteRef",

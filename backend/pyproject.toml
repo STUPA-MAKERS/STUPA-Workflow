@@ -53,6 +53,9 @@ dependencies = [
     # iCal subscription (#ics): RFC5545 feed of the meetings of the user. Loads lazily,
     # only on the feed path. Pure Python package.
     "icalendar>=6.0",
+    # age encryption for the backup archives. pyrage is the rust `age` implementation,
+    # so an archive stays readable with the standard `age` CLI off host.
+    "pyrage>=1.2",
 ]
 
 [project.optional-dependencies]

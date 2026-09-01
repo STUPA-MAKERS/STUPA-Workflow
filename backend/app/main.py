@@ -33,6 +33,7 @@ from app.modules.auth.oauth_admin_router import router as oauth_admin_router
 from app.modules.auth.oauth_router import router as oauth_router
 from app.modules.auth.oauth_router import well_known_router as oauth_well_known_router
 from app.modules.auth.router import router as auth_router
+from app.modules.backup.router import router as backup_router
 from app.modules.budget.tree_router import router as budget_tree_router
 from app.modules.calendar.router import router as calendar_router
 from app.modules.config_revision.router import router as config_revision_router
@@ -107,6 +108,7 @@ api_router.include_router(admin_router)
 api_router.include_router(deadline_policies_router)
 api_router.include_router(delegations_router)
 api_router.include_router(privacy_router)
+api_router.include_router(backup_router)
 api_router.include_router(gremien_authed_router)
 api_router.include_router(site_config_public_router)
 

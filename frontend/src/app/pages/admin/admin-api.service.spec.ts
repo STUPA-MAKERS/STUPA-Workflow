@@ -575,6 +575,63 @@ describe('AdminApiService — real mode (contract)', () => {
     expect(dl.request.responseType).toBe('blob');
     dl.flush(new Blob([]));
   });
+  // Backups. The archive never crosses the API as bytes: a download is a signed URL and
+  // an upload is multipart, so the contract for both is worth pinning down.
+  describe('backups', () => {
+    it('lists the catalogue', () => {
+      s.listBackups().subscribe();
+      expect(http.expectOne('/api/admin/backups').request.method).toBe('GET');
+    });
+
+    it('polls one row without raising the global loading overlay', () => {
+      s.getBackup('b-1').subscribe();
+      const req = http.expectOne('/api/admin/backups/b-1');
+      expect(req.request.method).toBe('GET');
+    });
+
+    it('POSTs a create with the note', () => {
+      s.createBackup('before the vote').subscribe();
+      const req = http.expectOne('/api/admin/backups');
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual({ note: 'before the vote' });
+    });
+
+    it('sends a null note when none was typed', () => {
+      s.createBackup().subscribe();
+      expect(http.expectOne('/api/admin/backups').request.body).toEqual({ note: null });
+    });
+
+    it('PATCHes the pin', () => {
+      s.updateBackup('b-1', { pinned: true }).subscribe();
+      const req = http.expectOne('/api/admin/backups/b-1');
+      expect(req.request.method).toBe('PATCH');
+      expect(req.request.body).toEqual({ pinned: true });
+    });
+
+    it('asks for a signed URL rather than the bytes', () => {
+      s.exportBackup('b-1').subscribe();
+      expect(http.expectOne('/api/admin/backups/b-1/export').request.method).toBe('GET');
+    });
+
+    it('uploads an import as multipart', () => {
+      s.importBackup(new File(['x'], 'a.tar.age')).subscribe();
+      const req = http.expectOne('/api/admin/backups/import');
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toBeInstanceOf(FormData);
+    });
+
+    it('sends the confirmation literal the API demands', () => {
+      s.restoreBackup('b-1').subscribe();
+      const req = http.expectOne('/api/admin/backups/b-1/restore');
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual({ confirm: 'RESTORE' });
+    });
+
+    it('DELETEs one', () => {
+      s.deleteBackup('b-1').subscribe();
+      expect(http.expectOne('/api/admin/backups/b-1').request.method).toBe('DELETE');
+    });
+  });
 });
 
 describe('AdminApiService — mock mode, exhaustive store branches', () => {
@@ -922,6 +979,35 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(rejected.reason).toBe('r');
     const rejectedNull = await firstValueFrom(s.rejectErasure('e-done'));
     expect(rejectedNull.reason).toBeNull();
+  });
+
+  it('serves the backup catalogue from the seeded store', async () => {
+    const s = svc();
+    const list = await firstValueFrom(s.listBackups());
+    expect(list.items.length).toBeGreaterThan(0);
+    expect(list.enabled).toBe(true);
+
+    const one = await firstValueFrom(s.getBackup(list.items[0].id));
+    expect(one.id).toBe(list.items[0].id);
+    // An unknown id falls back to a stub rather than throwing.
+    expect((await firstValueFrom(s.getBackup('nope'))).id).toBe('nope');
+
+    const created = await firstValueFrom(s.createBackup('note'));
+    expect(created.note).toBe('note');
+    expect((await firstValueFrom(s.listBackups())).items[0].id).toBe(created.id);
+
+    const pinned = await firstValueFrom(s.updateBackup(created.id, { pinned: true }));
+    expect(pinned.pinned).toBe(true);
+    expect((await firstValueFrom(s.updateBackup('nope', { pinned: true }))).id).toBe('nope');
+
+    expect((await firstValueFrom(s.exportBackup(created.id))).url).toBeTruthy();
+    expect((await firstValueFrom(s.importBackup(new File(['x'], 'a.age')))).note).toBe('a.age');
+    expect((await firstValueFrom(s.restoreBackup(created.id))).id).toBe(created.id);
+    expect((await firstValueFrom(s.restoreBackup('nope'))).id).toBe('nope');
+
+    await firstValueFrom(s.deleteBackup(created.id));
+    const after = await firstValueFrom(s.listBackups());
+    expect(after.items.some((b) => b.id === created.id)).toBe(false);
   });
 
   it('listGroupMappings/mail-templates always hit HTTP even in mock mode', () => {

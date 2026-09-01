@@ -81,6 +81,10 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     # /admin/privacy: GDPR erasure requests, principal and application deletion,
     # subject-access export and retention config.
     "privacy.manage",
+    # /admin/backups: create, download, upload and restore whole-platform backups.
+    # The permission is separate from every admin.* page permission on purpose. Its
+    # holder can read the entire database, PII included, and can replace it.
+    "backup.manage",
     # MCP and agent access: issue OAuth tokens for API agents. An admin holds it through
     # the bypass. You can also assign it to a non-admin.
     "mcp.use",

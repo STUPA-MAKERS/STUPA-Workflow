@@ -88,7 +88,7 @@ backend/    FastAPI app, arq worker, modules, migrations, tests
 frontend/   Angular SPA + design system
 pytex/      Markdown→PDF renderer (FastAPI around tectonic)
 mcp/        MCP server (agent/API access)
-deploy/     docker-compose.yml, web/ (nginx + multi-stage build), .env.example, backup/
+deploy/     docker-compose.yml, web/ (nginx + multi-stage build), .env.example
 scripts/    helper scripts (smoke, role maintenance)
 ```
 

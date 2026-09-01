@@ -69,8 +69,15 @@ The non-negotiables. Source of truth: `CONTRIBUTING.md`, `.github/pull_request_t
 - `alembic heads` MUST show exactly one head. `alembic upgrade head` MUST be green. Single-head is the
   one intended merge-conflict point.
 - Revision ids MUST be ≤ 32 chars (`alembic_version varchar(32)`) — `[[alembic-revision-id-limit]]`.
-- The `0002` migration creates tables and models via `Base.metadata.create_all` (single-source). Pure
+- The `0001` baseline creates the whole schema via `Base.metadata.create_all` (single-source). Pure
   data/constraint migrations get their own revision. Details: `backend/migrations/README.md`.
+- **A migration that adds a table MUST be idempotent.** The baseline builds from
+  `Base.metadata`, so the moment the model is registered in `app/models.py` the table already
+  exists at `0001` on a fresh database. A plain `op.create_table` then fails the FIRST
+  `alembic upgrade head` with `relation "<table>" already exists`, and only on a clean database,
+  so a local run against an existing one will not catch it. Use raw
+  `CREATE TABLE IF NOT EXISTS` / `CREATE INDEX IF NOT EXISTS` and `DROP TABLE IF EXISTS`, as
+  `0007_oauth_tokens`, `0035`, `0037` and `f3b3f1a022b5` do.
 
 ## `app/shared/` utilities (cross-cutting)
 
