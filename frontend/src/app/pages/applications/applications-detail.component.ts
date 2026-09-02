@@ -9,7 +9,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormGroup, FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormlyForm, type FormlyFieldConfig } from '@ngx-formly/core';
 import { ApiClient } from '@core/api/api-client.service';
 import { AuthService } from '@core/auth/auth.service';
@@ -27,6 +27,7 @@ import type {
   Transition,
   Uuid,
 } from '@core/api/models';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { resolveI18n } from '@shared/forms/i18n-text';
 import { toFormlyFields } from '@shared/forms/formly-mapper';
 import { BadgeComponent } from '@stupa-makers/ui-kit';
@@ -87,6 +88,8 @@ const PDF_ERROR_KEYS: Record<string, TranslationKey> = {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     PageHeaderComponent,
+    RouterLink,
+    EmptyStateComponent,
     FormsModule,
     FormlyForm,
     LocalizedDatePipe,

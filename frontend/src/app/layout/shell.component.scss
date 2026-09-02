@@ -51,6 +51,29 @@
   min-width: 0;
   overflow-x: auto;
   scrollbar-width: none;
+  /* The scrollbar is hidden, so a hard cut was the only cue that the strip scrolled at
+     all — and a half-sliced tab reads as a rendering fault rather than "there is more".
+     The mask fades both ends instead. It fades ONLY where content is actually hidden:
+     `mask-composite` intersects the two gradients, so at either end of the scroll the
+     matching edge returns to full opacity. No JS, no scroll listener. */
+  --nav-fade: var(--space-6);
+  mask-image:
+    linear-gradient(to right, transparent 0, #000 var(--nav-fade)),
+    linear-gradient(to left, transparent 0, #000 var(--nav-fade));
+  mask-composite: intersect;
+  -webkit-mask-image:
+    linear-gradient(to right, transparent 0, #000 var(--nav-fade)),
+    linear-gradient(to left, transparent 0, #000 var(--nav-fade));
+  -webkit-mask-composite: source-in;
+}
+/* A nav that fits needs no fade, and the mask would otherwise clip the first and last
+   tab for no reason. `animation-timeline: scroll()` is not broadly supported yet, so
+   the fade is simply dropped where the strip cannot scroll. */
+@media (min-width: 1440px) {
+  .header__nav {
+    mask-image: none;
+    -webkit-mask-image: none;
+  }
 }
 .header__nav::-webkit-scrollbar {
   display: none;

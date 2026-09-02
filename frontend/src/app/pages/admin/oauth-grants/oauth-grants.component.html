@@ -23,15 +23,16 @@
 <section class="grants" [attr.aria-label]="'admin.oauthGrants.title' | t">
   <p class="text-muted text-sm m-0">{{ 'admin.oauthGrants.intro' | t }}</p>
 
-  @if (loading()) {
-    <p class="text-muted py-4" aria-live="polite">{{ 'admin.oauthGrants.loading' | t }}</p>
-  } @else if (loadError()) {
+  @if (loadError()) {
     <p class="grants__error py-4" role="alert">{{ 'admin.oauthGrants.error' | t }}</p>
   } @else {
     <app-data-table
       [columns]="columns()"
       [rows]="grants()"
       [rowKey]="rowId"
+      [loading]="loading()"
+      [loadingText]="'admin.oauthGrants.loading' | t"
+      [skeletonRowCount]="5"
       [emptyText]="'admin.oauthGrants.empty' | t"
     >
       <ng-template appCell="owner" let-g>
@@ -47,35 +48,36 @@
         <span class="grants__mono">{{ $any(g).clientId }}</span>
       </ng-template>
 
+      <!-- A token usually carries every scope, and eight badges wrapped over three
+           lines set the height of every row. Show the first few and count the rest;
+           the title carries the full list for anyone who needs it. -->
       <ng-template appCell="scope" let-g>
-        <span class="grants__scopes">
-          @for (s of scopes($any(g)); track s) {
+        <span class="grants__scopes" [title]="scopes($any(g)).join(' ')">
+          @for (s of visibleScopes($any(g)); track s) {
             <app-badge variant="neutral">{{ s }}</app-badge>
+          }
+          @if (hiddenScopeCount($any(g)); as extra) {
+            <span class="grants__scopes-more">{{ 'admin.oauthGrants.moreScopes' | t: { count: extra } }}</span>
           }
         </span>
       </ng-template>
 
       <ng-template appCell="created" let-g>{{ $any(g).createdAt | ldate }}</ng-template>
 
-      <ng-template appCell="expires" let-g>
-        <span class="grants__expiry">
-          <span>
-            <span class="text-muted text-xs">{{ 'admin.oauthGrants.accessToken' | t }}</span>
-            @if ($any(g).accessExpiresAt; as at) {
-              <span>{{ at | ldate }}</span>
-            } @else {
-              <app-badge variant="warning">{{ 'admin.oauthGrants.neverExpires' | t }}</app-badge>
-            }
-          </span>
-          <span>
-            <span class="text-muted text-xs">{{ 'admin.oauthGrants.refreshToken' | t }}</span>
-            @if ($any(g).refreshExpiresAt; as at) {
-              <span>{{ at | ldate }}</span>
-            } @else {
-              <app-badge variant="warning">{{ 'admin.oauthGrants.neverExpires' | t }}</app-badge>
-            }
-          </span>
-        </span>
+      <ng-template appCell="accessExpires" let-g>
+        @if ($any(g).accessExpiresAt; as at) {
+          {{ at | ldate }}
+        } @else {
+          <app-badge variant="warning">{{ 'admin.oauthGrants.neverExpires' | t }}</app-badge>
+        }
+      </ng-template>
+
+      <ng-template appCell="refreshExpires" let-g>
+        @if ($any(g).refreshExpiresAt; as at) {
+          {{ at | ldate }}
+        } @else {
+          <app-badge variant="warning">{{ 'admin.oauthGrants.neverExpires' | t }}</app-badge>
+        }
       </ng-template>
 
       <ng-template appCell="actions" let-g>

@@ -454,3 +454,18 @@ formly-form formly-field + formly-field {
 formly-form formly-group > formly-field + formly-field {
   margin-top: var(--space-3);
 }
+
+/* Same affordance as the 404 page: a way out, styled as a button. */
+.det__backLink {
+  display: inline-flex;
+  padding: var(--space-3) var(--space-5);
+  font-weight: var(--fw-semibold);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+}
+.det__backLink:hover {
+  background: var(--color-surface-sunken);
+}

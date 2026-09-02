@@ -24,6 +24,10 @@ import { AdminApiService } from '../admin-api.service';
 import type { AdminPrincipal, OAuthGrantAdmin } from '../admin.models';
 
 /** Rows per page. The backend caps `limit` at 200 and defaults to 50. */
+/* A token usually carries every scope. Showing all of them wrapped each row over three
+   lines and set the height of the whole table, so the rest are counted instead. */
+const MAX_VISIBLE_SCOPES = 3;
+
 const PAGE_SIZE = 25;
 
 /** HTTP status of a failed request, or 0 when the error carries none. */
@@ -103,7 +107,14 @@ export class AdminOAuthGrantsComponent {
       { key: 'client', label: this.i18n.translate('admin.oauthGrants.col.client') },
       { key: 'scope', label: this.i18n.translate('admin.oauthGrants.col.scope') },
       { key: 'created', label: this.i18n.translate('admin.oauthGrants.col.created') },
-      { key: 'expires', label: this.i18n.translate('admin.oauthGrants.col.expires') },
+      {
+        key: 'accessExpires',
+        label: this.i18n.translate('admin.oauthGrants.col.accessExpires'),
+      },
+      {
+        key: 'refreshExpires',
+        label: this.i18n.translate('admin.oauthGrants.col.refreshExpires'),
+      },
     ];
     if (this.canRevoke()) {
       cols.push({
@@ -215,6 +226,16 @@ export class AdminOAuthGrantsComponent {
   /** The granted scopes as single tokens. */
   scopes(grant: OAuthGrantAdmin): string[] {
     return grant.scope.split(/\s+/).filter(Boolean);
+  }
+
+  /** The scopes that get a badge. The rest are counted, not drawn. */
+  visibleScopes(grant: OAuthGrantAdmin): string[] {
+    return this.scopes(grant).slice(0, MAX_VISIBLE_SCOPES);
+  }
+
+  /** How many scopes the badges leave out, or 0 when they all fit. */
+  hiddenScopeCount(grant: OAuthGrantAdmin): number {
+    return Math.max(0, this.scopes(grant).length - MAX_VISIBLE_SCOPES);
   }
 
   // --- revoke --------------------------------------------------------------
