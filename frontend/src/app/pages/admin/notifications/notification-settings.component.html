@@ -10,7 +10,7 @@
     <p class="ns__muted">{{ 'admin.notifications.taskReminderDesc' | t }}</p>
 
     @if (loading()) {
-      <p class="ns__muted" aria-live="polite">{{ 'common.loading' | t }}</p>
+      <app-skeleton variant="lines" [count]="4" [label]="'common.loading' | t" />
     } @else if (settings(); as s) {
       <div class="flex flex-col gap-4">
         <app-checkbox

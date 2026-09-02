@@ -29,6 +29,7 @@ import { InputComponent } from '@stupa-makers/ui-kit';
 import { StepperComponent, type Step } from '@stupa-makers/ui-kit';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { AltchaComponent } from './altcha.component';
+import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 
 interface WizardSection {
   key: string;
@@ -59,7 +60,7 @@ const DRAFT_PREFIX = 'ap.draft.';
   selector: 'app-apply-wizard',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
+  imports: [SkeletonComponent, 
     ReactiveFormsModule,
     FormlyForm,
     ButtonComponent,

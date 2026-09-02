@@ -1,4 +1,4 @@
-import { of, throwError } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
 import { ToastService } from '@stupa-makers/ui-kit';
 import type { FlowGraph, Guard } from '../admin.models';
@@ -107,6 +107,20 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     await setup();
     expect(screen.getByText('flow graph has no states')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
+  });
+
+  it('says nothing about the flow while the flow is still loading', async () => {
+    // The graph starts empty and an empty graph fails validation with "no states".
+    // Before the answer arrives that alert is a finding about the request, not the flow.
+    await setup({ getGlobalFlow: jest.fn(() => NEVER) });
+    expect(screen.queryByText('flow graph has no states')).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('reports the empty graph once the load comes back with no flow', async () => {
+    // A deployment with no flow yet is a real finding, and the admin has to see it.
+    await setup({ getGlobalFlow: jest.fn(() => of(null)) });
+    expect(screen.getByText('flow graph has no states')).toBeInTheDocument();
   });
 
   it('builds a valid graph and saves it as a flow version', async () => {

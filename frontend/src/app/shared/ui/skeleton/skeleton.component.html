@@ -1,0 +1,19 @@
+<div class="sk" aria-busy="true">
+  @if (variant() === 'panel') {
+    <span class="skel skel--panel" aria-hidden="true"></span>
+  } @else if (variant() === 'rows') {
+    @for (_ of items(); track $index) {
+      <span class="sk__row" aria-hidden="true">
+        <span class="skel skel--bar sk__row-lead"></span>
+        <span class="skel skel--bar"></span>
+      </span>
+    }
+  } @else {
+    @for (_ of items(); track $index) {
+      <span class="skel skel--line" aria-hidden="true"></span>
+    }
+  }
+  @if (label()) {
+    <span class="sr-only" role="status">{{ label() }}</span>
+  }
+</div>

@@ -115,6 +115,14 @@ export class FlowEditorComponent {
   protected readonly deadlinePolicyOptions = this.opts.deadlinePolicyOptions;
 
   protected readonly graph = signal<FlowGraph>(autoLayout(emptyFlowGraph()));
+  /**
+   * False until the first load settles, either with a flow or without one.
+   *
+   * The graph starts empty, and an empty graph fails validation with "no states". Shown
+   * before the answer arrives that alert is not a finding about the flow, it is a finding
+   * about the request being in flight.
+   */
+  protected readonly loaded = signal(false);
 
   private readonly history = new FlowHistory();
   protected readonly canUndo = this.history.canUndo;
@@ -182,8 +190,10 @@ export class FlowEditorComponent {
             this.applyingHistory = true;
             this.graph.set(autoLayout(normalizeFlowGraph(graph)));
           }
+          this.loaded.set(true);
         },
-        // Core editor data: surface the failure instead of an empty canvas.
+        // Core editor data: surface the failure instead of an empty canvas. The
+        // validation stays hidden: there is no flow to have findings about.
         error: () => this.toast.error(this.i18n.translate('admin.flow.loadFailed')),
       });
 

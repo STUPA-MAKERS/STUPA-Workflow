@@ -32,6 +32,7 @@ import {
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import type { AuditActor, AuditEntry, ConfigRevisionDiff } from '../admin.models';
+import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 
 const PAGE_SIZE = 50;
 
@@ -173,7 +174,7 @@ interface DayGroup {
   selector: 'app-audit-log',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
+  imports: [SkeletonComponent, 
     FormsModule,
     RouterLink,
     TranslatePipe,
