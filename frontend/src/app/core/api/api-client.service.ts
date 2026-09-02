@@ -35,6 +35,7 @@ import type {
   ApplicationListItemWire,
   ApplicationListQuery,
   ApplicationOutWire,
+  ApplicationShareLink,
   ApplicationState,
   ApplicationType,
   ApplicationTypeListItemWire,
@@ -269,6 +270,42 @@ export class ApiClient {
       ? this.http.post<ApplicationOutWire>(url, {})
       : this.http.delete<ApplicationOutWire>(url);
     return call.pipe(map((wire) => mapApplication(wire, lang)));
+  }
+
+  /**
+   * GET /applications/{id}/shares — every link ever minted for this application.
+   *
+   * Revoked and expired links stay in the list. "Revocable" only means something if you
+   * can see what you revoked, and a link that once existed is part of the record of who
+   * published what. None of them carries a `url`.
+   */
+  applicationShares(id: Uuid): Observable<ApplicationShareLink[]> {
+    return this.http.get<ApplicationShareLink[]>(`${this.base}/applications/${id}/shares`, {
+      context: skipLoading(),
+    });
+  }
+
+  /**
+   * POST /applications/{id}/shares — mint a public, read-only link.
+   *
+   * The `url` on the response is the ONLY place the token ever appears. It is not stored
+   * and cannot be fetched again, so a caller who loses it mints a new link.
+   */
+  createApplicationShare(
+    id: Uuid,
+    input: { ttlDays?: number; label?: string } = {},
+  ): Observable<ApplicationShareLink> {
+    return this.http.post<ApplicationShareLink>(
+      `${this.base}/applications/${id}/shares`,
+      input,
+    );
+  }
+
+  /** DELETE /applications/{id}/shares/{shareId} — stop honouring one link. */
+  revokeApplicationShare(id: Uuid, shareId: Uuid): Observable<ApplicationShareLink> {
+    return this.http.delete<ApplicationShareLink>(
+      `${this.base}/applications/${id}/shares/${shareId}`,
+    );
   }
 
   /** POST /applications/{id}/erasure-request — file a GDPR Art. 17 erasure request. */

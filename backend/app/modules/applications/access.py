@@ -39,6 +39,9 @@ DELETE_PERMISSION = "application.delete"
 # delete permission; but it decides what everyone else sees by default, so it is not
 # part of `application.manage` either.
 ARCHIVE_PERMISSION = "application.archive"
+# Publish a read-only link. Separate from reading, because deciding that a record may
+# be read by anyone holding a URL is a different decision from reading it.
+SHARE_PERMISSION = "application.share"
 
 
 @dataclass(slots=True)

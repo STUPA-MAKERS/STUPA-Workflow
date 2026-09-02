@@ -27,6 +27,7 @@ from app.modules.admin.router import router as admin_router
 from app.modules.antiabuse.router import router as antiabuse_router
 from app.modules.application_types.router import router as application_types_router
 from app.modules.applications.router import router as applications_router
+from app.modules.applications.share_router import router as share_page_router
 from app.modules.audit.router import router as audit_router
 from app.modules.auth.mcp_router import router as mcp_router
 from app.modules.auth.oauth_admin_router import router as oauth_admin_router
@@ -212,6 +213,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(api_router)
     # OAuth discovery (RFC 8414/9728) at the root, per well-known convention.
     app.include_router(oauth_well_known_router)
+    # Public share pages at `/s/<token>`, at the root and NOT under /api. Matrix, WhatsApp
+    # and Signal build a link preview by fetching the URL server-side and reading the
+    # OpenGraph tags, so the response has to be HTML from a path nginx proxies ahead of
+    # the SPA fallback. Under /api it would work but read as an internal URL in a chat.
+    app.include_router(share_page_router)
     use_problem_json_contract(app)
     return app
 

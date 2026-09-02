@@ -40,6 +40,11 @@ class AuditAction(StrEnum):
     # carries id references and the direction, never raw PII.
     APPLICATION_ARCHIVE = "application_archive"
     APPLICATION_UNARCHIVE = "application_unarchive"
+    # A public read-only link created or revoked. Both are recorded: publishing a record
+    # and taking it back are the two moments anyone will ask about afterwards. ``data``
+    # carries the share id and the expiry, never the token.
+    APPLICATION_SHARE = "application_share"
+    APPLICATION_SHARE_REVOKE = "application_share_revoke"
     WEBHOOK_CONFIG = "webhook_config"
     ATTACHMENT_QUARANTINE = "attachment_quarantine"
     ATTACHMENT_DELETE = "attachment_delete"

@@ -433,6 +433,28 @@ export interface Application {
   archivedAt: IsoDateTime | null;
 }
 
+/**
+ * A public, read-only link to one application.
+ *
+ * No separate wire type and no mapper: the payload is already camelCase and carries
+ * nothing language-dependent, so a second shape would only be a copy that can drift.
+ *
+ * `url` holds the plaintext token and is therefore present ONLY in the response that
+ * created the link. A listing returns it as null, because the server stored a hash and
+ * cannot reconstruct the token — nor would it hand it back if it could.
+ */
+export interface ApplicationShareLink {
+  id: Uuid;
+  createdAt: IsoDateTime;
+  expiresAt: IsoDateTime;
+  /** Set once the link stops being honoured. A timestamp, so the list can say when. */
+  revokedAt: IsoDateTime | null;
+  createdBy: string | null;
+  /** A note for whoever made it. Never shown on the public page. */
+  label: string | null;
+  url: string | null;
+}
+
 export interface ApplicationListItem {
   id: Uuid;
   typeId: Uuid;
