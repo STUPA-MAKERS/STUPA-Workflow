@@ -18,6 +18,8 @@ published a decision to everyone in the room before anyone opened the link.
 
 from __future__ import annotations
 
+import base64
+import hashlib
 from html import escape
 
 from app.modules.applications.share import PublicApplication
@@ -25,6 +27,43 @@ from app.modules.applications.share import PublicApplication
 #: A preview description that says what the page is without describing the application.
 #: Deliberately generic: whatever goes here is public the moment the link is pasted.
 _PREVIEW_DESCRIPTION = "Antrag der Antragsplattform, öffentlich einsehbar."
+
+
+#: The stylesheet, as a module constant rather than part of the template: the CSP
+#: below hashes exactly these bytes.
+_CSS = """:root { color-scheme: light dark; --fg: #14261c; --muted: #5c6b63; --bg: #fbfcfb;
+         --line: #dfe5e1; --card: #fff; }
+@media (prefers-color-scheme: dark) {
+  :root { --fg: #e7ece9; --muted: #9aa8a1; --bg: #101613; --line: #2a332e; --card: #161d19; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; padding: 2rem 1rem; background: var(--bg); color: var(--fg);
+        font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+main { max-width: 44rem; margin-inline: auto; }
+h1 { font-size: 1.6rem; line-height: 1.25; margin: 0 0 1.5rem; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+         padding: 1rem 1.25rem; margin-bottom: 1.25rem; }
+.row { display: grid; grid-template-columns: 12rem 1fr; gap: 0.5rem 1rem;
+        padding: 0.5rem 0; border-bottom: 1px solid var(--line); }
+.row:last-child { border-bottom: 0; }
+dt { color: var(--muted); }
+dd { margin: 0; overflow-wrap: anywhere; }
+footer { color: var(--muted); font-size: 0.875rem; margin-top: 2rem; }
+@media (max-width: 34rem) { .row { grid-template-columns: 1fr; gap: 0.125rem; } }
+"""
+
+#: The page carries its own policy, because the API-wide one forbids what it needs.
+#:
+#: `SecurityHeadersMiddleware` puts `default-src 'none'` on every response that does
+#: not already carry a CSP. That blocks this page's own <style> and leaves it as raw
+#: unstyled markup. A hash rather than 'unsafe-inline': the stylesheet is fixed at
+#: import time, so nothing has to trust arbitrary inline CSS.
+_STYLE_HASH = base64.b64encode(hashlib.sha256(_CSS.encode()).digest()).decode()
+SHARE_CSP = (
+    "default-src 'none'; "
+    f"style-src 'sha256-{_STYLE_HASH}'; "
+    "frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+)
 
 
 def render_share_page(
@@ -61,6 +100,7 @@ def render_share_page(
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{og_title}</title>
 <link rel="canonical" href="{escape(canonical_url)}">
+<link rel="icon" href="data:,">
 <!-- A public page must not enter a search index. It is meant for whoever holds the URL,
      not for everyone who searches the applicant's name. -->
 <meta name="robots" content="noindex, nofollow">
@@ -72,27 +112,7 @@ def render_share_page(
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="{og_title}">
 <meta name="twitter:description" content="{escape(_PREVIEW_DESCRIPTION)}">
-<style>
-:root {{ color-scheme: light dark; --fg: #14261c; --muted: #5c6b63; --bg: #fbfcfb;
-         --line: #dfe5e1; --card: #fff; }}
-@media (prefers-color-scheme: dark) {{
-  :root {{ --fg: #e7ece9; --muted: #9aa8a1; --bg: #101613; --line: #2a332e; --card: #161d19; }}
-}}
-* {{ box-sizing: border-box; }}
-body {{ margin: 0; padding: 2rem 1rem; background: var(--bg); color: var(--fg);
-        font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }}
-main {{ max-width: 44rem; margin-inline: auto; }}
-h1 {{ font-size: 1.6rem; line-height: 1.25; margin: 0 0 1.5rem; }}
-.card {{ background: var(--card); border: 1px solid var(--line); border-radius: 12px;
-         padding: 1rem 1.25rem; margin-bottom: 1.25rem; }}
-.row {{ display: grid; grid-template-columns: 12rem 1fr; gap: 0.5rem 1rem;
-        padding: 0.5rem 0; border-bottom: 1px solid var(--line); }}
-.row:last-child {{ border-bottom: 0; }}
-dt {{ color: var(--muted); }}
-dd {{ margin: 0; overflow-wrap: anywhere; }}
-footer {{ color: var(--muted); font-size: 0.875rem; margin-top: 2rem; }}
-@media (max-width: 34rem) {{ .row {{ grid-template-columns: 1fr; gap: 0.125rem; }} }}
-</style>
+<style>{_CSS}</style>
 </head>
 <body>
 <main>
