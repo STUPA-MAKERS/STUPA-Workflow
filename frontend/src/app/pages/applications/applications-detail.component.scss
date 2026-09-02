@@ -99,7 +99,6 @@ formly-form {
   margin-top: var(--space-3);
 }
 .det__ccTree {
-  margin-top: var(--space-3);
   max-height: 50vh;
   overflow-y: auto;
   border: var(--border-width) solid var(--color-border);
@@ -378,7 +377,6 @@ formly-form {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
-  margin-top: var(--space-3);
 
   span {
     font-size: var(--fs-sm);
@@ -474,7 +472,6 @@ formly-form formly-group > formly-field + formly-field {
 /* The token appears here once and never again, so the block is set apart from the
    form below it rather than reading as one more field. */
 .det__shareFresh {
-  margin-top: var(--space-3);
   padding: var(--space-3);
   border: var(--border-width) solid var(--color-border-strong);
   border-radius: var(--radius-lg);
@@ -512,7 +509,6 @@ formly-form formly-group > formly-field + formly-field {
   flex-wrap: wrap;
   align-items: flex-end;
   gap: var(--space-3);
-  margin-top: var(--space-3);
 }
 
 .det__shareLabel {

@@ -4,7 +4,7 @@ import {
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
 import { Router, provideRouter } from '@angular/router';
-import { render, screen } from '@testing-library/angular';
+import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { ApplicationsListComponent } from './applications-list.component';
 import { USE_MOCK_API } from '@core/api/api.config';
@@ -209,9 +209,56 @@ describe('ApplicationsListComponent', () => {
       expect.objectContaining({
         queryParams: {
           q: null, type: null, state: null, gremium: null, topf: null, budget: null,
-          amountMin: null, amountMax: null, createdFrom: null, createdTo: null, offset: null,
+          amountMin: null, amountMax: null, createdFrom: null, createdTo: null,
+          // `archived` clears with the rest. It is a tri-state, so a reset has to put it
+          // back to its default rather than merely leave it alone.
+          archived: null, offset: null,
         },
       }),
+    );
+    http.verify();
+  });
+
+  it('puts the archived filter back to its default on a reset', async () => {
+    // It was the one filter a reset visibly failed to undo: the list stayed filtered by
+    // whatever the tri-state had been set to.
+    const { fixture, http, detectChanges, router } = await setup();
+    flushTypes(http);
+    http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
+    detectChanges();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cmp = fixture.componentInstance as any;
+
+    cmp.setArchived('all');
+    expect(cmp.archived()).toBe('all');
+
+    jest.spyOn(router, 'navigate').mockResolvedValue(true);
+    cmp.reset();
+    expect(cmp.archived()).toBe('false');
+    for (const req of http.match((r) => r.url === '/api/applications')) req.flush(listPage([]));
+    http.verify();
+  });
+
+  it('offers all three archived states at once, like the bookings kind filter', async () => {
+    const { http, detectChanges } = await setup();
+    flushTypes(http);
+    http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
+    detectChanges();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Filter' }));
+    flushBudgets(http);
+    detectChanges();
+    // A dropdown hid two of the three behind a click; a segmented control shows them.
+    // Scoped to the group: the cost-centre tree has an "Alle" of its own, and the point
+    // of the group is that these three belong together.
+    const group = within(screen.getByRole('group', { name: 'Archiv' }));
+    expect(group.getByRole('button', { name: 'Ohne archivierte' })).toBeInTheDocument();
+    expect(group.getByRole('button', { name: 'Nur archivierte' })).toBeInTheDocument();
+    expect(group.getByRole('button', { name: 'Alle' })).toBeInTheDocument();
+    // The active one says so, which a row of look-alike buttons otherwise does not.
+    expect(group.getByRole('button', { name: 'Ohne archivierte' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
     );
     http.verify();
   });

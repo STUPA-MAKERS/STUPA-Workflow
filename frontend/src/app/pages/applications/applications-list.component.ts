@@ -321,6 +321,12 @@ export class ApplicationsListComponent implements OnDestroy {
     });
   }
 
+  /** Pick an archived state. Its own method, so the template holds no statement pair. */
+  setArchived(value: 'false' | 'true' | 'all'): void {
+    this.archived.set(value);
+    this.reload();
+  }
+
   reset(): void {
     this.q.set('');
     this.typeId.set('');
@@ -330,9 +336,14 @@ export class ApplicationsListComponent implements OnDestroy {
     this.createdFrom.set('');
     this.createdTo.set('');
     this.budgetId.set('');
+    // Back to the default, not merely cleared: `archived` is a tri-state and "" is not
+    // one of its values. Leaving it out of the reset kept the list filtered by whatever
+    // it had been set to, which is the one filter a reset visibly failed to undo.
+    this.archived.set('false');
     this.navigate({
       q: null, type: null, state: null, gremium: null, topf: null, budget: null,
-      amountMin: null, amountMax: null, createdFrom: null, createdTo: null, offset: null,
+      amountMin: null, amountMax: null, createdFrom: null, createdTo: null,
+      archived: null, offset: null,
     });
   }
 
