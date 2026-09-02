@@ -1,4 +1,4 @@
-<app-page-header [title]="'meetings.title' | t" [rail]="true">
+<app-page-header [title]="'meetings.title' | t" [rail]="true" [flush]="true">
   <div actions class="mtg__headActions">
     @if (!meeting()) {
       <!-- Debounced live search. It collapses the timeline into one relevance-sorted list. -->

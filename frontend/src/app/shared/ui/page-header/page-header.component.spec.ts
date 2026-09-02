@@ -40,4 +40,14 @@ describe('PageHeaderComponent', () => {
     const host = await setup({ rail: true });
     expect(host.classList.contains('ph--rail')).toBe(true);
   });
+
+  it('can be both flush and railed, which four pages need at once', async () => {
+    // A rail page whose host is a flex column with a gap needs both: the cap so the
+    // header sits on the content column, and the flush so its own margin does not stack
+    // on top of the parent's gap. Missing the second one put 40px of nothing under the
+    // heading on the budget tab.
+    const host = await setup({ rail: true, flush: true });
+    expect(host.classList.contains('ph--rail')).toBe(true);
+    expect(host.classList.contains('ph--flush')).toBe(true);
+  });
 });
