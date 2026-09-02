@@ -29,11 +29,14 @@
   overflow: hidden;
 }
 
+/* Room to type in. The field is the whole point of the panel, so it gets the height of
+   a real control rather than the padding of a list row. */
 .pal__field {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-4);
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  min-height: 3.5rem;
   border-bottom: var(--border-width) solid var(--color-border);
   color: var(--color-text-muted);
 }
@@ -45,7 +48,11 @@
   background: transparent;
   color: var(--color-text);
   font: inherit;
-  font-size: var(--fs-md);
+  font-size: var(--fs-lg);
+  line-height: 1.4;
+}
+.pal__input::placeholder {
+  color: var(--color-text-muted);
 }
 .pal__input:focus {
   /* The whole panel is the focus surface; a ring around the bare field inside it reads
@@ -53,14 +60,21 @@
   outline: none;
 }
 
+/* A hint, not a control: it sits quietly at the end of the field and never competes
+   with the text being typed. */
 .pal__kbd {
   flex: none;
+  display: inline-flex;
+  align-items: center;
+  height: 1.5rem;
   padding: 0 var(--space-2);
   border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-sm);
   font-size: var(--fs-xs);
   font-family: var(--font-mono);
+  line-height: 1;
   color: var(--color-text-muted);
+  white-space: nowrap;
 }
 
 .pal__spinner {
@@ -85,7 +99,7 @@
 
 .pal__results {
   overflow-y: auto;
-  padding: var(--space-2);
+  padding: var(--space-2) var(--space-3) var(--space-3);
 }
 
 .pal__groupLabel {
@@ -103,6 +117,7 @@
   gap: var(--space-3);
   width: 100%;
   padding: var(--space-2) var(--space-3);
+  min-height: 2.5rem;
   border: 0;
   border-radius: var(--radius-md);
   background: transparent;

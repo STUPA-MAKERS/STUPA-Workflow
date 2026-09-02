@@ -20,6 +20,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { IconComponent, type IconName } from '@stupa-makers/ui-kit';
 import { PageIndexService, type PageEntry } from './page-index.service';
+import { isApplePlatform } from './shortcut';
 
 /** One row of the palette. A page comes from the client, a record from the server. */
 interface PaletteRow {
@@ -77,6 +78,9 @@ export class CommandPaletteComponent {
   private readonly pages = inject(PageIndexService);
 
   private readonly field = viewChild<ElementRef<HTMLInputElement>>('field');
+
+  /** `⎋` is the key's own symbol on Apple keyboards; elsewhere the word is clearer. */
+  protected readonly escLabel = isApplePlatform() ? '⎋' : 'Esc';
 
   readonly open = signal(false);
   readonly query = signal('');

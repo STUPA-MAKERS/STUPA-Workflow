@@ -22,6 +22,7 @@ import { BrandingService } from '@core/branding/branding.service';
 import { LOCATION } from '@core/browser/location.token';
 import { I18nService } from '@core/i18n/i18n.service';
 import { CommandPaletteComponent } from '../features/search/command-palette.component';
+import { searchShortcutLabel } from '../features/search/shortcut';
 import { ThemeService } from '@core/theme/theme.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { Locale } from '@core/i18n/translations';
@@ -65,6 +66,9 @@ interface NavItem {
   styleUrl: './shell.component.scss',
 })
 export class ShellComponent {
+  /** `⌘K` only where that key exists. Computed, so a language switch re-spells it. */
+  readonly searchShortcut = computed(() => searchShortcutLabel(this.i18n.locale()));
+
   readonly theme = inject(ThemeService);
   readonly i18n = inject(I18nService);
   readonly auth = inject(AuthService);

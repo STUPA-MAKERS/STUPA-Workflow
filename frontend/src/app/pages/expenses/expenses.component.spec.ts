@@ -2240,10 +2240,9 @@ describe('ExpensesComponent — transfers tab', () => {
   });
 
   it('outlines rows inside the real table while the first page loads', async () => {
-    // The first attempt at this replaced the table with loose bars of assorted widths
-    // and no header, so a loading /expenses looked broken next to a loading
-    // /applications. The table stays mounted and the rows are outlined inside it, the
-    // way `app-data-table` does it, so every loading list in the platform matches.
+    // Two attempts got this wrong before the migration: first loose bars with no header,
+    // then a hand-rolled skeleton that had to be kept in step with the shared one by
+    // hand. The table is the shared one now, so there is one implementation to be right.
     const view = await render(ExpensesComponent, {
       providers: [
         provideRouter([]),
@@ -2255,13 +2254,71 @@ describe('ExpensesComponent — transfers tab', () => {
     });
     view.fixture.detectChanges();
 
-    const table = view.container.querySelector('.exp__table');
+    // The shared table now, so the selectors are its own. What matters is unchanged:
+    // the header survives and the rows are outlined INSIDE the table, not instead of it.
+    const table = view.container.querySelector('.dt__table');
     expect(table).not.toBeNull();
     expect(table?.querySelectorAll('thead th').length).toBeGreaterThan(0);
-    expect(table?.querySelectorAll('.exp__skelRow').length).toBeGreaterThan(0);
-    expect(table?.querySelectorAll('.skel--bar').length).toBeGreaterThan(0);
+    expect(table?.querySelectorAll('.dt__skeleton-row').length).toBeGreaterThan(0);
 
     const http = view.fixture.debugElement.injector.get(HttpTestingController);
     for (const req of http.match(() => true)) req.flush({ items: [], total: 0, limit: 50, offset: 0 });
+  });
+});
+
+describe('ExpensesComponent — shared table wiring', () => {
+  it('pins the actions column for a booker', async () => {
+    // Explicit width and `sticky: 'end'`. A self-sized sticky column grew to 246px and
+    // covered the amount beside it, which is the defect this migration inherits a fix
+    // for and must not reintroduce.
+    const { container, fixture } = await setup({
+      perms: ['budget.view', 'budget.book'],
+      page: page([EXPENSE]),
+    });
+    fixture.detectChanges();
+    expect(container.querySelector('tbody td.dt__cell--sticky')).not.toBeNull();
+  });
+
+  it('has no actions column at all for a reader', async () => {
+    const { container, fixture } = await setup({
+      perms: ['budget.view'],
+      page: page([EXPENSE]),
+    });
+    fixture.detectChanges();
+    expect(container.querySelector('.dt__cell--sticky')).toBeNull();
+  });
+
+  it('offers selection to a booker only', async () => {
+    const booker = await setup({
+      perms: ['budget.view', 'budget.book'],
+      page: page([EXPENSE]),
+    });
+    booker.fixture.detectChanges();
+    // In the BODY, not only the select-all in the header: without the pass below, these
+    // assertions ran against the skeleton rows and proved nothing about a real row.
+    expect(
+      booker.container.querySelectorAll('tbody input[type=checkbox]').length,
+    ).toBeGreaterThan(0);
+  });
+
+  it('offers no selection to a reader', async () => {
+    const reader = await setup({ perms: ['budget.view'], page: page([EXPENSE]) });
+    reader.fixture.detectChanges();
+    expect(reader.container.querySelectorAll('input[type=checkbox]').length).toBe(0);
+  });
+
+  it('keeps the selection keyed by booking id, so a re-sort cannot move it', async () => {
+    const { container, fixture } = await setup({
+      perms: ['budget.view', 'budget.book'],
+      page: page([{ ...EXPENSE, id: 'e-1' }, { ...EXPENSE, id: 'e-2' }]),
+    });
+    fixture.detectChanges();
+    const boxes = container.querySelectorAll<HTMLInputElement>('tbody input[type=checkbox]');
+    boxes[1].click();
+    fixture.detectChanges();
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    expect(c.selected()).toEqual(new Set(['e-2']));
   });
 });

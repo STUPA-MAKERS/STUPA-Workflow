@@ -51,10 +51,6 @@ input.exp__input {
   .exp__tree { position: static; max-height: none; }
 }
 .exp__status { color: var(--color-text-muted); padding: var(--space-4) 0; }
-/* The skeleton row keeps the height of a real row, so nothing shifts when the data
-   lands. It must not take the hover or the selection colour. */
-.exp__skelRow td { height: 3rem; }
-.exp__skelRow:hover td { background: transparent; }
 .exp__appLink { color: var(--color-primary); text-decoration: none; }
 .exp__appLink:hover { text-decoration: underline; }
 .exp__amount { font-variant-numeric: tabular-nums; font-weight: var(--fw-semibold); white-space: nowrap; }
@@ -70,61 +66,9 @@ input.exp__input {
 .exp__invDetails dt { color: var(--color-text-muted); }
 .exp__invDetails dd { margin: 0; }
 .exp__sentinel { height: 1px; }
-.exp__tableWrap {
-  overflow-x: auto;
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
-}
-.exp__table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--fs-sm);
-}
-.exp__table th,
-.exp__table td {
-  padding: var(--space-2) var(--space-4);
-  border-bottom: var(--border-width) solid var(--color-border);
-  text-align: start;
-  vertical-align: middle;
-}
-.exp__table tbody tr:last-child td {
-  border-bottom: none;
-}
-.exp__table tbody tr:hover {
-  background: var(--color-surface-sunken);
-}
-.exp__table th {
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-size: var(--fs-xs);
-  font-weight: var(--fw-semibold);
-  white-space: nowrap;
-  /* Darker, taller header like the shared DataTable. */
-  padding: var(--space-3) var(--space-4);
-  background: var(--color-surface-sunken);
-}
-.exp__sort {
-  background: transparent;
-  border: 0;
-  padding: 0;
-  cursor: pointer;
-  font: inherit;
-  color: inherit;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-size: var(--fs-xs);
-  font-weight: var(--fw-semibold);
-}
-.exp__sort:hover {
-  color: var(--color-primary);
-}
-.exp__num {
-  text-align: end;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
+/* What is left here is what only this page knows: how one cell should read. The box,
+   the header, the hover, the sort control, the skeleton, the sticky column and the
+   mobile cards all come from `app-data-table` now. */
 .exp__cellDate {
   color: var(--color-text-muted);
   white-space: nowrap;
@@ -279,32 +223,6 @@ input.exp__input {
 /* Mobile (≤768px): full-width search, table rows as cards (pure CSS). */
 @media (max-width: 768px) {
   .exp__search { flex: 1 1 100%; min-width: 0; }
-  .exp__tableWrap {
-    overflow-x: visible;
-    border: none;
-    border-radius: 0;
-    background: transparent;
-  }
-  .exp__table,
-  .exp__table tbody { display: block; }
-  .exp__table thead { display: none; }
-  .exp__table tbody tr {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-2) var(--space-3);
-    padding: var(--space-4);
-    margin-bottom: var(--space-3);
-    background: var(--color-surface);
-    border: var(--border-width) solid var(--color-border);
-    border-radius: var(--radius-lg);
-  }
-  .exp__table tbody tr:last-child { margin-bottom: 0; }
-  .exp__table th,
-  .exp__table td {
-    padding: 0;
-    border-bottom: none;
-  }
   /* Card layout: the description sits on top in bold at full width. The kind badge and
      the amount follow. A muted meta row closes the card. */
   .exp__cellDesc {
@@ -334,64 +252,16 @@ input.exp__input {
     color: var(--color-text-muted);
   }
   /* The actions get their own row to give large tap targets. */
-  .exp__actions { margin-left: auto; }
-  .exp__num:has(.exp__actions) { order: 2; flex: 1 1 100%; }
+  .exp__actions { margin-left: auto; order: 2; }
 }
 
-/* Sub-bookings use full rows like the parents, only tinted. */
+/* Sub-bookings are `childrenOf` rows of the shared table now, which tints and indents
+   them. Only the count badge is this page's own. */
 .exp__subCount {
   font-size: var(--fs-xs);
   font-variant-numeric: tabular-nums;
   font-weight: var(--fw-semibold);
 }
-/* The cell geometry matches a normal row, because the same td rules apply. Only the
-   background and a left accent mark the sub-booking. */
-.exp__subRow > td {
-  background: var(--color-surface-sunken);
-}
-.exp__subRow > td:first-child {
-  box-shadow: inset 3px 0 0 var(--color-primary-subtle, var(--color-border));
-}
-.exp__subRow:hover > td {
-  background: var(--color-surface-sunken);
-}
-
-/* Sticky action column (#expenses-ux). The rightmost column pins to the edge, so the
-   actions stay reachable without a horizontal scroll. This applies to desktop only. On
-   mobile (≤768px) the card reflow above sets overflow-x to visible, where sticky has no
-   effect. */
-@media (min-width: 769px) {
-  .exp__table th.exp__stickyCol,
-  .exp__table td.exp__stickyCol {
-    position: sticky;
-    right: 0;
-    /* A separator against the scrolling area. A plain token border instead of a shadow
-       gradient matches the rest of the table (#expenses-ux2). */
-    border-inline-start: var(--border-width) solid var(--color-border);
-  }
-  /* The cells must be opaque to hide the columns that scroll beneath them. */
-  .exp__table td.exp__stickyCol {
-    background: var(--color-surface);
-    z-index: 1;
-  }
-  .exp__table th.exp__stickyCol {
-    background: var(--color-surface-sunken);
-    z-index: 2;
-  }
-  /* Source order matters here. The hover override and the sub-booking override must
-     come after the generic cell rule, because equal specificity lets source order decide. */
-  .exp__table tbody tr:hover td.exp__stickyCol {
-    background: var(--color-surface-sunken);
-  }
-  .exp__subRow > td.exp__stickyCol {
-    background: var(--color-surface-sunken);
-  }
-  .exp__table tbody tr.exp__tr--selected td.exp__stickyCol,
-  .exp__table tbody tr.exp__tr--selected:hover td.exp__stickyCol {
-    background: color-mix(in srgb, var(--color-primary) 14%, var(--color-surface));
-  }
-}
-
 /* Bulk actions in a floating bottom bar (#expenses-ux2). The bar is fixed at the bottom
    center and appears only for an active selection. It stacks below the dialogs
    (--z-dialog) and above the sticky table cells. */
@@ -435,24 +305,8 @@ input.exp__input {
 .exp__layout:has(.exp__bulkbar) {
   padding-bottom: 4.5rem;
 }
-.exp__check {
-  width: 1%;
-  white-space: nowrap;
-  text-align: center;
-}
-/* A selected row or card gets a tinted surface, because mobile hides the checkboxes. */
-.exp__table tbody tr.exp__tr--selected,
-.exp__table tbody tr.exp__tr--selected:hover {
-  background: color-mix(in srgb, var(--color-primary) 14%, var(--color-surface));
-}
-@media (max-width: 768px) {
-  /* A press and hold enters select mode. The checkbox column disappears on touch. */
-  .exp__check { display: none; }
-  .exp__table tbody tr {
-    user-select: none;
-    -webkit-user-select: none;
-  }
-  .exp__table tbody tr.exp__tr--selected {
-    border-color: var(--color-primary);
-  }
+/* The income tint. The table hands `rowClass` back to us for exactly this: a state it
+   cannot know about. The selected state is the table's own now, so it is gone from here. */
+.dt__table tbody tr.exp__tr--income td {
+  background: color-mix(in srgb, var(--color-success, #2e7d32) 6%, transparent);
 }
