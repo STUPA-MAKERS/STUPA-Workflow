@@ -90,18 +90,43 @@ export class BackupsComponent {
     this.reload();
   }
 
+  /**
+   * Every column carries a width except the note, which is the one elastic column.
+   *
+   * Without that, table auto-layout had no single place to put the slack and spread it
+   * across all six, which is what made the row read as a set of widely and unevenly
+   * spaced fields. One elastic column absorbs it instead and the rest stay tight to
+   * their content.
+   */
   protected readonly columns = computed<ColumnDef[]>(() => [
-    { key: 'createdAt', label: this.i18n.translate('admin.backups.col.created') },
-    { key: 'kind', label: this.i18n.translate('admin.backups.col.kind') },
-    { key: 'status', label: this.i18n.translate('admin.backups.col.status') },
-    { key: 'size', label: this.i18n.translate('admin.backups.col.size'), align: 'end' },
-    { key: 'contents', label: this.i18n.translate('admin.backups.col.contents') },
+    {
+      key: 'createdAt',
+      label: this.i18n.translate('admin.backups.col.created'),
+      width: '11rem',
+    },
+    { key: 'kind', label: this.i18n.translate('admin.backups.col.kind'), width: '7rem' },
+    {
+      key: 'status',
+      label: this.i18n.translate('admin.backups.col.status'),
+      width: '7rem',
+    },
+    {
+      key: 'size',
+      label: this.i18n.translate('admin.backups.col.size'),
+      align: 'end',
+      width: '7rem',
+    },
+    {
+      key: 'contents',
+      label: this.i18n.translate('admin.backups.col.contents'),
+      width: '9rem',
+    },
     { key: 'note', label: this.i18n.translate('admin.backups.col.note') },
     {
       key: 'actions',
       label: this.i18n.translate('admin.common.actions'),
       align: 'end',
-      width: '14rem',
+      width: '10rem',
     },
   ]);
 
