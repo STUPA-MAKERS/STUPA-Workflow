@@ -36,6 +36,12 @@ const SETUP: McpSetup = {
 
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 
+/** What `ldate` renders for the German UI, so the assertions do not hardcode a format. */
+const fmt = (iso: string): string =>
+  new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' }).format(
+    new Date(iso),
+  );
+
 interface ApiOverrides {
   listGrants?: jest.Mock;
   revokeGrant?: jest.Mock;
@@ -79,8 +85,29 @@ describe('AccountGrantsComponent (#MCP)', () => {
     expect(cmp.loading()).toBe(false);
     expect(cmp.grants()).toHaveLength(2);
     expect(screen.getByText('application:read')).toBeInTheDocument();
-    // The second grant has no createdAt. The access expiry still renders.
-    expect(screen.getByText('2026-08-01T10:00:00Z')).toBeInTheDocument();
+    // Dates render through `ldate`, so a reader sees a localized date and not the raw
+    // ISO timestamp the API sends.
+    expect(screen.getByText(fmt('2026-08-01T10:00:00Z'))).toBeInTheDocument();
+    expect(screen.queryByText('2026-08-01T10:00:00Z')).not.toBeInTheDocument();
+  });
+
+  it('renders every scope of a grant as its own badge', async () => {
+    const api = makeApi({
+      listGrants: jest.fn(() =>
+        of([{ ...clone(GRANTS[0]), scope: 'application:read budget:read' }]),
+      ),
+    });
+    await setup({ api });
+    expect(screen.getByText('application:read')).toBeInTheDocument();
+    expect(screen.getByText('budget:read')).toBeInTheDocument();
+  });
+
+  it('marks a grant without an access expiry as never expiring', async () => {
+    const api = makeApi({
+      listGrants: jest.fn(() => of([{ ...clone(GRANTS[0]), accessExpiresAt: null }])),
+    });
+    await setup({ api });
+    expect(screen.getByText('Läuft nie ab')).toBeInTheDocument();
   });
 
   it('shows the empty state when there are no grants', async () => {

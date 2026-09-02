@@ -9,10 +9,10 @@
       <h2>{{ 'account.mcp.title' | t }}</h2>
       <p>{{ 'account.mcp.intro' | t }}</p>
       <div class="my-3">
-        <button type="button" class="btn btn--primary" (click)="downloadPackage()">
+        <app-button variant="primary" size="sm" (click)="downloadPackage()">
           <app-icon name="export" [size]="16" />
           {{ 'account.mcp.download' | t }}
-        </button>
+        </app-button>
       </div>
       @if (setup(); as s) {
         <ol class="mcp__steps">
@@ -23,9 +23,9 @@
         <div class="mcp__config">
           <div class="mcp__config-head">
             <span>{{ 'account.mcp.config' | t }}</span>
-            <button type="button" class="btn btn--ghost" (click)="copySetup()">
+            <app-button variant="ghost" size="sm" (click)="copySetup()">
               {{ 'action.copy' | t }}
-            </button>
+            </app-button>
           </div>
           <pre><code>{{ setupJson() }}</code></pre>
           <p class="mcp__hint">{{ 'account.mcp.wired' | t }}: <code>{{ s.baseUrl }}</code></p>
@@ -38,43 +38,61 @@
     <div class="grants__list-head">
       <h2>{{ 'account.grants.active' | t }}</h2>
       @if (grants().length > 0) {
-        <button type="button" class="btn btn--danger-ghost" (click)="revokeAll()">
+        <app-button variant="ghost" size="sm" (click)="revokeAll()">
           {{ 'account.grants.revokeAll' | t }}
-        </button>
+        </app-button>
       }
     </div>
 
-    @if (loading()) {
-      <p class="text-muted">{{ 'common.loading' | t }}</p>
-    } @else if (error()) {
-      <p class="text-danger">{{ 'account.grants.error' | t }}</p>
-    } @else if (grants().length === 0) {
-      <p class="text-center text-muted py-6">{{ 'account.grants.empty' | t }}</p>
+    @if (error()) {
+      <p class="text-danger" role="alert">{{ 'account.grants.error' | t }}</p>
     } @else {
-      <table class="grants__table">
-        <thead>
-          <tr>
-            <th>{{ 'account.grants.scope' | t }}</th>
-            <th>{{ 'account.grants.created' | t }}</th>
-            <th>{{ 'account.grants.expires' | t }}</th>
-            <th class="grants__col-action"></th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (g of grants(); track g.id) {
-            <tr>
-              <td><code class="grants__scope">{{ g.scope }}</code></td>
-              <td>{{ g.createdAt }}</td>
-              <td>{{ g.accessExpiresAt ?? ('account.grants.never' | t) }}</td>
-              <td class="grants__col-action">
-                <button type="button" class="btn btn--danger-ghost" (click)="revoke(g.id)">
-                  {{ 'account.grants.revoke' | t }}
-                </button>
-              </td>
-            </tr>
+      <!-- The table stays on screen while the grants reload. It keeps its header and
+           column widths and draws skeleton rows, so a revoke does not make the page
+           jump. The card already supplies the border, so the table is not boxed. -->
+      <app-data-table
+        [columns]="columns()"
+        [rows]="grants()"
+        [rowKey]="rowId"
+        [boxed]="false"
+        [loading]="loading()"
+        [loadingText]="'common.loading' | t"
+        [skeletonRowCount]="3"
+        [emptyText]="'account.grants.empty' | t"
+      >
+        <ng-template appCell="scope" let-g>
+          <span class="grants__scopes">
+            @for (s of scopes($any(g)); track s) {
+              <app-badge variant="neutral">{{ s }}</app-badge>
+            }
+          </span>
+        </ng-template>
+
+        <ng-template appCell="created" let-g>
+          {{ ($any(g).createdAt | ldate) || '—' }}
+        </ng-template>
+
+        <ng-template appCell="expires" let-g>
+          @if ($any(g).accessExpiresAt; as at) {
+            {{ at | ldate }}
+          } @else {
+            <app-badge variant="warning">{{ 'account.grants.never' | t }}</app-badge>
           }
-        </tbody>
-      </table>
+        </ng-template>
+
+        <ng-template appCell="actions" let-g>
+          <app-button
+            variant="ghost"
+            size="sm"
+            [iconOnly]="true"
+            [ariaLabel]="'account.grants.revoke' | t"
+            [title]="'account.grants.revoke' | t"
+            (click)="revoke($any(g).id)"
+          >
+            <app-icon name="delete" />
+          </app-button>
+        </ng-template>
+      </app-data-table>
     }
   </section>
 </section>
