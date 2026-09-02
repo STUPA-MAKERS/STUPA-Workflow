@@ -1,7 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '@core/auth/auth.service';
-import { BrandingService } from '@core/branding/branding.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { IconComponent } from '@stupa-makers/ui-kit';
 
@@ -21,8 +20,6 @@ import { IconComponent } from '@stupa-makers/ui-kit';
   styleUrl: './home.component.scss',
 })
 export class HomeComponent {
-  /** Configurable app name for the eyebrow line. It falls back to the i18n `app.title`. */
-  readonly branding = inject(BrandingService);
   private readonly auth = inject(AuthService);
 
   /** Start the OIDC login. It leaves the SPA, so there is no route to navigate to. */
