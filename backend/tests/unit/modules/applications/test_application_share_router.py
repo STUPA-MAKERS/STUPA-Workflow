@@ -28,6 +28,7 @@ from app.main import create_app
 from app.modules.applications.models import Application, ApplicationShare
 from app.modules.auth import tokens
 from app.modules.auth.principal import Applicant, Principal
+from app.modules.forms.models import FormField
 from app.settings import load_settings
 
 NOW = datetime(2026, 9, 2, 12, 0, tzinfo=UTC)
@@ -45,6 +46,10 @@ class _Rows:
 
     def all(self) -> list[object]:
         return self._rows
+
+    def first(self) -> object | None:
+        # The site-config lookup for the branding name reads one row this way.
+        return self._rows[0] if self._rows else None
 
 
 class _Result:
@@ -79,9 +84,20 @@ class _FakeSession:
     async def scalar(self, _stmt: object) -> object:
         return self.share
 
-    async def scalars(self, _stmt: object) -> _Rows:
-        # Two callers: the public page reads form fields, the listing reads shares.
-        return _Rows(self.fields if self.fields else [r for r in (self.share,) if r])
+    async def scalars(self, stmt: Any) -> _Rows:
+        """Answer by what is being selected.
+
+        Three callers read through this: the listing reads shares, the public page reads
+        form fields, and the branding name reads the site config. Answering the same rows
+        to all three fed form fields to whichever asked first.
+        """
+        entity = stmt.column_descriptions[0]["entity"]
+        if entity is FormField:
+            return _Rows(self.fields)
+        if entity is ApplicationShare:
+            return _Rows([r for r in (self.share,) if r])
+        # No active site config: the page falls back to the default name.
+        return _Rows([])
 
     async def get(self, model: type, _pk: object) -> object | None:
         return self.objects.get(model)
@@ -341,6 +357,14 @@ def test_the_public_page_needs_no_login() -> None:
     assert r.status_code == 200
     assert r.headers["content-type"].startswith("text/html")
     assert "Anschaffung Beamer" in r.text
+
+
+def test_the_preview_carries_the_branding_name_not_the_api_title() -> None:
+    """`settings.app_name` is the FastAPI title and reads "Antragsplattform API". The
+    og:title lands permanently on a chat server, so it takes the configured name."""
+    r = _public_client(_live_share()).get("/s/" + "x" * 32)
+    assert "Antragsplattform API" not in r.text
+    assert "STUPA Antragsplattform" in r.text
 
 
 def test_the_public_page_drops_pii_fields() -> None:
