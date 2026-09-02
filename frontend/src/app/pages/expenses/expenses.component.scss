@@ -51,6 +51,9 @@ input.exp__input {
   .exp__tree { position: static; max-height: none; }
 }
 .exp__status { color: var(--color-text-muted); padding: var(--space-4) 0; }
+/* Holds the height of a first page of rows, so the table does not jump in. */
+.exp__skel { padding: var(--space-4) 0; }
+.exp__skel .skel--line { height: 2.25rem; margin-bottom: var(--space-2); }
 .exp__appLink { color: var(--color-primary); text-decoration: none; }
 .exp__appLink:hover { text-decoration: underline; }
 .exp__amount { font-variant-numeric: tabular-nums; font-weight: var(--fw-semibold); white-space: nowrap; }
@@ -144,6 +147,32 @@ input.exp__input {
 }
 .exp__more:hover {
   text-decoration: underline;
+}
+/* The sub-booking expander lives with its row, under the description, not in the
+   actions strip. Muted rather than primary: it is a disclosure, not an action, and the
+   description above it must stay the thing the eye lands on. */
+.exp__subToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-top: var(--space-1);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+.exp__subToggle:hover {
+  color: var(--color-text);
+  text-decoration: underline;
+}
+.exp__subToggle:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
 }
 // Wrap the payee, the payer, and the cost center instead of letting them overflow.
 // A long name or IBAN without spaces must still break onto a new line.

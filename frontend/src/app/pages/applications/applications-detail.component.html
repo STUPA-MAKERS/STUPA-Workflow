@@ -14,7 +14,7 @@
     {{ 'applications.detail.error' | t }}
   </p>
 } @else if (app(); as application) {
-  <app-page-header [title]="title()">
+  <app-page-header [title]="title()" [rail]="true">
     <div actions class="det__ownerActions">
       <!-- The PDF follows the read scope of the application: whoever sees this
            page may render it. -->

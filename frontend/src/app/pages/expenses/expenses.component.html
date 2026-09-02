@@ -1,4 +1,4 @@
-<app-page-header [title]="'expenses.title' | t">
+<app-page-header [title]="'expenses.title' | t" [rail]="true">
   <div actions class="flex items-center gap-2 flex-wrap">
     <input
       class="exp__search"
@@ -92,7 +92,15 @@
 
     @if (tab() === 'transfers') {
       @if (transferLoading() && !transferItems().length) {
-        <p class="exp__status" aria-live="polite">{{ 'expenses.loading' | t }}</p>
+        <!-- A placeholder, not a sentence: the first load is exactly when a reader has
+             nothing to look at, so the page should show the shape of what is coming. -->
+        <div class="exp__skel" aria-busy="true">
+          <span class="skel skel--line"></span>
+          <span class="skel skel--line"></span>
+          <span class="skel skel--line"></span>
+          <span class="skel skel--line"></span>
+          <span class="sr-only" role="status">{{ 'expenses.loading' | t }}</span>
+        </div>
       } @else if (transferItems().length) {
         <div class="exp__tableWrap" appHScrollSync>
           <table class="exp__table">
@@ -146,7 +154,14 @@
         <div class="empty-state">{{ 'expenses.transfers.empty' | t }}</div>
       }
     } @else if (loading() && !items().length) {
-      <p class="exp__status" aria-live="polite">{{ 'expenses.loading' | t }}</p>
+      <div class="exp__skel" aria-busy="true">
+        <span class="skel skel--line"></span>
+        <span class="skel skel--line"></span>
+        <span class="skel skel--line"></span>
+        <span class="skel skel--line"></span>
+        <span class="skel skel--line"></span>
+        <span class="sr-only" role="status">{{ 'expenses.loading' | t }}</span>
+      </div>
     } @else if (items().length) {
       <!-- Floating bulk bar: fixed at the bottom center while a selection exists (#expenses-ux2). -->
       @if (canManage() && selectedCount()) {
@@ -193,10 +208,16 @@
               <th scope="col">{{ 'expenses.col.kind' | t }}</th>
               <th scope="col">{{ 'expenses.col.description' | t }}</th>
               <th scope="col">{{ 'expenses.col.correspondent' | t }}</th>
-              <th scope="col">{{ 'expenses.col.costCentre' | t }}</th>
+              <!-- Amount sits BEFORE the cost centre on purpose. The sticky actions
+                   column is displaced left by however much the table overflows, so it
+                   covers whatever sits immediately to its left. That used to be the
+                   amount — the one column a reader scans a booking list for — which was
+                   therefore hidden until you scrolled right. The cost-centre code is
+                   short and recoverable, so it takes that place instead. -->
               <th scope="col" class="exp__num" [attr.aria-sort]="ariaSort('amount')">
                 <button type="button" class="exp__sort" (click)="onSort('amount')">{{ 'expenses.col.amount' | t }}{{ sortInd('amount') }}</button>
               </th>
+              <th scope="col">{{ 'expenses.col.costCentre' | t }}</th>
               @if (canManage()) { <th scope="col" class="exp__num exp__stickyCol">{{ 'table.actions' | t }}</th> }
             </tr>
           </thead>
@@ -234,8 +255,26 @@
                   @if (e.applicationId) {
                     <a class="exp__appLink block" [routerLink]="['/applications', e.applicationId]">{{ e.applicationTitle || ('expenses.col.application' | t) }}</a>
                   }
+                  <!-- The expand control sits with the row it expands, not in the
+                       actions strip. It reveals the sub-bookings of THIS booking in
+                       place, which is a property of the row and not an action on it —
+                       and it took 40px off a sticky column that was covering the
+                       columns to its left. -->
+                  @if (canManage() && e.childCount) {
+                    <button
+                      type="button"
+                      class="exp__subToggle"
+                      [attr.aria-expanded]="isSubExpanded(e.id)"
+                      [title]="'expenses.sub.toggle' | t"
+                      (click)="toggleSub(e)"
+                    >
+                      <app-icon [name]="isSubExpanded(e.id) ? 'chevron-up' : 'chevron-down'" [size]="12" />
+                      {{ 'expenses.sub.count' | t: { count: e.childCount } }}
+                    </button>
+                  }
                 </td>
                 <td class="exp__cellMeta">{{ e.correspondent || '—' }}</td>
+                <td class="exp__num exp__amount" [class.exp__amount--income]="e.kind === 'income'">{{ e.kind === 'income' ? '+' : '−' }}{{ money(e.amount) }}</td>
                 <td class="exp__mono exp__cellMeta">
                   @if (e.pathKey) {
                     <a class="exp__appLink" [routerLink]="['/budget']" [queryParams]="ksLink(e)">{{ e.pathKey | simplifyPath }}</a>
@@ -243,13 +282,9 @@
                     —
                   }
                 </td>
-                <td class="exp__num exp__amount" [class.exp__amount--income]="e.kind === 'income'">{{ e.kind === 'income' ? '+' : '−' }}{{ money(e.amount) }}</td>
                 @if (canManage()) {
                   <td class="exp__num exp__stickyCol">
                     <span class="exp__actions">
-                      <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="!e.childCount" [title]="'expenses.sub.toggle' | t" [ariaLabel]="'expenses.sub.toggle' | t" (click)="toggleSub(e)">
-                        <span class="inline-flex items-center gap-1"><app-icon [name]="isSubExpanded(e.id) ? 'chevron-up' : 'chevron-down'" [size]="14" />@if (e.childCount) {<span class="exp__subCount">{{ e.childCount }}</span>}</span>
-                      </app-button>
                       <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'expenses.sub.add' | t" [title]="'expenses.sub.add' | t" (click)="openCreateSub(e)"><app-icon name="add" /></app-button>
                       <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="!e.invoiceId" [ariaLabel]="'expenses.action.viewInvoice' | t" [title]="'expenses.action.viewInvoice' | t" (click)="openInvoiceDialog(e)"><app-icon name="document" /></app-button>
                       <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'action.edit' | t" [title]="'action.edit' | t" (click)="openEdit(e)"><app-icon name="edit" /></app-button>
@@ -270,6 +305,7 @@
                     </td>
                     <td class="exp__cellDesc">{{ c.description }}</td>
                     <td class="exp__cellMeta">{{ c.correspondent || '—' }}</td>
+                    <td class="exp__num exp__amount" [class.exp__amount--income]="c.kind === 'income'">{{ c.kind === 'income' ? '+' : '−' }}{{ money(c.amount) }}</td>
                     <td class="exp__mono exp__cellMeta">
                       @if (c.pathKey) {
                         <a class="exp__appLink" [routerLink]="['/budget']" [queryParams]="ksLink(c)">{{ c.pathKey | simplifyPath }}</a>
@@ -277,7 +313,6 @@
                         —
                       }
                     </td>
-                    <td class="exp__num exp__amount" [class.exp__amount--income]="c.kind === 'income'">{{ c.kind === 'income' ? '+' : '−' }}{{ money(c.amount) }}</td>
                     <td class="exp__num exp__stickyCol">
                       <span class="exp__actions">
                         <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'action.edit' | t" [title]="'action.edit' | t" (click)="openEdit(c)"><app-icon name="edit" /></app-button>

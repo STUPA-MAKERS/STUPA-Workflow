@@ -1,4 +1,4 @@
-<app-page-header [title]="'budget.tree.title' | t">
+<app-page-header [title]="'budget.tree.title' | t" [rail]="true">
   <div actions class="bt__head-actions">
     <app-button size="sm" (click)="openTop()">{{ 'budget.tree.createTop' | t }}</app-button>
     <app-button size="sm" variant="secondary" [disabled]="!selectedTopId()" (click)="openFy()">

@@ -90,7 +90,15 @@
       </div>
 
       @if (loading()) {
-        <p class="dash__state" aria-live="polite">{{ 'dashboard.loading' | t }}</p>
+        <!-- Rows in outline, not a sentence. Each panel is a list, so the placeholder
+             holds the height of one and the card does not resize under the reader when
+             the real rows land. -->
+        <div class="dash__skel" aria-busy="true">
+          <span class="skel skel--line"></span>
+          <span class="skel skel--line"></span>
+          <span class="skel skel--line"></span>
+          <span class="sr-only" role="status">{{ 'dashboard.loading' | t }}</span>
+        </div>
       } @else if (error()) {
         <p class="dash__state dash__state--error" role="alert">{{ 'dashboard.error' | t }}</p>
       } @else if (taskRows().length === 0) {
@@ -130,7 +138,15 @@
       </div>
 
       @if (loading()) {
-        <p class="dash__state" aria-live="polite">{{ 'dashboard.loading' | t }}</p>
+        <!-- Rows in outline, not a sentence. Each panel is a list, so the placeholder
+             holds the height of one and the card does not resize under the reader when
+             the real rows land. -->
+        <div class="dash__skel" aria-busy="true">
+          <span class="skel skel--line"></span>
+          <span class="skel skel--line"></span>
+          <span class="skel skel--line"></span>
+          <span class="sr-only" role="status">{{ 'dashboard.loading' | t }}</span>
+        </div>
       } @else if (error()) {
         <p class="dash__state dash__state--error" role="alert">{{ 'dashboard.error' | t }}</p>
       } @else if (applicationRows().length === 0) {
