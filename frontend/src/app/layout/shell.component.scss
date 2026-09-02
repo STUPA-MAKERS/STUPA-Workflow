@@ -42,6 +42,22 @@
   height: 32px;
   width: auto;
 }
+/* The mark alone, for a header too narrow to carry the wordmark. Below the breakpoint
+   the wordmark is unreadable AND the widest single thing in the row, so it goes and the
+   mark takes its place. */
+.header__mark {
+  display: none;
+  height: 30px;
+  width: auto;
+}
+@media (max-width: 640px) {
+  .header__logo {
+    display: none;
+  }
+  .header__mark {
+    display: block;
+  }
+}
 .header__nav {
   display: flex;
   align-items: center;
@@ -259,6 +275,36 @@
 .account__menu-item:hover {
   background: var(--color-surface-sunken);
 }
+/* Language and appearance sit below the account actions, separated: they are settings,
+   and running them together with "Log out" would read as one list of actions. */
+.account__menuSep {
+  height: var(--border-width);
+  margin: var(--space-1) var(--space-2);
+  background: var(--color-border);
+}
+/* A row that holds a control rather than being one. The label takes the width so the
+   select lands hard right, in line with the rest of the menu. */
+.account__menu-item--field {
+  gap: var(--space-2);
+  cursor: default;
+}
+.account__menu-item--field > span {
+  flex: 1 1 auto;
+}
+.account__menuSelect {
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--fs-sm);
+  padding: 2px var(--space-2);
+  cursor: pointer;
+}
+.account__menuSelect:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
+}
 .account__btn {
   padding-inline: var(--space-4);
   white-space: nowrap;
@@ -436,7 +482,9 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  height: 2rem;
+  /* The shared control height, not a hardcoded 2rem. Every other control in this row
+     takes the token, and the odd one out is what made the strip look ragged. */
+  height: var(--control-height);
   padding: 0 var(--space-3);
   border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-md);

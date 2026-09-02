@@ -15,8 +15,12 @@
       </button>
     }
 
+    <!-- Two images, swapped in CSS. On a phone the wordmark is both unreadable and the
+         single widest thing in the header, so below the breakpoint only the mark shows.
+         A media query rather than a resize listener: no change detection on every drag. -->
     <a class="header__brand" [routerLink]="brandTarget()" [attr.aria-label]="branding.appName()">
       <img class="header__logo" [src]="logoSrc()" alt="" aria-hidden="true" />
+      <img class="header__mark" [src]="markSrc" alt="" aria-hidden="true" />
     </a>
 
     <nav class="header__nav" [attr.aria-label]="'nav.main' | t">
@@ -34,17 +38,6 @@
 
     <div class="header__actions">
       @if (auth.isAuthenticated()) {
-        <button
-          type="button"
-          class="header__search"
-          [attr.aria-label]="'search.open' | t"
-          [title]="'search.open' | t"
-          (click)="palette.show()"
-        >
-          <app-icon name="filter" [size]="16" />
-          <span class="header__searchLabel">{{ 'search.title' | t }}</span>
-          <kbd class="header__searchKbd">{{ searchShortcut() }}</kbd>
-        </button>
         <div class="relative flex items-center gap-2">
           <!-- The trigger is the icon alone. A full display name in the header cost more
                room than anything else in it and pushed the nav around as the name got
@@ -101,16 +94,62 @@
                 <app-icon name="power" [size]="16" />
                 {{ 'action.logout' | t }}
               </button>
+
+              <!-- Language and appearance live here at EVERY width, not only on a phone.
+                   Two more controls in the header made it cramped on a desktop and broke
+                   it outright on a phone; both are settings rather than navigation, so
+                   the account menu is where they belong. -->
+              <div class="account__menuSep" role="separator"></div>
+              <label class="account__menu-item account__menu-item--field">
+                <app-icon name="language" [size]="16" />
+                <span>{{ 'lang.switch' | t }}</span>
+                <select
+                  class="account__menuSelect"
+                  [attr.aria-label]="'lang.switch' | t"
+                  [value]="i18n.locale()"
+                  (change)="setLocale($any($event.target).value)"
+                >
+                  @for (loc of i18n.locales; track loc) {
+                    <option [value]="loc" [selected]="loc === i18n.locale()">{{ loc | uppercase }}</option>
+                  }
+                </select>
+              </label>
+              <button
+                type="button"
+                class="account__menu-item"
+                role="menuitemcheckbox"
+                [attr.aria-checked]="theme.resolved() === 'dark'"
+                (click)="toggleTheme()"
+              >
+                <app-icon [name]="theme.resolved() === 'dark' ? 'moon' : 'sun'" [size]="16" />
+                {{ 'theme.toggle' | t }}
+              </button>
             </div>
           }
         </div>
+        <!-- To the right of the account control, and a magnifier rather than a funnel:
+             the funnel is the filter button of the list pages, and searching is not
+             filtering. -->
+        <button
+          type="button"
+          class="header__search"
+          [attr.aria-label]="'search.open' | t"
+          [title]="'search.open' | t"
+          (click)="palette.show()"
+        >
+          <app-icon name="search" [size]="16" />
+          <span class="header__searchLabel">{{ 'search.title' | t }}</span>
+          <kbd class="header__searchKbd">{{ searchShortcut() }}</kbd>
+        </button>
       } @else {
         <button type="button" class="account__btn account__btn--primary" (click)="login()">
           {{ 'action.login' | t }}
         </button>
       }
 
-      <!-- Language and appearance belong to the right of "Log out" (#81). -->
+      <!-- Signed out there is no account menu to hold them, and the header is nearly
+           empty anyway, so the pair stays inline on that one branch. -->
+      @if (!auth.isAuthenticated()) {
       <div class="inline-flex items-center gap-1 flex-none">
         <label class="lang">
           <span class="lang__icon" aria-hidden="true"><app-icon name="language" [size]="16" /></span>
@@ -136,6 +175,7 @@
           <app-icon [name]="theme.resolved() === 'dark' ? 'moon' : 'sun'" [size]="18" />
         </button>
       </div>
+      }
     </div>
   </div>
 </header>

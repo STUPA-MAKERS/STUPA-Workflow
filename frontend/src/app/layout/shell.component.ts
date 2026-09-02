@@ -109,6 +109,13 @@ export class ShellComponent {
    * official CD variants. The multicolor mark stays legible in both modes.
    */
   readonly logoSrc = computed(() => `assets/logos/stupa-wordmark-${this.theme.resolved()}.svg`);
+  /**
+   * The mark without the wordmark, for the narrow header.
+   *
+   * One file for both themes, unlike the wordmark: the mark is the coloured emblem and
+   * carries no text that would have to change colour with the background.
+   */
+  readonly markSrc = 'assets/logos/stupa-mark.svg';
 
   /** Logo click: logged in → dashboard, otherwise the public landing page. */
   readonly brandTarget = computed(() => (this.auth.isAuthenticated() ? '/dashboard' : '/'));

@@ -2,17 +2,30 @@
    and not the muted text link that replaced it. A signed-in member came for their
    tasks and meetings, so this does not lead the page — but it is still the one action
    they take FROM here, so it has to read as a control. */
+/* Their own line under the greeting. The negative top margin pulls them up against the
+   heading, because the page gap is sized for blocks and these belong to the line above. */
+.dash__gremien {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: calc(var(--space-6) * -1 + var(--space-2));
+}
+
+/* The one action taken from this page, so it is a primary control rather than a quiet
+   outlined link. It still does not lead the page — a signed-in member came for their
+   tasks and meetings — but a bordered surface button beside panels of the same surface
+   disappeared into them, which is the opposite of what a call to action has to do. */
 .dash__apply {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
   align-self: flex-start;
-  padding: var(--space-3) var(--space-5);
-  color: var(--color-text);
-  background: var(--color-surface);
-  border: var(--border-width) solid var(--color-border-strong);
+  padding: var(--space-4) var(--space-6);
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+  border: var(--border-width) solid var(--color-primary);
   border-radius: var(--radius-md);
-  font-size: var(--fs-md);
+  font-size: var(--fs-lg);
   font-weight: var(--fw-semibold);
   text-decoration: none;
   transition:
@@ -21,8 +34,8 @@
 
   &:hover,
   &:focus-visible {
-    background: var(--color-surface-sunken);
-    border-color: var(--color-primary);
+    background: var(--color-primary-hover);
+    border-color: var(--color-primary-hover);
   }
 
   &:focus-visible {

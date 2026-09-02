@@ -352,7 +352,7 @@ describe('ApplicationsDetailComponent — PDF render', () => {
   });
 
   it.each([
-    ['render_error', 'Das PDF konnte nicht gesetzt werden.'],
+    ['render_error', 'Das PDF konnte nicht erzeugt werden.'],
     ['no_application', 'Der Antrag zum Auftrag existiert nicht mehr.'],
     ['render_unavailable', 'Der PDF-Dienst ist derzeit nicht erreichbar.'],
     ['weird_code', 'Der PDF-Auftrag ist fehlgeschlagen.'],
