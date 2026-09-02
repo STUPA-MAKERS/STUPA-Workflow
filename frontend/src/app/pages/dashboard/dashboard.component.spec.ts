@@ -366,4 +366,30 @@ describe('DashboardComponent', () => {
     expect(ids).toContain('p3');
     http.verify();
   });
+
+  it('shows outlined rows while loading, never a bare sentence', async () => {
+    // Both panels are lists. A line of text gives the reader nothing to anticipate and
+    // lets the card resize under them when the real rows land.
+    const view = await render(DashboardComponent, {
+      providers: [
+        provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: USE_MOCK_API, useValue: false },
+      ],
+    });
+    const auth = view.fixture.debugElement.injector.get(AuthService);
+    const http = view.fixture.debugElement.injector.get(HttpTestingController);
+    auth.ensureLoaded().subscribe();
+    http.expectOne('/api/auth/me').flush(MEMBER);
+    view.fixture.detectChanges();
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = view.fixture.componentInstance as any;
+    expect(c.loading()).toBe(true);
+    expect(view.container.querySelectorAll('.skel').length).toBeGreaterThan(0);
+    expect(view.container.querySelector('[aria-busy="true"]')).toBeTruthy();
+
+    for (const req of http.match(() => true)) req.flush([]);
+  });
 });
