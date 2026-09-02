@@ -31,14 +31,16 @@ describe('I18nService', () => {
 
   it('falls back to German for keys missing in the active locale', () => {
     // Simulate an incomplete EN catalog. The `en` type is `Partial` on purpose.
-    const original = CATALOG.en['home.cta'];
-    delete CATALOG.en['home.cta'];
+    // `action.login` is a shared, long-lived key, so this test does not break again the
+    // next time a page reworks its own copy.
+    const original = CATALOG.en['action.login'];
+    delete CATALOG.en['action.login'];
     try {
       const i18n = service();
       i18n.setLocale('en');
-      expect(i18n.translate('home.cta')).toBe('Jetzt Antrag stellen');
+      expect(i18n.translate('action.login')).toBe('Anmelden');
     } finally {
-      CATALOG.en['home.cta'] = original;
+      CATALOG.en['action.login'] = original;
     }
   });
 

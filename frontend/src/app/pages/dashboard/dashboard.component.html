@@ -12,12 +12,12 @@
   </div>
 </app-page-header>
 
-<a class="dash__cta" routerLink="/apply">
-  <div class="dash__cta-text">
-    <h2 class="m-0 mb-1 text-xl">{{ 'dashboard.apply.title' | t }}</h2>
-    <p class="dash__cta-body">{{ 'dashboard.apply.body' | t }}</p>
-  </div>
-  <span class="dash__cta-action">{{ 'dashboard.apply.cta' | t }} →</span>
+<!-- One quiet link, not a banner. A signed-in member came here for their tasks,
+     meetings and applications; submitting one themselves is the rare case, so it no
+     longer takes the widest, loudest block on the page. -->
+<a class="dash__apply" routerLink="/apply">
+  <app-icon name="form" [size]="16" />
+  {{ 'dashboard.apply.title' | t }}
 </a>
 
 @if (sessionShortcuts().length) {

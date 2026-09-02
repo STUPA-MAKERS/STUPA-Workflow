@@ -9,7 +9,7 @@ import { AuthService } from '@core/auth/auth.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { ApplicationListItem, ApplicationType, Meeting, Uuid } from '@core/api/models';
-import { BadgeComponent } from '@stupa-makers/ui-kit';
+import { BadgeComponent, IconComponent } from '@stupa-makers/ui-kit';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 
 /** Max number of application rows shown per panel. */
@@ -31,6 +31,7 @@ const PREVIEW_ROWS = 5;
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     RouterLink,
+    IconComponent,
     LocalizedDatePipe,
     TranslatePipe,
     BadgeComponent,

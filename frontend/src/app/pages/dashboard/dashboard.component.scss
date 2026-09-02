@@ -1,3 +1,33 @@
+/* The apply link. Deliberately quiet: an inline link, not a banner. A signed-in
+   member is here for their tasks and meetings, and submitting an application
+   themselves is the rare case. */
+.dash__apply {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  align-self: flex-start;
+  padding: var(--space-2) var(--space-3);
+  color: var(--color-text-muted);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--fs-sm);
+  text-decoration: none;
+  transition:
+    color var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard);
+
+  &:hover,
+  &:focus-visible {
+    color: var(--color-text);
+    border-color: var(--color-border-strong);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+}
+
 :host {
   display: flex;
   flex-direction: column;
@@ -11,44 +41,6 @@
 :host > *,
 .dash__panels > * {
   min-width: 0;
-}
-
-.dash__cta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  flex-wrap: wrap;
-  padding: var(--space-5) var(--space-6);
-  border-radius: var(--radius-lg);
-  background: var(--color-primary);
-  color: var(--color-on-primary, #fff);
-  text-decoration: none;
-  box-shadow: var(--shadow-sm);
-  transition: filter var(--motion-fast) var(--ease-standard);
-}
-
-.dash__cta:hover {
-  filter: brightness(1.06);
-}
-.dash__cta:active {
-  filter: brightness(0.95);
-}
-
-.dash__cta:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 2px;
-}
-
-.dash__cta-body {
-  margin: 0;
-  opacity: 0.9;
-  font-size: var(--fs-sm);
-}
-
-.dash__cta-action {
-  font-weight: var(--fw-semibold);
-  white-space: nowrap;
 }
 
 .dash__panels {
@@ -229,9 +221,6 @@
 }
 
 @media (max-width: 768px) {
-  .dash__cta {
-    padding: var(--space-4) var(--space-5);
-  }
   .dash__row {
     flex-wrap: wrap;
   }
