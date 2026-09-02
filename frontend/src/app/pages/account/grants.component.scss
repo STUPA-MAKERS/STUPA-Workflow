@@ -16,10 +16,6 @@
   margin-top: 0;
 }
 
-/* The empty state sits inside .card, which already supplies the border, the radius and
-   the surface. The empty state therefore uses centered muted text with no border of its
-   own. A border of its own would make a box in a box. This matches the canonical
-   .empty-state. */
 .grants__list-head,
 .mcp__config-head {
   display: flex;
@@ -34,33 +30,6 @@
   font-size: var(--fs-sm);
 }
 
-.grants__table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: var(--space-3);
-
-  th,
-  td {
-    text-align: left;
-    padding: var(--space-2) var(--space-3);
-    border-bottom: var(--border-width) solid var(--color-border);
-    vertical-align: middle;
-  }
-
-  th {
-    font-size: var(--fs-xs);
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    color: var(--color-text-muted);
-  }
-}
-
-.grants__col-action {
-  text-align: right;
-  white-space: nowrap;
-}
-
-.grants__scope,
 .mcp__hint code,
 .mcp__steps code {
   font-family: var(--font-mono);
@@ -90,54 +59,19 @@
   font-size: var(--fs-sm);
 }
 
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: 0 var(--space-3);
-  height: var(--control-height);
-  background: var(--color-surface);
-  color: var(--color-text);
-  cursor: pointer;
-  font: inherit;
-  font-size: var(--fs-sm);
-}
-
-.btn:hover {
-  border-color: var(--color-border-strong);
-}
-
-.btn--primary {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
-  color: var(--color-on-primary);
-}
-
-.btn--ghost {
-  border-color: transparent;
-  background: transparent;
-}
-
-.btn--danger-ghost {
-  border-color: transparent;
-  background: transparent;
-  color: var(--color-danger);
-}
-
 @media (max-width: 768px) {
-  .grants__table {
-    display: block;
-    overflow-x: auto;
-  }
   .grants__list-head {
     flex-wrap: wrap;
   }
   .mcp__steps code {
     word-break: break-all;
   }
-  .btn {
-    min-height: 2.5rem;
-  }
+}
+
+/* Scopes wrap inside their cell instead of stretching the column. A personal grant
+   carries a handful, so they all stay visible. */
+.grants__scopes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
 }

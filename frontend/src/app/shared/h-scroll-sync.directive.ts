@@ -1,4 +1,11 @@
-import { Directive, ElementRef, type OnDestroy, afterNextRender, inject } from '@angular/core';
+import {
+  Directive,
+  ElementRef,
+  type OnDestroy,
+  afterNextRender,
+  inject,
+  input,
+} from '@angular/core';
 
 /**
  * Mirror a second horizontal scrollbar above an overflowing container. The container is
@@ -10,9 +17,18 @@ import { Directive, ElementRef, type OnDestroy, afterNextRender, inject } from '
  * stays in sync with the wrapper in both directions. The bar shows only when the content
  * really overflows, which is the desktop case. On mobile the cards reflow without an
  * overflow, and the bar hides itself.
+ *
+ * When the overflow lives inside a component rather than on the host — `app-data-table`
+ * scrolls in its own `.dt__scroll` — pass that selector as `appHScrollSync`. The
+ * directive then mirrors the inner element. Naming the selector at the call site keeps
+ * the dependency on the component's internals visible in the template that takes it on,
+ * instead of hiding it in here.
  */
 @Directive({ selector: '[appHScrollSync]', standalone: true })
 export class HScrollSyncDirective implements OnDestroy {
+  /** CSS selector of the scrolling element inside the host. Empty means the host. */
+  readonly appHScrollSync = input('');
+
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private bar: HTMLDivElement | null = null;
   private ro: ResizeObserver | null = null;
@@ -24,8 +40,12 @@ export class HScrollSyncDirective implements OnDestroy {
   }
 
   private setup(): void {
-    const wrap = this.host.nativeElement;
-    const parent = wrap.parentElement;
+    const sel = this.appHScrollSync();
+    const scroller = sel ? this.host.nativeElement.querySelector<HTMLElement>(sel) : null;
+    const wrap = scroller ?? this.host.nativeElement;
+    // The bar sits above whatever actually scrolls, which for an inner scroller means
+    // above the component, not inside it.
+    const parent = this.host.nativeElement.parentElement;
     if (typeof document === 'undefined' || !parent) return;
 
     const bar = document.createElement('div');
@@ -34,7 +54,7 @@ export class HScrollSyncDirective implements OnDestroy {
     const inner = document.createElement('div');
     inner.style.height = '1px';
     bar.appendChild(inner);
-    parent.insertBefore(bar, wrap);
+    parent.insertBefore(bar, this.host.nativeElement);
     this.bar = bar;
 
     // Mirror scrollLeft in both directions. The equality check prevents a ping-pong. The

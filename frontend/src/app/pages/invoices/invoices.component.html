@@ -62,73 +62,76 @@
     </div>
   </app-page-header>
 
-  @if (loading()) {
-    <p class="inv__status" aria-live="polite">{{ 'invoices.loading' | t }}</p>
-  } @else if (items().length === 0) {
-    <div class="empty-state">{{ 'invoices.empty' | t }}</div>
-  } @else {
-    <div class="inv__tableWrap" appHScrollSync>
-      <table class="inv__table">
-        <thead>
-          <tr>
-            <th scope="col">{{ 'invoices.col.issueDate' | t }}</th>
-            <th scope="col">{{ 'invoices.col.dueDate' | t }}</th>
-            <th scope="col">{{ 'invoices.col.number' | t }}</th>
-            <th scope="col">{{ 'invoices.col.supplier' | t }}</th>
-            <th scope="col" class="inv__num">{{ 'invoices.col.net' | t }}</th>
-            <th scope="col" class="inv__num">{{ 'invoices.col.tax' | t }}</th>
-            <th scope="col" class="inv__num">{{ 'invoices.col.gross' | t }}</th>
-            <th scope="col">{{ 'invoices.col.status' | t }}</th>
-            <th scope="col">{{ 'invoices.col.file' | t }}</th>
-            @if (canManage()) { <th scope="col" class="inv__num inv__stickyCol">{{ 'table.actions' | t }}</th> }
-          </tr>
-        </thead>
-        <tbody>
-          @for (i of items(); track i.id) {
-            <tr [attr.title]="i.actor ? ('invoices.bookedBy' | t: { actor: i.actor }) : null">
-              <td class="inv__cellDate">{{ i.issueDate ? (i.issueDate | ldate: 'mediumDate') : '—' }}</td>
-              <td class="inv__cellDate">{{ i.dueDate ? (i.dueDate | ldate: 'mediumDate') : '—' }}</td>
-              <td class="inv__cellNumber">{{ i.number || '—' }}</td>
-              <td class="inv__cellSupplier">{{ i.supplier || '—' }}</td>
-              <td class="inv__num inv__mono">{{ i.netAmount ? money(i.netAmount) : '—' }}</td>
-              <td class="inv__num inv__mono">{{ i.taxAmount ? money(i.taxAmount) : '—' }}</td>
-              <td class="inv__num inv__amount">{{ money(i.grossAmount) }}</td>
-              <td class="inv__cellStatus">
-                <app-badge [variant]="i.status === 'paid' ? 'success' : 'warning'">{{ statusLabel(i.status) }}</app-badge>
-              </td>
-              <td class="inv__cellFile">
-                @if (i.hasFile) {
-                  <button type="button" class="inv__fileLink" (click)="openFile(i)">
-                    <app-icon name="export" [size]="14" /> {{ i.fileName || ('invoices.openFile' | t) }}
-                  </button>
-                } @else { — }
-              </td>
-              @if (canManage()) {
-                <td class="inv__num inv__stickyCol">
-                  <span class="inv__actions">
-                    <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'action.edit' | t" [title]="'action.edit' | t" (click)="openEdit(i)"><app-icon name="edit" /></app-button>
-                    <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'action.delete' | t" [title]="'action.delete' | t" (click)="askDelete(i)"><app-icon name="delete" /></app-button>
-                  </span>
-                </td>
-              }
-            </tr>
-          }
-        </tbody>
-      </table>
-    </div>
-    @if (hasMore()) {
-      <div #sentinel class="inv__sentinel" aria-hidden="true"></div>
-      <div class="flex justify-center mt-4">
-        @if (loadingMore()) {
-          <span class="inv__status">{{ 'invoices.loadingMore' | t }}</span>
+  <!-- The table stays on screen while a filter, a search or a page load runs: it keeps
+       its header and column widths and draws skeleton rows, instead of collapsing to a
+       line of text and then jumping back. The actions column is pinned, so edit and
+       delete stay reachable while the wide table scrolls sideways. -->
+  <app-data-table
+    class="inv__table"
+    appHScrollSync=".dt__scroll"
+    [columns]="columns()"
+    [rows]="items()"
+    [rowKey]="rowId"
+    [loading]="loading()"
+    [loadingText]="'invoices.loading' | t"
+    [skeletonRowCount]="8"
+    [emptyText]="'invoices.empty' | t"
+  >
+    <ng-template appCell="issueDate" let-i>
+      <span class="inv__date">{{ $any(i).issueDate ? ($any(i).issueDate | ldate: 'mediumDate') : '—' }}</span>
+    </ng-template>
+    <ng-template appCell="dueDate" let-i>
+      <span class="inv__date">{{ $any(i).dueDate ? ($any(i).dueDate | ldate: 'mediumDate') : '—' }}</span>
+    </ng-template>
+    <ng-template appCell="number" let-i>
+      <span class="inv__number">{{ $any(i).number || '—' }}</span>
+    </ng-template>
+    <ng-template appCell="supplier" let-i>
+      <span class="inv__supplier">{{ $any(i).supplier || '—' }}</span>
+    </ng-template>
+    <ng-template appCell="net" let-i>
+      <span class="inv__mono">{{ $any(i).netAmount ? money($any(i).netAmount) : '—' }}</span>
+    </ng-template>
+    <ng-template appCell="tax" let-i>
+      <span class="inv__mono">{{ $any(i).taxAmount ? money($any(i).taxAmount) : '—' }}</span>
+    </ng-template>
+    <ng-template appCell="gross" let-i>
+      <span class="inv__amount">{{ money($any(i).grossAmount) }}</span>
+    </ng-template>
+    <ng-template appCell="status" let-i>
+      <app-badge [variant]="$any(i).status === 'paid' ? 'success' : 'warning'">{{ statusLabel($any(i).status) }}</app-badge>
+    </ng-template>
+    <ng-template appCell="file" let-i>
+      <span class="inv__file">
+        @if ($any(i).hasFile) {
+          <button type="button" class="inv__fileLink" (click)="openFile($any(i))">
+            <app-icon name="export" [size]="14" /> {{ $any(i).fileName || ('invoices.openFile' | t) }}
+          </button>
         } @else {
-          <app-button variant="secondary" size="sm" (click)="loadMore()">{{ 'invoices.loadMore' | t }}</app-button>
+          —
         }
-      </div>
-    }
-    @if (total() > 0) {
-      <p class="text-center text-muted text-sm mt-3">{{ 'invoices.count' | t: { count: items().length, total: total() } }}</p>
-    }
+      </span>
+    </ng-template>
+    <ng-template appCell="actions" let-i>
+      <span class="inv__actions">
+        <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'action.edit' | t" [title]="'action.edit' | t" (click)="openEdit($any(i))"><app-icon name="edit" /></app-button>
+        <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'action.delete' | t" [title]="'action.delete' | t" (click)="askDelete($any(i))"><app-icon name="delete" /></app-button>
+      </span>
+    </ng-template>
+  </app-data-table>
+
+  @if (hasMore()) {
+    <div #sentinel class="inv__sentinel" aria-hidden="true"></div>
+    <div class="flex justify-center mt-4">
+      @if (loadingMore()) {
+        <span class="inv__status">{{ 'invoices.loadingMore' | t }}</span>
+      } @else {
+        <app-button variant="secondary" size="sm" (click)="loadMore()">{{ 'invoices.loadMore' | t }}</app-button>
+      }
+    </div>
+  }
+  @if (total() > 0) {
+    <p class="text-center text-muted text-sm mt-3">{{ 'invoices.count' | t: { count: items().length, total: total() } }}</p>
   }
 
   @if (dragActive()) {
