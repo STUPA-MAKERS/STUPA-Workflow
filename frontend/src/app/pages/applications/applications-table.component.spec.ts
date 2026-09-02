@@ -102,7 +102,9 @@ describe('ApplicationsTableComponent', () => {
       await setup({ sort: null });
       expect(screen.queryByRole('button')).not.toBeInTheDocument();
       const amountHeader = screen.getByRole('columnheader', { name: /Betrag/ });
-      expect(amountHeader).toHaveAttribute('aria-sort', 'none');
+      // No `aria-sort` at all on a header that cannot sort. `aria-sort="none"` means
+      // "sortable, not currently sorted", so it would promise a control that is absent.
+      expect(amountHeader).not.toHaveAttribute('aria-sort');
     });
 
     it('renders clickable headers with indicators when sort is set (descending)', async () => {

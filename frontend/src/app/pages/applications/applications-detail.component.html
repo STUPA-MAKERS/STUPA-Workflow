@@ -1,7 +1,14 @@
 @if (loading()) {
   <p class="text-muted py-5" aria-live="polite">{{ 'applications.detail.loading' | t }}</p>
 } @else if (notFound()) {
-  <p class="text-muted py-5" role="alert">{{ 'applications.detail.notFound' | t }}</p>
+  <app-empty-state
+    [heading]="'applications.detail.notFound' | t"
+    [body]="'applications.detail.notFoundBody' | t"
+  >
+    <a routerLink="/applications" class="det__backLink">
+      {{ 'applications.detail.backToList' | t }}
+    </a>
+  </app-empty-state>
 } @else if (error()) {
   <p class="text-muted py-5 text-danger" role="alert">
     {{ 'applications.detail.error' | t }}
