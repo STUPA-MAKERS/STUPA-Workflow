@@ -59,7 +59,7 @@
     <ng-template appCell="kind" let-r>
       <span class="bk__kind">{{ kindLabel($any(r).kind) }}</span>
       @if ($any(r).pinned) {
-        <app-icon name="key" [title]="'admin.backups.pinnedHint' | t" />
+        <app-icon name="paperclip" [title]="'admin.backups.pinnedHint' | t" />
       }
     </ng-template>
 
@@ -110,7 +110,7 @@
             [title]="($any(r).pinned ? 'admin.backups.unpin' : 'admin.backups.pin') | t"
             (click)="togglePin($any(r))"
           >
-            <app-icon [name]="$any(r).pinned ? 'link-slash' : 'paperclip'" />
+            <app-icon [name]="$any(r).pinned ? 'paperclip-slash' : 'paperclip'" />
           </app-button>
           @if (restoreEnabled()) {
             <app-button

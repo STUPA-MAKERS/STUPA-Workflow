@@ -38,6 +38,11 @@ export class PageIndexService {
       // A page needs a static path and a title. A parameterised route (`:id`) is a
       // record view, which the record half of the search already covers.
       if (!path || path.includes(':') || !data?.['title']) continue;
+      // A `contextual` route only means something after an action carried the reader
+      // there. Offering it is offering a dead end: /status without an id renders
+      // "Antrag nicht gefunden", and /apply/confirmation congratulates the reader on a
+      // submission that never happened.
+      if (data['contextual'] === true) continue;
       if (!this.allowed(data)) continue;
       const parent = (data['parent'] as string[] | undefined)?.[0];
       out.push({

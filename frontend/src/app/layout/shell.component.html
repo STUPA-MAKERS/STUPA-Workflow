@@ -38,6 +38,19 @@
 
     <div class="header__actions">
       @if (auth.isAuthenticated()) {
+        <!-- A magnifier rather than a funnel: the funnel is the filter button of the
+             list pages, and searching is not filtering. -->
+        <button
+          type="button"
+          class="header__search"
+          [attr.aria-label]="'search.open' | t"
+          [title]="'search.open' | t"
+          (click)="palette.show()"
+        >
+          <app-icon name="search" [size]="16" />
+          <span class="header__searchLabel">{{ 'search.title' | t }}</span>
+          <kbd class="header__searchKbd">{{ searchShortcut() }}</kbd>
+        </button>
         <div class="relative flex items-center gap-2">
           <!-- The trigger is the icon alone. A full display name in the header cost more
                room than anything else in it and pushed the nav around as the name got
@@ -127,20 +140,6 @@
             </div>
           }
         </div>
-        <!-- To the right of the account control, and a magnifier rather than a funnel:
-             the funnel is the filter button of the list pages, and searching is not
-             filtering. -->
-        <button
-          type="button"
-          class="header__search"
-          [attr.aria-label]="'search.open' | t"
-          [title]="'search.open' | t"
-          (click)="palette.show()"
-        >
-          <app-icon name="search" [size]="16" />
-          <span class="header__searchLabel">{{ 'search.title' | t }}</span>
-          <kbd class="header__searchKbd">{{ searchShortcut() }}</kbd>
-        </button>
       } @else {
         <button type="button" class="account__btn account__btn--primary" (click)="login()">
           {{ 'action.login' | t }}

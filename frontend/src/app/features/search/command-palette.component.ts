@@ -51,6 +51,30 @@ const KIND_ICON: Record<SearchKind, IconName> = {
 };
 
 /**
+ * The icon for a page row, keyed on the leading path segment.
+ *
+ * A gear for every page said "setting" about pages that are not one — the dashboard, the
+ * applications list. Admin pages keep it, because there it is true.
+ */
+const SECTION_ICON: Record<string, IconName> = {
+  dashboard: 'home',
+  applications: 'document',
+  apply: 'form',
+  tasks: 'check',
+  meetings: 'clock',
+  budget: 'chart-pie',
+  expenses: 'chart-pie',
+  invoices: 'euro',
+  account: 'user',
+  admin: 'gear',
+};
+
+/** The leading segment of a route path, which is the section it belongs to. */
+function sectionIcon(path: string): IconName {
+  return SECTION_ICON[path.replace(/^\//, '').split('/')[0] ?? ''] ?? 'gear';
+}
+
+/**
  * Global search, as a command palette.
  *
  * It answers two different questions with one box, because a reader does not separate
@@ -105,7 +129,7 @@ export class CommandPaletteComponent {
         group: this.i18n.translate('search.group.pages'),
         title: p.label,
         subtitle: p.parentLabel,
-        icon: 'gear' as IconName,
+        icon: sectionIcon(p.path),
         url: p.path,
       }));
   });

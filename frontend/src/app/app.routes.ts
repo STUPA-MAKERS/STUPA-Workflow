@@ -27,7 +27,9 @@ export const routes: Routes = [
       },
       {
         path: 'apply/confirmation',
-        data: { title: 'apply.confirm.heading' },
+        // `contextual`: this page only means something right after a submission. Opened
+        // cold it tells the reader to check their mail for an application nobody sent.
+        data: { title: 'apply.confirm.heading', contextual: true },
         loadComponent: () =>
           import('./features/apply/apply-confirmation.component').then(
             (m) => m.ApplyConfirmationComponent,
@@ -35,7 +37,9 @@ export const routes: Routes = [
       },
       {
         path: 'status',
-        data: { title: 'status.heading' },
+        // `contextual`: without an application id this renders "Antrag nicht gefunden".
+        // The id arrives from the magic link, never from navigating here.
+        data: { title: 'status.heading', contextual: true },
         loadComponent: () =>
           import('./features/apply/status-timeline.component').then(
             (m) => m.StatusTimelineComponent,
