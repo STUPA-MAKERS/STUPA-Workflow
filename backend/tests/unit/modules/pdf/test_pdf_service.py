@@ -14,12 +14,9 @@ import pytest
 from app.modules.applications.models import Application
 from app.modules.pdf.models import RenderJob
 from app.modules.pdf.service import PdfService
-from app.settings import load_settings
 from app.shared.errors import NotFoundError
 from tests._support.files_fakes import FakeStorage
 from tests._support.pdf_fakes import FakePdfSession
-
-SETTINGS = load_settings()
 
 
 def _svc(session: FakePdfSession) -> PdfService:
@@ -79,22 +76,39 @@ async def test_get_job_found_and_missing() -> None:
         await _svc(session).get_job(uuid.uuid4())
 
 
-def test_to_out_done_with_storage_yields_signed_url() -> None:
+def test_to_out_done_yields_the_app_download_route() -> None:
     storage = FakeStorage()
     job = RenderJob(
         application_id=uuid.uuid4(), status="done", storage_key="pdf/a/b.pdf"
     )
     job.id = uuid.uuid4()
-    out = _svc(FakePdfSession()).to_out(job, storage=storage, settings=SETTINGS)
+    out = _svc(FakePdfSession()).to_out(job, storage=storage)
     assert out.status == "done"
-    assert out.resultUrl is not None and "pdf/a/b.pdf" in out.resultUrl
-    assert storage.signed == ["pdf/a/b.pdf"]
+    assert out.resultUrl == f"/api/jobs/{job.id}/download"
+
+
+def test_to_out_never_presigns_the_bucket() -> None:
+    """Regression: the browser cannot resolve `minio:9000`, so nothing may be presigned.
+
+    The URL must stay app-relative and carry no bucket host and no storage key.
+    """
+    storage = FakeStorage()
+    job = RenderJob(
+        application_id=uuid.uuid4(), status="done", storage_key="pdf/a/b.pdf"
+    )
+    job.id = uuid.uuid4()
+    out = _svc(FakePdfSession()).to_out(job, storage=storage)
+    assert storage.signed == []
+    assert out.resultUrl is not None
+    assert out.resultUrl.startswith("/api/")
+    assert "minio" not in out.resultUrl
+    assert "pdf/a/b.pdf" not in out.resultUrl
 
 
 def test_to_out_pending_has_no_url() -> None:
     job = RenderJob(application_id=uuid.uuid4(), status="pending")
     job.id = uuid.uuid4()
-    out = _svc(FakePdfSession()).to_out(job, storage=FakeStorage(), settings=SETTINGS)
+    out = _svc(FakePdfSession()).to_out(job, storage=FakeStorage())
     assert out.resultUrl is None
 
 

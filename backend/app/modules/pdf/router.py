@@ -4,8 +4,10 @@
   and enqueues it for the worker, then answers 202 with ``JobOut``
   (``status=pending``). The storage in MinIO happens async.
 * ``GET  /api/jobs/{id}``           — applicant or principal. Returns the job status
-  and, when the job is ``done``, a signed result URL. Access goes through a principal
-  or through the applicant of the related application.
+  and, when the job is ``done``, the app-relative download route. Access goes through a
+  principal or through the applicant of the related application.
+* ``GET  /api/jobs/{id}/download``  — same access check. Streams the rendered PDF from
+  the API, because the browser cannot reach MinIO.
 
 Errors are declared as ``ProblemDetail`` (problem+json). Without Redis the job stays
 ``pending`` and the API does not block. Without MinIO ``GET`` returns no ``resultUrl``.
@@ -17,8 +19,9 @@ from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request, status
+from fastapi.responses import StreamingResponse
 
-from app.deps import DbSession, SettingsDep, get_current_applicant, get_current_principal
+from app.deps import DbSession, get_current_applicant, get_current_principal
 from app.modules.applications.access import (
     READ_PERMISSION,
     Access,
@@ -31,9 +34,11 @@ from app.modules.pdf.queue import render_queue_from_pool
 from app.modules.pdf.schemas import JobOut
 from app.modules.pdf.service import PdfService
 from app.shared.errors import (
+    ConflictError,
     ForbiddenError,
     NotFoundError,
     ProblemDetail,
+    ServiceUnavailableError,
     UnauthorizedError,
 )
 
@@ -90,7 +95,6 @@ async def get_job(
     job_id: UUID,
     service: ServiceDep,
     request: Request,
-    settings: SettingsDep,
     principal: Annotated[Principal | None, Depends(get_current_principal)],
     applicant: Annotated[Applicant | None, Depends(get_current_applicant)],
 ) -> JobOut:
@@ -120,4 +124,61 @@ async def get_job(
         # Job without an application link: only principals may see it.
         raise NotFoundError(f"job {job_id} not found")
     storage: ObjectStorage | None = getattr(request.app.state, "object_storage", None)
-    return service.to_out(job, storage=storage, settings=settings)
+    return service.to_out(job, storage=storage)
+
+
+@router.get(
+    "/jobs/{job_id}/download",
+    response_class=StreamingResponse,
+    responses=_errors(401, 404, 409, 503),
+)
+async def download_job_result(
+    job_id: UUID,
+    service: ServiceDep,
+    request: Request,
+    principal: Annotated[Principal | None, Depends(get_current_principal)],
+    applicant: Annotated[Applicant | None, Depends(get_current_applicant)],
+) -> StreamingResponse:
+    """Stream the rendered PDF.
+
+    NOT a presigned MinIO URL. MinIO runs on the internal Docker network, so such a URL
+    binds a host the browser cannot resolve. The attachment download solves it the same
+    way, and its comment states the reason.
+
+    The access check is the one from ``get_job``: a principal or the owning applicant,
+    and a cross-tenant read gets 404 rather than 403, so the API is no existence oracle.
+    """
+    if principal is None and applicant is None:
+        raise UnauthorizedError("Authentication required.")
+    job = await service.get_job(job_id)
+    if job.application_id is not None:
+        try:
+            resolve_access(
+                job.application_id,
+                principal,
+                applicant,
+                perm=READ_PERMISSION,
+                scope="view",
+            )
+        except ForbiddenError as exc:
+            raise NotFoundError(f"job {job_id} not found") from exc
+    elif principal is None:
+        raise NotFoundError(f"job {job_id} not found")
+
+    if job.status != "done" or job.storage_key is None:
+        raise ConflictError("This render is not finished.", code="render_not_ready")
+    storage: ObjectStorage | None = getattr(request.app.state, "object_storage", None)
+    if storage is None:
+        raise ServiceUnavailableError("Object storage is not configured.")
+
+    stream = await storage.get_stream(job.storage_key)
+    # A job without an application link is a standalone render, so name it after the job.
+    filename = f"antrag-{job.application_id or job.id}.pdf"
+    return StreamingResponse(
+        stream,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "X-Content-Type-Options": "nosniff",
+        },
+    )

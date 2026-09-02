@@ -543,9 +543,11 @@ export type RenderJobStatus = 'pending' | 'running' | 'done' | 'failed';
 /**
  * Async render job (`POST /applications/{id}/pdf`, `GET /jobs/{id}`).
  *
- * `resultUrl` holds a signed, short-lived MinIO link. It is set only on `done`,
- * and only when the deployment has an object store. `error` holds a short code,
- * for example `render_error`, and only on `failed`.
+ * `resultUrl` holds the app-relative download route `/api/jobs/{id}/download`,
+ * never a MinIO link: MinIO sits on the internal Docker network and the browser
+ * cannot resolve it. The field is set only on `done`, and only when the deployment
+ * has an object store. `error` holds a short code, for example `render_error`, and
+ * only on `failed`.
  */
 export interface RenderJob {
   id: Uuid;

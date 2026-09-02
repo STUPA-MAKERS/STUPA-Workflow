@@ -5,11 +5,11 @@ The service knows only the ``ObjectStorage`` protocol, never the concrete client
 a thread pool with ``asyncio.to_thread``, so the event loop never blocks. Nothing outside
 reaches the bucket directly.
 
-``presigned_get_url`` returns a short-lived S3v4-signed GET URL. Only internal callers
-use it, such as the PDF module. An attachment download of the files API does NOT use a
-signed URL. It streams from the server over the ``/api/attachments/{id}/download`` route
-that the authorization layer gates. MinIO runs on the internal Docker network and
-publishes no port, so the browser could not reach a signed URL.
+There is deliberately no presigned-URL method. MinIO runs on the internal Docker network
+and publishes no port, so a presigned S3 URL binds a host the browser cannot resolve. The
+platform shipped that bug twice, in the PDF download and in the backup download. Every
+download therefore streams from the server over a gated route, the way
+``/api/attachments/{id}/download`` does. Do not add presigning back for a browser caller.
 
 The module imports ``minio`` lazily. Without the upload path (contract CI) the library
 never loads.
@@ -21,7 +21,6 @@ import asyncio
 import io
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from datetime import timedelta
 from typing import TYPE_CHECKING, Protocol
 
 from app.settings import Settings
@@ -50,10 +49,6 @@ class ObjectStorage(Protocol):
     ) -> AsyncIterator[bytes]: ...
 
     async def remove(self, key: str) -> None: ...
-
-    def presigned_get_url(
-        self, key: str, *, expires_seconds: int, download_name: str | None = None
-    ) -> str: ...
 
 
 class BulkObjectStorage(ObjectStorage, Protocol):
@@ -194,28 +189,12 @@ class MinioStorage:
         except Exception as exc:  # noqa: BLE001
             raise StorageError(f"get_file failed: {type(exc).__name__}") from exc
 
-    def presigned_get_url(
-        self, key: str, *, expires_seconds: int, download_name: str | None = None
-    ) -> str:
-        # `Content-Disposition: attachment` forces a download instead of an inline
-        # render, so nothing executes. nginx also sets `nosniff`.
-        extra: dict[str, str] | None = None
-        if download_name is not None:
-            disposition = f'attachment; filename="{_safe_disposition(download_name)}"'
-            extra = {"response-content-disposition": disposition}
-        try:
-            return self.client.presigned_get_object(
-                self.bucket,
-                key,
-                expires=timedelta(seconds=expires_seconds),
-                response_headers=extra,  # type: ignore[arg-type]  # minio: mapping variance
-            )
-        except Exception as exc:  # noqa: BLE001
-            raise StorageError(f"presign failed: {type(exc).__name__}") from exc
-
 
 def _safe_disposition(name: str) -> str:
-    """Strip quotes and control characters from the filename to block header injection."""
+    """Strip quotes and control characters from the filename to block header injection.
+
+    Used by the download routes when they build ``Content-Disposition``.
+    """
     return "".join(c for c in name if c.isprintable() and c not in '"\\\r\n')
 
 

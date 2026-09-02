@@ -247,8 +247,6 @@ class Settings(BaseSettings):
     # Worker retry for arq PDF render jobs: maximum tries and backoff base in seconds.
     pdf_max_tries: int = 4
     pdf_retry_backoff_seconds: int = 30
-    # Lifetime of the signed result URL (GET /jobs/{id}).
-    pdf_url_ttl_seconds: int = 300
 
     # Application payload cap for the public POST /applications (anti-DoS). It applies
     # to the serialized field values (`data`) and as a Content-Length bound. A larger

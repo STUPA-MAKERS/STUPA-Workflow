@@ -32,7 +32,6 @@ from app.modules.pdf.markdown import ApplicationDoc, TimelineItem, VoteResult
 from app.modules.pdf.models import JOB_KIND_APPLICATION_PDF, RenderJob
 from app.modules.pdf.schemas import JobOut
 from app.modules.voting.models import Vote
-from app.settings import Settings
 from app.shared.config_schemas import FormFieldDef
 from app.shared.errors import NotFoundError
 from app.shared.i18n import resolve_i18n
@@ -85,25 +84,20 @@ class PdfService:
         job: RenderJob,
         *,
         storage: ObjectStorage | None = None,
-        settings: Settings | None = None,
     ) -> JobOut:
         """Convert the job to ``JobOut``.
 
-        When the job is ``done`` and both storage and settings are present, the result
-        carries a short-lived signed URL.
+        A finished job carries the APP-RELATIVE download route, not a presigned MinIO
+        URL. MinIO sits on the internal Docker network, so a presigned S3 URL binds a
+        host the browser cannot resolve. ``GET /api/jobs/{id}/download`` streams the
+        bytes instead, the same way the attachment download does.
+
+        ``storage`` stays in the signature because the download route only works when
+        object storage is configured. A stack without it must not advertise a link.
         """
         result_url: str | None = None
-        if (
-            job.status == "done"
-            and job.storage_key is not None
-            and storage is not None
-            and settings is not None
-        ):
-            result_url = storage.presigned_get_url(
-                job.storage_key,
-                expires_seconds=settings.pdf_url_ttl_seconds,
-                download_name=f"antrag-{job.application_id}.pdf",
-            )
+        if job.status == "done" and job.storage_key is not None and storage is not None:
+            result_url = f"/api/jobs/{job.id}/download"
         return JobOut(
             id=job.id,
             kind=job.kind or JOB_KIND_APPLICATION_PDF,
