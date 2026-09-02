@@ -71,11 +71,6 @@ class _FakeMinio:
     def remove_object(self, bucket: str, key: str) -> None:
         self.removed.append(key)
 
-    def presigned_get_object(
-        self, bucket: str, key: str, expires: Any, response_headers: Any = None
-    ) -> str:
-        return f"https://minio/{bucket}/{key}"
-
 
 def _storage(client: _FakeMinio | None = None) -> MinioStorage:
     return MinioStorage(client=client or _FakeMinio(), bucket="attachments")  # type: ignore[arg-type]
@@ -160,26 +155,6 @@ async def test_remove_error_wrapped(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(client, "remove_object", _boom)
     with pytest.raises(StorageError):
         await _storage(client).remove("k1")
-
-
-def test_presigned_url_with_disposition() -> None:
-    url = _storage().presigned_get_url(
-        "k1", expires_seconds=300, download_name='a"b.pdf'
-    )
-    assert url == "https://minio/attachments/k1"
-
-
-def test_presigned_url_error_wrapped(monkeypatch: pytest.MonkeyPatch) -> None:
-    client = _FakeMinio()
-
-    def _boom(*_a: Any, **_kw: Any) -> str:
-        raise RuntimeError("presign boom")
-
-    monkeypatch.setattr(client, "presigned_get_object", _boom)
-    with pytest.raises(StorageError):
-        MinioStorage(client=client, bucket="b").presigned_get_url(  # type: ignore[arg-type]
-            "k", expires_seconds=60
-        )
 
 
 def test_safe_disposition_strips_quotes_and_controls() -> None:

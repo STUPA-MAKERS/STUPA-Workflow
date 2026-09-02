@@ -27,7 +27,8 @@ description: Async application-PDF rendering — POST /api/applications/{id}/pdf
 
 **API surface:**
 - `POST /api/applications/{application_id}/pdf` — A/P (`require_app_read`). It creates a `render_job` (pending), commits, enqueues, and answers 202 + `JobOut`. The REST path leaves `idempotency_key` NULL, so every call is a fresh render.
-- `GET /api/jobs/{job_id}` — A/P job status. The route checks access against the application of the job (`resolve_access`, view scope, READ_PERMISSION). On `done` it returns a presigned MinIO URL (`pdf_url_ttl_seconds`). Without an identity it answers 401 before the DB lookup. A job without an application is principal-only.
+- `GET /api/jobs/{job_id}` — A/P job status. The route checks access against the application of the job (`resolve_access`, view scope, READ_PERMISSION). On `done` it returns `resultUrl` = the app-relative `/api/jobs/{job_id}/download`, never a bucket link. Without an identity it answers 401 before the DB lookup. A job without an application is principal-only.
+- `GET /api/jobs/{job_id}/download` — same access rules. Streams the PDF from storage with `Content-Disposition: attachment` + `nosniff`. 409 `render_not_ready` while the job is unfinished, 503 without object storage.
 
 **Conventions & gotchas:**
 - The API never renders — it only writes the row and enqueues. No Redis → queue is `None`, job stays `pending` (no API block or crash). No MinIO → worker returns `skipped` and the job stays `pending`. `GET` then returns no `resultUrl`.
@@ -35,6 +36,7 @@ description: Async application-PDF rendering — POST /api/applications/{id}/pdf
 - Error discipline (RFC-9457 problem+json out): `error` holds only a short path-free code. A pytex 4xx is permanent (no retry, job `failed`). A 5xx or a transport error is transient → `RenderRetry` → arq `Retry` with linear backoff up to `pdf_max_tries`, then `mark_failed` (`render_unavailable`). See `pytex_client._error_detail` for the scrubbed-detail cap.
 - Idempotency: the `exportPdf` flow action reuses an existing job for the same `idempotency_key` (one status-event ⇒ at most one render). arq `_job_id=render:<id>` coalesces duplicate enqueues.
 - Markdown is injection-safe. `_yaml_scalar` double-quotes the frontmatter scalars. The builder skips PII fields (`FormFieldDef.is_pii`), which stay in the applicant record and never reach the gremium PDF. `resolve_i18n` resolves the i18n labels against the lang of the application.
-- Settings: `pytex_url`, `pytex_trust`, `pytex_timeout_seconds`, `pdf_url_ttl_seconds`, `pdf_max_tries`, `pdf_retry_backoff_seconds`.
+- **No browser bucket links.** MinIO has no published port, so a presigned S3 URL binds a host the browser cannot resolve. The download streams through the API, the way `be-files` and `be-protocol` do. `ObjectStorage` carries no presigning method at all — do not add one back.
+- Settings: `pytex_url`, `pytex_trust`, `pytex_timeout_seconds`, `pdf_max_tries`, `pdf_retry_backoff_seconds`.
 
 **Related:** be-protocol, be-applications, be-flow, be-files, be-forms.

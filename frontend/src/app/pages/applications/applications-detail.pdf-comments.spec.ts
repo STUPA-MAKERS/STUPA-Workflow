@@ -329,13 +329,14 @@ describe('ApplicationsDetailComponent — PDF render', () => {
     jest.advanceTimersByTime(2000);
     http
       .expectOne('/api/jobs/job-1')
-      .flush({ ...PENDING_JOB, status: 'done', resultUrl: 'https://minio/x.pdf' });
+      .flush({ ...PENDING_JOB, status: 'done', resultUrl: '/api/jobs/job-1/download' });
     detectChanges();
 
     expect(c.pdfDone()).toBe(true);
+    // App-relative, never a MinIO link: the browser cannot resolve the internal host.
     expect(screen.getByRole('link', { name: 'PDF öffnen' })).toHaveAttribute(
       'href',
-      'https://minio/x.pdf',
+      '/api/jobs/job-1/download',
     );
     http.verify();
   });
@@ -390,7 +391,7 @@ describe('ApplicationsDetailComponent — PDF render', () => {
     });
     http
       .expectOne('/api/jobs/job-1')
-      .flush({ ...PENDING_JOB, status: 'done', resultUrl: 'https://minio/x.pdf' });
+      .flush({ ...PENDING_JOB, status: 'done', resultUrl: '/api/jobs/job-1/download' });
     detectChanges();
     expect(c.pdfDone()).toBe(true);
     http.verify();
