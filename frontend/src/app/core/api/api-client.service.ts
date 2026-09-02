@@ -57,6 +57,7 @@ import type {
   AttendanceStatus,
   MeetingOutWire,
   MeetingPage,
+  SearchResults,
   MeetingPageWire,
   MeetingPatchBody,
   NewApplication,
@@ -497,6 +498,21 @@ export class ApiClient {
    * previous page. A `null` or empty cursor starts at *now*.
    * `nextCursor === null` marks the end of the direction.
    */
+  /**
+   * Global search across every kind of record the caller may see.
+   *
+   * `skipLoading` on purpose: the palette runs this on every keystroke, and the global
+   * overlay flashing on each one would be worse than no feedback at all. The palette
+   * shows its own inline state.
+   */
+  search(q: string): Observable<SearchResults> {
+    const params = new HttpParams().set('q', q.trim()).set('lang', this.i18n.locale());
+    return this.http.get<SearchResults>(`${this.base}/search`, {
+      params,
+      context: skipLoading(),
+    });
+  }
+
   listMeetingsTimeline(opts: {
     direction: TimelineDirection;
     cursor?: string | null;
@@ -522,7 +538,12 @@ export class ApiClient {
    * (`id`/`name`) and needs no wire mapping.
    */
   listMeetingFilterGremien(): Observable<{ id: Uuid; name: string }[]> {
-    return this.http.get<{ id: Uuid; name: string }[]>(`${this.base}/meetings/gremien`);
+    // `skipLoading` like the timeline beside it. This fills a filter dropdown while the
+    // list loads its own rows, so without it the page showed its own placeholder AND the
+    // global overlay at the same time — two answers to one question.
+    return this.http.get<{ id: Uuid; name: string }[]>(`${this.base}/meetings/gremien`, {
+      context: skipLoading(),
+    });
   }
 
   /** GET /meetings/{id} — meeting state + votes. */

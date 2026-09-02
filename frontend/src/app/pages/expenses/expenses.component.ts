@@ -112,6 +112,20 @@ export class ExpensesComponent implements OnDestroy {
   private readonly dialogs = new ExpenseDialogsState(this.list, this.sub, this.transfers);
 
   readonly canManage = computed(() => this.auth.can('budget.book'));
+
+  /**
+   * Rows to outline while the first page loads. Five is the usual page a reader sees,
+   * so the table keeps roughly the height it is about to have.
+   */
+  protected readonly skeletonRows = [0, 1, 2, 3, 4];
+
+  /** The transfers table has a fixed column count. */
+  protected readonly transferSkeletonCols = [0, 1, 2, 3, 4, 5];
+
+  /** The bookings table gains a select column and an actions column for a booker. */
+  protected readonly bookingSkeletonCols = computed(() =>
+    this.canManage() ? [0, 1, 2, 3, 4, 5, 6, 7, 8] : [0, 1, 2, 3, 4, 5, 6],
+  );
   readonly canExport = computed(() => this.auth.can('budget.export'));
 
   readonly budgetTree = this.list.budgetTree;

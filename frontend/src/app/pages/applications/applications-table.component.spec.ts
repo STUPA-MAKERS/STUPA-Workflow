@@ -149,4 +149,17 @@ describe('ApplicationsTableComponent', () => {
       expect(emitted).toEqual([{ field: 'amount', order: 'desc' }]);
     });
   });
+
+  it('keeps the full title reachable when the cell clips it to one line', async () => {
+    // A long title used to wrap onto several lines and make one row several times the
+    // height of its neighbours. It is clipped with an ellipsis now, so the whole text
+    // has to stay available rather than simply disappearing.
+    const long =
+      'Systemdatenträger und Einbauteile für die Hardware-Symmetrie der beiden PRIMERGY-RX300-Server';
+    await setup({ rows: [{ ...ROW, title: long }] });
+
+    const link = screen.getByRole('link', { name: new RegExp(long.slice(0, 20)) });
+    expect(link).toHaveAttribute('title', long);
+    expect(link.querySelector('.atbl__rowTitle')?.textContent?.trim()).toBe(long);
+  });
 });

@@ -62,6 +62,16 @@
   height: 0.75rem;
   margin-bottom: var(--space-3);
 }
+/* The bar `app-data-table` draws inside a skeleton cell. Same height and width, so a
+   hand-rolled table that outlines its own rows is indistinguishable from the shared one.
+   Keep these in step with `.dt__skeleton` in the ui-kit. */
+.skel--bar {
+  height: 0.75rem;
+  width: 60%;
+}
+td:first-child > .skel--bar {
+  width: 80%;
+}
 .skel--line:nth-child(even) {
   width: 70%;
 }

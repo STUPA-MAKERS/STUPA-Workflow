@@ -1,0 +1,135 @@
+"""Unit tests for the global search.
+
+The point of these is the authorization claim in the module docstring: a source must not
+answer for a caller who could not reach that record through the module's own list. A fake
+session cannot prove the reuse, so each source is exercised through its permission gate
+and the delegation is asserted where it is cheap to observe.
+"""
+
+from __future__ import annotations
+
+import uuid
+from typing import Any
+
+import pytest
+
+from app.modules.auth.principal import Principal
+from app.modules.search.schemas import SearchHit
+from app.modules.search.service import MIN_QUERY_LENGTH, PER_KIND, SearchService
+
+
+def _svc(**sources: Any) -> SearchService:
+    """A service with every source stubbed out, so a test opts IN to what it exercises."""
+    svc = SearchService(session=None)  # type: ignore[arg-type]
+    for name in (
+        "_applications",
+        "_meetings",
+        "_invoices",
+        "_expenses",
+        "_budgets",
+        "_gremien",
+        "_principals",
+    ):
+
+        async def _empty(*_a: object, **_kw: object) -> list[SearchHit]:
+            return []
+
+        setattr(svc, name, sources.get(name, _empty))
+    return svc
+
+
+def _hit(i: int = 0) -> SearchHit:
+    return SearchHit(kind="application", id=str(uuid.uuid4()), title=f"hit {i}", url="/x")
+
+
+ANY = Principal(sub="u")
+
+
+async def test_a_query_shorter_than_the_floor_asks_no_source() -> None:
+    """The palette calls this on every keystroke. The first one is not a mistake."""
+    calls: list[str] = []
+
+    async def _spy(*_a: object, **_kw: object) -> list[SearchHit]:
+        calls.append("called")
+        return []
+
+    svc = _svc(_applications=_spy)
+    out = await svc.search("a" * (MIN_QUERY_LENGTH - 1), ANY)
+    assert out.hits == []
+    assert calls == []
+
+
+async def test_whitespace_does_not_count_towards_the_floor() -> None:
+    svc = _svc()
+    assert (await svc.search("   x   ", ANY)).hits == []
+
+
+async def test_a_source_over_the_cap_is_trimmed_and_reported() -> None:
+    async def _many(*_a: object, **_kw: object) -> list[SearchHit]:
+        return [_hit(i) for i in range(PER_KIND + 3)]
+
+    out = await _svc(_applications=_many).search("query", ANY)
+    assert len(out.hits) == PER_KIND
+    assert out.truncated is True
+
+
+async def test_a_source_at_the_cap_is_not_reported_as_truncated() -> None:
+    async def _exact(*_a: object, **_kw: object) -> list[SearchHit]:
+        return [_hit(i) for i in range(PER_KIND)]
+
+    out = await _svc(_applications=_exact).search("query", ANY)
+    assert len(out.hits) == PER_KIND
+    assert out.truncated is False
+
+
+async def test_one_broken_source_does_not_empty_the_palette() -> None:
+    """A palette that shows the other kinds beats one that shows a stack trace."""
+
+    async def _boom(*_a: object, **_kw: object) -> list[SearchHit]:
+        raise RuntimeError("source is down")
+
+    async def _ok(*_a: object, **_kw: object) -> list[SearchHit]:
+        return [_hit()]
+
+    out = await _svc(_applications=_boom, _meetings=_ok).search("query", ANY)
+    assert [h.title for h in out.hits] == ["hit 0"]
+    assert out.failed == ["application"]
+
+
+async def test_the_language_reaches_every_source() -> None:
+    """A hit is one flat line, so a translated label must be resolved server-side."""
+    seen: list[str] = []
+
+    async def _spy(_q: str, _p: Principal, lang: str) -> list[SearchHit]:
+        seen.append(lang)
+        return []
+
+    await _svc(_applications=_spy, _meetings=_spy).search("query", ANY, lang="en")
+    assert seen == ["en", "en"]
+
+
+@pytest.mark.parametrize(
+    ("source", "perms"),
+    [
+        ("_invoices", ("budget.view", "budget.structure", "budget.book")),
+        ("_expenses", ("budget.view", "budget.structure", "budget.book")),
+        ("_principals", ("admin.users", "admin.gremien")),
+    ],
+)
+async def test_a_gated_source_answers_nothing_without_its_permission(
+    source: str, perms: tuple[str, ...]
+) -> None:
+    """The gate is the module's own. Without it the source must not even query."""
+    svc = SearchService(session=None)  # type: ignore[arg-type]
+    assert await getattr(svc, source)("query", Principal(sub="u"), "de") == []
+
+
+@pytest.mark.parametrize("perm", ["admin.users", "admin.gremien"])
+async def test_a_gremium_hit_needs_somewhere_to_go(perm: str) -> None:
+    """A Gremium row links to the members page, which only an administrator may open.
+
+    A caller who cannot open it would get a label with nowhere to go, so the source
+    answers nothing for them rather than showing dead rows.
+    """
+    svc = SearchService(session=None)  # type: ignore[arg-type]
+    assert await svc._gremien("query", Principal(sub="u"), "de") == []

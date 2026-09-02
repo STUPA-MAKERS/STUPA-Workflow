@@ -63,6 +63,7 @@ from app.modules.pdf.action_dispatcher import ChainActionDispatcher
 from app.modules.pdf.router import router as pdf_router
 from app.modules.privacy.router import router as privacy_router
 from app.modules.protocol.router import router as protocol_router
+from app.modules.search.router import router as search_router
 from app.modules.voting.router import router as voting_router
 from app.modules.webhooks.action_dispatcher import build_webhook_dispatcher
 from app.settings import Settings, get_settings
@@ -109,6 +110,7 @@ api_router.include_router(deadline_policies_router)
 api_router.include_router(delegations_router)
 api_router.include_router(privacy_router)
 api_router.include_router(backup_router)
+api_router.include_router(search_router)
 api_router.include_router(gremien_authed_router)
 api_router.include_router(site_config_public_router)
 

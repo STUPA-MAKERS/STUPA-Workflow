@@ -198,6 +198,9 @@ export class MeetingsComponent implements OnDestroy {
   readonly assignableOptions = this.agendaSvc.assignableOptions;
 
   readonly loadingList = this.timeline.loadingList;
+
+  /** Rows to outline while the timeline first loads, so the page keeps its shape. */
+  protected readonly skeletonRows = [0, 1, 2, 3, 4];
   readonly upcomingItems = this.timeline.upcomingItems;
   readonly pastItems = this.timeline.pastItems;
   readonly upcomingHasMore = this.timeline.upcomingHasMore;

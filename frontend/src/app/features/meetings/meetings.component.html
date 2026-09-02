@@ -364,7 +364,15 @@
   @if (showOverview()) {
     <section class="mtg__listSection">
       @if (loadingList()) {
-        <p class="text-text-muted" aria-live="polite">{{ 'meetings.list.loading' | t }}</p>
+        <!-- The list, not the detail. The two loading branches differ only by a singular
+             and a plural i18n key, which is how the list stayed a bare sentence after the
+             detail was fixed. -->
+        <div class="mtg__listSkel" aria-busy="true">
+          @for (row of skeletonRows; track row) {
+            <span class="skel skel--line"></span>
+          }
+          <span class="sr-only" role="status">{{ 'meetings.list.loading' | t }}</span>
+        </div>
       } @else {
         <!-- The timeline shows the "now" bar even without meetings. The empty
              case is an empty timeline. Past meetings go on top and load lazily

@@ -227,6 +227,26 @@ function flushDelegationContext(http: HttpTestingController): void {
 }
 
 describe('MeetingsComponent', () => {
+  it('outlines the timeline while the list loads, never a bare sentence', async () => {
+    // The list and the detail each have a loading branch, and their i18n keys differ
+    // only by a singular and a plural. The detail was fixed first and the list kept its
+    // sentence, which nothing caught — so this asserts on the LIST branch specifically.
+    const { container, fixture } = await setup({ id: null, skipTimelineFlush: true });
+    fixture.detectChanges();
+
+    expect(container.querySelectorAll('.skel').length).toBeGreaterThan(0);
+    expect(container.querySelector('[aria-busy="true"]')).toBeTruthy();
+
+    // The wording stays, but only for a screen reader: the outlined rows are decorative
+    // and hidden from the accessibility tree, so something has to announce the wait.
+    // What must not come back is the visible paragraph that used to stand in for the
+    // whole list.
+    const announced = container.querySelector('[role="status"]');
+    expect(announced?.textContent).toContain('Sitzungen werden geladen');
+    expect(announced).toHaveClass('sr-only');
+    expect(container.querySelector('p[aria-live="polite"]')).toBeNull();
+  });
+
   it('shows a forbidden notice without the required permissions', async () => {
     await setup({ perms: [], id: null });
     expect(screen.getByRole('alert')).toHaveTextContent(/Keine Berechtigung/i);
