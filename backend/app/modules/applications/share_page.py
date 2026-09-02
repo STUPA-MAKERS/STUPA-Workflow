@@ -24,9 +24,9 @@ from html import escape
 
 from app.modules.applications.share import PublicApplication
 
-#: A preview description that says what the page is without describing the application.
-#: Deliberately generic: whatever goes here is public the moment the link is pasted.
-_PREVIEW_DESCRIPTION = "Antrag der Antragsplattform, öffentlich einsehbar."
+#: The preview description. Deliberately says nothing about the application: whatever
+#: goes here is public the moment the link is pasted.
+_PREVIEW_DESCRIPTION = "Geteilter Antrag"
 
 
 #: The stylesheet, as a module constant rather than part of the template: the CSP
@@ -124,8 +124,8 @@ def render_share_page(
 {rows}
   </dl>
   <footer>
-    <p>{escape(app_name)} — schreibgeschützte Ansicht. Kommentare und Änderungsverlauf
-       sind nicht Teil dieser Seite.</p>
+    <p>{escape(app_name)} — schreibgeschützte Ansicht ohne Kommentare und
+       Änderungsverlauf.</p>
   </footer>
 </main>
 </body>

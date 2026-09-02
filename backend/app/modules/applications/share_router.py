@@ -25,6 +25,7 @@ from sqlalchemy import select
 
 from app.deps import DbSession, SettingsDep
 from app.modules.admin.models import ApplicationType, Gremium
+from app.modules.admin.site_config_service import DEFAULT_APP_NAME, SiteConfigService
 from app.modules.applications.models import Application
 from app.modules.applications.service.service_base import _field_from_row
 from app.modules.applications.share import ShareService, build_public_view
@@ -86,9 +87,15 @@ async def public_application(
         lang=lang,
     )
 
+    # The BRANDING name, not `settings.app_name` — that is the FastAPI title and reads
+    # "Antragsplattform API". This name goes into the og:title, which is the one piece of
+    # the page that lands permanently on a chat server.
+    branding = (await SiteConfigService(session).public()).branding
+    app_name = branding.app_name.strip() or DEFAULT_APP_NAME
+
     html = render_share_page(
         view,
-        app_name=settings.app_name,
+        app_name=app_name,
         canonical_url=f"{settings.public_base_url.rstrip('/')}/s/{token}",
         lang=lang,
     )
