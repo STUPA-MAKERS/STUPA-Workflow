@@ -84,28 +84,56 @@
 
     <ng-template appCell="note" let-r>{{ $any(r).note || '—' }}</ng-template>
 
+    <!-- Icon buttons, like every other actions column in the platform. Four spelled-out
+         labels needed more room than the column had, so the table gave the width back to
+         the data columns and spread them into wide, uneven gaps. The wording survives as
+         the accessible name and the tooltip, and both destructive actions still open a
+         confirmation, so nothing is one careless click away. -->
     <ng-template appCell="actions" let-r>
       @if ($any(r).status === 'done') {
         <span class="inline-flex items-center gap-1 justify-end">
-          <app-button variant="ghost" size="sm" (click)="download($any(r))">
-            {{ 'admin.backups.download' | t }}
+          <app-button
+            variant="ghost"
+            size="sm"
+            [iconOnly]="true"
+            [ariaLabel]="'admin.backups.download' | t"
+            [title]="'admin.backups.download' | t"
+            (click)="download($any(r))"
+          >
+            <app-icon name="export" />
           </app-button>
-          <app-button variant="ghost" size="sm" (click)="togglePin($any(r))">
-            {{ ($any(r).pinned ? 'admin.backups.unpin' : 'admin.backups.pin') | t }}
+          <app-button
+            variant="ghost"
+            size="sm"
+            [iconOnly]="true"
+            [ariaLabel]="($any(r).pinned ? 'admin.backups.unpin' : 'admin.backups.pin') | t"
+            [title]="($any(r).pinned ? 'admin.backups.unpin' : 'admin.backups.pin') | t"
+            (click)="togglePin($any(r))"
+          >
+            <app-icon [name]="$any(r).pinned ? 'link-slash' : 'paperclip'" />
           </app-button>
           @if (restoreEnabled()) {
-            <app-button variant="ghost" size="sm" (click)="askRestore($any(r))">
-              {{ 'admin.backups.restore' | t }}
+            <app-button
+              variant="ghost"
+              size="sm"
+              [iconOnly]="true"
+              [ariaLabel]="'admin.backups.restore' | t"
+              [title]="'admin.backups.restore' | t"
+              (click)="askRestore($any(r))"
+            >
+              <app-icon name="repeat" />
             </app-button>
           }
           <app-button
             variant="ghost"
             size="sm"
+            [iconOnly]="true"
             [disabled]="$any(r).pinned"
-            [title]="$any(r).pinned ? ('admin.backups.pinnedHint' | t) : ''"
+            [ariaLabel]="'admin.common.delete' | t"
+            [title]="$any(r).pinned ? ('admin.backups.pinnedHint' | t) : ('admin.common.delete' | t)"
             (click)="askDelete($any(r))"
           >
-            {{ 'admin.common.delete' | t }}
+            <app-icon name="delete" />
           </app-button>
         </span>
       }

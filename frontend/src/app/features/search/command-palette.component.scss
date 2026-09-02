@@ -1,0 +1,163 @@
+/* The palette sits above everything, including the sticky header and any dialog
+   backdrop the page below might already own. */
+.pal__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-dialog) + 1);
+  background: rgba(0, 18, 10, 0.4);
+  /* Blur, not just dim: the palette covers the page it was opened from, and a blurred
+     page reads as "still there, not now" rather than as a new screen. */
+  backdrop-filter: blur(6px);
+}
+
+.pal {
+  position: fixed;
+  z-index: calc(var(--z-dialog) + 2);
+  /* High, not centred. A palette is a thing you type into and dismiss; centring it
+     puts the field in the middle of the screen and the results below the fold. */
+  top: 12vh;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(40rem, calc(100vw - var(--space-6)));
+  display: flex;
+  flex-direction: column;
+  max-height: 70vh;
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.28);
+  overflow: hidden;
+}
+
+.pal__field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-bottom: var(--border-width) solid var(--color-border);
+  color: var(--color-text-muted);
+}
+
+.pal__input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--fs-md);
+}
+.pal__input:focus {
+  /* The whole panel is the focus surface; a ring around the bare field inside it reads
+     as a second control. */
+  outline: none;
+}
+
+.pal__kbd {
+  flex: none;
+  padding: 0 var(--space-2);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-xs);
+  font-family: var(--font-mono);
+  color: var(--color-text-muted);
+}
+
+.pal__spinner {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: pal-spin 0.7s linear infinite;
+}
+@keyframes pal-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pal__spinner {
+    animation-duration: 2s;
+  }
+}
+
+.pal__results {
+  overflow-y: auto;
+  padding: var(--space-2);
+}
+
+.pal__groupLabel {
+  padding: var(--space-2) var(--space-3) var(--space-1);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+}
+
+.pal__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+/* One highlight, driven by the keyboard. Hover writes to the same signal, so the
+   pointer and the arrow keys can never disagree about which row is selected. */
+.pal__row--active {
+  background: var(--color-surface-sunken);
+}
+.pal__row:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+.pal__rowText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.pal__rowTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pal__rowSub {
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pal__note {
+  margin: 0;
+  padding: var(--space-4) var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+}
+.pal__note--foot {
+  padding-top: var(--space-2);
+  border-top: var(--border-width) solid var(--color-border);
+}
+
+@media (max-width: 768px) {
+  .pal {
+    top: var(--space-4);
+    width: calc(100vw - var(--space-4) * 2);
+    max-height: 80vh;
+  }
+  /* The shortcut hint is desktop-only advice. */
+  .pal__kbd {
+    display: none;
+  }
+}

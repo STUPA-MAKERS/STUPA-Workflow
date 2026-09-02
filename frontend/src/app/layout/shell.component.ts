@@ -21,6 +21,7 @@ import { AuthService } from '@core/auth/auth.service';
 import { BrandingService } from '@core/branding/branding.service';
 import { LOCATION } from '@core/browser/location.token';
 import { I18nService } from '@core/i18n/i18n.service';
+import { CommandPaletteComponent } from '../features/search/command-palette.component';
 import { ThemeService } from '@core/theme/theme.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { Locale } from '@core/i18n/translations';
@@ -58,6 +59,7 @@ interface NavItem {
     IconComponent,
     ToastComponent,
     LoadingOverlayComponent,
+    CommandPaletteComponent,
   ],
   templateUrl: './shell.component.html',
   styleUrl: './shell.component.scss',

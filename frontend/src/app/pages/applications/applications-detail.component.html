@@ -1,5 +1,22 @@
 @if (loading()) {
-  <p class="text-muted py-5" aria-live="polite">{{ 'applications.detail.loading' | t }}</p>
+  <!-- The shape of the page, not a sentence. This is the view a reader opens most often,
+       and a bare line gives them nothing to anticipate while the whole layout arrives at
+       once underneath it. -->
+  <div class="det__layout" aria-busy="true">
+    <aside class="det__rail det__rail--left" aria-hidden="true">
+      <span class="skel skel--line"></span>
+      <span class="skel skel--line"></span>
+      <span class="skel skel--line"></span>
+    </aside>
+    <div>
+      <span class="skel skel--panel"></span>
+      <span class="sr-only" role="status">{{ 'applications.detail.loading' | t }}</span>
+    </div>
+    <aside class="det__rail det__rail--right" aria-hidden="true">
+      <span class="skel skel--line"></span>
+      <span class="skel skel--line"></span>
+    </aside>
+  </div>
 } @else if (notFound()) {
   <app-empty-state
     [heading]="'applications.detail.notFound' | t"

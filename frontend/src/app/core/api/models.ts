@@ -986,3 +986,37 @@ export interface ConsentRequest {
   lifetimes: string[];
   defaultLifetime: string;
 }
+
+/** What kind of record a search hit points at. Stable keys, never translated text. */
+export type SearchKind =
+  | 'application'
+  | 'meeting'
+  | 'invoice'
+  | 'expense'
+  | 'budget'
+  | 'gremium'
+  | 'principal';
+
+/**
+ * One row of the global search (`GET /api/search`).
+ *
+ * Deliberately flat: the palette renders a line, a line under it, and somewhere to go,
+ * without knowing the shape of an application, an invoice or a meeting. `url` is always
+ * an app-relative route the client has.
+ */
+export interface SearchHit {
+  kind: SearchKind;
+  id: string;
+  title: string;
+  subtitle: string | null;
+  url: string;
+}
+
+/** Everything found for one query, in one round trip. */
+export interface SearchResults {
+  hits: SearchHit[];
+  /** At least one source had more matches than its cap, so this is not everything. */
+  truncated: boolean;
+  /** Sources that errored. The search degrades rather than returning nothing. */
+  failed: string[];
+}

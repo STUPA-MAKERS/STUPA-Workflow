@@ -34,6 +34,19 @@
 
     <div class="header__actions">
       @if (auth.isAuthenticated()) {
+        <button
+          type="button"
+          class="header__search"
+          [attr.aria-label]="'search.open' | t"
+          [title]="'search.open' | t"
+          (click)="palette.show()"
+        >
+          <app-icon name="filter" [size]="16" />
+          <span class="header__searchLabel">{{ 'search.title' | t }}</span>
+          <kbd class="header__searchKbd">⌘K</kbd>
+        </button>
+      }
+      @if (auth.isAuthenticated()) {
         <div class="relative flex items-center gap-2">
           <button
             type="button"
@@ -164,3 +177,7 @@
 
 <app-loading-overlay />
 <app-toast />
+
+<!-- Global search. It owns its own overlay, so it sits outside the header and the
+     main region rather than inside either. -->
+<app-command-palette #palette />

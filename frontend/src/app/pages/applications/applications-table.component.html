@@ -9,7 +9,12 @@
   [emptyText]="emptyText()"
 >
   <ng-template appCell="title" let-row>
-    <a class="atbl__rowLink" [routerLink]="['/applications', $any(row).id]">
+    <!-- The title is clipped to one line, so the full text has to stay reachable. -->
+    <a
+      class="atbl__rowLink"
+      [routerLink]="['/applications', $any(row).id]"
+      [title]="$any(row).title"
+    >
       <span class="atbl__rowTitle">{{ $any(row).title }}</span>
       <span class="atbl__rowHint">{{ 'applications.list.open' | t }}</span>
     </a>

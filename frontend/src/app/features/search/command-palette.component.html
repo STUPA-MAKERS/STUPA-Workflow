@@ -1,0 +1,69 @@
+@if (open()) {
+  <!-- The backdrop blurs what is behind it rather than only dimming it. The palette
+       covers the page it was opened from, and a blurred page reads as "still there,
+       not now" instead of as a new screen. -->
+  <div class="pal__backdrop" (click)="close()"></div>
+
+  <div
+    class="pal"
+    role="dialog"
+    aria-modal="true"
+    [attr.aria-label]="'search.title' | t"
+  >
+    <div class="pal__field">
+      <input
+        #field
+        type="text"
+        class="pal__input"
+        autocomplete="off"
+        spellcheck="false"
+        [attr.aria-label]="'search.title' | t"
+        [attr.aria-expanded]="rows().length > 0"
+        aria-controls="palette-results"
+        [placeholder]="'search.placeholder' | t"
+        [ngModel]="query()"
+        (ngModelChange)="onQuery($event)"
+      />
+      @if (loading()) {
+        <span class="pal__spinner" aria-hidden="true"></span>
+      }
+      <kbd class="pal__kbd">esc</kbd>
+    </div>
+
+    <div id="palette-results" class="pal__results" role="listbox">
+      @for (group of groups(); track group.label) {
+        <div class="pal__groupLabel" role="presentation">{{ group.label }}</div>
+        @for (row of group.rows; track row.key) {
+          <button
+            type="button"
+            role="option"
+            class="pal__row"
+            [class.pal__row--active]="indexOf(row) === active()"
+            [attr.aria-selected]="indexOf(row) === active()"
+            (mouseenter)="active.set(indexOf(row))"
+            (click)="go(row)"
+          >
+            <app-icon [name]="row.icon" [size]="16" />
+            <span class="pal__rowText">
+              <span class="pal__rowTitle">{{ row.title }}</span>
+              @if (row.subtitle) {
+                <span class="pal__rowSub">{{ row.subtitle }}</span>
+              }
+            </span>
+          </button>
+        }
+      }
+
+      @if (showEmpty()) {
+        <p class="pal__note">{{ 'search.empty' | t }}</p>
+      }
+      @if (!query().trim()) {
+        <p class="pal__note">{{ 'search.hint' | t }}</p>
+      }
+      <!-- Say so rather than implying that this is everything. -->
+      @if (showTruncated()) {
+        <p class="pal__note pal__note--foot">{{ 'search.truncated' | t }}</p>
+      }
+    </div>
+  </div>
+}

@@ -51,9 +51,10 @@ input.exp__input {
   .exp__tree { position: static; max-height: none; }
 }
 .exp__status { color: var(--color-text-muted); padding: var(--space-4) 0; }
-/* Holds the height of a first page of rows, so the table does not jump in. */
-.exp__skel { padding: var(--space-4) 0; }
-.exp__skel .skel--line { height: 2.25rem; margin-bottom: var(--space-2); }
+/* The skeleton row keeps the height of a real row, so nothing shifts when the data
+   lands. It must not take the hover or the selection colour. */
+.exp__skelRow td { height: 3rem; }
+.exp__skelRow:hover td { background: transparent; }
 .exp__appLink { color: var(--color-primary); text-decoration: none; }
 .exp__appLink:hover { text-decoration: underline; }
 .exp__amount { font-variant-numeric: tabular-nums; font-weight: var(--fw-semibold); white-space: nowrap; }

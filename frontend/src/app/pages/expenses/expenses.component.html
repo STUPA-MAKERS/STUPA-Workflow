@@ -91,17 +91,7 @@
     </div>
 
     @if (tab() === 'transfers') {
-      @if (transferLoading() && !transferItems().length) {
-        <!-- A placeholder, not a sentence: the first load is exactly when a reader has
-             nothing to look at, so the page should show the shape of what is coming. -->
-        <div class="exp__skel" aria-busy="true">
-          <span class="skel skel--line"></span>
-          <span class="skel skel--line"></span>
-          <span class="skel skel--line"></span>
-          <span class="skel skel--line"></span>
-          <span class="sr-only" role="status">{{ 'expenses.loading' | t }}</span>
-        </div>
-      } @else if (transferItems().length) {
+      @if (transferLoading() || transferItems().length) {
         <div class="exp__tableWrap" appHScrollSync>
           <table class="exp__table">
             <thead>
@@ -116,6 +106,23 @@
               </tr>
             </thead>
             <tbody>
+              <!-- Skeleton rows, not loose bars: the table keeps its header and its
+                   column widths, exactly the way `app-data-table` does it, so a loading
+                   list reads as the same thing everywhere in the platform. -->
+              @if (transferLoading() && !transferItems().length) {
+                @for (row of skeletonRows; track row) {
+                  <tr class="exp__skelRow" aria-hidden="true">
+                    @for (col of transferSkeletonCols; track col) {
+                      <td><span class="skel skel--bar"></span></td>
+                    }
+                  </tr>
+                }
+                <tr class="exp__skelRow">
+                  <td [attr.colspan]="transferSkeletonCols.length">
+                    <span class="sr-only" role="status">{{ 'expenses.loading' | t }}</span>
+                  </td>
+                </tr>
+              }
               @for (t of transferItems(); track t.transferId) {
                 <tr [attr.title]="t.actorName ? ('expenses.bookedBy' | t: { actor: t.actorName }) : null">
                   <td class="exp__cellDate">{{ t.paymentDate ? (t.paymentDate | ldate: 'mediumDate') : '—' }}</td>
@@ -153,16 +160,7 @@
       } @else {
         <div class="empty-state">{{ 'expenses.transfers.empty' | t }}</div>
       }
-    } @else if (loading() && !items().length) {
-      <div class="exp__skel" aria-busy="true">
-        <span class="skel skel--line"></span>
-        <span class="skel skel--line"></span>
-        <span class="skel skel--line"></span>
-        <span class="skel skel--line"></span>
-        <span class="skel skel--line"></span>
-        <span class="sr-only" role="status">{{ 'expenses.loading' | t }}</span>
-      </div>
-    } @else if (items().length) {
+    } @else if (loading() || items().length) {
       <!-- Floating bulk bar: fixed at the bottom center while a selection exists (#expenses-ux2). -->
       @if (canManage() && selectedCount()) {
         <div class="exp__bulkbar" role="toolbar" [attr.aria-label]="'expenses.bulk.selectedCount' | t: { count: selectedCount() }">
@@ -222,6 +220,20 @@
             </tr>
           </thead>
           <tbody>
+            @if (loading() && !items().length) {
+              @for (row of skeletonRows; track row) {
+                <tr class="exp__skelRow" aria-hidden="true">
+                  @for (col of bookingSkeletonCols(); track col) {
+                    <td><span class="skel skel--bar"></span></td>
+                  }
+                </tr>
+              }
+              <tr class="exp__skelRow">
+                <td [attr.colspan]="bookingSkeletonCols().length">
+                  <span class="sr-only" role="status">{{ 'expenses.loading' | t }}</span>
+                </td>
+              </tr>
+            }
             @for (e of items(); track e.id) {
               <tr
                 appPressSelect

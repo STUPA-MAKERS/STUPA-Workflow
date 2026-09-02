@@ -2238,4 +2238,30 @@ describe('ExpensesComponent — transfers tab', () => {
     expect(screen.getByText('Keine Buchungen gefunden.')).toBeInTheDocument();
     ctx.http.verify();
   });
+
+  it('outlines rows inside the real table while the first page loads', async () => {
+    // The first attempt at this replaced the table with loose bars of assorted widths
+    // and no header, so a loading /expenses looked broken next to a loading
+    // /applications. The table stays mounted and the rows are outlined inside it, the
+    // way `app-data-table` does it, so every loading list in the platform matches.
+    const view = await render(ExpensesComponent, {
+      providers: [
+        provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: USE_MOCK_API, useValue: false },
+        { provide: AuthService, useValue: fakeAuth(['budget.view', 'budget.book']) },
+      ],
+    });
+    view.fixture.detectChanges();
+
+    const table = view.container.querySelector('.exp__table');
+    expect(table).not.toBeNull();
+    expect(table?.querySelectorAll('thead th').length).toBeGreaterThan(0);
+    expect(table?.querySelectorAll('.exp__skelRow').length).toBeGreaterThan(0);
+    expect(table?.querySelectorAll('.skel--bar').length).toBeGreaterThan(0);
+
+    const http = view.fixture.debugElement.injector.get(HttpTestingController);
+    for (const req of http.match(() => true)) req.flush({ items: [], total: 0, limit: 50, offset: 0 });
+  });
 });

@@ -22,7 +22,12 @@
   </app-page-header>
 
   @if (loading()) {
-    <p class="py-4 text-muted" aria-live="polite">{{ 'admin.forms.overviewLoading' | t }}</p>
+    <div class="py-4" aria-busy="true">
+      <span class="skel skel--line"></span>
+      <span class="skel skel--line"></span>
+      <span class="skel skel--line"></span>
+      <span class="sr-only" role="status">{{ 'admin.forms.overviewLoading' | t }}</span>
+    </div>
   } @else {
     @if (duplicates().length > 0) {
       <p class="fe__alert" role="alert">{{ 'admin.form.dupKeys' | t: { keys: duplicates().join(', ') } }}</p>
