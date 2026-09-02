@@ -49,6 +49,24 @@ describe('PageIndexService', () => {
     expect(svc.visible().every((e) => !e.path.includes(':'))).toBe(true);
   });
 
+  it('withholds a page that only means something after an action', () => {
+    // `/status` without an application id renders "Antrag nicht gefunden", and
+    // `/apply/confirmation` congratulates the reader on a submission that never
+    // happened. Offering either is offering a dead end.
+    const svc = setup({ canAny: () => true });
+    const paths = svc.visible().map((e) => e.path);
+    expect(paths).not.toContain('/status');
+    expect(paths).not.toContain('/apply/confirmation');
+  });
+
+  it('still offers the pages that stand on their own', () => {
+    // The exclusion must not be so broad that it eats the ordinary pages with it.
+    const svc = setup({ canAny: () => true });
+    const paths = svc.visible().map((e) => e.path);
+    expect(paths).toContain('/dashboard');
+    expect(paths).toContain('/apply');
+  });
+
   it('lets a committee member through on a route that allows it', () => {
     // `/meetings` carries allowCommitteeMember: a member sees the meetings of their
     // gremium without meeting.manage. The guard does the same.

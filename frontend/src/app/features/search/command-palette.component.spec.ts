@@ -103,6 +103,29 @@ describe('CommandPaletteComponent', () => {
     await answer(http, { hits: [], truncated: false, failed: [] });
   });
 
+  it('gives a page row the icon of its section, not a gear for everything', async () => {
+    // A gear on every page row said "setting" about pages that are not one. It stays on
+    // the admin pages, where it is true.
+    const { cmp } = await setup([
+      { path: '/dashboard', label: 'Seite Dashboard', parentLabel: null },
+      { path: '/admin/roles', label: 'Seite Rollen', parentLabel: 'Verwaltung' },
+      { path: '/invoices', label: 'Seite Rechnungen', parentLabel: null },
+    ]);
+    cmp.show();
+    cmp.query.set('seite');
+    const byTitle = new Map(cmp.rows().map((r) => [r.title, r.icon]));
+    expect(byTitle.get('Seite Dashboard')).toBe('home');
+    expect(byTitle.get('Seite Rollen')).toBe('gear');
+    expect(byTitle.get('Seite Rechnungen')).toBe('euro');
+  });
+
+  it('falls back to a gear for a section nothing maps', async () => {
+    const { cmp } = await setup([{ path: '/somewhere-new', label: 'Neu', parentLabel: null }]);
+    cmp.show();
+    cmp.query.set('ne');
+    expect(cmp.rows()[0]?.icon).toBe('gear');
+  });
+
   it('shows records from the server under their own group', async () => {
     const { cmp, fixture, http } = await setup([]);
     cmp.show();

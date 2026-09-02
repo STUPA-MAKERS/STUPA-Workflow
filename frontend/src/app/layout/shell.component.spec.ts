@@ -354,15 +354,15 @@ describe('ShellComponent', () => {
     http.verify();
   });
 
-  it('puts the search trigger to the right of the account control', async () => {
+  it('puts the search trigger to the left of the account control', async () => {
     const { fixture, auth, http } = await setup();
     login(auth, http, MEMBER);
     fixture.detectChanges();
 
     const account = screen.getByRole('button', { name: /Mia Member/ });
     const search = screen.getByRole('button', { name: /Suche öffnen|Open search/i });
-    // `DOCUMENT_POSITION_FOLLOWING` = the search button comes after the account control.
-    expect(account.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // `DOCUMENT_POSITION_PRECEDING` = the search button comes before the account control.
+    expect(account.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
     http.verify();
   });
 
