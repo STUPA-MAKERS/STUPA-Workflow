@@ -1,15 +1,16 @@
 import { Injectable, Injector, computed, effect, inject, signal } from '@angular/core';
 import { Title } from '@angular/platform-browser';
 import { ApiClient } from '@core/api/api-client.service';
+import type { I18nMap, PublicFooterLink } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 
 /**
  * App name from the active site config, which needs no authentication.
  *
- * This service is the single source of truth for the configurable app name. It
- * loads the public branding config once at app start. It exposes the name as a
- * signal that the header (aria-label) and the home page (H1) read. It also sets
- * `document.title`.
+ * This service is the single source of truth for the configurable branding. It loads
+ * the public config once at app start and exposes the app name, the footer copyright
+ * and the footer legal links as signals. The header (aria-label), the home page (H1)
+ * and the footer read them, and it also sets `document.title`.
  *
  * Fallback: when the config name is empty or not yet loaded, the existing i18n
  * texts apply. `app.title` gives the full name and `home.heading` gives the H1.
@@ -27,6 +28,18 @@ export class BrandingService {
 
   /** Configured full name (empty ⇒ fallback). */
   private readonly _configuredName = signal('');
+
+  /* The footer used to come from `/admin/site-config`, which needs a session. On the
+     landing page and on the 404 that request is refused, so a configured imprint link
+     or copyright line never appeared where a logged-out visitor could see it. The
+     public config carries the same fields and needs no auth, so it serves both. */
+  private readonly _copyright = signal<I18nMap | null>(null);
+  private readonly _legalLinks = signal<PublicFooterLink[]>([]);
+
+  /** Footer copyright per locale, or `null` for the built-in co-branding text. */
+  readonly copyright = this._copyright.asReadonly();
+  /** Maintained footer links; empty means the built-in imprint/privacy pair. */
+  readonly legalLinks = this._legalLinks.asReadonly();
 
   /**
    * Full app name: the config value, else i18n `app.title`. The value reacts to
@@ -51,9 +64,13 @@ export class BrandingService {
   /** Call once at app start. Loads the active branding config and ignores failures. */
   init(): void {
     this.injector.get(ApiClient).publicSiteConfig().subscribe({
-      next: (cfg) => this._configuredName.set(cfg.branding?.appName ?? ''),
+      next: (cfg) => {
+        this._configuredName.set(cfg.branding?.appName ?? '');
+        this._copyright.set(cfg.branding?.copyright ?? null);
+        this._legalLinks.set(cfg.branding?.legalLinks ?? []);
+      },
       error: () => {
-        /* Keep the name empty so the i18n default fallback stays. */
+        /* Keep everything empty so the i18n default fallbacks stay. */
       },
     });
   }

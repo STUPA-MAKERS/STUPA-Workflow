@@ -23,6 +23,12 @@ export type I18nMap = Record<string, string>;
 /** Public branding config of the active site version. It needs no authentication.
  *  The type stays loose on purpose. The frontend reads only the free texts, for
  *  example `applyInfo`, and the app name. */
+/** One maintained footer link: a label per locale plus its target. */
+export interface PublicFooterLink {
+  label: I18nMap;
+  url: string;
+}
+
 export interface PublicSiteConfig {
   version: number;
   branding?: {
@@ -30,6 +36,10 @@ export interface PublicSiteConfig {
     appName?: string;
     /** Short name for the PWA icon. Empty falls back to the default. */
     appShortName?: string;
+    /** Footer copyright line per locale. Empty falls back to the co-branding text. */
+    copyright?: I18nMap;
+    /** Footer legal links. Empty falls back to the built-in imprint/privacy pair. */
+    legalLinks?: PublicFooterLink[];
     freetexts?: Partial<
       Record<'loginHint' | 'welcome' | 'support' | 'emailFooter' | 'applyInfo', I18nMap>
     >;
