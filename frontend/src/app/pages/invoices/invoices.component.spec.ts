@@ -143,6 +143,28 @@ describe('InvoicesComponent (#invoices)', () => {
     expect(c.hasMore()).toBe(false);
   });
 
+  // The table used to collapse to one line of text on every filter, search or reload.
+  // These two hold the behaviour the shared table brings: header and skeleton stay,
+  // and the pinned actions column survives a reload.
+  it('keeps the table and its header on screen while reloading', async () => {
+    const { c, fixture, container } = await setup({ initial: [inv({ id: 'a' })] });
+    c.loading.set(true);
+    fixture.detectChanges();
+    expect(container.querySelector('table')).not.toBeNull();
+    expect(container.querySelectorAll('th').length).toBeGreaterThan(0);
+    expect(container.querySelectorAll('.dt__skeleton-row').length).toBeGreaterThan(0);
+  });
+
+  it('pins the actions column for a user who may book', async () => {
+    const { container } = await setup({ initial: [inv({ id: 'a' })], canManage: true });
+    expect(container.querySelector('td.dt__cell--sticky')).not.toBeNull();
+  });
+
+  it('has no actions column at all for a user who may only read', async () => {
+    const { container } = await setup({ initial: [inv({ id: 'a' })], canManage: false });
+    expect(container.querySelector('.dt__cell--sticky')).toBeNull();
+  });
+
   it('money() formats in de-DE vs en-US per locale', async () => {
     const { c } = await setup();
     const de = c.money('119.00');

@@ -17,7 +17,10 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   BadgeComponent,
   ButtonComponent,
+  CellDirective,
+  type ColumnDef,
   CurrencyInputComponent,
+  DataTableComponent,
   DatepickerComponent,
   DialogComponent,
   FilterBarComponent,
@@ -57,7 +60,9 @@ import {
     TranslatePipe,
     BadgeComponent,
     ButtonComponent,
+    CellDirective,
     CurrencyInputComponent,
+    DataTableComponent,
     DatepickerComponent,
     DialogComponent,
     FilterBarComponent,
@@ -78,6 +83,37 @@ export class InvoicesComponent implements OnDestroy {
   private readonly toast = inject(ToastService);
 
   readonly canManage = computed(() => this.auth.can('budget.book'));
+
+  /**
+   * The actions column exists only for a user who may book, and it is pinned so edit
+   * and delete stay reachable while this wide table scrolls sideways.
+   */
+  readonly columns = computed<ColumnDef[]>(() => {
+    const cols: ColumnDef[] = [
+      { key: 'issueDate', label: this.i18n.translate('invoices.col.issueDate'), width: '9rem' },
+      { key: 'dueDate', label: this.i18n.translate('invoices.col.dueDate'), width: '9rem' },
+      { key: 'number', label: this.i18n.translate('invoices.col.number') },
+      { key: 'supplier', label: this.i18n.translate('invoices.col.supplier') },
+      { key: 'net', label: this.i18n.translate('invoices.col.net'), align: 'end' },
+      { key: 'tax', label: this.i18n.translate('invoices.col.tax'), align: 'end' },
+      { key: 'gross', label: this.i18n.translate('invoices.col.gross'), align: 'end' },
+      { key: 'status', label: this.i18n.translate('invoices.col.status') },
+      { key: 'file', label: this.i18n.translate('invoices.col.file') },
+    ];
+    if (this.canManage()) {
+      cols.push({
+        key: 'actions',
+        label: this.i18n.translate('table.actions'),
+        align: 'end',
+        width: '7rem',
+        sticky: 'end',
+      });
+    }
+    return cols;
+  });
+
+  /** Track by the invoice id, so paging in more rows does not re-create the earlier ones. */
+  readonly rowId = (row: unknown): unknown => (row as Invoice).id;
 
   private readonly PAGE = 20;
   readonly items = signal<Invoice[]>([]);

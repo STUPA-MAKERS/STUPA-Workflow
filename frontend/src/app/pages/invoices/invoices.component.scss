@@ -16,43 +16,26 @@ input.inv__input { height: var(--control-height); }
 .inv__search { min-width: 14rem; height: 2.25rem; }
 .inv__status { color: var(--color-text-muted); padding: var(--space-4) 0; }
 .inv__sentinel { height: 1px; }
-.inv__tableWrap {
-  overflow-x: auto;
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
+/* The table itself is `app-data-table`: box, header, hover, skeleton rows, sticky
+   actions column and the mobile card layout all come from there. What is left here is
+   what only this page knows — how a single cell should read. The rules target the
+   spans this component projects into the cells, not the table's own markup. */
+.inv__date { color: var(--color-text-muted); white-space: nowrap; }
+.inv__number { font-weight: var(--fw-medium); white-space: nowrap; }
+.inv__supplier {
+  display: inline-block;
+  min-width: 10rem;
+  max-width: 14rem;
+  overflow-wrap: anywhere;
 }
-.inv__table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
-.inv__table th, .inv__table td {
-  padding: var(--space-2) var(--space-4);
-  border-bottom: var(--border-width) solid var(--color-border);
-  text-align: start;
-  vertical-align: middle;
-}
-.inv__table tbody tr:last-child td { border-bottom: none; }
-.inv__table tbody tr:hover { background: var(--color-surface-sunken); }
-.inv__table th {
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-size: var(--fs-xs);
-  font-weight: var(--fw-semibold);
-  white-space: nowrap;
-  padding: var(--space-3) var(--space-4);
-  background: var(--color-surface-sunken);
-}
-.inv__num { text-align: end; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.inv__cellDate { color: var(--color-text-muted); white-space: nowrap; }
-.inv__cellNumber { font-weight: var(--fw-medium); white-space: nowrap; }
-.inv__cellSupplier { min-width: 10rem; max-width: 14rem; overflow-wrap: anywhere; }
 /* The receipt name is user-supplied and can be long without a space. It is the only
    elastic column, because every other cell is `nowrap`. Without a floor, auto table
    layout gives it the whole shortfall: the column shrinks to a few characters, the
    name wraps one letter per line and the row grows to several hundred pixels. The
-   floor keeps the column readable and pushes the table past the wrapper, so
-   `overflow-x` and the mirrored scrollbar take the rest. The cap stops a long name
-   from claiming the whole table. Same recipe as the bookings table. */
-.inv__cellFile { min-width: 12rem; max-width: 20rem; }
+   floor keeps the column readable and pushes the table past its scroller, so the
+   horizontal scroll and the mirrored scrollbar take the rest. The cap stops a long
+   name from claiming the whole table. */
+.inv__file { display: inline-block; min-width: 12rem; max-width: 20rem; }
 .inv__mono { font-variant-numeric: tabular-nums; color: var(--color-text-muted); }
 .inv__amount { font-variant-numeric: tabular-nums; font-weight: var(--fw-semibold); white-space: nowrap; }
 .inv__fileLink {
@@ -76,27 +59,6 @@ input.inv__input { height: var(--control-height); }
 }
 .inv__fileLink:hover { text-decoration: underline; }
 .inv__actions { display: inline-flex; gap: var(--space-1); justify-content: flex-end; }
-/* Sticky actions column, like the bookings table. See #expenses-ux2. It
-   pins the rightmost column on desktop only. On mobile, the card reflow below wins. */
-@media (min-width: 769px) {
-  .inv__table th.inv__stickyCol,
-  .inv__table td.inv__stickyCol {
-    position: sticky;
-    right: 0;
-    border-inline-start: var(--border-width) solid var(--color-border);
-  }
-  .inv__table td.inv__stickyCol {
-    background: var(--color-surface);
-    z-index: 1;
-  }
-  .inv__table th.inv__stickyCol {
-    background: var(--color-surface-sunken);
-    z-index: 2;
-  }
-  .inv__table tbody tr:hover td.inv__stickyCol {
-    background: var(--color-surface-sunken);
-  }
-}
 .inv__dropOverlay {
   position: absolute;
   inset: 0;
@@ -136,47 +98,19 @@ input.inv__input { height: var(--control-height); }
   border-radius: var(--radius-sm);
 }
 .inv__fileChipRemove:hover { color: var(--color-danger); }
-/* On mobile, show the table rows as cards with CSS only, like the bookings table. */
+/* On mobile the shared table stacks the rows into cards by itself. Only the cells this
+   page contributes need to give up their desktop widths. */
 @media (max-width: 768px) {
   .inv__search { flex: 1 1 100%; min-width: 0; }
-  .inv__tableWrap { overflow-x: visible; border: none; border-radius: 0; background: transparent; }
-  .inv__table, .inv__table tbody { display: block; }
-  .inv__table thead { display: none; }
-  .inv__table tbody tr {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-2) var(--space-3);
-    padding: var(--space-4);
-    margin-bottom: var(--space-3);
-    background: var(--color-surface);
-    border: var(--border-width) solid var(--color-border);
-    border-radius: var(--radius-lg);
-  }
-  .inv__table tbody tr:last-child { margin-bottom: 0; }
-  .inv__table th, .inv__table td { padding: 0; border-bottom: none; }
-  .inv__cellNumber { flex: 1 1 100%; order: -3; }
-  .inv__cellStatus { order: -2; }
-  .inv__amount { order: -1; margin-left: auto; font-size: var(--fs-md); }
-  .inv__cellDate, .inv__cellSupplier, .inv__cellFile, .inv__mono {
-    flex: 0 1 auto;
-    order: 1;
-    font-size: var(--fs-xs);
-    color: var(--color-text-muted);
-  }
-  /* The file link sits on its own full-width row. Long names then wrap inside the card.
-     The desktop column floor and cap do not apply to a card. */
-  .inv__cellFile {
-    flex: 1 1 100%;
+  .inv__supplier,
+  .inv__file {
     min-width: 0;
     max-width: none;
   }
-  .inv__cellSupplier { min-width: 0; max-width: none; }
-  .inv__cellNumber {
+  .inv__number {
     min-width: 0;
     white-space: normal;
     overflow-wrap: anywhere;
   }
   .inv__actions { margin-left: auto; }
-  .inv__num:has(.inv__actions) { order: 2; flex: 1 1 100%; }
 }
