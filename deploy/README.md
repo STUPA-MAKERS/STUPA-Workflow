@@ -1,7 +1,7 @@
 # deploy
 
 Compose stack for one VM. Internal traffic is plain HTTP. The external Nginx Proxy Manager
-terminates TLS. `web` publishes `127.0.0.1:8080`. `postgres` also publishes a loopback-only
+terminates TLS. `web` publishes `127.0.0.1:8080` (`WEB_PORT`). `postgres` also publishes a loopback-only
 port for the admin CLI (see the service table). Every other service stays on the internal
 network, so the internet cannot reach it.
 
@@ -23,7 +23,7 @@ docker compose up -d --build
 
 | Service | Role | Host port |
 |---|---|---|
-| `web` | nginx, serves the built SPA, routes `/api` to `api` | `127.0.0.1:8080` |
+| `web` | nginx, serves the built SPA, routes `/api` to `api` | `127.0.0.1:${WEB_PORT:-8080}` |
 | `migrate` | one-shot: `alembic upgrade head`, then exit | — |
 | `api` | FastAPI (uvicorn `--proxy-headers`) | — |
 | `worker` | arq (mail send, nightly budget rollup) | — |
@@ -221,7 +221,7 @@ It uses its own `COMPOSE_PROJECT_NAME` and touches no other stack. It saves an e
 ../scripts/smoke-real-stack.sh        # up -> check the core flows -> teardown
 ```
 
-The compose mapping fixes the host port at `127.0.0.1:8080`. `SMOKE_TIMEOUT` controls the wait
+The host port is `127.0.0.1:${WEB_PORT:-8080}`; set `WEB_PORT` to move it. `SMOKE_TIMEOUT` controls the wait
 time and defaults to 600 seconds, because ClamAV loads for a long time.
 
 CI runs the job `real-stack-smoke`. It is opt-in like e2e, so a default PR stays green and

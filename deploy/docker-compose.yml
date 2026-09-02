@@ -1,7 +1,7 @@
 # Antragsplattform — docker-compose skeleton (T-01)
 # One VM, plain HTTP inside, behind an external Nginx Proxy Manager (the TLS edge).
 # The stack holds no TLS, no certificate and no Keycloak. The only host port is `web`
-# (127.0.0.1:8080). Every other service stays internal, so nothing enters from the
+# (127.0.0.1:${WEB_PORT:-8080}). Every other service stays internal, so nothing enters from the
 # internet. Egress stays allowed (worker: SMTP/WebDAV/webhooks, pytex: tectonic bundle,
 # api: OIDC).
 # Reference: sds/deployment.md §1-§5, sds/overview.md §2.
@@ -26,8 +26,9 @@ services:
         condition: service_healthy
     ports:
       # Bound to localhost only. The external NPM proxies here, or through the `proxy`
-      # network.
-      - "127.0.0.1:8080:80"
+      # network. `WEB_PORT` moves the host port when 8080 is already taken; the
+      # container port stays 80, because nginx.conf listens there.
+      - "127.0.0.1:${WEB_PORT:-8080}:80"
     volumes:
       # The image already holds nginx.conf. This mount allows a production edit
       # (real_ip CIDR) without a rebuild. The SPA HTML comes from the image.

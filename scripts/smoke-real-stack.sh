@@ -14,16 +14,18 @@
 # file back at the end. It removes everything again (down -v). The script is idempotent.
 #
 # Usage: scripts/smoke-real-stack.sh
-#   SMOKE_TIMEOUT: default 600s, because ClamAV loads slowly. The host port is fixed to
-#   8080 (compose).
+#   SMOKE_TIMEOUT: default 600s, because ClamAV loads slowly.
+#   WEB_PORT: host port of `web`, default 8080. Set it when 8080 is taken.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEPLOY="${ROOT}/deploy"
 ENV_FILE="${DEPLOY}/.env"
 ENV_BACKUP=""
-# The compose file maps the host port hard to 127.0.0.1:8080:80. No override works.
-WEB="http://127.0.0.1:8080"
+# The compose mapping reads WEB_PORT, so the script and the stack agree on one value.
+WEB_PORT="${WEB_PORT:-8080}"
+export WEB_PORT
+WEB="http://127.0.0.1:${WEB_PORT}"
 TIMEOUT="${SMOKE_TIMEOUT:-600}"
 
 export COMPOSE_PROJECT_NAME="antrag-real-smoke"
@@ -90,8 +92,14 @@ BOOTSTRAP_ADMIN_SUBJECTS=smoke-admin-subject
 # with it rather than the guard being weakened.
 ENVIRONMENT=ci
 FORWARDED_ALLOW_IPS=*
-PUBLIC_BASE_URL=http://127.0.0.1:8080
 EOF
+
+# Outside the quoted heredoc, because that block does NOT expand variables and these two
+# values have to carry the chosen port.
+{
+  echo "PUBLIC_BASE_URL=${WEB}"
+  echo "WEB_PORT=${WEB_PORT}"
+} >> "${ENV_FILE}"
 
 # The web image compiles the Angular app against the ui-kit submodule, so a fresh
 # clone has to sync it first. `deploy/deploy.sh` does the same before it builds. Without
