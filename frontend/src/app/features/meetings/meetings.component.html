@@ -1,4 +1,4 @@
-<app-page-header [title]="'meetings.title' | t">
+<app-page-header [title]="'meetings.title' | t" [rail]="true">
   <div actions class="mtg__headActions">
     @if (!meeting()) {
       <!-- Debounced live search. It collapses the timeline into one relevance-sorted list. -->
@@ -58,7 +58,20 @@
 @if (showForbidden()) {
   <p class="mtg__status" role="alert">{{ 'rbac.forbidden' | t }}</p>
 } @else if (loading()) {
-  <p class="mtg__status" aria-live="polite">{{ 'meetings.loading' | t }}</p>
+  <!-- The shape of a meeting page, not a sentence: two rails and a body. A bare line of
+       text gives a reader nothing to anticipate and makes the layout jump when the real
+       content lands. -->
+  <div class="mtg__shell" aria-busy="true">
+    <aside class="mtg__side mtg__side--left" aria-hidden="true">
+      <span class="skel skel--line"></span>
+      <span class="skel skel--line"></span>
+      <span class="skel skel--line"></span>
+    </aside>
+    <div>
+      <span class="skel skel--panel"></span>
+      <span class="sr-only" role="status">{{ 'meetings.loading' | t }}</span>
+    </div>
+  </div>
 } @else if (error()) {
   <p class="mtg__status mtg__status--error" role="alert">{{ 'meetings.error' | t }}</p>
 } @else if (meeting(); as m) {

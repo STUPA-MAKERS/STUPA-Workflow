@@ -1,4 +1,4 @@
-<app-page-header [title]="'budget.title' | t" [subtitle]="'budget.subtitle' | t">
+<app-page-header [title]="'budget.title' | t" [subtitle]="'budget.subtitle' | t" [rail]="true">
   <div actions class="inline-flex items-center gap-2">
     <app-button variant="secondary" size="sm" (click)="overviewOpen.set(true)">
       <span class="inline-flex items-center gap-2">
@@ -19,6 +19,22 @@
 
 @if (error()) {
   <p class="bd__status bd__status--error" role="alert">{{ 'budget.error' | t }}</p>
+} @else if (loading()) {
+  <!-- Never the empty state while loading. "There are no cost centres" and "they have
+       not arrived yet" are different claims, and the first one is false during every
+       load. The placeholder holds the shape of the layout so the page does not jump
+       when the real tree lands. -->
+  <div class="bd__layout" aria-busy="true">
+    <aside class="bd__nav" aria-hidden="true">
+      <span class="skel skel--line"></span>
+      <span class="skel skel--line"></span>
+      <span class="skel skel--line"></span>
+    </aside>
+    <main class="bd__main">
+      <span class="skel skel--panel"></span>
+      <span class="sr-only" role="status">{{ 'budget.loading' | t }}</span>
+    </main>
+  </div>
 } @else if (!tree().length) {
   <section class="bd__empty">
     <h2 class="bd__emptyTitle">{{ 'budget.empty.title' | t }}</h2>

@@ -22,7 +22,10 @@ import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [BreadcrumbsComponent],
-  host: { '[class.ph--flush]': 'flush()' },
+  host: {
+    '[class.ph--flush]': 'flush()',
+    '[class.ph--rail]': 'rail()',
+  },
   templateUrl: './page-header.component.html',
   styleUrl: './page-header.component.scss',
 })
@@ -38,4 +41,21 @@ export class PageHeaderComponent {
    * band under the title grows to the sum of the two.
    */
   readonly flush = input(false);
+
+  /**
+   * Follow a rail layout: cap the header at `--layout-max-width` and centre it.
+   *
+   * A rail page puts its content in a three-column grid — a rail that breaks out into
+   * the margin, a main column capped at `--layout-max-width`, and a matching margin on
+   * the other side — so the content is CENTRED. Such a page is also a `wide` route,
+   * which removes the cap from `.main`. Without this the header filled the viewport and
+   * started at the gutter while the table it titles started wherever the centred column
+   * began: at 1920px the title sat at x=24 and its table at x=363. Narrow viewports
+   * collapse the outer columns to zero, which is why it stayed hidden.
+   *
+   * Do NOT set it on a wide page whose content really does start at the gutter. There
+   * the full-width header is correct, and that case is why the cap was dropped in the
+   * first place.
+   */
+  readonly rail = input(false);
 }

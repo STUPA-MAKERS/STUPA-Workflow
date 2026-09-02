@@ -567,6 +567,20 @@ describe('ApplicationsListComponent', () => {
     http.verify();
   });
 
+  it('keeps the table on screen while loading instead of replacing it with text', async () => {
+    // The page used to hide the whole table behind `@if (loading())` and render a
+    // sentence, so the list vanished on every filter and sort and the first load was a
+    // bare line where a table was about to appear. The table owns the state now: it
+    // keeps its header and column widths and draws skeleton rows.
+    const { fixture, container, cmp } = await setup();
+    cmp.loading.set(true);
+    fixture.detectChanges();
+
+    expect(container.querySelector('table')).not.toBeNull();
+    expect(container.querySelectorAll('th').length).toBeGreaterThan(0);
+    expect(container.querySelectorAll('.dt__skeleton-row').length).toBeGreaterThan(0);
+  });
+
   it('ignores loadMore while loading, while already loading more, or when nothing is left', async () => {
     const { http, cmp, detectChanges } = await setup();
     flushTypes(http);

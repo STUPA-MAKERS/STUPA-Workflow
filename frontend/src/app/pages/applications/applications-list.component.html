@@ -1,4 +1,5 @@
 <app-page-header
+  [rail]="true"
   [title]="'applications.list.title' | t"
 >
   <div actions class="apps__headActions">
@@ -95,16 +96,19 @@
   </div>
 </aside>
 <div class="apps__main">
-@if (loading()) {
-  <p class="apps__status" aria-live="polite">{{ 'applications.list.loading' | t }}</p>
-} @else if (error()) {
+@if (error()) {
   <p class="apps__status apps__status--error" role="alert">
     {{ 'applications.list.error' | t }}
   </p>
 } @else {
+  <!-- The table owns the loading state. Hiding it behind a line of text made the whole
+       list vanish on every filter and sort, and made the first load a bare sentence
+       where a table was about to appear. The table keeps its header and column widths
+       and draws skeleton rows instead. -->
   <app-applications-table
     [rows]="tableRows()"
     [sort]="sortState()"
+    [loading]="loading()"
     [emptyText]="'applications.list.empty' | t"
     (sortChange)="onSort($event)"
   />

@@ -529,6 +529,35 @@ describe('BudgetDashboardComponent (#17)', () => {
     http.verify();
   });
 
+  it('never claims the budget is empty while it is still loading', async () => {
+    // "There are no cost centres" and "they have not arrived yet" are different claims.
+    // The page used to render the empty panel on every load, because the template asked
+    // whether the tree was empty and never whether it was still loading.
+    const view = await render(BudgetDashboardComponent, {
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        { provide: AuthService, useValue: authStub() },
+      ],
+    });
+    const http = TestBed.inject(HttpTestingController);
+    const c = view.fixture.componentInstance as unknown as Inst;
+    view.fixture.detectChanges();
+
+    expect(c.loading()).toBe(true);
+    expect(view.container.querySelector('.bd__empty')).toBeNull();
+    expect(view.container.querySelector('.skel')).toBeTruthy();
+    expect(view.container.querySelector('[aria-busy="true"]')).toBeTruthy();
+
+    // Only once the answer really is "none" does the empty state appear.
+    http.expectOne((r) => r.url.endsWith('/budgets')).flush([]);
+    view.fixture.detectChanges();
+    expect(view.container.querySelector('.bd__empty')).toBeTruthy();
+    expect(view.container.querySelector('.skel')).toBeNull();
+    http.verify();
+  });
+
   it('prunes hidden cost centres from the visible tree and tops', async () => {
     const tree = [
       node({
