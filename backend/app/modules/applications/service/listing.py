@@ -270,8 +270,12 @@ class ListingOps(ApplicationsServiceBase):
         from app.modules.flow.service import FlowService
 
         flow = FlowService(self.session)
-        is_admin = "admin" in principal.roles
-        can_transition = is_admin or principal.has("application.transition")
+        # Both go through `Principal.has`, never through `principal.roles`: `has` grants
+        # the admin role every right and still applies the OAuth scope cap. A vote state
+        # is actionable only for someone who may actually cast, and `vote.cast` is in
+        # FORBIDDEN_PERMISSIONS, so no token ever sees one as a task.
+        can_cast = principal.has("vote.cast")
+        can_transition = principal.has("application.transition")
 
         apps = (
             await self.session.scalars(
@@ -301,7 +305,7 @@ class ListingOps(ApplicationsServiceBase):
                 continue
             ok = False
             if s.kind == "vote":
-                if is_admin:
+                if can_cast:
                     ok = True
                 else:
                     cfg = s.config if isinstance(s.config, dict) else {}

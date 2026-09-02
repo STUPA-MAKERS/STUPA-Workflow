@@ -752,7 +752,11 @@ class ProtocolService:
             cd = await resolve_cd_variant_by_key(
                 self.session, self.storage, protocol.cd_variant
             )
-            variant = cd.base_variant if cd else protocol_variant_for(protocol.cd_variant)
+            # A protocol always renders as a protocol. The design contributes logos, it
+            # does not pick the document shape: `cd.base_variant` here rendered the
+            # protocol of a report-based design as a report, without the TOP numbering,
+            # the vote boxes and the signature page.
+            variant = protocol_variant_for(protocol.cd_variant)
             config = cd_render_config(cd) if cd else None
             assets = cd.assets if cd else None
             # RCE protection: the user-written body can carry the Markdown `eval`

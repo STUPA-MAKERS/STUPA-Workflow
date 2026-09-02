@@ -69,8 +69,12 @@ class PermissionOps(MeetingServiceBase):
         An admin passes. A gremium role with `vote.cast` passes. A voting delegation
         of this meeting that names the principal also passes. The last case covers an
         external substitute.
+
+        The admin case goes through `Principal.has`, not through `principal.roles`:
+        `has` applies the OAuth scope cap, and `vote.cast` sits in
+        FORBIDDEN_PERMISSIONS, so no token can ever reach it. Voting stays human.
         """
-        if "admin" in principal.roles:
+        if principal.has("vote.cast"):
             return True
         if meeting.gremium_id in await gremium_ids_with_permission(
             self.session, principal.sub, "vote.cast"
@@ -81,9 +85,13 @@ class PermissionOps(MeetingServiceBase):
     async def is_member(self, gremium_id: UUID, principal: Principal) -> bool:
         """Check for current membership in the gremium with any role.
 
-        A member can follow the meeting live.
+        A member can follow the meeting live, and so can the holder of the global
+        `meeting.view_all` read right, which the admin role carries. That right goes
+        through `Principal.has`, so the OAuth scope cap applies: a raw `principal.roles`
+        read would give a narrowly scoped token the cross-gremium roster, which carries
+        names and email addresses.
         """
-        if "admin" in principal.roles:
+        if principal.has("meeting.view_all"):
             return True
         return gremium_id in await gremium_member_ids(self.session, principal.sub)
 
@@ -151,11 +159,10 @@ class PermissionOps(MeetingServiceBase):
         Returns:
             The visible gremium ids, or `None` for all gremien.
         """
-        if (
-            "admin" in principal.roles
-            or principal.has("meeting.manage")
-            or principal.has("meeting.view_all")
-        ):
+        # Both checks go through `Principal.has`, which grants the admin role every
+        # right and applies the OAuth scope cap. Reading `principal.roles` here would
+        # return `None` — every gremium — for a token scoped to far less.
+        if principal.has("meeting.manage") or principal.has("meeting.view_all"):
             return None
         member = await gremium_member_ids(self.session, principal.sub)
         pool = await self._substitute_pool_gremium_ids(principal.sub)

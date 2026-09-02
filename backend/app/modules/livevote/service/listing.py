@@ -245,7 +245,9 @@ class ListingOps(PermissionOps, VoteReadOps):
             if prot_ids
             else {}
         )
-        if "admin" in principal.roles or principal.has("meeting.manage"):
+        # `has` covers the admin role and applies the OAuth scope cap; a raw role read
+        # would hand a narrowly scoped token the full cross-gremium view.
+        if principal.has("meeting.manage"):
             manage_ids = write_ids = votes_mgmt_ids = vote_ids = all_gids
             my_id: UUID | None = None
         else:

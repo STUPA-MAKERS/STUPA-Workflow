@@ -109,9 +109,13 @@ class RenderPipeline:
         cd = await resolve_cd_variant(session, self.storage, doc.gremium_id)
         if cd is None:
             return await self.pytex.render_pdf(markdown, variant=doc.variant)
+        # The SHAPE of the document comes from the document, never from the design. One
+        # Gremium renders applications and protocols, so a design cannot decide which of
+        # the two this is. Passing `cd.base_variant` here rendered every application of a
+        # protocol-based design as a meeting protocol. A design contributes logos only.
         return await self.pytex.render_pdf(
             markdown,
-            variant=cd.base_variant,
+            variant=doc.variant,
             config=cd_render_config(cd),
             assets=cd.assets,
         )

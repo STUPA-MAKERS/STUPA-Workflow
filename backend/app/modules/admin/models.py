@@ -40,8 +40,12 @@ class CdVariant(UUIDPkMixin, CreatedAtMixin, Base):
     platform can hold arbitrarily many variants.
 
     ``key`` is the stable slug. It is immutable after the create, because the
-    render path and the seed data reference it. ``base_variant`` names the pytex
-    document shape that the variant builds on.
+    render path and the seed data reference it.
+
+    ``base_variant`` records which document family the design was drawn for. It is
+    DESCRIPTIVE: no render path reads it. The application render pins the report shape
+    and the protocol render pins the protocol shape, because the shape follows the kind
+    of document and not the design of the Gremium that owns it.
     """
 
     __tablename__ = "cd_variant"

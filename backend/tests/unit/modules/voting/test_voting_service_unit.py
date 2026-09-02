@@ -10,7 +10,8 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from typing import Any, ClassVar
-from uuid import uuid4
+from unittest import mock
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -724,10 +725,48 @@ async def test_absent_delegated_count_none_scalar_is_zero() -> None:
 
 
 # Object-level authorization lives in assert_can_read and get_scoped (#sec-audit).
-async def test_assert_can_read_admin_bypasses() -> None:
+async def test_assert_can_read_meeting_vote_goes_through_the_meeting_guard() -> None:
+    """Even an admin reads a meeting-bound vote through the meeting guard.
+
+    The admin used to return early here on a raw `principal.roles` read, before the
+    meeting check ran. That skipped `Principal.has`, which is where the OAuth scope cap
+    lives, so a narrowly scoped token issued to an admin read as a full admin.
+    """
+    seen: list[UUID] = []
+
+    class _Meetings:
+        def __init__(self, _session: object) -> None: ...
+
+        async def assert_can_read(self, meeting_id: UUID, _principal: object) -> None:
+            seen.append(meeting_id)
+
     svc = VotingService(fake_session())
     admin = Principal(sub="a", roles=["admin"])
-    await svc.assert_can_read(_vote(meeting_id=uuid4()), admin)  # pyright: ignore[reportArgumentType]
+    meeting_id = uuid4()
+    with mock.patch("app.modules.livevote.service.MeetingService", _Meetings):
+        await svc.assert_can_read(_vote(meeting_id=meeting_id), admin)  # pyright: ignore[reportArgumentType]
+    assert seen == [meeting_id]
+
+
+async def test_assert_can_manage_denies_a_scope_capped_admin_token() -> None:
+    """A token scoped below `vote.manage` cannot open, close or cancel a vote.
+
+    The guard used to return early on `"admin" in principal.roles`, so an agent token
+    issued to an admin with only the `read` scope managed votes. `Principal.has` applies
+    the cap; the raw role read did not.
+    """
+    svc = VotingService(fake_session())
+    capped = Principal(
+        sub="a", roles=["admin"], scope_permissions=frozenset({"application.read"})
+    )
+    with pytest.raises(ForbiddenError):
+        await svc.assert_can_manage_group("stupa", None, capped)
+
+
+async def test_assert_can_manage_allows_an_admin_session() -> None:
+    """The cookie session of an admin is uncapped and still manages votes."""
+    svc = VotingService(fake_session())
+    await svc.assert_can_manage_group("stupa", None, Principal(sub="a", roles=["admin"]))
 
 
 async def test_assert_can_read_sessionless_with_permission() -> None:
