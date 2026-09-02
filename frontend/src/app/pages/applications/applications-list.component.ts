@@ -93,6 +93,18 @@ export class ApplicationsListComponent implements OnDestroy {
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
   readonly typeId = signal('');
   readonly state = signal('');
+  /**
+   * Which rows to show. Archived applications leave the working list by default; this is
+   * how someone goes looking for one.
+   *
+   * Tri-state, because "only the archived ones" and "both" are different questions.
+   */
+  readonly archived = signal<'false' | 'true' | 'all'>('false');
+  readonly archivedOptions = computed<SelectOption[]>(() => [
+    { value: 'false', label: this.i18n.translate('applications.list.filter.archivedHide') },
+    { value: 'true', label: this.i18n.translate('applications.list.filter.archivedOnly') },
+    { value: 'all', label: this.i18n.translate('applications.list.filter.archivedAll') },
+  ]);
 
   readonly amountMin = signal('');
   readonly amountMax = signal('');
@@ -124,6 +136,8 @@ export class ApplicationsListComponent implements OnDestroy {
         this.amountMax(),
         this.createdFrom(),
         this.createdTo(),
+        // Anything other than the default is a filter the reader has set.
+        this.archived() === 'false' ? '' : this.archived(),
       ].filter((v) => String(v ?? '').trim() !== '').length,
   );
 
@@ -199,6 +213,8 @@ export class ApplicationsListComponent implements OnDestroy {
       this.topf = pm.get('topf') ?? '';
       this.sortField.set(pm.get('sort') === 'amount' ? 'amount' : 'createdAt');
       this.sortOrder.set(pm.get('order') === 'asc' ? 'asc' : 'desc');
+      const arch = pm.get('archived');
+      this.archived.set(arch === 'true' || arch === 'all' ? arch : 'false');
       this.reload();
     });
 
@@ -341,7 +357,7 @@ export class ApplicationsListComponent implements OnDestroy {
   }
 
   /** Reset the list after a filter or sort change and reload page 0. */
-  private reload(): void {
+  protected reload(): void {
     this.nextOffset = 0;
     this.items.set([]);
     this.total.set(0);
@@ -363,6 +379,9 @@ export class ApplicationsListComponent implements OnDestroy {
     if (this.amountMax().trim()) query.amountMax = Number(this.amountMax());
     if (this.createdFrom().trim()) query.createdFrom = this.createdFrom();
     if (this.createdTo().trim()) query.createdTo = this.createdTo();
+    // Only sent when it is not the server's own default, so the URL and the request
+    // stay clean for the case everyone is in.
+    if (this.archived() !== 'false') query.archived = this.archived();
     query.sort = this.sortField();
     query.order = this.sortOrder();
     return query;

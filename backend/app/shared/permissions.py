@@ -27,6 +27,10 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     # stays SEPARATE from application.manage, which covers the edit only. Grant it
     # deliberately.
     "application.delete",
+    # Move an application out of the working list and back. Reversible and destructive of
+    # nothing, so it is NOT folded into application.delete; but it decides what everyone
+    # else sees by default, so it is not part of application.manage either.
+    "application.archive",
     "form.configure",
     "flow.configure",
     "vote.cast",

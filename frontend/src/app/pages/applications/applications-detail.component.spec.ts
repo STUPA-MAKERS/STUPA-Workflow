@@ -1186,4 +1186,44 @@ describe('ApplicationsDetailComponent', () => {
     const http = view.fixture.debugElement.injector.get(HttpTestingController);
     for (const req of http.match(() => true)) req.flush(null, { status: 404, statusText: 'x' });
   });
+
+  describe('archiving', () => {
+    it('offers no archive control without the permission', async () => {
+      const { http, detectChanges } = await setup(['application.read']);
+      flushAll(http);
+      detectChanges();
+      expect(screen.queryByRole('button', { name: /Archivieren/ })).not.toBeInTheDocument();
+    });
+
+    it('archives without asking for confirmation, because it is reversible', async () => {
+      // The delete and the erasure request beside it both confirm. This one does not:
+      // the way back is one click on the same button, and a confirm would imply a risk
+      // that is not there.
+      const { http, detectChanges } = await setup(['application.read', 'application.archive']);
+      flushAll(http);
+      detectChanges();
+
+      await userEvent.click(screen.getByRole('button', { name: /Archivieren/ }));
+      const req = http.expectOne((r) => r.url.endsWith('/archive') && r.method === 'POST');
+      req.flush({ ...appWire(), archivedAt: '2026-09-02T10:00:00Z' });
+      detectChanges();
+
+      expect(screen.getByRole('button', { name: /Aus Archiv holen/ })).toBeInTheDocument();
+    });
+
+    it('says on the page that an application is archived', async () => {
+      // It looks exactly like an active one, and someone arriving from a link has no
+      // other way to know.
+      const { http, detectChanges } = await setup(['application.read']);
+      http.expectOne(url('')).flush({ ...appWire(), archivedAt: '2026-09-02T10:00:00Z' });
+      http.expectOne(url('/versions')).flush(VERSIONS);
+      http.expectOne(url('/comments')).flush(COMMENTS);
+      for (const req of http.match((r) => r.method === 'GET' && r.url === '/api/budgets')) {
+        req.flush([]);
+      }
+      flushForm(http);
+      detectChanges();
+      expect(screen.getByText(/Archiviert am/)).toBeInTheDocument();
+    });
+  });
 });

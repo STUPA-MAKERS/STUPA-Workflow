@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -97,6 +98,53 @@ class EditOps(ApplicationsServiceBase):
             ) from exc
         # The UPDATE expires ``updated_at``, a server-side onupdate column. Reload
         # it before serializing, to avoid lazy IO outside an await.
+        await self.session.refresh(app)
+        return await self._to_out(app, include_pii=False)
+
+    async def set_archived(
+        self, application_id: UUID, *, archived: bool, actor: str | None
+    ) -> ApplicationOut:
+        """Move an application out of the working list, or bring it back.
+
+        Archiving is orthogonal to the flow: it can happen in any state, because the flow
+        records where a decision stands and this records whether anyone still needs to
+        look. It is also NOT anonymization — nothing is hidden and nothing is deleted, and
+        `be-privacy` owns the DSGVO erasure that people will confuse this with.
+
+        A plain column change writes no timeline entry and no audit entry by itself, which
+        a flow transition would have done for free. Both directions are therefore recorded
+        explicitly. The entry carries id references and the direction, never raw PII.
+
+        Setting the state it already has is a no-op rather than an error: two clicks on
+        the same row should not fail, and re-archiving must not overwrite who archived it
+        first.
+        """
+        app = await self._get_app(application_id)
+        already = app.archived_at is not None
+        if already == archived:
+            return await self._to_out(app, include_pii=False)
+
+        await audit_record(
+            self.session,
+            actor=actor,
+            action=(
+                AuditAction.APPLICATION_ARCHIVE
+                if archived
+                else AuditAction.APPLICATION_UNARCHIVE
+            ),
+            target_type="application",
+            target_id=str(app.id),
+            data={
+                "typeId": str(app.type_id),
+                "gremiumId": str(app.gremium_id) if app.gremium_id else None,
+                "currentStateId": (
+                    str(app.current_state_id) if app.current_state_id else None
+                ),
+            },
+        )
+        app.archived_at = datetime.now(UTC) if archived else None
+        app.archived_by = actor if archived else None
+        await self.session.commit()
         await self.session.refresh(app)
         return await self._to_out(app, include_pii=False)
 

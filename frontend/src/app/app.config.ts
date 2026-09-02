@@ -11,6 +11,7 @@ import { provideRouter, withComponentInputBinding, withInMemoryScrolling } from 
 import { authInterceptor } from '@core/auth/auth.interceptor';
 import { AuthService } from '@core/auth/auth.service';
 import { mockApiInterceptor } from '@core/api/mock-api.interceptor';
+import { cacheInterceptor } from '@core/cache/cache.interceptor';
 import { loadingInterceptor } from '@core/loading/loading.interceptor';
 import { LoadingService } from '@core/loading/loading.service';
 import { USE_MOCK_API } from '@core/api/api.config';
@@ -46,8 +47,11 @@ export const appConfig: ApplicationConfig = {
     provideHttpClient(
       withInterceptors(
         isDevMode()
-          ? [loadingInterceptor, authInterceptor, mockApiInterceptor]
-          : [loadingInterceptor, authInterceptor],
+          // The cache sits INSIDE the loading interceptor: a served-from-cache answer
+          // still counts as a completed request for the overlay, and the auth layer
+          // must run for the revalidation that follows.
+          ? [loadingInterceptor, cacheInterceptor, authInterceptor, mockApiInterceptor]
+          : [loadingInterceptor, cacheInterceptor, authInterceptor],
       ),
     ),
     {

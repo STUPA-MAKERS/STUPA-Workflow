@@ -116,6 +116,12 @@ export interface ApplicationListQuery {
   order?: 'asc' | 'desc';
   /** Own applications only. It forces the owner filter even with `application.read`. */
   mine?: boolean;
+  /**
+   * Archived rows. `'false'` (the server default) hides them, `'true'` shows only those,
+   * `'all'` shows both. A tri-state rather than a boolean, because "only the archived
+   * ones" and "both" are different questions.
+   */
+  archived?: 'false' | 'true' | 'all';
   limit?: number;
   offset?: number;
 }
@@ -158,6 +164,7 @@ export interface ApplicationOutWire {
   applicant?: ApplicantOutWire | null;
   canEdit?: boolean;
   isOwner?: boolean;
+  archivedAt?: IsoDateTime | null;
 }
 
 /** `ApplicationListItem`. A list entry without `data` and without `applicant`. */
@@ -172,6 +179,7 @@ export interface ApplicationListItemWire {
   currency?: string | null;
   createdAt: IsoDateTime;
   updatedAt: IsoDateTime;
+  archivedAt?: IsoDateTime | null;
 }
 
 /** `ApplicationCreated`. The 201 response of `POST /applications`. It holds only the id. */
@@ -415,6 +423,14 @@ export interface Application {
   /** True if the requester is the creator, that is the applicant. It gates the
    *  anonymization request under GDPR Art. 17. Only the data subject may ask. */
   isOwner: boolean;
+  /**
+   * When it was archived, or null. A timestamp rather than a flag, so the view can say
+   * WHEN without a second field.
+   *
+   * Archiving is not anonymisation: the record is complete and readable, it has only
+   * left the working list. `be-privacy` owns the DSGVO erasure people confuse this with.
+   */
+  archivedAt: IsoDateTime | null;
 }
 
 export interface ApplicationListItem {
@@ -428,6 +444,8 @@ export interface ApplicationListItem {
   currency: string | null;
   createdAt: IsoDateTime;
   updatedAt: IsoDateTime;
+  /** Set when the row is archived, so a combined list can mark it. */
+  archivedAt: IsoDateTime | null;
 }
 
 /** Result of `POST /applications`, frontend view. */

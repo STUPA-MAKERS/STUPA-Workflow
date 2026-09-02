@@ -259,6 +259,7 @@ class ApplicationsServiceBase:
             applicant=applicant_out,
             canEdit=can_edit,
             isOwner=is_owner,
+            archivedAt=app.archived_at,
         )
 
     async def _author_names(self, subs: set[str]) -> dict[str, str]:

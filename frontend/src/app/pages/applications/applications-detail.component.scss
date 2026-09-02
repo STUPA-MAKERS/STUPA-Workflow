@@ -469,3 +469,18 @@ formly-form formly-group > formly-field + formly-field {
 .det__backLink:hover {
   background: var(--color-surface-sunken);
 }
+
+/* An archived application looks exactly like an active one, and someone arriving from a
+   link has no other way to tell. Muted rather than alarming: nothing is wrong with it,
+   it has only left the working list. */
+.det__archived {
+  width: 100%;
+  max-width: var(--layout-max-width);
+  margin-inline: auto;
+  padding: var(--space-2) var(--space-3);
+  border-inline-start: 3px solid var(--color-border-strong);
+  background: var(--color-surface-sunken);
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+}

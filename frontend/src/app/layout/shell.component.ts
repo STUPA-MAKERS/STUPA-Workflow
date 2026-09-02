@@ -23,6 +23,7 @@ import { LOCATION } from '@core/browser/location.token';
 import { I18nService } from '@core/i18n/i18n.service';
 import { CommandPaletteComponent } from '../features/search/command-palette.component';
 import { searchShortcutLabel } from '../features/search/shortcut';
+import { PrefetchService } from '@core/cache/prefetch.service';
 import { ThemeService } from '@core/theme/theme.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { Locale } from '@core/i18n/translations';
@@ -68,6 +69,11 @@ interface NavItem {
 export class ShellComponent {
   /** `⌘K` only where that key exists. Computed, so a language switch re-spells it. */
   readonly searchShortcut = computed(() => searchShortcutLabel(this.i18n.locale()));
+
+  // Injected for its side effect: it warms the reference-data cache after sign-in.
+  // Nothing reads it, and that is the point — the pages that need the data find it
+  // in the cache rather than being coupled to a prefetch they did not ask for.
+  private readonly prefetch = inject(PrefetchService);
 
   readonly theme = inject(ThemeService);
   readonly i18n = inject(I18nService);

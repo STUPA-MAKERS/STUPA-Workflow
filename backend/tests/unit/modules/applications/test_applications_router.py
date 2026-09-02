@@ -128,6 +128,10 @@ class _FakeService:
         self.deleted = application_id
         self.deleted_actor = actor
 
+    async def set_archived(self, application_id, *, archived, actor=None):  # noqa: ANN001
+        self.archived_call = (application_id, archived, actor)
+        return _out(application_id, with_pii=False)
+
     async def timeline(self, application_id, *, allow_unconfirmed=True):  # noqa: ANN001
         return [
             TimelineEventOut(
@@ -440,6 +444,62 @@ def test_delete_application_permission_holder(
     r = client.delete(f"/api/applications/{app_id}")
     assert r.status_code == 204
     assert fake_service.deleted == app_id
+
+
+def test_archive_needs_its_own_permission(app: FastAPI, client: TestClient) -> None:
+    """`application.manage` covers editing. Archiving decides what everyone else sees by
+    default, so it needs its own key — and it is not `application.delete` either, because
+    it destroys nothing and is reversible.
+    """
+    _as_principal(app, "application.manage")
+    r = client.post(f"/api/applications/{uuid4()}/archive")
+    assert r.status_code == 403
+    assert r.json()["code"] == "forbidden"
+
+
+def test_archive_and_unarchive_reach_the_service(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    app_id = uuid4()
+    app.dependency_overrides[get_current_principal] = lambda: Principal(
+        sub="office", roles=["office"], permissions={"application.archive"}
+    )
+    app.dependency_overrides[get_current_applicant] = lambda: None
+
+    assert client.post(f"/api/applications/{app_id}/archive").status_code == 200
+    assert fake_service.archived_call == (app_id, True, "office")
+
+    assert client.delete(f"/api/applications/{app_id}/archive").status_code == 200
+    assert fake_service.archived_call == (app_id, False, "office")
+
+
+def test_an_applicant_cannot_archive(app: FastAPI, client: TestClient) -> None:
+    # The applicant token authenticates for one application; archiving is a decision
+    # about the committee's working list and never theirs to make.
+    app_id = uuid4()
+    _as_applicant(app, app_id, "edit")
+    assert client.post(f"/api/applications/{app_id}/archive").status_code == 401
+
+
+def test_the_list_hides_archived_applications_by_default(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    _as_principal(app, "application.read")
+    client.get("/api/applications")
+    assert fake_service.list_kwargs["archived"] is False
+
+
+def test_the_list_can_ask_for_only_archived_or_for_both(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    # A tri-state, because "only the archived ones" and "both" are different questions
+    # and a boolean can answer only one of them.
+    _as_principal(app, "application.read")
+    client.get("/api/applications", params={"archived": "true"})
+    assert fake_service.list_kwargs["archived"] is True
+
+    client.get("/api/applications", params={"archived": "all"})
+    assert fake_service.list_kwargs["archived"] is None
 
 
 def test_delete_application_manager_forbidden(app: FastAPI, client: TestClient) -> None:

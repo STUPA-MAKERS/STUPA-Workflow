@@ -256,6 +256,21 @@ export class ApiClient {
     return this.http.delete<void>(`${this.base}/applications/${id}`);
   }
 
+  /**
+   * Move an application out of the working list, or bring it back.
+   *
+   * Reversible, and it destroys nothing: an archived application stays fully readable.
+   * Not to be confused with `requestErasure`, which is the GDPR Art. 17 path.
+   */
+  setApplicationArchived(id: Uuid, archived: boolean): Observable<Application> {
+    const url = `${this.base}/applications/${id}/archive`;
+    const lang = this.i18n.locale();
+    const call = archived
+      ? this.http.post<ApplicationOutWire>(url, {})
+      : this.http.delete<ApplicationOutWire>(url);
+    return call.pipe(map((wire) => mapApplication(wire, lang)));
+  }
+
   /** POST /applications/{id}/erasure-request — file a GDPR Art. 17 erasure request. */
   requestErasure(id: Uuid): Observable<void> {
     return this.http.post<void>(`${this.base}/applications/${id}/erasure-request`, {});

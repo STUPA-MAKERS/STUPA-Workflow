@@ -26,6 +26,7 @@ from app.deps import (
     require_principal,
 )
 from app.modules.applications.access import (
+    ARCHIVE_PERMISSION,
     DELETE_PERMISSION,
     EDIT_ANY_PERMISSION,
     MANAGE_PERMISSION,
@@ -225,12 +226,19 @@ async def list_applications(
     # "My applications" forces the owner filter even for a principal that holds
     # application.read. Without it, that principal would see every application.
     mine: Annotated[bool, Query()] = False,
+    # Archived applications leave the working list by default, so nobody has to remember
+    # to exclude them. `archived=true` lists only those; `archived=all` lists both.
+    archived: Annotated[Literal["false", "true", "all"], Query()] = "false",
 ) -> Page[ApplicationListItem]:
     """List applications with filters, sorting and paging.
 
     A principal without ``application.read`` and without the admin role sees the
     own applications (``created_by``) plus the committee read scope.
     ``mine=true`` forces the pure owner filter, also for an authorized reader.
+
+    ``archived`` hides archived applications by default. A tri-state string rather than a
+    boolean, because "only the archived ones" and "both" are different questions and a
+    boolean can only answer one of them.
     """
     # `Principal.has` is the single RBAC chokepoint: it grants every right to the admin
     # role AND applies the OAuth scope cap. Reading `principal.roles` directly would skip
@@ -244,6 +252,7 @@ async def list_applications(
         budget_pot_id=budget_pot_id,
         budget_id=budget_id,
         q=q,
+        archived={"false": False, "true": True, "all": None}[archived],
         amount_min=amount_min,
         amount_max=amount_max,
         created_from=created_from,
@@ -415,6 +424,46 @@ async def delete_application(
     delete either. The delete is irreversible.
     """
     await service.delete(application_id, actor=principal.sub)
+
+
+@router.post(
+    "/applications/{application_id}/archive",
+    response_model=ApplicationOut,
+    responses=_errors(401, 403, 404),
+)
+async def archive_application(
+    application_id: UUID,
+    service: ServiceDep,
+    principal: Annotated[Principal, Depends(require_principal(ARCHIVE_PERMISSION))],
+) -> ApplicationOut:
+    """Move an application out of the working list.
+
+    Reversible, and nothing is hidden or deleted: an archived application stays fully
+    readable to everyone who could read it before. This is NOT the DSGVO erasure, which
+    lives in `be-privacy` and destroys PII.
+
+    Archiving from any state is allowed on purpose. The flow records where a decision
+    stands; this records whether anyone still needs to look.
+
+    Archiving an already archived application answers 200 and changes nothing, rather
+    than failing: a second click should not be an error, and it must not overwrite who
+    archived it first.
+    """
+    return await service.set_archived(application_id, archived=True, actor=principal.sub)
+
+
+@router.delete(
+    "/applications/{application_id}/archive",
+    response_model=ApplicationOut,
+    responses=_errors(401, 403, 404),
+)
+async def unarchive_application(
+    application_id: UUID,
+    service: ServiceDep,
+    principal: Annotated[Principal, Depends(require_principal(ARCHIVE_PERMISSION))],
+) -> ApplicationOut:
+    """Bring an application back into the working list. Audited like the archive."""
+    return await service.set_archived(application_id, archived=False, actor=principal.sub)
 
 
 @router.get(
