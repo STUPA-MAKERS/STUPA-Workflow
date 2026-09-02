@@ -84,4 +84,49 @@ describe('BrandingService', () => {
     // The EN and DE titles differ, so a change proves the computed value ran again.
     expect(en).not.toBe(de);
   });
+  describe('footer branding (public, no session required)', () => {
+    it('keeps the copyright and the legal links from the public config', () => {
+      svc.init();
+      http.expectOne((r) => r.url.endsWith('/site-config')).flush({
+        version: 3,
+        branding: {
+          appName: 'StuPa',
+          copyright: { de: '© Verfasste Studierendenschaft' },
+          legalLinks: [{ label: { de: 'Impressum' }, url: 'https://example.org/impressum' }],
+        },
+      });
+      expect(svc.copyright()).toEqual({ de: '© Verfasste Studierendenschaft' });
+      expect(svc.legalLinks()).toEqual([
+        { label: { de: 'Impressum' }, url: 'https://example.org/impressum' },
+      ]);
+    });
+
+    it('reads the PUBLIC endpoint, so a logged-out visitor sees the same footer', () => {
+      // This is the whole point of the fix: the footer used to come from
+      // /admin/site-config, which a visitor on the landing page cannot read.
+      svc.init();
+      const req = http.expectOne((r) => r.url.endsWith('/site-config'));
+      expect(req.request.url).not.toContain('/admin/');
+      req.flush({ version: 1, branding: null });
+    });
+
+    it('falls back to empty footer data when the config carries none', () => {
+      svc.init();
+      http.expectOne((r) => r.url.endsWith('/site-config')).flush({
+        version: 1,
+        branding: { appName: 'StuPa' },
+      });
+      expect(svc.copyright()).toBeNull();
+      expect(svc.legalLinks()).toEqual([]);
+    });
+
+    it('keeps the footer empty when the config cannot be loaded', () => {
+      svc.init();
+      http
+        .expectOne((r) => r.url.endsWith('/site-config'))
+        .flush(null, { status: 500, statusText: 'Server Error' });
+      expect(svc.copyright()).toBeNull();
+      expect(svc.legalLinks()).toEqual([]);
+    });
+  });
 });

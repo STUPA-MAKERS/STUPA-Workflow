@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { Router, provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import {
@@ -12,6 +12,7 @@ import { ThemeService } from '@core/theme/theme.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { AuthService } from '@core/auth/auth.service';
 import { USE_MOCK_API } from '@core/api/api.config';
+import { BrandingService } from '@core/branding/branding.service';
 import type { Principal } from '@core/api/models';
 import { createLocationMock, provideLocationMock } from '../../testing/location-mock';
 
@@ -71,6 +72,26 @@ async function setup() {
 function login(auth: AuthService, http: HttpTestingController, principal: Principal): void {
   auth.ensureLoaded().subscribe();
   http.expectOne('/api/auth/me').flush(principal);
+}
+
+/**
+ * Footer content comes from the branding service, which loads the PUBLIC site config at
+ * app start. A shell test therefore states the branding directly instead of answering an
+ * HTTP request the shell no longer makes.
+ */
+function brandingStub(
+  over: {
+    copyright?: Record<string, string> | null;
+    legalLinks?: { label: Record<string, string>; url: string }[];
+  } = {},
+) {
+  return {
+    appName: signal('STUPA'),
+    homeHeading: signal('Willkommen'),
+    copyright: signal(over.copyright ?? null),
+    legalLinks: signal(over.legalLinks ?? []),
+    init: () => undefined,
+  };
 }
 
 describe('ShellComponent', () => {
@@ -171,26 +192,20 @@ describe('ShellComponent', () => {
         provideHttpClientTesting(),
         { provide: USE_MOCK_API, useValue: false },
         provideLocationMock(createLocationMock()),
+        {
+          provide: BrandingService,
+          useValue: brandingStub({
+            copyright: { de: '© Verfasste Studierendenschaft' },
+            legalLinks: [{ label: { de: 'Impressum' }, url: 'https://example.org/impressum' }],
+          }),
+        },
       ],
-    });
-    const http = view.fixture.debugElement.injector.get(HttpTestingController);
-    http.expectOne((r) => r.url.endsWith('/admin/site-config')).flush({
-      version: 2,
-      active: {
-        logos: {},
-        footerColumns: [],
-        copyright: { de: '© Verfasste Studierendenschaft' },
-        legalLinks: [{ label: { de: 'Impressum' }, url: 'https://example.org/impressum' }],
-        freetexts: {},
-      },
-      draft: { logos: {}, footerColumns: [], copyright: {}, legalLinks: [], freetexts: {} },
-      hasDraftChanges: false,
     });
     view.fixture.detectChanges();
     const link = screen.getByRole('link', { name: 'Impressum' });
     expect(link).toHaveAttribute('href', 'https://example.org/impressum');
     expect(screen.getByText('© Verfasste Studierendenschaft')).toBeInTheDocument();
-    http.verify();
+    view.fixture.debugElement.injector.get(HttpTestingController).verify();
   });
 
   it('uses a theme-dependent wordmark and swaps it when the theme changes', async () => {
@@ -318,7 +333,9 @@ describe('ShellComponent', () => {
     http.verify();
   });
 
-  it('keeps the default footer when the site-config request errors', async () => {
+  it('keeps the default footer when the branding config is unavailable', async () => {
+    // The branding service swallows a failed load and keeps its empty defaults, so the
+    // shell sees exactly this and falls back to the built-in footer.
     const view = await render(ShellComponent, {
       providers: [
         provideRouter([]),
@@ -326,20 +343,17 @@ describe('ShellComponent', () => {
         provideHttpClientTesting(),
         { provide: USE_MOCK_API, useValue: false },
         provideLocationMock(createLocationMock()),
+        { provide: BrandingService, useValue: brandingStub() },
       ],
     });
-    const http = view.fixture.debugElement.injector.get(HttpTestingController);
-    http
-      .expectOne((r) => r.url.endsWith('/admin/site-config'))
-      .flush(null, { status: 500, statusText: 'Server Error' });
     view.fixture.detectChanges();
     const cmp = view.fixture.componentInstance as ShellComponent;
     expect(cmp.footerLinks()).toEqual([]);
     expect(cmp.footerCopyright()).toBe('');
-    http.verify();
+    view.fixture.debugElement.injector.get(HttpTestingController).verify();
   });
 
-  it('falls back to empty footer state when the active config omits links and copyright', async () => {
+  it('falls back to empty footer state when the config omits links and copyright', async () => {
     const view = await render(ShellComponent, {
       providers: [
         provideRouter([]),
@@ -347,21 +361,14 @@ describe('ShellComponent', () => {
         provideHttpClientTesting(),
         { provide: USE_MOCK_API, useValue: false },
         provideLocationMock(createLocationMock()),
+        { provide: BrandingService, useValue: brandingStub({ copyright: {}, legalLinks: [] }) },
       ],
-    });
-    const http = view.fixture.debugElement.injector.get(HttpTestingController);
-    // The active config omits legalLinks and copyright, so the fallbacks fire.
-    http.expectOne((r) => r.url.endsWith('/admin/site-config')).flush({
-      version: 1,
-      active: { logos: {}, footerColumns: [], freetexts: {} },
-      draft: { logos: {}, footerColumns: [], copyright: {}, legalLinks: [], freetexts: {} },
-      hasDraftChanges: false,
     });
     view.fixture.detectChanges();
     const cmp = view.fixture.componentInstance as ShellComponent;
     expect(cmp.footerLinks()).toEqual([]);
     expect(cmp.footerCopyright()).toBe('');
-    http.verify();
+    view.fixture.debugElement.injector.get(HttpTestingController).verify();
   });
 
   it('reloadForLocale reloads when window is available', async () => {

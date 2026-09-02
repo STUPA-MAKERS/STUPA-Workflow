@@ -26,8 +26,6 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { Locale } from '@core/i18n/translations';
 import { resolveI18n } from '@shared/forms/i18n-text';
 import { IconComponent, LoadingOverlayComponent, ToastComponent } from '@stupa-makers/ui-kit';
-import { AdminApiService } from '../pages/admin/admin-api.service';
-import type { FooterLink } from '../pages/admin/admin.models';
 
 interface NavItem {
   path: string;
@@ -69,7 +67,6 @@ export class ShellComponent {
   readonly i18n = inject(I18nService);
   readonly auth = inject(AuthService);
   readonly branding = inject(BrandingService);
-  private readonly admin = inject(AdminApiService);
   private readonly router = inject(Router);
   private readonly location = inject(LOCATION);
   private readonly route = inject(ActivatedRoute);
@@ -77,17 +74,23 @@ export class ShellComponent {
   /** Full-width content from route data `wide`, for example the budget tab with two sidebars. */
   readonly wide = signal(false);
 
-  /** Maintained footer content: legal links + copyright from the active site config. */
-  private readonly legalLinks = signal<FooterLink[]>([]);
-  private readonly copyright = signal<Record<string, string> | null>(null);
+  /* Footer content comes from the BRANDING service, which loads the public site config.
+     It used to come from `/admin/site-config`, which needs a session: a logged-out
+     visitor on the landing page or the 404 therefore always saw the built-in defaults,
+     whatever the admin had configured. It also spared every non-admin an admin request
+     on each page load. */
 
   /** Legal links for the active locale. Empty means the default footer (imprint/privacy). */
   readonly footerLinks = computed(() =>
-    this.legalLinks().map((l) => ({ url: l.url, label: resolveI18n(l.label, this.i18n.locale()) })),
+    this.branding
+      .legalLinks()
+      .map((l) => ({ url: l.url, label: resolveI18n(l.label, this.i18n.locale()) })),
   );
 
   /** Copyright line for the active locale. Empty means the default co-branding text. */
-  readonly footerCopyright = computed(() => resolveI18n(this.copyright(), this.i18n.locale()));
+  readonly footerCopyright = computed(() =>
+    resolveI18n(this.branding.copyright(), this.i18n.locale()),
+  );
 
   /**
    * Theme-dependent wordmark: black type on light, white type on dark. Both are
@@ -99,18 +102,6 @@ export class ShellComponent {
   readonly brandTarget = computed(() => (this.auth.isAuthenticated() ? '/dashboard' : '/'));
 
   constructor() {
-    // Load the active site config so the footer can show the maintained legal links
-    // and copyright. On failure or empty data the default footer applies.
-    this.admin.getSiteConfig().subscribe({
-      next: (cfg) => {
-        this.legalLinks.set(cfg.active.legalLinks ?? []);
-        this.copyright.set(cfg.active.copyright ?? null);
-      },
-      error: () => {
-        /* keep the default footer */
-      },
-    });
-
     // Full width comes from the route data. The deepest active route wins.
     this.router.events
       .pipe(
