@@ -1159,4 +1159,31 @@ describe('ApplicationsDetailComponent', () => {
     flushAttachments(http);
     http.verify();
   });
+
+  it('outlines the detail layout while it loads, never a bare sentence', async () => {
+    // The most-opened view in the platform, and it used to be replaced entirely by one
+    // line of text until the whole layout arrived at once.
+    const view = await render(ApplicationsDetailComponent, {
+      providers: [
+        provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: USE_MOCK_API, useValue: false },
+        { provide: AuthService, useValue: fakeAuth(['application.read']) },
+        {
+          provide: ActivatedRoute,
+          useValue: { paramMap: new BehaviorSubject(convertToParamMap({ id: 'app-1' })) },
+        },
+      ],
+    });
+    view.fixture.detectChanges();
+
+    expect(view.container.querySelectorAll('.skel').length).toBeGreaterThan(0);
+    expect(view.container.querySelector('[aria-busy="true"]')).toBeTruthy();
+    // The wording stays for a screen reader, because the blocks are decorative.
+    expect(view.container.querySelector('[role="status"]')).toHaveClass('sr-only');
+
+    const http = view.fixture.debugElement.injector.get(HttpTestingController);
+    for (const req of http.match(() => true)) req.flush(null, { status: 404, statusText: 'x' });
+  });
 });
