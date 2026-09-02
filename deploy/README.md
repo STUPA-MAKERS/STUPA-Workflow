@@ -51,6 +51,21 @@ revisions before the application starts.
 `migrate` can also run as its own database user (`DB_MIGRATION_URL`), separate from the
 runtime user of the application.
 
+### Orphaned application PDFs — ONE-OFF manual step
+
+Applications no longer render a PDF. Migration `a7c3f1e59d84` drops the `render_job` table,
+but the rendered files stay in the attachment bucket: a migration has a database connection
+and no MinIO credentials.
+
+Run once, after the deploy that carries the migration:
+
+```bash
+docker compose exec api python -m scripts.drop_application_pdfs           # list
+docker compose exec api python -m scripts.drop_application_pdfs --delete  # remove
+```
+
+It walks the `pdf/` prefix and skips `pdf/protocol/`, which protocols still use.
+
 ### Least-privilege database roles (security.md §4/§10) — MANUAL production step
 
 > ⚠️ **Not automatic.** Compose runs only `alembic upgrade head` (DDL/DML). It creates

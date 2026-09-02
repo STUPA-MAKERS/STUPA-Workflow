@@ -30,8 +30,7 @@ from worker.deadlines import on_startup as deadlines_on_startup
 from worker.deadlines import process_deadlines
 from worker.mail import on_startup as mail_on_startup
 from worker.mail import send_mail
-from worker.pdf import on_startup as pdf_on_startup
-from worker.pdf import render_pdf
+from worker.protocol import on_startup as protocol_on_startup
 from worker.protocol import render_protocol
 from worker.retention import process_retention
 from worker.scan import on_startup as scan_on_startup
@@ -59,10 +58,10 @@ _BACKUP_JOB_TIMEOUT_SECONDS = 7200.0
 
 
 async def _on_startup(ctx: dict[str, Any]) -> None:
-    """Set up the mail, scan, PDF render, webhook and deadline dependencies."""
+    """Set up the mail, scan, protocol render, webhook and deadline dependencies."""
     await mail_on_startup(ctx)
     await scan_on_startup(ctx)
-    await pdf_on_startup(ctx)
+    await protocol_on_startup(ctx)
     await webhook_on_startup(ctx)
     await deadlines_on_startup(ctx)
     await backup_on_startup(ctx)
@@ -110,7 +109,6 @@ class WorkerSettings:
         refresh_budget_stats,
         send_mail,
         scan_attachment,
-        render_pdf,
         render_protocol,
         func(deliver_webhook, timeout=_WEBHOOK_JOB_TIMEOUT_SECONDS),
         process_deadlines,

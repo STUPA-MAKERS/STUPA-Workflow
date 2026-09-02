@@ -130,22 +130,6 @@ async def list_comments(application_id: str) -> dict:
 
 
 @group.tool
-async def create_application_pdf(application_id: str) -> dict:
-    """Queue the PDF generation for an application.
-
-    The call runs asynchronously and returns a job. Poll `get_job(job_id)` until the
-    job is done.
-    """
-    return await api().post(f"/applications/{application_id}/pdf")
-
-
-@group.tool
-async def get_job(job_id: str) -> dict:
-    """Get the status of an async job, for example a PDF generation."""
-    return await api().get(f"/jobs/{job_id}")
-
-
-@group.tool
 async def list_tasks() -> dict:
     """List the open tasks of the logged-in user.
 

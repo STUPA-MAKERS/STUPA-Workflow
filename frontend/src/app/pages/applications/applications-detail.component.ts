@@ -2,7 +2,6 @@ import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import {
   ChangeDetectionStrategy,
   Component,
-  type OnDestroy,
   computed,
   inject,
   signal,
@@ -24,7 +23,6 @@ import type {
   ApplicationVersion,
   CommentVisibility,
   FormFieldDef,
-  RenderJob,
   Transition,
   Uuid,
 } from '@core/api/models';
@@ -64,18 +62,6 @@ interface DetailPosition {
   noOffersReason?: string;
 }
 
-/** Delay between two polls of the render job, in milliseconds. */
-const PDF_POLL_MS = 2000;
-/** Number of polls before the dialog stops and offers a manual retry. */
-const PDF_POLL_MAX = 60;
-
-/** Short failure codes the render worker writes to `RenderJob.error`. */
-const PDF_ERROR_KEYS: Record<string, TranslationKey> = {
-  no_application: 'applications.pdf.error.noApplication',
-  render_error: 'applications.pdf.error.render',
-  render_unavailable: 'applications.pdf.error.unavailable',
-};
-
 /**
  * Application detail: fields, version history with diff, comments, and status actions.
  *
@@ -108,7 +94,7 @@ const PDF_ERROR_KEYS: Record<string, TranslationKey> = {
   templateUrl: './applications-detail.component.html',
   styleUrl: './applications-detail.component.scss',
 })
-export class ApplicationsDetailComponent implements OnDestroy {
+export class ApplicationsDetailComponent {
   private readonly api = inject(ApiClient);
   private readonly budgetApi = inject(BudgetTreeApi);
   private readonly auth = inject(AuthService);
@@ -139,20 +125,6 @@ export class ApplicationsDetailComponent implements OnDestroy {
   readonly savingComment = signal(false);
   readonly deletingComment = signal<ApplicationComment | null>(null);
   readonly removingComment = signal(false);
-
-  // PDF render. `POST /applications/{id}/pdf` starts an async job. The dialog
-  // polls `GET /jobs/{id}` until the job reaches `done` or `failed`, and it
-  // gives up after PDF_POLL_MAX tries instead of spinning forever.
-  readonly pdfOpen = signal(false);
-  readonly pdfJob = signal<RenderJob | null>(null);
-  /** True while a request is in flight or the next poll is scheduled. */
-  readonly pdfPolling = signal(false);
-  /** Set when the start or a poll failed at HTTP level. */
-  readonly pdfError = signal<TranslationKey | null>(null);
-  /** The poll window ran out. The job may still finish, so the dialog says so. */
-  readonly pdfTimedOut = signal(false);
-  private pdfTimer: ReturnType<typeof setTimeout> | null = null;
-  private pdfTries = 0;
 
   /** The version history starts collapsed. The card header holds the toggle. */
   readonly historyOpen = signal(false);
@@ -461,11 +433,6 @@ export class ApplicationsDetailComponent implements OnDestroy {
     this.error.set(false);
     this.editingComment.set(null);
     this.deletingComment.set(null);
-    // A render job belongs to one application. Drop it with the page state, so
-    // no poll of the previous application keeps running.
-    this.closePdf();
-    this.pdfJob.set(null);
-
     if (!id) {
       this.notFound.set(true);
       this.loading.set(false);
@@ -927,101 +894,6 @@ export class ApplicationsDetailComponent implements OnDestroy {
         this.toast.error(this.i18n.translate(this.commentErrorKey(err.status)));
       },
     });
-  }
-
-  // --- PDF render ----------------------------------------------------------
-
-  /** True while the job waits or runs. The dialog then shows the progress. */
-  readonly pdfRunning = computed(() => {
-    const status = this.pdfJob()?.status;
-    return this.pdfPolling() || status === 'pending' || status === 'running';
-  });
-  readonly pdfDone = computed(() => this.pdfJob()?.status === 'done');
-  readonly pdfFailed = computed(() => this.pdfJob()?.status === 'failed');
-
-  /** Explanation of the short failure code the worker wrote to the job. */
-  protected pdfFailureText(): string {
-    const code = this.pdfJob()?.error ?? '';
-    return this.i18n.translate(PDF_ERROR_KEYS[code] ?? 'applications.pdf.error.generic');
-  }
-
-  /** Start a render and open the progress dialog. */
-  protected startPdf(): void {
-    if (this.pdfPolling()) return;
-    this.stopPdfPoll();
-    this.pdfJob.set(null);
-    this.pdfError.set(null);
-    this.pdfTimedOut.set(false);
-    this.pdfTries = 0;
-    this.pdfOpen.set(true);
-    this.pdfPolling.set(true);
-    this.api.createApplicationPdf(this.id).subscribe({
-      next: (job) => this.applyJob(job),
-      error: (err: { status?: number }) => {
-        this.pdfPolling.set(false);
-        this.pdfError.set(
-          err.status === 403 ? 'applications.pdf.forbidden' : 'applications.pdf.startFailed',
-        );
-      },
-    });
-  }
-
-  /** Take a job answer. An end state stops the poll. Anything else schedules
-   *  the next one, until the poll window runs out. */
-  private applyJob(job: RenderJob): void {
-    this.pdfJob.set(job);
-    if (job.status === 'done' || job.status === 'failed') {
-      this.pdfPolling.set(false);
-      return;
-    }
-    if (this.pdfTries >= PDF_POLL_MAX) {
-      this.pdfPolling.set(false);
-      this.pdfTimedOut.set(true);
-      return;
-    }
-    this.pdfTries += 1;
-    this.pdfTimer = setTimeout(() => this.pollPdf(), PDF_POLL_MS);
-  }
-
-  /** One poll step of the running job. */
-  protected pollPdf(): void {
-    const job = this.pdfJob();
-    this.pdfTimer = null;
-    if (!job) return;
-    this.pdfPolling.set(true);
-    this.pdfError.set(null);
-    this.pdfTimedOut.set(false);
-    this.api.getJob(job.id).subscribe({
-      next: (updated) => this.applyJob(updated),
-      error: () => {
-        this.pdfPolling.set(false);
-        this.pdfError.set('applications.pdf.pollFailed');
-      },
-    });
-  }
-
-  /** "Check again" after the poll gave up or a poll failed. */
-  protected retryPdf(): void {
-    this.pdfTries = 0;
-    this.pollPdf();
-  }
-
-  /** Close the dialog and drop the poll. The job keeps running on the server. */
-  protected closePdf(): void {
-    this.stopPdfPoll();
-    this.pdfPolling.set(false);
-    this.pdfOpen.set(false);
-  }
-
-  private stopPdfPoll(): void {
-    if (this.pdfTimer !== null) {
-      clearTimeout(this.pdfTimer);
-      this.pdfTimer = null;
-    }
-  }
-
-  ngOnDestroy(): void {
-    this.stopPdfPoll();
   }
 
   /** Fire a manual transition with POST /transition, then reload the application.

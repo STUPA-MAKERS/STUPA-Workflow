@@ -1,25 +1,19 @@
 """The corporate design of a Gremium must reach the renderer.
 
-The resolver and the CRUD around it are covered elsewhere. These tests cover the
-seam: the render paths must turn a resolved design into the pytex `config` and
-the asset bytes, and they must keep working when a Gremium carries no design.
+The resolver and the CRUD around it are covered elsewhere. These tests cover
+`cd_render_config`: what a resolved design turns into as pytex `config`, and what an
+empty slot must NOT turn into.
+
+The end-to-end seam — config and assets actually reaching pytex, and the design never
+deciding the document shape — is pinned on the protocol render in
+`tests/unit/modules/protocol/test_protocol_service.py`.
 """
 
 from __future__ import annotations
 
-import uuid
 from typing import Any
 
-import pytest
-
 from app.modules.admin.cd_resolver import ResolvedCdVariant, cd_render_config
-from app.modules.pdf import render as render_mod
-from app.modules.pdf.models import RenderJob
-from app.modules.pdf.render import RenderPipeline
-from tests._support.files_fakes import FakeStorage
-from tests._support.pdf_fakes import FakePdfSession, FakePytex, FakeSessionmaker
-
-GREMIUM_ID = uuid.uuid4()
 
 
 def _resolved(**over: Any) -> ResolvedCdVariant:
@@ -31,80 +25,6 @@ def _resolved(**over: Any) -> ResolvedCdVariant:
     }
     base.update(over)
     return ResolvedCdVariant(**base)
-
-
-class _DocStub:
-    variant = "report"
-    gremium_id = GREMIUM_ID
-
-
-class _SvcStub:
-    def __init__(self, _session: object) -> None: ...
-
-    async def load_application_doc(self, _app_id: uuid.UUID) -> _DocStub:
-        return _DocStub()
-
-
-@pytest.fixture(autouse=True)
-def _stub_doc(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(render_mod, "PdfService", _SvcStub)
-    monkeypatch.setattr(render_mod, "build_application_markdown", lambda _doc: "# md")
-
-
-def _run(monkeypatch: pytest.MonkeyPatch, resolved: ResolvedCdVariant | None) -> FakePytex:
-    async def _fake_resolve(*_args: object, **_kw: object) -> ResolvedCdVariant | None:
-        return resolved
-
-    monkeypatch.setattr(render_mod, "resolve_cd_variant", _fake_resolve)
-    job = RenderJob(application_id=uuid.uuid4(), status="pending")
-    job.id = uuid.uuid4()
-    pytex = FakePytex()
-    pipe = RenderPipeline(
-        sessionmaker=FakeSessionmaker(FakePdfSession(store={job.id: job})),  # type: ignore[arg-type]
-        pytex=pytex,  # type: ignore[arg-type]
-        storage=FakeStorage(),  # type: ignore[arg-type]
-    )
-    import asyncio
-
-    assert asyncio.run(pipe.run(job.id)) == "done"
-    return pytex
-
-
-def test_a_resolved_design_reaches_pytex_as_config_and_assets(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    pytex = _run(monkeypatch, _resolved())
-
-    assert pytex.configs[0] == {
-        "logos": ["STUPA", "brand.png"],
-        "footer_logos": ["brand.png"],
-    }
-    # Only the uploaded logo carries bytes. The vendored one ships with pytex.
-    assert pytex.assets[0] == {"brand.png": b"\x89PNG\r\n\x1a\n"}
-
-
-def test_the_design_never_decides_the_document_shape(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """An application renders as a report even under a protocol-based design.
-
-    The design used to be passed to pytex as the shape, so every application of a
-    Gremium whose design was drawn for protocols came out as a meeting protocol. One
-    Gremium renders both kinds, so the shape can only come from the document.
-    """
-    pytex = _run(monkeypatch, _resolved(base_variant="protocol"))
-
-    assert pytex.calls[0][1] == _DocStub.variant == "report"
-
-
-def test_without_a_design_the_render_keeps_the_variant_name(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    pytex = _run(monkeypatch, None)
-
-    assert pytex.calls[0][1] == "report"
-    assert pytex.configs[0] is None
-    assert pytex.assets[0] is None
 
 
 def test_an_empty_logo_slot_stays_out_of_the_config() -> None:

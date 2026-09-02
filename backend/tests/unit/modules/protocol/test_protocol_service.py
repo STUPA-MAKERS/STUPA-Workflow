@@ -299,6 +299,24 @@ async def test_finalize_renders_user_markdown_trusted() -> None:
     assert pytex.trust_levels == [None]
 
 
+async def test_the_design_never_decides_the_document_shape() -> None:
+    """The shape comes from the document, the design only from the Gremium.
+
+    Passing the design to pytex as the shape once put every application of a
+    protocol-designed Gremium out as a meeting protocol. One Gremium renders both kinds,
+    so the two must stay separate: `cd_variant` picks `protocol-stupa` here, and it is
+    the protocol shape because a protocol is what is being rendered.
+    """
+    pytex = FakePytex(pdf=b"%PDF")
+    session = FakeSession(
+        store={MID: _meeting(), GID: _gremium("stupa")},
+        results=[result(_protocol()), result(), result(), result()],
+    )
+    await _service(session, storage=FakeStorage(), pytex=pytex).finalize(PID, now=NOW)
+
+    assert pytex.calls[0][1] == "protocol-stupa"
+
+
 async def test_finalize_uploads_and_mails_only_after_commit() -> None:
     """#pre-commit-side-effects: the storage put and the mail enqueue run after the commit.
 

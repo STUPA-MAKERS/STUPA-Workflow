@@ -140,3 +140,18 @@ class NullActionDispatcher:
                 action.type,
                 action.idempotency_key,
             )
+
+
+@dataclass(slots=True)
+class ChainActionDispatcher:
+    """Call several dispatchers in order.
+
+    Each one ignores the action types it does not handle, so the app injects a single
+    dispatcher and the flow engine knows nothing about who listens.
+    """
+
+    dispatchers: Sequence[ActionDispatcher]
+
+    async def dispatch(self, actions: Sequence[DispatchedAction]) -> None:
+        for dispatcher in self.dispatchers:
+            await dispatcher.dispatch(actions)

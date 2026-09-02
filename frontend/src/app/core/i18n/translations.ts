@@ -682,26 +682,6 @@ export const de = {
   'applications.comments.forbidden':
     'Nur die verfassende Person oder eine Antragsverwaltung darf diesen Kommentar ändern.',
   'applications.comments.gone': 'Dieser Kommentar existiert nicht mehr.',
-  'applications.pdf.create': 'PDF erzeugen',
-  'applications.pdf.title': 'Antrag als PDF',
-  'applications.pdf.queued': 'Der Auftrag wartet auf die Bearbeitung …',
-  'applications.pdf.rendering': 'Das PDF wird erzeugt …',
-  'applications.pdf.ready': 'Das PDF ist fertig.',
-  'applications.pdf.download': 'PDF öffnen',
-  'applications.pdf.noStorage':
-    'Das PDF ist fertig, aber der Dateispeicher liefert keinen Link. Bitte an die Administration wenden.',
-  'applications.pdf.timedOut':
-    'Der Auftrag läuft noch. Das dauert länger als erwartet. Bitte erneut prüfen.',
-  'applications.pdf.checkAgain': 'Erneut prüfen',
-  'applications.pdf.restart': 'Neu starten',
-  'applications.pdf.close': 'Schließen',
-  'applications.pdf.startFailed': 'Der PDF-Auftrag konnte nicht gestartet werden.',
-  'applications.pdf.pollFailed': 'Der Status des Auftrags ist nicht abrufbar.',
-  'applications.pdf.forbidden': 'Keine Berechtigung, für diesen Antrag ein PDF zu erzeugen.',
-  'applications.pdf.error.noApplication': 'Der Antrag zum Auftrag existiert nicht mehr.',
-  'applications.pdf.error.render': 'Das PDF konnte nicht erzeugt werden.',
-  'applications.pdf.error.unavailable': 'Der PDF-Dienst ist derzeit nicht erreichbar.',
-  'applications.pdf.error.generic': 'Der PDF-Auftrag ist fehlgeschlagen.',
   'applications.transitions.title': 'Aktionen',
   'applications.transitions.fallback': 'Übergang',
   'applications.transitions.forbidden': 'Sie dürfen diesen Übergang nicht ausführen.',
@@ -1379,7 +1359,6 @@ export const de = {
   'admin.flow.voteResult.tie': 'Unentschieden',
   'admin.flow.actionType.notify': 'Benachrichtigen',
   'admin.flow.actionType.webhook': 'Webhook auslösen',
-  'admin.flow.actionType.exportPdf': 'PDF exportieren',
   'admin.flow.actionType.setEditLock': 'Bearbeitung sperren',
   'admin.flow.actionType.budgetReserve': 'Budget reservieren',
   'admin.flow.actionType.budgetBook': 'Budget buchen',
@@ -1440,8 +1419,6 @@ export const de = {
     'Versendet konfigurierte E-Mail-Benachrichtigungen an die Empfänger der Regel.',
   'admin.flow.actionDesc.webhook':
     'Ruft die hinterlegten ausgehenden Webhooks für dieses Ereignis auf.',
-  'admin.flow.actionDesc.exportPdf':
-    'Erzeugt ein PDF (z. B. Beschluss/Protokoll-Auszug) und legt es ab.',
   'admin.flow.actionDesc.setEditLock':
     'Sperrt die weitere Bearbeitung des Antrags (folgt aus dem Ziel-Status).',
   'admin.flow.actionDesc.budgetReserve':
@@ -3069,26 +3046,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'applications.comments.forbidden':
     'Only the author or an application manager may change this comment.',
   'applications.comments.gone': 'This comment no longer exists.',
-  'applications.pdf.create': 'Create PDF',
-  'applications.pdf.title': 'Application as PDF',
-  'applications.pdf.queued': 'The job waits to be processed …',
-  'applications.pdf.rendering': 'The PDF is being created …',
-  'applications.pdf.ready': 'The PDF is ready.',
-  'applications.pdf.download': 'Open PDF',
-  'applications.pdf.noStorage':
-    'The PDF is ready, but the file storage gives no link. Please tell the administration.',
-  'applications.pdf.timedOut':
-    'The job still runs. This takes longer than expected. Please check again.',
-  'applications.pdf.checkAgain': 'Check again',
-  'applications.pdf.restart': 'Start again',
-  'applications.pdf.close': 'Close',
-  'applications.pdf.startFailed': 'The PDF job could not start.',
-  'applications.pdf.pollFailed': 'The status of the job is not available.',
-  'applications.pdf.forbidden': 'No permission to create a PDF for this application.',
-  'applications.pdf.error.noApplication': 'The application of this job no longer exists.',
-  'applications.pdf.error.render': 'The PDF could not be generated.',
-  'applications.pdf.error.unavailable': 'The PDF service is currently not available.',
-  'applications.pdf.error.generic': 'The PDF job failed.',
   'applications.transitions.title': 'Actions',
   'applications.transitions.fallback': 'Transition',
   'applications.transitions.forbidden': 'You are not allowed to perform this transition.',
@@ -3754,7 +3711,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.flow.voteResult.tie': 'Tie',
   'admin.flow.actionType.notify': 'Notify',
   'admin.flow.actionType.webhook': 'Trigger webhook',
-  'admin.flow.actionType.exportPdf': 'Export PDF',
   'admin.flow.actionType.setEditLock': 'Lock editing',
   'admin.flow.actionType.budgetReserve': 'Reserve budget',
   'admin.flow.actionType.budgetBook': 'Book budget',
@@ -3814,8 +3770,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.flow.actionDesc.notify':
     'Sends the configured email notifications to the rule recipients.',
   'admin.flow.actionDesc.webhook': 'Calls the configured outgoing webhooks for this event.',
-  'admin.flow.actionDesc.exportPdf':
-    'Generates a PDF (e.g. decision/protocol excerpt) and stores it.',
   'admin.flow.actionDesc.setEditLock':
     'Locks further editing of the application (follows from the target state).',
   'admin.flow.actionDesc.budgetReserve': 'Reserves the requested amount in the linked budget pot.',

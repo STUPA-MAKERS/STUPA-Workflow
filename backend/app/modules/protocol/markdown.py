@@ -40,7 +40,6 @@ try:  # marko ships with the render path (pytex_markdown). Hardening is optional
 except ImportError:  # pragma: no cover - primary regex protection works without marko
     _marko = None  # type: ignore[assignment]
 
-from app.modules.pdf.markdown import _md_escape, _yaml_scalar
 
 # RCE defense in depth.
 # In `trusted` mode pytex has a Markdown `eval` escape. A link reference definition
@@ -312,3 +311,29 @@ def demote_headings(markdown: str) -> str:
                 line = line.replace("#", "##", 1)
         out.append(line)
     return "\n".join(out)
+
+
+def _yaml_scalar(value: str) -> str:
+    """Quote a string as a safe double-quoted YAML scalar that cannot inject a directive."""
+    out = []
+    for ch in value:
+        if ch == "\\":
+            out.append("\\\\")
+        elif ch == '"':
+            out.append('\\"')
+        elif ch == "\n":
+            out.append("\\n")
+        elif ch == "\r":
+            out.append("\\r")
+        elif ch == "\t":
+            out.append("\\t")
+        elif ord(ch) < 0x20:
+            out.append(f"\\x{ord(ch):02x}")
+        else:
+            out.append(ch)
+    return '"' + "".join(out) + '"'
+
+
+def _md_escape(text: str) -> str:
+    """Minimal escape for inline Markdown text (newline → space)."""
+    return text.replace("\r\n", " ").replace("\n", " ").replace("\r", " ")

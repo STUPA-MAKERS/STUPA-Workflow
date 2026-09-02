@@ -1,9 +1,9 @@
 /**
- * Comment edit/delete and the PDF render job of the application detail page.
+ * Comment edit and delete on the application detail page.
  *
- * These live in their own spec file. The base spec of the same component is
- * already large, and one file with both blocks pushes the first TestBed compile
- * of this component over the default jest timeout under `--coverage`.
+ * Its own spec file: the base spec of the same component is already large, and one
+ * file with both blocks pushes the first TestBed compile over the default jest timeout
+ * under `--coverage`.
  */
 import { provideHttpClient } from '@angular/common/http';
 import {
@@ -12,7 +12,6 @@ import {
 } from '@angular/common/http/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
-import userEvent from '@testing-library/user-event';
 import { BehaviorSubject } from 'rxjs';
 import { ApplicationsDetailComponent } from './applications-detail.component';
 import { AuthService } from '@core/auth/auth.service';
@@ -124,16 +123,6 @@ function flushAttachments(http: HttpTestingController) {
 }
 
 // --- comment edit / delete -------------------------------------------------
-
-/** A pending render job as the POST returns it. */
-const PENDING_JOB = {
-  id: 'job-1',
-  kind: 'application_pdf',
-  status: 'pending',
-  applicationId: 'app-1',
-  resultUrl: null,
-  error: null,
-};
 
 describe('ApplicationsDetailComponent — comment edit and delete', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
@@ -286,168 +275,5 @@ describe('ApplicationsDetailComponent — comment edit and delete', () => {
     c.removingComment.set(true);
     c.doDeleteComment();
     http.verify();
-  });
-});
-
-// --- PDF render ------------------------------------------------------------
-
-describe('ApplicationsDetailComponent — PDF render', () => {
-  beforeEach(() => {
-    localStorage.setItem('ap.locale', 'de');
-    jest.useFakeTimers();
-  });
-  afterEach(() => {
-    jest.runOnlyPendingTimers();
-    jest.useRealTimers();
-  });
-
-  /** Load the page and start a render. Returns the flushed POST. */
-  async function startRender(permissions?: string[]) {
-    const ctx = await setup(permissions);
-    flushAll(ctx.http);
-    ctx.detectChanges();
-    flushAttachments(ctx.http);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const c = ctx.cmp as any;
-    c.startPdf();
-    return { ...ctx, c };
-  }
-
-  it('starts the job, polls it and offers the finished PDF', async () => {
-    const { http, detectChanges, c } = await startRender();
-    const post = http.expectOne(url('/pdf'));
-    expect(post.request.method).toBe('POST');
-    post.flush(PENDING_JOB, { status: 202, statusText: 'Accepted' });
-    detectChanges();
-    expect(screen.getByText('Der Auftrag wartet auf die Bearbeitung …')).toBeInTheDocument();
-
-    jest.advanceTimersByTime(2000);
-    http.expectOne('/api/jobs/job-1').flush({ ...PENDING_JOB, status: 'running' });
-    detectChanges();
-    expect(screen.getByText('Das PDF wird erzeugt …')).toBeInTheDocument();
-
-    jest.advanceTimersByTime(2000);
-    http
-      .expectOne('/api/jobs/job-1')
-      .flush({ ...PENDING_JOB, status: 'done', resultUrl: '/api/jobs/job-1/download' });
-    detectChanges();
-
-    expect(c.pdfDone()).toBe(true);
-    // App-relative, never a MinIO link: the browser cannot resolve the internal host.
-    expect(screen.getByRole('link', { name: 'PDF öffnen' })).toHaveAttribute(
-      'href',
-      '/api/jobs/job-1/download',
-    );
-    http.verify();
-  });
-
-  it('says so when the job finished but the store gave no link', async () => {
-    const { http, detectChanges } = await startRender();
-    http.expectOne(url('/pdf')).flush({ ...PENDING_JOB, status: 'done' });
-    detectChanges();
-    expect(
-      screen.getByText(/Dateispeicher liefert keinen Link/),
-    ).toBeInTheDocument();
-    http.verify();
-  });
-
-  it.each([
-    ['render_error', 'Das PDF konnte nicht erzeugt werden.'],
-    ['no_application', 'Der Antrag zum Auftrag existiert nicht mehr.'],
-    ['render_unavailable', 'Der PDF-Dienst ist derzeit nicht erreichbar.'],
-    ['weird_code', 'Der PDF-Auftrag ist fehlgeschlagen.'],
-  ])('explains the failure code %s', async (code, message) => {
-    const { http, detectChanges } = await startRender();
-    http.expectOne(url('/pdf')).flush({ ...PENDING_JOB, status: 'failed', error: code });
-    detectChanges();
-    expect(screen.getByText(message)).toBeInTheDocument();
-    // A failed job can be started again from the dialog.
-    expect(screen.getByRole('button', { name: 'Neu starten' })).toBeInTheDocument();
-    http.verify();
-  });
-
-  it.each([
-    [403, 'Keine Berechtigung, für diesen Antrag ein PDF zu erzeugen.'],
-    [500, 'Der PDF-Auftrag konnte nicht gestartet werden.'],
-  ])('reports a %s on the start', async (status, message) => {
-    const { http, detectChanges, c } = await startRender();
-    http.expectOne(url('/pdf')).flush({ title: 'e' }, { status, statusText: 'x' });
-    detectChanges();
-    expect(screen.getByText(message)).toBeInTheDocument();
-    expect(c.pdfPolling()).toBe(false);
-    http.verify();
-  });
-
-  it('reports a broken poll and checks again on demand', async () => {
-    const { http, detectChanges, c } = await startRender();
-    http.expectOne(url('/pdf')).flush(PENDING_JOB, { status: 202, statusText: 'Accepted' });
-    jest.advanceTimersByTime(2000);
-    http.expectOne('/api/jobs/job-1').flush({ title: 'e' }, { status: 502, statusText: 'x' });
-    detectChanges();
-    expect(screen.getByText('Der Status des Auftrags ist nicht abrufbar.')).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole('button', { name: 'Erneut prüfen' }), {
-      advanceTimers: jest.advanceTimersByTime,
-    });
-    http
-      .expectOne('/api/jobs/job-1')
-      .flush({ ...PENDING_JOB, status: 'done', resultUrl: '/api/jobs/job-1/download' });
-    detectChanges();
-    expect(c.pdfDone()).toBe(true);
-    http.verify();
-  });
-
-  it('gives up after the poll window and stays honest about it', async () => {
-    const { http, detectChanges, c } = await startRender();
-    http.expectOne(url('/pdf')).flush(PENDING_JOB, { status: 202, statusText: 'Accepted' });
-    for (let i = 0; i < 60; i++) {
-      jest.advanceTimersByTime(2000);
-      http.expectOne('/api/jobs/job-1').flush({ ...PENDING_JOB, status: 'running' });
-    }
-    detectChanges();
-    expect(c.pdfTimedOut()).toBe(true);
-    expect(c.pdfPolling()).toBe(false);
-    expect(screen.getByText(/Der Auftrag läuft noch/)).toBeInTheDocument();
-    // No further poll is scheduled.
-    jest.advanceTimersByTime(10_000);
-    http.verify();
-  });
-
-  it('stops the poll on close and on a navigation to another application', async () => {
-    const paramMap$ = new BehaviorSubject(convertToParamMap({ id: 'app-1' }));
-    const ctx = await setup(undefined, paramMap$);
-    flushAll(ctx.http);
-    ctx.detectChanges();
-    flushAttachments(ctx.http);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const c = ctx.cmp as any;
-
-    c.startPdf();
-    ctx.http.expectOne(url('/pdf')).flush(PENDING_JOB, { status: 202, statusText: 'Accepted' });
-    c.closePdf();
-    expect(c.pdfOpen()).toBe(false);
-    jest.advanceTimersByTime(10_000);
-
-    c.startPdf();
-    ctx.http.expectOne(url('/pdf')).flush(PENDING_JOB, { status: 202, statusText: 'Accepted' });
-    paramMap$.next(convertToParamMap({ id: 'app-2' }));
-    expect(c.pdfJob()).toBeNull();
-    jest.advanceTimersByTime(10_000);
-    flushAll(ctx.http, 'app-2');
-    ctx.detectChanges();
-    flushAttachments(ctx.http);
-    ctx.http.verify();
-  });
-
-  it('ignores a second start while one runs and a poll without a job', async () => {
-    const { http, c } = await startRender();
-    c.startPdf();
-    http.expectOne(url('/pdf')).flush(PENDING_JOB, { status: 202, statusText: 'Accepted' });
-    c.closePdf();
-    c.pdfJob.set(null);
-    c.pollPdf();
-    http.verify();
-    // ngOnDestroy clears a pending timer without a leak.
-    c.ngOnDestroy();
   });
 });

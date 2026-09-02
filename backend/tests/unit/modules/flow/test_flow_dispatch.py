@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from uuid import uuid4
 
 import pytest
@@ -9,6 +10,7 @@ import pytest
 from app.modules.flow import dispatch as dispatch_mod
 from app.modules.flow.dispatch import (
     ActionDispatcher,
+    ChainActionDispatcher,
     DispatchedAction,
     NullActionDispatcher,
     build_dispatched_actions,
@@ -119,3 +121,43 @@ def test_implicit_skips_applicant_when_explicitly_notified() -> None:
         status_event_id=uuid4(),
     )
     assert [a.type for a in implicit] == ["taskNotify"]
+
+
+# -- the chain ----------------------------------------------------------------
+
+
+def _action() -> DispatchedAction:
+    return DispatchedAction(
+        type="notify",
+        application_id=uuid4(),
+        transition_id=uuid4(),
+        status_event_id=uuid4(),
+        idempotency_key="k",
+    )
+
+
+class _Recording:
+    """A dispatcher that only remembers it was called, and with what."""
+
+    def __init__(self, name: str, log: list[str]) -> None:
+        self.name = name
+        self.log = log
+
+    async def dispatch(self, actions: Sequence[DispatchedAction]) -> None:
+        self.log.append(f"{self.name}:{len(actions)}")
+
+
+async def test_the_chain_calls_every_dispatcher_in_order() -> None:
+    """Order matters: each one ignores the types it does not handle, so a later
+    dispatcher must still see the actions an earlier one already looked at."""
+    log: list[str] = []
+    chain = ChainActionDispatcher([_Recording("a", log), _Recording("b", log)])
+
+    await chain.dispatch([_action()])
+
+    assert log == ["a:1", "b:1"]
+
+
+async def test_an_empty_chain_dispatches_nothing_rather_than_failing() -> None:
+    """A deployment can have no dispatcher wired at all — no Redis, no worker."""
+    await ChainActionDispatcher([]).dispatch([_action()])

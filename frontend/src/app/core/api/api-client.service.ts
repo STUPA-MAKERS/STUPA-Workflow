@@ -68,7 +68,6 @@ import type {
   PublicSiteConfig,
   ProtocolOutWire,
   ProtocolVotesBody,
-  RenderJob,
   SignedUrl,
   SignedUrlOutWire,
   StateOutWire,
@@ -373,21 +372,6 @@ export class ApiClient {
   /** DELETE /applications/{id}/comments/{commentId} — author or `application.manage`. */
   deleteComment(id: Uuid, commentId: Uuid): Observable<void> {
     return this.http.delete<void>(`${this.base}/applications/${id}/comments/${commentId}`);
-  }
-
-  /**
-   * POST /applications/{id}/pdf — start an async PDF render.
-   *
-   * The answer is 202 with a job in the `pending` state. Poll it with
-   * {@link getJob}. Access follows the read scope of the application.
-   */
-  createApplicationPdf(id: Uuid): Observable<RenderJob> {
-    return this.http.post<RenderJob>(`${this.base}/applications/${id}/pdf`, {});
-  }
-
-  /** GET /jobs/{jobId} — poll a render job. A poll never shows the overlay. */
-  getJob(jobId: Uuid): Observable<RenderJob> {
-    return this.http.get<RenderJob>(`${this.base}/jobs/${jobId}`, { context: skipLoading() });
   }
 
   transitions(id: Uuid): Observable<Transition[]> {
