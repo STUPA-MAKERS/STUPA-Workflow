@@ -1,6 +1,6 @@
 <section class="flex justify-center py-5">
   @if (loading()) {
-    <p class="text-muted">{{ 'common.loading' | t }}</p>
+    <app-skeleton variant="lines" [count]="3" [label]="'common.loading' | t" />
   } @else if (error() && !req()) {
     <p class="text-danger">{{ 'account.consent.error' | t }}</p>
   } @else if (req(); as r) {

@@ -10,7 +10,7 @@
 
   <section class="border border-solid border-line rounded-lg py-4 px-5 bg-surface">
     @if (loading()) {
-      <p class="text-muted m-0" aria-live="polite">{{ 'common.loading' | t }}</p>
+      <app-skeleton variant="lines" [count]="2" [label]="'common.loading' | t" />
     } @else if (url(); as feedUrl) {
       <label class="cal__label" for="cal-url">{{ 'account.calendar.urlLabel' | t }}</label>
       <div class="cal__row">

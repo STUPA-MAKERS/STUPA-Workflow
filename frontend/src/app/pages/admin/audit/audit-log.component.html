@@ -133,7 +133,7 @@
   </app-dialog>
 
   @if (loading()) {
-    <p class="text-muted text-center" aria-live="polite">{{ 'admin.audit.loading' | t }}</p>
+    <app-skeleton variant="rows" [count]="6" [label]="'admin.audit.loading' | t" />
   } @else if (hasMore()) {
     <div class="flex justify-center">
       <app-button variant="secondary" size="sm" (click)="loadMore()">

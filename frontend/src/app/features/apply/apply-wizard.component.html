@@ -30,7 +30,7 @@
           }
         </div>
         @if (loadingForm()) {
-          <p class="text-muted text-sm" role="status">{{ 'apply.form.loading' | t }}</p>
+          <app-skeleton variant="lines" [count]="5" [label]="'apply.form.loading' | t" />
         }
         <!-- Configured info text (#18): set per language as markdown in /admin/branding. -->
         @if (applyInfoHtml()) {

@@ -3,6 +3,7 @@ import { ApiClient } from '@core/api/api-client.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { ButtonComponent } from '@stupa-makers/ui-kit';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
+import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 
 /**
  * Account calendar subscription page.
@@ -16,7 +17,7 @@ import { PageHeaderComponent } from '@shared/ui/page-header/page-header.componen
   selector: 'app-account-calendar',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, ButtonComponent, PageHeaderComponent],
+  imports: [SkeletonComponent, TranslatePipe, ButtonComponent, PageHeaderComponent],
   templateUrl: './calendar.component.html',
   styleUrl: './calendar.component.scss',
 })
