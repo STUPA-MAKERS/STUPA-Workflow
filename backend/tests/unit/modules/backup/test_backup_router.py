@@ -90,11 +90,15 @@ class _FakeService:
         self.created.append((kind, actor, note))
         return _row(status="pending", kind=kind, created_by=actor, note=note)
 
-    def export_url(self, row: Backup) -> str:
+    async def export_stream(self, row: Backup):  # noqa: ANN202 — AsyncIterator[bytes]
         self.export_calls += 1
         if not row.storage_key:
             raise BackupError("this backup has no stored archive")
-        return "https://minio.invalid/k?signed"
+
+        async def _chunks():  # noqa: ANN202
+            yield b"cipher"
+
+        return _chunks()
 
     async def delete(self, row: Backup) -> None:
         self.deleted.append(row.id)
@@ -247,14 +251,22 @@ def test_create_rejects_an_over_long_note(app: FastAPI, client: TestClient) -> N
 # -------------------------------------------------------------------------- export
 
 
-def test_export_hands_out_a_signed_url_and_its_ttl(
-    app: FastAPI, client: TestClient, service: _FakeService
+def test_export_streams_the_archive_through_the_api(
+    app: FastAPI, client: TestClient
 ) -> None:
-    service.settings = _settings(backup_url_ttl_seconds=300)
+    """Regression: the download must NOT be a presigned MinIO URL.
+
+    MinIO sits on the internal Docker network, so a presigned S3 URL binds a host the
+    browser cannot resolve. The bytes therefore come through this route.
+    """
     _principal(app, "backup.manage")
-    body = client.get(f"/api/admin/backups/{BACKUP_ID}/export").json()
-    assert body["url"].startswith("https://minio.invalid/")
-    assert body["expiresIn"] == 300
+    response = client.get(f"/api/admin/backups/{BACKUP_ID}/export")
+    assert response.status_code == 200
+    assert response.content == b"cipher"
+    assert "attachment; filename=" in response.headers["content-disposition"]
+    assert response.headers["x-content-type-options"] == "nosniff"
+    # Nothing in the response may point a client at the object store.
+    assert "minio" not in response.text.lower()
 
 
 def test_export_refuses_a_backup_that_is_not_finished(

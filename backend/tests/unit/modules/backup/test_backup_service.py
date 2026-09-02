@@ -49,6 +49,15 @@ class _FakeStorage:
     async def get(self, key: str) -> bytes:
         return self.objects[key]
 
+    async def get_stream(self, key: str, *, chunk_size: int = 1024):  # noqa: ANN202
+        payload = self.objects[key]
+
+        async def _chunks():  # noqa: ANN202
+            for i in range(0, len(payload), chunk_size):
+                yield payload[i : i + chunk_size]
+
+        return _chunks()
+
     async def remove(self, key: str) -> None:
         if key not in self.objects:
             raise StorageError("gone")
@@ -229,19 +238,24 @@ async def test_mark_failed_truncates_the_code_and_never_carries_a_path() -> None
 
 
 @pytest.mark.asyncio
-async def test_export_url_signs_with_the_configured_ttl_and_download_name() -> None:
-    archives = _FakeStorage({"key": b"cipher"})
-    service = _service(archives=archives, backup_url_ttl_seconds=120)
-    row = _row(storage_key="key")
-    assert service.export_url(row).startswith("https://minio.invalid/key")
-    assert archives.presigned == [("key", 120, "antrag-20260901T220500Z.tar.age")]
+async def test_export_streams_the_bytes_rather_than_presigning_a_url() -> None:
+    """Regression: MinIO is internal, so a presigned URL is unreachable from a browser.
+
+    The export therefore reads the object and streams it; nothing hands the client a
+    URL that points at the object store.
+    """
+    archives = _FakeStorage({"key": b"cipher-bytes"})
+    service = _service(archives=archives)
+    chunks = [c async for c in await service.export_stream(_row(storage_key="key"))]
+    assert b"".join(chunks) == b"cipher-bytes"
+    assert archives.presigned == [], "the export must not presign anything"
 
 
 @pytest.mark.asyncio
-async def test_export_url_refuses_a_row_without_an_archive() -> None:
+async def test_export_refuses_a_row_without_an_archive() -> None:
     service = _service(archives=_FakeStorage())
     with pytest.raises(BackupError, match="no stored archive"):
-        service.export_url(_row(storage_key=None))
+        await service.export_stream(_row(storage_key=None))
 
 
 # ----------------------------------------------------------------------- retention

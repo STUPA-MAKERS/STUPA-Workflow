@@ -4,6 +4,12 @@
   margin-bottom: var(--space-5);
 }
 
+/* The parent already spaces its children, so the header must not add to it. Without
+   this the gap and the margin stack and the title floats far above its content. */
+:host(.ph--flush) {
+  margin-bottom: 0;
+}
+
 /* A `wide` route drops the max-width on `.main` so the content can use two sidebars.
    The header used to keep the normal container width and centre itself, which held the
    title in the same place across pages — but inside a wide page it left the title

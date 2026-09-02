@@ -250,19 +250,19 @@ class BackupService:
         # `rowcount` lives on the cursor result rather than the generic Result type.
         return int(getattr(result, "rowcount", 0) or 0)
 
-    def export_url(self, row: Backup) -> str:
-        """Return a short-lived signed URL for the archive.
+    async def export_stream(self, row: Backup) -> AsyncIterator[bytes]:
+        """Stream the archive bytes from the object store.
+
+        NOT a presigned URL. MinIO sits on the internal Docker network, so a presigned
+        S3 URL binds a host the browser cannot resolve; the download route therefore
+        streams through the API, exactly as the attachment download does.
 
         Raises:
             BackupError: Storage is off, or the row carries no archive.
         """
         if self.archives is None or not row.storage_key:
             raise BackupError("this backup has no stored archive")
-        return self.archives.presigned_get_url(
-            row.storage_key,
-            expires_seconds=self.settings.backup_url_ttl_seconds,
-            download_name=download_name(row.created_at),
-        )
+        return await self.archives.get_stream(row.storage_key)
 
     # ------------------------------------------------------------------ archive
 

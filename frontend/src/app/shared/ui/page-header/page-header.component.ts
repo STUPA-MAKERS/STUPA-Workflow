@@ -22,10 +22,20 @@ import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [BreadcrumbsComponent],
+  host: { '[class.ph--flush]': 'flush()' },
   templateUrl: './page-header.component.html',
   styleUrl: './page-header.component.scss',
 })
 export class PageHeaderComponent {
   readonly title = input.required<string>();
   readonly subtitle = input<string | null>(null);
+
+  /**
+   * Drop the header's own bottom margin.
+   *
+   * Set it when the surrounding layout already spaces its children — a flex column
+   * with a `gap`, for example. Otherwise the margin and the gap both apply and the
+   * band under the title grows to the sum of the two.
+   */
+  readonly flush = input(false);
 }

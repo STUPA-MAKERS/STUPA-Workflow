@@ -795,12 +795,6 @@ export interface BackupList {
   retentionCount: number;
 }
 
-/** Short-lived signed URL for one archive. */
-export interface BackupExport {
-  url: string;
-  expiresIn: number;
-}
-
 /** The literal a restore has to carry. It is a machine token, never translated. */
 export const BACKUP_RESTORE_CONFIRMATION = 'RESTORE';
 

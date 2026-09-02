@@ -608,9 +608,13 @@ describe('AdminApiService — real mode (contract)', () => {
       expect(req.request.body).toEqual({ pinned: true });
     });
 
-    it('asks for a signed URL rather than the bytes', () => {
+    it('asks for the BYTES, never a presigned store URL', () => {
+      // MinIO is internal, so a presigned S3 URL names a host the browser cannot
+      // resolve. The client therefore requests a blob from the API.
       s.exportBackup('b-1').subscribe();
-      expect(http.expectOne('/api/admin/backups/b-1/export').request.method).toBe('GET');
+      const req = http.expectOne('/api/admin/backups/b-1/export');
+      expect(req.request.method).toBe('GET');
+      expect(req.request.responseType).toBe('blob');
     });
 
     it('uploads an import as multipart', () => {
@@ -1000,7 +1004,7 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(pinned.pinned).toBe(true);
     expect((await firstValueFrom(s.updateBackup('nope', { pinned: true }))).id).toBe('nope');
 
-    expect((await firstValueFrom(s.exportBackup(created.id))).url).toBeTruthy();
+    expect(await firstValueFrom(s.exportBackup(created.id))).toBeInstanceOf(Blob);
     expect((await firstValueFrom(s.importBackup(new File(['x'], 'a.age')))).note).toBe('a.age');
     expect((await firstValueFrom(s.restoreBackup(created.id))).id).toBe(created.id);
     expect((await firstValueFrom(s.restoreBackup('nope'))).id).toBe('nope');

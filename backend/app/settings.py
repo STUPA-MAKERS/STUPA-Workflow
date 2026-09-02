@@ -177,7 +177,6 @@ class Settings(BaseSettings):
     # Retention: keep this many archives and drop the oldest beyond it. A pinned
     # archive never counts and is never pruned. 0 disables the pruning.
     backup_retention_count: int = 14
-    backup_url_ttl_seconds: int = 300
     # Cap for an uploaded archive (import) and for the pg_dump/restore subprocess.
     backup_max_upload_bytes: int = 2 * 1024 * 1024 * 1024
     backup_subprocess_timeout_seconds: int = 3600

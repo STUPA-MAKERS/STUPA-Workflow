@@ -15,8 +15,15 @@ import {
   InputComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
+import { downloadBlob } from '@shared/download.util';
 import { AdminApiService } from '../admin-api.service';
 import type { Backup, BackupKind, BackupStatus } from '../admin.models';
+
+/** File name the browser saves an archive under. Mirrors the server-side name. */
+function archiveFileName(createdAt: string): string {
+  const stamp = new Date(createdAt).toISOString().replace(/[-:]/g, '').replace(/\..+$/, 'Z');
+  return `antrag-${stamp}.tar.age`;
+}
 
 /** Poll interval while a backup job is still running, in milliseconds. */
 const POLL_MS = 3000;
@@ -205,12 +212,13 @@ export class BackupsComponent {
   /**
    * Download one archive.
    *
-   * The API answers with a short-lived signed URL rather than the bytes, so the browser
-   * fetches the archive straight from the object store and it never crosses the API.
+   * The API streams the bytes. It deliberately does NOT hand out a presigned MinIO URL:
+   * the object store sits on the internal Docker network, so such a URL names a host the
+   * browser cannot resolve.
    */
   protected download(row: Backup): void {
     this.api.exportBackup(row.id).subscribe({
-      next: ({ url }) => window.open(url, '_blank', 'noopener'),
+      next: (blob) => downloadBlob(blob, archiveFileName(row.createdAt)),
     });
   }
 
