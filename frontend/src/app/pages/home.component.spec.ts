@@ -1,35 +1,50 @@
 import { provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
+import userEvent from '@testing-library/user-event';
+import { AuthService } from '@core/auth/auth.service';
 import { HomeComponent } from './home.component';
+
+function setup(auth: { login: jest.Mock } = { login: jest.fn() }) {
+  return render(HomeComponent, {
+    providers: [provideRouter([]), { provide: AuthService, useValue: auth }],
+  }).then((view) => ({ ...view, auth }));
+}
 
 describe('HomeComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
   afterEach(() => localStorage.clear());
 
-  it('renders the apply heading and a call-to-action linking to /apply', async () => {
-    await render(HomeComponent, { providers: [provideRouter([])] });
-    expect(
-      screen.getByRole('heading', { level: 1, name: 'Antrag stellen' }),
-    ).toBeInTheDocument();
-    const cta = screen.getByRole('link', { name: /Antrag/ });
-    expect(cta).toHaveAttribute('href', '/apply');
+  it('offers exactly two ways in and nothing else', async () => {
+    await setup();
+    // The apply choice is a router link; the login choice is a button, because the OIDC
+    // redirect leaves the SPA and has no route of its own.
+    const apply = screen.getByRole('link', { name: /Antrag stellen/ });
+    expect(apply).toHaveAttribute('href', '/apply');
+    expect(screen.getByRole('button', { name: /Gremiumsmitglied anmelden/ })).toBeInTheDocument();
+    // Nothing else competes with them: one link and one button in the body.
+    expect(screen.getAllByRole('link')).toHaveLength(1);
+    expect(screen.getAllByRole('button')).toHaveLength(1);
   });
 
-  it('shows the returning-applicant magic-link note and no feature cards', async () => {
-    await render(HomeComponent, { providers: [provideRouter([])] });
+  it('starts the OIDC login from the member choice', async () => {
+    const { auth } = await setup();
+    await userEvent.click(screen.getByRole('button', { name: /Gremiumsmitglied anmelden/ }));
+    expect(auth.login).toHaveBeenCalled();
+  });
+
+  it('keeps the returning-applicant magic-link note', async () => {
+    await setup();
     expect(screen.getByText(/Bestätigungs-E-Mail/)).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Live-Vote' })).not.toBeInTheDocument();
   });
 
-  it('localizes the heading and the note to English when the locale is EN', async () => {
+  it('localizes both choices and the note to English', async () => {
     localStorage.setItem('ap.locale', 'en');
-    await render(HomeComponent, { providers: [provideRouter([])] });
+    await setup();
+    expect(screen.getByRole('heading', { level: 1, name: 'Welcome' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Submit an application/ })).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { level: 1, name: 'Submit an application' }),
+      screen.getByRole('button', { name: /Sign in as a committee member/ }),
     ).toBeInTheDocument();
     expect(screen.getByText(/confirmation email/)).toBeInTheDocument();
-    expect(
-      screen.queryByRole('heading', { level: 1, name: 'Antrag stellen' }),
-    ).not.toBeInTheDocument();
   });
 });

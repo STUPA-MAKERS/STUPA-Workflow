@@ -368,9 +368,11 @@ export const de = {
   'role.admin': 'Administrator',
   'role.member': 'Mitglied',
 
-  'home.heading': 'Antrag stellen',
-  'home.subtitle': 'Kein Konto nötig — stell deinen Antrag in wenigen Minuten.',
-  'home.cta': 'Jetzt Antrag stellen',
+  'home.heading': 'Willkommen',
+  'home.choice.apply.title': 'Antrag stellen',
+  'home.choice.apply.desc': 'Kein Konto nötig — in wenigen Minuten eingereicht.',
+  'home.choice.login.title': 'Als Gremiumsmitglied anmelden',
+  'home.choice.login.desc': 'Anträge bearbeiten, Sitzungen führen, Haushalt verwalten.',
   'home.statusNote':
     'Bereits eingereicht? Den Status verfolgst du über den Link in deiner Bestätigungs-E-Mail.',
 
@@ -2704,9 +2706,11 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'role.admin': 'Administrator',
   'role.member': 'Member',
 
-  'home.heading': 'Submit an application',
-  'home.subtitle': 'No account needed — submit your application in minutes.',
-  'home.cta': 'Submit an application',
+  'home.heading': 'Welcome',
+  'home.choice.apply.title': 'Submit an application',
+  'home.choice.apply.desc': 'No account needed — submitted in minutes.',
+  'home.choice.login.title': 'Sign in as a committee member',
+  'home.choice.login.desc': 'Process applications, run meetings, manage the budget.',
   'home.statusNote':
     'Already submitted? Track its status via the link in your confirmation email.',
 
