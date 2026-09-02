@@ -13,9 +13,7 @@
   </div>
 </app-page-header>
 
-@if (loading()) {
-  <p class="bt__status" aria-live="polite">{{ 'budget.tree.loading' | t }}</p>
-} @else if (loadError()) {
+@if (loadError()) {
   <p class="bt__status bt__status--error" role="alert">{{ 'budget.tree.error' | t }}</p>
 } @else if (!tree().length) {
   <p class="bt__status">{{ 'budget.tree.empty' | t }}</p>
@@ -34,7 +32,10 @@
 
     <main class="bt__main">
       @if (selectedTopId()) {
-        <app-data-table [columns]="columns()" [rows]="rows()" [rowKey]="rowId" [isExpanded]="childExpanded">
+        <app-data-table
+          [loading]="loading()"
+          [loadingText]="'budget.tree.loading' | t"
+          [columns]="columns()" [rows]="rows()" [rowKey]="rowId" [isExpanded]="childExpanded">
           <ng-template appCell="node" let-row>
             <span class="bt__node" [style.paddingLeft.rem]="$any(row).depth * 1.5">
               <span class="bt__path">{{ $any(row).node.pathKey | simplifyPath }}</span>

@@ -3,12 +3,13 @@
 </app-page-header>
 
 <section class="grem__list" [attr.aria-label]="'admin.gremien.title' | t">
-  @if (loading()) {
-    <p class="text-muted py-4" aria-live="polite">{{ 'admin.gremien.loading' | t }}</p>
-  } @else if (loadError()) {
+  @if (loadError()) {
     <p class="text-muted py-4 text-danger" role="alert">{{ 'admin.gremien.error' | t }}</p>
   } @else {
-    <app-data-table [columns]="columns()" [rows]="gremien()" [rowKey]="rowId" [emptyText]="'admin.gremien.empty' | t">
+    <app-data-table
+      [loading]="loading()"
+      [loadingText]="'admin.gremien.loading' | t"
+      [columns]="columns()" [rows]="gremien()" [rowKey]="rowId" [emptyText]="'admin.gremien.empty' | t">
       <ng-template appCell="slug" let-g><span class="grem__mono">{{ $any(g).slug }}</span></ng-template>
       <ng-template appCell="cdVariant" let-g>{{ cdVariantName($any(g)) }}</ng-template>
       <ng-template appCell="delegation" let-g>

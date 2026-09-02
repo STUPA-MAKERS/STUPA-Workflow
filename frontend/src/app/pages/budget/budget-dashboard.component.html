@@ -17,9 +17,7 @@
   </div>
 </app-page-header>
 
-@if (loading()) {
-  <p class="bd__status" aria-live="polite">{{ 'budget.loading' | t }}</p>
-} @else if (error()) {
+@if (error()) {
   <p class="bd__status bd__status--error" role="alert">{{ 'budget.error' | t }}</p>
 } @else if (!tree().length) {
   <section class="bd__empty">
@@ -78,7 +76,10 @@
             {{ 'budget.apps.viewAll' | t }}
           </a>
         </div>
-        <app-data-table [columns]="usageColumns()" [rows]="usageRows()" [rowKey]="usageRowId">
+        <app-data-table
+          [loading]="loading()"
+          [loadingText]="'budget.loading' | t"
+          [columns]="usageColumns()" [rows]="usageRows()" [rowKey]="usageRowId">
           <ng-template appCell="node" let-row>
             <button type="button" class="bd__ks" [style.paddingLeft.rem]="$any(row).depth * 1.25" (click)="drillInto($any(row).node)">
               <span class="bd__path">{{ $any(row).node.pathKey | simplifyPath }}</span>
