@@ -36,8 +36,15 @@ if TYPE_CHECKING:
 class ResolvedCdVariant:
     """The corporate design of one Gremium, ready for a pytex render.
 
+    A design contributes LOGOS. It does not decide what kind of document is being
+    rendered: one Gremium renders applications and protocols, so the shape belongs to
+    the render path, which pins its own.
+
     Attributes:
-        base_variant: The pytex document shape, ``report`` or ``protocol``.
+        base_variant: Which document family the design was drawn for, ``report`` or
+            ``protocol``. Descriptive only — no render path reads it. It used to be
+            passed to pytex as the document shape, which rendered every application of
+            a protocol-based design as a meeting protocol, and the reverse.
         title_logos: Title-page logos in order — vendored names AND/OR asset
             file names.
         footer_logos: Footer logos in the same value form.

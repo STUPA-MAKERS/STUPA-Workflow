@@ -75,14 +75,26 @@ def test_a_resolved_design_reaches_pytex_as_config_and_assets(
 ) -> None:
     pytex = _run(monkeypatch, _resolved())
 
-    # The base shape replaces the old per-design variant name.
-    assert pytex.calls[0][1] == "protocol"
     assert pytex.configs[0] == {
         "logos": ["STUPA", "brand.png"],
         "footer_logos": ["brand.png"],
     }
     # Only the uploaded logo carries bytes. The vendored one ships with pytex.
     assert pytex.assets[0] == {"brand.png": b"\x89PNG\r\n\x1a\n"}
+
+
+def test_the_design_never_decides_the_document_shape(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An application renders as a report even under a protocol-based design.
+
+    The design used to be passed to pytex as the shape, so every application of a
+    Gremium whose design was drawn for protocols came out as a meeting protocol. One
+    Gremium renders both kinds, so the shape can only come from the document.
+    """
+    pytex = _run(monkeypatch, _resolved(base_variant="protocol"))
+
+    assert pytex.calls[0][1] == _DocStub.variant == "report"
 
 
 def test_without_a_design_the_render_keeps_the_variant_name(

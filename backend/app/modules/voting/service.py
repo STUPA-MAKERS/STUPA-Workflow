@@ -523,11 +523,12 @@ class VotingService:
         tally of another gremium through ``GET /api/votes/{id}``, including closed
         SECRET votes.
 
+        The admin role reaches this through `Principal.has` below, not through a
+        `principal.roles` read: `has` is where the OAuth scope cap applies.
+
         Raises:
             ForbiddenError: The principal cannot view this vote.
         """
-        if "admin" in principal.roles:
-            return
         if vote.meeting_id is not None:
             from app.modules.livevote.service import MeetingService
 
@@ -585,11 +586,14 @@ class VotingService:
         ``vote.manage`` holder from opening or closing votes of OTHER gremien without
         membership. That would be a cross-tenant mutation.
 
+        The admin case runs through `principal.has("vote.manage")`, which grants the
+        admin role the right AND applies the OAuth scope cap. It used to read
+        `principal.roles` directly and return before that check, so a token issued to
+        an admin with only the `read` scope could open, close and cancel votes.
+
         Raises:
             ForbiddenError: The principal cannot manage this vote.
         """
-        if "admin" in principal.roles:
-            return
         if principal.has("vote.manage"):
             return
         gremium_id = await self._vote_gremium_id(

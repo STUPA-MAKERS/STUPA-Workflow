@@ -232,11 +232,10 @@ async def list_applications(
     own applications (``created_by``) plus the committee read scope.
     ``mine=true`` forces the pure owner filter, also for an authorized reader.
     """
-    can_read = (
-        "admin" in principal.roles
-        or principal.has("application.read")
-        or principal.has(READ_ALL_PERMISSION)
-    )
+    # `Principal.has` is the single RBAC chokepoint: it grants every right to the admin
+    # role AND applies the OAuth scope cap. Reading `principal.roles` directly would skip
+    # the cap, so a narrowly scoped agent token would read as a full admin.
+    can_read = principal.has("application.read") or principal.has(READ_ALL_PERMISSION)
     restricted = not can_read and not mine
     return await service.list_applications(
         state_id=state_id,

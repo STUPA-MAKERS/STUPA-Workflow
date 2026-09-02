@@ -915,7 +915,11 @@ def _principal(**over: Any) -> SimpleNamespace:
     base.update(over)
     ns = SimpleNamespace(**base)
     perms: set[str] = over.get("_perms", set())
-    ns.has = lambda p, _perms=perms: p in _perms  # type: ignore[attr-defined]
+    roles: list[str] = base["roles"]
+    # Mirror `Principal.has`: the admin role holds every right. The fake used to check
+    # only the explicit set, so a principal with `roles=["admin"]` behaved here unlike
+    # the real one and a test could pass against behaviour production never had.
+    ns.has = lambda p, _perms=perms, _roles=roles: "admin" in _roles or p in _perms  # type: ignore[attr-defined]
     return ns
 
 
