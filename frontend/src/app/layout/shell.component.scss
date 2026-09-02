@@ -201,14 +201,25 @@
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
-.account__name {
+/* The name heads the menu the icon opens. It is not decoration there: it answers "which
+   account am I in", which the header no longer shows. */
+.account__menuName {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+.account__menuNameLabel {
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+}
+.account__menuNameValue {
   font-size: var(--fs-sm);
   font-weight: var(--fw-medium);
   color: var(--color-text);
-  max-width: 9rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 .account__backdrop {
   position: fixed;
@@ -263,7 +274,9 @@
 }
 
 @media (max-width: 720px) {
-  .account__name {
+  /* The search label and its shortcut hint are desktop advice; the icon stays a target. */
+  .header__searchLabel,
+  .header__searchKbd {
     display: none;
   }
 }

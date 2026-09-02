@@ -43,25 +43,31 @@
         >
           <app-icon name="filter" [size]="16" />
           <span class="header__searchLabel">{{ 'search.title' | t }}</span>
-          <kbd class="header__searchKbd">⌘K</kbd>
+          <kbd class="header__searchKbd">{{ searchShortcut() }}</kbd>
         </button>
-      }
-      @if (auth.isAuthenticated()) {
         <div class="relative flex items-center gap-2">
+          <!-- The trigger is the icon alone. A full display name in the header cost more
+               room than anything else in it and pushed the nav around as the name got
+               longer; the name is not lost, it heads the menu this opens. -->
           <button
             type="button"
             class="account__name-btn"
             [attr.aria-expanded]="accountMenuOpen()"
             aria-haspopup="menu"
-            [title]="'auth.signedInAs' | t"
+            [attr.aria-label]="('auth.signedInAs' | t) + ': ' + auth.displayName()"
+            [title]="('auth.signedInAs' | t) + ': ' + auth.displayName()"
             (click)="toggleAccountMenu()"
           >
             <app-icon name="user" [size]="18" />
-            <span class="account__name">{{ auth.displayName() }}</span>
+            <app-icon [name]="accountMenuOpen() ? 'chevron-up' : 'chevron-down'" [size]="12" />
           </button>
           @if (accountMenuOpen()) {
             <button type="button" class="account__backdrop" aria-hidden="true" tabindex="-1" (click)="closeAccountMenu()"></button>
             <div class="account__menu" role="menu">
+              <p class="account__menuName">
+                <span class="account__menuNameLabel">{{ 'auth.signedInAs' | t }}</span>
+                <span class="account__menuNameValue">{{ auth.displayName() }}</span>
+              </p>
               <a
                 class="account__menu-item"
                 role="menuitem"

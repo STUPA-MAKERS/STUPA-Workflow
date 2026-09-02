@@ -114,6 +114,21 @@ describe('ShellComponent', () => {
     expect(screen.getByRole('link', { name: /Anträge/ })).toBeInTheDocument();
     // The member lacks admin.config, so the admin link stays hidden.
     expect(screen.queryByRole('link', { name: /Verwaltung/ })).not.toBeInTheDocument();
+    // The header shows an icon, not the name: a full display name took more room than
+    // anything else there and moved the nav as the name got longer. The name is still
+    // reachable — it is the trigger's accessible name and it heads the menu.
+    expect(screen.queryByText('Mia Member')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Mia Member/ })).toBeInTheDocument();
+    http.verify();
+  });
+
+  it('names the signed-in account at the head of the menu it opens', async () => {
+    const { fixture, auth, http } = await setup();
+    login(auth, http, MEMBER);
+    fixture.detectChanges();
+
+    await userEvent.click(screen.getByRole('button', { name: /Mia Member/ }));
+    fixture.detectChanges();
     expect(screen.getByText('Mia Member')).toBeInTheDocument();
     http.verify();
   });

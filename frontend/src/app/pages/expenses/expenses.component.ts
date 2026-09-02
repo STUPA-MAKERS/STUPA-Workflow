@@ -20,15 +20,20 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   BadgeComponent,
   ButtonComponent,
+  CellDirective,
   CheckboxComponent,
+  type ColumnDef,
   CurrencyInputComponent,
+  DataTableComponent,
   DatepickerComponent,
   DialogComponent,
   FilterBarComponent,
   FilterFieldComponent,
   FilterRangeComponent,
+  FootCellDirective,
   IconComponent,
   SelectComponent,
+  type SortState,
 } from '@stupa-makers/ui-kit';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { CostCentreTreeComponent } from '../budget/cost-centre-tree.component';
@@ -80,6 +85,9 @@ export type ExpensesTab = 'bookings' | 'transfers';
     SimplifyPathPipe,
     BadgeComponent,
     ButtonComponent,
+    CellDirective,
+    DataTableComponent,
+    FootCellDirective,
     CurrencyInputComponent,
     DatepickerComponent,
     DialogComponent,
@@ -113,19 +121,8 @@ export class ExpensesComponent implements OnDestroy {
 
   readonly canManage = computed(() => this.auth.can('budget.book'));
 
-  /**
-   * Rows to outline while the first page loads. Five is the usual page a reader sees,
-   * so the table keeps roughly the height it is about to have.
-   */
-  protected readonly skeletonRows = [0, 1, 2, 3, 4];
 
-  /** The transfers table has a fixed column count. */
-  protected readonly transferSkeletonCols = [0, 1, 2, 3, 4, 5];
 
-  /** The bookings table gains a select column and an actions column for a booker. */
-  protected readonly bookingSkeletonCols = computed(() =>
-    this.canManage() ? [0, 1, 2, 3, 4, 5, 6, 7, 8] : [0, 1, 2, 3, 4, 5, 6],
-  );
   readonly canExport = computed(() => this.auth.can('budget.export'));
 
   readonly budgetTree = this.list.budgetTree;
@@ -167,6 +164,133 @@ export class ExpensesComponent implements OnDestroy {
   readonly bulkReassignOpen = signal(false);
   readonly bulkBudgetId = signal('');
   readonly bulkCategory = signal('');
+  // -- shared-table wiring ----------------------------------------------------
+  //
+  // The bookings table was hand-rolled for years because the shared one could not do
+  // selection, child rows, a totals row or a per-row class. It can now, so this is a
+  // translation layer and nothing more: the component keeps the state it always had and
+  // hands the table the shape it wants.
+
+  /** Track by the booking id, so paging in more rows does not re-create the earlier ones. */
+  readonly rowId = (row: unknown): unknown => (row as Expense).id;
+
+  readonly bookingColumns = computed<ColumnDef[]>(() => {
+    const cols: ColumnDef[] = [
+      {
+        key: 'paymentDate',
+        label: this.i18n.translate('expenses.col.paymentDate'),
+        width: '9rem',
+        sortable: true,
+        initialSort: 'desc',
+      },
+      {
+        key: 'invoiceDate',
+        label: this.i18n.translate('expenses.col.invoiceDate'),
+        width: '9rem',
+        sortable: true,
+        initialSort: 'desc',
+      },
+      { key: 'kind', label: this.i18n.translate('expenses.col.kind'), width: '7rem' },
+      { key: 'description', label: this.i18n.translate('expenses.col.description') },
+      {
+        key: 'correspondent',
+        label: this.i18n.translate('expenses.col.correspondent'),
+        width: '11rem',
+      },
+      // Amount sits BEFORE the cost centre. The sticky actions column is displaced left
+      // by however much the table overflows and covers whatever is to its left; that
+      // used to be the amount, the one column a reader scans a booking list for.
+      {
+        key: 'amount',
+        label: this.i18n.translate('expenses.col.amount'),
+        align: 'end',
+        width: '9rem',
+        sortable: true,
+        initialSort: 'desc',
+      },
+      {
+        key: 'costCentre',
+        label: this.i18n.translate('expenses.col.costCentre'),
+        width: '10rem',
+      },
+    ];
+    if (this.canManage()) {
+      cols.push({
+        key: 'actions',
+        label: this.i18n.translate('table.actions'),
+        align: 'end',
+        // Explicit, never self-sized. Letting it size itself is what made it 246px and
+        // hid the column beside it.
+        width: '9rem',
+        sticky: 'end',
+      });
+    }
+    return cols;
+  });
+
+  readonly transferRowId = (row: unknown): unknown =>
+    (row as { transferId: string }).transferId;
+
+  readonly transferColumns = computed<ColumnDef[]>(() => {
+    const cols: ColumnDef[] = [
+      {
+        key: 'paymentDate',
+        label: this.i18n.translate('expenses.col.paymentDate'),
+        width: '9rem',
+      },
+      {
+        key: 'invoiceDate',
+        label: this.i18n.translate('expenses.col.invoiceDate'),
+        width: '9rem',
+      },
+      { key: 'description', label: this.i18n.translate('expenses.col.description') },
+      { key: 'from', label: this.i18n.translate('expenses.transfers.from'), width: '10rem' },
+      { key: 'to', label: this.i18n.translate('expenses.transfers.to'), width: '10rem' },
+      {
+        key: 'amount',
+        label: this.i18n.translate('expenses.col.amount'),
+        align: 'end',
+        width: '9rem',
+      },
+    ];
+    if (this.canManage()) {
+      cols.push({
+        key: 'actions',
+        label: this.i18n.translate('table.actions'),
+        align: 'end',
+        width: '7rem',
+        sticky: 'end',
+      });
+    }
+    return cols;
+  });
+
+  /** The table speaks `SortState`; the list state speaks a field plus an order. */
+  readonly sortState = computed<SortState>(() => ({
+    key: this.sortField(),
+    direction: this.sortOrder() === 'asc' ? 'asc' : 'desc',
+  }));
+
+  onSortChange(next: SortState): void {
+    this.onSort(next.key as ExpenseSortField);
+  }
+
+  onSelectionChange(next: Set<unknown>): void {
+    this.selected.set(next as ReadonlySet<Uuid>);
+  }
+
+  /** Expanded sub-bookings only. A collapsed row contributes no children. */
+  readonly childrenOf = (row: unknown): readonly unknown[] => {
+    const e = row as Expense;
+    return this.isSubExpanded(e.id) ? this.subOf(e.id) : [];
+  };
+
+  /** Income rows carry a tint the table cannot know about. */
+  readonly rowClassFor = (row: unknown): string | null =>
+    (row as Expense).kind === 'income' ? 'exp__tr--income' : null;
+
+  readonly rowSelectLabel = (row: unknown): string => (row as Expense).description;
+
   readonly canSubmitReassign = computed(
     () => !!this.bulkBudgetId() || !!this.bulkCategory().trim(),
   );
