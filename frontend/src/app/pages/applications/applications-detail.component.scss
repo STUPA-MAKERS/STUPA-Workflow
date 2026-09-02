@@ -373,22 +373,6 @@ formly-form {
   margin-inline-start: auto;
 }
 
-/* Progress of the PDF render job. */
-.det__pdf {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-.det__pdfLink {
-  color: var(--color-primary);
-  font-weight: var(--fw-medium);
-}
-.det__pdfBar {
-  width: 100%;
-  height: var(--space-1);
-  accent-color: var(--color-primary);
-}
-
 .det__commentEdit,
 .det__forceReason {
   display: flex;

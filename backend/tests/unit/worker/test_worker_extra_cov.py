@@ -1,8 +1,8 @@
 """Extra unit coverage of the worker tasks, without a DB, Redis or a network.
 
-The tasks are retention, scan, pdf, mail, webhook, main, task_reminders and deadlines.
+The tasks are retention, scan, mail, webhook, main, task_reminders and deadlines.
 These tests add the branches and error paths that the other worker tests leave
-uncovered. They cover the `_on_startup` orchestration and the scan and pdf tasks with
+uncovered. They cover the `_on_startup` orchestration and the scan task with
 retry and dead. They cover DSGVO retention with anonymize, purge and per-row failure
 isolation. They also cover the deadline auto-transitions and the edge branches of the
 task reminders.
@@ -22,14 +22,12 @@ from freezegun import freeze_time
 
 import worker.deadlines as wd
 import worker.main as wmain
-import worker.pdf as wpdf
 import worker.retention as wret
 import worker.scan as wscan
 import worker.task_reminders as wtr
 from app.modules.files.scanner import ScannerError, ScanVerdict
 from app.modules.files.storage import StorageError
 from app.modules.notifications.models import NotificationSettings, TaskReminderLog
-from app.modules.pdf.render import RenderRetry
 from app.settings import load_settings
 from app.shared.errors import ConflictError, NotFoundError
 from tests._support.notifications_fakes import FakeQueue
@@ -244,100 +242,6 @@ def test_scan_retry_or_dead_default_job_try() -> None:
     assert ei.value.defer_score == 11_000  # job_try(1) * backoff(11s), in ms
 
 
-# worker/pdf.py
-class _Pipeline:
-    """Fake render pipeline where `run` returns a status or raises RenderRetry."""
-
-    def __init__(self, *, result: str = "done", error: Exception | None = None) -> None:
-        self.result = result
-        self.error = error
-        self.failed: list[tuple[uuid.UUID, str]] = []
-
-    async def run(self, jid: uuid.UUID) -> str:
-        if self.error is not None:
-            raise self.error
-        return self.result
-
-    async def mark_failed(self, jid: uuid.UUID, reason: str) -> None:
-        self.failed.append((jid, reason))
-
-
-async def test_pdf_on_startup_populates_ctx() -> None:
-    ctx: dict[str, Any] = {}
-    await wpdf.on_startup(ctx)
-    assert "settings" in ctx
-    assert ctx["pytex_client"] is not None
-    # The default settings configure no MinIO, so the storage stays None.
-    assert ctx["object_storage"] is None
-
-
-def test_pdf_sessionmaker_default_and_injected() -> None:
-    assert wpdf._sessionmaker({}) is not None
-    sentinel = object()
-    assert wpdf._sessionmaker({"pdf_sessionmaker": sentinel}) is sentinel
-
-
-def test_pdf_pipeline_builds_with_ctx_deps() -> None:
-    captured: dict[str, Any] = {}
-
-    class _RP:
-        def __init__(self, *, sessionmaker: Any, pytex: Any, storage: Any) -> None:
-            captured["sessionmaker"] = sessionmaker
-            captured["pytex"] = pytex
-            captured["storage"] = storage
-
-    import worker.pdf as mod
-
-    orig = mod.RenderPipeline
-    mod.RenderPipeline = _RP  # type: ignore[misc]
-    try:
-        pytex = object()
-        storage = object()
-        sm = object()
-        mod._pipeline({"pytex_client": pytex, "object_storage": storage, "pdf_sessionmaker": sm})
-    finally:
-        mod.RenderPipeline = orig  # type: ignore[misc]
-    assert captured["pytex"] is pytex
-    assert captured["storage"] is storage
-
-
-async def test_render_pdf_success(monkeypatch: pytest.MonkeyPatch) -> None:
-    pipeline = _Pipeline(result="done")
-    monkeypatch.setattr(wpdf, "_pipeline", lambda _ctx: pipeline)
-    ctx = {"settings": SETTINGS}
-    assert await wpdf.render_pdf(ctx, str(uuid4())) == "done"
-
-
-async def test_render_pdf_retry(monkeypatch: pytest.MonkeyPatch) -> None:
-    pipeline = _Pipeline(error=RenderRetry("pytex 503"))
-    monkeypatch.setattr(wpdf, "_pipeline", lambda _ctx: pipeline)
-    ctx = {
-        "settings": load_settings(pdf_max_tries=4, pdf_retry_backoff_seconds=9),
-        "job_try": 1,
-    }
-    with pytest.raises(Retry) as ei:
-        await wpdf.render_pdf(ctx, str(uuid4()))
-    assert ei.value.defer_score == 9_000  # job_try(1) * backoff(9s), in ms
-    assert pipeline.failed == []
-
-
-async def test_render_pdf_dead_marks_failed(monkeypatch: pytest.MonkeyPatch) -> None:
-    pipeline = _Pipeline(error=RenderRetry("pytex 503"))
-    monkeypatch.setattr(wpdf, "_pipeline", lambda _ctx: pipeline)
-    jid = uuid4()
-    ctx = {"settings": load_settings(pdf_max_tries=3), "job_try": 3}
-    assert await wpdf.render_pdf(ctx, str(jid)) == "dead"
-    assert pipeline.failed == [(jid, "render_unavailable")]
-
-
-async def test_render_pdf_default_job_try(monkeypatch: pytest.MonkeyPatch) -> None:
-    # A missing job_try defaults to 1, so the task retries.
-    pipeline = _Pipeline(error=RenderRetry("boom"))
-    monkeypatch.setattr(wpdf, "_pipeline", lambda _ctx: pipeline)
-    with pytest.raises(Retry):
-        await wpdf.render_pdf({"settings": SETTINGS}, str(uuid4()))
-
-
 # worker/retention.py
 class _RetSession:
     """Serve scalar, scalars and execute from FIFO queues and count the commits."""
@@ -523,11 +427,11 @@ async def test_main_on_startup_calls_all_inits(monkeypatch: pytest.MonkeyPatch) 
 
     monkeypatch.setattr(wmain, "mail_on_startup", await _mk("mail"))
     monkeypatch.setattr(wmain, "scan_on_startup", await _mk("scan"))
-    monkeypatch.setattr(wmain, "pdf_on_startup", await _mk("pdf"))
+    monkeypatch.setattr(wmain, "protocol_on_startup", await _mk("protocol"))
     monkeypatch.setattr(wmain, "webhook_on_startup", await _mk("webhook"))
     monkeypatch.setattr(wmain, "deadlines_on_startup", await _mk("deadlines"))
     await wmain._on_startup({})
-    assert called == ["mail", "scan", "pdf", "webhook", "deadlines"]
+    assert called == ["mail", "scan", "protocol", "webhook", "deadlines"]
 
 
 # worker/deadlines.py: the discard log and the auto-transitions

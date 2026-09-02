@@ -1,15 +1,12 @@
 """The warm-up must cover every variant the platform asks for.
 
-This exists because it did not, and the gap cost a production feature. The warm-up
-rendered the two protocol variants only, so an application PDF — which asks for `report`
-or `report-makers` — met a cold cache, tried to fetch its LaTeX packages at run time, and
-died behind the container's egress block. pytex answered 400 and the job failed with
-`render_error`.
+A variant that is not warmed meets a cold cache in production, tries to fetch its LaTeX
+packages at run time, and dies behind the container's egress block.
 
-Nothing caught it, because every test that renders runs on a machine with internet, where
-a cold cache is a slow success rather than a failure. A cache miss is only fatal in
-production. So the check here is not "does it render" but "is the variant listed at all" —
-a property that holds without a network and without tectonic.
+No test that renders can catch this: they run on machines with internet, where a cold
+cache is a slow success rather than a failure. So the check is not "does it render" but
+"is the variant listed at all" — a property that holds without a network and without
+tectonic.
 """
 
 from __future__ import annotations
@@ -21,8 +18,7 @@ import pytest
 
 _WARMUP = Path(__file__).resolve().parents[1] / "warmup.py"
 
-#: What the backend asks pytex for. Keep in step with `variant_for` in
-#: `backend/app/modules/pdf/markdown.py` and `protocol_variant_for` in
+#: What the backend asks pytex for. Keep in step with `protocol_variant_for` in
 #: `backend/app/modules/protocol/markdown.py`.
 #:
 #: Duplicated here rather than imported: the backend is a separate package that this
@@ -30,11 +26,8 @@ _WARMUP = Path(__file__).resolve().parents[1] / "warmup.py"
 #: deployment cannot honour.
 REQUESTED_BY_THE_PLATFORM = frozenset(
     {
-        # Applications: `variant_for` maps "makers" to report-makers and everything else
-        # to the default "report".
-        "report",
-        "report-makers",
-        # Protocols: `protocol_variant_for` maps the stupa and asta designs.
+        # Protocols: `protocol_variant_for` maps the stupa and asta designs. They are the
+        # only renders left — applications no longer produce a PDF.
         "protocol-stupa",
         "protocol-asta",
     }

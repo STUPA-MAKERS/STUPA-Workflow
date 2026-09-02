@@ -572,32 +572,6 @@ export interface SignedUrl {
   expiresIn: number;
 }
 
-/**
- * Status of an async render job (`JobOut.status`).
- *
- * `pending` means the job waits for the worker. `running` means the worker
- * renders. `done` and `failed` are the two end states. Nothing else follows.
- */
-export type RenderJobStatus = 'pending' | 'running' | 'done' | 'failed';
-
-/**
- * Async render job (`POST /applications/{id}/pdf`, `GET /jobs/{id}`).
- *
- * `resultUrl` holds the app-relative download route `/api/jobs/{id}/download`,
- * never a MinIO link: MinIO sits on the internal Docker network and the browser
- * cannot resolve it. The field is set only on `done`, and only when the deployment
- * has an object store. `error` holds a short code, for example `render_error`, and
- * only on `failed`.
- */
-export interface RenderJob {
-  id: Uuid;
-  kind: string;
-  status: RenderJobStatus;
-  applicationId: Uuid | null;
-  resultUrl: string | null;
-  error: string | null;
-}
-
 /** Frontend input for a new application. It maps to `ApplicationCreateBody`. */
 export interface NewApplication {
   typeId: Uuid;

@@ -3,18 +3,11 @@
 This script runs during `docker build` with network access. It writes to
 `XDG_CACHE_HOME=/cache-seed`. The entrypoint copies the seed into the empty `/cache`
 volume at start. Without the seed, tectonic downloads the bundle and the LaTeX packages
-per document at runtime. That download fails behind the egress block.
+per document at runtime, and that download fails behind the egress block.
 
-It must render one document per variant the platform ACTUALLY ASKS FOR. It covered the
-two protocol variants only, so every application PDF — which asks for `report` or
-`report-makers` — hit a cold cache, tried to fetch packages at run time, and died as a
-`CompileError` behind the egress block. The application render answered 400 and the job
-failed with `render_error`.
-
-That went unnoticed because applications used to be rendered with the variant of their
-Gremium's corporate design, which for StuPa, AStA and ECHO was `protocol` — a warmed
-variant. They compiled, as the wrong kind of document. Pinning the correct shape turned a
-wrong PDF into no PDF and exposed the real gap here.
+It must render one document per variant the platform ACTUALLY ASKS FOR. A variant that
+is not warmed here meets a cold cache in production, dies as a `CompileError`, and the
+render answers 400.
 """
 
 from __future__ import annotations
@@ -50,26 +43,6 @@ Text mit **Fett**, *kursiv* und Umlauten: äöüß.
 # An application PDF. No `typ`/`gremium`, so nothing here pulls the document towards the
 # protocol path — the variant is passed explicitly anyway, and the frontmatter should not
 # quietly disagree with it.
-_REPORT_DOC = """---
-title: Cache-Warm-up Antrag
----
-
-# Cache-Warm-up Antrag
-
-## Antragsdaten
-
-Text mit **Fett**, *kursiv* und Umlauten: äöüß. LaTeX-Sonderzeichen: & % $ # _ ~ {}
-
-- **Feld:** Wert
-- **Betrag:** 1.234,56 €
-
-## Verlauf
-
-| Zeitpunkt | Status |
-| --- | --- |
-| 01.01.2026 | Eingereicht |
-"""
-
 # The first build downloads the bundle and can take a long time. Use a large limit.
 _LIMITS = BuildLimits(wall_timeout_s=600.0, cpu_timeout_s=600.0)
 
@@ -79,8 +52,6 @@ _LIMITS = BuildLimits(wall_timeout_s=600.0, cpu_timeout_s=600.0)
 _CASES: tuple[tuple[str, str], ...] = (
     ("protocol-asta", _DOC.format(cd="asta")),
     ("protocol-stupa", _DOC.format(cd="stupa")),
-    ("report", _REPORT_DOC),
-    ("report-makers", _REPORT_DOC),
 )
 
 

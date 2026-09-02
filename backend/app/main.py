@@ -42,7 +42,7 @@ from app.modules.deadlines.router import router as deadline_policies_router
 from app.modules.delegations.router import router as delegations_router
 from app.modules.files.router import router as files_router
 from app.modules.files.storage import build_object_storage
-from app.modules.flow.dispatch import ActionDispatcher
+from app.modules.flow.dispatch import ActionDispatcher, ChainActionDispatcher
 from app.modules.flow.extras_dispatcher import build_flow_extras_dispatcher
 from app.modules.flow.router import get_action_dispatcher
 from app.modules.flow.router import router as flow_router
@@ -60,8 +60,6 @@ from app.modules.notifications.router import router as notifications_router
 from app.modules.notifications.router import (
     templates_router as mail_templates_router,
 )
-from app.modules.pdf.action_dispatcher import ChainActionDispatcher
-from app.modules.pdf.router import router as pdf_router
 from app.modules.privacy.router import router as privacy_router
 from app.modules.protocol.router import router as protocol_router
 from app.modules.search.router import router as search_router
@@ -103,7 +101,6 @@ api_router.include_router(budget_tree_router)
 api_router.include_router(calendar_router)
 api_router.include_router(antiabuse_router)
 api_router.include_router(files_router)
-api_router.include_router(pdf_router)
 api_router.include_router(audit_router)
 api_router.include_router(config_revision_router)
 api_router.include_router(admin_router)

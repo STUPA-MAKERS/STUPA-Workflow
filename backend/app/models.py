@@ -54,7 +54,6 @@ from app.modules.notifications.models import (
     NotificationSettings,
     TaskReminderLog,
 )
-from app.modules.pdf.models import RenderJob
 from app.modules.privacy.models import ErasureRequest, PrivacySettings
 from app.modules.protocol.models import Protocol, ProtocolVoteRef
 from app.modules.voting.models import Ballot, SecretBallot, Vote, VotedMarker
@@ -103,7 +102,6 @@ __all__ = [
     "PrivacySettings",
     "Protocol",
     "ProtocolVoteRef",
-    "RenderJob",
     "Role",
     "RoleAssignment",
     "RolePermission",
