@@ -484,3 +484,118 @@ formly-form formly-group > formly-field + formly-field {
   color: var(--color-text-muted);
   font-size: var(--fs-sm);
 }
+
+/* -- share links ---------------------------------------------------------- */
+
+/* The token appears here once and never again, so the block is set apart from the
+   form below it rather than reading as one more field. */
+.det__shareFresh {
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-muted, var(--color-bg));
+}
+
+.det__shareFreshHint {
+  margin: 0 0 var(--space-2);
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+
+.det__shareFreshRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.det__shareUrl {
+  flex: 1 1 auto;
+  /* A long token must not push the copy button out of the dialog. */
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-bg);
+  color: var(--color-text);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  font-family: var(--font-mono, monospace);
+  font-size: var(--fs-sm);
+  text-overflow: ellipsis;
+}
+
+.det__shareForm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.det__shareLabel {
+  display: flex;
+  flex: 1 1 14rem;
+  flex-direction: column;
+  gap: var(--space-1);
+
+  span {
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--color-text-muted);
+  }
+
+  input {
+    width: 100%;
+    padding: var(--space-2) var(--space-3);
+    background: var(--color-bg);
+    color: var(--color-text);
+    border: var(--border-width) solid var(--color-border-strong);
+    border-radius: var(--radius-lg);
+    font: inherit;
+    font-size: var(--fs-sm);
+  }
+
+  input:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 1px;
+  }
+}
+
+.det__shareList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.det__shareRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+/* A revoked or expired link stays in the list — that is the record of who published
+   what — but it must not read as one that still opens. */
+.det__shareRow--dead {
+  opacity: 0.6;
+}
+
+.det__shareRowMain {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.det__shareRowLabel {
+  overflow: hidden;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

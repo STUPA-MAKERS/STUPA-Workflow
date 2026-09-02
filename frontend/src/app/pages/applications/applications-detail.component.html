@@ -41,6 +41,16 @@
           {{ 'applications.pdf.create' | t }}
         </span>
       </app-button>
+      <!-- Also outside the edit guard: `application.share` is a decision about who may
+           read the record, not about editing it. -->
+      @if (canShare() && !editing()) {
+        <app-button variant="secondary" size="sm" (click)="openShareDialog()">
+          <span class="inline-flex items-center gap-2">
+            <app-icon name="link" [size]="15" />
+            {{ 'applications.share.action' | t }}
+          </span>
+        </app-button>
+      }
       <!-- Outside the edit guard on purpose. `application.archive` is its own permission,
            and a holder who cannot edit the application still decides whether it stays in
            the working list. No confirmation: it is reversible with one click on the same
@@ -554,5 +564,98 @@
       </app-button>
     }
     <app-button variant="ghost" size="sm" (click)="closePdf()">{{ 'applications.pdf.close' | t }}</app-button>
+  </div>
+</app-dialog>
+
+<!-- Public share links. The dialog is where a link is minted, read once and revoked;
+     the token itself exists in the response and nowhere else. -->
+<app-dialog
+  [open]="shareDialogOpen()"
+  [title]="'applications.share.title' | t"
+  [closeLabel]="'applications.detail.cancel' | t"
+  (closed)="shareDialogOpen.set(false)"
+>
+  <p class="text-muted">{{ 'applications.share.lead' | t }}</p>
+
+  @if (freshShareUrl(); as url) {
+    <!-- Shown once. The server keeps a hash, so closing this dialog loses the token. -->
+    <div class="det__shareFresh">
+      <p class="det__shareFreshHint">{{ 'applications.share.onceHint' | t }}</p>
+      <div class="det__shareFreshRow">
+        <input
+          class="det__shareUrl"
+          type="text"
+          readonly
+          [value]="url"
+          [attr.aria-label]="'applications.share.url' | t"
+        />
+        <app-button variant="secondary" size="sm" (click)="copyShareUrl()">
+          {{ (shareCopied() ? 'applications.share.copied' : 'applications.share.copy') | t }}
+        </app-button>
+      </div>
+    </div>
+  }
+
+  <div class="det__shareForm">
+    <app-select
+      [label]="'applications.share.ttl' | t"
+      [options]="shareTtlOptions"
+      [ngModel]="shareTtl()"
+      (ngModelChange)="shareTtl.set($event)"
+    />
+    <label class="det__shareLabel">
+      <span>{{ 'applications.share.label' | t }}</span>
+      <input
+        type="text"
+        name="shareLabel"
+        maxlength="200"
+        [placeholder]="'applications.share.labelPlaceholder' | t"
+        [ngModel]="shareLabel()"
+        (ngModelChange)="shareLabel.set($event)"
+      />
+    </label>
+  </div>
+
+  @if (sharesLoading()) {
+    <div class="det__shareList" aria-busy="true">
+      <span class="skel skel--line"></span>
+      <span class="skel skel--line"></span>
+    </div>
+  } @else if (shares().length) {
+    <ul class="det__shareList">
+      @for (share of shares(); track share.id) {
+        <li class="det__shareRow" [class.det__shareRow--dead]="!shareIsLive(share)">
+          <div class="det__shareRowMain">
+            <span class="det__shareRowLabel">{{ share.label || ('applications.share.unlabelled' | t) }}</span>
+            <span class="text-muted text-sm">
+              @if (share.revokedAt) {
+                {{ 'applications.share.revokedAt' | t: { at: (share.revokedAt | ldate) } }}
+              } @else if (shareIsLive(share)) {
+                {{ 'applications.share.expiresAt' | t: { at: (share.expiresAt | ldate) } }}
+              } @else {
+                {{ 'applications.share.expired' | t: { at: (share.expiresAt | ldate) } }}
+              }
+            </span>
+          </div>
+          @if (shareIsLive(share)) {
+            <app-button
+              variant="danger"
+              size="sm"
+              [loading]="revokingShare() === share.id"
+              (click)="revokeShare(share.id)"
+            >{{ 'applications.share.revoke' | t }}</app-button>
+          }
+        </li>
+      }
+    </ul>
+  } @else {
+    <p class="text-muted text-sm m-0">{{ 'applications.share.none' | t }}</p>
+  }
+
+  <div dialog-footer>
+    <app-button variant="ghost" size="sm" (click)="shareDialogOpen.set(false)">{{ 'applications.share.close' | t }}</app-button>
+    <app-button size="sm" [loading]="creatingShare()" (click)="createShare()">
+      {{ 'applications.share.create' | t }}
+    </app-button>
   </div>
 </app-dialog>

@@ -19,6 +19,7 @@ import type { TranslationKey } from '@core/i18n/translations';
 import type {
   Application,
   ApplicationComment,
+  ApplicationShareLink,
   ApplicationState,
   ApplicationVersion,
   CommentVisibility,
@@ -301,6 +302,126 @@ export class ApplicationsDetailComponent implements OnDestroy {
       },
     });
   }
+  /**
+   * Public share links. `application.share` is its own permission on purpose: reading an
+   * application and deciding it may be read by anyone holding a URL are different
+   * decisions, and the server gates on the same key.
+   */
+  readonly canShare = computed(() => this.auth.can('application.share'));
+  readonly shareDialogOpen = signal(false);
+  readonly shares = signal<ApplicationShareLink[]>([]);
+  readonly sharesLoading = signal(false);
+  readonly creatingShare = signal(false);
+  readonly revokingShare = signal<Uuid | null>(null);
+  readonly shareTtl = signal('30');
+  readonly shareLabel = signal('');
+  /**
+   * The link that was just minted, held only for as long as the dialog is open.
+   *
+   * This is the one moment the token exists outside the URL bar of whoever pastes it.
+   * The server stored a hash; closing the dialog loses the plaintext for good, which is
+   * why the copy button sits next to it rather than on the list row.
+   *
+   * The whole row is kept, not just the URL, so that revoking can tell whether the link
+   * on screen is the one that just stopped working.
+   */
+  readonly freshShare = signal<ApplicationShareLink | null>(null);
+  readonly freshShareUrl = computed(() => this.freshShare()?.url ?? null);
+  readonly shareCopied = signal(false);
+
+  /** How long a new link lives. "Never" is deliberately not among the options. */
+  readonly shareTtlOptions: SelectOption[] = [
+    { value: '7', label: '7' },
+    { value: '30', label: '30' },
+    { value: '90', label: '90' },
+    { value: '365', label: '365' },
+  ];
+
+  openShareDialog(): void {
+    this.freshShare.set(null);
+    this.shareCopied.set(false);
+    this.shareLabel.set('');
+    this.shareDialogOpen.set(true);
+    this.loadShares();
+  }
+
+  private loadShares(): void {
+    const current = this.app();
+    if (!current) return;
+    this.sharesLoading.set(true);
+    this.api.applicationShares(current.id).subscribe({
+      next: (rows) => {
+        this.shares.set(rows);
+        this.sharesLoading.set(false);
+      },
+      error: () => {
+        this.shares.set([]);
+        this.sharesLoading.set(false);
+      },
+    });
+  }
+
+  createShare(): void {
+    const current = this.app();
+    if (!current || this.creatingShare()) return;
+    this.creatingShare.set(true);
+    this.shareCopied.set(false);
+    const label = this.shareLabel().trim();
+    this.api
+      .createApplicationShare(current.id, {
+        ttlDays: Number(this.shareTtl()),
+        ...(label ? { label } : {}),
+      })
+      .subscribe({
+        next: (link) => {
+          this.freshShare.set(link);
+          this.shares.update((rows) => [link, ...rows]);
+          this.shareLabel.set('');
+          this.creatingShare.set(false);
+        },
+        error: () => {
+          this.creatingShare.set(false);
+          this.toast.error(this.i18n.translate('applications.share.createError'));
+        },
+      });
+  }
+
+  revokeShare(shareId: Uuid): void {
+    const current = this.app();
+    if (!current || this.revokingShare()) return;
+    this.revokingShare.set(shareId);
+    this.api.revokeApplicationShare(current.id, shareId).subscribe({
+      next: (updated) => {
+        this.shares.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
+        this.revokingShare.set(null);
+        // A link that was just revoked must not stay on screen as something to copy.
+        if (updated.id === this.freshShare()?.id) {
+          this.freshShare.set(null);
+        }
+        this.toast.success(this.i18n.translate('applications.share.revoked'));
+      },
+      error: () => {
+        this.revokingShare.set(null);
+        this.toast.error(this.i18n.translate('applications.share.revokeError'));
+      },
+    });
+  }
+
+  /** Copy the fresh link. The Clipboard API can be absent, so the write is optional. */
+  copyShareUrl(): void {
+    const url = this.freshShareUrl();
+    if (!url) return;
+    void navigator.clipboard?.writeText(url)?.then(
+      () => this.shareCopied.set(true),
+      () => this.shareCopied.set(false),
+    );
+  }
+
+  /** Whether a link still opens. Revoked and expired both read as dead. */
+  protected shareIsLive(share: ApplicationShareLink): boolean {
+    return share.revokedAt === null && new Date(share.expiresAt).getTime() > Date.now();
+  }
+
   readonly fmt = formatFieldValue;
 
   private id: Uuid = '';

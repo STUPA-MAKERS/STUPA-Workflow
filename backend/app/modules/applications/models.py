@@ -205,6 +205,46 @@ class MagicLink(UUIDPkMixin, CreatedAtMixin, Base):
     )
 
 
+class ApplicationShare(UUIDPkMixin, CreatedAtMixin, Base):
+    """A public, read-only link to one application.
+
+    The database holds only ``HMAC-SHA256(pepper, token)``, like `MagicLink`: the
+    plaintext exists once, in the URL handed to whoever created it. A stolen database
+    yields no working links.
+
+    Revocable and expiring, both on purpose. A link that has been pasted into a chat is
+    outside our control, and the only way to take it back is to stop honouring it.
+    ``revoked_at`` is what makes "revocable" real rather than theoretical, and it is a
+    timestamp rather than a flag so the audit answers when.
+
+    NOT single-use, unlike a magic link: the whole point is that several people open it,
+    and often more than once.
+    """
+
+    __tablename__ = "application_share"
+
+    application_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("application.id", ondelete="CASCADE")
+    )
+    token_hash: Mapped[bytes] = mapped_column(LargeBinary)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # OIDC ``sub`` of whoever created the link, and a note they can leave for themselves.
+    # Not a foreign key, like ``created_by`` on the application: the record of who made a
+    # record public has to outlive the account.
+    created_by: Mapped[str | None] = mapped_column(Text, nullable=True)
+    label: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (
+        # UNIQUE: the lookup is by hash, and two rows with the same digest would make the
+        # answer ambiguous at exactly the moment it must not be.
+        Index("ix_application_share_token_hash", "token_hash", unique=True),
+        Index("ix_application_share_application_id", "application_id"),
+    )
+
+
 class Comment(UUIDPkMixin, Base):
     """Comment on an application.
 
