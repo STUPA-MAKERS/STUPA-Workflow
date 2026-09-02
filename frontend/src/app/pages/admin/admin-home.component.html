@@ -1,5 +1,5 @@
 <section class="flex flex-col gap-7">
-  <app-page-header [title]="'admin.home.title' | t" />
+  <app-page-header [flush]="true" [title]="'admin.home.title' | t" />
 
   <div class="admin-home__grid">
     @for (tile of visibleTiles(); track tile.link) {

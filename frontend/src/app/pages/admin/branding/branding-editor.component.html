@@ -1,6 +1,6 @@
 @if (draft(); as d) {
   <section class="flex flex-col gap-5">
-    <app-page-header [title]="'admin.brand.title' | t">
+    <app-page-header [flush]="true" [title]="'admin.brand.title' | t">
       <div actions class="inline-flex gap-2">
         <span class="py-1 px-3 rounded-full text-xs font-semibold bg-surface-sunken text-muted">{{ 'admin.brand.version' | t: { n: version() } }}</span>
         @if (hasDraftChanges()) {
