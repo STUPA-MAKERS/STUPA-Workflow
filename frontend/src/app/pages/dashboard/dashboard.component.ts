@@ -6,12 +6,10 @@ import { catchError, of } from 'rxjs';
 import { ApiClient } from '@core/api/api-client.service';
 import { type Delegation, DelegationsApiService } from '@core/api/delegations.service';
 import { AuthService } from '@core/auth/auth.service';
-import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { ApplicationListItem, ApplicationType, Meeting, Uuid } from '@core/api/models';
 import { BadgeComponent } from '@stupa-makers/ui-kit';
-import { CapitalizePipe } from '@shared/pipes/capitalize.pipe';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 
 /** Max number of application rows shown per panel. */
@@ -36,7 +34,6 @@ const PREVIEW_ROWS = 5;
     LocalizedDatePipe,
     TranslatePipe,
     BadgeComponent,
-    CapitalizePipe,
     PageHeaderComponent,
   ],
   templateUrl: './dashboard.component.html',
@@ -119,15 +116,6 @@ export class DashboardComponent {
     return status === 'live' ? 'success' : status === 'planned' ? 'info' : 'neutral';
   }
 
-  private readonly i18n = inject(I18nService);
-  /** Localized role label. An unknown role key returns the raw key. */
-  roleLabel(role: string): string {
-    const key = `role.${role}`;
-    const label = this.i18n.translate(key as TranslationKey);
-    return label === key ? role : label;
-  }
-
-  readonly roles = computed(() => this.auth.roles());
   readonly gremien = computed(() => this.auth.gremien());
 
   private readonly delegationsApi = inject(DelegationsApiService);

@@ -15,8 +15,6 @@ import {
 import { AuthService } from '@core/auth/auth.service';
 import { downloadBlob } from '@shared/download.util';
 import {
-  ApplicationsTableComponent,
-  type ApplicationRow,
 } from '../applications/applications-table.component';
 import {
   BudgetTreeApi,
@@ -79,8 +77,7 @@ import { PageHeaderComponent } from '@shared/ui/page-header/page-header.componen
     BudgetPieComponent,
     BudgetSunburstComponent,
     DialogComponent,
-    ApplicationsTableComponent,
-    RouterLink,
+      RouterLink,
   ],
   templateUrl: './budget-dashboard.component.html',
   styleUrl: './budget-dashboard.component.scss',
@@ -98,7 +95,6 @@ export class BudgetDashboardComponent {
   readonly loading = signal(true);
   readonly error = signal(false);
   readonly tree = signal<BudgetTreeNode[]>([]);
-  readonly applications = signal<BudgetApplication[]>([]);
   /** Fiscal years per top budget (for the left tree). */
   readonly fiscalYearsByBudget = signal<Record<Uuid, FiscalYear[]>>({});
 
@@ -231,23 +227,6 @@ export class BudgetDashboardComponent {
     { key: 'expended', label: this.i18n.translate('budget.tree.col.expended'), align: 'end' },
     { key: 'available', label: this.i18n.translate('budget.tree.col.available'), align: 'end' },
   ]);
-  /** Application rows for the shared table, styled like `/applications`. */
-  readonly appRows = computed<ApplicationRow[]>(() =>
-    this.applications().map((a) => ({
-      id: a.applicationId,
-      title: this.titleOf(a),
-      typeLabel: a.pathKey,
-      stateLabel: a.stateLabel
-        ? this.resolveLabel(a.stateLabel)
-        : a.stage
-          ? this.stageLabel(a.stage)
-          : null,
-      stateColor: a.stateColor ?? null,
-      amount: a.amount,
-      currency: a.currency,
-      createdAt: a.createdAt,
-    })),
-  );
 
   /** Application title. It falls back to the short id when no title is set. */
   titleOf(app: BudgetApplication): string {
@@ -386,9 +365,7 @@ export class BudgetDashboardComponent {
             error: () => this.restoreOrDefault(tops),
           });
         }
-        if (!tops.length) {
-          this.applications.set([]);
-        } else {
+        if (tops.length) {
           this.restoreOrDefault(tops);
         }
       },
@@ -425,7 +402,6 @@ export class BudgetDashboardComponent {
     this.selectedBudgetId.set(budgetId);
     this.selectedKsId.set(ksId);
     this.selectedFyId.set(fyId);
-    this.reloadApplications();
   }
 
   private syncUrl(): void {
@@ -447,7 +423,6 @@ export class BudgetDashboardComponent {
     const fys = this.fiscalYearsByBudget()[id] ?? [];
     this.selectedFyId.set(fys[0]?.id ?? '');
     this.syncUrl();
-    this.reloadApplications();
   }
 
   onYearPicked(sel: BudgetYearSelection): void {
@@ -458,30 +433,17 @@ export class BudgetDashboardComponent {
     // the tree open.
     this.navOpen.set(false);
     this.syncUrl();
-    this.reloadApplications();
   }
 
   selectKs(id: string): void {
     this.selectedKsId.set(id);
     this.syncUrl();
-    this.reloadApplications();
   }
 
   drillInto(node: BudgetTreeNode): void {
     this.selectKs(node.id);
   }
 
-  private reloadApplications(): void {
-    const ks = this.selectedKsId();
-    if (!ks) {
-      this.applications.set([]);
-      return;
-    }
-    this.api.applications(ks as Uuid, this.selectedFyId() || undefined).subscribe({
-      next: (apps) => this.applications.set(apps),
-      error: () => this.applications.set([]),
-    });
-  }
 
   onExport(): void {
     if (this.exporting()) return;

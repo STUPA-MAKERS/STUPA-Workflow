@@ -7,7 +7,6 @@ import { AuthService } from '@core/auth/auth.service';
 import { BudgetDashboardComponent } from './budget-dashboard.component';
 import type {
   BudgetAllocationView,
-  BudgetApplication,
   BudgetTreeNode,
   FiscalYear,
 } from './budget-tree.api';
@@ -91,22 +90,6 @@ const TREE: BudgetTreeNode[] = [
   }),
 ];
 
-const APPS: BudgetApplication[] = [
-  {
-    applicationId: 'aaaaaaaa-1111-2222-3333-444444444444',
-    title: 'Lautsprecher',
-    budgetId: 'b-800',
-    pathKey: 'VS-800',
-    fiscalYearId: 'fy-1',
-    amount: '120.00',
-    currency: 'EUR',
-    stage: 'approved',
-    stateId: 's-1',
-    stateLabel: { de: 'Angenommen', en: 'Accepted' },
-    stateColor: '#0a0',
-    createdAt: '2026-05-01T10:00:00Z',
-  },
-];
 
 function authStub(canValue = true): AuthService {
   return { can: (_p: string) => canValue } as unknown as AuthService;
@@ -115,7 +98,6 @@ function authStub(canValue = true): AuthService {
 interface SetupOpts {
   tree?: BudgetTreeNode[];
   fys?: FiscalYear[];
-  apps?: BudgetApplication[];
   can?: boolean;
   queryParams?: Record<string, string>;
 }
@@ -123,7 +105,6 @@ interface SetupOpts {
 async function setup(opts: SetupOpts = {}) {
   const tree = opts.tree ?? TREE;
   const fys = opts.fys ?? [FY];
-  const apps = opts.apps ?? APPS;
   const view = await render(BudgetDashboardComponent, {
     providers: [
       provideHttpClient(),
@@ -144,10 +125,8 @@ async function setup(opts: SetupOpts = {}) {
   for (const top of tops) {
     http.expectOne((r) => r.url.endsWith(`/budgets/${top.id}/fiscal-years`)).flush(fys);
   }
-  // After the restore the component requests the applications of the selected cost
-  // center, which is the first top.
-  const reqs = http.match((r) => r.url.includes('/applications'));
-  reqs.forEach((r) => r.flush(apps));
+  // The page no longer lists applications: that job belongs to /applications, which
+  // the cross-link opens. No request goes out for them.
   view.fixture.detectChanges();
   return { ...view, http, c: view.fixture.componentInstance as unknown as Inst };
 }
@@ -156,35 +135,22 @@ describe('BudgetDashboardComponent (#17)', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
   afterEach(() => TestBed.inject(HttpTestingController).verify());
 
-  it('shows the cost-centre subtree with bars and the applications panel', async () => {
+  it('shows the cost-centre subtree with bars', async () => {
     await setup();
     expect(screen.getAllByText('VS').length).toBeGreaterThan(0);
     expect(screen.getAllByText('VS-Mittel').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('VS-800').length).toBeGreaterThan(1);
+    // Once, in the usage tree. It used to appear twice, because the applications table
+    // repeated the cost-centre path in every row.
+    expect(screen.getAllByText('VS-800').length).toBe(1);
   });
 
-  it('drills into a cost centre on click and reloads its applications', async () => {
-    const { c, http } = await setup();
+  it('drills into a cost centre on click', async () => {
+    const { c } = await setup();
     c.drillInto(TREE[0].children[0]);
     expect(c.selectedKsId()).toBe('b-800');
-    http.expectOne((r) => r.url.includes('/budgets/b-800/applications')).flush(APPS);
     expect(c.breadcrumbs().map((n: { key: string }) => n.key)).toEqual(['VS', '800']);
   });
 
-  it('maps budget applications into shared-table rows linking to the detail page', async () => {
-    const { c } = await setup();
-    const rows = c.appRows();
-    expect(rows.length).toBe(APPS.length);
-    expect(rows[0].id).toBe(APPS[0].applicationId);
-    // stateLabel resolves in the active locale (de).
-    expect(rows[0].stateLabel).toBe('Angenommen');
-    expect(rows[0].stateColor).toBe('#0a0');
-    // The page also holds links from a cost center into the bookings tab
-    // (#expenses-ux), so pick the application link by its href, not by position.
-    const links = screen.getAllByRole('link') as HTMLAnchorElement[];
-    const appLink = links.find((a) => a.getAttribute('href')?.includes('/applications/'));
-    expect(appLink).toBeTruthy();
-  });
 
   it('toggleNav flips the mobile nav flag', async () => {
     const { c } = await setup();
@@ -264,45 +230,6 @@ describe('BudgetDashboardComponent (#17)', () => {
     expect(c.usageRowId(row)).toBe(row.node.id);
   });
 
-  it('appRows falls back to a short-id title and uses the stage label when no stateLabel', async () => {
-    const apps: BudgetApplication[] = [
-      {
-        applicationId: 'bbbbbbbb-2222-3333-4444-555555555555',
-        title: '   ',
-        budgetId: 'b-800',
-        pathKey: 'VS-800',
-        fiscalYearId: 'fy-1',
-        amount: null,
-        currency: null,
-        stage: 'review',
-        stateId: null,
-        stateLabel: null,
-        stateColor: null,
-        createdAt: '2026-05-02T10:00:00Z',
-      },
-      {
-        applicationId: 'cccccccc-3333-4444-5555-666666666666',
-        title: null,
-        budgetId: 'b-800',
-        pathKey: 'VS-800',
-        fiscalYearId: 'fy-1',
-        amount: null,
-        currency: null,
-        stage: null,
-        stateId: null,
-        createdAt: '2026-05-03T10:00:00Z',
-      },
-    ];
-    const { c } = await setup({ apps });
-    const rows = c.appRows();
-    // Blank title → "<shortId>…".
-    expect(rows[0].title).toBe('bbbbbbbb…');
-    // No stateLabel but a stage → translated stage label.
-    expect(typeof rows[0].stateLabel).toBe('string');
-    // No stateLabel and no stage → null.
-    expect(rows[1].stateLabel).toBeNull();
-    expect(rows[1].stateColor).toBeNull();
-  });
 
   it('resolveLabel falls back de → en → first value', async () => {
     const { c } = await setup();
@@ -402,12 +329,11 @@ describe('BudgetDashboardComponent (#17)', () => {
   });
 
   it('onOverviewPick closes the overlay and selects + reloads the picked cost centre', async () => {
-    const { c, http } = await setup();
+    const { c } = await setup();
     c.overviewOpen.set(true);
     c.onOverviewPick('b-800');
     expect(c.overviewOpen()).toBe(false);
     expect(c.selectedKsId()).toBe('b-800');
-    http.expectOne((r) => r.url.includes('/budgets/b-800/applications')).flush([]);
   });
 
   it('metricLabel resolves a translated label per metric', async () => {
@@ -460,27 +386,25 @@ describe('BudgetDashboardComponent (#17)', () => {
   });
 
   it('selectBudget sets root + first fiscal year, syncs the URL and reloads', async () => {
-    const { c, http } = await setup();
+    const { c } = await setup();
     const nav = jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
     c.selectBudget('b-vs');
     expect(c.selectedBudgetId()).toBe('b-vs');
     expect(c.selectedKsId()).toBe('b-vs');
     expect(c.selectedFyId()).toBe('fy-1');
     expect(nav).toHaveBeenCalled();
-    http.expectOne((r) => r.url.includes('/budgets/b-vs/applications')).flush(APPS);
   });
 
   it('selectBudget with an unknown budget id clears the fiscal year', async () => {
-    const { c, http } = await setup();
+    const { c } = await setup();
     jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
     c.selectBudget('ghost');
     expect(c.selectedFyId()).toBe('');
     // ks set to 'ghost' → reloadApplications fires.
-    http.expectOne((r) => r.url.includes('/budgets/ghost/applications')).flush([]);
   });
 
   it('onYearPicked applies the selection, collapses the nav, syncs and reloads', async () => {
-    const { c, http } = await setup();
+    const { c } = await setup();
     jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
     c.navOpen.set(true);
     c.onYearPicked({ budgetId: 'b-vs', fiscalYearId: 'fy-2' });
@@ -488,25 +412,9 @@ describe('BudgetDashboardComponent (#17)', () => {
     expect(c.selectedKsId()).toBe('b-vs');
     expect(c.selectedFyId()).toBe('fy-2');
     expect(c.navOpen()).toBe(false);
-    http.expectOne((r) => r.url.includes('/budgets/b-vs/applications')).flush(APPS);
   });
 
-  it('selectKs with an empty id clears the applications list', async () => {
-    const { c } = await setup();
-    jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
-    c.selectKs('');
-    expect(c.applications()).toEqual([]);
-  });
 
-  it('reloadApplications sets [] on an HTTP error', async () => {
-    const { c, http } = await setup();
-    jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
-    c.selectKs('b-800');
-    http
-      .expectOne((r) => r.url.includes('/budgets/b-800/applications'))
-      .flush('boom', { status: 500, statusText: 'err' });
-    expect(c.applications()).toEqual([]);
-  });
 
   it('renders the export button and exports on click', async () => {
     // jsdom has no URL.createObjectURL and no URL.revokeObjectURL. Stub both for
@@ -557,10 +465,9 @@ describe('BudgetDashboardComponent (#17)', () => {
         ],
       }),
     ];
-    const { c, http } = await setup({ tree });
+    const { c } = await setup({ tree });
     jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
     c.selectKs('orphan');
-    http.expectOne((r) => r.url.includes('/budgets/orphan/applications')).flush([]);
     // parentId resolves to nothing (?? null), so the chain holds only the orphan.
     expect(c.breadcrumbs().map((n: { id: string }) => n.id)).toEqual(['orphan']);
   });
@@ -617,7 +524,6 @@ describe('BudgetDashboardComponent (#17)', () => {
     const c = view.fixture.componentInstance as unknown as Inst;
     http.expectOne((r) => r.url.endsWith('/budgets')).flush([]);
     view.fixture.detectChanges();
-    expect(c.applications()).toEqual([]);
     expect(c.tops()).toEqual([]);
     expect(view.container.querySelector('.bd__empty')).toBeTruthy();
     http.verify();
@@ -718,11 +624,9 @@ describe('BudgetDashboardComponent (#17)', () => {
     // Only b-b has one here, so it becomes the default. Its fys then exist and the
     // restore runs. The later flush for b-a does nothing.
     http.expectOne((r) => r.url.endsWith('/budgets/b-b/fiscal-years')).flush([{ ...FY, budgetId: 'b-b' }]);
-    http.match((r) => r.url.includes('/applications')).forEach((r) => r.flush([]));
     http.expectOne((r) => r.url.endsWith('/budgets/b-a/fiscal-years')).flush([{ ...FY, budgetId: 'b-a' }]);
     view.fixture.detectChanges();
     expect(c.selectedBudgetId()).toBe('b-b');
-    http.match((r) => r.url.includes('/applications')).forEach((r) => r.flush([]));
     http.verify();
   });
 
@@ -742,7 +646,7 @@ describe('BudgetDashboardComponent (#17)', () => {
     http.expectOne((r) => r.url.endsWith('/budgets')).flush([node({ id: 'b-vs', key: 'VS' })]);
     http.expectOne((r) => r.url.endsWith('/budgets/b-vs/fiscal-years')).flush([]);
     view.fixture.detectChanges();
-    // Without a fiscal year nothing is selected and no applications request goes out.
+    // Without a fiscal year nothing is selected.
     expect(c.selectedBudgetId()).toBe('');
     http.verify();
   });
