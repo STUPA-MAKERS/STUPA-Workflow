@@ -11,11 +11,16 @@
 # live-vote WebSocket, protocol to PDF and OIDC. See e2e/README.md.
 #
 # Usage: scripts/e2e.sh
-#   E2E_TIMEOUT: default 900s, for the image build and the ClamAV start. The host ports
-#   are fixed: web 127.0.0.1:8080 (compose), mailpit API 127.0.0.1:8025 (overlay).
+#   E2E_TIMEOUT: default 900s, for the image build and the ClamAV start.
+#   WEB_PORT: host port of `web`, default 8080. The mailpit API stays on
+#   127.0.0.1:8025 (overlay).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# The compose mapping reads WEB_PORT, so the script and the stack agree on one value.
+WEB_PORT="${WEB_PORT:-8080}"
+export WEB_PORT
+WEB="http://127.0.0.1:${WEB_PORT}"
 DEPLOY="${ROOT}/deploy"
 FRONTEND="${ROOT}/frontend"
 ENV_FILE="${DEPLOY}/.env"
@@ -67,7 +72,6 @@ SESSION_SECRET=e2e-session-secret-0123456789
 MAGIC_LINK_SECRET=e2e-magic-link-secret-0123456789
 RATE_LIMIT_ENABLED=false
 FORWARDED_ALLOW_IPS=*
-PUBLIC_BASE_URL=http://127.0.0.1:8080
 # mailpit als SMTP-Sink (kein TLS).
 SMTP_HOST=mailpit
 SMTP_PORT=1025
@@ -75,6 +79,13 @@ SMTP_STARTTLS=false
 SMTP_SSL=false
 SMTP_FROM=noreply@e2e.test
 EOF
+
+# Outside the quoted heredoc, because that block does NOT expand variables and these two
+# values have to carry the chosen port.
+{
+  echo "PUBLIC_BASE_URL=${WEB}"
+  echo "WEB_PORT=${WEB_PORT}"
+} >> "${ENV_FILE}"
 
 rm -rf "${ARTIFACTS}"; mkdir -p "${ARTIFACTS}"
 
@@ -117,7 +128,7 @@ fi
 
 echo "==> Playwright"
 cd "${FRONTEND}"
-export E2E_BASE_URL="http://127.0.0.1:8080"
+export E2E_BASE_URL="${WEB}"
 export E2E_MAILPIT_URL="http://127.0.0.1:8025"
 export E2E_ARTIFACTS_FILE="${ARTIFACTS}/e2e.json"
 

@@ -75,7 +75,7 @@ docker compose up -d --build
 
 Migrations run on their own. A one-shot `migrate` service applies `alembic upgrade
 head` before `api` and `worker` start. The SPA then answers at
-<http://127.0.0.1:8080/>. Postgres also exposes `127.0.0.1:5433`, for the admin CLI
+<http://127.0.0.1:8080/> (`WEB_PORT` moves it). Postgres also exposes `127.0.0.1:5433`, for the admin CLI
 only. Liveness: `/healthz` (web) and `/api/health` (api).
 
 > On the first start, ClamAV downloads signatures for several minutes (long
