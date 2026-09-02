@@ -73,6 +73,10 @@
             <app-icon name="euro" [size]="14" />
             {{ 'budget.usage.viewExpenses' | t }}
           </a>
+          <a class="bd__sectionLink" [routerLink]="['/applications']" [queryParams]="{ budget: selectedKsId() }">
+            <app-icon name="form" [size]="14" />
+            {{ 'budget.apps.viewAll' | t }}
+          </a>
         </div>
         <app-data-table [columns]="usageColumns()" [rows]="usageRows()" [rowKey]="usageRowId">
           <ng-template appCell="node" let-row>
@@ -97,17 +101,6 @@
           </ng-template>
           <ng-template appCell="available" let-row><span [class.bd__neg]="$any(row).available < 0">{{ money($any(row).available, $any(row).node.currency) }}</span></ng-template>
         </app-data-table>
-      </section>
-
-      <section class="bd__apps" aria-labelledby="bd-apps-h">
-        <div class="bd__sectionHead">
-          <h2 id="bd-apps-h" class="bd__panel-h">{{ 'budget.apps.heading' | t }}</h2>
-          <a class="bd__sectionLink" [routerLink]="['/applications']" [queryParams]="{ budget: selectedKsId() }">
-            <app-icon name="form" [size]="14" />
-            {{ 'budget.apps.viewAll' | t }}
-          </a>
-        </div>
-        <app-applications-table [rows]="appRows()" [emptyText]="'budget.apps.empty' | t" />
       </section>
     </main>
 

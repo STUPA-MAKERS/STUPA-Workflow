@@ -186,11 +186,12 @@ function delegation(id: string, revocable: boolean, direction: string | null): u
 }
 
 describe('DashboardComponent', () => {
-  it('greets the signed-in member by name and shows their roles', async () => {
+  it('greets the signed-in member by name, without their RBAC roles', async () => {
     const { http } = await setup(MEMBER);
     expect(screen.getByText('Willkommen, Mia Member')).toBeInTheDocument();
-    // The i18n layer translates the 'member' role. German gives "Mitglied".
-    expect(screen.getByText('Mitglied')).toBeInTheDocument();
+    // The role badge is deliberately gone: a role name says nothing a member acts on.
+    // "Mitglied" is the German label of the 'member' role this fixture carries.
+    expect(screen.queryByText('Mitglied')).not.toBeInTheDocument();
     http.verify();
   });
 
@@ -290,14 +291,14 @@ describe('DashboardComponent', () => {
     http.verify();
   });
 
-  it('roleLabel localises known roles and echoes unknown ones', async () => {
+  it('exposes the Gremium memberships, which are what the header still shows', async () => {
     const { fixture } = await setup(MEMBER);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
-    expect(c.roleLabel('member')).toBe('Mitglied');
-    expect(c.roleLabel('totally_unknown_role')).toBe('totally_unknown_role');
-    expect(c.roles()).toContain('member');
     expect(Array.isArray(c.gremien())).toBe(true);
+    // The roles signal and its label helper went with the badges.
+    expect(c.roles).toBeUndefined();
+    expect(c.roleLabel).toBeUndefined();
   });
 
   it('shows only revocable delegations and reports their direction', async () => {

@@ -1,13 +1,11 @@
 <app-page-header
   [title]="'dashboard.greeting' | t: { name: auth.displayName() }"
-  [subtitle]="'dashboard.subtitle' | t"
 >
-  <!-- The roles and Gremien of the user ride in the actions slot. They are status, not
-       a control, so they stay in the header instead of taking a block of their own. -->
+  <!-- The Gremien of the user ride in the actions slot. They are status, not a control,
+       so they stay in the header instead of taking a block of their own. Roles are NOT
+       shown: an RBAC role name says nothing a member acts on, while the Gremium is the
+       thing their work actually belongs to. -->
   <div actions class="flex flex-wrap gap-2">
-    @for (role of roles(); track role) {
-      <app-badge variant="primary">{{ roleLabel(role) | capitalize }}</app-badge>
-    }
     @for (g of gremien(); track g.id) {
       <app-badge variant="neutral">{{ g.name }}</app-badge>
     }
