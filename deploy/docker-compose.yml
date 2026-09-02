@@ -25,9 +25,15 @@ services:
       api:
         condition: service_healthy
     ports:
-      # Bound to localhost only. The external NPM proxies here, or through the `proxy`
-      # network. `WEB_PORT` moves the host port when 8080 is already taken; the
-      # container port stays 80, because nginx.conf listens there.
+      # Loopback by default: the external NPM proxies here, or reaches `web` over the
+      # `proxy` network without any host port at all. `WEB_PORT` moves the port when
+      # 8080 is taken; the container port stays 80, because nginx.conf listens there.
+      #
+      # `WEB_HOST` moves the BIND ADDRESS, for an NPM that cannot reach 127.0.0.1 of
+      # this host. Setting it to 0.0.0.0 puts the app on every interface, so it is
+      # reachable WITHOUT TLS and PAST the proxy's access rules, and FORWARDED_ALLOW_IPS
+      # then trusts headers from whoever gets there. Use a host firewall with it, or
+      # prefer the `proxy` network and publish nothing.
       - "${WEB_HOST:-127.0.0.1}:${WEB_PORT:-8080}:80"
     volumes:
       # The image already holds nginx.conf. This mount allows a production edit
