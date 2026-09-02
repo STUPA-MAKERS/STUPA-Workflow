@@ -41,12 +41,16 @@ export class HScrollSyncDirective implements OnDestroy {
 
   private setup(): void {
     const sel = this.appHScrollSync();
-    const scroller = sel ? this.host.nativeElement.querySelector<HTMLElement>(sel) : null;
-    const wrap = scroller ?? this.host.nativeElement;
+    // A selector that matches nothing must NOT fall back to the host. The host is not the
+    // thing that scrolls, so the proxy would mirror an element with no scroll range and
+    // the two bars would disagree about how far there is to go.
+    const wrap = sel
+      ? this.host.nativeElement.querySelector<HTMLElement>(sel)
+      : this.host.nativeElement;
     // The bar sits above whatever actually scrolls, which for an inner scroller means
     // above the component, not inside it.
     const parent = this.host.nativeElement.parentElement;
-    if (typeof document === 'undefined' || !parent) return;
+    if (typeof document === 'undefined' || !parent || !wrap) return;
 
     const bar = document.createElement('div');
     bar.setAttribute('aria-hidden', 'true');
@@ -70,15 +74,23 @@ export class HScrollSyncDirective implements OnDestroy {
     this.disposers.push(() => bar.removeEventListener('scroll', onBar));
 
     const update = (): void => {
-      const full = wrap.scrollWidth;
-      inner.style.width = `${full}px`;
+      const range = wrap.scrollWidth - wrap.clientWidth;
+      // Match the RANGE, not the width. The proxy and the real scroller sit in different
+      // boxes — the boxed table draws a border, so its scroller is a couple of pixels
+      // narrower than the bar above it — and sizing the proxy to `scrollWidth` gave the
+      // two different distances to travel. The thumbs then had different lengths and
+      // drifted apart as you dragged either one. Deriving the inner width from the bar's
+      // own width plus the range makes both ranges identical whatever the boxes do.
+      inner.style.width = `${bar.clientWidth + Math.max(0, range)}px`;
       // No overflow, for example after a mobile card reflow: hide the bar.
-      bar.style.display = full > wrap.clientWidth + 1 ? 'block' : 'none';
+      bar.style.display = range > 1 ? 'block' : 'none';
     };
     update();
     if (typeof ResizeObserver !== 'undefined') {
       const ro = new ResizeObserver(() => update());
       ro.observe(wrap);
+      // The bar's own width feeds the calculation, so a change to it has to re-run too.
+      ro.observe(bar);
       const table = wrap.firstElementChild;
       if (table) ro.observe(table);
       this.ro = ro;
