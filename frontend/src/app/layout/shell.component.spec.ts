@@ -310,6 +310,88 @@ describe('ShellComponent', () => {
     http.verify();
   });
 
+  it('keeps language and appearance out of the header row when signed in', async () => {
+    // They are settings, not navigation. Two more controls in the header made it cramped
+    // on a desktop and pushed the theme toggle clean off a phone screen.
+    const { fixture, auth, http } = await setup();
+    login(auth, http, MEMBER);
+    fixture.detectChanges();
+
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /Erscheinungsbild|appearance/i }),
+    ).not.toBeInTheDocument();
+    http.verify();
+  });
+
+  it('offers language and appearance inside the account popout', async () => {
+    const { fixture, auth, http } = await setup();
+    const theme = fixture.debugElement.injector.get(ThemeService);
+    login(auth, http, MEMBER);
+    fixture.detectChanges();
+
+    await userEvent.click(screen.getByRole('button', { name: /Mia Member/ }));
+    fixture.detectChanges();
+
+    expect(screen.getByRole('combobox', { name: /Sprache|language/i })).toBeInTheDocument();
+    const before = theme.resolved();
+    await userEvent.click(
+      screen.getByRole('menuitemcheckbox', { name: /Erscheinungsbild|appearance/i }),
+    );
+    expect(theme.resolved()).not.toBe(before);
+    http.verify();
+  });
+
+  it('still offers both inline when nobody is signed in', async () => {
+    // There is no account menu to hold them then, and the header is nearly empty anyway.
+    const { fixture, http } = await setup();
+    fixture.detectChanges();
+
+    expect(screen.getByRole('combobox', { name: /Sprache|language/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /Erscheinungsbild|appearance/i }),
+    ).toBeInTheDocument();
+    http.verify();
+  });
+
+  it('puts the search trigger to the right of the account control', async () => {
+    const { fixture, auth, http } = await setup();
+    login(auth, http, MEMBER);
+    fixture.detectChanges();
+
+    const account = screen.getByRole('button', { name: /Mia Member/ });
+    const search = screen.getByRole('button', { name: /Suche öffnen|Open search/i });
+    // `DOCUMENT_POSITION_FOLLOWING` = the search button comes after the account control.
+    expect(account.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    http.verify();
+  });
+
+  it('shows a magnifier on the search trigger, not the filter funnel', async () => {
+    // The funnel is the filter button of the list pages. Searching is not filtering.
+    const { fixture, auth, http } = await setup();
+    login(auth, http, MEMBER);
+    fixture.detectChanges();
+
+    const search = screen.getByRole('button', { name: /Suche öffnen|Open search/i });
+    expect(search.querySelector('.fa-magnifying-glass')).toBeTruthy();
+    expect(search.querySelector('.fa-filter')).toBeNull();
+    http.verify();
+  });
+
+  it('drops the wordmark for the bare mark, so a narrow header has both to choose from', async () => {
+    // The swap itself is a media query; what a test can hold is that both images exist
+    // and that the mark is the one file that does not depend on the theme.
+    const { fixture, http } = await setup();
+    fixture.detectChanges();
+
+    const brand = document.querySelector('.header__brand');
+    expect(brand?.querySelector('.header__logo')).toBeTruthy();
+    expect(brand?.querySelector('.header__mark')?.getAttribute('src')).toBe(
+      'assets/logos/stupa-mark.svg',
+    );
+    http.verify();
+  });
+
   it('resolves the wide layout from the deepest active route data', async () => {
     const view = await render(ShellComponent, {
       providers: [

@@ -195,6 +195,26 @@ describe('DashboardComponent', () => {
     http.verify();
   });
 
+  it('puts the Gremium chips on their own line under the greeting', async () => {
+    // In the header's actions slot they read as controls glued to the right of a
+    // heading. On their own line they read as what they are: the Gremien this person's
+    // work belongs to.
+    const { http } = await setup({ ...MEMBER, gremien: [{ id: 'g1', name: 'StuPa' }] } as Principal);
+    const chip = screen.getByText('StuPa');
+    expect(chip.closest('app-page-header')).toBeNull();
+
+    const header = document.querySelector('app-page-header')!;
+    expect(header.compareDocumentPosition(chip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    http.verify();
+  });
+
+  it('renders no chip row at all when the member is in no Gremium', async () => {
+    // An empty flex row still costs its gap, which reads as a stray blank line.
+    const { http } = await setup(MEMBER);
+    expect(document.querySelector('.dash__gremien')).toBeNull();
+    http.verify();
+  });
+
   it('offers a prominent "submit application" CTA linking to the wizard', async () => {
     const { http } = await setup(MEMBER);
     const cta = screen.getByRole('link', { name: /Antrag stellen/ });
