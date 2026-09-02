@@ -76,6 +76,20 @@ class Application(UUIDPkMixin, TimestampMixin, Base):
     email_confirmed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # Archived: out of the working list, still fully readable. A timestamp rather than a
+    # flag, because it answers "whether" and "when" in one column and makes the un-archive
+    # obvious. Deliberately NOT a flow state: an application can be archived from any
+    # state, and the flow is about where a decision stands, not about whether the record
+    # is still in front of anyone.
+    #
+    # This is NOT anonymization. `be-privacy` erases PII under the DSGVO; archiving hides
+    # nothing and deletes nothing. The two must never be confused for one another.
+    archived_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # OIDC ``sub`` of whoever archived it. NOT a foreign key: a principal can be removed
+    # and the record of who archived must survive that, the same way ``created_by`` does.
+    archived_by: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
         Index(
@@ -91,6 +105,9 @@ class Application(UUIDPkMixin, TimestampMixin, Base):
         Index("ix_application_fiscal_year_id", "fiscal_year_id"),
         Index("ix_application_type_id", "type_id"),
         Index("ix_application_created_at", "created_at"),
+        # The default list filters archived rows out, so every listing query touches
+        # this column.
+        Index("ix_application_archived_at", "archived_at"),
     )
 
 

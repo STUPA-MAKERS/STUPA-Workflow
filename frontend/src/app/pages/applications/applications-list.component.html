@@ -56,6 +56,14 @@
         [ngModel]="state()"
         (ngModelChange)="state.set($event)"
       />
+      <app-select
+        id="apps-archived"
+        name="archived"
+        [label]="'applications.list.filter.archived' | t"
+        [options]="archivedOptions()"
+        [ngModel]="archived()"
+        (ngModelChange)="archived.set($event); reload()"
+      />
       <app-filter-field [label]="'applications.list.filter.amount' | t">
         <app-filter-range>
           <app-currency-input start name="amountMin" [placeholder]="'applications.list.filter.min' | t" [ariaLabel]="'applications.list.filter.min' | t" [ngModel]="amountMin()" (ngModelChange)="amountMin.set($event)" />

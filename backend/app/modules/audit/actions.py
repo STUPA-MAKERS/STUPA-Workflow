@@ -35,6 +35,11 @@ class AuditAction(StrEnum):
     # versions, status events, magic links, comments, budget entries and votes.
     # ``data`` carries only id references and metadata, never raw PII.
     APPLICATION_DELETE = "application_delete"
+    # Application archived or brought back. Reversible, unlike the delete above, but it
+    # changes what the working list shows, so both directions are recorded. ``data``
+    # carries id references and the direction, never raw PII.
+    APPLICATION_ARCHIVE = "application_archive"
+    APPLICATION_UNARCHIVE = "application_unarchive"
     WEBHOOK_CONFIG = "webhook_config"
     ATTACHMENT_QUARANTINE = "attachment_quarantine"
     ATTACHMENT_DELETE = "attachment_delete"

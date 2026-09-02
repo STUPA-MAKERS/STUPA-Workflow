@@ -273,6 +273,34 @@ export class ApplicationsDetailComponent implements OnDestroy {
    * server gates on the same key.
    */
   readonly canDelete = computed(() => this.auth.can('application.delete'));
+  readonly canArchive = computed(() => this.auth.can('application.archive'));
+  readonly archiving = signal(false);
+
+  /**
+   * Move the application out of the working list, or bring it back.
+   *
+   * Reversible and destructive of nothing, so unlike the delete and the erasure request
+   * it asks for no confirmation: the way back is one click on the same button.
+   */
+  toggleArchived(): void {
+    const current = this.app();
+    if (!current || this.archiving()) return;
+    const next = current.archivedAt === null;
+    this.archiving.set(true);
+    this.api.setApplicationArchived(current.id, next).subscribe({
+      next: (updated) => {
+        this.app.set(updated);
+        this.archiving.set(false);
+        this.toast.success(
+          this.i18n.translate(next ? 'applications.archived' : 'applications.unarchived'),
+        );
+      },
+      error: () => {
+        this.archiving.set(false);
+        this.toast.error(this.i18n.translate('applications.detail.error'));
+      },
+    });
+  }
   readonly fmt = formatFieldValue;
 
   private id: Uuid = '';

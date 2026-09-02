@@ -99,6 +99,10 @@ class ApplicationOut(_CamelModel):
     # the anonymization request (GDPR Art. 17). Only the data subject may ask,
     # never the administration.
     is_owner: bool = Field(default=False, alias="isOwner")
+    # When it was archived, or null. The client shows the badge from this, so it needs
+    # the timestamp and not just a flag. Archiving is NOT anonymization: this record is
+    # complete and readable, it has only left the working list.
+    archived_at: datetime | None = Field(default=None, alias="archivedAt")
 
 
 class ApplicationPatch(_CamelModel):
@@ -139,6 +143,8 @@ class ApplicationListItem(_CamelModel):
     currency: str | None = None
     created_at: datetime = Field(alias="createdAt")
     updated_at: datetime = Field(alias="updatedAt")
+    #: Set when the row is archived, so a combined list can mark it.
+    archived_at: datetime | None = Field(default=None, alias="archivedAt")
 
 
 class CommentCreate(_CamelModel):

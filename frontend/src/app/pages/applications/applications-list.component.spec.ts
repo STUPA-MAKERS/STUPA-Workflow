@@ -567,6 +567,45 @@ describe('ApplicationsListComponent', () => {
     http.verify();
   });
 
+  it('does not ask for archived applications by default', async () => {
+    // The working list hides them, and the parameter stays off the request entirely so
+    // the URL and the query are clean for the case everyone is in.
+    const { http, cmp } = await setup();
+    flushTypes(http);
+    const req = http.expectOne((r) => r.url.endsWith('/api/applications'));
+    expect(req.request.params.has('archived')).toBe(false);
+    req.flush({ items: [], total: 0, limit: 20, offset: 0 });
+    expect(cmp.archived()).toBe('false');
+  });
+
+  it('asks for only the archived ones, or for both, when told to', async () => {
+    const { http, cmp } = await setup();
+    flushTypes(http);
+    http
+      .expectOne((r) => r.url.endsWith('/api/applications'))
+      .flush({ items: [], total: 0, limit: 20, offset: 0 });
+
+    cmp.archived.set('true');
+    cmp.reload();
+    let req = http.expectOne((r) => r.url.endsWith('/api/applications'));
+    expect(req.request.params.get('archived')).toBe('true');
+    req.flush({ items: [], total: 0, limit: 20, offset: 0 });
+
+    cmp.archived.set('all');
+    cmp.reload();
+    req = http.expectOne((r) => r.url.endsWith('/api/applications'));
+    expect(req.request.params.get('archived')).toBe('all');
+    req.flush({ items: [], total: 0, limit: 20, offset: 0 });
+  });
+
+  it('counts a non-default archive filter as an active filter', async () => {
+    // Otherwise the filter badge says "none set" while the list is quietly narrowed.
+    const { cmp } = await setup();
+    expect(cmp.activeFilterCount()).toBe(0);
+    cmp.archived.set('true');
+    expect(cmp.activeFilterCount()).toBe(1);
+  });
+
   it('keeps the table on screen while loading instead of replacing it with text', async () => {
     // The page used to hide the whole table behind `@if (loading())` and render a
     // sentence, so the list vanished on every filter and sort and the first load was a

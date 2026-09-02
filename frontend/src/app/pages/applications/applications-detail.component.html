@@ -41,6 +41,21 @@
           {{ 'applications.pdf.create' | t }}
         </span>
       </app-button>
+      <!-- Outside the edit guard on purpose. `application.archive` is its own permission,
+           and a holder who cannot edit the application still decides whether it stays in
+           the working list. No confirmation: it is reversible with one click on the same
+           button, which is exactly what separates it from the delete and the erasure
+           request below. -->
+      @if (canArchive() && !editing()) {
+        <app-button
+          variant="secondary"
+          size="sm"
+          [loading]="archiving()"
+          (click)="toggleArchived()"
+        >
+          {{ (application.archivedAt ? 'applications.detail.unarchive' : 'applications.detail.archive') | t }}
+        </app-button>
+      }
       @if ((application.canEdit || canForceStatus()) && !editing()) {
         @if (application.canEdit && application.state?.editAllowed) {
           <app-button variant="secondary" size="sm" (click)="startEdit(application)">{{ 'applications.detail.edit' | t }}</app-button>
@@ -60,6 +75,14 @@
 
   <!-- Status, budget and the fact grid. They sit below the page header and keep
        the body width of the center column. -->
+  @if (application.archivedAt) {
+    <!-- Said plainly, because an archived application looks exactly like an active one
+         and someone arriving from a link has no other way to know. -->
+    <p class="det__archived" role="status">
+      {{ 'applications.detail.archivedNotice' | t: { at: (application.archivedAt | ldate) } }}
+    </p>
+  }
+
   <section class="det__summary">
     <div class="det__meta">
       @if (application.state) {

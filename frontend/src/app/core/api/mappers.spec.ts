@@ -94,7 +94,6 @@ describe('mapApplication', () => {
       typeId: 't1',
       state: { id: 's1', key: 'submitted', label: 'Eingereicht', color: '#4a90d9', editAllowed: true, kind: 'normal' },
       gremiumId: 'g1',
-      budgetId: null,
       budgetPotId: 'p1',
       budgetId: 'c1',
       fiscalYearId: 'fy1',
@@ -108,6 +107,8 @@ describe('mapApplication', () => {
       applicant: { email: 'a@b.de', name: 'Max', anonymized: false },
       canEdit: false,
       isOwner: false,
+      // Absent on the wire means not archived, not "unknown".
+      archivedAt: null,
     });
   });
 
