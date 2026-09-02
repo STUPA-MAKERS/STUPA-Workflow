@@ -20,6 +20,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Request, UploadFile, status
+from fastapi.responses import StreamingResponse
 
 from app.deps import DbSession, Principal, SettingsDep, require_principal
 from app.modules.audit.actions import AuditAction
@@ -29,7 +30,6 @@ from app.modules.backup.models import Backup
 from app.modules.backup.queue import backup_queue_from_pool
 from app.modules.backup.schemas import (
     BackupCreate,
-    BackupExportOut,
     BackupJobOut,
     BackupListOut,
     BackupOut,
@@ -41,6 +41,7 @@ from app.modules.backup.service import (
     BackupError,
     BackupService,
     archive_key,
+    download_name,
     stream_upload,
     temp_file,
 )
@@ -185,7 +186,7 @@ async def update_backup(
 
 @router.get(
     "/{backup_id}/export",
-    response_model=BackupExportOut,
+    response_class=StreamingResponse,
     responses=_errors(401, 403, 404, 409, 503),
 )
 async def export_backup(
@@ -193,20 +194,27 @@ async def export_backup(
     service: ServiceDep,
     session: DbSession,
     admin: AdminDep,
-) -> BackupExportOut:
-    """Hand out a short-lived signed URL for the archive.
+) -> StreamingResponse:
+    """Stream the archive to the caller.
 
-    The archive stays age-encrypted on the way out. The URL is what leaves the platform,
-    never the plaintext, and the audit entry records that it was handed out at all.
+    NOT a presigned URL. MinIO runs on the internal Docker network, so a presigned S3
+    URL binds a host the browser cannot resolve. The archive therefore streams through
+    this route, the same pattern the attachment download uses.
+
+    The bytes stay age-encrypted on the way out: what leaves the platform is ciphertext,
+    and the audit entry records that it left at all.
     """
     _require_enabled(service)
     row = await _load(service, backup_id)
     if row.status != "done":
         raise ConflictError("This backup carries no archive yet.", code="backup_not_ready")
     try:
-        url = service.export_url(row)
+        stream = await service.export_stream(row)
     except BackupError as exc:
         raise ServiceUnavailableError(str(exc)) from exc
+
+    # Audited and committed BEFORE the stream starts. A response that has begun cannot be
+    # rolled back, so the record of the export must not depend on it finishing.
     await audit_record(
         session,
         actor=admin.sub,
@@ -216,7 +224,14 @@ async def export_backup(
         data={"checksum": row.checksum, "sizeBytes": row.size_bytes},
     )
     await session.commit()
-    return BackupExportOut(url=url, expires_in=service.settings.backup_url_ttl_seconds)
+
+    headers = {
+        "Content-Disposition": f'attachment; filename="{download_name(row.created_at)}"',
+        "X-Content-Type-Options": "nosniff",
+    }
+    if row.size_bytes:
+        headers["Content-Length"] = str(row.size_bytes)
+    return StreamingResponse(stream, media_type=ARCHIVE_CONTENT_TYPE, headers=headers)
 
 
 @router.post(

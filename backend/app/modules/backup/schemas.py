@@ -70,13 +70,6 @@ class BackupRestoreBody(BaseModel):
     confirm: str
 
 
-class BackupExportOut(BaseModel):
-    """The signed download URL and how long it stays valid."""
-
-    url: str
-    expires_in: int = Field(serialization_alias="expiresIn")
-
-
 class BackupJobOut(BaseModel):
     """What an enqueue returns: the row to poll."""
 

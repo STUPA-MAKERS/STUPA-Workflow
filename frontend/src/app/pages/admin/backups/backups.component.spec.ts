@@ -50,7 +50,8 @@ function makeApi(o: ApiOverrides = {}) {
     updateBackup: o.updateBackup ?? jest.fn((_id: string, patch: Record<string, unknown>) =>
       of({ ...DONE, ...patch }),
     ),
-    exportBackup: o.exportBackup ?? jest.fn(() => of({ url: 'https://minio/x', expiresIn: 300 })),
+    exportBackup:
+      o.exportBackup ?? jest.fn(() => of(new Blob(['cipher'], { type: 'application/octet-stream' }))),
     importBackup: o.importBackup ?? jest.fn(() => of({ ...DONE, id: 'b-imp', kind: 'imported' })),
     restoreBackup: o.restoreBackup ?? jest.fn(() => of(DONE)),
     deleteBackup: o.deleteBackup ?? jest.fn(() => of(void 0)),
@@ -117,12 +118,16 @@ describe('BackupsComponent', () => {
     expect(api.createBackup).toHaveBeenCalledWith(null);
   });
 
-  it('opens the signed URL rather than streaming the archive through the app', async () => {
+  it('downloads the archive bytes instead of opening a store URL', async () => {
+    // Regression: MinIO is internal, so a presigned URL names a host the browser cannot
+    // resolve. The bytes come through the API and are saved as a blob.
+    (URL as unknown as { createObjectURL?: unknown }).createObjectURL = () => 'blob:mock';
+    (URL as unknown as { revokeObjectURL?: unknown }).revokeObjectURL = () => undefined;
     const open = jest.spyOn(window, 'open').mockImplementation(() => null);
     const { api } = await setup();
     await userEvent.click(screen.getAllByRole('button', { name: 'Herunterladen' })[0]);
     expect(api.exportBackup).toHaveBeenCalledWith('b-1');
-    expect(open).toHaveBeenCalledWith('https://minio/x', '_blank', 'noopener');
+    expect(open).not.toHaveBeenCalled();
     open.mockRestore();
   });
 

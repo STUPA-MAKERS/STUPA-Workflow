@@ -17,7 +17,6 @@ import {
   BACKUP_RESTORE_CONFIRMATION,
   type AdminPrincipal,
   type Backup,
-  type BackupExport,
   type BackupList,
   type ApplicationTypeCreateBody,
   type ApplicationTypeFull,
@@ -1022,10 +1021,17 @@ export class AdminApiService {
     return this.http.patch<Backup>(`${this.base}/admin/backups/${id}`, patch);
   }
 
-  /** GET /admin/backups/{id}/export — a short-lived signed download URL. */
-  exportBackup(id: Uuid): Observable<BackupExport> {
-    if (this.mock) return of({ url: '#mock-archive', expiresIn: 300 });
-    return this.http.get<BackupExport>(`${this.base}/admin/backups/${id}/export`);
+  /**
+   * GET /admin/backups/{id}/export — the archive bytes.
+   *
+   * A blob, NOT a URL: MinIO sits on the internal Docker network, so a presigned S3
+   * URL binds a host the browser cannot resolve. The API streams the object instead.
+   */
+  exportBackup(id: Uuid): Observable<Blob> {
+    if (this.mock) return of(new Blob([], { type: 'application/octet-stream' }));
+    return this.http.get(`${this.base}/admin/backups/${id}/export`, {
+      responseType: 'blob',
+    });
   }
 
   /** POST /admin/backups/import — take an uploaded archive into the catalogue. */
