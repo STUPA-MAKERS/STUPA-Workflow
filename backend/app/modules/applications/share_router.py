@@ -28,7 +28,7 @@ from app.modules.admin.models import ApplicationType, Gremium
 from app.modules.applications.models import Application
 from app.modules.applications.service.service_base import _field_from_row
 from app.modules.applications.share import ShareService, build_public_view
-from app.modules.applications.share_page import render_share_page
+from app.modules.applications.share_page import SHARE_CSP, render_share_page
 from app.modules.forms.models import FormField
 from app.shared.errors import NotFoundError
 from app.shared.i18n import resolve_i18n
@@ -96,6 +96,10 @@ async def public_application(
         content=html,
         media_type="text/html; charset=utf-8",
         headers={
+            # Its own policy. `SecurityHeadersMiddleware` only fills a CSP in where none
+            # is set, and the API-wide `default-src 'none'` would block this page's own
+            # stylesheet and serve it as raw unstyled markup.
+            "Content-Security-Policy": SHARE_CSP,
             # Not for a search index: this page is for whoever holds the URL, not for
             # everyone who searches the applicant's name.
             "X-Robots-Tag": "noindex, nofollow",

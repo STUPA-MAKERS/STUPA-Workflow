@@ -22,7 +22,7 @@ from app.modules.applications.share import (
     clamp_ttl,
     new_token,
 )
-from app.modules.applications.share_page import render_share_page
+from app.modules.applications.share_page import SHARE_CSP, render_share_page
 from app.modules.auth import tokens
 from app.shared.config_schemas import FormFieldDef
 from app.shared.errors import NotFoundError
@@ -344,9 +344,9 @@ def test_an_answer_is_flattened_to_one_readable_line(answer: object, shown: str)
     assert view.fields == [("K", shown)]
 
 
-def test_a_structured_answer_prints_nothing_rather_than_a_guess() -> None:
+def test_a_structured_answer_is_left_out_rather_than_guessed_at() -> None:
     """A dict has no sensible one-line form, and guessing one risks printing a key
-    nobody meant to publish."""
+    nobody meant to publish. The row goes with it — an empty value is not an answer."""
     view = build_public_view(
         _App({"title": "T", "k": {"iban": "DE00"}}),  # type: ignore[arg-type]
         fields=[_field("k")],
@@ -355,5 +355,65 @@ def test_a_structured_answer_prints_nothing_rather_than_a_guess() -> None:
         state_label=None,
         lang="de",
     )
-    assert view.fields == [("K", "")]
+    assert view.fields == []
 
+
+def test_a_list_of_structured_rows_does_not_render_as_bare_commas() -> None:
+    """A cost breakdown is a list of dicts. Joining them printed ", , ," — punctuation
+    around values this page deliberately does not show."""
+    view = build_public_view(
+        _App({"title": "T", "k": [{"a": 1}, {"a": 2}, {"a": 3}]}),  # type: ignore[arg-type]
+        fields=[_field("k")],
+        type_name=None,
+        gremium_name=None,
+        state_label=None,
+        lang="de",
+    )
+    assert view.fields == []
+
+
+def test_a_reference_field_does_not_publish_its_raw_id() -> None:
+    """A select pointing at a cost centre holds that cost centre's UUID. On a public page
+    the id names nothing the reader can use, and printing it publishes an internal
+    identifier."""
+    view = build_public_view(
+        _App({"title": "T", "k": "83d149a5-9939-5d1c-b784-ee413e87f41e"}),  # type: ignore[arg-type]
+        fields=[_field("k")],
+        type_name=None,
+        gremium_name=None,
+        state_label=None,
+        lang="de",
+    )
+    assert view.fields == []
+
+
+# -- the content security policy ----------------------------------------------
+
+
+def test_the_policy_hash_matches_the_style_the_page_actually_renders() -> None:
+    """The page shipped unstyled because the API-wide `default-src 'none'` blocked its
+    own <style>. A hash fixes that only while it matches byte for byte, so this recomputes
+    it from the rendered document rather than trusting the constant."""
+    import base64
+    import hashlib
+    import re
+
+    html = render_share_page(_view(), app_name="STUPA", canonical_url="https://x/s/t")
+    css = re.search(r"<style>(.*?)</style>", html, re.S)
+    assert css is not None
+    digest = base64.b64encode(hashlib.sha256(css.group(1).encode()).digest()).decode()
+    assert f"'sha256-{digest}'" in SHARE_CSP
+
+
+def test_the_policy_allows_nothing_but_that_stylesheet() -> None:
+    # No scripts, no images, no framing. The page is text and one stylesheet.
+    assert SHARE_CSP.startswith("default-src 'none'")
+    assert "frame-ancestors 'none'" in SHARE_CSP
+    assert "unsafe-inline" not in SHARE_CSP
+
+
+def test_the_page_asks_for_no_favicon() -> None:
+    """A browser requests /favicon.ico for any HTML page, and under this policy that
+    request is refused and logged. An empty data: icon stops it being made."""
+    html = render_share_page(_view(), app_name="STUPA", canonical_url="https://x/s/t")
+    assert '<link rel="icon" href="data:,">' in html

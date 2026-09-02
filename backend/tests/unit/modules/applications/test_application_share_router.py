@@ -349,6 +349,15 @@ def test_the_public_page_drops_pii_fields() -> None:
     assert "Iban" not in r.text
 
 
+def test_the_public_page_carries_its_own_policy() -> None:
+    """Without one the API-wide `default-src 'none'` applies and the page arrives as raw
+    unstyled markup."""
+    r = _public_client(_live_share()).get("/s/" + "x" * 32)
+    csp = r.headers["content-security-policy"]
+    assert csp.startswith("default-src 'none'")
+    assert "style-src 'sha256-" in csp
+
+
 def test_the_public_page_refuses_to_be_indexed_or_cached_by_a_proxy() -> None:
     """A shared cache holding this page would serve it to someone who never had the link."""
     r = _public_client(_live_share()).get("/s/" + "x" * 32)

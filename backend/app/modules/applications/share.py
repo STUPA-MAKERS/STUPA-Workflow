@@ -29,6 +29,7 @@ What the public view omits, and why:
 from __future__ import annotations
 
 import secrets
+import uuid as _uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -202,8 +203,14 @@ def build_public_view(
         value = data.get(f.key)
         if value in (None, "", [], {}):
             continue
+        text = _format(value)
+        # A field that flattens to nothing is left out rather than printed empty. A list
+        # of structured rows would otherwise render as ", , ," — punctuation around
+        # values this page deliberately does not show.
+        if not text.strip(" ,"):
+            continue
         label = resolve_i18n(f.label, lang, "de") or f.key
-        shown.append((label, _format(value)))
+        shown.append((label, text))
     return PublicApplication(
         title=str(data.get("title") or "").strip() or str(app.id),
         type_name=type_name,
@@ -221,9 +228,24 @@ def _format(value: object) -> str:
     if isinstance(value, bool):
         return "Ja" if value else "Nein"
     if isinstance(value, list):
-        return ", ".join(_format(v) for v in value)
+        parts = [p for p in (_format(v) for v in value) if p]
+        return ", ".join(parts)
     if isinstance(value, dict):
         # A structured answer has no sensible one-line form, and guessing one risks
         # printing a key nobody meant to publish.
         return ""
-    return str(value)
+    text = str(value)
+    # A reference field holds the id of the thing it points at. On a public page that id
+    # names nothing the reader can use and publishes an internal identifier, so the
+    # value is dropped rather than shown raw.
+    if _is_uuid(text):
+        return ""
+    return text
+
+
+def _is_uuid(text: str) -> bool:
+    try:
+        _uuid.UUID(text)
+    except ValueError:
+        return False
+    return True
