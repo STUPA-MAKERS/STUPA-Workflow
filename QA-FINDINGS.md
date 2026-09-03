@@ -21,7 +21,7 @@ Severity is what the finding costs a user, not how hard it is to fix.
 | 5 | medium | apply wizard | Review shows raw, unformatted amounts and dates | **fixed** |
 | 6 | minor | i18n | 12 hardcoded German strings in the formly field components | **fixed** |
 | 7 | minor | apply wizard | Positions summary reads "1 × Position value" | **fixed** |
-| 8 | *your call* | apply wizard | Raw UUID shown as the reference number | open |
+| 8 | *your call* | apply wizard | Raw UUID shown as the reference number | **fixed** — short prefix chosen |
 | 9 | **major** | application detail | Date range renders as raw JSON on the committee's own screen | **fixed** |
 | 10 | medium | apply wizard | A signed-in submitter is told to confirm an already-confirmed mail | **fixed** (screen only) |
 | 11 | medium | deploy | nginx's CSP double-applies and breaks an external share-page logo | **fixed** |
@@ -31,8 +31,8 @@ Severity is what the finding costs a user, not how hard it is to fix.
 | 15 | minor | a11y | `app-time-input` renders a duplicate `id` on host and inner input | **fixed** |
 | 16 | minor | meetings | Meeting time prints raw `18:00:00`, seconds and all | **fixed** |
 | 17 | minor | application detail | Version-diff view still renders dates as raw JSON | **fixed** |
-| 18 | *your call* | i18n | English UI uses US date order (`MM/DD/YYYY`) | open |
-| 19 | **major** | i18n | Every status-update mail to an applicant ignores their language | open |
+| 18 | *your call* | i18n | English UI uses US date order (`MM/DD/YYYY`) | **fixed** — en-GB chosen |
+| 19 | **major** | i18n | Every status-update mail to an applicant ignores their language | **fixed** (applicant-only subset) |
 | 20 | *your call* | attachments | Upload hint does not say which file types are allowed | open |
 | 21 | minor | application detail | Version-diff row reads "Changedtermin" — badge touches the field name | **fixed** |
 
@@ -717,3 +717,36 @@ same line — so this is what a reader actually sees, not an `innerText` artefac
 **Fix:** `.det__diff app-badge { margin-right: var(--space-1); }` in
 `applications-detail.component.scss`. A CSS margin rather than an `&nbsp;`, so the rule
 holds for the added/removed rows too.
+
+
+---
+
+## Decisions taken on the three open items
+
+All three were put to the maintainer rather than guessed.
+
+* **#18 — en-GB.** The English UI now formats through `en-GB`: `01/07/2026` and a 24-hour
+  clock, matching the German side. One mapping point (`FORMAT_LOCALES` /
+  `toFormatLocale` / `I18nService.formatLocale`) sits between the UI locale and `Intl`;
+  `locale()` still returns the bare `de`/`en` the translation catalogue is keyed on.
+  Fixing this also caught several call sites that were passing a bare locale to `Intl`
+  already — `deadlines.component.ts` rendered `toLocaleDateString('en')`, i.e. `7/1/2026`
+  for 1 July.
+
+  **Open follow-up:** the ui-kit datepicker hardcodes its placeholder, `format()` and
+  `parse()` on `lang === 'de'`, so English *entry* is still MM/DD/YYYY while display is
+  now DD/MM/YYYY. The kit is a git submodule and needs its own PR. The mismatch is
+  visible to the user, where the previous all-US behaviour was silently wrong, so this is
+  an improvement rather than a regression — but it is not finished until that PR lands.
+
+* **#8 — short prefix.** The confirmation screen shows the first eight characters,
+  uppercased (`1195A615`). The full id still reaches the record link, the URL and the
+  mailed link. A tooltip carrying the full id was considered and rejected: it is not
+  selectable, `aria-label` would read 36 characters aloud in place of the short text, and
+  it would put the raw UUID back on screen.
+
+* **#19 — applicant-only subset.** Implemented exactly the unambiguous part: when a
+  `notify` action names no language and every recipient is the applicant, the language
+  comes from the application, resolved before the status label so body and label agree.
+  A recipient list containing a team member keeps the default, because applicant and team
+  share one `MailMessage` there and choosing a language for both is a product decision.
