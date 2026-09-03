@@ -368,7 +368,7 @@ describe('ExpensesComponent (unit)', () => {
     expect(cmp.invoiceOptions()[0].label).not.toContain('·');
   });
 
-  it('lists only open invoices; edit keeps a linked paid invoice visible (#invoices)', () => {
+  it('lists only open invoices; edit keeps a linked paid invoice visible', () => {
     const paid: Invoice = { ...INVOICE, id: 'inv-paid', number: 'RE-PAID', status: 'paid' };
     const { cmp } = build({ invoices: [INVOICE, paid] });
     // Create dropdown: only open invoices (paid ones hidden).
@@ -380,7 +380,7 @@ describe('ExpensesComponent (unit)', () => {
     expect(cmp.editInvoiceOptions().map((o) => o.value)).toEqual(['inv-paid', 'inv-1']);
   });
 
-  it('sorts open invoices by issue date, newest first (#invoices)', () => {
+  it('sorts open invoices by issue date, newest first', () => {
     const older: Invoice = { ...INVOICE, id: 'inv-old', issueDate: '2026-01-01' };
     const newer: Invoice = { ...INVOICE, id: 'inv-new', issueDate: '2026-09-01' };
     const { cmp } = build({ invoices: [older, newer] });
@@ -1254,7 +1254,7 @@ describe('ExpensesComponent (descriptions)', () => {
   });
 });
 
-describe('ExpensesComponent (sub-bookings #subbookings)', () => {
+describe('ExpensesComponent (sub-bookings)', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
   afterEach(() => {
     try {
@@ -1473,7 +1473,7 @@ describe('ExpensesComponent (sub-bookings #subbookings)', () => {
   });
 });
 
-describe('ExpensesComponent (invoice detail #invoices)', () => {
+describe('ExpensesComponent (invoice detail)', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
   afterEach(() => {
     try {
@@ -1600,7 +1600,7 @@ describe('ExpensesComponent (infinite scroll)', () => {
   });
 });
 
-// Bulk actions, cross-links and URL sync (#expenses-ux). The facade adds these members
+// Bulk actions, cross-links and URL sync. The facade adds these members
 // on top of the state modules. They are the selection, the bulk delete, the bulk export
 // and reassign, ksLink, and the query-param adoption and mirror effects.
 
@@ -1629,7 +1629,7 @@ function stubDownload(): {
   };
 }
 
-describe('ExpensesComponent (batch/bulk #expenses-ux)', () => {
+describe('ExpensesComponent (batch/bulk)', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
   afterEach(() => {
     try {
@@ -1913,7 +1913,7 @@ describe('ExpensesComponent (batch/bulk #expenses-ux)', () => {
   });
 });
 
-describe('ExpensesComponent (query-param adoption #expenses-ux)', () => {
+describe('ExpensesComponent (query-param adoption)', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
   afterEach(() => {
     try {
@@ -1985,8 +1985,8 @@ describe('ExpensesComponent (query-param adoption #expenses-ux)', () => {
 
   it('re-filters when the palette sends it here while it is already here', () => {
     // Same route, new query string: the router keeps this component. Reading the
-    // snapshot once left the list showing the booking the reader came from, and the
-    // write-back effect then put the old id straight back into the URL.
+    // snapshot once would leave the list showing the booking the reader came from, and
+    // the write-back effect would put that id straight back into the URL.
     const params = new BehaviorSubject(convertToParamMap({ id: 'e-42' }));
     TestBed.configureTestingModule({
       providers: [
@@ -2026,7 +2026,7 @@ describe('ExpensesComponent (query-param adoption #expenses-ux)', () => {
 });
 
 // The window reload that ExpensesListState runs after a mutation, tested in isolation.
-describe('ExpensesListState.refresh (#expenses-ux)', () => {
+describe('ExpensesListState.refresh', () => {
   afterEach(() => {
     try {
       TestBed.inject(HttpTestingController).verify();
@@ -2046,7 +2046,7 @@ describe('ExpensesListState.refresh (#expenses-ux)', () => {
     const http = TestBed.inject(HttpTestingController);
     const state = TestBed.runInInjectionContext(() => new ExpensesListState());
     http.expectOne((r) => r.url.endsWith('/budgets')).flush([]);
-    // The state no longer loads on its own (#expenses-ux2). The component fires the
+    // The state no longer loads on its own. The component fires the
     // first reload after it adopts the URL filters. Mirror that here.
     state.reload();
     http.expectOne((r) => r.url.endsWith('/expenses') && r.method === 'GET').flush(page([]));

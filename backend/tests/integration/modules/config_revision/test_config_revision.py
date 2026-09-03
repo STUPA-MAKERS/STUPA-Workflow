@@ -1,4 +1,4 @@
-"""Integration (real Postgres, testcontainers): config_revision (#config-versioning).
+"""Integration (real Postgres, testcontainers): config_revision.
 
 These tests run against a real schema. They prove:
 * **Append-only**: an UPDATE, DELETE or TRUNCATE on `config_revision` fails. The trigger

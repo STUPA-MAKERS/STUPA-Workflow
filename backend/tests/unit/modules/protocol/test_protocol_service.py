@@ -275,7 +275,7 @@ async def test_finalize_renders_stores_and_mails() -> None:
     assert out.pdf_url is not None
     assert len(mail.sent) == 1
     assert mail.sent[0].to == ("a@x.de", "b@x.de")
-    # The PDF travels as an attachment (#protocol-mail-pdf). The earlier link needed a
+    # The PDF travels as an attachment. The earlier link needed a
     # login plus meeting.manage and was worthless for the recipients.
     assert [a.filename for a in mail.sent[0].attachments] == ["protokoll.pdf"]
     assert mail.sent[0].attachments[0].content.startswith(b"%PDF")
@@ -598,7 +598,7 @@ async def test_finalize_recipients_union_members_plus_maillist() -> None:
 
 
 async def test_get_by_meeting_reads_without_create() -> None:
-    """Reload and poll path (#429): reads the existing protocol and never creates one."""
+    """Reload and poll path: reads the existing protocol and never creates one."""
     proto = _protocol(status="rendering")
     session = FakeSession(results=[result(proto)])
     out = await _service(session).get_by_meeting(MID)

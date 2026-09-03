@@ -12,7 +12,7 @@ import { HttpCacheService } from './http-cache.service';
 const DEFAULT_TTL_MS = 60_000;
 
 /** Per-request opt-in. `0` (the default) means "do not cache this". */
-export const CACHE_TTL = new HttpContextToken<number>(() => 0);
+const CACHE_TTL = new HttpContextToken<number>(() => 0);
 
 /**
  * Ready-made {@link HttpContext} that caches this GET and serves it again while it

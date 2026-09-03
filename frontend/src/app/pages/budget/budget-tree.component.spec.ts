@@ -149,7 +149,7 @@ function flushReload(http: HttpTestingController, tree: BudgetTreeNode[] = TREE)
   }
 }
 
-describe('BudgetTreeComponent (#9)', () => {
+describe('BudgetTreeComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   it('renders the cost-centre tree with full path keys', async () => {

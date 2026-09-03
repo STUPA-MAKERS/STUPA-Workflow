@@ -202,7 +202,7 @@ describe('BudgetTreeApi', () => {
     req.flush(null);
   });
 
-  describe('sub-bookings (#subbookings)', () => {
+  describe('sub-bookings', () => {
     it('listSubBookings GETs /budget-expenses/:id/sub-bookings', () => {
       api.listSubBookings('e-1').subscribe();
       const req = http.expectOne(`${BASE}/budget-expenses/e-1/sub-bookings`);

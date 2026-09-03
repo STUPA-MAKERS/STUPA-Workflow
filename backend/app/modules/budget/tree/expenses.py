@@ -341,7 +341,7 @@ class ExpenseOps(BudgetTreeServiceBase):
         # expands its parent. It is no row of its own and no link candidate.
         filters: list[ColumnElement[bool]] = [BudgetExpense.parent_expense_id.is_(None)]
         if expense_id is not None:
-            # Deep link to one exact booking (#expenses-ux).
+            # Deep link to one exact booking.
             filters.append(BudgetExpense.id == expense_id)
         if budget_id is not None:
             node = await self._get_node(budget_id)

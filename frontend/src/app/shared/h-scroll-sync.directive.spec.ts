@@ -21,6 +21,16 @@ class ResizeObserverStub {
   }
 }
 
+/**
+ * Let the queued frame run.
+ *
+ * The observer schedules its write instead of doing it inline, so a test that drives the
+ * callback has to wait one frame before reading the result.
+ */
+function frame(): Promise<void> {
+  return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+}
+
 describe('HScrollSyncDirective', () => {
   const realRO = (globalThis as { ResizeObserver?: unknown }).ResizeObserver;
 
@@ -58,6 +68,7 @@ describe('HScrollSyncDirective', () => {
     Object.defineProperty(wrap, 'scrollWidth', { value: 500, configurable: true });
     Object.defineProperty(wrap, 'clientWidth', { value: 100, configurable: true });
     ResizeObserverStub.last?.cb();
+    await frame();
     expect(bar.style.display).toBe('block');
   });
 
@@ -102,8 +113,8 @@ describe('HScrollSyncDirective', () => {
   it('gives the proxy the same scroll RANGE as the element it mirrors', async () => {
     // The two live in different boxes: a boxed table draws a border, so its scroller is a
     // couple of pixels narrower than the bar above it. Sizing the proxy to `scrollWidth`
-    // gave the two different distances to travel, so their thumbs had different lengths
-    // and drifted apart as either one was dragged.
+    // gives the two different distances to travel, so their thumbs have different lengths
+    // and drift apart as either one is dragged.
     const { wrap } = await setup();
     const bar = wrap.previousElementSibling as HTMLElement;
     const inner = bar.firstElementChild as HTMLElement;
@@ -112,9 +123,79 @@ describe('HScrollSyncDirective', () => {
     Object.defineProperty(wrap, 'clientWidth', { value: 98, configurable: true });
     Object.defineProperty(bar, 'clientWidth', { value: 100, configurable: true });
     ResizeObserverStub.last?.cb();
+    await frame();
 
     // range = 500 - 98 = 402, so the proxy must be 100 + 402 wide to travel as far.
     expect(inner.style.width).toBe('502px');
+  });
+
+  it('writes nothing during the observer callback itself', async () => {
+    // The observer watches `bar`, and the update writes to `bar` and to its child. A write
+    // that lands inside the delivery starts another round, and the browser reports that as
+    // "ResizeObserver loop completed with undelivered notifications" — a console error on
+    // every page with a table. The write is deferred to the next frame instead.
+    const { wrap } = await setup();
+    const bar = wrap.previousElementSibling as HTMLElement;
+    Object.defineProperty(wrap, 'scrollWidth', { value: 500, configurable: true });
+    Object.defineProperty(wrap, 'clientWidth', { value: 100, configurable: true });
+
+    ResizeObserverStub.last?.cb();
+    expect(bar.style.display).toBe('none'); // untouched inside the callback
+
+    await frame();
+    expect(bar.style.display).toBe('block');
+  });
+
+  it('coalesces a burst of notifications into one frame', async () => {
+    // Three observed elements report a change on one layout pass, which is the normal
+    // case. One write, not three.
+    const { wrap } = await setup();
+    const bar = wrap.previousElementSibling as HTMLElement;
+    const inner = bar.firstElementChild as HTMLElement;
+    Object.defineProperty(wrap, 'scrollWidth', { value: 500, configurable: true });
+    Object.defineProperty(wrap, 'clientWidth', { value: 100, configurable: true });
+    const setWidth = jest.spyOn(inner.style, 'width', 'set');
+
+    ResizeObserverStub.last?.cb();
+    ResizeObserverStub.last?.cb();
+    ResizeObserverStub.last?.cb();
+    await frame();
+
+    expect(setWidth).toHaveBeenCalledTimes(1);
+  });
+
+  it('writes nothing when the measurement has not changed', async () => {
+    // A steady state must not keep assigning the same value: each assignment is a write to
+    // an observed element and re-arms the observer.
+    const { wrap } = await setup();
+    const bar = wrap.previousElementSibling as HTMLElement;
+    const inner = bar.firstElementChild as HTMLElement;
+    Object.defineProperty(wrap, 'scrollWidth', { value: 500, configurable: true });
+    Object.defineProperty(wrap, 'clientWidth', { value: 100, configurable: true });
+    ResizeObserverStub.last?.cb();
+    await frame();
+
+    const setWidth = jest.spyOn(inner.style, 'width', 'set');
+    const setDisplay = jest.spyOn(bar.style, 'display', 'set');
+    ResizeObserverStub.last?.cb();
+    await frame();
+
+    expect(setWidth).not.toHaveBeenCalled();
+    expect(setDisplay).not.toHaveBeenCalled();
+  });
+
+  it('cancels a pending frame when the host goes away', async () => {
+    // A queued write would run against a proxy that has already been removed.
+    const { view, wrap } = await setup();
+    Object.defineProperty(wrap, 'scrollWidth', { value: 500, configurable: true });
+    Object.defineProperty(wrap, 'clientWidth', { value: 100, configurable: true });
+    const cancel = jest.spyOn(globalThis, 'cancelAnimationFrame');
+
+    ResizeObserverStub.last?.cb(); // queued, not yet run
+    view.fixture.destroy();
+
+    expect(cancel).toHaveBeenCalled();
+    cancel.mockRestore();
   });
 
   it('mirrors nothing when the inner selector matches no element', async () => {

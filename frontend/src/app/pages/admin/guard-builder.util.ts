@@ -195,21 +195,3 @@ export function buildLeaf(op: GuardLeafOperator, value: unknown): Guard {
 export function combine(op: GuardCombinator, kids: Guard[]): Guard {
   return op === 'not' ? { not: kids[0] } : { [op]: kids };
 }
-
-/** Human-readable short description of a guard (read-only display). */
-export function describeGuard(guard: Guard | null | undefined): string {
-  if (!guard) return '—';
-  const keys = Object.keys(guard);
-  if (keys.length !== 1) return '⚠ invalid';
-  const op = keys[0];
-  const value = guard[op];
-  if (op === 'and' || op === 'or') {
-    const kids = (Array.isArray(value) ? value : [value]) as Guard[];
-    return kids.map((k) => describeGuard(k)).join(op === 'and' ? ' ∧ ' : ' ∨ ');
-  }
-  if (op === 'not') return `¬(${describeGuard(value as Guard)})`;
-  if (op === 'compare' && isRecord(value)) {
-    return `${String(value['field'])} ${String(value['op'])} ${JSON.stringify(value['value'])}`;
-  }
-  return `${op}: ${JSON.stringify(value)}`;
-}

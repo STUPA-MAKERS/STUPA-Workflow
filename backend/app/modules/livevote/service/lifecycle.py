@@ -97,11 +97,10 @@ class LifecycleOps(PermissionOps, VoteReadOps):
         if meeting.status == "closed" and wants_manage:
             raise ConflictError("the session is closed — its settings can no longer be changed")
 
-        # planned to live: the router creates the protocol at meeting start, after
-        # this commit. Nobody takes minutes or votes before that. The code sets
-        # ``meeting.status`` only AFTER the protokollant check. That keeps the change
-        # atomic: no ``live`` without a protokollant, not even in memory on a
-        # rejected patch.
+        # planned to live: the router creates the protocol at meeting start, after this
+        # commit, and nobody takes minutes or votes before that. ``meeting.status`` is
+        # set only AFTER the protokollant check, which keeps the change atomic: no
+        # ``live`` without a protokollant, not even in memory on a rejected patch.
         going_live = payload.status == "live" and meeting.status != "live"
         if payload.active_application_id is not None:
             meeting.active_application_id = payload.active_application_id

@@ -79,7 +79,7 @@ def test_map_rejects_non_eur() -> None:
     assert ei.value.currency == "USD"
 
 
-# Tolerant CII fallback (#15). This is real CII XML in the style of invoice-portal.de. The
+# Tolerant CII fallback. This is real CII XML in the style of invoice-portal.de. The
 # email carries no `schemeID="EM"` and the `IBANID` stays empty. The strict pycheval parser
 # refuses both, although the file is a valid ZUGFeRD document. The tolerant fallback still
 # reads the header data.
@@ -173,7 +173,7 @@ def test_cii_fallback_unparseable_is_not_zugferd() -> None:
 
 
 def test_cii_fallback_rejects_billion_laughs() -> None:
-    """Internal-entity expansion (billion-laughs) is refused, not expanded (#sec-audit)."""
+    """Internal-entity expansion (billion-laughs) is refused, not expanded."""
     bomb = (
         b'<?xml version="1.0"?>\n'
         b"<!DOCTYPE lolz [\n"
@@ -188,7 +188,7 @@ def test_cii_fallback_rejects_billion_laughs() -> None:
 
 
 def test_cii_fallback_rejects_dtd_with_external_entity() -> None:
-    """A DTD declaring an external (XXE/SSRF) entity is refused outright (#sec-audit)."""
+    """A DTD declaring an external (XXE/SSRF) entity is refused outright."""
     payload = (
         b'<?xml version="1.0"?>\n'
         b'<!DOCTYPE foo SYSTEM "file:///etc/passwd">\n'

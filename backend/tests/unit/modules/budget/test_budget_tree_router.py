@@ -373,7 +373,7 @@ def test_expense_list_forbidden_without_budget_perm(fake: _FakeService) -> None:
 
 
 def test_expense_list_id_filter_passthrough(fake: _FakeService) -> None:
-    """`id=` (#expenses-ux2) carries the exact booking deep link.
+    """`id=` carries the exact booking deep link.
 
     The router passes the deep link to the service as `expense_id`.
     """
@@ -486,7 +486,7 @@ def test_budget_export_xlsx(fake: _FakeService) -> None:
     assert resp.content[:2] == b"PK"  # xlsx = zip container
     assert fake.calls["tree"] == _GID
     assert fake.calls["fy_labels"] is True
-    # The router audits the export (#1). It writes an export entry and commits in the same
+    # The router audits the export. It writes an export entry and commits in the same
     # transaction.
     (entry,) = fake.session.entries
     assert entry.action == "export"
@@ -496,7 +496,7 @@ def test_budget_export_xlsx(fake: _FakeService) -> None:
 
 
 def test_get_budget_tree_service_factory() -> None:
-    # request.app.state.object_storage supplies the optional storage (#15).
+    # request.app.state.object_storage supplies the optional storage.
     request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(object_storage=None)))
     svc = get_budget_tree_service(
         session=object(),  # type: ignore[arg-type]

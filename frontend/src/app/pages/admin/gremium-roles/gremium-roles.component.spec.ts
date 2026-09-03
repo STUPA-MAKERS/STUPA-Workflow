@@ -39,7 +39,7 @@ async function setup(api = makeApi(), toast = makeToast()) {
   return { ...view, api, toast, c };
 }
 
-describe('GremiumRolesComponent (#42)', () => {
+describe('GremiumRolesComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   it('lists gremium roles via the route gremium id', async () => {

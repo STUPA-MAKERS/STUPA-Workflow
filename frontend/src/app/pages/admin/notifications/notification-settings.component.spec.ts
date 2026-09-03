@@ -25,7 +25,7 @@ async function setup(settings: NotificationSettings = SETTINGS) {
   return { ...view, putNotificationSettings };
 }
 
-describe('NotificationSettingsComponent (#task-reminder)', () => {
+describe('NotificationSettingsComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   it('shows the loaded settings', async () => {

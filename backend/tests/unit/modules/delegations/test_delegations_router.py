@@ -1,4 +1,4 @@
-"""Router tests for delegations (#delegation-rework): wiring, 401, camelCase, errors.
+"""Router tests for delegations: wiring, 401, camelCase, errors.
 
 These tests fake the service, so they cover endpoint behavior and not the database.
 They prove 401 without a session, the status codes 200/201/204, camelCase

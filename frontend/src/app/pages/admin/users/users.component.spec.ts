@@ -113,20 +113,19 @@ async function setup(
   return { ...view, api, toast, inst };
 }
 
-describe('UsersComponent (#70/#72/#73)', () => {
+describe('UsersComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   it('searches for the person the URL names', async () => {
-    // Where a global-search hit on a person lands. The hit used to link to a bare
-    // `/admin/users`, so picking one of five people opened the unfiltered list and the
-    // reader searched the same name a second time.
+    // Where a global-search hit on a person lands. A bare `/admin/users` would open the
+    // unfiltered list and leave the reader to search the same name a second time.
     const api = makeApi();
     const { inst } = await setup(api, makeAuth(null), makeToast(), { q: 'kc|alex' });
     expect(api.listPrincipals).toHaveBeenCalledWith('kc|alex');
     expect(inst.query()).toBe('kc|alex');
   });
 
-  it('lists principals and shows capitalized role tags (#73)', async () => {
+  it('lists principals and shows capitalized role tags', async () => {
     await setup();
     expect(screen.getByText('Alex Admin')).toBeInTheDocument();
     expect(screen.getAllByText('Administrator').length).toBeGreaterThan(0);
@@ -248,7 +247,7 @@ describe('UsersComponent (#70/#72/#73)', () => {
     expect(api.assignRole).not.toHaveBeenCalled();
   });
 
-  it('assigns a role with optional validity window and resets state (#72)', async () => {
+  it('assigns a role with optional validity window and resets state', async () => {
     const { api, inst } = await setup();
     inst.toggleAssign('p-3');
     inst.patchDraft('p-3', {
@@ -316,7 +315,7 @@ describe('UsersComponent (#70/#72/#73)', () => {
     expect(toast.error).toHaveBeenCalled();
   });
 
-  it('revokes a role (#72)', async () => {
+  it('revokes a role', async () => {
     const { api, inst, toast } = await setup();
     inst.revoke(ADMIN_ASSIGN);
     expect(api.revokeRole).toHaveBeenCalledWith('a-1');
@@ -336,7 +335,7 @@ describe('UsersComponent (#70/#72/#73)', () => {
     expect(screen.queryByRole('columnheader', { name: 'OIDC-Subject' })).not.toBeInTheDocument();
   });
 
-  describe('edit a role assignment (#g-role-edit)', () => {
+  describe('edit a role assignment', () => {
     it('offers the edit control only with admin.users', async () => {
       await setup(makeApi(), makeAuth(null, false));
       expect(

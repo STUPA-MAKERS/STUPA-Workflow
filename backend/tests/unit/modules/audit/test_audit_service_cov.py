@@ -395,7 +395,7 @@ async def test_resolve_data_ids_all_entity_branches() -> None:
 
 
 async def test_revertable_flags_classifies_actions() -> None:
-    """Classify each action type and data shape as revertable or not (#config-versioning).
+    """Classify each action type and data shape as revertable or not.
 
     A config change needs a predecessor, which the batch lookup provides. A budget change
     needs the recorded previous state. A delete and an unknown action never revert.

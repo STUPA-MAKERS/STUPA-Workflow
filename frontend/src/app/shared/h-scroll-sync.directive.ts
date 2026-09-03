@@ -10,7 +10,7 @@ import {
 /**
  * Mirror a second horizontal scrollbar above an overflowing container. The container is
  * normally a wide table in `.exp__tableWrap`. The user reaches the right columns without a
- * scroll down to the bottom edge (#expenses-ux).
+ * scroll down to the bottom edge.
  *
  * The directive works on the DOM only. The template needs no change except the attribute
  * on the wrapper. The proxy goes in as a sibling directly before the wrapper. Its `scrollLeft`
@@ -73,21 +73,39 @@ export class HScrollSyncDirective implements OnDestroy {
     this.disposers.push(() => wrap.removeEventListener('scroll', onWrap));
     this.disposers.push(() => bar.removeEventListener('scroll', onBar));
 
+    // The observer below watches `bar`, and this writes to `bar` and to its child, so a
+    // write that lands during delivery starts another round and the browser reports
+    // "ResizeObserver loop completed with undelivered notifications" as an error. Two
+    // guards: nothing is written unless the value actually changes, and a write is
+    // coalesced into the next frame so it never lands inside the delivery that caused it.
     const update = (): void => {
       const range = wrap.scrollWidth - wrap.clientWidth;
       // Match the RANGE, not the width. The proxy and the real scroller sit in different
       // boxes — the boxed table draws a border, so its scroller is a couple of pixels
-      // narrower than the bar above it — and sizing the proxy to `scrollWidth` gave the
-      // two different distances to travel. The thumbs then had different lengths and
-      // drifted apart as you dragged either one. Deriving the inner width from the bar's
-      // own width plus the range makes both ranges identical whatever the boxes do.
-      inner.style.width = `${bar.clientWidth + Math.max(0, range)}px`;
+      // narrower than the bar above it — so sizing the proxy to `scrollWidth` gives the
+      // two different distances to travel, and their thumbs drift apart as either one is
+      // dragged. The bar's own width plus the range makes both ranges identical whatever
+      // the boxes do.
+      const width = `${bar.clientWidth + Math.max(0, range)}px`;
+      if (inner.style.width !== width) inner.style.width = width;
       // No overflow, for example after a mobile card reflow: hide the bar.
-      bar.style.display = range > 1 ? 'block' : 'none';
+      const display = range > 1 ? 'block' : 'none';
+      if (bar.style.display !== display) bar.style.display = display;
     };
     update();
     if (typeof ResizeObserver !== 'undefined') {
-      const ro = new ResizeObserver(() => update());
+      let queued = 0;
+      const schedule = (): void => {
+        if (queued) return;
+        queued = requestAnimationFrame(() => {
+          queued = 0;
+          update();
+        });
+      };
+      this.disposers.push(() => {
+        if (queued) cancelAnimationFrame(queued);
+      });
+      const ro = new ResizeObserver(schedule);
       ro.observe(wrap);
       // The bar's own width feeds the calculation, so a change to it has to re-run too.
       ro.observe(bar);

@@ -108,7 +108,7 @@ class _EmptyResult:
 
 
 class _NoCreatorDb:
-    """Stub a session for the creator check (#24).
+    """Stub a session for the creator check.
 
     `scalar` returns None, so there is no created_by. `execute` returns an empty
     result, so the Gremium read path gives False.
@@ -220,7 +220,7 @@ def test_get_url_ok(app: FastAPI, client: TestClient) -> None:
     _as(app, "application.read")
     r = client.get(f"/api/attachments/{ATT_ID}")
     assert r.status_code == 200
-    # App-relative stream path instead of a presigned MinIO URL (#attachment-links).
+    # App-relative stream path instead of a presigned MinIO URL.
     assert r.json()["url"] == f"/api/attachments/{ATT_ID}/download"
     assert r.json()["expiresIn"] == 300
 
@@ -319,7 +319,7 @@ def test_delete_ok_with_edit_any(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
     # application.edit_any is a global write permission. Like the upload path
-    # (require_app_edit), it must also allow delete and must not give 404 (#AUD-040).
+    # (require_app_edit), it must also allow delete and must not give 404.
     # With the no-creator stub and no application.manage, only edit_any can pass.
     _as(app, "application.edit_any")
     r = client.delete(f"/api/attachments/{ATT_ID}")
@@ -367,7 +367,7 @@ def _patch_committee(monkeypatch: pytest.MonkeyPatch, *, can_read: bool) -> None
 def test_get_url_creator_fallback_ok(
     app: FastAPI, client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # No application.read, but the logged-in creator (#24) gets 200 by the creator branch.
+    # No application.read, but the logged-in creator gets 200 by the creator branch.
     _as(app)
     _patch_creator(monkeypatch, is_creator=True)
     r = client.get(f"/api/attachments/{ATT_ID}")
@@ -377,7 +377,7 @@ def test_get_url_creator_fallback_ok(
 def test_get_url_committee_read_fallback_ok(
     app: FastAPI, client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # No permission and no creator, but Gremium read (#committee-read) gives 200.
+    # No permission and no creator, but Gremium read gives 200.
     _as(app)
     _patch_creator(monkeypatch, is_creator=False)
     _patch_committee(monkeypatch, can_read=True)

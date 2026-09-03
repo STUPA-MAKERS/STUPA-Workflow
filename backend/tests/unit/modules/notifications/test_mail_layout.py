@@ -1,4 +1,4 @@
-"""Tests of the branded HTML mail layout (#4)."""
+"""Tests of the branded HTML mail layout."""
 
 from __future__ import annotations
 

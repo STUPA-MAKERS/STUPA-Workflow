@@ -1,4 +1,4 @@
-"""Unit coverage for the config_revision module, without a DB (#config-versioning).
+"""Unit coverage for the config_revision module, without a DB.
 
 The tests drive `_flatten`, `_lock_key`, `ConfigRevisionService` (record, head, get,
 list_for and diff), `RevertService` (every error branch) and `reapply_snapshot` (the

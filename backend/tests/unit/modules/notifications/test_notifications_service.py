@@ -61,7 +61,7 @@ async def test_create_template_duplicate_conflict() -> None:
 
 
 async def test_list_templates() -> None:
-    # The merge (#12) keeps the full builtin catalog plus the rows outside the catalog.
+    # The merge keeps the full builtin catalog plus the rows outside the catalog.
     ta, tb = _template("a"), _template("b")
     ta.id, tb.id = uuid.uuid4(), uuid.uuid4()
     session = FakeSession(scalars=[[ta, tb]])

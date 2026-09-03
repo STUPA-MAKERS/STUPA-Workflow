@@ -1,4 +1,4 @@
-"""Integration: the attachment item routes mirror the list visibility (#AUD-032).
+"""Integration: the attachment item routes mirror the list visibility.
 
 The tests run against a real Postgres through testcontainers.
 

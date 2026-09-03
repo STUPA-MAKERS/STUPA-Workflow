@@ -5,10 +5,8 @@ import { IconComponent, type IconName } from '@stupa-makers/ui-kit';
  * One shape for "there is nothing here".
  *
  * It covers both cases the platform has: a page that cannot show what was asked for
- * (a missing application, a 404) and a list that is legitimately empty. Both used to be
- * written by hand per page, so a missing application rendered as one line of muted text
- * in the top-left corner of an otherwise blank page, while the 404 page was centred with
- * a heading and a way out.
+ * (a missing application, a 404) and a list that is legitimately empty. One component for
+ * both, so the two do not drift into looking like different kinds of answer.
  *
  * The action is projected, so the caller decides whether there is a way forward and what
  * it is.

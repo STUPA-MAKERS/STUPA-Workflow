@@ -199,7 +199,7 @@ describe('ShellComponent', () => {
     http.verify();
   });
 
-  it('renders maintained legal links and copyright in the footer (#82)', async () => {
+  it('renders maintained legal links and copyright in the footer', async () => {
     const view = await render(ShellComponent, {
       providers: [
         provideRouter([]),

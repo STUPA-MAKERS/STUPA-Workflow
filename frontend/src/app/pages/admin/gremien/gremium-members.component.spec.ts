@@ -78,7 +78,7 @@ async function setup(
   return { ...view, api, delegations, toast, c };
 }
 
-describe('GremiumMembersComponent (#18/#62)', () => {
+describe('GremiumMembersComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   it('loads the gremium, roles, principals + memberships on init', async () => {

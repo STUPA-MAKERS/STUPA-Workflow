@@ -62,7 +62,7 @@ async function setupWithStub(api: Partial<Record<keyof AdminApiService, unknown>
   return { ...view, toast, api: fullApi };
 }
 
-describe('BrandingEditorComponent (#21)', () => {
+describe('BrandingEditorComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   it('loads the active version and seeded free text into the live preview', async () => {
@@ -79,7 +79,7 @@ describe('BrandingEditorComponent (#21)', () => {
     expect(legal).toHaveTextContent('Datenschutz');
   });
 
-  it('exposes EN inputs for copyright and free texts (#16)', async () => {
+  it('exposes EN inputs for copyright and free texts', async () => {
     await setup();
     expect(screen.getByRole('textbox', { name: 'Copyright-Zeile (EN)' })).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: 'Willkommenstext (EN)' })).toBeInTheDocument();

@@ -60,7 +60,7 @@ async function setup(api = makeApi()) {
   return { ...view, api, toast };
 }
 
-describe('PrivacyComponent (#PII-Re-Add)', () => {
+describe('PrivacyComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   it('loads the erasure queue and retention default on init', async () => {

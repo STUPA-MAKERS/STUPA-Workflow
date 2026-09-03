@@ -1249,7 +1249,7 @@ async def test_agenda_item_has_vote() -> None:
 
 
 async def test_agenda_item_has_vote_excludes_cancelled() -> None:
-    # FIX 1 (#cancel-reopen): the guard statement MUST hide cancelled votes with
+    # FIX 1: the guard statement MUST hide cancelled votes with
     # status != 'cancelled'. Without that filter one cancelled application vote
     # blocks the reopen forever.
     sess = _QueueSession(executes=[res()])

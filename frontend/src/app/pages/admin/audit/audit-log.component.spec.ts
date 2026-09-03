@@ -72,7 +72,7 @@ async function setup(opts: SetupOpts = {}) {
   return { ...view, cmp, listAuditLog, listAuditActors };
 }
 
-describe('AuditLogComponent (#45)', () => {
+describe('AuditLogComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   it('lists audit entries with cursor paging and human-readable rendering', async () => {
@@ -138,7 +138,7 @@ describe('AuditLogComponent (#45)', () => {
     expect(screen.getByText('7')).toBeInTheDocument();
   });
 
-  it('renders embedded data UUIDs and the actor as "<name> · <uuid>" (#no-uuids-in-ui)', async () => {
+  it('renders embedded data UUIDs and the actor as "<name> · <uuid>"', async () => {
     const { fixture } = await setup({
       page: {
         items: [

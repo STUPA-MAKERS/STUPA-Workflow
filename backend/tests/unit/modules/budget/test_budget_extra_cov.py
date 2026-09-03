@@ -1,4 +1,4 @@
-"""Extra coverage for the budget tree (#76/#78).
+"""Extra coverage for the budget tree.
 
 The tests cover the router endpoints, the schema validators and the ZUGFeRD import helpers
 that the existing suites do not reach. They are pure unit tests without a DB, MinIO or
@@ -330,7 +330,7 @@ class _FakeService:
     async def invoice_file_bytes(self, invoice_id: uuid.UUID) -> tuple[bytes, str, str]:
         self.calls["invoice_file_bytes"] = invoice_id
         # This returns an HTML MIME type that a client could inject. The router must not
-        # trust it. The router always sends application/pdf as an attachment (#sec-audit).
+        # trust it. The router always sends application/pdf as an attachment.
         return (b"<html>polyglot</html>", "text/html", 'we"ird\r\nname.pdf')
 
 
@@ -685,7 +685,7 @@ def test_export_expenses_xlsx(fake: _FakeService) -> None:
 
 
 def test_export_expenses_ids_filter(fake: _FakeService) -> None:
-    """`ids` limits the export to the selected bookings (#expenses-ux)."""
+    """`ids` limits the export to the selected bookings."""
     client = _client(fake, ("budget.export",))
     # a matching id keeps the booking, so the export has one row
     resp = client.get("/api/expenses/export.xlsx", params={"ids": str(_EID)})
@@ -793,7 +793,7 @@ def test_get_invoice_file_sanitises_filename(fake: _FakeService) -> None:
     resp = _client(fake, ("budget.view",)).get(f"/api/invoices/{_IID}/file")
     assert resp.status_code == 200
     cd = resp.headers["content-disposition"]
-    # Security hardening (#sec-audit): the router ignores the client MIME type and always
+    # Security hardening: the router ignores the client MIME type and always
     # sends application/pdf with Content-Disposition attachment. The HTML polyglot must
     # never render inline.
     assert resp.headers["content-type"] == "application/pdf"

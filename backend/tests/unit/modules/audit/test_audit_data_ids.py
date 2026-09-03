@@ -1,4 +1,4 @@
-"""Unit tests for `data_uuid_strings`: UUID extraction from `data` (#no-uuids-in-ui).
+"""Unit tests for `data_uuid_strings`: UUID extraction from `data`.
 
 The function is pure and needs no database. These tests cover the collection logic. It
 walks the payload, reads values only and keeps UUID-shaped strings only. The

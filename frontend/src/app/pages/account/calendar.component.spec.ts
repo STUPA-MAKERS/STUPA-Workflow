@@ -17,7 +17,7 @@ async function setup(opts: { url?: string | null } = {}) {
   return { ...view, rotateCalendar };
 }
 
-describe('AccountCalendarComponent (#ics)', () => {
+describe('AccountCalendarComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   it('shows the feed URL when one exists', async () => {

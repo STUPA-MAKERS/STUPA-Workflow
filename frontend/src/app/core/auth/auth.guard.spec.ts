@@ -116,7 +116,7 @@ describe('authGuard', () => {
       gremien: [{ id: 'g1', name: 'StuPa', slug: 'stupa' }],
     };
     // Mirrors the real /meetings route data. `protocol.write` is a gremium-role
-    // permission and is deliberately not listed there (#g10).
+    // permission and is deliberately not listed there.
     const data = { permission: ['meeting.manage'], allowCommitteeMember: true };
     expect(run(data, inCommittee)).toBe(true);
   });

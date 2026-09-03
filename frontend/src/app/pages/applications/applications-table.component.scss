@@ -61,9 +61,8 @@
   font-weight: var(--fw-medium);
   text-decoration: none;
 }
-/* One line with an ellipsis. A long title used to wrap onto three or four lines and
-   make that one row several times the height of its neighbours, which turns an even
-   table into a ragged one. The full text stays on the cell's `title`. */
+/* One line with an ellipsis, so a long title cannot make its row several times the
+   height of its neighbours. The full text stays on the cell's `title`. */
 .atbl__rowTitle {
   overflow: hidden;
   text-overflow: ellipsis;

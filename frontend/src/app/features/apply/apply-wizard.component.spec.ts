@@ -200,7 +200,7 @@ describe('ApplyWizardComponent', () => {
     expect(comp.activeIndex()).toBe(0);
   });
 
-  it('skips the contact step and Altcha for a logged-in user (#24)', async () => {
+  it('skips the contact step and Altcha for a logged-in user', async () => {
     const { fixture, create } = await setupLoggedIn();
     const comp = fixture.componentInstance;
     const router = TestBed.inject(Router);
@@ -255,7 +255,7 @@ describe('ApplyWizardComponent', () => {
     expect(errSpy).toHaveBeenCalledWith('Antragsarten konnten nicht geladen werden.');
   });
 
-  it('renders the configured apply info as markdown HTML (#18)', async () => {
+  it('renders the configured apply info as markdown HTML', async () => {
     const { fixture } = await render(ApplyWizardComponent, {
       providers: [
         provideRouter([]),

@@ -76,7 +76,7 @@ async function setup(opts: { canMcp?: boolean; api?: ReturnType<typeof makeApi> 
   return { ...view, api, auth, cmp };
 }
 
-describe('AccountGrantsComponent (#MCP)', () => {
+describe('AccountGrantsComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   it('loads grants on init and renders the table with created/expiry', async () => {

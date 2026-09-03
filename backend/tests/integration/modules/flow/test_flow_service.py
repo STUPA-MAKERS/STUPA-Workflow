@@ -130,7 +130,7 @@ async def _seed(session: AsyncSession) -> tuple[ApplicationType, dict[str, State
             guard={"roleIs": "treasurer"},  # the manager is NOT a treasurer, so this blocks
             actions=[], order=0,
         ),
-        # Vote outcomes (#28): fire_branch fires the pass and fail branch on vote close.
+        # Vote outcomes: fire_branch fires the pass and fail branch on vote close.
         Transition(
             flow_version_id=flow.id, from_state_id=states["voting"].id,
             to_state_id=states["approved"].id, label_i18n={"de": "Bewilligen"},
@@ -231,7 +231,7 @@ async def test_fire_into_locked_state_blocks_t12_patch(session: AsyncSession) ->
     # Put the application into `voting` (no manager path leads there), then move into
     # the locked `approved` state (edit_allowed=False) with fire_branch. The lock then
     # comes from the transition itself, not from a state that the test sets by hand.
-    # `voting` → `approved` is a `pass` branch (#vote-branch). Only a vote result fires
+    # `voting` → `approved` is a `pass` branch. Only a vote result fires
     # a branch transition, through fire_branch. A manual `fire` blocks with 409 on purpose.
     app_row = await session.get(Application, app.id)
     assert app_row is not None

@@ -338,7 +338,7 @@ input.exp__input {
   font-variant-numeric: tabular-nums;
   font-weight: var(--fw-semibold);
 }
-/* Bulk actions in a floating bottom bar (#expenses-ux2). The bar is fixed at the bottom
+/* Bulk actions in a floating bottom bar. The bar is fixed at the bottom
    center and appears only for an active selection. It stacks below the dialogs
    (--z-dialog) and above the sticky table cells. */
 .exp__bulkbar {

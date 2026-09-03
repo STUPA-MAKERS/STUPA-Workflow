@@ -43,7 +43,7 @@ async function setup(gremien: Gremium[] = [GREMIUM]) {
   return { ...view, http, c };
 }
 
-describe('AdminGremienComponent (#18)', () => {
+describe('AdminGremienComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   it('lists existing committees from /admin/gremien', async () => {

@@ -1,7 +1,6 @@
 import {
   buildLeaf,
   combine,
-  describeGuard,
   GuardError,
   isGuardValid,
   validateAction,
@@ -11,8 +10,8 @@ import {
 /**
  * The reason a guard was rejected, as the key and parameters it carries.
  *
- * A `GuardError` no longer holds a sentence, so a test names the reason instead of matching
- * on wording that only the catalog decides.
+ * A `GuardError` holds a key and not a sentence, so a test names the reason rather than
+ * matching on wording that only the catalog decides.
  */
 function reason(fn: () => void): { key: string; params?: Record<string, string | number> } {
   try {
@@ -217,28 +216,6 @@ describe('builder helpers', () => {
       and: [{ roleIs: 'a' }, { deadlinePassed: true }],
     });
     expect(combine('not', [{ deadlinePassed: true }])).toEqual({ not: { deadlinePassed: true } });
-  });
-
-  it('describeGuard renders nested + compare guards', () => {
-    expect(describeGuard(null)).toBe('—');
-    expect(describeGuard(undefined)).toBe('—');
-    expect(describeGuard({ roleIs: 'stupa' })).toBe('roleIs: "stupa"');
-    expect(describeGuard({ and: [{ roleIs: 'a' }, { deadlinePassed: true }] })).toBe(
-      'roleIs: "a" ∧ deadlinePassed: true',
-    );
-    // `or` joins with ∨
-    expect(describeGuard({ or: [{ roleIs: 'a' }, { roleIs: 'b' }] })).toBe(
-      'roleIs: "a" ∨ roleIs: "b"',
-    );
-    // and/or with a non-array value is wrapped into a single-element list
-    expect(describeGuard({ and: { deadlinePassed: true } })).toBe('deadlinePassed: true');
-    expect(describeGuard({ not: { deadlinePassed: true } })).toBe('¬(deadlinePassed: true)');
-    expect(describeGuard({ compare: { field: 'amount', op: '>', value: 100 } })).toBe(
-      'amount > 100',
-    );
-    // compare with a non-object value falls through to the generic branch
-    expect(describeGuard({ compare: 'x' })).toBe('compare: "x"');
-    expect(describeGuard({ a: 1, b: 2 })).toBe('⚠ invalid');
   });
 
   it('combine wraps `not` with the first child and isGuardValid swallows errors', () => {

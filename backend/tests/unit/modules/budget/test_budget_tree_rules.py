@@ -18,7 +18,7 @@ def test_is_valid_key() -> None:
     assert r.is_valid_key("800")
     assert not r.is_valid_key("VS-800")  # the separator is not allowed
     assert not r.is_valid_key("")
-    # Length limit (#sec-audit): exactly _KEY_MAX is valid, one more is rejected.
+    # Length limit: exactly _KEY_MAX is valid, one more is rejected.
     assert r.is_valid_key("A" * r._KEY_MAX)
     assert not r.is_valid_key("A" * (r._KEY_MAX + 1))
 
@@ -204,7 +204,7 @@ def test_build_forest_committed_only_node() -> None:
     assert view["available"] == Decimal("-30")
 
 
-# Gremium scope (#budget-scope)
+# Gremium scope
 def test_scope_forest_picks_assigned_subtrees_as_roots() -> None:
     g = uuid.uuid4()
     nodes = [

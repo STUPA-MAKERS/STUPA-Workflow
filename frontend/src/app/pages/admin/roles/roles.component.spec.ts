@@ -40,7 +40,7 @@ async function setup(api = makeApi(), toast = makeToast()) {
   return { ...view, api, toast, inst };
 }
 
-describe('AdminRolesComponent (#12)', () => {
+describe('AdminRolesComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   it('lists roles with capitalized labels and loads the permission catalog', async () => {
@@ -71,14 +71,14 @@ describe('AdminRolesComponent (#12)', () => {
     expect(inst.isLocked({ key: 'member' })).toBe(false);
   });
 
-  it('canDelete protects admin + member only (#38)', async () => {
+  it('canDelete protects admin + member only', async () => {
     const { inst } = await setup();
     expect(inst.canDelete({ key: 'admin' })).toBe(false);
     expect(inst.canDelete({ key: 'member' })).toBe(false);
     expect(inst.canDelete({ key: 'referent' })).toBe(true);
   });
 
-  it('onRowClick toggles the row expansion both ways (#40)', async () => {
+  it('onRowClick toggles the row expansion both ways', async () => {
     const { inst } = await setup();
     expect(inst.rowExpanded(ROLES[2])).toBe(false);
     inst.onRowClick(ROLES[2]);

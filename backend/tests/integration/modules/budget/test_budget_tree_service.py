@@ -298,7 +298,7 @@ async def test_delete_leaf_with_allocation_succeeds(session: AsyncSession) -> No
 
 
 async def test_list_expenses_fuzzy_search(session: AsyncSession) -> None:
-    """Fuzzy search (#3) against a real Postgres: pg_trgm filters and ranks bookings.
+    """Fuzzy search against a real Postgres: pg_trgm filters and ranks bookings.
 
     This proves the real trigram path, not the ILIKE fallback. A typo in the query still
     finds the closest description. Other bookings drop out. The rank puts the hit first.
@@ -335,7 +335,7 @@ async def test_list_expenses_fuzzy_search(session: AsyncSession) -> None:
 
 
 async def test_list_expenses_exact_id_filter(session: AsyncSession) -> None:
-    """The `id` filter (#expenses-ux2) returns exactly one booking.
+    """The `id` filter returns exactly one booking.
 
     The exact booking deeplink returns that one booking, even without any other
     filter.
@@ -367,7 +367,7 @@ async def test_list_expenses_exact_id_filter(session: AsyncSession) -> None:
 
 
 async def test_list_invoices_search_filter_pagination(session: AsyncSession) -> None:
-    """Server-side invoice search (#invoices): fuzzy `q`, filters and offset paging.
+    """Server-side invoice search: fuzzy `q`, filters and offset paging.
 
     Against a real Postgres this proves the trigram path, so a typo still hits. It also
     proves the status, gross and date predicates that hang on the shared `filters`. The

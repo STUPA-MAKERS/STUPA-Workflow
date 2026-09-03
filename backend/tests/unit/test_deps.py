@@ -209,7 +209,7 @@ async def test_get_current_principal_deactivated(monkeypatch: pytest.MonkeyPatch
 
     monkeypatch.setattr(deps.sessions, "load_principal_session", _sess)
     req = _request(cookies={_settings().session_cookie_name: "x"})
-    # A deactivated principal (active=False) does not resolve (#30).
+    # A deactivated principal (active=False) does not resolve.
     principal = await get_current_principal(
         req, fake_session(result(SimpleNamespace(active=False))), _settings()
     )

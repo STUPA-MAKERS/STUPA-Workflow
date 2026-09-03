@@ -1,7 +1,6 @@
-/* The apply link: a real secondary button, not the full-width banner it used to be
-   and not the muted text link that replaced it. A signed-in member came for their
-   tasks and meetings, so this does not lead the page — but it is still the one action
-   they take FROM here, so it has to read as a control. */
+/* The apply link is a secondary button. A signed-in member came for their tasks and
+   meetings, so it does not lead the page — but it is the one action they take FROM
+   here, so it has to read as a control rather than as text. */
 /* Their own line under the greeting. The negative top margin pulls them up against the
    heading, because the page gap is sized for blocks and these belong to the line above. */
 .dash__gremien {

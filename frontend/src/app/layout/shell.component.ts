@@ -88,10 +88,8 @@ export class ShellComponent {
   readonly wide = signal(false);
 
   /* Footer content comes from the BRANDING service, which loads the public site config.
-     It used to come from `/admin/site-config`, which needs a session: a logged-out
-     visitor on the landing page or the 404 therefore always saw the built-in defaults,
-     whatever the admin had configured. It also spared every non-admin an admin request
-     on each page load. */
+     It needs no session, so a logged-out visitor sees what the admin configured, and no
+     non-admin pays for an admin request on every page load. */
 
   /** Legal links for the active locale. Empty means the default footer (imprint/privacy). */
   readonly footerLinks = computed(() =>

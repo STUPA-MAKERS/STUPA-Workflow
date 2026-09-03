@@ -50,7 +50,7 @@ export function deepStateKeys(groupById: Map<string, FlowGroup>, groupId: string
  * Resolve a state on a level: directly visible ('state'), shown as a
  * sub-group box ('group'), or outside the level (null → proxy).
  */
-export function resolveAt(
+function resolveAt(
   stateOwnerId: Map<string, string>,
   parentGroupId: Map<string, string>,
   stateKey: string,
@@ -73,7 +73,7 @@ export function resolveAt(
  * Representative of an external state for the proxy columns. It is what the user sees
  * of that state on the closest enclosing level: the state itself or its group.
  */
-export function proxyRefFor(
+function proxyRefFor(
   stateOwnerId: Map<string, string>,
   parentGroupId: Map<string, string>,
   stateKey: string,

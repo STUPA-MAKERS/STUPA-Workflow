@@ -25,8 +25,8 @@
   line-height: 1.25;
 }
 
-/* One line, never wrapped: the badge list used to set the height of every row in the
-   table. What does not fit is counted by `.grants__scopes-more` instead. */
+/* One line, never wrapped, so the badge list cannot set the height of a row. What does
+   not fit is counted by `.grants__scopes-more` instead. */
 .grants__scopes {
   display: flex;
   align-items: center;
