@@ -750,3 +750,424 @@ All three were put to the maintainer rather than guessed.
   comes from the application, resolved before the status label so body and label agree.
   A recipient list containing a team member keeps the default, because applicant and team
   share one `MailMessage` there and choosing a language for both is a product decision.
+
+---
+
+# Round two — sweep of the merged code
+
+A second, deeper pass over `main` at `7a8bd323`, on the areas the first sweep never
+reached: the meeting lifecycle and live voting, the protocol render, backups, the webhook
+SSRF guard, search, and both colour schemes. Same local stack, same six roles.
+
+| # | Severity | Area | Summary | State |
+| --- | --- | --- | --- | --- |
+| 22 | **major** | meetings | A meeting manager is locked out once a minute-taker is assigned | **fixed** |
+| 23 | **major** | voting | The quorum counts members who cannot cast | **fixed** |
+| 31 | **major** | voting | The minute-taker can open a vote but cannot close it | **fixed** |
+| 32 | medium | meetings | "Finalized automatically on close" is true only in the browser | open |
+| 24 | medium | voting | Vote buttons enabled for members the server rejects | **fixed** |
+| 27 | medium | audit | The audit log prints a raw UUID for a form config change | **fixed** |
+| 29 | medium | deploy | The documented webhook allowlist variable does nothing | **fixed** |
+| 25 | minor | meetings | Toast reads "Action failed.: ..." | open |
+| 26 | minor | meetings | The vote counter does not follow an attendance change | open |
+| 28 | minor | audit | German quotation marks in the English UI | **fixed** |
+| 30 | minor | voting | The vote progress counter can read "2 of 1" | open |
+| 33 | **major** | deploy | Eight more documented env keys are read by nothing | partly fixed |
+
+---
+
+## 22 — A meeting manager is locked out once a minute-taker is assigned
+
+**Severity:** major. An unavailable minute-taker cannot be replaced.
+
+`frontend/src/app/features/meetings/meeting-session.service.ts:121`
+
+```ts
+if (m.protokollantId) return !this.isProtokollant();
+```
+
+`isFollower()` therefore becomes true for everyone except the minute-taker as soon as one
+is set. `meetings.component.html:95` then wraps the **whole** management surface in
+`@if (!beamerMode() && !isFollower())` — the control toolbar (open session, close, edit
+meeting, delete meeting), the agenda editor and vote creation.
+
+Measured on one meeting, same server state, two sessions:
+
+| role | canControl | canManage | canWrite | isProtokollant | UI shows |
+| --- | --- | --- | --- | --- | --- |
+| admin | true | true | true | false | Beamer view, attendance only |
+| manager | true | true | true | false | (same) |
+| protocol | true | true | true | **true** | Open session, Close, Edit meeting, Delete meeting, agenda editor, vote creation |
+
+The exclusivity itself is deliberate and documented at `meeting-session.service.ts:108-113`
+— two people must not edit one protocol at once. The defect is that it is applied to the
+whole management surface rather than to protocol editing. The template's own inner guard
+`@if (m.canControl || canWrite() || m.canManage)` (line 97) is unreachable dead code for a
+non-minute-taker, which is good evidence the coupling was not intended.
+
+**The bite:** the minute-taker is changed in the settings dialog
+(`meetings.component.html:565`), opened from the toolbar button that this hides. If the
+assigned minute-taker is unavailable, nobody can reassign them, start the meeting, or
+delete it — the API is the only way out.
+
+**Fix:** gate the protocol EDITOR on the protokollant exclusivity, and gate the toolbar,
+agenda editor and vote creation on `canControl` / `canManage` / `canWrite` as the inner
+guard already intends.
+
+---
+
+## 23 — The quorum counts members who cannot cast
+
+**Severity:** major, and `voting` is a critical module (100% branch coverage required).
+
+Two different definitions of "eligible":
+
+* **Quorum denominator** — `backend/app/modules/livevote/service/votes.py:255`
+  `vote_eligible_count` counts members whose **Gremium role** carries `vote.cast`.
+* **Cast gate** — `backend/app/modules/voting/service.py:420`
+  ```python
+  if not principal.has("vote.cast") or not self._eligible_group_member(principal, vote.eligible_group):
+      raise ForbiddenError("Not eligible to vote in this ballot.")
+  ```
+  requires the **global** `vote.cast` permission as well.
+
+So the denominator counts people the gate rejects. Measured against one open vote whose
+`tally.eligible` was **4**, all four holding the same group `vote:…60e1`:
+
+| role | global vote.cast | POST /votes/{id}/ballot |
+| --- | --- | --- |
+| admin | yes | **200** |
+| member | yes | **200** |
+| manager | no | **403** Not eligible to vote in this ballot. |
+| protocol | no | **403** Not eligible to vote in this ballot. |
+
+`manager` and `protocol` are counted in the quorum and cannot vote. A vote with a 75 %
+quorum would need 3 of those 4 and could never reach it. "Sachbearbeitung" and "Protokoll"
+are plausible real roles for people who also sit in the committee.
+
+This also contradicts the design note in `backend/app/modules/auth/rbac.py:96-101`, which
+says an active Gremium role with `vote.cast` is what grants voting eligibility.
+
+**Fix:** pick ONE definition. Either drop the global-permission half of the cast gate and
+let the namespaced group decide (which is what `vote_group_key` was built for), or count
+the quorum with the same rule the gate enforces. Whichever is chosen, the two must agree.
+
+---
+
+## 24 — Vote buttons are enabled for members the server will reject
+
+**Severity:** medium. Follows from 23 but is worth fixing separately.
+
+Yes / No / Abstain render enabled for a member who cannot cast. The failure only appears
+after the click, as a toast. The client already knows the answer — it has the principal's
+permissions and the vote's `eligibleGroup` — so it can disable the buttons and say why.
+
+---
+
+## 25 — Toast reads "Action failed.: …"
+
+**Severity:** minor (copy).
+
+The rejected cast surfaces as:
+
+```
+Action failed.: Not eligible to vote in this ballot.
+```
+
+A full stop immediately followed by a colon — a prefix that already ends in punctuation
+being concatenated with `": "`. Either drop the stop from the prefix or drop the colon.
+
+---
+
+## 26 — The vote counter does not follow an attendance change
+
+**Severity:** minor.
+
+With the vote open, marking a member present left the counter at `0 of 0 present have
+voted`. The attendance write reached the server (`GET .../attendance` showed
+`status: present`), and after a reload the counter read `0 of 1`. So the value is right
+and only the live view is stale — the attendance mutation does not refresh the tally.
+
+---
+
+## Verified working in this round
+
+* Meeting lifecycle as the minute-taker: add free-text agenda item, open session
+  (planned -> live), protocol draft auto-created, live presence ("Viewing live (1)").
+* Vote creation with options, secret-ballot flag and majority rule; the vote opens and
+  appears under its agenda item.
+* Casting works for a principal holding both the group and the global permission (200).
+* The rejection is surfaced to the user rather than failing silently.
+
+---
+
+## 27 — The audit log prints a raw UUID for a form config change
+
+**Severity:** medium. It breaks the project's own `no-uuids-in-ui` rule.
+**Reproduce:** edit a form, open `/admin/audit`.
+
+```
+Alina Admin changed the configuration (form:a257b8e0-0c78-43cb-938f-a4924f68443f).
+```
+
+The actor resolves correctly — that half was fixed before. The TARGET does not. The
+neighbouring flow entry reads `(flow:global)`, which is legible only because its id is
+literally the word `global`.
+
+**Cause:** the frontend falls back to `type:id` when the server sends no label —
+`frontend/src/app/pages/admin/audit/audit-log.component.ts:502`
+
+```ts
+private targetLabel(e: AuditEntry): string {
+  if (e.targetLabel) return `„${e.targetLabel}“`;
+  if (e.targetType && e.targetId) return `${e.targetType}:${e.targetId}`;
+```
+
+and the server does not send one for this type. `resolve_target_labels`
+(`backend/app/modules/audit/service.py:332`) resolves `application`, `gremium`,
+`application_type`, `role`, `principal`, `webhook` and `vote` — but **not `form`**, which
+is the target type a form config change writes.
+
+The id is resolvable: `a257b8e0-…` is the application type's own id, and
+`application_type` is already handled a few lines below. Only the mapping is missing.
+
+**Fix:** resolve `form` (and check `flow` and `site_config` while there) through the
+application-type name in `resolve_target_labels`. The memory `no-uuids-in-ui` states the
+rule: resolve ids to names SERVER-SIDE in the serializer, and "if you see a UUID on
+screen, a serializer skipped the name resolution."
+
+---
+
+## 28 — German quotation marks in the English UI
+
+**Severity:** minor.
+
+`audit-log.component.ts:503` wraps a resolved target in `„…“` — German low-9 quotes —
+whatever the active locale. English uses `“…”`. The character pair is hardcoded rather
+than taken from the locale.
+
+**Fix:** either drop the decoration and let CSS or the surrounding copy carry it, or take
+the pair from the translation catalogue so each locale supplies its own.
+
+---
+
+## 29 — The documented webhook allowlist variable does nothing
+
+**Severity:** medium — a security control an operator believes is on, and is not.
+**Reproduce:** set the variable exactly as `deploy/.env.example` shows, then read it back.
+
+`deploy/.env.example:118` ships:
+
+```
+WEBHOOK_ALLOWLIST=host1,host2     # optional zusätzlich zu IP-Block
+```
+
+The setting is `webhook_host_allowlist` (`backend/app/settings.py:205`). `Settings` uses a
+plain `SettingsConfigDict` with no `env_prefix` and no alias, so the variable it reads is
+**`WEBHOOK_HOST_ALLOWLIST`**. `extra="ignore"` means the documented name is dropped in
+silence.
+
+Measured on the running stack, with `WEBHOOK_ALLOWLIST=localhost` set in `deploy/.env`:
+
+```
+webhook_host_allowlist = []
+```
+
+and a webhook to `http://example.com/hook` — a host that is NOT in the configured
+allowlist — was accepted with **201**.
+
+**Why it matters beyond the typo:** `_strict_security_warnings`
+(`backend/app/settings.py:327`) warns loudly whenever the allowlist is empty under
+hardening. An operator who follows the shipped example gets that warning and has no way to
+silence it, because the name they were told to use is not the name that is read.
+
+**Fix:** rename the key in `.env.example` to `WEBHOOK_HOST_ALLOWLIST`, or add
+`validation_alias=AliasChoices("WEBHOOK_HOST_ALLOWLIST", "WEBHOOK_ALLOWLIST")` to the
+field so both work. Renaming the example is the smaller change; the alias is kinder to
+anyone who already copied the old name into a running deployment.
+
+**Not a finding, checked and deliberate:** the guard accepts plain `http` as well as
+`https` — `webhooks/ssrf.py:3-4` states that explicitly, so an unencrypted target is a
+documented choice rather than an oversight.
+
+---
+
+## Also verified working in round two
+
+* **Backups, end to end.** Create → 202 → `done` in under 5 s → 194 842 B archive with a
+  sha256 and the schema revision `a7c3f1e59d84` recorded. The export is a real
+  `age-encryption.org/v1` file, and it decrypts with the private key to `db.dump` plus
+  `manifest.json`. RBAC is right: `manager`, `member` and `nobody` all get 403 on list and
+  on create.
+* **The webhook SSRF guard.** Every one of these was refused with 400: loopback v4, the
+  name `localhost`, the metadata IP `169.254.169.254`, `10/8`, `192.168/16`, `172.20/16`,
+  IPv6 `::1`, and the internal service name `minio:9000`. `file://` and `gopher://` are
+  refused at validation with 422. Only public http/https targets are accepted.
+* **Contrast.** No WCAG AA failure on 12 routes in BOTH light and dark, measured with
+  alpha compositing over the real ancestor chain and the large-text threshold applied.
+  (An earlier run of my own checker reported three failures; those were a parser bug of
+  mine — it read `color(srgb 0.12 0.36 0.22 / 0.22)` floats as 0-255 values. Fixed and
+  re-run before reporting anything.)
+* **Nothing else flagged across 26 routes**: no `[object Object]`, no raw JSON, no ISO
+  date, no `NaN`, no leaked `HH:MM:SS`, no untranslated key, no console error. The single
+  hit was the audit UUID in finding 27.
+
+---
+
+## 30 — The vote progress counter can read "2 of 1"
+
+**Severity:** minor on its own, but it exposes the model split behind finding 23.
+**Observed live**, verbatim:
+
+```
+2 of 1 present have voted
+```
+
+Two ballots had been cast (by `admin` and `member`, neither marked present) while exactly
+one member (`protocol`) was marked present. The numerator counts ballots; the denominator
+counts *present* members — but casting never required being present, so the numerator can
+exceed the denominator.
+
+Either casting should require attendance, or the progress line should be denominated in
+the set that may actually cast. Right now the sentence can be arithmetically impossible,
+which is the visible symptom of the same "two definitions of eligible" problem as
+finding 23.
+
+---
+
+## 31 — The minute-taker can open a vote but cannot close it
+
+**Severity:** major. It strands an open vote in a live session.
+
+The two ends of a vote's lifecycle are gated on different rules.
+
+* **Create / open** — `backend/app/modules/livevote/router.py:415` and `:483` gate on the
+  meeting's `can_manage_votes` flag, which `permissions.py:56` grants to the protokollant
+  by design: *"Check who opens and closes votes: manager, protokollant, or `vote.manage`."*
+* **Close** — `backend/app/modules/voting/router.py:112` calls
+  `service.assert_can_manage_vote(...)`, a gremium-scoped `vote.manage` check that admits
+  an admin, a global `vote.manage` holder or a per-gremium `vote.manage` role. It does
+  **not** admit the protokollant.
+
+So the flag promises what the close gate refuses. Measured on one open vote:
+
+| role | `canManageVotes` | POST /votes/{id}/close |
+| --- | --- | --- |
+| protocol (the minute-taker) | **true** | **403** "not allowed to manage this vote" |
+| manager | true | 200 |
+| admin | true | 409 (already closed by manager) |
+
+The minute-taker had created and opened that very vote through the UI minutes earlier, so
+this is not a read-only role stumbling into a write — it is the person running the session
+being unable to finish what the same application let them start. The UI shows them a
+"Close vote" button, because it renders from `canManageVotes`.
+
+**Fix — one of two, and it is a decision:** either admit the protokollant in
+`assert_can_manage_vote` (which matches the documented intent of `can_manage_votes` and
+the fact that the minute-taker runs the session), or stop granting `can_manage_votes` on
+protokollant alone (which would also remove their ability to open a vote, and would need
+the UI to stop offering it). The first looks right, but it widens who may close a vote and
+fire the resulting flow branch, so it belongs in the critical-module review rather than in
+a quick patch.
+
+---
+
+## 32 — "Finalized automatically when the session is closed" is true only in the browser
+
+**Severity:** medium-to-major, and partly a product call. The protocol is the record of the
+meeting.
+
+The meeting page promises, on screen:
+
+> The minutes are finalized and sent automatically when the session is closed.
+
+That orchestration lives entirely in the **client**.
+`frontend/src/app/features/meetings/meeting-session.service.ts:206`:
+
+```ts
+closeMeeting(): void {
+  this.api.patchMeeting(m.id, { status: 'closed' }).subscribe({
+    next: (updated) => {
+      const proto = this.protocol();
+      // The finalize step is implicit: render the PDF and mail it to the list.
+      if (proto && !proto.isLocked) this.finalize();
+    },
+```
+
+The server does not do it. `backend/app/modules/livevote/service/lifecycle.py:138` sets
+`closed_at`, sets the status, commits and emits — and enqueues nothing.
+
+**Measured:** closing the meeting with `PATCH /api/meetings/{id} {"status":"closed"}` left
+`status: closed` with a protocol still `draft` for 150 s. The worker log over that whole
+window shows only `cron:process_deadlines` — no render job was ever enqueued. An explicit
+`POST /api/protocols/{id}/finalize` then produced everything correctly.
+
+So the minutes are silently not produced whenever the close does not come from a browser
+that survives long enough to fire the second request: any API or MCP client, a closed tab,
+a lost connection between the two calls, or a failure of the second call.
+
+The codebase already knows this can happen — `meetings.component.html:115` carries a retry
+button gated on `status === 'closed' && !proto.isFinal`, commented "Meeting closed but the
+protocol is a draft again: the render failed and rolled back. The explicit retry is the
+only path to a final protocol." That covers a failed render; it does not cover a close that
+never asked for one.
+
+**Fix:** enqueue the finalize server-side on the transition to `closed`, and let the client
+call stay as an optimistic fast path. Then the promise on screen is true for every client.
+
+**Verified working, once finalize is actually called:** the protocol reached `status:
+final`, `GET /api/protocols/{id}/pdf` returned 32 623 bytes of real PDF (`%PDF-1.5` …
+`%%EOF`), and the mail went to the gremium list as "Sitzungsprotokoll StuPa —
+15.10.2026". The pytex render path and the mail dispatch are both sound; only the trigger
+is missing.
+
+
+---
+
+## 33 — Eight more documented env keys are read by nothing
+
+**Severity:** major in aggregate. Found by auditing the whole template after finding 29,
+rather than stopping at the one key that was reported.
+
+There is exactly one `BaseSettings` in the repository (`backend/app/settings.py:25`); the
+worker imports it and pytex uses bare `os.environ`. Cross-checking all 76 keys of
+`deploy/.env.example` against its 94 env names turns up these, all silently ignored
+because `extra="ignore"`:
+
+| Key | Status | What actually happens |
+| --- | --- | --- |
+| `WEBHOOK_ALLOWLIST` | **fixed** | finding 29 — renamed, with an alias so existing deployments keep working |
+| `SMTP_FROM` | open | **Dead.** The sender address is `MAIL_FROM` (`settings.py:136`). An operator who fills in `SMTP_FROM` sends from the fallback `noreply@antragsplattform.local` and nothing says so. `scripts/e2e.sh:80` sets it just as uselessly. |
+| `WEBHOOK_HMAC_KEY` | open | **Dead**, and misleading about security: signing uses the per-webhook `hook.secret` from the database (`webhooks/service.py:240,267`). The template implies a global signing key that does not exist. |
+| `AUDIT_DB_ROLE` | open | **Dead.** The role name is hardcoded in `migrations/versions/0001_baseline.py:40`, `0034_config_revision.py:25` and `deploy/db/roles.sql:32`. Changing the value does nothing. |
+| `NEXTCLOUD_WEBDAV_URL`, `NEXTCLOUD_USER`, `NEXTCLOUD_APP_PASSWORD`, `NEXTCLOUD_BASE_PATH`, `NEXTCLOUD_TIMEOUT_SECONDS` | open | **Dead — the whole Nextcloud/WebDAV export does not exist in the code.** The only occurrences are the template and some memory files. The template asks the operator for a real app password for a feature that is not there. |
+
+### A second trap, found while fixing the first
+
+The plain rename would not have been enough. `webhook_host_allowlist` is `list[str]`, and
+pydantic-settings JSON-decodes complex fields, so the documented comma format aborts the
+start:
+
+```
+WEBHOOK_HOST_ALLOWLIST=host1,host2  ->  SettingsError: error parsing value for field …
+WEBHOOK_HOST_ALLOWLIST=["a","b"]    ->  ['a', 'b']
+WEBHOOK_ALLOWLIST=host1,host2       ->  []
+```
+
+So the "obvious" fix turns a silent no-op into a hard boot failure. The change therefore
+adds `NoDecode` plus a validator that accepts both the comma format and the JSON list.
+**`CORS_ALLOW_ORIGINS` had the identical trap** and got the same treatment — it also gates
+the live-vote WebSocket origin check (`livevote/connection.py:84`), so
+`CORS_ALLOW_ORIGINS=https://a.example` would have crashed the API at boot. It is
+undocumented in the template as well.
+
+### The durable guard
+
+`backend/tests/unit/test_env_example_settings_parity.py` now parses every key in the
+template and asserts each is either read by a `Settings` field or alias, or listed in an
+annotated exception list (compose/postgres/altcha/pytex keys, plus the dead ones above
+with a one-line reason each). A newly invented key fails CI, and the dead ones are
+inventoried rather than invisible.
+
+**Also undocumented and worth adding to the template:** `DELEGATION_VOTING_ENABLED` — a
+bylaws-level feature switch that defaults to OFF, which an operator has no way to discover.
