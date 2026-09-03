@@ -29,7 +29,7 @@ from app.modules.admin.site_config_service import DEFAULT_APP_NAME, SiteConfigSe
 from app.modules.applications.models import Application
 from app.modules.applications.service.service_base import _field_from_row
 from app.modules.applications.share import ShareService, build_public_view
-from app.modules.applications.share_page import SHARE_CSP, render_share_page
+from app.modules.applications.share_page import render_share_page, share_csp
 from app.modules.forms.models import FormField
 from app.shared.errors import NotFoundError
 from app.shared.i18n import resolve_i18n
@@ -92,12 +92,21 @@ async def public_application(
     # the page that lands permanently on a chat server.
     branding = (await SiteConfigService(session).public()).branding
     app_name = branding.app_name.strip() or DEFAULT_APP_NAME
+    # The wordmark is the branding a deployment really configures. `imagemark` is the
+    # fallback, because a square mark still names the instance; `favicon` is too small to
+    # read as a header logo, so a deployment that set only that one gets the name alone.
+    logo = branding.logos.get("wordmark") or branding.logos.get("imagemark")
 
+    base = settings.public_base_url.rstrip("/")
     html = render_share_page(
         view,
         app_name=app_name,
-        canonical_url=f"{settings.public_base_url.rstrip('/')}/s/{token}",
+        canonical_url=f"{base}/s/{token}",
         lang=lang,
+        # The record itself, not the list it lives on. A reader with an account lands on
+        # the application; one without meets the login, which is the honest answer.
+        app_url=f"{base}/applications/{app.id}",
+        logo_url=logo.url if logo is not None else None,
     )
     return Response(
         content=html,
@@ -105,8 +114,9 @@ async def public_application(
         headers={
             # Its own policy. `SecurityHeadersMiddleware` only fills a CSP in where none
             # is set, and the API-wide `default-src 'none'` would block this page's own
-            # stylesheet and serve it as raw unstyled markup.
-            "Content-Security-Policy": SHARE_CSP,
+            # stylesheet and serve it as raw unstyled markup. The logo widens `img-src`
+            # by exactly its own source, so the policy has to be built per response.
+            "Content-Security-Policy": share_csp(logo.url if logo is not None else None),
             # Not for a search index: this page is for whoever holds the URL, not for
             # everyone who searches the applicant's name.
             "X-Robots-Tag": "noindex, nofollow",
