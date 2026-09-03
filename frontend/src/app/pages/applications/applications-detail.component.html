@@ -264,19 +264,19 @@
                   <li>
                     <app-badge variant="warning">{{ 'applications.history.diff.changed' | t }}</app-badge>
                     <code>{{ change.key }}</code>:
-                    <del>{{ fmt(change.old) }}</del> → <ins>{{ fmt(change.new) }}</ins>
+                    <del>{{ fmt(change.old, change.key) }}</del> → <ins>{{ fmt(change.new, change.key) }}</ins>
                   </li>
                 }
                 @for (added of version.diff.added; track added.key) {
                   <li>
                     <app-badge variant="success">{{ 'applications.history.diff.added' | t }}</app-badge>
-                    <code>{{ added.key }}</code>: <ins>{{ fmt(added.value) }}</ins>
+                    <code>{{ added.key }}</code>: <ins>{{ fmt(added.value, added.key) }}</ins>
                   </li>
                 }
                 @for (removed of version.diff.removed; track removed.key) {
                   <li>
                     <app-badge variant="danger">{{ 'applications.history.diff.removed' | t }}</app-badge>
-                    <code>{{ removed.key }}</code>: <del>{{ fmt(removed.value) }}</del>
+                    <code>{{ removed.key }}</code>: <del>{{ fmt(removed.value, removed.key) }}</del>
                   </li>
                 }
               </ul>

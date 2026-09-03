@@ -45,7 +45,12 @@ import {
 import { CostCentreTreeComponent } from '../budget/cost-centre-tree.component';
 import { MarkdownViewComponent } from '@shared/markdown/markdown-view.component';
 import { AttachmentsPanelComponent } from './attachments-panel.component';
-import { applicationTitle, formatFieldValue } from './applications.util';
+import {
+  applicationTitle,
+  formatDateRangeValue,
+  formatFieldValue,
+  formatIsoDate,
+} from './applications.util';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 
 /** Comparison offer / cost position for the structured detail view. */
@@ -111,6 +116,11 @@ export class ApplicationsDetailComponent {
   readonly comments = signal<ApplicationComment[]>([]);
   /** Field definitions of the effective form for labels and typed values. Empty on error. */
   readonly formFields = signal<FormFieldDef[]>([]);
+  /** The same field definitions by key. The data rows and the version diff both
+   *  look a key up, so they share one map. */
+  private readonly fieldByKey = computed(
+    () => new Map(this.formFields().map((f) => [f.key, f])),
+  );
 
   readonly newComment = signal('');
   readonly visibility = signal<CommentVisibility>('public');
@@ -394,7 +404,21 @@ export class ApplicationsDetailComponent {
     return share.revokedAt === null && new Date(share.expiresAt).getTime() > Date.now();
   }
 
-  readonly fmt = formatFieldValue;
+  /**
+   * One value of the version diff, formatted the way the data rows show the field.
+   *
+   * The diff carries a key, not a field definition, so the type comes from the key.
+   * A date then reads as a day and a date range as a span, not as an ISO string or
+   * as JSON.
+   *
+   * A key the active form does not define — an answer of an older form version
+   * whose field is gone — keeps the plain rule. A type it never had cannot format
+   * it, and the stored text tells the reader more than a placeholder does.
+   */
+  readonly fmt = (value: unknown, key?: string): string => {
+    const field = key === undefined ? undefined : this.fieldByKey().get(key);
+    return field ? this.formatByField(field, value) : formatFieldValue(value);
+  };
 
   private id: Uuid = '';
 
@@ -544,7 +568,7 @@ export class ApplicationsDetailComponent {
    *  Markdown. This keeps the newlines and the simple formatting. */
   dataEntries(app: Application): { key: string; label: string; value: string; md: boolean }[] {
     const lang = this.i18n.locale();
-    const byKey = new Map(this.formFields().map((f) => [f.key, f]));
+    const byKey = this.fieldByKey();
     const rows: { key: string; label: string; value: string; md: boolean }[] = [];
     const seen = new Set<string>();
 
@@ -580,6 +604,10 @@ export class ApplicationsDetailComponent {
     if (field.type === 'checkbox' && typeof value === 'boolean') {
       return this.i18n.translate(value ? 'common.yes' : 'common.no');
     }
+    // A date and a date range read as a day, not as an ISO string or as JSON. The
+    // public share page shows the same span, so both views agree.
+    if (field.type === 'date') return formatIsoDate(value, lang) || '—';
+    if (field.type === 'daterange') return formatDateRangeValue(value, lang) || '—';
     // A dynamic picker for a Gremium or a budget carries the options of the server in
     // the effective form. Resolve them to names, like a plain select.
     if (field.type === 'select' || field.type === 'gremium_select' || field.type === 'budget_select') {
