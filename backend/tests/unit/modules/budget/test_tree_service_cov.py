@@ -833,6 +833,16 @@ async def test_list_invoices_paged_all_filters_and_search() -> None:
     assert page.items[0].has_file is False
 
 
+async def test_list_invoices_paged_by_exact_id() -> None:
+    """``id`` narrows the list to one invoice, which is where a search hit lands."""
+    inv = _invoice()
+    sess = _pg_session(result(1), result(inv))  # count, rows
+    svc = BudgetTreeService(sess)
+    page = await svc.list_invoices_paged(invoice_id=inv.id)
+    assert page.total == 1
+    assert page.items[0].id == inv.id
+
+
 async def test_list_invoices_paged_no_search_blank_q() -> None:
     sess = fake_session(result(None), result())  # a count of None becomes 0, no rows
     svc = BudgetTreeService(sess)
