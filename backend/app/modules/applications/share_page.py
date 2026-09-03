@@ -123,8 +123,11 @@ dd { margin: 0; overflow-wrap: anywhere; white-space: pre-line; }
 .offer { display: flex; align-items: baseline; gap: 0.6rem; font-size: 0.9375rem;
   color: var(--muted); flex-wrap: wrap; }
 .offer--pref { color: var(--fg); }
-.offer > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+/* The label is the only part that may shrink and wrap; the badge and the amount keep
+   their width, so neither is ever broken across lines. */
+.offer__label { min-width: 0; overflow-wrap: anywhere; flex: 1 1 auto; }
 .offer__val { margin-left: auto; white-space: nowrap; }
+.offer .tag { flex: 0 0 auto; align-self: baseline; }
 .tag { font-size: 0.75rem; border-radius: 999px; padding: 0.05rem 0.5rem;
   border: 1px solid currentColor; white-space: nowrap; }
 .tag--pref { color: var(--brand); }
@@ -181,16 +184,28 @@ def share_csp(logo_url: str | None) -> str:
 def _logo_source(logo_url: str | None) -> str | None:
     """The CSP source for a logo, or `None` where it must not be loaded at all.
 
-    Inline data and HTTPS only. A logo over plain `http:` would be mixed content, and any
-    remote logo tells its host the IP address of everyone who opens the link — over
-    `http:` it would do that in the clear as well, so that case is refused rather than
-    degraded.
+    `BrandingAsset.url` allows four shapes, and all three safe ones have to be handled
+    here or the header silently falls back to the bare app name:
+
+    * a `data:` URL — the logo travels inside the page;
+    * an ABSOLUTE PATH, which is the platform serving its own logo. Same origin, so it
+      needs `'self'` and it reaches no third party at all. This is the ordinary case for
+      an instance that uploaded a logo, and refusing it was a bug: the page rendered the
+      name where the deployment had configured a mark.
+    * an `https:` URL, named down to its own origin rather than a blanket `https:`.
+
+    `http:` is the one that stays refused: it would be mixed content, and it would hand
+    that host the IP address of everyone who opens the link, in the clear.
     """
     if not logo_url:
         return None
     raw = logo_url.strip()
     if raw.lower().startswith("data:"):
         return "data:"
+    # An absolute path, but not the protocol-relative `//host/...`, which is a remote
+    # host wearing a path's clothes and inherits the page's scheme.
+    if raw.startswith("/") and not raw.startswith("//"):
+        return "'self'"
     parts = urlsplit(raw)
     if parts.scheme == "https" and parts.netloc:
         return f"https://{parts.netloc}"
@@ -332,10 +347,14 @@ def _render_block(block: PositionBlock, text: dict[str, str]) -> str:
 
 def _render_position(position: Position, text: dict[str, str]) -> str:
     """One position: its name, what it is worth, its quotes and any opt-out reason."""
+    # The badge comes FIRST, before the label it belongs to. An offer label is free text
+    # and can run to several lines — a product name with a URL in it does. With the badge
+    # after the label it wrapped onto a line of its own at the bottom of that block, where
+    # it sat directly above the NEXT offer and read as marking that one instead.
     offers = "\n".join(
         f'        <li class="offer{" offer--pref" if o.preferred else ""}">'
-        f"<span>{escape(o.label)}</span>"
         + (f'<span class="tag tag--pref">{escape(text["preferred"])}</span>' if o.preferred else "")
+        + f'<span class="offer__label">{escape(o.label)}</span>'
         + f'<span class="offer__val">{escape(o.value)}</span></li>'
         for o in position.offers
     )
