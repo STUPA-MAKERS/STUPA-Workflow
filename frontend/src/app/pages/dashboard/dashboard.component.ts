@@ -1,4 +1,5 @@
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
+import { meetingTimeSuffix } from '../../features/meetings/meetings-display.util';
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -115,6 +116,17 @@ export class DashboardComponent {
 
   sessionVariant(status: Meeting['status']): 'success' | 'info' | 'neutral' {
     return status === 'live' ? 'success' : status === 'planned' ? 'info' : 'neutral';
+  }
+
+  /**
+   * The `, HH:MM` behind the date of a session tile.
+   *
+   * The API sends `startTime` as `HH:MM:SS`, so pasting it after the date printed the
+   * seconds. The meetings feature already solved this; the same helper keeps the tile
+   * and the meetings list reading the same way.
+   */
+  sessionTimeSuffix(startTime: string | null | undefined): string {
+    return meetingTimeSuffix(startTime);
   }
 
   readonly gremien = computed(() => this.auth.gremien());

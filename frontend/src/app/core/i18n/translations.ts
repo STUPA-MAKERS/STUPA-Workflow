@@ -427,6 +427,9 @@ export const de = {
   'apply.positions.value': 'Wert (€)',
   'apply.positions.preferred': 'Bevorzugt',
   'apply.positions.positionValue': 'Positionswert',
+  // Zusammenfassung im Prüfschritt: gezählte Kostenpositionen.
+  'apply.positions.countOne': '1 Kostenposition',
+  'apply.positions.countOther': '{count} Kostenpositionen',
   'apply.positions.total': 'Gesamtbetrag',
   'apply.positions.remove': 'Entfernen',
   'apply.positions.minOffersHint': 'Mindestanzahl an Vergleichsangeboten erreicht.',
@@ -444,6 +447,25 @@ export const de = {
   'apply.positions.errNoOffersReason':
     'Bitte begründe, warum keine Vergleichsangebote möglich sind.',
   'apply.positions.noOffersBadge': 'Ohne Vergleichsangebote',
+
+  // Generic formly field types (@shared/formly). These texts appear when the form
+  // definition sets no explicit label, placeholder or error text.
+  'formly.field.error': 'Ungültige Eingabe',
+  'formly.select.placeholder': 'Bitte wählen …',
+  'formly.select.error': 'Bitte eine Option wählen.',
+  'formly.checkbox.error': 'Bitte bestätigen.',
+  'formly.multicheckbox.error': 'Bitte auswählen.',
+  'formly.daterange.from': 'Von',
+  'formly.daterange.to': 'Bis',
+  'formly.daterange.error': 'Ungültiger Zeitraum.',
+  'formly.validation.required': 'Dieses Feld ist erforderlich.',
+  'formly.validation.min': 'Wert ist zu klein.',
+  'formly.validation.max': 'Wert ist zu groß.',
+  'formly.validation.minlength': 'Eingabe ist zu kurz.',
+  'formly.validation.maxlength': 'Eingabe ist zu lang.',
+  'formly.validation.pattern': 'Eingabe hat ein ungültiges Format.',
+  'formly.validation.email': 'Bitte eine gültige E-Mail-Adresse eingeben.',
+
   'apply.nav.back': 'Zurück',
   'apply.nav.discard': 'Entwurf verwerfen',
   'apply.nav.submit': 'Antrag absenden',
@@ -460,6 +482,13 @@ export const de = {
   'apply.confirm.hint':
     'Keine Mail erhalten? Prüfe den Spam-Ordner. Der Link ist zeitlich begrenzt gültig.',
   'apply.confirm.home': 'Zur Startseite',
+
+  // Angemeldete Person: das Backend bestätigt die Adresse schon beim Anlegen.
+  'apply.submitted.heading': 'Antrag eingereicht',
+  'apply.submitted.badge': 'Eingereicht',
+  'apply.submitted.body':
+    'Vielen Dank! Dein Antrag ist eingereicht und sichtbar. Deine E-Mail-Adresse ist über dein Konto bereits bestätigt – du musst nichts weiter tun.',
+  'apply.submitted.link': 'Antrag öffnen',
 
   'altcha.idle': 'Ich bin kein Roboter',
   'altcha.verifying': 'Wird überprüft …',
@@ -2135,6 +2164,10 @@ export const de = {
   'budget.empty.title': 'Noch keine Budgetdaten',
   'budget.empty.body':
     'Für die aktuelle Auswahl gibt es keine Budgets oder Anträge. Anträge ohne Budget bleiben davon unberührt.',
+  'budget.empty.noFiscalYear.title': 'Kein Haushaltsjahr angelegt',
+  'budget.empty.noFiscalYear.body':
+    'Kostenstellen sind vorhanden, aber es gibt noch kein Haushaltsjahr. Alle Zahlen auf dieser Seite gehören zu einem Haushaltsjahr. Lege eines an, dann erscheinen die Kostenstellen hier.',
+  'budget.empty.noFiscalYear.action': 'Haushaltsjahr anlegen',
 
   'budget.pots.title': 'Budget-Töpfe',
   'budget.pots.subtitle': 'Töpfe anlegen und bearbeiten (Gremium, Limit, Währung, Zeitraum).',
@@ -2832,6 +2865,9 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'apply.positions.value': 'Value (€)',
   'apply.positions.preferred': 'Preferred',
   'apply.positions.positionValue': 'Position value',
+  // Review-step summary: counted cost positions.
+  'apply.positions.countOne': '1 cost position',
+  'apply.positions.countOther': '{count} cost positions',
   'apply.positions.total': 'Total amount',
   'apply.positions.remove': 'Remove',
   'apply.positions.minOffersHint': 'Minimum number of comparison offers reached.',
@@ -2848,6 +2884,23 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'apply.positions.noOffersReason': 'Reason why no comparison offers are possible',
   'apply.positions.errNoOffersReason': 'Please explain why no comparison offers are possible.',
   'apply.positions.noOffersBadge': 'Without comparison offers',
+
+  'formly.field.error': 'Invalid input',
+  'formly.select.placeholder': 'Please select …',
+  'formly.select.error': 'Please select an option.',
+  'formly.checkbox.error': 'Please confirm.',
+  'formly.multicheckbox.error': 'Please make a selection.',
+  'formly.daterange.from': 'From',
+  'formly.daterange.to': 'To',
+  'formly.daterange.error': 'Invalid date range.',
+  'formly.validation.required': 'This field is required.',
+  'formly.validation.min': 'The value is too small.',
+  'formly.validation.max': 'The value is too large.',
+  'formly.validation.minlength': 'The input is too short.',
+  'formly.validation.maxlength': 'The input is too long.',
+  'formly.validation.pattern': 'The input has an invalid format.',
+  'formly.validation.email': 'Enter a valid email address.',
+
   'apply.nav.back': 'Back',
   'apply.nav.discard': 'Discard draft',
   'apply.nav.submit': 'Submit application',
@@ -2864,6 +2917,13 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'apply.confirm.hint':
     'No email received? Check your spam folder. The link is valid for a limited time.',
   'apply.confirm.home': 'Back to start',
+
+  // Signed-in submitter: the backend confirms the address at creation time.
+  'apply.submitted.heading': 'Application submitted',
+  'apply.submitted.badge': 'Submitted',
+  'apply.submitted.body':
+    'Thank you. Your application is submitted and visible. Your account confirms your email address already, thus no further step is necessary.',
+  'apply.submitted.link': 'Open the application',
 
   'altcha.idle': 'I am not a robot',
   'altcha.verifying': 'Verifying …',
@@ -4509,6 +4569,10 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'budget.empty.title': 'No budget data yet',
   'budget.empty.body':
     'There are no budgets or applications for the current selection. Applications without a budget are unaffected.',
+  'budget.empty.noFiscalYear.title': 'No fiscal year yet',
+  'budget.empty.noFiscalYear.body':
+    'Cost centres exist, but there is no fiscal year yet. Every figure on this page belongs to a fiscal year. Create one, and the cost centres show up here.',
+  'budget.empty.noFiscalYear.action': 'Create a fiscal year',
 
   'budget.pots.title': 'Budget pots',
   'budget.pots.subtitle': 'Create and edit pots (committee, limit, currency, period).',

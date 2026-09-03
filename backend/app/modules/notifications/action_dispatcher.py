@@ -25,10 +25,27 @@ from app.modules.flow.dispatch import DispatchedAction
 from app.modules.flow.models import State
 from app.modules.notifications.provider import mail_queue_from_pool
 from app.modules.notifications.queue import MailQueue
-from app.modules.notifications.service import NotificationService
+from app.modules.notifications.service import (
+    NotificationService,
+    resolve_application_lang,
+)
 from app.settings import Settings, get_settings
 
 logger = logging.getLogger("app.notifications")
+
+
+def _applicant_only(raw: object) -> bool:
+    """Tell whether the recipients of a `notify` action are applicants only.
+
+    `raw` is the recipient list as the flow stores it in JSONB. The service keeps
+    only the dict entries of that list, so this function looks at the same set. An
+    empty set, or one team recipient, gives False: those mails go out in the
+    configured default language.
+    """
+    if not isinstance(raw, list):
+        return False
+    specs = [r for r in raw if isinstance(r, dict)]
+    return bool(specs) and all(s.get("kind") == "applicant" for s in specs)
 
 
 @dataclass(slots=True)
@@ -75,6 +92,18 @@ class NotificationActionDispatcher:
             }
             raw_lang = action.params.get("lang")
             lang = str(raw_lang) if raw_lang else None
+            # The action names no language and the mail goes to the applicant
+            # alone: the applicant reads it in the language of their own
+            # application. This must come before the status label below, because
+            # a body in one language with a label in another is worse than a
+            # consistent mail. A recipient list with a team member in it keeps
+            # the default language, because one message serves them all.
+            if lang is None and _applicant_only(action.params.get("recipients")):
+                lang = await resolve_application_lang(
+                    session,
+                    application_id=action.application_id,
+                    settings=self.settings,
+                )
             # Default and status templates reference `{{ status }}`. Without a
             # value StrictUndefined makes the render fail.
             if current_state_id is not None:

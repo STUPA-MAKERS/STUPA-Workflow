@@ -10,6 +10,7 @@ import { skipLoading } from '@core/loading/loading.interceptor';
 import { Injectable, inject } from '@angular/core';
 import { type Observable, map, of } from 'rxjs';
 import { API_BASE_URL, USE_MOCK_API } from '@core/api/api.config';
+import { I18nService } from '@core/i18n/i18n.service';
 import { mapDiff } from '@core/api/mappers';
 import type { I18nMap, Page, Uuid } from '@core/api/models';
 import type { FormFieldDef } from '@core/api/models';
@@ -101,6 +102,9 @@ export class AdminApiService {
   private readonly http = inject(HttpClient);
   private readonly base = inject(API_BASE_URL);
   private readonly mock = inject(USE_MOCK_API);
+  // The public `/application-types` route resolves its i18n name server-side, so the
+  // active UI locale must travel with the request.
+  private readonly i18n = inject(I18nService);
 
   // In-memory store for mock mode only. One store per service instance is enough for
   // the UI and the tests.
@@ -313,11 +317,18 @@ export class AdminApiService {
    * Application types (id + name) as a selection source for the form/flow builders.
    * It uses the public `/application-types` page. A `form.configure` principal also
    * gets the inactive types there. Mock mode returns a small stub list.
+   *
+   * `lang` is mandatory. This route resolves the i18n map of the type name
+   * SERVER-side and returns one string, so there is nothing left to resolve here.
+   * The parameter defaults to German on the server, which showed German type names
+   * in an English admin UI. {@link listForms} reads `/admin/application-types`,
+   * which keeps the map and resolves it client-side, and needs no `lang`.
    */
   listApplicationTypes(): Observable<ApplicationTypeOption[]> {
     if (this.mock) return of(structuredCopy(MOCK_APP_TYPE_OPTIONS));
+    const params = new HttpParams().set('lang', this.i18n.locale());
     return this.http
-      .get<{ items: ApplicationTypeOption[] }>(`${this.base}/application-types`)
+      .get<{ items: ApplicationTypeOption[] }>(`${this.base}/application-types`, { params })
       .pipe(map((page) => page.items.map((t) => ({ id: t.id, name: t.name }))));
   }
 

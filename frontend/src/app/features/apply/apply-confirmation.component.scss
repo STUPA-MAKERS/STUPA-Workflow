@@ -7,6 +7,11 @@
   line-height: 1;
   color: var(--color-primary);
 }
+.done__ok {
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--color-success, var(--color-primary));
+}
 .done__text {
   margin-top: var(--space-4);
   color: var(--color-text);
@@ -28,4 +33,8 @@
 }
 .done__home:hover {
   text-decoration: underline;
+}
+/* The signed-in card has two footer links (record, home). Keep them apart. */
+.done__home + .done__home {
+  margin-left: var(--space-5);
 }

@@ -141,6 +141,27 @@ export class BudgetDashboardComponent {
     return this.visibleTree().filter((n) => (fy[n.id]?.length ?? 0) > 0);
   });
 
+  /**
+   * Why the page shows nothing, or `null` while it has something to show.
+   *
+   * `'noBudgets'` — no cost centre is visible to this reader.
+   * `'noFiscalYear'` — cost centres exist, but not one of them has a fiscal year. Every
+   * figure on this page belongs to a fiscal year, so the tree stays empty until one
+   * exists. "No cost centres" names the wrong cause here and sends the reader to create
+   * what is already there, instead of to the fiscal year that is missing.
+   *
+   * The years arrive as one response per budget, after the tree. Until the last of them
+   * is in, "no budget has a year" is not yet a fact, so neither claim is made.
+   */
+  readonly emptyReason = computed<'noBudgets' | 'noFiscalYear' | null>(() => {
+    if (!this.visibleTree().length) return 'noBudgets';
+    if (this.tops().length) return null;
+    return this.pendingFiscalYears() > 0 ? null : 'noFiscalYear';
+  });
+
+  /** Only a reader with `budget.structure` can open /admin/budget-pots and add a year. */
+  readonly canManageStructure = computed(() => this.auth.can('budget.structure'));
+
   private readonly nodeById = computed(() => {
     const map = new Map<string, BudgetTreeNode>();
     const walk = (nodes: BudgetTreeNode[]): void => {
@@ -323,8 +344,8 @@ export class BudgetDashboardComponent {
    */
   private urlParams: ParamMap = this.route.snapshot.queryParamMap;
 
-  /** Outstanding fiscal-year requests. See `resolveSelection`. */
-  private pendingFiscalYears = 0;
+  /** Outstanding fiscal-year requests. See `resolveSelection` and `emptyReason`. */
+  private readonly pendingFiscalYears = signal(0);
 
   constructor() {
     this.load();
@@ -340,7 +361,7 @@ export class BudgetDashboardComponent {
 
   money(value: string | number | null | undefined, currency = 'EUR'): string {
     const n = value == null || value === '' ? 0 : Number(value);
-    return new Intl.NumberFormat(this.i18n.locale(), { style: 'currency', currency }).format(n);
+    return new Intl.NumberFormat(this.i18n.formatLocale(), { style: 'currency', currency }).format(n);
   }
   /** Row total budget = available + bound + expended (= allocated + income).
    *  This is the reference value for the usage bar. Income-funded cost centers
@@ -380,16 +401,16 @@ export class BudgetDashboardComponent {
         // run in parallel and a failure of one does not stop the others.
         // How many fiscal-year responses are still out. `resolveSelection` uses it to
         // tell "this budget has no years" from "its years have not arrived yet".
-        this.pendingFiscalYears = tops.length;
+        this.pendingFiscalYears.set(tops.length);
         for (const top of tops) {
           this.api.listFiscalYears(top.id as Uuid).subscribe({
             next: (fys) => {
               this.fiscalYearsByBudget.update((m) => ({ ...m, [top.id]: fys }));
-              this.pendingFiscalYears--;
+              this.pendingFiscalYears.update((n) => n - 1);
               this.restoreOrDefault(tops);
             },
             error: () => {
-              this.pendingFiscalYears--;
+              this.pendingFiscalYears.update((n) => n - 1);
               this.restoreOrDefault(tops);
             },
           });
@@ -474,7 +495,7 @@ export class BudgetDashboardComponent {
     // must WAIT rather than settle for the first budget that happens to be ready — the
     // choice is latched, so settling early meant the link silently opened the wrong cost
     // centre and never corrected itself.
-    if (wanted === null && (ks || qpBudget) && this.pendingFiscalYears > 0) return null;
+    if (wanted === null && (ks || qpBudget) && this.pendingFiscalYears() > 0) return null;
     const budgetId = wanted ?? withFy[0].id;
 
     const fys = this.fiscalYearsByBudget()[budgetId];

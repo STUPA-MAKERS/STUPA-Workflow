@@ -439,8 +439,7 @@ export class AuditLogComponent {
     const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
     if (this.sameDay(g.date, today)) return this.i18n.translate('admin.audit.today');
     if (this.sameDay(g.date, yesterday)) return this.i18n.translate('admin.audit.yesterday');
-    const locale = this.i18n.locale() === 'en' ? 'en-US' : 'de-DE';
-    return new Intl.DateTimeFormat(locale, { dateStyle: 'full' }).format(g.date);
+    return new Intl.DateTimeFormat(this.i18n.formatLocale(), { dateStyle: 'full' }).format(g.date);
   }
 
   private sameDay(a: Date, b: Date): boolean {

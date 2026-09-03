@@ -1,4 +1,6 @@
 import { FormControl } from '@angular/forms';
+import { render, screen } from '@testing-library/angular';
+import { de } from '@core/i18n/translations';
 import { FormlyDateRangeType } from './formly-daterange.type';
 
 function makeType(
@@ -38,5 +40,44 @@ describe('FormlyDateRangeType', () => {
     const { cmp, control } = makeType({ from: '2026-01-01' });
     cmp.patch('from', evt(''));
     expect(control.value).toBeNull();
+  });
+});
+
+/** Render the type on its own so the untouched `props` fallbacks of the template fire. */
+async function renderBare(props: Record<string, unknown>, showError = false): Promise<void> {
+  await render(FormlyDateRangeType, {
+    componentInputs: {
+      field: {
+        formControl: new FormControl(null),
+        props,
+        options: { showError: () => showError },
+      } as never,
+    },
+  });
+}
+
+describe('FormlyDateRangeType (captions and error text)', () => {
+  afterEach(() => localStorage.removeItem('ap.locale'));
+
+  it('uses the German captions and error text by default', async () => {
+    await renderBare({ label: 'Zeitraum' }, true);
+    expect(screen.getByText(de['formly.daterange.from'])).toBeInTheDocument();
+    expect(screen.getByText(de['formly.daterange.to'])).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent(de['formly.daterange.error']);
+  });
+
+  it('renders the captions and the error text in English', async () => {
+    localStorage.setItem('ap.locale', 'en');
+    await renderBare({ label: 'Period' }, true);
+    expect(screen.getByText('From')).toBeInTheDocument();
+    expect(screen.getByText('To')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Invalid date range.');
+  });
+
+  it('lets explicit props win over the translated defaults', async () => {
+    await renderBare({ fromLabel: 'Start', toLabel: 'Ende', errorText: 'Kaputt.' }, true);
+    expect(screen.getByText('Start')).toBeInTheDocument();
+    expect(screen.getByText('Ende')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Kaputt.');
   });
 });

@@ -30,7 +30,10 @@
       />
     </aside>
 
-    <main class="bt__main">
+    <!-- Not a `<main>`: the shell already wraps the routed page in one, and a main
+         landmark inside a main landmark is invalid HTML that gives a screen reader two
+         "main" regions with no way to tell which is the page. -->
+    <div class="bt__main">
       @if (selectedTopId()) {
         <app-data-table
           [loading]="loading()"
@@ -82,7 +85,7 @@
       } @else {
         <p class="text-muted p-6">{{ 'budget.tree.pickHint' | t }}</p>
       }
-    </main>
+    </div>
   </div>
 }
 

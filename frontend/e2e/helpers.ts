@@ -45,7 +45,10 @@ export async function createApplication(
     data: {
       typeId: opts.typeId,
       applicantEmail: opts.email,
-      data: { titel: opts.title },
+      // `title`, not `titel`: the server prepends a mandatory system field named
+      // `title` to every effective form (forms/validation.py, `system_title_field`),
+      // so a payload without it answers 422 and no scenario past this point can run.
+      data: { title: opts.title },
     },
   });
   expect(res.ok(), `POST /api/applications → ${res.status()}: ${await res.text()}`).toBeTruthy();

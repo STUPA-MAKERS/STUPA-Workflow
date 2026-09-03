@@ -1,13 +1,14 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { ReactiveFormsModule } from '@angular/forms';
 import { FieldType, type FieldTypeConfig } from '@ngx-formly/core';
+import { TranslatePipe } from '@core/i18n/translate.pipe';
 
 /** Formly field type `checkbox` for a boolean consent (form definition `checkbox`). */
 @Component({
   selector: 'app-formly-checkbox',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, TranslatePipe],
   template: `
     <div class="check">
       <label class="check__row">
@@ -30,7 +31,7 @@ import { FieldType, type FieldTypeConfig } from '@ngx-formly/core';
       }
       @if (showError) {
         <p class="check__error" [id]="controlId + '-error'" role="alert">
-          {{ props['errorText'] ?? 'Bitte bestätigen.' }}
+          {{ props['errorText'] ?? ('formly.checkbox.error' | t) }}
         </p>
       }
     </div>

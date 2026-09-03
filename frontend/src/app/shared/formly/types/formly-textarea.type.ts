@@ -1,13 +1,14 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { ReactiveFormsModule } from '@angular/forms';
 import { FieldType, type FieldTypeConfig } from '@ngx-formly/core';
+import { TranslatePipe } from '@core/i18n/translate.pipe';
 
 /** Formly field type `textarea`: multi-line text field (form definition `textarea`). */
 @Component({
   selector: 'app-formly-textarea',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, TranslatePipe],
   template: `
     <div class="field">
       <label class="field__label" [for]="controlId">
@@ -30,7 +31,7 @@ import { FieldType, type FieldTypeConfig } from '@ngx-formly/core';
       }
       @if (showError) {
         <p class="field__error" [id]="controlId + '-error'" role="alert">
-          {{ props['errorText'] ?? 'Ungültige Eingabe' }}
+          {{ props['errorText'] ?? ('formly.field.error' | t) }}
         </p>
       }
     </div>

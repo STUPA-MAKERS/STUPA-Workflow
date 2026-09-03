@@ -135,11 +135,22 @@ export class ApiClient {
     });
   }
 
-  /** GET /application-types — the backend returns a Page. The FE wants the list. */
-  /** `quiet` skips the global overlay for a background type-cache load. */
+  /**
+   * GET /application-types — the backend returns a Page. The FE wants the list.
+   *
+   * `lang` is mandatory here, unlike everywhere else in this client. This route
+   * resolves the i18n map of the type name SERVER-side and returns one string, so
+   * `mapApplicationType` has nothing left to choose from. The parameter defaults to
+   * German on the server, which is why an English UI showed German type names. Every
+   * other list keeps the map and resolves it in the mapper.
+   *
+   * `quiet` skips the global overlay for a background type-cache load.
+   */
   applicationTypes(opts: { quiet?: boolean } = {}): Observable<ApplicationType[]> {
+    const params = new HttpParams().set('lang', this.i18n.locale());
     return this.http
       .get<Page<ApplicationTypeListItemWire>>(`${this.base}/application-types`, {
+        params,
         context: opts.quiet ? skipLoading() : undefined,
       })
       .pipe(map((page) => page.items.map(mapApplicationType)));

@@ -34,13 +34,15 @@ describe('mockApiInterceptor', () => {
       expect(typeof types[0].hasBudget).toBe('boolean');
       done();
     });
-    http.expectNone('/api/application-types');
+    http.expectNone((r) => r.url === '/api/application-types');
   });
 
   it('passes through when the mock is disabled', () => {
     const { api, http } = setup(false);
     api.applicationTypes().subscribe();
-    http.expectOne('/api/application-types').flush({ items: [], total: 0, limit: 20, offset: 0 });
+    http
+      .expectOne((r) => r.url === '/api/application-types')
+      .flush({ items: [], total: 0, limit: 20, offset: 0 });
     http.verify();
   });
 

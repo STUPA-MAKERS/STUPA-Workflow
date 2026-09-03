@@ -147,6 +147,13 @@ formly-form {
   gap: var(--space-2);
   font-size: var(--fs-sm);
 }
+/* The template writes the badge and the field name on separate lines, but Angular
+   strips that whitespace (`preserveWhitespaces` is off), so the two boxes touched and
+   the row read "Changedtermin". Measured gap was 0px. The margin restores the word
+   break the source already implies. */
+.det__diff app-badge {
+  margin-right: var(--space-1);
+}
 .det__diff code {
   background: var(--color-surface-sunken);
   padding: 0 var(--space-1);

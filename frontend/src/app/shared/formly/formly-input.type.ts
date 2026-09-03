@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { ReactiveFormsModule } from '@angular/forms';
 import { FieldType, type FieldTypeConfig } from '@ngx-formly/core';
 import { CurrencyInputComponent, DatepickerComponent, InputComponent } from '@stupa-makers/ui-kit';
+import { TranslatePipe } from '@core/i18n/translate.pipe';
 
 /**
  * Formly field type `input` that uses the UI-kit input.
@@ -16,7 +17,13 @@ import { CurrencyInputComponent, DatepickerComponent, InputComponent } from '@st
   selector: 'app-formly-input',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, InputComponent, DatepickerComponent, CurrencyInputComponent],
+  imports: [
+    ReactiveFormsModule,
+    InputComponent,
+    DatepickerComponent,
+    CurrencyInputComponent,
+    TranslatePipe,
+  ],
   template: `
     @if (props.type === 'date') {
       <app-datepicker
@@ -26,7 +33,9 @@ import { CurrencyInputComponent, DatepickerComponent, InputComponent } from '@st
         [hint]="props['hint'] ?? ''"
         [min]="asString(props['min'])"
         [max]="asString(props['max'])"
-        [error]="showError && formControl.errors ? (props['errorText'] ?? 'Ungültige Eingabe') : ''"
+        [error]="
+          showError && formControl.errors ? (props['errorText'] ?? ('formly.field.error' | t)) : ''
+        "
       />
     } @else if (props.type === 'currency') {
       <app-currency-input
@@ -35,7 +44,9 @@ import { CurrencyInputComponent, DatepickerComponent, InputComponent } from '@st
         [required]="!!props.required"
         [hint]="props['hint'] ?? ''"
         [placeholder]="props.placeholder ?? ''"
-        [error]="showError && formControl.errors ? (props['errorText'] ?? 'Ungültige Eingabe') : ''"
+        [error]="
+          showError && formControl.errors ? (props['errorText'] ?? ('formly.field.error' | t)) : ''
+        "
       />
     } @else {
       <app-input
@@ -45,7 +56,9 @@ import { CurrencyInputComponent, DatepickerComponent, InputComponent } from '@st
         [placeholder]="props.placeholder ?? ''"
         [required]="!!props.required"
         [hint]="props['hint'] ?? ''"
-        [error]="showError && formControl.errors ? (props['errorText'] ?? 'Ungültige Eingabe') : ''"
+        [error]="
+          showError && formControl.errors ? (props['errorText'] ?? ('formly.field.error' | t)) : ''
+        "
       />
     }
   `,

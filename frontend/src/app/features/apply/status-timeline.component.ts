@@ -296,7 +296,7 @@ export class StatusTimelineComponent {
       const pref = (p.offers ?? []).find((o) => o.preferred);
       total += pref?.value ?? 0;
     }
-    const sum = new Intl.NumberFormat(this.i18n.locale(), {
+    const sum = new Intl.NumberFormat(this.i18n.formatLocale(), {
       style: 'currency',
       currency: 'EUR',
     }).format(total);

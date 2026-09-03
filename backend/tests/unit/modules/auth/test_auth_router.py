@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import AsyncIterator, Iterator
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
@@ -16,7 +18,7 @@ from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.oidc import OidcError
 from app.settings import Settings, get_settings, load_settings
 from app.shared.errors import GoneError
-from tests._support.auth_fakes import fake_session
+from tests._support.auth_fakes import fake_session, result
 
 DISABLED = load_settings(
     database_url="postgresql+asyncpg://x/y",
@@ -288,6 +290,69 @@ async def test_deliver_magic_link_opens_session_and_commits(
     await router_mod._deliver_magic_link(ENABLED, "x@y.de", None, None)
     assert called == ["x@y.de"]
     assert db.committed == 1
+
+
+async def _deliver_and_capture_lang(
+    monkeypatch: pytest.MonkeyPatch, db: object
+) -> list[str | None]:
+    """Run `_deliver_magic_link` against `db` and return the language of each mail."""
+
+    class _ACM:
+        async def __aenter__(self) -> object:
+            return db
+
+        async def __aexit__(self, *exc: object) -> bool:
+            return False
+
+    langs: list[str | None] = []
+
+    class _FakeNotificationService:
+        def __init__(self, session: object, *, queue: object, settings: object) -> None:
+            self._s = session
+
+        async def send_magic_link(
+            self, *, email: str, link: str, lang: str | None = None
+        ) -> None:
+            langs.append(lang)
+
+    async def _req(
+        session: object, settings: object, *, email: str, application_id: object,
+        deliver: object,
+    ) -> None:
+        # Call the inner deliver closure, so the mail really goes out.
+        await deliver("r@x.de", "https://link")  # type: ignore[operator]
+
+    monkeypatch.setattr(router_mod, "get_sessionmaker", lambda: _ACM)
+    monkeypatch.setattr(router_mod, "mail_queue_from_pool", lambda pool: None)
+    monkeypatch.setattr(router_mod, "NotificationService", _FakeNotificationService)
+    monkeypatch.setattr(router_mod.service, "request_magic_link", _req)
+
+    await router_mod._deliver_magic_link(ENABLED, "x@y.de", None, None)
+    return langs
+
+
+async def test_deliver_magic_link_uses_the_application_language(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The magic-link mail follows the language of the application it opens.
+
+    The route can get no application id. The delivery then resolves the same
+    application as the service does, so the applicant reads the mail in the language
+    they applied in.
+    """
+    # The first result is the application, the second its (lang, gremium_id) row.
+    db = fake_session(result(SimpleNamespace(id=uuid.uuid4())), result(("en", None)))
+    assert await _deliver_and_capture_lang(monkeypatch, db) == ["en"]
+
+
+async def test_deliver_magic_link_without_application_keeps_default_language(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An address without an application keeps the default language."""
+    db = fake_session()  # the application lookup finds nothing
+    assert await _deliver_and_capture_lang(monkeypatch, db) == [
+        ENABLED.mail_default_lang
+    ]
 
 
 def test_magic_link_verify_ok(

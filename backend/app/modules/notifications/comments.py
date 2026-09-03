@@ -32,6 +32,7 @@ from app.modules.notifications.recipients import actionable_principal_emails
 from app.modules.notifications.service import (
     NotificationService,
     filter_recipients_by_preference,
+    resolve_application_lang,
 )
 from app.modules.notifications.templating import (
     TemplateRenderError,
@@ -165,13 +166,27 @@ async def send_comment_notifications(
     if app_row is None:
         return 0
     data, state_id = app_row
+    # Applicants never see an internal comment, so send no mail. The check comes
+    # before every other read, because it makes them all pointless.
+    if author_kind == "principal" and visibility != "public":
+        return 0
     title = (data or {}).get("title")
     service = NotificationService(session, queue=queue, settings=settings)
+
+    # The applicant reads the mail in the language of their own application. A mail
+    # to the team keeps the configured default language.
+    lang = (
+        await resolve_application_lang(
+            session, application_id=application_id, settings=settings
+        )
+        if author_kind == "principal"
+        else settings.mail_default_lang
+    )
 
     state = await session.get(State, state_id) if state_id is not None else None
     status_label = ""
     if state is not None and isinstance(state.label_i18n, dict) and state.label_i18n:
-        status_label = state.label_i18n.get(settings.mail_default_lang) or next(
+        status_label = state.label_i18n.get(lang) or next(
             iter(state.label_i18n.values())
         )
 
@@ -180,7 +195,7 @@ async def send_comment_notifications(
     author_label = (author_name or "").strip()
     if not author_label:
         author_label = _APPLICANT_AUTHOR_FALLBACK.get(
-            settings.mail_default_lang, _APPLICANT_AUTHOR_FALLBACK["de"]
+            lang, _APPLICANT_AUTHOR_FALLBACK["de"]
         )
 
     context = {
@@ -193,9 +208,6 @@ async def send_comment_notifications(
     }
 
     if author_kind == "principal":
-        # Applicants never see an internal comment, so send no mail.
-        if visibility != "public":
-            return 0
         recipients = await service.resolver.resolve(
             [{"kind": "applicant"}], application_id=application_id
         )
@@ -224,7 +236,7 @@ async def send_comment_notifications(
             tpl,
             recipients,
             context=context,
-            lang=None,
+            lang=lang,
             idempotency_parts=idem,
             reason="comment",
         )
@@ -235,7 +247,7 @@ async def send_comment_notifications(
             body_i18n=builtin[1],
             body_html_i18n=builtin[2],
             context=context,
-            lang=settings.mail_default_lang,
+            lang=lang,
             default_lang=settings.mail_default_lang,
         )
     except TemplateRenderError as exc:  # defensive: the builtin covers every variable

@@ -1,17 +1,36 @@
 <section class="done">
-  <app-card [heading]="'apply.confirm.heading' | t">
-    <div class="flex items-center gap-3">
-      <span class="done__mail" aria-hidden="true">✉</span>
-      <app-badge variant="warning">{{ 'apply.confirm.badge' | t }}</app-badge>
-    </div>
-    <p class="done__text">{{ 'apply.confirm.body' | t }}</p>
-    <p class="done__expiry" role="note">{{ 'apply.confirm.expiry' | t }}</p>
-    @if (applicationId()) {
-      <p class="mt-4 text-muted text-sm">
-        {{ 'apply.confirm.ref' | t }} <code>{{ applicationId() }}</code>
-      </p>
-    }
-    <p class="mt-2 text-muted text-sm">{{ 'apply.confirm.hint' | t }}</p>
-    <a card-footer routerLink="/" class="done__home">{{ 'apply.confirm.home' | t }}</a>
-  </app-card>
+  @if (loggedIn()) {
+    <app-card [heading]="'apply.submitted.heading' | t">
+      <div class="flex items-center gap-3">
+        <span class="done__ok" aria-hidden="true">✓</span>
+        <app-badge variant="success">{{ 'apply.submitted.badge' | t }}</app-badge>
+      </div>
+      <p class="done__text">{{ 'apply.submitted.body' | t }}</p>
+      @if (applicationId()) {
+        <p class="mt-4 text-muted text-sm">
+          {{ 'apply.confirm.ref' | t }} <code>{{ shortRef() }}</code>
+        </p>
+        <a card-footer [routerLink]="['/applications', applicationId()]" class="done__home">
+          {{ 'apply.submitted.link' | t }}
+        </a>
+      }
+      <a card-footer routerLink="/" class="done__home">{{ 'apply.confirm.home' | t }}</a>
+    </app-card>
+  } @else {
+    <app-card [heading]="'apply.confirm.heading' | t">
+      <div class="flex items-center gap-3">
+        <span class="done__mail" aria-hidden="true">✉</span>
+        <app-badge variant="warning">{{ 'apply.confirm.badge' | t }}</app-badge>
+      </div>
+      <p class="done__text">{{ 'apply.confirm.body' | t }}</p>
+      <p class="done__expiry" role="note">{{ 'apply.confirm.expiry' | t }}</p>
+      @if (applicationId()) {
+        <p class="mt-4 text-muted text-sm">
+          {{ 'apply.confirm.ref' | t }} <code>{{ shortRef() }}</code>
+        </p>
+      }
+      <p class="mt-2 text-muted text-sm">{{ 'apply.confirm.hint' | t }}</p>
+      <a card-footer routerLink="/" class="done__home">{{ 'apply.confirm.home' | t }}</a>
+    </app-card>
+  }
 </section>
