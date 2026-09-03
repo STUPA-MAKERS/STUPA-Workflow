@@ -351,6 +351,87 @@ def _public_client(
     return TestClient(application)
 
 
+def _public_client_as(
+    share: ApplicationShare | None, *perms: str, missing_application: bool = False
+) -> tuple[TestClient, _App | None]:
+    """A public client that also carries a signed-in principal with `perms`."""
+    application = create_app()
+    row = None if missing_application else _App()
+    fake = _FakeSession(
+        share=share,
+        objects={Application: row},
+        fields=[_FieldRow("zweck"), _FieldRow("iban", pii=True)],
+    )
+    application.dependency_overrides[get_session] = lambda: fake
+    application.dependency_overrides[get_current_principal] = lambda: Principal(
+        sub="office", roles=["office"], permissions=set(perms)
+    )
+    application.dependency_overrides[get_current_applicant] = lambda: None
+    return TestClient(application, follow_redirects=False), row
+
+
+# -- the signed-in short cut --------------------------------------------------
+
+
+def test_a_member_who_may_read_it_is_sent_to_the_real_application() -> None:
+    """The reduced view exists for people who have no account. Someone who is signed in
+    and may open the record should land on it, not on a copy of it with less on it."""
+    client, row = _public_client_as(_live_share(), "application.read")
+    r = client.get("/s/" + "x" * 32)
+
+    assert r.status_code == 303
+    assert row is not None
+    assert r.headers["location"].endswith(f"/applications/{row.id}")
+
+
+def test_read_all_is_enough_on_its_own() -> None:
+    client, _ = _public_client_as(_live_share(), "application.read_all")
+    assert client.get("/s/" + "x" * 32).status_code == 303
+
+
+def test_a_signed_in_user_who_may_not_read_it_still_gets_the_page() -> None:
+    """Redirecting them would trade a page they can read for a 403. The reduced view is
+    the better answer, and it is what the link promised."""
+    client, _ = _public_client_as(_live_share(), "budget.view")
+    r = client.get("/s/" + "x" * 32)
+
+    assert r.status_code == 200
+    assert "Anschaffung Beamer" in r.text
+
+
+def test_a_dead_link_is_a_404_even_for_a_member() -> None:
+    """The token is resolved BEFORE anyone is redirected. Otherwise a signed-in reader
+    could tell a revoked link from a made-up one by whether it bounced."""
+    client, _ = _public_client_as(None, "application.read")
+    assert client.get("/s/" + "x" * 32).status_code == 404
+
+
+def test_the_redirect_is_never_cached_and_never_shared() -> None:
+    """It depends on a cookie. A cache that kept it would send the next reader — who may
+    hold only the link — to a page they cannot open."""
+    client, _ = _public_client_as(_live_share(), "application.read")
+    r = client.get("/s/" + "x" * 32)
+
+    assert "no-store" in r.headers["cache-control"]
+    assert r.headers["vary"] == "Cookie"
+    assert r.headers["x-robots-tag"] == "noindex, nofollow"
+
+
+def test_the_page_itself_also_varies_on_the_cookie() -> None:
+    """Same URL, two answers. Without this a shared cache could hand the HTML to a member
+    or the redirect to a stranger."""
+    r = _public_client(_live_share()).get("/s/" + "x" * 32)
+    assert r.headers["vary"] == "Cookie"
+
+
+def test_a_preview_bot_still_gets_the_html() -> None:
+    """A bot carries no session, so it takes the anonymous path and the OpenGraph tags
+    survive. This is the whole reason the route renders HTML at all."""
+    r = _public_client(_live_share()).get("/s/" + "x" * 32)
+    assert r.status_code == 200
+    assert 'property="og:title"' in r.text
+
+
 def test_the_public_page_needs_no_login() -> None:
     """The point of the feature. Anyone holding the URL, and nobody else, gets the page."""
     r = _public_client(_live_share()).get("/s/" + "x" * 32)
