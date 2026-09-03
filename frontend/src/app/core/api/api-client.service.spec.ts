@@ -4,6 +4,8 @@ import {
   HttpTestingController,
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
+import { I18nService } from '@core/i18n/i18n.service';
+import { SKIP_LOADING } from '@core/loading/loading.interceptor';
 import { ApiClient } from './api-client.service';
 import { USE_MOCK_API } from './api.config';
 import type {
@@ -88,7 +90,34 @@ describe('ApiClient', () => {
       ]);
       done();
     });
-    http.expectOne('/api/application-types').flush(page);
+    http.expectOne((r) => r.url === '/api/application-types').flush(page);
+  });
+
+  it('asks /application-types for the active locale and follows a locale change', (done) => {
+    // The server resolves the type name from its i18n map with the `lang` query
+    // parameter, which defaults to German. Without this parameter an English UI
+    // shows German type names, and no mapper downstream can repair that.
+    const i18n = TestBed.inject(I18nService);
+    const page: Page<ApplicationTypeListItemWire> = { items: [], total: 0, limit: 20, offset: 0 };
+
+    i18n.setLocale('de');
+    api.applicationTypes().subscribe();
+    const de = http.expectOne((r) => r.url === '/api/application-types');
+    expect(de.request.params.get('lang')).toBe('de');
+    expect(de.request.urlWithParams).toBe('/api/application-types?lang=de');
+    de.flush(page);
+
+    i18n.setLocale('en');
+    api.applicationTypes({ quiet: true }).subscribe(() => done());
+    const en = http.expectOne((r) => r.url === '/api/application-types');
+    expect(en.request.params.get('lang')).toBe('en');
+    expect(en.request.urlWithParams).toBe('/api/application-types?lang=en');
+    // `quiet` still keeps the background load out of the global overlay.
+    expect(en.request.context.get(SKIP_LOADING)).toBe(true);
+    en.flush(page);
+
+    // Leave the persisted locale as the suite found it.
+    i18n.setLocale('de');
   });
 
   it('serialises list query params and maps the page items', (done) => {

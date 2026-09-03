@@ -1179,7 +1179,9 @@ async def test_deliver_magic_link_inner_deliver_sends(
         def __init__(self, session: object, *, queue: object, settings: object) -> None:
             self._s = session
 
-        async def send_magic_link(self, *, email: str, link: str) -> None:
+        async def send_magic_link(
+            self, *, email: str, link: str, lang: str | None = None
+        ) -> None:
             sent.append((email, link))
 
     async def _req(

@@ -3,6 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 import { firstValueFrom } from 'rxjs';
 import { USE_MOCK_API } from '@core/api/api.config';
+import { I18nService } from '@core/i18n/i18n.service';
 import type { FormFieldDef } from '@core/api/models';
 import { AdminApiService } from './admin-api.service';
 import type { Branding, WebhookConfig } from './admin.models';
@@ -313,10 +314,32 @@ describe('AdminApiService — real mode (contract)', () => {
   it('maps /application-types page to id+name options', () => {
     let out: { id: string; name: string }[] | undefined;
     s.listApplicationTypes().subscribe((o) => (out = o));
+    // Match on the path only. A plain string matcher compares `urlWithParams` and
+    // would miss the mandatory `lang`.
     http
-      .expectOne('/api/application-types')
+      .expectOne((r) => r.url === '/api/application-types')
       .flush({ items: [{ id: 't1', name: 'Foo', extra: 1 }] });
     expect(out).toEqual([{ id: 't1', name: 'Foo' }]);
+  });
+
+  // The public `/application-types` resolves the type name SERVER-side from the `lang`
+  // query parameter, which defaults to German. Without the parameter the
+  // application-type picker of the form and flow builders shows German names in an
+  // English admin UI.
+  it('sends the active locale as `lang` on /application-types', () => {
+    const i18n = TestBed.inject(I18nService);
+
+    i18n.setLocale('en');
+    s.listApplicationTypes().subscribe();
+    const en = http.expectOne((r) => r.url === '/api/application-types');
+    expect(en.request.params.get('lang')).toBe('en');
+    en.flush({ items: [] });
+
+    i18n.setLocale('de');
+    s.listApplicationTypes().subscribe();
+    const de = http.expectOne((r) => r.url === '/api/application-types');
+    expect(de.request.params.get('lang')).toBe('de');
+    de.flush({ items: [] });
   });
 
   it('maps /admin/application-types to FormOverviewItem (active vs draft)', () => {

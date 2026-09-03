@@ -74,7 +74,7 @@ async function setup(opts: { perms?: string[]; flushBudgets?: boolean } = {}) {
 }
 
 function flushTypes(http: HttpTestingController) {
-  http.expectOne('/api/application-types').flush(TYPES);
+  http.expectOne((r) => r.url === '/api/application-types').flush(TYPES);
 }
 
 /** The cost center tree (left filter picker) loads eagerly in the constructor. */
@@ -659,7 +659,9 @@ describe('ApplicationsListComponent', () => {
 
   it('falls back to empty lists when the types and budget-tree requests fail', async () => {
     const { http, cmp } = await setup({ flushBudgets: false });
-    http.expectOne('/api/application-types').flush(null, { status: 500, statusText: 'x' });
+    http
+      .expectOne((r) => r.url === '/api/application-types')
+      .flush(null, { status: 500, statusText: 'x' });
     for (const req of http.match((r) => r.url === '/api/budgets')) {
       req.flush(null, { status: 500, statusText: 'x' });
     }

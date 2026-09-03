@@ -59,7 +59,10 @@ from app.modules.auth import service as auth_service
 from app.modules.forms.schemas import EffectiveFormOut
 from app.modules.notifications.privacy import notify_erasure_requested
 from app.modules.notifications.provider import mail_queue_from_pool
-from app.modules.notifications.service import NotificationService
+from app.modules.notifications.service import (
+    NotificationService,
+    resolve_application_lang,
+)
 from app.modules.privacy.service import ErasureRequestService
 from app.settings import Settings
 from app.shared.antiabuse import (
@@ -102,16 +105,21 @@ async def _deliver_magic_link(
     """Issue and send the magic link for a new application in its own session.
 
     This runs as a background task after the 201 response. The scope follows the
-    initial state and is ``edit``. The mail queue delivers the message. Without
-    an arq pool, `NotificationService` logs the mail and drops it.
+    initial state and is ``edit``. The mail is in the language of the application,
+    because this is the first mail the applicant gets and it gates the
+    confirmation. The mail queue delivers the message. Without an arq pool,
+    `NotificationService` logs the mail and drops it.
     """
     queue = mail_queue_from_pool(pool)  # type: ignore[arg-type]
     sessionmaker = get_sessionmaker()
     async with sessionmaker() as db:
 
         async def deliver(recipient: str, link: str) -> None:
+            lang = await resolve_application_lang(
+                db, application_id=application_id, settings=settings
+            )
             await NotificationService(db, queue=queue, settings=settings).send_magic_link(
-                email=recipient, link=link
+                email=recipient, link=link, lang=lang
             )
 
         await auth_service.request_magic_link(

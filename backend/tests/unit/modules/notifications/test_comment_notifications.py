@@ -42,6 +42,8 @@ class _FakeService:
 
 @pytest.fixture(autouse=True)
 def _patch_service(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Reset the class attribute, so a test never reads the service of the test before.
+    _FakeService.last = None
     monkeypatch.setattr(mod, "NotificationService", _FakeService)
 
 
@@ -73,6 +75,32 @@ async def test_principal_public_comment_mails_applicant() -> None:
     assert msg.html == "<html>comment</html>"
 
 
+async def test_principal_public_comment_uses_the_application_language() -> None:
+    """The applicant reads the comment mail in the language of their application."""
+    # executes: the application row, then the (lang, gremium_id) row of that
+    # application. scalars: the preference filter with no opt-outs.
+    session = cast(
+        AsyncSession,
+        FakeSession(executes=[_app_row(), [("en", None)]], scalars=[[]]),
+    )
+    sent = await send_comment_notifications(
+        session,
+        queue=FakeQueue(),
+        settings=SETTINGS,
+        application_id=uuid.uuid4(),
+        comment_id=uuid.uuid4(),
+        author_kind="principal",
+        visibility="public",
+        body="Please add the quote.",
+    )
+    assert sent == 1
+    svc = _FakeService.last
+    assert svc is not None
+    msg = svc.enqueued[0]
+    assert msg.subject == 'New comment on your application "Beamer"'
+    assert msg.text.startswith("Hello,")
+
+
 async def test_internal_comment_sends_nothing() -> None:
     session = cast(AsyncSession, FakeSession(executes=[_app_row()]))
     sent = await send_comment_notifications(
@@ -86,8 +114,8 @@ async def test_internal_comment_sends_nothing() -> None:
         body="intern",
     )
     assert sent == 0
-    assert _FakeService.last is not None
-    assert _FakeService.last.enqueued == []
+    # The internal check comes first, so the function builds no service at all.
+    assert _FakeService.last is None
 
 
 async def test_applicant_comment_mails_actionable_team(
