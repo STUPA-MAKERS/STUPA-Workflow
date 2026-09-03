@@ -9,11 +9,13 @@
       [attr.aria-label]="'expenses.search' | t"
     />
     <app-filter-bar [live]="true" [activeCount]="activeFilterCount()" (reset)="resetFilters()">
-      <app-filter-field [label]="'expenses.filter.kind' | t">
+      <!-- `group`: three controls, not one. A plain field wraps its content in a label,
+           which would bind to the first button and take its name away. -->
+      <app-filter-field [label]="'expenses.filter.kind' | t" [group]="true">
         <div class="inline-flex gap-1">
-          <app-button [variant]="kind() === '' ? 'primary' : 'ghost'" size="sm" (click)="setKind('')">{{ 'expenses.filter.all' | t }}</app-button>
-          <app-button [variant]="kind() === 'expense' ? 'primary' : 'ghost'" size="sm" (click)="setKind('expense')">{{ 'expenses.kind.expense' | t }}</app-button>
-          <app-button [variant]="kind() === 'income' ? 'primary' : 'ghost'" size="sm" (click)="setKind('income')">{{ 'expenses.kind.income' | t }}</app-button>
+          <app-button [variant]="kind() === '' ? 'primary' : 'ghost'" size="sm" [ariaPressed]="kind() === ''" (click)="setKind('')">{{ 'expenses.filter.all' | t }}</app-button>
+          <app-button [variant]="kind() === 'expense' ? 'primary' : 'ghost'" size="sm" [ariaPressed]="kind() === 'expense'" (click)="setKind('expense')">{{ 'expenses.kind.expense' | t }}</app-button>
+          <app-button [variant]="kind() === 'income' ? 'primary' : 'ghost'" size="sm" [ariaPressed]="kind() === 'income'" (click)="setKind('income')">{{ 'expenses.kind.income' | t }}</app-button>
         </div>
       </app-filter-field>
       <app-filter-field [label]="'expenses.filter.amountRange' | t">

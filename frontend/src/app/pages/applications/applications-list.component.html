@@ -56,15 +56,11 @@
         [ngModel]="state()"
         (ngModelChange)="state.set($event)"
       />
-      <!-- The same segmented control the bookings page uses for "Art": three states, all
-           visible, one click each. A dropdown hid two of the three behind a click.
-
-           NOT `app-filter-field`, which wraps its content in a `<label>`. A label binds to
-           the first labelable control inside it, so the first button would answer to the
-           field's name instead of its own. A `role="group"` labels the set without
-           swallowing a member of it. -->
-      <div class="flex flex-col gap-1 min-w-0" role="group" [attr.aria-label]="'applications.list.filter.archived' | t">
-        <span class="text-sm font-medium text-muted">{{ 'applications.list.filter.archived' | t }}</span>
+      <!-- The same segmented control the bookings and invoices filters use: three states,
+           all visible, one click each. `group` because it is three controls and not one —
+           a plain field wraps its content in a label, which binds to the first button and
+           takes its name away. -->
+      <app-filter-field [label]="'applications.list.filter.archived' | t" [group]="true">
         <div class="inline-flex gap-1">
           @for (opt of archivedOptions(); track opt.value) {
             <app-button
@@ -75,7 +71,7 @@
             >{{ opt.label }}</app-button>
           }
         </div>
-      </div>
+      </app-filter-field>
       <app-filter-field [label]="'applications.list.filter.amount' | t">
         <app-filter-range>
           <app-currency-input start name="amountMin" [placeholder]="'applications.list.filter.min' | t" [ariaLabel]="'applications.list.filter.min' | t" [ngModel]="amountMin()" (ngModelChange)="amountMin.set($event)" />
