@@ -279,6 +279,15 @@ describe('InvoicesComponent', () => {
     http.verify();
   });
 
+  it('adopts every filter the URL carries, not only the invoice id', async () => {
+    // Reading the whole set is what makes the URL a faithful description of the list.
+    const { c, http } = await setup({ queryParams: { grossMin: '10', status: 'paid' } });
+    const typed = c as unknown as { grossMin(): string; statusFilter(): string };
+    expect(typed.grossMin()).toBe('10');
+    expect(typed.statusFilter()).toBe('paid');
+    http.verify();
+  });
+
   it('refuses a filter value the panel could never produce', async () => {
     // The query string is typed by whoever holds the link. Reading every filter from it
     // is what makes a bad number or an unknown status reachable at all.

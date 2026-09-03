@@ -632,6 +632,37 @@ describe('BudgetDashboardComponent', () => {
     expect(c.selectedBudgetId()).toBe('b-vs');
   });
 
+  it('leaves the selection alone when the URL repeats what is already shown', async () => {
+    // The write-back navigates on every selection change, so the stream re-emits what
+    // the page just wrote. Re-applying it would be work for nothing.
+    const { c, params } = await setup();
+    const before = [c.selectedBudgetId(), c.selectedKsId(), c.selectedFyId()];
+
+    params.next(convertToParamMap({ budget: 'b-vs', ks: 'b-vs', fy: 'fy-1' }));
+
+    expect([c.selectedBudgetId(), c.selectedKsId(), c.selectedFyId()]).toEqual(before);
+  });
+
+  it('stops at the highest cost centre it can see when the parent is out of scope', async () => {
+    // A gremium-scoped tree hands back sub cost centres as roots, so a root can name a
+    // parent that is not in the response. Walking up has to stop there rather than
+    // give up and fall back to the first budget.
+    const tree = [
+      node({
+        id: 'b-sub', parentId: 'b-not-in-scope', key: 'SUB', pathKey: 'SUB', name: 'Teilbereich',
+        byFiscalYear: [alloc({ fiscalYearId: 'fy-1' })],
+        children: [
+          node({ id: 'b-leaf', parentId: 'b-sub', key: 'LEAF', pathKey: 'SUB-LEAF', name: 'Blatt',
+            byFiscalYear: [alloc({ fiscalYearId: 'fy-1' })], children: [] }),
+        ],
+      }),
+    ];
+    const { c } = await setup({ tree, queryParams: { ks: 'b-leaf' } });
+
+    expect(c.selectedKsId()).toBe('b-leaf');
+    expect(c.selectedBudgetId()).toBe('b-sub');
+  });
+
   it('ignores invalid query params and defaults to the first budget/year', async () => {
     const { c } = await setup({
       queryParams: { budget: 'ghost', ks: 'ghost', fy: 'ghost' },
