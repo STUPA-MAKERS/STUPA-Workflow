@@ -25,16 +25,41 @@ interface Overrides {
 
 const BUDGET_TREE = [
   {
-    id: 'b1', parentId: null, gremiumId: null, key: 'VS-800', pathKey: 'VS-800', name: 'Verwaltung',
-    currency: 'EUR', active: true, color: null, acceptedStateKeys: [], deniedStateKeys: [],
-    hiddenInBudget: false, viewGremiumId: null, fiscalStartMonth: 1,
-    fiscalStartDay: 1, byFiscalYear: [],
+    id: 'b1',
+    parentId: null,
+    gremiumId: null,
+    key: 'VS-800',
+    pathKey: 'VS-800',
+    name: 'Verwaltung',
+    currency: 'EUR',
+    active: true,
+    color: null,
+    acceptedStateKeys: [],
+    deniedStateKeys: [],
+    hiddenInBudget: false,
+    viewGremiumId: null,
+    fiscalStartMonth: 1,
+    fiscalStartDay: 1,
+    byFiscalYear: [],
     children: [
       {
-        id: 'b2', parentId: 'b1', gremiumId: null, key: 'VS-800-40', pathKey: 'VS-800-40', name: 'IT',
-        currency: 'EUR', active: true, color: null, acceptedStateKeys: [], deniedStateKeys: [],
-        hiddenInBudget: false, viewGremiumId: null, fiscalStartMonth: 1,
-        fiscalStartDay: 1, byFiscalYear: [], children: [],
+        id: 'b2',
+        parentId: 'b1',
+        gremiumId: null,
+        key: 'VS-800-40',
+        pathKey: 'VS-800-40',
+        name: 'IT',
+        currency: 'EUR',
+        active: true,
+        color: null,
+        acceptedStateKeys: [],
+        deniedStateKeys: [],
+        hiddenInBudget: false,
+        viewGremiumId: null,
+        fiscalStartMonth: 1,
+        fiscalStartDay: 1,
+        byFiscalYear: [],
+        children: [],
       },
     ],
   },
@@ -45,13 +70,39 @@ async function setup(over: Overrides = {}) {
   const getGlobalFlow = over.getGlobalFlow ?? jest.fn(() => of(null));
   const createGlobalFlowVersion = over.createGlobalFlowVersion ?? jest.fn(() => of({ id: 'gfv1' }));
   const listApplicationTypes = jest.fn(() => of([{ id: 't1', name: 'Finanzantrag' }]));
-  const listGremienOptions = over.listGremienOptions ?? jest.fn(() => of([{ id: 'g1', name: 'StuPa', slug: 'stupa', cdVariantId: 'cd-stupa', defaultLang: 'de' }]));
-  const listGremiumRoles = jest.fn(() => of([{ id: 'gr1', key: 'vorsitz', name: { de: 'Vorsitz' } }]));
-  const listRoles = over.listRoles ?? jest.fn(() => of([{ id: 'r1', key: 'finance', label: { de: 'Finanzen' }, permissions: [] }]));
-  const listDeadlinePolicies = over.listDeadlinePolicies ?? jest.fn(() => of([{ id: 'dp1', key: 'semester', label: { de: 'Semesterfrist' }, kind: 'absolute' }]));
-  const listWebhooks = over.listWebhooks ?? jest.fn(() => of([{ id: 'w1', name: 'Buchhaltung', url: 'https://h.test', events: [], active: true }]));
+  const listGremienOptions =
+    over.listGremienOptions ??
+    jest.fn(() =>
+      of([{ id: 'g1', name: 'StuPa', slug: 'stupa', cdVariantId: 'cd-stupa', defaultLang: 'de' }]),
+    );
+  const listGremiumRoles = jest.fn(() =>
+    of([{ id: 'gr1', key: 'vorsitz', name: { de: 'Vorsitz' } }]),
+  );
+  const listRoles =
+    over.listRoles ??
+    jest.fn(() => of([{ id: 'r1', key: 'finance', label: { de: 'Finanzen' }, permissions: [] }]));
+  const listDeadlinePolicies =
+    over.listDeadlinePolicies ??
+    jest.fn(() =>
+      of([{ id: 'dp1', key: 'semester', label: { de: 'Semesterfrist' }, kind: 'absolute' }]),
+    );
+  const listWebhooks =
+    over.listWebhooks ??
+    jest.fn(() =>
+      of([{ id: 'w1', name: 'Buchhaltung', url: 'https://h.test', events: [], active: true }]),
+    );
   const listConfigRevisions = jest.fn(() => of([]));
-  const api = { getGlobalFlow, createGlobalFlowVersion, listApplicationTypes, listGremienOptions, listGremiumRoles, listRoles, listDeadlinePolicies, listWebhooks, listConfigRevisions };
+  const api = {
+    getGlobalFlow,
+    createGlobalFlowVersion,
+    listApplicationTypes,
+    listGremienOptions,
+    listGremiumRoles,
+    listRoles,
+    listDeadlinePolicies,
+    listWebhooks,
+    listConfigRevisions,
+  };
   // Cost centers give the names for `budgetIs` guard labels.
   const budgetApi = { tree: over.tree ?? jest.fn(() => of([])) };
   const toast = { success: jest.fn(), error: jest.fn(), info: jest.fn() };
@@ -81,8 +132,12 @@ function stubCanvas(c: any): void {
 
 function ptr(clientX: number, clientY: number, extra: Partial<PointerEvent> = {}): PointerEvent {
   return {
-    clientX, clientY, pointerId: 1, shiftKey: false,
-    stopPropagation: () => {}, preventDefault: () => {},
+    clientX,
+    clientY,
+    pointerId: 1,
+    shiftKey: false,
+    stopPropagation: () => {},
+    preventDefault: () => {},
     target: { setPointerCapture: () => {} },
     currentTarget: { setPointerCapture: () => {} },
     ...extra,
@@ -105,22 +160,30 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
 
   it('reports an empty graph as invalid and disables save', async () => {
     await setup();
-    expect(screen.getByText('flow graph has no states')).toBeInTheDocument();
+    expect(screen.getByText('Der Flow hat keine Status.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
   });
 
   it('says nothing about the flow while the flow is still loading', async () => {
-    // The graph starts empty and an empty graph fails validation with "no states".
+    // The graph starts empty and an empty graph fails validation.
     // Before the answer arrives that alert is a finding about the request, not the flow.
     await setup({ getGlobalFlow: jest.fn(() => NEVER) });
-    expect(screen.queryByText('flow graph has no states')).not.toBeInTheDocument();
+    expect(screen.queryByText('Der Flow hat keine Status.')).not.toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('reports the empty graph once the load comes back with no flow', async () => {
     // A deployment with no flow yet is a real finding, and the admin has to see it.
     await setup({ getGlobalFlow: jest.fn(() => of(null)) });
-    expect(screen.getByText('flow graph has no states')).toBeInTheDocument();
+    expect(screen.getByText('Der Flow hat keine Status.')).toBeInTheDocument();
+  });
+
+  it("states the reason in the reader's language", async () => {
+    // The validator names a reason; the catalog words it. Before that, every reason
+    // reached the admin as the English the validator was written in.
+    localStorage.setItem('ap.locale', 'en');
+    await setup({ getGlobalFlow: jest.fn(() => of(null)) });
+    expect(screen.getByText('The flow has no states.')).toBeInTheDocument();
   });
 
   it('builds a valid graph and saves it as a flow version', async () => {
@@ -289,7 +352,11 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     fixture.detectChanges();
     c.selection.set({ kind: 'state', key: c.graph().states[0].key });
     const input = document.createElement('input');
-    c.onKeydown({ key: 'Delete', target: input, preventDefault: () => {} } as unknown as KeyboardEvent);
+    c.onKeydown({
+      key: 'Delete',
+      target: input,
+      preventDefault: () => {},
+    } as unknown as KeyboardEvent);
     expect(c.graph().states).toHaveLength(1);
   });
 
@@ -325,7 +392,10 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     c.openGroup(groupId);
     expect(c.breadcrumbs().map((g: { id: string }) => g.id)).toEqual([groupId]);
     expect(
-      c.nodes().map((n: { key: string }) => n.key).sort(),
+      c
+        .nodes()
+        .map((n: { key: string }) => n.key)
+        .sort(),
     ).toEqual(['b', 'c']);
     expect(c.proxies().left.map((p: { pid: string }) => p.pid)).toEqual(['state:a']);
 
@@ -382,15 +452,20 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
   });
 
   it('toasts when the global flow fails to load', async () => {
-    const { toast } = await setup({ getGlobalFlow: jest.fn(() => throwError(() => new Error('boom'))) });
+    const { toast } = await setup({
+      getGlobalFlow: jest.fn(() => throwError(() => new Error('boom'))),
+    });
     expect(toast.error).toHaveBeenCalled();
   });
 
   it('swallows errors from option/role/webhook/policy/budget loads', async () => {
     const err = jest.fn(() => throwError(() => new Error('x')));
     const { fixture } = await setup({
-      listRoles: err, listWebhooks: err, listDeadlinePolicies: err,
-      listGremienOptions: err, tree: err,
+      listRoles: err,
+      listWebhooks: err,
+      listDeadlinePolicies: err,
+      listGremienOptions: err,
+      tree: err,
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
@@ -408,8 +483,15 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(c.webhookOptions()).toEqual([{ value: 'w1', label: 'Buchhaltung' }]);
     expect(c.deadlinePolicyOptions()[0].label).toContain('Semesterfrist');
     // The budget guard label resolves the nested id to its name.
-    expect(c.guardGroupLabel({ sig: 'x', guard: { budgetIs: 'b2' }, op: 'budgetIs', value: 'b2', indices: [] }))
-      .toContain('IT (VS-800-40)');
+    expect(
+      c.guardGroupLabel({
+        sig: 'x',
+        guard: { budgetIs: 'b2' },
+        op: 'budgetIs',
+        value: 'b2',
+        indices: [],
+      }),
+    ).toContain('IT (VS-800-40)');
   });
 
   it('renders human-readable guard-group labels for every operator family', async () => {
@@ -417,29 +499,89 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
     // catch-all (empty signature)
-    expect(c.guardGroupLabel({ sig: '', guard: null, op: '', value: '', indices: [] })).toBeTruthy();
+    expect(
+      c.guardGroupLabel({ sig: '', guard: null, op: '', value: '', indices: [] }),
+    ).toBeTruthy();
     // combinator with children → "(n)"
-    expect(c.guardGroupLabel({ sig: 's', guard: { and: [{ roleIs: 'a' }, { roleIs: 'b' }] }, op: 'and', value: '', indices: [] }))
-      .toContain('(2)');
+    expect(
+      c.guardGroupLabel({
+        sig: 's',
+        guard: { and: [{ roleIs: 'a' }, { roleIs: 'b' }] },
+        op: 'and',
+        value: '',
+        indices: [],
+      }),
+    ).toContain('(2)');
     // combinator with non-array child counts as 1
-    expect(c.guardGroupLabel({ sig: 's', guard: { not: { roleIs: 'a' } }, op: 'not', value: '', indices: [] }))
-      .toContain('(1)');
+    expect(
+      c.guardGroupLabel({
+        sig: 's',
+        guard: { not: { roleIs: 'a' } },
+        op: 'not',
+        value: '',
+        indices: [],
+      }),
+    ).toContain('(1)');
     // compare with a scalar value
-    expect(c.guardGroupLabel({ sig: 's', guard: { compare: { field: 'amount', op: '>', value: 100 } }, op: 'compare', value: '', indices: [] }))
-      .toBe('amount > 100');
+    expect(
+      c.guardGroupLabel({
+        sig: 's',
+        guard: { compare: { field: 'amount', op: '>', value: 100 } },
+        op: 'compare',
+        value: '',
+        indices: [],
+      }),
+    ).toBe('amount > 100');
     // compare with a list value
-    expect(c.guardGroupLabel({ sig: 's', guard: { compare: { field: 'k', op: 'in', value: ['x', 'y'] } }, op: 'compare', value: '', indices: [] }))
-      .toBe('k in x, y');
+    expect(
+      c.guardGroupLabel({
+        sig: 's',
+        guard: { compare: { field: 'k', op: 'in', value: ['x', 'y'] } },
+        op: 'compare',
+        value: '',
+        indices: [],
+      }),
+    ).toBe('k in x, y');
     // compare missing the object → falls back to the op label
-    expect(c.guardGroupLabel({ sig: 's', guard: { compare: 'nope' }, op: 'compare', value: '', indices: [] })).toBeTruthy();
+    expect(
+      c.guardGroupLabel({
+        sig: 's',
+        guard: { compare: 'nope' },
+        op: 'compare',
+        value: '',
+        indices: [],
+      }),
+    ).toBeTruthy();
     // role op resolves the value to a role name
-    expect(c.guardGroupLabel({ sig: 's', guard: { roleIs: 'finance' }, op: 'roleIs', value: 'finance', indices: [] }))
-      .toContain('Finanzen (finance)');
+    expect(
+      c.guardGroupLabel({
+        sig: 's',
+        guard: { roleIs: 'finance' },
+        op: 'roleIs',
+        value: 'finance',
+        indices: [],
+      }),
+    ).toContain('Finanzen (finance)');
     // committee op resolves via gremium options
-    expect(c.guardGroupLabel({ sig: 's', guard: { isInCommittee: 'g1' }, op: 'isInCommittee', value: 'g1', indices: [] }))
-      .toContain('StuPa');
+    expect(
+      c.guardGroupLabel({
+        sig: 's',
+        guard: { isInCommittee: 'g1' },
+        op: 'isInCommittee',
+        value: 'g1',
+        indices: [],
+      }),
+    ).toContain('StuPa');
     // text op with empty value → just the op label
-    expect(c.guardGroupLabel({ sig: 's', guard: { hasField: '' }, op: 'hasField', value: '', indices: [] })).toBeTruthy();
+    expect(
+      c.guardGroupLabel({
+        sig: 's',
+        guard: { hasField: '' },
+        op: 'hasField',
+        value: '',
+        indices: [],
+      }),
+    ).toBeTruthy();
   });
 
   it('transitionGuardLabel handles guarded and guard-less transitions', async () => {
@@ -447,9 +589,17 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
     expect(c.transitionGuardLabel({ from: 'a', to: 'b' })).toBeTruthy();
-    expect(c.transitionGuardLabel({ from: 'a', to: 'b', guard: { roleIs: 'finance' } })).toContain('Finanzen');
+    expect(c.transitionGuardLabel({ from: 'a', to: 'b', guard: { roleIs: 'finance' } })).toContain(
+      'Finanzen',
+    );
     // object/compare value → blanked op-value path
-    expect(c.transitionGuardLabel({ from: 'a', to: 'b', guard: { compare: { field: 'f', op: '==', value: 1 } } })).toBe('f == 1');
+    expect(
+      c.transitionGuardLabel({
+        from: 'a',
+        to: 'b',
+        guard: { compare: { field: 'f', op: '==', value: 1 } },
+      }),
+    ).toBe('f == 1');
   });
 
   it('lists incoming/outgoing transitions for the selected state and nothing otherwise', async () => {
@@ -595,7 +745,10 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(c.recipientsOf(c.graph().transitions[0].actions[ai])).toHaveLength(1);
     c.setRecipientKind(0, ai, 0, 'gremium');
     c.setRecipientRef(0, ai, 0, 'g1');
-    expect(c.recipientsOf(c.graph().transitions[0].actions[ai])[0]).toEqual({ kind: 'gremium', ref: 'g1' });
+    expect(c.recipientsOf(c.graph().transitions[0].actions[ai])[0]).toEqual({
+      kind: 'gremium',
+      ref: 'g1',
+    });
     // switching back to applicant drops the ref
     c.setRecipientKind(0, ai, 0, 'applicant');
     expect(c.recipientsOf(c.graph().transitions[0].actions[ai])[0].ref).toBeUndefined();
@@ -747,7 +900,12 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(c.tempEdge()).not.toBeNull();
     c.onCanvasPointerUp(ptr(320, 26)); // drop on b
     const created = c.graph().transitions[c.graph().transitions.length - 1];
-    expect(created).toMatchObject({ from: 'a', to: 'b', branch: 'pass', guard: { roleIs: 'finance' } });
+    expect(created).toMatchObject({
+      from: 'a',
+      to: 'b',
+      branch: 'pass',
+      guard: { roleIs: 'finance' },
+    });
     expect(c.tempEdge()).toBeNull();
   });
 
@@ -833,8 +991,18 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(zoomed).not.toBeNull();
     c.zoomOut();
     expect(c.view()!.w).toBeGreaterThan(zoomed!.w);
-    c.onWheel({ deltaY: -10, clientX: 5, clientY: 5, preventDefault: () => {} } as unknown as WheelEvent);
-    c.onWheel({ deltaY: 10, clientX: 5, clientY: 5, preventDefault: () => {} } as unknown as WheelEvent);
+    c.onWheel({
+      deltaY: -10,
+      clientX: 5,
+      clientY: 5,
+      preventDefault: () => {},
+    } as unknown as WheelEvent);
+    c.onWheel({
+      deltaY: 10,
+      clientX: 5,
+      clientY: 5,
+      preventDefault: () => {},
+    } as unknown as WheelEvent);
     // The viewBox reflects the active view. A reset falls back to the content bounds.
     expect(c.viewBox()).toMatch(/^[-\d.]+ [-\d.]+ [\d.]+ [\d.]+$/);
     c.resetView();
@@ -889,7 +1057,9 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
   });
 
   it('shows the server error detail when saving fails', async () => {
-    const createGlobalFlowVersion = jest.fn(() => throwError(() => ({ error: { detail: 'nope' } })));
+    const createGlobalFlowVersion = jest.fn(() =>
+      throwError(() => ({ error: { detail: 'nope' } })),
+    );
     const { fixture, toast } = await setup({ createGlobalFlowVersion });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
@@ -1108,11 +1278,25 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
     // text op (hasField) with a value → "op: value" (resolveGuardValue returns value)
-    expect(c.guardGroupLabel({ sig: 's', guard: { hasField: 'iban' }, op: 'hasField', value: 'iban', indices: [] }))
-      .toContain('iban');
+    expect(
+      c.guardGroupLabel({
+        sig: 's',
+        guard: { hasField: 'iban' },
+        op: 'hasField',
+        value: 'iban',
+        indices: [],
+      }),
+    ).toContain('iban');
     // budgetIs with an id absent from the tree → value passed through unchanged
-    expect(c.guardGroupLabel({ sig: 's', guard: { budgetIs: 'unknown' }, op: 'budgetIs', value: 'unknown', indices: [] }))
-      .toContain('unknown');
+    expect(
+      c.guardGroupLabel({
+        sig: 's',
+        guard: { budgetIs: 'unknown' },
+        op: 'budgetIs',
+        value: 'unknown',
+        indices: [],
+      }),
+    ).toContain('unknown');
   });
 
   it('draws vote branch edges from their branch-specific dot offsets', async () => {
@@ -1162,7 +1346,12 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     const outerGroup = c.groups().find((g: { id: string }) => g.id === outer);
     expect(outerGroup.groupIds?.length).toBe(1);
     const sub = outerGroup.groupIds[0];
-    expect(c.groups().find((g: { id: string }) => g.id === sub).stateKeys.sort()).toEqual(['c', 'd']);
+    expect(
+      c
+        .groups()
+        .find((g: { id: string }) => g.id === sub)
+        .stateKeys.sort(),
+    ).toEqual(['c', 'd']);
 
     // Add two more states inside outer, then group them. The outer group already
     // carries a non-empty groupIds list, so this covers the `gr.groupIds.filter(...)`
@@ -1196,7 +1385,10 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     }));
     c.multiSel.set(new Set(['a', 'b']));
     c.createGroupFromSelection();
-    const ids = c.groups().map((g: { id: string }) => g.id).sort();
+    const ids = c
+      .groups()
+      .map((g: { id: string }) => g.id)
+      .sort();
     expect(ids).toContain('grp2');
     expect(ids).toContain('grp3'); // collision bumped the new id past grp2
     expect(new Set(ids).size).toBe(ids.length);
@@ -1284,9 +1476,13 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
       // role without a `de` label → falls back to its key in the label string
       listRoles: jest.fn(() => of([{ id: 'r1', key: 'finance', label: {}, permissions: [] }])),
       // webhook with an empty name → falls back to its url
-      listWebhooks: jest.fn(() => of([{ id: 'w1', name: '', url: 'https://h.test', events: [], active: true }])),
+      listWebhooks: jest.fn(() =>
+        of([{ id: 'w1', name: '', url: 'https://h.test', events: [], active: true }]),
+      ),
       // deadline policy without a `de` label → falls back to its key
-      listDeadlinePolicies: jest.fn(() => of([{ id: 'dp1', key: 'semester', label: {}, kind: 'absolute' }])),
+      listDeadlinePolicies: jest.fn(() =>
+        of([{ id: 'dp1', key: 'semester', label: {}, kind: 'absolute' }]),
+      ),
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
@@ -1418,9 +1614,21 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(c.compareOp({ from: 'a', to: 'b' })).toBe('==');
     expect(c.compareValue({ from: 'a', to: 'b' })).toBe('');
     // compareValue of a null value → ''
-    expect(c.compareValue({ from: 'a', to: 'b', guard: { compare: { field: 'f', op: '==', value: null } } })).toBe('');
+    expect(
+      c.compareValue({
+        from: 'a',
+        to: 'b',
+        guard: { compare: { field: 'f', op: '==', value: null } },
+      }),
+    ).toBe('');
     // compareValue of an array → joined
-    expect(c.compareValue({ from: 'a', to: 'b', guard: { compare: { field: 'f', op: 'in', value: ['x', 'y'] } } })).toBe('x, y');
+    expect(
+      c.compareValue({
+        from: 'a',
+        to: 'b',
+        guard: { compare: { field: 'f', op: 'in', value: ['x', 'y'] } },
+      }),
+    ).toBe('x, y');
     // guardValue of an object value → '' (the typeof object branch)
     expect(c.guardValue({ from: 'a', to: 'b', guard: { compare: { field: 'f' } } })).toBe('');
     // guardValue of a null value → ''
@@ -1437,11 +1645,25 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
     // compare with absent field/op/value → "<empty> == <empty>" (the ?? fallbacks)
-    expect(c.guardGroupLabel({ sig: 's', guard: { compare: {} }, op: 'compare', value: '', indices: [] }))
-      .toBe('==');
+    expect(
+      c.guardGroupLabel({
+        sig: 's',
+        guard: { compare: {} },
+        op: 'compare',
+        value: '',
+        indices: [],
+      }),
+    ).toBe('==');
     // compare with a null value → spec.value ?? '' fallback
-    expect(c.guardGroupLabel({ sig: 's', guard: { compare: { field: 'f', op: '>', value: null } }, op: 'compare', value: '', indices: [] }))
-      .toBe('f >');
+    expect(
+      c.guardGroupLabel({
+        sig: 's',
+        guard: { compare: { field: 'f', op: '>', value: null } },
+        op: 'compare',
+        value: '',
+        indices: [],
+      }),
+    ).toBe('f >');
     // an empty guard object → Object.keys(...)[0] undefined → the '' fallback in the label
     expect(c.transitionGuardLabel({ from: 'a', to: 'b', guard: {} })).toBeTruthy();
   });
@@ -1657,7 +1879,14 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(c.graph().states).toHaveLength(0);
     // Insert while typing in a textarea is ignored
     const ta = document.createElement('textarea');
-    c.onKeydown({ key: 'Insert', target: ta, preventDefault: () => {}, ctrlKey: false, metaKey: false, shiftKey: false } as unknown as KeyboardEvent);
+    c.onKeydown({
+      key: 'Insert',
+      target: ta,
+      preventDefault: () => {},
+      ctrlKey: false,
+      metaKey: false,
+      shiftKey: false,
+    } as unknown as KeyboardEvent);
     expect(c.graph().states).toHaveLength(0);
     // Backspace deletes the selected state (the Backspace arm)
     c.addState();
@@ -1665,7 +1894,14 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     c.onKeydown(new KeyboardEvent('keydown', { key: 'Backspace' }));
     expect(c.graph().states).toHaveLength(0);
     // Ctrl+Y / metaKey redo arm
-    c.onKeydown({ key: 'z', metaKey: true, ctrlKey: false, shiftKey: false, preventDefault: () => {}, target: null } as unknown as KeyboardEvent);
+    c.onKeydown({
+      key: 'z',
+      metaKey: true,
+      ctrlKey: false,
+      shiftKey: false,
+      preventDefault: () => {},
+      target: null,
+    } as unknown as KeyboardEvent);
   });
 
   it('pointer move with nothing grabbed and no pan is inert', async () => {
@@ -1817,7 +2053,9 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     c.graph.update((g: FlowGraph) => ({
       ...g,
       // guard's first value is null → String(undefined/null ?? '') === ''
-      transitions: [{ from: 'a', to: 'b', guard: { roleIs: null } as unknown as Guard, actions: [] }],
+      transitions: [
+        { from: 'a', to: 'b', guard: { roleIs: null } as unknown as Guard, actions: [] },
+      ],
     }));
     const groups = c.guardGroupsFor('a');
     expect(groups[0].value).toBe('');
@@ -1906,7 +2144,10 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     c.addRecipient(0, 0);
     c.addRecipient(0, 0); // two recipients → mutate index 0, index 1 hits the `: r` else
     c.setRecipientKind(0, 0, 0, 'role'); // ref needed → r.ref ?? '' keeps ''
-    expect(c.recipientsOf(c.graph().transitions[0].actions[0])[0]).toEqual({ kind: 'role', ref: '' });
+    expect(c.recipientsOf(c.graph().transitions[0].actions[0])[0]).toEqual({
+      kind: 'role',
+      ref: '',
+    });
     c.setRecipientRef(0, 0, 0, 'r1');
     c.setRecipientKind(0, 0, 0, 'gremium'); // still ref-needing → keeps existing ref
     expect(c.recipientsOf(c.graph().transitions[0].actions[0])[0].ref).toBe('r1');
@@ -2237,7 +2478,10 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     stubCanvas(c);
     c.graph.update((g: FlowGraph) => ({
       ...g,
-      layout: { ...g.layout, positions: { ...g.layout.positions, b: { x: 5, y: 5 }, c: { x: 5, y: 5 } } },
+      layout: {
+        ...g.layout,
+        positions: { ...g.layout.positions, b: { x: 5, y: 5 }, c: { x: 5, y: 5 } },
+      },
     }));
     c.onGroupPointerDown(ptr(0, 0), gid);
     c.onCanvasPointerMove(ptr(-200, -200)); // negative → clamp members to 0
@@ -2489,8 +2733,11 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
       ...g,
       layout: {
         positions: {
-          a: { x: 0, y: 0 }, b: { x: 100, y: 0 }, c: { x: 200, y: 0 },
-          d: { x: 300, y: 0 }, e: { x: 400, y: 0 },
+          a: { x: 0, y: 0 },
+          b: { x: 100, y: 0 },
+          c: { x: 200, y: 0 },
+          d: { x: 300, y: 0 },
+          e: { x: 400, y: 0 },
         },
         groups: [
           { id: 'inner', name: 'Inner', stateKeys: ['b', 'c'] },

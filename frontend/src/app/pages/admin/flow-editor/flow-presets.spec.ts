@@ -17,9 +17,7 @@ describe('FLOW_PRESETS', () => {
       // The only acceptable "error" is the empty Gremium seed of the vote preset.
       // The admin fills it in later. No structural problem may remain: dangling,
       // unreachable or duplicate.
-      expect(
-        errors.filter((e) => !e.includes('needs a committee')),
-      ).toEqual([]);
+      expect(errors.filter((e) => e.key !== 'admin.flow.err.voteNeedsGremium')).toEqual([]);
     }
   });
 
