@@ -605,8 +605,7 @@ export const de = {
   'applications.detail.loading': 'Antrag wird geladen …',
   'applications.detail.error': 'Antrag konnte nicht geladen werden.',
   'applications.detail.notFound': 'Antrag nicht gefunden.',
-  'applications.detail.notFoundBody':
-    'Der Antrag wurde gelöscht, oder der Link stimmt nicht.',
+  'applications.detail.notFoundBody': 'Der Antrag wurde gelöscht, oder der Link stimmt nicht.',
   'applications.detail.backToList': 'Zur Antragsliste',
   'applications.detail.version': 'Version {version}',
   'applications.detail.created': 'Eingegangen',
@@ -1251,6 +1250,46 @@ export const de = {
     'Antragstellende können pro Position mit Begründung erklären, dass keine Vergleichsangebote möglich sind — dann genügt ein einzelnes Angebot.',
 
   'admin.flow.title': 'Flow-Editor',
+  // Flow-Validierung: was der Editor an einem Graphen bemängelt, bevor gespeichert wird.
+  'admin.flow.err.noStates': 'Der Flow hat keine Status.',
+  'admin.flow.err.duplicateKeys': 'Doppelte Status-Schlüssel: {keys}',
+  'admin.flow.err.invalidKey':
+    'Ungültiger Status-Schlüssel: {key}. Erlaubt sind Kleinbuchstaben, Ziffern und Unterstriche, beginnend mit einem Buchstaben.',
+  'admin.flow.err.noInitial': 'Der Flow hat keinen Startstatus.',
+  'admin.flow.err.multipleInitial': 'Der Flow hat mehrere Startstatus: {keys}',
+  'admin.flow.err.unknownFrom': 'Ein Übergang geht von einem unbekannten Status aus: {key}',
+  'admin.flow.err.unknownTo': 'Ein Übergang führt in einen unbekannten Status: {key}',
+  'admin.flow.err.unreachable': 'Vom Startstatus nicht erreichbar: {keys}',
+  'admin.flow.err.sessionNeedsVote':
+    'Der Übergang {from} → {to} setzt den Antrag auf eine Sitzung, führt aber nicht in einen Abstimmungs-Status.',
+  'admin.flow.err.voteNeedsGremium': 'Der Abstimmungs-Status „{key}“ braucht ein Gremium.',
+  'admin.flow.err.voteBranches':
+    'Der Abstimmungs-Status „{key}“ braucht genau zwei ausgehende Übergänge: „angenommen“ und „abgelehnt“.',
+  'admin.flow.err.voteNoAutomatic':
+    'Der Abstimmungs-Status „{key}“ darf keine automatischen Übergänge haben. Nur das Ergebnis der Abstimmung oder ein manueller Abbruch führen aus ihm heraus.',
+  'admin.flow.err.guardChildren': 'Die Bedingung „{op}“ erwartet weitere Bedingungen als Inhalt.',
+  'admin.flow.err.guardOneOperator': 'Eine Bedingung braucht genau einen Operator, gefunden: {ops}',
+  'admin.flow.err.guardNotOneChild': 'Die Bedingung „nicht“ braucht genau eine Unterbedingung.',
+  'admin.flow.err.guardNeedsChild': 'Die Bedingung „{op}“ braucht mindestens eine Unterbedingung.',
+  'admin.flow.err.guardUnknownOp': 'Unbekannter Bedingungs-Operator: {op}',
+  'admin.flow.err.guardActorManualOnly':
+    'Die Bedingung „{op}“ prüft die handelnde Person und ist deshalb nur bei manuellen Übergängen erlaubt.',
+  'admin.flow.err.guardNeedsValue': 'Die Bedingung „{op}“ braucht einen Wert.',
+  'admin.flow.err.compareShape': 'Ein Vergleich braucht ein Feld, einen Operator und einen Wert.',
+  'admin.flow.err.compareField': 'Ein Vergleich braucht ein Feld.',
+  'admin.flow.err.compareUnknownOp': 'Unbekannter Vergleichs-Operator: {op}',
+  'admin.flow.err.compareInList': 'Der Vergleich „in“ braucht eine Liste als Wert.',
+  'admin.flow.err.actionShape': 'Eine Aktion muss ein Objekt sein.',
+  'admin.flow.err.actionUnknownType': 'Unbekannte Aktion: {type}',
+  'admin.flow.err.actionWebhook': 'Die Webhook-Aktion braucht einen Webhook.',
+  'admin.flow.err.actionGremium':
+    'Die Aktion „Auf die nächste Sitzung setzen“ braucht ein Gremium.',
+  'admin.flow.err.actionBudget': 'Die Aktion „Kostenstelle zuweisen“ braucht eine Kostenstelle.',
+  'admin.flow.err.actionField': 'Die Aktion „Kostenstelle aus Feld zuweisen“ braucht ein Feld.',
+  'admin.flow.err.notifyRecipients':
+    'Die Benachrichtigungs-Aktion braucht mindestens einen Empfänger.',
+  'admin.flow.err.notifyRecipientInvalid': 'Ungültiger Empfänger in der Benachrichtigungs-Aktion.',
+  'admin.flow.err.notifyRecipientValue': 'Der Empfänger „{kind}“ braucht einen Wert.',
   'admin.flow.loadFailed': 'Flow konnte nicht geladen werden (fehlende Berechtigung?).',
   'admin.flow.desc':
     'Definiere Status und Übergänge eines Antragstyps. „Einfach" startet von einer Vorlage, „Experte" gibt volle Kontrolle über Bedingungen und Aktionen.',
@@ -1704,8 +1743,7 @@ export const de = {
   'admin.audit.msg.budget_assign':
     '{actor} hat einen Antrag einer Kostenstelle zugeordnet ({target}).',
   'admin.audit.msg.budget_move_fiscal_year': '{actor} hat ein Haushaltsjahr verschoben ({target}).',
-  'admin.audit.msg.budget_fiscal_year_delete':
-    '{actor} hat ein Haushaltsjahr gelöscht ({target}).',
+  'admin.audit.msg.budget_fiscal_year_delete': '{actor} hat ein Haushaltsjahr gelöscht ({target}).',
   'admin.audit.msg.unknown': '{actor}: {action} ({target}).',
   'admin.backups.title': 'Backups',
   'admin.backups.offTitle': 'Backups sind nicht eingerichtet',
@@ -1745,15 +1783,15 @@ export const de = {
   'admin.backups.download': 'Herunterladen',
   'admin.backups.pin': 'Anheften',
   'admin.backups.unpin': 'Lösen',
-  'admin.backups.pinnedHint': 'Angeheftet: wird nicht automatisch gelöscht. Zum Löschen zuerst lösen.',
+  'admin.backups.pinnedHint':
+    'Angeheftet: wird nicht automatisch gelöscht. Zum Löschen zuerst lösen.',
   'admin.backups.restore': 'Zurücksetzen',
   'admin.backups.restoreTitle': 'Plattform zurücksetzen',
   'admin.backups.restoreWarning':
     'Dieser Vorgang ersetzt die gesamte Plattform durch den Stand dieser Sicherung.',
   'admin.backups.restorePoint1':
     'Alles, was seit dieser Sicherung entstanden ist, geht verloren: Anträge, Abstimmungen, Buchungen, Protokolle.',
-  'admin.backups.restorePoint2':
-    'Alle Benutzer werden abgemeldet, Sie eingeschlossen.',
+  'admin.backups.restorePoint2': 'Alle Benutzer werden abgemeldet, Sie eingeschlossen.',
   'admin.backups.restorePoint3':
     'Vorher wird automatisch eine Sicherung des jetzigen Stands angelegt. Damit lässt sich der Vorgang rückgängig machen.',
   'admin.backups.restoreTarget': 'Zurückgesetzt wird auf den Stand vom',
@@ -1883,8 +1921,7 @@ export const de = {
 
   // Corporate-design variants: the logo sets of the rendered documents.
   'admin.cdVariants.title': 'CD-Varianten',
-  'admin.cdVariants.subtitle':
-    'Logo-Sätze, mit denen ein Gremium seine Dokumente rendert.',
+  'admin.cdVariants.subtitle': 'Logo-Sätze, mit denen ein Gremium seine Dokumente rendert.',
   'admin.cdVariants.add': 'Variante hinzufügen',
   'admin.cdVariants.create': 'CD-Variante anlegen',
   'admin.cdVariants.edit': 'CD-Variante bearbeiten',
@@ -2757,8 +2794,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'home.choice.apply.desc': 'No account needed — submitted in minutes.',
   'home.choice.login.title': 'Sign in as a committee member',
   'home.choice.login.desc': 'Process applications, run meetings, manage the budget.',
-  'home.statusNote':
-    'Already submitted? Track its status via the link in your confirmation email.',
+  'home.statusNote': 'Already submitted? Track its status via the link in your confirmation email.',
 
   'placeholder.fallback': 'Section',
   'placeholder.badge': 'In progress',
@@ -2810,8 +2846,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'apply.positions.noOffersHint':
     'Please explain why comparison offers cannot be obtained (e.g. sole supplier). A single offer is sufficient then.',
   'apply.positions.noOffersReason': 'Reason why no comparison offers are possible',
-  'apply.positions.errNoOffersReason':
-    'Please explain why no comparison offers are possible.',
+  'apply.positions.errNoOffersReason': 'Please explain why no comparison offers are possible.',
   'apply.positions.noOffersBadge': 'Without comparison offers',
   'apply.nav.back': 'Back',
   'apply.nav.discard': 'Discard draft',
@@ -2973,8 +3008,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'applications.detail.loading': 'Loading application …',
   'applications.detail.error': 'Application could not be loaded.',
   'applications.detail.notFound': 'Application not found.',
-  'applications.detail.notFoundBody':
-    'The application was deleted, or the link is wrong.',
+  'applications.detail.notFoundBody': 'The application was deleted, or the link is wrong.',
   'applications.detail.backToList': 'Back to the application list',
   'applications.detail.version': 'Version {version}',
   'applications.detail.created': 'Received',
@@ -3233,8 +3267,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.protocol.deleteBody':
     'The draft of the minutes is deleted permanently. The agenda-item text stays, but the minutes must be created again.',
   'meetings.protocol.deleted': 'Draft minutes discarded.',
-  'meetings.protocol.deleteConflict':
-    'The minutes are no longer a draft and cannot be discarded',
+  'meetings.protocol.deleteConflict': 'The minutes are no longer a draft and cannot be discarded',
   'meetings.protocol.deleteFailed': 'Could not discard the draft minutes.',
   'meetings.create.title': 'Create meeting',
   'meetings.create.lead': 'Create a new meeting to steer applications and votes.',
@@ -3368,8 +3401,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'voting.delete.conflict.meetingBound':
     'This vote belongs to a meeting. Delete it through that meeting.',
   'voting.delete.conflict.notDraft': 'The vote already opened. Cancel it instead of deleting it.',
-  'voting.delete.conflict.hasBallots':
-    'Ballots exist already. The vote can no longer be deleted.',
+  'voting.delete.conflict.hasBallots': 'Ballots exist already. The vote can no longer be deleted.',
   'voting.delete.conflict.other': 'The vote is in a state that rules out a delete.',
 
   'voting.live.heading': 'Live vote',
@@ -3606,6 +3638,44 @@ export const en: Partial<Record<TranslationKey, string>> = {
     'Applicants can declare per position — with a reason — that comparison offers are not possible; a single offer is sufficient then.',
 
   'admin.flow.title': 'Flow editor',
+  // Flow validation: what the editor rejects in a graph before it is saved.
+  'admin.flow.err.noStates': 'The flow has no states.',
+  'admin.flow.err.duplicateKeys': 'Duplicate state keys: {keys}',
+  'admin.flow.err.invalidKey':
+    'Invalid state key: {key}. Use lowercase letters, digits and underscores, starting with a letter.',
+  'admin.flow.err.noInitial': 'The flow has no initial state.',
+  'admin.flow.err.multipleInitial': 'The flow has more than one initial state: {keys}',
+  'admin.flow.err.unknownFrom': 'A transition starts from an unknown state: {key}',
+  'admin.flow.err.unknownTo': 'A transition leads to an unknown state: {key}',
+  'admin.flow.err.unreachable': 'Not reachable from the initial state: {keys}',
+  'admin.flow.err.sessionNeedsVote':
+    'The transition {from} → {to} puts the application on a meeting agenda but does not lead into a vote state.',
+  'admin.flow.err.voteNeedsGremium': 'The vote state "{key}" needs a committee.',
+  'admin.flow.err.voteBranches':
+    'The vote state "{key}" needs exactly two outgoing transitions: "passed" and "failed".',
+  'admin.flow.err.voteNoAutomatic':
+    'The vote state "{key}" must have no automatic transitions. Only the vote outcome or a manual exit leaves it.',
+  'admin.flow.err.guardChildren': 'The condition "{op}" expects further conditions as its content.',
+  'admin.flow.err.guardOneOperator': 'A condition needs exactly one operator, found: {ops}',
+  'admin.flow.err.guardNotOneChild': 'The condition "not" needs exactly one sub-condition.',
+  'admin.flow.err.guardNeedsChild': 'The condition "{op}" needs at least one sub-condition.',
+  'admin.flow.err.guardUnknownOp': 'Unknown condition operator: {op}',
+  'admin.flow.err.guardActorManualOnly':
+    'The condition "{op}" tests who is acting, so it is allowed on manual transitions only.',
+  'admin.flow.err.guardNeedsValue': 'The condition "{op}" needs a value.',
+  'admin.flow.err.compareShape': 'A comparison needs a field, an operator and a value.',
+  'admin.flow.err.compareField': 'A comparison needs a field.',
+  'admin.flow.err.compareUnknownOp': 'Unknown comparison operator: {op}',
+  'admin.flow.err.compareInList': 'The comparison "in" needs a list as its value.',
+  'admin.flow.err.actionShape': 'An action must be an object.',
+  'admin.flow.err.actionUnknownType': 'Unknown action: {type}',
+  'admin.flow.err.actionWebhook': 'The webhook action needs a webhook.',
+  'admin.flow.err.actionGremium': 'The "add to next meeting" action needs a committee.',
+  'admin.flow.err.actionBudget': 'The "assign cost centre" action needs a cost centre.',
+  'admin.flow.err.actionField': 'The "assign cost centre from field" action needs a field.',
+  'admin.flow.err.notifyRecipients': 'The notify action needs at least one recipient.',
+  'admin.flow.err.notifyRecipientInvalid': 'Invalid recipient in the notify action.',
+  'admin.flow.err.notifyRecipientValue': 'The recipient "{kind}" needs a value.',
   'admin.flow.loadFailed': 'Could not load flow (missing permission?).',
   'admin.flow.desc':
     'Define the states and transitions of an application type. “Simple” starts from a template, “Expert” gives full control over guards and actions.',
@@ -4269,8 +4339,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.cdVariants.deleteTitle': 'Delete CD variant',
   'admin.cdVariants.deleteConfirm': 'Really delete “{name}”?',
   'admin.cdVariants.deleted': 'CD variant deleted.',
-  'admin.cdVariants.inUse':
-    'A committee still uses this variant. Change the committee first.',
+  'admin.cdVariants.inUse': 'A committee still uses this variant. Change the committee first.',
   'admin.deleg.title': 'Proxy / Delegation',
   'admin.deleg.subtitle':
     'Overview of meeting-bound proxies. Members set up their proxy on the meeting page; the substitute pool is maintained per body in the member administration.',

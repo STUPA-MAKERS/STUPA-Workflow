@@ -1,5 +1,6 @@
 import type { FlowGraph } from './admin.models';
 import {
+  type FlowValidationResult,
   autoLayout,
   blankState,
   blankTransition,
@@ -10,6 +11,11 @@ import {
   serializeFlowGraph,
   validateFlowGraph,
 } from './flow-graph.util';
+
+/** Errors are keys plus parameters, so a test names the reason and not its wording. */
+function keys(result: FlowValidationResult): string[] {
+  return result.errors.map((e) => e.key);
+}
 
 function graph(overrides: Partial<FlowGraph> = {}): FlowGraph {
   return {
@@ -39,14 +45,12 @@ describe('validateFlowGraph', () => {
   it('rejects an empty graph', () => {
     const r = validateFlowGraph(emptyFlowGraph());
     expect(r.valid).toBe(false);
-    expect(r.errors).toContain('flow graph has no states');
+    expect(keys(r)).toContain('admin.flow.err.noStates');
   });
 
   it('requires exactly one initial state', () => {
-    const none = validateFlowGraph(
-      graph({ states: [{ key: 'a', label: { de: 'A' } }] }),
-    );
-    expect(none.errors).toContain('flow graph has no initial state');
+    const none = validateFlowGraph(graph({ states: [{ key: 'a', label: { de: 'A' } }] }));
+    expect(keys(none)).toContain('admin.flow.err.noInitial');
 
     const many = validateFlowGraph({
       states: [
@@ -55,7 +59,7 @@ describe('validateFlowGraph', () => {
       ],
       transitions: [{ from: 'a', to: 'b' }],
     });
-    expect(many.errors.some((e) => e.includes('multiple initial states'))).toBe(true);
+    expect(keys(many)).toContain('admin.flow.err.multipleInitial');
   });
 
   it('detects duplicate state keys', () => {
@@ -66,7 +70,10 @@ describe('validateFlowGraph', () => {
       ],
       transitions: [],
     });
-    expect(r.errors.some((e) => e.includes('duplicate state keys: a'))).toBe(true);
+    expect(r.errors).toContainEqual({
+      key: 'admin.flow.err.duplicateKeys',
+      params: { keys: 'a' },
+    });
   });
 
   it('flags invalid key syntax', () => {
@@ -74,21 +81,22 @@ describe('validateFlowGraph', () => {
       states: [{ key: 'Not Valid', label: { de: 'x' }, isInitial: true }],
       transitions: [],
     });
-    expect(r.errors.some((e) => e.includes('invalid state key'))).toBe(true);
+    expect(keys(r)).toContain('admin.flow.err.invalidKey');
   });
 
   it('detects dangling transition refs', () => {
-    const r = validateFlowGraph(
-      graph({ transitions: [{ from: 'draft', to: 'ghost' }] }),
-    );
-    expect(r.errors.some((e) => e.includes('unknown to-state'))).toBe(true);
+    const r = validateFlowGraph(graph({ transitions: [{ from: 'draft', to: 'ghost' }] }));
+    expect(keys(r)).toContain('admin.flow.err.unknownTo');
   });
 
   it('detects unreachable states', () => {
     const r = validateFlowGraph(
       graph({ transitions: [{ from: 'draft', to: 'review' }] }), // 'done' stays unreachable
     );
-    expect(r.errors.some((e) => e.includes('unreachable states: done'))).toBe(true);
+    expect(r.errors).toContainEqual({
+      key: 'admin.flow.err.unreachable',
+      params: { keys: 'done' },
+    });
   });
 
   it('rejects automatic exits from vote states (#vote-bypass)', () => {
@@ -109,7 +117,7 @@ describe('validateFlowGraph', () => {
     });
     const v = validateFlowGraph(g);
     expect(v.valid).toBe(false);
-    expect(v.errors.join(' ')).toContain('must not have automatic outgoing transitions');
+    expect(keys(v)).toContain('admin.flow.err.voteNoAutomatic');
     // A manual exit that aborts the vote stays allowed.
     g.transitions = g.transitions.filter((t) => !t.automatic);
     g.transitions.push({ from: 'voting', to: 'failed' });
@@ -139,7 +147,7 @@ describe('validateFlowGraph', () => {
       }),
     );
     expect(bad.valid).toBe(false);
-    expect(bad.errors.some((e) => e.includes('must lead into a vote state'))).toBe(true);
+    expect(keys(bad)).toContain('admin.flow.err.sessionNeedsVote');
 
     // The same action passes when the target state has kind 'vote'.
     const ok = validateFlowGraph({
@@ -172,8 +180,8 @@ describe('validateFlowGraph', () => {
       ],
     });
     expect(r.valid).toBe(false);
-    expect(r.errors.some((e) => e.includes('needs a committee'))).toBe(true);
-    expect(r.errors.some((e) => e.includes('needs exactly two outgoing transitions'))).toBe(true);
+    expect(keys(r)).toContain('admin.flow.err.voteNeedsGremium');
+    expect(keys(r)).toContain('admin.flow.err.voteBranches');
   });
 
   it('skips reachability check while there are duplicate keys', () => {
@@ -187,8 +195,8 @@ describe('validateFlowGraph', () => {
     });
     // The check reports the duplicate. It skips the reachability test, because that test
     // runs only when the duplicate count is zero.
-    expect(r.errors.some((e) => e.includes('duplicate state keys'))).toBe(true);
-    expect(r.errors.some((e) => e.includes('unreachable'))).toBe(false);
+    expect(keys(r)).toContain('admin.flow.err.duplicateKeys');
+    expect(keys(r)).not.toContain('admin.flow.err.unreachable');
   });
 });
 
@@ -292,7 +300,13 @@ describe('graph ↔ JSON round-trip', () => {
         groups: [
           // Keeps the live key 'a' and drops the dead 'ghost'. Also references a real
           // sibling group, a self reference and a missing group.
-          { id: 'g1', name: 'G1', stateKeys: ['a', 'ghost'], groupIds: ['g2', 'g1', 'missing'], color: '#111' },
+          {
+            id: 'g1',
+            name: 'G1',
+            stateKeys: ['a', 'ghost'],
+            groupIds: ['g2', 'g1', 'missing'],
+            color: '#111',
+          },
           { id: 'g2', name: 'G2', stateKeys: ['b'] },
           // normalizeFlowGraph drops a group with no states and no sub-groups.
           { id: 'gEmpty', name: 'Empty', stateKeys: ['ghost'] },
@@ -402,9 +416,7 @@ describe('autoLayout edge cases', () => {
       ],
     } as unknown as FlowGraph;
     // validate, normalize, serialize and autoLayout all default transitions to [].
-    expect(validateFlowGraph(noTransitions).errors.some((e) => e.includes('unreachable'))).toBe(
-      true,
-    );
+    expect(keys(validateFlowGraph(noTransitions))).toContain('admin.flow.err.unreachable');
     expect(normalizeFlowGraph(noTransitions).transitions).toEqual([]);
     const laid = autoLayout(noTransitions);
     expect(laid.layout!.positions!['a']).toBeDefined();
@@ -415,11 +427,7 @@ describe('autoLayout edge cases', () => {
 describe('layoutEntities', () => {
   it('arranges virtual entities/edges and honours isInitial', () => {
     const pos = layoutEntities(
-      [
-        { id: 'x', isInitial: true },
-        { id: 'y' },
-        { id: 'z' },
-      ],
+      [{ id: 'x', isInitial: true }, { id: 'y' }, { id: 'z' }],
       [
         ['x', 'y'],
         ['y', 'z'],
@@ -462,6 +470,6 @@ describe('validateFlowGraph defensive defaults', () => {
     const noStates = {} as unknown as FlowGraph;
     const r = validateFlowGraph(noStates);
     expect(r.valid).toBe(false);
-    expect(r.errors).toContain('flow graph has no states');
+    expect(keys(r)).toContain('admin.flow.err.noStates');
   });
 });

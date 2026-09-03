@@ -18,10 +18,10 @@
     </span>
   </div>
 
-  @if (loaded() && validation().errors.length > 0) {
+  @if (loaded() && validationMessages().length > 0) {
     <div role="alert">
       <ul class="fe__alert">
-        @for (err of validation().errors; track err) {
+        @for (err of validationMessages(); track err) {
           <li>{{ err }}</li>
         }
       </ul>
