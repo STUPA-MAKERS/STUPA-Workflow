@@ -43,8 +43,24 @@ function withoutPlaceholder(): string[] {
   });
 }
 
+/** A table that never says it is loading shows its empty text while the request is out. */
+function tablesWithoutLoading(): string[] {
+  return [...templates(PAGES_ROOT), ...templates(FEATURES_ROOT)].filter((file) => {
+    const src = readFileSync(file, 'utf8');
+    return src.includes('<app-data-table') && !/\[loading\]/.test(src);
+  });
+}
+
 describe('loading placeholders', () => {
   it('every page that loads draws a shape rather than a sentence', () => {
     expect(withoutPlaceholder()).toEqual([]);
+  });
+
+  it('every table says when it is loading', () => {
+    // Without `[loading]` the table renders its empty text — "no roles", "no results" —
+    // while the request is still out, which asserts there is nothing when nothing has
+    // arrived yet. Seven pages had this and none of them was reported; they were simply
+    // fast enough that nobody caught the flash.
+    expect(tablesWithoutLoading()).toEqual([]);
   });
 });

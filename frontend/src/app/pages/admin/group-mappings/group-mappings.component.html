@@ -3,6 +3,8 @@
 </app-page-header>
 
 <app-data-table
+    [loading]="loading()"
+    [loadingText]="'common.loading' | t"
   [columns]="columns()"
   [rows]="rows()"
   [rowKey]="rowId"

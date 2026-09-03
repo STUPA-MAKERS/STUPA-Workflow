@@ -8,7 +8,9 @@
   }
 </app-page-header>
 
-<app-data-table [columns]="columns()" [rows]="members()" [rowKey]="rowId" [emptyText]="'admin.gremien.membersEmpty' | t">
+<app-data-table
+    [loading]="loading()"
+    [loadingText]="'common.loading' | t" [columns]="columns()" [rows]="members()" [rowKey]="rowId" [emptyText]="'admin.gremien.membersEmpty' | t">
   <ng-template appCell="email" let-m>{{ $any(m).email || '—' }}</ng-template>
   <ng-template appCell="roleLabel" let-m><app-badge variant="primary">{{ $any(m).roleLabel }}</app-badge></ng-template>
   <ng-template appCell="term" let-m><span class="text-muted text-sm">{{ $any(m).term }}</span></ng-template>

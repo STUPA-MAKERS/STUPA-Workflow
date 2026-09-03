@@ -51,6 +51,12 @@ export class PrivacyComponent {
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
 
+  /**
+   * True until the first answer. Without it the table shows its empty text while the
+   * request is still out, which asserts there is nothing when nothing has arrived yet.
+   */
+  protected readonly loading = signal(true);
+
   protected readonly erasures = signal<ErasureRequest[]>([]);
   protected readonly rejecting = signal<ErasureRequest | null>(null);
   protected readonly rejectReason = signal('');
@@ -76,7 +82,13 @@ export class PrivacyComponent {
   }
 
   protected reload(): void {
-    this.api.listErasures().subscribe((rows) => this.erasures.set(rows));
+    this.api.listErasures().subscribe({
+      next: (rows) => {
+        this.erasures.set(rows);
+        this.loading.set(false);
+      },
+      error: () => this.loading.set(false),
+    });
   }
 
   protected statusLabel(status: string): string {
