@@ -104,6 +104,19 @@ describe('BackupsComponent', () => {
     expect(screen.queryByRole('button', { name: 'Zurücksetzen' })).not.toBeInTheDocument();
   });
 
+  it('says why the import is dead rather than leaving a greyed-out button', async () => {
+    // The button was disabled with nothing beside it, which reads as a broken page. An
+    // import decrypts the archive to verify it, so it needs the private key.
+    const api = makeApi({ listBackups: jest.fn(() => of(list({ restoreEnabled: false }))) });
+    await setup(api);
+    expect(screen.getByText(/BACKUP_AGE_IDENTITY_FILE/)).toBeInTheDocument();
+  });
+
+  it('says nothing about the key when the key is there', async () => {
+    await setup();
+    expect(screen.queryByText(/BACKUP_AGE_IDENTITY_FILE/)).not.toBeInTheDocument();
+  });
+
   it('creates a backup with the typed note', async () => {
     const { api } = await setup();
     const note = screen.getByLabelText(/Notiz/i);

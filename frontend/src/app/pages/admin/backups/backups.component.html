@@ -27,6 +27,12 @@
     <div>
       <p class="bk__label">{{ 'admin.backups.importTitle' | t }}</p>
       <p class="text-muted text-sm mt-0">{{ 'admin.backups.importHint' | t }}</p>
+      <!-- A dead control with no reason beside it reads as a broken page. An import has
+           to decrypt the archive to verify it, so it needs the private key the API
+           does not have here. -->
+      @if (!restoreEnabled()) {
+        <p class="bk__disabledHint" role="note">{{ 'admin.backups.noIdentity' | t }}</p>
+      }
     </div>
     <label class="bk__file">
       <input
