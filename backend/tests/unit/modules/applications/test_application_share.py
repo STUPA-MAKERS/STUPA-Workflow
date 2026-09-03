@@ -694,6 +694,63 @@ def test_a_logo_served_over_plain_http_is_left_off() -> None:
     assert "STUPA" in html
 
 
+def test_a_logo_the_platform_serves_itself_is_shown() -> None:
+    """`BrandingAsset.url` allows an absolute path, and that is what an instance which
+    uploaded a logo actually stores. Refusing it rendered the bare app name on a page the
+    deployment had given a mark."""
+    html = render_share_page(
+        _view(),
+        app_name="STUPA",
+        canonical_url="https://x/s/t",
+        logo_url="/api/admin/branding/logo/wordmark.png",
+    )
+    assert '<img class="brand__logo" src="/api/admin/branding/logo/wordmark.png"' in html
+    assert "img-src 'self'" in share_csp("/api/admin/branding/logo/wordmark.png")
+
+
+def test_a_protocol_relative_logo_is_not_mistaken_for_a_path() -> None:
+    """`//host/logo.png` starts with a slash but is a remote host, and it inherits the
+    page scheme rather than naming one."""
+    assert "img-src 'none'" in share_csp("//cdn.example/logo.png")
+    html = render_share_page(
+        _view(), app_name="STUPA", canonical_url="https://x/s/t", logo_url="//cdn.example/l.png"
+    )
+    assert "cdn.example" not in html
+
+
+def test_the_preferred_badge_comes_before_the_label_it_marks() -> None:
+    """An offer label can run to several lines — a product name with a URL in it does.
+    With the badge after the label it wrapped to the bottom of that block, directly above
+    the NEXT offer, and read as marking that one."""
+    view = build_public_view(
+        _App(  # type: ignore[arg-type]
+            {
+                "title": "T",
+                "kosten": [
+                    {
+                        "label": "SSD",
+                        "offers": [
+                            {"label": "Kingston " + "x" * 120, "value": 269.8, "preferred": True},
+                            {"label": "Lexar " + "y" * 120, "value": 283.8},
+                        ],
+                    }
+                ],
+            }
+        ),
+        fields=[_positions_field()],
+        type_name=None,
+        gremium_name=None,
+        state_label=None,
+        lang="de",
+    )
+    html = render_share_page(view, app_name="STUPA", canonical_url="https://x/s/t")
+    badge = html.index("Bevorzugt")
+    kingston = html.index("Kingston")
+    lexar = html.index("Lexar")
+    # The badge sits between the start of its own row and its own label, never after it.
+    assert badge < kingston < lexar
+
+
 def test_the_policy_names_the_logo_source_and_nothing_wider() -> None:
     """`img-src https:` would allow any host on the internet. The page loads exactly one
     image, so the policy names exactly where it comes from."""
