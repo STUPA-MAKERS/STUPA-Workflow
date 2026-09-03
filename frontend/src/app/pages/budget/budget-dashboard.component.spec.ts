@@ -1,7 +1,8 @@
+import { BehaviorSubject } from 'rxjs';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { ActivatedRoute, provideRouter, Router } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
 import { AuthService } from '@core/auth/auth.service';
 import { BudgetDashboardComponent } from './budget-dashboard.component';
@@ -105,6 +106,7 @@ interface SetupOpts {
 async function setup(opts: SetupOpts = {}) {
   const tree = opts.tree ?? TREE;
   const fys = opts.fys ?? [FY];
+  const params = new BehaviorSubject(convertToParamMap(opts.queryParams ?? {}));
   const view = await render(BudgetDashboardComponent, {
     providers: [
       provideHttpClient(),
@@ -114,7 +116,10 @@ async function setup(opts: SetupOpts = {}) {
       {
         provide: ActivatedRoute,
         useValue: {
-          snapshot: { queryParamMap: new Map(Object.entries(opts.queryParams ?? {})) },
+          snapshot: { queryParamMap: params.value },
+          // The page follows the URL after the first restore, so the stub needs the
+          // stream and not only the snapshot.
+          queryParamMap: params,
         },
       },
     ],
@@ -128,7 +133,7 @@ async function setup(opts: SetupOpts = {}) {
   // The page does not list applications: that job belongs to /applications, which the
   // cross-link opens. No request goes out for them.
   view.fixture.detectChanges();
-  return { ...view, http, c: view.fixture.componentInstance as unknown as Inst };
+  return { ...view, http, params, c: view.fixture.componentInstance as unknown as Inst };
 }
 
 describe('BudgetDashboardComponent', () => {
@@ -598,6 +603,64 @@ describe('BudgetDashboardComponent', () => {
     expect(c.selectedBudgetId()).toBe('b-vs');
     expect(c.selectedKsId()).toBe('b-800');
     expect(c.selectedFyId()).toBe('fy-2');
+  });
+
+  it('follows the URL when the palette sends it here while it is already here', async () => {
+    // Same route, new query string: the router keeps this component alive. Nothing
+    // re-read the URL, so the page went on showing the cost centre the reader came
+    // from and the search hit looked ignored.
+    const { c, params } = await setup();
+    expect(c.selectedKsId()).toBe('b-vs');
+
+    params.next(convertToParamMap({ ks: 'b-800' }));
+
+    expect(c.selectedKsId()).toBe('b-800');
+  });
+
+  it('derives the budget from a cost centre the link names on its own', async () => {
+    // The global search sends `/budget?ks=…` with no budget. Falling back to the first
+    // budget put the right cost centre under the wrong root.
+    const tree = [
+      node({ id: 'b-other', key: 'OTHER', pathKey: 'OTHER', name: 'Andere',
+        byFiscalYear: [alloc({ fiscalYearId: 'fy-1' })], children: [] }),
+      ...TREE,
+    ];
+    const { c } = await setup({ tree, queryParams: { ks: 'b-800' } });
+
+    expect(c.selectedKsId()).toBe('b-800');
+    // b-800 hangs under b-vs, not under the first budget in the tree.
+    expect(c.selectedBudgetId()).toBe('b-vs');
+  });
+
+  it('leaves the selection alone when the URL repeats what is already shown', async () => {
+    // The write-back navigates on every selection change, so the stream re-emits what
+    // the page just wrote. Re-applying it would be work for nothing.
+    const { c, params } = await setup();
+    const before = [c.selectedBudgetId(), c.selectedKsId(), c.selectedFyId()];
+
+    params.next(convertToParamMap({ budget: 'b-vs', ks: 'b-vs', fy: 'fy-1' }));
+
+    expect([c.selectedBudgetId(), c.selectedKsId(), c.selectedFyId()]).toEqual(before);
+  });
+
+  it('stops at the highest cost centre it can see when the parent is out of scope', async () => {
+    // A gremium-scoped tree hands back sub cost centres as roots, so a root can name a
+    // parent that is not in the response. Walking up has to stop there rather than
+    // give up and fall back to the first budget.
+    const tree = [
+      node({
+        id: 'b-sub', parentId: 'b-not-in-scope', key: 'SUB', pathKey: 'SUB', name: 'Teilbereich',
+        byFiscalYear: [alloc({ fiscalYearId: 'fy-1' })],
+        children: [
+          node({ id: 'b-leaf', parentId: 'b-sub', key: 'LEAF', pathKey: 'SUB-LEAF', name: 'Blatt',
+            byFiscalYear: [alloc({ fiscalYearId: 'fy-1' })], children: [] }),
+        ],
+      }),
+    ];
+    const { c } = await setup({ tree, queryParams: { ks: 'b-leaf' } });
+
+    expect(c.selectedKsId()).toBe('b-leaf');
+    expect(c.selectedBudgetId()).toBe('b-sub');
   });
 
   it('ignores invalid query params and defaults to the first budget/year', async () => {

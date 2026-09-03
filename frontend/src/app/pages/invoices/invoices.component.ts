@@ -12,7 +12,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, type ParamMap } from '@angular/router';
+import { ActivatedRoute, type ParamMap, Router } from '@angular/router';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -83,6 +83,7 @@ import {
 export class InvoicesComponent implements OnDestroy {
   private readonly api = inject(BudgetTreeApi);
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
@@ -289,6 +290,30 @@ export class InvoicesComponent implements OnDestroy {
       if (this.adoptUrlFilters(qp)) this.reload();
     });
 
+    // Write the filters back, so the URL always states what the list is showing.
+    //
+    // Reading the URL without writing it let the two drift apart, and the drift broke
+    // the palette. Reset cleared the filters but left `?id=…` behind; picking that same
+    // invoice again then navigated to the URL the browser was ALREADY on, the router
+    // dropped it as a same-URL navigation, `queryParamMap` never emitted — and nothing
+    // happened at all. Keeping the URL true means the palette's target differs from the
+    // current URL exactly when the list would actually change.
+    //
+    // `replaceUrl`, so filtering does not fill the back button with one entry per
+    // keystroke. This mirrors /expenses.
+    effect(() => {
+      const queryParams: Record<string, string | null> = {};
+      for (const f of this.filterSignals) {
+        queryParams[f.key as string] = f.signal().trim() || null;
+      }
+      void this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams,
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
+      });
+    });
+
     // Infinite scroll. When the sentinel at the list end appears, load the next page.
     effect((onCleanup) => {
       const el = this.sentinel()?.nativeElement;
@@ -316,10 +341,37 @@ export class InvoicesComponent implements OnDestroy {
    * clearing on absence would wipe it.
    */
   private adoptUrlFilters(qp: ParamMap): boolean {
-    const id = qp.get('id');
-    if (!id || id === this.invoiceId()) return false;
-    this.invoiceId.set(id);
-    return true;
+    let changed = false;
+    for (const f of this.filterSignals) {
+      // Absence clears. Every one of these is written back by the effect in the
+      // constructor, so a parameter that is gone was taken away rather than merely
+      // omitted — the same rule /expenses states. Reading only what was present is what
+      // let a filter survive in the list after the URL had dropped it.
+      const next = this.sanitizeFilter(f, qp.get(f.key as string) ?? '');
+      if (next !== f.signal()) {
+        f.signal.set(next);
+        changed = true;
+      }
+    }
+    return changed;
+  }
+
+  /**
+   * A query string is typed by whoever holds the link, so it can name a value the panel
+   * itself could never produce. Reading every filter from it — rather than only `id` —
+   * is what makes that reachable, so each one is checked on the way in: a bad number
+   * would otherwise reach the request as `NaN`, and a bad status as a word the API has
+   * no case for.
+   */
+  private sanitizeFilter(
+    f: { readonly key: keyof InvoiceQuery; readonly numeric?: boolean },
+    raw: string,
+  ): string {
+    const value = raw.trim();
+    if (value === '') return '';
+    if (f.numeric) return Number.isFinite(Number(value)) ? value : '';
+    if (f.key === 'status') return value === 'open' || value === 'paid' ? value : '';
+    return value;
   }
 
   money(amount: string): string {

@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, type ParamMap, Router, RouterLink } from '@angular/router';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
@@ -312,8 +313,29 @@ export class BudgetDashboardComponent {
     return this.i18n.translate(`budget.overview.metric.${m}` as TranslationKey);
   }
 
+  /**
+   * The query params to resolve the selection from.
+   *
+   * A field rather than `route.snapshot`, because the snapshot is read while the tree
+   * and the fiscal years are still arriving: by then the reader may already have been
+   * sent somewhere else, and the restore would answer the URL the page opened with
+   * instead of the one it is on.
+   */
+  private urlParams: ParamMap = this.route.snapshot.queryParamMap;
+
+  /** Outstanding fiscal-year requests. See `resolveSelection`. */
+  private pendingFiscalYears = 0;
+
   constructor() {
     this.load();
+
+    // The palette can send us here while we are already here. The router keeps this
+    // component alive for a query-string-only change, so without this the URL named one
+    // cost centre and the page went on showing another.
+    this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((qp) => {
+      this.urlParams = qp;
+      this.applyUrlSelection();
+    });
   }
 
   money(value: string | number | null | undefined, currency = 'EUR'): string {
@@ -356,13 +378,20 @@ export class BudgetDashboardComponent {
         const tops = tree.filter((n) => !n.hiddenInBudget);
         // Load the fiscal years of all top budgets for the left tree. The requests
         // run in parallel and a failure of one does not stop the others.
+        // How many fiscal-year responses are still out. `resolveSelection` uses it to
+        // tell "this budget has no years" from "its years have not arrived yet".
+        this.pendingFiscalYears = tops.length;
         for (const top of tops) {
           this.api.listFiscalYears(top.id as Uuid).subscribe({
             next: (fys) => {
               this.fiscalYearsByBudget.update((m) => ({ ...m, [top.id]: fys }));
+              this.pendingFiscalYears--;
               this.restoreOrDefault(tops);
             },
-            error: () => this.restoreOrDefault(tops),
+            error: () => {
+              this.pendingFiscalYears--;
+              this.restoreOrDefault(tops);
+            },
           });
         }
         if (tops.length) {
@@ -381,27 +410,93 @@ export class BudgetDashboardComponent {
   private restored = false;
   private restoreOrDefault(tops: BudgetTreeNode[]): void {
     if (this.restored || !tops.length) return;
-    // Only budgets with a fiscal year are selectable in the budget tab.
-    const withFy = tops.filter(
-      (t) => (this.fiscalYearsByBudget()[t.id]?.length ?? 0) > 0,
-    );
-    if (!withFy.length) return; // no fiscal year loaded yet, try again later
-    const qp = this.route.snapshot.queryParamMap;
-    const qpBudget = qp.get('budget');
-    const budgetId =
-      qpBudget &&
-      this.nodeById().get(qpBudget) &&
-      (this.fiscalYearsByBudget()[qpBudget]?.length ?? 0) > 0
-        ? qpBudget
-        : withFy[0].id;
-    const fys = this.fiscalYearsByBudget()[budgetId];
-    if (fys === undefined) return; // not loaded yet, try again later
+    const next = this.resolveSelection(tops);
+    if (next === null) return; // not loaded yet, try again later
     this.restored = true;
-    const ksId = qp.get('ks') && this.nodeById().get(qp.get('ks')!) ? qp.get('ks')! : budgetId;
-    const fyId = qp.get('fy') && fys.some((f) => f.id === qp.get('fy')) ? qp.get('fy')! : (fys[0]?.id ?? '');
-    this.selectedBudgetId.set(budgetId);
-    this.selectedKsId.set(ksId);
-    this.selectedFyId.set(fyId);
+    this.selectedBudgetId.set(next.budgetId);
+    this.selectedKsId.set(next.ksId);
+    this.selectedFyId.set(next.fyId);
+  }
+
+  /**
+   * Follow the URL after the first restore, so a link into this page works while the
+   * reader is already on it.
+   *
+   * The global search sends a cost centre here as `/budget?ks=…`, and the router keeps
+   * this component alive for a query-string-only change. Nothing re-read the URL, so the
+   * selection stayed where it was and the hit looked ignored. `restoreOrDefault` could
+   * not do this job: it is latched, because its OTHER job is to pick a default exactly
+   * once while the tree and the fiscal years trickle in.
+   */
+  private applyUrlSelection(): void {
+    const tops = this.tree().filter((n) => !n.hiddenInBudget);
+    const next = this.resolveSelection(tops);
+    if (next === null) return; // nothing loaded yet; the restore will pick it up
+    if (
+      next.budgetId === this.selectedBudgetId() &&
+      next.ksId === this.selectedKsId() &&
+      next.fyId === this.selectedFyId()
+    ) {
+      return;
+    }
+    this.restored = true;
+    this.selectedBudgetId.set(next.budgetId);
+    this.selectedKsId.set(next.ksId);
+    this.selectedFyId.set(next.fyId);
+  }
+
+  /**
+   * What the current URL selects, or `null` while the data it names is still arriving.
+   *
+   * One resolver for both entry points, so a deep link cannot mean one thing on arrival
+   * and another when it is followed later.
+   */
+  private resolveSelection(
+    tops: BudgetTreeNode[],
+  ): { budgetId: string; ksId: string; fyId: string } | null {
+    if (!tops.length) return null;
+    // Only budgets with a fiscal year are selectable in the budget tab.
+    const withFy = tops.filter((t) => (this.fiscalYearsByBudget()[t.id]?.length ?? 0) > 0);
+    if (!withFy.length) return null; // no fiscal year loaded yet, try again later
+    const qp = this.urlParams;
+    const selectable = (id: string | null): boolean =>
+      !!id && !!this.nodeById().get(id) && (this.fiscalYearsByBudget()[id]?.length ?? 0) > 0;
+
+    const ks = qp.get('ks');
+    const qpBudget = qp.get('budget');
+    // A search hit is `?ks=…` alone. Taking the first budget then showed the right cost
+    // centre hanging under the wrong root, so the budget comes from the cost centre
+    // itself when the URL does not name one.
+    const derived = ks && this.nodeById().get(ks) ? this.rootOf(ks) : null;
+    const wanted = selectable(qpBudget) ? qpBudget : selectable(derived) ? derived : null;
+    // The fiscal years of each top budget arrive as separate responses, and this runs
+    // after every one of them. A URL that names a budget whose years have not landed yet
+    // must WAIT rather than settle for the first budget that happens to be ready — the
+    // choice is latched, so settling early meant the link silently opened the wrong cost
+    // centre and never corrected itself.
+    if (wanted === null && (ks || qpBudget) && this.pendingFiscalYears > 0) return null;
+    const budgetId = wanted ?? withFy[0].id;
+
+    const fys = this.fiscalYearsByBudget()[budgetId];
+    if (fys === undefined) return null; // not loaded yet, try again later
+    const fy = qp.get('fy');
+    return {
+      budgetId,
+      ksId: ks && this.nodeById().get(ks) ? ks : budgetId,
+      fyId: fy && fys.some((f) => f.id === fy) ? fy : (fys[0]?.id ?? ''),
+    };
+  }
+
+  /** The top budget a cost centre hangs under. */
+  private rootOf(id: string): string | null {
+    const map = this.nodeById();
+    let node = map.get(id) ?? null;
+    while (node?.parentId) {
+      const parent = map.get(node.parentId);
+      if (!parent) break;
+      node = parent;
+    }
+    return node?.id ?? null;
   }
 
   private syncUrl(): void {
