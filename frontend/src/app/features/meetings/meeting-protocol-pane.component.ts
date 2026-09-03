@@ -38,6 +38,12 @@ export class MeetingProtocolPaneComponent {
 
   readonly meeting = input.required<Meeting>();
   readonly protocol = input.required<Protocol | null>();
+  /**
+   * Write the minutes. It is narrower than `meeting().canWrite`: once a
+   * protokollant is named, only that person edits the text, so that two people
+   * never type into one protocol. Everybody else reads the pane.
+   */
+  readonly canEdit = input.required<boolean>();
   /** TOP selected in the left pane, plus its 0-based index. */
   readonly top = input.required<AgendaItem | null>();
   readonly topIndex = input.required<number>();
