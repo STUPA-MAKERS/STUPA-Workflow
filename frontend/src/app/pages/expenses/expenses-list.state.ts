@@ -1,4 +1,5 @@
-import { computed, inject, signal } from '@angular/core';
+import { computed, inject, signal,
+  type WritableSignal } from '@angular/core';
 import type { SelectOption } from '@stupa-makers/ui-kit';
 import { downloadBlob } from '@shared/download.util';
 import {
@@ -102,13 +103,33 @@ export class ExpensesListState {
     this.debouncedReload();
   }
 
+  /**
+   * Every filter that reaches the request, and whether "Zurücksetzen" clears it.
+   *
+   * One list, because the filters used to be spelled out separately in the reset and in
+   * the request builder, and a filter added to one and forgotten in the other is
+   * invisible until someone notices the list not changing. `filterSignals` is what the
+   * spec walks.
+   *
+   * `q` and `budgetId` are NOT cleared. Both are controls outside the filter panel — the
+   * search box in the page header and the cost-centre tree beside the table — and the
+   * reset button belongs to the panel. Note that /applications clears both, because there
+   * the search sits inside its panel.
+   */
+  readonly filterSignals: readonly { signal: WritableSignal<string>; clearedByReset: boolean }[] =
+    [
+      { signal: this.kind as WritableSignal<string>, clearedByReset: true },
+      { signal: this.expenseId, clearedByReset: true },
+      { signal: this.amountMin, clearedByReset: true },
+      { signal: this.amountMax, clearedByReset: true },
+      { signal: this.createdFrom, clearedByReset: true },
+      { signal: this.createdTo, clearedByReset: true },
+      { signal: this.q, clearedByReset: false },
+      { signal: this.budgetId, clearedByReset: false },
+    ];
+
   resetFilters(): void {
-    this.kind.set('');
-    this.expenseId.set('');
-    this.amountMin.set('');
-    this.amountMax.set('');
-    this.createdFrom.set('');
-    this.createdTo.set('');
+    for (const f of this.filterSignals) if (f.clearedByReset) f.signal.set('');
     this.reload();
   }
 

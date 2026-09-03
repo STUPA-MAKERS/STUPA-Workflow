@@ -2322,3 +2322,42 @@ describe('ExpensesComponent — shared table wiring', () => {
     expect(c.selected()).toEqual(new Set(['e-2']));
   });
 });
+
+describe('ExpensesComponent (filters, generically)', () => {
+  /**
+   * Walks the state's own filter list rather than naming filters, so one added later is
+   * covered the day it is declared.
+   *
+   * On /applications the same class of mistake shipped: a filter reached the request but
+   * not the reset, and the panel cleared while the list kept its rows. Here the reset
+   * reloads either way, so the failure is quieter — a filter silently surviving a reset —
+   * which is why it wants a check rather than a pair of eyes.
+   */
+  it('clears every filter it says it clears, and keeps the ones it does not', async () => {
+    const { fixture } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const state = (fixture.componentInstance as any).list;
+
+    for (const f of state.filterSignals) f.signal.set('x');
+    state.resetFilters();
+
+    for (const f of state.filterSignals) {
+      expect(f.signal()).toBe(f.clearedByReset ? '' : 'x');
+    }
+  });
+
+  it('sends every declared filter that has a value', async () => {
+    // The reset list and the request list were spelled out separately; a filter in one
+    // and not the other is invisible until the list stops answering.
+    const { fixture } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const state = (fixture.componentInstance as any).list;
+    for (const f of state.filterSignals) f.signal.set('7');
+
+    const params = state.filterParams();
+    const values = Object.values(params).filter((v) => v !== undefined);
+    // Eight filters plus sort and order.
+    expect(values.length).toBe(state.filterSignals.length + 2);
+  });
+});
+
