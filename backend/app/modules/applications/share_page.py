@@ -36,6 +36,13 @@ from app.modules.applications.share import (
 #: goes here is public the moment the link is pasted.
 _PREVIEW_DESCRIPTION = {"de": "Geteilter Antrag", "en": "Shared application"}
 
+#: The platform's own wordmark, as the SPA header uses it: black text for a light
+#: background, white text for a dark one. Served by this origin from the frontend bundle,
+#: so `img-src 'self'` covers it. Absolute, never relative — this page lives at
+#: `/s/{token}`, where a relative path would resolve under `/s/`.
+_WORDMARK_LIGHT = "/assets/logos/stupa-wordmark-light.svg"
+_WORDMARK_DARK = "/assets/logos/stupa-wordmark-dark.svg"
+
 #: Every reader-facing string on the page. The route already knows the language of the
 #: application, so a German page around English content (or the reverse) would be a
 #: choice rather than an oversight.
@@ -89,12 +96,23 @@ _CSS = """:root { color-scheme: light dark;
 body { margin: 0; background: var(--bg); color: var(--fg);
   font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
 main { max-width: 46rem; margin-inline: auto; padding: 0 1rem 3rem; }
-.brand { background: var(--brand); color: var(--on-brand); padding: 1rem;
-  margin-bottom: 2rem; }
+/* The page surface, not a brand-coloured band. The wordmark comes in two variants, one
+   with black text for a light background and one with white text for a dark one. On a
+   green band neither pairs with the page theme, and picking by contrast-with-the-band
+   inverts the rule for whoever edits this next. The green stays where it carries
+   meaning, on the button. */
+.brand { background: var(--card); color: var(--fg); padding: 1rem;
+  margin-bottom: 2rem; border-bottom: 1px solid var(--line); }
 .brand__in { max-width: 46rem; margin-inline: auto; display: flex; align-items: center;
   gap: 0.75rem; }
 .brand__logo { height: 2rem; width: auto; max-width: 12rem; object-fit: contain; }
-.brand__name { font-weight: 600; letter-spacing: 0.01em; }
+/* One wordmark per theme, switched here rather than in the markup, so it still follows
+   a system theme the reader changes while the page is open. */
+.brand__logo--dark { display: none; }
+@media (prefers-color-scheme: dark) {
+  .brand__logo--light { display: none; }
+  .brand__logo--dark { display: inline-block; }
+}
 h1 { font-size: 1.75rem; line-height: 1.2; margin: 0 0 0.75rem; letter-spacing: -0.01em; }
 h2 { font-size: 1rem; margin: 0 0 0.75rem; color: var(--muted); font-weight: 600;
   text-transform: uppercase; letter-spacing: 0.06em; }
@@ -158,12 +176,13 @@ footer { color: var(--muted); font-size: 0.875rem; margin-top: 2.5rem; }
 #: import time, so nothing has to trust arbitrary inline CSS.
 _STYLE_HASH = base64.b64encode(hashlib.sha256(_CSS.encode()).digest()).decode()
 
-#: The policy for a page without a logo, which is also the narrowest one: no images at
-#: all. `share_csp` widens `img-src` by exactly the one source a logo needs.
+#: The base policy. `img-src 'self'` because the page always carries a wordmark, and the
+#: fallback one is served by this very origin. `share_csp` adds the source an
+#: instance-configured logo needs, and nothing wider.
 SHARE_CSP = (
     "default-src 'none'; "
     f"style-src 'sha256-{_STYLE_HASH}'; "
-    "img-src 'none'; "
+    "img-src 'self'; "
     "frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
 )
 
@@ -172,13 +191,41 @@ def share_csp(logo_url: str | None) -> str:
     """The policy for one rendered page, naming where its logo may come from.
 
     `img-src https:` would allow every host on the internet to be contacted from a page
-    an outsider opens. The page loads at most one image, so the policy names exactly that
-    source and nothing wider.
+    an outsider opens. The page loads one image, so the policy names exactly where that
+    one may come from: this origin, plus the configured logo's own source if there is one.
     """
     source = _logo_source(logo_url)
-    if source is None:
+    if source is None or source == "'self'":
         return SHARE_CSP
-    return SHARE_CSP.replace("img-src 'none'", f"img-src {source}")
+    return SHARE_CSP.replace("img-src 'self'", f"img-src 'self' {source}")
+
+
+def _render_logo(logo_url: str | None, app_name: str) -> str:
+    """The header mark.
+
+    A deployment's own logo wins. Without one the page uses the platform's wordmark,
+    which is where the mark in the app header comes from too — it is a bundled asset and
+    NOT part of the site config, which is why a page that only read the config showed the
+    app name as text while every other page showed a logo.
+
+    Two files, one per theme. Both are rendered and CSS hides one, rather than a
+    `<picture>` choosing at load: a `<picture>` picks its source when the document is
+    parsed and does NOT re-pick when the reader's system theme flips afterwards, which
+    left the black-text mark sitting on the dark header until a reload. A media query
+    keeps working for as long as the page is open, and this page carries no script to fix
+    it up. The second copy is one more small same-origin SVG.
+    """
+    if logo_url and _logo_source(logo_url) is not None:
+        return (
+            f'<img class="brand__logo" src="{escape(logo_url.strip())}" '
+            f'alt="{escape(app_name)}">'
+        )
+    return (
+        f'<img class="brand__logo brand__logo--light" src="{_WORDMARK_LIGHT}" '
+        f'alt="{escape(app_name)}">'
+        f'<img class="brand__logo brand__logo--dark" src="{_WORDMARK_DARK}" alt=""'
+        ' aria-hidden="true">'
+    )
 
 
 def _logo_source(logo_url: str | None) -> str | None:
@@ -262,12 +309,7 @@ def render_share_page(
             f'  <p class="cta__hint">{escape(text["open_hint"])}</p>'
         )
 
-    logo = ""
-    if _logo_source(logo_url) is not None and logo_url:
-        logo = (
-            f'<img class="brand__logo" src="{escape(logo_url.strip())}" '
-            f'alt="{escape(app_name)}">'
-        )
+    logo = _render_logo(logo_url, app_name)
 
     description = _PREVIEW_DESCRIPTION.get(lang, _PREVIEW_DESCRIPTION["de"])
 
@@ -294,7 +336,7 @@ def render_share_page(
 </head>
 <body>
 <header class="brand">
-  <div class="brand__in">{logo}<span class="brand__name">{escape(app_name)}</span></div>
+  <div class="brand__in">{logo}</div>
 </header>
 <main>
   <h1>{title}</h1>
