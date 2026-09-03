@@ -10,9 +10,11 @@ import {
   liveOpenedVote,
   longDate,
   meetingStatusKey,
+  meetingTimeSuffix,
   meetingStatusVariant,
   pickBeamerVote,
   resolveI18n,
+  shortTime,
   voteOptionLabel,
   voteOptionsFor,
   voteResultKey,
@@ -128,6 +130,27 @@ describe('meetings-display.util', () => {
     expect(longDate('2026-06-14', 'de')).toBe('14. Juni 2026');
     expect(longDate('2026-06-14', 'en')).toBe('June 14, 2026');
     expect(longDate('not-a-date', 'de')).toBe('not-a-date');
+  });
+
+  it('shortens a clock time to HH:MM and keeps 24 h', () => {
+    // The API sends the SQL `time` as `HH:MM:SS`. Only hours and minutes are shown.
+    expect(shortTime('18:00:00')).toBe('18:00');
+    expect(shortTime('08:05:30.5')).toBe('08:05');
+    expect(shortTime('18:00')).toBe('18:00');
+    expect(shortTime('9:05')).toBe('09:05');
+    expect(shortTime('')).toBe('');
+    expect(shortTime(null)).toBe('');
+    expect(shortTime(undefined)).toBe('');
+    // Text that is not a time stays as it is. Garbage is better than a wrong time.
+    expect(shortTime('bald')).toBe('bald');
+    expect(shortTime('25:00:00')).toBe('25:00:00');
+  });
+
+  it('builds the ", HH:MM" suffix of a meeting date, or nothing', () => {
+    expect(meetingTimeSuffix('18:00:00')).toBe(', 18:00');
+    expect(meetingTimeSuffix('18:00')).toBe(', 18:00');
+    expect(meetingTimeSuffix(null)).toBe('');
+    expect(meetingTimeSuffix('  ')).toBe('');
   });
 
   it('builds a placeholder vote from a live vote_opened message', () => {

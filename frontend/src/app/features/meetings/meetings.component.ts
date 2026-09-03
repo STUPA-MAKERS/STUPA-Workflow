@@ -60,6 +60,7 @@ import {
   countEntries,
   meetingStatusKey,
   meetingStatusVariant,
+  meetingTimeSuffix,
   resolveI18n,
   voteOptionLabel,
   voteOptionsFor,
@@ -570,6 +571,11 @@ export class MeetingsComponent implements OnDestroy {
 
   voteOptionLabel(opt: string): string {
     return voteOptionLabel(opt, (key) => this.i18n.translate(key));
+  }
+
+  /** `", 18:00"` behind the meeting date, or nothing. See meetings-display.util. */
+  timeSuffix(startTime: string | null | undefined): string {
+    return meetingTimeSuffix(startTime);
   }
 
   statusVariant(status: Meeting['status']): BadgeVariant {

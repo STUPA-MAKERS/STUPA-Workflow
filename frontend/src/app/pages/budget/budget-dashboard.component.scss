@@ -96,6 +96,18 @@
   color: var(--color-text);
 }
 
+/* The one next step out of the empty panel. It carries the whole message, so it is a
+   full link colour and not the muted tone of the cross-links in the usage section. */
+.bd__emptyLink {
+  color: var(--color-primary);
+  font-weight: var(--fw-semibold);
+  text-decoration: none;
+}
+.bd__emptyLink:hover,
+.bd__emptyLink:focus-visible {
+  text-decoration: underline;
+}
+
 /* The applications go below the tree table, not beside it. */
 .bd__cols {
   display: grid;

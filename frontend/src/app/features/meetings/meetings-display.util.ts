@@ -123,6 +123,27 @@ export function longDate(isoDate: string, i18nLocale: string): string {
   return new Intl.DateTimeFormat(locale, { dateStyle: 'long' }).format(date);
 }
 
+/**
+ * Clock time of a meeting as `HH:MM`, always 24 h.
+ *
+ * The API sends a SQL `time`, thus `18:00:00`. The seconds are noise on screen.
+ * An empty value gives an empty string. A value that is not a time stays as it
+ * is, because unreadable source text tells more than an invented time. The
+ * format stays 24 h on purpose: `app-time-input` also forces 24 h, because the
+ * native `type="time"` follows the browser locale and can show AM/PM.
+ */
+export function shortTime(value: string | null | undefined): string {
+  const raw = (value ?? '').trim();
+  const match = /^([01]?\d|2[0-3]):([0-5]\d)(?::[0-5]\d(?:\.\d+)?)?$/.exec(raw);
+  return match ? `${match[1].padStart(2, '0')}:${match[2]}` : raw;
+}
+
+/** `", 18:00"` suffix behind a meeting date, or an empty string. */
+export function meetingTimeSuffix(value: string | null | undefined): string {
+  const time = shortTime(value);
+  return time ? `, ${time}` : '';
+}
+
 /** Placeholder vote for a live `vote_opened` that was not loaded yet (follower). */
 export function liveOpenedVote(
   msg: Extract<ServerMessage, { type: 'vote_opened' }>,

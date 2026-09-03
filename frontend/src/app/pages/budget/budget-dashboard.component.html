@@ -30,12 +30,27 @@
       <span class="skel skel--line"></span>
       <span class="skel skel--line"></span>
     </aside>
-    <main class="bd__main">
+    <div class="bd__main">
       <span class="skel skel--panel"></span>
       <span class="sr-only" role="status">{{ 'budget.loading' | t }}</span>
-    </main>
+    </div>
   </div>
-} @else if (!tree().length) {
+} @else if (emptyReason() === 'noFiscalYear') {
+  <!-- Cost centres exist; the fiscal year does not. Saying "nothing is created yet"
+       here names the wrong cause, so this branch names the fiscal year and points at
+       the page that creates one. -->
+  <section class="bd__empty">
+    <h2 class="bd__emptyTitle">{{ 'budget.empty.noFiscalYear.title' | t }}</h2>
+    <p>{{ 'budget.empty.noFiscalYear.body' | t }}</p>
+    @if (canManageStructure()) {
+      <p>
+        <a class="bd__emptyLink" [routerLink]="['/admin/budget-pots']">
+          {{ 'budget.empty.noFiscalYear.action' | t }}
+        </a>
+      </p>
+    }
+  </section>
+} @else if (emptyReason()) {
   <section class="bd__empty">
     <h2 class="bd__emptyTitle">{{ 'budget.empty.title' | t }}</h2>
     <p>{{ 'budget.empty.body' | t }}</p>
@@ -66,7 +81,10 @@
       </div>
     </aside>
 
-    <main class="bd__main">
+    <!-- Not a `<main>`: the shell already wraps the routed page in one, and a main
+         landmark inside a main landmark is invalid HTML that gives a screen reader two
+         "main" regions with no way to tell which is the page. -->
+    <div class="bd__main">
       @if (breadcrumbs().length > 1) {
         <nav class="flex flex-wrap items-center gap-2" [attr.aria-label]="'budget.breadcrumbs' | t">
           @for (node of breadcrumbs(); track node.id; let last = $last) {
@@ -119,7 +137,7 @@
           <ng-template appCell="available" let-row><span [class.bd__neg]="$any(row).available < 0">{{ money($any(row).available, $any(row).node.currency) }}</span></ng-template>
         </app-data-table>
       </section>
-    </main>
+    </div>
 
     <!-- The pie charts cover the direct sub cost centers only. -->
     <aside class="bd__charts">

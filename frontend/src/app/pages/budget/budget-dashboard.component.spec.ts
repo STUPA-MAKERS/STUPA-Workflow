@@ -742,4 +742,83 @@ describe('BudgetDashboardComponent', () => {
     expect(c.selectedBudgetId()).toBe('');
     http.verify();
   });
+
+  it('nests no second main landmark inside the shell main', async () => {
+    // The shell already wraps the routed page in `<main id="main">`. A `<main>` in a
+    // page template makes a landmark inside a landmark: HTML forbids it, and a screen
+    // reader then offers two "main" regions without a way to tell which is the page.
+    const view = await setup();
+    expect(view.container.querySelectorAll('main')).toHaveLength(0);
+    const region = view.container.querySelector('.bd__main');
+    expect(region).toBeTruthy();
+    expect(region!.getAttribute('role')).toBeNull();
+  });
+
+  it('nests no second main landmark while the tree is still loading', async () => {
+    const view = await render(BudgetDashboardComponent, {
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        { provide: AuthService, useValue: authStub() },
+      ],
+    });
+    const http = TestBed.inject(HttpTestingController);
+    view.fixture.detectChanges();
+    expect(view.container.querySelector('[aria-busy="true"]')).toBeTruthy();
+    expect(view.container.querySelectorAll('main')).toHaveLength(0);
+    http.expectOne((r) => r.url.endsWith('/budgets')).flush([]);
+    view.fixture.detectChanges();
+    http.verify();
+  });
+
+  it('blames the missing fiscal year, not the cost centres, when only the year is gone', async () => {
+    // 46 seeded cost centres and no fiscal year read as "nothing is created yet" before.
+    // The two claims need different words, and different next steps.
+    const view = await setup({ fys: [] });
+    expect(view.container.querySelector('.bd__empty')).toBeTruthy();
+    expect(screen.getByText('Kein Haushaltsjahr angelegt')).toBeTruthy();
+    expect(screen.queryByText('Noch keine Budgetdaten')).toBeNull();
+    const link = screen.getByRole('link', { name: 'Haushaltsjahr anlegen' });
+    expect(link.getAttribute('href')).toBe('/admin/budget-pots');
+  });
+
+  it('keeps the "nothing is configured" wording when there is no cost centre at all', async () => {
+    const view = await setup({ tree: [], fys: [] });
+    expect(screen.getByText('Noch keine Budgetdaten')).toBeTruthy();
+    expect(screen.queryByText('Kein Haushaltsjahr angelegt')).toBeNull();
+    expect(view.container.querySelector('.bd__empty')).toBeTruthy();
+  });
+
+  it('claims neither empty state while the fiscal years are still on the wire', async () => {
+    // The tree lands first and the years follow, one response per budget. "No budget has
+    // a year" is not a fact until the last of them is in.
+    const view = await render(BudgetDashboardComponent, {
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        { provide: AuthService, useValue: authStub() },
+      ],
+    });
+    const http = TestBed.inject(HttpTestingController);
+    const c = view.fixture.componentInstance as unknown as Inst;
+    http.expectOne((r) => r.url.endsWith('/budgets')).flush(TREE);
+    view.fixture.detectChanges();
+    expect(c.emptyReason()).toBeNull();
+    expect(screen.queryByText('Kein Haushaltsjahr angelegt')).toBeNull();
+
+    http.expectOne((r) => r.url.endsWith('/budgets/b-vs/fiscal-years')).flush([]);
+    view.fixture.detectChanges();
+    expect(c.emptyReason()).toBe('noFiscalYear');
+    http.verify();
+  });
+
+  it('hides the fiscal-year link from a reader who cannot create one', async () => {
+    // /admin/budget-pots needs `budget.structure`. Without it the link only leads to a
+    // 403, so the panel states the cause and stops there.
+    await setup({ fys: [], can: false });
+    expect(screen.getByText('Kein Haushaltsjahr angelegt')).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'Haushaltsjahr anlegen' })).toBeNull();
+  });
 });

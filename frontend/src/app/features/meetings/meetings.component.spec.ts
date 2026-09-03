@@ -2697,4 +2697,67 @@ describe('MeetingsComponent — methods', () => {
       http.verify();
     });
   });
+
+  describe('date, time and DOM ids', () => {
+    /** The API sends a SQL `time`, thus `18:00:00`. The seconds are noise on screen. */
+    const AT_18: MeetingOutWire = { ...MEETING, startTime: '18:00:00', endTime: '20:30:00' };
+
+    it('prints the list time as HH:MM and drops the seconds of the API', async () => {
+      const { container } = await setup({
+        id: null,
+        meetings: [{ ...AT_18, title: 'Vergangene Sitzung', status: 'closed' }],
+      });
+      expect(await screen.findByText('Vergangene Sitzung')).toBeInTheDocument();
+      expect(container.textContent).toContain('18:00');
+      expect(container.textContent).not.toContain('18:00:00');
+    });
+
+    it('prints the detail header time as HH:MM', async () => {
+      const { container, http } = await setup();
+      http.expectOne('/api/meetings/m-1').flush(AT_18);
+      http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
+      http.expectOne('/api/meetings/m-1/attendance').flush([]);
+      http.expectOne('/api/meetings/m-1/agenda').flush([]);
+      http.expectOne('/api/meetings/m-1/agenda/assignable').flush([]);
+      flushDelegationContext(http);
+      expect(await screen.findByText('Sitzungssteuerung')).toBeInTheDocument();
+      expect(container.textContent).toContain('18:00');
+      expect(container.textContent).not.toContain('18:00:00');
+    });
+
+    it('gives each element of the create dialog exactly one DOM id', async () => {
+      // A STATIC `id="x"` on `app-time-input` lands twice: Angular binds it to the
+      // matching `@Input() id` AND leaves the attribute on the host element. The
+      // `label[for]` then points at the host, not at the field. A property binding
+      // `[id]="'x'"` does not reflect onto the host.
+      const { container, fixture } = await setup({ id: null });
+      const cmp = fixture.componentInstance as Cmp;
+      cmp.openCreate();
+      fixture.detectChanges();
+
+      expect(container.querySelectorAll('#mtg-new-time')).toHaveLength(1);
+      expect(container.querySelectorAll('#mtg-new-end-time')).toHaveLength(1);
+      // The label must reach the input field.
+      expect(container.querySelector('#mtg-new-time')?.tagName).toBe('INPUT');
+      expect(container.querySelector('#mtg-new-end-time')?.tagName).toBe('INPUT');
+
+      const ids = Array.from(container.querySelectorAll('[id]')).map((el) => el.id);
+      const duplicates = ids.filter((id, i) => ids.indexOf(id) !== i);
+      expect(duplicates).toEqual([]);
+    });
+
+    it('gives each element of the settings dialog exactly one DOM id', async () => {
+      const { container, cmp, fixture, http } = await loaded();
+      cmp.openSettings(cmp.meeting()!);
+      http.expectOne('/api/meetings/m-1/attendance').flush([]);
+      fixture.detectChanges();
+
+      expect(container.querySelector('#mtg-set-time')?.tagName).toBe('INPUT');
+      expect(container.querySelector('#mtg-set-end-time')?.tagName).toBe('INPUT');
+
+      const ids = Array.from(container.querySelectorAll('[id]')).map((el) => el.id);
+      const duplicates = ids.filter((id, i) => ids.indexOf(id) !== i);
+      expect(duplicates).toEqual([]);
+    });
+  });
 });

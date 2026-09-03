@@ -285,6 +285,17 @@ describe('DashboardComponent', () => {
     http.verify();
   });
 
+  it('prints the session time as HH:MM and drops the seconds of the API', async () => {
+    // The API sends `startTime` as `HH:MM:SS`. Pasting it behind the date printed the
+    // seconds on the tile, which no other timestamp in the app does.
+    const withTime = { ...(meeting('t', 'planned', '2026-07-10') as object), startTime: '18:00:00' };
+    const { fixture } = await setup(MEMBER, { meetings: [withTime] });
+    fixture.detectChanges();
+    const tile = fixture.nativeElement.querySelector('.dash__session-date') as HTMLElement;
+    expect(tile.textContent).toContain('18:00');
+    expect(tile.textContent).not.toContain('18:00:00');
+  });
+
   it('ranks session shortcuts live-first, then planned by date, dropping closed', async () => {
     const { fixture, http } = await setup(MEMBER, {
       meetings: [

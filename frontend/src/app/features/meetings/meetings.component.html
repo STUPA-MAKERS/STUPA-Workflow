@@ -36,7 +36,7 @@
   <div class="mtg__meta">
     <span class="font-semibold">{{ m.title }}</span>
     @if (m.date) {
-      <span class="text-text-muted">{{ m.date | ldate: 'mediumDate' }}{{ m.startTime ? ', ' + m.startTime : '' }}</span>
+      <span class="text-text-muted">{{ m.date | ldate: 'mediumDate' }}{{ timeSuffix(m.startTime) }}</span>
     }
     <app-badge [variant]="statusVariant(m.status)">
       {{ statusKey(m.status) | t }}
@@ -431,7 +431,7 @@
               <div class="mtg__tlMeta">
                 <span class="text-text-muted text-sm">
                   @if (m.date) {
-                    {{ m.date | ldate: 'mediumDate' }}{{ m.startTime ? ', ' + m.startTime : '' }}
+                    {{ m.date | ldate: 'mediumDate' }}{{ timeSuffix(m.startTime) }}
                   } @else {
                     {{ 'meetings.list.noDate' | t }}
                   }
@@ -497,7 +497,7 @@
         />
         <!-- Forced 24 h: the native type="time" follows the browser locale (AM/PM). -->
         <app-time-input
-          id="mtg-new-time"
+          [id]="'mtg-new-time'"
           [label]="'meetings.create.time' | t"
           [required]="true"
           [ngModel]="newTime()"
@@ -506,7 +506,7 @@
         />
         <!-- Optional end time: without it the iCal feed assumes 1 h duration. -->
         <app-time-input
-          id="mtg-new-end-time"
+          [id]="'mtg-new-end-time'"
           [label]="'meetings.create.endTime' | t"
           [ngModel]="newEndTime()"
           (ngModelChange)="newEndTime.set($event)"
@@ -582,8 +582,8 @@
       (ngModelChange)="settingsDate.set($event)"
       name="setDate"
     />
-    <app-time-input id="mtg-set-time" [label]="'meetings.create.time' | t" [required]="true" [disabled]="settingsLocked()" [ngModel]="settingsTime()" (ngModelChange)="settingsTime.set($event)" name="setTime" />
-    <app-time-input id="mtg-set-end-time" [label]="'meetings.create.endTime' | t" [disabled]="settingsLocked()" [ngModel]="settingsEndTime()" (ngModelChange)="settingsEndTime.set($event)" name="setEndTime" />
+    <app-time-input [id]="'mtg-set-time'" [label]="'meetings.create.time' | t" [required]="true" [disabled]="settingsLocked()" [ngModel]="settingsTime()" (ngModelChange)="settingsTime.set($event)" name="setTime" />
+    <app-time-input [id]="'mtg-set-end-time'" [label]="'meetings.create.endTime' | t" [disabled]="settingsLocked()" [ngModel]="settingsEndTime()" (ngModelChange)="settingsEndTime.set($event)" name="setEndTime" />
     @if (settingsLocked()) {
       <p class="text-text-muted">{{ 'meetings.settings.closedHint' | t }}</p>
     }
