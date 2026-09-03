@@ -20,7 +20,9 @@
     </a>
   </ng-template>
 
-  <ng-template appCell="typeLabel" let-row>{{ $any(row).typeLabel || '—' }}</ng-template>
+  <ng-template appCell="typeLabel" let-row>
+    <span class="dt__truncate" [title]="$any(row).typeLabel || ''">{{ $any(row).typeLabel || '—' }}</span>
+  </ng-template>
 
   <ng-template appCell="stateLabel" let-row>
     @if ($any(row).stateLabel) {

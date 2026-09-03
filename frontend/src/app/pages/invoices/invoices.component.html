@@ -104,8 +104,14 @@
     <ng-template appCell="file" let-i>
       <span class="inv__file">
         @if ($any(i).hasFile) {
-          <button type="button" class="inv__fileLink" (click)="openFile($any(i))">
-            <app-icon name="export" [size]="14" /> {{ $any(i).fileName || ('invoices.openFile' | t) }}
+          <button
+            type="button"
+            class="inv__fileLink"
+            [title]="$any(i).fileName || ('invoices.openFile' | t)"
+            (click)="openFile($any(i))"
+          >
+            <app-icon name="export" [size]="14" />
+            <span class="dt__truncate">{{ $any(i).fileName || ('invoices.openFile' | t) }}</span>
           </button>
         } @else {
           —

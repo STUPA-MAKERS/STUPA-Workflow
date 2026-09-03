@@ -77,21 +77,26 @@ export class ApplicationsTableComponent {
   protected readonly columns = computed<ColumnDef[]>(() => {
     const sortable = this.sort() !== null;
     return [
-      { key: 'title', label: this.i18n.translate('applications.list.col.title') },
-      { key: 'typeLabel', label: this.i18n.translate('applications.list.col.type') },
-      { key: 'stateLabel', label: this.i18n.translate('applications.list.col.state') },
+      // Widths are floors, so a column keeps its room and the table scrolls rather than
+      // crushing one. Without them "Nicht-monetärer Antrag" broke across three lines and
+      // made its row twice the height of its neighbours.
+      { key: 'title', label: this.i18n.translate('applications.list.col.title'), width: '26rem' },
+      { key: 'typeLabel', label: this.i18n.translate('applications.list.col.type'), width: '12rem' },
+      { key: 'stateLabel', label: this.i18n.translate('applications.list.col.state'), width: '13rem' },
       {
         key: 'amount',
         label: this.i18n.translate('applications.list.col.amount'),
         align: 'end',
         sortable,
         initialSort: 'desc',
+        width: '8rem',
       },
       {
         key: 'createdAt',
         label: this.i18n.translate('applications.list.col.created'),
         sortable,
         initialSort: 'desc',
+        width: '10rem',
       },
     ];
   });
