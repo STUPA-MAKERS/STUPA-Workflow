@@ -694,6 +694,53 @@ def test_a_logo_served_over_plain_http_is_left_off() -> None:
     assert "STUPA" in html
 
 
+def test_the_page_carries_the_platform_wordmark_when_the_instance_set_none() -> None:
+    """The live instance has `logos: {}`, and the mark in the app header is a bundled
+    frontend asset rather than site config. A page that read only the config therefore
+    showed the app NAME as text while every other page showed a logo."""
+    html = render_share_page(_view(), app_name="STUPA", canonical_url="https://x/s/t")
+
+    assert "/assets/logos/stupa-wordmark-light.svg" in html
+    assert "/assets/logos/stupa-wordmark-dark.svg" in html
+
+
+def test_the_wordmark_follows_a_theme_the_reader_changes_while_reading() -> None:
+    """Both variants are rendered and CSS hides one. A `<picture>` picks its source when
+    the document is parsed and does not re-pick afterwards, so a reader who flipped their
+    system theme kept the black-text mark on the dark header until a reload."""
+    html = render_share_page(_view(), app_name="STUPA", canonical_url="https://x/s/t")
+
+    assert "<picture>" not in html
+    assert 'class="brand__logo brand__logo--light"' in html
+    assert 'class="brand__logo brand__logo--dark"' in html
+    # The mark is named once. A second alt would read the app name out twice.
+    assert html.count('alt="STUPA"') == 1
+    assert 'aria-hidden="true"' in html
+
+
+def test_the_wordmark_path_is_absolute() -> None:
+    """The page lives at `/s/{token}`, so a relative `assets/…` would be looked for
+    under `/s/` and 404."""
+    html = render_share_page(_view(), app_name="STUPA", canonical_url="https://x/s/t")
+    assert 'src="assets/' not in html
+    assert 'srcset="assets/' not in html
+
+
+def test_the_wordmark_names_the_app_for_a_reader_who_gets_no_image() -> None:
+    html = render_share_page(_view(), app_name="STUPA", canonical_url="https://x/s/t")
+    assert 'alt="STUPA"' in html
+
+
+def test_a_configured_logo_beats_the_bundled_one() -> None:
+    html = render_share_page(
+        _view(),
+        app_name="STUPA",
+        canonical_url="https://x/s/t",
+        logo_url="data:image/png;base64,AAAA",
+    )
+    assert "stupa-wordmark" not in html
+
+
 def test_a_logo_the_platform_serves_itself_is_shown() -> None:
     """`BrandingAsset.url` allows an absolute path, and that is what an instance which
     uploaded a logo actually stores. Refusing it rendered the bare app name on a page the
@@ -711,7 +758,7 @@ def test_a_logo_the_platform_serves_itself_is_shown() -> None:
 def test_a_protocol_relative_logo_is_not_mistaken_for_a_path() -> None:
     """`//host/logo.png` starts with a slash but is a remote host, and it inherits the
     page scheme rather than naming one."""
-    assert "img-src 'none'" in share_csp("//cdn.example/logo.png")
+    assert "img-src 'self';" in share_csp("//cdn.example/logo.png")
     html = render_share_page(
         _view(), app_name="STUPA", canonical_url="https://x/s/t", logo_url="//cdn.example/l.png"
     )
@@ -754,10 +801,13 @@ def test_the_preferred_badge_comes_before_the_label_it_marks() -> None:
 def test_the_policy_names_the_logo_source_and_nothing_wider() -> None:
     """`img-src https:` would allow any host on the internet. The page loads exactly one
     image, so the policy names exactly where it comes from."""
-    assert "img-src 'none'" in share_csp(None)
-    assert "img-src data:" in share_csp("data:image/png;base64,AAAA")
-    assert "img-src https://cdn.example" in share_csp("https://cdn.example/logo.png")
-    assert "img-src 'none'" in share_csp("http://cdn.example/logo.png")
+    # `'self'` is the floor, not `'none'`: the fallback wordmark is served by this
+    # origin, so every rendering of this page loads one image.
+    assert "img-src 'self'" in share_csp(None)
+    assert "img-src 'self' data:" in share_csp("data:image/png;base64,AAAA")
+    assert "img-src 'self' https://cdn.example" in share_csp("https://cdn.example/logo.png")
+    # A logo it must not load leaves the policy at the floor.
+    assert "img-src 'self';" in share_csp("http://cdn.example/logo.png")
 
 
 def test_the_policy_still_allows_no_script_whatever_the_logo() -> None:
