@@ -14,7 +14,7 @@
     <app-button type="submit" size="sm">{{ 'admin.users.searchAction' | t }}</app-button>
   </form>
 
-  <app-data-table [columns]="columns()" [rows]="principals()" [rowKey]="rowId" [isExpanded]="rowExpanded" [emptyText]="'admin.users.noResults' | t">
+  <app-data-table appHScrollSync=".dt__scroll" [columns]="columns()" [rows]="principals()" [rowKey]="rowId" [isExpanded]="rowExpanded" [emptyText]="'admin.users.noResults' | t">
       <ng-template appCell="name" let-p>
         <span class="font-medium">{{ userLabel($any(p)) }}</span>
         @if ($any(p).active === false) {
