@@ -2,7 +2,7 @@ import { BehaviorSubject, of } from 'rxjs';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
 import { render } from '@testing-library/angular';
 import { AuthService } from '@core/auth/auth.service';
 import { USE_MOCK_API } from '@core/api/api.config';
@@ -206,6 +206,86 @@ describe('InvoicesComponent', () => {
     const again = http.expectOne((r) => r.url.endsWith('/api/invoices'));
     expect(again.request.params.get('id')).toBe('i-9');
     again.flush(page([inv({ id: 'i-9' })], 1));
+    http.verify();
+  });
+
+  it('writes a cleared filter back, so the palette can send you to it again', async () => {
+    // The bug this holds: the page read `?id=` but never wrote it. A reset cleared the
+    // list but left `?id=i-1` in the address bar, so picking that same invoice in the
+    // palette navigated to the URL the browser was ALREADY on. The router drops a
+    // same-URL navigation, `queryParamMap` never fired, and nothing happened at all.
+    localStorage.setItem('ap.locale', 'de');
+    const params = new BehaviorSubject(convertToParamMap({ id: 'i-1' }));
+    const view = await render(InvoicesComponent, {
+      providers: [
+        provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: USE_MOCK_API, useValue: false },
+        { provide: AuthService, useValue: new FakeAuth() },
+        {
+          provide: ActivatedRoute,
+          useValue: { snapshot: { queryParamMap: params.value }, queryParamMap: params },
+        },
+      ],
+    });
+    const http = TestBed.inject(HttpTestingController);
+    http.expectOne((r) => r.url.endsWith('/api/invoices')).flush(page([inv({ id: 'i-1' })], 1));
+    view.fixture.detectChanges();
+
+    const navigate = jest.spyOn(TestBed.inject(Router), 'navigate');
+    const c = view.fixture.componentInstance as unknown as { resetFilters(): void };
+    c.resetFilters();
+    view.fixture.detectChanges();
+
+    // The URL loses the id, so it states what the list is actually showing.
+    expect(navigate).toHaveBeenCalledWith(
+      [],
+      expect.objectContaining({
+        queryParams: expect.objectContaining({ id: null }),
+        replaceUrl: true,
+      }),
+    );
+    http.expectOne((r) => r.url.endsWith('/api/invoices')).flush(page([], 0));
+    http.verify();
+  });
+
+  it('drops a filter the URL no longer carries', async () => {
+    // Absence clears. Reading only what is present let a filter outlive the URL that
+    // put it there, which is the other half of the same drift.
+    localStorage.setItem('ap.locale', 'de');
+    const params = new BehaviorSubject(convertToParamMap({ id: 'i-1' }));
+    const view = await render(InvoicesComponent, {
+      providers: [
+        provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: USE_MOCK_API, useValue: false },
+        { provide: AuthService, useValue: new FakeAuth() },
+        {
+          provide: ActivatedRoute,
+          useValue: { snapshot: { queryParamMap: params.value }, queryParamMap: params },
+        },
+      ],
+    });
+    const http = TestBed.inject(HttpTestingController);
+    http.expectOne((r) => r.url.endsWith('/api/invoices')).flush(page([inv({ id: 'i-1' })], 1));
+    view.fixture.detectChanges();
+
+    params.next(convertToParamMap({}));
+    const again = http.expectOne((r) => r.url.endsWith('/api/invoices'));
+    expect(again.request.params.get('id')).toBeNull();
+    again.flush(page([inv({ id: 'i-1' }), inv({ id: 'i-2' })], 2));
+    http.verify();
+  });
+
+  it('refuses a filter value the panel could never produce', async () => {
+    // The query string is typed by whoever holds the link. Reading every filter from it
+    // is what makes a bad number or an unknown status reachable at all.
+    const { c, http } = await setup({ queryParams: { grossMin: 'abc', status: 'nonsense' } });
+    const typed = c as unknown as { grossMin(): string; statusFilter(): string };
+    expect(typed.grossMin()).toBe('');
+    expect(typed.statusFilter()).toBe('');
     http.verify();
   });
 
