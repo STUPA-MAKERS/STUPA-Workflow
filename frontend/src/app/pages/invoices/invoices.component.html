@@ -17,11 +17,13 @@
       />
       <!-- These filters drive the server query. -->
       <app-filter-bar [live]="true" [activeCount]="activeFilterCount()" (reset)="resetFilters()">
-        <app-filter-field [label]="'invoices.filter.status' | t">
+        <!-- `group`: three controls, not one. A plain field wraps its content in a
+             label, which would bind to the first button and take its name away. -->
+        <app-filter-field [label]="'invoices.filter.status' | t" [group]="true">
           <div class="inline-flex gap-2 flex-wrap">
-            <app-button [variant]="statusFilter() === '' ? 'primary' : 'ghost'" size="sm" (click)="setStatus('')">{{ 'invoices.filter.all' | t }}</app-button>
-            <app-button [variant]="statusFilter() === 'open' ? 'primary' : 'ghost'" size="sm" (click)="setStatus('open')">{{ 'invoices.status.open' | t }}</app-button>
-            <app-button [variant]="statusFilter() === 'paid' ? 'primary' : 'ghost'" size="sm" (click)="setStatus('paid')">{{ 'invoices.status.paid' | t }}</app-button>
+            <app-button [variant]="statusFilter() === '' ? 'primary' : 'ghost'" size="sm" [ariaPressed]="statusFilter() === ''" (click)="setStatus('')">{{ 'invoices.filter.all' | t }}</app-button>
+            <app-button [variant]="statusFilter() === 'open' ? 'primary' : 'ghost'" size="sm" [ariaPressed]="statusFilter() === 'open'" (click)="setStatus('open')">{{ 'invoices.status.open' | t }}</app-button>
+            <app-button [variant]="statusFilter() === 'paid' ? 'primary' : 'ghost'" size="sm" [ariaPressed]="statusFilter() === 'paid'" (click)="setStatus('paid')">{{ 'invoices.status.paid' | t }}</app-button>
           </div>
         </app-filter-field>
         <app-filter-field [label]="'invoices.filter.grossRange' | t">
