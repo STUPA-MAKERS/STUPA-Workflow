@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { FieldType, type FieldTypeConfig } from '@ngx-formly/core';
+import { TranslatePipe } from '@core/i18n/translate.pipe';
 
 /** Value of the `daterange` form-definition field: two ISO date strings. */
 interface DateRange {
@@ -17,6 +18,7 @@ interface DateRange {
   selector: 'app-formly-daterange',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [TranslatePipe],
   template: `
     <div class="dr">
       <span class="dr__label">
@@ -27,7 +29,7 @@ interface DateRange {
       </span>
       <div class="dr__row">
         <label class="dr__field">
-          <span class="dr__cap">{{ props['fromLabel'] ?? 'Von' }}</span>
+          <span class="dr__cap">{{ props['fromLabel'] ?? ('formly.daterange.from' | t) }}</span>
           <input
             type="date"
             [value]="range.from ?? ''"
@@ -36,7 +38,7 @@ interface DateRange {
           />
         </label>
         <label class="dr__field">
-          <span class="dr__cap">{{ props['toLabel'] ?? 'Bis' }}</span>
+          <span class="dr__cap">{{ props['toLabel'] ?? ('formly.daterange.to' | t) }}</span>
           <input
             type="date"
             [value]="range.to ?? ''"
@@ -49,7 +51,9 @@ interface DateRange {
         <p class="dr__hint">{{ props.description }}</p>
       }
       @if (showError) {
-        <p class="dr__error" role="alert">{{ props['errorText'] ?? 'Ungültiger Zeitraum.' }}</p>
+        <p class="dr__error" role="alert">
+          {{ props['errorText'] ?? ('formly.daterange.error' | t) }}
+        </p>
       }
     </div>
   `,

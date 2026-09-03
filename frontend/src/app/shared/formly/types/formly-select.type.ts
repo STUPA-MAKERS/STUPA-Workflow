@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { ReactiveFormsModule } from '@angular/forms';
 import { FieldType, type FieldTypeConfig } from '@ngx-formly/core';
+import { TranslatePipe } from '@core/i18n/translate.pipe';
 
 interface SelectOption {
   value: string;
@@ -12,7 +13,7 @@ interface SelectOption {
   selector: 'app-formly-select',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, TranslatePipe],
   template: `
     <div class="field">
       <label class="field__label" [for]="controlId">
@@ -28,7 +29,9 @@ interface SelectOption {
         [attr.aria-invalid]="showError ? 'true' : null"
         [attr.aria-describedby]="describedBy"
       >
-        <option value="" disabled>{{ props.placeholder ?? 'Bitte wählen …' }}</option>
+        <option value="" disabled>
+          {{ props.placeholder ?? ('formly.select.placeholder' | t) }}
+        </option>
         @for (opt of optionList; track opt.value) {
           <option [value]="opt.value">{{ opt.label }}</option>
         }
@@ -38,7 +41,7 @@ interface SelectOption {
       }
       @if (showError) {
         <p class="field__error" [id]="controlId + '-error'" role="alert">
-          {{ props['errorText'] ?? 'Bitte eine Option wählen.' }}
+          {{ props['errorText'] ?? ('formly.select.error' | t) }}
         </p>
       }
     </div>

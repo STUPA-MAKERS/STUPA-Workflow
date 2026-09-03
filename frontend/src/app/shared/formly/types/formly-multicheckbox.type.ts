@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { FieldType, type FieldTypeConfig } from '@ngx-formly/core';
+import { TranslatePipe } from '@core/i18n/translate.pipe';
 
 interface MultiOption {
   value: string;
@@ -16,6 +17,7 @@ interface MultiOption {
   selector: 'app-formly-multicheckbox',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [TranslatePipe],
   template: `
     <fieldset class="multi">
       <legend class="multi__legend">
@@ -39,7 +41,9 @@ interface MultiOption {
         <p class="multi__hint">{{ props.description }}</p>
       }
       @if (showError) {
-        <p class="multi__error" role="alert">{{ props['errorText'] ?? 'Bitte auswählen.' }}</p>
+        <p class="multi__error" role="alert">
+          {{ props['errorText'] ?? ('formly.multicheckbox.error' | t) }}
+        </p>
       }
     </fieldset>
   `,

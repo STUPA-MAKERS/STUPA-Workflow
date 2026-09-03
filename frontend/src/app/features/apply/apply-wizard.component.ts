@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   FormControl,
   FormGroup,
@@ -79,6 +87,7 @@ export class ApplyWizardComponent {
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
 
   /**
    * True when a principal is logged in. The wizard then skips the contact step and
@@ -97,8 +106,24 @@ export class ApplyWizardComponent {
   /** Whether an anonymous submission needs an Altcha solution (false ⇒ Altcha off). */
   readonly altchaRequired = signal(true);
 
+  /**
+   * Shared Formly model across all sections.
+   *
+   * Formly needs a stable object reference for `[model]`, so it writes each answer
+   * into the same object. A plain field would therefore stay invisible to the signal
+   * graph and leave `summary` stale. The signal keeps the reference but reports every
+   * write: `equal` always says "not equal", so {@link touchModel} notifies its readers
+   * although the object is the same one.
+   */
+  private readonly modelSignal = signal<Record<string, unknown>>({}, { equal: () => false });
+
   /** Shared Formly model across all sections (stable reference). */
-  model: Record<string, unknown> = {};
+  get model(): Record<string, unknown> {
+    return this.modelSignal();
+  }
+  set model(next: Record<string, unknown>) {
+    this.modelSignal.set(next);
+  }
 
   readonly contactForm = new FormGroup({
     email: new FormControl('', {
@@ -197,9 +222,29 @@ export class ApplyWizardComponent {
         key: s.key,
         label: resolveI18n(s.label, lang),
         fields: toFormlyFields(s.fields, lang, ctx),
-        form: new FormGroup({}),
+        form: this.trackedGroup(),
       })),
     );
+  }
+
+  /**
+   * Section form group that reports every answer to the signal graph.
+   *
+   * Formly writes the value into {@link model} from the subscription of the single
+   * control. Angular emits the value of the control before the value of the group, so
+   * the model already holds the new answer when this handler runs.
+   */
+  private trackedGroup(): FormGroup {
+    const form = new FormGroup({});
+    form.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.touchModel());
+    return form;
+  }
+
+  /** Tell the readers of {@link model} that Formly changed the object. */
+  private touchModel(): void {
+    this.modelSignal.update((m) => m);
   }
 
   next(): void {
@@ -313,7 +358,10 @@ export class ApplyWizardComponent {
         contact?: { email?: string; name?: string };
         activeIndex?: number;
       };
-      if (draft.model) Object.assign(this.model, draft.model);
+      if (draft.model) {
+        Object.assign(this.model, draft.model);
+        this.touchModel();
+      }
       if (draft.contact) {
         this.contactForm.patchValue({
           email: draft.contact.email ?? '',
@@ -370,10 +418,59 @@ export class ApplyWizardComponent {
   private formatValue(field: FormFieldDef, value: unknown): string {
     if (value === null || value === undefined || value === '') return '';
     if (field.type === 'positions') return this.formatPositions(value);
+    if (field.type === 'currency') return this.formatCurrency(value);
+    if (field.type === 'date') return this.formatDate(value);
+    if (field.type === 'daterange') return this.formatDateRange(value);
     if (Array.isArray(value)) return value.map((v) => this.optionLabel(field, v)).join(', ');
     if (typeof value === 'boolean')
       return this.i18n.translate(value ? 'common.yes' : 'common.no');
     return this.optionLabel(field, value);
+  }
+
+  /**
+   * Currency amount in the active locale. The currency control holds a canonical
+   * decimal string (`"4200"`), so parse before you format. An amount that is no
+   * number stays raw.
+   */
+  private formatCurrency(value: unknown): string {
+    const amount = typeof value === 'number' ? value : Number(String(value).trim());
+    return Number.isFinite(amount) ? this.euro(amount) : String(value);
+  }
+
+  /** Amount in euro, in the active locale. */
+  private euro(amount: number): string {
+    return new Intl.NumberFormat(this.i18n.locale(), {
+      style: 'currency',
+      currency: 'EUR',
+    }).format(amount);
+  }
+
+  /**
+   * Date in the active locale. A `date` field holds a plain ISO day
+   * (`YYYY-MM-DD`), which the format reads in UTC. The shown day then stays the
+   * entered day in every timezone. A date that does not parse stays raw.
+   */
+  private formatDate(value: unknown): string {
+    const raw = String(value).trim();
+    const date = new Date(/^\d{4}-\d{2}-\d{2}$/.test(raw) ? `${raw}T00:00:00Z` : raw);
+    if (Number.isNaN(date.getTime())) return raw;
+    return new Intl.DateTimeFormat(this.i18n.locale(), {
+      dateStyle: 'medium',
+      timeZone: 'UTC',
+    }).format(date);
+  }
+
+  /**
+   * Date range `{from, to}` as `from – to`. A range with only one end shows that
+   * end alone. An empty range gives an empty text, which drops the row.
+   */
+  private formatDateRange(value: unknown): string {
+    if (typeof value !== 'object' || value === null) return String(value);
+    const { from, to } = value as { from?: unknown; to?: unknown };
+    const start = from ? this.formatDate(from) : '';
+    const end = to ? this.formatDate(to) : '';
+    if (start && end) return `${start} – ${end}`;
+    return start || end;
   }
 
   private optionLabel(field: FormFieldDef, value: unknown): string {
@@ -389,10 +486,11 @@ export class ApplyWizardComponent {
       const pref = (p.offers ?? []).find((o) => o.preferred);
       total += pref?.value ?? 0;
     }
-    const sum = new Intl.NumberFormat(this.i18n.locale(), {
-      style: 'currency',
-      currency: 'EUR',
-    }).format(total);
-    return `${value.length} × ${this.i18n.translate('apply.positions.positionValue')} · ${this.i18n.translate('apply.positions.total')}: ${sum}`;
+    const count = this.i18n.translate(
+      value.length === 1 ? 'apply.positions.countOne' : 'apply.positions.countOther',
+      { count: value.length },
+    );
+    const sum = this.euro(total);
+    return `${count} · ${this.i18n.translate('apply.positions.total')}: ${sum}`;
   }
 }
