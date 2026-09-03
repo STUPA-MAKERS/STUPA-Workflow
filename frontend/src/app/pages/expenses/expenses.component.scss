@@ -74,10 +74,17 @@ input.exp__input {
   white-space: nowrap;
 }
 .exp__cellDesc {
-  font-weight: var(--fw-medium);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-2);
   min-width: 12rem;
   max-width: 22rem;
-  overflow-wrap: anywhere;
+  font-weight: var(--fw-medium);
+}
+/* The collapsed line takes the room, the "more" button keeps its own. */
+.exp__cellDesc > .dt__truncate {
+  flex: 1 1 0;
 }
 .exp__more {
   background: transparent;
@@ -123,7 +130,6 @@ input.exp__input {
 // A long name or IBAN without spaces must still break onto a new line.
 .exp__cellMeta {
   max-width: 14rem;
-  overflow-wrap: anywhere;
 }
 .exp__mono {
   font-variant-numeric: tabular-nums;

@@ -209,7 +209,10 @@
         <ng-template appCell="description" let-e let-child="child">
           <span class="exp__cellDesc">
             @if (!child && isDescLong($any(e).description) && !descExpanded($any(e).id)) {
-              {{ $any(e).description.slice(0, DESC_LIMIT) }}…
+              <!-- Collapsed: ONE line, cut by the column rather than by a character
+                   count, which cannot know how wide the column ended up. The button
+                   sits outside the truncating span so the ellipsis never eats it. -->
+              <span class="dt__truncate" [title]="$any(e).description">{{ $any(e).description }}</span>
               <button type="button" class="exp__more" (click)="toggleDesc($any(e).id)">{{ 'action.more' | t }}</button>
             } @else {
               {{ $any(e).description }}
@@ -237,7 +240,7 @@
         </ng-template>
 
         <ng-template appCell="correspondent" let-e>
-          <span class="exp__cellMeta">{{ $any(e).correspondent || '—' }}</span>
+          <span class="exp__cellMeta dt__truncate" [title]="$any(e).correspondent || ''">{{ $any(e).correspondent || '—' }}</span>
         </ng-template>
 
         <ng-template appCell="amount" let-e>
