@@ -3,6 +3,8 @@
 <!-- Erasure-request queue (GDPR Art. 17) -->
 <app-card [heading]="'admin.privacy.queueTitle' | t" [headingLevel]="2">
   <app-data-table
+    [loading]="loading()"
+    [loadingText]="'common.loading' | t"
     [columns]="columns()"
     [rows]="erasures()"
     [emptyText]="'admin.privacy.queueEmpty' | t"

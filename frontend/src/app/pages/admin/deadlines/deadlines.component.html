@@ -3,7 +3,9 @@
     <app-button actions size="sm" (click)="openAdd()">{{ 'admin.deadlines.add' | t }}</app-button>
   </app-page-header>
 
-  <app-data-table [columns]="columns()" [rows]="policies()" [emptyText]="'admin.deadlines.empty' | t">
+  <app-data-table
+    [loading]="loading()"
+    [loadingText]="'common.loading' | t" [columns]="columns()" [rows]="policies()" [emptyText]="'admin.deadlines.empty' | t">
     <ng-template appCell="label" let-r>{{ label($any(r)) }}</ng-template>
     <ng-template appCell="key" let-r><span class="dl__mono">{{ $any(r).key }}</span></ng-template>
     <ng-template appCell="kind" let-r>{{ kindLabel($any(r).kind) }}</ng-template>

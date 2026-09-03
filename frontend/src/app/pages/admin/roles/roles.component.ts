@@ -78,8 +78,17 @@ export class AdminRolesComponent {
   protected readonly rowId = (r: unknown): string => (r as Role).id;
   protected readonly rowExpanded = (r: unknown): boolean => this.expanded().has((r as Role).id);
 
+  /** True until the first answer, so the table does not claim there are no roles. */
+  protected readonly loading = signal(true);
+
   constructor() {
-    this.api.listRoles().subscribe((r) => this.roles.set(r));
+    this.api.listRoles().subscribe({
+      next: (r) => {
+        this.roles.set(r);
+        this.loading.set(false);
+      },
+      error: () => this.loading.set(false),
+    });
     this.api.listPermissions().subscribe((p) => this.permissions.set(p));
   }
 

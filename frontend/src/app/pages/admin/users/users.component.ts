@@ -114,6 +114,12 @@ export class UsersComponent {
    * name column asked for 22rem and was measured at 107px, so every name broke onto two
    * lines and every row was a different height.
    */
+  /**
+   * True until the first answer. Without it the table showed "Keine Treffer" while the
+   * request was still out, which asserts there is nothing when nothing has arrived yet.
+   */
+  protected readonly loading = signal(true);
+
   protected readonly columns = computed<ColumnDef[]>(() => [
     { key: 'name', label: this.i18n.translate('admin.users.col.name'), width: '14rem' },
     // Long enough for a full university address without a mid-domain break.
@@ -144,9 +150,16 @@ export class UsersComponent {
   }
 
   protected search(): void {
+    this.loading.set(true);
     this.api.listPrincipals(this.query()).subscribe({
-      next: (list) => this.principals.set(list),
-      error: () => this.toast.error(this.i18n.translate('admin.users.loadFailed')),
+      next: (list) => {
+        this.principals.set(list);
+        this.loading.set(false);
+      },
+      error: () => {
+        this.loading.set(false);
+        this.toast.error(this.i18n.translate('admin.users.loadFailed'));
+      },
     });
   }
 

@@ -51,12 +51,12 @@
   <p class="text-muted text-sm mt-0">
     {{ 'admin.backups.retentionHint' | t: { count: retentionCount() } }}
   </p>
-  <!-- The shared table has no loading state yet, so an empty first paint reads as
-       "no backups". `emptyText` therefore says "loading" until the list arrives. -->
   <app-data-table
     [columns]="columns()"
     [rows]="rows()"
-    [emptyText]="(loading() ? 'common.loading' : 'admin.backups.empty') | t"
+    [loading]="loading()"
+    [loadingText]="'common.loading' | t"
+    [emptyText]="'admin.backups.empty' | t"
   >
     <ng-template appCell="createdAt" let-r>
       {{ $any(r).createdAt | ldate: 'medium' }}

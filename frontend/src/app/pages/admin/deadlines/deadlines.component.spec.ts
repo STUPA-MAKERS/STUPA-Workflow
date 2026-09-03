@@ -331,4 +331,12 @@ describe('AdminDeadlinesComponent', () => {
     expect(d.atTime).toBe('23:59');
     expect(d.timezone).toBe('Europe/Vienna');
   });
+
+  it('stops loading when the list fails, rather than spinning forever', async () => {
+    // Without this the table keeps its skeleton rows and never says anything went wrong.
+    const api = { ...makeApi(), listDeadlinePolicies: jest.fn(() => throwError(() => new Error('boom'))) };
+    const { fixture } = await setup(api);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((fixture.componentInstance as any).loading()).toBe(false);
+  });
 });

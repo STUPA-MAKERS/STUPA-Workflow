@@ -5,7 +5,9 @@
     }
   </app-page-header>
 
-  <app-data-table [columns]="columns()" [rows]="hooks()" [emptyText]="'admin.webhook.none' | t">
+  <app-data-table
+    [loading]="loading()"
+    [loadingText]="'common.loading' | t" [columns]="columns()" [rows]="hooks()" [emptyText]="'admin.webhook.none' | t">
     <ng-template appCell="active" let-h>
       @if ($any(h).active) {
         <span class="cfg__yes" aria-label="✓">✓</span>
