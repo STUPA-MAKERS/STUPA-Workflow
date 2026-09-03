@@ -22,7 +22,7 @@ from app.modules.applications.share import (
     clamp_ttl,
     new_token,
 )
-from app.modules.applications.share_page import SHARE_CSP, render_share_page
+from app.modules.applications.share_page import SHARE_CSP, render_share_page, share_csp
 from app.modules.auth import tokens
 from app.shared.config_schemas import FormFieldDef
 from app.shared.errors import NotFoundError
@@ -206,8 +206,8 @@ class _App:
     def __init__(self, data: dict[str, object]) -> None:
         self.id = uuid.uuid4()
         self.data = data
-        self.amount = None
-        self.currency = None
+        self.amount: str | None = None
+        self.currency: str | None = None
         self.created_at = NOW
 
 
@@ -417,3 +417,443 @@ def test_the_page_asks_for_no_favicon() -> None:
     request is refused and logged. An empty data: icon stops it being made."""
     html = render_share_page(_view(), app_name="STUPA", canonical_url="https://x/s/t")
     assert '<link rel="icon" href="data:,">' in html
+
+
+# -- cost positions -----------------------------------------------------------
+#
+# A cost breakdown is the substance of a funding application: what the money is for, what
+# it costs, and which quotes it was compared against. A public page that drops it shows
+# the reader a title and hides what is being asked for.
+
+
+def _positions_field(key: str = "kosten", *, pii: bool = False) -> FormFieldDef:
+    return FormFieldDef.model_validate(
+        {
+            "key": key,
+            "type": "positions",
+            "label": {"de": "Kostenpositionen", "en": "Cost positions"},
+            "isPII": pii,
+        }
+    )
+
+
+#: Two positions: one compared against another quote, one that could not be compared.
+POSITIONS: list[dict[str, object]] = [
+    {
+        "label": "Bühnentechnik",
+        "offers": [
+            {"label": "Firma A", "value": 1250, "preferred": True},
+            {"label": "Firma B", "value": 1400},
+        ],
+    },
+    {
+        "label": "Catering",
+        "noOffers": True,
+        "noOffersReason": "einziger Anbieter vor Ort",
+        "offers": [{"label": "Firma D", "value": 480, "preferred": True}],
+    },
+]
+
+
+def _positions_view(lang: str = "de") -> PublicApplication:
+    return build_public_view(
+        _App({"title": "Fest", "kosten": POSITIONS}),  # type: ignore[arg-type]
+        fields=[_positions_field()],
+        type_name=None,
+        gremium_name=None,
+        state_label=None,
+        lang=lang,
+    )
+
+
+def test_cost_positions_become_a_block_rather_than_one_flattened_line() -> None:
+    """The whole point of the field is the breakdown. Flattening dropped it, so a funding
+    application published its title and hid what it was asking for."""
+    view = _positions_view()
+
+    assert len(view.positions) == 1
+    block = view.positions[0]
+    assert block.label == "Kostenpositionen"
+    assert [p.label for p in block.positions] == ["Bühnentechnik", "Catering"]
+
+
+def test_a_position_is_worth_its_preferred_offer() -> None:
+    """The same rule `positions_total` applies: the preferred offer is the position."""
+    block = _positions_view().positions[0]
+    assert block.positions[0].value == "1.250,00 €"
+    assert block.total == "1.730,00 €"
+
+
+def test_every_comparison_offer_is_shown_and_the_preferred_one_is_marked() -> None:
+    # A reader cannot check "we took the cheapest" without seeing what it was compared
+    # against, so the losing quotes are part of the answer rather than noise.
+    offers = _positions_view().positions[0].positions[0].offers
+    assert [(o.label, o.value, o.preferred) for o in offers] == [
+        ("Firma A", "1.250,00 €", True),
+        ("Firma B", "1.400,00 €", False),
+    ]
+
+
+def test_a_position_without_comparison_offers_carries_its_reason() -> None:
+    """Opting out is allowed, and the reason is the justification for it. The opt-out
+    without its reason reads as a missing comparison rather than an explained one."""
+    catering = _positions_view().positions[0].positions[1]
+    assert catering.no_offers_reason == "einziger Anbieter vor Ort"
+
+
+def test_a_positions_field_marked_pii_never_reaches_the_page() -> None:
+    """`isPII` is one rule for every field type. A structured field must not be the hole
+    in it."""
+    view = build_public_view(
+        _App({"title": "Fest", "kosten": POSITIONS}),  # type: ignore[arg-type]
+        fields=[_positions_field(pii=True)],
+        type_name=None,
+        gremium_name=None,
+        state_label=None,
+        lang="de",
+    )
+    assert view.positions == []
+
+
+def test_a_positions_field_does_not_also_appear_as_a_flattened_row() -> None:
+    # It is rendered as a block. A second, empty scalar row for the same field would be
+    # the same field printed twice.
+    assert [label for label, _ in _positions_view().fields] == []
+
+
+def test_a_broken_position_is_skipped_rather_than_crashing_the_page() -> None:
+    """The answer is JSONB written by an older form version, so the page cannot assume
+    the current shape. A public route that raises here is a 500 on a valid link."""
+    view = build_public_view(
+        _App({"title": "T", "kosten": ["nope", {"offers": "not a list"}]}),  # type: ignore[arg-type]
+        fields=[_positions_field()],
+        type_name=None,
+        gremium_name=None,
+        state_label=None,
+        lang="de",
+    )
+    assert view.positions == []
+
+
+# -- the remaining field types ------------------------------------------------
+
+
+def _typed(key: str, type_: str, **extra: object) -> FormFieldDef:
+    return FormFieldDef.model_validate(
+        {"key": key, "type": type_, "label": {"de": key.title()}, **extra}
+    )
+
+
+def _one(field: FormFieldDef, value: object, lang: str = "de") -> list[tuple[str, str]]:
+    return build_public_view(
+        _App({"title": "T", field.key: value}),  # type: ignore[arg-type]
+        fields=[field],
+        type_name=None,
+        gremium_name=None,
+        state_label=None,
+        lang=lang,
+    ).fields
+
+
+def test_a_select_shows_the_option_label_and_not_the_stored_value() -> None:
+    """The stored value is a machine key such as `av`. Printing it publishes the form's
+    internals and tells the reader nothing."""
+    field = _typed(
+        "medium", "select", options=[{"value": "av", "label": {"de": "Audio und Video"}}]
+    )
+    assert _one(field, "av") == [("Medium", "Audio und Video")]
+
+
+def test_a_multiselect_joins_its_option_labels() -> None:
+    field = _typed(
+        "tags",
+        "multiselect",
+        options=[
+            {"value": "a", "label": {"de": "Kultur"}},
+            {"value": "b", "label": {"de": "Sport"}},
+        ],
+    )
+    assert _one(field, ["a", "b"]) == [("Tags", "Kultur, Sport")]
+
+
+def test_a_currency_field_reads_as_money_rather_than_a_bare_number() -> None:
+    assert _one(_typed("kosten", "currency"), 1250) == [("Kosten", "1.250,00 €")]
+
+
+def test_a_date_range_reads_as_a_span() -> None:
+    """`{'from': ..., 'to': ...}` is a dict, so the old rule dropped it entirely."""
+    field = _typed("zeitraum", "daterange")
+    value = {"from": "2026-07-01", "to": "2026-07-03"}
+    assert _one(field, value) == [("Zeitraum", "01.07.2026 – 03.07.2026")]
+
+
+def test_a_date_reads_in_the_house_format() -> None:
+    # `%d.%m.%Y`, the format the protocol and the notification mails already use.
+    assert _one(_typed("tag", "date"), "2026-07-01") == [("Tag", "01.07.2026")]
+
+
+def test_an_unreadable_date_is_shown_as_stored_rather_than_dropped() -> None:
+    """A date the form never validated is still the applicant's answer. Guessing it away
+    loses information; printing it as stored is honest."""
+    assert _one(_typed("tag", "date"), "irgendwann") == [("Tag", "irgendwann")]
+
+
+# -- the rendered breakdown, the portal button and the logo -------------------
+
+
+def test_the_page_renders_every_position_with_its_offers() -> None:
+    html = render_share_page(
+        _positions_view(), app_name="STUPA", canonical_url="https://x/s/t"
+    )
+    for expected in (
+        "Kostenpositionen",
+        "Bühnentechnik",
+        "Firma A",
+        "Firma B",
+        "1.250,00 €",
+        "1.400,00 €",
+        "einziger Anbieter vor Ort",
+        "1.730,00 €",
+    ):
+        assert expected in html
+
+
+def test_the_breakdown_stays_out_of_the_link_preview() -> None:
+    """Same rule as the amount: what the meta tags carry lands on a chat server for good."""
+    html = render_share_page(
+        _positions_view(), app_name="STUPA", canonical_url="https://x/s/t"
+    )
+    head = html.split("</head>")[0]
+    assert "Firma A" not in head
+    assert "1.730" not in head
+
+
+def test_a_position_label_is_escaped_like_every_other_value() -> None:
+    view = build_public_view(
+        _App(  # type: ignore[arg-type]
+            {
+                "title": "T",
+                "kosten": [
+                    {
+                        "label": "<script>alert(1)</script>",
+                        "offers": [{"label": "<img>", "value": 5, "preferred": True}],
+                    }
+                ],
+            }
+        ),
+        fields=[_positions_field()],
+        type_name=None,
+        gremium_name=None,
+        state_label=None,
+        lang="de",
+    )
+    html = render_share_page(view, app_name="STUPA", canonical_url="https://x/s/t")
+    assert "<script>alert(1)</script>" not in html
+    assert "&lt;script&gt;" in html
+    assert "<img>" not in html
+
+
+def test_the_page_offers_a_way_into_the_portal() -> None:
+    """A reader who has an account should not have to find the application by hand. The
+    link goes to the record itself, and a reader without an account meets the login."""
+    html = render_share_page(
+        _view(),
+        app_name="STUPA",
+        canonical_url="https://x/s/t",
+        app_url="https://x/applications/abc",
+    )
+    assert 'href="https://x/applications/abc"' in html
+
+
+def test_without_a_portal_url_there_is_no_dead_button() -> None:
+    html = render_share_page(_view(), app_name="STUPA", canonical_url="https://x/s/t")
+    assert "applications/" not in html
+
+
+def test_the_page_carries_the_instance_logo_when_there_is_one() -> None:
+    """The one piece of branding this platform really holds per instance."""
+    html = render_share_page(
+        _view(),
+        app_name="STUPA",
+        canonical_url="https://x/s/t",
+        logo_url="https://cdn.example/logo.png",
+    )
+    assert '<img class="brand__logo" src="https://cdn.example/logo.png"' in html
+
+
+def test_a_logo_served_over_plain_http_is_left_off() -> None:
+    """It would be mixed content, and it would tell that host the IP of every reader who
+    opens the link."""
+    html = render_share_page(
+        _view(),
+        app_name="STUPA",
+        canonical_url="https://x/s/t",
+        logo_url="http://cdn.example/logo.png",
+    )
+    assert "cdn.example" not in html
+    assert "STUPA" in html
+
+
+def test_the_policy_names_the_logo_source_and_nothing_wider() -> None:
+    """`img-src https:` would allow any host on the internet. The page loads exactly one
+    image, so the policy names exactly where it comes from."""
+    assert "img-src 'none'" in share_csp(None)
+    assert "img-src data:" in share_csp("data:image/png;base64,AAAA")
+    assert "img-src https://cdn.example" in share_csp("https://cdn.example/logo.png")
+    assert "img-src 'none'" in share_csp("http://cdn.example/logo.png")
+
+
+def test_the_policy_still_allows_no_script_whatever_the_logo() -> None:
+    for logo in (None, "data:image/png;base64,AAAA", "https://cdn.example/l.png"):
+        policy = share_csp(logo)
+        assert policy.startswith("default-src 'none'")
+        assert "script-src" not in policy
+        assert "unsafe-inline" not in policy
+
+
+# -- the edges of the formatting ----------------------------------------------
+
+
+def test_an_english_page_reads_money_the_english_way() -> None:
+    """The route already knows the language of the application. A German number format
+    around English labels would be a choice rather than an oversight."""
+    assert _one(_typed("kosten", "currency"), 1250, lang="en") == [
+        ("Kosten", "€1,250.00")
+    ]
+
+
+def test_a_currency_other_than_the_euro_is_named_rather_than_symbolised() -> None:
+    """`amount`/`currency` are per application, so the page cannot assume the euro."""
+    app = _App({"title": "T", "kosten": 1250})
+    app.currency = "CHF"
+    view = build_public_view(
+        app,  # type: ignore[arg-type]
+        fields=[_typed("kosten", "currency")],
+        type_name=None,
+        gremium_name=None,
+        state_label=None,
+        lang="de",
+    )
+    assert view.fields == [("Kosten", "1.250,00 CHF")]
+
+
+def test_a_currency_field_that_holds_no_number_falls_back_to_the_plain_rule() -> None:
+    assert _one(_typed("kosten", "currency"), "auf Anfrage") == [
+        ("Kosten", "auf Anfrage")
+    ]
+
+
+def test_the_headline_amount_is_written_like_the_breakdown_below_it() -> None:
+    """It was the stored decimal joined to the currency code, so one page showed
+    "4200.00 EUR" above "1.730,00 €" — the same kind of number written two ways."""
+    html = render_share_page(_view(), app_name="STUPA", canonical_url="https://x/s/t")
+    assert "4.200,00 €" in html
+    assert "4200.00" not in html
+
+
+def test_an_amount_that_will_not_parse_is_still_shown() -> None:
+    html = render_share_page(
+        _view(amount="etwa 4200", currency="EUR"),
+        app_name="STUPA",
+        canonical_url="https://x/s/t",
+    )
+    assert "etwa 4200 EUR" in html
+
+
+def test_a_boolean_is_never_read_as_an_amount() -> None:
+    """`Decimal(str(True))` raises, but `True` also equals 1, and an application that
+    quietly claims to cost one euro would be worse than one that reads oddly."""
+    assert _one(_typed("kosten", "currency"), True) == [("Kosten", "Ja")]
+
+
+def test_a_half_filled_date_range_shows_the_half_it_has() -> None:
+    field = _typed("zeitraum", "daterange")
+    assert _one(field, {"from": "2026-07-01"}) == [("Zeitraum", "01.07.2026")]
+    assert _one(field, {"from": "", "to": ""}) == []
+
+
+def test_a_date_that_is_not_even_text_takes_the_plain_rule() -> None:
+    assert _one(_typed("tag", "date"), 20260701) == [("Tag", "20260701")]
+
+
+def test_an_option_without_a_label_falls_back_to_its_value() -> None:
+    """A form saved with an empty label should still name the answer somehow."""
+    field = _typed("medium", "select", options=[{"value": "av", "label": {}}])
+    assert _one(field, "av") == [("Medium", "av")]
+
+
+def test_an_answer_that_matches_no_option_is_not_invented() -> None:
+    """A stale answer from an older form version. The id rule still applies."""
+    field = _typed("medium", "select", options=[{"value": "av", "label": {"de": "AV"}}])
+    assert _one(field, "83d149a5-9939-5d1c-b784-ee413e87f41e") == []
+
+
+def test_an_unreadable_offer_is_skipped_rather_than_shown_as_zero() -> None:
+    """`positions` is JSONB. An offer with no usable value must not become "0,00 €",
+    which would read as a free quote."""
+    view = build_public_view(
+        _App(  # type: ignore[arg-type]
+            {
+                "title": "T",
+                "kosten": [
+                    {
+                        "label": "Technik",
+                        "offers": [
+                            "not an offer",
+                            {"label": "kein Preis", "value": "tbd"},
+                            {"label": "Firma A", "value": 100, "preferred": True},
+                        ],
+                    }
+                ],
+            }
+        ),
+        fields=[_positions_field()],
+        type_name=None,
+        gremium_name=None,
+        state_label=None,
+        lang="de",
+    )
+    offers = view.positions[0].positions[0].offers
+    assert [o.label for o in offers] == ["Firma A"]
+
+
+def test_a_position_with_no_preferred_offer_shows_its_quotes_and_no_value() -> None:
+    """An application still being put together. Showing nothing would hide the quotes it
+    already has; inventing a value would state a decision nobody made."""
+    view = build_public_view(
+        _App(  # type: ignore[arg-type]
+            {
+                "title": "T",
+                "kosten": [
+                    {"label": "Technik", "offers": [{"label": "Firma A", "value": 100}]}
+                ],
+            }
+        ),
+        fields=[_positions_field()],
+        type_name=None,
+        gremium_name=None,
+        state_label=None,
+        lang="de",
+    )
+    block = view.positions[0]
+    assert block.positions[0].value is None
+    assert block.total is None
+    assert len(block.positions[0].offers) == 1
+
+    # And the page prints no total line rather than a total of nothing.
+    html = render_share_page(view, app_name="STUPA", canonical_url="https://x/s/t")
+    assert "Firma A" in html
+    assert "Gesamtbetrag" not in html
+
+
+def test_a_positions_answer_that_is_not_a_list_is_left_out() -> None:
+    view = build_public_view(
+        _App({"title": "T", "kosten": "kostet halt was"}),  # type: ignore[arg-type]
+        fields=[_positions_field()],
+        type_name=None,
+        gremium_name=None,
+        state_label=None,
+        lang="de",
+    )
+    assert view.positions == []
+    assert view.fields == []
