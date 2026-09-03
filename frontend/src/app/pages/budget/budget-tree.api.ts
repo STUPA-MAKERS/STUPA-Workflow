@@ -1,7 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { skipLoading } from '@core/loading/loading.interceptor';
-import { cached } from '@core/cache/cache.interceptor';
+import { cached, listContext } from '@core/cache/cache.interceptor';
 import type { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { API_BASE_URL } from '@core/api/api.config';
@@ -503,7 +503,7 @@ export class BudgetTreeApi {
     }
     return this.http.get<ExpensePage>(`${this.base}/expenses`, {
       params,
-      context: skipLoading(),
+      context: listContext(query.offset),
     });
   }
 
@@ -572,7 +572,7 @@ export class BudgetTreeApi {
     }
     return this.http.get<InvoicePage>(`${this.base}/invoices`, {
       params,
-      context: skipLoading(),
+      context: listContext(query.offset),
     });
   }
 
