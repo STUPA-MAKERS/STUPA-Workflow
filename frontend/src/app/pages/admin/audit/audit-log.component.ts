@@ -37,6 +37,12 @@ import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 const PAGE_SIZE = 50;
 
 /**
+ * A UUID target id. Such an id says nothing to a reader, so the sentence leaves it out
+ * (`[[no-uuids-in-ui]]`). A readable id — `global`, `1`, an export file name — stays.
+ */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
  * Audit action types. The list mirrors `AuditAction` in
  * `backend/app/modules/audit/actions.py`. It fills the action filter. It also tells the view
  * if a specific message template exists. If not, the view uses `admin.audit.msg.unknown`.
@@ -498,11 +504,23 @@ export class AuditLogComponent {
     return e.actorName ?? e.actor ?? this.i18n.translate('admin.audit.system');
   }
 
-  /** Target in the sentence. The label resolved by the backend wins, else `type:id`. */
+  /**
+   * Target in the sentence.
+   *
+   * The label that the backend resolved wins, in the quotation marks of the active
+   * locale. Without a label the sentence shows the localized target type, plus the
+   * id when that id is readable — `global`, `1` or an export file name. A UUID id
+   * stays out of the sentence, because it tells the reader nothing. The details of
+   * the entry still show it in full, together with the type.
+   */
   private targetLabel(e: AuditEntry): string {
-    if (e.targetLabel) return `„${e.targetLabel}“`;
-    if (e.targetType && e.targetId) return `${e.targetType}:${e.targetId}`;
-    return e.targetType ?? e.targetId ?? '—';
+    if (e.targetLabel) {
+      return this.i18n.translate('admin.audit.targetQuoted', { label: e.targetLabel });
+    }
+    const type = e.targetType ? this.targetTypeLabel(e.targetType) : null;
+    const id = e.targetId && !UUID_RE.test(e.targetId) ? e.targetId : null;
+    if (type && id) return `${type}:${id}`;
+    return type ?? id ?? '—';
   }
 
   /** The `data` content as (key, value) pairs for the detail chips. A UUID value with a
