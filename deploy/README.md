@@ -187,6 +187,28 @@ platform cannot decrypt its own archives.
 > compromised container can decrypt every archive the application wrote. Use this key pair
 > for the application ONLY, and keep a separate disaster-recovery key pair off host.
 
+### Rotating the key pair
+
+An archive can be read only by the private key matching the recipient it was encrypted
+**to**. `BACKUP_AGE_RECIPIENT` decides that at the moment the archive is written, and
+nothing re-encrypts an existing one.
+
+So after changing the pair:
+
+* new archives use the new recipient and are readable with the new identity;
+* **every archive taken before the change stays bound to the old key**. Importing or
+  restoring one with the new identity in place fails to decrypt.
+
+Keep the old private key for as long as you keep archives that were written to it. To read
+one without putting the old key back into the stack:
+
+```bash
+age -d -i /path/to/old-backup-age.key antrag-<ts>.tar.age | tar -xf -
+```
+
+The retention count is per archive, not per key, so archives from before a rotation age out
+on the same schedule as the rest.
+
 ### A restore
 
 A restore replaces the database and the attachment bucket with the contents of the archive.

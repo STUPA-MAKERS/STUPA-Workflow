@@ -28,6 +28,15 @@
   font-weight: var(--fw-medium);
 }
 
+/* Why a control beside this text is dead. Warning-coloured rather than muted: it is the
+   reason an admin cannot do the thing they came for, not a footnote. */
+.bk__disabledHint {
+  margin: var(--space-2) 0 0;
+  max-width: 44rem;
+  color: var(--color-warning-text, var(--color-text));
+  font-size: var(--fs-sm);
+}
+
 /* The native file input is replaced by its label, so the control matches the buttons
    next to it. The input stays in the DOM and keeps the keyboard and screen-reader
    behaviour that a div would throw away. */

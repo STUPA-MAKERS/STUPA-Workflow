@@ -1721,6 +1721,8 @@ export const de = {
   'admin.backups.importHint':
     'Nimmt eine hochgeladene .tar.age-Datei in die Liste auf. Sie wird dabei geprüft, aber NICHT zurückgespielt.',
   'admin.backups.import': 'Datei wählen',
+  'admin.backups.noIdentity':
+    'Kein privater AGE-Schlüssel hinterlegt. Ein Import prüft das Archiv, indem er es entschlüsselt — dafür braucht die Plattform BACKUP_AGE_IDENTITY_FILE. Ohne den Schlüssel bleiben Import und Zurückspielen aus.',
   'admin.backups.listTitle': 'Vorhandene Sicherungen',
   'admin.backups.retentionHint':
     'Die {count} neuesten Sicherungen bleiben erhalten. Angeheftete Sicherungen und die automatische Kopie vor einem Zurücksetzen werden nie gelöscht.',
@@ -4063,6 +4065,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.backups.importHint':
     'Takes an uploaded .tar.age file into the list. The file is checked, but it is NOT restored.',
   'admin.backups.import': 'Choose a file',
+  'admin.backups.noIdentity':
+    'No AGE private key is configured. An import verifies the archive by decrypting it, which needs BACKUP_AGE_IDENTITY_FILE. Without the key, import and restore stay off.',
   'admin.backups.listTitle': 'Existing backups',
   'admin.backups.retentionHint':
     'The {count} newest backups are kept. A pinned backup, and the automatic copy taken before a restore, are never deleted.',

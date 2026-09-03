@@ -31,10 +31,15 @@ description: Whole-platform backup and restore — age-encrypted archives (pg_du
 
 ## Config
 
-`backup_age_recipient` (empty ⇒ every route answers 503 and the cron does nothing) · `backup_age_identity_file` (absent ⇒ restore and import are off) · `backup_bucket` · `backup_retention_count` · `backup_url_ttl_seconds` · `backup_max_upload_bytes` · `backup_subprocess_timeout_seconds`. Setup and the operator callout: `deploy/README.md`.
+`backup_age_recipient` (empty ⇒ every route answers 503 and the cron does nothing) · `backup_age_identity_file` (absent ⇒ restore and import are off, and the page now says so beside the disabled control rather than leaving it dead) · `backup_bucket` · `backup_retention_count` · `backup_url_ttl_seconds` · `backup_max_upload_bytes` · `backup_subprocess_timeout_seconds`. Setup and the operator callout: `deploy/README.md`.
 
 ## Frontend
 
 `frontend/src/app/pages/admin/backups/`. The restore dialog demands the literal `RESTORE`; the API demands the same. The page reports `enabled`/`restoreEnabled` from the list response rather than offering buttons that always fail.
 
 **Related:** `be-audit` (the action catalog), `be-files` (the object storage it walks), `be-auth` (the permission), `deploy` (the key pair and the volume the host backs up), `conventions` (the alembic rule).
+
+**Key rotation:** an archive is readable only by the private key matching the recipient it
+was encrypted TO. Changing `backup_age_recipient` does not re-encrypt anything, so every
+archive written before the change stays bound to the old key and a restore with the new
+identity in place fails to decrypt it. `deploy/README.md` carries the operator steps.
