@@ -3,7 +3,9 @@
     <app-button actions size="sm" (click)="openAdd()">{{ 'admin.gremiumRoles.add' | t }}</app-button>
   </app-page-header>
 
-  <app-data-table [columns]="columns()" [rows]="roles()" [emptyText]="'admin.gremiumRoles.empty' | t">
+  <app-data-table
+    [loading]="loading()"
+    [loadingText]="'common.loading' | t" [columns]="columns()" [rows]="roles()" [emptyText]="'admin.gremiumRoles.empty' | t">
     <ng-template appCell="name" let-r>{{ label($any(r)) | capitalize }}</ng-template>
     <ng-template appCell="key" let-r><span class="font-mono text-xs">{{ $any(r).key }}</span></ng-template>
     <ng-template appCell="permissions" let-r>

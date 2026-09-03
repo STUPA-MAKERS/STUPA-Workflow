@@ -1,22 +1,63 @@
 @if (loading()) {
-  <p class="text-muted py-5" aria-live="polite">{{ 'applications.detail.loading' | t }}</p>
+  <!-- The shape of the page, not a sentence. This is the view a reader opens most often,
+       and a bare line gives them nothing to anticipate while the whole layout arrives at
+       once underneath it. -->
+  <div class="det__layout" aria-busy="true">
+    <aside class="det__rail det__rail--left" aria-hidden="true">
+      <span class="skel skel--line"></span>
+      <span class="skel skel--line"></span>
+      <span class="skel skel--line"></span>
+    </aside>
+    <div>
+      <span class="skel skel--panel"></span>
+      <span class="sr-only" role="status">{{ 'applications.detail.loading' | t }}</span>
+    </div>
+    <aside class="det__rail det__rail--right" aria-hidden="true">
+      <span class="skel skel--line"></span>
+      <span class="skel skel--line"></span>
+    </aside>
+  </div>
 } @else if (notFound()) {
-  <p class="text-muted py-5" role="alert">{{ 'applications.detail.notFound' | t }}</p>
+  <app-empty-state
+    [heading]="'applications.detail.notFound' | t"
+    [body]="'applications.detail.notFoundBody' | t"
+  >
+    <a routerLink="/applications" class="det__backLink">
+      {{ 'applications.detail.backToList' | t }}
+    </a>
+  </app-empty-state>
 } @else if (error()) {
   <p class="text-muted py-5 text-danger" role="alert">
     {{ 'applications.detail.error' | t }}
   </p>
 } @else if (app(); as application) {
-  <app-page-header [title]="title()">
+  <app-page-header [title]="title()" [rail]="true" [flush]="true">
     <div actions class="det__ownerActions">
-      <!-- The PDF follows the read scope of the application: whoever sees this
-           page may render it. -->
-      <app-button variant="secondary" size="sm" [disabled]="pdfPolling()" (click)="startPdf()">
-        <span class="inline-flex items-center gap-2">
-          <app-icon name="document" [size]="15" />
-          {{ 'applications.pdf.create' | t }}
-        </span>
-      </app-button>
+      <!-- Also outside the edit guard: `application.share` is a decision about who may
+           read the record, not about editing it. -->
+      @if (canShare() && !editing()) {
+        <app-button variant="secondary" size="sm" (click)="openShareDialog()">
+          <span class="inline-flex items-center gap-2">
+            <app-icon name="link" [size]="15" />
+            {{ 'applications.share.action' | t }}
+          </span>
+        </app-button>
+      }
+      <!-- Outside the edit guard on purpose. `application.archive` is its own permission,
+           and a holder who cannot edit the application still decides whether it stays in
+           the working list. No confirmation: it is reversible with one click on the same
+           button, which is exactly what separates it from the delete and the erasure
+           request below. -->
+      @if (canArchive() && !editing()) {
+        <app-button
+          variant="secondary"
+          size="sm"
+          [loading]="archiving()"
+          (click)="toggleArchived()"
+        >
+          {{ (application.archivedAt ? 'applications.detail.unarchive' : 'applications.detail.archive') | t }}
+        </app-button>
+      }
       @if ((application.canEdit || canForceStatus()) && !editing()) {
         @if (application.canEdit && application.state?.editAllowed) {
           <app-button variant="secondary" size="sm" (click)="startEdit(application)">{{ 'applications.detail.edit' | t }}</app-button>
@@ -36,6 +77,14 @@
 
   <!-- Status, budget and the fact grid. They sit below the page header and keep
        the body width of the center column. -->
+  @if (application.archivedAt) {
+    <!-- Said plainly, because an archived application looks exactly like an active one
+         and someone arriving from a link has no other way to know. -->
+    <p class="det__archived" role="status">
+      {{ 'applications.detail.archivedNotice' | t: { at: (application.archivedAt | ldate) } }}
+    </p>
+  }
+
   <section class="det__summary">
     <div class="det__meta">
       @if (application.state) {
@@ -215,19 +264,19 @@
                   <li>
                     <app-badge variant="warning">{{ 'applications.history.diff.changed' | t }}</app-badge>
                     <code>{{ change.key }}</code>:
-                    <del>{{ fmt(change.old) }}</del> → <ins>{{ fmt(change.new) }}</ins>
+                    <del>{{ fmt(change.old, change.key) }}</del> → <ins>{{ fmt(change.new, change.key) }}</ins>
                   </li>
                 }
                 @for (added of version.diff.added; track added.key) {
                   <li>
                     <app-badge variant="success">{{ 'applications.history.diff.added' | t }}</app-badge>
-                    <code>{{ added.key }}</code>: <ins>{{ fmt(added.value) }}</ins>
+                    <code>{{ added.key }}</code>: <ins>{{ fmt(added.value, added.key) }}</ins>
                   </li>
                 }
                 @for (removed of version.diff.removed; track removed.key) {
                   <li>
                     <app-badge variant="danger">{{ 'applications.history.diff.removed' | t }}</app-badge>
-                    <code>{{ removed.key }}</code>: <del>{{ fmt(removed.value) }}</del>
+                    <code>{{ removed.key }}</code>: <del>{{ fmt(removed.value, removed.key) }}</del>
                   </li>
                 }
               </ul>
@@ -464,48 +513,95 @@
   </div>
 </app-dialog>
 
-<!-- PDF render. The job runs in the worker, so the dialog polls it and shows
-     the real state: running, finished with a link, or failed with a reason. -->
+<!-- Public share links. The dialog is where a link is minted, read once and revoked;
+     the token itself exists in the response and nowhere else. -->
 <app-dialog
-  [open]="pdfOpen()"
-  [title]="'applications.pdf.title' | t"
+  [open]="shareDialogOpen()"
+  [title]="'applications.share.title' | t"
   [closeLabel]="'applications.detail.cancel' | t"
-  (closed)="closePdf()"
+  (closed)="shareDialogOpen.set(false)"
 >
-  <div class="det__pdf" aria-live="polite">
-    @if (pdfError(); as err) {
-      <p class="text-danger m-0" role="alert">{{ err | t }}</p>
-    } @else if (pdfTimedOut()) {
-      <p class="m-0">{{ 'applications.pdf.timedOut' | t }}</p>
-    } @else if (pdfDone()) {
-      @if (pdfJob()?.resultUrl; as url) {
-        <p class="m-0">{{ 'applications.pdf.ready' | t }}</p>
-        <a class="det__pdfLink" [href]="url" target="_blank" rel="noopener">
-          {{ 'applications.pdf.download' | t }}
-        </a>
-      } @else {
-        <p class="m-0" role="alert">{{ 'applications.pdf.noStorage' | t }}</p>
-      }
-    } @else if (pdfFailed()) {
-      <p class="text-danger m-0" role="alert">{{ pdfFailureText() }}</p>
-    } @else if (pdfRunning()) {
-      <p class="m-0">
-        {{ (pdfJob()?.status === 'running' ? 'applications.pdf.rendering' : 'applications.pdf.queued') | t }}
-      </p>
-      <progress class="det__pdfBar" [attr.aria-label]="'applications.pdf.title' | t"></progress>
-    }
+  <p class="text-muted">{{ 'applications.share.lead' | t }}</p>
+
+  @if (freshShareUrl(); as url) {
+    <!-- Shown once. The server keeps a hash, so closing this dialog loses the token. -->
+    <div class="det__shareFresh">
+      <p class="det__shareFreshHint">{{ 'applications.share.onceHint' | t }}</p>
+      <div class="det__shareFreshRow">
+        <input
+          class="det__shareUrl"
+          type="text"
+          readonly
+          [value]="url"
+          [attr.aria-label]="'applications.share.url' | t"
+        />
+        <app-button variant="secondary" size="sm" (click)="copyShareUrl()">
+          {{ (shareCopied() ? 'applications.share.copied' : 'applications.share.copy') | t }}
+        </app-button>
+      </div>
+    </div>
+  }
+
+  <div class="det__shareForm">
+    <app-select
+      [label]="'applications.share.ttl' | t"
+      [options]="shareTtlOptions"
+      [ngModel]="shareTtl()"
+      (ngModelChange)="shareTtl.set($event)"
+    />
+    <label class="det__shareLabel">
+      <span>{{ 'applications.share.label' | t }}</span>
+      <input
+        type="text"
+        name="shareLabel"
+        maxlength="200"
+        [placeholder]="'applications.share.labelPlaceholder' | t"
+        [ngModel]="shareLabel()"
+        (ngModelChange)="shareLabel.set($event)"
+      />
+    </label>
   </div>
+
+  @if (sharesLoading()) {
+    <div class="det__shareList" aria-busy="true">
+      <span class="skel skel--line"></span>
+      <span class="skel skel--line"></span>
+    </div>
+  } @else if (shares().length) {
+    <ul class="det__shareList">
+      @for (share of shares(); track share.id) {
+        <li class="det__shareRow" [class.det__shareRow--dead]="!shareIsLive(share)">
+          <div class="det__shareRowMain">
+            <span class="det__shareRowLabel">{{ share.label || ('applications.share.unlabelled' | t) }}</span>
+            <span class="text-muted text-sm">
+              @if (share.revokedAt) {
+                {{ 'applications.share.revokedAt' | t: { at: (share.revokedAt | ldate) } }}
+              } @else if (shareIsLive(share)) {
+                {{ 'applications.share.expiresAt' | t: { at: (share.expiresAt | ldate) } }}
+              } @else {
+                {{ 'applications.share.expired' | t: { at: (share.expiresAt | ldate) } }}
+              }
+            </span>
+          </div>
+          @if (shareIsLive(share)) {
+            <app-button
+              variant="danger"
+              size="sm"
+              [loading]="revokingShare() === share.id"
+              (click)="revokeShare(share.id)"
+            >{{ 'applications.share.revoke' | t }}</app-button>
+          }
+        </li>
+      }
+    </ul>
+  } @else {
+    <p class="text-muted text-sm m-0">{{ 'applications.share.none' | t }}</p>
+  }
+
   <div dialog-footer>
-    @if (pdfError() || pdfTimedOut()) {
-      <app-button variant="secondary" size="sm" (click)="retryPdf()">
-        {{ 'applications.pdf.checkAgain' | t }}
-      </app-button>
-    }
-    @if (pdfFailed()) {
-      <app-button variant="secondary" size="sm" (click)="startPdf()">
-        {{ 'applications.pdf.restart' | t }}
-      </app-button>
-    }
-    <app-button variant="ghost" size="sm" (click)="closePdf()">{{ 'applications.pdf.close' | t }}</app-button>
+    <app-button variant="ghost" size="sm" (click)="shareDialogOpen.set(false)">{{ 'applications.share.close' | t }}</app-button>
+    <app-button size="sm" [loading]="creatingShare()" (click)="createShare()">
+      {{ 'applications.share.create' | t }}
+    </app-button>
   </div>
 </app-dialog>

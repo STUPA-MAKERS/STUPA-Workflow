@@ -55,7 +55,7 @@
   margin-top: var(--space-5);
 }
 
-/* Space between the form questions, as in the internal application form (#det). */
+/* Space between the form questions, as in the internal application form. */
 :host ::ng-deep formly-form formly-field {
   display: block;
 }

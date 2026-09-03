@@ -1,6 +1,6 @@
 <app-page-header
+  [rail]="true"
   [title]="'applications.list.title' | t"
-  [subtitle]="'applications.list.subtitle' | t"
 >
   <div actions class="apps__headActions">
     <!-- The header search is debounced. It writes the q query parameter. -->
@@ -56,6 +56,22 @@
         [ngModel]="state()"
         (ngModelChange)="state.set($event)"
       />
+      <!-- The same segmented control the bookings and invoices filters use: three states,
+           all visible, one click each. `group` because it is three controls and not one —
+           a plain field wraps its content in a label, which binds to the first button and
+           takes its name away. -->
+      <app-filter-field [label]="'applications.list.filter.archived' | t" [group]="true">
+        <div class="inline-flex gap-1">
+          @for (opt of archivedOptions(); track opt.value) {
+            <app-button
+              [variant]="archived() === opt.value ? 'primary' : 'ghost'"
+              size="sm"
+              [ariaPressed]="archived() === opt.value"
+              (click)="setFilter('archived', opt.value)"
+            >{{ opt.label }}</app-button>
+          }
+        </div>
+      </app-filter-field>
       <app-filter-field [label]="'applications.list.filter.amount' | t">
         <app-filter-range>
           <app-currency-input start name="amountMin" [placeholder]="'applications.list.filter.min' | t" [ariaLabel]="'applications.list.filter.min' | t" [ngModel]="amountMin()" (ngModelChange)="amountMin.set($event)" />
@@ -96,16 +112,19 @@
   </div>
 </aside>
 <div class="apps__main">
-@if (loading()) {
-  <p class="apps__status" aria-live="polite">{{ 'applications.list.loading' | t }}</p>
-} @else if (error()) {
+@if (error()) {
   <p class="apps__status apps__status--error" role="alert">
     {{ 'applications.list.error' | t }}
   </p>
 } @else {
+  <!-- The table owns the loading state. Hiding it behind a line of text made the whole
+       list vanish on every filter and sort, and made the first load a bare sentence
+       where a table was about to appear. The table keeps its header and column widths
+       and draws skeleton rows instead. -->
   <app-applications-table
     [rows]="tableRows()"
     [sort]="sortState()"
+    [loading]="loading()"
     [emptyText]="'applications.list.empty' | t"
     (sortChange)="onSort($event)"
   />

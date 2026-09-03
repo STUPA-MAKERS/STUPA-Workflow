@@ -30,7 +30,10 @@ from app.modules.auth.schemas import (
     MeOut,
 )
 from app.modules.notifications.provider import mail_queue_from_pool
-from app.modules.notifications.service import NotificationService
+from app.modules.notifications.service import (
+    NotificationService,
+    resolve_application_lang,
+)
 from app.settings import Settings
 from app.shared.antiabuse import (
     enforce_auth_payload_limit,
@@ -276,15 +279,29 @@ async def _deliver_magic_link(
     therefore the same for a hit and for a miss, so nobody can enumerate addresses by
     timing. The mail queue delivers the link. Without an arq pool the code logs the
     mail and drops it.
+
+    The mail is in the language of the application that the link opens. A request
+    without an application id resolves the same application as the service, so the
+    applicant reads the mail in the language they applied in. Only a request that
+    matches no application at all falls back to the default language, and that request
+    sends no mail.
     """
     queue = mail_queue_from_pool(pool)  # type: ignore[arg-type]
     sessionmaker = get_sessionmaker()
     async with sessionmaker() as db:
+        app_row = await service.resolve_application(
+            db, email=email, application_id=application_id
+        )
+        lang = await resolve_application_lang(
+            db,
+            application_id=app_row.id if app_row is not None else None,
+            settings=settings,
+        )
 
         async def deliver(recipient: str, link: str) -> None:
             await NotificationService(
                 db, queue=queue, settings=settings
-            ).send_magic_link(email=recipient, link=link)
+            ).send_magic_link(email=recipient, link=link, lang=lang)
 
         await service.request_magic_link(
             db, settings, email=email, application_id=application_id, deliver=deliver

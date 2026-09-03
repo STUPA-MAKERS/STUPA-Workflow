@@ -2,8 +2,17 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { ApiClient } from '@core/api/api-client.service';
 import type { McpSetup, OAuthGrant } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
+import { I18nService } from '@core/i18n/i18n.service';
+import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { IconComponent } from '@stupa-makers/ui-kit';
+import {
+  BadgeComponent,
+  ButtonComponent,
+  CellDirective,
+  type ColumnDef,
+  DataTableComponent,
+  IconComponent,
+} from '@stupa-makers/ui-kit';
 import { downloadBlob } from '@shared/download.util';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 
@@ -18,12 +27,22 @@ import { PageHeaderComponent } from '@shared/ui/page-header/page-header.componen
   selector: 'app-account-grants',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, IconComponent, PageHeaderComponent],
+  imports: [
+    BadgeComponent,
+    ButtonComponent,
+    CellDirective,
+    DataTableComponent,
+    IconComponent,
+    LocalizedDatePipe,
+    PageHeaderComponent,
+    TranslatePipe,
+  ],
   templateUrl: './grants.component.html',
   styleUrl: './grants.component.scss',
 })
 export class AccountGrantsComponent {
   private readonly api = inject(ApiClient);
+  private readonly i18n = inject(I18nService);
   readonly auth = inject(AuthService);
 
   readonly grants = signal<OAuthGrant[]>([]);
@@ -33,6 +52,24 @@ export class AccountGrantsComponent {
 
   /** The MCP download and setup actions need `mcp.use`. An admin always holds it. */
   readonly canUseMcp = computed(() => this.auth.canAny('mcp.use'));
+
+  readonly columns = computed<ColumnDef[]>(() => [
+    { key: 'scope', label: this.i18n.translate('account.grants.scope') },
+    { key: 'created', label: this.i18n.translate('account.grants.created'), width: '12rem' },
+    { key: 'expires', label: this.i18n.translate('account.grants.expires'), width: '12rem' },
+    { key: 'actions', label: '', align: 'end', width: '4rem' },
+  ]);
+
+  /** Track by the grant id, so a reload does not re-create the rows. */
+  readonly rowId = (row: unknown): unknown => (row as OAuthGrant).id;
+
+  /**
+   * A grant carries its scopes as one space-separated string. Split it, so each scope
+   * reads as its own badge instead of one long run-on line.
+   */
+  scopes(grant: OAuthGrant): string[] {
+    return (grant.scope ?? '').split(/\s+/).filter(Boolean);
+  }
 
   constructor() {
     this.reload();

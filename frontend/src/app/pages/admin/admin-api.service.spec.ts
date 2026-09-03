@@ -3,6 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 import { firstValueFrom } from 'rxjs';
 import { USE_MOCK_API } from '@core/api/api.config';
+import { I18nService } from '@core/i18n/i18n.service';
 import type { FormFieldDef } from '@core/api/models';
 import { AdminApiService } from './admin-api.service';
 import type { Branding, WebhookConfig } from './admin.models';
@@ -69,7 +70,7 @@ describe('AdminApiService — mock mode', () => {
     expect(wh.name).toBe('renamed');
   });
 
-  it('manages principals, role assignments and permissions in mock mode (#72)', async () => {
+  it('manages principals, role assignments and permissions in mock mode', async () => {
     const s = svc();
     const all = await firstValueFrom(s.listPrincipals());
     expect(all.length).toBeGreaterThan(0);
@@ -173,7 +174,7 @@ describe('AdminApiService — real mode (contract)', () => {
     expect(http.expectOne('/api/admin/site-config/activate').request.method).toBe('POST');
   });
 
-  it('wires principal/role-assignment/permission endpoints (#72)', () => {
+  it('wires principal/role-assignment/permission endpoints', () => {
     s.listPrincipals().subscribe();
     expect(http.expectOne('/api/admin/principals').request.method).toBe('GET');
     s.listPrincipals('a x').subscribe();
@@ -213,12 +214,12 @@ describe('AdminApiService — real mode (contract)', () => {
     expect(http.expectOne('/api/admin/oauth-grants/grant-9').request.method).toBe('DELETE');
   });
 
-  it('GETs gremium options from the public /gremien path (#68)', () => {
+  it('GETs gremium options from the public /gremien path', () => {
     s.listGremienOptions().subscribe();
     http.expectOne('/api/gremien').flush([]);
   });
 
-  it('PATCHes/DELETEs a gremium and gets/sets mail recipients (#105)', () => {
+  it('PATCHes/DELETEs a gremium and gets/sets mail recipients', () => {
     s.updateGremium('g-9', { name: 'X' }).subscribe();
     expect(http.expectOne('/api/admin/gremien/g-9').request.method).toBe('PATCH');
 
@@ -310,16 +311,38 @@ describe('AdminApiService — real mode (contract)', () => {
     expect(http.expectOne('/api/admin/mail-templates/preview').request.method).toBe('POST');
   });
 
-  it('maps /application-types page to id+name options (#69)', () => {
+  it('maps /application-types page to id+name options', () => {
     let out: { id: string; name: string }[] | undefined;
     s.listApplicationTypes().subscribe((o) => (out = o));
+    // Match on the path only. A plain string matcher compares `urlWithParams` and
+    // would miss the mandatory `lang`.
     http
-      .expectOne('/api/application-types')
+      .expectOne((r) => r.url === '/api/application-types')
       .flush({ items: [{ id: 't1', name: 'Foo', extra: 1 }] });
     expect(out).toEqual([{ id: 't1', name: 'Foo' }]);
   });
 
-  it('maps /admin/application-types to FormOverviewItem (active vs draft) (#75)', () => {
+  // The public `/application-types` resolves the type name SERVER-side from the `lang`
+  // query parameter, which defaults to German. Without the parameter the
+  // application-type picker of the form and flow builders shows German names in an
+  // English admin UI.
+  it('sends the active locale as `lang` on /application-types', () => {
+    const i18n = TestBed.inject(I18nService);
+
+    i18n.setLocale('en');
+    s.listApplicationTypes().subscribe();
+    const en = http.expectOne((r) => r.url === '/api/application-types');
+    expect(en.request.params.get('lang')).toBe('en');
+    en.flush({ items: [] });
+
+    i18n.setLocale('de');
+    s.listApplicationTypes().subscribe();
+    const de = http.expectOne((r) => r.url === '/api/application-types');
+    expect(de.request.params.get('lang')).toBe('de');
+    de.flush({ items: [] });
+  });
+
+  it('maps /admin/application-types to FormOverviewItem (active vs draft)', () => {
     let out: { status: string; name: unknown; gremiumId: unknown }[] | undefined;
     s.listForms().subscribe((o) => (out = o as never));
     http.expectOne('/api/admin/application-types').flush([
@@ -331,7 +354,7 @@ describe('AdminApiService — real mode (contract)', () => {
     expect(out![1]).toEqual({ id: 't2', name: {}, gremiumId: null, status: 'draft', version: 0 });
   });
 
-  it('maps listApplicationTypesFull with defaults for missing fields (#13)', () => {
+  it('maps listApplicationTypesFull with defaults for missing fields', () => {
     let out: { hasBudget: boolean; retentionMonths: unknown; activeFormVersionId: unknown }[] | undefined;
     s.listApplicationTypesFull().subscribe((o) => (out = o as never));
     http.expectOne('/api/admin/application-types').flush([
@@ -342,7 +365,7 @@ describe('AdminApiService — real mode (contract)', () => {
     expect(out![1]).toEqual({ id: 't2', name: {}, gremiumId: null, hasBudget: false, retentionMonths: null, activeFormVersionId: null });
   });
 
-  it('POSTs a new application type and maps the wire response (#13)', () => {
+  it('POSTs a new application type and maps the wire response', () => {
     let created: { hasBudget: boolean; name: unknown } | undefined;
     s.createApplicationType({ key: 'k', name: { de: 'N' }, gremiumId: 'g1', hasBudget: true }).subscribe(
       (c) => (created = c as never),
@@ -361,7 +384,7 @@ describe('AdminApiService — real mode (contract)', () => {
     req.flush({ id: 'x' });
   });
 
-  it('PATCHes only the supplied application-type fields and DELETEs (#13)', () => {
+  it('PATCHes only the supplied application-type fields and DELETEs', () => {
     let done = false;
     s.updateApplicationType('t1', { name: { de: 'N' }, gremiumId: 'g1', hasBudget: false }).subscribe(
       () => (done = true),
@@ -417,7 +440,7 @@ describe('AdminApiService — real mode (contract)', () => {
     });
   });
 
-  it('wires gremium-role CRUD + permission helper (#42/#62)', () => {
+  it('wires gremium-role CRUD + permission helper', () => {
     s.listGremiumRoles('g1').subscribe();
     http.expectOne('/api/admin/gremien/g1/roles').flush([]);
 
@@ -575,6 +598,67 @@ describe('AdminApiService — real mode (contract)', () => {
     expect(dl.request.responseType).toBe('blob');
     dl.flush(new Blob([]));
   });
+  // Backups. The archive never crosses the API as bytes: a download is a signed URL and
+  // an upload is multipart, so the contract for both is worth pinning down.
+  describe('backups', () => {
+    it('lists the catalogue', () => {
+      s.listBackups().subscribe();
+      expect(http.expectOne('/api/admin/backups').request.method).toBe('GET');
+    });
+
+    it('polls one row without raising the global loading overlay', () => {
+      s.getBackup('b-1').subscribe();
+      const req = http.expectOne('/api/admin/backups/b-1');
+      expect(req.request.method).toBe('GET');
+    });
+
+    it('POSTs a create with the note', () => {
+      s.createBackup('before the vote').subscribe();
+      const req = http.expectOne('/api/admin/backups');
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual({ note: 'before the vote' });
+    });
+
+    it('sends a null note when none was typed', () => {
+      s.createBackup().subscribe();
+      expect(http.expectOne('/api/admin/backups').request.body).toEqual({ note: null });
+    });
+
+    it('PATCHes the pin', () => {
+      s.updateBackup('b-1', { pinned: true }).subscribe();
+      const req = http.expectOne('/api/admin/backups/b-1');
+      expect(req.request.method).toBe('PATCH');
+      expect(req.request.body).toEqual({ pinned: true });
+    });
+
+    it('asks for the BYTES, never a presigned store URL', () => {
+      // MinIO is internal, so a presigned S3 URL names a host the browser cannot
+      // resolve. The client therefore requests a blob from the API.
+      s.exportBackup('b-1').subscribe();
+      const req = http.expectOne('/api/admin/backups/b-1/export');
+      expect(req.request.method).toBe('GET');
+      expect(req.request.responseType).toBe('blob');
+    });
+
+    it('uploads an import as multipart', () => {
+      s.importBackup(new File(['x'], 'a.tar.age')).subscribe();
+      const req = http.expectOne('/api/admin/backups/import');
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toBeInstanceOf(FormData);
+    });
+
+    it('sends the confirmation literal the API demands', () => {
+      s.restoreBackup('b-1').subscribe();
+      const req = http.expectOne('/api/admin/backups/b-1/restore');
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual({ confirm: 'RESTORE' });
+    });
+
+    it('DELETEs one', () => {
+      s.deleteBackup('b-1').subscribe();
+      expect(http.expectOne('/api/admin/backups/b-1').request.method).toBe('DELETE');
+    });
+  });
 });
 
 describe('AdminApiService — mock mode, exhaustive store branches', () => {
@@ -640,7 +724,7 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(res.name).toBe(all[0].name);
   });
 
-  it('renames a role, creates a role, and deletes it (#21/#38)', async () => {
+  it('renames a role, creates a role, and deletes it', async () => {
     const s = svc();
     const roles = await firstValueFrom(s.listRoles());
     const renamed = await firstValueFrom(s.renameRole(roles[0].id, { de: 'Neu', en: 'New' }));
@@ -656,7 +740,7 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect((await firstValueFrom(s.listRoles())).some((r) => r.id === created.id)).toBe(false);
   });
 
-  it('activates/deactivates a principal, falling back when id unknown (#30)', async () => {
+  it('activates/deactivates a principal, falling back when id unknown', async () => {
     const s = svc();
     const all = await firstValueFrom(s.listPrincipals());
     const updated = await firstValueFrom(s.setPrincipalActive(all[0].id, false));
@@ -728,7 +812,7 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(rn.id).toBe(roles[0].id);
   });
 
-  it('CRUDs application types in the mock store (#13)', async () => {
+  it('CRUDs application types in the mock store', async () => {
     const s = svc();
     const before = (await firstValueFrom(s.listApplicationTypesFull())).length;
     const created = await firstValueFrom(s.createApplicationType({ key: 'neu', name: { de: 'Neu' } }));
@@ -756,7 +840,7 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect((await firstValueFrom(s.listApplicationTypesFull())).some((t) => t.id === created.id)).toBe(false);
   });
 
-  it('loads a known form draft and an empty stub for an unknown type (#13)', async () => {
+  it('loads a known form draft and an empty stub for an unknown type', async () => {
     const s = svc();
     const known = await firstValueFrom(s.getFormDraft('f-foerderung'));
     expect(known.fields.length).toBeGreaterThan(0);
@@ -800,14 +884,14 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(stub).toEqual({ applicationTypeId: 'no-draft-type', active: true, fields: [] });
   });
 
-  it('returns null global flow and a deterministic mock flow id in mock mode (#28)', async () => {
+  it('returns null global flow and a deterministic mock flow id in mock mode', async () => {
     const s = svc();
     expect(await firstValueFrom(s.getGlobalFlow())).toBeNull();
     const created = await firstValueFrom(s.createGlobalFlowVersion({ states: [{ key: 's', label: {} }], transitions: [] }));
     expect(created.id).toBe('gflow-1');
   });
 
-  it('CRUDs gremium-roles in the mock store (#42/#62)', async () => {
+  it('CRUDs gremium-roles in the mock store', async () => {
     const s = svc();
     expect(await firstValueFrom(s.listGremiumRoles('g-stupa'))).toEqual([]);
     const created = await firstValueFrom(s.createGremiumRole('g-stupa', { key: 'chair', name: { de: 'Vorsitz' } }));
@@ -922,6 +1006,35 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(rejected.reason).toBe('r');
     const rejectedNull = await firstValueFrom(s.rejectErasure('e-done'));
     expect(rejectedNull.reason).toBeNull();
+  });
+
+  it('serves the backup catalogue from the seeded store', async () => {
+    const s = svc();
+    const list = await firstValueFrom(s.listBackups());
+    expect(list.items.length).toBeGreaterThan(0);
+    expect(list.enabled).toBe(true);
+
+    const one = await firstValueFrom(s.getBackup(list.items[0].id));
+    expect(one.id).toBe(list.items[0].id);
+    // An unknown id falls back to a stub rather than throwing.
+    expect((await firstValueFrom(s.getBackup('nope'))).id).toBe('nope');
+
+    const created = await firstValueFrom(s.createBackup('note'));
+    expect(created.note).toBe('note');
+    expect((await firstValueFrom(s.listBackups())).items[0].id).toBe(created.id);
+
+    const pinned = await firstValueFrom(s.updateBackup(created.id, { pinned: true }));
+    expect(pinned.pinned).toBe(true);
+    expect((await firstValueFrom(s.updateBackup('nope', { pinned: true }))).id).toBe('nope');
+
+    expect(await firstValueFrom(s.exportBackup(created.id))).toBeInstanceOf(Blob);
+    expect((await firstValueFrom(s.importBackup(new File(['x'], 'a.age')))).note).toBe('a.age');
+    expect((await firstValueFrom(s.restoreBackup(created.id))).id).toBe(created.id);
+    expect((await firstValueFrom(s.restoreBackup('nope'))).id).toBe('nope');
+
+    await firstValueFrom(s.deleteBackup(created.id));
+    const after = await firstValueFrom(s.listBackups());
+    expect(after.items.some((b) => b.id === created.id)).toBe(false);
   });
 
   it('listGroupMappings/mail-templates always hit HTTP even in mock mode', () => {

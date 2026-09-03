@@ -343,10 +343,11 @@ jobs:
           cp .env.example .env
           docker compose config -q
 
-  # Restore smoke test (T-42). It proves the backup-to-restore round against a
-  # throwaway stack (DB + MinIO). Opt-in like e2e, because it builds the backup image
-  # and downloads mc. That is too heavy and too slow for every pull request. A default
-  # run shows up as *skipped* (neutral) and does not block. Three ways to opt in:
+  # Restore smoke test. It proves the backup-to-restore round against a throwaway stack
+  # (DB + MinIO), driving the real service and worker code inside the backend image.
+  # Opt-in like e2e, because it builds that image and runs a full migrate. That is too
+  # heavy and too slow for every pull request. A default run shows up as *skipped*
+  # (neutral) and does not block. Three ways to opt in:
   #   - by hand:   Actions → Run workflow (workflow_dispatch)
   #   - per PR:    set the label `run-restore-smoke`
   #   - permanent: repo variable RUN_RESTORE_SMOKE=true
@@ -379,5 +380,10 @@ jobs:
       || vars.RUN_REAL_STACK_SMOKE == 'true'
     steps:
       - uses: actions/checkout@v7
+        with:
+          # The job builds the `web` image, which compiles the Angular app against the
+          # `@stupa-makers/ui-kit` submodule. Without this the build cannot resolve the
+          # package and the job fails before it reaches a single smoke assertion.
+          submodules: recursive
       - name: Real-Stack-Smoke (compose up -> HTTP/WS-Kernflüsse)
         run: scripts/smoke-real-stack.sh

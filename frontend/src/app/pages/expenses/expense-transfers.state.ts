@@ -1,11 +1,7 @@
 import { computed, inject, signal } from '@angular/core';
 import { I18nService } from '@core/i18n/i18n.service';
 import { ToastService } from '@stupa-makers/ui-kit';
-import {
-  BudgetTreeApi,
-  type BudgetTransfer,
-  type TransferUpdate,
-} from '../budget/budget-tree.api';
+import { BudgetTreeApi, type BudgetTransfer, type TransferUpdate } from '../budget/budget-tree.api';
 import { problemDetail } from '../budget/expense-display.util';
 import type { ExpensesListState } from './expenses-list.state';
 

@@ -50,12 +50,14 @@ def _default_deliver(email: str, link: str) -> None:
     logger.info("magic-link issued (recipient domain=%s)", domain)
 
 
-async def _resolve_application(
+async def resolve_application(
     db: AsyncSession, *, email: str, application_id: object | None
 ) -> Application | None:
     """Find the application for an email and an optional id.
 
-    The lookup goes through the PII table `applicant`.
+    The lookup goes through the PII table `applicant`. Without an id it takes the
+    newest application of that address, which is the one the magic link opens. The
+    router uses the same function to read the language of that application.
     """
     stmt = (
         select(Application)
@@ -92,7 +94,7 @@ async def request_magic_link(
 
     The function sends a mail only on a hit. The caller always answers 202.
     """
-    app = await _resolve_application(db, email=email, application_id=application_id)
+    app = await resolve_application(db, email=email, application_id=application_id)
     if app is None:
         return  # anti-enumeration: tell the outside nothing
 

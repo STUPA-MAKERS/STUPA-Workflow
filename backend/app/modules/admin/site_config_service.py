@@ -28,8 +28,8 @@ from app.modules.config_revision.service import (
 )
 from app.shared.errors import ConflictError
 
-# Fallback app names for the case where the config leaves them empty. The
-# values come from the previously static ``frontend/public/manifest.webmanifest``.
+# Fallback app names for the case where the config leaves them empty. They match the
+# defaults in ``frontend/public/manifest.webmanifest``.
 DEFAULT_APP_NAME = "STUPA Antragsplattform"
 DEFAULT_APP_SHORT_NAME = "StuPa"
 

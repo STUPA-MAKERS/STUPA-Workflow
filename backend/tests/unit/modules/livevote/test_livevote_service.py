@@ -334,7 +334,7 @@ async def test_service_open_vote_returns_row() -> None:
     assert await svc.open_vote(uuid4()) is vote
 
 
-# The list endpoint finds meetings again (#104).
+# The list endpoint finds meetings again.
 class _ListResult:
     def __init__(self, rows: list) -> None:
         self._rows = rows

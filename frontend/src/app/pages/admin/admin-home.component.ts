@@ -40,7 +40,7 @@ export class AdminHomeComponent {
     { link: 'gremien', title: 'admin.home.gremien', desc: 'admin.home.gremienDesc', icon: 'parliament', permissions: ['admin.gremien'] },
     { link: 'budget-pots', title: 'budget.tree.title', desc: 'admin.home.budgetPotsDesc', icon: 'euro', permissions: ['budget.structure'] },
     { link: 'forms', title: 'admin.home.formBuilder', desc: 'admin.home.formBuilderDesc', icon: 'form', permissions: ['form.configure'] },
-    // The flow editor route and its save both accept either key (#g7).
+    // The flow editor route and its save both accept either key.
     { link: 'flow', title: 'admin.home.flowEditor', desc: 'admin.home.flowEditorDesc', icon: 'flow', permissions: ['flow.configure', 'admin.types'] },
     { link: 'branding', title: 'admin.home.branding', desc: 'admin.home.brandingDesc', icon: 'palette', permissions: ['admin.site'] },
     { link: 'cd-variants', title: 'admin.cdVariants.title', desc: 'admin.home.cdVariantsDesc', icon: 'document', permissions: ['admin.cd_variants'] },
@@ -49,6 +49,7 @@ export class AdminHomeComponent {
     { link: 'audit', title: 'admin.audit.title', desc: 'admin.audit.desc', icon: 'audit', permissions: ['audit.read'] },
     { link: 'deadlines', title: 'admin.deadlines.title', desc: 'admin.deadlines.subtitle', icon: 'clock', permissions: ['admin.deadlines'] },
     { link: 'privacy', title: 'admin.home.privacy', desc: 'admin.home.privacyDesc', icon: 'key', permissions: ['privacy.manage'] },
+    { link: 'backups', title: 'admin.home.backups', desc: 'admin.home.backupsDesc', icon: 'export', permissions: ['backup.manage'] },
     { link: 'notifications', title: 'admin.notifications.title', desc: 'admin.notifications.intro', icon: 'bell', permissions: ['admin.notifications'] },
     { link: 'mail-templates', title: 'admin.home.mailTemplates', desc: 'admin.home.mailTemplatesDesc', icon: 'send', permissions: ['admin.notifications'] },
   ];

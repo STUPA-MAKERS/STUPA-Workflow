@@ -69,6 +69,12 @@ export class GremiumRolesComponent {
   /** The gremium that owns these roles. Each role belongs to one gremium. */
   private readonly gremiumId = this.route.snapshot.paramMap.get('id') as Uuid;
 
+  /**
+   * True until the first answer. Without it the table shows its empty text while the
+   * request is still out, which asserts there is nothing when nothing has arrived yet.
+   */
+  protected readonly loading = signal(true);
+
   protected readonly roles = signal<GremiumRole[]>([]);
   protected readonly draft = signal<RoleDraft | null>(null);
   protected readonly editingId = signal<string | null>(null);
@@ -98,7 +104,13 @@ export class GremiumRolesComponent {
   }
 
   constructor() {
-    this.api.listGremiumRoles(this.gremiumId).subscribe((r) => this.roles.set(r));
+    this.api.listGremiumRoles(this.gremiumId).subscribe({
+      next: (r) => {
+        this.roles.set(r);
+        this.loading.set(false);
+      },
+      error: () => this.loading.set(false),
+    });
   }
 
   protected label(r: GremiumRole | null): string {

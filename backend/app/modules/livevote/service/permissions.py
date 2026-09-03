@@ -66,24 +66,44 @@ class PermissionOps(MeetingServiceBase):
     async def can_vote(self, meeting: Meeting, principal: Principal) -> bool:
         """Check if the principal can vote in this meeting.
 
-        An admin passes. A gremium role with `vote.cast` passes. A voting delegation
-        of this meeting that names the principal also passes. The last case covers an
-        external substitute.
+        A gremium role with `vote.cast` passes. A voting delegation of this meeting
+        that names the principal also passes. The last case covers an external
+        substitute.
+
+        The flag mirrors the cast gate of `VotingService`, which admits the gremium
+        roster of the vote and nobody else. A GLOBAL `vote.cast` permission is
+        therefore not enough on its own: an admin without a membership in this gremium
+        would see a ballot UI that the API then refuses with 403. The quorum counts
+        that admin as little as the gate admits them.
+
+        Voting also stays human. `vote.cast` sits in FORBIDDEN_PERMISSIONS, and the
+        cast gate refuses every scoped OAuth token.
         """
-        if "admin" in principal.roles:
-            return True
-        if meeting.gremium_id in await gremium_ids_with_permission(
-            self.session, principal.sub, "vote.cast"
-        ):
+        if meeting.gremium_id in await self._vote_cast_gremium_ids(principal):
             return True
         return meeting.id in await self._delegated_meeting_ids(principal.sub, voting_only=True)
+
+    async def _vote_cast_gremium_ids(self, principal: Principal) -> set[UUID]:
+        """Return the gremien whose roster admits this principal to a ballot.
+
+        This is the roster side of the cast gate, and the same set that
+        `vote_eligible_count` counts for the quorum. A scoped OAuth token gets the
+        empty set: `vote.cast` sits in FORBIDDEN_PERMISSIONS, and voting stays human.
+        """
+        if principal.scope_permissions is not None:
+            return set()
+        return await gremium_ids_with_permission(self.session, principal.sub, "vote.cast")
 
     async def is_member(self, gremium_id: UUID, principal: Principal) -> bool:
         """Check for current membership in the gremium with any role.
 
-        A member can follow the meeting live.
+        A member can follow the meeting live, and so can the holder of the global
+        `meeting.view_all` read right, which the admin role carries. That right goes
+        through `Principal.has`, so the OAuth scope cap applies: a raw `principal.roles`
+        read would give a narrowly scoped token the cross-gremium roster, which carries
+        names and email addresses.
         """
-        if "admin" in principal.roles:
+        if principal.has("meeting.view_all"):
             return True
         return gremium_id in await gremium_member_ids(self.session, principal.sub)
 
@@ -151,11 +171,10 @@ class PermissionOps(MeetingServiceBase):
         Returns:
             The visible gremium ids, or `None` for all gremien.
         """
-        if (
-            "admin" in principal.roles
-            or principal.has("meeting.manage")
-            or principal.has("meeting.view_all")
-        ):
+        # Both checks go through `Principal.has`, which grants the admin role every
+        # right and applies the OAuth scope cap. Reading `principal.roles` here would
+        # return `None` — every gremium — for a token scoped to far less.
+        if principal.has("meeting.manage") or principal.has("meeting.view_all"):
             return None
         member = await gremium_member_ids(self.session, principal.sub)
         pool = await self._substitute_pool_gremium_ids(principal.sub)

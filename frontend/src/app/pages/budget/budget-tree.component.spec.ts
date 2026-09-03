@@ -149,7 +149,7 @@ function flushReload(http: HttpTestingController, tree: BudgetTreeNode[] = TREE)
   }
 }
 
-describe('BudgetTreeComponent (#9)', () => {
+describe('BudgetTreeComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   it('renders the cost-centre tree with full path keys', async () => {
@@ -295,7 +295,7 @@ describe('BudgetTreeComponent (#9)', () => {
   it('money formats numbers, empty strings and null as currency', async () => {
     const { c } = await setup();
     const eur = (n: number) =>
-      new Intl.NumberFormat(TestBed.inject(I18nService).locale(), {
+      new Intl.NumberFormat(TestBed.inject(I18nService).formatLocale(), {
         style: 'currency',
         currency: 'EUR',
       }).format(n);
@@ -1022,5 +1022,15 @@ describe('BudgetTreeComponent (#9)', () => {
     fixture.detectChanges();
     expect(screen.getByRole('button', { name: 'Haushaltsjahr bearbeiten' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Haushaltsjahr löschen' })).toBeInTheDocument();
+  });
+
+  it('nests no second main landmark inside the shell main', async () => {
+    // `<main>` in a routed page template lands inside the `<main id="main">` of the
+    // shell. HTML forbids that, and it gives a screen reader two "main" landmarks.
+    const view = await setup();
+    expect(view.container.querySelectorAll('main')).toHaveLength(0);
+    const region = view.container.querySelector('.bt__main');
+    expect(region).toBeTruthy();
+    expect(region!.getAttribute('role')).toBeNull();
   });
 });

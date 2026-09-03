@@ -1,7 +1,8 @@
 # deploy
 
 Compose stack for one VM. Internal traffic is plain HTTP. The external Nginx Proxy Manager
-terminates TLS. `web` publishes `127.0.0.1:8080`. `postgres` also publishes a loopback-only
+terminates TLS. `web` publishes `127.0.0.1:8080` by default (`WEB_PORT` moves the port,
+`WEB_HOST` the bind address; see `.env.example` before opening it beyond loopback). `postgres` also publishes a loopback-only
 port for the admin CLI (see the service table). Every other service stays on the internal
 network, so the internet cannot reach it.
 
@@ -23,7 +24,7 @@ docker compose up -d --build
 
 | Service | Role | Host port |
 |---|---|---|
-| `web` | nginx, serves the built SPA, routes `/api` to `api` | `127.0.0.1:8080` |
+| `web` | nginx, serves the built SPA, routes `/api` to `api` | `${WEB_HOST:-127.0.0.1}:${WEB_PORT:-8080}` |
 | `migrate` | one-shot: `alembic upgrade head`, then exit | — |
 | `api` | FastAPI (uvicorn `--proxy-headers`) | — |
 | `worker` | arq (mail send, nightly budget rollup) | — |
@@ -33,7 +34,6 @@ docker compose up -d --build
 | `clamav` | virus scan (the first start is slow because it loads the signatures) | — |
 | `pytex` | internal Markdown→PDF renderer | — |
 | `altcha` | ALTCHA Sentinel (captcha verifier) | — |
-| `backup` | daily encrypted backup (pg_dump + MinIO mirror, age). Profile `prod`/`backup` | — |
 
 Docker builds `web` from the repository root `..` in two stages (`web/Dockerfile`). Stage 1
 builds the Angular frontend with Node. Stage 2 serves it with nginx. The image contains
@@ -50,6 +50,21 @@ revisions before the application starts.
 
 `migrate` can also run as its own database user (`DB_MIGRATION_URL`), separate from the
 runtime user of the application.
+
+### Orphaned application PDFs — ONE-OFF manual step
+
+Applications no longer render a PDF. Migration `a7c3f1e59d84` drops the `render_job` table,
+but the rendered files stay in the attachment bucket: a migration has a database connection
+and no MinIO credentials.
+
+Run once, after the deploy that carries the migration:
+
+```bash
+docker compose exec api python -m scripts.drop_application_pdfs           # list
+docker compose exec api python -m scripts.drop_application_pdfs --delete  # remove
+```
+
+It walks the `pdf/` prefix and skips `pdf/protocol/`, which protocols still use.
 
 ### Least-privilege database roles (security.md §4/§10) — MANUAL production step
 
@@ -125,18 +140,100 @@ BOOTSTRAP_ADMIN_EMAILS=admin@hochschule.example,vorstand@stupa.example
 
 ## Profiles
 
-- **prod** — behind NPM, with external Keycloak, SMTP and Nextcloud, ClamAV on. It also starts
-  the `backup` service:
+- **prod** — behind NPM, with external Keycloak, SMTP and Nextcloud, ClamAV on:
   ```bash
   docker compose --profile prod up -d --build
   ```
   For the real NPM network, switch `proxy:` in the compose file to `external: true`.
-- Default (no profile) = smoke and dev stack without `backup`.
+- Default (no profile) = smoke and dev stack.
 
 ## Backup and restore
 
-For the daily encrypted backup (PostgreSQL and MinIO, age) and the tested restore procedure
-see [`backup/README.md`](backup/README.md). The restore test is `../scripts/restore-smoke.sh`.
+Backups run **inside the application**, at `/admin/backups`. There is no backup container.
+One archive is an age-encrypted tar holding a `pg_dump --format=custom` of the database plus
+a mirror of the attachment bucket. Archives live in their own MinIO bucket (`BACKUP_BUCKET`,
+default `backups`).
+
+The page creates, downloads, uploads, restores and deletes an archive, and it lists what
+exists. A nightly job takes one at 04:00. Every one of those actions is written to the audit
+log. `backup.manage` gates the page; that permission is separate from every `admin.*` page
+permission and is unreachable through an OAuth agent token.
+
+### Set it up
+
+1. Generate the key pair:
+   ```bash
+   age-keygen -o deploy/secrets/backup-age.key
+   ```
+   `deploy/secrets/` is gitignored. The `# public key: age1...` line in that file is the
+   recipient.
+2. Make the key readable by the container user:
+   ```bash
+   sudo chown 10001:10001 deploy/secrets/backup-age.key
+   chmod 400 deploy/secrets/backup-age.key
+   ```
+   `age-keygen` writes 0600 owned by you. The containers run as uid 10001 and mount
+   `./secrets` read-only, so the mode on the HOST decides whether the app can read the
+   key at all. Skip this and backups still work, but a restore fails with *the age
+   identity file is not readable*.
+3. Put the recipient in `.env` as `BACKUP_AGE_RECIPIENT`. Leave
+   `BACKUP_AGE_IDENTITY_FILE=/secrets/backup-age.key` as it is.
+
+Without a recipient the page answers 503 and the nightly job does nothing. Without the
+identity the page still lists and creates, but import and restore stay off, because the
+platform cannot decrypt its own archives.
+
+> **The private key lives in the stack.** That is the price of restoring from a browser: a
+> compromised container can decrypt every archive the application wrote. Use this key pair
+> for the application ONLY, and keep a separate disaster-recovery key pair off host.
+
+### Rotating the key pair
+
+An archive can be read only by the private key matching the recipient it was encrypted
+**to**. `BACKUP_AGE_RECIPIENT` decides that at the moment the archive is written, and
+nothing re-encrypts an existing one.
+
+So after changing the pair:
+
+* new archives use the new recipient and are readable with the new identity;
+* **every archive taken before the change stays bound to the old key**. Importing or
+  restoring one with the new identity in place fails to decrypt.
+
+Keep the old private key for as long as you keep archives that were written to it. To read
+one without putting the old key back into the stack:
+
+```bash
+age -d -i /path/to/old-backup-age.key antrag-<ts>.tar.age | tar -xf -
+```
+
+The retention count is per archive, not per key, so archives from before a rotation age out
+on the same schedule as the rest.
+
+### A restore
+
+A restore replaces the database and the attachment bucket with the contents of the archive.
+Everybody is logged out, because the session table comes from the archive too. The worker
+takes a `pre_restore` safety archive first and only replaces anything once that archive is
+stored, so restoring the wrong archive is itself undoable. A safety archive and a pinned
+archive are never pruned by retention.
+
+The archive format is deliberately ordinary, so the platform is never the only thing that
+can read its own backups:
+
+```bash
+age -d -i deploy/secrets/backup-age.key antrag-<ts>.tar.age | tar -tvf -
+  manifest.json     format version, app version, alembic head, counts
+  db.dump           pg_dump --format=custom
+  objects/<key>     one member per attachment
+```
+
+### Off-host copies
+
+The application does not push archives anywhere. Back up the `minio_data` Docker volume
+from the host; it holds the backup bucket and the attachments. On the production NixOS host
+that is the directory to add to the host's own backup job.
+
+The round-trip test is `../scripts/restore-smoke.sh`.
 
 ## Smoke test
 
@@ -162,7 +259,7 @@ It uses its own `COMPOSE_PROJECT_NAME` and touches no other stack. It saves an e
 ../scripts/smoke-real-stack.sh        # up -> check the core flows -> teardown
 ```
 
-The compose mapping fixes the host port at `127.0.0.1:8080`. `SMOKE_TIMEOUT` controls the wait
+The host port is `${WEB_HOST:-127.0.0.1}:${WEB_PORT:-8080}`; `WEB_PORT` moves the port and `WEB_HOST` the bind address. `SMOKE_TIMEOUT` controls the wait
 time and defaults to 600 seconds, because ClamAV loads for a long time.
 
 CI runs the job `real-stack-smoke`. It is opt-in like e2e, so a default PR stays green and

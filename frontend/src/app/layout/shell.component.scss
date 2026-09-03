@@ -42,6 +42,22 @@
   height: 32px;
   width: auto;
 }
+/* The mark alone, for a header too narrow to carry the wordmark. Below the breakpoint
+   the wordmark is unreadable AND the widest single thing in the row, so it goes and the
+   mark takes its place. */
+.header__mark {
+  display: none;
+  height: 30px;
+  width: auto;
+}
+@media (max-width: 640px) {
+  .header__logo {
+    display: none;
+  }
+  .header__mark {
+    display: block;
+  }
+}
 .header__nav {
   display: flex;
   align-items: center;
@@ -51,6 +67,35 @@
   min-width: 0;
   overflow-x: auto;
   scrollbar-width: none;
+  /* A hidden scrollbar leaves a hard cut as the only cue that the strip scrolls, and a
+     half-sliced tab reads as a rendering fault. `appScrollFade` measures what is actually
+     hidden and sets the two classes; a strip that fits carries neither and stays sharp.
+
+     This cannot be CSS alone. Two static gradients fade both ends whatever the scroll
+     position, and a width media query cannot know whether the nav overflows — that
+     depends on how much room the logo, the search and the account control took, not on
+     the viewport. The previous rule assumed anything above 1440px fits, which is exactly
+     where the cut was reported. */
+  --nav-fade: var(--space-6);
+}
+.header__nav.is-fade-start {
+  mask-image: linear-gradient(to right, transparent 0, #000 var(--nav-fade));
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--nav-fade));
+}
+.header__nav.is-fade-end {
+  mask-image: linear-gradient(to left, transparent 0, #000 var(--nav-fade));
+  -webkit-mask-image: linear-gradient(to left, transparent 0, #000 var(--nav-fade));
+}
+.header__nav.is-fade-start.is-fade-end {
+  mask-image:
+    linear-gradient(to right, transparent 0, #000 var(--nav-fade)),
+    linear-gradient(to left, transparent 0, #000 var(--nav-fade));
+  mask-composite: intersect;
+  -webkit-mask-image:
+    linear-gradient(to right, transparent 0, #000 var(--nav-fade)),
+    linear-gradient(to left, transparent 0, #000 var(--nav-fade));
+  -webkit-mask-composite: source-in;
+
 }
 .header__nav::-webkit-scrollbar {
   display: none;
@@ -178,14 +223,25 @@
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
-.account__name {
+/* The name heads the menu the icon opens. It is not decoration there: it answers "which
+   account am I in", which the header no longer shows. */
+.account__menuName {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+.account__menuNameLabel {
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+}
+.account__menuNameValue {
   font-size: var(--fs-sm);
   font-weight: var(--fw-medium);
   color: var(--color-text);
-  max-width: 9rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 .account__backdrop {
   position: fixed;
@@ -225,6 +281,36 @@
 .account__menu-item:hover {
   background: var(--color-surface-sunken);
 }
+/* Language and appearance sit below the account actions, separated: they are settings,
+   and running them together with "Log out" would read as one list of actions. */
+.account__menuSep {
+  height: var(--border-width);
+  margin: var(--space-1) var(--space-2);
+  background: var(--color-border);
+}
+/* A row that holds a control rather than being one. The label takes the width so the
+   select lands hard right, in line with the rest of the menu. */
+.account__menu-item--field {
+  gap: var(--space-2);
+  cursor: default;
+}
+.account__menu-item--field > span {
+  flex: 1 1 auto;
+}
+.account__menuSelect {
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--fs-sm);
+  padding: 2px var(--space-2);
+  cursor: pointer;
+}
+.account__menuSelect:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
+}
 .account__btn {
   padding-inline: var(--space-4);
   white-space: nowrap;
@@ -240,7 +326,9 @@
 }
 
 @media (max-width: 720px) {
-  .account__name {
+  /* The search label and its shortcut hint are desktop advice; the icon stays a target. */
+  .header__searchLabel,
+  .header__searchKbd {
     display: none;
   }
 }
@@ -389,6 +477,41 @@
 @media (min-width: 720.02px) {
   .mobile-nav,
   .mobile-nav__backdrop {
+    display: none;
+  }
+}
+
+/* The search trigger. Quiet by design: it is a shortcut, not a call to action, and the
+   keyboard is the primary way in. The label collapses on a narrow header so the icon
+   still gives a target. */
+.header__search {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  /* The shared control height, not a hardcoded 2rem. Every other control in this row
+     takes the token, and the odd one out is what made the strip look ragged. */
+  height: var(--control-height);
+  padding: 0 var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.header__search:hover {
+  border-color: var(--color-border-strong);
+  color: var(--color-text);
+}
+.header__searchKbd {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+}
+@media (max-width: 900px) {
+  .header__searchLabel,
+  .header__searchKbd {
     display: none;
   }
 }

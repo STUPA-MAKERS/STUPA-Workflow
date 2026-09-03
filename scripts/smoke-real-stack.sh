@@ -14,16 +14,18 @@
 # file back at the end. It removes everything again (down -v). The script is idempotent.
 #
 # Usage: scripts/smoke-real-stack.sh
-#   SMOKE_TIMEOUT: default 600s, because ClamAV loads slowly. The host port is fixed to
-#   8080 (compose).
+#   SMOKE_TIMEOUT: default 600s, because ClamAV loads slowly.
+#   WEB_PORT: host port of `web`, default 8080. Set it when 8080 is taken.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEPLOY="${ROOT}/deploy"
 ENV_FILE="${DEPLOY}/.env"
 ENV_BACKUP=""
-# The compose file maps the host port hard to 127.0.0.1:8080:80. No override works.
-WEB="http://127.0.0.1:8080"
+# The compose mapping reads WEB_PORT, so the script and the stack agree on one value.
+WEB_PORT="${WEB_PORT:-8080}"
+export WEB_PORT
+WEB="http://127.0.0.1:${WEB_PORT}"
 TIMEOUT="${SMOKE_TIMEOUT:-600}"
 
 export COMPOSE_PROJECT_NAME="antrag-real-smoke"
@@ -31,6 +33,20 @@ export COMPOSE_PROJECT_NAME="antrag-real-smoke"
 cd "${DEPLOY}"
 
 cleanup() {
+  # Show the logs of anything that did not come up BEFORE tearing the stack down. A
+  # smoke failure that prints only "service migrate didn't complete successfully" costs
+  # the next person a full round trip to find out what actually broke.
+  if [[ "${SMOKE_OK:-0}" != "1" ]]; then
+    # `ps` first: it names which service is unhealthy, which is usually the answer.
+    echo "==> Container status (smoke failed)"
+    docker compose ps || true
+    # One block per service. A single combined `logs ... | tail` lets a chatty service
+    # such as migrate crowd out the one that actually failed.
+    for svc in migrate api worker web; do
+      echo "--- logs: ${svc} ---"
+      docker compose logs --no-color --tail 30 "${svc}" 2>&1 | tail -30 || true
+    done
+  fi
   echo "==> Teardown (down -v)"
   docker compose down -v --remove-orphans >/dev/null 2>&1 || true
   if [[ -n "${ENV_BACKUP}" && -f "${ENV_BACKUP}" ]]; then
@@ -62,11 +78,35 @@ MINIO_SECRET_KEY=smoke-minio-secret-key
 SESSION_SECRET=smoke-session-secret-0123456789
 MAGIC_LINK_SECRET=smoke-magic-link-secret-0123456789
 ALTCHA_HMAC_SECRET=smoke-altcha-hmac-secret-0123456789
+# `.env.example` ships this EMPTY, and an empty string is not an absent one, so the
+# 16-character minimum rejects it and every app container refuses to start. The stack
+# needs no working OIDC here; it only has to satisfy the settings validation.
+OIDC_CLIENT_SECRET=smoke-oidc-client-secret-0123456789
 BOOTSTRAP_ADMIN_EMAILS=admin@smoke.example
 BOOTSTRAP_ADMIN_SUBJECTS=smoke-admin-subject
+# `.env.example` sets ENVIRONMENT=production, and production forbids a wildcard
+# FORWARDED_ALLOW_IPS: with "*" uvicorn trusts any X-Forwarded-* source, so a client IP
+# can be spoofed. The smoke stack reaches the app through the compose proxy from the
+# runner, which needs the wildcard, and the settings guard documents exactly this case
+# as allowed outside production ("dev, CI, container smoke"). So the environment moves
+# with it rather than the guard being weakened.
+ENVIRONMENT=ci
 FORWARDED_ALLOW_IPS=*
-PUBLIC_BASE_URL=http://127.0.0.1:8080
 EOF
+
+# Outside the quoted heredoc, because that block does NOT expand variables and these two
+# values have to carry the chosen port.
+{
+  echo "PUBLIC_BASE_URL=${WEB}"
+  echo "WEB_PORT=${WEB_PORT}"
+} >> "${ENV_FILE}"
+
+# The web image compiles the Angular app against the ui-kit submodule, so a fresh
+# clone has to sync it first. `deploy/deploy.sh` does the same before it builds. Without
+# this the build fails on an unresolvable `@stupa-makers/ui-kit`.
+echo "==> git submodule sync + update --init --recursive"
+git -C "${ROOT}" submodule sync --recursive
+git -C "${ROOT}" submodule update --init --recursive
 
 echo "==> docker compose config (Validierung)"
 docker compose config -q
@@ -150,4 +190,5 @@ if [[ "${fails}" -ne 0 ]]; then
   docker compose logs --no-color --tail=80 api web || true
   exit 1
 fi
+SMOKE_OK=1
 echo "==> Real-Stack-Smoke grün."

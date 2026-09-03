@@ -574,17 +574,25 @@ class NotificationService:
         )
         return int(await self._enqueue(msg))
 
-    async def send_magic_link(self, *, email: str, link: str) -> None:
-        """Render and enqueue the magic-link mail."""
+    async def send_magic_link(
+        self, *, email: str, link: str, lang: str | None = None
+    ) -> None:
+        """Render and enqueue the magic-link mail in `lang`.
+
+        `lang` is the language of the application that the link opens. The applicant
+        chose it at submit time, so the first mail must use it. ``None`` keeps the
+        configured default language. A template without that language falls back to the
+        default, as every other mail does.
+        """
         tpl = await self._get_template_by_key(MAGIC_LINK_TEMPLATE_KEY)
         if tpl is not None:
-            rendered = self._render(tpl, context={"link": link}, lang=None)
+            rendered = self._render(tpl, context={"link": link}, lang=lang)
         else:
             rendered = render_mail(
                 subject_i18n=_BUILTIN_MAGIC_LINK_SUBJECT,
                 body_i18n=_BUILTIN_MAGIC_LINK_BODY,
                 context={"link": link},
-                lang=self.settings.mail_default_lang,
+                lang=lang or self.settings.mail_default_lang,
                 default_lang=self.settings.mail_default_lang,
             )
         msg = MailMessage(
@@ -727,3 +735,39 @@ def _template_out(tpl: MailTemplate, *, source: str = "override") -> MailTemplat
         placeholders=tpl.placeholders,
         source=source,  # type: ignore[arg-type]
     )
+
+
+async def resolve_application_lang(
+    session: AsyncSession, *, application_id: uuid.UUID | None, settings: Settings
+) -> str:
+    """Return the mail language of an application.
+
+    The order is: the language of the application, then the default language of its
+    gremium, then the configured default language. The applicant sets the first one at
+    submit time, so every mail to that applicant must follow it. Without an application
+    (a magic link asked for by mail address alone) the function returns the default.
+    """
+    if application_id is None:
+        return settings.mail_default_lang
+    from app.modules.admin.models import Gremium
+    from app.modules.applications.models import Application
+
+    row = (
+        await session.execute(
+            select(Application.lang, Application.gremium_id).where(
+                Application.id == application_id
+            )
+        )
+    ).first()
+    if row is None:
+        return settings.mail_default_lang
+    lang, gremium_id = row
+    if lang:
+        return str(lang)
+    if gremium_id is not None:
+        gremium_lang = await session.scalar(
+            select(Gremium.default_lang).where(Gremium.id == gremium_id)
+        )
+        if gremium_lang:
+            return str(gremium_lang)
+    return settings.mail_default_lang

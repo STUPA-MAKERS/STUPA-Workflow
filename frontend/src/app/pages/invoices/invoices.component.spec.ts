@@ -1,7 +1,8 @@
+import { BehaviorSubject, of } from 'rxjs';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
 import { render } from '@testing-library/angular';
 import { AuthService } from '@core/auth/auth.service';
 import { USE_MOCK_API } from '@core/api/api.config';
@@ -76,6 +77,8 @@ interface SetupOpts {
   /** Fail the initial GET instead of flushing it. */
   error?: boolean;
   canManage?: boolean;
+  /** Query params on the page URL, as a global-search hit or a bookmark carries them. */
+  queryParams?: Record<string, string>;
 }
 
 async function setup(opts: SetupOpts = {}) {
@@ -90,6 +93,13 @@ async function setup(opts: SetupOpts = {}) {
       provideHttpClientTesting(),
       { provide: USE_MOCK_API, useValue: false },
       { provide: AuthService, useValue: auth },
+      {
+        provide: ActivatedRoute,
+        useValue: {
+          snapshot: { queryParamMap: convertToParamMap(opts.queryParams ?? {}) },
+          queryParamMap: of(convertToParamMap(opts.queryParams ?? {})),
+        },
+      },
     ],
   });
   const http = TestBed.inject(HttpTestingController);
@@ -115,7 +125,7 @@ function lastInvoicesReq(http: HttpTestingController) {
   return reqs[reqs.length - 1];
 }
 
-describe('InvoicesComponent (#invoices)', () => {
+describe('InvoicesComponent', () => {
   afterEach(() => {
     if (jest.isMockFunction(setTimeout)) jest.useRealTimers();
     const http = TestBed.inject(HttpTestingController);
@@ -131,6 +141,163 @@ describe('InvoicesComponent (#invoices)', () => {
     expect(c.hasMore()).toBe(true);
   });
 
+  it('asks for the one invoice the URL names', async () => {
+    // Where a global-search hit lands. A bare `/invoices` would open the whole list and
+    // leave the reader to find the invoice they had already named.
+    localStorage.setItem('ap.locale', 'de');
+    const auth = new FakeAuth();
+    const view = await render(InvoicesComponent, {
+      providers: [
+        provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: USE_MOCK_API, useValue: false },
+        { provide: AuthService, useValue: auth },
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            snapshot: { queryParamMap: convertToParamMap({ id: 'i-42' }) },
+            queryParamMap: of(convertToParamMap({ id: 'i-42' })),
+          },
+        },
+      ],
+    });
+    const http = TestBed.inject(HttpTestingController);
+    // One request, and it already carries the filter. A second, unfiltered one could
+    // resolve last and overwrite the row the reader came for.
+    const req = http.expectOne((r) => r.url.endsWith('/api/invoices') && r.method === 'GET');
+    expect(req.request.params.get('id')).toBe('i-42');
+    req.flush(page([inv({ id: 'i-42' })], 1));
+    view.fixture.detectChanges();
+
+    const c = view.fixture.componentInstance as unknown as {
+      activeFilterCount(): number;
+      invoiceId(): string;
+    };
+    // It counts, so the filter badge says the list is narrowed and the reset clears it.
+    expect(c.invoiceId()).toBe('i-42');
+    expect(c.activeFilterCount()).toBe(1);
+    http.verify();
+  });
+
+  it('re-filters when the palette sends it here while it is already here', async () => {
+    // Same route, new query string: the router keeps this component, so reading the
+    // snapshot once would leave the list showing the invoice the reader came from.
+    localStorage.setItem('ap.locale', 'de');
+    const params = new BehaviorSubject(convertToParamMap({ id: 'i-1' }));
+    const view = await render(InvoicesComponent, {
+      providers: [
+        provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: USE_MOCK_API, useValue: false },
+        { provide: AuthService, useValue: new FakeAuth() },
+        {
+          provide: ActivatedRoute,
+          useValue: { snapshot: { queryParamMap: params.value }, queryParamMap: params },
+        },
+      ],
+    });
+    const http = TestBed.inject(HttpTestingController);
+    http.expectOne((r) => r.url.endsWith('/api/invoices')).flush(page([inv({ id: 'i-1' })], 1));
+    view.fixture.detectChanges();
+
+    params.next(convertToParamMap({ id: 'i-9' }));
+    const again = http.expectOne((r) => r.url.endsWith('/api/invoices'));
+    expect(again.request.params.get('id')).toBe('i-9');
+    again.flush(page([inv({ id: 'i-9' })], 1));
+    http.verify();
+  });
+
+  it('writes a cleared filter back, so the palette can send you to it again', async () => {
+    // The bug this holds: the page read `?id=` but never wrote it. A reset cleared the
+    // list but left `?id=i-1` in the address bar, so picking that same invoice in the
+    // palette navigated to the URL the browser was ALREADY on. The router drops a
+    // same-URL navigation, `queryParamMap` never fired, and nothing happened at all.
+    localStorage.setItem('ap.locale', 'de');
+    const params = new BehaviorSubject(convertToParamMap({ id: 'i-1' }));
+    const view = await render(InvoicesComponent, {
+      providers: [
+        provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: USE_MOCK_API, useValue: false },
+        { provide: AuthService, useValue: new FakeAuth() },
+        {
+          provide: ActivatedRoute,
+          useValue: { snapshot: { queryParamMap: params.value }, queryParamMap: params },
+        },
+      ],
+    });
+    const http = TestBed.inject(HttpTestingController);
+    http.expectOne((r) => r.url.endsWith('/api/invoices')).flush(page([inv({ id: 'i-1' })], 1));
+    view.fixture.detectChanges();
+
+    const navigate = jest.spyOn(TestBed.inject(Router), 'navigate');
+    const c = view.fixture.componentInstance as unknown as { resetFilters(): void };
+    c.resetFilters();
+    view.fixture.detectChanges();
+
+    // The URL loses the id, so it states what the list is actually showing.
+    expect(navigate).toHaveBeenCalledWith(
+      [],
+      expect.objectContaining({
+        queryParams: expect.objectContaining({ id: null }),
+        replaceUrl: true,
+      }),
+    );
+    http.expectOne((r) => r.url.endsWith('/api/invoices')).flush(page([], 0));
+    http.verify();
+  });
+
+  it('drops a filter the URL no longer carries', async () => {
+    // Absence clears. Reading only what is present let a filter outlive the URL that
+    // put it there, which is the other half of the same drift.
+    localStorage.setItem('ap.locale', 'de');
+    const params = new BehaviorSubject(convertToParamMap({ id: 'i-1' }));
+    const view = await render(InvoicesComponent, {
+      providers: [
+        provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: USE_MOCK_API, useValue: false },
+        { provide: AuthService, useValue: new FakeAuth() },
+        {
+          provide: ActivatedRoute,
+          useValue: { snapshot: { queryParamMap: params.value }, queryParamMap: params },
+        },
+      ],
+    });
+    const http = TestBed.inject(HttpTestingController);
+    http.expectOne((r) => r.url.endsWith('/api/invoices')).flush(page([inv({ id: 'i-1' })], 1));
+    view.fixture.detectChanges();
+
+    params.next(convertToParamMap({}));
+    const again = http.expectOne((r) => r.url.endsWith('/api/invoices'));
+    expect(again.request.params.get('id')).toBeNull();
+    again.flush(page([inv({ id: 'i-1' }), inv({ id: 'i-2' })], 2));
+    http.verify();
+  });
+
+  it('adopts every filter the URL carries, not only the invoice id', async () => {
+    // Reading the whole set is what makes the URL a faithful description of the list.
+    const { c, http } = await setup({ queryParams: { grossMin: '10', status: 'paid' } });
+    const typed = c as unknown as { grossMin(): string; statusFilter(): string };
+    expect(typed.grossMin()).toBe('10');
+    expect(typed.statusFilter()).toBe('paid');
+    http.verify();
+  });
+
+  it('refuses a filter value the panel could never produce', async () => {
+    // The query string is typed by whoever holds the link. Reading every filter from it
+    // is what makes a bad number or an unknown status reachable at all.
+    const { c, http } = await setup({ queryParams: { grossMin: 'abc', status: 'nonsense' } });
+    const typed = c as unknown as { grossMin(): string; statusFilter(): string };
+    expect(typed.grossMin()).toBe('');
+    expect(typed.statusFilter()).toBe('');
+    http.verify();
+  });
+
   it('clears items/total on an initial load error', async () => {
     const { c } = await setup({ error: true });
     expect(c.items()).toEqual([]);
@@ -143,7 +310,28 @@ describe('InvoicesComponent (#invoices)', () => {
     expect(c.hasMore()).toBe(false);
   });
 
-  it('money() formats in de-DE vs en-US per locale', async () => {
+  // These two hold what the shared table brings: the header and the skeleton stay
+  // through a filter, a search or a reload, and the pinned actions column survives one.
+  it('keeps the table and its header on screen while reloading', async () => {
+    const { c, fixture, container } = await setup({ initial: [inv({ id: 'a' })] });
+    c.loading.set(true);
+    fixture.detectChanges();
+    expect(container.querySelector('table')).not.toBeNull();
+    expect(container.querySelectorAll('th').length).toBeGreaterThan(0);
+    expect(container.querySelectorAll('.dt__skeleton-row').length).toBeGreaterThan(0);
+  });
+
+  it('pins the actions column for a user who may book', async () => {
+    const { container } = await setup({ initial: [inv({ id: 'a' })], canManage: true });
+    expect(container.querySelector('td.dt__cell--sticky')).not.toBeNull();
+  });
+
+  it('has no actions column at all for a user who may only read', async () => {
+    const { container } = await setup({ initial: [inv({ id: 'a' })], canManage: false });
+    expect(container.querySelector('.dt__cell--sticky')).toBeNull();
+  });
+
+  it('money() formats in de-DE vs en-GB per locale', async () => {
     const { c } = await setup();
     const de = c.money('119.00');
     expect(de).toContain('119');
@@ -440,15 +628,17 @@ describe('InvoicesComponent (#invoices)', () => {
     const { c, http } = await setup();
     const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
     c.onFilePicked({ target: { files: [file], value: 'x' } } as unknown as Event);
-    http.expectOne((r) => r.url.endsWith('/api/invoices/parse')).flush({
-      ...PARSE,
-      number: null,
-      issueDate: null,
-      dueDate: null,
-      supplier: null,
-      netAmount: null,
-      taxAmount: null,
-    });
+    http
+      .expectOne((r) => r.url.endsWith('/api/invoices/parse'))
+      .flush({
+        ...PARSE,
+        number: null,
+        issueDate: null,
+        dueDate: null,
+        supplier: null,
+        netAmount: null,
+        taxAmount: null,
+      });
     expect(c.newNumber()).toBe('');
     expect(c.newSupplier()).toBe('');
     expect(c.newIssueDate()).toBe('');
@@ -638,9 +828,7 @@ describe('InvoicesComponent (#invoices)', () => {
     expect(ev.preventDefault).toHaveBeenCalled();
     expect(c.saving()).toBe(true);
 
-    const req = http.expectOne(
-      (r) => r.url.endsWith('/api/invoices') && r.method === 'POST',
-    );
+    const req = http.expectOne((r) => r.url.endsWith('/api/invoices') && r.method === 'POST');
     expect(req.request.body).toMatchObject({
       number: 'R-9',
       supplier: 'Sup',
@@ -668,9 +856,7 @@ describe('InvoicesComponent (#invoices)', () => {
     // Every other field stays blank and there is no importToken.
     const ev = { preventDefault: jest.fn() } as unknown as Event;
     c.create(ev);
-    const req = http.expectOne(
-      (r) => r.url.endsWith('/api/invoices') && r.method === 'POST',
-    );
+    const req = http.expectOne((r) => r.url.endsWith('/api/invoices') && r.method === 'POST');
     expect(req.request.body).toMatchObject({
       number: null,
       supplier: null,
@@ -697,9 +883,7 @@ describe('InvoicesComponent (#invoices)', () => {
     // The importFileMime value stays empty here. This covers the fileMime null branch.
     const ev = { preventDefault: jest.fn() } as unknown as Event;
     c.create(ev);
-    const req = http.expectOne(
-      (r) => r.url.endsWith('/api/invoices') && r.method === 'POST',
-    );
+    const req = http.expectOne((r) => r.url.endsWith('/api/invoices') && r.method === 'POST');
     expect(req.request.body.fileName).toBe('f.pdf');
     expect(req.request.body.fileMime).toBe(null);
     req.flush(inv());
@@ -775,9 +959,7 @@ describe('InvoicesComponent (#invoices)', () => {
     const ev = { preventDefault: jest.fn() } as unknown as Event;
     c.saveEdit(ev);
     expect(ev.preventDefault).toHaveBeenCalled();
-    const req = http.expectOne(
-      (r) => r.url.endsWith('/api/invoices/e1') && r.method === 'PATCH',
-    );
+    const req = http.expectOne((r) => r.url.endsWith('/api/invoices/e1') && r.method === 'PATCH');
     expect(req.request.body.supplier).toBe('New Sup');
     expect(req.request.body.note).toBe(null);
     req.flush(inv({ id: 'e1', supplier: 'New Sup' }));
@@ -817,9 +999,7 @@ describe('InvoicesComponent (#invoices)', () => {
     });
     c.openEdit(c.items()[0]);
     c.saveEdit({ preventDefault: jest.fn() } as unknown as Event);
-    const req = http.expectOne(
-      (r) => r.url.endsWith('/api/invoices/e1') && r.method === 'PATCH',
-    );
+    const req = http.expectOne((r) => r.url.endsWith('/api/invoices/e1') && r.method === 'PATCH');
     expect(req.request.body).toMatchObject({
       number: null,
       supplier: null,
@@ -885,9 +1065,7 @@ describe('InvoicesComponent (#invoices)', () => {
     c.askDelete(c.items()[0]);
     c.doDelete();
     expect(c.saving()).toBe(true);
-    http
-      .expectOne((r) => r.url.endsWith('/api/invoices/d1') && r.method === 'DELETE')
-      .flush(null);
+    http.expectOne((r) => r.url.endsWith('/api/invoices/d1') && r.method === 'DELETE').flush(null);
     expect(c.confirmDelete()).toBe(null);
     expect(c.items().map((x: Invoice) => x.id)).toEqual(['d2']);
     expect(c.total()).toBe(1);
@@ -898,9 +1076,7 @@ describe('InvoicesComponent (#invoices)', () => {
     const { c, http } = await setup({ initial: [inv({ id: 'd1' })], total: 0 });
     c.askDelete(c.items()[0]);
     c.doDelete();
-    http
-      .expectOne((r) => r.url.endsWith('/api/invoices/d1') && r.method === 'DELETE')
-      .flush(null);
+    http.expectOne((r) => r.url.endsWith('/api/invoices/d1') && r.method === 'DELETE').flush(null);
     expect(c.total()).toBe(0);
   });
 
@@ -989,8 +1165,7 @@ describe('InvoicesComponent infinite-scroll effect', () => {
       constructor(cb: (e: { isIntersecting: boolean }[]) => void) {
         lastCb = cb;
       }
-      observe(): void {
-      }
+      observe(): void {}
       disconnect(): void {
         disconnected = true;
       }
@@ -1033,5 +1208,56 @@ describe('InvoicesComponent infinite-scroll effect', () => {
 
     view.fixture.destroy();
     expect(disconnected).toBe(true);
+  });
+});
+
+describe('InvoicesComponent filter declaration', () => {
+  /** The component, with the filter machinery this suite walks. */
+  interface FilterHost {
+    filterSignals: readonly {
+      signal: { (): string; set(v: string): void };
+      key: string;
+      clearedByReset: boolean;
+    }[];
+    filterParams(): Record<string, unknown>;
+    resetFilters(): void;
+    activeFilterCount(): number;
+  }
+
+  it('resets exactly the filters it declares as reset by the button', async () => {
+    // The count, the reset and the request each kept their own list. A filter added to
+    // one and forgotten in another is invisible: the control moves, and the list does
+    // not change. This is what /applications was reported broken for.
+    const { c, http } = await setup();
+    const host = c as unknown as FilterHost;
+    for (const f of host.filterSignals) f.signal.set('x');
+
+    host.resetFilters();
+    http.expectOne((r) => r.url.endsWith('/api/invoices')).flush(page([], 0));
+
+    for (const f of host.filterSignals) {
+      expect(f.signal()).toBe(f.clearedByReset ? '' : 'x');
+    }
+  });
+
+  it('sends every declared filter that has a value', async () => {
+    const { c } = await setup();
+    const host = c as unknown as FilterHost;
+    for (const f of host.filterSignals) f.signal.set('7');
+
+    const params = host.filterParams();
+    expect(Object.keys(params).sort()).toEqual(host.filterSignals.map((f) => f.key).sort());
+  });
+
+  it('counts only the filters the reset button owns', async () => {
+    // The search box sits in the page header, outside the filter panel, so counting it
+    // would show a badge no button in that panel can clear.
+    const { c } = await setup();
+    const host = c as unknown as FilterHost;
+    for (const f of host.filterSignals) f.signal.set('7');
+
+    expect(host.activeFilterCount()).toBe(
+      host.filterSignals.filter((f) => f.clearedByReset).length,
+    );
   });
 });

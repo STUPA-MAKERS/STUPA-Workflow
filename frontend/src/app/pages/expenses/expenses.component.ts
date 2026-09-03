@@ -11,7 +11,8 @@ import {
 } from '@angular/core';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, type ParamMap, Router, RouterLink } from '@angular/router';
 import { from } from 'rxjs';
 import { concatMap } from 'rxjs/operators';
 import { AuthService } from '@core/auth/auth.service';
@@ -20,15 +21,20 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   BadgeComponent,
   ButtonComponent,
+  CellDirective,
   CheckboxComponent,
+  type ColumnDef,
   CurrencyInputComponent,
+  DataTableComponent,
   DatepickerComponent,
   DialogComponent,
   FilterBarComponent,
   FilterFieldComponent,
   FilterRangeComponent,
+  FootCellDirective,
   IconComponent,
   SelectComponent,
+  type SortState,
 } from '@stupa-makers/ui-kit';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { CostCentreTreeComponent } from '../budget/cost-centre-tree.component';
@@ -80,6 +86,9 @@ export type ExpensesTab = 'bookings' | 'transfers';
     SimplifyPathPipe,
     BadgeComponent,
     ButtonComponent,
+    CellDirective,
+    DataTableComponent,
+    FootCellDirective,
     CurrencyInputComponent,
     DatepickerComponent,
     DialogComponent,
@@ -112,6 +121,7 @@ export class ExpensesComponent implements OnDestroy {
   private readonly dialogs = new ExpenseDialogsState(this.list, this.sub, this.transfers);
 
   readonly canManage = computed(() => this.auth.can('budget.book'));
+
   readonly canExport = computed(() => this.auth.can('budget.export'));
 
   readonly budgetTree = this.list.budgetTree;
@@ -136,7 +146,7 @@ export class ExpensesComponent implements OnDestroy {
   readonly exporting = this.list.exporting;
   readonly refreshing = this.list.refreshing;
 
-  // Batch and bulk actions. See #expenses-ux.
+  // Batch and bulk actions. See.
   readonly selected = signal<ReadonlySet<Uuid>>(new Set());
   readonly bulkBusy = signal(false);
   readonly selectedCount = computed(() => this.selected().size);
@@ -148,11 +158,150 @@ export class ExpensesComponent implements OnDestroy {
    *  pending action, delete or export. */
   readonly bulkConfirm = signal<null | 'delete' | 'export'>(null);
   /** Select-all must not enable mass deletion. The user must pick each row for the
-   *  destructive bulk action. See #expenses-ux2. */
+   *  destructive bulk action. See. */
   readonly bulkDeleteBlocked = computed(() => this.allSelected() && this.selectedCount() > 1);
   readonly bulkReassignOpen = signal(false);
   readonly bulkBudgetId = signal('');
   readonly bulkCategory = signal('');
+  // -- shared-table wiring ----------------------------------------------------
+  //
+  // The bookings table was hand-rolled for years because the shared one could not do
+  // selection, child rows, a totals row or a per-row class. It can now, so this is a
+  // translation layer and nothing more: the component keeps the state it always had and
+  // hands the table the shape it wants.
+
+  /** Track by the booking id, so paging in more rows does not re-create the earlier ones. */
+  readonly rowId = (row: unknown): unknown => (row as Expense).id;
+
+  readonly bookingColumns = computed<ColumnDef[]>(() => {
+    const cols: ColumnDef[] = [
+      {
+        key: 'paymentDate',
+        label: this.i18n.translate('expenses.col.paymentDate'),
+        width: '9rem',
+        sortable: true,
+        initialSort: 'desc',
+      },
+      {
+        key: 'invoiceDate',
+        label: this.i18n.translate('expenses.col.invoiceDate'),
+        width: '9rem',
+        sortable: true,
+        initialSort: 'desc',
+        // Off the card: most bookings have none, so it is a labelled em-dash.
+        card: 'hidden',
+      },
+      {
+        key: 'kind',
+        label: this.i18n.translate('expenses.col.kind'),
+        width: '7rem',
+        // Off the card: the amount already carries the sign.
+        card: 'hidden',
+      },
+      {
+        key: 'description',
+        label: this.i18n.translate('expenses.col.description'),
+        // The card's heading. It is what says WHICH booking this is; a date does not.
+        card: 'title',
+      },
+      {
+        key: 'correspondent',
+        label: this.i18n.translate('expenses.col.correspondent'),
+        width: '11rem',
+      },
+      // Amount sits BEFORE the cost centre. The sticky actions column is displaced left
+      // by however much the table overflows and covers whatever is to its left, and the
+      // amount is the one column a reader scans a booking list for.
+      {
+        key: 'amount',
+        label: this.i18n.translate('expenses.col.amount'),
+        align: 'end',
+        width: '9rem',
+        sortable: true,
+        initialSort: 'desc',
+      },
+      {
+        key: 'costCentre',
+        label: this.i18n.translate('expenses.col.costCentre'),
+        width: '10rem',
+      },
+    ];
+    if (this.canManage()) {
+      cols.push({
+        key: 'actions',
+        label: this.i18n.translate('table.actions'),
+        align: 'end',
+        // Explicit, never self-sized. Letting it size itself is what made it 246px and
+        // hid the column beside it.
+        width: '9rem',
+        sticky: 'end',
+      });
+    }
+    return cols;
+  });
+
+  readonly transferRowId = (row: unknown): unknown => (row as { transferId: string }).transferId;
+
+  readonly transferColumns = computed<ColumnDef[]>(() => {
+    const cols: ColumnDef[] = [
+      {
+        key: 'paymentDate',
+        label: this.i18n.translate('expenses.col.paymentDate'),
+        width: '9rem',
+      },
+      {
+        key: 'invoiceDate',
+        label: this.i18n.translate('expenses.col.invoiceDate'),
+        width: '9rem',
+      },
+      { key: 'description', label: this.i18n.translate('expenses.col.description') },
+      { key: 'from', label: this.i18n.translate('expenses.transfers.from'), width: '10rem' },
+      { key: 'to', label: this.i18n.translate('expenses.transfers.to'), width: '10rem' },
+      {
+        key: 'amount',
+        label: this.i18n.translate('expenses.col.amount'),
+        align: 'end',
+        width: '9rem',
+      },
+    ];
+    if (this.canManage()) {
+      cols.push({
+        key: 'actions',
+        label: this.i18n.translate('table.actions'),
+        align: 'end',
+        width: '7rem',
+        sticky: 'end',
+      });
+    }
+    return cols;
+  });
+
+  /** The table speaks `SortState`; the list state speaks a field plus an order. */
+  readonly sortState = computed<SortState>(() => ({
+    key: this.sortField(),
+    direction: this.sortOrder() === 'asc' ? 'asc' : 'desc',
+  }));
+
+  onSortChange(next: SortState): void {
+    this.onSort(next.key as ExpenseSortField);
+  }
+
+  onSelectionChange(next: Set<unknown>): void {
+    this.selected.set(next as ReadonlySet<Uuid>);
+  }
+
+  /** Expanded sub-bookings only. A collapsed row contributes no children. */
+  readonly childrenOf = (row: unknown): readonly unknown[] => {
+    const e = row as Expense;
+    return this.isSubExpanded(e.id) ? this.subOf(e.id) : [];
+  };
+
+  /** Income rows carry a tint the table cannot know about. */
+  readonly rowClassFor = (row: unknown): string | null =>
+    (row as Expense).kind === 'income' ? 'exp__tr--income' : null;
+
+  readonly rowSelectLabel = (row: unknown): string => (row as Expense).description;
+
   readonly canSubmitReassign = computed(
     () => !!this.bulkBudgetId() || !!this.bulkCategory().trim(),
   );
@@ -237,9 +386,17 @@ export class ExpensesComponent implements OnDestroy {
     // Apply the URL filters first, then load data exactly once. The URL keeps the view
     // shareable, survives a browser reload, and is the target of cross-links from
     // Budget. The state module sends no request on its own. If the unfiltered
-    // reload resolves last, it can overwrite the filtered one. See #expenses-ux2.
-    this.applyQueryParams();
+    // reload resolves last, it can overwrite the filtered one. See.
+    this.applyQueryParams(this.route.snapshot.queryParamMap);
     this.list.reload();
+
+    // The palette can send us here while we are already here: a hit on another booking
+    // changes only the query string, and the router keeps this component alive. A
+    // snapshot read alone would never run again, and the write-back effect below would
+    // put the old filters straight back into the URL.
+    this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((qp) => {
+      if (this.applyQueryParams(qp)) this.list.reload();
+    });
 
     effect(() => {
       const queryParams = {
@@ -283,17 +440,34 @@ export class ExpensesComponent implements OnDestroy {
    *  URL carried at least one of them. `id` is a deep link to one exact booking.
    *  It has no dedicated control, but it counts as an active filter and resets
    *  with the others. */
-  private applyQueryParams(): boolean {
-    const qp = this.route.snapshot.queryParamMap;
-    const id = qp.get('id');
-    const budget = qp.get('budget');
-    const kind = qp.get('kind');
-    const q = qp.get('q');
-    if (id) this.expenseId.set(id);
-    if (budget) this.budgetId.set(budget);
-    if (kind === 'expense' || kind === 'income') this.kind.set(kind);
-    if (q) this.q.set(q);
-    return !!(id || budget || kind || q);
+  private applyQueryParams(qp: ParamMap): boolean {
+    const raw = qp.get('kind');
+    const kind: '' | ExpenseKind = raw === 'expense' || raw === 'income' ? raw : '';
+    const next = {
+      expenseId: qp.get('id') ?? '',
+      budgetId: qp.get('budget') ?? '',
+      q: qp.get('q') ?? '',
+    };
+    let changed = false;
+    // Absence clears. Every one of these four is written back into the URL by the effect
+    // in the constructor, so a parameter that is gone was taken away, not merely omitted.
+    if (next.expenseId !== this.expenseId()) {
+      this.expenseId.set(next.expenseId);
+      changed = true;
+    }
+    if (next.budgetId !== this.budgetId()) {
+      this.budgetId.set(next.budgetId);
+      changed = true;
+    }
+    if (kind !== this.kind()) {
+      this.kind.set(kind);
+      changed = true;
+    }
+    if (next.q !== this.q()) {
+      this.q.set(next.q);
+      changed = true;
+    }
+    return changed;
   }
 
   ngOnDestroy(): void {
@@ -505,7 +679,7 @@ export class ExpensesComponent implements OnDestroy {
   }
 
   /** Deep-link target for the cost-center cell. It opens the Budget tab drilled into
-   *  this cost center. See #expenses-ux. */
+   *  this cost center. See. */
   ksLink(e: Expense): { budget: string | null; ks: string; fy: string } {
     const top = findTopBudgetNode(this.budgetTree(), e.budgetId);
     return { budget: top?.id ?? null, ks: e.budgetId, fy: e.fiscalYearId };

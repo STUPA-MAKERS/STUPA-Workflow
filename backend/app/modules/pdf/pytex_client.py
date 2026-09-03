@@ -58,7 +58,12 @@ _LIVE_EVAL_TRIGGER_RE = re.compile(
 )
 # The evaluated pytex marker (``\iffalse{pytex(...)}\fi``) has no place in the body.
 # Its presence is also a signal that the body must not render trusted.
-_PYTEX_MARKER_RE = re.compile(r"\\iffalse\s*\{?\s*pytex\s*\(", re.DOTALL | re.IGNORECASE)
+# The optional brace sits inside its own group (``(?:\{\s*)?``). Two separate ``\s*``
+# around a bare ``\{?`` would let both consume the same whitespace run, which splits a
+# long run O(N**2) ways when no ``pytex(`` follows (ReDoS).
+_PYTEX_MARKER_RE = re.compile(
+    r"\\iffalse\s*(?:\{\s*)?pytex\s*\(", re.DOTALL | re.IGNORECASE
+)
 
 
 def _markdown_has_eval_trigger(markdown: str) -> bool:

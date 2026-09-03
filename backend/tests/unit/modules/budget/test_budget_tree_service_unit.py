@@ -537,7 +537,7 @@ async def test_get_tree_assembles() -> None:
 
 
 async def test_get_tree_rolls_up_standalone_expenses() -> None:
-    """Standalone expenses (#25) count as expended, not as bound."""
+    """Standalone expenses count as expended, not as bound."""
     g = uuid.uuid4()
     fy_id = uuid.uuid4()
     top = _budget(id=uuid.uuid4(), path_key="VS", gremium_id=g, key="VS")
@@ -557,7 +557,7 @@ async def test_get_tree_rolls_up_standalone_expenses() -> None:
 
 
 async def test_get_tree_income_increases_available() -> None:
-    """Income (#25) raises the available budget."""
+    """Income raises the available budget."""
     fy_id = uuid.uuid4()
     top = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     alloc = _alloc(budget_id=top.id, fy_id=fy_id, allocated="1000")
@@ -575,7 +575,7 @@ async def test_get_tree_income_increases_available() -> None:
 
 
 async def test_get_tree_linked_expense_replaces_bound() -> None:
-    """An expense linked to an application replaces that binding in proportion (#25)."""
+    """An expense linked to an application replaces that binding in proportion."""
     fy_id = uuid.uuid4()
     app_id = uuid.uuid4()
     top = _budget(id=uuid.uuid4(), path_key="VS", key="VS")

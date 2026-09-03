@@ -145,7 +145,7 @@ async def test_meeting_crud_and_patch(session: AsyncSession) -> None:
 
 
 async def test_list_timeline_keyset_pagination(session: AsyncSession) -> None:
-    """Timeline keyset (#104): past goes backward, upcoming forward, undated last."""
+    """Timeline keyset: past goes backward, upcoming forward, undated last."""
     gremium, _ = await _gremium_and_application(session)
     svc = MeetingService(session)
     principal = Principal(sub="adm", roles=["admin"])
@@ -438,7 +438,7 @@ async def test_agenda_set_body_renames_freetext_top_only(session: AsyncSession) 
 
 
 async def test_list_timeline_fuzzy_search(session: AsyncSession) -> None:
-    """Fuzzy search (#4) against real Postgres: pg_trgm collapses the timeline.
+    """Fuzzy search against real Postgres: pg_trgm collapses the timeline.
 
     An active query merges past and upcoming into ONE list sorted by relevance with
     offset paging. The test hits the real trigram path. A typo still matches. Meetings

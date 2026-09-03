@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { Router, provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import {
@@ -12,6 +12,7 @@ import { ThemeService } from '@core/theme/theme.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { AuthService } from '@core/auth/auth.service';
 import { USE_MOCK_API } from '@core/api/api.config';
+import { BrandingService } from '@core/branding/branding.service';
 import type { Principal } from '@core/api/models';
 import { createLocationMock, provideLocationMock } from '../../testing/location-mock';
 
@@ -73,6 +74,26 @@ function login(auth: AuthService, http: HttpTestingController, principal: Princi
   http.expectOne('/api/auth/me').flush(principal);
 }
 
+/**
+ * Footer content comes from the branding service, which loads the PUBLIC site config at
+ * app start. A shell test therefore states the branding directly instead of answering an
+ * HTTP request the shell no longer makes.
+ */
+function brandingStub(
+  over: {
+    copyright?: Record<string, string> | null;
+    legalLinks?: { label: Record<string, string>; url: string }[];
+  } = {},
+) {
+  return {
+    appName: signal('STUPA'),
+    homeHeading: signal('Willkommen'),
+    copyright: signal(over.copyright ?? null),
+    legalLinks: signal(over.legalLinks ?? []),
+    init: () => undefined,
+  };
+}
+
 describe('ShellComponent', () => {
   beforeEach(() => localStorage.clear());
 
@@ -93,6 +114,21 @@ describe('ShellComponent', () => {
     expect(screen.getByRole('link', { name: /Anträge/ })).toBeInTheDocument();
     // The member lacks admin.config, so the admin link stays hidden.
     expect(screen.queryByRole('link', { name: /Verwaltung/ })).not.toBeInTheDocument();
+    // The header shows an icon, not the name: a full display name took more room than
+    // anything else there and moved the nav as the name got longer. The name is still
+    // reachable — it is the trigger's accessible name and it heads the menu.
+    expect(screen.queryByText('Mia Member')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Mia Member/ })).toBeInTheDocument();
+    http.verify();
+  });
+
+  it('names the signed-in account at the head of the menu it opens', async () => {
+    const { fixture, auth, http } = await setup();
+    login(auth, http, MEMBER);
+    fixture.detectChanges();
+
+    await userEvent.click(screen.getByRole('button', { name: /Mia Member/ }));
+    fixture.detectChanges();
     expect(screen.getByText('Mia Member')).toBeInTheDocument();
     http.verify();
   });
@@ -163,7 +199,7 @@ describe('ShellComponent', () => {
     http.verify();
   });
 
-  it('renders maintained legal links and copyright in the footer (#82)', async () => {
+  it('renders maintained legal links and copyright in the footer', async () => {
     const view = await render(ShellComponent, {
       providers: [
         provideRouter([]),
@@ -171,26 +207,20 @@ describe('ShellComponent', () => {
         provideHttpClientTesting(),
         { provide: USE_MOCK_API, useValue: false },
         provideLocationMock(createLocationMock()),
+        {
+          provide: BrandingService,
+          useValue: brandingStub({
+            copyright: { de: '© Verfasste Studierendenschaft' },
+            legalLinks: [{ label: { de: 'Impressum' }, url: 'https://example.org/impressum' }],
+          }),
+        },
       ],
-    });
-    const http = view.fixture.debugElement.injector.get(HttpTestingController);
-    http.expectOne((r) => r.url.endsWith('/admin/site-config')).flush({
-      version: 2,
-      active: {
-        logos: {},
-        footerColumns: [],
-        copyright: { de: '© Verfasste Studierendenschaft' },
-        legalLinks: [{ label: { de: 'Impressum' }, url: 'https://example.org/impressum' }],
-        freetexts: {},
-      },
-      draft: { logos: {}, footerColumns: [], copyright: {}, legalLinks: [], freetexts: {} },
-      hasDraftChanges: false,
     });
     view.fixture.detectChanges();
     const link = screen.getByRole('link', { name: 'Impressum' });
     expect(link).toHaveAttribute('href', 'https://example.org/impressum');
     expect(screen.getByText('© Verfasste Studierendenschaft')).toBeInTheDocument();
-    http.verify();
+    view.fixture.debugElement.injector.get(HttpTestingController).verify();
   });
 
   it('uses a theme-dependent wordmark and swaps it when the theme changes', async () => {
@@ -280,6 +310,88 @@ describe('ShellComponent', () => {
     http.verify();
   });
 
+  it('keeps language and appearance out of the header row when signed in', async () => {
+    // They are settings, not navigation. Two more controls in the header made it cramped
+    // on a desktop and pushed the theme toggle clean off a phone screen.
+    const { fixture, auth, http } = await setup();
+    login(auth, http, MEMBER);
+    fixture.detectChanges();
+
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /Erscheinungsbild|appearance/i }),
+    ).not.toBeInTheDocument();
+    http.verify();
+  });
+
+  it('offers language and appearance inside the account popout', async () => {
+    const { fixture, auth, http } = await setup();
+    const theme = fixture.debugElement.injector.get(ThemeService);
+    login(auth, http, MEMBER);
+    fixture.detectChanges();
+
+    await userEvent.click(screen.getByRole('button', { name: /Mia Member/ }));
+    fixture.detectChanges();
+
+    expect(screen.getByRole('combobox', { name: /Sprache|language/i })).toBeInTheDocument();
+    const before = theme.resolved();
+    await userEvent.click(
+      screen.getByRole('menuitemcheckbox', { name: /Erscheinungsbild|appearance/i }),
+    );
+    expect(theme.resolved()).not.toBe(before);
+    http.verify();
+  });
+
+  it('still offers both inline when nobody is signed in', async () => {
+    // There is no account menu to hold them then, and the header is nearly empty anyway.
+    const { fixture, http } = await setup();
+    fixture.detectChanges();
+
+    expect(screen.getByRole('combobox', { name: /Sprache|language/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /Erscheinungsbild|appearance/i }),
+    ).toBeInTheDocument();
+    http.verify();
+  });
+
+  it('puts the search trigger to the left of the account control', async () => {
+    const { fixture, auth, http } = await setup();
+    login(auth, http, MEMBER);
+    fixture.detectChanges();
+
+    const account = screen.getByRole('button', { name: /Mia Member/ });
+    const search = screen.getByRole('button', { name: /Suche öffnen|Open search/i });
+    // `DOCUMENT_POSITION_PRECEDING` = the search button comes before the account control.
+    expect(account.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+    http.verify();
+  });
+
+  it('shows a magnifier on the search trigger, not the filter funnel', async () => {
+    // The funnel is the filter button of the list pages. Searching is not filtering.
+    const { fixture, auth, http } = await setup();
+    login(auth, http, MEMBER);
+    fixture.detectChanges();
+
+    const search = screen.getByRole('button', { name: /Suche öffnen|Open search/i });
+    expect(search.querySelector('.fa-magnifying-glass')).toBeTruthy();
+    expect(search.querySelector('.fa-filter')).toBeNull();
+    http.verify();
+  });
+
+  it('drops the wordmark for the bare mark, so a narrow header has both to choose from', async () => {
+    // The swap itself is a media query; what a test can hold is that both images exist
+    // and that the mark is the one file that does not depend on the theme.
+    const { fixture, http } = await setup();
+    fixture.detectChanges();
+
+    const brand = document.querySelector('.header__brand');
+    expect(brand?.querySelector('.header__logo')).toBeTruthy();
+    expect(brand?.querySelector('.header__mark')?.getAttribute('src')).toBe(
+      'assets/logos/stupa-mark.svg',
+    );
+    http.verify();
+  });
+
   it('resolves the wide layout from the deepest active route data', async () => {
     const view = await render(ShellComponent, {
       providers: [
@@ -318,7 +430,9 @@ describe('ShellComponent', () => {
     http.verify();
   });
 
-  it('keeps the default footer when the site-config request errors', async () => {
+  it('keeps the default footer when the branding config is unavailable', async () => {
+    // The branding service swallows a failed load and keeps its empty defaults, so the
+    // shell sees exactly this and falls back to the built-in footer.
     const view = await render(ShellComponent, {
       providers: [
         provideRouter([]),
@@ -326,20 +440,17 @@ describe('ShellComponent', () => {
         provideHttpClientTesting(),
         { provide: USE_MOCK_API, useValue: false },
         provideLocationMock(createLocationMock()),
+        { provide: BrandingService, useValue: brandingStub() },
       ],
     });
-    const http = view.fixture.debugElement.injector.get(HttpTestingController);
-    http
-      .expectOne((r) => r.url.endsWith('/admin/site-config'))
-      .flush(null, { status: 500, statusText: 'Server Error' });
     view.fixture.detectChanges();
     const cmp = view.fixture.componentInstance as ShellComponent;
     expect(cmp.footerLinks()).toEqual([]);
     expect(cmp.footerCopyright()).toBe('');
-    http.verify();
+    view.fixture.debugElement.injector.get(HttpTestingController).verify();
   });
 
-  it('falls back to empty footer state when the active config omits links and copyright', async () => {
+  it('falls back to empty footer state when the config omits links and copyright', async () => {
     const view = await render(ShellComponent, {
       providers: [
         provideRouter([]),
@@ -347,21 +458,14 @@ describe('ShellComponent', () => {
         provideHttpClientTesting(),
         { provide: USE_MOCK_API, useValue: false },
         provideLocationMock(createLocationMock()),
+        { provide: BrandingService, useValue: brandingStub({ copyright: {}, legalLinks: [] }) },
       ],
-    });
-    const http = view.fixture.debugElement.injector.get(HttpTestingController);
-    // The active config omits legalLinks and copyright, so the fallbacks fire.
-    http.expectOne((r) => r.url.endsWith('/admin/site-config')).flush({
-      version: 1,
-      active: { logos: {}, footerColumns: [], freetexts: {} },
-      draft: { logos: {}, footerColumns: [], copyright: {}, legalLinks: [], freetexts: {} },
-      hasDraftChanges: false,
     });
     view.fixture.detectChanges();
     const cmp = view.fixture.componentInstance as ShellComponent;
     expect(cmp.footerLinks()).toEqual([]);
     expect(cmp.footerCopyright()).toBe('');
-    http.verify();
+    view.fixture.debugElement.injector.get(HttpTestingController).verify();
   });
 
   it('reloadForLocale reloads when window is available', async () => {

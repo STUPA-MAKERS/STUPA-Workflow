@@ -47,11 +47,15 @@ describe('LocalizedDatePipe', () => {
     expect(pipe.transform(epoch, 'mediumDate')).toContain('2026');
   });
 
-  it('uses en-US formatting for the English locale', () => {
+  it('uses en-GB formatting for the English locale (day first, 24 h)', () => {
     const pipe = pipeFor('en');
-    const out = pipe.transform('2026-01-05T12:00:00Z', 'mediumDate');
-    // The en-US medium date shows the month name in English (for example "Jan 5, 2026").
-    expect(out).toMatch(/Jan/);
+    // The month name stays English, but the day comes first ("5 Jan 2026").
+    expect(pipe.transform('2026-01-05T12:00:00Z', 'mediumDate')).toMatch(/^\d{1,2} Jan 2026$/);
+    // The short date is DD/MM/YYYY, not MM/DD/YYYY.
+    expect(pipe.transform('2026-07-01T12:00:00Z', 'short')).toMatch(/^\d{2}\/\d{2}\/\d{4},/);
+    // 24 h clock: no AM/PM in a time or in a timestamp.
+    expect(pipe.transform('2026-09-03T19:50:00Z', 'time')).toMatch(/^\d{2}:\d{2}$/);
+    expect(pipe.transform('2026-09-03T19:50:00Z', 'medium')).not.toMatch(/[AP]M/);
   });
 
   it('uses de-DE formatting for the German locale', () => {

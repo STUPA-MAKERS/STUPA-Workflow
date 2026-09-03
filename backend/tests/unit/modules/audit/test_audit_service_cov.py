@@ -235,6 +235,51 @@ async def test_resolve_target_labels_vote_and_attachment_fill() -> None:
     }
 
 
+async def test_resolve_target_labels_form_uses_application_type_name() -> None:
+    """A `form` target carries the application-type id, so the type name is the label."""
+    t_id = _uuid(70)
+    db = fake_session(result((t_id, {"de": "Finanzantrag", "en": "Funding request"})))
+    out = await AuditService(db).resolve_target_labels([("form", str(t_id))])
+    assert out == {("form", str(t_id)): "Finanzantrag"}
+
+
+async def test_resolve_target_labels_form_and_application_type_one_query() -> None:
+    """Both types read the same table, so one query serves both and each keeps its key."""
+    form_id = _uuid(71)
+    type_id = _uuid(72)
+    db = fake_session(result((form_id, {"de": "Formulartyp"}), (type_id, {"de": "Typ"})))
+    out = await AuditService(db).resolve_target_labels(
+        [("form", str(form_id)), ("application_type", str(type_id))]
+    )
+    assert out == {
+        ("form", str(form_id)): "Formulartyp",
+        ("application_type", str(type_id)): "Typ",
+    }
+
+
+async def test_resolve_target_labels_cd_variant_fill() -> None:
+    """A corporate-design variant resolves through its `name` column."""
+    v_id = _uuid(73)
+    db = fake_session(result((v_id, "AStA Protokoll")))
+    out = await AuditService(db).resolve_target_labels([("cd_variant", str(v_id))])
+    assert out == {("cd_variant", str(v_id)): "AStA Protokoll"}
+
+
+async def test_resolve_target_labels_site_config_version_number() -> None:
+    """A site-config target has no name, so the version number is the label."""
+    s_id = _uuid(74)
+    db = fake_session(result((s_id, 7)))
+    out = await AuditService(db).resolve_target_labels([("site_config", str(s_id))])
+    assert out == {("site_config", str(s_id)): "Version 7"}
+
+
+async def test_resolve_target_labels_flow_global_id_is_not_resolvable() -> None:
+    """The global flow has the literal id `global`, which no table resolves."""
+    db = fake_session()
+    out = await AuditService(db).resolve_target_labels([("flow", "global")])
+    assert out == {}
+
+
 async def test_resolve_target_labels_unknown_type_no_query() -> None:
     """An unknown type parses, but no block resolves it."""
     unknown = _uuid(60)
@@ -395,7 +440,7 @@ async def test_resolve_data_ids_all_entity_branches() -> None:
 
 
 async def test_revertable_flags_classifies_actions() -> None:
-    """Classify each action type and data shape as revertable or not (#config-versioning).
+    """Classify each action type and data shape as revertable or not.
 
     A config change needs a predecessor, which the batch lookup provides. A budget change
     needs the recorded previous state. A delete and an unknown action never revert.

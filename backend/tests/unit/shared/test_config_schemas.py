@@ -184,7 +184,7 @@ def test_vote_state_requires_two_branches() -> None:
 
 
 def test_vote_state_rejects_automatic_exit() -> None:
-    """Reject an automatic non-branch exit out of a vote state (#vote-bypass).
+    """Reject an automatic non-branch exit out of a vote state.
 
     Such a transition moves the application on at once and skips the vote. The
     validator fails closed and rejects the graph when someone saves it.
@@ -196,7 +196,7 @@ def test_vote_state_rejects_automatic_exit() -> None:
 
 
 def test_vote_state_allows_manual_exit() -> None:
-    """A manual exit stays allowed, for example "cancel the vote" (#abort-vote)."""
+    """A manual exit stays allowed, for example "cancel the vote"."""
     g = _vote_graph_dict()
     g["transitions"].append({"from": "voting", "to": "failed"})
     validate_flow_graph(FlowGraph.model_validate(g))  # no raise

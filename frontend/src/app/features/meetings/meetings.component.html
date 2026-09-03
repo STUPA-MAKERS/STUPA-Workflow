@@ -1,4 +1,4 @@
-<app-page-header [title]="'meetings.title' | t">
+<app-page-header [title]="'meetings.title' | t" [rail]="true" [flush]="true">
   <div actions class="mtg__headActions">
     @if (!meeting()) {
       <!-- Debounced live search. It collapses the timeline into one relevance-sorted list. -->
@@ -36,7 +36,7 @@
   <div class="mtg__meta">
     <span class="font-semibold">{{ m.title }}</span>
     @if (m.date) {
-      <span class="text-text-muted">{{ m.date | ldate: 'mediumDate' }}{{ m.startTime ? ', ' + m.startTime : '' }}</span>
+      <span class="text-text-muted">{{ m.date | ldate: 'mediumDate' }}{{ timeSuffix(m.startTime) }}</span>
     }
     <app-badge [variant]="statusVariant(m.status)">
       {{ statusKey(m.status) | t }}
@@ -58,7 +58,20 @@
 @if (showForbidden()) {
   <p class="mtg__status" role="alert">{{ 'rbac.forbidden' | t }}</p>
 } @else if (loading()) {
-  <p class="mtg__status" aria-live="polite">{{ 'meetings.loading' | t }}</p>
+  <!-- The shape of a meeting page, not a sentence: two rails and a body. A bare line of
+       text gives a reader nothing to anticipate and makes the layout jump when the real
+       content lands. -->
+  <div class="mtg__shell" aria-busy="true">
+    <aside class="mtg__side mtg__side--left" aria-hidden="true">
+      <span class="skel skel--line"></span>
+      <span class="skel skel--line"></span>
+      <span class="skel skel--line"></span>
+    </aside>
+    <div>
+      <span class="skel skel--panel"></span>
+      <span class="sr-only" role="status">{{ 'meetings.loading' | t }}</span>
+    </div>
+  </div>
 } @else if (error()) {
   <p class="mtg__status mtg__status--error" role="alert">{{ 'meetings.error' | t }}</p>
 } @else if (meeting(); as m) {
@@ -191,6 +204,7 @@
       <app-meeting-protocol-pane
         [meeting]="m"
         [protocol]="protocol()"
+        [canEdit]="canEditProtocol()"
         [top]="selectedTop()"
         [topIndex]="selectedIndex()"
         [saveState]="saveState()"
@@ -351,7 +365,15 @@
   @if (showOverview()) {
     <section class="mtg__listSection">
       @if (loadingList()) {
-        <p class="text-text-muted" aria-live="polite">{{ 'meetings.list.loading' | t }}</p>
+        <!-- The list, not the detail. The two loading branches differ only by a singular
+             and a plural i18n key, which is how the list stayed a bare sentence after the
+             detail was fixed. -->
+        <div class="mtg__listSkel" aria-busy="true">
+          @for (row of skeletonRows; track row) {
+            <span class="skel skel--line"></span>
+          }
+          <span class="sr-only" role="status">{{ 'meetings.list.loading' | t }}</span>
+        </div>
       } @else {
         <!-- The timeline shows the "now" bar even without meetings. The empty
              case is an empty timeline. Past meetings go on top and load lazily
@@ -410,7 +432,7 @@
               <div class="mtg__tlMeta">
                 <span class="text-text-muted text-sm">
                   @if (m.date) {
-                    {{ m.date | ldate: 'mediumDate' }}{{ m.startTime ? ', ' + m.startTime : '' }}
+                    {{ m.date | ldate: 'mediumDate' }}{{ timeSuffix(m.startTime) }}
                   } @else {
                     {{ 'meetings.list.noDate' | t }}
                   }
@@ -476,7 +498,7 @@
         />
         <!-- Forced 24 h: the native type="time" follows the browser locale (AM/PM). -->
         <app-time-input
-          id="mtg-new-time"
+          [id]="'mtg-new-time'"
           [label]="'meetings.create.time' | t"
           [required]="true"
           [ngModel]="newTime()"
@@ -485,7 +507,7 @@
         />
         <!-- Optional end time: without it the iCal feed assumes 1 h duration. -->
         <app-time-input
-          id="mtg-new-end-time"
+          [id]="'mtg-new-end-time'"
           [label]="'meetings.create.endTime' | t"
           [ngModel]="newEndTime()"
           (ngModelChange)="newEndTime.set($event)"
@@ -561,8 +583,8 @@
       (ngModelChange)="settingsDate.set($event)"
       name="setDate"
     />
-    <app-time-input id="mtg-set-time" [label]="'meetings.create.time' | t" [required]="true" [disabled]="settingsLocked()" [ngModel]="settingsTime()" (ngModelChange)="settingsTime.set($event)" name="setTime" />
-    <app-time-input id="mtg-set-end-time" [label]="'meetings.create.endTime' | t" [disabled]="settingsLocked()" [ngModel]="settingsEndTime()" (ngModelChange)="settingsEndTime.set($event)" name="setEndTime" />
+    <app-time-input [id]="'mtg-set-time'" [label]="'meetings.create.time' | t" [required]="true" [disabled]="settingsLocked()" [ngModel]="settingsTime()" (ngModelChange)="settingsTime.set($event)" name="setTime" />
+    <app-time-input [id]="'mtg-set-end-time'" [label]="'meetings.create.endTime' | t" [disabled]="settingsLocked()" [ngModel]="settingsEndTime()" (ngModelChange)="settingsEndTime.set($event)" name="setEndTime" />
     @if (settingsLocked()) {
       <p class="text-text-muted">{{ 'meetings.settings.closedHint' | t }}</p>
     }

@@ -61,11 +61,11 @@
                   <dt>{{ 'admin.audit.detail.action' | t }}</dt>
                   <dd><app-badge variant="neutral">{{ actionLabel(e.action) }}</app-badge></dd>
                 </div>
-                @if (e.targetType) {
+                @if (e.targetType || e.targetId) {
                   <div class="audit__metaRow">
                     <dt>{{ 'admin.audit.detail.target' | t }}</dt>
                     <dd>
-                      {{ targetTypeLabel(e.targetType) }}@if (e.targetLabel) {<span> · {{ e.targetLabel }}</span>}@if (e.targetId) {<span> · {{ e.targetId }}</span>}
+                      @if (e.targetType) {<span>{{ targetTypeLabel(e.targetType) }}</span>}@if (e.targetLabel) {<span> · {{ e.targetLabel }}</span>}@if (e.targetId) {<span> · {{ e.targetId }}</span>}
                     </dd>
                   </div>
                 }
@@ -133,7 +133,7 @@
   </app-dialog>
 
   @if (loading()) {
-    <p class="text-muted text-center" aria-live="polite">{{ 'admin.audit.loading' | t }}</p>
+    <app-skeleton variant="rows" [count]="6" [label]="'admin.audit.loading' | t" />
   } @else if (hasMore()) {
     <div class="flex justify-center">
       <app-button variant="secondary" size="sm" (click)="loadMore()">

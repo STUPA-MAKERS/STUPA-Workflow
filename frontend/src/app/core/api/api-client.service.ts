@@ -1,6 +1,7 @@
 import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { type Observable, catchError, map, of, throwError } from 'rxjs';
+import { listContext } from '@core/cache/cache.interceptor';
 import { I18nService } from '@core/i18n/i18n.service';
 import { skipLoading } from '@core/loading/loading.interceptor';
 import { API_BASE_URL } from './api.config';
@@ -35,6 +36,7 @@ import type {
   ApplicationListItemWire,
   ApplicationListQuery,
   ApplicationOutWire,
+  ApplicationShareLink,
   ApplicationState,
   ApplicationType,
   ApplicationTypeListItemWire,
@@ -57,6 +59,7 @@ import type {
   AttendanceStatus,
   MeetingOutWire,
   MeetingPage,
+  SearchResults,
   MeetingPageWire,
   MeetingPatchBody,
   NewApplication,
@@ -66,7 +69,6 @@ import type {
   PublicSiteConfig,
   ProtocolOutWire,
   ProtocolVotesBody,
-  RenderJob,
   SignedUrl,
   SignedUrlOutWire,
   StateOutWire,
@@ -133,11 +135,22 @@ export class ApiClient {
     });
   }
 
-  /** GET /application-types — the backend returns a Page. The FE wants the list. */
-  /** `quiet` skips the global overlay for a background type-cache load. */
+  /**
+   * GET /application-types — the backend returns a Page. The FE wants the list.
+   *
+   * `lang` is mandatory here, unlike everywhere else in this client. This route
+   * resolves the i18n map of the type name SERVER-side and returns one string, so
+   * `mapApplicationType` has nothing left to choose from. The parameter defaults to
+   * German on the server, which is why an English UI showed German type names. Every
+   * other list keeps the map and resolves it in the mapper.
+   *
+   * `quiet` skips the global overlay for a background type-cache load.
+   */
   applicationTypes(opts: { quiet?: boolean } = {}): Observable<ApplicationType[]> {
+    const params = new HttpParams().set('lang', this.i18n.locale());
     return this.http
       .get<Page<ApplicationTypeListItemWire>>(`${this.base}/application-types`, {
+        params,
         context: opts.quiet ? skipLoading() : undefined,
       })
       .pipe(map((page) => page.items.map(mapApplicationType)));
@@ -175,7 +188,7 @@ export class ApiClient {
     return this.http
       .get<Page<ApplicationListItemWire>>(`${this.base}/applications`, {
         params,
-        context: skipLoading(),
+        context: listContext(query.offset),
       })
       .pipe(
         map((page) => ({
@@ -225,20 +238,19 @@ export class ApiClient {
    * when the server turns ALTCHA off (404 → no captcha).
    */
   altchaChallenge(): Observable<AltchaChallenge | null> {
-    return this.http.get<AltchaChallenge>(`${this.base}/altcha/challenge`).pipe(
-      catchError((err: HttpErrorResponse) =>
-        err.status === 404 ? of(null) : throwError(() => err),
-      ),
-    );
+    return this.http
+      .get<AltchaChallenge>(`${this.base}/altcha/challenge`)
+      .pipe(
+        catchError((err: HttpErrorResponse) =>
+          err.status === 404 ? of(null) : throwError(() => err),
+        ),
+      );
   }
 
   /** POST /applications — camelCase body. The response is `{ applicationId }`, not a full DTO. */
   createApplication(input: NewApplication): Observable<ApplicationCreated> {
     return this.http
-      .post<ApplicationCreatedWire>(
-        `${this.base}/applications`,
-        toApplicationCreateBody(input),
-      )
+      .post<ApplicationCreatedWire>(`${this.base}/applications`, toApplicationCreateBody(input))
       .pipe(map(mapApplicationCreated));
   }
 
@@ -253,6 +265,54 @@ export class ApiClient {
   /** DELETE /applications/{id} — manager or creator. */
   deleteApplication(id: Uuid): Observable<void> {
     return this.http.delete<void>(`${this.base}/applications/${id}`);
+  }
+
+  /**
+   * Move an application out of the working list, or bring it back.
+   *
+   * Reversible, and it destroys nothing: an archived application stays fully readable.
+   * Not to be confused with `requestErasure`, which is the GDPR Art. 17 path.
+   */
+  setApplicationArchived(id: Uuid, archived: boolean): Observable<Application> {
+    const url = `${this.base}/applications/${id}/archive`;
+    const lang = this.i18n.locale();
+    const call = archived
+      ? this.http.post<ApplicationOutWire>(url, {})
+      : this.http.delete<ApplicationOutWire>(url);
+    return call.pipe(map((wire) => mapApplication(wire, lang)));
+  }
+
+  /**
+   * GET /applications/{id}/shares — every link ever minted for this application.
+   *
+   * Revoked and expired links stay in the list. "Revocable" only means something if you
+   * can see what you revoked, and a link that once existed is part of the record of who
+   * published what. None of them carries a `url`.
+   */
+  applicationShares(id: Uuid): Observable<ApplicationShareLink[]> {
+    return this.http.get<ApplicationShareLink[]>(`${this.base}/applications/${id}/shares`, {
+      context: skipLoading(),
+    });
+  }
+
+  /**
+   * POST /applications/{id}/shares — mint a public, read-only link.
+   *
+   * The `url` on the response is the ONLY place the token ever appears. It is not stored
+   * and cannot be fetched again, so a caller who loses it mints a new link.
+   */
+  createApplicationShare(
+    id: Uuid,
+    input: { ttlDays?: number; label?: string } = {},
+  ): Observable<ApplicationShareLink> {
+    return this.http.post<ApplicationShareLink>(`${this.base}/applications/${id}/shares`, input);
+  }
+
+  /** DELETE /applications/{id}/shares/{shareId} — stop honouring one link. */
+  revokeApplicationShare(id: Uuid, shareId: Uuid): Observable<ApplicationShareLink> {
+    return this.http.delete<ApplicationShareLink>(
+      `${this.base}/applications/${id}/shares/${shareId}`,
+    );
   }
 
   /** POST /applications/{id}/erasure-request — file a GDPR Art. 17 erasure request. */
@@ -322,21 +382,6 @@ export class ApiClient {
     return this.http.delete<void>(`${this.base}/applications/${id}/comments/${commentId}`);
   }
 
-  /**
-   * POST /applications/{id}/pdf — start an async PDF render.
-   *
-   * The answer is 202 with a job in the `pending` state. Poll it with
-   * {@link getJob}. Access follows the read scope of the application.
-   */
-  createApplicationPdf(id: Uuid): Observable<RenderJob> {
-    return this.http.post<RenderJob>(`${this.base}/applications/${id}/pdf`, {});
-  }
-
-  /** GET /jobs/{jobId} — poll a render job. A poll never shows the overlay. */
-  getJob(jobId: Uuid): Observable<RenderJob> {
-    return this.http.get<RenderJob>(`${this.base}/jobs/${jobId}`, { context: skipLoading() });
-  }
-
   transitions(id: Uuid): Observable<Transition[]> {
     const lang = this.i18n.locale();
     return this.http
@@ -360,9 +405,7 @@ export class ApiClient {
       })
       .pipe(
         map((items) =>
-          items
-            .map((s) => mapState(s, lang))
-            .filter((s): s is ApplicationState => s !== null),
+          items.map((s) => mapState(s, lang)).filter((s): s is ApplicationState => s !== null),
         ),
       );
   }
@@ -370,10 +413,7 @@ export class ApiClient {
   /** POST /applications/{id}/force-status — set a status directly. This privileged
    *  override bypasses guards and transitions. Needs `application.force_status`. */
   forceStatus(id: Uuid, req: ForceStatusBody): Observable<TransitionResult> {
-    return this.http.post<TransitionResult>(
-      `${this.base}/applications/${id}/force-status`,
-      req,
-    );
+    return this.http.post<TransitionResult>(`${this.base}/applications/${id}/force-status`, req);
   }
 
   /** Transitions the magic-link applicant may fire (actorIsApplicant gate). */
@@ -467,17 +507,14 @@ export class ApiClient {
 
   /** POST /meetings — create a meeting (P(meeting.manage)). */
   createMeeting(body: MeetingCreateBody): Observable<Meeting> {
-    return this.http
-      .post<MeetingOutWire>(`${this.base}/meetings`, body)
-      .pipe(map(mapMeeting));
+    return this.http.post<MeetingOutWire>(`${this.base}/meetings`, body).pipe(map(mapMeeting));
   }
 
   /** GET /gremien/{id}/meeting-members — protokollant candidates (P(session.manage)). */
   listMeetingMembers(gremiumId: Uuid): Observable<MeetingMember[]> {
-    return this.http.get<MeetingMember[]>(
-      `${this.base}/gremien/${gremiumId}/meeting-members`,
-      { context: skipLoading() },
-    );
+    return this.http.get<MeetingMember[]>(`${this.base}/gremien/${gremiumId}/meeting-members`, {
+      context: skipLoading(),
+    });
   }
 
   /** GET /meetings — list meetings (newest first), optionally gremium-filtered. */
@@ -497,6 +534,21 @@ export class ApiClient {
    * previous page. A `null` or empty cursor starts at *now*.
    * `nextCursor === null` marks the end of the direction.
    */
+  /**
+   * Global search across every kind of record the caller may see.
+   *
+   * `skipLoading` on purpose: the palette runs this on every keystroke, and the global
+   * overlay flashing on each one would be worse than no feedback at all. The palette
+   * shows its own inline state.
+   */
+  search(q: string): Observable<SearchResults> {
+    const params = new HttpParams().set('q', q.trim()).set('lang', this.i18n.locale());
+    return this.http.get<SearchResults>(`${this.base}/search`, {
+      params,
+      context: skipLoading(),
+    });
+  }
+
   listMeetingsTimeline(opts: {
     direction: TimelineDirection;
     cursor?: string | null;
@@ -522,7 +574,12 @@ export class ApiClient {
    * (`id`/`name`) and needs no wire mapping.
    */
   listMeetingFilterGremien(): Observable<{ id: Uuid; name: string }[]> {
-    return this.http.get<{ id: Uuid; name: string }[]>(`${this.base}/meetings/gremien`);
+    // `skipLoading` like the timeline beside it. This fills a filter dropdown while the
+    // list loads its own rows, so without it the page showed its own placeholder AND the
+    // global overlay at the same time — two answers to one question.
+    return this.http.get<{ id: Uuid; name: string }[]>(`${this.base}/meetings/gremien`, {
+      context: skipLoading(),
+    });
   }
 
   /** GET /meetings/{id} — meeting state + votes. */
@@ -557,10 +614,9 @@ export class ApiClient {
 
   /** PUT /meetings/{id}/attendance/me — mark own attendance. */
   setOwnAttendance(meetingId: Uuid, status: AttendanceStatus): Observable<Attendance[]> {
-    return this.http.put<Attendance[]>(
-      `${this.base}/meetings/${meetingId}/attendance/me`,
-      { status },
-    );
+    return this.http.put<Attendance[]>(`${this.base}/meetings/${meetingId}/attendance/me`, {
+      status,
+    });
   }
 
   /** PUT /meetings/{id}/attendance/{principalId} — set a member (meeting lead). */
@@ -607,37 +663,28 @@ export class ApiClient {
 
   /** DELETE /meetings/{id}/agenda/{itemId} — remove an item from the agenda. */
   removeAgendaItem(meetingId: Uuid, itemId: Uuid): Observable<AgendaItem[]> {
-    return this.http.delete<AgendaItem[]>(
-      `${this.base}/meetings/${meetingId}/agenda/${itemId}`,
-    );
+    return this.http.delete<AgendaItem[]>(`${this.base}/meetings/${meetingId}/agenda/${itemId}`);
   }
 
   /** PATCH /meetings/{id}/agenda/{itemId} — set the markdown text of an item. */
   setAgendaBody(meetingId: Uuid, itemId: Uuid, body: string): Observable<AgendaItem[]> {
-    return this.http.patch<AgendaItem[]>(
-      `${this.base}/meetings/${meetingId}/agenda/${itemId}`,
-      { body },
-    );
+    return this.http.patch<AgendaItem[]>(`${this.base}/meetings/${meetingId}/agenda/${itemId}`, {
+      body,
+    });
   }
 
   /** PATCH /meetings/{id}/agenda/{itemId} — rename a free-text item (set title). */
   renameAgendaItem(meetingId: Uuid, itemId: Uuid, title: string): Observable<AgendaItem[]> {
-    return this.http.patch<AgendaItem[]>(
-      `${this.base}/meetings/${meetingId}/agenda/${itemId}`,
-      { title },
-    );
+    return this.http.patch<AgendaItem[]>(`${this.base}/meetings/${meetingId}/agenda/${itemId}`, {
+      title,
+    });
   }
 
   /** PATCH /meetings/{id}/agenda/{itemId} — mark an item (non-)public. */
-  setAgendaNonPublic(
-    meetingId: Uuid,
-    itemId: Uuid,
-    nonPublic: boolean,
-  ): Observable<AgendaItem[]> {
-    return this.http.patch<AgendaItem[]>(
-      `${this.base}/meetings/${meetingId}/agenda/${itemId}`,
-      { nonPublic },
-    );
+  setAgendaNonPublic(meetingId: Uuid, itemId: Uuid, nonPublic: boolean): Observable<AgendaItem[]> {
+    return this.http.patch<AgendaItem[]>(`${this.base}/meetings/${meetingId}/agenda/${itemId}`, {
+      nonPublic,
+    });
   }
 
   /** PUT /meetings/{id}/agenda/order — order items in the supplied sequence. */
@@ -814,5 +861,4 @@ export class ApiClient {
   downloadMcpPackage(): Observable<Blob> {
     return this.http.get(`${this.base}/mcp/package`, { responseType: 'blob' });
   }
-
 }

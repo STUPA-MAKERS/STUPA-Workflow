@@ -15,9 +15,10 @@ const OPTIONS: Record<LocalDateFormat, Intl.DateTimeFormatOptions> = {
 /**
  * Localized date and time output through `Intl.DateTimeFormat`.
  *
- * The pipe follows the active UI language (`I18nService.locale()`), not the fixed
- * Angular `LOCALE_ID`, which would always give `en-US`. The pipe is impure, so a
- * language switch updates the output without a reload. Date formatting is cheap.
+ * The pipe follows the active UI language (`I18nService.formatLocale()`), not the
+ * fixed Angular `LOCALE_ID`, which would always give `en-US`. EN thus reads as
+ * `en-GB` (day first, 24 h). The pipe is impure, so a language switch updates the
+ * output without a reload. Date formatting is cheap.
  */
 @Pipe({ name: 'ldate', standalone: true, pure: false })
 export class LocalizedDatePipe implements PipeTransform {
@@ -30,7 +31,6 @@ export class LocalizedDatePipe implements PipeTransform {
     if (value === null || value === undefined || value === '') return '';
     const date = value instanceof Date ? value : new Date(value);
     if (Number.isNaN(date.getTime())) return '';
-    const locale = this.i18n.locale() === 'en' ? 'en-US' : 'de-DE';
-    return new Intl.DateTimeFormat(locale, OPTIONS[format]).format(date);
+    return new Intl.DateTimeFormat(this.i18n.formatLocale(), OPTIONS[format]).format(date);
   }
 }

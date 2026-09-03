@@ -8,57 +8,66 @@
  * from the whitelist. The server validates again on save and stays authoritative. This
  * check only gives the user instant feedback.
  */
-import {
-  type FlowGraph,
-  type FlowGroup,
-  type StateDef,
-  type TransitionDef,
-} from './admin.models';
-import { validateAction, validateGuard } from './guard-builder.util';
+import { type TranslationKey } from '../../core/i18n/translations';
+import { type FlowGraph, type FlowGroup, type StateDef, type TransitionDef } from './admin.models';
+import { type GuardError, validateAction, validateGuard } from './guard-builder.util';
 
 /** Keys of a field or a state. Mirrors `KEY_PATTERN` in `config_schemas`. */
 export const KEY_PATTERN = /^[a-z][a-z0-9_]*$/;
 
+/**
+ * One rejected thing, named by a translation key rather than by a sentence.
+ *
+ * An admin reads these in the flow editor, so the caller picks the language.
+ */
+export interface FlowValidationError {
+  readonly key: TranslationKey;
+  readonly params?: Record<string, string | number>;
+}
+
 export interface FlowValidationResult {
   valid: boolean;
-  errors: string[];
+  errors: FlowValidationError[];
 }
 
 export function validateFlowGraph(graph: FlowGraph): FlowValidationResult {
-  const errors: string[] = [];
+  const errors: FlowValidationError[] = [];
   const states = graph.states ?? [];
 
   if (states.length === 0) {
-    errors.push('flow graph has no states');
+    errors.push({ key: 'admin.flow.err.noStates' });
     return { valid: false, errors };
   }
 
   const keys = states.map((s) => s.key);
   const duplicates = [...new Set(keys.filter((k) => keys.indexOf(k) !== keys.lastIndexOf(k)))];
   if (duplicates.length > 0) {
-    errors.push(`duplicate state keys: ${duplicates.sort().join(', ')}`);
+    errors.push({
+      key: 'admin.flow.err.duplicateKeys',
+      params: { keys: duplicates.sort().join(', ') },
+    });
   }
   for (const s of states) {
     if (!KEY_PATTERN.test(s.key)) {
-      errors.push(`invalid state key: ${JSON.stringify(s.key)}`);
+      errors.push({ key: 'admin.flow.err.invalidKey', params: { key: String(s.key) } });
     }
   }
   const keySet = new Set(keys);
 
   const initials = states.filter((s) => s.isInitial).map((s) => s.key);
   if (initials.length === 0) {
-    errors.push('flow graph has no initial state');
+    errors.push({ key: 'admin.flow.err.noInitial' });
   } else if (initials.length > 1) {
-    errors.push(`flow graph has multiple initial states: ${initials.join(', ')}`);
+    errors.push({ key: 'admin.flow.err.multipleInitial', params: { keys: initials.join(', ') } });
   }
 
   const transitions = graph.transitions ?? [];
   for (const t of transitions) {
     if (!keySet.has(t.from)) {
-      errors.push(`transition references unknown from-state: ${JSON.stringify(t.from)}`);
+      errors.push({ key: 'admin.flow.err.unknownFrom', params: { key: String(t.from) } });
     }
     if (!keySet.has(t.to)) {
-      errors.push(`transition references unknown to-state: ${JSON.stringify(t.to)}`);
+      errors.push({ key: 'admin.flow.err.unknownTo', params: { key: String(t.to) } });
     }
     try {
       // Actor gates (roleIs/isInCommittee) apply to manual transitions only.
@@ -68,21 +77,26 @@ export function validateFlowGraph(graph: FlowGraph): FlowValidationResult {
         if (a.type === 'addToNextSession') {
           const target = states.find((s) => s.key === t.to);
           if ((target?.kind ?? 'normal') !== 'vote') {
-            errors.push(
-              `addToNextSession action on "${t.from}→${t.to}" must lead into a vote state`,
-            );
+            errors.push({
+              key: 'admin.flow.err.sessionNeedsVote',
+              params: { from: String(t.from), to: String(t.to) },
+            });
           }
         }
       }
     } catch (err) {
-      errors.push((err as Error).message);
+      const gerr = err as GuardError;
+      errors.push({ key: gerr.key, params: gerr.params });
     }
   }
 
   if (initials.length === 1 && duplicates.length === 0) {
     const unreachable = findUnreachable(initials[0], keySet, transitions);
     if (unreachable.length > 0) {
-      errors.push(`unreachable states: ${unreachable.sort().join(', ')}`);
+      errors.push({
+        key: 'admin.flow.err.unreachable',
+        params: { keys: unreachable.sort().join(', ') },
+      });
     }
   }
 
@@ -95,16 +109,16 @@ export function validateFlowGraph(graph: FlowGraph): FlowValidationResult {
       .map((t) => t.branch as string)
       .sort();
     if (s.kind === 'vote') {
-      if (!s.config?.gremiumId) errors.push(`vote state "${s.key}" needs a committee (config.gremiumId)`);
+      if (!s.config?.gremiumId) {
+        errors.push({ key: 'admin.flow.err.voteNeedsGremium', params: { key: s.key } });
+      }
       if (outBranches.join(',') !== 'fail,pass') {
-        errors.push(`vote state "${s.key}" needs exactly two outgoing transitions: branch "pass" and "fail"`);
+        errors.push({ key: 'admin.flow.err.voteBranches', params: { key: s.key } });
       }
       // Only the vote or a manual abort decides a vote state. An automatic exit would
       // fire at once, before a vote happened. This mirrors the backend validator.
       if (transitions.some((t) => t.from === s.key && t.automatic && !t.branch)) {
-        errors.push(
-          `vote state "${s.key}" must not have automatic outgoing transitions — only the vote outcome (pass/fail) or a manual exit may leave it`,
-        );
+        errors.push({ key: 'admin.flow.err.voteNoAutomatic', params: { key: s.key } });
       }
     }
   }
@@ -132,7 +146,6 @@ function findUnreachable(
   }
   return [...keySet].filter((k) => !seen.has(k));
 }
-
 
 /**
  * Bring the graph into canonical wire form: exactly the schema fields, with empty
@@ -334,7 +347,6 @@ export function layoutEntities(
   };
   return autoLayout(fake).layout?.positions ?? {};
 }
-
 
 export function emptyFlowGraph(): FlowGraph {
   return { states: [], transitions: [] };

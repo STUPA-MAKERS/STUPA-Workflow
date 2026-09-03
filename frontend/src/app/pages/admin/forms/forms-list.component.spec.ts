@@ -217,7 +217,7 @@ describe('FormsListComponent — create dialog state', () => {
   });
 });
 
-describe('FormsListComponent — create gate (#g8)', () => {
+describe('FormsListComponent — create gate', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   it('offers the create button with admin.types', async () => {

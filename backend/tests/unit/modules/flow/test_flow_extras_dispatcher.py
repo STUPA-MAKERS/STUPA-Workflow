@@ -1,4 +1,4 @@
-"""Tests for `FlowExtrasActionDispatcher` (#28) — addToNextSession and assignBudget.
+"""Tests for `FlowExtrasActionDispatcher` — addToNextSession and assignBudget.
 
 The suite covers the branches without a DB. It uses an in-memory session fake
 (`get`, `scalar`, `scalars` and `commit`) plus a sessionmaker wrapper. The tests patch

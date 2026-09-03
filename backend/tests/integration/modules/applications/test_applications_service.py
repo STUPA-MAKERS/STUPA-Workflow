@@ -425,7 +425,7 @@ async def test_patch_has_budget_context_from_type(session: AsyncSession) -> None
     assert any(e.field == "reason" for e in ei.value.errors)
 
 
-# Fuzzy search (#3/#4) runs against real Postgres with pg_trgm.
+# Fuzzy search runs against real Postgres with pg_trgm.
 async def _seed_type_for_search(session: AsyncSession) -> ApplicationType:
     """Seed like `_seed_type`, but without the removed `FlowVersion` type field.
 
@@ -582,7 +582,7 @@ async def test_anonymize_scrubs_field_marked_pii_in_later_version(
     assert out.data.get("title") is None  # marked PII later, scrubbed anyway
 
 
-# A delete (#AUD-002) is irreversible and audited. Its metadata holds ids only, no PII.
+# A delete is irreversible and audited. Its metadata holds ids only, no PII.
 async def test_delete_writes_audit_entry_without_pii(session: AsyncSession) -> None:
     from app.modules.audit.actions import AuditAction
     from app.modules.audit.models import AuditEntry

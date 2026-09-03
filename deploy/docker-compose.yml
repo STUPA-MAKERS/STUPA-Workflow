@@ -1,7 +1,7 @@
 # Antragsplattform — docker-compose skeleton (T-01)
 # One VM, plain HTTP inside, behind an external Nginx Proxy Manager (the TLS edge).
 # The stack holds no TLS, no certificate and no Keycloak. The only host port is `web`
-# (127.0.0.1:8080). Every other service stays internal, so nothing enters from the
+# (127.0.0.1:${WEB_PORT:-8080}). Every other service stays internal, so nothing enters from the
 # internet. Egress stays allowed (worker: SMTP/WebDAV/webhooks, pytex: tectonic bundle,
 # api: OIDC).
 # Reference: sds/deployment.md §1-§5, sds/overview.md §2.
@@ -25,9 +25,16 @@ services:
       api:
         condition: service_healthy
     ports:
-      # Bound to localhost only. The external NPM proxies here, or through the `proxy`
-      # network.
-      - "127.0.0.1:8080:80"
+      # Loopback by default: the external NPM proxies here, or reaches `web` over the
+      # `proxy` network without any host port at all. `WEB_PORT` moves the port when
+      # 8080 is taken; the container port stays 80, because nginx.conf listens there.
+      #
+      # `WEB_HOST` moves the BIND ADDRESS, for an NPM that cannot reach 127.0.0.1 of
+      # this host. Setting it to 0.0.0.0 puts the app on every interface, so it is
+      # reachable WITHOUT TLS and PAST the proxy's access rules, and FORWARDED_ALLOW_IPS
+      # then trusts headers from whoever gets there. Use a host firewall with it, or
+      # prefer the `proxy` network and publish nothing.
+      - "${WEB_HOST:-127.0.0.1}:${WEB_PORT:-8080}:80"
     volumes:
       # The image already holds nginx.conf. This mount allows a production edit
       # (real_ip CIDR) without a rebuild. The SPA HTML comes from the image.
@@ -36,7 +43,11 @@ services:
       - internal
       - proxy
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost/healthz >/dev/null 2>&1 || exit 1"]
+      # 127.0.0.1, NOT localhost. The config is mounted read-only, which stops nginx's
+      # `10-listen-on-ipv6-by-default.sh` from adding the IPv6 listener, so nginx binds
+      # IPv4 only. busybox wget tries ::1 first for `localhost` and gets a refused
+      # connection, which left this container permanently unhealthy.
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/healthz >/dev/null 2>&1 || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -74,6 +85,10 @@ services:
     # only, so that directory is not in the image. MCP_PACKAGE_DIR points to the mount.
     volumes:
       - ../mcp:/opt/mcp:ro
+      # The private age key for /admin/backups. Read-only, and absent by default: a
+      # stack without it still lists and creates backups, but cannot import or restore
+      # one. `:z` relabels for SELinux hosts and is a no-op elsewhere.
+      - ./secrets:/secrets:ro,z
     environment:
       MCP_PACKAGE_DIR: /opt/mcp
     depends_on:
@@ -105,6 +120,9 @@ services:
     <<: *restart
     command: ["arq", "worker.main.WorkerSettings"]
     env_file: .env
+    volumes:
+      # The worker is what actually dumps and restores, so it needs the same key.
+      - ./secrets:/secrets:ro,z
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -260,38 +278,6 @@ services:
     security_opt:
       - no-new-privileges:true
 
-  backup:
-    # Daily encrypted backup (T-42, deployment.md §4): pg_dump (custom) and mc mirror
-    # (MinIO) write one age-encrypted artifact into the backups volume, with retention.
-    # This is a separate job instead of a cron in the worker, so it stays free of the app
-    # lifecycle. It is active in the prod profile only. The default stack leaves it off to
-    # keep the smoke run small. The `backup` profile allows a backup or a restore without
-    # the rest of the prod profile.
-    # Manual run: docker compose --profile backup run --rm backup backup.sh
-    build:
-      context: ./backup
-    profiles: ["prod", "backup"]
-    <<: *restart
-    env_file: .env
-    depends_on:
-      postgres:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-    volumes:
-      # A restore needs the private age key, which lives off-host. In normal operation
-      # the default path does NOT exist, and the encrypt-only backup still runs. For a
-      # restore only, put a key file at ./backup/secrets/age.key (gitignored).
-      - backups:/backups
-      # `:z` relabels for SELinux hosts (Fedora, rootless podman). It is a no-op on a
-      # host without SELinux, such as CI or ubuntu. Without it, the read of the age key
-      # fails with "Permission denied".
-      - ./backup/secrets:/secrets:ro,z
-    networks:
-      - internal
-    security_opt:
-      - no-new-privileges:true
-
   # TODO T-04/e2e: add dev profile services here to enable e2e (T-10 auth, captcha and
   # Playwright specs). Add MailHog (SMTP sink) and a dev Keycloak mock under
   # `profiles: [dev]`, so the prod stack stays untouched. They are absent on purpose,
@@ -303,7 +289,6 @@ volumes:
   redis_data:
   clamav_data:
   pytex_cache:
-  backups:
   altcha_data:
 
 networks:

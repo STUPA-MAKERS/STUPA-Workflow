@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from datetime import date
 
 from app.modules.protocol.markdown import (
@@ -69,7 +70,7 @@ def test_frontmatter_injection_is_quoted() -> None:
 def test_vote_snippet_renders_abstimmung_callout_with_tally() -> None:
     snippet = build_vote_snippet("Antrag A", {"yes": 5, "no": 2, "abstain": 1})
     # The pytex protocol callout renders the built-in vote box: a bold title plus a
-    # tally line (yes/no/abstain). It carries NO separate `Ergebnis:` line (#pdf-format).
+    # tally line (yes/no/abstain). It carries NO separate `Ergebnis:` line.
     assert snippet.startswith("> [!abstimmung] **Antrag A**")
     assert "Ergebnis" not in snippet
     assert "> yes: 5, no: 2, abstain: 1" in snippet
@@ -93,7 +94,7 @@ def test_frontmatter_has_signatures_and_quorum_dataline() -> None:
     assert "unterschriften:" in block
     assert '- "Schriftführung"' in block and '- "Vorstand"' in block
     # The quorum gets its own frontmatter key. The pytex wrapper renders it as a
-    # data line on the title page (#protocol-quorum).
+    # data line on the title page.
     assert 'beschlussfaehigkeit: "Gegeben"' in block
 
 
@@ -304,3 +305,18 @@ def test_sanitizer_no_eval_refdef_survives_marko_parse() -> None:
     for src in vectors:
         cleaned = sanitize_user_markdown(src)
         assert not _has_eval_refdef(cleaned), src
+
+
+def test_sanitizer_is_linear_on_adversarial_open_brackets() -> None:
+    """ReDoS regression: a long run of `[` must not backtrack catastrophically.
+
+    A run of `[` without a closing bracket made the label scan restart at every `[`
+    position, which is O(N**2) and hung the contract-test job. The run matches no
+    reference definition, so the text stays unchanged, and it must finish in
+    milliseconds.
+    """
+    adversarial = "[" * 200_000
+    start = time.perf_counter()
+    out = sanitize_user_markdown(adversarial)
+    assert time.perf_counter() - start < 1.0
+    assert out == adversarial

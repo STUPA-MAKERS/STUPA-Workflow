@@ -5,17 +5,39 @@ clear `SettingsError` at startup instead of a raw pydantic ValidationError. See
 `deploy/.env.example` for the layout and the names.
 """
 
+import json
 import logging
 from functools import lru_cache
-from typing import Any
+from typing import Annotated, Any
 
-from pydantic import Field, ValidationError, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import AliasChoices, Field, ValidationError, field_validator, model_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 # Minimum length for signing/client secrets (no weak secrets).
 _MIN_SECRET_LEN = 16
 
 _log = logging.getLogger("app.settings")
+
+# A list that an operator writes as a comma-separated string in `.env`.
+#
+# `NoDecode` turns the JSON decoding of pydantic-settings off for the field. Without
+# it, `HOSTS=a,b` is not valid JSON and the app aborts the start with a
+# `SettingsError`. The `_split_csv` validator below accepts both the comma format of
+# `deploy/.env.example` and the older JSON list.
+CsvList = Annotated[list[str], NoDecode]
+
+
+def _split_csv(value: Any) -> Any:
+    """Turn a comma-separated (or JSON) env value into a list of trimmed entries."""
+    if not isinstance(value, str):
+        return value
+    text = value.strip()
+    if text.startswith("["):
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            pass
+    return [part.strip() for part in text.split(",") if part.strip()]
 
 
 class SettingsError(RuntimeError):
@@ -58,8 +80,8 @@ class Settings(BaseSettings):
     csrf_cookie_name: str = "XSRF-TOKEN"
     csrf_header_name: str = "X-XSRF-TOKEN"
 
-    # The empty default keeps cross-origin access off.
-    cors_allow_origins: list[str] = []
+    # The empty default keeps cross-origin access off. Comma-separated in `.env`.
+    cors_allow_origins: CsvList = []
 
     redis_url: str = "redis://redis:6379/0"
     db_migration_url: str | None = None
@@ -161,6 +183,26 @@ class Settings(BaseSettings):
     attachment_max_bytes: int = 10 * 1024 * 1024
     attachment_url_ttl_seconds: int = 300
 
+    # Whole-platform backups (/admin/backups). An archive holds the pg_dump plus a
+    # mirror of the attachment bucket, age-encrypted, in its own MinIO bucket. Without
+    # `backup_age_recipient` the feature is off and every route answers 503. DEV and
+    # contract CI run without it.
+    backup_bucket: str = "backups"
+    # age public key. The API encrypts every archive to it and can do nothing else
+    # with it.
+    backup_age_recipient: str | None = None
+    # Path to the age private key inside the container, mounted read-only. A restore
+    # and a download of a decrypted archive need it. Keep the disaster-recovery key
+    # that lives off host SEPARATE from this one: a stack compromise then exposes only
+    # the archives that the app itself wrote.
+    backup_age_identity_file: str | None = None
+    # Retention: keep this many archives and drop the oldest beyond it. A pinned
+    # archive never counts and is never pruned. 0 disables the pruning.
+    backup_retention_count: int = 14
+    # Cap for an uploaded archive (import) and for the pg_dump/restore subprocess.
+    backup_max_upload_bytes: int = 2 * 1024 * 1024 * 1024
+    backup_subprocess_timeout_seconds: int = 3600
+
     # ClamAV. Without `clamav_host` the scan is off. An upload then stays
     # `scanned=false`, which quarantines it and blocks the download. This is
     # fail-closed (DEV/test).
@@ -182,7 +224,22 @@ class Settings(BaseSettings):
     # Optional host allowlist for webhook targets. Empty = any public host, and the
     # SSRF guard stays active either way. Set it in production. Under hardening
     # `_strict_security_warnings` warns loudly when it is empty.
-    webhook_host_allowlist: list[str] = []
+    #
+    # `deploy/.env.example` named this `WEBHOOK_ALLOWLIST` up to and including v0.0.2.
+    # `extra="ignore"` dropped that name without a word, so a deployment that copied
+    # the example ran with an EMPTY allowlist and could not silence the warning. The
+    # alias keeps such a deployment working. `WEBHOOK_HOST_ALLOWLIST` is the canonical
+    # name and wins when both are set.
+    webhook_host_allowlist: CsvList = Field(
+        default=[],
+        validation_alias=AliasChoices("webhook_host_allowlist", "webhook_allowlist"),
+    )
+
+    @field_validator("cors_allow_origins", "webhook_host_allowlist", mode="before")
+    @classmethod
+    def _accept_csv_lists(cls, value: Any) -> Any:
+        """Accept a comma-separated list, as `deploy/.env.example` documents it."""
+        return _split_csv(value)
 
     # Delegation. Vote delegation needs bylaws approval and defaults to OFF. A
     # delegation may transfer roles and rights. The server accepts
@@ -203,6 +260,16 @@ class Settings(BaseSettings):
         return bool(self.minio_endpoint)
 
     @property
+    def backup_enabled(self) -> bool:
+        """Backups need object storage and the age recipient the API encrypts to."""
+        return bool(self.minio_endpoint) and bool(self.backup_age_recipient)
+
+    @property
+    def backup_restore_enabled(self) -> bool:
+        """A restore also needs the private key, so the API can decrypt an archive."""
+        return self.backup_enabled and bool(self.backup_age_identity_file)
+
+    @property
     def clamav_enabled(self) -> bool:
         """ClamAV scan is active only when a clamd host is set."""
         return bool(self.clamav_host)
@@ -217,8 +284,6 @@ class Settings(BaseSettings):
     # Worker retry for arq PDF render jobs: maximum tries and backoff base in seconds.
     pdf_max_tries: int = 4
     pdf_retry_backoff_seconds: int = 30
-    # Lifetime of the signed result URL (GET /jobs/{id}).
-    pdf_url_ttl_seconds: int = 300
 
     # Application payload cap for the public POST /applications (anti-DoS). It applies
     # to the serialized field values (`data`) and as a Content-Length bound. A larger
@@ -298,7 +363,7 @@ class Settings(BaseSettings):
             )
         if self.strict_security_enabled and not self.webhook_host_allowlist:
             _log.warning(
-                "WEBHOOK_ALLOWLIST is empty under strict security: webhook targets are "
+                "WEBHOOK_HOST_ALLOWLIST is empty under strict security: webhook targets are "
                 "only restricted by the SSRF guard, not pinned to known hosts "
                 "(security.md §5)."
             )

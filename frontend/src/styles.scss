@@ -39,3 +39,58 @@
     overflow-x: clip;
   }
 }
+
+
+/* ---------------------------------------------------------------------------
+   Loading placeholders for pages that are not a table.
+
+   `app-data-table` draws its own skeleton rows. A page whose content is a tree, a
+   timeline or a panel had nothing, so it fell back to a sentence — or worse, to its
+   empty state, which asserts that there is nothing when the truth is that nothing has
+   arrived yet. These give such a page something structural to hold the shape with.
+
+   Always pair a placeholder with a `role="status"` message for a screen reader: the
+   blocks themselves are decorative and hidden from the accessibility tree.
+   --------------------------------------------------------------------------- */
+.skel {
+  display: block;
+  border-radius: var(--radius-sm, 4px);
+  background: var(--color-surface-sunken);
+  animation: skel-pulse 1.4s var(--ease-standard, ease) infinite;
+}
+.skel--line {
+  height: 0.75rem;
+  margin-bottom: var(--space-3);
+}
+/* The bar `app-data-table` draws inside a skeleton cell. Same height and width, so a
+   hand-rolled table that outlines its own rows is indistinguishable from the shared one.
+   Keep these in step with `.dt__skeleton` in the ui-kit. */
+.skel--bar {
+  height: 0.75rem;
+  width: 60%;
+}
+td:first-child > .skel--bar {
+  width: 80%;
+}
+.skel--line:nth-child(even) {
+  width: 70%;
+}
+.skel--panel {
+  height: 18rem;
+  border: var(--border-width) solid var(--color-border);
+  background: var(--color-surface);
+}
+@keyframes skel-pulse {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skel {
+    animation: none;
+  }
+}

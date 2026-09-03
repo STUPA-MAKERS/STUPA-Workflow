@@ -186,11 +186,32 @@ function delegation(id: string, revocable: boolean, direction: string | null): u
 }
 
 describe('DashboardComponent', () => {
-  it('greets the signed-in member by name and shows their roles', async () => {
+  it('greets the signed-in member by name, without their RBAC roles', async () => {
     const { http } = await setup(MEMBER);
     expect(screen.getByText('Willkommen, Mia Member')).toBeInTheDocument();
-    // The i18n layer translates the 'member' role. German gives "Mitglied".
-    expect(screen.getByText('Mitglied')).toBeInTheDocument();
+    // The role badge is deliberately gone: a role name says nothing a member acts on.
+    // "Mitglied" is the German label of the 'member' role this fixture carries.
+    expect(screen.queryByText('Mitglied')).not.toBeInTheDocument();
+    http.verify();
+  });
+
+  it('puts the Gremium chips on their own line under the greeting', async () => {
+    // In the header's actions slot they read as controls glued to the right of a
+    // heading. On their own line they read as what they are: the Gremien this person's
+    // work belongs to.
+    const { http } = await setup({ ...MEMBER, gremien: [{ id: 'g1', name: 'StuPa' }] } as Principal);
+    const chip = screen.getByText('StuPa');
+    expect(chip.closest('app-page-header')).toBeNull();
+
+    const header = document.querySelector('app-page-header')!;
+    expect(header.compareDocumentPosition(chip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    http.verify();
+  });
+
+  it('renders no chip row at all when the member is in no Gremium', async () => {
+    // An empty flex row still costs its gap, which reads as a stray blank line.
+    const { http } = await setup(MEMBER);
+    expect(document.querySelector('.dash__gremien')).toBeNull();
     http.verify();
   });
 
@@ -264,6 +285,17 @@ describe('DashboardComponent', () => {
     http.verify();
   });
 
+  it('prints the session time as HH:MM and drops the seconds of the API', async () => {
+    // The API sends `startTime` as `HH:MM:SS`. Pasting it behind the date printed the
+    // seconds on the tile, which no other timestamp in the app does.
+    const withTime = { ...(meeting('t', 'planned', '2026-07-10') as object), startTime: '18:00:00' };
+    const { fixture } = await setup(MEMBER, { meetings: [withTime] });
+    fixture.detectChanges();
+    const tile = fixture.nativeElement.querySelector('.dash__session-date') as HTMLElement;
+    expect(tile.textContent).toContain('18:00');
+    expect(tile.textContent).not.toContain('18:00:00');
+  });
+
   it('ranks session shortcuts live-first, then planned by date, dropping closed', async () => {
     const { fixture, http } = await setup(MEMBER, {
       meetings: [
@@ -290,14 +322,14 @@ describe('DashboardComponent', () => {
     http.verify();
   });
 
-  it('roleLabel localises known roles and echoes unknown ones', async () => {
+  it('exposes the Gremium memberships, which are what the header still shows', async () => {
     const { fixture } = await setup(MEMBER);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
-    expect(c.roleLabel('member')).toBe('Mitglied');
-    expect(c.roleLabel('totally_unknown_role')).toBe('totally_unknown_role');
-    expect(c.roles()).toContain('member');
     expect(Array.isArray(c.gremien())).toBe(true);
+    // The roles signal and its label helper went with the badges.
+    expect(c.roles).toBeUndefined();
+    expect(c.roleLabel).toBeUndefined();
   });
 
   it('shows only revocable delegations and reports their direction', async () => {
@@ -364,5 +396,31 @@ describe('DashboardComponent', () => {
     expect(ids).toContain('p2');
     expect(ids).toContain('p3');
     http.verify();
+  });
+
+  it('shows outlined rows while loading, never a bare sentence', async () => {
+    // Both panels are lists. A line of text gives the reader nothing to anticipate and
+    // lets the card resize under them when the real rows land.
+    const view = await render(DashboardComponent, {
+      providers: [
+        provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: USE_MOCK_API, useValue: false },
+      ],
+    });
+    const auth = view.fixture.debugElement.injector.get(AuthService);
+    const http = view.fixture.debugElement.injector.get(HttpTestingController);
+    auth.ensureLoaded().subscribe();
+    http.expectOne('/api/auth/me').flush(MEMBER);
+    view.fixture.detectChanges();
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = view.fixture.componentInstance as any;
+    expect(c.loading()).toBe(true);
+    expect(view.container.querySelectorAll('.skel').length).toBeGreaterThan(0);
+    expect(view.container.querySelector('[aria-busy="true"]')).toBeTruthy();
+
+    for (const req of http.match(() => true)) req.flush([]);
   });
 });

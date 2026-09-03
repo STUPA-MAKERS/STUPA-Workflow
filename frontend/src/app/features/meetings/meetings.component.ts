@@ -60,6 +60,7 @@ import {
   countEntries,
   meetingStatusKey,
   meetingStatusVariant,
+  meetingTimeSuffix,
   resolveI18n,
   voteOptionLabel,
   voteOptionsFor,
@@ -159,6 +160,7 @@ export class MeetingsComponent implements OnDestroy {
   readonly canViewAll = this.session.canViewAll;
   readonly isProtokollant = this.session.isProtokollant;
   readonly isFollower = this.session.isFollower;
+  readonly canEditProtocol = this.session.canEditProtocol;
   /** Create needs global `meeting.manage` OR a manage role in at least one Gremium. */
   readonly canCreate = computed(
     () => this.canManageAny() || this.auth.sessionManageGremien().length > 0,
@@ -198,6 +200,9 @@ export class MeetingsComponent implements OnDestroy {
   readonly assignableOptions = this.agendaSvc.assignableOptions;
 
   readonly loadingList = this.timeline.loadingList;
+
+  /** Rows to outline while the timeline first loads, so the page keeps its shape. */
+  protected readonly skeletonRows = [0, 1, 2, 3, 4];
   readonly upcomingItems = this.timeline.upcomingItems;
   readonly pastItems = this.timeline.pastItems;
   readonly upcomingHasMore = this.timeline.upcomingHasMore;
@@ -567,6 +572,11 @@ export class MeetingsComponent implements OnDestroy {
 
   voteOptionLabel(opt: string): string {
     return voteOptionLabel(opt, (key) => this.i18n.translate(key));
+  }
+
+  /** `", 18:00"` behind the meeting date, or nothing. See meetings-display.util. */
+  timeSuffix(startTime: string | null | undefined): string {
+    return meetingTimeSuffix(startTime);
   }
 
   statusVariant(status: Meeting['status']): BadgeVariant {

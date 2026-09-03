@@ -150,7 +150,7 @@ async def upload_invoice_file(file_path: str) -> dict:
 
 @group.tool
 async def list_sub_bookings(expense_id: str) -> dict:
-    """List the sub-bookings of a booking (#subbookings).
+    """List the sub-bookings of a booking.
 
     A booking can break down into sub-bookings with the same schema. A sub-booking
     inherits the cost center, the fiscal year and the kind of the parent. The

@@ -16,7 +16,10 @@ from app.modules.notifications.schemas import (
     MailTemplateCreate,
     MailTemplateUpdate,
 )
-from app.modules.notifications.service import NotificationService
+from app.modules.notifications.service import (
+    NotificationService,
+    resolve_application_lang,
+)
 from app.settings import load_settings
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 from tests._support.notifications_fakes import FakeQueue, FakeResolver, FakeSession
@@ -61,7 +64,7 @@ async def test_create_template_duplicate_conflict() -> None:
 
 
 async def test_list_templates() -> None:
-    # The merge (#12) keeps the full builtin catalog plus the rows outside the catalog.
+    # The merge keeps the full builtin catalog plus the rows outside the catalog.
     ta, tb = _template("a"), _template("b")
     ta.id, tb.id = uuid.uuid4(), uuid.uuid4()
     session = FakeSession(scalars=[[ta, tb]])
@@ -372,6 +375,119 @@ async def test_send_magic_link_builtin_fallback() -> None:
     queue = FakeQueue()
     await _service(session, queue).send_magic_link(email="a@x.de", link="https://l/#t=2")
     assert "https://l/#t=2" in queue.messages[0].text
+
+
+async def test_send_magic_link_uses_the_application_language() -> None:
+    """An application in English gets the English magic-link mail.
+
+    The magic-link mail is the first mail a public applicant reads and it gates the
+    confirmation. In the default language it locks out everybody who does not read
+    that language.
+    """
+    tpl = MailTemplate(
+        key="magic_link",
+        subject_i18n={"de": "Ihr Zugangslink", "en": "Your access link"},
+        body_i18n={"de": "Hier: {{ link }}", "en": "Here: {{ link }}"},
+        body_html_i18n={},
+        placeholders={},
+    )
+    session = FakeSession(scalars=[[tpl]])
+    queue = FakeQueue()
+    await _service(session, queue).send_magic_link(
+        email="a@x.de", link="https://l/#t=1", lang="en"
+    )
+    assert queue.messages[0].subject == "Your access link"
+    assert queue.messages[0].text == "Here: https://l/#t=1"
+
+
+async def test_send_magic_link_falls_back_to_default_language() -> None:
+    # A template without the asked language keeps the default language.
+    tpl = MailTemplate(
+        key="magic_link",
+        subject_i18n={"de": "Ihr Zugangslink"},
+        body_i18n={"de": "Hier: {{ link }}"},
+        body_html_i18n={},
+        placeholders={},
+    )
+    session = FakeSession(scalars=[[tpl]])
+    queue = FakeQueue()
+    await _service(session, queue).send_magic_link(
+        email="a@x.de", link="https://l", lang="en"
+    )
+    assert queue.messages[0].subject == "Ihr Zugangslink"
+
+
+async def test_send_magic_link_builtin_fallback_in_english() -> None:
+    session = FakeSession(scalars=[[]])  # no magic_link template
+    queue = FakeQueue()
+    await _service(session, queue).send_magic_link(
+        email="a@x.de", link="https://l/#t=3", lang="en"
+    )
+    assert queue.messages[0].subject == "Your access link for the application platform"
+    assert "use this link to access your application" in queue.messages[0].text
+
+
+async def test_resolve_application_lang_takes_the_application_language() -> None:
+    session = FakeSession(executes=[[("en", None)]])
+    lang = await resolve_application_lang(
+        session,  # type: ignore[arg-type]
+        application_id=uuid.uuid4(),
+        settings=SETTINGS,
+    )
+    assert lang == "en"
+
+
+async def test_resolve_application_lang_takes_the_gremium_default() -> None:
+    # The application holds no language, so the gremium default applies.
+    session = FakeSession(executes=[[(None, uuid.uuid4())]], scalar=["en"])
+    lang = await resolve_application_lang(
+        session,  # type: ignore[arg-type]
+        application_id=uuid.uuid4(),
+        settings=SETTINGS,
+    )
+    assert lang == "en"
+
+
+async def test_resolve_application_lang_falls_back_to_the_settings_default() -> None:
+    # Neither the application nor its gremium holds a language.
+    session = FakeSession(executes=[[(None, uuid.uuid4())]], scalar=[None])
+    lang = await resolve_application_lang(
+        session,  # type: ignore[arg-type]
+        application_id=uuid.uuid4(),
+        settings=SETTINGS,
+    )
+    assert lang == SETTINGS.mail_default_lang
+
+
+async def test_resolve_application_lang_without_gremium() -> None:
+    session = FakeSession(executes=[[(None, None)]])
+    lang = await resolve_application_lang(
+        session,  # type: ignore[arg-type]
+        application_id=uuid.uuid4(),
+        settings=SETTINGS,
+    )
+    assert lang == SETTINGS.mail_default_lang
+
+
+async def test_resolve_application_lang_without_application() -> None:
+    # No id at all, and an id that matches no row, both keep the default.
+    session = FakeSession(executes=[[]])
+    assert (
+        await resolve_application_lang(
+            session,  # type: ignore[arg-type]
+            application_id=None,
+            settings=SETTINGS,
+        )
+        == SETTINGS.mail_default_lang
+    )
+    assert (
+        await resolve_application_lang(
+            session,  # type: ignore[arg-type]
+            application_id=uuid.uuid4(),
+            settings=SETTINGS,
+        )
+        == SETTINGS.mail_default_lang
+    )
 
 
 async def test_enqueue_without_queue_drops(caplog: pytest.LogCaptureFixture) -> None:

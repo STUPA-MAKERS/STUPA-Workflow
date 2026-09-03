@@ -1,6 +1,8 @@
 import { SlicePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -21,12 +23,8 @@ import {
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
-import type {
-  AdminPrincipal,
-  Role,
-  RoleAssignment,
-  RoleAssignmentPatch,
-} from '../admin.models';
+import { HScrollSyncDirective } from '@shared/h-scroll-sync.directive';
+import type { AdminPrincipal, Role, RoleAssignment, RoleAssignmentPatch } from '../admin.models';
 
 /** Local form state for assigning a role per user. */
 interface AssignDraft {
@@ -54,6 +52,7 @@ function emptyDraft(): AssignDraft {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    HScrollSyncDirective,
     FormsModule,
     SlicePipe,
     TranslatePipe,
@@ -79,6 +78,7 @@ export class UsersComponent {
   private readonly i18n = inject(I18nService);
   private readonly capitalize = inject(CapitalizePipe);
   private readonly auth = inject(AuthService);
+  private readonly route = inject(ActivatedRoute);
 
   /** OIDC `sub` of the logged-in user. The view uses it to block self-deactivation. */
   protected readonly mySub = computed(() => this.auth.principal()?.sub ?? null);
@@ -108,12 +108,31 @@ export class UsersComponent {
     })),
   );
 
+  /**
+   * True until the first answer. Without it the table says "Keine Treffer" while the
+   * request is still out, which asserts there is nothing when nothing has arrived yet.
+   */
+  protected readonly loading = signal(true);
+
+  /**
+   * Widths are floors: the table scrolls rather than crushing a column. A `width` alone
+   * is a suggestion under `table-layout: auto`, so a column can be squeezed until every
+   * value wraps and no two rows are the same height.
+   */
   protected readonly columns = computed<ColumnDef[]>(() => [
-    { key: 'name', label: this.i18n.translate('admin.users.col.name'), width: '22rem' },
-    { key: 'email', label: this.i18n.translate('admin.users.col.email') },
-    { key: 'roles', label: this.i18n.translate('admin.users.col.roles') },
-    { key: 'lastLogin', label: this.i18n.translate('admin.users.col.lastLogin') },
-    { key: 'actions', label: this.i18n.translate('admin.users.col.actions'), align: 'end' },
+    { key: 'name', label: this.i18n.translate('admin.users.col.name'), width: '14rem' },
+    // Long enough for a full university address without a mid-domain break.
+    { key: 'email', label: this.i18n.translate('admin.users.col.email'), width: '22rem' },
+    { key: 'roles', label: this.i18n.translate('admin.users.col.roles'), width: '20rem' },
+    { key: 'lastLogin', label: this.i18n.translate('admin.users.col.lastLogin'), width: '9rem' },
+    {
+      key: 'actions',
+      label: this.i18n.translate('admin.users.col.actions'),
+      align: 'end',
+      // Pinned, so the row's actions stay reachable while the rest scrolls under them.
+      sticky: 'end',
+      width: '7rem',
+    },
   ]);
 
   /** Roles column: global roles only, without a Gremium scope. */
@@ -122,17 +141,38 @@ export class UsersComponent {
   }
   protected readonly rowId = (p: unknown): string => (p as AdminPrincipal).id;
   /** Detail row with the assign form for an expanded principal. */
-  protected readonly rowExpanded = (p: unknown): boolean => this.isExpanded((p as AdminPrincipal).id);
+  protected readonly rowExpanded = (p: unknown): boolean =>
+    this.isExpanded((p as AdminPrincipal).id);
 
   constructor() {
     this.api.listRoles().subscribe((r) => this.roles.set(r));
+    // `/admin/users?q=…` is where a global-search hit on a person lands. Without it the
+    // hit opened the unfiltered list and the reader searched the same name twice.
+    //
+    // The subscription and not one read of the snapshot: the palette can send us here
+    // while we are already here, and a hit on another person changes only the query
+    // string. The router keeps this component, so a snapshot read would never run again.
+    // The first emission arrives before the initial search, so there is one request.
+    this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((qp) => {
+      const q = qp.get('q') ?? '';
+      if (q === this.query()) return;
+      this.query.set(q);
+      this.search();
+    });
     this.search();
   }
 
   protected search(): void {
+    this.loading.set(true);
     this.api.listPrincipals(this.query()).subscribe({
-      next: (list) => this.principals.set(list),
-      error: () => this.toast.error(this.i18n.translate('admin.users.loadFailed')),
+      next: (list) => {
+        this.principals.set(list);
+        this.loading.set(false);
+      },
+      error: () => {
+        this.loading.set(false);
+        this.toast.error(this.i18n.translate('admin.users.loadFailed'));
+      },
     });
   }
 
@@ -271,8 +311,7 @@ export class UsersComponent {
         this.savingEdit.set(false);
         // 403 = the self-lockout guard. An admin must not change their own
         // admin assignment. Name that reason instead of a generic failure.
-        const key =
-          err.status === 403 ? 'admin.users.editSelfBlocked' : 'admin.users.editFailed';
+        const key = err.status === 403 ? 'admin.users.editSelfBlocked' : 'admin.users.editFailed';
         this.toast.error(this.i18n.translate(key));
       },
     });

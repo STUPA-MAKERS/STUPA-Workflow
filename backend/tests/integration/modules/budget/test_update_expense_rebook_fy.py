@@ -1,4 +1,4 @@
-"""Integration: a rebook across top-budget borders must check the fiscal year (#AUD-036).
+"""Integration: a rebook across top-budget borders must check the fiscal year.
 
 The tests run against a real Postgres through testcontainers.
 
@@ -54,7 +54,7 @@ def _suffix() -> str:
 
 
 async def test_update_expense_rejects_cross_top_level_rebook(session: AsyncSession) -> None:
-    """A rebook to a cost center under a different top budget gives 422 (#AUD-036)."""
+    """A rebook to a cost center under a different top budget gives 422."""
     svc = BudgetTreeService(session)
     g = await _gremium(session)
     # Two independent top budgets, each with its own fiscal year.

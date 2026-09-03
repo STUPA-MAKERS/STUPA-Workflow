@@ -1,4 +1,4 @@
-"""Integration test for non-public agenda items (#PII-Re-Add).
+"""Integration test for non-public agenda items.
 
 The test uses a real Postgres from testcontainers and checks the migrated schema.
 

@@ -6,12 +6,12 @@
 </app-page-header>
 
 <section class="cdv__list" [attr.aria-label]="'admin.cdVariants.title' | t">
-  @if (loading()) {
-    <p class="text-muted py-4" aria-live="polite">{{ 'admin.cdVariants.loading' | t }}</p>
-  } @else if (loadError()) {
+  @if (loadError()) {
     <p class="text-muted py-4 text-danger" role="alert">{{ 'admin.cdVariants.error' | t }}</p>
   } @else {
     <app-data-table
+      [loading]="loading()"
+      [loadingText]="'admin.cdVariants.loading' | t"
       [columns]="columns()"
       [rows]="variants()"
       [rowKey]="rowId"

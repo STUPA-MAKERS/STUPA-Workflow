@@ -275,7 +275,7 @@ async def test_finalize_renders_stores_and_mails() -> None:
     assert out.pdf_url is not None
     assert len(mail.sent) == 1
     assert mail.sent[0].to == ("a@x.de", "b@x.de")
-    # The PDF travels as an attachment (#protocol-mail-pdf). The earlier link needed a
+    # The PDF travels as an attachment. The earlier link needed a
     # login plus meeting.manage and was worthless for the recipients.
     assert [a.filename for a in mail.sent[0].attachments] == ["protokoll.pdf"]
     assert mail.sent[0].attachments[0].content.startswith(b"%PDF")
@@ -297,6 +297,24 @@ async def test_finalize_renders_user_markdown_trusted() -> None:
     )
     await _service(session, storage=FakeStorage(), pytex=pytex).finalize(PID, now=NOW)
     assert pytex.trust_levels == [None]
+
+
+async def test_the_design_never_decides_the_document_shape() -> None:
+    """The shape comes from the document, the design only from the Gremium.
+
+    Passing the design to pytex as the shape once put every application of a
+    protocol-designed Gremium out as a meeting protocol. One Gremium renders both kinds,
+    so the two must stay separate: `cd_variant` picks `protocol-stupa` here, and it is
+    the protocol shape because a protocol is what is being rendered.
+    """
+    pytex = FakePytex(pdf=b"%PDF")
+    session = FakeSession(
+        store={MID: _meeting(), GID: _gremium("stupa")},
+        results=[result(_protocol()), result(), result(), result()],
+    )
+    await _service(session, storage=FakeStorage(), pytex=pytex).finalize(PID, now=NOW)
+
+    assert pytex.calls[0][1] == "protocol-stupa"
 
 
 async def test_finalize_uploads_and_mails_only_after_commit() -> None:
@@ -580,7 +598,7 @@ async def test_finalize_recipients_union_members_plus_maillist() -> None:
 
 
 async def test_get_by_meeting_reads_without_create() -> None:
-    """Reload and poll path (#429): reads the existing protocol and never creates one."""
+    """Reload and poll path: reads the existing protocol and never creates one."""
     proto = _protocol(status="rendering")
     session = FakeSession(results=[result(proto)])
     out = await _service(session).get_by_meeting(MID)

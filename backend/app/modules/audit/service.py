@@ -338,6 +338,11 @@ class AuditService:
         has a name source. A deleted target and a non-UUID id are absent from the
         map. The method adds no PII beyond the read view. A holder of ``audit.read``
         can reach all of it through the admin views.
+
+        A config target keeps the id of the entity it configures. ``form`` therefore
+        holds an ``application_type`` id and reads the same table. ``flow`` holds the
+        literal id ``global`` and ``notification_settings`` holds ``1``. Both are
+        singletons with no name column, so no lookup can resolve them.
         """
         by_type: dict[str, set[uuid.UUID]] = {}
         for target_type, target_id in targets:
@@ -382,18 +387,28 @@ class AuditService:
             await fill(
                 "gremium", select(Gremium.id, Gremium.name).where(Gremium.id.in_(ids))
             )
-        if ids := by_type.get("application_type"):
+        # ``form`` and ``application_type`` both hold an application-type id, so one
+        # query serves both. A form config change writes the id of the type it belongs
+        # to, and the type name is the only name a form has.
+        form_ids = by_type.get("form", set())
+        type_ids = by_type.get("application_type", set())
+        if form_ids or type_ids:
             from app.modules.admin.models import ApplicationType
 
             rows = (
                 await self.session.execute(
                     select(ApplicationType.id, ApplicationType.name_i18n).where(
-                        ApplicationType.id.in_(ids)
+                        ApplicationType.id.in_(form_ids | type_ids)
                     )
                 )
             ).all()
             for row_id, name_i18n in rows:
-                if label := i18n_label(name_i18n):
+                label = i18n_label(name_i18n)
+                if not label:
+                    continue
+                if row_id in form_ids:
+                    labels[("form", str(row_id))] = label
+                if row_id in type_ids:
                     labels[("application_type", str(row_id))] = label
         if ids := by_type.get("role"):
             from app.modules.auth.models import Role
@@ -438,6 +453,28 @@ class AuditService:
                     Attachment.id.in_(ids)
                 ),
             )
+        if ids := by_type.get("cd_variant"):
+            from app.modules.admin.models import CdVariant
+
+            await fill(
+                "cd_variant",
+                select(CdVariant.id, CdVariant.name).where(CdVariant.id.in_(ids)),
+            )
+        if ids := by_type.get("site_config"):
+            from app.modules.admin.models import SiteConfigVersion
+
+            # A site-config version has no name column. The version number is the
+            # only thing that tells two drafts apart, and it reads the same in
+            # both UI locales.
+            rows = (
+                await self.session.execute(
+                    select(SiteConfigVersion.id, SiteConfigVersion.version).where(
+                        SiteConfigVersion.id.in_(ids)
+                    )
+                )
+            ).all()
+            for row_id, version in rows:
+                labels[("site_config", str(row_id))] = f"Version {version}"
         return labels
 
     async def resolve_data_ids(

@@ -363,7 +363,7 @@ class TransferCreate(WireModel):
 
 
 class InvoiceCreate(WireModel):
-    """Create an invoice (#invoices).
+    """Create an invoice.
 
     `grossAmount` is required and the rest is optional. `fileToken` links an original PDF
     that you uploaded or parsed before, with `parse_invoice` or `upload_invoice_file`.

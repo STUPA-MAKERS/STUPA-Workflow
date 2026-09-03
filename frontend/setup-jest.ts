@@ -26,3 +26,18 @@ Object.defineProperty(window, 'matchMedia', {
     dispatchEvent: () => false,
   }),
 });
+
+// jsdom does not implement ResizeObserver. Any directive that measures its own element
+// needs it, and a test that does not drive a resize still needs the constructor to exist.
+// A spec that wants to trigger a callback replaces this with its own stub.
+if (!('ResizeObserver' in globalThis)) {
+  Object.defineProperty(globalThis, 'ResizeObserver', {
+    writable: true,
+    value: class {
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void {}
+    },
+  });
+}
+

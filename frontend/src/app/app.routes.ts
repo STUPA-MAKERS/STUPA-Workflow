@@ -27,7 +27,9 @@ export const routes: Routes = [
       },
       {
         path: 'apply/confirmation',
-        data: { title: 'apply.confirm.heading' },
+        // `contextual`: this page only means something right after a submission. Opened
+        // cold it tells the reader to check their mail for an application nobody sent.
+        data: { title: 'apply.confirm.heading', contextual: true },
         loadComponent: () =>
           import('./features/apply/apply-confirmation.component').then(
             (m) => m.ApplyConfirmationComponent,
@@ -35,7 +37,9 @@ export const routes: Routes = [
       },
       {
         path: 'status',
-        data: { title: 'status.heading' },
+        // `contextual`: without an application id this renders "Antrag nicht gefunden".
+        // The id arrives from the magic link, never from navigating here.
+        data: { title: 'status.heading', contextual: true },
         loadComponent: () =>
           import('./features/apply/status-timeline.component').then(
             (m) => m.StatusTimelineComponent,
@@ -135,7 +139,7 @@ export const routes: Routes = [
         path: 'meetings',
         // A Gremium member can reach their own meetings without meeting.manage.
         // `protocol.write` is NOT listed: it is a GREMIUM-role permission and never
-        // enters the global permission set, so it could never match here (#g10).
+        // enters the global permission set, so it could never match here.
         data: {
           title: 'nav.meetings',
           permission: ['meeting.manage'],
@@ -149,7 +153,7 @@ export const routes: Routes = [
         path: 'meetings/:id',
         // `allowAuthenticated`: a delegation recipient can be neither a member nor
         // permitted. The server scopes the meeting view. `protocol.write` is a
-        // GREMIUM-role permission and never matches globally, so it is not listed (#g10).
+        // GREMIUM-role permission and never matches globally, so it is not listed.
         data: {
           title: 'meetings.detailCrumb',
           parent: ['meetings'],
@@ -199,7 +203,7 @@ export const routes: Routes = [
         data: {
           title: 'nav.admin',
           // Every area-admin role can reach the admin overview.
-          permission: ['admin.site', 'admin.gremien', 'admin.types', 'admin.roles', 'admin.users', 'admin.group_mappings', 'admin.gremium_roles', 'admin.cd_variants', 'admin.delegations', 'admin.deadlines', 'admin.notifications', 'privacy.manage', 'webhook.manage', 'audit.read'],
+          permission: ['admin.site', 'admin.gremien', 'admin.types', 'admin.roles', 'admin.users', 'admin.group_mappings', 'admin.gremium_roles', 'admin.cd_variants', 'admin.delegations', 'admin.deadlines', 'admin.notifications', 'privacy.manage', 'webhook.manage', 'audit.read', 'backup.manage'],
         },
         canActivate: [authGuard],
         loadComponent: () =>
@@ -256,7 +260,7 @@ export const routes: Routes = [
         path: 'admin/flow',
         // The save (POST /admin/flow-versions/global) accepts either key. The route
         // gate must list both, or a holder of one of them opens an editor it cannot
-        // save, or cannot open an editor it may save (#g7).
+        // save, or cannot open an editor it may save.
         data: {
           title: 'admin.flow.title',
           permission: ['flow.configure', 'admin.types'],
@@ -266,6 +270,15 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./pages/admin/flow-editor/flow-editor.component').then(
             (m) => m.FlowEditorComponent,
+          ),
+      },
+      {
+        path: 'admin/backups',
+        data: { title: 'admin.backups.title', permission: 'backup.manage', parent: ['admin'] },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./pages/admin/backups/backups.component').then(
+            (m) => m.BackupsComponent,
           ),
       },
       {

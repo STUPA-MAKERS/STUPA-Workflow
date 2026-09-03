@@ -298,7 +298,7 @@ async def test_delete_leaf_with_allocation_succeeds(session: AsyncSession) -> No
 
 
 async def test_list_expenses_fuzzy_search(session: AsyncSession) -> None:
-    """Fuzzy search (#3) against a real Postgres: pg_trgm filters and ranks bookings.
+    """Fuzzy search against a real Postgres: pg_trgm filters and ranks bookings.
 
     This proves the real trigram path, not the ILIKE fallback. A typo in the query still
     finds the closest description. Other bookings drop out. The rank puts the hit first.
@@ -335,7 +335,7 @@ async def test_list_expenses_fuzzy_search(session: AsyncSession) -> None:
 
 
 async def test_list_expenses_exact_id_filter(session: AsyncSession) -> None:
-    """The `id` filter (#expenses-ux2) returns exactly one booking.
+    """The `id` filter returns exactly one booking.
 
     The exact booking deeplink returns that one booking, even without any other
     filter.
@@ -367,7 +367,7 @@ async def test_list_expenses_exact_id_filter(session: AsyncSession) -> None:
 
 
 async def test_list_invoices_search_filter_pagination(session: AsyncSession) -> None:
-    """Server-side invoice search (#invoices): fuzzy `q`, filters and offset paging.
+    """Server-side invoice search: fuzzy `q`, filters and offset paging.
 
     Against a real Postgres this proves the trigram path, so a typo still hits. It also
     proves the status, gross and date predicates that hang on the shared `filters`. The
@@ -437,6 +437,17 @@ async def test_list_invoices_search_filter_pagination(session: AsyncSession) -> 
     assert len(first.items) == 2 and len(second.items) == 1
     ids = {i.id for i in first.items} | {i.id for i in second.items}
     assert len(ids) == 3
+
+    # The exact invoice for a deep link, such as a global-search hit. Before this filter
+    # a hit on one invoice opened the whole list and the reader had to find it again.
+    one = await svc.list_invoices_paged(invoice_id=first.items[0].id)
+    assert one.total == 1
+    assert one.items[0].id == first.items[0].id
+
+    # It combines with the other filters rather than overriding them, so a deep link
+    # into a filtered list cannot silently widen it.
+    conflict = await svc.list_invoices_paged(invoice_id=first.items[0].id, q="zzzzzznope")
+    assert conflict.total == 0
 
     # No hit gives an empty page. The count query and the row query stay identical.
     empty = await svc.list_invoices_paged(q="zzzzzznope")

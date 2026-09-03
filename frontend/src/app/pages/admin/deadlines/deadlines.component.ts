@@ -105,6 +105,12 @@ export class AdminDeadlinesComponent {
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
 
+  /**
+   * True until the first answer. Without it the table shows its empty text while the
+   * request is still out, which asserts there is nothing when nothing has arrived yet.
+   */
+  protected readonly loading = signal(true);
+
   protected readonly policies = signal<DeadlinePolicy[]>([]);
   protected readonly draft = signal<PolicyDraft | null>(null);
   protected readonly editingId = signal<string | null>(null);
@@ -125,7 +131,13 @@ export class AdminDeadlinesComponent {
   ]);
 
   constructor() {
-    this.api.listDeadlinePolicies().subscribe((p) => this.policies.set(p));
+    this.api.listDeadlinePolicies().subscribe({
+      next: (p) => {
+        this.policies.set(p);
+        this.loading.set(false);
+      },
+      error: () => this.loading.set(false),
+    });
   }
 
   protected label(p: DeadlinePolicy | null): string {
@@ -145,7 +157,7 @@ export class AdminDeadlinesComponent {
 
   private baseValue(p: DeadlinePolicy): string {
     if (p.kind === 'absolute') {
-      return p.absoluteAt ? new Date(p.absoluteAt).toLocaleDateString(this.i18n.locale()) : '—';
+      return p.absoluteAt ? new Date(p.absoluteAt).toLocaleDateString(this.i18n.formatLocale()) : '—';
     }
     if (p.kind === 'recurring') {
       const n = p.dates?.length ?? 0;

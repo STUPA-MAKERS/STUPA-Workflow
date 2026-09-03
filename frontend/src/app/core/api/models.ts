@@ -23,6 +23,12 @@ export type I18nMap = Record<string, string>;
 /** Public branding config of the active site version. It needs no authentication.
  *  The type stays loose on purpose. The frontend reads only the free texts, for
  *  example `applyInfo`, and the app name. */
+/** One maintained footer link: a label per locale plus its target. */
+export interface PublicFooterLink {
+  label: I18nMap;
+  url: string;
+}
+
 export interface PublicSiteConfig {
   version: number;
   branding?: {
@@ -30,6 +36,10 @@ export interface PublicSiteConfig {
     appName?: string;
     /** Short name for the PWA icon. Empty falls back to the default. */
     appShortName?: string;
+    /** Footer copyright line per locale. Empty falls back to the co-branding text. */
+    copyright?: I18nMap;
+    /** Footer legal links. Empty falls back to the built-in imprint/privacy pair. */
+    legalLinks?: PublicFooterLink[];
     freetexts?: Partial<
       Record<'loginHint' | 'welcome' | 'support' | 'emailFooter' | 'applyInfo', I18nMap>
     >;
@@ -106,6 +116,12 @@ export interface ApplicationListQuery {
   order?: 'asc' | 'desc';
   /** Own applications only. It forces the owner filter even with `application.read`. */
   mine?: boolean;
+  /**
+   * Archived rows. `'false'` (the server default) hides them, `'true'` shows only those,
+   * `'all'` shows both. A tri-state rather than a boolean, because "only the archived
+   * ones" and "both" are different questions.
+   */
+  archived?: 'false' | 'true' | 'all';
   limit?: number;
   offset?: number;
 }
@@ -148,6 +164,7 @@ export interface ApplicationOutWire {
   applicant?: ApplicantOutWire | null;
   canEdit?: boolean;
   isOwner?: boolean;
+  archivedAt?: IsoDateTime | null;
 }
 
 /** `ApplicationListItem`. A list entry without `data` and without `applicant`. */
@@ -162,6 +179,7 @@ export interface ApplicationListItemWire {
   currency?: string | null;
   createdAt: IsoDateTime;
   updatedAt: IsoDateTime;
+  archivedAt?: IsoDateTime | null;
 }
 
 /** `ApplicationCreated`. The 201 response of `POST /applications`. It holds only the id. */
@@ -405,6 +423,36 @@ export interface Application {
   /** True if the requester is the creator, that is the applicant. It gates the
    *  anonymization request under GDPR Art. 17. Only the data subject may ask. */
   isOwner: boolean;
+  /**
+   * When it was archived, or null. A timestamp rather than a flag, so the view can say
+   * WHEN without a second field.
+   *
+   * Archiving is not anonymisation: the record is complete and readable, it has only
+   * left the working list. `be-privacy` owns the DSGVO erasure people confuse this with.
+   */
+  archivedAt: IsoDateTime | null;
+}
+
+/**
+ * A public, read-only link to one application.
+ *
+ * No separate wire type and no mapper: the payload is already camelCase and carries
+ * nothing language-dependent, so a second shape would only be a copy that can drift.
+ *
+ * `url` holds the plaintext token and is therefore present ONLY in the response that
+ * created the link. A listing returns it as null, because the server stored a hash and
+ * cannot reconstruct the token — nor would it hand it back if it could.
+ */
+export interface ApplicationShareLink {
+  id: Uuid;
+  createdAt: IsoDateTime;
+  expiresAt: IsoDateTime;
+  /** Set once the link stops being honoured. A timestamp, so the list can say when. */
+  revokedAt: IsoDateTime | null;
+  createdBy: string | null;
+  /** A note for whoever made it. Never shown on the public page. */
+  label: string | null;
+  url: string | null;
 }
 
 export interface ApplicationListItem {
@@ -418,6 +466,8 @@ export interface ApplicationListItem {
   currency: string | null;
   createdAt: IsoDateTime;
   updatedAt: IsoDateTime;
+  /** Set when the row is archived, so a combined list can mark it. */
+  archivedAt: IsoDateTime | null;
 }
 
 /** Result of `POST /applications`, frontend view. */
@@ -520,30 +570,6 @@ export interface Attachment {
 export interface SignedUrl {
   url: string;
   expiresIn: number;
-}
-
-/**
- * Status of an async render job (`JobOut.status`).
- *
- * `pending` means the job waits for the worker. `running` means the worker
- * renders. `done` and `failed` are the two end states. Nothing else follows.
- */
-export type RenderJobStatus = 'pending' | 'running' | 'done' | 'failed';
-
-/**
- * Async render job (`POST /applications/{id}/pdf`, `GET /jobs/{id}`).
- *
- * `resultUrl` holds a signed, short-lived MinIO link. It is set only on `done`,
- * and only when the deployment has an object store. `error` holds a short code,
- * for example `render_error`, and only on `failed`.
- */
-export interface RenderJob {
-  id: Uuid;
-  kind: string;
-  status: RenderJobStatus;
-  applicationId: Uuid | null;
-  resultUrl: string | null;
-  error: string | null;
 }
 
 /** Frontend input for a new application. It maps to `ApplicationCreateBody`. */
@@ -973,4 +999,38 @@ export interface ConsentRequest {
   requestedScopes: ConsentScope[];
   lifetimes: string[];
   defaultLifetime: string;
+}
+
+/** What kind of record a search hit points at. Stable keys, never translated text. */
+export type SearchKind =
+  | 'application'
+  | 'meeting'
+  | 'invoice'
+  | 'expense'
+  | 'budget'
+  | 'gremium'
+  | 'principal';
+
+/**
+ * One row of the global search (`GET /api/search`).
+ *
+ * Deliberately flat: the palette renders a line, a line under it, and somewhere to go,
+ * without knowing the shape of an application, an invoice or a meeting. `url` is always
+ * an app-relative route the client has.
+ */
+export interface SearchHit {
+  kind: SearchKind;
+  id: string;
+  title: string;
+  subtitle: string | null;
+  url: string;
+}
+
+/** Everything found for one query, in one round trip. */
+export interface SearchResults {
+  hits: SearchHit[];
+  /** At least one source had more matches than its cap, so this is not everything. */
+  truncated: boolean;
+  /** Sources that errored. The search degrades rather than returning nothing. */
+  failed: string[];
 }

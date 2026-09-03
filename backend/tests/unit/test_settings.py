@@ -135,7 +135,7 @@ def test_empty_webhook_allowlist_warns_under_strict(
     monkeypatch.setenv("FORWARDED_ALLOW_IPS", "172.18.0.2")
     s, warnings = _settings_warnings(monkeypatch, _env_file=None)
     assert s.webhook_host_allowlist == []
-    assert any("WEBHOOK_ALLOWLIST" in m for m in warnings)
+    assert any("WEBHOOK_HOST_ALLOWLIST" in m for m in warnings)
 
 
 def test_webhook_allowlist_set_no_warning(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -148,4 +148,96 @@ def test_webhook_allowlist_set_no_warning(monkeypatch: pytest.MonkeyPatch) -> No
         monkeypatch, _env_file=None, webhook_host_allowlist=["hooks.example"]
     )
     assert s.webhook_host_allowlist == ["hooks.example"]
-    assert not any("WEBHOOK_ALLOWLIST" in m for m in warnings)
+    assert not any("WEBHOOK_HOST_ALLOWLIST" in m for m in warnings)
+
+
+def _clear_allowlist_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Remove every spelling of the webhook allowlist from the environment."""
+    for key in ("WEBHOOK_HOST_ALLOWLIST", "WEBHOOK_ALLOWLIST"):
+        monkeypatch.delenv(key, raising=False)
+        monkeypatch.delenv(key.lower(), raising=False)
+
+
+def test_webhook_allowlist_reads_canonical_name(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Read the allowlist from the canonical `WEBHOOK_HOST_ALLOWLIST`."""
+    _base_env(monkeypatch)
+    _clear_allowlist_env(monkeypatch)
+    monkeypatch.setenv("WEBHOOK_HOST_ALLOWLIST", "hooks.example")
+    s = load_settings(_env_file=None)
+    assert s.webhook_host_allowlist == ["hooks.example"]
+
+
+def test_webhook_allowlist_reads_documented_legacy_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Read the allowlist from the older `WEBHOOK_ALLOWLIST` too.
+
+    `deploy/.env.example` documented that name for a long time. A deployment that
+    copied it must keep an allowlist that works, not an empty one.
+    """
+    _base_env(monkeypatch)
+    _clear_allowlist_env(monkeypatch)
+    monkeypatch.setenv("WEBHOOK_ALLOWLIST", "hooks.example")
+    s = load_settings(_env_file=None)
+    assert s.webhook_host_allowlist == ["hooks.example"]
+
+
+def test_webhook_allowlist_splits_comma_list(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Split a comma-separated value, which is the documented format."""
+    _base_env(monkeypatch)
+    _clear_allowlist_env(monkeypatch)
+    monkeypatch.setenv("WEBHOOK_HOST_ALLOWLIST", "host1, host2 ,")
+    s = load_settings(_env_file=None)
+    assert s.webhook_host_allowlist == ["host1", "host2"]
+
+
+def test_webhook_allowlist_accepts_json_list(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Accept a JSON list, the format that pydantic-settings took before."""
+    _base_env(monkeypatch)
+    _clear_allowlist_env(monkeypatch)
+    monkeypatch.setenv("WEBHOOK_HOST_ALLOWLIST", '["host1", "host2"]')
+    s = load_settings(_env_file=None)
+    assert s.webhook_host_allowlist == ["host1", "host2"]
+
+
+def test_webhook_allowlist_broken_json_does_not_abort_start(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Fall back to the comma split when a bracketed value is not valid JSON.
+
+    A typo in the value must not stop the boot with a raw parser error.
+    """
+    _base_env(monkeypatch)
+    _clear_allowlist_env(monkeypatch)
+    monkeypatch.setenv("WEBHOOK_HOST_ALLOWLIST", "[host1, host2")
+    s = load_settings(_env_file=None)
+    assert s.webhook_host_allowlist == ["[host1", "host2"]
+
+
+def test_webhook_allowlist_canonical_name_wins(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Prefer the canonical name when both names are set."""
+    _base_env(monkeypatch)
+    _clear_allowlist_env(monkeypatch)
+    monkeypatch.setenv("WEBHOOK_HOST_ALLOWLIST", "canonical.example")
+    monkeypatch.setenv("WEBHOOK_ALLOWLIST", "legacy.example")
+    s = load_settings(_env_file=None)
+    assert s.webhook_host_allowlist == ["canonical.example"]
+
+
+def test_webhook_allowlist_empty_value_stays_empty(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Treat an empty or blank value as no allowlist."""
+    _base_env(monkeypatch)
+    _clear_allowlist_env(monkeypatch)
+    monkeypatch.setenv("WEBHOOK_HOST_ALLOWLIST", "  ")
+    s = load_settings(_env_file=None)
+    assert s.webhook_host_allowlist == []
+
+
+def test_cors_allow_origins_splits_comma_list(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Split `CORS_ALLOW_ORIGINS` the same way, so a plain value cannot crash boot."""
+    _base_env(monkeypatch)
+    monkeypatch.setenv("CORS_ALLOW_ORIGINS", "https://a.example,https://b.example")
+    s = load_settings(_env_file=None)
+    assert s.cors_allow_origins == ["https://a.example", "https://b.example"]

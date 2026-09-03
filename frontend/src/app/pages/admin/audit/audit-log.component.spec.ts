@@ -72,8 +72,11 @@ async function setup(opts: SetupOpts = {}) {
   return { ...view, cmp, listAuditLog, listAuditActors };
 }
 
-describe('AuditLogComponent (#45)', () => {
+describe('AuditLogComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+
+  /** A real application-type id: a `form` audit target keeps the id of its type. */
+  const TYPE_UUID = 'a257b8e0-0c78-43cb-938f-a4924f68443f';
 
   it('lists audit entries with cursor paging and human-readable rendering', async () => {
     const { fixture, listAuditLog } = await setup({
@@ -83,7 +86,7 @@ describe('AuditLogComponent (#45)', () => {
       expect.objectContaining({ limit: 50, before: undefined }),
     );
     expect(
-      screen.getByText(/Root Admin hat Rollen\/Rechte geändert \(principal:p-1\)\./),
+      screen.getByText(/Root Admin hat Rollen\/Rechte geändert \(Benutzer:p-1\)\./),
     ).toBeInTheDocument();
     screen.getByRole('button', { expanded: false }).click();
     fixture.detectChanges();
@@ -94,7 +97,7 @@ describe('AuditLogComponent (#45)', () => {
     await setup({
       page: { items: [entry(1, { action: 'mystery_event', actorName: null })], nextCursor: null, hasMore: false },
     });
-    expect(screen.getByText(/mystery_event \(principal:p-1\)/)).toBeInTheDocument();
+    expect(screen.getByText(/mystery_event \(Benutzer:p-1\)/)).toBeInTheDocument();
   });
 
   it('shows the empty state when there are no entries', async () => {
@@ -138,7 +141,7 @@ describe('AuditLogComponent (#45)', () => {
     expect(screen.getByText('7')).toBeInTheDocument();
   });
 
-  it('renders embedded data UUIDs and the actor as "<name> · <uuid>" (#no-uuids-in-ui)', async () => {
+  it('renders embedded data UUIDs and the actor as "<name> · <uuid>"', async () => {
     const { fixture } = await setup({
       page: {
         items: [
@@ -337,12 +340,13 @@ describe('AuditLogComponent (#45)', () => {
     expect(cmp.dayLabel({ date: old })).toMatch(/2020/);
   });
 
-  it('dayLabel uses the en-US locale when the UI is English', async () => {
+  it('dayLabel uses the en-GB locale when the UI is English', async () => {
     localStorage.setItem('ap.locale', 'en');
     const { cmp, fixture } = await setup();
     fixture.debugElement.injector.get(I18nService).setLocale('en');
     const old = new Date(2020, 0, 15);
-    expect(cmp.dayLabel({ date: old })).toMatch(/2020/);
+    // en-GB full date: "Wednesday, 15 January 2020" — day before the month name.
+    expect(cmp.dayLabel({ date: old })).toBe('Wednesday, 15 January 2020');
     expect(cmp.dayLabel({ date: new Date() })).toBe('Today');
   });
 
@@ -454,9 +458,90 @@ describe('AuditLogComponent (#45)', () => {
     expect(link.getAttribute('href')).toBe('/applications/a-1');
   });
 
-  it('message falls back to type:id when no resolved label is present', async () => {
+  it('message falls back to the localized type and the id when no label is present', async () => {
     const { cmp } = await setup();
-    expect(cmp.message(entry(1, { targetLabel: null }))).toMatch(/principal:p-1/);
+    expect(cmp.message(entry(1, { targetLabel: null }))).toMatch(/Benutzer:p-1/);
+  });
+
+
+  it('shows the resolved form name and never the raw application-type UUID', async () => {
+    await setup({
+      page: {
+        items: [
+          entry(1, {
+            action: 'config_change',
+            targetType: 'form',
+            targetId: TYPE_UUID,
+            targetLabel: 'Finanzantrag',
+          }),
+        ],
+        nextCursor: null,
+        hasMore: false,
+      },
+    });
+    expect(
+      screen.getByText(/hat die Konfiguration geändert \(„Finanzantrag“\)\./),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(new RegExp(TYPE_UUID))).not.toBeInTheDocument();
+  });
+
+  it('quotes the target label with the marks of the active locale', async () => {
+    const { cmp, fixture } = await setup();
+    const e = entry(1, {
+      action: 'config_change',
+      targetType: 'form',
+      targetId: TYPE_UUID,
+      targetLabel: 'Finanzantrag',
+    });
+    expect(cmp.message(e)).toContain('\u201EFinanzantrag\u201C');
+    fixture.debugElement.injector.get(I18nService).setLocale('en');
+    expect(cmp.message(e)).toContain('\u201CFinanzantrag\u201D');
+    expect(cmp.message(e)).not.toContain('\u201E');
+  });
+
+  it('drops a UUID target id from the sentence but keeps it in the details', async () => {
+    const { fixture } = await setup({
+      page: {
+        items: [
+          entry(1, {
+            action: 'config_change',
+            targetType: 'form',
+            targetId: TYPE_UUID,
+            targetLabel: null,
+          }),
+        ],
+        nextCursor: null,
+        hasMore: false,
+      },
+    });
+    expect(screen.getByText(/hat die Konfiguration geändert \(Formular\)\./)).toBeInTheDocument();
+    expect(screen.queryByText(new RegExp(TYPE_UUID))).not.toBeInTheDocument();
+    screen.getByRole('button', { expanded: false }).click();
+    fixture.detectChanges();
+    expect(screen.getByText(new RegExp(TYPE_UUID))).toBeInTheDocument();
+  });
+
+  it('keeps a readable non-UUID target id in the sentence', async () => {
+    const { cmp } = await setup();
+    expect(
+      cmp.message(entry(1, { action: 'config_change', targetType: 'flow', targetId: 'global', targetLabel: null })),
+    ).toMatch(/\(Ablauf:global\)/);
+    expect(
+      cmp.message(entry(1, { action: 'export', targetType: 'export', targetId: 'antraege.csv', targetLabel: null })),
+    ).toMatch(/antraege\.csv/);
+  });
+
+  it('shows the target id in the details even without a target type', async () => {
+    const { fixture } = await setup({
+      page: {
+        items: [entry(1, { targetType: null, targetId: TYPE_UUID })],
+        nextCursor: null,
+        hasMore: false,
+      },
+    });
+    screen.getByRole('button', { expanded: false }).click();
+    fixture.detectChanges();
+    expect(screen.getByText(new RegExp(TYPE_UUID))).toBeInTheDocument();
   });
 
   it('targetLabel uses just the target type when no id is present', async () => {
@@ -464,7 +549,7 @@ describe('AuditLogComponent (#45)', () => {
     // An unknown action uses the fallback message, and the target holds the type only.
     expect(
       cmp.message(entry(1, { action: 'mystery', targetType: 'principal', targetId: null })),
-    ).toMatch(/\(principal\)/);
+    ).toMatch(/\(Benutzer\)/);
   });
 
   it('targetLabel uses just the target id when no type is present', async () => {

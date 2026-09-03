@@ -126,7 +126,7 @@ async def test_dispatch_race_integrity_error_is_deduped() -> None:
     assert session.added == []  # the savepoint rollback discarded the delivery
 
 
-# Tests for dispatch_to_webhook (#28).
+# Tests for dispatch_to_webhook.
 async def test_dispatch_to_webhook_dedup_skips_existing() -> None:
     hook = _hook()
     base = "app:evt:0:webhook"

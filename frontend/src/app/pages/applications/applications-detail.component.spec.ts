@@ -119,6 +119,26 @@ function flushForm(http: HttpTestingController, id = 'app-1') {
     });
 }
 
+/** Flush an effective form that defines a `date` and a `daterange` field. */
+function flushDateForm(http: HttpTestingController, id = 'app-1') {
+  http
+    .expectOne((r) => r.url === `/api/applications/${id}/form`)
+    .flush({
+      applicationTypeId: 't1',
+      formVersionId: 'fv1',
+      sections: [
+        {
+          key: 'main',
+          label: { de: 'Antrag' },
+          fields: [
+            { key: 'span', type: 'daterange', label: { de: 'Zeitraum' } },
+            { key: 'eventDay', type: 'date', label: { de: 'Tag' } },
+          ],
+        },
+      ],
+    });
+}
+
 // The form loads on the initial load only. A refresh does not reload the form.
 // A status change runs through the flow, so no further /transitions request follows.
 function flushAll(http: HttpTestingController, id = 'app-1', form = true) {
@@ -253,6 +273,77 @@ describe('ApplicationsDetailComponent', () => {
     detectChanges();
     expect(screen.getByText('Keine Feldänderungen.')).toBeInTheDocument();
     flushForm(http);
+    flushAttachments(http);
+    http.verify();
+  });
+
+  it('shows a date and a date range in the version diff as days, not as JSON', async () => {
+    const { http, detectChanges } = await setup();
+    http.expectOne(url('')).flush(appWire());
+    http.expectOne(url('/versions')).flush([
+      VERSIONS[0],
+      {
+        version: 2,
+        data: {},
+        diff: {
+          added: { eventDay: '2026-07-01' },
+          removed: {},
+          changed: {
+            span: {
+              old: { from: '2026-06-01', to: '2026-06-02' },
+              new: { from: '2026-07-01', to: '2026-07-02' },
+            },
+          },
+        },
+        changedBy: 'Mia',
+        at: '2026-06-05T11:00:00Z',
+      },
+    ]);
+    http.expectOne(url('/comments')).flush([]);
+    flushDateForm(http);
+    detectChanges();
+    await userEvent.click(screen.getByRole('button', { name: /Versionshistorie/ }));
+    detectChanges();
+
+    expect(screen.getByText('01.06.2026 – 02.06.2026')).toBeInTheDocument();
+    expect(screen.getByText('01.07.2026 – 02.07.2026')).toBeInTheDocument();
+    expect(screen.getByText('01.07.2026')).toBeInTheDocument();
+    // Neither the raw JSON of the range nor the raw ISO day reaches the reader.
+    expect(screen.queryAllByText(/\{"from"/)).toHaveLength(0);
+    expect(screen.queryAllByText(/2026-07-01/)).toHaveLength(0);
+    flushAttachments(http);
+    http.verify();
+  });
+
+  it('keeps a diff value raw when the active form defines no such field', async () => {
+    const { http, detectChanges } = await setup();
+    http.expectOne(url('')).flush(appWire());
+    http.expectOne(url('/versions')).flush([
+      VERSIONS[0],
+      {
+        version: 2,
+        data: {},
+        diff: {
+          added: {},
+          removed: { legacyRange: { from: '2026-05-01', to: '2026-05-02' } },
+          changed: { legacyNote: { old: 'alt', new: 'neu' } },
+        },
+        changedBy: 'Mia',
+        at: '2026-06-05T11:00:00Z',
+      },
+    ]);
+    http.expectOne(url('/comments')).flush([]);
+    flushDateForm(http);
+    detectChanges();
+    await userEvent.click(screen.getByRole('button', { name: /Versionshistorie/ }));
+    detectChanges();
+
+    // A field the active form version dropped keeps the stored text. No crash and no
+    // "Invalid Date".
+    expect(screen.getByText('{"from":"2026-05-01","to":"2026-05-02"}')).toBeInTheDocument();
+    expect(screen.getByText('alt')).toBeInTheDocument();
+    expect(screen.getByText('neu')).toBeInTheDocument();
+    expect(screen.queryAllByText(/Invalid Date/)).toHaveLength(0);
     flushAttachments(http);
     http.verify();
   });
@@ -750,6 +841,41 @@ describe('ApplicationsDetailComponent', () => {
     expect(byKey.has('desc')).toBe(false);
   });
 
+  it('renders a date and a daterange readably, not as a raw ISO day or raw JSON', async () => {
+    const fields: FormFieldDef[] = [
+      { key: 'eventDate', type: 'date', label: { de: 'Veranstaltungsdatum' } },
+      { key: 'period', type: 'daterange', label: { de: 'Zeitraum' } },
+      { key: 'halfOpen', type: 'daterange', label: { de: 'Ab' } },
+      { key: 'brokenDate', type: 'date', label: { de: 'Kaputt' } },
+      { key: 'brokenRange', type: 'daterange', label: { de: 'Kaputter Zeitraum' } },
+      { key: 'rangeText', type: 'daterange', label: { de: 'Zeitraum als Text' } },
+    ];
+    const data = {
+      eventDate: '2026-07-01',
+      period: { from: '2026-07-01', to: '2026-07-02' },
+      halfOpen: { from: '2026-07-01' },
+      brokenDate: 'irgendwann',
+      brokenRange: {},
+      rangeText: 'im Sommer',
+    };
+    const { cmp, container } = await setupWithFields(fields, data);
+    const byKey = new Map(cmp.dataEntries(cmp.app() as Application).map((e) => [e.key, e.value]));
+    expect(byKey.get('eventDate')).toBe('01.07.2026');
+    expect(byKey.get('period')).toBe('01.07.2026 \u2013 02.07.2026');
+    // A half-filled range shows the half it has.
+    expect(byKey.get('halfOpen')).toBe('01.07.2026');
+    // An unparsable answer keeps its text rather than reading "Invalid Date".
+    expect(byKey.get('brokenDate')).toBe('irgendwann');
+    expect(byKey.get('brokenRange')).toBe('\u2014');
+    expect(byKey.get('rangeText')).toBe('im Sommer');
+    // The screen a committee member reads shows neither raw JSON nor a raw ISO day.
+    const text = container.textContent ?? '';
+    expect(text).not.toContain('{"from"');
+    expect(text).not.toContain('{"to"');
+    expect(text).not.toContain('2026-07-01');
+    expect(screen.getByText('01.07.2026 \u2013 02.07.2026')).toBeTruthy();
+  });
+
   it('handles unknown select option and non-finite currency and false checkbox', async () => {
     const fields: FormFieldDef[] = [
       {
@@ -1158,5 +1284,72 @@ describe('ApplicationsDetailComponent', () => {
     expect(cmp.title()).toBe('Ohne Titel');
     flushAttachments(http);
     http.verify();
+  });
+
+  it('outlines the detail layout while it loads, never a bare sentence', async () => {
+    // The most-opened view in the platform. One line of text standing in for the whole
+    // layout until it arrives at once is the worst place for it.
+    const view = await render(ApplicationsDetailComponent, {
+      providers: [
+        provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: USE_MOCK_API, useValue: false },
+        { provide: AuthService, useValue: fakeAuth(['application.read']) },
+        {
+          provide: ActivatedRoute,
+          useValue: { paramMap: new BehaviorSubject(convertToParamMap({ id: 'app-1' })) },
+        },
+      ],
+    });
+    view.fixture.detectChanges();
+
+    expect(view.container.querySelectorAll('.skel').length).toBeGreaterThan(0);
+    expect(view.container.querySelector('[aria-busy="true"]')).toBeTruthy();
+    // The wording stays for a screen reader, because the blocks are decorative.
+    expect(view.container.querySelector('[role="status"]')).toHaveClass('sr-only');
+
+    const http = view.fixture.debugElement.injector.get(HttpTestingController);
+    for (const req of http.match(() => true)) req.flush(null, { status: 404, statusText: 'x' });
+  });
+
+  describe('archiving', () => {
+    it('offers no archive control without the permission', async () => {
+      const { http, detectChanges } = await setup(['application.read']);
+      flushAll(http);
+      detectChanges();
+      expect(screen.queryByRole('button', { name: /Archivieren/ })).not.toBeInTheDocument();
+    });
+
+    it('archives without asking for confirmation, because it is reversible', async () => {
+      // The delete and the erasure request beside it both confirm. This one does not:
+      // the way back is one click on the same button, and a confirm would imply a risk
+      // that is not there.
+      const { http, detectChanges } = await setup(['application.read', 'application.archive']);
+      flushAll(http);
+      detectChanges();
+
+      await userEvent.click(screen.getByRole('button', { name: /Archivieren/ }));
+      const req = http.expectOne((r) => r.url.endsWith('/archive') && r.method === 'POST');
+      req.flush({ ...appWire(), archivedAt: '2026-09-02T10:00:00Z' });
+      detectChanges();
+
+      expect(screen.getByRole('button', { name: /Aus Archiv holen/ })).toBeInTheDocument();
+    });
+
+    it('says on the page that an application is archived', async () => {
+      // It looks exactly like an active one, and someone arriving from a link has no
+      // other way to know.
+      const { http, detectChanges } = await setup(['application.read']);
+      http.expectOne(url('')).flush({ ...appWire(), archivedAt: '2026-09-02T10:00:00Z' });
+      http.expectOne(url('/versions')).flush(VERSIONS);
+      http.expectOne(url('/comments')).flush(COMMENTS);
+      for (const req of http.match((r) => r.method === 'GET' && r.url === '/api/budgets')) {
+        req.flush([]);
+      }
+      flushForm(http);
+      detectChanges();
+      expect(screen.getByText(/Archiviert am/)).toBeInTheDocument();
+    });
   });
 });

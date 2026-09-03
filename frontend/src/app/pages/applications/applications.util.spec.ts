@@ -1,7 +1,9 @@
 import {
   applicationTitle,
   formatBytes,
+  formatDateRangeValue,
   formatFieldValue,
+  formatIsoDate,
   scanBadgeVariant,
 } from './applications.util';
 import type { ScanState } from '@core/api/models';
@@ -39,6 +41,63 @@ describe('formatFieldValue', () => {
   it('JSON-stringifies objects and arrays', () => {
     expect(formatFieldValue({ a: 1 })).toBe('{"a":1}');
     expect(formatFieldValue([1, 2])).toBe('[1,2]');
+  });
+});
+
+describe('formatIsoDate', () => {
+  it('formats an ISO day in the active locale', () => {
+    expect(formatIsoDate('2026-07-01', 'de')).toBe('01.07.2026');
+    // en-GB, not en-US: 1 July reads as 01/07/2026, never as 07/01/2026.
+    expect(formatIsoDate('2026-07-01', 'en')).toBe('01/07/2026');
+  });
+
+  it('keeps the entered day west of UTC', () => {
+    // A date-only answer carries no zone. Read and printed in UTC it stays the
+    // day the applicant entered, in every timezone.
+    expect(formatIsoDate('2026-01-01', 'de')).toBe('01.01.2026');
+    expect(formatIsoDate('2026-07-01T00:00:00Z', 'de')).toBe('01.07.2026');
+  });
+
+  it('keeps an unparsable or empty value instead of printing an invalid date', () => {
+    expect(formatIsoDate('irgendwann', 'de')).toBe('irgendwann');
+    expect(formatIsoDate('   ', 'de')).toBe('');
+  });
+
+  it('falls back to the plain value formatter for a non-string', () => {
+    expect(formatIsoDate(42, 'de')).toBe('42');
+    expect(formatIsoDate(null, 'de')).toBe('');
+    expect(formatIsoDate({ a: 1 }, 'de')).toBe('{"a":1}');
+  });
+});
+
+describe('formatDateRangeValue', () => {
+  it('formats a full range as one span', () => {
+    expect(formatDateRangeValue({ from: '2026-07-01', to: '2026-07-02' }, 'de')).toBe(
+      '01.07.2026 \u2013 02.07.2026',
+    );
+  });
+
+  it('formats a full range day-first under the English UI', () => {
+    expect(formatDateRangeValue({ from: '2026-07-01', to: '2026-07-02' }, 'en')).toBe(
+      '01/07/2026 \u2013 02/07/2026',
+    );
+  });
+
+  it('shows the half a half-filled range has', () => {
+    expect(formatDateRangeValue({ from: '2026-07-01' }, 'de')).toBe('01.07.2026');
+    expect(formatDateRangeValue({ to: '2026-07-02' }, 'de')).toBe('02.07.2026');
+    expect(formatDateRangeValue({ from: '  ', to: '2026-07-02' }, 'de')).toBe('02.07.2026');
+  });
+
+  it('gives an empty text for a range without an end', () => {
+    expect(formatDateRangeValue({}, 'de')).toBe('');
+    expect(formatDateRangeValue({ from: null, to: null }, 'de')).toBe('');
+  });
+
+  it('falls back to the plain value formatter for a non-object', () => {
+    expect(formatDateRangeValue('2026-07-01', 'de')).toBe('2026-07-01');
+    expect(formatDateRangeValue([1, 2], 'de')).toBe('[1,2]');
+    expect(formatDateRangeValue(null, 'de')).toBe('');
   });
 });
 

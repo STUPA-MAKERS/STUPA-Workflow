@@ -2,14 +2,13 @@ import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import {
   ChangeDetectionStrategy,
   Component,
-  type OnDestroy,
   computed,
   inject,
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormGroup, FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormlyForm, type FormlyFieldConfig } from '@ngx-formly/core';
 import { ApiClient } from '@core/api/api-client.service';
 import { AuthService } from '@core/auth/auth.service';
@@ -19,14 +18,15 @@ import type { TranslationKey } from '@core/i18n/translations';
 import type {
   Application,
   ApplicationComment,
+  ApplicationShareLink,
   ApplicationState,
   ApplicationVersion,
   CommentVisibility,
   FormFieldDef,
-  RenderJob,
   Transition,
   Uuid,
 } from '@core/api/models';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { resolveI18n } from '@shared/forms/i18n-text';
 import { toFormlyFields } from '@shared/forms/formly-mapper';
 import { BadgeComponent } from '@stupa-makers/ui-kit';
@@ -45,7 +45,12 @@ import {
 import { CostCentreTreeComponent } from '../budget/cost-centre-tree.component';
 import { MarkdownViewComponent } from '@shared/markdown/markdown-view.component';
 import { AttachmentsPanelComponent } from './attachments-panel.component';
-import { applicationTitle, formatFieldValue } from './applications.util';
+import {
+  applicationTitle,
+  formatDateRangeValue,
+  formatFieldValue,
+  formatIsoDate,
+} from './applications.util';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 
 /** Comparison offer / cost position for the structured detail view. */
@@ -62,18 +67,6 @@ interface DetailPosition {
   noOffersReason?: string;
 }
 
-/** Delay between two polls of the render job, in milliseconds. */
-const PDF_POLL_MS = 2000;
-/** Number of polls before the dialog stops and offers a manual retry. */
-const PDF_POLL_MAX = 60;
-
-/** Short failure codes the render worker writes to `RenderJob.error`. */
-const PDF_ERROR_KEYS: Record<string, TranslationKey> = {
-  no_application: 'applications.pdf.error.noApplication',
-  render_error: 'applications.pdf.error.render',
-  render_unavailable: 'applications.pdf.error.unavailable',
-};
-
 /**
  * Application detail: fields, version history with diff, comments, and status actions.
  *
@@ -87,6 +80,8 @@ const PDF_ERROR_KEYS: Record<string, TranslationKey> = {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     PageHeaderComponent,
+    RouterLink,
+    EmptyStateComponent,
     FormsModule,
     FormlyForm,
     LocalizedDatePipe,
@@ -104,7 +99,7 @@ const PDF_ERROR_KEYS: Record<string, TranslationKey> = {
   templateUrl: './applications-detail.component.html',
   styleUrl: './applications-detail.component.scss',
 })
-export class ApplicationsDetailComponent implements OnDestroy {
+export class ApplicationsDetailComponent {
   private readonly api = inject(ApiClient);
   private readonly budgetApi = inject(BudgetTreeApi);
   private readonly auth = inject(AuthService);
@@ -121,6 +116,11 @@ export class ApplicationsDetailComponent implements OnDestroy {
   readonly comments = signal<ApplicationComment[]>([]);
   /** Field definitions of the effective form for labels and typed values. Empty on error. */
   readonly formFields = signal<FormFieldDef[]>([]);
+  /** The same field definitions by key. The data rows and the version diff both
+   *  look a key up, so they share one map. */
+  private readonly fieldByKey = computed(
+    () => new Map(this.formFields().map((f) => [f.key, f])),
+  );
 
   readonly newComment = signal('');
   readonly visibility = signal<CommentVisibility>('public');
@@ -135,20 +135,6 @@ export class ApplicationsDetailComponent implements OnDestroy {
   readonly savingComment = signal(false);
   readonly deletingComment = signal<ApplicationComment | null>(null);
   readonly removingComment = signal(false);
-
-  // PDF render. `POST /applications/{id}/pdf` starts an async job. The dialog
-  // polls `GET /jobs/{id}` until the job reaches `done` or `failed`, and it
-  // gives up after PDF_POLL_MAX tries instead of spinning forever.
-  readonly pdfOpen = signal(false);
-  readonly pdfJob = signal<RenderJob | null>(null);
-  /** True while a request is in flight or the next poll is scheduled. */
-  readonly pdfPolling = signal(false);
-  /** Set when the start or a poll failed at HTTP level. */
-  readonly pdfError = signal<TranslationKey | null>(null);
-  /** The poll window ran out. The job may still finish, so the dialog says so. */
-  readonly pdfTimedOut = signal(false);
-  private pdfTimer: ReturnType<typeof setTimeout> | null = null;
-  private pdfTries = 0;
 
   /** The version history starts collapsed. The card header holds the toggle. */
   readonly historyOpen = signal(false);
@@ -265,12 +251,174 @@ export class ApplicationsDetailComponent implements OnDestroy {
   private readonly router = inject(Router);
   readonly canManage = computed(() => this.auth.can('application.manage'));
   /**
-   * Delete is irreversible and needs `application.delete` (#g9). An admin holds it
+   * Delete is irreversible and needs `application.delete`. An admin holds it
    * through the role bypass. Any other role holds it through an explicit grant. The
    * server gates on the same key.
    */
   readonly canDelete = computed(() => this.auth.can('application.delete'));
-  readonly fmt = formatFieldValue;
+  readonly canArchive = computed(() => this.auth.can('application.archive'));
+  readonly archiving = signal(false);
+
+  /**
+   * Move the application out of the working list, or bring it back.
+   *
+   * Reversible and destructive of nothing, so unlike the delete and the erasure request
+   * it asks for no confirmation: the way back is one click on the same button.
+   */
+  toggleArchived(): void {
+    const current = this.app();
+    if (!current || this.archiving()) return;
+    const next = current.archivedAt === null;
+    this.archiving.set(true);
+    this.api.setApplicationArchived(current.id, next).subscribe({
+      next: (updated) => {
+        this.app.set(updated);
+        this.archiving.set(false);
+        this.toast.success(
+          this.i18n.translate(next ? 'applications.archived' : 'applications.unarchived'),
+        );
+      },
+      error: () => {
+        this.archiving.set(false);
+        this.toast.error(this.i18n.translate('applications.detail.error'));
+      },
+    });
+  }
+  /**
+   * Public share links. `application.share` is its own permission on purpose: reading an
+   * application and deciding it may be read by anyone holding a URL are different
+   * decisions, and the server gates on the same key.
+   */
+  readonly canShare = computed(() => this.auth.can('application.share'));
+  readonly shareDialogOpen = signal(false);
+  readonly shares = signal<ApplicationShareLink[]>([]);
+  readonly sharesLoading = signal(false);
+  readonly creatingShare = signal(false);
+  readonly revokingShare = signal<Uuid | null>(null);
+  readonly shareTtl = signal('30');
+  readonly shareLabel = signal('');
+  /**
+   * The link that was just minted, held only for as long as the dialog is open.
+   *
+   * This is the one moment the token exists outside the URL bar of whoever pastes it.
+   * The server stored a hash; closing the dialog loses the plaintext for good, which is
+   * why the copy button sits next to it rather than on the list row.
+   *
+   * The whole row is kept, not just the URL, so that revoking can tell whether the link
+   * on screen is the one that just stopped working.
+   */
+  readonly freshShare = signal<ApplicationShareLink | null>(null);
+  readonly freshShareUrl = computed(() => this.freshShare()?.url ?? null);
+  readonly shareCopied = signal(false);
+
+  /** How long a new link lives. "Never" is deliberately not among the options. */
+  readonly shareTtlOptions: SelectOption[] = [
+    { value: '7', label: '7' },
+    { value: '30', label: '30' },
+    { value: '90', label: '90' },
+    { value: '365', label: '365' },
+  ];
+
+  openShareDialog(): void {
+    this.freshShare.set(null);
+    this.shareCopied.set(false);
+    this.shareLabel.set('');
+    this.shareDialogOpen.set(true);
+    this.loadShares();
+  }
+
+  private loadShares(): void {
+    const current = this.app();
+    if (!current) return;
+    this.sharesLoading.set(true);
+    this.api.applicationShares(current.id).subscribe({
+      next: (rows) => {
+        this.shares.set(rows);
+        this.sharesLoading.set(false);
+      },
+      error: () => {
+        this.shares.set([]);
+        this.sharesLoading.set(false);
+      },
+    });
+  }
+
+  createShare(): void {
+    const current = this.app();
+    if (!current || this.creatingShare()) return;
+    this.creatingShare.set(true);
+    this.shareCopied.set(false);
+    const label = this.shareLabel().trim();
+    this.api
+      .createApplicationShare(current.id, {
+        ttlDays: Number(this.shareTtl()),
+        ...(label ? { label } : {}),
+      })
+      .subscribe({
+        next: (link) => {
+          this.freshShare.set(link);
+          this.shares.update((rows) => [link, ...rows]);
+          this.shareLabel.set('');
+          this.creatingShare.set(false);
+        },
+        error: () => {
+          this.creatingShare.set(false);
+          this.toast.error(this.i18n.translate('applications.share.createError'));
+        },
+      });
+  }
+
+  revokeShare(shareId: Uuid): void {
+    const current = this.app();
+    if (!current || this.revokingShare()) return;
+    this.revokingShare.set(shareId);
+    this.api.revokeApplicationShare(current.id, shareId).subscribe({
+      next: (updated) => {
+        this.shares.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
+        this.revokingShare.set(null);
+        // A link that was just revoked must not stay on screen as something to copy.
+        if (updated.id === this.freshShare()?.id) {
+          this.freshShare.set(null);
+        }
+        this.toast.success(this.i18n.translate('applications.share.revoked'));
+      },
+      error: () => {
+        this.revokingShare.set(null);
+        this.toast.error(this.i18n.translate('applications.share.revokeError'));
+      },
+    });
+  }
+
+  /** Copy the fresh link. The Clipboard API can be absent, so the write is optional. */
+  copyShareUrl(): void {
+    const url = this.freshShareUrl();
+    if (!url) return;
+    void navigator.clipboard?.writeText(url)?.then(
+      () => this.shareCopied.set(true),
+      () => this.shareCopied.set(false),
+    );
+  }
+
+  /** Whether a link still opens. Revoked and expired both read as dead. */
+  protected shareIsLive(share: ApplicationShareLink): boolean {
+    return share.revokedAt === null && new Date(share.expiresAt).getTime() > Date.now();
+  }
+
+  /**
+   * One value of the version diff, formatted the way the data rows show the field.
+   *
+   * The diff carries a key, not a field definition, so the type comes from the key.
+   * A date then reads as a day and a date range as a span, not as an ISO string or
+   * as JSON.
+   *
+   * A key the active form does not define — an answer of an older form version
+   * whose field is gone — keeps the plain rule. A type it never had cannot format
+   * it, and the stored text tells the reader more than a placeholder does.
+   */
+  readonly fmt = (value: unknown, key?: string): string => {
+    const field = key === undefined ? undefined : this.fieldByKey().get(key);
+    return field ? this.formatByField(field, value) : formatFieldValue(value);
+  };
 
   private id: Uuid = '';
 
@@ -309,11 +457,6 @@ export class ApplicationsDetailComponent implements OnDestroy {
     this.error.set(false);
     this.editingComment.set(null);
     this.deletingComment.set(null);
-    // A render job belongs to one application. Drop it with the page state, so
-    // no poll of the previous application keeps running.
-    this.closePdf();
-    this.pdfJob.set(null);
-
     if (!id) {
       this.notFound.set(true);
       this.loading.set(false);
@@ -425,7 +568,7 @@ export class ApplicationsDetailComponent implements OnDestroy {
    *  Markdown. This keeps the newlines and the simple formatting. */
   dataEntries(app: Application): { key: string; label: string; value: string; md: boolean }[] {
     const lang = this.i18n.locale();
-    const byKey = new Map(this.formFields().map((f) => [f.key, f]));
+    const byKey = this.fieldByKey();
     const rows: { key: string; label: string; value: string; md: boolean }[] = [];
     const seen = new Set<string>();
 
@@ -461,6 +604,10 @@ export class ApplicationsDetailComponent implements OnDestroy {
     if (field.type === 'checkbox' && typeof value === 'boolean') {
       return this.i18n.translate(value ? 'common.yes' : 'common.no');
     }
+    // A date and a date range read as a day, not as an ISO string or as JSON. The
+    // public share page shows the same span, so both views agree.
+    if (field.type === 'date') return formatIsoDate(value, lang) || '—';
+    if (field.type === 'daterange') return formatDateRangeValue(value, lang) || '—';
     // A dynamic picker for a Gremium or a budget carries the options of the server in
     // the effective form. Resolve them to names, like a plain select.
     if (field.type === 'select' || field.type === 'gremium_select' || field.type === 'budget_select') {
@@ -478,7 +625,10 @@ export class ApplicationsDetailComponent implements OnDestroy {
     if (field.type === 'currency') {
       const n = Number(value);
       if (Number.isFinite(n)) {
-        return new Intl.NumberFormat(lang, { style: 'currency', currency: 'EUR' }).format(n);
+        return new Intl.NumberFormat(this.i18n.formatLocale(), {
+          style: 'currency',
+          currency: 'EUR',
+        }).format(n);
       }
     }
     return formatFieldValue(value);
@@ -511,7 +661,7 @@ export class ApplicationsDetailComponent implements OnDestroy {
   /** Value of a comparison offer / position as currency. */
   money(value: number | null | undefined): string {
     const n = Number(value ?? 0);
-    return new Intl.NumberFormat(this.i18n.locale(), {
+    return new Intl.NumberFormat(this.i18n.formatLocale(), {
       style: 'currency',
       currency: 'EUR',
     }).format(Number.isFinite(n) ? n : 0);
@@ -535,7 +685,7 @@ export class ApplicationsDetailComponent implements OnDestroy {
       const pref = (p.offers ?? []).find((o) => o.preferred);
       total += pref?.value ?? 0;
     }
-    const sum = new Intl.NumberFormat(this.i18n.locale(), {
+    const sum = new Intl.NumberFormat(this.i18n.formatLocale(), {
       style: 'currency',
       currency: 'EUR',
     }).format(total);
@@ -547,7 +697,7 @@ export class ApplicationsDetailComponent implements OnDestroy {
     if (app.amount === null) return this.i18n.translate('applications.detail.notProvided');
     const value = Number(app.amount);
     if (Number.isNaN(value)) return app.amount;
-    return new Intl.NumberFormat(this.i18n.locale(), {
+    return new Intl.NumberFormat(this.i18n.formatLocale(), {
       style: 'currency',
       currency: app.currency ?? 'EUR',
     }).format(value);
@@ -775,101 +925,6 @@ export class ApplicationsDetailComponent implements OnDestroy {
         this.toast.error(this.i18n.translate(this.commentErrorKey(err.status)));
       },
     });
-  }
-
-  // --- PDF render ----------------------------------------------------------
-
-  /** True while the job waits or runs. The dialog then shows the progress. */
-  readonly pdfRunning = computed(() => {
-    const status = this.pdfJob()?.status;
-    return this.pdfPolling() || status === 'pending' || status === 'running';
-  });
-  readonly pdfDone = computed(() => this.pdfJob()?.status === 'done');
-  readonly pdfFailed = computed(() => this.pdfJob()?.status === 'failed');
-
-  /** Explanation of the short failure code the worker wrote to the job. */
-  protected pdfFailureText(): string {
-    const code = this.pdfJob()?.error ?? '';
-    return this.i18n.translate(PDF_ERROR_KEYS[code] ?? 'applications.pdf.error.generic');
-  }
-
-  /** Start a render and open the progress dialog. */
-  protected startPdf(): void {
-    if (this.pdfPolling()) return;
-    this.stopPdfPoll();
-    this.pdfJob.set(null);
-    this.pdfError.set(null);
-    this.pdfTimedOut.set(false);
-    this.pdfTries = 0;
-    this.pdfOpen.set(true);
-    this.pdfPolling.set(true);
-    this.api.createApplicationPdf(this.id).subscribe({
-      next: (job) => this.applyJob(job),
-      error: (err: { status?: number }) => {
-        this.pdfPolling.set(false);
-        this.pdfError.set(
-          err.status === 403 ? 'applications.pdf.forbidden' : 'applications.pdf.startFailed',
-        );
-      },
-    });
-  }
-
-  /** Take a job answer. An end state stops the poll. Anything else schedules
-   *  the next one, until the poll window runs out. */
-  private applyJob(job: RenderJob): void {
-    this.pdfJob.set(job);
-    if (job.status === 'done' || job.status === 'failed') {
-      this.pdfPolling.set(false);
-      return;
-    }
-    if (this.pdfTries >= PDF_POLL_MAX) {
-      this.pdfPolling.set(false);
-      this.pdfTimedOut.set(true);
-      return;
-    }
-    this.pdfTries += 1;
-    this.pdfTimer = setTimeout(() => this.pollPdf(), PDF_POLL_MS);
-  }
-
-  /** One poll step of the running job. */
-  protected pollPdf(): void {
-    const job = this.pdfJob();
-    this.pdfTimer = null;
-    if (!job) return;
-    this.pdfPolling.set(true);
-    this.pdfError.set(null);
-    this.pdfTimedOut.set(false);
-    this.api.getJob(job.id).subscribe({
-      next: (updated) => this.applyJob(updated),
-      error: () => {
-        this.pdfPolling.set(false);
-        this.pdfError.set('applications.pdf.pollFailed');
-      },
-    });
-  }
-
-  /** "Check again" after the poll gave up or a poll failed. */
-  protected retryPdf(): void {
-    this.pdfTries = 0;
-    this.pollPdf();
-  }
-
-  /** Close the dialog and drop the poll. The job keeps running on the server. */
-  protected closePdf(): void {
-    this.stopPdfPoll();
-    this.pdfPolling.set(false);
-    this.pdfOpen.set(false);
-  }
-
-  private stopPdfPoll(): void {
-    if (this.pdfTimer !== null) {
-      clearTimeout(this.pdfTimer);
-      this.pdfTimer = null;
-    }
-  }
-
-  ngOnDestroy(): void {
-    this.stopPdfPoll();
   }
 
   /** Fire a manual transition with POST /transition, then reload the application.

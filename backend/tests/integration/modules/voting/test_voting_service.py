@@ -246,7 +246,7 @@ async def test_percent_quorum_denominator_is_roster_not_voters(
     assert pre.tally.eligible == 20
     assert pre.tally.quorum_met is False
 
-    # A missed quorum blocks the close (#12). The service raises a 409 instead of a
+    # A missed quorum blocks the close. The service raises a 409 instead of a
     # silent rejected. The way out is to collect more votes or to cancel the vote.
     closer = Principal(sub="mgr", permissions={"vote.manage"})
     with pytest.raises(ConflictError):

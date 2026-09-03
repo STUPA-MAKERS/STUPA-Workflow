@@ -1,4 +1,4 @@
-"""Unit tests of the calendar service (#ics): DB branches through FakeSession, no Docker."""
+"""Unit tests of the calendar service: DB branches through FakeSession, no Docker."""
 
 from __future__ import annotations
 

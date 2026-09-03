@@ -3,7 +3,7 @@
 * ``POST /api/applications/{id}/votes`` - create a vote. P(vote.manage).
 * ``POST /api/votes/{id}/open``         - open a vote. P(vote.manage).
 * ``POST /api/votes/{id}/close``        - close -> result -> flow. P(vote.manage).
-* ``POST /api/votes/{id}/ballot``       - cast a vote. P(vote.cast) plus group.
+* ``POST /api/votes/{id}/ballot``       - cast a vote. Roster of the vote, human only.
 * ``GET  /api/votes/{id}``              - vote state + tally (secret: only counts).
 
 RBAC is fail-closed: 401 without a session, 403 without the permission or group
@@ -191,9 +191,9 @@ async def cast_ballot(
     payload: BallotIn,
     service: ServiceDep,
     publisher: PublisherDep,
-    # Auth-only gate: an external substitute has no global ``vote.cast``. The service
-    # holds the authorization. It checks ``vote.cast`` plus group for the own vote, and
-    # a delegation row for the represented vote.
+    # Auth-only gate: an external substitute is in no gremium of the vote. The service
+    # holds the authorization. It checks the roster of the vote for the own ballot, and
+    # a delegation row for the represented ballot. Both need a human session.
     principal: ReaderDep,
 ) -> BallotAccepted:
     """Cast a vote.

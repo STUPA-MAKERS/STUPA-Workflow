@@ -1,4 +1,4 @@
-<app-page-header [title]="'budget.tree.title' | t" [subtitle]="'budget.tree.subtitle' | t">
+<app-page-header [title]="'budget.tree.title' | t" [rail]="true" [flush]="true">
   <div actions class="bt__head-actions">
     <app-button size="sm" (click)="openTop()">{{ 'budget.tree.createTop' | t }}</app-button>
     <app-button size="sm" variant="secondary" [disabled]="!selectedTopId()" (click)="openFy()">
@@ -13,9 +13,7 @@
   </div>
 </app-page-header>
 
-@if (loading()) {
-  <p class="bt__status" aria-live="polite">{{ 'budget.tree.loading' | t }}</p>
-} @else if (loadError()) {
+@if (loadError()) {
   <p class="bt__status bt__status--error" role="alert">{{ 'budget.tree.error' | t }}</p>
 } @else if (!tree().length) {
   <p class="bt__status">{{ 'budget.tree.empty' | t }}</p>
@@ -32,9 +30,15 @@
       />
     </aside>
 
-    <main class="bt__main">
+    <!-- Not a `<main>`: the shell already wraps the routed page in one, and a main
+         landmark inside a main landmark is invalid HTML that gives a screen reader two
+         "main" regions with no way to tell which is the page. -->
+    <div class="bt__main">
       @if (selectedTopId()) {
-        <app-data-table [columns]="columns()" [rows]="rows()" [rowKey]="rowId" [isExpanded]="childExpanded">
+        <app-data-table
+          [loading]="loading()"
+          [loadingText]="'budget.tree.loading' | t"
+          [columns]="columns()" [rows]="rows()" [rowKey]="rowId" [isExpanded]="childExpanded">
           <ng-template appCell="node" let-row>
             <span class="bt__node" [style.paddingLeft.rem]="$any(row).depth * 1.5">
               <span class="bt__path">{{ $any(row).node.pathKey | simplifyPath }}</span>
@@ -81,7 +85,7 @@
       } @else {
         <p class="text-muted p-6">{{ 'budget.tree.pickHint' | t }}</p>
       }
-    </main>
+    </div>
   </div>
 }
 

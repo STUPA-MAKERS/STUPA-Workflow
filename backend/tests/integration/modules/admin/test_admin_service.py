@@ -123,7 +123,7 @@ def _global_graph(*, with_accepted: bool = True) -> dict:
 async def test_global_flow_new_version_per_save_app_follows_newest(
     session: AsyncSession,
 ) -> None:
-    """Prove that every save creates a NEW, immutable FlowVersion (#config-versioning).
+    """Prove that every save creates a NEW, immutable FlowVersion.
 
     Earlier versions stay. Open applications follow the newest active version by state
     KEY, so they are NOT pinned. A key that the new version drops sends the application
@@ -188,7 +188,7 @@ async def test_global_flow_new_version_per_save_app_follows_newest(
 async def test_global_flow_save_keeps_prior_states_and_timeline(
     session: AsyncSession,
 ) -> None:
-    """A save that omits a state does NOT delete the old version (#config-versioning).
+    """A save that omits a state does NOT delete the old version.
 
     The state rows of the old version stay valid, and so does the `status_event`
     timeline. No foreign key breaks and no row needs a new target. The old in-place

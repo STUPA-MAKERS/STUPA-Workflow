@@ -51,11 +51,22 @@
   background: var(--color-surface-sunken);
 }
 .atbl__rowLink {
-  display: inline-flex;
+  /* `flex`, not `inline-flex`: an inline box shrink-wraps its content, so the title
+     below has nothing to clip against and wraps instead of truncating. */
+  display: flex;
   flex-direction: column;
+  min-width: 0;
+  max-width: 100%;
   color: var(--color-primary);
   font-weight: var(--fw-medium);
   text-decoration: none;
+}
+/* One line with an ellipsis, so a long title cannot make its row several times the
+   height of its neighbours. The full text stays on the cell's `title`. */
+.atbl__rowTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .atbl__rowLink:hover .atbl__rowTitle {
   text-decoration: underline;
@@ -67,6 +78,13 @@
 }
 /* Mobile (max 768px): stack the rows as cards. Pure CSS, the markup does not change. */
 @media (max-width: 768px) {
+  /* A card is as tall as it needs to be, so the title wraps rather than truncating.
+     Clipping here would hide the one thing the card is about. */
+  .atbl__rowTitle {
+    overflow: visible;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
   .atbl__wrap {
     overflow-x: visible;
     border: none;

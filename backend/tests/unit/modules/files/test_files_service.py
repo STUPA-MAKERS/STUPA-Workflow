@@ -74,7 +74,7 @@ async def test_upload_clean_path_stores_and_enqueues() -> None:
 
 
 async def test_upload_allowed_in_locked_state() -> None:
-    """Allow an upload while the state locks edits (#attachments-when-locked).
+    """Allow an upload while the state locks edits.
 
     A user may add attachments in a locked state, for example receipts and invoices
     after the decision. The PATCH lock protects only the form data.

@@ -60,7 +60,7 @@ async function setup(api = makeApi()) {
   return { ...view, api, toast };
 }
 
-describe('PrivacyComponent (#PII-Re-Add)', () => {
+describe('PrivacyComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   it('loads the erasure queue and retention default on init', async () => {
@@ -335,5 +335,12 @@ describe('PrivacyComponent (#PII-Re-Add)', () => {
     const { container } = await setup();
     fireEvent.click(screen.getByRole('button', { name: 'Ablehnen' }));
     expect(container.querySelector('textarea')).toBeInTheDocument();
+  });
+
+  it('stops loading when the list fails, rather than spinning forever', async () => {
+    const api = makeApi({ listErasures: jest.fn(() => throwError(() => new Error('boom'))) });
+    const { fixture } = await setup(api);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((fixture.componentInstance as any).loading()).toBe(false);
   });
 });

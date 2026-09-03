@@ -32,8 +32,15 @@ import {
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import type { AuditActor, AuditEntry, ConfigRevisionDiff } from '../admin.models';
+import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 
 const PAGE_SIZE = 50;
+
+/**
+ * A UUID target id. Such an id says nothing to a reader, so the sentence leaves it out
+ * (`[[no-uuids-in-ui]]`). A readable id — `global`, `1`, an export file name — stays.
+ */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Audit action types. The list mirrors `AuditAction` in
@@ -173,7 +180,7 @@ interface DayGroup {
   selector: 'app-audit-log',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
+  imports: [SkeletonComponent, 
     FormsModule,
     RouterLink,
     TranslatePipe,
@@ -438,8 +445,7 @@ export class AuditLogComponent {
     const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
     if (this.sameDay(g.date, today)) return this.i18n.translate('admin.audit.today');
     if (this.sameDay(g.date, yesterday)) return this.i18n.translate('admin.audit.yesterday');
-    const locale = this.i18n.locale() === 'en' ? 'en-US' : 'de-DE';
-    return new Intl.DateTimeFormat(locale, { dateStyle: 'full' }).format(g.date);
+    return new Intl.DateTimeFormat(this.i18n.formatLocale(), { dateStyle: 'full' }).format(g.date);
   }
 
   private sameDay(a: Date, b: Date): boolean {
@@ -498,11 +504,23 @@ export class AuditLogComponent {
     return e.actorName ?? e.actor ?? this.i18n.translate('admin.audit.system');
   }
 
-  /** Target in the sentence. The label resolved by the backend wins, else `type:id`. */
+  /**
+   * Target in the sentence.
+   *
+   * The label that the backend resolved wins, in the quotation marks of the active
+   * locale. Without a label the sentence shows the localized target type, plus the
+   * id when that id is readable — `global`, `1` or an export file name. A UUID id
+   * stays out of the sentence, because it tells the reader nothing. The details of
+   * the entry still show it in full, together with the type.
+   */
   private targetLabel(e: AuditEntry): string {
-    if (e.targetLabel) return `„${e.targetLabel}“`;
-    if (e.targetType && e.targetId) return `${e.targetType}:${e.targetId}`;
-    return e.targetType ?? e.targetId ?? '—';
+    if (e.targetLabel) {
+      return this.i18n.translate('admin.audit.targetQuoted', { label: e.targetLabel });
+    }
+    const type = e.targetType ? this.targetTypeLabel(e.targetType) : null;
+    const id = e.targetId && !UUID_RE.test(e.targetId) ? e.targetId : null;
+    if (type && id) return `${type}:${id}`;
+    return type ?? id ?? '—';
   }
 
   /** The `data` content as (key, value) pairs for the detail chips. A UUID value with a

@@ -3,6 +3,7 @@ import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { FormlyForm, type FormlyFieldConfig } from '@ngx-formly/core';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
+import { de } from '@core/i18n/translations';
 import { provideFormly } from '../formly.providers';
 import { FormlySelectType } from './formly-select.type';
 
@@ -81,7 +82,7 @@ describe('FormlySelectType (rendered)', () => {
       },
     });
     const placeholderOpt = screen.getAllByRole('option').find((o) => o.hasAttribute('disabled'));
-    expect(placeholderOpt?.textContent?.trim()).toBe('Bitte wählen …');
+    expect(placeholderOpt?.textContent?.trim()).toBe(de['formly.select.placeholder']);
   });
 
   it('uses a custom placeholder when provided', async () => {
@@ -120,7 +121,7 @@ describe('FormlySelectType (rendered)', () => {
       },
     });
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('Bitte eine Option wählen.');
+    expect(alert).toHaveTextContent(de['formly.select.error']);
     const sel = screen.getByLabelText(/Err/);
     expect(sel.getAttribute('aria-invalid')).toBe('true');
     expect(sel.getAttribute('aria-describedby')).toMatch(/-error$/);
@@ -176,5 +177,44 @@ describe('FormlySelectType (getters)', () => {
 
   it('describedBy → null with no error and no description', () => {
     expect(makeType({ id: 's', props: {}, showError: false }).describedBy).toBeNull();
+  });
+});
+
+describe('FormlySelectType (English locale)', () => {
+  // The German texts are fallbacks in the catalog, not literals in the template.
+  // An English session must therefore read English.
+  beforeEach(() => localStorage.setItem('ap.locale', 'en'));
+  afterEach(() => localStorage.removeItem('ap.locale'));
+
+  it('renders the default prompt and the default error in English', async () => {
+    await render(HostComponent, {
+      providers: [provideFormly()],
+      componentProperties: {
+        model: {},
+        fields: [
+          {
+            key: 'c',
+            type: 'select',
+            props: { label: 'Err', required: true, options: [] },
+            validation: { show: true },
+          } as FormlyFieldConfig,
+        ],
+      },
+    });
+    expect(await screen.findByRole('alert')).toHaveTextContent('Please select an option.');
+  });
+
+  it('renders the default select prompt in English', async () => {
+    await render(FormlySelectType, {
+      componentInputs: {
+        field: {
+          formControl: new FormControl(''),
+          props: { label: 'P', options: [] },
+          options: { showError: () => false },
+        } as never,
+      },
+    });
+    const placeholderOpt = screen.getAllByRole('option').find((o) => o.hasAttribute('disabled'));
+    expect(placeholderOpt?.textContent?.trim()).toBe('Please select …');
   });
 });

@@ -1,6 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { skipLoading } from '@core/loading/loading.interceptor';
+import { cached, listContext } from '@core/cache/cache.interceptor';
 import type { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { API_BASE_URL } from '@core/api/api.config';
@@ -266,6 +267,8 @@ export interface InvoiceOption {
 
 /** Filter and paging of the invoice list. The server does the fuzzy match and the filter. */
 export interface InvoiceQuery {
+  /** The exact invoice, for a deep link such as a global-search hit. */
+  id?: string;
   q?: string;
   status?: InvoiceStatus;
   grossMin?: number;
@@ -420,6 +423,9 @@ export interface BudgetApplication {
  * endpoints `/api/budgets`, fiscal-years and allocations. Money stays a string
  * (Decimal). The UI formats it with `Number`.
  */
+/** The tree changes only when a cost centre is edited, and that invalidates it. */
+const TREE_TTL_MS = 5 * 60_000;
+
 @Injectable({ providedIn: 'root' })
 export class BudgetTreeApi {
   private readonly http = inject(HttpClient);
@@ -429,9 +435,14 @@ export class BudgetTreeApi {
     const params = gremiumId ? { gremium: gremiumId } : undefined;
     // The budget and dashboard pages have their own loading indicator. Every other
     // call only hydrates the nav or a dropdown, so suppress the global overlay.
+    //
+    // Cached: the whole tree comes down in one request, five pages ask for it, and it
+    // changes only when someone edits a cost centre — which invalidates it, because a
+    // mutation under `/budgets` drops every entry there. Every caller sets a signal from
+    // `next`, so the second emission simply corrects what is already on screen.
     return this.http.get<BudgetTreeNode[]>(`${this.base}/budgets`, {
       params,
-      context: skipLoading(),
+      context: cached(TREE_TTL_MS, skipLoading()),
     });
   }
 
@@ -460,10 +471,7 @@ export class BudgetTreeApi {
   /** Correct the year or the active flag. Needs P(`budget.structure`). A year that
    *  already exists in the same top budget answers 422. */
   updateFiscalYear(topId: Uuid, fyId: Uuid, body: FiscalYearUpdate): Observable<FiscalYear> {
-    return this.http.patch<FiscalYear>(
-      `${this.base}/budgets/${topId}/fiscal-years/${fyId}`,
-      body,
-    );
+    return this.http.patch<FiscalYear>(`${this.base}/budgets/${topId}/fiscal-years/${fyId}`, body);
   }
 
   /** Delete a fiscal year. Needs P(`budget.structure`). The route answers 409 while
@@ -495,7 +503,7 @@ export class BudgetTreeApi {
     }
     return this.http.get<ExpensePage>(`${this.base}/expenses`, {
       params,
-      context: skipLoading(),
+      context: listContext(query.offset),
     });
   }
 
@@ -564,7 +572,7 @@ export class BudgetTreeApi {
     }
     return this.http.get<InvoicePage>(`${this.base}/invoices`, {
       params,
-      context: skipLoading(),
+      context: listContext(query.offset),
     });
   }
 
@@ -631,7 +639,9 @@ export class BudgetTreeApi {
   }
 
   /** Budget tree as ``.xlsx`` (P(``budget.export``)), filtered like the dashboard. */
-  exportXlsx(opts: { node?: string; fiscalYear?: string; gremium?: string } = {}): Observable<Blob> {
+  exportXlsx(
+    opts: { node?: string; fiscalYear?: string; gremium?: string } = {},
+  ): Observable<Blob> {
     const params: Record<string, string> = {};
     if (opts.node) params['node'] = opts.node;
     if (opts.fiscalYear) params['fiscalYear'] = opts.fiscalYear;
@@ -648,10 +658,14 @@ export class BudgetTreeApi {
     budgetId: Uuid | null,
     fiscalYearId?: Uuid | null,
   ): Observable<{ applicationId: Uuid; budgetId: Uuid | null; fiscalYearId: Uuid | null }> {
-    return this.http.post<{ applicationId: Uuid; budgetId: Uuid | null; fiscalYearId: Uuid | null }>(
-      `${this.base}/applications/${applicationId}/assign-budget`,
-      { budgetId, fiscalYearId: fiscalYearId ?? null },
-    );
+    return this.http.post<{
+      applicationId: Uuid;
+      budgetId: Uuid | null;
+      fiscalYearId: Uuid | null;
+    }>(`${this.base}/applications/${applicationId}/assign-budget`, {
+      budgetId,
+      fiscalYearId: fiscalYearId ?? null,
+    });
   }
 }
 
@@ -661,9 +675,7 @@ import { simplifyPathKey } from '@shared/budget-path';
 export { simplifyPathKey };
 
 /** Tree (recursive) -> flat option list (pre-order, "pathKey - name", simplified). */
-export function flattenBudgetOptions(
-  nodes: BudgetTreeNode[],
-): { value: Uuid; label: string }[] {
+export function flattenBudgetOptions(nodes: BudgetTreeNode[]): { value: Uuid; label: string }[] {
   const out: { value: Uuid; label: string }[] = [];
   const walk = (ns: BudgetTreeNode[]): void => {
     for (const n of ns) {

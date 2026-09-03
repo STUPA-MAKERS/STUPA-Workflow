@@ -326,9 +326,29 @@ async def test_can_manage_votes_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     assert await svc3.can_manage_votes(m, _principal()) is True
 
 
-async def test_can_vote_admin() -> None:
+async def test_can_vote_admin_without_membership_is_false() -> None:
+    """A management right is not a ballot: `canVote` must match the cast gate.
+
+    The gate admits the gremium roster of the vote and nobody else. An admin without an
+    active `vote.cast` membership holds no namespaced group key, so the cast returns
+    403. The flag must not promise otherwise, and the quorum does not count them.
+    """
     svc = MeetingService(_QueueSession())  # type: ignore[arg-type]
-    assert await svc.can_vote(_meeting(), _principal(roles=["admin"])) is True
+    assert await svc.can_vote(_meeting(), _principal(roles=["admin"])) is False
+
+
+async def test_can_vote_agent_token_is_false(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Voting stays human, so a scoped OAuth token never sees the flag."""
+    m = _meeting()
+
+    async def _cast(_s, _sub, perm, now=None):  # noqa: ANN001, ANN202
+        return {m.gremium_id} if perm == "vote.cast" else set()
+
+    monkeypatch.setattr(permissions_mod, "gremium_ids_with_permission", _cast)
+    agent = _principal()
+    agent.scope_permissions = frozenset({"vote.manage"})
+    svc = MeetingService(_QueueSession(executes=[res()]))  # type: ignore[arg-type]
+    assert await svc.can_vote(m, agent) is False
 
 
 async def test_can_vote_via_role(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -744,8 +764,8 @@ async def test_list_with_gremium_filter_and_visibility(
             res(),  # session.manage
             res(),  # protocol.write
             res(),  # vote.manage
-            res(),  # vote.cast
             res(uuid4()),  # _principal_id
+            res(),  # vote.cast
             res(),  # _votes_for: votes
         ]
     )
@@ -860,8 +880,8 @@ async def test_list_timeline_past_with_cursor_and_gremium(
             res(),  # session.manage
             res(),  # protocol.write
             res(),  # vote.manage
-            res(),  # vote.cast
             res(uuid4()),  # principal_id
+            res(),  # vote.cast
             res(),  # votes
         ]
     )
@@ -939,8 +959,8 @@ async def test_search_timeline_pagination_and_gremium(
             res(),  # session.manage
             res(),  # protocol.write
             res(),  # vote.manage
-            res(),  # vote.cast
             res(uuid4()),  # principal_id
+            res(),  # vote.cast
             res(),  # votes
         ],
         bind=True,
@@ -1249,7 +1269,7 @@ async def test_agenda_item_has_vote() -> None:
 
 
 async def test_agenda_item_has_vote_excludes_cancelled() -> None:
-    # FIX 1 (#cancel-reopen): the guard statement MUST hide cancelled votes with
+    # FIX 1: the guard statement MUST hide cancelled votes with
     # status != 'cancelled'. Without that filter one cancelled application vote
     # blocks the reopen forever.
     sess = _QueueSession(executes=[res()])

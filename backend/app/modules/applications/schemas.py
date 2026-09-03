@@ -99,6 +99,10 @@ class ApplicationOut(_CamelModel):
     # the anonymization request (GDPR Art. 17). Only the data subject may ask,
     # never the administration.
     is_owner: bool = Field(default=False, alias="isOwner")
+    # When it was archived, or null. The client shows the badge from this, so it needs
+    # the timestamp and not just a flag. Archiving is NOT anonymization: this record is
+    # complete and readable, it has only left the working list.
+    archived_at: datetime | None = Field(default=None, alias="archivedAt")
 
 
 class ApplicationPatch(_CamelModel):
@@ -139,6 +143,36 @@ class ApplicationListItem(_CamelModel):
     currency: str | None = None
     created_at: datetime = Field(alias="createdAt")
     updated_at: datetime = Field(alias="updatedAt")
+    #: Set when the row is archived, so a combined list can mark it.
+    archived_at: datetime | None = Field(default=None, alias="archivedAt")
+
+
+class ShareCreate(_CamelModel):
+    """Ask for a public link. Both fields are optional."""
+
+    # Bounded by the service: 1..365 days, defaulting to 30. "Never" is not on offer,
+    # because the point of an expiry is that a forgotten link stops working by itself.
+    ttl_days: int | None = Field(default=None, alias="ttlDays", ge=1, le=365)
+    # A note for whoever made it: "an die Fachschaft geschickt". Never shown publicly.
+    label: str | None = Field(default=None, max_length=200)
+
+
+class ShareOut(_CamelModel):
+    """One share link as its creator sees it.
+
+    ``url`` carries the plaintext token and is therefore present ONLY in the response that
+    created the link. Listing existing links returns it as null, because the server cannot
+    reconstruct a token it only ever stored a hash of — and would not hand it back if it
+    could.
+    """
+
+    id: UUID
+    created_at: datetime = Field(alias="createdAt")
+    expires_at: datetime = Field(alias="expiresAt")
+    revoked_at: datetime | None = Field(default=None, alias="revokedAt")
+    created_by: str | None = Field(default=None, alias="createdBy")
+    label: str | None = None
+    url: str | None = None
 
 
 class CommentCreate(_CamelModel):

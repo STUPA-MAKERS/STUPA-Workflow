@@ -102,7 +102,9 @@ describe('ApplicationsTableComponent', () => {
       await setup({ sort: null });
       expect(screen.queryByRole('button')).not.toBeInTheDocument();
       const amountHeader = screen.getByRole('columnheader', { name: /Betrag/ });
-      expect(amountHeader).toHaveAttribute('aria-sort', 'none');
+      // No `aria-sort` at all on a header that cannot sort. `aria-sort="none"` means
+      // "sortable, not currently sorted", so it would promise a control that is absent.
+      expect(amountHeader).not.toHaveAttribute('aria-sort');
     });
 
     it('renders clickable headers with indicators when sort is set (descending)', async () => {
@@ -146,5 +148,18 @@ describe('ApplicationsTableComponent', () => {
       await userEvent.click(screen.getByRole('button', { name: /Betrag/ }));
       expect(emitted).toEqual([{ field: 'amount', order: 'desc' }]);
     });
+  });
+
+  it('keeps the full title reachable when the cell clips it to one line', async () => {
+    // The cell clips to one line with an ellipsis, so a long title cannot make its row
+    // several times the height of its neighbours. The whole text has to stay reachable
+    // rather than simply disappearing.
+    const long =
+      'Systemdatenträger und Einbauteile für die Hardware-Symmetrie der beiden PRIMERGY-RX300-Server';
+    await setup({ rows: [{ ...ROW, title: long }] });
+
+    const link = screen.getByRole('link', { name: new RegExp(long.slice(0, 20)) });
+    expect(link).toHaveAttribute('title', long);
+    expect(link.querySelector('.atbl__rowTitle')?.textContent?.trim()).toBe(long);
   });
 });

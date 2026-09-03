@@ -10,7 +10,7 @@
 
   <section class="border border-solid border-line rounded-lg py-4 px-5 bg-surface">
     @if (loading()) {
-      <p class="text-muted m-0" aria-live="polite">{{ 'admin.audit.loading' | t }}</p>
+      <app-skeleton variant="rows" [count]="4" [label]="'admin.audit.loading' | t" />
     } @else {
       <ul class="notif__list">
         @for (p of prefs(); track p.kind) {

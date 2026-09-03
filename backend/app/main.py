@@ -27,12 +27,14 @@ from app.modules.admin.router import router as admin_router
 from app.modules.antiabuse.router import router as antiabuse_router
 from app.modules.application_types.router import router as application_types_router
 from app.modules.applications.router import router as applications_router
+from app.modules.applications.share_router import router as share_page_router
 from app.modules.audit.router import router as audit_router
 from app.modules.auth.mcp_router import router as mcp_router
 from app.modules.auth.oauth_admin_router import router as oauth_admin_router
 from app.modules.auth.oauth_router import router as oauth_router
 from app.modules.auth.oauth_router import well_known_router as oauth_well_known_router
 from app.modules.auth.router import router as auth_router
+from app.modules.backup.router import router as backup_router
 from app.modules.budget.tree_router import router as budget_tree_router
 from app.modules.calendar.router import router as calendar_router
 from app.modules.config_revision.router import router as config_revision_router
@@ -40,7 +42,7 @@ from app.modules.deadlines.router import router as deadline_policies_router
 from app.modules.delegations.router import router as delegations_router
 from app.modules.files.router import router as files_router
 from app.modules.files.storage import build_object_storage
-from app.modules.flow.dispatch import ActionDispatcher
+from app.modules.flow.dispatch import ActionDispatcher, ChainActionDispatcher
 from app.modules.flow.extras_dispatcher import build_flow_extras_dispatcher
 from app.modules.flow.router import get_action_dispatcher
 from app.modules.flow.router import router as flow_router
@@ -58,10 +60,9 @@ from app.modules.notifications.router import router as notifications_router
 from app.modules.notifications.router import (
     templates_router as mail_templates_router,
 )
-from app.modules.pdf.action_dispatcher import ChainActionDispatcher
-from app.modules.pdf.router import router as pdf_router
 from app.modules.privacy.router import router as privacy_router
 from app.modules.protocol.router import router as protocol_router
+from app.modules.search.router import router as search_router
 from app.modules.voting.router import router as voting_router
 from app.modules.webhooks.action_dispatcher import build_webhook_dispatcher
 from app.settings import Settings, get_settings
@@ -100,13 +101,14 @@ api_router.include_router(budget_tree_router)
 api_router.include_router(calendar_router)
 api_router.include_router(antiabuse_router)
 api_router.include_router(files_router)
-api_router.include_router(pdf_router)
 api_router.include_router(audit_router)
 api_router.include_router(config_revision_router)
 api_router.include_router(admin_router)
 api_router.include_router(deadline_policies_router)
 api_router.include_router(delegations_router)
 api_router.include_router(privacy_router)
+api_router.include_router(backup_router)
+api_router.include_router(search_router)
 api_router.include_router(gremien_authed_router)
 api_router.include_router(site_config_public_router)
 
@@ -208,6 +210,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(api_router)
     # OAuth discovery (RFC 8414/9728) at the root, per well-known convention.
     app.include_router(oauth_well_known_router)
+    # Public share pages at `/s/<token>`, at the root and NOT under /api. Matrix, WhatsApp
+    # and Signal build a link preview by fetching the URL server-side and reading the
+    # OpenGraph tags, so the response has to be HTML from a path nginx proxies ahead of
+    # the SPA fallback. Under /api it would work but read as an internal URL in a chat.
+    app.include_router(share_page_router)
     use_problem_json_contract(app)
     return app
 

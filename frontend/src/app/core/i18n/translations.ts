@@ -29,7 +29,6 @@ export const de = {
   'nav.applications': 'Anträge',
   'nav.tasks': 'Aufgaben',
   'tasks.title': 'Aufgaben',
-  'tasks.subtitle': 'Anträge mit ausstehender Entscheidung für Ihre Rolle.',
   'tasks.loading': 'Aufgaben werden geladen…',
   'tasks.empty': 'Keine offenen Aufgaben.',
   'tasks.col.title': 'Titel',
@@ -105,6 +104,20 @@ export const de = {
   'account.notifications.hint.deadline': 'Wenn eine Frist zu einem Antrag näher rückt.',
   'account.notifications.kind.privacy': 'Datenschutz/Löschanträge',
   'account.notifications.hint.privacy': 'Statusmeldungen zu DSGVO-Löschanträgen.',
+  'search.title': 'Suche',
+  'search.placeholder': 'Antrag, Sitzung, Kostenstelle, Seite …',
+  'search.hint': 'Tippen, um zu suchen. Enter öffnet den Treffer.',
+  'search.empty': 'Nichts gefunden.',
+  'search.truncated': 'Es gibt weitere Treffer. Suchbegriff eingrenzen.',
+  'search.open': 'Suche öffnen',
+  'search.group.pages': 'Seiten',
+  'search.group.application': 'Anträge',
+  'search.group.meeting': 'Sitzungen',
+  'search.group.invoice': 'Rechnungen',
+  'search.group.expense': 'Buchungen',
+  'search.group.budget': 'Kostenstellen',
+  'search.group.gremium': 'Gremien',
+  'search.group.principal': 'Personen',
   'account.grants.title': 'API-Zugang & Agenten',
   'account.grants.intro':
     'Verwalte hier die OAuth-Zugriffe (Agenten/MCP), die in deinem Namen handeln dürfen.',
@@ -168,7 +181,6 @@ export const de = {
   'table.actions': 'Aktionen',
 
   'expenses.title': 'Buchungen',
-  'expenses.subtitle': 'Ausgaben & Einnahmen mit Filter und Suche.',
   'expenses.add': 'Buchung hinzufügen',
   'expenses.export': 'Export',
   'expenses.transfer': 'Übertrag',
@@ -288,6 +300,7 @@ export const de = {
   'expenses.toast.failed': 'Aktion fehlgeschlagen.',
   'expenses.sub.title': 'Unterbuchungen',
   'expenses.sub.toggle': 'Unterbuchungen ein-/ausklappen',
+  'expenses.sub.count': '{count} Unterbuchungen',
   'expenses.sub.add': 'Unterbuchung hinzufügen',
   'expenses.sub.added': 'Unterbuchung hinzugefügt.',
   'expenses.sub.addTitle': 'Unterbuchung hinzufügen',
@@ -370,9 +383,11 @@ export const de = {
   'role.admin': 'Administrator',
   'role.member': 'Mitglied',
 
-  'home.heading': 'Antrag stellen',
-  'home.subtitle': 'Kein Konto nötig — stell deinen Antrag in wenigen Minuten.',
-  'home.cta': 'Jetzt Antrag stellen',
+  'home.heading': 'Willkommen',
+  'home.choice.apply.title': 'Antrag stellen',
+  'home.choice.apply.desc': 'Kein Konto nötig — in wenigen Minuten eingereicht.',
+  'home.choice.login.title': 'Als Gremiumsmitglied anmelden',
+  'home.choice.login.desc': 'Anträge bearbeiten, Sitzungen führen, Haushalt verwalten.',
   'home.statusNote':
     'Bereits eingereicht? Den Status verfolgst du über den Link in deiner Bestätigungs-E-Mail.',
 
@@ -412,6 +427,9 @@ export const de = {
   'apply.positions.value': 'Wert (€)',
   'apply.positions.preferred': 'Bevorzugt',
   'apply.positions.positionValue': 'Positionswert',
+  // Zusammenfassung im Prüfschritt: gezählte Kostenpositionen.
+  'apply.positions.countOne': '1 Kostenposition',
+  'apply.positions.countOther': '{count} Kostenpositionen',
   'apply.positions.total': 'Gesamtbetrag',
   'apply.positions.remove': 'Entfernen',
   'apply.positions.minOffersHint': 'Mindestanzahl an Vergleichsangeboten erreicht.',
@@ -429,6 +447,25 @@ export const de = {
   'apply.positions.errNoOffersReason':
     'Bitte begründe, warum keine Vergleichsangebote möglich sind.',
   'apply.positions.noOffersBadge': 'Ohne Vergleichsangebote',
+
+  // Generic formly field types (@shared/formly). These texts appear when the form
+  // definition sets no explicit label, placeholder or error text.
+  'formly.field.error': 'Ungültige Eingabe',
+  'formly.select.placeholder': 'Bitte wählen …',
+  'formly.select.error': 'Bitte eine Option wählen.',
+  'formly.checkbox.error': 'Bitte bestätigen.',
+  'formly.multicheckbox.error': 'Bitte auswählen.',
+  'formly.daterange.from': 'Von',
+  'formly.daterange.to': 'Bis',
+  'formly.daterange.error': 'Ungültiger Zeitraum.',
+  'formly.validation.required': 'Dieses Feld ist erforderlich.',
+  'formly.validation.min': 'Wert ist zu klein.',
+  'formly.validation.max': 'Wert ist zu groß.',
+  'formly.validation.minlength': 'Eingabe ist zu kurz.',
+  'formly.validation.maxlength': 'Eingabe ist zu lang.',
+  'formly.validation.pattern': 'Eingabe hat ein ungültiges Format.',
+  'formly.validation.email': 'Bitte eine gültige E-Mail-Adresse eingeben.',
+
   'apply.nav.back': 'Zurück',
   'apply.nav.discard': 'Entwurf verwerfen',
   'apply.nav.submit': 'Antrag absenden',
@@ -445,6 +482,13 @@ export const de = {
   'apply.confirm.hint':
     'Keine Mail erhalten? Prüfe den Spam-Ordner. Der Link ist zeitlich begrenzt gültig.',
   'apply.confirm.home': 'Zur Startseite',
+
+  // Angemeldete Person: das Backend bestätigt die Adresse schon beim Anlegen.
+  'apply.submitted.heading': 'Antrag eingereicht',
+  'apply.submitted.badge': 'Eingereicht',
+  'apply.submitted.body':
+    'Vielen Dank! Dein Antrag ist eingereicht und sichtbar. Deine E-Mail-Adresse ist über dein Konto bereits bestätigt – du musst nichts weiter tun.',
+  'apply.submitted.link': 'Antrag öffnen',
 
   'altcha.idle': 'Ich bin kein Roboter',
   'altcha.verifying': 'Wird überprüft …',
@@ -494,7 +538,6 @@ export const de = {
   'rbac.forbidden': 'Keine Berechtigung für diesen Bereich.',
 
   'dashboard.greeting': 'Willkommen, {name}',
-  'dashboard.subtitle': 'Dein Überblick über offene Aufgaben, Anträge und Abstimmungen.',
   'dashboard.loading': 'Wird geladen …',
   'dashboard.error': 'Konnte nicht geladen werden.',
   'dashboard.viewAll': 'Alle ansehen',
@@ -520,7 +563,6 @@ export const de = {
   'dashboard.admin.title': 'Verwaltung',
 
   'applications.list.title': 'Anträge',
-  'applications.list.subtitle': 'Alle Anträge mit Filter und Suche.',
   'applications.list.search': 'Suche',
   'applications.list.search.placeholder': 'Titel, Antragsteller:in …',
   'applications.list.filter.state': 'Status',
@@ -544,6 +586,38 @@ export const de = {
   'applications.list.col.amount': 'Betrag',
   'applications.list.col.created': 'Eingegangen',
   'applications.list.empty': 'Keine Anträge gefunden.',
+  'applications.detail.archive': 'Archivieren',
+  'applications.detail.unarchive': 'Aus Archiv holen',
+  'applications.detail.archivedNotice': 'Archiviert am {at}. Der Antrag bleibt vollständig lesbar.',
+  'applications.archived': 'Antrag archiviert.',
+  'applications.unarchived': 'Antrag ist wieder in der Liste.',
+  'applications.share.action': 'Teilen',
+  'applications.share.title': 'Öffentlicher Link',
+  'applications.share.lead':
+    'Wer den Link hat, sieht den Antrag ohne Anmeldung — ohne Kommentare und ohne Änderungsverlauf. Persönliche Angaben bleiben außen vor.',
+  'applications.share.ttl': 'Gültig für (Tage)',
+  'applications.share.label': 'Notiz',
+  'applications.share.labelPlaceholder': 'Wofür ist dieser Link?',
+  'applications.share.create': 'Link erstellen',
+  'applications.share.createError': 'Der Link konnte nicht erstellt werden.',
+  'applications.share.onceHint':
+    'Dieser Link wird nur jetzt angezeigt. Kopiere ihn, bevor du das Fenster schließt.',
+  'applications.share.url': 'Öffentlicher Link',
+  'applications.share.copy': 'Kopieren',
+  'applications.share.copied': 'Kopiert',
+  'applications.share.close': 'Schließen',
+  'applications.share.none': 'Es gibt noch keinen Link zu diesem Antrag.',
+  'applications.share.unlabelled': 'Ohne Notiz',
+  'applications.share.expiresAt': 'Gültig bis {at}',
+  'applications.share.expired': 'Abgelaufen am {at}',
+  'applications.share.revokedAt': 'Zurückgezogen am {at}',
+  'applications.share.revoke': 'Zurückziehen',
+  'applications.share.revoked': 'Der Link öffnet den Antrag nicht mehr.',
+  'applications.share.revokeError': 'Der Link konnte nicht zurückgezogen werden.',
+  'applications.list.filter.archived': 'Archiv',
+  'applications.list.filter.archivedHide': 'Ohne archivierte',
+  'applications.list.filter.archivedOnly': 'Nur archivierte',
+  'applications.list.filter.archivedAll': 'Alle',
   'applications.list.loading': 'Anträge werden geladen …',
   'applications.list.error': 'Anträge konnten nicht geladen werden.',
   'applications.list.count': '{count} von {total}',
@@ -560,6 +634,8 @@ export const de = {
   'applications.detail.loading': 'Antrag wird geladen …',
   'applications.detail.error': 'Antrag konnte nicht geladen werden.',
   'applications.detail.notFound': 'Antrag nicht gefunden.',
+  'applications.detail.notFoundBody': 'Der Antrag wurde gelöscht, oder der Link stimmt nicht.',
+  'applications.detail.backToList': 'Zur Antragsliste',
   'applications.detail.version': 'Version {version}',
   'applications.detail.created': 'Eingegangen',
   'applications.detail.updated': 'Aktualisiert',
@@ -634,26 +710,6 @@ export const de = {
   'applications.comments.forbidden':
     'Nur die verfassende Person oder eine Antragsverwaltung darf diesen Kommentar ändern.',
   'applications.comments.gone': 'Dieser Kommentar existiert nicht mehr.',
-  'applications.pdf.create': 'PDF erzeugen',
-  'applications.pdf.title': 'Antrag als PDF',
-  'applications.pdf.queued': 'Der Auftrag wartet auf die Bearbeitung …',
-  'applications.pdf.rendering': 'Das PDF wird erzeugt …',
-  'applications.pdf.ready': 'Das PDF ist fertig.',
-  'applications.pdf.download': 'PDF öffnen',
-  'applications.pdf.noStorage':
-    'Das PDF ist fertig, aber der Dateispeicher liefert keinen Link. Bitte an die Administration wenden.',
-  'applications.pdf.timedOut':
-    'Der Auftrag läuft noch. Das dauert länger als erwartet. Bitte erneut prüfen.',
-  'applications.pdf.checkAgain': 'Erneut prüfen',
-  'applications.pdf.restart': 'Neu starten',
-  'applications.pdf.close': 'Schließen',
-  'applications.pdf.startFailed': 'Der PDF-Auftrag konnte nicht gestartet werden.',
-  'applications.pdf.pollFailed': 'Der Status des Auftrags ist nicht abrufbar.',
-  'applications.pdf.forbidden': 'Keine Berechtigung, für diesen Antrag ein PDF zu erzeugen.',
-  'applications.pdf.error.noApplication': 'Der Antrag zum Auftrag existiert nicht mehr.',
-  'applications.pdf.error.render': 'Das PDF konnte nicht gesetzt werden.',
-  'applications.pdf.error.unavailable': 'Der PDF-Dienst ist derzeit nicht erreichbar.',
-  'applications.pdf.error.generic': 'Der PDF-Auftrag ist fehlgeschlagen.',
   'applications.transitions.title': 'Aktionen',
   'applications.transitions.fallback': 'Übergang',
   'applications.transitions.forbidden': 'Sie dürfen diesen Übergang nicht ausführen.',
@@ -841,6 +897,7 @@ export const de = {
   'meetings.protocol.retryHint':
     'Die Finalisierung ist fehlgeschlagen — Inhalt prüfen und erneut versuchen.',
   'meetings.protocol.delete': 'Protokollentwurf verwerfen',
+  'meetings.protocol.takenBy': '{name} führt das Protokoll — du liest mit.',
   'meetings.protocol.deleteTitle': 'Protokollentwurf verwerfen',
   'meetings.protocol.deleteBody':
     'Der Entwurf des Protokolls wird endgültig gelöscht. Der TOP-Text bleibt erhalten, das Protokoll muss danach neu angelegt werden.',
@@ -1003,7 +1060,6 @@ export const de = {
   'voting.beamer.closed': 'Endergebnis',
 
   'admin.home.title': 'Verwaltung',
-  'admin.home.subtitle': 'Formulare, Workflows und Konfiguration pflegen.',
   'admin.home.formBuilder': 'Formular-Builder',
   'admin.home.formBuilderDesc': 'Antragsfelder visuell zusammenstellen.',
   'admin.home.flowEditor': 'Flow-Editor',
@@ -1016,7 +1072,6 @@ export const de = {
   'admin.home.budgetPots': 'Budget-Töpfe',
   'admin.home.budgetPotsDesc': 'Budgets & Kostenstellen verwalten.',
   'budget.tree.title': 'Budgets & Kostenstellen',
-  'budget.tree.subtitle': 'Budgets und ihnen untergeordnete Kostenstellen als Baum.',
   'budget.tree.budget': 'Budget',
   'budget.tree.budgetPlaceholder': 'Budget wählen …',
   'budget.tree.fyEmpty': 'Noch keine Haushaltsjahre in diesem Budget.',
@@ -1139,6 +1194,8 @@ export const de = {
     'Auf diesem Haushaltsjahr liegen noch Buchungen, Mittel-Zuteilungen oder zugeordnete Anträge. Bitte diese zuerst entfernen.',
   'admin.home.delegations': 'Vertretung / Delegation',
   'admin.home.delegationsDesc': 'Sitzungsgebundene Vertretungen einsehen und widerrufen.',
+  'admin.home.backups': 'Backups',
+  'admin.home.backupsDesc': 'Sicherungen anlegen, herunterladen, einspielen, zurücksetzen.',
   'admin.home.privacy': 'Datenschutz',
   'admin.home.privacyDesc': 'DSGVO: Löschanträge, Auskunft, Aufbewahrung.',
   'admin.home.mockNotice':
@@ -1223,6 +1280,46 @@ export const de = {
     'Antragstellende können pro Position mit Begründung erklären, dass keine Vergleichsangebote möglich sind — dann genügt ein einzelnes Angebot.',
 
   'admin.flow.title': 'Flow-Editor',
+  // Flow-Validierung: was der Editor an einem Graphen bemängelt, bevor gespeichert wird.
+  'admin.flow.err.noStates': 'Der Flow hat keine Status.',
+  'admin.flow.err.duplicateKeys': 'Doppelte Status-Schlüssel: {keys}',
+  'admin.flow.err.invalidKey':
+    'Ungültiger Status-Schlüssel: {key}. Erlaubt sind Kleinbuchstaben, Ziffern und Unterstriche, beginnend mit einem Buchstaben.',
+  'admin.flow.err.noInitial': 'Der Flow hat keinen Startstatus.',
+  'admin.flow.err.multipleInitial': 'Der Flow hat mehrere Startstatus: {keys}',
+  'admin.flow.err.unknownFrom': 'Ein Übergang geht von einem unbekannten Status aus: {key}',
+  'admin.flow.err.unknownTo': 'Ein Übergang führt in einen unbekannten Status: {key}',
+  'admin.flow.err.unreachable': 'Vom Startstatus nicht erreichbar: {keys}',
+  'admin.flow.err.sessionNeedsVote':
+    'Der Übergang {from} → {to} setzt den Antrag auf eine Sitzung, führt aber nicht in einen Abstimmungs-Status.',
+  'admin.flow.err.voteNeedsGremium': 'Der Abstimmungs-Status „{key}“ braucht ein Gremium.',
+  'admin.flow.err.voteBranches':
+    'Der Abstimmungs-Status „{key}“ braucht genau zwei ausgehende Übergänge: „angenommen“ und „abgelehnt“.',
+  'admin.flow.err.voteNoAutomatic':
+    'Der Abstimmungs-Status „{key}“ darf keine automatischen Übergänge haben. Nur das Ergebnis der Abstimmung oder ein manueller Abbruch führen aus ihm heraus.',
+  'admin.flow.err.guardChildren': 'Die Bedingung „{op}“ erwartet weitere Bedingungen als Inhalt.',
+  'admin.flow.err.guardOneOperator': 'Eine Bedingung braucht genau einen Operator, gefunden: {ops}',
+  'admin.flow.err.guardNotOneChild': 'Die Bedingung „nicht“ braucht genau eine Unterbedingung.',
+  'admin.flow.err.guardNeedsChild': 'Die Bedingung „{op}“ braucht mindestens eine Unterbedingung.',
+  'admin.flow.err.guardUnknownOp': 'Unbekannter Bedingungs-Operator: {op}',
+  'admin.flow.err.guardActorManualOnly':
+    'Die Bedingung „{op}“ prüft die handelnde Person und ist deshalb nur bei manuellen Übergängen erlaubt.',
+  'admin.flow.err.guardNeedsValue': 'Die Bedingung „{op}“ braucht einen Wert.',
+  'admin.flow.err.compareShape': 'Ein Vergleich braucht ein Feld, einen Operator und einen Wert.',
+  'admin.flow.err.compareField': 'Ein Vergleich braucht ein Feld.',
+  'admin.flow.err.compareUnknownOp': 'Unbekannter Vergleichs-Operator: {op}',
+  'admin.flow.err.compareInList': 'Der Vergleich „in“ braucht eine Liste als Wert.',
+  'admin.flow.err.actionShape': 'Eine Aktion muss ein Objekt sein.',
+  'admin.flow.err.actionUnknownType': 'Unbekannte Aktion: {type}',
+  'admin.flow.err.actionWebhook': 'Die Webhook-Aktion braucht einen Webhook.',
+  'admin.flow.err.actionGremium':
+    'Die Aktion „Auf die nächste Sitzung setzen“ braucht ein Gremium.',
+  'admin.flow.err.actionBudget': 'Die Aktion „Kostenstelle zuweisen“ braucht eine Kostenstelle.',
+  'admin.flow.err.actionField': 'Die Aktion „Kostenstelle aus Feld zuweisen“ braucht ein Feld.',
+  'admin.flow.err.notifyRecipients':
+    'Die Benachrichtigungs-Aktion braucht mindestens einen Empfänger.',
+  'admin.flow.err.notifyRecipientInvalid': 'Ungültiger Empfänger in der Benachrichtigungs-Aktion.',
+  'admin.flow.err.notifyRecipientValue': 'Der Empfänger „{kind}“ braucht einen Wert.',
   'admin.flow.loadFailed': 'Flow konnte nicht geladen werden (fehlende Berechtigung?).',
   'admin.flow.desc':
     'Definiere Status und Übergänge eines Antragstyps. „Einfach" startet von einer Vorlage, „Experte" gibt volle Kontrolle über Bedingungen und Aktionen.',
@@ -1331,7 +1428,6 @@ export const de = {
   'admin.flow.voteResult.tie': 'Unentschieden',
   'admin.flow.actionType.notify': 'Benachrichtigen',
   'admin.flow.actionType.webhook': 'Webhook auslösen',
-  'admin.flow.actionType.exportPdf': 'PDF exportieren',
   'admin.flow.actionType.setEditLock': 'Bearbeitung sperren',
   'admin.flow.actionType.budgetReserve': 'Budget reservieren',
   'admin.flow.actionType.budgetBook': 'Budget buchen',
@@ -1392,8 +1488,6 @@ export const de = {
     'Versendet konfigurierte E-Mail-Benachrichtigungen an die Empfänger der Regel.',
   'admin.flow.actionDesc.webhook':
     'Ruft die hinterlegten ausgehenden Webhooks für dieses Ereignis auf.',
-  'admin.flow.actionDesc.exportPdf':
-    'Erzeugt ein PDF (z. B. Beschluss/Protokoll-Auszug) und legt es ab.',
   'admin.flow.actionDesc.setEditLock':
     'Sperrt die weitere Bearbeitung des Antrags (folgt aus dem Ziel-Status).',
   'admin.flow.actionDesc.budgetReserve':
@@ -1604,6 +1698,11 @@ export const de = {
   'admin.audit.targetType.comment': 'Kommentar',
   'admin.audit.targetType.protocol': 'Protokoll',
   'admin.audit.targetType.fiscal_year': 'Haushaltsjahr',
+  'admin.audit.targetType.form': 'Formular',
+  'admin.audit.targetType.flow': 'Ablauf',
+  'admin.audit.targetType.cd_variant': 'Corporate-Design-Variante',
+  // Quotation marks around a resolved target name. Each locale brings its own pair.
+  'admin.audit.targetQuoted': '„{label}“',
   'admin.audit.msg.login': '{actor} hat sich angemeldet.',
   'admin.audit.msg.status_change': '{actor} hat den Status von {target} geändert.',
   'admin.audit.msg.vote_cast': '{actor} hat eine Stimme abgegeben ({target}).',
@@ -1679,9 +1778,67 @@ export const de = {
   'admin.audit.msg.budget_assign':
     '{actor} hat einen Antrag einer Kostenstelle zugeordnet ({target}).',
   'admin.audit.msg.budget_move_fiscal_year': '{actor} hat ein Haushaltsjahr verschoben ({target}).',
-  'admin.audit.msg.budget_fiscal_year_delete':
-    '{actor} hat ein Haushaltsjahr gelöscht ({target}).',
+  'admin.audit.msg.budget_fiscal_year_delete': '{actor} hat ein Haushaltsjahr gelöscht ({target}).',
   'admin.audit.msg.unknown': '{actor}: {action} ({target}).',
+  'admin.backups.title': 'Backups',
+  'admin.backups.offTitle': 'Backups sind nicht eingerichtet',
+  'admin.backups.offHint':
+    'Für diese Installation ist kein age-Empfänger hinterlegt. Ohne ihn kann die Plattform kein Archiv verschlüsseln. Siehe deploy/README.md.',
+  'admin.backups.createTitle': 'Sicherung anlegen',
+  'admin.backups.createHint':
+    'Ein Archiv enthält die gesamte Datenbank und alle Anhänge, age-verschlüsselt. Die Erstellung läuft im Hintergrund und dauert je nach Datenmenge einige Minuten.',
+  'admin.backups.note': 'Notiz (optional)',
+  'admin.backups.notePlaceholder': 'z. B. vor der Haushaltsabstimmung',
+  'admin.backups.create': 'Sicherung anlegen',
+  'admin.backups.importTitle': 'Archiv einspielen',
+  'admin.backups.importHint':
+    'Nimmt eine hochgeladene .tar.age-Datei in die Liste auf. Sie wird dabei geprüft, aber NICHT zurückgespielt.',
+  'admin.backups.import': 'Datei wählen',
+  'admin.backups.noIdentity':
+    'Kein privater AGE-Schlüssel hinterlegt. Ein Import prüft das Archiv, indem er es entschlüsselt — dafür braucht die Plattform BACKUP_AGE_IDENTITY_FILE. Ohne den Schlüssel bleiben Import und Zurückspielen aus.',
+  'admin.backups.listTitle': 'Vorhandene Sicherungen',
+  'admin.backups.retentionHint':
+    'Die {count} neuesten Sicherungen bleiben erhalten. Angeheftete Sicherungen und die automatische Kopie vor einem Zurücksetzen werden nie gelöscht.',
+  'admin.backups.empty': 'Noch keine Sicherungen vorhanden.',
+  'admin.backups.col.created': 'Erstellt',
+  'admin.backups.col.kind': 'Art',
+  'admin.backups.col.status': 'Status',
+  'admin.backups.col.size': 'Größe',
+  'admin.backups.col.contents': 'Inhalt',
+  'admin.backups.col.note': 'Notiz',
+  'admin.backups.kind.manual': 'Manuell',
+  'admin.backups.kind.scheduled': 'Automatisch',
+  'admin.backups.kind.pre_restore': 'Vor Zurücksetzen',
+  'admin.backups.kind.imported': 'Eingespielt',
+  'admin.backups.status.pending': 'Wartet',
+  'admin.backups.status.running': 'Läuft',
+  'admin.backups.status.done': 'Fertig',
+  'admin.backups.status.failed': 'Fehlgeschlagen',
+  'admin.backups.objectCount': '{count} Anhänge',
+  'admin.backups.download': 'Herunterladen',
+  'admin.backups.pin': 'Anheften',
+  'admin.backups.unpin': 'Lösen',
+  'admin.backups.pinnedHint':
+    'Angeheftet: wird nicht automatisch gelöscht. Zum Löschen zuerst lösen.',
+  'admin.backups.restore': 'Zurücksetzen',
+  'admin.backups.restoreTitle': 'Plattform zurücksetzen',
+  'admin.backups.restoreWarning':
+    'Dieser Vorgang ersetzt die gesamte Plattform durch den Stand dieser Sicherung.',
+  'admin.backups.restorePoint1':
+    'Alles, was seit dieser Sicherung entstanden ist, geht verloren: Anträge, Abstimmungen, Buchungen, Protokolle.',
+  'admin.backups.restorePoint2': 'Alle Benutzer werden abgemeldet, Sie eingeschlossen.',
+  'admin.backups.restorePoint3':
+    'Vorher wird automatisch eine Sicherung des jetzigen Stands angelegt. Damit lässt sich der Vorgang rückgängig machen.',
+  'admin.backups.restoreTarget': 'Zurückgesetzt wird auf den Stand vom',
+  'admin.backups.restoreConfirmLabel': 'Zum Bestätigen RESTORE eingeben',
+  'admin.backups.deleteTitle': 'Sicherung löschen',
+  'admin.backups.deleteWarning': 'Diese Sicherung endgültig löschen? Betrifft den Stand vom',
+  'admin.backups.toast.started': 'Sicherung wird im Hintergrund erstellt.',
+  'admin.backups.toast.created': 'Sicherung fertiggestellt.',
+  'admin.backups.toast.failed': 'Sicherung fehlgeschlagen.',
+  'admin.backups.toast.imported': 'Archiv eingespielt.',
+  'admin.backups.toast.restoreStarted':
+    'Zurücksetzen gestartet. Die Plattform ist gleich kurz nicht erreichbar und Sie werden abgemeldet.',
   'admin.privacy.title': 'Datenschutz',
   'admin.privacy.subtitle': 'DSGVO-Verwaltung: Löschanträge, Auskunft, Aufbewahrung.',
   'admin.privacy.queueTitle': 'Löschanträge (Art. 17)',
@@ -1777,9 +1934,9 @@ export const de = {
   'admin.oauthGrants.col.client': 'Anwendung',
   'admin.oauthGrants.col.scope': 'Berechtigungen',
   'admin.oauthGrants.col.created': 'Erstellt',
-  'admin.oauthGrants.col.expires': 'Läuft ab',
-  'admin.oauthGrants.accessToken': 'Zugriff',
-  'admin.oauthGrants.refreshToken': 'Erneuerung',
+  'admin.oauthGrants.col.accessExpires': 'Zugriff bis',
+  'admin.oauthGrants.col.refreshExpires': 'Erneuerung bis',
+  'admin.oauthGrants.moreScopes': '+{count} weitere',
   'admin.oauthGrants.neverExpires': 'Läuft nie ab',
   'admin.oauthGrants.unknownOwner': 'Person ohne Namen',
   'admin.oauthGrants.filter.principal': 'Person',
@@ -1799,8 +1956,7 @@ export const de = {
 
   // Corporate-design variants: the logo sets of the rendered documents.
   'admin.cdVariants.title': 'CD-Varianten',
-  'admin.cdVariants.subtitle':
-    'Logo-Sätze, mit denen ein Gremium seine Dokumente rendert.',
+  'admin.cdVariants.subtitle': 'Logo-Sätze, mit denen ein Gremium seine Dokumente rendert.',
   'admin.cdVariants.add': 'Variante hinzufügen',
   'admin.cdVariants.create': 'CD-Variante anlegen',
   'admin.cdVariants.edit': 'CD-Variante bearbeiten',
@@ -1861,7 +2017,7 @@ export const de = {
   'admin.deleg.revoked': 'Delegation widerrufen.',
   'admin.deleg.revokeFailed': 'Widerruf fehlgeschlagen.',
 
-  // Substitute pool (#delegation-rework), shown in the Gremium member administration.
+  // Substitute pool, shown in the Gremium member administration.
   'admin.substitutes.title': 'Stellvertreter-Pool',
   'admin.substitutes.hint':
     'Gewählte/bestimmte Vertreter (z. B. der Fachschaften): an sie darf ohne Vorlauf bis Sitzungsbeginn delegiert werden — auch wenn sie nicht selbst Mitglied sind.',
@@ -1879,7 +2035,7 @@ export const de = {
   'admin.substitutes.duplicate': 'Dieser Eintrag existiert bereits.',
   'admin.substitutes.failed': 'Aktion fehlgeschlagen.',
 
-  // Meeting delegation (#delegation-rework): card on the meeting page plus dialog.
+  // Meeting delegation: card on the meeting page plus dialog.
   'delegation.card.title': 'Vertretung',
   'delegation.card.lead':
     'Du kannst dich für diese Sitzung vertreten lassen (optional inkl. Stimmrecht).',
@@ -1985,7 +2141,7 @@ export const de = {
   'admin.forms.advanced': 'Erweiterte Optionen',
   'admin.forms.duplicate': 'Duplizieren',
 
-  // Question groups (#13). One group container is one wizard step.
+  // Question groups. One group container is one wizard step.
   'admin.form.groupStep': 'Schritt {n}',
   'admin.form.groupTitleDe': 'Gruppen-Titel (DE)',
   'admin.form.groupTitleEn': 'Gruppen-Titel (EN)',
@@ -2010,19 +2166,14 @@ export const de = {
   'budget.breadcrumbs': 'Kostenstellen-Pfad',
   'budget.usage.bar': 'Auslastung',
   'budget.usage.viewExpenses': 'Buchungen ansehen',
-  'budget.apps.heading': 'Anträge in dieser Kostenstelle',
   'budget.apps.viewAll': 'Im Antrags-Tab öffnen',
-  'budget.apps.empty': 'Keine Anträge in dieser Kostenstelle (inkl. Unterbaum).',
-  'budget.apps.col.id': 'Antrag',
-  'budget.apps.col.title': 'Antrag',
-  'budget.apps.col.ks': 'Kostenstelle',
-  'budget.apps.col.stage': 'Stufe',
-  'budget.apps.col.amount': 'Betrag',
-  'budget.apps.dialogTitle': 'Antrag',
-  'budget.apps.openFull': 'Vollständig öffnen',
   'budget.empty.title': 'Noch keine Budgetdaten',
   'budget.empty.body':
     'Für die aktuelle Auswahl gibt es keine Budgets oder Anträge. Anträge ohne Budget bleiben davon unberührt.',
+  'budget.empty.noFiscalYear.title': 'Kein Haushaltsjahr angelegt',
+  'budget.empty.noFiscalYear.body':
+    'Kostenstellen sind vorhanden, aber es gibt noch kein Haushaltsjahr. Alle Zahlen auf dieser Seite gehören zu einem Haushaltsjahr. Lege eines an, dann erscheinen die Kostenstellen hier.',
+  'budget.empty.noFiscalYear.action': 'Haushaltsjahr anlegen',
 
   'budget.pots.title': 'Budget-Töpfe',
   'budget.pots.subtitle': 'Töpfe anlegen und bearbeiten (Gremium, Limit, Währung, Zeitraum).',
@@ -2188,6 +2339,7 @@ export const de = {
   'admin.users.search': 'Benutzer suchen',
   'admin.users.searchPlaceholder': 'Name, E-Mail oder OIDC-Subject …',
   'admin.users.searchAction': 'Suchen',
+  'admin.users.loading': 'Benutzer werden geladen …',
   'admin.users.noResults': 'Keine Benutzer gefunden.',
   'admin.users.col.name': 'Name',
   'admin.users.col.email': 'E-Mail',
@@ -2230,6 +2382,7 @@ export const de = {
   'admin.users.rolesTitle': 'Rechte je Rolle',
   'admin.users.rolesSubtitle': 'Berechtigungen einer Rolle einsehen und zuweisen.',
   'admin.users.permsFor': 'Rechte für',
+  'admin.roles.loading': 'Rollen werden geladen …',
   'admin.roles.title': 'Rollen & Rechte',
   'admin.roles.subtitle': 'Globale Rollen + Rechte. Aufklappen zeigt die Berechtigungen.',
   'admin.roles.permsFor': 'Rechte für',
@@ -2324,7 +2477,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'nav.applications': 'Applications',
   'nav.tasks': 'Tasks',
   'tasks.title': 'Tasks',
-  'tasks.subtitle': 'Applications awaiting a decision from your role.',
   'tasks.loading': 'Loading tasks…',
   'tasks.empty': 'No open tasks.',
   'tasks.col.title': 'Title',
@@ -2399,6 +2551,20 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'account.notifications.hint.deadline': 'When a deadline on an application is approaching.',
   'account.notifications.kind.privacy': 'Privacy/erasure requests',
   'account.notifications.hint.privacy': 'Status updates on GDPR erasure requests.',
+  'search.title': 'Search',
+  'search.placeholder': 'Application, meeting, cost centre, page …',
+  'search.hint': 'Type to search. Enter opens the result.',
+  'search.empty': 'Nothing found.',
+  'search.truncated': 'There are more results. Narrow the query.',
+  'search.open': 'Open search',
+  'search.group.pages': 'Pages',
+  'search.group.application': 'Applications',
+  'search.group.meeting': 'Meetings',
+  'search.group.invoice': 'Invoices',
+  'search.group.expense': 'Bookings',
+  'search.group.budget': 'Cost centres',
+  'search.group.gremium': 'Committees',
+  'search.group.principal': 'People',
   'account.grants.title': 'API access & agents',
   'account.grants.intro':
     'Manage the OAuth grants (agents/MCP) that are allowed to act on your behalf.',
@@ -2462,7 +2628,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'action.close': 'Close',
 
   'expenses.title': 'Bookings',
-  'expenses.subtitle': 'Expenses & income with filter and search.',
   'expenses.add': 'Add booking',
   'expenses.export': 'Export',
   'expenses.transfer': 'Transfer',
@@ -2581,6 +2746,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'expenses.toast.failed': 'Action failed.',
   'expenses.sub.title': 'Sub-bookings',
   'expenses.sub.toggle': 'Toggle sub-bookings',
+  'expenses.sub.count': '{count} sub-bookings',
   'expenses.sub.add': 'Add sub-booking',
   'expenses.sub.added': 'Sub-booking added.',
   'expenses.sub.addTitle': 'Add sub-booking',
@@ -2662,11 +2828,12 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'role.admin': 'Administrator',
   'role.member': 'Member',
 
-  'home.heading': 'Submit an application',
-  'home.subtitle': 'No account needed — submit your application in minutes.',
-  'home.cta': 'Submit an application',
-  'home.statusNote':
-    'Already submitted? Track its status via the link in your confirmation email.',
+  'home.heading': 'Welcome',
+  'home.choice.apply.title': 'Submit an application',
+  'home.choice.apply.desc': 'No account needed — submitted in minutes.',
+  'home.choice.login.title': 'Sign in as a committee member',
+  'home.choice.login.desc': 'Process applications, run meetings, manage the budget.',
+  'home.statusNote': 'Already submitted? Track its status via the link in your confirmation email.',
 
   'placeholder.fallback': 'Section',
   'placeholder.badge': 'In progress',
@@ -2704,6 +2871,9 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'apply.positions.value': 'Value (€)',
   'apply.positions.preferred': 'Preferred',
   'apply.positions.positionValue': 'Position value',
+  // Review-step summary: counted cost positions.
+  'apply.positions.countOne': '1 cost position',
+  'apply.positions.countOther': '{count} cost positions',
   'apply.positions.total': 'Total amount',
   'apply.positions.remove': 'Remove',
   'apply.positions.minOffersHint': 'Minimum number of comparison offers reached.',
@@ -2718,9 +2888,25 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'apply.positions.noOffersHint':
     'Please explain why comparison offers cannot be obtained (e.g. sole supplier). A single offer is sufficient then.',
   'apply.positions.noOffersReason': 'Reason why no comparison offers are possible',
-  'apply.positions.errNoOffersReason':
-    'Please explain why no comparison offers are possible.',
+  'apply.positions.errNoOffersReason': 'Please explain why no comparison offers are possible.',
   'apply.positions.noOffersBadge': 'Without comparison offers',
+
+  'formly.field.error': 'Invalid input',
+  'formly.select.placeholder': 'Please select …',
+  'formly.select.error': 'Please select an option.',
+  'formly.checkbox.error': 'Please confirm.',
+  'formly.multicheckbox.error': 'Please make a selection.',
+  'formly.daterange.from': 'From',
+  'formly.daterange.to': 'To',
+  'formly.daterange.error': 'Invalid date range.',
+  'formly.validation.required': 'This field is required.',
+  'formly.validation.min': 'The value is too small.',
+  'formly.validation.max': 'The value is too large.',
+  'formly.validation.minlength': 'The input is too short.',
+  'formly.validation.maxlength': 'The input is too long.',
+  'formly.validation.pattern': 'The input has an invalid format.',
+  'formly.validation.email': 'Enter a valid email address.',
+
   'apply.nav.back': 'Back',
   'apply.nav.discard': 'Discard draft',
   'apply.nav.submit': 'Submit application',
@@ -2737,6 +2923,13 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'apply.confirm.hint':
     'No email received? Check your spam folder. The link is valid for a limited time.',
   'apply.confirm.home': 'Back to start',
+
+  // Signed-in submitter: the backend confirms the address at creation time.
+  'apply.submitted.heading': 'Application submitted',
+  'apply.submitted.badge': 'Submitted',
+  'apply.submitted.body':
+    'Thank you. Your application is submitted and visible. Your account confirms your email address already, thus no further step is necessary.',
+  'apply.submitted.link': 'Open the application',
 
   'altcha.idle': 'I am not a robot',
   'altcha.verifying': 'Verifying …',
@@ -2786,7 +2979,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'rbac.forbidden': 'You do not have access to this area.',
 
   'dashboard.greeting': 'Welcome, {name}',
-  'dashboard.subtitle': 'Your overview of open tasks, applications and votes.',
   'dashboard.loading': 'Loading …',
   'dashboard.error': 'Could not be loaded.',
   'dashboard.viewAll': 'View all',
@@ -2811,7 +3003,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'dashboard.admin.title': 'Administration',
 
   'applications.list.title': 'Applications',
-  'applications.list.subtitle': 'All applications with filtering and search.',
   'applications.list.search': 'Search',
   'applications.list.search.placeholder': 'Title, applicant …',
   'applications.list.filter.state': 'Status',
@@ -2835,6 +3026,38 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'applications.list.col.amount': 'Amount',
   'applications.list.col.created': 'Received',
   'applications.list.empty': 'No applications found.',
+  'applications.detail.archive': 'Archive',
+  'applications.detail.unarchive': 'Restore from archive',
+  'applications.detail.archivedNotice': 'Archived on {at}. The application stays fully readable.',
+  'applications.archived': 'Application archived.',
+  'applications.unarchived': 'Application is back in the list.',
+  'applications.share.action': 'Share',
+  'applications.share.title': 'Public link',
+  'applications.share.lead':
+    'Whoever holds the link sees the application without signing in — no comments and no change history. Personal details stay out.',
+  'applications.share.ttl': 'Valid for (days)',
+  'applications.share.label': 'Note',
+  'applications.share.labelPlaceholder': 'What is this link for?',
+  'applications.share.create': 'Create link',
+  'applications.share.createError': 'The link could not be created.',
+  'applications.share.onceHint':
+    'This link is shown only now. Copy it before you close the window.',
+  'applications.share.url': 'Public link',
+  'applications.share.copy': 'Copy',
+  'applications.share.copied': 'Copied',
+  'applications.share.close': 'Close',
+  'applications.share.none': 'There is no link to this application yet.',
+  'applications.share.unlabelled': 'No note',
+  'applications.share.expiresAt': 'Valid until {at}',
+  'applications.share.expired': 'Expired on {at}',
+  'applications.share.revokedAt': 'Withdrawn on {at}',
+  'applications.share.revoke': 'Withdraw',
+  'applications.share.revoked': 'The link no longer opens the application.',
+  'applications.share.revokeError': 'The link could not be withdrawn.',
+  'applications.list.filter.archived': 'Archive',
+  'applications.list.filter.archivedHide': 'Without archived',
+  'applications.list.filter.archivedOnly': 'Archived only',
+  'applications.list.filter.archivedAll': 'All',
   'applications.list.loading': 'Loading applications …',
   'applications.list.error': 'Applications could not be loaded.',
   'applications.list.count': '{count} of {total}',
@@ -2851,6 +3074,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'applications.detail.loading': 'Loading application …',
   'applications.detail.error': 'Application could not be loaded.',
   'applications.detail.notFound': 'Application not found.',
+  'applications.detail.notFoundBody': 'The application was deleted, or the link is wrong.',
+  'applications.detail.backToList': 'Back to the application list',
   'applications.detail.version': 'Version {version}',
   'applications.detail.created': 'Received',
   'applications.detail.updated': 'Updated',
@@ -2925,26 +3150,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'applications.comments.forbidden':
     'Only the author or an application manager may change this comment.',
   'applications.comments.gone': 'This comment no longer exists.',
-  'applications.pdf.create': 'Create PDF',
-  'applications.pdf.title': 'Application as PDF',
-  'applications.pdf.queued': 'The job waits to be processed …',
-  'applications.pdf.rendering': 'The PDF is being created …',
-  'applications.pdf.ready': 'The PDF is ready.',
-  'applications.pdf.download': 'Open PDF',
-  'applications.pdf.noStorage':
-    'The PDF is ready, but the file storage gives no link. Please tell the administration.',
-  'applications.pdf.timedOut':
-    'The job still runs. This takes longer than expected. Please check again.',
-  'applications.pdf.checkAgain': 'Check again',
-  'applications.pdf.restart': 'Start again',
-  'applications.pdf.close': 'Close',
-  'applications.pdf.startFailed': 'The PDF job could not start.',
-  'applications.pdf.pollFailed': 'The status of the job is not available.',
-  'applications.pdf.forbidden': 'No permission to create a PDF for this application.',
-  'applications.pdf.error.noApplication': 'The application of this job no longer exists.',
-  'applications.pdf.error.render': 'The PDF could not be typeset.',
-  'applications.pdf.error.unavailable': 'The PDF service is currently not available.',
-  'applications.pdf.error.generic': 'The PDF job failed.',
   'applications.transitions.title': 'Actions',
   'applications.transitions.fallback': 'Transition',
   'applications.transitions.forbidden': 'You are not allowed to perform this transition.',
@@ -3124,12 +3329,12 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.protocol.renderingHint': 'The PDF is rendered in the background and sent afterwards.',
   'meetings.protocol.retryHint': 'Finalizing failed — review the content and try again.',
   'meetings.protocol.delete': 'Discard draft minutes',
+  'meetings.protocol.takenBy': '{name} takes the minutes — you read along.',
   'meetings.protocol.deleteTitle': 'Discard draft minutes',
   'meetings.protocol.deleteBody':
     'The draft of the minutes is deleted permanently. The agenda-item text stays, but the minutes must be created again.',
   'meetings.protocol.deleted': 'Draft minutes discarded.',
-  'meetings.protocol.deleteConflict':
-    'The minutes are no longer a draft and cannot be discarded',
+  'meetings.protocol.deleteConflict': 'The minutes are no longer a draft and cannot be discarded',
   'meetings.protocol.deleteFailed': 'Could not discard the draft minutes.',
   'meetings.create.title': 'Create meeting',
   'meetings.create.lead': 'Create a new meeting to steer applications and votes.',
@@ -3263,8 +3468,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'voting.delete.conflict.meetingBound':
     'This vote belongs to a meeting. Delete it through that meeting.',
   'voting.delete.conflict.notDraft': 'The vote already opened. Cancel it instead of deleting it.',
-  'voting.delete.conflict.hasBallots':
-    'Ballots exist already. The vote can no longer be deleted.',
+  'voting.delete.conflict.hasBallots': 'Ballots exist already. The vote can no longer be deleted.',
   'voting.delete.conflict.other': 'The vote is in a state that rules out a delete.',
 
   'voting.live.heading': 'Live vote',
@@ -3283,7 +3487,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'voting.beamer.closed': 'Final result',
 
   'admin.home.title': 'Administration',
-  'admin.home.subtitle': 'Manage forms, workflows and configuration.',
   'admin.home.formBuilder': 'Form builder',
   'admin.home.formBuilderDesc': 'Compose application fields visually.',
   'admin.home.flowEditor': 'Flow editor',
@@ -3296,7 +3499,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.home.budgetPots': 'Budget pots',
   'admin.home.budgetPotsDesc': 'Maintain budgets & cost centres (tree) per committee.',
   'budget.tree.title': 'Budgets & cost centres',
-  'budget.tree.subtitle': 'Budgets and cost centers within them.',
   'budget.tree.budget': 'Budget',
   'budget.tree.budgetPlaceholder': 'Choose a budget …',
   'budget.tree.fyEmpty': 'No fiscal years in this budget yet.',
@@ -3417,6 +3619,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
     'This fiscal year still carries bookings, allocations or assigned applications. Remove them first.',
   'admin.home.delegations': 'Proxy / Delegation',
   'admin.home.delegationsDesc': 'Inspect and revoke meeting-bound proxies.',
+  'admin.home.backups': 'Backups',
+  'admin.home.backupsDesc': 'Create, download, import and restore backups.',
   'admin.home.privacy': 'Privacy',
   'admin.home.privacyDesc': 'GDPR: erasure requests, data access, retention.',
   'admin.home.mockNotice': 'Admin API (T-24) not available yet – data comes from a local mock.',
@@ -3501,6 +3705,44 @@ export const en: Partial<Record<TranslationKey, string>> = {
     'Applicants can declare per position — with a reason — that comparison offers are not possible; a single offer is sufficient then.',
 
   'admin.flow.title': 'Flow editor',
+  // Flow validation: what the editor rejects in a graph before it is saved.
+  'admin.flow.err.noStates': 'The flow has no states.',
+  'admin.flow.err.duplicateKeys': 'Duplicate state keys: {keys}',
+  'admin.flow.err.invalidKey':
+    'Invalid state key: {key}. Use lowercase letters, digits and underscores, starting with a letter.',
+  'admin.flow.err.noInitial': 'The flow has no initial state.',
+  'admin.flow.err.multipleInitial': 'The flow has more than one initial state: {keys}',
+  'admin.flow.err.unknownFrom': 'A transition starts from an unknown state: {key}',
+  'admin.flow.err.unknownTo': 'A transition leads to an unknown state: {key}',
+  'admin.flow.err.unreachable': 'Not reachable from the initial state: {keys}',
+  'admin.flow.err.sessionNeedsVote':
+    'The transition {from} → {to} puts the application on a meeting agenda but does not lead into a vote state.',
+  'admin.flow.err.voteNeedsGremium': 'The vote state "{key}" needs a committee.',
+  'admin.flow.err.voteBranches':
+    'The vote state "{key}" needs exactly two outgoing transitions: "passed" and "failed".',
+  'admin.flow.err.voteNoAutomatic':
+    'The vote state "{key}" must have no automatic transitions. Only the vote outcome or a manual exit leaves it.',
+  'admin.flow.err.guardChildren': 'The condition "{op}" expects further conditions as its content.',
+  'admin.flow.err.guardOneOperator': 'A condition needs exactly one operator, found: {ops}',
+  'admin.flow.err.guardNotOneChild': 'The condition "not" needs exactly one sub-condition.',
+  'admin.flow.err.guardNeedsChild': 'The condition "{op}" needs at least one sub-condition.',
+  'admin.flow.err.guardUnknownOp': 'Unknown condition operator: {op}',
+  'admin.flow.err.guardActorManualOnly':
+    'The condition "{op}" tests who is acting, so it is allowed on manual transitions only.',
+  'admin.flow.err.guardNeedsValue': 'The condition "{op}" needs a value.',
+  'admin.flow.err.compareShape': 'A comparison needs a field, an operator and a value.',
+  'admin.flow.err.compareField': 'A comparison needs a field.',
+  'admin.flow.err.compareUnknownOp': 'Unknown comparison operator: {op}',
+  'admin.flow.err.compareInList': 'The comparison "in" needs a list as its value.',
+  'admin.flow.err.actionShape': 'An action must be an object.',
+  'admin.flow.err.actionUnknownType': 'Unknown action: {type}',
+  'admin.flow.err.actionWebhook': 'The webhook action needs a webhook.',
+  'admin.flow.err.actionGremium': 'The "add to next meeting" action needs a committee.',
+  'admin.flow.err.actionBudget': 'The "assign cost centre" action needs a cost centre.',
+  'admin.flow.err.actionField': 'The "assign cost centre from field" action needs a field.',
+  'admin.flow.err.notifyRecipients': 'The notify action needs at least one recipient.',
+  'admin.flow.err.notifyRecipientInvalid': 'Invalid recipient in the notify action.',
+  'admin.flow.err.notifyRecipientValue': 'The recipient "{kind}" needs a value.',
   'admin.flow.loadFailed': 'Could not load flow (missing permission?).',
   'admin.flow.desc':
     'Define the states and transitions of an application type. “Simple” starts from a template, “Expert” gives full control over guards and actions.',
@@ -3610,7 +3852,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.flow.voteResult.tie': 'Tie',
   'admin.flow.actionType.notify': 'Notify',
   'admin.flow.actionType.webhook': 'Trigger webhook',
-  'admin.flow.actionType.exportPdf': 'Export PDF',
   'admin.flow.actionType.setEditLock': 'Lock editing',
   'admin.flow.actionType.budgetReserve': 'Reserve budget',
   'admin.flow.actionType.budgetBook': 'Book budget',
@@ -3670,8 +3911,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.flow.actionDesc.notify':
     'Sends the configured email notifications to the rule recipients.',
   'admin.flow.actionDesc.webhook': 'Calls the configured outgoing webhooks for this event.',
-  'admin.flow.actionDesc.exportPdf':
-    'Generates a PDF (e.g. decision/protocol excerpt) and stores it.',
   'admin.flow.actionDesc.setEditLock':
     'Locks further editing of the application (follows from the target state).',
   'admin.flow.actionDesc.budgetReserve': 'Reserves the requested amount in the linked budget pot.',
@@ -3881,6 +4120,10 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.audit.targetType.comment': 'Comment',
   'admin.audit.targetType.protocol': 'Protocol',
   'admin.audit.targetType.fiscal_year': 'Fiscal year',
+  'admin.audit.targetType.form': 'Form',
+  'admin.audit.targetType.flow': 'Workflow',
+  'admin.audit.targetType.cd_variant': 'Corporate design variant',
+  'admin.audit.targetQuoted': '“{label}”',
   'admin.audit.msg.login': '{actor} signed in.',
   'admin.audit.msg.status_change': '{actor} changed the status of {target}.',
   'admin.audit.msg.vote_cast': '{actor} cast a vote ({target}).',
@@ -3951,6 +4194,64 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.audit.msg.budget_move_fiscal_year': '{actor} moved a fiscal year ({target}).',
   'admin.audit.msg.budget_fiscal_year_delete': '{actor} deleted a fiscal year ({target}).',
   'admin.audit.msg.unknown': '{actor}: {action} ({target}).',
+  'admin.backups.title': 'Backups',
+  'admin.backups.offTitle': 'Backups are not set up',
+  'admin.backups.offHint':
+    'This installation has no age recipient. Without one the platform cannot encrypt an archive. See deploy/README.md.',
+  'admin.backups.createTitle': 'Create a backup',
+  'admin.backups.createHint':
+    'An archive holds the whole database and every attachment, age-encrypted. It is built in the background and takes a few minutes, depending on how much data there is.',
+  'admin.backups.note': 'Note (optional)',
+  'admin.backups.notePlaceholder': 'for example: before the budget vote',
+  'admin.backups.create': 'Create a backup',
+  'admin.backups.importTitle': 'Import an archive',
+  'admin.backups.importHint':
+    'Takes an uploaded .tar.age file into the list. The file is checked, but it is NOT restored.',
+  'admin.backups.import': 'Choose a file',
+  'admin.backups.noIdentity':
+    'No AGE private key is configured. An import verifies the archive by decrypting it, which needs BACKUP_AGE_IDENTITY_FILE. Without the key, import and restore stay off.',
+  'admin.backups.listTitle': 'Existing backups',
+  'admin.backups.retentionHint':
+    'The {count} newest backups are kept. A pinned backup, and the automatic copy taken before a restore, are never deleted.',
+  'admin.backups.empty': 'No backups yet.',
+  'admin.backups.col.created': 'Created',
+  'admin.backups.col.kind': 'Kind',
+  'admin.backups.col.status': 'Status',
+  'admin.backups.col.size': 'Size',
+  'admin.backups.col.contents': 'Contents',
+  'admin.backups.col.note': 'Note',
+  'admin.backups.kind.manual': 'Manual',
+  'admin.backups.kind.scheduled': 'Scheduled',
+  'admin.backups.kind.pre_restore': 'Before a restore',
+  'admin.backups.kind.imported': 'Imported',
+  'admin.backups.status.pending': 'Waiting',
+  'admin.backups.status.running': 'Running',
+  'admin.backups.status.done': 'Done',
+  'admin.backups.status.failed': 'Failed',
+  'admin.backups.objectCount': '{count} attachments',
+  'admin.backups.download': 'Download',
+  'admin.backups.pin': 'Pin',
+  'admin.backups.unpin': 'Unpin',
+  'admin.backups.pinnedHint': 'Pinned: never deleted automatically. Unpin it first to delete it.',
+  'admin.backups.restore': 'Restore',
+  'admin.backups.restoreTitle': 'Restore the platform',
+  'admin.backups.restoreWarning':
+    'This replaces the whole platform with the contents of this backup.',
+  'admin.backups.restorePoint1':
+    'Everything created since this backup is lost: applications, votes, bookings, minutes.',
+  'admin.backups.restorePoint2': 'Everybody is logged out, you included.',
+  'admin.backups.restorePoint3':
+    'A backup of the current state is taken first, automatically. That is what makes this undoable.',
+  'admin.backups.restoreTarget': 'Restoring to the state of',
+  'admin.backups.restoreConfirmLabel': 'Type RESTORE to confirm',
+  'admin.backups.deleteTitle': 'Delete the backup',
+  'admin.backups.deleteWarning': 'Delete this backup for good? It holds the state of',
+  'admin.backups.toast.started': 'The backup is being created in the background.',
+  'admin.backups.toast.created': 'Backup finished.',
+  'admin.backups.toast.failed': 'The backup failed.',
+  'admin.backups.toast.imported': 'Archive imported.',
+  'admin.backups.toast.restoreStarted':
+    'Restore started. The platform will be briefly unavailable and you will be logged out.',
   'admin.privacy.title': 'Privacy',
   'admin.privacy.subtitle': 'GDPR administration: erasure requests, data access, retention.',
   'admin.privacy.queueTitle': 'Erasure requests (Art. 17)',
@@ -4046,9 +4347,9 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.oauthGrants.col.client': 'Application',
   'admin.oauthGrants.col.scope': 'Permissions',
   'admin.oauthGrants.col.created': 'Created',
-  'admin.oauthGrants.col.expires': 'Expires',
-  'admin.oauthGrants.accessToken': 'Access',
-  'admin.oauthGrants.refreshToken': 'Refresh',
+  'admin.oauthGrants.col.accessExpires': 'Access until',
+  'admin.oauthGrants.col.refreshExpires': 'Renewal until',
+  'admin.oauthGrants.moreScopes': '+{count} more',
   'admin.oauthGrants.neverExpires': 'Never expires',
   'admin.oauthGrants.unknownOwner': 'Person without a name',
   'admin.oauthGrants.filter.principal': 'Person',
@@ -4109,8 +4410,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.cdVariants.deleteTitle': 'Delete CD variant',
   'admin.cdVariants.deleteConfirm': 'Really delete “{name}”?',
   'admin.cdVariants.deleted': 'CD variant deleted.',
-  'admin.cdVariants.inUse':
-    'A committee still uses this variant. Change the committee first.',
+  'admin.cdVariants.inUse': 'A committee still uses this variant. Change the committee first.',
   'admin.deleg.title': 'Proxy / Delegation',
   'admin.deleg.subtitle':
     'Overview of meeting-bound proxies. Members set up their proxy on the meeting page; the substitute pool is maintained per body in the member administration.',
@@ -4128,7 +4428,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.deleg.revoked': 'Delegation revoked.',
   'admin.deleg.revokeFailed': 'Revocation failed.',
 
-  // Substitute pool (#delegation-rework), shown in the Gremium member administration.
+  // Substitute pool, shown in the Gremium member administration.
   'admin.substitutes.title': 'Substitute pool',
   'admin.substitutes.hint':
     'Elected/designated substitutes (e.g. of student councils): delegations to them are possible without lead time until the meeting starts — even if they are not members themselves.',
@@ -4146,7 +4446,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.substitutes.duplicate': 'This entry already exists.',
   'admin.substitutes.failed': 'Action failed.',
 
-  // Meeting delegation (#delegation-rework): card on the meeting page plus dialog.
+  // Meeting delegation: card on the meeting page plus dialog.
   'delegation.card.title': 'Proxy',
   'delegation.card.lead':
     'You can arrange a proxy for this meeting (optionally including your voting right).',
@@ -4251,7 +4551,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.forms.advanced': 'Advanced options',
   'admin.forms.duplicate': 'Duplicate',
 
-  // Question groups (#13). One group container is one wizard step.
+  // Question groups. One group container is one wizard step.
   'admin.form.groupStep': 'Step {n}',
   'admin.form.groupTitleDe': 'Group title (DE)',
   'admin.form.groupTitleEn': 'Group title (EN)',
@@ -4276,19 +4576,14 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'budget.breadcrumbs': 'Cost-centre path',
   'budget.usage.bar': 'Utilisation',
   'budget.usage.viewExpenses': 'View bookings',
-  'budget.apps.heading': 'Applications in this cost centre',
   'budget.apps.viewAll': 'Open in applications tab',
-  'budget.apps.empty': 'No applications in this cost centre (incl. subtree).',
-  'budget.apps.col.id': 'Application',
-  'budget.apps.col.title': 'Application',
-  'budget.apps.col.ks': 'Cost centre',
-  'budget.apps.col.stage': 'Stage',
-  'budget.apps.col.amount': 'Amount',
-  'budget.apps.dialogTitle': 'Application',
-  'budget.apps.openFull': 'Open in full',
   'budget.empty.title': 'No budget data yet',
   'budget.empty.body':
     'There are no budgets or applications for the current selection. Applications without a budget are unaffected.',
+  'budget.empty.noFiscalYear.title': 'No fiscal year yet',
+  'budget.empty.noFiscalYear.body':
+    'Cost centres exist, but there is no fiscal year yet. Every figure on this page belongs to a fiscal year. Create one, and the cost centres show up here.',
+  'budget.empty.noFiscalYear.action': 'Create a fiscal year',
 
   'budget.pots.title': 'Budget pots',
   'budget.pots.subtitle': 'Create and edit pots (committee, limit, currency, period).',
@@ -4451,6 +4746,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.users.search': 'Search users',
   'admin.users.searchPlaceholder': 'Name, email or OIDC subject …',
   'admin.users.searchAction': 'Search',
+  'admin.users.loading': 'Loading users …',
   'admin.users.noResults': 'No users found.',
   'admin.users.col.name': 'Name',
   'admin.users.col.email': 'Email',
@@ -4493,6 +4789,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.users.rolesTitle': 'Permissions per role',
   'admin.users.rolesSubtitle': 'View and assign a role’s permissions.',
   'admin.users.permsFor': 'Permissions for',
+  'admin.roles.loading': 'Loading roles …',
   'admin.roles.title': 'Roles & permissions',
   'admin.roles.subtitle': 'Global roles + permissions. Expand a row to see its permissions.',
   'admin.roles.permsFor': 'Permissions for',

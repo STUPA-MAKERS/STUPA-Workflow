@@ -26,14 +26,17 @@ from app.deps import (
     require_principal,
 )
 from app.modules.applications.access import (
+    ARCHIVE_PERMISSION,
     DELETE_PERMISSION,
     EDIT_ANY_PERMISSION,
     MANAGE_PERMISSION,
     READ_ALL_PERMISSION,
+    SHARE_PERMISSION,
     Access,
     require_app_edit,
     require_app_read,
 )
+from app.modules.applications.models import ApplicationShare
 from app.modules.applications.schemas import (
     ApplicationCreate,
     ApplicationCreated,
@@ -43,17 +46,23 @@ from app.modules.applications.schemas import (
     CommentCreate,
     CommentOut,
     CommentPatch,
+    ShareCreate,
+    ShareOut,
     TimelineEventOut,
     VersionOut,
 )
 from app.modules.applications.service import ApplicationsService
+from app.modules.applications.share import ShareService
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth import service as auth_service
 from app.modules.forms.schemas import EffectiveFormOut
 from app.modules.notifications.privacy import notify_erasure_requested
 from app.modules.notifications.provider import mail_queue_from_pool
-from app.modules.notifications.service import NotificationService
+from app.modules.notifications.service import (
+    NotificationService,
+    resolve_application_lang,
+)
 from app.modules.privacy.service import ErasureRequestService
 from app.settings import Settings
 from app.shared.antiabuse import (
@@ -96,16 +105,21 @@ async def _deliver_magic_link(
     """Issue and send the magic link for a new application in its own session.
 
     This runs as a background task after the 201 response. The scope follows the
-    initial state and is ``edit``. The mail queue delivers the message. Without
-    an arq pool, `NotificationService` logs the mail and drops it.
+    initial state and is ``edit``. The mail is in the language of the application,
+    because this is the first mail the applicant gets and it gates the
+    confirmation. The mail queue delivers the message. Without an arq pool,
+    `NotificationService` logs the mail and drops it.
     """
     queue = mail_queue_from_pool(pool)  # type: ignore[arg-type]
     sessionmaker = get_sessionmaker()
     async with sessionmaker() as db:
 
         async def deliver(recipient: str, link: str) -> None:
+            lang = await resolve_application_lang(
+                db, application_id=application_id, settings=settings
+            )
             await NotificationService(db, queue=queue, settings=settings).send_magic_link(
-                email=recipient, link=link
+                email=recipient, link=link, lang=lang
             )
 
         await auth_service.request_magic_link(
@@ -225,18 +239,24 @@ async def list_applications(
     # "My applications" forces the owner filter even for a principal that holds
     # application.read. Without it, that principal would see every application.
     mine: Annotated[bool, Query()] = False,
+    # Archived applications leave the working list by default, so nobody has to remember
+    # to exclude them. `archived=true` lists only those; `archived=all` lists both.
+    archived: Annotated[Literal["false", "true", "all"], Query()] = "false",
 ) -> Page[ApplicationListItem]:
     """List applications with filters, sorting and paging.
 
     A principal without ``application.read`` and without the admin role sees the
     own applications (``created_by``) plus the committee read scope.
     ``mine=true`` forces the pure owner filter, also for an authorized reader.
+
+    ``archived`` hides archived applications by default. A tri-state string rather than a
+    boolean, because "only the archived ones" and "both" are different questions and a
+    boolean can only answer one of them.
     """
-    can_read = (
-        "admin" in principal.roles
-        or principal.has("application.read")
-        or principal.has(READ_ALL_PERMISSION)
-    )
+    # `Principal.has` is the single RBAC chokepoint: it grants every right to the admin
+    # role AND applies the OAuth scope cap. Reading `principal.roles` directly would skip
+    # the cap, so a narrowly scoped agent token would read as a full admin.
+    can_read = principal.has("application.read") or principal.has(READ_ALL_PERMISSION)
     restricted = not can_read and not mine
     return await service.list_applications(
         state_id=state_id,
@@ -245,6 +265,7 @@ async def list_applications(
         budget_pot_id=budget_pot_id,
         budget_id=budget_id,
         q=q,
+        archived={"false": False, "true": True, "all": None}[archived],
         amount_min=amount_min,
         amount_max=amount_max,
         created_from=created_from,
@@ -416,6 +437,149 @@ async def delete_application(
     delete either. The delete is irreversible.
     """
     await service.delete(application_id, actor=principal.sub)
+
+
+@router.post(
+    "/applications/{application_id}/archive",
+    response_model=ApplicationOut,
+    responses=_errors(401, 403, 404),
+)
+async def archive_application(
+    application_id: UUID,
+    service: ServiceDep,
+    principal: Annotated[Principal, Depends(require_principal(ARCHIVE_PERMISSION))],
+) -> ApplicationOut:
+    """Move an application out of the working list.
+
+    Reversible, and nothing is hidden or deleted: an archived application stays fully
+    readable to everyone who could read it before. This is NOT the DSGVO erasure, which
+    lives in `be-privacy` and destroys PII.
+
+    Archiving from any state is allowed on purpose. The flow records where a decision
+    stands; this records whether anyone still needs to look.
+
+    Archiving an already archived application answers 200 and changes nothing, rather
+    than failing: a second click should not be an error, and it must not overwrite who
+    archived it first.
+    """
+    return await service.set_archived(application_id, archived=True, actor=principal.sub)
+
+
+@router.delete(
+    "/applications/{application_id}/archive",
+    response_model=ApplicationOut,
+    responses=_errors(401, 403, 404),
+)
+async def unarchive_application(
+    application_id: UUID,
+    service: ServiceDep,
+    principal: Annotated[Principal, Depends(require_principal(ARCHIVE_PERMISSION))],
+) -> ApplicationOut:
+    """Bring an application back into the working list. Audited like the archive."""
+    return await service.set_archived(application_id, archived=False, actor=principal.sub)
+
+
+def _share_out(row: ApplicationShare, *, url: str | None = None) -> ShareOut:
+    return ShareOut(
+        id=row.id,
+        createdAt=row.created_at,
+        expiresAt=row.expires_at,
+        revokedAt=row.revoked_at,
+        createdBy=row.created_by,
+        label=row.label,
+        url=url,
+    )
+
+
+@router.post(
+    "/applications/{application_id}/shares",
+    response_model=ShareOut,
+    status_code=status.HTTP_201_CREATED,
+    responses=_errors(401, 403, 404),
+)
+async def create_share(
+    application_id: UUID,
+    payload: ShareCreate,
+    session: DbSession,
+    settings: SettingsDep,
+    principal: Annotated[Principal, Depends(require_principal(SHARE_PERMISSION))],
+) -> ShareOut:
+    """Mint a public, read-only link to this application.
+
+    Gated on ``application.share`` and NOT on the read permission. Reading an application
+    and deciding it may be read by anyone holding a URL are different decisions — which is
+    also why an applicant reading through a magic link cannot reach this route at all.
+
+    The plaintext token is in the response and nowhere else. It is never stored and cannot
+    be recovered; a caller who loses it mints a new link.
+    """
+    service = ShareService(session, pepper=settings.magic_link_secret)
+    row, token = await service.create(
+        application_id,
+        actor=principal.sub,
+        ttl_days=payload.ttl_days,
+        label=payload.label,
+    )
+    await audit_record(
+        session,
+        actor=principal.sub,
+        action=AuditAction.APPLICATION_SHARE,
+        target_type="application",
+        target_id=str(application_id),
+        # The token is deliberately absent: an audit entry that carried it would be a
+        # second copy of the secret, in a table built to be read.
+        data={"shareId": str(row.id), "expiresAt": row.expires_at.isoformat()},
+    )
+    await session.commit()
+    return _share_out(row, url=f"{settings.public_base_url.rstrip('/')}/s/{token}")
+
+
+@router.get(
+    "/applications/{application_id}/shares",
+    response_model=list[ShareOut],
+    responses=_errors(401, 403, 404),
+)
+async def list_shares(
+    application_id: UUID,
+    session: DbSession,
+    settings: SettingsDep,
+    _principal: Annotated[Principal, Depends(require_principal(SHARE_PERMISSION))],
+) -> list[ShareOut]:
+    """List every link ever minted for this application, newest first.
+
+    Revoked and expired ones stay in the list: "revocable" only means something if you can
+    see what you revoked, and a link that once existed is part of the record of who
+    published what. No ``url`` — the server holds a hash, not a token.
+    """
+    service = ShareService(session, pepper=settings.magic_link_secret)
+    return [_share_out(row) for row in await service.list_for(application_id)]
+
+
+@router.delete(
+    "/applications/{application_id}/shares/{share_id}",
+    response_model=ShareOut,
+    responses=_errors(401, 403, 404),
+)
+async def revoke_share(
+    application_id: UUID,
+    share_id: UUID,
+    session: DbSession,
+    settings: SettingsDep,
+    principal: Annotated[Principal, Depends(require_principal(SHARE_PERMISSION))],
+) -> ShareOut:
+    """Stop honouring a link. Idempotent: a second revoke keeps the first timestamp."""
+    service = ShareService(session, pepper=settings.magic_link_secret)
+    row = await service.revoke(share_id, application_id=application_id)
+    await audit_record(
+        session,
+        actor=principal.sub,
+        action=AuditAction.APPLICATION_SHARE_REVOKE,
+        target_type="application",
+        target_id=str(application_id),
+        data={"shareId": str(row.id)},
+    )
+    await session.commit()
+    return _share_out(row)
 
 
 @router.get(

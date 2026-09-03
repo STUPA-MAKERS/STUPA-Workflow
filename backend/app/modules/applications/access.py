@@ -35,6 +35,13 @@ EDIT_ANY_PERMISSION = "application.edit_any"
 # holds it through the role bypass in `Principal.has`. Any other role holds it only
 # through an explicit grant.
 DELETE_PERMISSION = "application.delete"
+# Move an application out of the working list and back. Reversible, so it is not the
+# delete permission; but it decides what everyone else sees by default, so it is not
+# part of `application.manage` either.
+ARCHIVE_PERMISSION = "application.archive"
+# Publish a read-only link. Separate from reading, because deciding that a record may
+# be read by anyone holding a URL is a different decision from reading it.
+SHARE_PERMISSION = "application.share"
 
 
 @dataclass(slots=True)

@@ -1,4 +1,4 @@
-<!-- Create posts an application type, so the button needs admin.types (#g8). -->
+<!-- Create posts an application type, so the button needs admin.types. -->
 <app-page-header [title]="'admin.forms.listTitle' | t" [subtitle]="'admin.forms.listSubtitle' | t">
   @if (canCreate()) {
     <app-button actions size="sm" (click)="openCreate()">{{ 'admin.forms.add' | t }}</app-button>
@@ -6,12 +6,13 @@
 </app-page-header>
 
 <section class="fl__list" [attr.aria-label]="'admin.forms.listTitle' | t">
-  @if (loading()) {
-    <p class="text-muted py-4" aria-live="polite">{{ 'admin.forms.overviewLoading' | t }}</p>
-  } @else if (loadError()) {
+  @if (loadError()) {
     <p class="text-muted py-4 text-danger" role="alert">{{ 'admin.forms.overviewError' | t }}</p>
   } @else {
-    <app-data-table [columns]="columns()" [rows]="types()" [rowKey]="rowId" [emptyText]="'admin.forms.overviewEmpty' | t">
+    <app-data-table
+      [loading]="loading()"
+      [loadingText]="'admin.forms.overviewLoading' | t"
+      [columns]="columns()" [rows]="types()" [rowKey]="rowId" [emptyText]="'admin.forms.overviewEmpty' | t">
       <ng-template appCell="name" let-t>
         <a class="fl__name" [routerLink]="['/admin/forms', $any(t).id]">{{ name($any(t)) }}</a>
       </ng-template>

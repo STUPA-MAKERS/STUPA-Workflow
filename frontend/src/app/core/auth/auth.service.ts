@@ -4,6 +4,7 @@ import { catchError, map } from 'rxjs/operators';
 import { ApiClient } from '../api/api-client.service';
 import type { Principal } from '../api/models';
 import { LOCATION } from '../browser/location.token';
+import { HttpCacheService } from '@core/cache/http-cache.service';
 
 /**
  * Auth state. The principal comes from GET /api/auth/me over the OIDC session
@@ -24,6 +25,7 @@ export class AuthService {
   // with NG0201.
   private readonly injector = inject(Injector);
   private readonly location = inject(LOCATION);
+  private readonly cache = inject(HttpCacheService);
   private get api(): ApiClient {
     return this.injector.get(ApiClient);
   }
@@ -114,6 +116,9 @@ export class AuthService {
       .subscribe((res) => {
         this._principal.set(null);
         this.principal$ = undefined;
+        // Cached responses are scoped to whoever asked for them. The next person at this
+        // browser must not inherit a list they were never allowed to see.
+        this.cache.clear();
         this.location.assign(res.logout_url ?? '/');
       });
   }

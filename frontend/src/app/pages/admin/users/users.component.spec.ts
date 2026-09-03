@@ -1,4 +1,5 @@
 import { of, throwError } from 'rxjs';
+import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { AuthService } from '@core/auth/auth.service';
@@ -8,27 +9,59 @@ import { AdminApiService } from '../admin-api.service';
 import { UsersComponent } from './users.component';
 
 const ROLES: Role[] = [
-  { id: 'r-admin', key: 'admin', label: { de: 'administrator', en: 'administrator' }, permissions: ['admin.roles'] },
-  { id: 'r-member', key: 'member', label: { de: 'mitglied', en: 'member' }, permissions: ['application.read'] },
+  {
+    id: 'r-admin',
+    key: 'admin',
+    label: { de: 'administrator', en: 'administrator' },
+    permissions: ['admin.roles'],
+  },
+  {
+    id: 'r-member',
+    key: 'member',
+    label: { de: 'mitglied', en: 'member' },
+    permissions: ['application.read'],
+  },
   { id: 'r-ref', key: 'referent', label: { en: 'officer' }, permissions: [] },
 ];
 
 const ADMIN_ASSIGN: RoleAssignment = {
-  id: 'a-1', principalId: 'p-1', roleId: 'r-admin', gremiumId: null,
-  grantedBy: 'bootstrap', validFrom: null, validUntil: null, delegateVoting: false,
+  id: 'a-1',
+  principalId: 'p-1',
+  roleId: 'r-admin',
+  gremiumId: null,
+  grantedBy: 'bootstrap',
+  validFrom: null,
+  validUntil: null,
+  delegateVoting: false,
 };
 const SCOPED_ASSIGN: RoleAssignment = {
-  id: 'a-2', principalId: 'p-1', roleId: 'r-ref', gremiumId: 'g-1',
-  grantedBy: 'bootstrap', validFrom: null, validUntil: null, delegateVoting: false,
+  id: 'a-2',
+  principalId: 'p-1',
+  roleId: 'r-ref',
+  gremiumId: 'g-1',
+  grantedBy: 'bootstrap',
+  validFrom: null,
+  validUntil: null,
+  delegateVoting: false,
 };
 
 const PRINCIPALS: AdminPrincipal[] = [
   {
-    id: 'p-1', sub: 'kc|alex', email: 'alex@x.de', displayName: 'Alex Admin',
+    id: 'p-1',
+    sub: 'kc|alex',
+    email: 'alex@x.de',
+    displayName: 'Alex Admin',
     lastLogin: '2026-06-06T18:20:00+00:00',
     assignments: [ADMIN_ASSIGN, SCOPED_ASSIGN],
   },
-  { id: 'p-3', sub: 'kc|sam', email: null, displayName: 'Sam Neu', lastLogin: null, assignments: [] },
+  {
+    id: 'p-3',
+    sub: 'kc|sam',
+    email: null,
+    displayName: 'Sam Neu',
+    lastLogin: null,
+    assignments: [],
+  },
 ];
 
 function makeAuth(sub: string | null, canManage = true) {
@@ -41,7 +74,9 @@ function makeAuth(sub: string | null, canManage = true) {
 function makeApi(over: Partial<Record<string, jest.Mock>> = {}) {
   return {
     listRoles: jest.fn(() => of(ROLES.map((r) => ({ ...r })))),
-    listPrincipals: jest.fn(() => of(PRINCIPALS.map((p) => ({ ...p, assignments: [...p.assignments] })))),
+    listPrincipals: jest.fn(() =>
+      of(PRINCIPALS.map((p) => ({ ...p, assignments: [...p.assignments] }))),
+    ),
     assignRole: jest.fn(() => of({ id: 'a-new' })),
     revokeRole: jest.fn(() => of(void 0)),
     setPrincipalActive: jest.fn(() => of({ id: 'p-1', active: true })),
@@ -53,12 +88,24 @@ function makeToast() {
   return { success: jest.fn(), error: jest.fn() };
 }
 
-async function setup(api = makeApi(), auth = makeAuth(null), toast = makeToast()) {
+async function setup(
+  api = makeApi(),
+  auth = makeAuth(null),
+  toast = makeToast(),
+  queryParams: Record<string, string> = {},
+) {
   const view = await render(UsersComponent, {
     providers: [
       { provide: AdminApiService, useValue: api },
       { provide: AuthService, useValue: auth },
       { provide: ToastService, useValue: toast },
+      {
+        provide: ActivatedRoute,
+        useValue: {
+          snapshot: { queryParamMap: convertToParamMap(queryParams) },
+          queryParamMap: of(convertToParamMap(queryParams)),
+        },
+      },
     ],
   });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -66,10 +113,19 @@ async function setup(api = makeApi(), auth = makeAuth(null), toast = makeToast()
   return { ...view, api, toast, inst };
 }
 
-describe('UsersComponent (#70/#72/#73)', () => {
+describe('UsersComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
-  it('lists principals and shows capitalized role tags (#73)', async () => {
+  it('searches for the person the URL names', async () => {
+    // Where a global-search hit on a person lands. A bare `/admin/users` would open the
+    // unfiltered list and leave the reader to search the same name a second time.
+    const api = makeApi();
+    const { inst } = await setup(api, makeAuth(null), makeToast(), { q: 'kc|alex' });
+    expect(api.listPrincipals).toHaveBeenCalledWith('kc|alex');
+    expect(inst.query()).toBe('kc|alex');
+  });
+
+  it('lists principals and shows capitalized role tags', async () => {
     await setup();
     expect(screen.getByText('Alex Admin')).toBeInTheDocument();
     expect(screen.getAllByText('Administrator').length).toBeGreaterThan(0);
@@ -165,7 +221,11 @@ describe('UsersComponent (#70/#72/#73)', () => {
     inst.patchDraft('p-3', { roleId: 'r-member' });
     expect(inst.draftFor('p-3')).toEqual({ roleId: 'r-member', validFrom: '', validUntil: '' });
     inst.patchDraft('p-3', { validFrom: '2026-07-01' });
-    expect(inst.draftFor('p-3')).toEqual({ roleId: 'r-member', validFrom: '2026-07-01', validUntil: '' });
+    expect(inst.draftFor('p-3')).toEqual({
+      roleId: 'r-member',
+      validFrom: '2026-07-01',
+      validUntil: '',
+    });
   });
 
   it('searches by query', async () => {
@@ -187,10 +247,14 @@ describe('UsersComponent (#70/#72/#73)', () => {
     expect(api.assignRole).not.toHaveBeenCalled();
   });
 
-  it('assigns a role with optional validity window and resets state (#72)', async () => {
+  it('assigns a role with optional validity window and resets state', async () => {
     const { api, inst } = await setup();
     inst.toggleAssign('p-3');
-    inst.patchDraft('p-3', { roleId: 'r-member', validFrom: '2026-07-01', validUntil: '2026-12-31' });
+    inst.patchDraft('p-3', {
+      roleId: 'r-member',
+      validFrom: '2026-07-01',
+      validUntil: '2026-12-31',
+    });
     inst.assign(PRINCIPALS[1]);
     expect(api.assignRole).toHaveBeenCalledWith({
       principalId: 'p-3',
@@ -251,7 +315,7 @@ describe('UsersComponent (#70/#72/#73)', () => {
     expect(toast.error).toHaveBeenCalled();
   });
 
-  it('revokes a role (#72)', async () => {
+  it('revokes a role', async () => {
     const { api, inst, toast } = await setup();
     inst.revoke(ADMIN_ASSIGN);
     expect(api.revokeRole).toHaveBeenCalledWith('a-1');
@@ -271,7 +335,7 @@ describe('UsersComponent (#70/#72/#73)', () => {
     expect(screen.queryByRole('columnheader', { name: 'OIDC-Subject' })).not.toBeInTheDocument();
   });
 
-  describe('edit a role assignment (#g-role-edit)', () => {
+  describe('edit a role assignment', () => {
     it('offers the edit control only with admin.users', async () => {
       await setup(makeApi(), makeAuth(null, false));
       expect(

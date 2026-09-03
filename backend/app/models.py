@@ -33,6 +33,7 @@ from app.modules.auth.models import (
     RolePermission,
 )
 from app.modules.auth.oauth_models import OAuthAuthorizationCode, OAuthToken
+from app.modules.backup.models import Backup
 from app.modules.budget.models import BudgetEntry, BudgetField, BudgetPot
 from app.modules.budget.tree_models import (
     Budget,
@@ -53,7 +54,6 @@ from app.modules.notifications.models import (
     NotificationSettings,
     TaskReminderLog,
 )
-from app.modules.pdf.models import RenderJob
 from app.modules.privacy.models import ErasureRequest, PrivacySettings
 from app.modules.protocol.models import Protocol, ProtocolVoteRef
 from app.modules.voting.models import Ballot, SecretBallot, Vote, VotedMarker
@@ -98,10 +98,10 @@ __all__ = [
     "OAuthToken",
     "ErasureRequest",
     "Principal",
+    "Backup",
     "PrivacySettings",
     "Protocol",
     "ProtocolVoteRef",
-    "RenderJob",
     "Role",
     "RoleAssignment",
     "RolePermission",

@@ -73,7 +73,7 @@ export class FormsListComponent {
   /**
    * Create posts to `POST /api/admin/application-types`, which needs `admin.types`.
    * The page itself opens on `form.configure`, so a form manager reaches it without
-   * that key. Without this gate the button is offered and the save answers 403 (#g8).
+   * that key. Without this gate the button is offered and the save answers 403.
    * The gate is UX only. The server stays authoritative.
    */
   protected readonly canCreate = computed(() => this.auth.can('admin.types'));

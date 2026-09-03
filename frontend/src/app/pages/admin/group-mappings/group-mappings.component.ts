@@ -59,6 +59,12 @@ export class GroupMappingsComponent {
   private readonly roles = signal<Role[]>([]);
   private readonly gremien = signal<Gremium[]>([]);
 
+  /**
+   * True until the first answer. Without it the table shows its empty text while the
+   * request is still out, which asserts there is nothing when nothing has arrived yet.
+   */
+  protected readonly loading = signal(true);
+
   readonly dialogOpen = signal(false);
   readonly editId = signal<string | null>(null);
   readonly oidcGroup = signal('');
@@ -111,9 +117,13 @@ export class GroupMappingsComponent {
 
   private refresh(): void {
     this.api.listGroupMappings().subscribe({
-      next: (m) => this.mappings.set(m),
+      next: (m) => {
+        this.mappings.set(m);
+        this.loading.set(false);
+      },
       error: () => {
         this.mappings.set([]);
+        this.loading.set(false);
         this.toast.error(this.i18n.translate('admin.groupMappings.loadFailed'));
       },
     });

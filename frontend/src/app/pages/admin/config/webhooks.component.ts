@@ -83,6 +83,12 @@ export class WebhooksComponent {
   private readonly i18n = inject(I18nService);
   private readonly auth = inject(AuthService);
 
+  /**
+   * True until the first answer. Without it the table shows its empty text while the
+   * request is still out, which asserts there is nothing when nothing has arrived yet.
+   */
+  protected readonly loading = signal(true);
+
   protected readonly allEvents = EVENT_NAMES;
   protected readonly hooks = signal<WebhookConfig[]>([]);
   protected readonly draft = signal<WebhookConfig | null>(null);
@@ -134,7 +140,13 @@ export class WebhooksComponent {
   });
 
   constructor() {
-    this.api.listWebhooks().subscribe((h) => this.hooks.set(h));
+    this.api.listWebhooks().subscribe({
+      next: (h) => {
+        this.hooks.set(h);
+        this.loading.set(false);
+      },
+      error: () => this.loading.set(false),
+    });
     // The diagnosis route needs webhook.manage. Ask for it only once the principal
     // shows the permission, so a user without it never triggers a 403.
     effect(() => {

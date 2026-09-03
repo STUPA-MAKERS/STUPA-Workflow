@@ -1,4 +1,4 @@
-"""Integration (real Postgres, testcontainers): Gremium read scope (#committee-read).
+"""Integration (real Postgres, testcontainers): Gremium read scope.
 
 The tests run against a real schema. A Gremium **member** without the global
 `application.read` permission reads the OWN applications. That member also reads an

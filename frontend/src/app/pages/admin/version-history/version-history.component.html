@@ -1,6 +1,6 @@
 <app-card [heading]="'admin.config.history.title' | t" [headingLevel]="2">
   @if (loading()) {
-    <p class="text-muted">{{ 'common.loading' | t }}</p>
+    <app-skeleton variant="rows" [count]="4" [label]="'common.loading' | t" />
   } @else if (revisions().length === 0) {
     <p class="text-muted">{{ 'admin.config.history.empty' | t }}</p>
   } @else {

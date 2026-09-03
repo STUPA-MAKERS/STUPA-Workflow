@@ -76,6 +76,20 @@ class Application(UUIDPkMixin, TimestampMixin, Base):
     email_confirmed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # Archived: out of the working list, still fully readable. A timestamp rather than a
+    # flag, because it answers "whether" and "when" in one column and makes the un-archive
+    # obvious. Deliberately NOT a flow state: an application can be archived from any
+    # state, and the flow is about where a decision stands, not about whether the record
+    # is still in front of anyone.
+    #
+    # This is NOT anonymization. `be-privacy` erases PII under the DSGVO; archiving hides
+    # nothing and deletes nothing. The two must never be confused for one another.
+    archived_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # OIDC ``sub`` of whoever archived it. NOT a foreign key: a principal can be removed
+    # and the record of who archived must survive that, the same way ``created_by`` does.
+    archived_by: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
         Index(
@@ -91,6 +105,9 @@ class Application(UUIDPkMixin, TimestampMixin, Base):
         Index("ix_application_fiscal_year_id", "fiscal_year_id"),
         Index("ix_application_type_id", "type_id"),
         Index("ix_application_created_at", "created_at"),
+        # The default list filters archived rows out, so every listing query touches
+        # this column.
+        Index("ix_application_archived_at", "archived_at"),
     )
 
 
@@ -185,6 +202,46 @@ class MagicLink(UUIDPkMixin, CreatedAtMixin, Base):
         # (UPDATE ... WHERE used_at IS NULL). It also prevents an ambiguous hash
         # collision.
         Index("ix_magic_link_token_hash", "token_hash", unique=True),
+    )
+
+
+class ApplicationShare(UUIDPkMixin, CreatedAtMixin, Base):
+    """A public, read-only link to one application.
+
+    The database holds only ``HMAC-SHA256(pepper, token)``, like `MagicLink`: the
+    plaintext exists once, in the URL handed to whoever created it. A stolen database
+    yields no working links.
+
+    Revocable and expiring, both on purpose. A link that has been pasted into a chat is
+    outside our control, and the only way to take it back is to stop honouring it.
+    ``revoked_at`` is what makes "revocable" real rather than theoretical, and it is a
+    timestamp rather than a flag so the audit answers when.
+
+    NOT single-use, unlike a magic link: the whole point is that several people open it,
+    and often more than once.
+    """
+
+    __tablename__ = "application_share"
+
+    application_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("application.id", ondelete="CASCADE")
+    )
+    token_hash: Mapped[bytes] = mapped_column(LargeBinary)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # OIDC ``sub`` of whoever created the link, and a note they can leave for themselves.
+    # Not a foreign key, like ``created_by`` on the application: the record of who made a
+    # record public has to outlive the account.
+    created_by: Mapped[str | None] = mapped_column(Text, nullable=True)
+    label: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (
+        # UNIQUE: the lookup is by hash, and two rows with the same digest would make the
+        # answer ambiguous at exactly the moment it must not be.
+        Index("ix_application_share_token_hash", "token_hash", unique=True),
+        Index("ix_application_share_application_id", "application_id"),
     )
 
 

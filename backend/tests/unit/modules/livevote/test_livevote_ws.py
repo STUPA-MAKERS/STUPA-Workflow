@@ -159,7 +159,7 @@ def _voter(groups: set[str] | None = None) -> Principal:
 
 
 def _recv(ws) -> dict:  # noqa: ANN001 — Starlette-Test-WS
-    """Return the next event and skip the presence frames (#live-viewers).
+    """Return the next event and skip the presence frames.
 
     The `viewers` broadcast fires asynchronously on a connect or a disconnect. It can
     arrive between two expected events.

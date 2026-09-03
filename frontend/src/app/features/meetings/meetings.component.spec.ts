@@ -227,6 +227,25 @@ function flushDelegationContext(http: HttpTestingController): void {
 }
 
 describe('MeetingsComponent', () => {
+  it('outlines the timeline while the list loads, never a bare sentence', async () => {
+    // The list and the detail each have a loading branch, and their i18n keys differ
+    // only by a singular and a plural. The detail was fixed first and the list kept its
+    // sentence, which nothing caught — so this asserts on the LIST branch specifically.
+    const { container, fixture } = await setup({ id: null, skipTimelineFlush: true });
+    fixture.detectChanges();
+
+    expect(container.querySelectorAll('.skel').length).toBeGreaterThan(0);
+    expect(container.querySelector('[aria-busy="true"]')).toBeTruthy();
+
+    // The wording stays, but only for a screen reader: the outlined rows are decorative
+    // and hidden from the accessibility tree, so something has to announce the wait. A
+    // VISIBLE paragraph standing in for the whole list is what must not appear.
+    const announced = container.querySelector('[role="status"]');
+    expect(announced?.textContent).toContain('Sitzungen werden geladen');
+    expect(announced).toHaveClass('sr-only');
+    expect(container.querySelector('p[aria-live="polite"]')).toBeNull();
+  });
+
   it('shows a forbidden notice without the required permissions', async () => {
     await setup({ perms: [], id: null });
     expect(screen.getByRole('alert')).toHaveTextContent(/Keine Berechtigung/i);
@@ -275,7 +294,7 @@ describe('MeetingsComponent', () => {
     req.flush({ ...MEETING, activeApplicationId: 'app-2' });
   });
 
-  it('assembles the TOPs and finalizes the protocol (#58)', async () => {
+  it('assembles the TOPs and finalizes the protocol', async () => {
     const { http } = await setup();
     http.expectOne('/api/meetings/m-1').flush(MEETING);
     http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
@@ -445,7 +464,7 @@ describe('MeetingsComponent', () => {
     expect(screen.getByText('Geschlossen')).toBeInTheDocument();
   });
 
-  it('lets a manager create a meeting and redirects to its detail route (#104)', async () => {
+  it('lets a manager create a meeting and redirects to its detail route', async () => {
     const { http, navigate, fixture } = await setup({
       id: null,
       gremien: [{ id: 'g-1', name: 'StuPa' }],
@@ -483,7 +502,7 @@ describe('MeetingsComponent', () => {
     expect(navigate).toHaveBeenCalledWith(['/meetings', 'm-1']);
   });
 
-  it('lists existing meetings and opens one (#104)', async () => {
+  it('lists existing meetings and opens one', async () => {
     const { navigate } = await setup({
       id: null,
       meetings: [{ ...MEETING, title: 'Vergangene Sitzung', status: 'closed' }],
@@ -572,6 +591,104 @@ describe('MeetingsComponent', () => {
     flushDelegationContext(http);
     expect(await screen.findByText('Live-Sitzung')).toBeInTheDocument();
     expect(screen.queryByText('Sitzungssteuerung')).not.toBeInTheDocument();
+  });
+
+  it('keeps the follow view for a member without rights and without a minute-taker', async () => {
+    // The follow view is the view of a plain member. It must not depend on a
+    // minute-taker being assigned: no write and no manage right is enough.
+    const member: MeetingOutWire = {
+      ...MEETING,
+      canControl: false,
+      canManage: false,
+      canWrite: false,
+      canManageVotes: false,
+      canVote: true,
+      protokollantId: null,
+      protokollantName: null,
+    };
+    const { http } = await setup({ perms: ['vote.cast'], userId: 'pr-1' });
+    http.expectOne('/api/meetings/m-1').flush(member);
+    http.expectOne('/api/meetings/m-1/attendance').flush([]);
+    http.expectOne('/api/meetings/m-1/agenda').flush([]);
+    flushDelegationContext(http);
+    expect(await screen.findByText('Live-Sitzung')).toBeInTheDocument();
+    expect(screen.queryByRole('toolbar', { name: 'Sitzungssteuerung' })).not.toBeInTheDocument();
+  });
+
+  describe('minute-taker exclusivity is about the protocol only', () => {
+    /** Detail load with the minute-taker assigned to somebody else. */
+    async function loadOtherProtokollant(over: Partial<MeetingOutWire> = {}) {
+      const view = await setup();
+      const { http } = view;
+      http.expectOne('/api/meetings/m-1').flush({
+        ...MEETING,
+        status: 'planned',
+        protokollantId: 'someone-else',
+        protokollantName: 'Other P',
+        ...over,
+      });
+      http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
+      http.expectOne('/api/meetings/m-1/attendance').flush([]);
+      http
+        .expectOne('/api/meetings/m-1/agenda')
+        .flush([
+          { id: 't-1', applicationId: null, title: 'Begrüßung', body: '', position: 0, nonPublic: false },
+        ]);
+      http.expectOne('/api/meetings/m-1/agenda/assignable').flush([]);
+      flushDelegationContext(http);
+      return view;
+    }
+
+    it('keeps the control toolbar for a manager who is not the minute-taker', async () => {
+      // The operational bite: the minute-taker is reassigned in the settings
+      // dialog, and that dialog opens from this toolbar. Hiding the toolbar from
+      // everybody else strands the meeting when the minute-taker drops out.
+      await loadOtherProtokollant();
+
+      expect(await screen.findByRole('toolbar', { name: 'Sitzungssteuerung' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Sitzung eröffnen' })).toBeEnabled();
+      expect(screen.getByRole('button', { name: 'Schließen' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Sitzung bearbeiten' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Sitzung löschen' })).toBeInTheDocument();
+      // The follow view must not take the page over.
+      expect(screen.queryByText('Live-Sitzung')).not.toBeInTheDocument();
+    });
+
+    it('keeps the agenda editor and vote creation for a manager who is not the minute-taker', async () => {
+      await loadOtherProtokollant();
+
+      expect(await screen.findByPlaceholderText(/Freitext-TOP/)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'TOP hinzufügen' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Beschlussfrage hinzufügen' })).toBeInTheDocument();
+    });
+
+    it('shows the protocol pane read-only to a manager who is not the minute-taker', async () => {
+      // Two people must not type into one protocol. That is what the exclusivity
+      // was written for, so the editor is disabled — not the whole page hidden.
+      const { container } = await loadOtherProtokollant();
+
+      expect(await screen.findByText('Entwurf')).toBeInTheDocument();
+      expect(container.querySelector('.mde__host--disabled')).toBeTruthy();
+      expect(
+        screen.queryByRole('button', { name: 'Protokollentwurf verwerfen' }),
+      ).not.toBeInTheDocument();
+      // Say who holds the pen, so the greyed editor is not a mystery.
+      expect(screen.getByText(/Other P führt das Protokoll/)).toBeInTheDocument();
+    });
+
+    it('lets the minute-taker edit the protocol', async () => {
+      const { container } = await loadOtherProtokollant({
+        protokollantId: 'pr-1',
+        protokollantName: 'Ich',
+        isProtokollant: true,
+      });
+
+      expect(await screen.findByText('Entwurf')).toBeInTheDocument();
+      expect(container.querySelector('.mde__host--disabled')).toBeNull();
+      expect(
+        screen.getByRole('button', { name: 'Protokollentwurf verwerfen' }),
+      ).toBeInTheDocument();
+    });
   });
 });
 
@@ -1500,7 +1617,7 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.settingsRoster()).toEqual([]);
     });
 
-    it('refuses to save a closed meeting (#15) and when date/time missing', async () => {
+    it('refuses to save a closed meeting and when date/time missing', async () => {
       const { cmp, http } = await loaded();
       cmp.openSettings({ ...cmp.meeting()!, status: 'closed' });
       http.expectOne('/api/meetings/m-1/attendance').flush([]);
@@ -1527,7 +1644,7 @@ describe('MeetingsComponent — methods', () => {
       http.verify();
     });
 
-    it('omits the protokollant field when the protocol is final (#15)', async () => {
+    it('omits the protokollant field when the protocol is final', async () => {
       const { cmp, http } = await loaded();
       // protokollantLocked: same id + finalized protocol.
       cmp.protocol.set({ ...PROTOCOL, status: 'final', isFinal: true, isLocked: true });
@@ -1749,17 +1866,47 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.isProtokollant()).toBe(false);
     });
 
-    it('marks a user as follower when a protokollant is set and it is not them', async () => {
+    it('marks a user as follower on the server rights alone, not on the protokollant', async () => {
       const { cmp } = await loaded();
+      // A named protokollant leaves the rights of everybody else untouched.
       cmp.meeting.set({ ...cmp.meeting()!, protokollantId: 'someone', isProtokollant: false });
-      expect(cmp.isFollower()).toBe(true);
+      expect(cmp.isFollower()).toBe(false);
       cmp.meeting.set({ ...cmp.meeting()!, protokollantId: 'someone', isProtokollant: true });
       expect(cmp.isFollower()).toBe(false);
-      // Without a selected minute-taker the write/manage gate applies.
+      // No write and no manage right ⇒ follow view, with or without a protokollant.
       cmp.meeting.set({ ...cmp.meeting()!, protokollantId: null, canWrite: false, canManage: false });
+      expect(cmp.isFollower()).toBe(true);
+      cmp.meeting.set({ ...cmp.meeting()!, protokollantId: 'someone', canWrite: false, canManage: false });
       expect(cmp.isFollower()).toBe(true);
       cmp.meeting.set(null);
       expect(cmp.isFollower()).toBe(false);
+    });
+
+    it('gives a meeting.view_all reader the full view read-only, never the follow view', async () => {
+      const { cmp } = await loaded({ perms: ['meeting.view_all'] });
+      cmp.meeting.set({
+        ...cmp.meeting()!,
+        canWrite: false,
+        canManage: false,
+        protokollantId: 'someone',
+      });
+      expect(cmp.isFollower()).toBe(false);
+      // A reader still may not type into the minutes.
+      expect(cmp.canEditProtocol()).toBe(false);
+    });
+
+    it('grants the protocol edit only to the protokollant once one is named', async () => {
+      const { cmp } = await loaded();
+      // No protokollant yet: everyone with canWrite may take the minutes.
+      expect(cmp.canEditProtocol()).toBe(true);
+      cmp.meeting.set({ ...cmp.meeting()!, protokollantId: 'someone', isProtokollant: false });
+      expect(cmp.canEditProtocol()).toBe(false);
+      cmp.meeting.set({ ...cmp.meeting()!, protokollantId: 'someone', isProtokollant: true });
+      expect(cmp.canEditProtocol()).toBe(true);
+      cmp.meeting.set({ ...cmp.meeting()!, canWrite: false });
+      expect(cmp.canEditProtocol()).toBe(false);
+      cmp.meeting.set(null);
+      expect(cmp.canEditProtocol()).toBe(false);
     });
 
     it('loads more upcoming + past pages on scroll near the edges', async () => {
@@ -2262,7 +2409,7 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.newTitle()).toContain('not-a-date');
     });
 
-    it('formats the prefilled date with the en-US locale when English is active', async () => {
+    it('formats the prefilled date with the en-GB locale when English is active', async () => {
       const { fixture, http } = await setup({ id: null, gremien: [{ id: 'g-1', name: 'StuPa' }] });
       const cmp = fixture.componentInstance as Cmp;
       const i18n = fixture.debugElement.injector.get(I18nService);
@@ -2270,12 +2417,12 @@ describe('MeetingsComponent — methods', () => {
       try {
         cmp.onCreateGremiumChange('g-1');
         http.expectOne('/api/gremien/g-1/meeting-members').flush([]);
-        // A valid date and locale=en select Intl with 'en-US' (longDate en branch).
+        // A valid date and locale=en select Intl with 'en-GB' (longDate en branch).
         cmp.newDate.set('2026-07-01');
         cmp.newTime.set('17:00');
         cmp.goToCreateStep2();
-        // English long date (month name in English).
-        expect(cmp.newTitle()).toContain('July');
+        // English long date, day first: "1 July 2026", not "July 1, 2026".
+        expect(cmp.newTitle()).toContain('1 July 2026');
       } finally {
         i18n.setLocale('de');
       }
@@ -2676,6 +2823,69 @@ describe('MeetingsComponent — methods', () => {
       cmp.closeDeleteProtocol();
       expect(cmp.confirmDeleteProtocol()).toBe(false);
       http.verify();
+    });
+  });
+
+  describe('date, time and DOM ids', () => {
+    /** The API sends a SQL `time`, thus `18:00:00`. The seconds are noise on screen. */
+    const AT_18: MeetingOutWire = { ...MEETING, startTime: '18:00:00', endTime: '20:30:00' };
+
+    it('prints the list time as HH:MM and drops the seconds of the API', async () => {
+      const { container } = await setup({
+        id: null,
+        meetings: [{ ...AT_18, title: 'Vergangene Sitzung', status: 'closed' }],
+      });
+      expect(await screen.findByText('Vergangene Sitzung')).toBeInTheDocument();
+      expect(container.textContent).toContain('18:00');
+      expect(container.textContent).not.toContain('18:00:00');
+    });
+
+    it('prints the detail header time as HH:MM', async () => {
+      const { container, http } = await setup();
+      http.expectOne('/api/meetings/m-1').flush(AT_18);
+      http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
+      http.expectOne('/api/meetings/m-1/attendance').flush([]);
+      http.expectOne('/api/meetings/m-1/agenda').flush([]);
+      http.expectOne('/api/meetings/m-1/agenda/assignable').flush([]);
+      flushDelegationContext(http);
+      expect(await screen.findByText('Sitzungssteuerung')).toBeInTheDocument();
+      expect(container.textContent).toContain('18:00');
+      expect(container.textContent).not.toContain('18:00:00');
+    });
+
+    it('gives each element of the create dialog exactly one DOM id', async () => {
+      // A STATIC `id="x"` on `app-time-input` lands twice: Angular binds it to the
+      // matching `@Input() id` AND leaves the attribute on the host element. The
+      // `label[for]` then points at the host, not at the field. A property binding
+      // `[id]="'x'"` does not reflect onto the host.
+      const { container, fixture } = await setup({ id: null });
+      const cmp = fixture.componentInstance as Cmp;
+      cmp.openCreate();
+      fixture.detectChanges();
+
+      expect(container.querySelectorAll('#mtg-new-time')).toHaveLength(1);
+      expect(container.querySelectorAll('#mtg-new-end-time')).toHaveLength(1);
+      // The label must reach the input field.
+      expect(container.querySelector('#mtg-new-time')?.tagName).toBe('INPUT');
+      expect(container.querySelector('#mtg-new-end-time')?.tagName).toBe('INPUT');
+
+      const ids = Array.from(container.querySelectorAll('[id]')).map((el) => el.id);
+      const duplicates = ids.filter((id, i) => ids.indexOf(id) !== i);
+      expect(duplicates).toEqual([]);
+    });
+
+    it('gives each element of the settings dialog exactly one DOM id', async () => {
+      const { container, cmp, fixture, http } = await loaded();
+      cmp.openSettings(cmp.meeting()!);
+      http.expectOne('/api/meetings/m-1/attendance').flush([]);
+      fixture.detectChanges();
+
+      expect(container.querySelector('#mtg-set-time')?.tagName).toBe('INPUT');
+      expect(container.querySelector('#mtg-set-end-time')?.tagName).toBe('INPUT');
+
+      const ids = Array.from(container.querySelectorAll('[id]')).map((el) => el.id);
+      const duplicates = ids.filter((id, i) => ids.indexOf(id) !== i);
+      expect(duplicates).toEqual([]);
     });
   });
 });

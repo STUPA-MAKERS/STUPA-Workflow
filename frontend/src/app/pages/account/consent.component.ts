@@ -5,6 +5,7 @@ import type { ConsentRequest } from '@core/api/models';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { IconComponent } from '@stupa-makers/ui-kit';
+import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 
 /**
  * OAuth consent page.
@@ -17,7 +18,7 @@ import { IconComponent } from '@stupa-makers/ui-kit';
   selector: 'app-oauth-consent',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, IconComponent],
+  imports: [SkeletonComponent, TranslatePipe, IconComponent],
   templateUrl: './consent.component.html',
   styleUrl: './consent.component.scss',
 })

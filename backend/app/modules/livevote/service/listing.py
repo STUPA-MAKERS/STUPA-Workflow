@@ -245,8 +245,10 @@ class ListingOps(PermissionOps, VoteReadOps):
             if prot_ids
             else {}
         )
-        if "admin" in principal.roles or principal.has("meeting.manage"):
-            manage_ids = write_ids = votes_mgmt_ids = vote_ids = all_gids
+        # `has` covers the admin role and applies the OAuth scope cap; a raw role read
+        # would hand a narrowly scoped token the full cross-gremium view.
+        if principal.has("meeting.manage"):
+            manage_ids = write_ids = votes_mgmt_ids = all_gids
             my_id: UUID | None = None
         else:
             manage_ids = await gremium_ids_with_permission(
@@ -258,8 +260,12 @@ class ListingOps(PermissionOps, VoteReadOps):
             votes_mgmt_ids = manage_ids | await gremium_ids_with_permission(
                 self.session, principal.sub, "vote.manage"
             )
-            vote_ids = await gremium_ids_with_permission(self.session, principal.sub, "vote.cast")
             my_id = await self._principal_id(principal.sub)
+        # A management right never grants a ballot. Only an active gremium role with
+        # `vote.cast` passes the cast gate, so `canVote` reads that roster for every
+        # principal, the global meeting manager included. `PermissionOps.can_vote`
+        # applies the same rule to the meeting detail.
+        vote_ids = await self._vote_cast_gremium_ids(principal)
         votes_by_meeting = await self._votes_for([m.id for m in meetings])
         out: list[MeetingOut] = []
         for m in meetings:

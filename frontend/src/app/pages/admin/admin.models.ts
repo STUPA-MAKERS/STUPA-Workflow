@@ -752,6 +752,52 @@ export interface PrivacySettings {
   defaultRetentionMonths: number;
 }
 
+// Backups (P backup.manage)
+
+/** Why the archive exists. `preRestore` is the safety copy a restore takes first. */
+export type BackupKind = 'manual' | 'scheduled' | 'pre_restore' | 'imported';
+
+/** Job state of the archive build. The page polls while it is not terminal. */
+export type BackupStatus = 'pending' | 'running' | 'done' | 'failed';
+
+/**
+ * One whole-platform archive: a `pg_dump` plus a mirror of the attachment bucket,
+ * age-encrypted in its own bucket. The row is metadata only; the archive itself never
+ * passes through the browser except as a signed download.
+ */
+export interface Backup {
+  id: Uuid;
+  kind: BackupKind;
+  status: BackupStatus;
+  createdAt: string;
+  finishedAt?: string | null;
+  /** OIDC `sub` of whoever started it. Null for the nightly job. */
+  createdBy?: string | null;
+  sizeBytes?: number | null;
+  objectCount?: number | null;
+  checksum?: string | null;
+  note?: string | null;
+  appVersion?: string | null;
+  schemaRevision?: string | null;
+  /** A pinned archive is never pruned by retention and cannot be deleted. */
+  pinned: boolean;
+  /** Short failure code. Never carries a path. */
+  error?: string | null;
+}
+
+/** The catalogue plus what this installation can actually do. */
+export interface BackupList {
+  items: Backup[];
+  /** False without an age recipient: creating is off and the page says why. */
+  enabled: boolean;
+  /** False without the private key: the platform cannot read its own archives. */
+  restoreEnabled: boolean;
+  retentionCount: number;
+}
+
+/** The literal a restore has to carry. It is a machine token, never translated. */
+export const BACKUP_RESTORE_CONFIRMATION = 'RESTORE';
+
 // Branding / site-config
 
 export type LogoSlot = 'wordmark' | 'imagemark' | 'favicon';

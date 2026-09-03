@@ -8,8 +8,11 @@ import {
   inject,
   signal,
   viewChild,
+  type WritableSignal,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute, type ParamMap, Router } from '@angular/router';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -17,7 +20,10 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   BadgeComponent,
   ButtonComponent,
+  CellDirective,
+  type ColumnDef,
   CurrencyInputComponent,
+  DataTableComponent,
   DatepickerComponent,
   DialogComponent,
   FilterBarComponent,
@@ -35,6 +41,7 @@ import {
   BudgetTreeApi,
   type Invoice,
   type InvoiceParseResult,
+  type InvoiceQuery,
   type InvoiceStatus,
 } from '../budget/budget-tree.api';
 
@@ -57,7 +64,9 @@ import {
     TranslatePipe,
     BadgeComponent,
     ButtonComponent,
+    CellDirective,
     CurrencyInputComponent,
+    DataTableComponent,
     DatepickerComponent,
     DialogComponent,
     FilterBarComponent,
@@ -73,11 +82,46 @@ import {
 })
 export class InvoicesComponent implements OnDestroy {
   private readonly api = inject(BudgetTreeApi);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
 
   readonly canManage = computed(() => this.auth.can('budget.book'));
+
+  /**
+   * The actions column exists only for a user who may book, and it is pinned so edit
+   * and delete stay reachable while this wide table scrolls sideways.
+   */
+  readonly columns = computed<ColumnDef[]>(() => {
+    const cols: ColumnDef[] = [
+      { key: 'issueDate', label: this.i18n.translate('invoices.col.issueDate'), width: '9rem' },
+      { key: 'dueDate', label: this.i18n.translate('invoices.col.dueDate'), width: '9rem' },
+      // The number is what names an invoice, so it heads the card. Net and tax are off
+      // it: gross is the figure a reader checks, and the split belongs to the detail.
+      { key: 'number', label: this.i18n.translate('invoices.col.number'), card: 'title' },
+      { key: 'supplier', label: this.i18n.translate('invoices.col.supplier') },
+      { key: 'net', label: this.i18n.translate('invoices.col.net'), align: 'end', card: 'hidden' },
+      { key: 'tax', label: this.i18n.translate('invoices.col.tax'), align: 'end', card: 'hidden' },
+      { key: 'gross', label: this.i18n.translate('invoices.col.gross'), align: 'end' },
+      { key: 'status', label: this.i18n.translate('invoices.col.status') },
+      { key: 'file', label: this.i18n.translate('invoices.col.file') },
+    ];
+    if (this.canManage()) {
+      cols.push({
+        key: 'actions',
+        label: this.i18n.translate('table.actions'),
+        align: 'end',
+        width: '7rem',
+        sticky: 'end',
+      });
+    }
+    return cols;
+  });
+
+  /** Track by the invoice id, so paging in more rows does not re-create the earlier ones. */
+  readonly rowId = (row: unknown): unknown => (row as Invoice).id;
 
   private readonly PAGE = 20;
   readonly items = signal<Invoice[]>([]);
@@ -102,19 +146,52 @@ export class InvoicesComponent implements OnDestroy {
   readonly issueTo = signal('');
   readonly dueFrom = signal('');
   readonly dueTo = signal('');
+  /** Exact-invoice filter for a deep link, such as a hit in the global search. Only the
+   *  URL sets it and no control shows it. It still counts as an active filter, so the
+   *  reset button clears it and the badge says the list is narrowed. */
+  readonly invoiceId = signal('');
+
+  /**
+   * Every filter, declared once.
+   *
+   * The count, the reset and the request each had their own hand-kept list. A filter
+   * added to one and forgotten in another is invisible: the control moves, the badge
+   * counts, and the list does not change. `filterSignals` is what the spec walks.
+   *
+   * `q` is not cleared by the reset. It is the search box in the page header, outside
+   * the filter panel the reset button belongs to. This mirrors /expenses.
+   */
+  readonly filterSignals: readonly {
+    readonly signal: WritableSignal<string>;
+    readonly key: keyof InvoiceQuery;
+    readonly clearedByReset: boolean;
+    readonly numeric?: boolean;
+  }[] = [
+    { signal: this.statusFilter as WritableSignal<string>, key: 'status', clearedByReset: true },
+    { signal: this.invoiceId, key: 'id', clearedByReset: true },
+    { signal: this.grossMin, key: 'grossMin', clearedByReset: true, numeric: true },
+    { signal: this.grossMax, key: 'grossMax', clearedByReset: true, numeric: true },
+    { signal: this.issueFrom, key: 'issueFrom', clearedByReset: true },
+    { signal: this.issueTo, key: 'issueTo', clearedByReset: true },
+    { signal: this.dueFrom, key: 'dueFrom', clearedByReset: true },
+    { signal: this.dueTo, key: 'dueTo', clearedByReset: true },
+    { signal: this.q, key: 'q', clearedByReset: false },
+  ];
+
+  /** Active filters as the query part of a list request. */
+  filterParams(): InvoiceQuery {
+    const params: InvoiceQuery = {};
+    for (const f of this.filterSignals) {
+      const value = f.signal().trim();
+      if (value === '') continue;
+      Object.assign(params, { [f.key]: f.numeric ? Number(value) : value });
+    }
+    return params;
+  }
 
   /** Number of active filters for the filter-button indicator. The search stays out. */
   readonly activeFilterCount = computed(
-    () =>
-      [
-        this.statusFilter(),
-        this.grossMin().trim(),
-        this.grossMax().trim(),
-        this.issueFrom(),
-        this.issueTo(),
-        this.dueFrom(),
-        this.dueTo(),
-      ].filter((v) => String(v ?? '').trim() !== '').length,
+    () => this.filterSignals.filter((f) => f.clearedByReset && f.signal().trim() !== '').length,
   );
 
   readonly sentinel = viewChild<ElementRef<HTMLElement>>('sentinel');
@@ -147,13 +224,7 @@ export class InvoicesComponent implements OnDestroy {
   }
 
   resetFilters(): void {
-    this.statusFilter.set('');
-    this.grossMin.set('');
-    this.grossMax.set('');
-    this.issueFrom.set('');
-    this.issueTo.set('');
-    this.dueFrom.set('');
-    this.dueTo.set('');
+    for (const f of this.filterSignals) if (f.clearedByReset) f.signal.set('');
     this.reload();
   }
 
@@ -209,7 +280,39 @@ export class InvoicesComponent implements OnDestroy {
   readonly confirmDelete = signal<Invoice | null>(null);
 
   constructor() {
+    this.adoptUrlFilters(this.route.snapshot.queryParamMap);
     this.reload();
+
+    // The palette can send us here while we are already here: a hit on another invoice
+    // changes only the query string, and the router keeps this component alive. Without
+    // this the URL named one invoice and the list went on showing the previous one.
+    this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((qp) => {
+      if (this.adoptUrlFilters(qp)) this.reload();
+    });
+
+    // Write the filters back, so the URL always states what the list is showing.
+    //
+    // Reading the URL without writing it let the two drift apart, and the drift broke
+    // the palette. Reset cleared the filters but left `?id=…` behind; picking that same
+    // invoice again then navigated to the URL the browser was ALREADY on, the router
+    // dropped it as a same-URL navigation, `queryParamMap` never emitted — and nothing
+    // happened at all. Keeping the URL true means the palette's target differs from the
+    // current URL exactly when the list would actually change.
+    //
+    // `replaceUrl`, so filtering does not fill the back button with one entry per
+    // keystroke. This mirrors /expenses.
+    effect(() => {
+      const queryParams: Record<string, string | null> = {};
+      for (const f of this.filterSignals) {
+        queryParams[f.key as string] = f.signal().trim() || null;
+      }
+      void this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams,
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
+      });
+    });
 
     // Infinite scroll. When the sentinel at the list end appears, load the next page.
     effect((onCleanup) => {
@@ -226,8 +329,53 @@ export class InvoicesComponent implements OnDestroy {
     });
   }
 
+  /**
+   * Adopt the filters the URL carries. Returns whether any of them changed.
+   *
+   * `/invoices?id=…` is where a global-search hit lands. This runs before the first
+   * request rather than after it: reading it later would fire an unfiltered request
+   * first, and that one can resolve last and overwrite the filtered list.
+   *
+   * `id` is the only one read. This page does not write its panel filters into the URL,
+   * so a parameter that is absent says nothing about what the reader has set, and
+   * clearing on absence would wipe it.
+   */
+  private adoptUrlFilters(qp: ParamMap): boolean {
+    let changed = false;
+    for (const f of this.filterSignals) {
+      // Absence clears. Every one of these is written back by the effect in the
+      // constructor, so a parameter that is gone was taken away rather than merely
+      // omitted — the same rule /expenses states. Reading only what was present is what
+      // let a filter survive in the list after the URL had dropped it.
+      const next = this.sanitizeFilter(f, qp.get(f.key as string) ?? '');
+      if (next !== f.signal()) {
+        f.signal.set(next);
+        changed = true;
+      }
+    }
+    return changed;
+  }
+
+  /**
+   * A query string is typed by whoever holds the link, so it can name a value the panel
+   * itself could never produce. Reading every filter from it — rather than only `id` —
+   * is what makes that reachable, so each one is checked on the way in: a bad number
+   * would otherwise reach the request as `NaN`, and a bad status as a word the API has
+   * no case for.
+   */
+  private sanitizeFilter(
+    f: { readonly key: keyof InvoiceQuery; readonly numeric?: boolean },
+    raw: string,
+  ): string {
+    const value = raw.trim();
+    if (value === '') return '';
+    if (f.numeric) return Number.isFinite(Number(value)) ? value : '';
+    if (f.key === 'status') return value === 'open' || value === 'paid' ? value : '';
+    return value;
+  }
+
   money(amount: string): string {
-    return Number(amount).toLocaleString(this.i18n.locale() === 'en' ? 'en-US' : 'de-DE', {
+    return Number(amount).toLocaleString(this.i18n.formatLocale(), {
       style: 'currency',
       currency: 'EUR',
     });
@@ -254,14 +402,7 @@ export class InvoicesComponent implements OnDestroy {
   private fetch(initial: boolean): void {
     this.api
       .listInvoicesPaged({
-        q: this.q().trim() || undefined,
-        status: this.statusFilter() || undefined,
-        grossMin: this.grossMin().trim() ? Number(this.grossMin()) : undefined,
-        grossMax: this.grossMax().trim() ? Number(this.grossMax()) : undefined,
-        issueFrom: this.issueFrom() || undefined,
-        issueTo: this.issueTo() || undefined,
-        dueFrom: this.dueFrom() || undefined,
-        dueTo: this.dueTo() || undefined,
+        ...this.filterParams(),
         limit: this.PAGE,
         offset: this.nextOffset,
       })

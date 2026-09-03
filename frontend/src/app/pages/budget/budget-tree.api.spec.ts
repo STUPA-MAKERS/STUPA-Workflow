@@ -202,7 +202,7 @@ describe('BudgetTreeApi', () => {
     req.flush(null);
   });
 
-  describe('sub-bookings (#subbookings)', () => {
+  describe('sub-bookings', () => {
     it('listSubBookings GETs /budget-expenses/:id/sub-bookings', () => {
       api.listSubBookings('e-1').subscribe();
       const req = http.expectOne(`${BASE}/budget-expenses/e-1/sub-bookings`);
@@ -388,13 +388,15 @@ describe('BudgetTreeApi', () => {
 });
 
 describe('re-exported simplifyPathKey', () => {
-  it('is the shared implementation', () => {
-    expect(simplifyPathKey('VSM-8-81-810')).toBe('VSM-810');
+  it('is the shared implementation, which now passes the path through', () => {
+    // The collapsing was dropped as too unstable; `shared/budget-path.spec.ts` owns the
+    // behaviour. This only pins that the re-export still points at the same function.
+    expect(simplifyPathKey('VSM-8-81-810')).toBe('VSM-8-81-810');
   });
 });
 
 describe('flattenBudgetOptions', () => {
-  it('pre-order flattens with simplified "pathKey – name" labels', () => {
+  it('pre-order flattens with "pathKey – name" labels', () => {
     const tree = [
       node({
         id: 'a',
@@ -406,8 +408,8 @@ describe('flattenBudgetOptions', () => {
       }),
     ];
     expect(flattenBudgetOptions(tree)).toEqual([
-      { value: 'a', label: 'VS-81 – Root' },
-      { value: 'b', label: 'VS-81-330 – Child' },
+      { value: 'a', label: 'VS-8-81 – Root' },
+      { value: 'b', label: 'VS-8-81-330 – Child' },
     ]);
   });
 

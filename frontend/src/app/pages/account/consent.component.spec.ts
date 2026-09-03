@@ -47,7 +47,7 @@ async function setup(api = makeApi()) {
   return { ...view, api, cmp };
 }
 
-describe('OAuthConsentComponent (#MCP)', () => {
+describe('OAuthConsentComponent', () => {
   beforeEach(() => {
     localStorage.setItem('ap.locale', 'de');
     loc = createLocationMock();

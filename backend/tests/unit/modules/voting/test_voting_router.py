@@ -47,7 +47,7 @@ class _FakeService:
         self.cast_args: dict[str, object] | None = None
 
     async def assert_can_manage_group(self, eligible_group, meeting_id, principal):  # noqa: ANN001
-        # Mirrors the real service gate (#AUD-027) on the router path. The admin role or
+        # Mirrors the real service gate on the router path. The admin role or
         # a global vote.manage passes. The integration test covers the per-Gremium
         # resolution against the DB. Everything else fails closed with a 403.
         if "admin" in principal.roles or principal.has("vote.manage"):

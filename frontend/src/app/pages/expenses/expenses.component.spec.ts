@@ -1,10 +1,8 @@
+import { BehaviorSubject, of } from 'rxjs';
 import { provideHttpClient } from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { ActivatedRoute, Router, provideRouter } from '@angular/router';
+import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { AuthService } from '@core/auth/auth.service';
@@ -18,6 +16,18 @@ import type {
   FiscalYear,
   Invoice,
 } from '../budget/budget-tree.api';
+
+/**
+ * An `ActivatedRoute` carrying query params.
+ *
+ * Both the snapshot and the stream: the page reads the snapshot for its first request and
+ * then follows the stream, because the palette can navigate to this page while it is
+ * already open and only the query string changes.
+ */
+function routeStub(query: [string, string][]) {
+  const map = convertToParamMap(Object.fromEntries(query));
+  return { snapshot: { queryParamMap: map }, queryParamMap: of(map) };
+}
 
 const EXPENSE: Expense = {
   id: 'e-1',
@@ -230,9 +240,12 @@ function build(
       provideHttpClient(),
       provideHttpClientTesting(),
       provideRouter([]),
-      { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: new Map() } } },
+      { provide: ActivatedRoute, useValue: routeStub([]) },
       { provide: USE_MOCK_API, useValue: false },
-      { provide: AuthService, useValue: fakeAuth(opts.perms ?? ['budget.view', 'budget.book', 'budget.export']) },
+      {
+        provide: AuthService,
+        useValue: fakeAuth(opts.perms ?? ['budget.view', 'budget.book', 'budget.export']),
+      },
     ],
   });
   const http = TestBed.inject(HttpTestingController);
@@ -244,7 +257,13 @@ function build(
 
   const invReq = http.expectOne((r) => r.url.endsWith('/invoices') && r.method === 'GET');
   if (opts.invoicesError) invReq.error(new ProgressEvent('err'));
-  else invReq.flush({ items: opts.invoices ?? [], total: (opts.invoices ?? []).length, limit: 200, offset: 0 });
+  else
+    invReq.flush({
+      items: opts.invoices ?? [],
+      total: (opts.invoices ?? []).length,
+      limit: 200,
+      offset: 0,
+    });
 
   const expReq = http.expectOne((r) => r.url.endsWith('/expenses') && r.method === 'GET');
   if (opts.expensesError) expReq.error(new ProgressEvent('err'));
@@ -336,14 +355,20 @@ describe('ExpensesComponent (unit)', () => {
   });
 
   it('invoiceLabel falls back gracefully for sparse invoices', () => {
-    const sparse: Invoice = { ...INVOICE, id: 'inv-2', number: null, supplier: null, grossAmount: '5.00' };
+    const sparse: Invoice = {
+      ...INVOICE,
+      id: 'inv-2',
+      number: null,
+      supplier: null,
+      grossAmount: '5.00',
+    };
     const { cmp } = build({ invoices: [sparse] });
     // Only the amount remains (number/supplier filtered out).
     expect(cmp.invoiceOptions()[0].label).toMatch(/5,00\s?€/);
     expect(cmp.invoiceOptions()[0].label).not.toContain('·');
   });
 
-  it('lists only open invoices; edit keeps a linked paid invoice visible (#invoices)', () => {
+  it('lists only open invoices; edit keeps a linked paid invoice visible', () => {
     const paid: Invoice = { ...INVOICE, id: 'inv-paid', number: 'RE-PAID', status: 'paid' };
     const { cmp } = build({ invoices: [INVOICE, paid] });
     // Create dropdown: only open invoices (paid ones hidden).
@@ -355,7 +380,7 @@ describe('ExpensesComponent (unit)', () => {
     expect(cmp.editInvoiceOptions().map((o) => o.value)).toEqual(['inv-paid', 'inv-1']);
   });
 
-  it('sorts open invoices by issue date, newest first (#invoices)', () => {
+  it('sorts open invoices by issue date, newest first', () => {
     const older: Invoice = { ...INVOICE, id: 'inv-old', issueDate: '2026-01-01' };
     const newer: Invoice = { ...INVOICE, id: 'inv-new', issueDate: '2026-09-01' };
     const { cmp } = build({ invoices: [older, newer] });
@@ -560,7 +585,9 @@ describe('ExpensesComponent (unit)', () => {
     const { cmp, http } = build({ tree: ROOT_TREE });
     cmp.fiscalYearOptions.set([{ value: 'x', label: 'X' }]);
     cmp.onPickBudget('child-1');
-    http.expectOne((r) => r.url.endsWith('/budgets/top-1/fiscal-years')).error(new ProgressEvent('err'));
+    http
+      .expectOne((r) => r.url.endsWith('/budgets/top-1/fiscal-years'))
+      .error(new ProgressEvent('err'));
     expect(cmp.fiscalYearOptions()).toEqual([]);
   });
 
@@ -664,7 +691,10 @@ describe('ExpensesComponent (unit)', () => {
 
   it('create surfaces the problem+json detail on error, else a generic message', () => {
     const { cmp, http } = build();
-    const toastSpy = jest.spyOn((cmp as unknown as { toast: { error: (m: string) => void } }).toast, 'error');
+    const toastSpy = jest.spyOn(
+      (cmp as unknown as { toast: { error: (m: string) => void } }).toast,
+      'error',
+    );
     cmp.newDescription.set('x');
     cmp.newAmount.set('1');
     cmp.newApplicationId.set('app-1');
@@ -855,7 +885,9 @@ describe('ExpensesComponent (unit)', () => {
     cmp.editCategory.set(' Z ');
     cmp.editNote.set(' note ');
     cmp.saveEdit(new Event('submit'));
-    const req = http.expectOne((r) => r.url.endsWith('/budget-expenses/e-1') && r.method === 'PATCH');
+    const req = http.expectOne(
+      (r) => r.url.endsWith('/budget-expenses/e-1') && r.method === 'PATCH',
+    );
     expect(req.request.body).toMatchObject({
       amount: '200',
       description: 'Neu',
@@ -886,7 +918,9 @@ describe('ExpensesComponent (unit)', () => {
     cmp.editCategory.set('');
     cmp.editNote.set('');
     cmp.saveEdit(new Event('submit'));
-    const req = http.expectOne((r) => r.url.endsWith('/budget-expenses/e-1') && r.method === 'PATCH');
+    const req = http.expectOne(
+      (r) => r.url.endsWith('/budget-expenses/e-1') && r.method === 'PATCH',
+    );
     expect(req.request.body).toMatchObject({
       invoiceId: null,
       invoiceDate: null,
@@ -912,7 +946,10 @@ describe('ExpensesComponent (unit)', () => {
 
   it('saveEdit toasts a generic failure on error', () => {
     const { cmp, http } = build();
-    const toastSpy = jest.spyOn((cmp as unknown as { toast: { error: (m: string) => void } }).toast, 'error');
+    const toastSpy = jest.spyOn(
+      (cmp as unknown as { toast: { error: (m: string) => void } }).toast,
+      'error',
+    );
     cmp.openEdit(EXPENSE);
     cmp.saveEdit(new Event('submit'));
     http
@@ -928,7 +965,9 @@ describe('ExpensesComponent (unit)', () => {
     cmp.askDelete(EXPENSE);
     expect(cmp.confirmDelete()).toBe(EXPENSE);
     cmp.doDelete();
-    http.expectOne((r) => r.url.endsWith('/budget-expenses/e-1') && r.method === 'DELETE').flush(null);
+    http
+      .expectOne((r) => r.url.endsWith('/budget-expenses/e-1') && r.method === 'DELETE')
+      .flush(null);
     expect(cmp.confirmDelete()).toBeNull();
     expect(cmp.items().map((x) => x.id)).toEqual(['e-2']);
     expect(cmp.total()).toBe(1);
@@ -939,7 +978,9 @@ describe('ExpensesComponent (unit)', () => {
     const { cmp, http } = build({ expenses: page([EXPENSE], 0) });
     cmp.confirmDelete.set(EXPENSE);
     cmp.doDelete();
-    http.expectOne((r) => r.url.endsWith('/budget-expenses/e-1') && r.method === 'DELETE').flush(null);
+    http
+      .expectOne((r) => r.url.endsWith('/budget-expenses/e-1') && r.method === 'DELETE')
+      .flush(null);
     expect(cmp.total()).toBe(0);
   });
 
@@ -955,7 +996,10 @@ describe('ExpensesComponent (unit)', () => {
 
   it('doDelete toasts a failure on error', () => {
     const { cmp, http } = build({ expenses: page([EXPENSE], 1) });
-    const toastSpy = jest.spyOn((cmp as unknown as { toast: { error: (m: string) => void } }).toast, 'error');
+    const toastSpy = jest.spyOn(
+      (cmp as unknown as { toast: { error: (m: string) => void } }).toast,
+      'error',
+    );
     cmp.confirmDelete.set(EXPENSE);
     cmp.doDelete();
     http
@@ -971,7 +1015,9 @@ describe('ExpensesComponent (unit)', () => {
     (URL as unknown as { revokeObjectURL?: unknown }).revokeObjectURL = () => undefined;
     const createObjSpy = jest.spyOn(URL, 'createObjectURL').mockReturnValue('blob:mock');
     const revokeSpy = jest.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
-    const clickSpy = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    const clickSpy = jest
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(() => undefined);
     const { cmp, http } = build();
     cmp.budgetId.set('b-1');
     cmp.kind.set('expense');
@@ -1067,7 +1113,9 @@ describe('ExpensesComponent (unit)', () => {
     // known but error → options reset
     cmp.transferFyOptions.set([{ value: 'x', label: 'X' }]);
     cmp.onTransferFrom('child-1');
-    http.expectOne((r) => r.url.endsWith('/budgets/top-1/fiscal-years')).error(new ProgressEvent('err'));
+    http
+      .expectOne((r) => r.url.endsWith('/budgets/top-1/fiscal-years'))
+      .error(new ProgressEvent('err'));
     expect(cmp.transferFyOptions()).toEqual([]);
   });
 
@@ -1136,7 +1184,10 @@ describe('ExpensesComponent (unit)', () => {
 
   it('createTransfer surfaces the problem detail on error', () => {
     const { cmp, http } = build();
-    const toastSpy = jest.spyOn((cmp as unknown as { toast: { error: (m: string) => void } }).toast, 'error');
+    const toastSpy = jest.spyOn(
+      (cmp as unknown as { toast: { error: (m: string) => void } }).toast,
+      'error',
+    );
     cmp.tFromId.set('a');
     cmp.tToId.set('b');
     cmp.tFiscalYearId.set('fy-1');
@@ -1164,8 +1215,13 @@ const SUB: Expense = {
   description: 'Teilzahlung',
 };
 
-function toastSpies(cmp: ExpensesComponent): { success: jest.SpyInstance; error: jest.SpyInstance } {
-  const toast = (cmp as unknown as { toast: { success: (m: string) => void; error: (m: string) => void } }).toast;
+function toastSpies(cmp: ExpensesComponent): {
+  success: jest.SpyInstance;
+  error: jest.SpyInstance;
+} {
+  const toast = (
+    cmp as unknown as { toast: { success: (m: string) => void; error: (m: string) => void } }
+  ).toast;
   return { success: jest.spyOn(toast, 'success'), error: jest.spyOn(toast, 'error') };
 }
 
@@ -1196,10 +1252,9 @@ describe('ExpensesComponent (descriptions)', () => {
     cmp.toggleDesc('e-1');
     expect(cmp.descExpanded('e-1')).toBe(false);
   });
-
 });
 
-describe('ExpensesComponent (sub-bookings #subbookings)', () => {
+describe('ExpensesComponent (sub-bookings)', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
   afterEach(() => {
     try {
@@ -1217,7 +1272,9 @@ describe('ExpensesComponent (sub-bookings #subbookings)', () => {
     expect(cmp.isSubExpanded('parent-1')).toBe(true);
     expect(cmp.isLoadingSub('parent-1')).toBe(true);
     http
-      .expectOne((r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings') && r.method === 'GET')
+      .expectOne(
+        (r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings') && r.method === 'GET',
+      )
       .flush([SUB]);
     expect(cmp.isLoadingSub('parent-1')).toBe(false);
     expect(cmp.subOf('parent-1')).toEqual([SUB]);
@@ -1236,7 +1293,9 @@ describe('ExpensesComponent (sub-bookings #subbookings)', () => {
     const { error } = toastSpies(cmp);
     cmp.toggleSub(PARENT);
     http
-      .expectOne((r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings') && r.method === 'GET')
+      .expectOne(
+        (r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings') && r.method === 'GET',
+      )
       .error(new ProgressEvent('err'));
     expect(cmp.isLoadingSub('parent-1')).toBe(false);
     expect(error).toHaveBeenCalledWith('Unterbuchungen konnten nicht geladen werden.');
@@ -1294,7 +1353,9 @@ describe('ExpensesComponent (sub-bookings #subbookings)', () => {
     expect(success).toHaveBeenCalledWith('Unterbuchung hinzugefügt.');
     // reload the child list and the parent amount, which is the sum of the children
     http
-      .expectOne((r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings') && r.method === 'GET')
+      .expectOne(
+        (r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings') && r.method === 'GET',
+      )
       .flush([SUB]);
     flushList(http, page([PARENT], 1));
   });
@@ -1317,7 +1378,9 @@ describe('ExpensesComponent (sub-bookings #subbookings)', () => {
     });
     req.flush(SUB);
     http
-      .expectOne((r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings') && r.method === 'GET')
+      .expectOne(
+        (r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings') && r.method === 'GET',
+      )
       .flush([SUB]);
     flushList(http, page([PARENT], 1));
   });
@@ -1346,7 +1409,9 @@ describe('ExpensesComponent (sub-bookings #subbookings)', () => {
     cmp.subDescription.set('Teil');
     cmp.createSub(new Event('submit'));
     http
-      .expectOne((r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings') && r.method === 'POST')
+      .expectOne(
+        (r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings') && r.method === 'POST',
+      )
       .error(new ProgressEvent('err'));
     expect(cmp.saving()).toBe(false);
     // dialog stays open for correction.
@@ -1365,7 +1430,9 @@ describe('ExpensesComponent (sub-bookings #subbookings)', () => {
     expect(cmp.editing()).toBeNull();
     // parentExpenseId is set, so the parent panel and the list reload for the amount
     http
-      .expectOne((r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings') && r.method === 'GET')
+      .expectOne(
+        (r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings') && r.method === 'GET',
+      )
       .flush([{ ...SUB, description: 'Teil neu' }]);
     flushList(http, page([PARENT], 1));
     expect(cmp.subOf('parent-1')[0].description).toBe('Teil neu');
@@ -1376,7 +1443,9 @@ describe('ExpensesComponent (sub-bookings #subbookings)', () => {
     cmp.openEdit(PARENT);
     cmp.editBudgetId.set('b-2'); // standalone + changed → gets sent
     cmp.saveEdit(new Event('submit'));
-    const req = http.expectOne((r) => r.url.endsWith('/budget-expenses/parent-1') && r.method === 'PATCH');
+    const req = http.expectOne(
+      (r) => r.url.endsWith('/budget-expenses/parent-1') && r.method === 'PATCH',
+    );
     expect(req.request.body).toMatchObject({ budgetId: 'b-2' });
     // the amount did not change and stays read-only on the server, so it is not sent
     expect((req.request.body as Record<string, unknown>)['amount']).toBeUndefined();
@@ -1389,18 +1458,22 @@ describe('ExpensesComponent (sub-bookings #subbookings)', () => {
     const { cmp, http } = build({ expenses: page([PARENT], 1) });
     cmp.askDelete(SUB);
     cmp.doDelete();
-    http.expectOne((r) => r.url.endsWith('/budget-expenses/sub-1') && r.method === 'DELETE').flush(null);
+    http
+      .expectOne((r) => r.url.endsWith('/budget-expenses/sub-1') && r.method === 'DELETE')
+      .flush(null);
     expect(cmp.confirmDelete()).toBeNull();
     // the parent row stays in the list. Reload the panel and the list instead.
     http
-      .expectOne((r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings') && r.method === 'GET')
+      .expectOne(
+        (r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings') && r.method === 'GET',
+      )
       .flush([]);
     flushList(http, page([PARENT], 1));
     expect(cmp.items().map((x) => x.id)).toEqual(['parent-1']);
   });
 });
 
-describe('ExpensesComponent (invoice detail #invoices)', () => {
+describe('ExpensesComponent (invoice detail)', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
   afterEach(() => {
     try {
@@ -1448,11 +1521,15 @@ describe('ExpensesComponent (invoice detail #invoices)', () => {
     (URL as unknown as { revokeObjectURL?: unknown }).revokeObjectURL = () => undefined;
     const createObjSpy = jest.spyOn(URL, 'createObjectURL').mockReturnValue('blob:mock');
     const revokeSpy = jest.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
-    const clickSpy = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    const clickSpy = jest
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(() => undefined);
     const { cmp, http } = build();
     // a null fileName falls back to 'beleg.pdf'
     cmp.openInvoiceFile({ ...INVOICE, fileName: null });
-    http.expectOne((r) => r.url.endsWith('/invoices/inv-1/file') && r.method === 'GET').flush(new Blob(['pdf']));
+    http
+      .expectOne((r) => r.url.endsWith('/invoices/inv-1/file') && r.method === 'GET')
+      .flush(new Blob(['pdf']));
     expect(createObjSpy).toHaveBeenCalled();
     expect(clickSpy).toHaveBeenCalled();
     createObjSpy.mockRestore();
@@ -1511,9 +1588,9 @@ describe('ExpensesComponent (infinite scroll)', () => {
     expect(observe).toHaveBeenCalled();
     // the sentinel becomes visible, so loadMore fetches the second page
     trigger?.([{ isIntersecting: true }]);
-    http.match((r) => r.url.endsWith('/expenses') && r.method === 'GET').forEach((req) =>
-      req.flush(page([{ ...EXPENSE, id: 'e-2' }], 3, 1)),
-    );
+    http
+      .match((r) => r.url.endsWith('/expenses') && r.method === 'GET')
+      .forEach((req) => req.flush(page([{ ...EXPENSE, id: 'e-2' }], 3, 1)));
     // the sentinel is not visible, so no further request runs
     trigger?.([{ isIntersecting: false }]);
     http.expectNone((r) => r.url.endsWith('/expenses') && r.method === 'GET');
@@ -1523,18 +1600,24 @@ describe('ExpensesComponent (infinite scroll)', () => {
   });
 });
 
-// Bulk actions, cross-links and URL sync (#expenses-ux). The facade adds these members
+// Bulk actions, cross-links and URL sync. The facade adds these members
 // on top of the state modules. They are the selection, the bulk delete, the bulk export
 // and reassign, ksLink, and the query-param adoption and mirror effects.
 
 /** Stub URL.createObjectURL, URL.revokeObjectURL and the anchor click for blob
  *  downloads. */
-function stubDownload(): { create: jest.SpyInstance; click: jest.SpyInstance; restore: () => void } {
+function stubDownload(): {
+  create: jest.SpyInstance;
+  click: jest.SpyInstance;
+  restore: () => void;
+} {
   (URL as unknown as { createObjectURL?: unknown }).createObjectURL = () => 'blob:mock';
   (URL as unknown as { revokeObjectURL?: unknown }).revokeObjectURL = () => undefined;
   const create = jest.spyOn(URL, 'createObjectURL').mockReturnValue('blob:mock');
   const revoke = jest.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
-  const click = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+  const click = jest
+    .spyOn(HTMLAnchorElement.prototype, 'click')
+    .mockImplementation(() => undefined);
   return {
     create,
     click,
@@ -1546,7 +1629,7 @@ function stubDownload(): { create: jest.SpyInstance; click: jest.SpyInstance; re
   };
 }
 
-describe('ExpensesComponent (batch/bulk #expenses-ux)', () => {
+describe('ExpensesComponent (batch/bulk)', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
   afterEach(() => {
     try {
@@ -1621,8 +1704,12 @@ describe('ExpensesComponent (batch/bulk #expenses-ux)', () => {
     cmp.toggleSelect('e-2', true);
     cmp.askBulk('delete');
     cmp.runBulk();
-    http.expectOne((r) => r.url.endsWith('/budget-expenses/e-1') && r.method === 'DELETE').flush(null);
-    http.expectOne((r) => r.url.endsWith('/budget-expenses/e-2') && r.method === 'DELETE').flush(null);
+    http
+      .expectOne((r) => r.url.endsWith('/budget-expenses/e-1') && r.method === 'DELETE')
+      .flush(null);
+    http
+      .expectOne((r) => r.url.endsWith('/budget-expenses/e-2') && r.method === 'DELETE')
+      .flush(null);
     // the bulk epilogue refreshes the list with one GET /expenses for the window
     flushList(http, page([], 0));
     expect(cmp.bulkConfirm()).toBeNull();
@@ -1713,11 +1800,15 @@ describe('ExpensesComponent (batch/bulk #expenses-ux)', () => {
     cmp.bulkCategory.set('  Reise  ');
     cmp.runBulkReassign();
     // a standalone booking takes budgetId and category
-    const r1 = http.expectOne((r) => r.url.endsWith('/budget-expenses/e-1') && r.method === 'PATCH');
+    const r1 = http.expectOne(
+      (r) => r.url.endsWith('/budget-expenses/e-1') && r.method === 'PATCH',
+    );
     expect(r1.request.body).toEqual({ category: 'Reise', budgetId: 'b-9' });
     r1.flush({ ...EXPENSE });
     // a bound booking takes only the category, because the application sets the cost center
-    const r2 = http.expectOne((r) => r.url.endsWith('/budget-expenses/e-bound') && r.method === 'PATCH');
+    const r2 = http.expectOne(
+      (r) => r.url.endsWith('/budget-expenses/e-bound') && r.method === 'PATCH',
+    );
     expect(r2.request.body).toEqual({ category: 'Reise' });
     r2.flush({ ...bound });
     flushList(http, page([EXPENSE, bound], 2));
@@ -1732,7 +1823,9 @@ describe('ExpensesComponent (batch/bulk #expenses-ux)', () => {
     cmp.openBulkReassign();
     cmp.bulkBudgetId.set('b-7'); // no category → the category branch stays false
     cmp.runBulkReassign();
-    const req = http.expectOne((r) => r.url.endsWith('/budget-expenses/e-1') && r.method === 'PATCH');
+    const req = http.expectOne(
+      (r) => r.url.endsWith('/budget-expenses/e-1') && r.method === 'PATCH',
+    );
     expect(req.request.body).toEqual({ budgetId: 'b-7' });
     req.flush({ ...EXPENSE });
     flushList(http, page([EXPENSE], 1));
@@ -1820,7 +1913,7 @@ describe('ExpensesComponent (batch/bulk #expenses-ux)', () => {
   });
 });
 
-describe('ExpensesComponent (query-param adoption #expenses-ux)', () => {
+describe('ExpensesComponent (query-param adoption)', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
   afterEach(() => {
     try {
@@ -1830,13 +1923,16 @@ describe('ExpensesComponent (query-param adoption #expenses-ux)', () => {
     }
   });
 
-  function buildWithQuery(query: [string, string][]): { cmp: ExpensesComponent; http: HttpTestingController } {
+  function buildWithQuery(query: [string, string][]): {
+    cmp: ExpensesComponent;
+    http: HttpTestingController;
+  } {
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([]),
-        { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: new Map(query) } } },
+        { provide: ActivatedRoute, useValue: routeStub(query) },
         { provide: USE_MOCK_API, useValue: false },
         { provide: AuthService, useValue: fakeAuth(['budget.view', 'budget.book']) },
       ],
@@ -1886,10 +1982,51 @@ describe('ExpensesComponent (query-param adoption #expenses-ux)', () => {
     expect(req.request.params.has('id')).toBe(false);
     req.flush(page([]));
   });
+
+  it('re-filters when the palette sends it here while it is already here', () => {
+    // Same route, new query string: the router keeps this component. Reading the
+    // snapshot once would leave the list showing the booking the reader came from, and
+    // the write-back effect would put that id straight back into the URL.
+    const params = new BehaviorSubject(convertToParamMap({ id: 'e-42' }));
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        {
+          provide: ActivatedRoute,
+          useValue: { snapshot: { queryParamMap: params.value }, queryParamMap: params },
+        },
+        { provide: USE_MOCK_API, useValue: false },
+        { provide: AuthService, useValue: fakeAuth(['budget.view', 'budget.book']) },
+      ],
+    });
+    const http = TestBed.inject(HttpTestingController);
+    const cmp = TestBed.runInInjectionContext(() => new ExpensesComponent());
+    http.expectOne((r) => r.url.endsWith('/budgets')).flush([]);
+    http
+      .expectOne((r) => r.url.endsWith('/invoices') && r.method === 'GET')
+      .flush({ items: [], total: 0, limit: 200, offset: 0 });
+    http.expectOne((r) => r.url.endsWith('/expenses') && r.method === 'GET').flush(page([]));
+
+    params.next(convertToParamMap({ id: 'e-9' }));
+    expect(cmp.expenseId()).toBe('e-9');
+    const again = http.expectOne((r) => r.url.endsWith('/expenses') && r.method === 'GET');
+    expect(again.request.params.get('id')).toBe('e-9');
+    again.flush(page([]));
+
+    // A parameter that goes away clears its filter. Every one of these four is written
+    // back into the URL, so absence means the reader took it away.
+    params.next(convertToParamMap({}));
+    expect(cmp.expenseId()).toBe('');
+    const cleared = http.expectOne((r) => r.url.endsWith('/expenses') && r.method === 'GET');
+    expect(cleared.request.params.has('id')).toBe(false);
+    cleared.flush(page([]));
+  });
 });
 
 // The window reload that ExpensesListState runs after a mutation, tested in isolation.
-describe('ExpensesListState.refresh (#expenses-ux)', () => {
+describe('ExpensesListState.refresh', () => {
   afterEach(() => {
     try {
       TestBed.inject(HttpTestingController).verify();
@@ -1909,7 +2046,7 @@ describe('ExpensesListState.refresh (#expenses-ux)', () => {
     const http = TestBed.inject(HttpTestingController);
     const state = TestBed.runInInjectionContext(() => new ExpensesListState());
     http.expectOne((r) => r.url.endsWith('/budgets')).flush([]);
-    // The state no longer loads on its own (#expenses-ux2). The component fires the
+    // The state no longer loads on its own. The component fires the
     // first reload after it adopts the URL filters. Mirror that here.
     state.reload();
     http.expectOne((r) => r.url.endsWith('/expenses') && r.method === 'GET').flush(page([]));
@@ -1957,7 +2094,9 @@ describe('ExpensesListState.refresh (#expenses-ux)', () => {
   it('clears the refreshing flag on an error', () => {
     const { state, http } = buildState();
     state.refresh();
-    http.expectOne((r) => r.url.endsWith('/expenses') && r.method === 'GET').error(new ProgressEvent('err'));
+    http
+      .expectOne((r) => r.url.endsWith('/expenses') && r.method === 'GET')
+      .error(new ProgressEvent('err'));
     expect(state.refreshing()).toBe(false);
   });
 
@@ -2237,5 +2376,130 @@ describe('ExpensesComponent — transfers tab', () => {
     ctx.detectChanges();
     expect(screen.getByText('Keine Buchungen gefunden.')).toBeInTheDocument();
     ctx.http.verify();
+  });
+
+  it('outlines rows inside the real table while the first page loads', async () => {
+    // Two attempts got this wrong before the migration: first loose bars with no header,
+    // then a hand-rolled skeleton that had to be kept in step with the shared one by
+    // hand. The table is the shared one now, so there is one implementation to be right.
+    const view = await render(ExpensesComponent, {
+      providers: [
+        provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: USE_MOCK_API, useValue: false },
+        { provide: AuthService, useValue: fakeAuth(['budget.view', 'budget.book']) },
+      ],
+    });
+    view.fixture.detectChanges();
+
+    // The shared table now, so the selectors are its own. What matters is unchanged:
+    // the header survives and the rows are outlined INSIDE the table, not instead of it.
+    const table = view.container.querySelector('.dt__table');
+    expect(table).not.toBeNull();
+    expect(table?.querySelectorAll('thead th').length).toBeGreaterThan(0);
+    expect(table?.querySelectorAll('.dt__skeleton-row').length).toBeGreaterThan(0);
+
+    const http = view.fixture.debugElement.injector.get(HttpTestingController);
+    for (const req of http.match(() => true))
+      req.flush({ items: [], total: 0, limit: 50, offset: 0 });
+  });
+});
+
+describe('ExpensesComponent — shared table wiring', () => {
+  it('pins the actions column for a booker', async () => {
+    // Explicit width and `sticky: 'end'`. A self-sized sticky column grew to 246px and
+    // covered the amount beside it, which is the defect this migration inherits a fix
+    // for and must not reintroduce.
+    const { container, fixture } = await setup({
+      perms: ['budget.view', 'budget.book'],
+      page: page([EXPENSE]),
+    });
+    fixture.detectChanges();
+    expect(container.querySelector('tbody td.dt__cell--sticky')).not.toBeNull();
+  });
+
+  it('has no actions column at all for a reader', async () => {
+    const { container, fixture } = await setup({
+      perms: ['budget.view'],
+      page: page([EXPENSE]),
+    });
+    fixture.detectChanges();
+    expect(container.querySelector('.dt__cell--sticky')).toBeNull();
+  });
+
+  it('offers selection to a booker only', async () => {
+    const booker = await setup({
+      perms: ['budget.view', 'budget.book'],
+      page: page([EXPENSE]),
+    });
+    booker.fixture.detectChanges();
+    // In the BODY, not only the select-all in the header: without the pass below, these
+    // assertions ran against the skeleton rows and proved nothing about a real row.
+    expect(booker.container.querySelectorAll('tbody input[type=checkbox]').length).toBeGreaterThan(
+      0,
+    );
+  });
+
+  it('offers no selection to a reader', async () => {
+    const reader = await setup({ perms: ['budget.view'], page: page([EXPENSE]) });
+    reader.fixture.detectChanges();
+    expect(reader.container.querySelectorAll('input[type=checkbox]').length).toBe(0);
+  });
+
+  it('keeps the selection keyed by booking id, so a re-sort cannot move it', async () => {
+    const { container, fixture } = await setup({
+      perms: ['budget.view', 'budget.book'],
+      page: page([
+        { ...EXPENSE, id: 'e-1' },
+        { ...EXPENSE, id: 'e-2' },
+      ]),
+    });
+    fixture.detectChanges();
+    const boxes = container.querySelectorAll<HTMLInputElement>('tbody input[type=checkbox]');
+    boxes[1].click();
+    fixture.detectChanges();
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    expect(c.selected()).toEqual(new Set(['e-2']));
+  });
+});
+
+describe('ExpensesComponent (filters, generically)', () => {
+  /**
+   * Walks the state's own filter list rather than naming filters, so one added later is
+   * covered the day it is declared.
+   *
+   * On /applications the same class of mistake shipped: a filter reached the request but
+   * not the reset, and the panel cleared while the list kept its rows. Here the reset
+   * reloads either way, so the failure is quieter — a filter silently surviving a reset —
+   * which is why it wants a check rather than a pair of eyes.
+   */
+  it('clears every filter it says it clears, and keeps the ones it does not', async () => {
+    const { fixture } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const state = (fixture.componentInstance as any).list;
+
+    for (const f of state.filterSignals) f.signal.set('x');
+    state.resetFilters();
+
+    for (const f of state.filterSignals) {
+      expect(f.signal()).toBe(f.clearedByReset ? '' : 'x');
+    }
+  });
+
+  it('sends every declared filter that has a value', async () => {
+    // The reset list and the request list were spelled out separately; a filter in one
+    // and not the other is invisible until the list stops answering.
+    const { fixture } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const state = (fixture.componentInstance as any).list;
+    for (const f of state.filterSignals) f.signal.set('7');
+
+    const params = state.filterParams();
+    const values = Object.values(params).filter((v) => v !== undefined);
+    // Eight filters plus sort and order.
+    expect(values.length).toBe(state.filterSignals.length + 2);
   });
 });

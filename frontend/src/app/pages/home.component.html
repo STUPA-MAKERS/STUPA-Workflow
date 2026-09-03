@@ -1,7 +1,22 @@
-<section class="hero">
-  <p class="hero__eyebrow">{{ branding.appName() }}</p>
-  <h1 class="my-3">{{ 'home.heading' | t }}</h1>
-  <p class="text-muted text-lg mb-6">{{ 'home.subtitle' | t }}</p>
-  <a routerLink="/apply" class="hero__cta">{{ 'home.cta' | t }}</a>
-  <p class="hero__note text-muted">{{ 'home.statusNote' | t }}</p>
+<section class="home">
+  <h1 class="home__heading">{{ 'home.heading' | t }}</h1>
+
+  <!-- Two ways in, side by side and weighted the same. A visitor is either an applicant
+       or a Gremium member, and the page has no way to tell which, so it must not guess
+       by making one of them the primary action. -->
+  <div class="home__choices">
+    <a routerLink="/apply" class="home__choice">
+      <app-icon name="form" [size]="22" />
+      <span class="home__choice-title">{{ 'home.choice.apply.title' | t }}</span>
+      <span class="home__choice-desc">{{ 'home.choice.apply.desc' | t }}</span>
+    </a>
+
+    <button type="button" class="home__choice" (click)="login()">
+      <app-icon name="user" [size]="22" />
+      <span class="home__choice-title">{{ 'home.choice.login.title' | t }}</span>
+      <span class="home__choice-desc">{{ 'home.choice.login.desc' | t }}</span>
+    </button>
+  </div>
+
+  <p class="home__note text-muted">{{ 'home.statusNote' | t }}</p>
 </section>

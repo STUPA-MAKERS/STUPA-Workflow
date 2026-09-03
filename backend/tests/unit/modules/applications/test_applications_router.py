@@ -128,6 +128,10 @@ class _FakeService:
         self.deleted = application_id
         self.deleted_actor = actor
 
+    async def set_archived(self, application_id, *, archived, actor=None):  # noqa: ANN001
+        self.archived_call = (application_id, archived, actor)
+        return _out(application_id, with_pii=False)
+
     async def timeline(self, application_id, *, allow_unconfirmed=True):  # noqa: ANN001
         return [
             TimelineEventOut(
@@ -303,7 +307,7 @@ def test_create_application_rejects_bad_email_422(client: TestClient) -> None:
 
 
 def _login(app: FastAPI, **kw: object) -> None:
-    """Set a logged-in principal for the ALTCHA exemption and identity derivation (#24)."""
+    """Set a logged-in principal for the ALTCHA exemption and identity derivation."""
     app.dependency_overrides[get_current_principal] = lambda: Principal(
         sub=str(kw.get("sub", "u-1")),
         email=kw.get("email"),  # type: ignore[arg-type]
@@ -317,7 +321,7 @@ def test_create_application_logged_in_skips_altcha_and_derives_identity(
     app: FastAPI, client: TestClient, fake_service: _FakeService, sent: list[tuple[str, UUID]]
 ) -> None:
     _login(app, sub="u-7", email="user@example.org", display_name="Userin")
-    # A logged-in user may omit applicantEmail and ALTCHA (#24).
+    # A logged-in user may omit applicantEmail and ALTCHA.
     body = {"typeId": str(uuid4()), "data": {"title": "Mein Antrag"}, "lang": "de"}
     r = client.post("/api/applications", json=body)
     assert r.status_code == 201
@@ -442,6 +446,62 @@ def test_delete_application_permission_holder(
     assert fake_service.deleted == app_id
 
 
+def test_archive_needs_its_own_permission(app: FastAPI, client: TestClient) -> None:
+    """`application.manage` covers editing. Archiving decides what everyone else sees by
+    default, so it needs its own key — and it is not `application.delete` either, because
+    it destroys nothing and is reversible.
+    """
+    _as_principal(app, "application.manage")
+    r = client.post(f"/api/applications/{uuid4()}/archive")
+    assert r.status_code == 403
+    assert r.json()["code"] == "forbidden"
+
+
+def test_archive_and_unarchive_reach_the_service(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    app_id = uuid4()
+    app.dependency_overrides[get_current_principal] = lambda: Principal(
+        sub="office", roles=["office"], permissions={"application.archive"}
+    )
+    app.dependency_overrides[get_current_applicant] = lambda: None
+
+    assert client.post(f"/api/applications/{app_id}/archive").status_code == 200
+    assert fake_service.archived_call == (app_id, True, "office")
+
+    assert client.delete(f"/api/applications/{app_id}/archive").status_code == 200
+    assert fake_service.archived_call == (app_id, False, "office")
+
+
+def test_an_applicant_cannot_archive(app: FastAPI, client: TestClient) -> None:
+    # The applicant token authenticates for one application; archiving is a decision
+    # about the committee's working list and never theirs to make.
+    app_id = uuid4()
+    _as_applicant(app, app_id, "edit")
+    assert client.post(f"/api/applications/{app_id}/archive").status_code == 401
+
+
+def test_the_list_hides_archived_applications_by_default(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    _as_principal(app, "application.read")
+    client.get("/api/applications")
+    assert fake_service.list_kwargs["archived"] is False
+
+
+def test_the_list_can_ask_for_only_archived_or_for_both(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    # A tri-state, because "only the archived ones" and "both" are different questions
+    # and a boolean can answer only one of them.
+    _as_principal(app, "application.read")
+    client.get("/api/applications", params={"archived": "true"})
+    assert fake_service.list_kwargs["archived"] is True
+
+    client.get("/api/applications", params={"archived": "all"})
+    assert fake_service.list_kwargs["archived"] is None
+
+
 def test_delete_application_manager_forbidden(app: FastAPI, client: TestClient) -> None:
     """#g9: a principal without ``application.delete`` must NOT delete.
 
@@ -502,7 +562,7 @@ def test_list_applications_filters_passed(
 def test_list_applications_without_read_scopes_to_own(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
-    # Without application.read and without admin the list shows only own applications (#24).
+    # Without application.read and without admin the list shows only own applications.
     _as_principal(app)  # authenticated but without any permission
     r = client.get("/api/applications")
     assert r.status_code == 200
@@ -569,7 +629,7 @@ def test_applications_export_xlsx(
     assert fake_service.list_kwargs["gremium_id"] == gremium
     assert fake_service.list_kwargs["q"] == "foo"
     assert fake_service.name_maps_called is True
-    # The router audits the export (#1). It writes the entry and commits in one transaction.
+    # The router audits the export. It writes the entry and commits in one transaction.
     (entry,) = fake_service.session.entries
     assert entry.action == "export"
     assert entry.actor == "admin"

@@ -1,12 +1,12 @@
 <section class="cfg">
   <app-page-header [title]="'admin.deleg.title' | t" [subtitle]="'admin.deleg.subtitle' | t" />
 
-  @if (loading()) {
-    <p class="cfg__empty" aria-live="polite">{{ 'admin.deleg.loading' | t }}</p>
-  } @else if (loadError()) {
+  @if (loadError()) {
     <p class="cfg__empty" role="alert">{{ 'admin.deleg.error' | t }}</p>
   } @else {
     <app-data-table
+      [loading]="loading()"
+      [loadingText]="'admin.deleg.loading' | t"
       [columns]="columns()"
       [rows]="delegations()"
       [rowKey]="rowId"

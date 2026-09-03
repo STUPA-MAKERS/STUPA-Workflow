@@ -3,6 +3,7 @@ import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { FormlyForm, type FormlyFieldConfig } from '@ngx-formly/core';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
+import { de } from '@core/i18n/translations';
 import { provideFormly } from '../formly.providers';
 import { FormlyTextareaType } from './formly-textarea.type';
 
@@ -109,7 +110,7 @@ describe('FormlyTextareaType (rendered)', () => {
     });
     fixture.detectChanges();
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('Ungültige Eingabe');
+    expect(alert).toHaveTextContent(de['formly.field.error']);
     const ta = screen.getByLabelText(/X/);
     expect(ta.getAttribute('aria-describedby')).toMatch(/-error$/);
     expect(ta.getAttribute('aria-invalid')).toBe('true');
@@ -158,5 +159,28 @@ describe('FormlyTextareaType (getters)', () => {
 
   it('describedBy → null when no error and no description', () => {
     expect(makeType({ id: 'x', props: {}, showError: false }).describedBy).toBeNull();
+  });
+});
+
+describe('FormlyTextareaType (English locale)', () => {
+  beforeEach(() => localStorage.setItem('ap.locale', 'en'));
+  afterEach(() => localStorage.removeItem('ap.locale'));
+
+  it('renders the default error message in English', async () => {
+    await render(HostComponent, {
+      providers: [provideFormly()],
+      componentProperties: {
+        model: {},
+        fields: [
+          {
+            key: 'note',
+            type: 'textarea',
+            props: { label: 'X', required: true },
+            validation: { show: true },
+          } as FormlyFieldConfig,
+        ],
+      },
+    });
+    expect(await screen.findByRole('alert')).toHaveTextContent('Invalid input');
   });
 });

@@ -180,6 +180,9 @@ def _app(**over: Any) -> _Obj:
         "email_confirmed_at": NOW,
         "created_at": NOW,
         "updated_at": NOW,
+        # Not archived by default, which is the state nearly every test wants.
+        "archived_at": None,
+        "archived_by": None,
     }
     base.update(over)
     return _Obj(**base)
@@ -649,8 +652,8 @@ async def test_patch_concurrent_integrity_error_409(
 
 async def test_delete_removes_and_commits() -> None:
     app = _app()
-    # Before the row goes away, delete() writes an APPLICATION_DELETE audit entry
-    # (#AUD-002). It calls scalar() for the version count and then audit_record. That
+    # Before the row goes away, delete() writes an APPLICATION_DELETE audit entry.
+    # It calls scalar() for the version count and then audit_record. That
     # runs two execute() calls, one advisory lock and one prev-hash select through
     # scalar_one_or_none, then add(entry) and flush(). Both execute() calls get an empty
     # _Result from the fake, so prev_hash stays None (genesis). That is enough here.
@@ -662,6 +665,74 @@ async def test_delete_removes_and_commits() -> None:
     # The audit entry is added and flushed before the delete, in the same transaction.
     assert any(type(o).__name__ == "AuditEntry" for o in session.added)
     assert session.flushed == 1
+
+
+async def test_archive_stamps_the_time_and_the_actor_and_audits() -> None:
+    """A plain column change writes no timeline entry by itself, so the audit is explicit.
+
+    A flow transition would have recorded itself. Archiving is deliberately not a flow
+    state, so the record of who did it has to be written by hand or it is simply absent.
+    """
+    app = _app()
+    session = _Session(get_results=[app])
+    svc = ApplicationsService(session)  # type: ignore[arg-type]
+
+    await svc.set_archived(app.id, archived=True, actor="admin")
+
+    assert app.archived_at is not None
+    assert app.archived_by == "admin"
+    assert any(type(o).__name__ == "AuditEntry" for o in session.added)
+    assert session.committed == 1
+
+
+async def test_unarchive_clears_both_columns_and_audits() -> None:
+    app = _app(archived_at=NOW, archived_by="someone")
+    session = _Session(get_results=[app])
+    svc = ApplicationsService(session)  # type: ignore[arg-type]
+
+    await svc.set_archived(app.id, archived=False, actor="admin")
+
+    assert app.archived_at is None
+    # Cleared too: leaving the old actor on an active application would claim it was
+    # archived by them when it is not archived at all.
+    assert app.archived_by is None
+    assert any(type(o).__name__ == "AuditEntry" for o in session.added)
+
+
+async def test_archiving_twice_changes_nothing_and_writes_no_second_entry() -> None:
+    """A second click is not an error, and must not overwrite who archived it first."""
+    first = datetime(2026, 1, 1, tzinfo=UTC)
+    app = _app(archived_at=first, archived_by="first-admin")
+    session = _Session(get_results=[app])
+    svc = ApplicationsService(session)  # type: ignore[arg-type]
+
+    await svc.set_archived(app.id, archived=True, actor="second-admin")
+
+    assert app.archived_at == first
+    assert app.archived_by == "first-admin"
+    assert session.added == []
+    assert session.committed == 0
+
+
+async def test_unarchiving_an_active_application_is_a_no_op() -> None:
+    app = _app()
+    session = _Session(get_results=[app])
+    svc = ApplicationsService(session)  # type: ignore[arg-type]
+
+    await svc.set_archived(app.id, archived=False, actor="admin")
+
+    assert app.archived_at is None
+    assert session.added == []
+    assert session.committed == 0
+
+
+async def test_archive_missing_404_writes_nothing() -> None:
+    session = _Session(get_results=[None])
+    svc = ApplicationsService(session)  # type: ignore[arg-type]
+    with pytest.raises(NotFoundError):
+        await svc.set_archived(uuid4(), archived=True, actor="admin")
+    assert session.added == []
+    assert session.committed == 0
 
 
 async def test_delete_missing_404() -> None:
@@ -915,7 +986,11 @@ def _principal(**over: Any) -> SimpleNamespace:
     base.update(over)
     ns = SimpleNamespace(**base)
     perms: set[str] = over.get("_perms", set())
-    ns.has = lambda p, _perms=perms: p in _perms  # type: ignore[attr-defined]
+    roles: list[str] = base["roles"]
+    # Mirror `Principal.has`: the admin role holds every right. The fake used to check
+    # only the explicit set, so a principal with `roles=["admin"]` behaved here unlike
+    # the real one and a test could pass against behaviour production never had.
+    ns.has = lambda p, _perms=perms, _roles=roles: "admin" in _roles or p in _perms  # type: ignore[attr-defined]
     return ns
 
 

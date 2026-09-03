@@ -1,4 +1,5 @@
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
+import { meetingTimeSuffix } from '../../features/meetings/meetings-display.util';
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -6,12 +7,10 @@ import { catchError, of } from 'rxjs';
 import { ApiClient } from '@core/api/api-client.service';
 import { type Delegation, DelegationsApiService } from '@core/api/delegations.service';
 import { AuthService } from '@core/auth/auth.service';
-import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { ApplicationListItem, ApplicationType, Meeting, Uuid } from '@core/api/models';
-import { BadgeComponent } from '@stupa-makers/ui-kit';
-import { CapitalizePipe } from '@shared/pipes/capitalize.pipe';
+import { BadgeComponent, IconComponent } from '@stupa-makers/ui-kit';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 
 /** Max number of application rows shown per panel. */
@@ -33,10 +32,10 @@ const PREVIEW_ROWS = 5;
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     RouterLink,
+    IconComponent,
     LocalizedDatePipe,
     TranslatePipe,
     BadgeComponent,
-    CapitalizePipe,
     PageHeaderComponent,
   ],
   templateUrl: './dashboard.component.html',
@@ -119,15 +118,17 @@ export class DashboardComponent {
     return status === 'live' ? 'success' : status === 'planned' ? 'info' : 'neutral';
   }
 
-  private readonly i18n = inject(I18nService);
-  /** Localized role label. An unknown role key returns the raw key. */
-  roleLabel(role: string): string {
-    const key = `role.${role}`;
-    const label = this.i18n.translate(key as TranslationKey);
-    return label === key ? role : label;
+  /**
+   * The `, HH:MM` behind the date of a session tile.
+   *
+   * The API sends `startTime` as `HH:MM:SS`, so pasting it after the date printed the
+   * seconds. The meetings feature already solved this; the same helper keeps the tile
+   * and the meetings list reading the same way.
+   */
+  sessionTimeSuffix(startTime: string | null | undefined): string {
+    return meetingTimeSuffix(startTime);
   }
 
-  readonly roles = computed(() => this.auth.roles());
   readonly gremien = computed(() => this.auth.gremien());
 
   private readonly delegationsApi = inject(DelegationsApiService);

@@ -1,23 +1,17 @@
 import { Pipe, type PipeTransform } from '@angular/core';
 
 /**
- * Simplify a path key for display and collapse numeric prefix chains.
+ * The one place a cost-centre path key is prepared for display.
  *
- * When a segment is a prefix of the next one (8→81→810), only the longest segment stays.
- * The top-level segment always stays: `VSM-8-81-810-330` becomes `VSM-810-330`.
+ * It returns the key UNCHANGED. Shortening a path by collapsing numeric prefix chains
+ * depends on how a committee numbers its cost centres, so the same path shortens
+ * differently after an unrelated rename; the committee renames its cost centres instead.
  *
- * Every view uses this function, so a cost center path looks the same across the app
- * (budget tree, bookings, application-detail badge, dropdowns).
+ * This is NOT dead code. Every view routes its path keys through it, so a change to how
+ * a path reads has one seam rather than twelve call sites.
  */
 export function simplifyPathKey(pathKey: string): string {
-  const seg = pathKey.split('-');
-  const out: string[] = [];
-  for (let i = 0; i < seg.length; i++) {
-    const next = seg[i + 1];
-    if (i > 0 && next && next.length > seg[i].length && next.startsWith(seg[i])) continue;
-    out.push(seg[i]);
-  }
-  return out.join('-');
+  return pathKey;
 }
 
 /** Pipe form of {@link simplifyPathKey} for templates: `{{ pathKey | simplifyPath }}`. */

@@ -1,8 +1,9 @@
 import type { BudgetTreeNode } from './budget-tree.api';
+import { toFormatLocale } from '@core/i18n/i18n.service';
 
 /** Format a value as EUR. Money stays a decimal string in the API, so `Number` is UI-only. */
 export function formatEur(value: number, locale: string): string {
-  return value.toLocaleString(locale === 'en' ? 'en-US' : 'de-DE', {
+  return value.toLocaleString(toFormatLocale(locale), {
     style: 'currency',
     currency: 'EUR',
   });

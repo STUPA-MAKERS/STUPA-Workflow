@@ -7,6 +7,7 @@ import { ToastService } from '@stupa-makers/ui-kit';
 import { I18nService } from '@core/i18n/i18n.service';
 import { AdminApiService } from '../admin-api.service';
 import type { NotificationSettings } from '../admin.models';
+import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 
 /**
  * Admin notification settings (#task-reminder, permission `admin.notifications`).
@@ -20,7 +21,7 @@ import type { NotificationSettings } from '../admin.models';
   selector: 'app-notification-settings',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, ButtonComponent, CheckboxComponent, PageHeaderComponent],
+  imports: [SkeletonComponent, FormsModule, TranslatePipe, ButtonComponent, CheckboxComponent, PageHeaderComponent],
   templateUrl: './notification-settings.component.html',
   styleUrl: './notification-settings.component.scss',
 })

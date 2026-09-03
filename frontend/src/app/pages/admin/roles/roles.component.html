@@ -1,9 +1,9 @@
 <section class="flex flex-col gap-5">
-  <app-page-header [title]="'admin.roles.title' | t" [subtitle]="'admin.roles.subtitle' | t">
+  <app-page-header [flush]="true" [title]="'admin.roles.title' | t" [subtitle]="'admin.roles.subtitle' | t">
     <app-button actions size="sm" (click)="openAdd()">{{ 'admin.roles.addGlobalRole' | t }}</app-button>
   </app-page-header>
 
-  <app-data-table [columns]="columns()" [rows]="roles()" [rowKey]="rowId" [isExpanded]="rowExpanded" [clickable]="true" (rowClick)="onRowClick($event)">
+  <app-data-table [columns]="columns()" [rows]="roles()" [rowKey]="rowId" [isExpanded]="rowExpanded" [clickable]="true" [loading]="loading()" [loadingText]="'admin.roles.loading' | t" (rowClick)="onRowClick($event)">
     <ng-template appCell="name" let-r>
       <span class="inline-flex items-center gap-2">
         <app-icon name="chevron-down" class="roles__chevron" [class.roles__chevron--open]="expanded().has($any(r).id)" [size]="16" />

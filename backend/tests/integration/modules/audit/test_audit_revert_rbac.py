@@ -94,7 +94,7 @@ async def test_budget_revert_requires_budget_book(session: AsyncSession) -> None
         session, AuditAction.BUDGET_EXPENSE_CREATE, str(booked.id)
     )
 
-    # audit.revert alone is NOT enough (#AUD-018). The permission budget.book is missing.
+    # audit.revert alone is NOT enough. The permission budget.book is missing.
     with pytest.raises(ForbiddenError):
         await RevertService(session).revert(
             audit_id, "u", _principal("audit.revert")

@@ -53,9 +53,11 @@ Backend domain modules (`backend/app/modules/<module>`):
 - **be-notifications** — mail templates (Jinja2 sandboxed), rules, prefs, arq dispatch
 - **be-webhooks** — outgoing event webhooks, SSRF guard, HMAC signature *(critical)*
 - **be-audit** — append-only sha256 hash chain, DB trigger, chain verification *(critical)*
+- **be-backup** — whole-platform age-encrypted backups + in-app restore, `/admin/backups` *(critical)*
 - **be-config-revision** — versioned config + audit + revert
 - **be-files** — MinIO attachments, ClamAV scan, signed URLs
-- **be-pdf** — client to the pytex render service, async render jobs
+- **be-pdf** — client to the pytex render service (protocols only; applications no
+  longer render a PDF)
 - **be-privacy** — DSGVO/GDPR anonymization, export/erasure
 - **be-calendar** — calendar/ICS feed for meetings
 - **be-antiabuse** — ALTCHA captcha + rate-limiting + body-cap for public endpoints

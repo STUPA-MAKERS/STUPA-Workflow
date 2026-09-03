@@ -1,25 +1,26 @@
 <app-page-header
   [title]="'dashboard.greeting' | t: { name: auth.displayName() }"
-  [subtitle]="'dashboard.subtitle' | t"
->
-  <!-- The roles and Gremien of the user ride in the actions slot. They are status, not
-       a control, so they stay in the header instead of taking a block of their own. -->
-  <div actions class="flex flex-wrap gap-2">
-    @for (role of roles(); track role) {
-      <app-badge variant="primary">{{ roleLabel(role) | capitalize }}</app-badge>
-    }
+/>
+
+<!-- Below the greeting, not beside it. In the actions slot the chips read as controls
+     glued to the right of a heading; on their own line they read as what they are, the
+     Gremien this person's work belongs to. Roles are still NOT shown: an RBAC role name
+     says nothing a member acts on. -->
+@if (gremien().length) {
+  <div class="dash__gremien">
     @for (g of gremien(); track g.id) {
       <app-badge variant="neutral">{{ g.name }}</app-badge>
     }
   </div>
-</app-page-header>
+}
 
-<a class="dash__cta" routerLink="/apply">
-  <div class="dash__cta-text">
-    <h2 class="m-0 mb-1 text-xl">{{ 'dashboard.apply.title' | t }}</h2>
-    <p class="dash__cta-body">{{ 'dashboard.apply.body' | t }}</p>
-  </div>
-  <span class="dash__cta-action">{{ 'dashboard.apply.cta' | t }} →</span>
+<!-- A primary button, not a banner and not a muted text link. A signed-in member came
+     for their tasks and meetings, so this does not lead the page — but it is the one
+     action they take from here, and an outlined button on the same surface as the panels
+     around it read as part of the furniture. -->
+<a class="dash__apply" routerLink="/apply">
+  <app-icon name="form" [size]="20" />
+  {{ 'dashboard.apply.title' | t }}
 </a>
 
 @if (sessionShortcuts().length) {
@@ -33,7 +34,7 @@
           </span>
           <span class="dash__session-title">{{ s.title }}</span>
           @if (s.date) {
-            <time class="dash__session-date" [attr.datetime]="s.date">{{ s.date | ldate: 'mediumDate' }}{{ s.startTime ? ', ' + s.startTime : '' }}</time>
+            <time class="dash__session-date" [attr.datetime]="s.date">{{ s.date | ldate: 'mediumDate' }}{{ sessionTimeSuffix(s.startTime) }}</time>
           }
           <span class="dash__link">
             {{ (s.status === 'live' ? 'dashboard.sessions.join' : 'dashboard.sessions.inspect') | t }} →
@@ -92,7 +93,15 @@
       </div>
 
       @if (loading()) {
-        <p class="dash__state" aria-live="polite">{{ 'dashboard.loading' | t }}</p>
+        <!-- Rows in outline, not a sentence. Each panel is a list, so the placeholder
+             holds the height of one and the card does not resize under the reader when
+             the real rows land. -->
+        <div class="dash__skel" aria-busy="true">
+          <span class="skel skel--line"></span>
+          <span class="skel skel--line"></span>
+          <span class="skel skel--line"></span>
+          <span class="sr-only" role="status">{{ 'dashboard.loading' | t }}</span>
+        </div>
       } @else if (error()) {
         <p class="dash__state dash__state--error" role="alert">{{ 'dashboard.error' | t }}</p>
       } @else if (taskRows().length === 0) {
@@ -132,7 +141,15 @@
       </div>
 
       @if (loading()) {
-        <p class="dash__state" aria-live="polite">{{ 'dashboard.loading' | t }}</p>
+        <!-- Rows in outline, not a sentence. Each panel is a list, so the placeholder
+             holds the height of one and the card does not resize under the reader when
+             the real rows land. -->
+        <div class="dash__skel" aria-busy="true">
+          <span class="skel skel--line"></span>
+          <span class="skel skel--line"></span>
+          <span class="skel skel--line"></span>
+          <span class="sr-only" role="status">{{ 'dashboard.loading' | t }}</span>
+        </div>
       } @else if (error()) {
         <p class="dash__state dash__state--error" role="alert">{{ 'dashboard.error' | t }}</p>
       } @else if (applicationRows().length === 0) {

@@ -229,7 +229,7 @@ def test_firable_actor_is_applicant_via_created_by() -> None:
 
 
 def test_firable_admin_with_only_unsatisfied_guards_excluded() -> None:
-    # THE bug (#task-recipients): admins got task mail even without a firable
+    # THE bug: admins got task mail even without a firable
     # transition. The code now drops an admin without a matching guard gate.
     admin = _candidate(sub="adm", email="admin@x.de", roles=frozenset({ADMIN_ROLE_KEY}))
     out = firable_candidates(
@@ -348,7 +348,7 @@ async def test_candidates_no_groups_skips_mapping_query() -> None:
     assert out[0].committees == frozenset({str(gid)})
 
 
-# actionable_principal_emails end to end (#task-recipients)
+# actionable_principal_emails end to end
 def _app_ns(**over: Any) -> SimpleNamespace:
     base: dict[str, Any] = {
         "id": uuid.uuid4(),
@@ -410,7 +410,7 @@ async def test_actionable_no_requires_action_transitions_empty() -> None:
 async def test_actionable_excludes_admin_without_firable_guard(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # THE bug (#task-recipients) end to end: only a principal whose guard fires gets
+    # THE bug end to end: only a principal whose guard fires gets
     # mail. The admin with an unsatisfied guard drops out.
     captured: dict[str, Any] = {}
 

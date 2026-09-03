@@ -25,6 +25,8 @@ const DEAD: WebhookDeliveryStatus = {
 };
 
 interface Opts {
+  /** Make the initial list fail, so the loading state has to end anyway. */
+  listError?: boolean;
   saveError?: boolean;
   deleteError?: boolean;
   statusError?: boolean;
@@ -44,7 +46,9 @@ async function setup(seed: WebhookConfig[] = [], opts: Opts = {}) {
     ? jest.fn(() => throwError(() => new Error('boom')))
     : jest.fn(() => of(opts.status ?? []));
   const api = {
-    listWebhooks: jest.fn(() => of(seed)),
+    listWebhooks: opts.listError
+      ? jest.fn(() => throwError(() => new Error('boom')))
+      : jest.fn(() => of(seed)),
     saveWebhook,
     deleteWebhook,
     listWebhookDeliveryStatus,
@@ -318,5 +322,12 @@ describe('WebhooksComponent', () => {
       'delivery',
       'actions',
     ]);
+  });
+
+  it('stops loading when the list fails, rather than spinning forever', async () => {
+    // Without this the table keeps its skeleton rows and never says anything went wrong.
+    const { fixture } = await setup([], { listError: true });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((fixture.componentInstance as any).loading()).toBe(false);
   });
 });

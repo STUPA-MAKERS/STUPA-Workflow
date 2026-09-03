@@ -1,4 +1,4 @@
-"""Unit tests without a DB: Gremium roles and memberships (#42).
+"""Unit tests without a DB: Gremium roles and memberships.
 
 The focus is the pure overlap invariant. Two terms of office must not overlap, and a
 later term without an overlap stays allowed. The tests also cover the service branches:

@@ -4,8 +4,9 @@ import { of, throwError } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { ApiClient } from '@core/api/api-client.service';
+import { I18nService } from '@core/i18n/i18n.service';
 import { ToastService } from '@stupa-makers/ui-kit';
-import type { ApplicationType, EffectiveForm } from '@core/api/models';
+import type { ApplicationType, EffectiveForm, FormFieldDef } from '@core/api/models';
 import { provideFormly } from '@shared/formly/formly.providers';
 import { ApplyWizardComponent } from './apply-wizard.component';
 
@@ -85,6 +86,33 @@ async function setup(create?: jest.Mock) {
   });
   return view;
 }
+
+/** Render the wizard against a form of one section that holds `fields`. */
+async function setupFields(fields: FormFieldDef[]) {
+  const eff: EffectiveForm = {
+    ...EFF,
+    sections: [{ key: 'main', label: { de: 'Antrag' }, fields }],
+  };
+  const view = await render(ApplyWizardComponent, {
+    providers: [
+      provideRouter([]),
+      provideFormly(),
+      { provide: ApiClient, useValue: { ...fakeApi(), effectiveForm: () => of(eff) } },
+    ],
+  });
+  view.fixture.componentInstance.selectType('t1');
+  return view;
+}
+
+/** Expected review output of a currency amount in the pinned DE locale. */
+const euro = (amount: number) =>
+  new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(amount);
+
+/** Expected review output of an ISO day in the pinned DE locale. */
+const day = (iso: string) =>
+  new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeZone: 'UTC' }).format(
+    new Date(`${iso}T00:00:00Z`),
+  );
 
 /** Like {@link setup}, but with a logged-in session (principal). */
 async function setupLoggedIn(create = jest.fn(() => of({ applicationId: 'app-1' }))) {
@@ -200,7 +228,7 @@ describe('ApplyWizardComponent', () => {
     expect(comp.activeIndex()).toBe(0);
   });
 
-  it('skips the contact step and Altcha for a logged-in user (#24)', async () => {
+  it('skips the contact step and Altcha for a logged-in user', async () => {
     const { fixture, create } = await setupLoggedIn();
     const comp = fixture.componentInstance;
     const router = TestBed.inject(Router);
@@ -255,7 +283,7 @@ describe('ApplyWizardComponent', () => {
     expect(errSpy).toHaveBeenCalledWith('Antragsarten konnten nicht geladen werden.');
   });
 
-  it('renders the configured apply info as markdown HTML (#18)', async () => {
+  it('renders the configured apply info as markdown HTML', async () => {
     const { fixture } = await render(ApplyWizardComponent, {
       providers: [
         provideRouter([]),
@@ -610,7 +638,7 @@ describe('ApplyWizardComponent', () => {
     };
     const rows = comp.summary();
     const kosten = rows.find((r) => r.label === 'Kosten')?.value ?? '';
-    expect(kosten).toMatch(/4 ×/);
+    expect(kosten).toMatch(/4 Kostenpositionen/);
     expect(kosten).toMatch(/200/);
   });
 
@@ -773,5 +801,170 @@ describe('ApplyWizardComponent', () => {
     });
     expect(() => comp.discardDraft()).not.toThrow();
     spy.mockRestore();
+  });
+
+  it('updates the review summary after an edit that follows the first review', async () => {
+    const { fixture } = await setup();
+    const comp = fixture.componentInstance;
+    await userEvent.click(screen.getByRole('radio', { name: /Finanzantrag/ }));
+    comp.contactForm.setValue({ email: 'a@b.de', name: '' });
+    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → contact
+    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → main
+    await userEvent.type(screen.getByLabelText(/Titel/), 'Sommerfest');
+    await userEvent.type(screen.getByLabelText(/Betrag/), '500');
+    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → budget
+    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → review
+    expect(comp.summary().find((r) => r.label === 'Titel')?.value).toBe('Sommerfest');
+
+    // Back to the first section, change the title, forward to the review again.
+    await userEvent.click(screen.getByRole('button', { name: /Zurück/ })); // → budget
+    await userEvent.click(screen.getByRole('button', { name: /Zurück/ })); // → main
+    await userEvent.clear(screen.getByLabelText(/Titel/));
+    await userEvent.type(screen.getByLabelText(/Titel/), 'Winterfest');
+    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → budget
+    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → review
+
+    // The summary must show what the payload sends, not the first-visit snapshot.
+    expect(comp.model['title']).toBe('Winterfest');
+    expect(comp.summary().find((r) => r.label === 'Titel')?.value).toBe('Winterfest');
+    expect(screen.getByText('Winterfest')).toBeInTheDocument();
+  });
+
+  it('shows a field first filled after the review was open', async () => {
+    const { fixture } = await setup();
+    const comp = fixture.componentInstance;
+    await userEvent.click(screen.getByRole('radio', { name: /Finanzantrag/ }));
+    comp.contactForm.setValue({ email: 'a@b.de', name: '' });
+    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → contact
+    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → main
+    await userEvent.type(screen.getByLabelText(/Titel/), 'Fest');
+    await userEvent.type(screen.getByLabelText(/Betrag/), '500');
+    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → budget
+    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → review
+    expect(comp.summary().some((r) => r.label === 'Kategorie')).toBe(false);
+
+    await userEvent.click(screen.getByRole('button', { name: /Zurück/ })); // → budget
+    await userEvent.click(screen.getByRole('button', { name: /Zurück/ })); // → main
+    await userEvent.selectOptions(screen.getByLabelText(/Kategorie/), 'event');
+    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → budget
+    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → review
+
+    expect(comp.summary().find((r) => r.label === 'Kategorie')?.value).toBe('Veranstaltung');
+  });
+
+  it('formats currency, date and date-range values in the review summary', async () => {
+    const { fixture } = await setupFields([
+      { key: 'amount', type: 'currency', label: { de: 'Betrag' } },
+      { key: 'day', type: 'date', label: { de: 'Termin' } },
+      { key: 'span', type: 'daterange', label: { de: 'Zeitraum' } },
+    ]);
+    const comp = fixture.componentInstance;
+    // The currency control stores a canonical decimal string, not a number.
+    comp.model = {
+      amount: '4200',
+      day: '2026-07-01',
+      span: { from: '2026-07-01', to: '2026-07-05' },
+    };
+    const rows = comp.summary();
+    const byLabel = (label: string) => rows.find((r) => r.label === label)?.value;
+    expect(byLabel('Betrag')).toBe(euro(4200));
+    expect(byLabel('Termin')).toBe(day('2026-07-01'));
+    expect(byLabel('Zeitraum')).toBe(`${day('2026-07-01')} – ${day('2026-07-05')}`);
+  });
+
+  it('reads a date day-first in the review summary when the UI is English', async () => {
+    const { fixture } = await setupFields([
+      { key: 'amount', type: 'currency', label: { de: 'Betrag' } },
+      { key: 'day', type: 'date', label: { de: 'Termin' } },
+      { key: 'span', type: 'daterange', label: { de: 'Zeitraum' } },
+    ]);
+    const comp = fixture.componentInstance;
+    const i18n = fixture.debugElement.injector.get(I18nService);
+    i18n.setLocale('en');
+    try {
+      comp.model = {
+        amount: '1500',
+        day: '2026-07-01',
+        span: { from: '2026-07-01', to: '2026-07-02' },
+      };
+      const rows = comp.summary();
+      const byLabel = (label: string) => rows.find((r) => r.label === label)?.value;
+      // 1 July, not 7 January.
+      expect(byLabel('Termin')).toBe('1 Jul 2026');
+      expect(byLabel('Zeitraum')).toBe('1 Jul 2026 \u2013 2 Jul 2026');
+      // EUR under en-GB keeps the English amount format. Only the date order moves.
+      expect(byLabel('Betrag')).toBe('\u20ac1,500.00');
+    } finally {
+      i18n.setLocale('de');
+    }
+  });
+
+  it('formats a numeric currency value and a half-filled date range', async () => {
+    const { fixture } = await setupFields([
+      { key: 'amount', type: 'currency', label: { de: 'Betrag' } },
+      { key: 'from_only', type: 'daterange', label: { de: 'Ab' } },
+      { key: 'to_only', type: 'daterange', label: { de: 'Bis' } },
+      { key: 'empty_span', type: 'daterange', label: { de: 'Leer' } },
+    ]);
+    const comp = fixture.componentInstance;
+    comp.model = {
+      amount: 1234.5,
+      from_only: { from: '2026-07-01' },
+      to_only: { to: '2026-07-05' },
+      empty_span: {},
+    };
+    const rows = comp.summary();
+    const byLabel = (label: string) => rows.find((r) => r.label === label)?.value;
+    expect(byLabel('Betrag')).toBe(euro(1234.5));
+    expect(byLabel('Ab')).toBe(day('2026-07-01'));
+    expect(byLabel('Bis')).toBe(day('2026-07-05'));
+    // An empty range formats to '' → the summary drops the row.
+    expect(rows.some((r) => r.label === 'Leer')).toBe(false);
+  });
+
+  it('keeps unparsable currency, date and range values raw', async () => {
+    const { fixture } = await setupFields([
+      { key: 'amount', type: 'currency', label: { de: 'Betrag' } },
+      { key: 'day', type: 'date', label: { de: 'Termin' } },
+      { key: 'span', type: 'daterange', label: { de: 'Zeitraum' } },
+    ]);
+    const comp = fixture.componentInstance;
+    comp.model = { amount: 'k. A.', day: 'irgendwann', span: 'kein Objekt' };
+    const rows = comp.summary();
+    const byLabel = (label: string) => rows.find((r) => r.label === label)?.value;
+    expect(byLabel('Betrag')).toBe('k. A.');
+    expect(byLabel('Termin')).toBe('irgendwann');
+    expect(byLabel('Zeitraum')).toBe('kein Objekt');
+  });
+
+  it('formats a full timestamp in a date field', async () => {
+    const { fixture } = await setupFields([
+      { key: 'day', type: 'date', label: { de: 'Termin' } },
+    ]);
+    const comp = fixture.componentInstance;
+    comp.model = { day: '2026-07-01T10:30:00Z' };
+    expect(comp.summary().find((r) => r.label === 'Termin')?.value).toBe(day('2026-07-01'));
+  });
+
+  it('names the counted cost positions instead of the field caption', async () => {
+    const { fixture } = await setupFields([
+      { key: 'kosten', type: 'positions', label: { de: 'Kosten' } },
+    ]);
+    const comp = fixture.componentInstance;
+    comp.model = { kosten: [{ label: 'Zelt', offers: [{ value: 120, preferred: true }] }] };
+    const one = comp.summary().find((r) => r.label === 'Kosten')?.value ?? '';
+    expect(one).toContain('1 Kostenposition');
+    expect(one).not.toContain('Positionswert');
+    expect(one).toContain(euro(120));
+
+    comp.model = {
+      kosten: [
+        { label: 'Zelt', offers: [{ value: 120, preferred: true }] },
+        { label: 'Musik', offers: [{ value: 80, preferred: true }] },
+      ],
+    };
+    expect(comp.summary().find((r) => r.label === 'Kosten')?.value ?? '').toContain(
+      '2 Kostenpositionen',
+    );
   });
 });

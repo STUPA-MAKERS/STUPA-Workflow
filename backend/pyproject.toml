@@ -53,6 +53,9 @@ dependencies = [
     # iCal subscription (#ics): RFC5545 feed of the meetings of the user. Loads lazily,
     # only on the feed path. Pure Python package.
     "icalendar>=6.0",
+    # age encryption for the backup archives. pyrage is the rust `age` implementation,
+    # so an archive stays readable with the standard `age` CLI off host.
+    "pyrage>=1.2",
 ]
 
 [project.optional-dependencies]
@@ -72,7 +75,7 @@ dev = [
     # on every run. Without a fixed version and a fixed seed (see `--seed` in the CI),
     # `be-contract` turns non-deterministic and passes or fails on the same commit. Exact
     # pins keep a red run reproducible and stop tool updates from moving it.
-    "schemathesis==4.22.3",
+    "schemathesis==4.25.2",
     "hypothesis==6.165.10",
     "ruff>=0.9",
     "basedpyright>=1.28",

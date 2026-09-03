@@ -25,7 +25,7 @@ description: The antragsplattform_mcp MCP server, a standalone FastMCP package. 
 
 **API surface (tools → backend routes):**
 - Auth/identity: `login`/`whoami` → `GET /auth/me` · `logout` (clears the cache) · `get_config_schemas` → `GET /admin/config-schemas`.
-- Applications: `list_applications` `GET /applications` · `get_application`/`update_application`(PATCH `{data}`)/`delete_application` · `get_application_timeline`/`list_application_versions`/`get_application_form` · `create_application` `POST /applications` · `comment_application`/`list_comments` · `create_application_pdf` `POST .../pdf` · `get_job` `GET /jobs/{id}` · `list_tasks` `GET /applications/tasks`.
+- Applications: `list_applications` `GET /applications` · `get_application`/`update_application`(PATCH `{data}`)/`delete_application` · `get_application_timeline`/`list_application_versions`/`get_application_form` · `create_application` `POST /applications` · `comment_application`/`list_comments` · `list_tasks` `GET /applications/tasks`.
 - Flow engine (apply): `list_transitions` `GET .../transitions` · `fire_transition` `POST /applications/{id}/transition {transitionId, note}`.
 - Flow editing: `get_global_flow`/`set_global_flow` `GET|POST /admin/flow-versions/global` · atomic `flow_add_state`/`flow_update_state`/`flow_remove_state`/`flow_add_transition`/`flow_update_transition(index)`/`flow_remove_transition(index)`/`flow_set_positions`/`flow_set_group`/`flow_delete_group` (each re-reads, mutates via graphops, re-POSTs with `activate:true`).
 - Forms: `get_latest_form_version`/`get_effective_form`/`create_form_version`/`set_active_form` · atomic `form_add_field`/`form_update_field`/`form_remove_field`/`form_move_field`.

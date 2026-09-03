@@ -39,7 +39,7 @@ async function setup(api = makeApi(), toast = makeToast()) {
   return { ...view, api, toast, c };
 }
 
-describe('GremiumRolesComponent (#42)', () => {
+describe('GremiumRolesComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   it('lists gremium roles via the route gremium id', async () => {
@@ -218,5 +218,12 @@ describe('GremiumRolesComponent (#42)', () => {
     c.doDelete();
     expect(toast.error).toHaveBeenCalled();
     expect(c.roles().some((r: GremiumRole) => r.id === 'gr-1')).toBe(true);
+  });
+
+  it('stops loading when the list fails, rather than spinning forever', async () => {
+    const api = { ...makeApi(), listGremiumRoles: jest.fn(() => throwError(() => new Error('boom'))) };
+    const { fixture } = await setup(api);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((fixture.componentInstance as any).loading()).toBe(false);
   });
 });

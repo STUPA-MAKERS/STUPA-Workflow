@@ -1,4 +1,4 @@
-"""Integration (real Postgres, testcontainers): the calendar feed (#ics).
+"""Integration (real Postgres, testcontainers): the calendar feed.
 
 These tests run against the migrated schema. They prove:
 * `calendar_token` rotates. `principal_by_calendar_token` and `get_calendar_token`

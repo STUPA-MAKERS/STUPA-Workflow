@@ -1,4 +1,4 @@
-"""Extra coverage for `DelegationService` (#delegation-rework).
+"""Extra coverage for `DelegationService`.
 
 These tests add the branches that `test_delegations_service_unit.py` leaves open.
 They cover `_independently_eligible` for direct, OIDC and group-mapping sources.

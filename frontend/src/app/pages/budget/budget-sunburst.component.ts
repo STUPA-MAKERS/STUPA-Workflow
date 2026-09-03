@@ -145,7 +145,7 @@ export class BudgetSunburstComponent {
   }
 
   protected money(value: number): string {
-    return new Intl.NumberFormat(this.i18n.locale(), {
+    return new Intl.NumberFormat(this.i18n.formatLocale(), {
       style: 'currency',
       currency: 'EUR',
       maximumFractionDigits: 0,

@@ -93,6 +93,7 @@ export function mapApplication(wire: ApplicationOutWire, lang: string): Applicat
     applicant: mapApplicant(wire.applicant),
     canEdit: wire.canEdit ?? false,
     isOwner: wire.isOwner ?? false,
+    archivedAt: wire.archivedAt ?? null,
   };
 }
 
@@ -111,6 +112,7 @@ export function mapApplicationListItem(
     currency: wire.currency ?? null,
     createdAt: wire.createdAt,
     updatedAt: wire.updatedAt,
+    archivedAt: wire.archivedAt ?? null,
   };
 }
 

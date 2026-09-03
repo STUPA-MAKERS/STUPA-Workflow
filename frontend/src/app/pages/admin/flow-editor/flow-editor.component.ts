@@ -115,6 +115,14 @@ export class FlowEditorComponent {
   protected readonly deadlinePolicyOptions = this.opts.deadlinePolicyOptions;
 
   protected readonly graph = signal<FlowGraph>(autoLayout(emptyFlowGraph()));
+  /**
+   * False until the first load settles, either with a flow or without one.
+   *
+   * The graph starts empty, and an empty graph fails validation with "no states". Shown
+   * before the answer arrives that alert is not a finding about the flow, it is a finding
+   * about the request being in flight.
+   */
+  protected readonly loaded = signal(false);
 
   private readonly history = new FlowHistory();
   protected readonly canUndo = this.history.canUndo;
@@ -182,8 +190,10 @@ export class FlowEditorComponent {
             this.applyingHistory = true;
             this.graph.set(autoLayout(normalizeFlowGraph(graph)));
           }
+          this.loaded.set(true);
         },
-        // Core editor data: surface the failure instead of an empty canvas.
+        // Core editor data: surface the failure instead of an empty canvas. The
+        // validation stays hidden: there is no flow to have findings about.
         error: () => this.toast.error(this.i18n.translate('admin.flow.loadFailed')),
       });
 
@@ -209,12 +219,14 @@ export class FlowEditorComponent {
     });
   }
 
-
-  protected readonly multiCount = computed(
-    () => this.multiSel().size + this.multiSelGroups().size,
-  );
+  protected readonly multiCount = computed(() => this.multiSel().size + this.multiSelGroups().size);
 
   protected readonly validation = computed(() => validateFlowGraph(this.graph()));
+
+  /** Validation reasons in the reader's language. The validator names them, it does not word them. */
+  protected readonly validationMessages = computed(() =>
+    this.validation().errors.map((e) => this.i18n.translate(e.key, e.params)),
+  );
   protected readonly json = computed(() => serializeFlowGraph(this.graph()));
 
   protected readonly viewBox = computed(() => {
@@ -243,7 +255,6 @@ export class FlowEditorComponent {
     if (sel?.kind !== 'state') return null;
     return buildTransitionLists(this.graph(), sel.key, this.opts.labelContext());
   });
-
 
   protected label(s: StateDef): string {
     return stateDisplayLabel(s);
@@ -300,14 +311,16 @@ export class FlowEditorComponent {
     return this.opts.guardValueHint(op);
   }
 
-
   protected guardGroupsFor(fromKey: string): GuardGroup[] {
     return groupsOf(this.graph().transitions ?? [], fromKey);
   }
 
   /** Rows for the priority stack of the state inspector. Labels resolve here. */
   protected guardGroupRows(fromKey: string): GuardPriorityRow[] {
-    return this.guardGroupsFor(fromKey).map((g) => ({ sig: g.sig, label: this.guardGroupLabel(g) }));
+    return this.guardGroupsFor(fromKey).map((g) => ({
+      sig: g.sig,
+      label: this.guardGroupLabel(g),
+    }));
   }
 
   protected guardGroupLabel(g: GuardGroup): string {
@@ -333,7 +346,6 @@ export class FlowEditorComponent {
   private reorderGuard(fromKey: string, sig: string, dir: -1 | 1): void {
     this.graph.update((g) => ops.reorderGuardGroup(g, fromKey, sig, dir));
   }
-
 
   protected addState(): void {
     const key = ops.uniqueStateKey('state', this.graph().states);
@@ -392,7 +404,6 @@ export class FlowEditorComponent {
     return this.graph().states.find((s) => s.key === key);
   }
 
-
   protected removeSelectedTransition(): void {
     const sel = this.selection();
     if (sel?.kind !== 'transition') return;
@@ -423,7 +434,6 @@ export class FlowEditorComponent {
   protected setTransitionBranch(index: number, branch: string): void {
     this.graph.update((g) => ops.setTransitionBranch(g, index, branch));
   }
-
 
   protected setGuard(index: number, guard: Guard | null): void {
     this.graph.update((g) => ops.setGuard(g, index, guard));
@@ -466,10 +476,12 @@ export class FlowEditorComponent {
     return v == null ? '' : Array.isArray(v) ? v.join(', ') : String(v);
   }
 
-  protected setCompare(index: number, patch: { field?: string; op?: string; value?: string }): void {
+  protected setCompare(
+    index: number,
+    patch: { field?: string; op?: string; value?: string },
+  ): void {
     this.graph.update((g) => ops.setCompare(g, index, patch));
   }
-
 
   protected addAction(index: number, type: string): void {
     if (!type) return;
@@ -511,7 +523,6 @@ export class FlowEditorComponent {
   protected recipientNeedsRef(kind: string): boolean {
     return recipientNeedsRef(kind);
   }
-
 
   protected relayout(): void {
     const ctx = this.currentGroupId();
@@ -570,7 +581,6 @@ export class FlowEditorComponent {
     this.navigateTo(this.vm.stateOwnerId().get(key) ?? null);
     this.selection.set({ kind: 'state', key });
   }
-
 
   protected undo(): void {
     const prev = this.history.undo(this.graph());
@@ -631,7 +641,6 @@ export class FlowEditorComponent {
     }
   }
 
-
   protected onNodePointerDown(event: PointerEvent, key: string): void {
     this.pointer.nodePointerDown(event, key);
   }
@@ -685,7 +694,6 @@ export class FlowEditorComponent {
     this.pointer.resetView();
   }
 
-
   /** Guards against double-click (two flow versions from one click). */
   protected readonly saving = signal(false);
 
@@ -693,7 +701,7 @@ export class FlowEditorComponent {
     if (this.saving()) return;
     const v = this.validation();
     if (!v.valid) {
-      this.toast.error(v.errors[0] ?? this.i18n.translate('admin.common.invalid'));
+      this.toast.error(this.validationMessages()[0] ?? this.i18n.translate('admin.common.invalid'));
       return;
     }
     const graph = normalizeFlowGraph(autoLayout(this.graph()));

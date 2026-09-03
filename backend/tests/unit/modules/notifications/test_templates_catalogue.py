@@ -1,4 +1,4 @@
-"""Mail template catalogue (#12): completeness and no drift.
+"""Mail template catalogue: completeness and no drift.
 
 The tests check three properties. Every catalogue entry carries DE and EN for the
 subject and the body. The catalogue references the same builtin objects as the senders,

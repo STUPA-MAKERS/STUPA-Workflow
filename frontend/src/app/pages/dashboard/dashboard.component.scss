@@ -1,3 +1,56 @@
+/* The apply link is a secondary button. A signed-in member came for their tasks and
+   meetings, so it does not lead the page — but it is the one action they take FROM
+   here, so it has to read as a control rather than as text. */
+/* Their own line under the greeting. The negative top margin pulls them up against the
+   heading, because the page gap is sized for blocks and these belong to the line above. */
+.dash__gremien {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: calc(var(--space-6) * -1 + var(--space-2));
+}
+
+/* The one action taken from this page, so it is a primary control rather than a quiet
+   outlined link. It still does not lead the page — a signed-in member came for their
+   tasks and meetings — but a bordered surface button beside panels of the same surface
+   disappeared into them, which is the opposite of what a call to action has to do. */
+.dash__apply {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  align-self: flex-start;
+  padding: var(--space-4) var(--space-6);
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+  border: var(--border-width) solid var(--color-primary);
+  border-radius: var(--radius-md);
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
+  text-decoration: none;
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard);
+
+  &:hover,
+  &:focus-visible {
+    background: var(--color-primary-hover);
+    border-color: var(--color-primary-hover);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+}
+
+/* Full-width tap target on a phone, where the inline size was hardest to hit. */
+@media (max-width: 768px) {
+  .dash__apply {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 :host {
   display: flex;
   flex-direction: column;
@@ -11,44 +64,6 @@
 :host > *,
 .dash__panels > * {
   min-width: 0;
-}
-
-.dash__cta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  flex-wrap: wrap;
-  padding: var(--space-5) var(--space-6);
-  border-radius: var(--radius-lg);
-  background: var(--color-primary);
-  color: var(--color-on-primary, #fff);
-  text-decoration: none;
-  box-shadow: var(--shadow-sm);
-  transition: filter var(--motion-fast) var(--ease-standard);
-}
-
-.dash__cta:hover {
-  filter: brightness(1.06);
-}
-.dash__cta:active {
-  filter: brightness(0.95);
-}
-
-.dash__cta:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 2px;
-}
-
-.dash__cta-body {
-  margin: 0;
-  opacity: 0.9;
-  font-size: var(--fs-sm);
-}
-
-.dash__cta-action {
-  font-weight: var(--fw-semibold);
-  white-space: nowrap;
 }
 
 .dash__panels {
@@ -229,9 +244,6 @@
 }
 
 @media (max-width: 768px) {
-  .dash__cta {
-    padding: var(--space-4) var(--space-5);
-  }
   .dash__row {
     flex-wrap: wrap;
   }
@@ -245,4 +257,14 @@
   .dash__grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* The loading placeholder of a panel. Each line stands in for a list row, so the panel
+   keeps roughly the height it will have. */
+.dash__skel {
+  padding: var(--space-2) 0;
+}
+.dash__skel .skel--line {
+  height: 1.75rem;
+  margin-bottom: var(--space-2);
 }

@@ -669,9 +669,23 @@ def test_applications_service_factory_and_sender_getters() -> None:
     assert get_comment_mail_sender() is _deliver_comment_mails
 
 
+class _FakeRow:
+    """Result stub with the single row that `resolve_application_lang` reads."""
+
+    def __init__(self, row: object | None) -> None:
+        self._row = row
+
+    def first(self) -> object | None:
+        return self._row
+
+
 class _FakeMagicSession:
-    def __init__(self) -> None:
+    def __init__(self, lang_row: object | None = None) -> None:
         self.committed = False
+        self.lang_row = lang_row
+
+    async def execute(self, _stmt: object) -> _FakeRow:
+        return _FakeRow(self.lang_row)
 
     async def commit(self) -> None:
         self.committed = True
@@ -693,13 +707,13 @@ class _FakeSessionmaker:
         return False
 
 
-async def test_deliver_magic_link_invokes_request_magic_link(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """`_deliver_magic_link` opens its own session, calls the auth service and commits."""
+async def _run_deliver_magic_link(
+    monkeypatch: pytest.MonkeyPatch, *, lang_row: object | None
+) -> dict[str, Any]:
+    """Run the applications-router magic-link background task against fakes."""
     import app.modules.applications.router as ar
 
-    fake_db = _FakeMagicSession()
+    fake_db = _FakeMagicSession(lang_row)
     monkeypatch.setattr(ar, "get_sessionmaker", lambda: _FakeSessionmaker(fake_db))
     monkeypatch.setattr(ar, "mail_queue_from_pool", lambda _pool: None)
 
@@ -716,18 +730,37 @@ async def test_deliver_magic_link_invokes_request_magic_link(
         def __init__(self, *a: object, **k: object) -> None:
             pass
 
-        async def send_magic_link(self, *, email: str, link: str) -> None:
-            seen["delivered"] = (email, link)
+        async def send_magic_link(self, *, email: str, link: str, lang: str) -> None:
+            seen["delivered"] = (email, link, lang)
 
     monkeypatch.setattr(ar.auth_service, "request_magic_link", _request_magic_link)
     monkeypatch.setattr(ar, "NotificationService", _NS)
 
     aid = uuid4()
     await _deliver_magic_link(_settings(), "user@example.org", aid, pool=None)
+    seen["expected_application_id"] = aid
+    seen["committed"] = fake_db.committed
+    return seen
+
+
+async def test_deliver_magic_link_invokes_request_magic_link(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`_deliver_magic_link` opens its own session, calls the auth service and commits."""
+    seen = await _run_deliver_magic_link(monkeypatch, lang_row=None)
     assert seen["email"] == "user@example.org"
-    assert seen["application_id"] == aid
-    assert seen["delivered"] == ("user@example.org", "https://link/x")
-    assert fake_db.committed is True
+    assert seen["application_id"] == seen["expected_application_id"]
+    # No application row: the mail keeps the default language.
+    assert seen["delivered"] == ("user@example.org", "https://link/x", "de")
+    assert seen["committed"] is True
+
+
+async def test_deliver_magic_link_sends_in_the_application_language(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The confirmation mail follows `application.lang`, not the default language."""
+    seen = await _run_deliver_magic_link(monkeypatch, lang_row=("en", None))
+    assert seen["delivered"] == ("user@example.org", "https://link/x", "en")
 
 
 async def test_deliver_comment_mails_invokes_send(

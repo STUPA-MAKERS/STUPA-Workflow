@@ -22,14 +22,16 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.db import get_sessionmaker
+from app.modules.files.storage import build_object_storage
 from app.modules.livevote.broker import RedisBroker
 from app.modules.livevote.events import MeetingStateEvent
 from app.modules.livevote.models import Meeting
 from app.modules.livevote.service import meeting_channel
 from app.modules.notifications.queue import ArqMailQueue, MailQueue
+from app.modules.pdf.pytex_client import build_pytex_client
 from app.modules.protocol.models import Protocol
 from app.modules.protocol.service import ProtocolService
-from app.settings import Settings
+from app.settings import Settings, load_settings
 from app.shared.errors import ServiceUnavailableError
 
 logger = logging.getLogger("app.protocol")
@@ -146,3 +148,16 @@ async def render_protocol(ctx: dict[str, Any], protocol_id: str) -> str:
         return "failed"
     await _broadcast_meeting_state(ctx, pid)
     return "final"
+
+
+async def on_startup(ctx: dict[str, Any]) -> None:
+    """Build the render dependencies once per worker.
+
+    The pytex client and the object storage were set up by the application-PDF task,
+    which no longer exists. Protocols render through the same two, so the setup moved
+    here rather than going with it.
+    """
+    settings = load_settings()
+    ctx["settings"] = settings
+    ctx["pytex_client"] = build_pytex_client(settings)
+    ctx["object_storage"] = build_object_storage(settings)

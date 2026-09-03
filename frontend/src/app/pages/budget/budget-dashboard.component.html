@@ -1,4 +1,4 @@
-<app-page-header [title]="'budget.title' | t" [subtitle]="'budget.subtitle' | t">
+<app-page-header [title]="'budget.title' | t" [subtitle]="'budget.subtitle' | t" [rail]="true" [flush]="true">
   <div actions class="inline-flex items-center gap-2">
     <app-button variant="secondary" size="sm" (click)="overviewOpen.set(true)">
       <span class="inline-flex items-center gap-2">
@@ -17,11 +17,40 @@
   </div>
 </app-page-header>
 
-@if (loading()) {
-  <p class="bd__status" aria-live="polite">{{ 'budget.loading' | t }}</p>
-} @else if (error()) {
+@if (error()) {
   <p class="bd__status bd__status--error" role="alert">{{ 'budget.error' | t }}</p>
-} @else if (!tree().length) {
+} @else if (loading()) {
+  <!-- Never the empty state while loading. "There are no cost centres" and "they have
+       not arrived yet" are different claims, and the first one is false during every
+       load. The placeholder holds the shape of the layout so the page does not jump
+       when the real tree lands. -->
+  <div class="bd__layout" aria-busy="true">
+    <aside class="bd__nav" aria-hidden="true">
+      <span class="skel skel--line"></span>
+      <span class="skel skel--line"></span>
+      <span class="skel skel--line"></span>
+    </aside>
+    <div class="bd__main">
+      <span class="skel skel--panel"></span>
+      <span class="sr-only" role="status">{{ 'budget.loading' | t }}</span>
+    </div>
+  </div>
+} @else if (emptyReason() === 'noFiscalYear') {
+  <!-- Cost centres exist; the fiscal year does not. Saying "nothing is created yet"
+       here names the wrong cause, so this branch names the fiscal year and points at
+       the page that creates one. -->
+  <section class="bd__empty">
+    <h2 class="bd__emptyTitle">{{ 'budget.empty.noFiscalYear.title' | t }}</h2>
+    <p>{{ 'budget.empty.noFiscalYear.body' | t }}</p>
+    @if (canManageStructure()) {
+      <p>
+        <a class="bd__emptyLink" [routerLink]="['/admin/budget-pots']">
+          {{ 'budget.empty.noFiscalYear.action' | t }}
+        </a>
+      </p>
+    }
+  </section>
+} @else if (emptyReason()) {
   <section class="bd__empty">
     <h2 class="bd__emptyTitle">{{ 'budget.empty.title' | t }}</h2>
     <p>{{ 'budget.empty.body' | t }}</p>
@@ -52,7 +81,10 @@
       </div>
     </aside>
 
-    <main class="bd__main">
+    <!-- Not a `<main>`: the shell already wraps the routed page in one, and a main
+         landmark inside a main landmark is invalid HTML that gives a screen reader two
+         "main" regions with no way to tell which is the page. -->
+    <div class="bd__main">
       @if (breadcrumbs().length > 1) {
         <nav class="flex flex-wrap items-center gap-2" [attr.aria-label]="'budget.breadcrumbs' | t">
           @for (node of breadcrumbs(); track node.id; let last = $last) {
@@ -67,14 +99,21 @@
       }
 
       <section class="bd__usage" [attr.aria-label]="'budget.usage.heading' | t">
-        <!-- Cross-link for the selected cost center (#expenses-ux2). -->
+        <!-- Cross-link for the selected cost center. -->
         <div class="bd__sectionHead bd__sectionHead--end">
           <a class="bd__sectionLink" [routerLink]="['/expenses']" [queryParams]="{ budget: selectedKsId() }">
             <app-icon name="euro" [size]="14" />
             {{ 'budget.usage.viewExpenses' | t }}
           </a>
+          <a class="bd__sectionLink" [routerLink]="['/applications']" [queryParams]="{ budget: selectedKsId() }">
+            <app-icon name="form" [size]="14" />
+            {{ 'budget.apps.viewAll' | t }}
+          </a>
         </div>
-        <app-data-table [columns]="usageColumns()" [rows]="usageRows()" [rowKey]="usageRowId">
+        <app-data-table
+          [loading]="loading()"
+          [loadingText]="'budget.loading' | t"
+          [columns]="usageColumns()" [rows]="usageRows()" [rowKey]="usageRowId">
           <ng-template appCell="node" let-row>
             <button type="button" class="bd__ks" [style.paddingLeft.rem]="$any(row).depth * 1.25" (click)="drillInto($any(row).node)">
               <span class="bd__path">{{ $any(row).node.pathKey | simplifyPath }}</span>
@@ -98,18 +137,7 @@
           <ng-template appCell="available" let-row><span [class.bd__neg]="$any(row).available < 0">{{ money($any(row).available, $any(row).node.currency) }}</span></ng-template>
         </app-data-table>
       </section>
-
-      <section class="bd__apps" aria-labelledby="bd-apps-h">
-        <div class="bd__sectionHead">
-          <h2 id="bd-apps-h" class="bd__panel-h">{{ 'budget.apps.heading' | t }}</h2>
-          <a class="bd__sectionLink" [routerLink]="['/applications']" [queryParams]="{ budget: selectedKsId() }">
-            <app-icon name="form" [size]="14" />
-            {{ 'budget.apps.viewAll' | t }}
-          </a>
-        </div>
-        <app-applications-table [rows]="appRows()" [emptyText]="'budget.apps.empty' | t" />
-      </section>
-    </main>
+    </div>
 
     <!-- The pie charts cover the direct sub cost centers only. -->
     <aside class="bd__charts">

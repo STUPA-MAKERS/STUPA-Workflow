@@ -1,4 +1,4 @@
-"""Integration test for the GDPR privacy services (#PII-Re-Add).
+"""Integration test for the GDPR privacy services.
 
 The tests run against a real schema with Postgres in testcontainers (data-model
 section 1, security.md section 4). They cover principal erasure (Art. 17), the erasure

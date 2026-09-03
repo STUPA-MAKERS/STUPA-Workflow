@@ -303,7 +303,7 @@ async def test_fire_default_dispatcher_when_none() -> None:
     assert res.dispatched_actions == ["notify", "taskNotify"]
 
 
-# fire cancels the open votes on a non-branch exit (#abort-vote).
+# fire cancels the open votes on a non-branch exit.
 def _vote_cancel_updates(db) -> list:
     """Return the `UPDATE vote` statements of the session that cancel open votes."""
     return [
@@ -432,7 +432,7 @@ async def test_auto_advance_fires_matching_automatic_transition() -> None:
     assert res.new_state_id == done
 
 
-# branch_transition and fire_branch (#28).
+# branch_transition and fire_branch.
 async def test_auto_advance_with_explicit_deadline_skips_db_derive() -> None:
     # deadline_passed is set (not None), so the code derives nothing from the DB
     # (branch 308->310).
@@ -533,8 +533,7 @@ async def test_schedule_deadline_unresolvable_due_just_commits(
     assert db.committed == 1
 
 
-# schedule_state_deadline picks the target transition by a satisfiable guard
-# (#deadline-guard).
+# schedule_state_deadline picks the target transition by a satisfiable guard.
 class _PolSvcOk:
     def __init__(self, _session: object) -> None: ...
 
@@ -704,7 +703,7 @@ async def test_revert_status_reschedules_restored_state_deadline() -> None:
     assert db.committed >= 1
 
 
-# Tests for force_status (#force-status): a privileged direct override.
+# Tests for force_status: a privileged direct override.
 def _target_state(state_id: object, flow_id: object) -> SimpleNamespace:
     return SimpleNamespace(id=state_id, flow_version_id=flow_id, config={})
 

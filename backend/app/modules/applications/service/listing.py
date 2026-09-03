@@ -34,6 +34,7 @@ class ListingOps(ApplicationsServiceBase):
         budget_pot_id: UUID | None = None,
         budget_id: UUID | None = None,
         q: str | None = None,
+        archived: bool | None = False,
         amount_min: Decimal | None = None,
         amount_max: Decimal | None = None,
         created_from: date | None = None,
@@ -57,6 +58,11 @@ class ListingOps(ApplicationsServiceBase):
         The query combines both limits with OR. If the caller sets neither, the list
         holds every application. That is the full view for `application.read` and for
         admin.
+
+        `archived` defaults to False, so the working list hides archived applications
+        without every caller remembering to ask. `True` lists only the archived ones and
+        `None` lists both. The count follows the same filter, or the total would promise
+        rows the page does not contain.
         """
         # An unconfirmed guest application stays invisible until the applicant confirms
         # the email. An existing or logged-in application carries `email_confirmed_at`.
@@ -68,6 +74,12 @@ class ListingOps(ApplicationsServiceBase):
             read_scope.extend(await self._committee_read_clauses(committee_sub))
         if read_scope:
             filters.append(or_(*read_scope))
+        # Archived applications leave the working list by default. `None` asks for both,
+        # which is what a search across everything wants.
+        if archived is False:
+            filters.append(Application.archived_at.is_(None))
+        elif archived is True:
+            filters.append(Application.archived_at.is_not(None))
         if state_id is not None:
             filters.append(Application.current_state_id == state_id)
         if gremium_id is not None:
@@ -147,6 +159,7 @@ class ListingOps(ApplicationsServiceBase):
                     currency=app.currency,
                     createdAt=app.created_at,
                     updatedAt=app.updated_at,
+                    archivedAt=app.archived_at,
                 )
             )
         return Page(items=items, total=total or 0, limit=limit, offset=offset)
@@ -270,8 +283,12 @@ class ListingOps(ApplicationsServiceBase):
         from app.modules.flow.service import FlowService
 
         flow = FlowService(self.session)
-        is_admin = "admin" in principal.roles
-        can_transition = is_admin or principal.has("application.transition")
+        # Both go through `Principal.has`, never through `principal.roles`: `has` grants
+        # the admin role every right and still applies the OAuth scope cap. A vote state
+        # is actionable only for someone who may actually cast, and `vote.cast` is in
+        # FORBIDDEN_PERMISSIONS, so no token ever sees one as a task.
+        can_cast = principal.has("vote.cast")
+        can_transition = principal.has("application.transition")
 
         apps = (
             await self.session.scalars(
@@ -301,7 +318,7 @@ class ListingOps(ApplicationsServiceBase):
                 continue
             ok = False
             if s.kind == "vote":
-                if is_admin:
+                if can_cast:
                     ok = True
                 else:
                     cfg = s.config if isinstance(s.config, dict) else {}

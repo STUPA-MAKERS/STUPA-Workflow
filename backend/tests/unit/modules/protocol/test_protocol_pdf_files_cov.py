@@ -1,11 +1,10 @@
 """Extra branch and line coverage for the protocol, pdf and files services.
 
-The suite adds the paths that `test_protocol_service`, `test_pdf_service` and
-`test_files_service` do not reach. It covers the protocol dual-render assembly from
-the agenda (#PII-Re-Add) and the public PDF variant. It also covers `_quorate`,
-`_header_meta` and `_local_end_time`. It drives the `PdfService` document load path
-`load_application_doc` with its joins. Finally it covers the `FilesService` operations
-`list_for_application`, `delete` and `delete_for_application`.
+The suite adds the paths that `test_protocol_service` and `test_files_service` do not
+reach. It covers the protocol dual-render assembly from the agenda (#PII-Re-Add) and the
+public PDF variant, plus `_quorate`, `_header_meta` and `_local_end_time`. Finally it
+covers the `FilesService` operations `list_for_application`, `delete` and
+`delete_for_application`.
 
 The suite runs without a database, pytex, MinIO or Redis. The sessions are fakes with
 a store and ordered result queues. The storage, pytex and mail fakes come from
@@ -27,7 +26,6 @@ from app.modules.applications.models import Application
 from app.modules.files import service as files_service
 from app.modules.files.models import Attachment
 from app.modules.pdf.pytex_client import PytexError
-from app.modules.pdf.service import PdfService
 from app.modules.protocol.models import Protocol
 from app.modules.protocol.service import (
     ProtocolService,
@@ -638,222 +636,6 @@ async def test_build_document_fallback_title_without_meeting() -> None:
     assert out.status == "final"
     # The build falls back to protocol.markdown because there are no agenda items.
     assert "# Bestehendes Markdown" in pytex.calls[0][0]
-
-
-# PdfService.load_application_doc and its helpers.
-class _Result:
-    """Minimal wrapper for an execute or scalars result."""
-
-    def __init__(self, items: list[Any]) -> None:
-        self._items = items
-
-    def all(self) -> list[Any]:
-        return list(self._items)
-
-    def scalars(self) -> _Result:
-        return self
-
-
-class _PdfDocSession:
-    """Session fake for `load_application_doc` with get, scalar, scalars and execute."""
-
-    def __init__(
-        self,
-        *,
-        store: dict[uuid.UUID, Any],
-        scalars: list[list[Any]],
-        scalar: list[Any],
-        executes: list[list[Any]],
-    ) -> None:
-        self.store = store
-        self._scalars = scalars
-        self._scalar = scalar
-        self._executes = executes
-
-    async def get(self, _model: type, ident: uuid.UUID) -> Any:
-        return self.store.get(ident)
-
-    async def scalar(self, _stmt: Any) -> Any:
-        return self._scalar.pop(0) if self._scalar else None
-
-    async def scalars(self, _stmt: Any) -> _Result:
-        return _Result(self._scalars.pop(0) if self._scalars else [])
-
-    async def execute(self, _stmt: Any) -> _Result:
-        return _Result(self._executes.pop(0) if self._executes else [])
-
-
-def _field_row(key: str = "betrag") -> SimpleNamespace:
-    return SimpleNamespace(
-        key=key,
-        type="text",
-        label_i18n={"de": "Betrag"},
-        help_i18n=None,
-        required=True,
-        validation=None,
-        visible_if=None,
-        compute=None,
-        options=None,
-        is_pii=False,
-        is_promoted=False,
-        promote_target=None,
-    )
-
-
-def _make_app(**over: Any) -> Application:
-    app = Application()
-    app.id = over.pop("id", uuid4())
-    app.type_id = over.pop("type_id", uuid4())
-    app.form_version_id = over.pop("form_version_id", uuid4())
-    app.gremium_id = over.pop("gremium_id", None)
-    app.data = over.pop("data", {"betrag": "100"})
-    app.lang = over.pop("lang", None)
-    app.created_at = over.pop("created_at", NOW)
-    for k, v in over.items():
-        setattr(app, k, v)
-    return app
-
-
-async def test_load_application_doc_full_with_gremium_timeline_vote() -> None:
-    app_id = uuid4()
-    type_id = uuid4()
-    gremium_id = uuid4()
-    app = _make_app(
-        id=app_id, type_id=type_id, gremium_id=gremium_id, lang=None,
-        data={"betrag": "100"},
-    )
-    app_type = SimpleNamespace(name_i18n={"de": "Finanzantrag"}, key="finanz")
-    gremium = SimpleNamespace(
-        id=gremium_id, default_lang="de", slug="stupa", cd_variant_id=uuid4()
-    )
-    state = SimpleNamespace(label_i18n={"de": "Bewilligt"}, key="approved")
-    event = SimpleNamespace(at=NOW, to_state_id=uuid4(), note="ok")
-    vote = SimpleNamespace(
-        config={"title": {"de": "Finanzierung"}}, result="passed"
-    )
-    session = _PdfDocSession(
-        store={app_id: app, type_id: app_type, gremium_id: gremium},
-        scalars=[[_field_row()]],          # _fields
-        # applicant_name, _vote_result, cd_variant_key_for_gremium
-        scalar=["Max Muster", vote, "stupa"],
-        executes=[[(event, state)]],       # _timeline rows
-    )
-    doc = await PdfService(session).load_application_doc(app_id)  # type: ignore[arg-type]
-    assert doc.type_name == "Finanzantrag"
-    assert doc.gremium_slug == "stupa"
-    assert doc.cd_variant == "stupa"
-    assert doc.lang == "de"
-    assert doc.applicant_name == "Max Muster"
-    assert len(doc.fields) == 1 and doc.fields[0].key == "betrag"
-    assert len(doc.timeline) == 1
-    assert doc.timeline[0].state_label == "Bewilligt"
-    assert doc.timeline[0].note == "ok"
-    assert doc.vote is not None and doc.vote.title == "Finanzierung"
-    assert doc.vote.result == "passed"
-
-
-async def test_load_application_doc_no_gremium_uses_de_and_type_key() -> None:
-    """Without a Gremium the default_lang is 'de'.
-
-    An empty `app_type.name_i18n` falls back to the key.
-    """
-    app_id = uuid4()
-    type_id = uuid4()
-    app = _make_app(id=app_id, type_id=type_id, gremium_id=None, lang="en")
-    app_type = SimpleNamespace(name_i18n={}, key="generic")
-    session = _PdfDocSession(
-        store={app_id: app, type_id: app_type},
-        scalars=[[]],          # _fields (none)
-        scalar=[None, None],   # applicant_name None, _vote_result None
-        executes=[[]],         # _timeline (none)
-    )
-    doc = await PdfService(session).load_application_doc(app_id)  # type: ignore[arg-type]
-    assert doc.gremium_slug is None
-    assert doc.cd_variant is None
-    assert doc.lang == "en"            # app.lang wins
-    assert doc.default_lang == "de"
-    assert doc.type_name == "generic"  # key fallback
-    assert doc.applicant_name is None
-    assert doc.timeline == []
-    assert doc.vote is None
-
-
-async def test_load_application_doc_missing_app_type_falls_back_to_antrag() -> None:
-    """A missing app_type in the store gives the type_name 'Antrag'."""
-    app_id = uuid4()
-    app = _make_app(id=app_id, gremium_id=None, lang=None)
-    session = _PdfDocSession(
-        store={app_id: app},  # no app_type
-        scalars=[[]],
-        scalar=[None, None],
-        executes=[[]],
-    )
-    doc = await PdfService(session).load_application_doc(app_id)  # type: ignore[arg-type]
-    assert doc.type_name == "Antrag"
-    assert doc.lang == "de"  # no app.lang and no gremium, so the default 'de'
-
-
-async def test_load_application_doc_unknown_application_404() -> None:
-    session = _PdfDocSession(store={}, scalars=[], scalar=[], executes=[])
-    with pytest.raises(NotFoundError):
-        await PdfService(session).load_application_doc(uuid4())  # type: ignore[arg-type]
-
-
-async def test_vote_result_none_when_no_vote() -> None:
-    """_vote_result returns None when there is no vote."""
-    app_id = uuid4()
-    app = _make_app(id=app_id, gremium_id=None)
-    session = _PdfDocSession(
-        store={app_id: app},
-        scalars=[[]],
-        scalar=[None, None],  # applicant None, vote None
-        executes=[[]],
-    )
-    doc = await PdfService(session).load_application_doc(app_id)  # type: ignore[arg-type]
-    assert doc.vote is None
-
-
-async def test_vote_result_string_title_and_default_title() -> None:
-    """A raw_title that is already a string stays.
-
-    Without a title key the result falls back to 'Abstimmung'.
-    """
-    svc = PdfService(_PdfDocSession(store={}, scalars=[], scalar=[], executes=[]))  # type: ignore[arg-type]
-    vote_str = SimpleNamespace(config={"title": "Direkt"}, result="passed")
-    svc.session._scalar = [vote_str]  # type: ignore[attr-defined]
-    res = await svc._vote_result(uuid4(), "de", "de")
-    assert res is not None and res.title == "Direkt"
-    # A missing title key gives the default "Abstimmung".
-    vote_no_title = SimpleNamespace(config={}, result="rejected")
-    svc.session._scalar = [vote_no_title]  # type: ignore[attr-defined]
-    res2 = await svc._vote_result(uuid4(), "de", "de")
-    assert res2 is not None and res2.title == "Abstimmung"
-    assert res2.result == "rejected"
-    # A config that is not a dict gives raw_title None, so the default applies.
-    vote_bad_cfg = SimpleNamespace(config=None, result="passed")
-    svc.session._scalar = [vote_bad_cfg]  # type: ignore[attr-defined]
-    res3 = await svc._vote_result(uuid4(), "de", "de")
-    assert res3 is not None and res3.title == "Abstimmung"
-
-
-async def test_vote_result_none_when_result_none() -> None:
-    """A vote whose result is None gives None."""
-    svc = PdfService(_PdfDocSession(store={}, scalars=[], scalar=[], executes=[]))  # type: ignore[arg-type]
-    vote = SimpleNamespace(config={"title": "X"}, result=None)
-    svc.session._scalar = [vote]  # type: ignore[attr-defined]
-    assert await svc._vote_result(uuid4(), "de", "de") is None
-
-
-async def test_timeline_uses_state_key_when_label_missing() -> None:
-    """_timeline falls back to state.key when label_i18n is empty."""
-    svc = PdfService(_PdfDocSession(store={}, scalars=[], scalar=[], executes=[]))  # type: ignore[arg-type]
-    state = SimpleNamespace(label_i18n={}, key="draft")
-    event = SimpleNamespace(at=NOW, to_state_id=uuid4(), note=None)
-    svc.session._executes = [[(event, state)]]  # type: ignore[attr-defined]
-    items = await svc._timeline(uuid4(), "de", "de")
-    assert len(items) == 1
-    assert items[0].state_label == "draft"
-    assert items[0].note is None
 
 
 # FilesService: list_for_application, delete and delete_for_application.

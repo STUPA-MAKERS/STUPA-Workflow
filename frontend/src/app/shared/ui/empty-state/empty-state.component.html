@@ -1,0 +1,15 @@
+<div class="es">
+  @if (code(); as c) {
+    <p class="es__code">{{ c }}</p>
+  } @else {
+    <app-icon class="es__icon" [name]="icon()" [size]="32" />
+  }
+  <h1 class="es__heading">{{ heading() }}</h1>
+  @if (body(); as text) {
+    <p class="es__body">{{ text }}</p>
+  }
+  <!-- Projected, so the caller decides whether there is a way forward at all. -->
+  <div class="es__action">
+    <ng-content />
+  </div>
+</div>

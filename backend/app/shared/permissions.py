@@ -27,6 +27,14 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     # stays SEPARATE from application.manage, which covers the edit only. Grant it
     # deliberately.
     "application.delete",
+    # Move an application out of the working list and back. Reversible and destructive of
+    # nothing, so it is NOT folded into application.delete; but it decides what everyone
+    # else sees by default, so it is not part of application.manage either.
+    "application.archive",
+    # Create a PUBLIC read-only link to an application. Its own key on purpose: reading an
+    # application and deciding it may be read by anyone with a URL are different
+    # decisions, and someone reading through a magic link must not be able to publish.
+    "application.share",
     "form.configure",
     "flow.configure",
     "vote.cast",
@@ -81,6 +89,10 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     # /admin/privacy: GDPR erasure requests, principal and application deletion,
     # subject-access export and retention config.
     "privacy.manage",
+    # /admin/backups: create, download, upload and restore whole-platform backups.
+    # The permission is separate from every admin.* page permission on purpose. Its
+    # holder can read the entire database, PII included, and can replace it.
+    "backup.manage",
     # MCP and agent access: issue OAuth tokens for API agents. An admin holds it through
     # the bypass. You can also assign it to a non-admin.
     "mcp.use",

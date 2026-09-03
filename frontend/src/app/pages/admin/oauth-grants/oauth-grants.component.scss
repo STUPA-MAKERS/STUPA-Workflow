@@ -25,23 +25,18 @@
   line-height: 1.25;
 }
 
+/* One line, never wrapped, so the badge list cannot set the height of a row. What does
+   not fit is counted by `.grants__scopes-more` instead. */
 .grants__scopes {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
   gap: var(--space-1);
+  white-space: nowrap;
 }
 
-.grants__expiry {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  line-height: 1.25;
-
-  > span {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-  }
+.grants__scopes-more {
+  color: var(--color-text-muted);
+  font-size: var(--fs-xs);
 }
 
 .grants__pager {

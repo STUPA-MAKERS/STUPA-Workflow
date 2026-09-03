@@ -73,6 +73,12 @@ export class GremiumMembersComponent {
 
   /** `admin.gremien` as a front-end gate for add, edit and remove. The backend stays
    *  authoritative. The value is reactive, because the principal loads asynchronously. */
+  /**
+   * True until the first answer. Without it the table shows its empty text while the
+   * request is still out, which asserts there is nothing when nothing has arrived yet.
+   */
+  protected readonly loading = signal(true);
+
   readonly canManage = computed(() => this.auth.can('admin.gremien'));
 
   private readonly gremiumId = this.route.snapshot.paramMap.get('id') ?? '';
@@ -365,11 +371,16 @@ export class GremiumMembersComponent {
   }
 
   private refresh(): void {
+    this.loading.set(true);
     this.api.listGremiumMemberships(this.gremiumId as Uuid).subscribe({
-      next: (m) => this.memberships.set(m),
+      next: (m) => {
+        this.memberships.set(m);
+        this.loading.set(false);
+      },
       // Do not swallow the error. Show a 403 or another failure, not an empty table.
       error: () => {
         this.memberships.set([]);
+        this.loading.set(false);
         this.toast.error(this.i18n.translate('admin.gremien.membersLoadFailed'));
       },
     });
