@@ -186,6 +186,23 @@ input.inv__input {
     white-space: normal;
     overflow-wrap: anywhere;
   }
+  /* The Beleg keeps its ellipsis here, where `.dt__truncate` otherwise wraps.
+     The ui-kit wraps a value in a stacked card on purpose: a card has width for one
+     value and no column to hold, so a DESCRIPTION should use it. A FILE NAME is the
+     other case — it reads from the start, so "Rechnung 03-2026 RF Hoch…" already says
+     which invoice this is, while wrapping turned one card row into three and broke the
+     label/value rhythm of every other row.
+
+     Nothing is lost by cutting: the button carries the full name as its `title`, and
+     the file is one tap away. The shrinking this needs is already done above. */
+  .inv__file .dt__truncate {
+    overflow: hidden;
+    /* `overflow-wrap: anywhere` comes from the card cell and would break the name
+       mid-word instead of letting it run past the edge to be cut. */
+    overflow-wrap: normal;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
   .inv__actions {
     margin-left: auto;
   }
