@@ -625,7 +625,10 @@ export class ApplicationsDetailComponent {
     if (field.type === 'currency') {
       const n = Number(value);
       if (Number.isFinite(n)) {
-        return new Intl.NumberFormat(lang, { style: 'currency', currency: 'EUR' }).format(n);
+        return new Intl.NumberFormat(this.i18n.formatLocale(), {
+          style: 'currency',
+          currency: 'EUR',
+        }).format(n);
       }
     }
     return formatFieldValue(value);
@@ -658,7 +661,7 @@ export class ApplicationsDetailComponent {
   /** Value of a comparison offer / position as currency. */
   money(value: number | null | undefined): string {
     const n = Number(value ?? 0);
-    return new Intl.NumberFormat(this.i18n.locale(), {
+    return new Intl.NumberFormat(this.i18n.formatLocale(), {
       style: 'currency',
       currency: 'EUR',
     }).format(Number.isFinite(n) ? n : 0);
@@ -682,7 +685,7 @@ export class ApplicationsDetailComponent {
       const pref = (p.offers ?? []).find((o) => o.preferred);
       total += pref?.value ?? 0;
     }
-    const sum = new Intl.NumberFormat(this.i18n.locale(), {
+    const sum = new Intl.NumberFormat(this.i18n.formatLocale(), {
       style: 'currency',
       currency: 'EUR',
     }).format(total);
@@ -694,7 +697,7 @@ export class ApplicationsDetailComponent {
     if (app.amount === null) return this.i18n.translate('applications.detail.notProvided');
     const value = Number(app.amount);
     if (Number.isNaN(value)) return app.amount;
-    return new Intl.NumberFormat(this.i18n.locale(), {
+    return new Intl.NumberFormat(this.i18n.formatLocale(), {
       style: 'currency',
       currency: app.currency ?? 'EUR',
     }).format(value);

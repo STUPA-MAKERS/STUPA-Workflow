@@ -295,7 +295,7 @@ describe('BudgetTreeComponent', () => {
   it('money formats numbers, empty strings and null as currency', async () => {
     const { c } = await setup();
     const eur = (n: number) =>
-      new Intl.NumberFormat(TestBed.inject(I18nService).locale(), {
+      new Intl.NumberFormat(TestBed.inject(I18nService).formatLocale(), {
         style: 'currency',
         currency: 'EUR',
       }).format(n);

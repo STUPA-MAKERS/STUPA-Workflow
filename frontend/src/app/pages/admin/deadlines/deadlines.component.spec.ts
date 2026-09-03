@@ -61,7 +61,7 @@ describe('AdminDeadlinesComponent', () => {
     const { fixture } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
-    expect(c.valueOf(POLICIES[0])).toBe(new Date('2026-07-01T00:00:00Z').toLocaleDateString('de'));
+    expect(c.valueOf(POLICIES[0])).toBe(new Date('2026-07-01T00:00:00Z').toLocaleDateString('de-DE'));
   });
 
   it('valueOf shows an em-dash for missing absolute date / offset', async () => {

@@ -68,7 +68,7 @@ export class TasksComponent {
   protected waitingSince(createdAt: string | null): string {
     if (!createdAt) return '—';
     const days = Math.floor((Date.now() - new Date(createdAt).getTime()) / 86_400_000);
-    const rtf = new Intl.RelativeTimeFormat(this.i18n.locale() === 'en' ? 'en' : 'de', {
+    const rtf = new Intl.RelativeTimeFormat(this.i18n.formatLocale(), {
       numeric: 'auto',
     });
     return days <= 0 ? rtf.format(0, 'day') : rtf.format(-days, 'day');

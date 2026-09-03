@@ -206,7 +206,7 @@ export class BudgetTreeComponent {
 
   money(value: string | number | null | undefined, currency: string): string {
     const n = value == null || value === '' ? 0 : Number(value);
-    return new Intl.NumberFormat(this.i18n.locale(), { style: 'currency', currency }).format(n);
+    return new Intl.NumberFormat(this.i18n.formatLocale(), { style: 'currency', currency }).format(n);
   }
 
   alloc(node: BudgetTreeNode) {

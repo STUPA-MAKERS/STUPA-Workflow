@@ -128,7 +128,8 @@ describe('meetings-display.util', () => {
 
   it('formats long dates per locale and passes invalid input through', () => {
     expect(longDate('2026-06-14', 'de')).toBe('14. Juni 2026');
-    expect(longDate('2026-06-14', 'en')).toBe('June 14, 2026');
+    // en-GB puts the day before the month name.
+    expect(longDate('2026-06-14', 'en')).toBe('14 June 2026');
     expect(longDate('not-a-date', 'de')).toBe('not-a-date');
   });
 

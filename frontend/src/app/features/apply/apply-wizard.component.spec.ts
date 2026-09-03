@@ -4,6 +4,7 @@ import { of, throwError } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { ApiClient } from '@core/api/api-client.service';
+import { I18nService } from '@core/i18n/i18n.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import type { ApplicationType, EffectiveForm, FormFieldDef } from '@core/api/models';
 import { provideFormly } from '@shared/formly/formly.providers';
@@ -105,11 +106,11 @@ async function setupFields(fields: FormFieldDef[]) {
 
 /** Expected review output of a currency amount in the pinned DE locale. */
 const euro = (amount: number) =>
-  new Intl.NumberFormat('de', { style: 'currency', currency: 'EUR' }).format(amount);
+  new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(amount);
 
 /** Expected review output of an ISO day in the pinned DE locale. */
 const day = (iso: string) =>
-  new Intl.DateTimeFormat('de', { dateStyle: 'medium', timeZone: 'UTC' }).format(
+  new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeZone: 'UTC' }).format(
     new Date(`${iso}T00:00:00Z`),
   );
 
@@ -869,6 +870,33 @@ describe('ApplyWizardComponent', () => {
     expect(byLabel('Betrag')).toBe(euro(4200));
     expect(byLabel('Termin')).toBe(day('2026-07-01'));
     expect(byLabel('Zeitraum')).toBe(`${day('2026-07-01')} – ${day('2026-07-05')}`);
+  });
+
+  it('reads a date day-first in the review summary when the UI is English', async () => {
+    const { fixture } = await setupFields([
+      { key: 'amount', type: 'currency', label: { de: 'Betrag' } },
+      { key: 'day', type: 'date', label: { de: 'Termin' } },
+      { key: 'span', type: 'daterange', label: { de: 'Zeitraum' } },
+    ]);
+    const comp = fixture.componentInstance;
+    const i18n = fixture.debugElement.injector.get(I18nService);
+    i18n.setLocale('en');
+    try {
+      comp.model = {
+        amount: '1500',
+        day: '2026-07-01',
+        span: { from: '2026-07-01', to: '2026-07-02' },
+      };
+      const rows = comp.summary();
+      const byLabel = (label: string) => rows.find((r) => r.label === label)?.value;
+      // 1 July, not 7 January.
+      expect(byLabel('Termin')).toBe('1 Jul 2026');
+      expect(byLabel('Zeitraum')).toBe('1 Jul 2026 \u2013 2 Jul 2026');
+      // EUR under en-GB keeps the English amount format. Only the date order moves.
+      expect(byLabel('Betrag')).toBe('\u20ac1,500.00');
+    } finally {
+      i18n.setLocale('de');
+    }
   });
 
   it('formats a numeric currency value and a half-filled date range', async () => {

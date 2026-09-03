@@ -278,7 +278,7 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
   }
 
   protected fmt(value: number): string {
-    return new Intl.NumberFormat(this.i18n.locale(), {
+    return new Intl.NumberFormat(this.i18n.formatLocale(), {
       style: 'currency',
       currency: 'EUR',
     }).format(value);
@@ -389,7 +389,7 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
     if (this.editing && this.editing.pi === pi && this.editing.oi === oi) {
       return String(v);
     }
-    return new Intl.NumberFormat(this.i18n.locale(), {
+    return new Intl.NumberFormat(this.i18n.formatLocale(), {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(v);

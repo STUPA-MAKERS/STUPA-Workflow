@@ -1,5 +1,6 @@
 /** Pure, DI-free display helpers for the meetings feature. */
 
+import { toFormatLocale } from '@core/i18n/i18n.service';
 import type { TranslationKey } from '@core/i18n/translations';
 import type {
   AgendaItem,
@@ -119,8 +120,7 @@ export function pickBeamerVote(votes: MeetingVote[]): MeetingVote | null {
 export function longDate(isoDate: string, i18nLocale: string): string {
   const date = new Date(isoDate);
   if (Number.isNaN(date.getTime())) return isoDate;
-  const locale = i18nLocale === 'en' ? 'en-US' : 'de-DE';
-  return new Intl.DateTimeFormat(locale, { dateStyle: 'long' }).format(date);
+  return new Intl.DateTimeFormat(toFormatLocale(i18nLocale), { dateStyle: 'long' }).format(date);
 }
 
 /**

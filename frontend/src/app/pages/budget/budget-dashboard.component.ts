@@ -361,7 +361,7 @@ export class BudgetDashboardComponent {
 
   money(value: string | number | null | undefined, currency = 'EUR'): string {
     const n = value == null || value === '' ? 0 : Number(value);
-    return new Intl.NumberFormat(this.i18n.locale(), { style: 'currency', currency }).format(n);
+    return new Intl.NumberFormat(this.i18n.formatLocale(), { style: 'currency', currency }).format(n);
   }
   /** Row total budget = available + bound + expended (= allocated + income).
    *  This is the reference value for the usage bar. Income-funded cost centers

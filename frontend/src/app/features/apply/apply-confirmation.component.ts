@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs';
@@ -41,5 +41,19 @@ export class ApplyConfirmationComponent {
   readonly applicationId = toSignal(
     this.route.queryParamMap.pipe(map((p) => p.get('id'))),
     { initialValue: null },
+  );
+
+  /**
+   * The reference number the page shows: the first 8 characters of the record id, in
+   * upper case. A 36-character UUID is not a number a person can read out on the phone
+   * or copy off a printout, and house rule `no-uuids-in-ui` forbids a raw id on screen.
+   *
+   * This shortens the DISPLAY only. The full id stays in the URL, in the link to the
+   * record and in the magic-link email, thus every other path is unchanged. An id
+   * shorter than 8 characters gives all of its characters, and no id gives an empty
+   * string — the template hides the line in that case.
+   */
+  protected readonly shortRef = computed(() =>
+    (this.applicationId() ?? '').slice(0, 8).toUpperCase(),
   );
 }

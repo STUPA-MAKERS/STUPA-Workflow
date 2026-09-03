@@ -375,7 +375,7 @@ export class InvoicesComponent implements OnDestroy {
   }
 
   money(amount: string): string {
-    return Number(amount).toLocaleString(this.i18n.locale() === 'en' ? 'en-US' : 'de-DE', {
+    return Number(amount).toLocaleString(this.i18n.formatLocale(), {
       style: 'currency',
       currency: 'EUR',
     });

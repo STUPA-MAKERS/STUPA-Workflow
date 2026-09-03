@@ -337,12 +337,13 @@ describe('AuditLogComponent', () => {
     expect(cmp.dayLabel({ date: old })).toMatch(/2020/);
   });
 
-  it('dayLabel uses the en-US locale when the UI is English', async () => {
+  it('dayLabel uses the en-GB locale when the UI is English', async () => {
     localStorage.setItem('ap.locale', 'en');
     const { cmp, fixture } = await setup();
     fixture.debugElement.injector.get(I18nService).setLocale('en');
     const old = new Date(2020, 0, 15);
-    expect(cmp.dayLabel({ date: old })).toMatch(/2020/);
+    // en-GB full date: "Wednesday, 15 January 2020" — day before the month name.
+    expect(cmp.dayLabel({ date: old })).toBe('Wednesday, 15 January 2020');
     expect(cmp.dayLabel({ date: new Date() })).toBe('Today');
   });
 

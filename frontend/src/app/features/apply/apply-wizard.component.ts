@@ -439,7 +439,7 @@ export class ApplyWizardComponent {
 
   /** Amount in euro, in the active locale. */
   private euro(amount: number): string {
-    return new Intl.NumberFormat(this.i18n.locale(), {
+    return new Intl.NumberFormat(this.i18n.formatLocale(), {
       style: 'currency',
       currency: 'EUR',
     }).format(amount);
@@ -454,7 +454,7 @@ export class ApplyWizardComponent {
     const raw = String(value).trim();
     const date = new Date(/^\d{4}-\d{2}-\d{2}$/.test(raw) ? `${raw}T00:00:00Z` : raw);
     if (Number.isNaN(date.getTime())) return raw;
-    return new Intl.DateTimeFormat(this.i18n.locale(), {
+    return new Intl.DateTimeFormat(this.i18n.formatLocale(), {
       dateStyle: 'medium',
       timeZone: 'UTC',
     }).format(date);

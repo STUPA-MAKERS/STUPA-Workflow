@@ -2281,7 +2281,7 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.newTitle()).toContain('not-a-date');
     });
 
-    it('formats the prefilled date with the en-US locale when English is active', async () => {
+    it('formats the prefilled date with the en-GB locale when English is active', async () => {
       const { fixture, http } = await setup({ id: null, gremien: [{ id: 'g-1', name: 'StuPa' }] });
       const cmp = fixture.componentInstance as Cmp;
       const i18n = fixture.debugElement.injector.get(I18nService);
@@ -2289,12 +2289,12 @@ describe('MeetingsComponent — methods', () => {
       try {
         cmp.onCreateGremiumChange('g-1');
         http.expectOne('/api/gremien/g-1/meeting-members').flush([]);
-        // A valid date and locale=en select Intl with 'en-US' (longDate en branch).
+        // A valid date and locale=en select Intl with 'en-GB' (longDate en branch).
         cmp.newDate.set('2026-07-01');
         cmp.newTime.set('17:00');
         cmp.goToCreateStep2();
-        // English long date (month name in English).
-        expect(cmp.newTitle()).toContain('July');
+        // English long date, day first: "1 July 2026", not "July 1, 2026".
+        expect(cmp.newTitle()).toContain('1 July 2026');
       } finally {
         i18n.setLocale('de');
       }

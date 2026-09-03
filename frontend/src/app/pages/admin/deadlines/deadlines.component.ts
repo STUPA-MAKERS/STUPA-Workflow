@@ -157,7 +157,7 @@ export class AdminDeadlinesComponent {
 
   private baseValue(p: DeadlinePolicy): string {
     if (p.kind === 'absolute') {
-      return p.absoluteAt ? new Date(p.absoluteAt).toLocaleDateString(this.i18n.locale()) : '—';
+      return p.absoluteAt ? new Date(p.absoluteAt).toLocaleDateString(this.i18n.formatLocale()) : '—';
     }
     if (p.kind === 'recurring') {
       const n = p.dates?.length ?? 0;

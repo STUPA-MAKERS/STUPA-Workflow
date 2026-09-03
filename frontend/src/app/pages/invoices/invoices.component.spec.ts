@@ -331,7 +331,7 @@ describe('InvoicesComponent', () => {
     expect(container.querySelector('.dt__cell--sticky')).toBeNull();
   });
 
-  it('money() formats in de-DE vs en-US per locale', async () => {
+  it('money() formats in de-DE vs en-GB per locale', async () => {
     const { c } = await setup();
     const de = c.money('119.00');
     expect(de).toContain('119');

@@ -1,5 +1,6 @@
 import type { BadgeVariant } from '@stupa-makers/ui-kit';
 import type { ScanState } from '@core/api/models';
+import { toFormatLocale } from '@core/i18n/i18n.service';
 
 /**
  * Derive the display title of an application from the free `data` fields.
@@ -52,7 +53,7 @@ export function formatIsoDate(value: unknown, locale: string): string {
   if (!raw) return '';
   const date = new Date(ISO_DAY.test(raw) ? `${raw}T00:00:00Z` : raw);
   if (Number.isNaN(date.getTime())) return raw;
-  return new Intl.DateTimeFormat(locale, {
+  return new Intl.DateTimeFormat(toFormatLocale(locale), {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',

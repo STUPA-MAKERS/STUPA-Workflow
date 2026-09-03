@@ -6,18 +6,23 @@ import { render, screen } from '@testing-library/angular';
 import { AuthService } from '@core/auth/auth.service';
 import { ApplyConfirmationComponent } from './apply-confirmation.component';
 
+const FULL_ID = '1195a615-3a71-4cfe-9ae0-3ba0c2c4b7e9';
+const SHORT_REF = '1195A615';
+
 describe('ApplyConfirmationComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
   afterEach(() => localStorage.clear());
 
-  async function setup(loggedIn = false) {
+  async function setup(loggedIn = false, id: string | null = FULL_ID) {
     return render(ApplyConfirmationComponent, {
       providers: [
         provideRouter([]),
         { provide: AuthService, useValue: { isAuthenticated: signal(loggedIn) } },
         {
           provide: ActivatedRoute,
-          useValue: { queryParamMap: of(convertToParamMap({ id: 'app-77' })) },
+          useValue: {
+            queryParamMap: of(convertToParamMap(id === null ? {} : { id })),
+          },
         },
       ],
     });
@@ -28,7 +33,7 @@ describe('ApplyConfirmationComponent', () => {
     expect(screen.getByText(/E-Mail bestätigen/)).toBeInTheDocument();
     expect(screen.getByText(/persönlichen Link/)).toBeInTheDocument();
     expect(screen.getByText(/nach 12 Stunden automatisch verworfen/)).toBeInTheDocument();
-    expect(screen.getByText('app-77')).toBeInTheDocument();
+    expect(screen.getByText(SHORT_REF)).toBeInTheDocument();
   });
 
   it('renders the confirmation in English when the locale is EN', async () => {
@@ -50,7 +55,7 @@ describe('ApplyConfirmationComponent', () => {
     expect(screen.queryByText(/persönlichen Link/)).not.toBeInTheDocument();
     expect(screen.queryByText(/nach 12 Stunden automatisch verworfen/)).not.toBeInTheDocument();
     const link = screen.getByRole('link', { name: 'Antrag öffnen' });
-    expect(link).toHaveAttribute('href', '/applications/app-77');
+    expect(link).toHaveAttribute('href', `/applications/${FULL_ID}`);
   });
 
   it('shows the signed-in state in English too', async () => {
@@ -69,5 +74,37 @@ describe('ApplyConfirmationComponent', () => {
     expect(screen.getByText(/nach 12 Stunden automatisch verworfen/)).toBeInTheDocument();
     expect(screen.queryByText('Antrag eingereicht')).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Antrag öffnen' })).not.toBeInTheDocument();
+  });
+
+  // A 36-character UUID is unreadable and [[no-uuids-in-ui]] forbids it on screen. The
+  // applicant reads or writes down the short prefix; the full id stays in the URL, in
+  // the record link and in the magic-link email.
+  it('shortens the anonymous reference to an 8-character uppercase prefix', async () => {
+    await setup(false);
+    expect(screen.getByText(SHORT_REF)).toBeInTheDocument();
+    expect(screen.queryByText(FULL_ID)).not.toBeInTheDocument();
+    expect(screen.queryByText(/1195a615-3a71/)).not.toBeInTheDocument();
+  });
+
+  it('shortens the signed-in reference but keeps the full id in the record link', async () => {
+    await setup(true);
+    expect(screen.getByText(SHORT_REF)).toBeInTheDocument();
+    expect(screen.queryByText(FULL_ID)).not.toBeInTheDocument();
+    expect(screen.queryByText(/1195a615-3a71/)).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Antrag öffnen' })).toHaveAttribute(
+      'href',
+      `/applications/${FULL_ID}`,
+    );
+  });
+
+  it('shows an id shorter than 8 characters as it is', async () => {
+    await setup(false, 'ab12');
+    expect(screen.getByText('AB12')).toBeInTheDocument();
+  });
+
+  it('hides the reference line when the query has no id', async () => {
+    await setup(false, null);
+    expect(screen.getByText(/Fast geschafft – E-Mail bestätigen/)).toBeInTheDocument();
+    expect(screen.queryByText(/Vorgangsnummer/)).not.toBeInTheDocument();
   });
 });

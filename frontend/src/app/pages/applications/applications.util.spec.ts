@@ -47,7 +47,8 @@ describe('formatFieldValue', () => {
 describe('formatIsoDate', () => {
   it('formats an ISO day in the active locale', () => {
     expect(formatIsoDate('2026-07-01', 'de')).toBe('01.07.2026');
-    expect(formatIsoDate('2026-07-01', 'en')).toBe('07/01/2026');
+    // en-GB, not en-US: 1 July reads as 01/07/2026, never as 07/01/2026.
+    expect(formatIsoDate('2026-07-01', 'en')).toBe('01/07/2026');
   });
 
   it('keeps the entered day west of UTC', () => {
@@ -73,6 +74,12 @@ describe('formatDateRangeValue', () => {
   it('formats a full range as one span', () => {
     expect(formatDateRangeValue({ from: '2026-07-01', to: '2026-07-02' }, 'de')).toBe(
       '01.07.2026 \u2013 02.07.2026',
+    );
+  });
+
+  it('formats a full range day-first under the English UI', () => {
+    expect(formatDateRangeValue({ from: '2026-07-01', to: '2026-07-02' }, 'en')).toBe(
+      '01/07/2026 \u2013 02/07/2026',
     );
   });
 

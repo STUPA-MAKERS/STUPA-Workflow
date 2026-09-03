@@ -8,7 +8,7 @@
       <p class="done__text">{{ 'apply.submitted.body' | t }}</p>
       @if (applicationId()) {
         <p class="mt-4 text-muted text-sm">
-          {{ 'apply.confirm.ref' | t }} <code>{{ applicationId() }}</code>
+          {{ 'apply.confirm.ref' | t }} <code>{{ shortRef() }}</code>
         </p>
         <a card-footer [routerLink]="['/applications', applicationId()]" class="done__home">
           {{ 'apply.submitted.link' | t }}
@@ -26,7 +26,7 @@
       <p class="done__expiry" role="note">{{ 'apply.confirm.expiry' | t }}</p>
       @if (applicationId()) {
         <p class="mt-4 text-muted text-sm">
-          {{ 'apply.confirm.ref' | t }} <code>{{ applicationId() }}</code>
+          {{ 'apply.confirm.ref' | t }} <code>{{ shortRef() }}</code>
         </p>
       }
       <p class="mt-2 text-muted text-sm">{{ 'apply.confirm.hint' | t }}</p>
