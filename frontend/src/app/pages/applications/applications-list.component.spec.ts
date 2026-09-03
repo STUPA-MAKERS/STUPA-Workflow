@@ -3,7 +3,7 @@ import {
   HttpTestingController,
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
-import { Router, provideRouter } from '@angular/router';
+import { convertToParamMap, Router, provideRouter } from '@angular/router';
 import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { ApplicationsListComponent } from './applications-list.component';
@@ -219,24 +219,194 @@ describe('ApplicationsListComponent', () => {
     http.verify();
   });
 
-  it('puts the archived filter back to its default on a reset', async () => {
-    // It was the one filter a reset visibly failed to undo: the list stayed filtered by
-    // whatever the tri-state had been set to.
+  it('writes the archived filter to the URL, like every other filter', async () => {
+    // Setting the signal and reloading directly left the choice out of the URL, so it
+    // could not be shared or survive a reload — and a reset had no parameter to clear.
     const { fixture, http, detectChanges, router } = await setup();
     flushTypes(http);
     http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
     detectChanges();
+    const navigate = jest.spyOn(router, 'navigate').mockResolvedValue(true);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const cmp = fixture.componentInstance as any;
 
-    cmp.setArchived('all');
-    expect(cmp.archived()).toBe('all');
+    cmp.setFilter('archived', 'all');
+    expect(navigate).toHaveBeenCalledWith(
+      [],
+      expect.objectContaining({ queryParams: { archived: 'all', offset: null } }),
+    );
 
-    jest.spyOn(router, 'navigate').mockResolvedValue(true);
-    cmp.reset();
-    expect(cmp.archived()).toBe('false');
+    // The default travels as no parameter at all, so a shared URL carries only what was
+    // actually chosen.
+    cmp.setFilter('archived', 'false');
+    expect(navigate).toHaveBeenLastCalledWith(
+      [],
+      expect.objectContaining({ queryParams: { archived: null, offset: null } }),
+    );
     for (const req of http.match((r) => r.url === '/api/applications')) req.flush(listPage([]));
     http.verify();
+  });
+
+  it('reloads the list on a reset, not just the filter panel', async () => {
+    // Reported: the panel reset visually — the badge cleared, another segment looked
+    // active — and the data did not move. The reset clears the query params, so the
+    // reload only happens if the filters live in the URL in the first place.
+    const { fixture, http, detectChanges, router } = await setup();
+    flushTypes(http);
+    http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
+    detectChanges();
+    const navigate = jest.spyOn(router, 'navigate').mockResolvedValue(true);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cmp = fixture.componentInstance as any;
+
+    cmp.reset();
+    expect(cmp.archived()).toBe('false');
+    expect(navigate).toHaveBeenCalledWith(
+      [],
+      expect.objectContaining({ queryParams: expect.objectContaining({ archived: null }) }),
+    );
+    for (const req of http.match((r) => r.url === '/api/applications')) req.flush(listPage([]));
+    http.verify();
+  });
+
+  it('keeps the loaded rows when loading another page fails', async () => {
+    // Only the FIRST page turns a failure into the error state. A later page failing must
+    // not blank a list the reader is already looking at.
+    const { fixture, http, detectChanges } = await setup();
+    flushTypes(http);
+    http
+      .expectOne((r) => r.url === '/api/applications')
+      .flush({ items: [ITEM], total: 40, limit: 20, offset: 0 });
+    detectChanges();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cmp = fixture.componentInstance as any;
+
+    cmp.loadMore();
+    http
+      .expectOne((r) => r.url === '/api/applications')
+      .flush({ code: 'boom' }, { status: 500, statusText: 'Server Error' });
+
+    expect(cmp.error()).toBe(false);
+    expect(cmp.items()).toHaveLength(1);
+    expect(cmp.loadingMore()).toBe(false);
+    http.verify();
+  });
+
+  describe('every filter, generically', () => {
+    /**
+     * These walk the component's own filter list rather than naming filters, so a filter
+     * added later is covered the day it is declared.
+     *
+     * This exists because one class of bug kept coming back. A filter used to live in
+     * five hand-kept places — its signal, the URL reader, the apply, the reset and the
+     * request builder — and the archived filter reached three of them. The panel reset
+     * while the list kept its rows, because the list reloads from the URL and the reset
+     * only touched signals.
+     */
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    function defs(cmp: any): { param: string; empty: string; signal: any }[] {
+      return cmp.filters;
+    }
+
+    async function ready() {
+      const view = await setup();
+      flushTypes(view.http);
+      view.http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
+      view.detectChanges();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return { ...view, cmp: view.fixture.componentInstance as any };
+    }
+
+    function drain(http: HttpTestingController) {
+      for (const req of http.match((r) => r.url === '/api/applications')) req.flush(listPage([]));
+      http.verify();
+    }
+
+    it('declares every filter the panel offers', async () => {
+      const { cmp, http } = await ready();
+      expect(defs(cmp).map((f) => f.param)).toEqual(
+        expect.arrayContaining(['q', 'type', 'state', 'budget', 'amountMin', 'archived']),
+      );
+      drain(http);
+    });
+
+    it('sends nothing for a filter at its default', async () => {
+      const { cmp, http, router } = await ready();
+      const navigate = jest.spyOn(router, 'navigate').mockResolvedValue(true);
+
+      cmp.applyFilters();
+
+      const params = navigate.mock.calls[0][1]?.queryParams as Record<string, unknown>;
+      for (const f of defs(cmp)) expect(params[f.param]).toBeNull();
+      drain(http);
+    });
+
+    it('clears every filter on a reset, in the signals AND in the URL', async () => {
+      // Both halves matter: the signals drive the panel, the URL drives the reload. The
+      // reported bug was the panel resetting while the list kept its old rows.
+      const { cmp, http, router } = await ready();
+      const navigate = jest.spyOn(router, 'navigate').mockResolvedValue(true);
+      for (const f of defs(cmp)) f.signal.set(f.param === 'archived' ? 'all' : 'x');
+
+      cmp.reset();
+
+      const params = navigate.mock.calls.at(-1)?.[1]?.queryParams as Record<string, unknown>;
+      for (const f of defs(cmp)) {
+        expect(f.signal()).toBe(f.empty);
+        expect(params[f.param]).toBeNull();
+      }
+      drain(http);
+    });
+
+    it('carries a chosen value into the URL', async () => {
+      const { cmp, http, router } = await ready();
+      const navigate = jest.spyOn(router, 'navigate').mockResolvedValue(true);
+
+      for (const f of defs(cmp)) {
+        const value = f.param === 'archived' ? 'all' : '42';
+        f.signal.set(value);
+        cmp.applyFilters();
+        const params = navigate.mock.calls.at(-1)?.[1]?.queryParams as Record<string, unknown>;
+        expect(String(params[f.param])).toBe(value);
+        f.signal.set(f.empty);
+      }
+      drain(http);
+    });
+
+    it('applies any filter immediately through the URL, never past it', async () => {
+      // The defect was a bespoke setter that set the signal and reloaded, leaving no
+      // query parameter for a reset to clear.
+      const { cmp, http, router } = await ready();
+      const navigate = jest.spyOn(router, 'navigate').mockResolvedValue(true);
+
+      for (const f of defs(cmp)) {
+        const value = f.param === 'archived' ? 'all' : '42';
+        cmp.setFilter(f.param, value);
+        expect(navigate.mock.calls.at(-1)?.[1]?.queryParams).toEqual({
+          [f.param]: value,
+          offset: null,
+        });
+
+        // And its own default clears the parameter rather than writing it out.
+        cmp.setFilter(f.param, f.empty);
+        expect(navigate.mock.calls.at(-1)?.[1]?.queryParams).toEqual({
+          [f.param]: null,
+          offset: null,
+        });
+      }
+      drain(http);
+    });
+
+    it('reads every filter back out of the URL', async () => {
+      const { cmp, http } = await ready();
+      const raw: Record<string, string> = {};
+      for (const f of defs(cmp)) raw[f.param] = f.param === 'archived' ? 'all' : '42';
+
+      cmp.readFilters(convertToParamMap(raw));
+
+      for (const f of defs(cmp)) expect(f.signal()).toBe(raw[f.param]);
+      drain(http);
+    });
   });
 
   it('offers all three archived states at once, like the bookings kind filter', async () => {

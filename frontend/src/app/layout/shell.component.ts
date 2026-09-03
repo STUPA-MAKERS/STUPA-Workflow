@@ -29,6 +29,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { Locale } from '@core/i18n/translations';
 import { resolveI18n } from '@shared/forms/i18n-text';
 import { IconComponent, LoadingOverlayComponent, ToastComponent } from '@stupa-makers/ui-kit';
+import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 
 interface NavItem {
   path: string;
@@ -52,7 +53,7 @@ interface NavItem {
   selector: 'app-shell',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
+  imports: [ScrollFadeDirective, 
     RouterOutlet,
     RouterLink,
     RouterLinkActive,

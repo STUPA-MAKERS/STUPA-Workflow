@@ -23,7 +23,7 @@
       <img class="header__mark" [src]="markSrc" alt="" aria-hidden="true" />
     </a>
 
-    <nav class="header__nav" [attr.aria-label]="'nav.main' | t">
+    <nav class="header__nav" appScrollFade [attr.aria-label]="'nav.main' | t">
       @for (item of visibleNav(); track item.path) {
         <a
           class="header__link"

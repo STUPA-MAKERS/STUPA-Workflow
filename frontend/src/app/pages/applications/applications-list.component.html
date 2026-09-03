@@ -71,7 +71,7 @@
               [variant]="archived() === opt.value ? 'primary' : 'ghost'"
               size="sm"
               [ariaPressed]="archived() === opt.value"
-              (click)="setArchived($any(opt.value))"
+              (click)="setFilter('archived', opt.value)"
             >{{ opt.label }}</app-button>
           }
         </div>
