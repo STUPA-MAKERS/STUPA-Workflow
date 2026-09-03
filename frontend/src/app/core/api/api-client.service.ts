@@ -1,6 +1,7 @@
 import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { type Observable, catchError, map, of, throwError } from 'rxjs';
+import { listContext } from '@core/cache/cache.interceptor';
 import { I18nService } from '@core/i18n/i18n.service';
 import { skipLoading } from '@core/loading/loading.interceptor';
 import { API_BASE_URL } from './api.config';
@@ -176,7 +177,7 @@ export class ApiClient {
     return this.http
       .get<Page<ApplicationListItemWire>>(`${this.base}/applications`, {
         params,
-        context: skipLoading(),
+        context: listContext(query.offset),
       })
       .pipe(
         map((page) => ({
@@ -226,20 +227,19 @@ export class ApiClient {
    * when the server turns ALTCHA off (404 → no captcha).
    */
   altchaChallenge(): Observable<AltchaChallenge | null> {
-    return this.http.get<AltchaChallenge>(`${this.base}/altcha/challenge`).pipe(
-      catchError((err: HttpErrorResponse) =>
-        err.status === 404 ? of(null) : throwError(() => err),
-      ),
-    );
+    return this.http
+      .get<AltchaChallenge>(`${this.base}/altcha/challenge`)
+      .pipe(
+        catchError((err: HttpErrorResponse) =>
+          err.status === 404 ? of(null) : throwError(() => err),
+        ),
+      );
   }
 
   /** POST /applications — camelCase body. The response is `{ applicationId }`, not a full DTO. */
   createApplication(input: NewApplication): Observable<ApplicationCreated> {
     return this.http
-      .post<ApplicationCreatedWire>(
-        `${this.base}/applications`,
-        toApplicationCreateBody(input),
-      )
+      .post<ApplicationCreatedWire>(`${this.base}/applications`, toApplicationCreateBody(input))
       .pipe(map(mapApplicationCreated));
   }
 
@@ -294,10 +294,7 @@ export class ApiClient {
     id: Uuid,
     input: { ttlDays?: number; label?: string } = {},
   ): Observable<ApplicationShareLink> {
-    return this.http.post<ApplicationShareLink>(
-      `${this.base}/applications/${id}/shares`,
-      input,
-    );
+    return this.http.post<ApplicationShareLink>(`${this.base}/applications/${id}/shares`, input);
   }
 
   /** DELETE /applications/{id}/shares/{shareId} — stop honouring one link. */
@@ -397,9 +394,7 @@ export class ApiClient {
       })
       .pipe(
         map((items) =>
-          items
-            .map((s) => mapState(s, lang))
-            .filter((s): s is ApplicationState => s !== null),
+          items.map((s) => mapState(s, lang)).filter((s): s is ApplicationState => s !== null),
         ),
       );
   }
@@ -407,10 +402,7 @@ export class ApiClient {
   /** POST /applications/{id}/force-status — set a status directly. This privileged
    *  override bypasses guards and transitions. Needs `application.force_status`. */
   forceStatus(id: Uuid, req: ForceStatusBody): Observable<TransitionResult> {
-    return this.http.post<TransitionResult>(
-      `${this.base}/applications/${id}/force-status`,
-      req,
-    );
+    return this.http.post<TransitionResult>(`${this.base}/applications/${id}/force-status`, req);
   }
 
   /** Transitions the magic-link applicant may fire (actorIsApplicant gate). */
@@ -504,17 +496,14 @@ export class ApiClient {
 
   /** POST /meetings — create a meeting (P(meeting.manage)). */
   createMeeting(body: MeetingCreateBody): Observable<Meeting> {
-    return this.http
-      .post<MeetingOutWire>(`${this.base}/meetings`, body)
-      .pipe(map(mapMeeting));
+    return this.http.post<MeetingOutWire>(`${this.base}/meetings`, body).pipe(map(mapMeeting));
   }
 
   /** GET /gremien/{id}/meeting-members — protokollant candidates (P(session.manage)). */
   listMeetingMembers(gremiumId: Uuid): Observable<MeetingMember[]> {
-    return this.http.get<MeetingMember[]>(
-      `${this.base}/gremien/${gremiumId}/meeting-members`,
-      { context: skipLoading() },
-    );
+    return this.http.get<MeetingMember[]>(`${this.base}/gremien/${gremiumId}/meeting-members`, {
+      context: skipLoading(),
+    });
   }
 
   /** GET /meetings — list meetings (newest first), optionally gremium-filtered. */
@@ -614,10 +603,9 @@ export class ApiClient {
 
   /** PUT /meetings/{id}/attendance/me — mark own attendance. */
   setOwnAttendance(meetingId: Uuid, status: AttendanceStatus): Observable<Attendance[]> {
-    return this.http.put<Attendance[]>(
-      `${this.base}/meetings/${meetingId}/attendance/me`,
-      { status },
-    );
+    return this.http.put<Attendance[]>(`${this.base}/meetings/${meetingId}/attendance/me`, {
+      status,
+    });
   }
 
   /** PUT /meetings/{id}/attendance/{principalId} — set a member (meeting lead). */
@@ -664,37 +652,28 @@ export class ApiClient {
 
   /** DELETE /meetings/{id}/agenda/{itemId} — remove an item from the agenda. */
   removeAgendaItem(meetingId: Uuid, itemId: Uuid): Observable<AgendaItem[]> {
-    return this.http.delete<AgendaItem[]>(
-      `${this.base}/meetings/${meetingId}/agenda/${itemId}`,
-    );
+    return this.http.delete<AgendaItem[]>(`${this.base}/meetings/${meetingId}/agenda/${itemId}`);
   }
 
   /** PATCH /meetings/{id}/agenda/{itemId} — set the markdown text of an item. */
   setAgendaBody(meetingId: Uuid, itemId: Uuid, body: string): Observable<AgendaItem[]> {
-    return this.http.patch<AgendaItem[]>(
-      `${this.base}/meetings/${meetingId}/agenda/${itemId}`,
-      { body },
-    );
+    return this.http.patch<AgendaItem[]>(`${this.base}/meetings/${meetingId}/agenda/${itemId}`, {
+      body,
+    });
   }
 
   /** PATCH /meetings/{id}/agenda/{itemId} — rename a free-text item (set title). */
   renameAgendaItem(meetingId: Uuid, itemId: Uuid, title: string): Observable<AgendaItem[]> {
-    return this.http.patch<AgendaItem[]>(
-      `${this.base}/meetings/${meetingId}/agenda/${itemId}`,
-      { title },
-    );
+    return this.http.patch<AgendaItem[]>(`${this.base}/meetings/${meetingId}/agenda/${itemId}`, {
+      title,
+    });
   }
 
   /** PATCH /meetings/{id}/agenda/{itemId} — mark an item (non-)public. */
-  setAgendaNonPublic(
-    meetingId: Uuid,
-    itemId: Uuid,
-    nonPublic: boolean,
-  ): Observable<AgendaItem[]> {
-    return this.http.patch<AgendaItem[]>(
-      `${this.base}/meetings/${meetingId}/agenda/${itemId}`,
-      { nonPublic },
-    );
+  setAgendaNonPublic(meetingId: Uuid, itemId: Uuid, nonPublic: boolean): Observable<AgendaItem[]> {
+    return this.http.patch<AgendaItem[]>(`${this.base}/meetings/${meetingId}/agenda/${itemId}`, {
+      nonPublic,
+    });
   }
 
   /** PUT /meetings/{id}/agenda/order — order items in the supplied sequence. */
@@ -871,5 +850,4 @@ export class ApiClient {
   downloadMcpPackage(): Observable<Blob> {
     return this.http.get(`${this.base}/mcp/package`, { responseType: 'blob' });
   }
-
 }

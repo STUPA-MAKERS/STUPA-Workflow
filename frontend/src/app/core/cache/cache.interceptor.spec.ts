@@ -1,7 +1,7 @@
 import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { cacheInterceptor, cached } from './cache.interceptor';
+import { cacheInterceptor, cached, listContext } from './cache.interceptor';
 import { HttpCacheService } from './http-cache.service';
 
 describe('cacheInterceptor', () => {
@@ -22,6 +22,57 @@ describe('cacheInterceptor', () => {
   });
 
   afterEach(() => mock.verify());
+
+  describe('listContext', () => {
+    it('paints page one from the cache before the request answers', () => {
+      // What a page switch is supposed to feel like: the list is there, and corrects
+      // itself a moment later rather than showing a loading state for a round trip.
+      http.get('/api/expenses', { context: listContext(0) }).subscribe();
+      mock.expectOne('/api/expenses').flush({ items: ['a'], total: 1, offset: 0 });
+
+      const seen: unknown[] = [];
+      http.get('/api/expenses', { context: listContext(0) }).subscribe((b) => seen.push(b));
+      // Before the request is answered — the cached page is already delivered.
+      expect(seen).toEqual([{ items: ['a'], total: 1, offset: 0 }]);
+
+      mock.expectOne('/api/expenses').flush({ items: ['a', 'b'], total: 2, offset: 0 });
+      expect(seen).toHaveLength(2);
+    });
+
+    it('never caches a load-more page, which would append the same rows twice', () => {
+      // A cached GET emits twice, and a load-more subscriber appends what it is given.
+      // Two emissions there means every row of that page arriving a second time.
+      http.get('/api/expenses?offset=20', { context: listContext(20) }).subscribe();
+      mock.expectOne('/api/expenses?offset=20').flush({ items: ['c'], total: 40, offset: 20 });
+      expect(cache.size).toBe(0);
+
+      const seen: unknown[] = [];
+      http
+        .get('/api/expenses?offset=20', { context: listContext(20) })
+        .subscribe((b) => seen.push(b));
+      expect(seen).toEqual([]);
+      mock.expectOne('/api/expenses?offset=20').flush({ items: ['c'], total: 40, offset: 20 });
+      expect(seen).toHaveLength(1);
+    });
+
+    it('treats a missing offset as page one', () => {
+      // The list APIs leave `offset` off the first request rather than sending 0.
+      http.get('/api/invoices', { context: listContext(undefined) }).subscribe();
+      mock.expectOne('/api/invoices').flush({ items: [], total: 0, offset: 0 });
+      expect(cache.size).toBe(1);
+    });
+
+    it('drops the cached page when something is written to the collection', () => {
+      // A booking that was just created cannot be missing from the list that follows it.
+      http.get('/api/expenses', { context: listContext(0) }).subscribe();
+      mock.expectOne('/api/expenses').flush({ items: ['a'], total: 1, offset: 0 });
+      expect(cache.size).toBe(1);
+
+      http.post('/api/expenses', {}).subscribe();
+      mock.expectOne('/api/expenses').flush({});
+      expect(cache.size).toBe(0);
+    });
+  });
 
   it('does not cache a request that did not ask to be cached', () => {
     http.get('/api/budgets').subscribe();
