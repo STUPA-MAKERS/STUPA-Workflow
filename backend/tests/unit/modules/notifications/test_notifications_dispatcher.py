@@ -188,3 +188,164 @@ async def test_dispatch_task_notify_skips_non_actionable_state(
     await disp.dispatch([_action("taskNotify")])
 
     assert "recipients" not in captured  # the dispatcher skipped the send
+
+
+# --- #19: the applicant mail follows the language of the application ---------
+
+
+class _CapturingService:
+    """Record the keyword arguments that the dispatcher gives to the service."""
+
+    captured: dict[str, object] = {}
+
+    def __init__(self, session, *, queue, settings) -> None:  # noqa: ANN001
+        pass
+
+    async def handle_notify_action(self, action, **kw):  # noqa: ANN001, ANN003
+        type(self).captured.update(kw)
+        return 1
+
+
+def _capture(monkeypatch: pytest.MonkeyPatch) -> dict[str, object]:
+    """Install the capturing service and return the dict that it fills."""
+    _CapturingService.captured.clear()
+    monkeypatch.setattr(mod, "NotificationService", _CapturingService)
+    return _CapturingService.captured
+
+
+def _applicant_notify(params: dict) -> DispatchedAction:
+    return _action("notify", params)
+
+
+async def test_applicant_only_notify_uses_the_application_language(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """#19: an English application gets an English mail, with the status label.
+
+    The test drives the real `NotificationService`, so the assertion covers the
+    rendered subject and body, not only the language argument.
+    """
+    from app.modules.notifications.service import NotificationService
+    from tests._support.notifications_fakes import FakeQueue, FakeResolver
+
+    class _Service(NotificationService):
+        def __init__(self, session, *, queue, settings) -> None:  # noqa: ANN001
+            super().__init__(session, queue=queue, settings=settings)
+            self.resolver = FakeResolver(["applicant@example.org"])  # type: ignore[assignment]
+
+    monkeypatch.setattr(mod, "NotificationService", _Service)
+    state_id = uuid.uuid4()
+    session = FakeSession(
+        executes=[
+            [(uuid.uuid4(), state_id, {"title": "Beamer"})],  # the application row
+            [("en", None)],  # resolve_application_lang: application.lang is en
+        ],
+        scalar=[{"de": "Genehmigt", "en": "Approved"}],  # the state label
+        scalars=[[], []],  # nobody opted out, and no template override in the DB
+    )
+    queue = FakeQueue()
+    disp = NotificationActionDispatcher(_sessionmaker(session), queue, SETTINGS)
+    await disp.dispatch(
+        [
+            _applicant_notify(
+                {
+                    "templateKey": "status_update",
+                    "recipients": [{"kind": "applicant"}],
+                }
+            )
+        ]
+    )
+
+    assert len(queue.messages) == 1
+    msg = queue.messages[0]
+    assert msg.subject == "Update on your application"
+    assert "New status: Approved" in msg.text
+    assert "Genehmigt" not in msg.text
+
+
+async def test_applicant_only_notify_without_a_state_label(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A state without a label leaves `status` out, and the language still resolves."""
+    captured = _capture(monkeypatch)
+    session = FakeSession(
+        executes=[
+            [(uuid.uuid4(), uuid.uuid4(), None)],  # the application row, with a state
+            [("en", None)],  # resolve_application_lang
+        ],
+        scalar=[None],  # the state carries no label
+    )
+    disp = NotificationActionDispatcher(_sessionmaker(session), None, SETTINGS)
+    await disp.dispatch([_applicant_notify({"recipients": [{"kind": "applicant"}]})])
+    assert captured["lang"] == "en"
+    assert "status" not in captured["context"]  # type: ignore[operator]
+
+
+async def test_explicit_lang_param_wins_over_the_application_language(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A `lang` param on the action stays as it is, so no resolve runs."""
+    captured = _capture(monkeypatch)
+    session = FakeSession(executes=[[(uuid.uuid4(), None, None)]])
+    disp = NotificationActionDispatcher(_sessionmaker(session), None, SETTINGS)
+    await disp.dispatch(
+        [_applicant_notify({"lang": "de", "recipients": [{"kind": "applicant"}]})]
+    )
+    assert captured["lang"] == "de"
+
+
+async def test_mixed_recipients_keep_the_default_language(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Applicant and team in one action share one message, so the default stays."""
+    captured = _capture(monkeypatch)
+    session = FakeSession(executes=[[(uuid.uuid4(), None, None)]])
+    disp = NotificationActionDispatcher(_sessionmaker(session), None, SETTINGS)
+    await disp.dispatch(
+        [
+            _applicant_notify(
+                {
+                    "recipients": [
+                        {"kind": "applicant"},
+                        {"kind": "gremium", "value": "stupa"},
+                    ]
+                }
+            )
+        ]
+    )
+    assert captured["lang"] is None
+
+
+async def test_team_only_recipients_keep_the_default_language(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A mail without an applicant recipient keeps the configured default language."""
+    captured = _capture(monkeypatch)
+    session = FakeSession(executes=[[(uuid.uuid4(), None, None)]])
+    disp = NotificationActionDispatcher(_sessionmaker(session), None, SETTINGS)
+    await disp.dispatch(
+        [_applicant_notify({"recipients": [{"kind": "gremium", "value": "stupa"}]})]
+    )
+    assert captured["lang"] is None
+
+
+async def test_notify_without_recipients_keeps_the_default_language(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An action without a recipient list resolves no language."""
+    captured = _capture(monkeypatch)
+    session = FakeSession(executes=[[(uuid.uuid4(), None, None)]])
+    disp = NotificationActionDispatcher(_sessionmaker(session), None, SETTINGS)
+    await disp.dispatch([_applicant_notify({"templateKey": "status_update"})])
+    assert captured["lang"] is None
+
+
+async def test_notify_with_non_dict_recipients_keeps_the_default_language(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The service drops the non-dict JSONB entries, so no applicant stays."""
+    captured = _capture(monkeypatch)
+    session = FakeSession(executes=[[(uuid.uuid4(), None, None)]])
+    disp = NotificationActionDispatcher(_sessionmaker(session), None, SETTINGS)
+    await disp.dispatch([_applicant_notify({"recipients": ["applicant"]})])
+    assert captured["lang"] is None
