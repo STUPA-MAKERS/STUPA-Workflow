@@ -7,11 +7,12 @@ import {
   effect,
   inject,
   signal,
+  type WritableSignal,
   viewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, type ParamMap } from '@angular/router';
 import { ApiClient } from '@core/api/api-client.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -50,6 +51,25 @@ import { PageHeaderComponent } from '@shared/ui/page-header/page-header.componen
  * Visible controls exist for search, type and status. `gremium` and `topf` come from the
  * URL only. Pickers follow once the gremium and pot list endpoints exist.
  */
+
+/**
+ * One filter of the list.
+ *
+ * `empty` is the value that means "not filtering". It travels as no query parameter and
+ * as no request field, so a shared URL and a request carry only what was actually chosen,
+ * and a reset is simply every filter back to `empty`.
+ */
+interface FilterDef {
+  /** Query-parameter name. Also the request field, unless `apiKey` says otherwise. */
+  readonly param: string;
+  readonly signal: WritableSignal<string>;
+  readonly empty: string;
+  /** Narrow a raw parameter to an allowed value. A hand-edited URL reaches this. */
+  readonly parse?: (raw: string) => string;
+  readonly apiKey?: string;
+  readonly numeric?: boolean;
+  readonly trim?: boolean;
+}
 @Component({
   selector: 'app-applications-list',
   standalone: true,
@@ -82,9 +102,9 @@ export class ApplicationsListComponent implements OnDestroy {
   private nextOffset = 0;
   /** Fetch sequence number. The fetch handler drops late responses from old filters. */
   private fetchSeq = 0;
-  /** `gremium` and `topf` have no visible controls. They mirror the URL. */
-  private gremium = '';
-  private topf = '';
+  /** `gremium` and `topf` have no visible controls. They still mirror the URL. */
+  readonly gremium = signal('');
+  readonly topf = signal('');
   readonly types = signal<ApplicationType[]>([]);
 
   /** Visible filter controls. They mirror the query params. */
@@ -201,20 +221,9 @@ export class ApplicationsListComponent implements OnDestroy {
     // the list and reloads page 0. The offset is not in the URL (infinite
     // scroll). The component counts it up internally.
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((pm) => {
-      this.q.set(pm.get('q') ?? '');
-      this.typeId.set(pm.get('type') ?? '');
-      this.state.set(pm.get('state') ?? '');
-      this.amountMin.set(pm.get('amountMin') ?? '');
-      this.amountMax.set(pm.get('amountMax') ?? '');
-      this.createdFrom.set(pm.get('createdFrom') ?? '');
-      this.createdTo.set(pm.get('createdTo') ?? '');
-      this.budgetId.set(pm.get('budget') ?? '');
-      this.gremium = pm.get('gremium') ?? '';
-      this.topf = pm.get('topf') ?? '';
+      this.readFilters(pm);
       this.sortField.set(pm.get('sort') === 'amount' ? 'amount' : 'createdAt');
       this.sortOrder.set(pm.get('order') === 'asc' ? 'asc' : 'desc');
-      const arch = pm.get('archived');
-      this.archived.set(arch === 'true' || arch === 'all' ? arch : 'false');
       this.reload();
     });
 
@@ -308,43 +317,31 @@ export class ApplicationsListComponent implements OnDestroy {
   }
 
   applyFilters(): void {
-    this.navigate({
-      q: this.q() || null,
-      type: this.typeId() || null,
-      state: this.state() || null,
-      amountMin: this.amountMin() ? Number(this.amountMin()) : null,
-      amountMax: this.amountMax() ? Number(this.amountMax()) : null,
-      createdFrom: this.createdFrom() || null,
-      createdTo: this.createdTo() || null,
-      budget: this.budgetId() || null,
-      offset: null,
-    });
+    this.navigate({ ...this.filterParams(), offset: null });
   }
 
-  /** Pick an archived state. Its own method, so the template holds no statement pair. */
-  setArchived(value: 'false' | 'true' | 'all'): void {
-    this.archived.set(value);
-    this.reload();
+  /**
+   * Apply one filter immediately, for a control that has no "apply" step of its own.
+   *
+   * Through the URL, like the panel's apply and its reset. A bespoke setter that set the
+   * signal and reloaded directly left no query parameter behind, so a reset had nothing
+   * to clear: the panel reset and the list kept its rows.
+   */
+  setFilter(param: string, value: string): void {
+    const def = this.filters.find((f) => f.param === param);
+    this.navigate({ [param]: value === def?.empty ? null : value, offset: null });
   }
 
+  /**
+   * Clear every filter.
+   *
+   * The signals go back to their defaults AND the query params are cleared, because the
+   * URL is what the list reloads from: clearing only the signals reset the panel and left
+   * the data alone.
+   */
   reset(): void {
-    this.q.set('');
-    this.typeId.set('');
-    this.state.set('');
-    this.amountMin.set('');
-    this.amountMax.set('');
-    this.createdFrom.set('');
-    this.createdTo.set('');
-    this.budgetId.set('');
-    // Back to the default, not merely cleared: `archived` is a tri-state and "" is not
-    // one of its values. Leaving it out of the reset kept the list filtered by whatever
-    // it had been set to, which is the one filter a reset visibly failed to undo.
-    this.archived.set('false');
-    this.navigate({
-      q: null, type: null, state: null, gremium: null, topf: null, budget: null,
-      amountMin: null, amountMax: null, createdFrom: null, createdTo: null,
-      archived: null, offset: null,
-    });
+    for (const f of this.filters) f.signal.set(f.empty);
+    this.navigate({ ...this.filterParams(true), offset: null });
   }
 
   /** Write a sort event of the shared table into the query params. */
@@ -367,6 +364,60 @@ export class ApplicationsListComponent implements OnDestroy {
     });
   }
 
+  /**
+   * Every filter, declared once.
+   *
+   * A filter used to live in five places: its signal, the query-param reader, the apply,
+   * the reset and the request builder. Adding one meant remembering all five, and the
+   * archived filter reached only three — so a reset cleared the panel and left the data
+   * standing. Everything below is derived from this list and cannot drift from it.
+   */
+  private readonly filters: readonly FilterDef[] = [
+    { param: 'q', signal: this.q, empty: '', trim: true },
+    { param: 'type', signal: this.typeId, empty: '' },
+    { param: 'state', signal: this.state, empty: '' },
+    { param: 'gremium', signal: this.gremium, empty: '' },
+    { param: 'topf', signal: this.topf, empty: '' },
+    { param: 'budget', signal: this.budgetId, empty: '' },
+    { param: 'amountMin', signal: this.amountMin, empty: '', numeric: true, trim: true },
+    { param: 'amountMax', signal: this.amountMax, empty: '', numeric: true, trim: true },
+    { param: 'createdFrom', signal: this.createdFrom, empty: '', trim: true },
+    { param: 'createdTo', signal: this.createdTo, empty: '', trim: true },
+    {
+      param: 'archived',
+      signal: this.archived as WritableSignal<string>,
+      empty: 'false',
+      // A tri-state: anything that is not one of the two non-default values is the
+      // default, so a hand-edited URL cannot leave the filter in a state no control shows.
+      parse: (raw) => (raw === 'true' || raw === 'all' ? raw : 'false'),
+    },
+  ];
+
+  /** Read every filter out of the URL. The URL is the single source of truth. */
+  private readFilters(pm: ParamMap): void {
+    for (const f of this.filters) {
+      const raw = pm.get(f.param) ?? f.empty;
+      f.signal.set(f.parse ? f.parse(raw) : raw);
+    }
+  }
+
+  /**
+   * Every filter as query params. A filter at its default becomes `null`, which the
+   * router drops. `toDefaults` clears them all regardless of the signals.
+   */
+  private filterParams(toDefaults = false): Record<string, string | number | null> {
+    const out: Record<string, string | number | null> = {};
+    for (const f of this.filters) {
+      const raw = toDefaults ? f.empty : f.signal();
+      const value = f.trim ? raw.trim() : raw;
+      // A numeric filter keeps travelling as a number, as it did before this list
+      // existed. The router serializes either the same way; the type is what the tests
+      // and any other reader see.
+      out[f.param] = value === f.empty ? null : f.numeric ? Number(value) : value;
+    }
+    return out;
+  }
+
   /** Reset the list after a filter or sort change and reload page 0. */
   protected reload(): void {
     this.nextOffset = 0;
@@ -378,24 +429,21 @@ export class ApplicationsListComponent implements OnDestroy {
     this.fetch(true);
   }
 
+  /**
+   * The request, built from the same list the URL is. A filter at its default is left
+   * out entirely, so the request stays clean for the case everyone is in.
+   */
   private buildQuery(offset: number): ApplicationListQuery {
-    const query: ApplicationListQuery = { limit: this.limit, offset };
-    if (this.q().trim()) query.q = this.q().trim();
-    if (this.typeId()) query.type = this.typeId();
-    if (this.state()) query.state = this.state();
-    if (this.gremium) query.gremium = this.gremium;
-    if (this.topf) query.topf = this.topf;
-    if (this.budgetId()) query.budget = this.budgetId();
-    if (this.amountMin().trim()) query.amountMin = Number(this.amountMin());
-    if (this.amountMax().trim()) query.amountMax = Number(this.amountMax());
-    if (this.createdFrom().trim()) query.createdFrom = this.createdFrom();
-    if (this.createdTo().trim()) query.createdTo = this.createdTo();
-    // Only sent when it is not the server's own default, so the URL and the request
-    // stay clean for the case everyone is in.
-    if (this.archived() !== 'false') query.archived = this.archived();
-    query.sort = this.sortField();
-    query.order = this.sortOrder();
-    return query;
+    const query = { limit: this.limit, offset } as Record<string, unknown>;
+    for (const f of this.filters) {
+      const raw = f.signal();
+      const value = f.trim ? raw.trim() : raw;
+      if (value === f.empty) continue;
+      query[f.apiKey ?? f.param] = f.numeric ? Number(value) : value;
+    }
+    query['sort'] = this.sortField();
+    query['order'] = this.sortOrder();
+    return query as ApplicationListQuery;
   }
 
   /**
