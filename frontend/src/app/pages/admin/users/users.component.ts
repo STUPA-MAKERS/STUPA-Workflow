@@ -21,6 +21,7 @@ import {
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
+import { HScrollSyncDirective } from '@shared/h-scroll-sync.directive';
 import type {
   AdminPrincipal,
   Role,
@@ -53,7 +54,7 @@ function emptyDraft(): AssignDraft {
   selector: 'app-admin-users',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
+  imports: [HScrollSyncDirective, 
     FormsModule,
     SlicePipe,
     TranslatePipe,
@@ -108,12 +109,25 @@ export class UsersComponent {
     })),
   );
 
+  /**
+   * Widths are floors: the table scrolls rather than crushing a column. Without them the
+   * name column asked for 22rem and was measured at 107px, so every name broke onto two
+   * lines and every row was a different height.
+   */
   protected readonly columns = computed<ColumnDef[]>(() => [
-    { key: 'name', label: this.i18n.translate('admin.users.col.name'), width: '22rem' },
-    { key: 'email', label: this.i18n.translate('admin.users.col.email') },
-    { key: 'roles', label: this.i18n.translate('admin.users.col.roles') },
-    { key: 'lastLogin', label: this.i18n.translate('admin.users.col.lastLogin') },
-    { key: 'actions', label: this.i18n.translate('admin.users.col.actions'), align: 'end' },
+    { key: 'name', label: this.i18n.translate('admin.users.col.name'), width: '14rem' },
+    // Long enough for a full university address without a mid-domain break.
+    { key: 'email', label: this.i18n.translate('admin.users.col.email'), width: '22rem' },
+    { key: 'roles', label: this.i18n.translate('admin.users.col.roles'), width: '20rem' },
+    { key: 'lastLogin', label: this.i18n.translate('admin.users.col.lastLogin'), width: '9rem' },
+    {
+      key: 'actions',
+      label: this.i18n.translate('admin.users.col.actions'),
+      align: 'end',
+      // Pinned, so the row's actions stay reachable while the rest scrolls under them.
+      sticky: 'end',
+      width: '7rem',
+    },
   ]);
 
   /** Roles column: global roles only, without a Gremium scope. */
