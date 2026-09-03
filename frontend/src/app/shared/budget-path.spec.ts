@@ -3,12 +3,10 @@ import { SimplifyPathPipe, simplifyPathKey } from './budget-path';
 /**
  * These pin the PASS-THROUGH deliberately.
  *
- * The function used to collapse numeric prefix chains, and the committee dropped that as
- * too unstable — the same path shortened differently depending on how the cost centres
- * happened to be numbered. Keeping the old cases would test behaviour nobody wants;
- * deleting the file would let the collapsing creep back unnoticed. So the tests assert
- * that the path comes out exactly as it went in, including the cases the old
- * implementation would have shortened.
+ * A path key comes out exactly as it went in, including the shapes a collapsing
+ * implementation would shorten. Collapsing numeric prefix chains is unstable — the same
+ * path shortens differently depending on how the cost centres happen to be numbered —
+ * and these cases keep it from creeping back.
  */
 describe('simplifyPathKey', () => {
   it.each([

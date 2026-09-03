@@ -146,7 +146,7 @@ export class ExpensesComponent implements OnDestroy {
   readonly exporting = this.list.exporting;
   readonly refreshing = this.list.refreshing;
 
-  // Batch and bulk actions. See #expenses-ux.
+  // Batch and bulk actions. See.
   readonly selected = signal<ReadonlySet<Uuid>>(new Set());
   readonly bulkBusy = signal(false);
   readonly selectedCount = computed(() => this.selected().size);
@@ -158,7 +158,7 @@ export class ExpensesComponent implements OnDestroy {
    *  pending action, delete or export. */
   readonly bulkConfirm = signal<null | 'delete' | 'export'>(null);
   /** Select-all must not enable mass deletion. The user must pick each row for the
-   *  destructive bulk action. See #expenses-ux2. */
+   *  destructive bulk action. See. */
   readonly bulkDeleteBlocked = computed(() => this.allSelected() && this.selectedCount() > 1);
   readonly bulkReassignOpen = signal(false);
   readonly bulkBudgetId = signal('');
@@ -197,8 +197,8 @@ export class ExpensesComponent implements OnDestroy {
         width: '11rem',
       },
       // Amount sits BEFORE the cost centre. The sticky actions column is displaced left
-      // by however much the table overflows and covers whatever is to its left; that
-      // used to be the amount, the one column a reader scans a booking list for.
+      // by however much the table overflows and covers whatever is to its left, and the
+      // amount is the one column a reader scans a booking list for.
       {
         key: 'amount',
         label: this.i18n.translate('expenses.col.amount'),
@@ -373,7 +373,7 @@ export class ExpensesComponent implements OnDestroy {
     // Apply the URL filters first, then load data exactly once. The URL keeps the view
     // shareable, survives a browser reload, and is the target of cross-links from
     // Budget. The state module sends no request on its own. If the unfiltered
-    // reload resolves last, it can overwrite the filtered one. See #expenses-ux2.
+    // reload resolves last, it can overwrite the filtered one. See.
     this.applyQueryParams(this.route.snapshot.queryParamMap);
     this.list.reload();
 
@@ -666,7 +666,7 @@ export class ExpensesComponent implements OnDestroy {
   }
 
   /** Deep-link target for the cost-center cell. It opens the Budget tab drilled into
-   *  this cost center. See #expenses-ux. */
+   *  this cost center. See. */
   ksLink(e: Expense): { budget: string | null; ks: string; fy: string } {
     const top = findTopBudgetNode(this.budgetTree(), e.budgetId);
     return { budget: top?.id ?? null, ks: e.budgetId, fy: e.fiscalYearId };

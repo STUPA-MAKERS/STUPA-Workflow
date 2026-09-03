@@ -24,7 +24,7 @@ describe('AdminOptionsService — mock mode', () => {
     expect(opts[0]).toEqual(expect.objectContaining({ value: expect.any(String), label: expect.any(String) }));
   });
 
-  it('maps application types to {value,label} options (#69)', async () => {
+  it('maps application types to {value,label} options', async () => {
     const opts = await firstValueFrom(svc().applicationTypeOptions());
     expect(opts.length).toBe(2);
     expect(opts[0]).toEqual(expect.objectContaining({ value: expect.any(String), label: expect.any(String) }));

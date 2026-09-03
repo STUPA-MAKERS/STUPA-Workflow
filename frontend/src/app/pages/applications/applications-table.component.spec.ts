@@ -151,9 +151,9 @@ describe('ApplicationsTableComponent', () => {
   });
 
   it('keeps the full title reachable when the cell clips it to one line', async () => {
-    // A long title used to wrap onto several lines and make one row several times the
-    // height of its neighbours. It is clipped with an ellipsis now, so the whole text
-    // has to stay available rather than simply disappearing.
+    // The cell clips to one line with an ellipsis, so a long title cannot make its row
+    // several times the height of its neighbours. The whole text has to stay reachable
+    // rather than simply disappearing.
     const long =
       'Systemdatenträger und Einbauteile für die Hardware-Symmetrie der beiden PRIMERGY-RX300-Server';
     await setup({ rows: [{ ...ROW, title: long }] });

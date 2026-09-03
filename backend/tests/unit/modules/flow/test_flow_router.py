@@ -142,7 +142,7 @@ def test_fire_rejects_bad_body_422(app: FastAPI, client: TestClient) -> None:
     assert r.status_code == 422
 
 
-# Applicant transitions (#applicant-actions): access through a magic link.
+# Applicant transitions: access through a magic link.
 def test_list_applicant_transitions_ok(
     app: FastAPI, client: TestClient
 ) -> None:

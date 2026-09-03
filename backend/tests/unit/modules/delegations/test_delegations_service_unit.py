@@ -1,4 +1,4 @@
-"""TDD suite for `DelegationService` (#delegation-rework): meeting-bound delegations.
+"""TDD suite for `DelegationService`: meeting-bound delegations.
 
 The result queues of the fake hit every service branch deterministically. The fake
 comes from `flow_fakes` and holds an `execute` queue and a `get` queue. No real

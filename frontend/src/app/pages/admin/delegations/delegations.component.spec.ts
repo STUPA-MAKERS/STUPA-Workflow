@@ -81,7 +81,7 @@ async function setup(api = makeApi()) {
   return { ...view, api, toast, cmp };
 }
 
-describe('DelegationsComponent (#delegation-rework)', () => {
+describe('DelegationsComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   it('loads delegations on init and clears the loading flag', async () => {

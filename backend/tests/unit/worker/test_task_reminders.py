@@ -1,4 +1,4 @@
-"""Task reminders (#task-reminder): the worker and the admin API without a DB."""
+"""Task reminders: the worker and the admin API without a DB."""
 
 from __future__ import annotations
 
@@ -172,7 +172,7 @@ async def test_vote_state_counts_as_actionable() -> None:
     assert await process_task_reminders(_ctx(session, queue), now=NOW) == 1
 
 
-# Admin API (#6)
+# Admin API
 class _FakeService:
     def __init__(self) -> None:
         self.updated: dict[str, Any] | None = None

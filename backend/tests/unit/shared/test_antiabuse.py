@@ -188,7 +188,7 @@ def test_applications_rate_limit_blocks() -> None:
 
 
 async def test_rate_limit_bypassed_for_oauth_principal() -> None:
-    """A logged-in MCP client bypasses the upload throttle (#mcp).
+    """A logged-in MCP client bypasses the upload throttle.
 
     An OAuth token sets `scope_permissions` on the principal, which marks it as an
     agent. A session principal leaves `scope_permissions` at None and stays throttled.

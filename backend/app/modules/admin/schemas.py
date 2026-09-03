@@ -293,7 +293,7 @@ class FlowVersionCreate(_CamelModel):
 
 
 class FlowVersionOut(_CamelModel):
-    """The single global flow — per-type flows no longer exist."""
+    """The single global flow. There are no per-type flows."""
 
     id: UUID
     version: int

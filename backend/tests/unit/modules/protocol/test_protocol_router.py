@@ -193,7 +193,7 @@ def test_create_or_load_protocol(
 def test_get_protocol_read_only(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
-    """Reload and poll path (#429): GET reads and creates no protocol."""
+    """Reload and poll path: GET reads and creates no protocol."""
     _writer(app, "meeting.manage")
     fake_service.status = "rendering"
     r = client.get(f"/api/meetings/{MEETING_ID}/protocol")

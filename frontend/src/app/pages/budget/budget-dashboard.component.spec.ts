@@ -125,13 +125,13 @@ async function setup(opts: SetupOpts = {}) {
   for (const top of tops) {
     http.expectOne((r) => r.url.endsWith(`/budgets/${top.id}/fiscal-years`)).flush(fys);
   }
-  // The page no longer lists applications: that job belongs to /applications, which
-  // the cross-link opens. No request goes out for them.
+  // The page does not list applications: that job belongs to /applications, which the
+  // cross-link opens. No request goes out for them.
   view.fixture.detectChanges();
   return { ...view, http, c: view.fixture.componentInstance as unknown as Inst };
 }
 
-describe('BudgetDashboardComponent (#17)', () => {
+describe('BudgetDashboardComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
   afterEach(() => TestBed.inject(HttpTestingController).verify());
 
@@ -139,8 +139,8 @@ describe('BudgetDashboardComponent (#17)', () => {
     await setup();
     expect(screen.getAllByText('VS').length).toBeGreaterThan(0);
     expect(screen.getAllByText('VS-Mittel').length).toBeGreaterThan(0);
-    // Once, in the usage tree. It used to appear twice, because the applications table
-    // repeated the cost-centre path in every row.
+    // Once, in the usage tree. A second occurrence would mean something below repeats
+    // the cost-centre path per row.
     expect(screen.getAllByText('VS-800').length).toBe(1);
   });
 

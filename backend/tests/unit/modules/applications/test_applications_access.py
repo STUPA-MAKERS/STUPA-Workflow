@@ -74,7 +74,7 @@ def test_read_principal_without_permission_403() -> None:
 
 
 def test_read_creator_without_permission_ok() -> None:
-    """A logged-in creator can read their own application without a permission (#24)."""
+    """A logged-in creator can read their own application without a permission."""
     app_id = uuid4()
     access = asyncio.run(
         require_app_read(app_id, _db(created_by="p"), _principal(sub="p"), None)
@@ -114,7 +114,7 @@ def test_edit_requires_manage_permission() -> None:
 
 
 def test_edit_creator_without_permission_ok() -> None:
-    """A creator can edit their own application without `application.manage` (#24)."""
+    """A creator can edit their own application without `application.manage`."""
     app_id = uuid4()
     access = asyncio.run(
         require_app_edit(app_id, _db(created_by="p"), _principal(sub="p"), None)

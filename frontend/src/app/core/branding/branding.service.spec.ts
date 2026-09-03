@@ -102,8 +102,8 @@ describe('BrandingService', () => {
     });
 
     it('reads the PUBLIC endpoint, so a logged-out visitor sees the same footer', () => {
-      // This is the whole point of the fix: the footer used to come from
-      // /admin/site-config, which a visitor on the landing page cannot read.
+      // A visitor on the landing page cannot read /admin/site-config, so a footer taken
+      // from there falls back to the defaults for exactly the people who are not signed in.
       svc.init();
       const req = http.expectOne((r) => r.url.endsWith('/site-config'));
       expect(req.request.url).not.toContain('/admin/');

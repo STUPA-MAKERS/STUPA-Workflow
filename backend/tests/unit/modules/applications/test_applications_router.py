@@ -307,7 +307,7 @@ def test_create_application_rejects_bad_email_422(client: TestClient) -> None:
 
 
 def _login(app: FastAPI, **kw: object) -> None:
-    """Set a logged-in principal for the ALTCHA exemption and identity derivation (#24)."""
+    """Set a logged-in principal for the ALTCHA exemption and identity derivation."""
     app.dependency_overrides[get_current_principal] = lambda: Principal(
         sub=str(kw.get("sub", "u-1")),
         email=kw.get("email"),  # type: ignore[arg-type]
@@ -321,7 +321,7 @@ def test_create_application_logged_in_skips_altcha_and_derives_identity(
     app: FastAPI, client: TestClient, fake_service: _FakeService, sent: list[tuple[str, UUID]]
 ) -> None:
     _login(app, sub="u-7", email="user@example.org", display_name="Userin")
-    # A logged-in user may omit applicantEmail and ALTCHA (#24).
+    # A logged-in user may omit applicantEmail and ALTCHA.
     body = {"typeId": str(uuid4()), "data": {"title": "Mein Antrag"}, "lang": "de"}
     r = client.post("/api/applications", json=body)
     assert r.status_code == 201
@@ -562,7 +562,7 @@ def test_list_applications_filters_passed(
 def test_list_applications_without_read_scopes_to_own(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
-    # Without application.read and without admin the list shows only own applications (#24).
+    # Without application.read and without admin the list shows only own applications.
     _as_principal(app)  # authenticated but without any permission
     r = client.get("/api/applications")
     assert r.status_code == 200
@@ -629,7 +629,7 @@ def test_applications_export_xlsx(
     assert fake_service.list_kwargs["gremium_id"] == gremium
     assert fake_service.list_kwargs["q"] == "foo"
     assert fake_service.name_maps_called is True
-    # The router audits the export (#1). It writes the entry and commits in one transaction.
+    # The router audits the export. It writes the entry and commits in one transaction.
     (entry,) = fake_service.session.entries
     assert entry.action == "export"
     assert entry.actor == "admin"

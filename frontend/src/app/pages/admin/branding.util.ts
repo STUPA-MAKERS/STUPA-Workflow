@@ -7,7 +7,7 @@
  */
 import type { Branding } from './admin.models';
 
-export const ALLOWED_LINK_SCHEMES: readonly string[] = ['http:', 'https:', 'mailto:'] as const;
+const ALLOWED_LINK_SCHEMES: readonly string[] = ['http:', 'https:', 'mailto:'] as const;
 
 /** true when `url` is a non-empty link with an allowed scheme. */
 export function isAllowedLinkUrl(url: string | null | undefined): boolean {

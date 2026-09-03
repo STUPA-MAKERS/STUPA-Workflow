@@ -32,7 +32,7 @@ export class ExpensesListState {
   /** Shared in-flight flag for every mutating dialog (create/edit/delete/sub/transfer). */
   readonly saving = signal(false);
   /** A refresh after a mutation is in flight. The list stays visible and only `aria-busy`
-   *  changes (#expenses-ux). */
+   *  changes. */
   readonly refreshing = signal(false);
 
   readonly kind = signal<'' | ExpenseKind>('');
@@ -74,7 +74,7 @@ export class ExpensesListState {
     });
     // Do not reload here. The component adopts the URL filters first, then fires
     // exactly one reload. A second, unfiltered request can resolve late and overwrite
-    // the filtered list (#expenses-ux2).
+    // the filtered list.
   }
 
   setKind(k: '' | ExpenseKind): void {
@@ -105,15 +105,14 @@ export class ExpensesListState {
   /**
    * Every filter that reaches the request, and whether "Zurücksetzen" clears it.
    *
-   * One list, because the filters used to be spelled out separately in the reset and in
-   * the request builder, and a filter added to one and forgotten in the other is
-   * invisible until someone notices the list not changing. `filterSignals` is what the
-   * spec walks.
+   * The reset and the request builder both read this list, so a filter reaches both or
+   * neither. A filter wired into one alone is invisible: the control moves and the list
+   * does not change. `filterSignals` is what the spec walks.
    *
    * `q` and `budgetId` are NOT cleared. Both are controls outside the filter panel — the
    * search box in the page header and the cost-centre tree beside the table — and the
-   * reset button belongs to the panel. Note that /applications clears both, because there
-   * the search sits inside its panel.
+   * reset button belongs to the panel. /applications clears both, because there the
+   * search sits inside its panel.
    */
   readonly filterSignals: readonly { signal: WritableSignal<string>; clearedByReset: boolean }[] = [
     { signal: this.kind as WritableSignal<string>, clearedByReset: true },
@@ -179,14 +178,13 @@ export class ExpensesListState {
     };
   }
 
-  /** Monotone request generation. A response whose epoch no longer matches belongs to an
-   *  outdated filter state. Such a response must not touch the list (#expenses-ux2). */
+  /** Monotone request generation. A response whose epoch does not match the current one
+   *  belongs to an outdated filter state and must not touch the list. */
   private fetchEpoch = 0;
 
   /** Refetch the loaded window after a mutation. One request at offset 0 replaces the
-   *  list. The method never clears the list and never flips `loading`. The table stays
-   *  mounted, and the scroll position and all infinite-scroll pages survive
-   *  (#expenses-ux). */
+   *  list. It never clears the list and never flips `loading`, so the table stays
+   *  mounted and the scroll position and every infinite-scroll page survive. */
   refresh(): void {
     if (this.refreshing()) return;
     const epoch = this.fetchEpoch;

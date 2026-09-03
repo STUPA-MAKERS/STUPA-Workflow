@@ -99,7 +99,7 @@ describe('validateFlowGraph', () => {
     });
   });
 
-  it('rejects automatic exits from vote states (#vote-bypass)', () => {
+  it('rejects automatic exits from vote states', () => {
     const g = graph({
       states: [
         { key: 'draft', label: { de: 'Entwurf' }, isInitial: true },
@@ -136,7 +136,7 @@ describe('validateFlowGraph', () => {
     expect(badAction.valid).toBe(false);
   });
 
-  it('requires addToNextSession to lead into a vote state (#28)', () => {
+  it('requires addToNextSession to lead into a vote state', () => {
     // The target "review" is a normal state, so the check rejects the graph.
     const bad = validateFlowGraph(
       graph({
@@ -211,7 +211,7 @@ describe('graph ↔ JSON round-trip', () => {
     expect(n.transitions[0]).toEqual({ from: 'draft', to: 'review' });
   });
 
-  it('keeps a transition color through normalize (#flow)', () => {
+  it('keeps a transition color through normalize', () => {
     const g = graph({
       transitions: [{ from: 'draft', to: 'review', color: '#16a34a' }],
     });

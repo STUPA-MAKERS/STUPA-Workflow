@@ -238,9 +238,8 @@ describe('MeetingsComponent', () => {
     expect(container.querySelector('[aria-busy="true"]')).toBeTruthy();
 
     // The wording stays, but only for a screen reader: the outlined rows are decorative
-    // and hidden from the accessibility tree, so something has to announce the wait.
-    // What must not come back is the visible paragraph that used to stand in for the
-    // whole list.
+    // and hidden from the accessibility tree, so something has to announce the wait. A
+    // VISIBLE paragraph standing in for the whole list is what must not appear.
     const announced = container.querySelector('[role="status"]');
     expect(announced?.textContent).toContain('Sitzungen werden geladen');
     expect(announced).toHaveClass('sr-only');
@@ -295,7 +294,7 @@ describe('MeetingsComponent', () => {
     req.flush({ ...MEETING, activeApplicationId: 'app-2' });
   });
 
-  it('assembles the TOPs and finalizes the protocol (#58)', async () => {
+  it('assembles the TOPs and finalizes the protocol', async () => {
     const { http } = await setup();
     http.expectOne('/api/meetings/m-1').flush(MEETING);
     http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
@@ -465,7 +464,7 @@ describe('MeetingsComponent', () => {
     expect(screen.getByText('Geschlossen')).toBeInTheDocument();
   });
 
-  it('lets a manager create a meeting and redirects to its detail route (#104)', async () => {
+  it('lets a manager create a meeting and redirects to its detail route', async () => {
     const { http, navigate, fixture } = await setup({
       id: null,
       gremien: [{ id: 'g-1', name: 'StuPa' }],
@@ -503,7 +502,7 @@ describe('MeetingsComponent', () => {
     expect(navigate).toHaveBeenCalledWith(['/meetings', 'm-1']);
   });
 
-  it('lists existing meetings and opens one (#104)', async () => {
+  it('lists existing meetings and opens one', async () => {
     const { navigate } = await setup({
       id: null,
       meetings: [{ ...MEETING, title: 'Vergangene Sitzung', status: 'closed' }],
@@ -1520,7 +1519,7 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.settingsRoster()).toEqual([]);
     });
 
-    it('refuses to save a closed meeting (#15) and when date/time missing', async () => {
+    it('refuses to save a closed meeting and when date/time missing', async () => {
       const { cmp, http } = await loaded();
       cmp.openSettings({ ...cmp.meeting()!, status: 'closed' });
       http.expectOne('/api/meetings/m-1/attendance').flush([]);
@@ -1547,7 +1546,7 @@ describe('MeetingsComponent — methods', () => {
       http.verify();
     });
 
-    it('omits the protokollant field when the protocol is final (#15)', async () => {
+    it('omits the protokollant field when the protocol is final', async () => {
       const { cmp, http } = await loaded();
       // protokollantLocked: same id + finalized protocol.
       cmp.protocol.set({ ...PROTOCOL, status: 'final', isFinal: true, isLocked: true });

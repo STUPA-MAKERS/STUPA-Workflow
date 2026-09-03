@@ -367,10 +367,10 @@ export class ApplicationsListComponent implements OnDestroy {
   /**
    * Every filter, declared once.
    *
-   * A filter used to live in five places: its signal, the query-param reader, the apply,
-   * the reset and the request builder. Adding one meant remembering all five, and the
-   * archived filter reached only three — so a reset cleared the panel and left the data
-   * standing. Everything below is derived from this list and cannot drift from it.
+   * The query-param reader, the apply, the reset and the request builder are all derived
+   * from this list. A filter therefore reaches every one of them, or none: it cannot be
+   * wired into the panel and left out of the request, which shows a control that moves
+   * and a list that does not change.
    */
   private readonly filters: readonly FilterDef[] = [
     { param: 'q', signal: this.q, empty: '', trim: true },
@@ -410,9 +410,8 @@ export class ApplicationsListComponent implements OnDestroy {
     for (const f of this.filters) {
       const raw = toDefaults ? f.empty : f.signal();
       const value = f.trim ? raw.trim() : raw;
-      // A numeric filter keeps travelling as a number, as it did before this list
-      // existed. The router serializes either the same way; the type is what the tests
-      // and any other reader see.
+      // A numeric filter travels as a number. The router serializes either the same
+      // way; the type is what a test and any other reader sees.
       out[f.param] = value === f.empty ? null : f.numeric ? Number(value) : value;
     }
     return out;

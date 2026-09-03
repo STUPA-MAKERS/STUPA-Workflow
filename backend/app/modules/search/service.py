@@ -47,9 +47,8 @@ MIN_QUERY_LENGTH = 2
 #: Where a hit of each kind sends the reader.
 #:
 #: Every template names the record: a path segment where the record has a page of its
-#: own, and a filter the list applies where it does not. Bare list URLs used to sit here
-#: for invoices, bookings and people, so picking one of five people out of the palette
-#: opened the unfiltered user list and the reader searched a second time.
+#: own, and a filter the list applies where it does not. A bare list URL would drop the
+#: reader back into the search they just ran.
 #:
 #: One table rather than seven f-strings scattered through the sources, so a new kind
 #: cannot ship a URL that forgets which record it is about.
@@ -234,9 +233,8 @@ class SearchService:
     async def _gremien(self, q: str, principal: Principal, lang: str) -> list[SearchHit]:
         """Committees, for a caller who can act on one."""
         # Gate BEFORE the query. A Gremium row links to the members page, which only an
-        # administrator may open; anyone else would get a label with nowhere to go. The
-        # check sat after the query at first, which still answered correctly but paid for
-        # a scan nobody was allowed to see.
+        # administrator may open; anyone else would get a label with nowhere to go, and
+        # a gate after the query would pay for a scan nobody is allowed to see.
         if not (principal.has("admin.gremien") or principal.has("admin.users")):
             return []
         where, rank = trigram_rank(

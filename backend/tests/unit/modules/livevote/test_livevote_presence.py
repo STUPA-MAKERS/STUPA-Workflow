@@ -1,4 +1,4 @@
-"""Unit tests for MeetingPresence (#live-viewers): join, leave, dedupe, multi-tab."""
+"""Unit tests for MeetingPresence: join, leave, dedupe, multi-tab."""
 
 from __future__ import annotations
 

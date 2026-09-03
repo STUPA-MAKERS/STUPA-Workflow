@@ -29,7 +29,7 @@ def test_worker_settings_registers_tasks() -> None:
     assert process_retention in WorkerSettings.functions
     assert WorkerSettings.redis_settings is not None
     # Nightly budget rollup, deadline scan every minute (T-44), hourly task reminders
-    # (#task-reminder), daily DSGVO retention (#PII-Re-Add) and the nightly backup.
+    #, daily DSGVO retention and the nightly backup.
     assert len(WorkerSettings.cron_jobs) == 5
     assert any(
         job.coroutine is scheduled_backup for job in WorkerSettings.cron_jobs

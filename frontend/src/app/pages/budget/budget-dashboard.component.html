@@ -81,7 +81,7 @@
       }
 
       <section class="bd__usage" [attr.aria-label]="'budget.usage.heading' | t">
-        <!-- Cross-link for the selected cost center (#expenses-ux2). -->
+        <!-- Cross-link for the selected cost center. -->
         <div class="bd__sectionHead bd__sectionHead--end">
           <a class="bd__sectionLink" [routerLink]="['/expenses']" [queryParams]="{ budget: selectedKsId() }">
             <app-icon name="euro" [size]="14" />

@@ -145,7 +145,7 @@
               <textarea rows="2" [attr.aria-label]="('admin.brand.text.emailFooter' | t) + ' (EN)'" [(ngModel)]="d.freetexts.emailFooter['en']" (ngModelChange)="reemit()" placeholder="EN"></textarea>
             </div>
           </div>
-          <!-- Info text below the application selection (#18). Markdown works here. -->
+          <!-- Info text below the application selection. Markdown works here. -->
           <div class="flex flex-col gap-1 text-sm font-medium">{{ 'admin.brand.text.applyInfo' | t }}
             <div class="br__bi">
               <textarea rows="4" [attr.aria-label]="('admin.brand.text.applyInfo' | t) + ' (DE)'" [(ngModel)]="applyInfo(d)['de']" (ngModelChange)="reemit()" placeholder="DE (Markdown)"></textarea>

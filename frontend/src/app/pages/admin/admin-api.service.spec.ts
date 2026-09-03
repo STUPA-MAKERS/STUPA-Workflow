@@ -69,7 +69,7 @@ describe('AdminApiService — mock mode', () => {
     expect(wh.name).toBe('renamed');
   });
 
-  it('manages principals, role assignments and permissions in mock mode (#72)', async () => {
+  it('manages principals, role assignments and permissions in mock mode', async () => {
     const s = svc();
     const all = await firstValueFrom(s.listPrincipals());
     expect(all.length).toBeGreaterThan(0);
@@ -173,7 +173,7 @@ describe('AdminApiService — real mode (contract)', () => {
     expect(http.expectOne('/api/admin/site-config/activate').request.method).toBe('POST');
   });
 
-  it('wires principal/role-assignment/permission endpoints (#72)', () => {
+  it('wires principal/role-assignment/permission endpoints', () => {
     s.listPrincipals().subscribe();
     expect(http.expectOne('/api/admin/principals').request.method).toBe('GET');
     s.listPrincipals('a x').subscribe();
@@ -213,12 +213,12 @@ describe('AdminApiService — real mode (contract)', () => {
     expect(http.expectOne('/api/admin/oauth-grants/grant-9').request.method).toBe('DELETE');
   });
 
-  it('GETs gremium options from the public /gremien path (#68)', () => {
+  it('GETs gremium options from the public /gremien path', () => {
     s.listGremienOptions().subscribe();
     http.expectOne('/api/gremien').flush([]);
   });
 
-  it('PATCHes/DELETEs a gremium and gets/sets mail recipients (#105)', () => {
+  it('PATCHes/DELETEs a gremium and gets/sets mail recipients', () => {
     s.updateGremium('g-9', { name: 'X' }).subscribe();
     expect(http.expectOne('/api/admin/gremien/g-9').request.method).toBe('PATCH');
 
@@ -310,7 +310,7 @@ describe('AdminApiService — real mode (contract)', () => {
     expect(http.expectOne('/api/admin/mail-templates/preview').request.method).toBe('POST');
   });
 
-  it('maps /application-types page to id+name options (#69)', () => {
+  it('maps /application-types page to id+name options', () => {
     let out: { id: string; name: string }[] | undefined;
     s.listApplicationTypes().subscribe((o) => (out = o));
     http
@@ -319,7 +319,7 @@ describe('AdminApiService — real mode (contract)', () => {
     expect(out).toEqual([{ id: 't1', name: 'Foo' }]);
   });
 
-  it('maps /admin/application-types to FormOverviewItem (active vs draft) (#75)', () => {
+  it('maps /admin/application-types to FormOverviewItem (active vs draft)', () => {
     let out: { status: string; name: unknown; gremiumId: unknown }[] | undefined;
     s.listForms().subscribe((o) => (out = o as never));
     http.expectOne('/api/admin/application-types').flush([
@@ -331,7 +331,7 @@ describe('AdminApiService — real mode (contract)', () => {
     expect(out![1]).toEqual({ id: 't2', name: {}, gremiumId: null, status: 'draft', version: 0 });
   });
 
-  it('maps listApplicationTypesFull with defaults for missing fields (#13)', () => {
+  it('maps listApplicationTypesFull with defaults for missing fields', () => {
     let out: { hasBudget: boolean; retentionMonths: unknown; activeFormVersionId: unknown }[] | undefined;
     s.listApplicationTypesFull().subscribe((o) => (out = o as never));
     http.expectOne('/api/admin/application-types').flush([
@@ -342,7 +342,7 @@ describe('AdminApiService — real mode (contract)', () => {
     expect(out![1]).toEqual({ id: 't2', name: {}, gremiumId: null, hasBudget: false, retentionMonths: null, activeFormVersionId: null });
   });
 
-  it('POSTs a new application type and maps the wire response (#13)', () => {
+  it('POSTs a new application type and maps the wire response', () => {
     let created: { hasBudget: boolean; name: unknown } | undefined;
     s.createApplicationType({ key: 'k', name: { de: 'N' }, gremiumId: 'g1', hasBudget: true }).subscribe(
       (c) => (created = c as never),
@@ -361,7 +361,7 @@ describe('AdminApiService — real mode (contract)', () => {
     req.flush({ id: 'x' });
   });
 
-  it('PATCHes only the supplied application-type fields and DELETEs (#13)', () => {
+  it('PATCHes only the supplied application-type fields and DELETEs', () => {
     let done = false;
     s.updateApplicationType('t1', { name: { de: 'N' }, gremiumId: 'g1', hasBudget: false }).subscribe(
       () => (done = true),
@@ -417,7 +417,7 @@ describe('AdminApiService — real mode (contract)', () => {
     });
   });
 
-  it('wires gremium-role CRUD + permission helper (#42/#62)', () => {
+  it('wires gremium-role CRUD + permission helper', () => {
     s.listGremiumRoles('g1').subscribe();
     http.expectOne('/api/admin/gremien/g1/roles').flush([]);
 
@@ -701,7 +701,7 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(res.name).toBe(all[0].name);
   });
 
-  it('renames a role, creates a role, and deletes it (#21/#38)', async () => {
+  it('renames a role, creates a role, and deletes it', async () => {
     const s = svc();
     const roles = await firstValueFrom(s.listRoles());
     const renamed = await firstValueFrom(s.renameRole(roles[0].id, { de: 'Neu', en: 'New' }));
@@ -717,7 +717,7 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect((await firstValueFrom(s.listRoles())).some((r) => r.id === created.id)).toBe(false);
   });
 
-  it('activates/deactivates a principal, falling back when id unknown (#30)', async () => {
+  it('activates/deactivates a principal, falling back when id unknown', async () => {
     const s = svc();
     const all = await firstValueFrom(s.listPrincipals());
     const updated = await firstValueFrom(s.setPrincipalActive(all[0].id, false));
@@ -789,7 +789,7 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(rn.id).toBe(roles[0].id);
   });
 
-  it('CRUDs application types in the mock store (#13)', async () => {
+  it('CRUDs application types in the mock store', async () => {
     const s = svc();
     const before = (await firstValueFrom(s.listApplicationTypesFull())).length;
     const created = await firstValueFrom(s.createApplicationType({ key: 'neu', name: { de: 'Neu' } }));
@@ -817,7 +817,7 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect((await firstValueFrom(s.listApplicationTypesFull())).some((t) => t.id === created.id)).toBe(false);
   });
 
-  it('loads a known form draft and an empty stub for an unknown type (#13)', async () => {
+  it('loads a known form draft and an empty stub for an unknown type', async () => {
     const s = svc();
     const known = await firstValueFrom(s.getFormDraft('f-foerderung'));
     expect(known.fields.length).toBeGreaterThan(0);
@@ -861,14 +861,14 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(stub).toEqual({ applicationTypeId: 'no-draft-type', active: true, fields: [] });
   });
 
-  it('returns null global flow and a deterministic mock flow id in mock mode (#28)', async () => {
+  it('returns null global flow and a deterministic mock flow id in mock mode', async () => {
     const s = svc();
     expect(await firstValueFrom(s.getGlobalFlow())).toBeNull();
     const created = await firstValueFrom(s.createGlobalFlowVersion({ states: [{ key: 's', label: {} }], transitions: [] }));
     expect(created.id).toBe('gflow-1');
   });
 
-  it('CRUDs gremium-roles in the mock store (#42/#62)', async () => {
+  it('CRUDs gremium-roles in the mock store', async () => {
     const s = svc();
     expect(await firstValueFrom(s.listGremiumRoles('g-stupa'))).toEqual([]);
     const created = await firstValueFrom(s.createGremiumRole('g-stupa', { key: 'chair', name: { de: 'Vorsitz' } }));

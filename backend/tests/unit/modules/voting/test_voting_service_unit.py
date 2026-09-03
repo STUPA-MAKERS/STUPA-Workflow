@@ -338,7 +338,7 @@ async def test_get_closed_includes_result() -> None:
 
 
 async def test_get_secret_hides_counts_until_close() -> None:
-    # Secret: no choice counts before the close, only participation (#vote-progress).
+    # Secret: no choice counts before the close, only participation.
     vote = _vote(config=_config(secret=True))
     db = fake_session(result(vote), result("yes", "no", "yes"))
     out = await VotingService(db).get(vote.id)
@@ -405,7 +405,7 @@ async def test_close_fires_matching_branch(_patch_flow: type[_FakeFlow]) -> None
 
 
 async def test_close_prefers_global_flow_branch(_patch_flow: type[_FakeFlow]) -> None:
-    """Fire the `pass` branch directly from a `vote` state (#28).
+    """Fire the `pass` branch directly from a `vote` state.
 
     The close path never uses the guard-based `available_transitions` path.
     """
@@ -490,7 +490,7 @@ async def test_close_unknown_vote_404() -> None:
 
 
 async def test_close_blocked_without_quorum(_patch_flow: type[_FakeFlow]) -> None:
-    """Return 409 when the quorum fails, instead of a silent "rejected" (#12).
+    """Return 409 when the quorum fails, instead of a silent "rejected".
 
     The vote stays open. The caller collects more ballots or cancels the vote.
     """
@@ -635,7 +635,7 @@ async def test_delete_vote_from_other_meeting_404() -> None:
 
 
 # A meeting vote reveals the counts only when every expected ballot arrived. The
-# denominator comes from the attendance roster (#vote-progress).
+# denominator comes from the attendance roster.
 async def test_get_meeting_open_reveals_when_all_present_voted() -> None:
     vote = _vote(meeting_id=uuid4())  # open, not secret
     db = fake_session(result(vote), result("yes", "yes"))
@@ -664,7 +664,7 @@ async def test_get_meeting_open_without_attendance_stays_hidden() -> None:
 
 
 def test_open_tally_revealed_rule() -> None:
-    # present must be above 0 AND voted must reach expected (#vote-progress).
+    # present must be above 0 AND voted must reach expected.
     assert open_tally_revealed(present=2, voted=2, expected=2) is True
     assert open_tally_revealed(present=2, voted=3, expected=2) is True
     assert open_tally_revealed(present=2, voted=1, expected=2) is False
@@ -724,7 +724,7 @@ async def test_absent_delegated_count_none_scalar_is_zero() -> None:
     assert await VotingService(db)._absent_delegated_count(vote) == 0  # pyright: ignore[reportArgumentType]
 
 
-# Object-level authorization lives in assert_can_read and get_scoped (#sec-audit).
+# Object-level authorization lives in assert_can_read and get_scoped.
 async def test_assert_can_read_meeting_vote_goes_through_the_meeting_guard() -> None:
     """Even an admin reads a meeting-bound vote through the meeting guard.
 

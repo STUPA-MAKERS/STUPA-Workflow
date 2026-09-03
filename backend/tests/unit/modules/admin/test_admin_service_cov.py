@@ -699,7 +699,7 @@ async def test_create_global_flow_version_fresh_no_existing_version() -> None:
 
 
 async def test_create_global_flow_version_new_version_remaps_apps() -> None:
-    """A save creates a NEW immutable FlowVersion (#config-versioning).
+    """A save creates a NEW immutable FlowVersion.
 
     The service moves a running application to the newest version by state key. A removed
     key falls back to the initial state. The service writes fresh state and transition

@@ -1,4 +1,4 @@
-"""Unit tests of the calendar endpoints (#ics) with TestClient and dependency_overrides."""
+"""Unit tests of the calendar endpoints with TestClient and dependency_overrides."""
 
 from __future__ import annotations
 

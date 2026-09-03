@@ -125,7 +125,7 @@ function lastInvoicesReq(http: HttpTestingController) {
   return reqs[reqs.length - 1];
 }
 
-describe('InvoicesComponent (#invoices)', () => {
+describe('InvoicesComponent', () => {
   afterEach(() => {
     if (jest.isMockFunction(setTimeout)) jest.useRealTimers();
     const http = TestBed.inject(HttpTestingController);
@@ -142,8 +142,8 @@ describe('InvoicesComponent (#invoices)', () => {
   });
 
   it('asks for the one invoice the URL names', async () => {
-    // Where a global-search hit lands. The hit used to link to a bare `/invoices`, so
-    // picking one invoice out of the palette opened the whole list.
+    // Where a global-search hit lands. A bare `/invoices` would open the whole list and
+    // leave the reader to find the invoice they had already named.
     localStorage.setItem('ap.locale', 'de');
     const auth = new FakeAuth();
     const view = await render(InvoicesComponent, {
@@ -221,9 +221,8 @@ describe('InvoicesComponent (#invoices)', () => {
     expect(c.hasMore()).toBe(false);
   });
 
-  // The table used to collapse to one line of text on every filter, search or reload.
-  // These two hold the behaviour the shared table brings: header and skeleton stay,
-  // and the pinned actions column survives a reload.
+  // These two hold what the shared table brings: the header and the skeleton stay
+  // through a filter, a search or a reload, and the pinned actions column survives one.
   it('keeps the table and its header on screen while reloading', async () => {
     const { c, fixture, container } = await setup({ initial: [inv({ id: 'a' })] });
     c.loading.set(true);

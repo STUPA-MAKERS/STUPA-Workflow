@@ -51,7 +51,7 @@ class FakeSession:
         self.committed = 0
 
     async def execute(self, _stmt: Any) -> FakeResult:
-        # The header metadata path (#protocol-metadata) reads the attendance. That query
+        # The header metadata path reads the attendance. That query
         # has no entry in the ordered queue. Return an empty result for it, so that it
         # does not take the result of another query.
         if "meeting_attendance" in str(_stmt).lower():

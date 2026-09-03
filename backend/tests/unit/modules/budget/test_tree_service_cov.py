@@ -336,8 +336,7 @@ async def test_update_node_stichtag_changed_but_not_top_level() -> None:
 
 async def test_create_fiscal_year_impossible_stichtag_raises_422() -> None:
     # Legacy rows and direct calls can carry an impossible fiscal start date (February 31).
-    # The service wraps the ValueError of `fiscal_year_bounds` into a 422, not a 500
-    # (#sec-audit).
+    # The service wraps the ValueError of `fiscal_year_bounds` into a 422, not a 500.
     top = _budget(id=uuid.uuid4(), path_key="VS", key="VS",
                   fiscal_start_month=2, fiscal_start_day=31)
     sess = fake_session(result(top))  # _require_top_level only, raises before the dup check
@@ -622,7 +621,7 @@ async def test_update_expense_amount_none_skipped() -> None:
 
 
 async def test_update_expense_rebooks_within_same_top_level() -> None:
-    # Move a standalone booking to another cost center (#25), but only inside the same
+    # Move a standalone booking to another cost center, but only inside the same
     # top-level budget. `budget_id` and the currency follow the new node. The fixed
     # fiscal year still belongs to the top-level budget (`_resolve_fiscal_year` passes,
     # #AUD-036).
@@ -760,7 +759,7 @@ async def test_list_expenses_paged_all_filters_and_search() -> None:
 
 async def test_list_expenses_paged_exact_id_filter() -> None:
     # An expense_id takes the exact-filter branch. It serves the deeplink
-    # to bookings (#expenses-ux2). A budget_id of None skips _get_node.
+    # to bookings. A budget_id of None skips _get_node.
     e = _expense(actor=None)
     sess = fake_session(result(1), result((e, "VS", None, None)))
     svc = BudgetTreeService(sess)
@@ -1427,7 +1426,7 @@ async def test_audit_uses_actor() -> None:
     assert sess.committed == 1
 
 
-# Audit log revert (#config-versioning): revert_audit and its helpers, without a DB.
+# Audit log revert: revert_audit and its helpers, without a DB.
 def _entry(
     action: AuditAction, target_id: Any, data: dict | None = None, *, eid: int = 1
 ) -> AuditEntry:
@@ -1735,7 +1734,7 @@ async def test_create_sub_booking_on_transfer_rejected() -> None:
 
 
 async def test_create_sub_booking_nested_rejected() -> None:
-    """Sub-bookings do not nest (#review)."""
+    """Sub-bookings do not nest."""
     child = _expense(id=uuid.uuid4())
     child.parent_expense_id = uuid.uuid4()
     svc = BudgetTreeService(fake_session(gets=[child]))

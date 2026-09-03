@@ -1,4 +1,4 @@
-"""Unit tests without a database: flow selection when an application is created (#28).
+"""Unit tests without a database: flow selection when an application is created.
 
 Only the global flow remains. Per-type flows are gone. A missing global flow gives 404.
 """

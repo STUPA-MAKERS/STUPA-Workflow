@@ -4,10 +4,8 @@ import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 /**
  * The header every page starts with: breadcrumbs, title, subtitle and actions.
  *
- * One component owns the whole block, so the breadcrumb can never drift away
- * from the title it belongs to. Before this, each page built its own `<header>`
- * and the breadcrumb lived in the shell, which gave a different alignment on a
- * `wide` route than on a normal one.
+ * One component owns the whole block, so the breadcrumb cannot drift away from the title
+ * it belongs to, and a `wide` route aligns the same way a normal one does.
  *
  * Put actions in the `actions` slot:
  *

@@ -1161,8 +1161,8 @@ describe('ApplicationsDetailComponent', () => {
   });
 
   it('outlines the detail layout while it loads, never a bare sentence', async () => {
-    // The most-opened view in the platform, and it used to be replaced entirely by one
-    // line of text until the whole layout arrived at once.
+    // The most-opened view in the platform. One line of text standing in for the whole
+    // layout until it arrives at once is the worst place for it.
     const view = await render(ApplicationsDetailComponent, {
       providers: [
         provideRouter([]),

@@ -410,7 +410,7 @@ def test_create_form_version_activate_true() -> None:
     assert [f.key for f in out.fields] == ["title"]
     # With active=True the service writes one UPDATE deactivation statement. The
     # config_revision record adds three execute statements: the advisory lock plus the
-    # lock and the prev_hash select of the audit append (#config-versioning).
+    # lock and the prev_hash select of the audit append.
     assert len(sess.statements) == 4
     assert at.active_form_version_id is not None
     assert sess.committed == 1

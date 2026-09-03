@@ -29,10 +29,9 @@ export class BrandingService {
   /** Configured full name (empty ⇒ fallback). */
   private readonly _configuredName = signal('');
 
-  /* The footer used to come from `/admin/site-config`, which needs a session. On the
-     landing page and on the 404 that request is refused, so a configured imprint link
-     or copyright line never appeared where a logged-out visitor could see it. The
-     public config carries the same fields and needs no auth, so it serves both. */
+  /* Footer content comes from the PUBLIC config, which needs no session. A logged-out
+     visitor on the landing page or the 404 sees what the admin configured; reading it
+     from `/admin/site-config` would refuse that request and fall back to the defaults. */
   private readonly _copyright = signal<I18nMap | null>(null);
   private readonly _legalLinks = signal<PublicFooterLink[]>([]);
 

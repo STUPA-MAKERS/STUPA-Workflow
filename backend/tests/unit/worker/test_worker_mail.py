@@ -60,7 +60,7 @@ async def test_on_startup_populates_ctx() -> None:
 
 
 def test_mail_message_attachment_roundtrip() -> None:
-    """Attachments survive the queue as a base64 payload (#protocol-mail-pdf)."""
+    """Attachments survive the queue as a base64 payload."""
     from app.modules.notifications.mail import MailAttachment, MailMessage
 
     msg = MailMessage(

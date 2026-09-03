@@ -223,7 +223,7 @@
         <div class="empty-state">{{ 'expenses.transfers.empty' | t }}</div>
       }
     } @else if (loading() || items().length) {
-      <!-- Floating bulk bar: fixed at the bottom center while a selection exists (#expenses-ux2). -->
+      <!-- Floating bulk bar: fixed at the bottom center while a selection exists. -->
       @if (canManage() && selectedCount()) {
         <div
           class="exp__bulkbar"

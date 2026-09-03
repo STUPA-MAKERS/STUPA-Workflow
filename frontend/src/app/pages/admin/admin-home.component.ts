@@ -40,7 +40,7 @@ export class AdminHomeComponent {
     { link: 'gremien', title: 'admin.home.gremien', desc: 'admin.home.gremienDesc', icon: 'parliament', permissions: ['admin.gremien'] },
     { link: 'budget-pots', title: 'budget.tree.title', desc: 'admin.home.budgetPotsDesc', icon: 'euro', permissions: ['budget.structure'] },
     { link: 'forms', title: 'admin.home.formBuilder', desc: 'admin.home.formBuilderDesc', icon: 'form', permissions: ['form.configure'] },
-    // The flow editor route and its save both accept either key (#g7).
+    // The flow editor route and its save both accept either key.
     { link: 'flow', title: 'admin.home.flowEditor', desc: 'admin.home.flowEditorDesc', icon: 'flow', permissions: ['flow.configure', 'admin.types'] },
     { link: 'branding', title: 'admin.home.branding', desc: 'admin.home.brandingDesc', icon: 'palette', permissions: ['admin.site'] },
     { link: 'cd-variants', title: 'admin.cdVariants.title', desc: 'admin.home.cdVariantsDesc', icon: 'document', permissions: ['admin.cd_variants'] },

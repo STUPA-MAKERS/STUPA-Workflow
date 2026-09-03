@@ -109,16 +109,16 @@ export class UsersComponent {
   );
 
   /**
-   * Widths are floors: the table scrolls rather than crushing a column. Without them the
-   * name column asked for 22rem and was measured at 107px, so every name broke onto two
-   * lines and every row was a different height.
-   */
-  /**
-   * True until the first answer. Without it the table showed "Keine Treffer" while the
-   * request was still out, which asserts there is nothing when nothing has arrived yet.
+   * True until the first answer. Without it the table says "Keine Treffer" while the
+   * request is still out, which asserts there is nothing when nothing has arrived yet.
    */
   protected readonly loading = signal(true);
 
+  /**
+   * Widths are floors: the table scrolls rather than crushing a column. A `width` alone
+   * is a suggestion under `table-layout: auto`, so a column can be squeezed until every
+   * value wraps and no two rows are the same height.
+   */
   protected readonly columns = computed<ColumnDef[]>(() => [
     { key: 'name', label: this.i18n.translate('admin.users.col.name'), width: '14rem' },
     // Long enough for a full university address without a mid-domain break.

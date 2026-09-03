@@ -17,7 +17,7 @@ async function setup(inputs: Partial<{ title: string; slices: PieSlice[] }> = {}
   return { ...view, c: view.fixture.componentInstance as unknown as PieInternals };
 }
 
-describe('BudgetPieComponent (#budget-redesign)', () => {
+describe('BudgetPieComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   it('renders the title and one path per non-zero slice', async () => {

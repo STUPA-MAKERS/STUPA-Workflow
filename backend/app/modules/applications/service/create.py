@@ -133,8 +133,8 @@ class CreateOps(ApplicationsServiceBase):
     async def _resolve_flow_version_id(self, app_type: ApplicationType) -> UUID:
         """Resolve the active global flow for a new application.
 
-        Per-type flows no longer exist. Only the single global flow remains. A
-        fresh install without a flow config has none, so the method answers 404.
+        There is one global flow and no per-type flows. A fresh install without a flow
+        config has none, so the method answers 404.
         """
         global_flow_id = (
             await self.session.execute(select(FlowVersion.id).where(FlowVersion.active.is_(True)))

@@ -297,11 +297,9 @@ describe('ApplicationsListComponent', () => {
      * These walk the component's own filter list rather than naming filters, so a filter
      * added later is covered the day it is declared.
      *
-     * This exists because one class of bug kept coming back. A filter used to live in
-     * five hand-kept places — its signal, the URL reader, the apply, the reset and the
-     * request builder — and the archived filter reached three of them. The panel reset
-     * while the list kept its rows, because the list reloads from the URL and the reset
-     * only touched signals.
+     * The failure they guard against: a filter that reaches the signal and the panel but
+     * not the URL, so a reset clears the control and the list keeps its rows, because
+     * the list reloads from the URL.
      */
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     function defs(cmp: any): { param: string; empty: string; signal: any }[] {
@@ -824,10 +822,9 @@ describe('ApplicationsListComponent', () => {
   });
 
   it('keeps the table on screen while loading instead of replacing it with text', async () => {
-    // The page used to hide the whole table behind `@if (loading())` and render a
-    // sentence, so the list vanished on every filter and sort and the first load was a
-    // bare line where a table was about to appear. The table owns the state now: it
-    // keeps its header and column widths and draws skeleton rows.
+    // The table owns the loading state: it keeps its header and its column widths and
+    // draws skeleton rows. Hiding it behind `@if (loading())` would make the list vanish
+    // on every filter and sort, and make the first load a bare line of text.
     const { fixture, container, cmp } = await setup();
     cmp.loading.set(true);
     fixture.detectChanges();

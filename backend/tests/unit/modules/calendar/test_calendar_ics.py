@@ -1,4 +1,4 @@
-"""Unit tests of the iCal builder (#ics): a pure function, no DB."""
+"""Unit tests of the iCal builder: a pure function, no DB."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""TDD: bootstrap of the initial admins (#70).
+"""TDD: bootstrap of the initial admins.
 
 The suite covers every branch of `app.modules.auth.bootstrap`. That module is critical, so
 it needs 100 percent branch coverage. The suite also covers the settings parser properties.
@@ -67,7 +67,7 @@ def test_is_bootstrap_matches_verified_email_case_insensitive() -> None:
 
 
 def test_is_bootstrap_unverified_email_is_rejected() -> None:
-    """Core protection: a matching but unverified email gives no match (#70)."""
+    """Core protection: a matching but unverified email gives no match."""
     s = _settings(bootstrap_admin_emails="admin@x.de")
     assert not bootstrap._is_bootstrap_principal(
         _principal(sub="x", email="admin@x.de"), s, email_verified=False
@@ -199,7 +199,7 @@ async def test_sweep_no_flush_when_all_present() -> None:
     assert db.flushed == 0
 
 
-# The global member base role through `ensure_member_for_principal` (#61).
+# The global member base role through `ensure_member_for_principal`.
 async def test_member_grant_when_role_present_and_missing() -> None:
     db = fake_session(result(_ROLE_ID), result())  # role id, then no assignment
     assert await bootstrap.ensure_member_for_principal(db, _principal()) is True

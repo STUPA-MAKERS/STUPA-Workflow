@@ -10,7 +10,7 @@ import {
 /**
  * Mirror a second horizontal scrollbar above an overflowing container. The container is
  * normally a wide table in `.exp__tableWrap`. The user reaches the right columns without a
- * scroll down to the bottom edge (#expenses-ux).
+ * scroll down to the bottom edge.
  *
  * The directive works on the DOM only. The template needs no change except the attribute
  * on the wrapper. The proxy goes in as a sibling directly before the wrapper. Its `scrollLeft`

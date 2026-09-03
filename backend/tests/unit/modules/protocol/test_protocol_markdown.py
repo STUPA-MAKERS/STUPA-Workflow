@@ -70,7 +70,7 @@ def test_frontmatter_injection_is_quoted() -> None:
 def test_vote_snippet_renders_abstimmung_callout_with_tally() -> None:
     snippet = build_vote_snippet("Antrag A", {"yes": 5, "no": 2, "abstain": 1})
     # The pytex protocol callout renders the built-in vote box: a bold title plus a
-    # tally line (yes/no/abstain). It carries NO separate `Ergebnis:` line (#pdf-format).
+    # tally line (yes/no/abstain). It carries NO separate `Ergebnis:` line.
     assert snippet.startswith("> [!abstimmung] **Antrag A**")
     assert "Ergebnis" not in snippet
     assert "> yes: 5, no: 2, abstain: 1" in snippet
@@ -94,7 +94,7 @@ def test_frontmatter_has_signatures_and_quorum_dataline() -> None:
     assert "unterschriften:" in block
     assert '- "Schriftführung"' in block and '- "Vorstand"' in block
     # The quorum gets its own frontmatter key. The pytex wrapper renders it as a
-    # data line on the title page (#protocol-quorum).
+    # data line on the title page.
     assert 'beschlussfaehigkeit: "Gegeben"' in block
 
 

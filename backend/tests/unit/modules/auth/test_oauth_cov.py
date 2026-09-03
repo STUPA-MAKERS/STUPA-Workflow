@@ -1,4 +1,4 @@
-"""Full line and branch coverage of the auth and OAuth endpoints and services (#MCP).
+"""Full line and branch coverage of the auth and OAuth endpoints and services.
 
 The tests run without a database. Router tests use the FastAPI `TestClient` with
 `dependency_overrides`. Service tests use `FakeSession` from `tests._support.flow_fakes`.

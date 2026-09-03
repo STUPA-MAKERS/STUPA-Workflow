@@ -55,7 +55,7 @@ async function setup(
   return { ...view, c: view.fixture.componentInstance as unknown as SunInternals };
 }
 
-describe('BudgetSunburstComponent (#budget-sunburst)', () => {
+describe('BudgetSunburstComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   it('total() is 0 with no root and shows the empty paragraph', async () => {

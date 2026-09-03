@@ -10,12 +10,10 @@
   margin-bottom: 0;
 }
 
-/* A `wide` route drops the max-width on `.main` so the content can use two sidebars.
-   The header used to keep the normal container width and centre itself, which held the
-   title in the same place across pages — but inside a wide page it left the title
-   indented from the content below it, and a header that does not line up with its own
-   table is the misalignment a reader actually sees. The header therefore shares the
-   content box exactly, so the two always share a left edge.
+/* The header shares the content box exactly, so the two always share a left edge. A
+   `wide` route drops the max-width on `.main` for two sidebars; a header that kept the
+   normal container width would sit indented from the table it titles, which is the
+   misalignment a reader sees.
 
    That holds only while the content really starts at the gutter. A RAIL page does not:
    its main column is capped and centred between two margins, so a full-width header

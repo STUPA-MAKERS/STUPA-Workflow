@@ -1982,7 +1982,7 @@ export const de = {
   'admin.deleg.revoked': 'Delegation widerrufen.',
   'admin.deleg.revokeFailed': 'Widerruf fehlgeschlagen.',
 
-  // Substitute pool (#delegation-rework), shown in the Gremium member administration.
+  // Substitute pool, shown in the Gremium member administration.
   'admin.substitutes.title': 'Stellvertreter-Pool',
   'admin.substitutes.hint':
     'Gewählte/bestimmte Vertreter (z. B. der Fachschaften): an sie darf ohne Vorlauf bis Sitzungsbeginn delegiert werden — auch wenn sie nicht selbst Mitglied sind.',
@@ -2000,7 +2000,7 @@ export const de = {
   'admin.substitutes.duplicate': 'Dieser Eintrag existiert bereits.',
   'admin.substitutes.failed': 'Aktion fehlgeschlagen.',
 
-  // Meeting delegation (#delegation-rework): card on the meeting page plus dialog.
+  // Meeting delegation: card on the meeting page plus dialog.
   'delegation.card.title': 'Vertretung',
   'delegation.card.lead':
     'Du kannst dich für diese Sitzung vertreten lassen (optional inkl. Stimmrecht).',
@@ -2106,7 +2106,7 @@ export const de = {
   'admin.forms.advanced': 'Erweiterte Optionen',
   'admin.forms.duplicate': 'Duplizieren',
 
-  // Question groups (#13). One group container is one wizard step.
+  // Question groups. One group container is one wizard step.
   'admin.form.groupStep': 'Schritt {n}',
   'admin.form.groupTitleDe': 'Gruppen-Titel (DE)',
   'admin.form.groupTitleEn': 'Gruppen-Titel (EN)',
@@ -4357,7 +4357,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.deleg.revoked': 'Delegation revoked.',
   'admin.deleg.revokeFailed': 'Revocation failed.',
 
-  // Substitute pool (#delegation-rework), shown in the Gremium member administration.
+  // Substitute pool, shown in the Gremium member administration.
   'admin.substitutes.title': 'Substitute pool',
   'admin.substitutes.hint':
     'Elected/designated substitutes (e.g. of student councils): delegations to them are possible without lead time until the meeting starts — even if they are not members themselves.',
@@ -4375,7 +4375,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.substitutes.duplicate': 'This entry already exists.',
   'admin.substitutes.failed': 'Action failed.',
 
-  // Meeting delegation (#delegation-rework): card on the meeting page plus dialog.
+  // Meeting delegation: card on the meeting page plus dialog.
   'delegation.card.title': 'Proxy',
   'delegation.card.lead':
     'You can arrange a proxy for this meeting (optionally including your voting right).',
@@ -4480,7 +4480,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.forms.advanced': 'Advanced options',
   'admin.forms.duplicate': 'Duplicate',
 
-  // Question groups (#13). One group container is one wizard step.
+  // Question groups. One group container is one wizard step.
   'admin.form.groupStep': 'Step {n}',
   'admin.form.groupTitleDe': 'Group title (DE)',
   'admin.form.groupTitleEn': 'Group title (EN)',

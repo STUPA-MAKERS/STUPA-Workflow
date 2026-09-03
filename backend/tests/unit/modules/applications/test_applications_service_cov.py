@@ -652,8 +652,8 @@ async def test_patch_concurrent_integrity_error_409(
 
 async def test_delete_removes_and_commits() -> None:
     app = _app()
-    # Before the row goes away, delete() writes an APPLICATION_DELETE audit entry
-    # (#AUD-002). It calls scalar() for the version count and then audit_record. That
+    # Before the row goes away, delete() writes an APPLICATION_DELETE audit entry.
+    # It calls scalar() for the version count and then audit_record. That
     # runs two execute() calls, one advisory lock and one prev-hash select through
     # scalar_one_or_none, then add(entry) and flush(). Both execute() calls get an empty
     # _Result from the fake, so prev_hash stays None (genesis). That is enough here.

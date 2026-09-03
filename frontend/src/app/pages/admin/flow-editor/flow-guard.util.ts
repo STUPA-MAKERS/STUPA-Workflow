@@ -48,7 +48,7 @@ export function outDots(fromKey: string, transitions: readonly TransitionDef[]):
   return groups;
 }
 
-export function branchDotsFor(kind: string | null | undefined): string[] {
+function branchDotsFor(kind: string | null | undefined): string[] {
   return kind === 'vote' ? ['pass', 'fail'] : [];
 }
 
