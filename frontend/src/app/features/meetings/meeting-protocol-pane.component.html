@@ -17,7 +17,7 @@
     } @else if (proto.pdfUrl) {
       <a class="text-primary text-sm font-medium" [href]="proto.pdfUrl" target="_blank" rel="noopener">{{ 'meetings.protocol.pdf' | t }}</a>
     }
-    @if (!proto.isLocked && meeting().canWrite) {
+    @if (!proto.isLocked && canEdit()) {
       <!-- Only a draft may be discarded. The server answers 409 once the protocol
            is final or renders, and the pane says so if the click races. -->
       <app-button
@@ -29,6 +29,13 @@
         [disabled]="deletingProtocol()"
         (click)="protocolDelete.emit()"
       ><app-icon name="delete" /></app-button>
+    }
+    @if (!proto.isLocked && !canEdit() && meeting().canWrite) {
+      <!-- The editor is greyed for everyone but the minute-taker. Name them, so
+           that the read-only state reads as a rule and not as a fault. -->
+      <span class="text-text-muted text-sm">{{
+        'meetings.protocol.takenBy' | t: { name: meeting().protokollantName ?? '' }
+      }}</span>
     }
     @if (!proto.isLocked) {
       <!-- A locked protocol, so rendering or final, makes the editor read-only. No
@@ -55,7 +62,7 @@
       <app-markdown-editor
         [docKey]="top.id"
         [value]="top.body ?? ''"
-        [disabled]="proto.isLocked || !meeting().canWrite"
+        [disabled]="proto.isLocked || !canEdit()"
         [placeholder]="'meetings.protocol.placeholder' | t"
         (valueChange)="bodyChange.emit({ itemId: top.id, body: $event })"
       />

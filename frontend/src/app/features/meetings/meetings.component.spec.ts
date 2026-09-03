@@ -592,6 +592,104 @@ describe('MeetingsComponent', () => {
     expect(await screen.findByText('Live-Sitzung')).toBeInTheDocument();
     expect(screen.queryByText('Sitzungssteuerung')).not.toBeInTheDocument();
   });
+
+  it('keeps the follow view for a member without rights and without a minute-taker', async () => {
+    // The follow view is the view of a plain member. It must not depend on a
+    // minute-taker being assigned: no write and no manage right is enough.
+    const member: MeetingOutWire = {
+      ...MEETING,
+      canControl: false,
+      canManage: false,
+      canWrite: false,
+      canManageVotes: false,
+      canVote: true,
+      protokollantId: null,
+      protokollantName: null,
+    };
+    const { http } = await setup({ perms: ['vote.cast'], userId: 'pr-1' });
+    http.expectOne('/api/meetings/m-1').flush(member);
+    http.expectOne('/api/meetings/m-1/attendance').flush([]);
+    http.expectOne('/api/meetings/m-1/agenda').flush([]);
+    flushDelegationContext(http);
+    expect(await screen.findByText('Live-Sitzung')).toBeInTheDocument();
+    expect(screen.queryByRole('toolbar', { name: 'Sitzungssteuerung' })).not.toBeInTheDocument();
+  });
+
+  describe('minute-taker exclusivity is about the protocol only', () => {
+    /** Detail load with the minute-taker assigned to somebody else. */
+    async function loadOtherProtokollant(over: Partial<MeetingOutWire> = {}) {
+      const view = await setup();
+      const { http } = view;
+      http.expectOne('/api/meetings/m-1').flush({
+        ...MEETING,
+        status: 'planned',
+        protokollantId: 'someone-else',
+        protokollantName: 'Other P',
+        ...over,
+      });
+      http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
+      http.expectOne('/api/meetings/m-1/attendance').flush([]);
+      http
+        .expectOne('/api/meetings/m-1/agenda')
+        .flush([
+          { id: 't-1', applicationId: null, title: 'Begrüßung', body: '', position: 0, nonPublic: false },
+        ]);
+      http.expectOne('/api/meetings/m-1/agenda/assignable').flush([]);
+      flushDelegationContext(http);
+      return view;
+    }
+
+    it('keeps the control toolbar for a manager who is not the minute-taker', async () => {
+      // The operational bite: the minute-taker is reassigned in the settings
+      // dialog, and that dialog opens from this toolbar. Hiding the toolbar from
+      // everybody else strands the meeting when the minute-taker drops out.
+      await loadOtherProtokollant();
+
+      expect(await screen.findByRole('toolbar', { name: 'Sitzungssteuerung' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Sitzung eröffnen' })).toBeEnabled();
+      expect(screen.getByRole('button', { name: 'Schließen' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Sitzung bearbeiten' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Sitzung löschen' })).toBeInTheDocument();
+      // The follow view must not take the page over.
+      expect(screen.queryByText('Live-Sitzung')).not.toBeInTheDocument();
+    });
+
+    it('keeps the agenda editor and vote creation for a manager who is not the minute-taker', async () => {
+      await loadOtherProtokollant();
+
+      expect(await screen.findByPlaceholderText(/Freitext-TOP/)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'TOP hinzufügen' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Beschlussfrage hinzufügen' })).toBeInTheDocument();
+    });
+
+    it('shows the protocol pane read-only to a manager who is not the minute-taker', async () => {
+      // Two people must not type into one protocol. That is what the exclusivity
+      // was written for, so the editor is disabled — not the whole page hidden.
+      const { container } = await loadOtherProtokollant();
+
+      expect(await screen.findByText('Entwurf')).toBeInTheDocument();
+      expect(container.querySelector('.mde__host--disabled')).toBeTruthy();
+      expect(
+        screen.queryByRole('button', { name: 'Protokollentwurf verwerfen' }),
+      ).not.toBeInTheDocument();
+      // Say who holds the pen, so the greyed editor is not a mystery.
+      expect(screen.getByText(/Other P führt das Protokoll/)).toBeInTheDocument();
+    });
+
+    it('lets the minute-taker edit the protocol', async () => {
+      const { container } = await loadOtherProtokollant({
+        protokollantId: 'pr-1',
+        protokollantName: 'Ich',
+        isProtokollant: true,
+      });
+
+      expect(await screen.findByText('Entwurf')).toBeInTheDocument();
+      expect(container.querySelector('.mde__host--disabled')).toBeNull();
+      expect(
+        screen.getByRole('button', { name: 'Protokollentwurf verwerfen' }),
+      ).toBeInTheDocument();
+    });
+  });
 });
 
 // Instance-driven tests: call the public methods directly and check signals and
@@ -1768,17 +1866,47 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.isProtokollant()).toBe(false);
     });
 
-    it('marks a user as follower when a protokollant is set and it is not them', async () => {
+    it('marks a user as follower on the server rights alone, not on the protokollant', async () => {
       const { cmp } = await loaded();
+      // A named protokollant leaves the rights of everybody else untouched.
       cmp.meeting.set({ ...cmp.meeting()!, protokollantId: 'someone', isProtokollant: false });
-      expect(cmp.isFollower()).toBe(true);
+      expect(cmp.isFollower()).toBe(false);
       cmp.meeting.set({ ...cmp.meeting()!, protokollantId: 'someone', isProtokollant: true });
       expect(cmp.isFollower()).toBe(false);
-      // Without a selected minute-taker the write/manage gate applies.
+      // No write and no manage right ⇒ follow view, with or without a protokollant.
       cmp.meeting.set({ ...cmp.meeting()!, protokollantId: null, canWrite: false, canManage: false });
+      expect(cmp.isFollower()).toBe(true);
+      cmp.meeting.set({ ...cmp.meeting()!, protokollantId: 'someone', canWrite: false, canManage: false });
       expect(cmp.isFollower()).toBe(true);
       cmp.meeting.set(null);
       expect(cmp.isFollower()).toBe(false);
+    });
+
+    it('gives a meeting.view_all reader the full view read-only, never the follow view', async () => {
+      const { cmp } = await loaded({ perms: ['meeting.view_all'] });
+      cmp.meeting.set({
+        ...cmp.meeting()!,
+        canWrite: false,
+        canManage: false,
+        protokollantId: 'someone',
+      });
+      expect(cmp.isFollower()).toBe(false);
+      // A reader still may not type into the minutes.
+      expect(cmp.canEditProtocol()).toBe(false);
+    });
+
+    it('grants the protocol edit only to the protokollant once one is named', async () => {
+      const { cmp } = await loaded();
+      // No protokollant yet: everyone with canWrite may take the minutes.
+      expect(cmp.canEditProtocol()).toBe(true);
+      cmp.meeting.set({ ...cmp.meeting()!, protokollantId: 'someone', isProtokollant: false });
+      expect(cmp.canEditProtocol()).toBe(false);
+      cmp.meeting.set({ ...cmp.meeting()!, protokollantId: 'someone', isProtokollant: true });
+      expect(cmp.canEditProtocol()).toBe(true);
+      cmp.meeting.set({ ...cmp.meeting()!, canWrite: false });
+      expect(cmp.canEditProtocol()).toBe(false);
+      cmp.meeting.set(null);
+      expect(cmp.canEditProtocol()).toBe(false);
     });
 
     it('loads more upcoming + past pages on scroll near the edges', async () => {

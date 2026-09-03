@@ -18,17 +18,23 @@ from app.modules.auth.models import GroupMapping, Role, RoleAssignment, RolePerm
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 
+# The internal namespace of the voting eligibility. It belongs to this resolver alone.
+# `resolve_principal` drops every incoming OIDC group claim that uses it, so a key in
+# this namespace always proves an active `vote.cast` membership.
+VOTE_GROUP_PREFIX = "vote:"
+
 
 def vote_group_key(gremium_id: object) -> str:
     """Build the namespaced group key for the voting eligibility in a Gremium.
 
-    The cast gate must depend on a real `vote.cast` membership in the Gremium. It must
-    never depend on a raw OIDC group claim that equals a Gremium UUID string. The prefix
-    of the internal key, `vote:<uuid>`, stops any IdP-emitted group name from satisfying
-    the cast eligibility. `Vote.eligible_group` stays the bare UUID as text. The voting
-    service derives this prefixed key from it for the membership check.
+    The cast gate depends on a real `vote.cast` membership in the Gremium. It must never
+    depend on a raw OIDC group claim. The prefix of the internal key, `vote:<uuid>`,
+    keeps the two apart: a claim that equals a Gremium UUID string misses the prefix,
+    and a claim that carries the prefix never enters the group set. `Vote.eligible_group`
+    stays the bare UUID as text. The voting service derives this prefixed key from it for
+    the membership check.
     """
-    return f"vote:{gremium_id}"
+    return f"{VOTE_GROUP_PREFIX}{gremium_id}"
 
 
 def _as_aware(dt: datetime | None) -> datetime | None:
@@ -60,7 +66,16 @@ def _assignment_valid(
 
 async def resolve_principal(db: AsyncSession, row: PrincipalRow, now: datetime) -> Principal:
     """Resolve a `principal` row into a full `Principal` with roles, permissions, groups."""
-    groups: set[str] = {str(g) for g in (row.oidc_groups or [])}
+    # The `vote:` namespace is reserved for the membership loop below. An IdP can emit
+    # any group name, including one that copies the internal key, and the cast gate
+    # reads that key as proof of an active `vote.cast` membership. The resolver
+    # therefore drops such a claim at the door. A `group_mapping` on a reserved name
+    # stays without effect for the same reason.
+    groups: set[str] = {
+        g
+        for g in (str(raw) for raw in (row.oidc_groups or []))
+        if not g.startswith(VOTE_GROUP_PREFIX)
+    }
     role_ids: set = set()
 
     assignments = (

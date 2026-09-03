@@ -897,6 +897,7 @@ export const de = {
   'meetings.protocol.retryHint':
     'Die Finalisierung ist fehlgeschlagen — Inhalt prüfen und erneut versuchen.',
   'meetings.protocol.delete': 'Protokollentwurf verwerfen',
+  'meetings.protocol.takenBy': '{name} führt das Protokoll — du liest mit.',
   'meetings.protocol.deleteTitle': 'Protokollentwurf verwerfen',
   'meetings.protocol.deleteBody':
     'Der Entwurf des Protokolls wird endgültig gelöscht. Der TOP-Text bleibt erhalten, das Protokoll muss danach neu angelegt werden.',
@@ -1697,6 +1698,11 @@ export const de = {
   'admin.audit.targetType.comment': 'Kommentar',
   'admin.audit.targetType.protocol': 'Protokoll',
   'admin.audit.targetType.fiscal_year': 'Haushaltsjahr',
+  'admin.audit.targetType.form': 'Formular',
+  'admin.audit.targetType.flow': 'Ablauf',
+  'admin.audit.targetType.cd_variant': 'Corporate-Design-Variante',
+  // Quotation marks around a resolved target name. Each locale brings its own pair.
+  'admin.audit.targetQuoted': '„{label}“',
   'admin.audit.msg.login': '{actor} hat sich angemeldet.',
   'admin.audit.msg.status_change': '{actor} hat den Status von {target} geändert.',
   'admin.audit.msg.vote_cast': '{actor} hat eine Stimme abgegeben ({target}).',
@@ -3323,6 +3329,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.protocol.renderingHint': 'The PDF is rendered in the background and sent afterwards.',
   'meetings.protocol.retryHint': 'Finalizing failed — review the content and try again.',
   'meetings.protocol.delete': 'Discard draft minutes',
+  'meetings.protocol.takenBy': '{name} takes the minutes — you read along.',
   'meetings.protocol.deleteTitle': 'Discard draft minutes',
   'meetings.protocol.deleteBody':
     'The draft of the minutes is deleted permanently. The agenda-item text stays, but the minutes must be created again.',
@@ -4113,6 +4120,10 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.audit.targetType.comment': 'Comment',
   'admin.audit.targetType.protocol': 'Protocol',
   'admin.audit.targetType.fiscal_year': 'Fiscal year',
+  'admin.audit.targetType.form': 'Form',
+  'admin.audit.targetType.flow': 'Workflow',
+  'admin.audit.targetType.cd_variant': 'Corporate design variant',
+  'admin.audit.targetQuoted': '“{label}”',
   'admin.audit.msg.login': '{actor} signed in.',
   'admin.audit.msg.status_change': '{actor} changed the status of {target}.',
   'admin.audit.msg.vote_cast': '{actor} cast a vote ({target}).',

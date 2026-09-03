@@ -107,19 +107,31 @@ export class MeetingSessionService implements OnDestroy {
   readonly isProtokollant = computed(() => this.meeting()?.isProtokollant ?? false);
   /**
    * Live follow view (read the protocol and cast on open votes) instead of the
-   * edit/manager view. After a protokollant is chosen, ONLY that person gets
-   * the manager view. Without a protokollant the write/manage gate applies.
-   * This keeps a fresh meeting usable before the start.
+   * edit/manager view. Only the rights the server sends decide this. A named
+   * protokollant does NOT push everybody else into the follow view: the
+   * exclusivity covers the protocol text alone (see `canEditProtocol`), never
+   * the meeting control, the agenda or the votes. Coupling the two once stranded
+   * a meeting whose protokollant was away, because the switch that reassigns
+   * them sits in the settings dialog behind the hidden toolbar.
    */
   readonly isFollower = computed(() => {
     const m = this.meeting();
     if (!m) return false;
-    // Readers with view_all get the full 3-column view read-only. This applies
-    // only when they have no write or manage right on this meeting. Otherwise
-    // they would bypass the protokollant exclusivity below.
-    if (this.canViewAll() && !m.canWrite && !m.canManage) return false;
-    if (m.protokollantId) return !this.isProtokollant();
+    // Readers with view_all get the full 3-column view read-only.
+    if (this.canViewAll()) return false;
     return !m.canWrite && !m.canManage;
+  });
+  /**
+   * Write the minutes. Two people must not type into one protocol, so after a
+   * protokollant is named only that person edits it. Everybody else with
+   * `canWrite` reads the pane. The server grants `canWrite` to the protokollant,
+   * the manager and any `protocol.write` role alike, so this last step is the
+   * frontend's alone.
+   */
+  readonly canEditProtocol = computed(() => {
+    const m = this.meeting();
+    if (!m?.canWrite) return false;
+    return !m.protokollantId || this.isProtokollant();
   });
 
   /** Votes of one TOP, grouped by agendaItemId. */
