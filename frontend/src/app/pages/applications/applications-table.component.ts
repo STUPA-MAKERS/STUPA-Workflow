@@ -80,7 +80,14 @@ export class ApplicationsTableComponent {
       // Widths are floors, so a column keeps its room and the table scrolls rather than
       // crushing one. Without them "Nicht-monetärer Antrag" broke across three lines and
       // made its row twice the height of its neighbours.
-      { key: 'title', label: this.i18n.translate('applications.list.col.title'), width: '26rem' },
+      // Named as the card's heading rather than left to fall there by being first, so a
+      // column reorder cannot quietly move the heading onto a date.
+      {
+        key: 'title',
+        label: this.i18n.translate('applications.list.col.title'),
+        width: '26rem',
+        card: 'title',
+      },
       { key: 'typeLabel', label: this.i18n.translate('applications.list.col.type'), width: '12rem' },
       { key: 'stateLabel', label: this.i18n.translate('applications.list.col.state'), width: '13rem' },
       {

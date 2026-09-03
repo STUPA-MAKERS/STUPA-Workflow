@@ -97,10 +97,12 @@ export class InvoicesComponent implements OnDestroy {
     const cols: ColumnDef[] = [
       { key: 'issueDate', label: this.i18n.translate('invoices.col.issueDate'), width: '9rem' },
       { key: 'dueDate', label: this.i18n.translate('invoices.col.dueDate'), width: '9rem' },
-      { key: 'number', label: this.i18n.translate('invoices.col.number') },
+      // The number is what names an invoice, so it heads the card. Net and tax are off
+      // it: gross is the figure a reader checks, and the split belongs to the detail.
+      { key: 'number', label: this.i18n.translate('invoices.col.number'), card: 'title' },
       { key: 'supplier', label: this.i18n.translate('invoices.col.supplier') },
-      { key: 'net', label: this.i18n.translate('invoices.col.net'), align: 'end' },
-      { key: 'tax', label: this.i18n.translate('invoices.col.tax'), align: 'end' },
+      { key: 'net', label: this.i18n.translate('invoices.col.net'), align: 'end', card: 'hidden' },
+      { key: 'tax', label: this.i18n.translate('invoices.col.tax'), align: 'end', card: 'hidden' },
       { key: 'gross', label: this.i18n.translate('invoices.col.gross'), align: 'end' },
       { key: 'status', label: this.i18n.translate('invoices.col.status') },
       { key: 'file', label: this.i18n.translate('invoices.col.file') },

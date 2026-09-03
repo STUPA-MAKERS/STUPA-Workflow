@@ -188,9 +188,22 @@ export class ExpensesComponent implements OnDestroy {
         width: '9rem',
         sortable: true,
         initialSort: 'desc',
+        // Off the card: most bookings have none, so it is a labelled em-dash.
+        card: 'hidden',
       },
-      { key: 'kind', label: this.i18n.translate('expenses.col.kind'), width: '7rem' },
-      { key: 'description', label: this.i18n.translate('expenses.col.description') },
+      {
+        key: 'kind',
+        label: this.i18n.translate('expenses.col.kind'),
+        width: '7rem',
+        // Off the card: the amount already carries the sign.
+        card: 'hidden',
+      },
+      {
+        key: 'description',
+        label: this.i18n.translate('expenses.col.description'),
+        // The card's heading. It is what says WHICH booking this is; a date does not.
+        card: 'title',
+      },
       {
         key: 'correspondent',
         label: this.i18n.translate('expenses.col.correspondent'),
