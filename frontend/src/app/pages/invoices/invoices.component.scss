@@ -1,6 +1,12 @@
-:host { display: block; }
-.inv { position: relative; min-height: 60vh; }
-.inv__search, .inv__input {
+:host {
+  display: block;
+}
+.inv {
+  position: relative;
+  min-height: 60vh;
+}
+.inv__search,
+.inv__input {
   padding: var(--space-2) var(--space-3);
   border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-md);
@@ -11,17 +17,37 @@
 /* Text inputs fill their grid cell and must shrink below it. Without min-width: 0,
    the intrinsic field width makes the 1fr grid overflow. Then the dialog scrolls
    horizontally. */
-.inv__input { width: 100%; min-width: 0; box-sizing: border-box; }
-input.inv__input { height: var(--control-height); }
-.inv__search { min-width: 14rem; height: 2.25rem; }
-.inv__status { color: var(--color-text-muted); padding: var(--space-4) 0; }
-.inv__sentinel { height: 1px; }
+.inv__input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+input.inv__input {
+  height: var(--control-height);
+}
+.inv__search {
+  min-width: 14rem;
+  height: 2.25rem;
+}
+.inv__status {
+  color: var(--color-text-muted);
+  padding: var(--space-4) 0;
+}
+.inv__sentinel {
+  height: 1px;
+}
 /* The table itself is `app-data-table`: box, header, hover, skeleton rows, sticky
    actions column and the mobile card layout all come from there. What is left here is
    what only this page knows — how a single cell should read. The rules target the
    spans this component projects into the cells, not the table's own markup. */
-.inv__date { color: var(--color-text-muted); white-space: nowrap; }
-.inv__number { font-weight: var(--fw-medium); white-space: nowrap; }
+.inv__date {
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+.inv__number {
+  font-weight: var(--fw-medium);
+  white-space: nowrap;
+}
 .inv__supplier {
   display: inline-block;
   min-width: 10rem;
@@ -35,9 +61,20 @@ input.inv__input { height: var(--control-height); }
    floor keeps the column readable and pushes the table past its scroller, so the
    horizontal scroll and the mirrored scrollbar take the rest. The cap stops a long
    name from claiming the whole table. */
-.inv__file { display: inline-block; min-width: 12rem; max-width: 20rem; }
-.inv__mono { font-variant-numeric: tabular-nums; color: var(--color-text-muted); }
-.inv__amount { font-variant-numeric: tabular-nums; font-weight: var(--fw-semibold); white-space: nowrap; }
+.inv__file {
+  display: inline-block;
+  min-width: 12rem;
+  max-width: 20rem;
+}
+.inv__mono {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+}
+.inv__amount {
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--fw-semibold);
+  white-space: nowrap;
+}
 .inv__fileLink {
   display: inline-flex;
   align-items: center;
@@ -55,8 +92,14 @@ input.inv__input { height: var(--control-height); }
 .inv__fileLink app-icon {
   flex: 0 0 auto;
 }
-.inv__fileLink:hover { text-decoration: underline; }
-.inv__actions { display: inline-flex; gap: var(--space-1); justify-content: flex-end; }
+.inv__fileLink:hover {
+  text-decoration: underline;
+}
+.inv__actions {
+  display: inline-flex;
+  gap: var(--space-1);
+  justify-content: flex-end;
+}
 .inv__dropOverlay {
   position: absolute;
   inset: 0;
@@ -78,12 +121,40 @@ input.inv__input { height: var(--control-height); }
   font-weight: var(--fw-semibold);
 }
 /* Fields and layout of the create and edit dialogs. */
-.inv__field { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
-.inv__grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); align-items: end; }
-.inv__grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--space-3); align-items: end; }
-@media (max-width: 30rem) { .inv__grid2, .inv__grid3 { grid-template-columns: 1fr; } }
-.inv__textarea { resize: vertical; min-height: 4.5rem; }
-.inv__fileChipName { font-weight: var(--fw-medium); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inv__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.inv__grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+  align-items: end;
+}
+.inv__grid3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: var(--space-3);
+  align-items: end;
+}
+@media (max-width: 30rem) {
+  .inv__grid2,
+  .inv__grid3 {
+    grid-template-columns: 1fr;
+  }
+}
+.inv__textarea {
+  resize: vertical;
+  min-height: 4.5rem;
+}
+.inv__fileChipName {
+  font-weight: var(--fw-medium);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .inv__fileChipRemove {
   margin-left: auto;
   background: transparent;
@@ -95,11 +166,16 @@ input.inv__input { height: var(--control-height); }
   padding: var(--space-1);
   border-radius: var(--radius-sm);
 }
-.inv__fileChipRemove:hover { color: var(--color-danger); }
+.inv__fileChipRemove:hover {
+  color: var(--color-danger);
+}
 /* On mobile the shared table stacks the rows into cards by itself. Only the cells this
    page contributes need to give up their desktop widths. */
 @media (max-width: 768px) {
-  .inv__search { flex: 1 1 100%; min-width: 0; }
+  .inv__search {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
   .inv__supplier,
   .inv__file {
     min-width: 0;
@@ -110,5 +186,7 @@ input.inv__input { height: var(--control-height); }
     white-space: normal;
     overflow-wrap: anywhere;
   }
-  .inv__actions { margin-left: auto; }
+  .inv__actions {
+    margin-left: auto;
+  }
 }

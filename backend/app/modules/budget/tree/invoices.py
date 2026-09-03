@@ -82,6 +82,7 @@ class InvoiceOps(BudgetTreeServiceBase):
     async def list_invoices_paged(
         self,
         *,
+        invoice_id: UUID | None = None,
         q: str | None = None,
         status: str | None = None,
         gross_min: Decimal | None = None,
@@ -102,6 +103,11 @@ class InvoiceOps(BudgetTreeServiceBase):
         relevance before the usual "newest issue date first".
         """
         filters = []
+        # The exact invoice for a deep link, such as a global-search hit. It stands
+        # beside the other filters rather than replacing them, so the list still shows
+        # the one row it was asked for and the reset button still clears it.
+        if invoice_id is not None:
+            filters.append(Invoice.id == invoice_id)
         # Fuzzy search: a trigram rank over number, supplier and note (GIN
         # indexes). On a non-Postgres dialect the ILIKE substring fallback runs.
         rank_expr = None

@@ -9,13 +9,18 @@ and the delegation is asserted where it is cheap to observe.
 from __future__ import annotations
 
 import uuid
-from typing import Any
+from typing import Any, get_args
 
 import pytest
 
 from app.modules.auth.principal import Principal
-from app.modules.search.schemas import SearchHit
-from app.modules.search.service import MIN_QUERY_LENGTH, PER_KIND, SearchService
+from app.modules.search.schemas import SearchHit, SearchKind
+from app.modules.search.service import (
+    HIT_URL,
+    MIN_QUERY_LENGTH,
+    PER_KIND,
+    SearchService,
+)
 
 
 def _svc(**sources: Any) -> SearchService:
@@ -133,3 +138,21 @@ async def test_a_gremium_hit_needs_somewhere_to_go(perm: str) -> None:
     """
     svc = SearchService(session=None)  # type: ignore[arg-type]
     assert await svc._gremien("query", Principal(sub="u"), "de") == []
+
+
+def test_every_kind_has_a_url_that_names_the_record() -> None:
+    """A hit must land on the thing it names, not on the list it lives in.
+
+    Invoices, bookings and people used to link to `/invoices`, `/expenses` and
+    `/admin/users`: picking one of five people out of the palette opened the whole user
+    list, and the reader searched a second time. One table rather than a URL built at
+    each source, so a kind added later cannot quietly repeat that.
+    """
+    kinds = set(get_args(SearchKind))
+    assert set(HIT_URL) == kinds
+
+    for kind, template in HIT_URL.items():
+        assert "{id}" in template, kind
+        # Filled in, the URL has to differ from the plain page: a template that ignores
+        # its id would still pass the check above if the id sat in a comment.
+        assert template.format(id="X") != template.format(id="Y"), kind
