@@ -1,5 +1,9 @@
 <section class="flex flex-col gap-6">
-  <app-page-header [flush]="true" [title]="'admin.users.title' | t" [subtitle]="'admin.users.subtitle' | t" />
+  <app-page-header
+    [flush]="true"
+    [title]="'admin.users.title' | t"
+    [subtitle]="'admin.users.subtitle' | t"
+  />
 
   <form class="users__search" (submit)="$event.preventDefault(); search()" role="search">
     <label class="users__search-lbl" for="user-search">{{ 'admin.users.search' | t }}</label>
@@ -14,92 +18,134 @@
     <app-button type="submit" size="sm">{{ 'admin.users.searchAction' | t }}</app-button>
   </form>
 
-  <app-data-table appHScrollSync=".dt__scroll" [columns]="columns()" [rows]="principals()" [rowKey]="rowId" [isExpanded]="rowExpanded" [loading]="loading()" [loadingText]="'admin.users.loading' | t" [emptyText]="'admin.users.noResults' | t">
-      <ng-template appCell="name" let-p>
-        <span class="font-medium">{{ userLabel($any(p)) }}</span>
-        @if ($any(p).active === false) {
-          <app-badge variant="neutral">{{ 'admin.users.inactive' | t }}</app-badge>
+  <app-data-table
+    appHScrollSync=".dt__scroll"
+    [columns]="columns()"
+    [rows]="principals()"
+    [rowKey]="rowId"
+    [isExpanded]="rowExpanded"
+    [loading]="loading()"
+    [loadingText]="'admin.users.loading' | t"
+    [emptyText]="'admin.users.noResults' | t"
+  >
+    <ng-template appCell="name" let-p>
+      <span class="font-medium">{{ userLabel($any(p)) }}</span>
+      @if ($any(p).active === false) {
+        <app-badge variant="neutral">{{ 'admin.users.inactive' | t }}</app-badge>
+      }
+    </ng-template>
+    <ng-template appCell="email" let-p
+      ><span class="text-muted">{{ $any(p).email || '—' }}</span></ng-template
+    >
+    <ng-template appCell="roles" let-p>
+      <div class="users__roles">
+        @if (globalAssignments($any(p)).length === 0) {
+          <span class="text-muted">{{ 'admin.users.noRoles' | t }}</span>
         }
-      </ng-template>
-      <ng-template appCell="email" let-p><span class="text-muted">{{ $any(p).email || '—' }}</span></ng-template>
-      <ng-template appCell="roles" let-p>
-        <div class="users__roles">
-          @if (globalAssignments($any(p)).length === 0) {
-            <span class="text-muted">{{ 'admin.users.noRoles' | t }}</span>
-          }
-          @for (a of globalAssignments($any(p)); track a.id) {
-            <span class="users__tag">
-              <app-badge variant="primary">
-                <span class="users__tag-label">{{ roleLabel(a.roleId) | capitalize }}</span>
-                @if (canManageUsers()) {
-                  <button
-                    type="button"
-                    class="users__tag-x users__tag-edit"
-                    [attr.aria-label]="('admin.users.editAssignment' | t) + ': ' + (roleLabel(a.roleId) | capitalize)"
-                    (click)="openEdit(a)"
-                  ><app-icon name="edit" [size]="11" /></button>
-                }
-                @if (!isAdminRole(a.roleId)) {
-                  <button
-                    type="button"
-                    class="users__tag-x"
-                    [attr.aria-label]="('admin.users.revoke' | t) + ': ' + (roleLabel(a.roleId) | capitalize)"
-                    (click)="revoke(a)"
-                  >×</button>
-                }
-              </app-badge>
-              @if (a.validUntil) {
-                <span class="text-muted text-xs">→ {{ a.validUntil | slice: 0 : 10 }}</span>
+        @for (a of globalAssignments($any(p)); track a.id) {
+          <span class="users__tag">
+            <app-badge variant="primary">
+              <span class="users__tag-label">{{ roleLabel(a.roleId) | capitalize }}</span>
+              @if (canManageUsers()) {
+                <button
+                  type="button"
+                  class="users__tag-x users__tag-edit"
+                  [attr.aria-label]="
+                    ('admin.users.editAssignment' | t) + ': ' + (roleLabel(a.roleId) | capitalize)
+                  "
+                  (click)="openEdit(a)"
+                >
+                  <app-icon name="edit" [size]="11" />
+                </button>
               }
-            </span>
-          }
-        </div>
-      </ng-template>
-      <ng-template appCell="lastLogin" let-p>
-        <span class="text-muted">{{ $any(p).lastLogin ? ($any(p).lastLogin | slice: 0 : 10) : ('admin.users.never' | t) }}</span>
-      </ng-template>
-      <ng-template appCell="actions" let-p>
-        <span class="inline-flex gap-1 justify-end">
-          <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.users.addRole' | t" [attr.aria-expanded]="isExpanded($any(p).id)" (click)="toggleAssign($any(p).id)">
-            <app-icon name="add" />
-          </app-button>
-          <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="isSelf($any(p)) && $any(p).active !== false" [ariaLabel]="($any(p).active === false ? 'admin.users.activate' : 'admin.users.deactivate') | t" [attr.title]="isSelf($any(p)) && $any(p).active !== false ? ('admin.users.cannotDeactivateSelf' | t) : null" (click)="setActive($any(p), $any(p).active === false)">
-            <app-icon name="power" />
-          </app-button>
-        </span>
-      </ng-template>
+              @if (!isAdminRole(a.roleId)) {
+                <button
+                  type="button"
+                  class="users__tag-x"
+                  [attr.aria-label]="
+                    ('admin.users.revoke' | t) + ': ' + (roleLabel(a.roleId) | capitalize)
+                  "
+                  (click)="revoke(a)"
+                >
+                  ×
+                </button>
+              }
+            </app-badge>
+            @if (a.validUntil) {
+              <span class="text-muted text-xs">→ {{ a.validUntil | slice: 0 : 10 }}</span>
+            }
+          </span>
+        }
+      </div>
+    </ng-template>
+    <ng-template appCell="lastLogin" let-p>
+      <span class="text-muted">{{
+        $any(p).lastLogin ? ($any(p).lastLogin | slice: 0 : 10) : ('admin.users.never' | t)
+      }}</span>
+    </ng-template>
+    <ng-template appCell="actions" let-p>
+      <span class="inline-flex gap-1 justify-end">
+        <app-button
+          variant="ghost"
+          size="sm"
+          [iconOnly]="true"
+          [ariaLabel]="'admin.users.addRole' | t"
+          [attr.aria-expanded]="isExpanded($any(p).id)"
+          (click)="toggleAssign($any(p).id)"
+        >
+          <app-icon name="add" />
+        </app-button>
+        <app-button
+          variant="ghost"
+          size="sm"
+          [iconOnly]="true"
+          [disabled]="isSelf($any(p)) && $any(p).active !== false"
+          [ariaLabel]="
+            ($any(p).active === false ? 'admin.users.activate' : 'admin.users.deactivate') | t
+          "
+          [attr.title]="
+            isSelf($any(p)) && $any(p).active !== false
+              ? ('admin.users.cannotDeactivateSelf' | t)
+              : null
+          "
+          (click)="setActive($any(p), $any(p).active === false)"
+        >
+          <app-icon name="power" />
+        </app-button>
+      </span>
+    </ng-template>
 
-      <ng-template appRowDetail let-p>
-        <fieldset class="users__assign">
-          <app-select
-            class="flex flex-col gap-1 text-sm"
-            [label]="'admin.users.role' | t"
-            [placeholder]="'admin.users.selectRole' | t"
-            [options]="roleOptions()"
-            [ngModel]="draftFor($any(p).id).roleId"
-            (ngModelChange)="patchDraft($any(p).id, { roleId: $event })"
-            [name]="'role-' + $any(p).id"
-          />
-          <app-datepicker
-            class="flex flex-col gap-1 text-sm"
-            [label]="'admin.users.validFrom' | t"
-            [ngModel]="draftFor($any(p).id).validFrom"
-            (ngModelChange)="patchDraft($any(p).id, { validFrom: $event })"
-            [name]="'vf-' + $any(p).id"
-          />
-          <app-datepicker
-            class="flex flex-col gap-1 text-sm"
-            [label]="'admin.users.validUntil' | t"
-            [ngModel]="draftFor($any(p).id).validUntil"
-            (ngModelChange)="patchDraft($any(p).id, { validUntil: $event })"
-            [name]="'vu-' + $any(p).id"
-          />
-          <app-button size="sm" [disabled]="!draftFor($any(p).id).roleId" (click)="assign($any(p))">
-            {{ 'admin.users.assign' | t }}
-          </app-button>
-        </fieldset>
-      </ng-template>
-    </app-data-table>
+    <ng-template appRowDetail let-p>
+      <fieldset class="users__assign">
+        <app-select
+          class="flex flex-col gap-1 text-sm"
+          [label]="'admin.users.role' | t"
+          [placeholder]="'admin.users.selectRole' | t"
+          [options]="roleOptions()"
+          [ngModel]="draftFor($any(p).id).roleId"
+          (ngModelChange)="patchDraft($any(p).id, { roleId: $event })"
+          [name]="'role-' + $any(p).id"
+        />
+        <app-datepicker
+          class="flex flex-col gap-1 text-sm"
+          [label]="'admin.users.validFrom' | t"
+          [ngModel]="draftFor($any(p).id).validFrom"
+          (ngModelChange)="patchDraft($any(p).id, { validFrom: $event })"
+          [name]="'vf-' + $any(p).id"
+        />
+        <app-datepicker
+          class="flex flex-col gap-1 text-sm"
+          [label]="'admin.users.validUntil' | t"
+          [ngModel]="draftFor($any(p).id).validUntil"
+          (ngModelChange)="patchDraft($any(p).id, { validUntil: $event })"
+          [name]="'vu-' + $any(p).id"
+        />
+        <app-button size="sm" [disabled]="!draftFor($any(p).id).roleId" (click)="assign($any(p))">
+          {{ 'admin.users.assign' | t }}
+        </app-button>
+      </fieldset>
+    </ng-template>
+  </app-data-table>
 </section>
 
 <!-- Change an existing assignment: the role and its validity window. The route
@@ -135,8 +181,15 @@
     <p class="text-muted text-sm m-0">{{ 'admin.users.editHint' | t }}</p>
   </form>
   <div dialog-footer class="flex justify-end gap-3">
-    <app-button size="sm" variant="ghost" (click)="closeEdit()">{{ 'action.cancel' | t }}</app-button>
-    <app-button size="sm" [disabled]="!editDraft().roleId" [loading]="savingEdit()" (click)="saveEdit()">
+    <app-button size="sm" variant="ghost" (click)="closeEdit()">{{
+      'action.cancel' | t
+    }}</app-button>
+    <app-button
+      size="sm"
+      [disabled]="!editDraft().roleId"
+      [loading]="savingEdit()"
+      (click)="saveEdit()"
+    >
       {{ 'action.save' | t }}
     </app-button>
   </div>

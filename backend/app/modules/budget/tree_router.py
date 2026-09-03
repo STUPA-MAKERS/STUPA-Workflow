@@ -603,6 +603,7 @@ _INVOICE_READ = Depends(require_any_permission("budget.view", "budget.structure"
 )
 async def list_invoices(
     service: ServiceDep,
+    invoice_id: Annotated[UUID | None, Query(alias="id")] = None,
     q: Annotated[str | None, Query()] = None,
     status: Annotated[InvoiceStatus | None, Query()] = None,
     gross_min: Annotated[Decimal | None, Query(alias="grossMin", ge=0)] = None,
@@ -616,12 +617,14 @@ async def list_invoices(
 ) -> Page[InvoiceOut]:
     """List invoices with fuzzy search, filters and offset paging.
 
+    ``id`` selects the exact invoice for the deep link.
     The newest issue date comes first. ``q`` searches number, supplier and note.
     ``status`` is ``open`` or ``paid``. ``grossMin`` and ``grossMax`` bound the
     gross amount. ``issueFrom``/``issueTo`` and ``dueFrom``/``dueTo`` bound the
     dates.
     """
     return await service.list_invoices_paged(
+        invoice_id=invoice_id,
         q=q,
         status=status,
         gross_min=gross_min,

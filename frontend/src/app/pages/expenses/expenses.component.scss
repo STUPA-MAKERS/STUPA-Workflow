@@ -1,5 +1,8 @@
-:host { display: block; }
-.exp__search, .exp__input {
+:host {
+  display: block;
+}
+.exp__search,
+.exp__input {
   padding: var(--space-2) var(--space-3);
   border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-md);
@@ -12,7 +15,10 @@ input.exp__input {
   height: var(--control-height);
   box-sizing: border-box;
 }
-.exp__search { min-width: 14rem; height: 2.25rem; }
+.exp__search {
+  min-width: 14rem;
+  height: 2.25rem;
+}
 .exp__layout {
   display: grid;
   grid-template-columns:
@@ -42,30 +48,65 @@ input.exp__input {
   margin-bottom: var(--space-3);
 }
 
-.exp__main { min-width: 0; }
+.exp__main {
+  min-width: 0;
+}
 @media (max-width: 60rem) {
-  .exp__layout { grid-template-columns: minmax(11rem, 14rem) minmax(0, 1fr); }
+  .exp__layout {
+    grid-template-columns: minmax(11rem, 14rem) minmax(0, 1fr);
+  }
 }
 @media (max-width: 40rem) {
-  .exp__layout { grid-template-columns: 1fr; }
-  .exp__tree { position: static; max-height: none; }
+  .exp__layout {
+    grid-template-columns: 1fr;
+  }
+  .exp__tree {
+    position: static;
+    max-height: none;
+  }
 }
-.exp__status { color: var(--color-text-muted); padding: var(--space-4) 0; }
-.exp__appLink { color: var(--color-primary); text-decoration: none; }
-.exp__appLink:hover { text-decoration: underline; }
-.exp__amount { font-variant-numeric: tabular-nums; font-weight: var(--fw-semibold); white-space: nowrap; }
-.exp__amount--income { color: var(--color-success, #2e7d32); }
-.exp__actions { display: inline-flex; gap: var(--space-1); justify-content: flex-end; }
+.exp__status {
+  color: var(--color-text-muted);
+  padding: var(--space-4) 0;
+}
+.exp__appLink {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+.exp__appLink:hover {
+  text-decoration: underline;
+}
+.exp__amount {
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--fw-semibold);
+  white-space: nowrap;
+}
+.exp__amount--income {
+  color: var(--color-success, #2e7d32);
+}
+.exp__actions {
+  display: inline-flex;
+  gap: var(--space-1);
+  justify-content: flex-end;
+}
 .exp__invDetails {
   display: grid;
   grid-template-columns: max-content 1fr;
   gap: var(--space-2) var(--space-4);
   margin: 0 0 var(--space-4);
 }
-.exp__invDetails > div { display: contents; }
-.exp__invDetails dt { color: var(--color-text-muted); }
-.exp__invDetails dd { margin: 0; }
-.exp__sentinel { height: 1px; }
+.exp__invDetails > div {
+  display: contents;
+}
+.exp__invDetails dt {
+  color: var(--color-text-muted);
+}
+.exp__invDetails dd {
+  margin: 0;
+}
+.exp__sentinel {
+  height: 1px;
+}
 /* What is left here is what only this page knows: how one cell should read. The box,
    the header, the hover, the sort control, the skeleton, the sticky column and the
    mobile cards all come from `app-data-table` now. */
@@ -153,9 +194,21 @@ input.exp__input {
   gap: var(--space-1);
   justify-content: flex-end;
 }
-.exp__grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); align-items: end; }
-.exp__textarea { resize: vertical; min-height: 4.5rem; }
-@media (max-width: 30rem) { .exp__grid2 { grid-template-columns: 1fr; } }
+.exp__grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+  align-items: end;
+}
+.exp__textarea {
+  resize: vertical;
+  min-height: 4.5rem;
+}
+@media (max-width: 30rem) {
+  .exp__grid2 {
+    grid-template-columns: 1fr;
+  }
+}
 /* Application typeahead, like the user search. */
 .exp__suggest {
   list-style: none;
@@ -184,10 +237,17 @@ input.exp__input {
   cursor: pointer;
   font: inherit;
 }
-.exp__suggestItem:hover { background: var(--color-primary-subtle); }
+.exp__suggestItem:hover {
+  background: var(--color-primary-subtle);
+}
 @media (max-width: 720px) {
-  .exp__layout { grid-template-columns: 1fr; }
-  .exp__tree { position: static; max-height: none; }
+  .exp__layout {
+    grid-template-columns: 1fr;
+  }
+  .exp__tree {
+    position: static;
+    max-height: none;
+  }
 }
 /* Mobile (≤768px): a collapsible toggle hides the tree, and the layout drops to one
    column. The toggle starts closed. Desktop keeps the tree and hides the toggle. */
@@ -195,7 +255,9 @@ input.exp__input {
   display: none;
 }
 @media (max-width: 768px) {
-  .exp__layout { grid-template-columns: 1fr; }
+  .exp__layout {
+    grid-template-columns: 1fr;
+  }
   .exp__tree {
     position: static;
     max-height: none;
@@ -228,7 +290,10 @@ input.exp__input {
 }
 /* Mobile (≤768px): full-width search, table rows as cards (pure CSS). */
 @media (max-width: 768px) {
-  .exp__search { flex: 1 1 100%; min-width: 0; }
+  .exp__search {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
   /* Card layout: the description sits on top in bold at full width. The kind badge and
      the amount follow. A muted meta row closes the card. */
   .exp__cellDesc {
@@ -238,7 +303,9 @@ input.exp__input {
     order: -3;
     font-weight: var(--fw-medium);
   }
-  .exp__cellKind { order: -2; }
+  .exp__cellKind {
+    order: -2;
+  }
   /* The amount stays prominent and right-aligned on the badge row. */
   .exp__amount {
     order: -1;
@@ -258,7 +325,10 @@ input.exp__input {
     color: var(--color-text-muted);
   }
   /* The actions get their own row to give large tap targets. */
-  .exp__actions { margin-left: auto; order: 2; }
+  .exp__actions {
+    margin-left: auto;
+    order: 2;
+  }
 }
 
 /* Sub-bookings are `childrenOf` rows of the shared table now, which tints and indents

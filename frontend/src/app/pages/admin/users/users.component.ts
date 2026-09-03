@@ -1,6 +1,8 @@
 import { SlicePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -22,12 +24,7 @@ import {
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import { HScrollSyncDirective } from '@shared/h-scroll-sync.directive';
-import type {
-  AdminPrincipal,
-  Role,
-  RoleAssignment,
-  RoleAssignmentPatch,
-} from '../admin.models';
+import type { AdminPrincipal, Role, RoleAssignment, RoleAssignmentPatch } from '../admin.models';
 
 /** Local form state for assigning a role per user. */
 interface AssignDraft {
@@ -54,7 +51,8 @@ function emptyDraft(): AssignDraft {
   selector: 'app-admin-users',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HScrollSyncDirective, 
+  imports: [
+    HScrollSyncDirective,
     FormsModule,
     SlicePipe,
     TranslatePipe,
@@ -80,6 +78,7 @@ export class UsersComponent {
   private readonly i18n = inject(I18nService);
   private readonly capitalize = inject(CapitalizePipe);
   private readonly auth = inject(AuthService);
+  private readonly route = inject(ActivatedRoute);
 
   /** OIDC `sub` of the logged-in user. The view uses it to block self-deactivation. */
   protected readonly mySub = computed(() => this.auth.principal()?.sub ?? null);
@@ -142,10 +141,24 @@ export class UsersComponent {
   }
   protected readonly rowId = (p: unknown): string => (p as AdminPrincipal).id;
   /** Detail row with the assign form for an expanded principal. */
-  protected readonly rowExpanded = (p: unknown): boolean => this.isExpanded((p as AdminPrincipal).id);
+  protected readonly rowExpanded = (p: unknown): boolean =>
+    this.isExpanded((p as AdminPrincipal).id);
 
   constructor() {
     this.api.listRoles().subscribe((r) => this.roles.set(r));
+    // `/admin/users?q=…` is where a global-search hit on a person lands. Without it the
+    // hit opened the unfiltered list and the reader searched the same name twice.
+    //
+    // The subscription and not one read of the snapshot: the palette can send us here
+    // while we are already here, and a hit on another person changes only the query
+    // string. The router keeps this component, so a snapshot read would never run again.
+    // The first emission arrives before the initial search, so there is one request.
+    this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((qp) => {
+      const q = qp.get('q') ?? '';
+      if (q === this.query()) return;
+      this.query.set(q);
+      this.search();
+    });
     this.search();
   }
 
@@ -298,8 +311,7 @@ export class UsersComponent {
         this.savingEdit.set(false);
         // 403 = the self-lockout guard. An admin must not change their own
         // admin assignment. Name that reason instead of a generic failure.
-        const key =
-          err.status === 403 ? 'admin.users.editSelfBlocked' : 'admin.users.editFailed';
+        const key = err.status === 403 ? 'admin.users.editSelfBlocked' : 'admin.users.editFailed';
         this.toast.error(this.i18n.translate(key));
       },
     });

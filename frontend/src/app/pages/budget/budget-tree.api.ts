@@ -267,6 +267,8 @@ export interface InvoiceOption {
 
 /** Filter and paging of the invoice list. The server does the fuzzy match and the filter. */
 export interface InvoiceQuery {
+  /** The exact invoice, for a deep link such as a global-search hit. */
+  id?: string;
   q?: string;
   status?: InvoiceStatus;
   grossMin?: number;
@@ -469,10 +471,7 @@ export class BudgetTreeApi {
   /** Correct the year or the active flag. Needs P(`budget.structure`). A year that
    *  already exists in the same top budget answers 422. */
   updateFiscalYear(topId: Uuid, fyId: Uuid, body: FiscalYearUpdate): Observable<FiscalYear> {
-    return this.http.patch<FiscalYear>(
-      `${this.base}/budgets/${topId}/fiscal-years/${fyId}`,
-      body,
-    );
+    return this.http.patch<FiscalYear>(`${this.base}/budgets/${topId}/fiscal-years/${fyId}`, body);
   }
 
   /** Delete a fiscal year. Needs P(`budget.structure`). The route answers 409 while
@@ -640,7 +639,9 @@ export class BudgetTreeApi {
   }
 
   /** Budget tree as ``.xlsx`` (P(``budget.export``)), filtered like the dashboard. */
-  exportXlsx(opts: { node?: string; fiscalYear?: string; gremium?: string } = {}): Observable<Blob> {
+  exportXlsx(
+    opts: { node?: string; fiscalYear?: string; gremium?: string } = {},
+  ): Observable<Blob> {
     const params: Record<string, string> = {};
     if (opts.node) params['node'] = opts.node;
     if (opts.fiscalYear) params['fiscalYear'] = opts.fiscalYear;
@@ -657,10 +658,14 @@ export class BudgetTreeApi {
     budgetId: Uuid | null,
     fiscalYearId?: Uuid | null,
   ): Observable<{ applicationId: Uuid; budgetId: Uuid | null; fiscalYearId: Uuid | null }> {
-    return this.http.post<{ applicationId: Uuid; budgetId: Uuid | null; fiscalYearId: Uuid | null }>(
-      `${this.base}/applications/${applicationId}/assign-budget`,
-      { budgetId, fiscalYearId: fiscalYearId ?? null },
-    );
+    return this.http.post<{
+      applicationId: Uuid;
+      budgetId: Uuid | null;
+      fiscalYearId: Uuid | null;
+    }>(`${this.base}/applications/${applicationId}/assign-budget`, {
+      budgetId,
+      fiscalYearId: fiscalYearId ?? null,
+    });
   }
 }
 
@@ -670,9 +675,7 @@ import { simplifyPathKey } from '@shared/budget-path';
 export { simplifyPathKey };
 
 /** Tree (recursive) -> flat option list (pre-order, "pathKey - name", simplified). */
-export function flattenBudgetOptions(
-  nodes: BudgetTreeNode[],
-): { value: Uuid; label: string }[] {
+export function flattenBudgetOptions(nodes: BudgetTreeNode[]): { value: Uuid; label: string }[] {
   const out: { value: Uuid; label: string }[] = [];
   const walk = (ns: BudgetTreeNode[]): void => {
     for (const n of ns) {

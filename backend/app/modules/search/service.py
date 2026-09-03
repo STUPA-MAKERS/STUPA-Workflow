@@ -17,8 +17,10 @@ shows a stack trace.
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from decimal import Decimal
 from typing import TYPE_CHECKING
+from urllib.parse import quote
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,7 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.admin.models import Gremium
 from app.modules.applications.access import READ_ALL_PERMISSION, READ_PERMISSION
 from app.modules.budget.tree_models import Budget
-from app.modules.search.schemas import SearchHit, SearchResults
+from app.modules.search.schemas import SearchHit, SearchKind, SearchResults
 from app.search import dialect_of, trigram_rank
 from app.shared.i18n import resolve_i18n
 
@@ -41,6 +43,26 @@ PER_KIND = 5
 
 #: Below this the query matches too much to be useful and every source scans.
 MIN_QUERY_LENGTH = 2
+
+#: Where a hit of each kind sends the reader.
+#:
+#: Every template names the record: a path segment where the record has a page of its
+#: own, and a filter the list applies where it does not. Bare list URLs used to sit here
+#: for invoices, bookings and people, so picking one of five people out of the palette
+#: opened the unfiltered user list and the reader searched a second time.
+#:
+#: One table rather than seven f-strings scattered through the sources, so a new kind
+#: cannot ship a URL that forgets which record it is about.
+HIT_URL: Mapping[SearchKind, str] = {
+    "application": "/applications/{id}",
+    "meeting": "/meetings/{id}",
+    "invoice": "/invoices?id={id}",
+    "expense": "/expenses?id={id}",
+    "budget": "/budget?ks={id}",
+    "gremium": "/admin/gremien/{id}/members",
+    # `sub` and not the row id: it is what the principal search matches on.
+    "principal": "/admin/users?q={id}",
+}
 
 
 class SearchService:
@@ -114,11 +136,9 @@ class SearchService:
                 id=str(item.id),
                 title=item.title or str(item.id),
                 subtitle=(
-                    resolve_i18n(item.state.label, lang, "de")
-                    if item.state is not None
-                    else None
+                    resolve_i18n(item.state.label, lang, "de") if item.state is not None else None
                 ),
-                url=f"/applications/{item.id}",
+                url=HIT_URL["application"].format(id=item.id),
             )
             for item in page.items
         ]
@@ -136,7 +156,7 @@ class SearchService:
                 id=str(m.id),
                 title=m.title,
                 subtitle=m.gremium_name,
-                url=f"/meetings/{m.id}",
+                url=HIT_URL["meeting"].format(id=m.id),
             )
             for m in page.items
         ]
@@ -156,7 +176,7 @@ class SearchService:
                 id=str(inv.id),
                 title=inv.number or inv.supplier or str(inv.id),
                 subtitle=_money(inv.gross_amount, inv.supplier),
-                url="/invoices",
+                url=HIT_URL["invoice"].format(id=inv.id),
             )
             for inv in page.items
         ]
@@ -176,7 +196,7 @@ class SearchService:
                 id=str(e.id),
                 title=e.description or str(e.id),
                 subtitle=_money(e.amount, e.correspondent),
-                url="/expenses",
+                url=HIT_URL["expense"].format(id=e.id),
             )
             for e in page.items
         ]
@@ -199,16 +219,14 @@ class SearchService:
             if not member:
                 return []
             stmt = stmt.where(Budget.view_gremium_id.in_(member))
-        rows = (
-            await self.session.scalars(stmt.order_by(rank.desc()).limit(PER_KIND + 1))
-        ).all()
+        rows = (await self.session.scalars(stmt.order_by(rank.desc()).limit(PER_KIND + 1))).all()
         return [
             SearchHit(
                 kind="budget",
                 id=str(b.id),
                 title=b.name,
                 subtitle=b.path_key,
-                url=f"/budget?ks={b.id}",
+                url=HIT_URL["budget"].format(id=b.id),
             )
             for b in rows
         ]
@@ -235,7 +253,7 @@ class SearchService:
                 id=str(g.id),
                 title=g.name,
                 subtitle=g.slug,
-                url=f"/admin/gremien/{g.id}/members",
+                url=HIT_URL["gremium"].format(id=g.id),
             )
             for g in rows
         ]
@@ -255,7 +273,7 @@ class SearchService:
                 id=str(p.id),
                 title=p.display_name or p.email or p.sub,
                 subtitle=p.email if p.display_name else None,
-                url="/admin/users",
+                url=HIT_URL["principal"].format(id=quote(p.sub)),
             )
             for p in rows
         ]
@@ -263,9 +281,7 @@ class SearchService:
 
 def _has_budget_read(principal: Principal) -> bool:
     """The permission trio that `GET /api/invoices` and `/api/expenses` accept."""
-    return any(
-        principal.has(p) for p in ("budget.view", "budget.structure", "budget.book")
-    )
+    return any(principal.has(p) for p in ("budget.view", "budget.structure", "budget.book"))
 
 
 def _money(amount: Decimal | None, other: str | None) -> str | None:

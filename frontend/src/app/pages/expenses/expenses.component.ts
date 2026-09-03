@@ -11,7 +11,8 @@ import {
 } from '@angular/core';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, type ParamMap, Router, RouterLink } from '@angular/router';
 import { from } from 'rxjs';
 import { concatMap } from 'rxjs/operators';
 import { AuthService } from '@core/auth/auth.service';
@@ -121,8 +122,6 @@ export class ExpensesComponent implements OnDestroy {
 
   readonly canManage = computed(() => this.auth.can('budget.book'));
 
-
-
   readonly canExport = computed(() => this.auth.can('budget.export'));
 
   readonly budgetTree = this.list.budgetTree;
@@ -228,8 +227,7 @@ export class ExpensesComponent implements OnDestroy {
     return cols;
   });
 
-  readonly transferRowId = (row: unknown): unknown =>
-    (row as { transferId: string }).transferId;
+  readonly transferRowId = (row: unknown): unknown => (row as { transferId: string }).transferId;
 
   readonly transferColumns = computed<ColumnDef[]>(() => {
     const cols: ColumnDef[] = [
@@ -376,8 +374,16 @@ export class ExpensesComponent implements OnDestroy {
     // shareable, survives a browser reload, and is the target of cross-links from
     // Budget. The state module sends no request on its own. If the unfiltered
     // reload resolves last, it can overwrite the filtered one. See #expenses-ux2.
-    this.applyQueryParams();
+    this.applyQueryParams(this.route.snapshot.queryParamMap);
     this.list.reload();
+
+    // The palette can send us here while we are already here: a hit on another booking
+    // changes only the query string, and the router keeps this component alive. A
+    // snapshot read alone would never run again, and the write-back effect below would
+    // put the old filters straight back into the URL.
+    this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((qp) => {
+      if (this.applyQueryParams(qp)) this.list.reload();
+    });
 
     effect(() => {
       const queryParams = {
@@ -421,17 +427,34 @@ export class ExpensesComponent implements OnDestroy {
    *  URL carried at least one of them. `id` is a deep link to one exact booking.
    *  It has no dedicated control, but it counts as an active filter and resets
    *  with the others. */
-  private applyQueryParams(): boolean {
-    const qp = this.route.snapshot.queryParamMap;
-    const id = qp.get('id');
-    const budget = qp.get('budget');
-    const kind = qp.get('kind');
-    const q = qp.get('q');
-    if (id) this.expenseId.set(id);
-    if (budget) this.budgetId.set(budget);
-    if (kind === 'expense' || kind === 'income') this.kind.set(kind);
-    if (q) this.q.set(q);
-    return !!(id || budget || kind || q);
+  private applyQueryParams(qp: ParamMap): boolean {
+    const raw = qp.get('kind');
+    const kind: '' | ExpenseKind = raw === 'expense' || raw === 'income' ? raw : '';
+    const next = {
+      expenseId: qp.get('id') ?? '',
+      budgetId: qp.get('budget') ?? '',
+      q: qp.get('q') ?? '',
+    };
+    let changed = false;
+    // Absence clears. Every one of these four is written back into the URL by the effect
+    // in the constructor, so a parameter that is gone was taken away, not merely omitted.
+    if (next.expenseId !== this.expenseId()) {
+      this.expenseId.set(next.expenseId);
+      changed = true;
+    }
+    if (next.budgetId !== this.budgetId()) {
+      this.budgetId.set(next.budgetId);
+      changed = true;
+    }
+    if (kind !== this.kind()) {
+      this.kind.set(kind);
+      changed = true;
+    }
+    if (next.q !== this.q()) {
+      this.q.set(next.q);
+      changed = true;
+    }
+    return changed;
   }
 
   ngOnDestroy(): void {

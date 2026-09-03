@@ -438,6 +438,17 @@ async def test_list_invoices_search_filter_pagination(session: AsyncSession) -> 
     ids = {i.id for i in first.items} | {i.id for i in second.items}
     assert len(ids) == 3
 
+    # The exact invoice for a deep link, such as a global-search hit. Before this filter
+    # a hit on one invoice opened the whole list and the reader had to find it again.
+    one = await svc.list_invoices_paged(invoice_id=first.items[0].id)
+    assert one.total == 1
+    assert one.items[0].id == first.items[0].id
+
+    # It combines with the other filters rather than overriding them, so a deep link
+    # into a filtered list cannot silently widen it.
+    conflict = await svc.list_invoices_paged(invoice_id=first.items[0].id, q="zzzzzznope")
+    assert conflict.total == 0
+
     # No hit gives an empty page. The count query and the row query stay identical.
     empty = await svc.list_invoices_paged(q="zzzzzznope")
     assert empty.total == 0 and empty.items == []

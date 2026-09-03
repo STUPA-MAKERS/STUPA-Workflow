@@ -1,5 +1,4 @@
-import { computed, inject, signal,
-  type WritableSignal } from '@angular/core';
+import { computed, inject, signal, type WritableSignal } from '@angular/core';
 import type { SelectOption } from '@stupa-makers/ui-kit';
 import { downloadBlob } from '@shared/download.util';
 import {
@@ -116,17 +115,16 @@ export class ExpensesListState {
    * reset button belongs to the panel. Note that /applications clears both, because there
    * the search sits inside its panel.
    */
-  readonly filterSignals: readonly { signal: WritableSignal<string>; clearedByReset: boolean }[] =
-    [
-      { signal: this.kind as WritableSignal<string>, clearedByReset: true },
-      { signal: this.expenseId, clearedByReset: true },
-      { signal: this.amountMin, clearedByReset: true },
-      { signal: this.amountMax, clearedByReset: true },
-      { signal: this.createdFrom, clearedByReset: true },
-      { signal: this.createdTo, clearedByReset: true },
-      { signal: this.q, clearedByReset: false },
-      { signal: this.budgetId, clearedByReset: false },
-    ];
+  readonly filterSignals: readonly { signal: WritableSignal<string>; clearedByReset: boolean }[] = [
+    { signal: this.kind as WritableSignal<string>, clearedByReset: true },
+    { signal: this.expenseId, clearedByReset: true },
+    { signal: this.amountMin, clearedByReset: true },
+    { signal: this.amountMax, clearedByReset: true },
+    { signal: this.createdFrom, clearedByReset: true },
+    { signal: this.createdTo, clearedByReset: true },
+    { signal: this.q, clearedByReset: false },
+    { signal: this.budgetId, clearedByReset: false },
+  ];
 
   resetFilters(): void {
     for (const f of this.filterSignals) if (f.clearedByReset) f.signal.set('');
@@ -194,18 +192,16 @@ export class ExpensesListState {
     const epoch = this.fetchEpoch;
     const windowLimit = Math.max(this.PAGE, Math.ceil(this.items().length / this.PAGE) * this.PAGE);
     this.refreshing.set(true);
-    this.api
-      .listExpenses({ ...this.filterParams(), limit: windowLimit, offset: 0 })
-      .subscribe({
-        next: (page) => {
-          this.refreshing.set(false);
-          if (epoch !== this.fetchEpoch) return; // a reload ran meanwhile
-          this.total.set(page.total);
-          this.items.set(page.items);
-          this.nextOffset = page.offset + page.items.length;
-        },
-        error: () => this.refreshing.set(false),
-      });
+    this.api.listExpenses({ ...this.filterParams(), limit: windowLimit, offset: 0 }).subscribe({
+      next: (page) => {
+        this.refreshing.set(false);
+        if (epoch !== this.fetchEpoch) return; // a reload ran meanwhile
+        this.total.set(page.total);
+        this.items.set(page.items);
+        this.nextOffset = page.offset + page.items.length;
+      },
+      error: () => this.refreshing.set(false),
+    });
   }
 
   private fetch(initial: boolean): void {

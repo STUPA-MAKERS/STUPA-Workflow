@@ -8,8 +8,11 @@ import {
   inject,
   signal,
   viewChild,
+  type WritableSignal,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute, type ParamMap } from '@angular/router';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -38,6 +41,7 @@ import {
   BudgetTreeApi,
   type Invoice,
   type InvoiceParseResult,
+  type InvoiceQuery,
   type InvoiceStatus,
 } from '../budget/budget-tree.api';
 
@@ -78,6 +82,7 @@ import {
 })
 export class InvoicesComponent implements OnDestroy {
   private readonly api = inject(BudgetTreeApi);
+  private readonly route = inject(ActivatedRoute);
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
@@ -138,19 +143,52 @@ export class InvoicesComponent implements OnDestroy {
   readonly issueTo = signal('');
   readonly dueFrom = signal('');
   readonly dueTo = signal('');
+  /** Exact-invoice filter for a deep link, such as a hit in the global search. Only the
+   *  URL sets it and no control shows it. It still counts as an active filter, so the
+   *  reset button clears it and the badge says the list is narrowed. */
+  readonly invoiceId = signal('');
+
+  /**
+   * Every filter, declared once.
+   *
+   * The count, the reset and the request each had their own hand-kept list. A filter
+   * added to one and forgotten in another is invisible: the control moves, the badge
+   * counts, and the list does not change. `filterSignals` is what the spec walks.
+   *
+   * `q` is not cleared by the reset. It is the search box in the page header, outside
+   * the filter panel the reset button belongs to. This mirrors /expenses.
+   */
+  readonly filterSignals: readonly {
+    readonly signal: WritableSignal<string>;
+    readonly key: keyof InvoiceQuery;
+    readonly clearedByReset: boolean;
+    readonly numeric?: boolean;
+  }[] = [
+    { signal: this.statusFilter as WritableSignal<string>, key: 'status', clearedByReset: true },
+    { signal: this.invoiceId, key: 'id', clearedByReset: true },
+    { signal: this.grossMin, key: 'grossMin', clearedByReset: true, numeric: true },
+    { signal: this.grossMax, key: 'grossMax', clearedByReset: true, numeric: true },
+    { signal: this.issueFrom, key: 'issueFrom', clearedByReset: true },
+    { signal: this.issueTo, key: 'issueTo', clearedByReset: true },
+    { signal: this.dueFrom, key: 'dueFrom', clearedByReset: true },
+    { signal: this.dueTo, key: 'dueTo', clearedByReset: true },
+    { signal: this.q, key: 'q', clearedByReset: false },
+  ];
+
+  /** Active filters as the query part of a list request. */
+  filterParams(): InvoiceQuery {
+    const params: InvoiceQuery = {};
+    for (const f of this.filterSignals) {
+      const value = f.signal().trim();
+      if (value === '') continue;
+      Object.assign(params, { [f.key]: f.numeric ? Number(value) : value });
+    }
+    return params;
+  }
 
   /** Number of active filters for the filter-button indicator. The search stays out. */
   readonly activeFilterCount = computed(
-    () =>
-      [
-        this.statusFilter(),
-        this.grossMin().trim(),
-        this.grossMax().trim(),
-        this.issueFrom(),
-        this.issueTo(),
-        this.dueFrom(),
-        this.dueTo(),
-      ].filter((v) => String(v ?? '').trim() !== '').length,
+    () => this.filterSignals.filter((f) => f.clearedByReset && f.signal().trim() !== '').length,
   );
 
   readonly sentinel = viewChild<ElementRef<HTMLElement>>('sentinel');
@@ -183,13 +221,7 @@ export class InvoicesComponent implements OnDestroy {
   }
 
   resetFilters(): void {
-    this.statusFilter.set('');
-    this.grossMin.set('');
-    this.grossMax.set('');
-    this.issueFrom.set('');
-    this.issueTo.set('');
-    this.dueFrom.set('');
-    this.dueTo.set('');
+    for (const f of this.filterSignals) if (f.clearedByReset) f.signal.set('');
     this.reload();
   }
 
@@ -245,7 +277,15 @@ export class InvoicesComponent implements OnDestroy {
   readonly confirmDelete = signal<Invoice | null>(null);
 
   constructor() {
+    this.adoptUrlFilters(this.route.snapshot.queryParamMap);
     this.reload();
+
+    // The palette can send us here while we are already here: a hit on another invoice
+    // changes only the query string, and the router keeps this component alive. Without
+    // this the URL named one invoice and the list went on showing the previous one.
+    this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((qp) => {
+      if (this.adoptUrlFilters(qp)) this.reload();
+    });
 
     // Infinite scroll. When the sentinel at the list end appears, load the next page.
     effect((onCleanup) => {
@@ -260,6 +300,24 @@ export class InvoicesComponent implements OnDestroy {
       obs.observe(el);
       onCleanup(() => obs.disconnect());
     });
+  }
+
+  /**
+   * Adopt the filters the URL carries. Returns whether any of them changed.
+   *
+   * `/invoices?id=…` is where a global-search hit lands. This runs before the first
+   * request rather than after it: reading it later would fire an unfiltered request
+   * first, and that one can resolve last and overwrite the filtered list.
+   *
+   * `id` is the only one read. This page does not write its panel filters into the URL,
+   * so a parameter that is absent says nothing about what the reader has set, and
+   * clearing on absence would wipe it.
+   */
+  private adoptUrlFilters(qp: ParamMap): boolean {
+    const id = qp.get('id');
+    if (!id || id === this.invoiceId()) return false;
+    this.invoiceId.set(id);
+    return true;
   }
 
   money(amount: string): string {
@@ -290,14 +348,7 @@ export class InvoicesComponent implements OnDestroy {
   private fetch(initial: boolean): void {
     this.api
       .listInvoicesPaged({
-        q: this.q().trim() || undefined,
-        status: this.statusFilter() || undefined,
-        grossMin: this.grossMin().trim() ? Number(this.grossMin()) : undefined,
-        grossMax: this.grossMax().trim() ? Number(this.grossMax()) : undefined,
-        issueFrom: this.issueFrom() || undefined,
-        issueTo: this.issueTo() || undefined,
-        dueFrom: this.dueFrom() || undefined,
-        dueTo: this.dueTo() || undefined,
+        ...this.filterParams(),
         limit: this.PAGE,
         offset: this.nextOffset,
       })
