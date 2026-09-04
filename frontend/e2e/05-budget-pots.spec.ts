@@ -5,14 +5,19 @@ import { readArtifacts } from './helpers';
 test.use({ storageState: ADMIN_STATE });
 
 /**
- * Budget pots view (testing.md §3, the budget pots view from the task brief). The
- * admin opens `/budget/pots` and sees the seeded pot in the real list. The data comes
- * from the database over `GET /api/budget/pots`.
+ * Budget view (testing.md §3): the admin opens the cost-centre tree and sees the
+ * seeded pot in the real list. The data comes from the database over the budget API.
+ *
+ * Three things moved under this test since it was written, which is why it asserts
+ * differently than it reads in the history: the page lives at `/admin/budget-pots`
+ * rather than `/budget/pots`, its heading is "Budgets & Kostenstellen", and the
+ * hand-rolled `table.pots__table` is gone — the page renders through the shared
+ * `app-data-table`, whose table carries `dt__table`.
  */
-test('@gating Admin Budget-Töpfe-Sicht zeigt geseedeten Topf', async ({ page }) => {
+test('@gating Admin Budget-Sicht zeigt geseedeten Topf', async ({ page }) => {
   readArtifacts();
-  await page.goto('/budget/pots');
-  await expect(page.getByRole('heading', { name: 'Budget-Töpfe' })).toBeVisible();
+  await page.goto('/admin/budget-pots');
+  await expect(page.getByRole('heading', { name: 'Budgets & Kostenstellen' })).toBeVisible();
 
-  await expect(page.locator('table.pots__table')).toContainText('E2E-Topf');
+  await expect(page.locator('table.dt__table')).toContainText('E2E-Topf');
 });
