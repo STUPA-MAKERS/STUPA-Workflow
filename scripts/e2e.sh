@@ -93,6 +93,12 @@ EOF
 } >> "${ENV_FILE}"
 
 rm -rf "${ARTIFACTS}"; mkdir -p "${ARTIFACTS}"
+# The `seed` service writes e2e.json in here, and the backend image runs as uid 10001.
+# This directory belongs to whoever ran the script — uid 1001 on a CI runner — so the
+# container could not write into it and seeding died with EACCES. The mode has to be
+# open because the two uids have nothing else in common. Throwaway directory, deleted
+# again by the cleanup trap.
+chmod 777 "${ARTIFACTS}"
 
 echo "==> docker compose config (Validierung)"
 "${COMPOSE[@]}" config -q
