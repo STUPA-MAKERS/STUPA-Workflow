@@ -82,7 +82,6 @@ SMTP_HOST=mailpit
 SMTP_PORT=1025
 SMTP_STARTTLS=false
 SMTP_SSL=false
-SMTP_FROM=noreply@e2e.test
 EOF
 
 # Outside the quoted heredoc, because that block does NOT expand variables and these two

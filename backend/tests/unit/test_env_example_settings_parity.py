@@ -39,16 +39,11 @@ _NOT_READ_BY_THE_API = {
     "PYTEX_MAX_BODY_BYTES": "pytex service",
     "PYTEX_MAX_ASSETS": "pytex service",
     "PYTEX_MAX_ASSET_BYTES": "pytex service",
-    # Documented but dead: nothing in the repo reads these. They stay listed here so a
-    # NEW dead key fails the test. Do not add to this group without a decision.
-    "AUDIT_DB_ROLE": "dead — the role name is hardcoded in the migrations",
-    "WEBHOOK_HMAC_KEY": "dead — the signature uses the per-webhook secret from the DB",
-    "SMTP_FROM": "dead — the sender address comes from MAIL_FROM",
-    "NEXTCLOUD_WEBDAV_URL": "dead — no Nextcloud export in the code",
-    "NEXTCLOUD_USER": "dead — no Nextcloud export in the code",
-    "NEXTCLOUD_APP_PASSWORD": "dead — no Nextcloud export in the code",
-    "NEXTCLOUD_BASE_PATH": "dead — no Nextcloud export in the code",
-    "NEXTCLOUD_TIMEOUT_SECONDS": "dead — no Nextcloud export in the code",
+    # The "documented but dead" group is empty on purpose. Eight keys sat here — a
+    # Nextcloud export that was never written, a webhook key replaced by a per-webhook
+    # secret, an SMTP sender replaced by MAIL_FROM, and an audit role the migrations
+    # hardcode. They are gone from the template rather than described in it: a key an
+    # operator can set that changes nothing is worse than no key at all.
 }
 
 _KEY_RE = re.compile(r"^\s*(?:#\s*)?([A-Z][A-Z0-9_]*)=", re.MULTILINE)
