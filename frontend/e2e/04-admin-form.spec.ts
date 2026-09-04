@@ -6,29 +6,37 @@ import { readArtifacts } from './helpers';
 test.use({ storageState: ADMIN_STATE });
 
 /**
- * Scenario 6 (testing.md §3.6): admin config. The form builder adds a new field and
+ * Scenario 6 (testing.md §3.6): admin config. The editor adds a question and
  * **persists** a new form version.
  *
- * Proof of persistence: after the save the success message `Gespeichert.` appears.
- * This toast fires only on a 2xx from
- * `POST /admin/application-types/{id}/form-versions` (form-builder.component.ts:198).
- * The server therefore created the new form version. The builder does not load
- * existing versions back into the UI, so the test cannot compare after a reload.
+ * Proof of persistence: the success toast "Gespeichert." fires only on a 2xx from
+ * `POST /admin/application-types/{id}/form-versions` (form-editor.component.ts). The
+ * server therefore created the version. The editor does not load older versions back
+ * into the UI, so the test cannot compare after a reload.
+ *
+ * What moved since this was written: `/admin/forms` is now the LIST of application
+ * types, and the editor sits at `/admin/forms/{typeId}`. It was renamed from
+ * form-builder to form-editor, fields became questions grouped in sections, the save
+ * control is "Speichern", and the `[data-testid="form-json"]` mirror no longer
+ * exists. The key and label inputs kept their labels.
  */
-test('@gating Admin Form-Builder: Feld hinzufügen → Form-Version persistiert', async ({ page }) => {
-  readArtifacts();
-  await page.goto('/admin/forms');
-  await expect(page.getByRole('heading', { name: 'Formular-Builder' })).toBeVisible();
+test('@gating Admin Form-Editor: Frage hinzufügen → Form-Version persistiert', async ({ page }) => {
+  const art = readArtifacts();
+  await page.goto(`/admin/forms/${art.typeId}`);
 
-  // A new field is valid only with a key and a German label, which gives formValid.
-  const fieldKey = `e2e_feld_${Date.now()}`;
-  await page.getByRole('button', { name: 'Feld hinzufügen' }).click();
-  await page.getByRole('textbox', { name: 'Schlüssel' }).fill(fieldKey);
-  await page.getByRole('textbox', { name: 'Bezeichnung (DE)' }).fill('E2E Feld');
+  const save = page.getByRole('button', { name: 'Speichern', exact: true });
+  await expect(save).toBeVisible();
 
-  await expect(page.locator('[data-testid="form-json"]')).toContainText(fieldKey);
+  // "+ Frage hinzufügen" opens a menu of question types; take the first type.
+  await page.getByRole('button', { name: /Frage hinzufügen/ }).first().click();
+  await page.getByRole('menuitem').first().click();
 
-  // The success toast fires only on a 2xx from the server, so it proves persistence.
-  await page.getByRole('button', { name: 'Als Form-Version speichern' }).click();
+  // The new question is appended, so `.last()` addresses it rather than a seeded one.
+  const key = `e2e_frage_${Date.now()}`;
+  await page.getByRole('textbox', { name: 'Schlüssel' }).last().fill(key);
+  await page.getByRole('textbox', { name: 'Bezeichnung (DE)' }).last().fill('E2E Frage');
+
+  // The toast fires only on a 2xx from the server, so it proves persistence.
+  await save.click();
   await expect(page.getByText('Gespeichert.')).toBeVisible();
 });

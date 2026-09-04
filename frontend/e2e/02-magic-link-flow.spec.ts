@@ -52,9 +52,11 @@ test('@gating Magic-Link bearbeiten → Flow-Transition → read-only', async ({
   const ad = await admin.newPage();
   await ad.goto(`/applications/${appId}`);
   await expect(ad.getByRole('button', { name: 'Zur Prüfung' })).toBeVisible();
+  // A transition fires straight from its own button — `fire(t)` posts and reloads. The
+  // confirmation dialog this used to click through ("Ausführen", with an optional note)
+  // is gone; waiting for it hung the whole test until the 60s budget ran out, which read
+  // as a magic-link failure rather than as the one obsolete step it was.
   await ad.getByRole('button', { name: 'Zur Prüfung' }).click();
-  // The transition first opens a confirmation dialog.
-  await ad.getByRole('button', { name: 'Ausführen' }).click();
   await expect(ad.getByText('In Prüfung')).toBeVisible();
 
   // 4) The applicant loads again with the cookie session. The view is now read-only.

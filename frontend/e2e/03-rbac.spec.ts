@@ -8,7 +8,11 @@ import { expect, test } from '@playwright/test';
  * stack has no mock Keycloak (the mock is OFF since #101). The test checks that the
  * guarded content stays hidden and that the visitor lands on login or forbidden.
  */
-const GUARDED = ['/applications', '/admin', '/budget/pots', '/admin/forms'];
+// `/admin/budget-pots`, not `/budget/pots`: the cost-centre tree moved under /admin
+// (app.routes.ts). The old path matches no route, so the guard never runs and the
+// visitor lands nowhere in particular — the test then times out instead of failing on
+// what it means to check.
+const GUARDED = ['/applications', '/admin', '/admin/budget-pots', '/admin/forms'];
 
 for (const path of GUARDED) {
   test(`@gating Unauth sieht ${path} nicht`, async ({ page }) => {
