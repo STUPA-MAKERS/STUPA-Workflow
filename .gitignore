@@ -48,3 +48,8 @@ frontend/.angular/
 # Internal audit report — kept local per CLAUDE.md, never mirrored into repo
 AUDIT-REPORT.md
 .playwright-mcp/
+
+# Screenshots dropped in the root while checking a fix. The app's own icons live
+# under frontend/public/icons, so this rule is anchored to the root only.
+/*.png
+
