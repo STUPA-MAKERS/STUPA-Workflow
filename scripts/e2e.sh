@@ -61,9 +61,14 @@ sed -i -E '/^[[:space:]]*(OIDC_CLIENT_SECRET|ALTCHA_HMAC_SECRET)[[:space:]]*=/d'
 # Append the overrides, because the last value per key wins. The throwaway secrets hold
 # at least 16 characters. The rate limit is OFF, so no lockout can happen.
 # The value `FORWARDED_ALLOW_IPS=*` is safe here, because the environment is development.
+# That environment has to be SET, not assumed: `.env.example` ships
+# `ENVIRONMENT=production`, and `Settings._no_wildcard_proxy_in_prod` refuses the
+# wildcard there, so migrate exited 1 before the stack ever came up. `strict_security`
+# defaults to true, so the hardening guards stay on either way.
 cat >> "${ENV_FILE}" <<'EOF'
 
 # --- e2e overrides (vom Treiber erzeugt; NICHT committen) ----------------------
+ENVIRONMENT=development
 POSTGRES_PASSWORD=e2e-pg-pw
 DATABASE_URL=postgresql+asyncpg://app:e2e-pg-pw@postgres/antrag
 MINIO_ACCESS_KEY=e2e-minio-access
