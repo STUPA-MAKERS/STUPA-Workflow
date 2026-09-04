@@ -56,7 +56,6 @@ import {
 } from '../budget/expense-display.util';
 import { SimplifyPathPipe } from '@shared/budget-path';
 import { downloadBlob } from '@shared/download.util';
-import { HScrollSyncDirective } from '@shared/h-scroll-sync.directive';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { PressSelectDirective } from '@shared/press-select.directive';
 import { ExpenseDialogsState } from './expense-dialogs.state';
@@ -99,7 +98,6 @@ export type ExpensesTab = 'bookings' | 'transfers';
     SelectComponent,
     CheckboxComponent,
     CostCentreTreeComponent,
-    HScrollSyncDirective,
     PressSelectDirective,
     RouterLink,
   ],
