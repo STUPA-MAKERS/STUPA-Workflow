@@ -216,7 +216,7 @@ export class ApplyWizardComponent {
 
   private buildSections(eff: EffectiveForm): void {
     const lang = this.i18n.locale();
-    const ctx = { has_budget: Boolean(eff.budgetPotId) };
+    const ctx = { has_budget: eff.hasBudget };
     this.sections.set(
       eff.sections.map((s) => ({
         key: s.key,
@@ -297,7 +297,6 @@ export class ApplyWizardComponent {
 
     const payload: NewApplication = {
       typeId,
-      budgetPotId: this.effForm()?.budgetPotId ?? null,
       data: { ...this.model },
       // Logged in: the backend derives identity/Altcha from the account.
       applicantEmail: this.loggedIn() ? null : this.contactForm.controls.email.value,

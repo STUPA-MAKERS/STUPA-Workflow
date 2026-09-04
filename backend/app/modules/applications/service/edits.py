@@ -58,10 +58,7 @@ class EditOps(ApplicationsServiceBase):
         # ``_whitelist`` drops the title on every PATCH and loses data.
         if not any(f.key == SYSTEM_TITLE_KEY for f in fields):
             fields = [system_title_field(), *fields]
-        # Take the ``has_budget`` context from the type, as create does. Do not
-        # take it from ``budget_pot_id``. Otherwise ``visibleIf: has_budget``
-        # flips for a has_budget type without a pot, and an edit could drop a
-        # required field without a penalty.
+        # ``has_budget`` comes from the type, as it does on create.
         app_type = await self.session.get(ApplicationType, app.type_id)
         clean = _whitelist(fields, data)
         context = {"has_budget": app_type.has_budget if app_type is not None else False}

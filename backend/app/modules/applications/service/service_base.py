@@ -15,7 +15,6 @@ from sqlalchemy import func, select
 
 from app.modules.applications.models import Applicant, Application, SubmissionVersion
 from app.modules.applications.schemas import ApplicantOut, ApplicationOut, StateOut
-from app.modules.budget.models import BudgetField
 from app.modules.flow.models import FlowVersion, State
 from app.modules.forms.validation import extract_promoted
 from app.shared.config_schemas import FormFieldDef
@@ -187,17 +186,7 @@ class ApplicationsServiceBase:
                 .order_by(FormField.order)
             )
         ).all()
-        fields = [_field_from_row(r) for r in rows]
-        if app.budget_pot_id is not None:
-            pot_rows = (
-                await self.session.scalars(
-                    select(BudgetField)
-                    .where(BudgetField.budget_pot_id == app.budget_pot_id)
-                    .order_by(BudgetField.order)
-                )
-            ).all()
-            fields.extend(FormFieldDef.model_validate(r.field) for r in pot_rows)
-        return fields
+        return [_field_from_row(r) for r in rows]
 
     async def _pii_keys_for_type(self, type_id: UUID) -> set[str]:
         """Collect the `isPII` field keys across all form versions of a type.
@@ -246,7 +235,6 @@ class ApplicationsServiceBase:
             typeId=app.type_id,
             state=await self._state_out_resolved(state),
             gremiumId=app.gremium_id,
-            budgetPotId=app.budget_pot_id,
             budgetId=app.budget_id,
             fiscalYearId=app.fiscal_year_id,
             amount=app.amount,

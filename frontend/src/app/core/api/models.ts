@@ -104,7 +104,6 @@ export interface ApplicationListQuery {
   state?: string;
   gremium?: Uuid;
   type?: Uuid;
-  topf?: Uuid;
   /** Cost center in the budget tree. The filter includes the subtree. */
   budget?: Uuid;
   q?: string;
@@ -151,7 +150,6 @@ export interface ApplicationOutWire {
   typeId: Uuid;
   state?: StateOutWire | null;
   gremiumId?: Uuid | null;
-  budgetPotId?: Uuid | null;
   budgetId?: Uuid | null;
   fiscalYearId?: Uuid | null;
   amount?: string | null;
@@ -174,7 +172,6 @@ export interface ApplicationListItemWire {
   title?: string | null;
   state?: StateOutWire | null;
   gremiumId?: Uuid | null;
-  budgetPotId?: Uuid | null;
   amount?: string | null;
   currency?: string | null;
   createdAt: IsoDateTime;
@@ -345,7 +342,6 @@ export interface SignedUrlOutWire {
 /** Body for `POST /applications` (`ApplicationCreate`, by_alias). */
 export interface ApplicationCreateBody {
   typeId: Uuid;
-  budgetPotId?: Uuid | null;
   data: Record<string, unknown>;
   // Optional. For a logged-in user the backend takes the identity from the account.
   // For an anonymous submission the server requires these fields.
@@ -407,7 +403,6 @@ export interface Application {
   typeId: Uuid;
   state: ApplicationState | null;
   gremiumId: Uuid | null;
-  budgetPotId: Uuid | null;
   budgetId: Uuid | null;
   fiscalYearId: Uuid | null;
   amount: string | null;
@@ -461,7 +456,6 @@ export interface ApplicationListItem {
   title: string | null;
   state: ApplicationState | null;
   gremiumId: Uuid | null;
-  budgetPotId: Uuid | null;
   amount: string | null;
   currency: string | null;
   createdAt: IsoDateTime;
@@ -575,7 +569,6 @@ export interface SignedUrl {
 /** Frontend input for a new application. It maps to `ApplicationCreateBody`. */
 export interface NewApplication {
   typeId: Uuid;
-  budgetPotId?: Uuid | null;
   data: Record<string, unknown>;
   // Null for a logged-in user. The backend takes the identity and the altcha itself.
   applicantEmail?: string | null;
@@ -660,7 +653,8 @@ export interface FormSection {
 export interface EffectiveForm {
   applicationTypeId: Uuid;
   formVersionId: Uuid;
-  budgetPotId?: Uuid | null;
+  /** Drives `visibleIf: has_budget`. Comes from the type, as the server's own check does. */
+  hasBudget: boolean;
   sections: FormSection[];
 }
 

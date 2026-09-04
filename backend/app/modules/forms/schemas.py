@@ -87,9 +87,11 @@ class FormSectionOut(_CamelModel):
 
 
 class EffectiveFormOut(_CamelModel):
-    """Effective form definition: type fields plus optional pot extra fields."""
+    """Effective form definition for one application type."""
 
     application_type_id: UUID = Field(alias="applicationTypeId")
     form_version_id: UUID = Field(alias="formVersionId")
-    budget_pot_id: UUID | None = Field(default=None, alias="budgetPotId")
+    # The client evaluates ``visibleIf: has_budget`` against this. It belongs to the
+    # type; deriving it anywhere else disagrees with the server's own validation.
+    has_budget: bool = Field(default=False, alias="hasBudget")
     sections: list[FormSectionOut]

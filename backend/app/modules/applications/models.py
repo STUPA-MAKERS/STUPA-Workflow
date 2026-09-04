@@ -49,12 +49,9 @@ class Application(UUIDPkMixin, TimestampMixin, Base):
     gremium_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("gremium.id"), nullable=True
     )
-    budget_pot_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("budget_pot.id"), nullable=True
-    )
     # Cost center in the budget tree, most often a leaf, plus the fiscal year.
     # The budget assignment sets the fiscal year, not the submission.
-    # `move-fiscal-year` moves it. Both columns add to the flat `budget_pot_id`.
+    # `move-fiscal-year` moves it.
     budget_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("budget.id"), nullable=True
     )
@@ -100,7 +97,6 @@ class Application(UUIDPkMixin, TimestampMixin, Base):
         ),
         Index("ix_application_current_state_id", "current_state_id"),
         Index("ix_application_gremium_id", "gremium_id"),
-        Index("ix_application_budget_pot_id", "budget_pot_id"),
         Index("ix_application_budget_id", "budget_id"),
         Index("ix_application_fiscal_year_id", "fiscal_year_id"),
         Index("ix_application_type_id", "type_id"),

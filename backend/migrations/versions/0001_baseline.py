@@ -18,8 +18,7 @@ schema, so the models and the migration always agree. This file adds only what
   They run before `create_all`, because column defaults and types need them.
 * Audit append-only: the `BEFORE UPDATE/DELETE` (row) and `BEFORE TRUNCATE` (statement)
   triggers run `RAISE EXCEPTION`. A least-privilege grant goes to `audit_writer`.
-* Materialized views `mv_budget_usage` (pot × stage), `mv_status_distribution`
-  (Gremium × state) and `mv_budget_rollup` (committed sum per node × fiscal year).
+* Materialized view `mv_status_distribution` (Gremium × state).
   Each view carries a unique index for `REFRESH … CONCURRENTLY` (worker).
 """
 
@@ -58,20 +57,6 @@ BEGIN
 END $$;
 """
 
-# Pot × stage on the flat budget_pot/budget_entry model (T-17).
-_MV_USAGE = """
-CREATE MATERIALIZED VIEW mv_budget_usage AS
-SELECT be.budget_pot_id AS budget_pot_id,
-       bp.period        AS period,
-       be.stage         AS stage,
-       COALESCE(SUM(be.amount), 0) AS total_amount,
-       COUNT(*)         AS entry_count
-FROM budget_entry be
-JOIN budget_pot bp ON bp.id = be.budget_pot_id
-GROUP BY be.budget_pot_id, bp.period, be.stage
-WITH DATA
-"""
-
 _MV_STATUS = """
 CREATE MATERIALIZED VIEW mv_status_distribution AS
 SELECT a.gremium_id       AS gremium_id,
@@ -79,28 +64,6 @@ SELECT a.gremium_id       AS gremium_id,
        COUNT(*)           AS application_count
 FROM application a
 GROUP BY a.gremium_id, a.current_state_id
-WITH DATA
-"""
-
-# Roll-up of the committed sum. An approved application counts for its own cost center
-# (`b.path_key = leaf.path_key`) and for every ancestor
-# (`leaf.path_key LIKE b.path_key||'-%'`).
-_MV_ROLLUP = """
-CREATE MATERIALIZED VIEW mv_budget_rollup AS
-SELECT b.id              AS budget_id,
-       a.fiscal_year_id  AS fiscal_year_id,
-       COALESCE(SUM(a.amount), 0) AS committed
-FROM application a
-JOIN budget leaf ON leaf.id = a.budget_id
-JOIN budget b
-  ON b.path_key = leaf.path_key
-  OR leaf.path_key LIKE b.path_key || '-%'
-JOIN budget_entry be
-  ON be.application_id = a.id
- AND be.stage IN ('reserved', 'approved', 'paid')
-WHERE a.amount IS NOT NULL
-  AND a.fiscal_year_id IS NOT NULL
-GROUP BY b.id, a.fiscal_year_id
 WITH DATA
 """
 
@@ -136,20 +99,10 @@ def upgrade() -> None:
     op.execute(_GRANT)
 
     # `REFRESH … CONCURRENTLY` needs a unique index on each materialized view.
-    op.execute(_MV_USAGE)
-    op.execute(
-        "CREATE UNIQUE INDEX uq_mv_budget_usage "
-        "ON mv_budget_usage (budget_pot_id, stage)"
-    )
     op.execute(_MV_STATUS)
     op.execute(
         "CREATE UNIQUE INDEX uq_mv_status_distribution "
         "ON mv_status_distribution (gremium_id, current_state_id) NULLS NOT DISTINCT"
-    )
-    op.execute(_MV_ROLLUP)
-    op.execute(
-        "CREATE UNIQUE INDEX uq_mv_budget_rollup "
-        "ON mv_budget_rollup (budget_id, fiscal_year_id)"
     )
 
 
@@ -157,9 +110,7 @@ def downgrade() -> None:
     bind = op.get_bind()
     # Drop the materialized views first, because they depend on the tables. Then drop
     # the schema, then the function and the extensions.
-    op.execute("DROP MATERIALIZED VIEW IF EXISTS mv_budget_rollup")
     op.execute("DROP MATERIALIZED VIEW IF EXISTS mv_status_distribution")
-    op.execute("DROP MATERIALIZED VIEW IF EXISTS mv_budget_usage")
     Base.metadata.drop_all(bind=bind)
     op.execute("DROP FUNCTION IF EXISTS audit_entry_append_only()")
     op.execute("DROP EXTENSION IF EXISTS btree_gist")

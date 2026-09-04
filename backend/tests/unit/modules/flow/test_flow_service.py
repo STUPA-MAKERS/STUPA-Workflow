@@ -75,7 +75,6 @@ def _app(state_id: object, flow_id: object) -> SimpleNamespace:
         flow_version_id=flow_id,
         type_id=uuid4(),
         form_version_id=uuid4(),
-        budget_pot_id=None,
         data={},
     )
 

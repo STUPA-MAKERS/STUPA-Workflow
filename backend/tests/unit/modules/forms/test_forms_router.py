@@ -29,9 +29,9 @@ class _FakeService:
     def __init__(self) -> None:
         self.created: tuple[object, FormVersionCreate] | None = None
 
-    async def get_effective_form(self, type_id, budget_pot_id=None):  # noqa: ANN001
-        if budget_pot_id is not None and str(budget_pot_id).startswith("00000000"):
-            raise NotFoundError("budget pot not found")
+    async def get_effective_form(self, type_id):  # noqa: ANN001
+        if str(type_id).startswith("00000000"):
+            raise NotFoundError("application type not found")
         sections = [
             FormSectionOut(
                 key="main",
@@ -39,18 +39,10 @@ class _FakeService:
                 fields=[FormFieldDef(key="title", type="text", label={"de": "Titel"})],
             )
         ]
-        if budget_pot_id is not None:
-            sections.append(
-                FormSectionOut(
-                    key="budget",
-                    label={"de": "Topf"},
-                    fields=[FormFieldDef(key="cost", type="currency", label={"de": "Kosten"})],
-                )
-            )
         return EffectiveFormOut(
             applicationTypeId=type_id,
             formVersionId=uuid4(),
-            budgetPotId=budget_pot_id,
+            hasBudget=False,
             sections=sections,
         )
 
@@ -100,19 +92,16 @@ def test_get_effective_form_main_only(app_client: TestClient) -> None:
     assert body["sections"][0]["fields"][0]["key"] == "title"
 
 
-def test_get_effective_form_with_budget_pot(app_client: TestClient) -> None:
-    type_id, pot_id = uuid4(), uuid4()
-    r = app_client.get(f"/api/application-types/{type_id}/form?budgetPotId={pot_id}")
-    assert r.status_code == 200
-    body = r.json()
-    assert [s["key"] for s in body["sections"]] == ["main", "budget"]
-    assert body["budgetPotId"] == str(pot_id)
-
-
-def test_get_effective_form_unknown_pot_404(app_client: TestClient) -> None:
+def test_get_effective_form_carries_has_budget(app_client: TestClient) -> None:
     type_id = uuid4()
-    pot_id = "00000000-0000-0000-0000-000000000000"
-    r = app_client.get(f"/api/application-types/{type_id}/form?budgetPotId={pot_id}")
+    r = app_client.get(f"/api/application-types/{type_id}/form")
+    assert r.status_code == 200
+    assert r.json()["hasBudget"] is False
+
+
+def test_get_effective_form_unknown_type_404(app_client: TestClient) -> None:
+    type_id = "00000000-0000-0000-0000-000000000000"
+    r = app_client.get(f"/api/application-types/{type_id}/form")
     assert r.status_code == 404
     assert r.json()["code"] == "not_found"
 

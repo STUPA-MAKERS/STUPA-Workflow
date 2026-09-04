@@ -174,16 +174,13 @@ async def get_latest_form_version(type_id: str) -> dict:
 
 
 @group.tool
-async def get_effective_form(type_id: str, budget_pot_id: str | None = None) -> dict:
+async def get_effective_form(type_id: str) -> dict:
     """Get the effective (public) form of an application type.
 
     The form holds the sections and the fields as an applicant sees them. Read it to
     learn which `data` keys `create_application` expects.
     """
-    return await api().get(
-        f"/application-types/{type_id}/form",
-        params=params(budgetPotId=budget_pot_id),
-    )
+    return await api().get(f"/application-types/{type_id}/form")
 
 
 @group.tool

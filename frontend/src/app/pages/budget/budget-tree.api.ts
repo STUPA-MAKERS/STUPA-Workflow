@@ -410,7 +410,6 @@ export interface BudgetApplication {
   fiscalYearId: Uuid | null;
   amount: string | null;
   currency: string | null;
-  stage: string | null;
   stateId: Uuid | null;
   /** Current flow state (i18n label map and color) for the status column. */
   stateLabel?: Record<string, string> | null;

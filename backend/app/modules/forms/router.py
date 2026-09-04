@@ -3,7 +3,7 @@
 Endpoints:
 
 * ``GET  /api/application-types/{type_id}/form`` — public. It returns the effective form
-  definition, plus the budget-pot extra fields when the caller sends ``budget_pot_id``.
+  definition.
 * ``POST /api/admin/application-types/{type_id}/form-versions`` — needs the
   ``form.configure`` permission. It creates a new form version and validates the
   definition.
@@ -17,7 +17,7 @@ from __future__ import annotations
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends
 
 from app.deps import DbSession, Principal, require_principal
 from app.modules.forms.schemas import (
@@ -58,10 +58,9 @@ ServiceDep = Annotated[FormsService, Depends(get_forms_service)]
 async def get_effective_form(
     type_id: UUID,
     service: ServiceDep,
-    budget_pot_id: Annotated[UUID | None, Query(alias="budgetPotId")] = None,
 ) -> EffectiveFormOut:
     """Return the effective form definition for a submission (public endpoint)."""
-    return await service.get_effective_form(type_id, budget_pot_id)
+    return await service.get_effective_form(type_id)
 
 
 @router.get(

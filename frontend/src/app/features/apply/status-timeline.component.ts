@@ -240,7 +240,7 @@ export class StatusTimelineComponent {
   }
 
   private loadForm(application: Application): void {
-    this.api.effectiveForm(application.typeId, application.budgetPotId).subscribe({
+    this.api.effectiveForm(application.typeId).subscribe({
       next: (eff) => {
         this.buildView(eff, application);
         this.phase.set('ready');
@@ -259,7 +259,7 @@ export class StatusTimelineComponent {
     if (this.canEdit()) {
       this.editModel = { ...application.data };
       this.editFields.set(
-        toFormlyFields(allFields, lang, { has_budget: Boolean(eff.budgetPotId) }),
+        toFormlyFields(allFields, lang, { has_budget: eff.hasBudget }),
       );
     }
   }

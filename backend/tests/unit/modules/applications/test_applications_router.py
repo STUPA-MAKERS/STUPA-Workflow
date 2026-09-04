@@ -54,7 +54,6 @@ def _out(app_id: UUID, *, with_pii: bool) -> ApplicationOut:
         typeId=uuid4(),
         state=_state(),
         gremiumId=None,
-        budgetPotId=None,
         amount=Decimal("10.00"),
         currency="EUR",
         data={"title": "X"},

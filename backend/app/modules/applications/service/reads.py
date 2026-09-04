@@ -29,7 +29,6 @@ class ReadOps(ApplicationsServiceBase):
         app = await self._get_app(application_id, allow_unconfirmed=allow_unconfirmed)
         return await FormsService(self.session).get_effective_form(
             app.type_id,
-            app.budget_pot_id,
             form_version_id=app.form_version_id,
         )
 

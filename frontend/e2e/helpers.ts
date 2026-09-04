@@ -8,7 +8,6 @@ export interface Artifacts {
   applicantEmail: string;
   typeId: string;
   gremiumId: string | null;
-  budgetPotId: string | null;
   states: { initial: string; locked: string };
   fieldKeys: string[];
 }

@@ -80,7 +80,6 @@ export function mapApplication(wire: ApplicationOutWire, lang: string): Applicat
     typeId: wire.typeId,
     state: mapState(wire.state, lang),
     gremiumId: wire.gremiumId ?? null,
-    budgetPotId: wire.budgetPotId ?? null,
     budgetId: wire.budgetId ?? null,
     fiscalYearId: wire.fiscalYearId ?? null,
     amount: wire.amount ?? null,
@@ -107,7 +106,6 @@ export function mapApplicationListItem(
     title: wire.title ?? null,
     state: mapState(wire.state, lang),
     gremiumId: wire.gremiumId ?? null,
-    budgetPotId: wire.budgetPotId ?? null,
     amount: wire.amount ?? null,
     currency: wire.currency ?? null,
     createdAt: wire.createdAt,
@@ -284,7 +282,6 @@ export function mapProtocol(wire: ProtocolOutWire): Protocol {
 export function toApplicationCreateBody(input: NewApplication): ApplicationCreateBody {
   return {
     typeId: input.typeId,
-    budgetPotId: input.budgetPotId ?? null,
     data: input.data,
     applicantEmail: input.applicantEmail ?? null,
     applicantName: input.applicantName ?? null,

@@ -37,7 +37,6 @@ export const de = {
   'nav.budget': 'Budget',
   'nav.expenses': 'Buchungen',
   'nav.invoices': 'Rechnungen',
-  'nav.budgetPots': 'Budget-Töpfe',
   'nav.admin': 'Verwaltung',
   'nav.apply': 'Antrag stellen',
 
@@ -958,8 +957,7 @@ export const de = {
   'admin.home.cdVariantsDesc': 'Logos der gerenderten Dokumente je Gremium pflegen.',
   'admin.home.webhooks': 'Webhooks',
   'admin.home.webhooksDesc': 'Ausgehende Ereignis-Hooks verwalten.',
-  'admin.home.budgetPots': 'Budget-Töpfe',
-  'admin.home.budgetPotsDesc': 'Budgets & Kostenstellen verwalten.',
+  'admin.home.costCentresDesc': 'Budgets & Kostenstellen verwalten.',
   'budget.tree.title': 'Budgets & Kostenstellen',
   'budget.tree.fyEmpty': 'Noch keine Haushaltsjahre in diesem Budget.',
   'budget.tree.setLimit': 'Limit setzen',
@@ -1971,13 +1969,6 @@ export const de = {
 
   'budget.usage.heading': 'Auslastung je Budget',
 
-  'budget.stage.requested': 'Beantragt',
-  'budget.stage.reserved': 'Reserviert',
-  'budget.stage.approved': 'Bewilligt',
-  'budget.stage.paid': 'Ausgezahlt',
-  'budget.stage.committed': 'Gebunden',
-  'budget.stage.available': 'Verfügbar',
-
 
   'admin.home.users': 'Benutzer',
   'admin.home.usersDesc': 'Benutzer & Rollenzuweisungen verwalten.',
@@ -2199,7 +2190,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'nav.budget': 'Budget',
   'nav.expenses': 'Bookings',
   'nav.invoices': 'Invoices',
-  'nav.budgetPots': 'Budget pots',
   'nav.admin': 'Administration',
   'nav.apply': 'Submit application',
 
@@ -3102,8 +3092,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.home.cdVariantsDesc': 'Manage the logos of the rendered documents per committee.',
   'admin.home.webhooks': 'Webhooks',
   'admin.home.webhooksDesc': 'Manage outgoing event hooks.',
-  'admin.home.budgetPots': 'Budget pots',
-  'admin.home.budgetPotsDesc': 'Maintain budgets & cost centres (tree) per committee.',
+  'admin.home.costCentresDesc': 'Maintain budgets & cost centres (tree) per committee.',
   'budget.tree.title': 'Budgets & cost centres',
   'budget.tree.fyEmpty': 'No fiscal years in this budget yet.',
   'budget.tree.setLimit': 'Set limit',
@@ -4097,13 +4086,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
 
 
   'budget.usage.heading': 'Utilisation per budget',
-
-  'budget.stage.requested': 'Requested',
-  'budget.stage.reserved': 'Reserved',
-  'budget.stage.approved': 'Approved',
-  'budget.stage.paid': 'Paid',
-  'budget.stage.committed': 'Committed',
-  'budget.stage.available': 'Available',
 
 
   'admin.home.users': 'Users',

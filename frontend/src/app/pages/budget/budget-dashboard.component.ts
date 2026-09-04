@@ -159,7 +159,7 @@ export class BudgetDashboardComponent {
     return this.pendingFiscalYears() > 0 ? null : 'noFiscalYear';
   });
 
-  /** Only a reader with `budget.structure` can open /admin/budget-pots and add a year. */
+  /** Only a reader with `budget.structure` can open /admin/cost-centres and add a year. */
   readonly canManageStructure = computed(() => this.auth.can('budget.structure'));
 
   private readonly nodeById = computed(() => {
@@ -381,10 +381,6 @@ export class BudgetDashboardComponent {
   }
   shortId(id: Uuid): string {
     return id.slice(0, 8);
-  }
-  stageLabel(stage: string | null): string {
-    if (!stage) return '—';
-    return this.i18n.translate(`budget.stage.${stage}` as TranslationKey);
   }
 
   private load(): void {

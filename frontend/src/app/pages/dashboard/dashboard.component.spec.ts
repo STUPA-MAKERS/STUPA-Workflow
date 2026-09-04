@@ -56,7 +56,6 @@ function item(id: string, typeId: string, state: StateOutWire): ApplicationListI
     typeId,
     state,
     gremiumId: null,
-    budgetPotId: null,
     amount: null,
     currency: 'EUR',
     createdAt: '2026-05-30T09:00:00Z',

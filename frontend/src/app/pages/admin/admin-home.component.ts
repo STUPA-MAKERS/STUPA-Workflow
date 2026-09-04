@@ -38,7 +38,7 @@ export class AdminHomeComponent {
     { link: 'group-mappings', title: 'admin.home.groupMappings', desc: 'admin.home.groupMappingsDesc', icon: 'key', permissions: ['admin.group_mappings'] },
     { link: 'oauth-grants', title: 'admin.oauthGrants.title', desc: 'admin.home.oauthGrantsDesc', icon: 'key', permissions: ['admin.users'] },
     { link: 'gremien', title: 'admin.home.gremien', desc: 'admin.home.gremienDesc', icon: 'parliament', permissions: ['admin.gremien'] },
-    { link: 'budget-pots', title: 'budget.tree.title', desc: 'admin.home.budgetPotsDesc', icon: 'euro', permissions: ['budget.structure'] },
+    { link: 'cost-centres', title: 'budget.tree.title', desc: 'admin.home.costCentresDesc', icon: 'euro', permissions: ['budget.structure'] },
     { link: 'forms', title: 'admin.home.formBuilder', desc: 'admin.home.formBuilderDesc', icon: 'form', permissions: ['form.configure'] },
     // The flow editor route and its save both accept either key.
     { link: 'flow', title: 'admin.home.flowEditor', desc: 'admin.home.flowEditorDesc', icon: 'flow', permissions: ['flow.configure', 'admin.types'] },
