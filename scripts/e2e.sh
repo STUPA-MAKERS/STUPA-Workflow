@@ -61,9 +61,14 @@ sed -i -E '/^[[:space:]]*(OIDC_CLIENT_SECRET|ALTCHA_HMAC_SECRET)[[:space:]]*=/d'
 # Append the overrides, because the last value per key wins. The throwaway secrets hold
 # at least 16 characters. The rate limit is OFF, so no lockout can happen.
 # The value `FORWARDED_ALLOW_IPS=*` is safe here, because the environment is development.
+# That environment has to be SET, not assumed: `.env.example` ships
+# `ENVIRONMENT=production`, and `Settings._no_wildcard_proxy_in_prod` refuses the
+# wildcard there, so migrate exited 1 before the stack ever came up. `strict_security`
+# defaults to true, so the hardening guards stay on either way.
 cat >> "${ENV_FILE}" <<'EOF'
 
 # --- e2e overrides (vom Treiber erzeugt; NICHT committen) ----------------------
+ENVIRONMENT=development
 POSTGRES_PASSWORD=e2e-pg-pw
 DATABASE_URL=postgresql+asyncpg://app:e2e-pg-pw@postgres/antrag
 MINIO_ACCESS_KEY=e2e-minio-access
@@ -88,6 +93,12 @@ EOF
 } >> "${ENV_FILE}"
 
 rm -rf "${ARTIFACTS}"; mkdir -p "${ARTIFACTS}"
+# The `seed` service writes e2e.json in here, and the backend image runs as uid 10001.
+# This directory belongs to whoever ran the script — uid 1001 on a CI runner — so the
+# container could not write into it and seeding died with EACCES. The mode has to be
+# open because the two uids have nothing else in common. Throwaway directory, deleted
+# again by the cleanup trap.
+chmod 777 "${ARTIFACTS}"
 
 echo "==> docker compose config (Validierung)"
 "${COMPOSE[@]}" config -q
