@@ -143,7 +143,6 @@
     @if (tab() === 'transfers') {
       @if (transferLoading() || transferItems().length) {
         <app-data-table
-          appHScrollSync=".dt__scroll"
           [columns]="transferColumns()"
           [rows]="transferItems()"
           [rowKey]="transferRowId"
@@ -284,7 +283,6 @@
            header, the sort affordance, the skeleton, the sticky column and the mobile
            cards all come from one place now. -->
       <app-data-table
-        appHScrollSync=".dt__scroll"
         [columns]="bookingColumns()"
         [rows]="items()"
         [rowKey]="rowId"

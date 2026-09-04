@@ -23,7 +23,6 @@ import {
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
-import { HScrollSyncDirective } from '@shared/h-scroll-sync.directive';
 import type { AdminPrincipal, Role, RoleAssignment, RoleAssignmentPatch } from '../admin.models';
 
 /** Local form state for assigning a role per user. */
@@ -52,7 +51,6 @@ function emptyDraft(): AssignDraft {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    HScrollSyncDirective,
     FormsModule,
     SlicePipe,
     TranslatePipe,
