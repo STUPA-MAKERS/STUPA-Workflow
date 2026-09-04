@@ -417,13 +417,24 @@ export class ApplicationsListComponent implements OnDestroy {
     return out;
   }
 
-  /** Reset the list after a filter or sort change and reload page 0. */
+  /**
+   * Reload page 0 after a filter or sort change, WITHOUT emptying the list first.
+   *
+   * Clearing the rows here made every sort and every filter flash: the table dropped
+   * to skeletons and back, and a reader who had scrolled a wide table sideways lost
+   * their place, because an empty box has nothing to scroll and the browser clamps the
+   * position to 0.
+   *
+   * The rows therefore stay until the new ones arrive — `fetch(true)` replaces them
+   * rather than appending. `loading` keeps its narrow meaning of "nothing to show yet",
+   * so the skeleton appears on a first load and never over a list that is merely being
+   * refreshed. The old total stays for the same reason: a number that is a moment out
+   * of date reads better than a 0 that was never true.
+   */
   protected reload(): void {
     this.nextOffset = 0;
-    this.items.set([]);
-    this.total.set(0);
     this.loadingMore.set(false);
-    this.loading.set(true);
+    this.loading.set(this.items().length === 0);
     this.error.set(false);
     this.fetch(true);
   }
