@@ -1,7 +1,7 @@
 """Budget rollup stats: refresh of the materialized views.
 
-``mv_budget_usage`` and ``mv_status_distribution`` are refreshed by the worker
-(``CONCURRENTLY``) or non-concurrently within the same request/test.
+``mv_status_distribution`` is refreshed by the worker (``CONCURRENTLY``) or
+non-concurrently within the same request/test.
 """
 
 from __future__ import annotations
@@ -9,7 +9,7 @@ from __future__ import annotations
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-_REFRESH_VIEWS = ("mv_budget_usage", "mv_status_distribution")
+_REFRESH_VIEWS = ("mv_status_distribution",)
 
 
 class BudgetStatsService:

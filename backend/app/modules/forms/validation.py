@@ -177,24 +177,18 @@ def validate_definition(fields: Sequence[FormFieldDef]) -> None:
                 ) from exc
 
 
-def effective_form(
-    type_fields: Sequence[FormFieldDef],
-    pot_fields: Sequence[FormFieldDef] | None = None,
-) -> list[FormSection]:
-    """Merge the type fields and the pot extra fields into sections.
+def effective_form(type_fields: Sequence[FormFieldDef]) -> list[FormSection]:
+    """Split the type fields into sections.
 
     ``main`` always holds the type fields. The system ``title`` field comes first, because
     every application MUST have a title. A type that defines its own field with that key
-    keeps its own field. ``budget`` appears only when the caller passes non-empty
-    ``pot_fields``.
+    keeps its own field.
     """
     sections = _split_sections(list(type_fields))
     # Add the title field to the FIRST section after the split. A leading marker must not
     # create a title-only step.
     if not any(f.key == SYSTEM_TITLE_KEY for s in sections for f in s.fields):
         sections[0].fields.insert(0, system_title_field())
-    if pot_fields:
-        sections.append(FormSection(key="budget", fields=list(pot_fields)))
     return sections
 
 

@@ -16,8 +16,6 @@ from app.db import Base
 EXPECTED_TABLES = {
     "gremium",
     "mail_list",
-    "budget_pot",
-    "budget_field",
     "application_type",
     "form_version",
     "form_field",
@@ -60,7 +58,6 @@ def test_uuid_pk_with_gen_random_uuid_default() -> None:
     ("table", "column", "referred", "ondelete"),
     [
         ("mail_list", "gremium_id", "gremium", "CASCADE"),
-        ("budget_field", "budget_pot_id", "budget_pot", "CASCADE"),
         ("form_field", "form_version_id", "form_version", "CASCADE"),
         ("state", "flow_version_id", "flow_version", "CASCADE"),
         ("transition", "flow_version_id", "flow_version", "CASCADE"),
@@ -112,7 +109,6 @@ def test_application_filterable_fk_indexes() -> None:
     assert {
         "ix_application_current_state_id",
         "ix_application_gremium_id",
-        "ix_application_budget_pot_id",
         "ix_application_type_id",
         "ix_application_created_at",
     } <= names

@@ -6,7 +6,6 @@ import pytest
 from pydantic import ValidationError
 
 from app.shared.config_schemas import (
-    BudgetField,
     ComparisonOffers,
     FlowGraph,
     FlowValidationError,
@@ -460,20 +459,11 @@ def test_comparison_offers_alias() -> None:
     assert c.model_dump(by_alias=True)["as"] == "file"
 
 
-def test_budget_field_wraps_form_field() -> None:
-    bf = BudgetField.model_validate(
-        {"field": {"key": "reason", "type": "textarea", "label": {"de": "Begründung"}},
-         "order": 3}
-    )
-    assert bf.field.key == "reason"
-    assert bf.order == 3
-
-
 def test_export_json_schemas_keys_and_deterministic() -> None:
     schemas = export_json_schemas()
     assert set(schemas) == {
         "FormFieldDef", "FlowGraph", "VoteConfig", "NotificationRule",
-        "WebhookConfig", "ComparisonOffers", "BudgetField", "Branding",
+        "WebhookConfig", "ComparisonOffers", "Branding",
     }
     assert export_json_schemas() == schemas
     # The schema carries the camelCase aliases.

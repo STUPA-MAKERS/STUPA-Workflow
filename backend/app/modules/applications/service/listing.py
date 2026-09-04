@@ -31,7 +31,6 @@ class ListingOps(ApplicationsServiceBase):
         state_id: UUID | None = None,
         gremium_id: UUID | None = None,
         type_id: UUID | None = None,
-        budget_pot_id: UUID | None = None,
         budget_id: UUID | None = None,
         q: str | None = None,
         archived: bool | None = False,
@@ -86,8 +85,6 @@ class ListingOps(ApplicationsServiceBase):
             filters.append(Application.gremium_id == gremium_id)
         if type_id is not None:
             filters.append(Application.type_id == type_id)
-        if budget_pot_id is not None:
-            filters.append(Application.budget_pot_id == budget_pot_id)
         if budget_id is not None:
             # The filter covers the cost center and its whole subtree through the
             # `path_key` prefix. An unknown cost center gives an empty list.
@@ -154,7 +151,6 @@ class ListingOps(ApplicationsServiceBase):
                     title=_title_of(app.data),
                     state=await self._state_out_resolved(state),
                     gremiumId=app.gremium_id,
-                    budgetPotId=app.budget_pot_id,
                     amount=app.amount,
                     currency=app.currency,
                     createdAt=app.created_at,
@@ -343,8 +339,7 @@ class ListingOps(ApplicationsServiceBase):
                         title=_title_of(app.data),
                         state=await self._state_out_resolved(s),
                         gremiumId=app.gremium_id,
-                        budgetPotId=app.budget_pot_id,
-                        amount=app.amount,
+                            amount=app.amount,
                         currency=app.currency,
                         createdAt=app.created_at,
                         updatedAt=app.updated_at,

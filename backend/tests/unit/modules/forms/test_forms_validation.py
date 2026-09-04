@@ -88,17 +88,6 @@ def test_effective_form_main_only_without_pot() -> None:
     assert sections == [FormSection(key="main", fields=[_field("title", "text")])]
 
 
-def test_effective_form_adds_budget_section_with_pot() -> None:
-    sections = effective_form([_field("title", "text")], [_field("cost_center", "text")])
-    assert [s.key for s in sections] == ["main", "budget"]
-    assert sections[1].fields[0].key == "cost_center"
-
-
-def test_effective_form_empty_pot_no_budget_section() -> None:
-    sections = effective_form([_field("title", "text")], [])
-    assert [s.key for s in sections] == ["main"]
-
-
 def test_effective_form_injects_required_system_title_when_absent() -> None:
     sections = effective_form([_field("amount", "currency")])
     main = sections[0].fields

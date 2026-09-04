@@ -40,7 +40,6 @@ class ApplicationCreate(_CamelModel):
     """
 
     type_id: UUID = Field(alias="typeId")
-    budget_pot_id: UUID | None = Field(default=None, alias="budgetPotId")
     data: dict[str, Any]
     # Optional in the schema, because the account supplies it for a logged-in
     # user. For an anonymous submission the router enforces it and answers 422.
@@ -82,7 +81,6 @@ class ApplicationOut(_CamelModel):
     type_id: UUID = Field(alias="typeId")
     state: StateOut | None = None
     gremium_id: UUID | None = Field(default=None, alias="gremiumId")
-    budget_pot_id: UUID | None = Field(default=None, alias="budgetPotId")
     budget_id: UUID | None = Field(default=None, alias="budgetId")
     fiscal_year_id: UUID | None = Field(default=None, alias="fiscalYearId")
     amount: Decimal | None = None
@@ -138,7 +136,6 @@ class ApplicationListItem(_CamelModel):
     title: str | None = None
     state: StateOut | None = None
     gremium_id: UUID | None = Field(default=None, alias="gremiumId")
-    budget_pot_id: UUID | None = Field(default=None, alias="budgetPotId")
     amount: Decimal | None = None
     currency: str | None = None
     created_at: datetime = Field(alias="createdAt")

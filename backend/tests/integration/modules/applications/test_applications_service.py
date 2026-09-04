@@ -390,7 +390,7 @@ async def test_patch_drops_unknown_keys(session: AsyncSession) -> None:
     assert "evil" not in (v2.diff or {}).get("added", {})
 
 
-# MED: in the has_budget context, patch reads the type and not budget_pot_id.
+# MED: patch takes the has_budget context from the type.
 async def test_patch_has_budget_context_from_type(session: AsyncSession) -> None:
     # A has_budget type without a pot. A field that the has_budget flag makes visible
     # and required must stay required on edit. Otherwise a user could drop it freely.

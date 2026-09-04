@@ -392,7 +392,7 @@ async def test_list_applications_with_fiscal_year_filter() -> None:
     app.current_state_id = uuid.uuid4()
     app.currency = "EUR"
     app.created_at = datetime(2026, 1, 1, tzinfo=UTC)
-    row = (app, "VS", "review", {"de": "In Prüfung"}, "#abc")
+    row = (app, "VS", {"de": "In Prüfung"}, "#abc")
     # Queue: the node, then the rows.
     sess = fake_session(result(node), result(row))
     svc = BudgetTreeService(sess)
@@ -400,7 +400,6 @@ async def test_list_applications_with_fiscal_year_filter() -> None:
     assert len(out) == 1
     assert out[0].title == "Antrag X"
     assert out[0].state_label == {"de": "In Prüfung"}
-    assert out[0].stage == "review"
 
 
 async def test_list_applications_no_filter_empty_state_label() -> None:
@@ -410,12 +409,11 @@ async def test_list_applications_no_filter_empty_state_label() -> None:
     app.currency = "EUR"
     app.created_at = datetime(2026, 1, 1, tzinfo=UTC)
     # A falsy state_label ("" or None) maps to None.
-    row = (app, "VS", None, None, None)
+    row = (app, "VS", None, None)
     sess = fake_session(result(node), result(row))
     svc = BudgetTreeService(sess)
     out = await svc.list_applications(node.id)
     assert out[0].state_label is None
-    assert out[0].stage is None
 
 
 async def test_book_expense_standalone_with_actor() -> None:

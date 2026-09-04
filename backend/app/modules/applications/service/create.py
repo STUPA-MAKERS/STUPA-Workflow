@@ -54,10 +54,8 @@ class CreateOps(ApplicationsServiceBase):
         # Exactly one global flow is active. A missing flow answers 404.
         flow_version_id = await self._resolve_flow_version_id(app_type)
 
-        # Effective form: type fields plus optional pot fields. The call also
-        # validates the pot scoping and answers 404.
         forms = FormsService(self.session)
-        effective = await forms.get_effective_form(payload.type_id, payload.budget_pot_id)
+        effective = await forms.get_effective_form(payload.type_id)
         fields = [f for section in effective.sections for f in section.fields]
 
         context = {"has_budget": app_type.has_budget}
@@ -80,7 +78,6 @@ class CreateOps(ApplicationsServiceBase):
             flow_version_id=flow_version_id,
             current_state_id=initial.id,
             gremium_id=app_type.gremium_id,
-            budget_pot_id=payload.budget_pot_id,
             amount=amount,
             currency=currency,
             data=clean,

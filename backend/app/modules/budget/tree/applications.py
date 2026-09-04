@@ -9,7 +9,6 @@ from sqlalchemy import or_, select
 from app.modules.applications.models import Application
 from app.modules.applications.service.service_base import _title_of
 from app.modules.audit.actions import AuditAction
-from app.modules.budget.models import BudgetEntry
 from app.modules.budget.tree.service_base import BudgetTreeServiceBase
 from app.modules.budget.tree_models import Budget
 from app.modules.budget.tree_rules import _SEP
@@ -55,12 +54,10 @@ class AssignmentOps(BudgetTreeServiceBase):
             select(
                 Application,
                 Budget.path_key,
-                BudgetEntry.stage,
                 State.label_i18n,
                 State.color,
             )
             .join(Budget, Budget.id == Application.budget_id)
-            .outerjoin(BudgetEntry, BudgetEntry.application_id == Application.id)
             .outerjoin(State, State.id == Application.current_state_id)
             .where(Application.budget_id.in_(subtree))
             .order_by(Application.created_at.desc())
@@ -77,13 +74,12 @@ class AssignmentOps(BudgetTreeServiceBase):
                 fiscalYearId=app.fiscal_year_id,
                 amount=app.amount,
                 currency=app.currency,
-                stage=stage,
                 stateId=app.current_state_id,
                 stateLabel=state_label or None,
                 stateColor=state_color,
                 createdAt=app.created_at,
             )
-            for (app, path_key, stage, state_label, state_color) in rows
+            for (app, path_key, state_label, state_color) in rows
         ]
 
     async def assign_budget(

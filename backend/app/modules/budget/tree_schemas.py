@@ -207,7 +207,7 @@ class AssignBudgetOut(_CamelModel):
 class BudgetApplicationOut(_CamelModel):
     """Application in a cost center and its subtree, for the budget drilldown list.
 
-    Money uses `Decimal`. `stage` comes from the `budget_entry` and can be None.
+    Money uses `Decimal`.
     """
 
     application_id: UUID = Field(alias="applicationId")
@@ -217,7 +217,6 @@ class BudgetApplicationOut(_CamelModel):
     fiscal_year_id: UUID | None = Field(default=None, alias="fiscalYearId")
     amount: Decimal | None = None
     currency: str | None = None
-    stage: str | None = None
     state_id: UUID | None = Field(default=None, alias="stateId")
     # Current flow state (i18n label + color) for the status column.
     state_label: dict[str, str] | None = Field(default=None, alias="stateLabel")

@@ -169,7 +169,6 @@ def _app(**over: Any) -> _Obj:
         "flow_version_id": uuid4(),
         "current_state_id": uuid4(),
         "gremium_id": uuid4(),
-        "budget_pot_id": None,
         "budget_id": None,
         "fiscal_year_id": None,
         "amount": None,
@@ -351,7 +350,6 @@ async def test_state_out_resolved_none() -> None:
 def _payload(**over: Any) -> SimpleNamespace:
     base: dict[str, Any] = {
         "type_id": uuid4(),
-        "budget_pot_id": None,
         "data": {"title": "Mein Antrag", "cost": "10"},
         "applicant_email": "a@b.de",
         "applicant_name": "Alice",
@@ -798,23 +796,8 @@ async def test_versions_missing_404() -> None:
 
 
 # These tests run the real _pinned_fields and _pii_keys_for_type, without a monkeypatch.
-async def test_pinned_fields_with_budget_pot() -> None:
-    app = _app(budget_pot_id=uuid4())
-    row = _Obj(
-        key="title", type="text", label_i18n={"de": "t"}, help_i18n=None,
-        required=True, validation=None, visible_if=None, compute=None,
-        options=None, is_pii=False, is_promoted=False, promote_target=None,
-    )
-    pot_field = _Obj(field={"key": "pot_field", "type": "text", "label": {"de": "p"}})
-    session = _Session(scalars_results=[[row], [pot_field]])
-    svc = ApplicationsService(session)  # type: ignore[arg-type]
-    fields = await svc._pinned_fields(app)  # type: ignore[arg-type]
-    keys = {f.key for f in fields}
-    assert keys == {"title", "pot_field"}
-
-
-async def test_pinned_fields_no_pot() -> None:
-    app = _app(budget_pot_id=None)
+async def test_pinned_fields_returns_the_version_fields() -> None:
+    app = _app()
     row = _Obj(
         key="title", type="text", label_i18n={"de": "t"}, help_i18n=None,
         required=True, validation=None, visible_if=None, compute=None,
@@ -877,7 +860,6 @@ async def test_list_applications_all_filters_postgres_search(
         state_id=uuid4(),
         gremium_id=uuid4(),
         type_id=uuid4(),
-        budget_pot_id=uuid4(),
         budget_id=uuid4(),
         q="suche",
         amount_min=Decimal("1"),

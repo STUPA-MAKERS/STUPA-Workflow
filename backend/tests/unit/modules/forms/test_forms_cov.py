@@ -20,7 +20,6 @@ from typing import Any
 import pytest
 
 from app.modules.admin.models import ApplicationType
-from app.modules.budget.models import BudgetField, BudgetPot
 from app.modules.forms.models import FormField, FormVersion
 from app.modules.forms.schemas import FormVersionCreate
 from app.modules.forms.service import (
@@ -159,11 +158,6 @@ def _form_field_row(
     )
 
 
-def _budget_field_row(field: dict, *, order: int = 0) -> BudgetField:
-    bf = BudgetField(budget_pot_id=uuid.uuid4(), field=field, order=order)
-    return bf
-
-
 def _run(coro: Any) -> Any:
     return asyncio.run(coro)
 
@@ -236,59 +230,6 @@ def test_fields_of_version_maps_rows() -> None:
     assert [f.key for f in out] == ["title", "amount"]
 
 
-def test_pot_fields_pot_not_found() -> None:
-    at = _app_type(has_budget=True, gremium_id=uuid.uuid4())
-    svc = FormsService(_Session(gets=[None]))  # type: ignore[arg-type]
-    with pytest.raises(NotFoundError, match="budget pot .* not found"):
-        _run(svc._pot_fields(at, uuid.uuid4()))
-
-
-def test_pot_fields_type_without_budget() -> None:
-    gremium_id = uuid.uuid4()
-    at = _app_type(has_budget=False, gremium_id=gremium_id)
-    pot = BudgetPot()
-    pot.id = uuid.uuid4()
-    pot.gremium_id = gremium_id
-    svc = FormsService(_Session(gets=[pot]))  # type: ignore[arg-type]
-    with pytest.raises(NotFoundError, match="does not support budget pots"):
-        _run(svc._pot_fields(at, pot.id))
-
-
-def test_pot_fields_type_gremium_none() -> None:
-    at = _app_type(has_budget=True, gremium_id=None)
-    pot = BudgetPot()
-    pot.id = uuid.uuid4()
-    pot.gremium_id = uuid.uuid4()
-    svc = FormsService(_Session(gets=[pot]))  # type: ignore[arg-type]
-    with pytest.raises(NotFoundError, match="not available for this application type"):
-        _run(svc._pot_fields(at, pot.id))
-
-
-def test_pot_fields_cross_gremium_rejected() -> None:
-    at = _app_type(has_budget=True, gremium_id=uuid.uuid4())
-    pot = BudgetPot()
-    pot.id = uuid.uuid4()
-    pot.gremium_id = uuid.uuid4()  # a different Gremium
-    svc = FormsService(_Session(gets=[pot]))  # type: ignore[arg-type]
-    with pytest.raises(NotFoundError, match="not available for this application type"):
-        _run(svc._pot_fields(at, pot.id))
-
-
-def test_pot_fields_success_maps_budget_fields() -> None:
-    g = uuid.uuid4()
-    at = _app_type(has_budget=True, gremium_id=g)
-    pot = BudgetPot()
-    pot.id = uuid.uuid4()
-    pot.gremium_id = g
-    rows = [
-        _budget_field_row({"key": "cc", "type": "text", "label": {"de": "CC"}}),
-        _budget_field_row({"key": "note", "type": "textarea", "label": {"de": "N"}}, order=1),
-    ]
-    svc = FormsService(_Session(results=[_Result(rows)], gets=[pot]))  # type: ignore[arg-type]
-    out = _run(svc._pot_fields(at, pot.id))
-    assert [f.key for f in out] == ["cc", "note"]
-
-
 def test_get_effective_form_no_active_version_raises() -> None:
     at = _app_type(active_form_version_id=None)
     svc = FormsService(_Session(gets=[at]))  # type: ignore[arg-type]
@@ -306,7 +247,7 @@ def test_get_effective_form_active_version_main_only() -> None:
     out = _run(svc.get_effective_form(at.id))
     assert out.application_type_id == at.id
     assert out.form_version_id == ver_id
-    assert out.budget_pot_id is None
+    assert out.has_budget is False
     assert [s.key for s in out.sections] == ["main"]
     # The service prepends the system title and resolves the default label.
     assert out.sections[0].label == {"de": "Antrag", "en": "Application"}
@@ -324,24 +265,15 @@ def test_get_effective_form_pinned_version_overrides_active() -> None:
     assert out.form_version_id == pinned
 
 
-def test_get_effective_form_with_budget_pot_adds_section() -> None:
-    g = uuid.uuid4()
-    at = _app_type(has_budget=True, gremium_id=g, active_form_version_id=uuid.uuid4())
-    pot = BudgetPot()
-    pot.id = uuid.uuid4()
-    pot.gremium_id = g
-    type_fields = _Result([_form_field_row("a", "text")])
-    pot_fields = _Result([_budget_field_row({"key": "cc", "type": "text", "label": {"de": "CC"}})])
+def test_get_effective_form_reports_has_budget_of_the_type() -> None:
+    # The client evaluates `visibleIf: has_budget` against this, so it must match what
+    # the server validates against: the type's own flag.
+    at = _app_type(has_budget=True, active_form_version_id=uuid.uuid4())
     svc = FormsService(
-        _Session(results=[type_fields, pot_fields], gets=[at, pot])  # type: ignore[arg-type]
+        _Session(results=[_Result([_form_field_row("a", "text")])], gets=[at])  # type: ignore[arg-type]
     )
-    out = _run(svc.get_effective_form(at.id, budget_pot_id=pot.id))
-    assert [s.key for s in out.sections] == ["main", "budget"]
-    assert out.sections[1].label == {
-        "de": "Topf-spezifische Felder",
-        "en": "Budget-specific fields",
-    }
-    assert out.budget_pot_id == pot.id
+    out = _run(svc.get_effective_form(at.id))
+    assert out.has_budget is True
 
 
 def test_get_effective_form_injects_dynamic_options() -> None:

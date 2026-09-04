@@ -846,7 +846,6 @@ class _AppsServiceFake:
         return EffectiveFormOut(
             applicationTypeId=uuid4(),
             formVersionId=uuid4(),
-            budgetPotId=None,
             sections=[],
         )
 

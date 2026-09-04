@@ -19,7 +19,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.admin.models import ApplicationType, Gremium
 from app.modules.audit.actions import AuditAction
-from app.modules.budget.models import BudgetField, BudgetPot
 from app.modules.budget.tree_models import Budget
 from app.modules.config_revision.service import (
     ENTITY_FORM,
@@ -135,42 +134,9 @@ class FormsService:
         ).all()
         return [_row_to_field_def(r) for r in rows]
 
-    async def _pot_fields(
-        self, app_type: ApplicationType, budget_pot_id: UUID
-    ) -> list[FormFieldDef]:
-        """Load the extra fields of a budget pot of the Gremium of the application type.
-
-        The check stops cross-Gremium leaks. A pot of another Gremium, or a pot on a type
-        without a budget, must never reach the public effective form.
-
-        Raises:
-            NotFoundError: The pot does not exist, or it does not match the type. The
-                answer is 404 and does not reveal that the pot exists.
-        """
-        pot = await self.session.get(BudgetPot, budget_pot_id)
-        if pot is None:
-            raise NotFoundError(f"budget pot {budget_pot_id} not found")
-        if not app_type.has_budget:
-            raise NotFoundError(
-                f"application type {app_type.id} does not support budget pots"
-            )
-        if app_type.gremium_id is None or pot.gremium_id != app_type.gremium_id:
-            raise NotFoundError(
-                f"budget pot {budget_pot_id} is not available for this application type"
-            )
-        rows = (
-            await self.session.scalars(
-                select(BudgetField)
-                .where(BudgetField.budget_pot_id == budget_pot_id)
-                .order_by(BudgetField.order)
-            )
-        ).all()
-        return [FormFieldDef.model_validate(r.field) for r in rows]
-
     async def get_effective_form(
         self,
         type_id: UUID,
-        budget_pot_id: UUID | None = None,
         *,
         form_version_id: UUID | None = None,
     ) -> EffectiveFormOut:
@@ -185,10 +151,7 @@ class FormsService:
             raise NotFoundError(f"application type {type_id} has no active form version")
 
         type_fields = await self._fields_of_version(version_id)
-        pot_fields = (
-            await self._pot_fields(app_type, budget_pot_id) if budget_pot_id else None
-        )
-        sections = effective_form(type_fields, pot_fields)
+        sections = effective_form(type_fields)
 
         # The server injects the options of the dynamic picker fields only here. Each type
         # costs one lookup, and only when the form holds such a field.
@@ -202,7 +165,7 @@ class FormsService:
         return EffectiveFormOut(
             applicationTypeId=type_id,
             formVersionId=version_id,
-            budgetPotId=budget_pot_id,
+            hasBudget=app_type.has_budget,
             sections=[
                 FormSectionOut(
                     key=s.key,

@@ -495,12 +495,6 @@ class ComparisonOffers(_CamelModel):
     as_: Literal["file", "field", "both"] = Field(default="file", alias="as")
 
 
-# A budget pot can add this extra field to the effective form.
-class BudgetField(_CamelModel):
-    field: FormFieldDef
-    order: int = 0
-
-
 # JSON-Schema export for the frontend editors and for client-side validation
 def _exported_models() -> dict[str, type[BaseModel]]:
     """Return the config models to export.
@@ -517,7 +511,6 @@ def _exported_models() -> dict[str, type[BaseModel]]:
         "NotificationRule": NotificationRule,
         "WebhookConfig": WebhookConfig,
         "ComparisonOffers": ComparisonOffers,
-        "BudgetField": BudgetField,
         "Branding": Branding,
     }
 
