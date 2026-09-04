@@ -383,11 +383,21 @@ export class InvoicesComponent implements OnDestroy {
     return this.i18n.translate(status === 'paid' ? 'invoices.status.paid' : 'invoices.status.open');
   }
 
+  /**
+   * Reload page 0 after a filter or sort change, WITHOUT emptying the list first.
+   *
+   * Clearing the rows made every sort and every filter flash: the table dropped to
+   * skeletons and back, and a reader who had scrolled a wide table sideways lost their
+   * place, because an empty box has nothing to scroll and the browser clamps the
+   * position to 0. `fetch(true)` replaces the rows, so keeping them costs nothing.
+   *
+   * `loading` keeps its narrow meaning of "nothing to show yet". The old total stays
+   * for the same reason: a number a moment out of date reads better than a 0 that was
+   * never true.
+   */
   private reload(): void {
     this.nextOffset = 0;
-    this.items.set([]);
-    this.total.set(0);
-    this.loading.set(true);
+    this.loading.set(this.items().length === 0);
     this.fetch(true);
   }
 
