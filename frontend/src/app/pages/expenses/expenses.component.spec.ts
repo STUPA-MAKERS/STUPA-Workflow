@@ -1911,6 +1911,28 @@ describe('ExpensesComponent (batch/bulk)', () => {
     cmp.askBulk('delete');
     expect(cmp.bulkConfirm()).toBe('delete');
   });
+
+  it('blocks bulk delete above five rows, and leaves the other actions alone', () => {
+    const rows = Array.from({ length: 7 }, (_, i) => ({ ...EXPENSE, id: `e-${i}` }));
+    const { cmp } = build({ expenses: page(rows, 7) });
+
+    for (const r of rows.slice(0, 5)) cmp.toggleSelect(r.id, true);
+    expect(cmp.bulkDeleteOverMax()).toBe(false);
+    expect(cmp.bulkDeleteBlocked()).toBe(false);
+
+    cmp.toggleSelect('e-5', true);
+    expect(cmp.bulkDeleteOverMax()).toBe(true);
+    cmp.askBulk('delete');
+    expect(cmp.bulkConfirm()).toBeNull();
+
+    cmp.askBulk('export');
+    expect(cmp.bulkConfirm()).toBe('export');
+    cmp.bulkConfirm.set(null);
+
+    cmp.toggleSelect('e-5', false);
+    cmp.askBulk('delete');
+    expect(cmp.bulkConfirm()).toBe('delete');
+  });
 });
 
 describe('ExpensesComponent (query-param adoption)', () => {

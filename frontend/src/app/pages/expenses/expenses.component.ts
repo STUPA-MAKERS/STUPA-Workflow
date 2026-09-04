@@ -157,7 +157,12 @@ export class ExpensesComponent implements OnDestroy {
   readonly bulkConfirm = signal<null | 'delete' | 'export'>(null);
   /** Select-all must not enable mass deletion. The user must pick each row for the
    *  destructive bulk action. See. */
-  readonly bulkDeleteBlocked = computed(() => this.allSelected() && this.selectedCount() > 1);
+  /** Most rows one bulk delete may take. Selecting more stays allowed; deleting them does not. */
+  readonly bulkDeleteMax = 5;
+  readonly bulkDeleteOverMax = computed(() => this.selectedCount() > this.bulkDeleteMax);
+  readonly bulkDeleteBlocked = computed(
+    () => this.bulkDeleteOverMax() || (this.allSelected() && this.selectedCount() > 1),
+  );
   readonly bulkReassignOpen = signal(false);
   readonly bulkBudgetId = signal('');
   readonly bulkCategory = signal('');
@@ -711,7 +716,8 @@ export class ExpensesComponent implements OnDestroy {
 
   private runBulkDelete(): void {
     const ids = [...this.selected()];
-    if (!ids.length) return;
+    // The disabled button is an affordance, not a control: check the cap here too.
+    if (!ids.length || this.bulkDeleteBlocked()) return;
     this.bulkBusy.set(true);
     let done = 0;
     from(ids)
