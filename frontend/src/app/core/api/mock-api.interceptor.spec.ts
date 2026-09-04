@@ -67,7 +67,7 @@ describe('mockApiInterceptor', () => {
     const { api, http } = setup(true);
     api.effectiveForm('11111111-1111-1111-1111-111111111111').subscribe((form) => {
       expect(form.sections.length).toBeGreaterThan(0);
-      expect(form.budgetPotId).toBeTruthy();
+      expect(form.hasBudget).toBe(false);
       done();
     });
     http.expectNone((r) => r.url.includes('/form'));

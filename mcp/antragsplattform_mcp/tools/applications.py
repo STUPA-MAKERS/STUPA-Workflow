@@ -73,7 +73,6 @@ async def create_application(
     applicant_email: str | None = None,
     applicant_name: str | None = None,
     lang: str | None = None,
-    budget_pot_id: str | None = None,
 ) -> dict:
     """Create an application of the given type.
 
@@ -88,7 +87,7 @@ async def create_application(
         "/applications",
         json=params(
             typeId=type_id, data=data, applicantEmail=applicant_email,
-            applicantName=applicant_name, lang=lang, budgetPotId=budget_pot_id,
+            applicantName=applicant_name, lang=lang,
         ),
     )
 

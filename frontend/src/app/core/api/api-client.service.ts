@@ -156,13 +156,9 @@ export class ApiClient {
       .pipe(map((page) => page.items.map(mapApplicationType)));
   }
 
-  /** Effective form definition (type fields plus optional pot extra fields). */
-  effectiveForm(typeId: Uuid, budgetPotId?: Uuid | null): Observable<EffectiveForm> {
-    let params = new HttpParams();
-    // The backend expects `?budgetPotId=`, not `?pot=`.
-    if (budgetPotId) params = params.set('budgetPotId', budgetPotId);
+  /** Effective form definition of an application type. */
+  effectiveForm(typeId: Uuid): Observable<EffectiveForm> {
     return this.http.get<EffectiveForm>(`${this.base}/application-types/${typeId}/form`, {
-      params,
       context: skipLoading(),
     });
   }

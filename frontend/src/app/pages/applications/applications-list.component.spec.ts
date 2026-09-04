@@ -47,7 +47,6 @@ const ITEM: ApplicationListItemWire = {
   title: 'Mein Antrag',
   state: OPEN_STATE,
   gremiumId: null,
-  budgetPotId: null,
   amount: '250.00',
   currency: 'EUR',
   createdAt: '2026-05-30T09:00:00Z',
@@ -208,7 +207,7 @@ describe('ApplicationsListComponent', () => {
       [],
       expect.objectContaining({
         queryParams: {
-          q: null, type: null, state: null, gremium: null, topf: null, budget: null,
+          q: null, type: null, state: null, gremium: null, budget: null,
           amountMin: null, amountMax: null, createdFrom: null, createdTo: null,
           // `archived` clears with the rest. It is a tri-state, so a reset has to put it
           // back to its default rather than merely leave it alone.
@@ -577,7 +576,6 @@ describe('ApplicationsListComponent', () => {
           type: 't1',
           state: 's1',
           gremium: 'g1',
-          topf: 'topf1',
           budget: 'b1',
           createdFrom: '2026-01-01',
           createdTo: '2026-12-31',
@@ -598,7 +596,6 @@ describe('ApplicationsListComponent', () => {
       expect(p.get('type')).toBe('t1');
       expect(p.get('state')).toBe('s1');
       expect(p.get('gremium')).toBe('g1');
-      expect(p.get('topf')).toBe('topf1');
       expect(p.get('budget')).toBe('b1');
       expect(p.get('createdFrom')).toBe('2026-01-01');
       expect(p.get('createdTo')).toBe('2026-12-31');
@@ -905,7 +902,6 @@ describe('ApplicationsListComponent', () => {
         type: 't1',
         state: 's1',
         gremium: 'g1',
-        topf: 'topf1',
         budget: 'b1',
         amountMin: '100',
         amountMax: '500',
@@ -921,7 +917,6 @@ describe('ApplicationsListComponent', () => {
     expect(p.get('type')).toBe('t1');
     expect(p.get('state')).toBe('s1');
     expect(p.get('gremium')).toBe('g1');
-    expect(p.get('topf')).toBe('topf1');
     expect(p.get('budget')).toBe('b1');
     expect(p.get('amountMin')).toBe('100');
     expect(p.get('amountMax')).toBe('500');

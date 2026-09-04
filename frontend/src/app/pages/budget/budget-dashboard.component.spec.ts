@@ -378,11 +378,6 @@ describe('BudgetDashboardComponent', () => {
     expect(c.shortId('aaaaaaaa-1111')).toBe('aaaaaaaa');
   });
 
-  it('stageLabel returns a dash for null and a translated label otherwise', async () => {
-    const { c } = await setup();
-    expect(c.stageLabel(null)).toBe('—');
-    expect(typeof c.stageLabel('approved')).toBe('string');
-  });
 
   it('titleOf trims and falls back to a short id', async () => {
     const { c } = await setup();
@@ -780,7 +775,7 @@ describe('BudgetDashboardComponent', () => {
     expect(screen.getByText('Kein Haushaltsjahr angelegt')).toBeTruthy();
     expect(screen.queryByText('Noch keine Budgetdaten')).toBeNull();
     const link = screen.getByRole('link', { name: 'Haushaltsjahr anlegen' });
-    expect(link.getAttribute('href')).toBe('/admin/budget-pots');
+    expect(link.getAttribute('href')).toBe('/admin/cost-centres');
   });
 
   it('keeps the "nothing is configured" wording when there is no cost centre at all', async () => {
@@ -815,7 +810,7 @@ describe('BudgetDashboardComponent', () => {
   });
 
   it('hides the fiscal-year link from a reader who cannot create one', async () => {
-    // /admin/budget-pots needs `budget.structure`. Without it the link only leads to a
+    // /admin/cost-centres needs `budget.structure`. Without it the link only leads to a
     // 403, so the panel states the cause and stops there.
     await setup({ fys: [], can: false });
     expect(screen.getByText('Kein Haushaltsjahr angelegt')).toBeTruthy();

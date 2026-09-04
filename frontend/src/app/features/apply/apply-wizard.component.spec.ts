@@ -25,7 +25,6 @@ const TYPES: ApplicationType[] = [
 const EFF: EffectiveForm = {
   applicationTypeId: 't1',
   formVersionId: 'v1',
-  budgetPotId: 'pot1',
   sections: [
     {
       key: 'main',
@@ -742,34 +741,6 @@ describe('ApplyWizardComponent', () => {
     expect(create).not.toHaveBeenCalled();
   });
 
-  it('sends a null budgetPotId when the effective form has no budget pot', async () => {
-    const create = jest.fn(() => of({ applicationId: 'app-1' }));
-    const noPot: EffectiveForm = { ...EFF, budgetPotId: undefined };
-    const { fixture } = await render(ApplyWizardComponent, {
-      providers: [
-        provideRouter([]),
-        provideFormly(),
-        {
-          provide: ApiClient,
-          useValue: {
-            ...fakeApi(create),
-            effectiveForm: () => of(noPot),
-            createApplication: create as unknown as ApiClient['createApplication'],
-          },
-        },
-      ],
-    });
-    const comp = fixture.componentInstance;
-    comp.selectType('t1');
-    comp.contactForm.setValue({ email: 'a@b.de', name: '' });
-    comp.model = { title: 'X' };
-    comp.onAltchaSolved('sol');
-    comp.submit();
-    const payload = create.mock.calls[0][0] as { budgetPotId: string | null; applicantName: string | null };
-    expect(payload.budgetPotId).toBeNull();
-    // name empty string → applicantName null (the `|| null` branch).
-    expect(payload.applicantName).toBeNull();
-  });
 
   it('discardDraft is a no-op for clearing when no type is selected', async () => {
     const { fixture } = await setup();

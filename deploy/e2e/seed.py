@@ -49,7 +49,6 @@ from app.modules.admin.schemas import ApplicationTypeCreate, FlowVersionCreate
 from app.modules.admin.service import ConfigService
 from app.modules.auth.models import Principal, Role, RoleAssignment
 from app.modules.auth.sessions import create_principal_session
-from app.modules.budget.models import BudgetPot
 from app.modules.flow.models import FlowVersion, State
 from app.modules.forms.models import FormField
 from app.modules.forms.schemas import FormVersionCreate
@@ -261,20 +260,6 @@ async def _ensure_flow(session) -> dict[str, str]:
     return {"initial": initial, "locked": locked}
 
 
-async def _ensure_budget_pot(session, gremium_id: uuid.UUID) -> uuid.UUID:
-    existing = (
-        await session.execute(select(BudgetPot).where(BudgetPot.name == "E2E-Topf"))
-    ).scalar_one_or_none()
-    if existing is not None:
-        return existing.id
-    pot = BudgetPot(
-        gremium_id=gremium_id, name="E2E-Topf", total=10000, currency="EUR",
-        period="2026", active=True,
-    )
-    session.add(pot)
-    await session.flush()
-    return pot.id
-
 
 async def _ensure_admin_session(session, settings) -> str:
     """Make sure the admin Principal and its RoleAssignment exist, then mint a session.
@@ -337,7 +322,6 @@ async def main() -> None:
         # The pot needs a Gremium. An existing type may carry none, so fall back to the
         # seeded one instead of rewriting the type.
         pot_gremium_id = app_type.gremium_id or gremium.id
-        pot_id = await _ensure_budget_pot(session, pot_gremium_id)
         admin_cookie = await _ensure_admin_session(session, settings)
         await session.commit()
 
@@ -348,7 +332,6 @@ async def main() -> None:
         "applicantEmail": "antragsteller@e2e.test",
         "typeId": str(app_type.id),
         "gremiumId": str(pot_gremium_id),
-        "budgetPotId": str(pot_id),
         "states": states,
         "fieldKeys": field_keys,
     }

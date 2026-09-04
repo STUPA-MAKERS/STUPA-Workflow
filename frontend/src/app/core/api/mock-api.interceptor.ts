@@ -128,7 +128,7 @@ const MOCK_APP_ID = '33333333-3333-3333-3333-333333333333';
 const MOCK_EFFECTIVE_FORM: EffectiveForm = {
   applicationTypeId: MOCK_TYPES.items[0].id,
   formVersionId: '44444444-4444-4444-4444-444444444444',
-  budgetPotId: '55555555-5555-5555-5555-555555555555',
+  hasBudget: false,
   sections: [
     {
       key: 'main',
@@ -217,7 +217,6 @@ function mockApplication(data: Record<string, unknown> = {}): ApplicationOutWire
     typeId: MOCK_TYPES.items[0].id,
     state: SUBMITTED_STATE,
     gremiumId: null,
-    budgetPotId: MOCK_EFFECTIVE_FORM.budgetPotId ?? null,
     amount: null,
     currency: 'EUR',
     data,
@@ -235,7 +234,6 @@ const MOCK_APPLICATIONS: Page<ApplicationOutWire> = {
       typeId: '11111111-1111-1111-1111-111111111111',
       state: { ...SUBMITTED_STATE, editAllowed: false },
       gremiumId: null,
-      budgetPotId: null,
       amount: '250.00',
       currency: 'EUR',
       data: { title: 'Förderung Ersti-Wochenende' },
@@ -255,7 +253,6 @@ const MOCK_APPLICATIONS: Page<ApplicationOutWire> = {
         editAllowed: true,
       },
       gremiumId: null,
-      budgetPotId: null,
       amount: null,
       currency: 'EUR',
       data: { title: 'Anschaffung Beamer' },
@@ -290,7 +287,6 @@ const MOCK_TASKS: ApplicationListItemWire[] = [
       kind: 'vote',
     },
     gremiumId: null,
-    budgetPotId: null,
     amount: '480.00',
     currency: 'EUR',
     title: 'Hardware für Fachschaftsraum',
@@ -309,7 +305,6 @@ const MOCK_TASKS: ApplicationListItemWire[] = [
       kind: 'vote',
     },
     gremiumId: null,
-    budgetPotId: null,
     amount: '1200.00',
     currency: 'EUR',
     title: 'Förderung Sommerfest',

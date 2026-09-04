@@ -31,7 +31,6 @@ function appWire(): ApplicationOutWire {
     typeId: 't1',
     state: STATE,
     gremiumId: null,
-    budgetPotId: 'p1',
     amount: '10.00',
     currency: 'EUR',
     data: { title: 'X' },
@@ -137,7 +136,6 @@ describe('ApiClient', () => {
   it('maps a single application from the wire DTO', (done) => {
     api.getApplication('app-1').subscribe((app) => {
       expect(app.typeId).toBe('t1');
-      expect(app.budgetPotId).toBe('p1');
       expect(app.state?.editAllowed).toBe(true);
       expect(app.createdAt).toBe('2026-06-05T10:00:00Z');
       done();
@@ -149,7 +147,6 @@ describe('ApiClient', () => {
     api
       .createApplication({
         typeId: 't1',
-        budgetPotId: 'p1',
         data: { title: 'X' },
         applicantEmail: 'a@b.de',
         applicantName: 'Max',
@@ -164,7 +161,6 @@ describe('ApiClient', () => {
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual({
       typeId: 't1',
-      budgetPotId: 'p1',
       data: { title: 'X' },
       applicantEmail: 'a@b.de',
       applicantName: 'Max',
@@ -281,13 +277,6 @@ describe('ApiClient', () => {
     req.flush({ application_id: 'a', scope: 'edit' });
   });
 
-  it('GETs the effective form with the budgetPotId param (not ?pot)', () => {
-    api.effectiveForm('type-1', 'pot-9').subscribe();
-    const req = http.expectOne((r) => r.url === '/api/application-types/type-1/form');
-    expect(req.request.params.get('budgetPotId')).toBe('pot-9');
-    expect(req.request.params.get('pot')).toBeNull();
-    req.flush({ applicationTypeId: 'type-1', formVersionId: 'v1', sections: [] });
-  });
 
   it('PATCHes application data and maps the result', (done) => {
     api.updateApplication('app-1', { title: 'Neu' }).subscribe((app) => {
@@ -395,11 +384,11 @@ describe('ApiClient', () => {
     req.flush({ url: 'https://example/feed.ics?t=abc' });
   });
 
-  it('GETs the effective form WITHOUT a budgetPotId param when none given', () => {
+  it('GETs the effective form without any query parameters', () => {
     api.effectiveForm('type-1').subscribe();
     const req = http.expectOne((r) => r.url === '/api/application-types/type-1/form');
     expect(req.request.params.keys()).toHaveLength(0);
-    req.flush({ applicationTypeId: 'type-1', formVersionId: 'v1', sections: [] });
+    req.flush({ applicationTypeId: 'type-1', formVersionId: 'v1', hasBudget: false, sections: [] });
   });
 
   it('GETs the pinned form for an existing application', () => {

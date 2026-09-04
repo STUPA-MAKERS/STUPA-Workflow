@@ -45,11 +45,11 @@ import { downloadBlob } from '@shared/download.util';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 
 /**
- * Application list with filter and search (`state/gremium/type/topf/q`) and offset paging.
+ * Application list with filter and search (`state/gremium/type/q`) and offset paging.
  * The filter and page state lives in the route query params. A filtered list is therefore
  * shareable as a link, for example from the budget area, and the browser back button works.
- * Visible controls exist for search, type and status. `gremium` and `topf` come from the
- * URL only. Pickers follow once the gremium and pot list endpoints exist.
+ * Visible controls exist for search, type and status. `gremium` comes from the URL only;
+ * a picker follows once the gremium list endpoint exists.
  */
 
 /**
@@ -102,9 +102,8 @@ export class ApplicationsListComponent implements OnDestroy {
   private nextOffset = 0;
   /** Fetch sequence number. The fetch handler drops late responses from old filters. */
   private fetchSeq = 0;
-  /** `gremium` and `topf` have no visible controls. They still mirror the URL. */
+  /** `gremium` has no visible control. It still mirrors the URL. */
   readonly gremium = signal('');
-  readonly topf = signal('');
   readonly types = signal<ApplicationType[]>([]);
 
   /** Visible filter controls. They mirror the query params. */
@@ -285,7 +284,7 @@ export class ApplicationsListComponent implements OnDestroy {
       const v = pm.get(p);
       if (v) (query[k] as unknown) = v;
     };
-    str('q'); str('type'); str('state'); str('gremium'); str('topf'); str('budget');
+    str('q'); str('type'); str('state'); str('gremium'); str('budget');
     str('createdFrom'); str('createdTo');
     const min = pm.get('amountMin'); if (min) query.amountMin = Number(min);
     const max = pm.get('amountMax'); if (max) query.amountMax = Number(max);
@@ -377,7 +376,6 @@ export class ApplicationsListComponent implements OnDestroy {
     { param: 'type', signal: this.typeId, empty: '' },
     { param: 'state', signal: this.state, empty: '' },
     { param: 'gremium', signal: this.gremium, empty: '' },
-    { param: 'topf', signal: this.topf, empty: '' },
     { param: 'budget', signal: this.budgetId, empty: '' },
     { param: 'amountMin', signal: this.amountMin, empty: '', numeric: true, trim: true },
     { param: 'amountMax', signal: this.amountMax, empty: '', numeric: true, trim: true },

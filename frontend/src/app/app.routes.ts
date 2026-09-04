@@ -192,12 +192,15 @@ export const routes: Routes = [
           import('./pages/invoices/invoices.component').then((m) => m.InvoicesComponent),
       },
       {
-        path: 'admin/budget-pots',
+        path: 'admin/cost-centres',
         data: { title: 'budget.tree.title', permission: 'budget.structure', parent: ['admin'], wide: true },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/budget/budget-tree.component').then((m) => m.BudgetTreeComponent),
       },
+      // The page was called budget-pots while the pot feature existed. Bookmarks and
+      // shared links from that time still work.
+      { path: 'admin/budget-pots', redirectTo: 'admin/cost-centres', pathMatch: 'full' },
       {
         path: 'admin',
         data: {

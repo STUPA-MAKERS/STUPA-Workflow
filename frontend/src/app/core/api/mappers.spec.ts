@@ -74,7 +74,6 @@ describe('mapApplication', () => {
     typeId: 't1',
     state: STATE,
     gremiumId: 'g1',
-    budgetPotId: 'p1',
     budgetId: 'c1',
     fiscalYearId: 'fy1',
     amount: '250.00',
@@ -94,7 +93,6 @@ describe('mapApplication', () => {
       typeId: 't1',
       state: { id: 's1', key: 'submitted', label: 'Eingereicht', color: '#4a90d9', editAllowed: true, kind: 'normal' },
       gremiumId: 'g1',
-      budgetPotId: 'p1',
       budgetId: 'c1',
       fiscalYearId: 'fy1',
       amount: '250.00',
@@ -124,7 +122,6 @@ describe('mapApplication', () => {
     const view = mapApplication(minimal, 'de');
     expect(view.state).toBeNull();
     expect(view.gremiumId).toBeNull();
-    expect(view.budgetPotId).toBeNull();
     expect(view.amount).toBeNull();
     expect(view.currency).toBeNull();
     expect(view.lang).toBeNull();
@@ -147,7 +144,6 @@ describe('mapApplicationListItem', () => {
     const view = mapApplicationListItem(wire, 'en');
     expect(view.state?.label).toBe('Submitted');
     expect(view.gremiumId).toBeNull();
-    expect(view.budgetPotId).toBeNull();
     expect(view.amount).toBe('10.00');
   });
 });
@@ -306,7 +302,6 @@ describe('toApplicationCreateBody', () => {
   it('builds the camelCase request body', () => {
     const input: NewApplication = {
       typeId: 't1',
-      budgetPotId: 'p1',
       data: { title: 'Fest' },
       applicantEmail: 'a@b.de',
       applicantName: 'Max',
@@ -315,7 +310,6 @@ describe('toApplicationCreateBody', () => {
     };
     expect(toApplicationCreateBody(input)).toEqual({
       typeId: 't1',
-      budgetPotId: 'p1',
       data: { title: 'Fest' },
       applicantEmail: 'a@b.de',
       applicantName: 'Max',
@@ -324,7 +318,7 @@ describe('toApplicationCreateBody', () => {
     });
   });
 
-  it('defaults omitted optionals (budgetPotId/applicantName) to null', () => {
+  it('defaults an omitted applicantName to null', () => {
     const input: NewApplication = {
       typeId: 't1',
       data: {},
@@ -333,7 +327,6 @@ describe('toApplicationCreateBody', () => {
       altcha: 'sol',
     };
     const body = toApplicationCreateBody(input);
-    expect(body.budgetPotId).toBeNull();
     expect(body.applicantName).toBeNull();
   });
 });
