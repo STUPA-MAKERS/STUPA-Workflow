@@ -164,6 +164,8 @@ export class MeetingFocusComponent {
   protected readonly openVote = computed(
     () => this.votes().find((v) => v.status === 'open') ?? null,
   );
+  /** Every vote of the item that no longer runs: closed, cancelled or never opened. */
+  protected readonly doneVotes = computed(() => this.votes().filter((v) => v.status !== 'open'));
   /** The last closed vote whose result is not in the text yet. */
   protected readonly pendingResult = computed<MeetingVote | null>(() => {
     if (this.openVote()) return null;

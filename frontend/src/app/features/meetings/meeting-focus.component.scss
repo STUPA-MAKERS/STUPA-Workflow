@@ -253,6 +253,18 @@ app-markdown-editor ::ng-deep .mde__host .ProseMirror {
   min-width: 0;
   flex-wrap: wrap;
 }
+.fx__done {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.fx__done .fx__q {
+  max-width: 22rem;
+}
+.fx__hidden {
+  white-space: normal;
+}
 
 /* Popovers out of the dock */
 .fx__backdrop {

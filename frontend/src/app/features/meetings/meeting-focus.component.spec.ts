@@ -392,11 +392,32 @@ describe('MeetingFocusComponent', () => {
       expect(screen.queryByRole('button', { name: 'Ergebnis ins Protokoll übernehmen' })).toBeNull();
     });
 
-    it('goes quiet once the result is in the text', async () => {
+    it('keeps a finished vote reachable once its result is in the text', async () => {
       const closed = vote({ status: 'closed', result: 'passed', counts: { yes: 3 } });
-      await setup({ meeting: meeting({ votes: [closed] }), top: item({ body: 'Text\n:::vote{#v-1}\n:::' }) });
-      expect(screen.queryByText('Angenommen')).toBeNull();
+      const cancelled = vote({ id: 'v-2', status: 'cancelled', question: 'Vertagen?' });
+      const { on } = await setup({
+        meeting: meeting({ votes: [closed, cancelled] }),
+        top: item({ body: 'Text\n:::vote{#v-1}\n:::' }),
+      });
+      expect(screen.getByText('Angenommen')).toBeInTheDocument();
+      expect(screen.getByText('Abgebrochen')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Ergebnis ins Protokoll übernehmen' })).toBeNull();
+      const deletes = screen.getAllByRole('button', { name: 'Beschlussfrage löschen' });
+      expect(deletes).toHaveLength(2);
+      await userEvent.click(deletes[1]);
+      expect(on.voteDelete).toHaveBeenCalledWith('v-2');
       expect(screen.getByRole('button', { name: 'Beschlussfrage hinzufügen' })).toBeInTheDocument();
+    });
+
+    it('names the concealed tally of a secret vote', async () => {
+      await setup({ meeting: meeting({ votes: [vote({ revealed: false })] }) });
+      expect(screen.getByText(/Zwischenstand sichtbar/)).toBeInTheDocument();
+    });
+
+    it('lets the lead close a planned meeting that does not take place', async () => {
+      const { on } = await setup({ meeting: meeting({ status: 'planned' }), protocol: null });
+      await userEvent.click(screen.getByRole('button', { name: 'Sitzung schließen' }));
+      expect(on.closeSession).toHaveBeenCalled();
     });
 
     it('points back to now when the open item is not the one the room handles', async () => {

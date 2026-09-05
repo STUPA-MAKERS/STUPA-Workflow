@@ -20,7 +20,9 @@
     <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.settings.title' | t" [title]="'meetings.settings.title' | t" (click)="openSettings.emit()"><app-icon name="edit" /></app-button>
     <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.delete.title' | t" [title]="'meetings.delete.title' | t" (click)="deleteMeeting.emit()"><app-icon name="delete" /></app-button>
   }
-  @if (m.canControl && m.status === 'live') {
+  <!-- "closed" is terminal, so the close leaves with it. A planned meeting closes
+       too: that is how a meeting that does not take place is put to rest. -->
+  @if (m.canControl && m.status !== 'closed') {
     <app-button variant="secondary" size="sm" [loading]="finalizing()" [title]="'meetings.control.closeSession' | t" (click)="closeSession.emit()">
       <span class="inline-flex items-center gap-2"><app-icon name="stop" [size]="14" /> {{ 'meetings.control.closeSession' | t }}</span>
     </app-button>
@@ -243,6 +245,8 @@
             <div [class.mtg__tally--leading]="entry.key === vote.leading"><dt>{{ optionLabel(entry.key) }}</dt><dd>{{ entry.value }}</dd></div>
           }
         </dl>
+      } @else {
+        <span class="text-sm text-text-muted fx__hidden">{{ 'meetings.vote.progressHidden' | t }}</span>
       }
     </div>
   }
@@ -299,32 +303,38 @@
           <app-button variant="danger" size="sm" (click)="voteClose.emit(vote.id)">{{ 'meetings.vote.close' | t }}</app-button>
           <app-button variant="ghost" size="sm" (click)="voteCancel.emit(vote.id)">{{ 'meetings.vote.cancel' | t }}</app-button>
         }
-      } @else if (pendingResult(); as vote) {
-        <span class="fx__q font-medium">{{ vote.question || ('meetings.vote.untitled' | t) }}</span>
-        <app-badge [variant]="voteResultVariant(vote.result)">{{ voteResultKey(vote.result) | t }}</app-badge>
-        @if (vote.result === 'rejected' && vote.failedReason === 'quorum') {
-          <span class="text-xs text-danger font-medium">{{ 'vote.failedQuorum' | t }}</span>
-        }
-        @if (vote.counts) {
-          <dl class="mtg__tally" [attr.aria-label]="'meetings.vote.tally' | t">
-            @for (entry of countEntries(vote); track entry.key) {
-              <div [class.mtg__tally--leading]="entry.key === vote.leading"><dt>{{ optionLabel(entry.key) }}</dt><dd>{{ entry.value }}</dd></div>
-            }
-          </dl>
-        }
-        @if (editable()) {
-          <app-button size="sm" (click)="insertResult(vote)">{{ 'meetings.dock.insertResult' | t }}</app-button>
-        }
-        @if (m.canManageVotes && !locked()) {
-          <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.vote.delete' | t" [title]="'meetings.vote.delete' | t" [disabled]="deletingVote() === vote.id" (click)="voteDelete.emit(vote.id)"><app-icon name="delete" /></app-button>
-          @if (top(); as t) {
-            @if (canAddVote(t)) {
-              <app-button size="sm" variant="secondary" (click)="voteDialog.emit(t)">{{ (t.applicationId ? 'meetings.vote.openFor' : 'meetings.vote.addQuestion') | t }}</app-button>
-            }
-          }
-        }
       } @else {
-        <!-- Nothing runs, so the dock offers the next step and says nothing else. -->
+        <!-- Every finished vote of the item stays reachable: its result, and the
+             delete for the vote managers. The newest result that is not in the
+             text yet offers the insert. Nothing runs, so nothing else is said. -->
+        @for (vote of doneVotes(); track vote.id) {
+          <span class="fx__done">
+            <span class="fx__q">{{ vote.question || ('meetings.vote.untitled' | t) }}</span>
+            @if (vote.status === 'closed') {
+              <app-badge [variant]="voteResultVariant(vote.result)">{{ voteResultKey(vote.result) | t }}</app-badge>
+            } @else {
+              <app-badge [variant]="voteVariant(vote.status)">{{ voteStatusKey(vote.status) | t }}</app-badge>
+            }
+            @if (vote.result === 'rejected' && vote.failedReason === 'quorum') {
+              <span class="text-xs text-danger font-medium">{{ 'vote.failedQuorum' | t }}</span>
+            }
+            @if (pendingResult()?.id === vote.id) {
+              @if (vote.counts) {
+                <dl class="mtg__tally" [attr.aria-label]="'meetings.vote.tally' | t">
+                  @for (entry of countEntries(vote); track entry.key) {
+                    <div [class.mtg__tally--leading]="entry.key === vote.leading"><dt>{{ optionLabel(entry.key) }}</dt><dd>{{ entry.value }}</dd></div>
+                  }
+                </dl>
+              }
+              @if (editable()) {
+                <app-button size="sm" (click)="insertResult(vote)">{{ 'meetings.dock.insertResult' | t }}</app-button>
+              }
+            }
+            @if (m.canManageVotes && !locked()) {
+              <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.vote.delete' | t" [title]="'meetings.vote.delete' | t" [disabled]="deletingVote() === vote.id" (click)="voteDelete.emit(vote.id)"><app-icon name="delete" /></app-button>
+            }
+          </span>
+        }
         @if (top(); as t) {
           @if (m.canManageVotes && !locked() && m.status === 'live' && canAddVote(t)) {
             <app-button size="sm" variant="secondary" (click)="voteDialog.emit(t)">{{ (t.applicationId ? 'meetings.vote.openFor' : 'meetings.vote.addQuestion') | t }}</app-button>
