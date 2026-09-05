@@ -5,6 +5,10 @@
   flex-direction: column;
   gap: var(--space-5);
 }
+/* A closed dialog renders nothing but still takes a gap in the column. */
+:host > app-dialog:empty {
+  display: none;
+}
 .mtg__headActions {
   display: flex;
   align-items: center;

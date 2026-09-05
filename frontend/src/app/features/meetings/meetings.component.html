@@ -41,14 +41,11 @@
   <div class="mtg__meta">
     <span class="font-semibold">{{ m.title }}</span>
     @if (m.date) {
-      <span class="text-text-muted">{{ m.date | ldate: 'mediumDate' }}{{ timeSuffix(m.startTime) }}</span>
+      <app-badge variant="neutral">{{ m.date | ldate: 'mediumDate' }}{{ timeSuffix(m.startTime) }}</app-badge>
     }
     <app-badge [variant]="statusVariant(m.status)">
       {{ statusKey(m.status) | t }}
     </app-badge>
-    @if (m.protokollantName) {
-      <span class="text-text-muted">{{ 'meetings.protokollant.label' | t }}: {{ m.protokollantName }}</span>
-    }
     <app-button
       variant="ghost"
       size="sm"
@@ -324,13 +321,13 @@
             <span class="mtg__tlDot" [class.mtg__tlDot--live]="m.status === 'live'"></span>
             <div class="mtg__tlBody">
               <div class="mtg__tlMeta">
-                <span class="text-text-muted text-sm">
+                <app-badge variant="neutral">
                   @if (m.date) {
                     {{ m.date | ldate: 'mediumDate' }}{{ timeSuffix(m.startTime) }}
                   } @else {
                     {{ 'meetings.list.noDate' | t }}
                   }
-                </span>
+                </app-badge>
                 <app-badge [variant]="statusVariant(m.status)">{{ statusKey(m.status) | t }}</app-badge>
                 @if (m.gremiumName) {
                   <span class="mtg__tlGremium"><app-icon name="parliament" [size]="12" /> {{ m.gremiumName }}</span>
@@ -338,7 +335,7 @@
               </div>
               <h3 class="m-0 text-base font-semibold">{{ m.title }}</h3>
               @if (m.protokollantName) {
-                <span class="text-text-muted text-sm">{{ 'meetings.protokollant.label' | t }}: {{ m.protokollantName }}</span>
+                <span class="mtg__tlGremium" [title]="'meetings.protokollant.label' | t"><app-icon name="user" [size]="12" /> {{ m.protokollantName }}</span>
               }
             </div>
             <span class="mtg__rowActions" (click)="$event.stopPropagation()">

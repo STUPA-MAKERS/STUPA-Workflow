@@ -451,8 +451,19 @@ app-markdown-editor ::ng-deep .mde__host .ProseMirror {
   min-width: 0;
 }
 
-/* Phone: the dock stacks and the popovers become sheets. */
+/* Phone: the dock sits on the viewport like a tab bar, the page keeps its height free
+   below the content, and the popovers become sheets. */
 @media (max-width: 48rem) {
+  :host {
+    padding-bottom: var(--fx-dock-h, 0px);
+  }
+  .fx__dock {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom));
+  }
   .fx__bar {
     padding: var(--space-3) var(--space-4);
     gap: var(--space-2);

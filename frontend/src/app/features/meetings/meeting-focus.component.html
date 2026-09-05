@@ -6,7 +6,7 @@
   <span class="fx__sep" aria-hidden="true"></span>
   <span class="font-semibold fx__title">{{ m.title }}</span>
   @if (m.date) {
-    <span class="text-text-muted text-sm fx__nowrap">{{ m.date | ldate: 'mediumDate' }}{{ timeSuffix(m.startTime) }}</span>
+    <app-badge variant="neutral">{{ m.date | ldate: 'mediumDate' }}{{ timeSuffix(m.startTime) }}</app-badge>
   }
   <app-badge [variant]="statusVariant(m.status)">{{ statusKey(m.status) | t }}</app-badge>
   <span class="fx__spacer"></span>
@@ -111,7 +111,7 @@
   }
 </div>
 
-<div class="fx__dock" [class.fx__dock--stack]="openVote() !== null">
+<div #dock class="fx__dock" [class.fx__dock--stack]="openVote() !== null">
   @if (panel() !== 'none') {
     <button type="button" class="fx__backdrop" aria-hidden="true" tabindex="-1" (click)="closePanel()"></button>
   }
