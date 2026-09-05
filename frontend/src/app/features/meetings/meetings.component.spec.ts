@@ -2312,6 +2312,66 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.meeting()?.activeApplicationId).toBe('app-2');
     });
 
+    it('follows the current agenda item from a meeting_state and opens it when nothing is selected', async () => {
+      const { cmp, ws, http } = await loaded();
+      ws.subject.next({ type: 'meeting_state', activeApplicationId: null, currentAgendaItemId: 't-2', status: 'live' });
+      http.expectOne('/api/meetings/m-1/agenda').flush([AGENDA_ITEM(), AGENDA_ITEM({ id: 't-2', position: 1 })]);
+      http.expectOne('/api/meetings/m-1/agenda/assignable').flush([]);
+      http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
+      expect(cmp.meeting()?.currentAgendaItemId).toBe('t-2');
+      expect(cmp.currentTop()?.id).toBe('t-2');
+      expect(cmp.currentTopIndex()).toBe(1);
+      expect(cmp.selectedTopId()).toBe('t-2');
+    });
+
+    it('keeps the prior current item when the meeting_state omits it', async () => {
+      const { cmp, ws, http } = await loaded();
+      cmp.meeting.set({ ...MEETING_MODEL, currentAgendaItemId: 't-1' });
+      ws.subject.next({ type: 'meeting_state', activeApplicationId: null, status: 'live' });
+      http.expectOne('/api/meetings/m-1/agenda').flush([]);
+      http.expectOne('/api/meetings/m-1/agenda/assignable').flush([]);
+      http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
+      expect(cmp.meeting()?.currentAgendaItemId).toBe('t-1');
+    });
+
+    it('broadcasts the item the room lead opens, once', async () => {
+      const { cmp, http } = await loaded();
+      cmp.agenda.set([AGENDA_ITEM(), AGENDA_ITEM({ id: 't-2', position: 1 })] as never);
+      cmp.jumpTo('t-2');
+      expect(cmp.selectedTopId()).toBe('t-2');
+      const req = http.expectOne('/api/meetings/m-1');
+      expect(req.request.method).toBe('PATCH');
+      expect(req.request.body).toEqual({ currentAgendaItemId: 't-2' });
+      req.flush({ ...MEETING, currentAgendaItemId: 't-2' });
+      expect(cmp.meeting()?.currentAgendaItemId).toBe('t-2');
+      cmp.jumpTo('t-2');
+      http.expectNone('/api/meetings/m-1');
+    });
+
+    it('keeps "now" local without vote management, after the close and without a meeting', async () => {
+      const { cmp, http } = await loaded();
+      cmp.meeting.set({ ...MEETING_MODEL, canManageVotes: false });
+      cmp.jumpTo('t-2');
+      cmp.meeting.set({ ...MEETING_MODEL, status: 'closed' });
+      cmp.jumpTo('t-2');
+      cmp.meeting.set(null);
+      cmp.jumpTo('t-2');
+      http.expectNone('/api/meetings/m-1');
+    });
+
+    it('leaves the meeting untouched when the "now" broadcast fails', async () => {
+      const { cmp, http } = await loaded();
+      cmp.jumpTo('t-2');
+      http.expectOne('/api/meetings/m-1').flush({ detail: 'nope' }, { status: 403, statusText: 'Forbidden' });
+      expect(cmp.meeting()?.currentAgendaItemId).toBeNull();
+    });
+
+    it('navigates back to the list', async () => {
+      const { cmp, navigate } = await loaded();
+      cmp.goBack();
+      expect(navigate).toHaveBeenCalledWith(['/meetings']);
+    });
+
     it('ignores unknown live messages and messages with no meeting', async () => {
       const { cmp, ws } = await loaded();
       ws.subject.next({ type: 'pong' } as unknown as ServerMessage);

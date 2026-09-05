@@ -227,6 +227,7 @@ class LiveVoteConnection:
         await self._send(
             MeetingStateEvent(
                 activeApplicationId=meeting.active_application_id,
+                currentAgendaItemId=meeting.current_agenda_item_id,
                 status=meeting.status,
             ).dump()
         )

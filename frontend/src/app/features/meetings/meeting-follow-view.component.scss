@@ -100,3 +100,9 @@
     overflow-x: auto;
   }
 }
+
+/* The item the room handles now, so a follower finds the place at a glance. */
+.mtg__followTop--now {
+  border-left: 3px solid var(--color-primary);
+  padding-left: var(--space-3);
+}

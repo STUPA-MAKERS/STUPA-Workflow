@@ -249,6 +249,7 @@
   }
 
   <div class="fx__row">
+    <div class="fx__nav">
     <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="!hasPrev()" [ariaLabel]="'meetings.dock.prev' | t" [title]="'meetings.dock.prev' | t" (click)="step(-1)"><app-icon name="chevron-down" class="fx__prevIcon" /></app-button>
     <button
       type="button"
@@ -269,6 +270,7 @@
       <app-icon name="chevron-up" [size]="12" />
     </button>
     <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="!hasNext()" [ariaLabel]="'meetings.dock.next' | t" [title]="'meetings.dock.next' | t" (click)="step(1)"><app-icon name="chevron-down" class="fx__nextIcon" /></app-button>
+    </div>
     <span class="fx__sep" aria-hidden="true"></span>
 
     <div class="fx__mid">

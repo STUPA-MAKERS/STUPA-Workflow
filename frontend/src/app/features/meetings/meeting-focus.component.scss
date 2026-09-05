@@ -192,6 +192,12 @@ app-markdown-editor ::ng-deep .mde__host .ProseMirror {
   height: 100%;
   background: var(--color-primary);
 }
+.fx__nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
 .fx__prevIcon {
   transform: rotate(90deg);
 }
@@ -461,10 +467,17 @@ app-markdown-editor ::ng-deep .mde__host .ProseMirror {
     flex: 1 1 auto;
     width: auto;
   }
+  .fx__nav {
+    flex: 1 1 100%;
+    gap: var(--space-2);
+  }
   .fx__chip--now {
     flex: 1 1 auto;
     max-width: none;
     justify-content: center;
+  }
+  .fx__row > .fx__sep {
+    display: none;
   }
   .fx__mid {
     flex: 1 1 100%;

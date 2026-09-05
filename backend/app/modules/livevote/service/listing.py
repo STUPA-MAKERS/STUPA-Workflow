@@ -278,6 +278,7 @@ class ListingOps(PermissionOps, VoteReadOps):
                     can_write=(m.gremium_id in write_ids) or is_prot,
                     can_manage_votes=(m.gremium_id in votes_mgmt_ids) or is_prot,
                     can_vote=m.gremium_id in vote_ids,
+                    is_protokollant=is_prot,
                     gremium_name=gremium_names.get(m.gremium_id),
                     protokollant_name=(
                         prot_names.get(m.protokollant_id) if m.protokollant_id is not None else None
