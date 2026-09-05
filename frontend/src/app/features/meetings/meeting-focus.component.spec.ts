@@ -107,7 +107,6 @@ type Inputs = {
   viewers: string[];
   casting: string | null;
   deletingVote: string | null;
-  deletingProtocol: boolean;
   finalizing: boolean;
   choices: Record<string, string>;
   assignableOptions: { value: string; label: string }[];
@@ -132,7 +131,6 @@ function inputs(over: Partial<Inputs> = {}): Inputs {
     viewers: ['Pia Protokoll', 'Alina Admin'],
     casting: null,
     deletingVote: null,
-    deletingProtocol: false,
     finalizing: false,
     choices: {},
     assignableOptions: [{ value: 'app-9', label: 'Antrag Neun' }],
@@ -147,7 +145,7 @@ function inputs(over: Partial<Inputs> = {}): Inputs {
 
 const OUTPUTS = [
   'back', 'selectTop', 'bodyChange', 'castVote', 'voteClose', 'voteCancel', 'voteDelete',
-  'voteDialog', 'protocolDelete', 'startSession', 'closeSession', 'finalize', 'openSettings',
+  'voteDialog', 'startSession', 'closeSession', 'finalize', 'openSettings',
   'deleteMeeting', 'toggleBeamer', 'attendanceChange', 'addToAgenda', 'addFreetext',
   'removeFromAgenda', 'startRename', 'cancelRename', 'renameTop', 'setNonPublic', 'dragStart',
   'dragOver', 'drop',
@@ -230,16 +228,8 @@ describe('MeetingFocusComponent', () => {
     });
 
     it('names the minute-taker for a reader who may not type', async () => {
-      const { on } = await setup({ canEdit: false });
+      await setup({ canEdit: false });
       expect(screen.getByText(/Pia Protokoll führt das Protokoll/)).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Protokollentwurf verwerfen' })).toBeNull();
-      expect(on.protocolDelete).not.toHaveBeenCalled();
-    });
-
-    it('lets the minute-taker discard the draft', async () => {
-      const { on } = await setup();
-      await userEvent.click(screen.getByRole('button', { name: 'Protokollentwurf verwerfen' }));
-      expect(on.protocolDelete).toHaveBeenCalled();
     });
 
     it('explains the empty states', async () => {
@@ -374,7 +364,8 @@ describe('MeetingFocusComponent', () => {
 
     it('carries the result until it is in the text, then goes quiet', async () => {
       const closed = vote({ status: 'closed', result: 'passed', counts: { yes: 3, no: 1, abstain: 0 }, leading: 'yes', revealed: true });
-      const { on } = await setup({ meeting: meeting({ votes: [closed] }), top: item({ body: 'Aussprache.  ' }) });
+      // A trailing hard break from a phone keyboard must not survive as an empty line.
+      const { on } = await setup({ meeting: meeting({ votes: [closed] }), top: item({ body: 'Aussprache.\\\n' }) });
       expect(screen.getByText('Angenommen')).toBeInTheDocument();
       await userEvent.click(screen.getByRole('button', { name: 'Ergebnis ins Protokoll übernehmen' }));
       const payload = on.bodyChange.mock.calls[0][0] as { itemId: string; body: string };

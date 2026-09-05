@@ -508,6 +508,19 @@ app-markdown-editor ::ng-deep .mde__host .ProseMirror {
   .fx__mid app-button {
     flex: 1 1 auto;
   }
+  .fx__done {
+    display: flex;
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+  }
+  .fx__done .fx__q {
+    flex: 1 1 100%;
+    max-width: none;
+    white-space: normal;
+  }
+  .fx__done .mtg__tally {
+    flex: 1 1 100%;
+  }
   .fx__chip--tail {
     flex: 1 1 100%;
     margin-left: 0;

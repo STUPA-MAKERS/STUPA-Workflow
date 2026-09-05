@@ -808,15 +808,7 @@ export const de = {
     'Das PDF wird im Hintergrund gerendert und anschließend versandt.',
   'meetings.protocol.retryHint':
     'Die Finalisierung ist fehlgeschlagen — Inhalt prüfen und erneut versuchen.',
-  'meetings.protocol.delete': 'Protokollentwurf verwerfen',
   'meetings.protocol.takenBy': '{name} führt das Protokoll — du liest mit.',
-  'meetings.protocol.deleteTitle': 'Protokollentwurf verwerfen',
-  'meetings.protocol.deleteBody':
-    'Der Entwurf des Protokolls wird endgültig gelöscht. Der TOP-Text bleibt erhalten, das Protokoll muss danach neu angelegt werden.',
-  'meetings.protocol.deleted': 'Protokollentwurf verworfen.',
-  'meetings.protocol.deleteConflict':
-    'Das Protokoll ist kein Entwurf mehr und lässt sich nicht mehr verwerfen',
-  'meetings.protocol.deleteFailed': 'Der Protokollentwurf konnte nicht verworfen werden.',
   'meetings.create.title': 'Sitzung anlegen',
   'meetings.create.name': 'Titel',
   'meetings.create.placeholder': 'z. B. STUPA-Sitzung 12.06.',
@@ -2973,14 +2965,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.protocol.finalizedHint': 'The minutes are final and have been sent.',
   'meetings.protocol.renderingHint': 'The PDF is rendered in the background and sent afterwards.',
   'meetings.protocol.retryHint': 'Finalizing failed — review the content and try again.',
-  'meetings.protocol.delete': 'Discard draft minutes',
   'meetings.protocol.takenBy': '{name} takes the minutes — you read along.',
-  'meetings.protocol.deleteTitle': 'Discard draft minutes',
-  'meetings.protocol.deleteBody':
-    'The draft of the minutes is deleted permanently. The agenda-item text stays, but the minutes must be created again.',
-  'meetings.protocol.deleted': 'Draft minutes discarded.',
-  'meetings.protocol.deleteConflict': 'The minutes are no longer a draft and cannot be discarded',
-  'meetings.protocol.deleteFailed': 'Could not discard the draft minutes.',
   'meetings.create.title': 'Create meeting',
   'meetings.create.name': 'Title',
   'meetings.create.placeholder': 'e.g. STUPA session June 12',

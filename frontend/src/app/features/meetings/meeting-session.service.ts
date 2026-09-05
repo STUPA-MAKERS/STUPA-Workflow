@@ -68,10 +68,6 @@ export class MeetingSessionService implements OnDestroy {
   /** Poll fallback while the worker renders the protocol. */
   private renderPollTimer: ReturnType<typeof setTimeout> | null = null;
 
-  /** Confirmation state of "discard the draft minutes". */
-  readonly confirmDeleteProtocol = signal(false);
-  readonly deletingProtocol = signal(false);
-
   /** The vote with a cast in flight, and the vote with a delete in flight. */
   readonly casting = signal<Uuid | null>(null);
   readonly deletingVote = signal<Uuid | null>(null);
@@ -459,58 +455,6 @@ export class MeetingSessionService implements OnDestroy {
       error: () => {
         this.finalizing.set(false);
         this.toast.error(this.i18n.translate('meetings.toast.saveFailed'));
-      },
-    });
-  }
-
-  /** A draft protocol may be discarded. `isLocked` covers `rendering` and
-   *  `final`, and the server answers 409 for both. */
-  readonly canDeleteProtocol = computed(() => {
-    const proto = this.protocol();
-    return !!proto && !proto.isLocked && this.canWrite();
-  });
-
-  askDeleteProtocol(): void {
-    if (!this.canDeleteProtocol()) return;
-    this.confirmDeleteProtocol.set(true);
-  }
-
-  closeDeleteProtocol(): void {
-    this.confirmDeleteProtocol.set(false);
-  }
-
-  /**
-   * Discard the draft minutes (`DELETE /protocols/{id}`).
-   *
-   * A race is real: another person can finalize between the render of the button
-   * and the click. The server then answers 409. Say what happened, and reload
-   * the protocol so that the pane shows the new state instead of a stale draft.
-   */
-  doDeleteProtocol(): void {
-    const proto = this.protocol();
-    if (!proto || this.deletingProtocol()) return;
-    this.deletingProtocol.set(true);
-    this.api.deleteProtocol(proto.id).subscribe({
-      next: () => {
-        this.deletingProtocol.set(false);
-        this.confirmDeleteProtocol.set(false);
-        this.protocol.set(null);
-        this.toast.success(this.i18n.translate('meetings.protocol.deleted'));
-      },
-      error: (err: unknown) => {
-        this.deletingProtocol.set(false);
-        this.confirmDeleteProtocol.set(false);
-        const status = (err as { status?: number }).status;
-        if (status === 409) {
-          // The protocol left the draft state in the meantime. The 409 detail
-          // says whether it is final or still rendering.
-          const detail = errorDetail(err);
-          const base = this.i18n.translate('meetings.protocol.deleteConflict');
-          this.toast.error(detail ? `${base}: ${detail}` : base);
-          this.refreshProtocol();
-          return;
-        }
-        this.toast.error(this.i18n.translate('meetings.protocol.deleteFailed'));
       },
     });
   }
