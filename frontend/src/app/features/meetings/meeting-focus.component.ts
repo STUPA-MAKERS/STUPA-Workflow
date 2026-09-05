@@ -1,12 +1,16 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
+  type ElementRef,
+  afterNextRender,
   computed,
   inject,
   input,
   model,
   output,
   signal,
+  viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -81,10 +85,30 @@ export type DockPanel = 'none' | 'agenda' | 'attendance';
   ],
   templateUrl: './meeting-focus.component.html',
   styleUrl: './meeting-focus.component.scss',
-  host: { '(document:keydown.escape)': 'closePanel()' },
+  host: {
+    '(document:keydown.escape)': 'closePanel()',
+    '[style.--fx-dock-h.px]': 'dockHeight()',
+  },
 })
 export class MeetingFocusComponent {
   private readonly i18n = inject(I18nService);
+  private readonly dock = viewChild.required<ElementRef<HTMLElement>>('dock');
+  /**
+   * Height of the dock. On a phone the dock is fixed to the viewport, so the page
+   * keeps this much room below its content.
+   */
+  protected readonly dockHeight = signal(0);
+
+  constructor() {
+    const destroyRef = inject(DestroyRef);
+    afterNextRender(() => {
+      if (typeof ResizeObserver === 'undefined') return;
+      const el = this.dock().nativeElement;
+      const observer = new ResizeObserver(() => this.dockHeight.set(el.offsetHeight));
+      observer.observe(el);
+      destroyRef.onDestroy(() => observer.disconnect());
+    });
+  }
 
   readonly meeting = input.required<Meeting>();
   readonly protocol = input.required<Protocol | null>();
