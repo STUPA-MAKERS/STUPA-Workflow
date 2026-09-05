@@ -789,16 +789,6 @@ export class ApiClient {
       .pipe(map(mapProtocol));
   }
 
-  /**
-   * DELETE /protocols/{id} — discard a draft protocol.
-   *
-   * The scope is the same as the PATCH: whoever may write the minutes may drop
-   * them. The server answers 409 once the protocol is `final` or `rendering`.
-   */
-  deleteProtocol(protocolId: Uuid): Observable<void> {
-    return this.http.delete<void>(`${this.base}/protocols/${protocolId}`);
-  }
-
   /** GET /notifications/preferences — own toggles (full catalog). */
   listNotificationPreferences(): Observable<NotificationPreference[]> {
     return this.http.get<NotificationPreference[]>(`${this.base}/notifications/preferences`, {

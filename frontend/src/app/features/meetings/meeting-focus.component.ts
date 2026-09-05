@@ -3,6 +3,7 @@ import {
   Component,
   DestroyRef,
   type ElementRef,
+  NgZone,
   afterNextRender,
   computed,
   inject,
@@ -101,10 +102,15 @@ export class MeetingFocusComponent {
 
   constructor() {
     const destroyRef = inject(DestroyRef);
+    const zone = inject(NgZone);
     afterNextRender(() => {
       if (typeof ResizeObserver === 'undefined') return;
       const el = this.dock().nativeElement;
-      const observer = new ResizeObserver(() => this.dockHeight.set(el.offsetHeight));
+      // The observer fires outside the zone, so the write runs inside it, or the
+      // page keeps the old room below its content until the next event.
+      const observer = new ResizeObserver(() =>
+        zone.run(() => this.dockHeight.set(el.offsetHeight)),
+      );
       observer.observe(el);
       destroyRef.onDestroy(() => observer.disconnect());
     });
@@ -127,7 +133,6 @@ export class MeetingFocusComponent {
   readonly viewers = input.required<string[]>();
   readonly casting = input.required<Uuid | null>();
   readonly deletingVote = input.required<Uuid | null>();
-  readonly deletingProtocol = input.required<boolean>();
   readonly finalizing = input.required<boolean>();
   /** Own choice per vote id. It highlights the picked option. */
   readonly choices = input.required<Record<string, string>>();
@@ -147,7 +152,6 @@ export class MeetingFocusComponent {
   readonly voteCancel = output<Uuid>();
   readonly voteDelete = output<Uuid>();
   readonly voteDialog = output<AgendaItem>();
-  readonly protocolDelete = output<void>();
   readonly startSession = output<void>();
   readonly closeSession = output<void>();
   readonly finalize = output<void>();
@@ -268,7 +272,9 @@ export class MeetingFocusComponent {
   insertResult(vote: MeetingVote): void {
     const t = this.top();
     if (!t) return;
-    const body = (t.body ?? '').replace(/\s+$/, '');
+    // A phone keyboard often ends the text with a hard break, which Markdown keeps
+    // as a trailing backslash. Left in place it becomes an empty line before the block.
+    const body = (t.body ?? '').replace(/[\s\\]+$/, '');
     const snippet = voteSnippet(vote).replace(/^\n+/, '');
     this.bodyChange.emit({ itemId: t.id, body: body ? `${body}\n\n${snippet}` : snippet });
     this.editorRev.update((r) => r + 1);

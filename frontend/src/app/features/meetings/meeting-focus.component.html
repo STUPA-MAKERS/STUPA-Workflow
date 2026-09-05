@@ -104,9 +104,6 @@
       @if (top()) {
         <span class="fx__nowrap">{{ 'meetings.dock.words' | t: { n: wordCount() } }}</span>
       }
-      @if (!proto.isLocked && canEdit()) {
-        <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.protocol.delete' | t" [title]="'meetings.protocol.delete' | t" [disabled]="deletingProtocol()" (click)="protocolDelete.emit()"><app-icon name="delete" /></app-button>
-      }
     </div>
   }
 </div>
