@@ -126,6 +126,10 @@ class SearchService:
             q=q,
             owner_sub=None if can_read else principal.sub,
             committee_sub=None if can_read else principal.sub,
+            # `None` is both. The list defaults to hiding archived rows, which is right
+            # for a working list and wrong for a search: someone searching by name is
+            # looking for one record, and archiving it does not make it stop existing.
+            archived=None,
             limit=PER_KIND + 1,
             offset=0,
         )
@@ -138,6 +142,7 @@ class SearchService:
                     resolve_i18n(item.state.label, lang, "de") if item.state is not None else None
                 ),
                 url=HIT_URL["application"].format(id=item.id),
+                archived=item.archived_at is not None,
             )
             for item in page.items
         ]

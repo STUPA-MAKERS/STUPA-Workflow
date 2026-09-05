@@ -259,4 +259,25 @@ describe('CommandPaletteComponent', () => {
     expect(cmp.query()).toBe('');
     expect(cmp.rows()).toEqual([]);
   });
+
+  it('badges an archived hit and leaves a current one plain', async () => {
+    const { cmp, fixture, http } = await setup([]);
+    cmp.show();
+    cmp.onQuery('Antrag');
+    await answer(http, {
+      hits: [
+        { kind: 'application', id: 'a-1', title: 'Laufend', subtitle: null,
+          url: '/applications/a-1' },
+        { kind: 'application', id: 'a-2', title: 'Archiviert', subtitle: null,
+          url: '/applications/a-2', archived: true },
+      ],
+      truncated: false,
+      failed: [],
+    });
+    fixture.detectChanges();
+
+    const badges = fixture.nativeElement.querySelectorAll('.pal__rowBadge');
+    expect(badges).toHaveLength(1);
+    expect(badges[0].textContent.trim()).toBe('Archiviert');
+  });
 });

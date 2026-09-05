@@ -176,3 +176,17 @@
     display: none;
   }
 }
+
+/* Marks an archived hit. The list already hides archived rows by default, so a reader
+   who meets one in the palette needs to know why it looks inactive. */
+.pal__rowBadge {
+  margin-inline-start: var(--space-2);
+  padding: 0 var(--space-2);
+  border-radius: 999px;
+  background: var(--color-surface-sunken);
+  border: var(--border-width) solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  white-space: nowrap;
+}

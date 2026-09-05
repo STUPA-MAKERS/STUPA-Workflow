@@ -36,6 +36,9 @@ class SearchHit(BaseModel):
     subtitle: str | None = None
     #: Where the palette navigates. App-relative, and always a route the client has.
     url: str
+    #: The record is archived. Applications only; the palette marks such a hit, because
+    #: an archived record is otherwise indistinguishable from a current one.
+    archived: bool = False
 
 
 class SearchResults(BaseModel):

@@ -156,3 +156,41 @@ def test_every_kind_has_a_url_that_names_the_record() -> None:
         # Filled in, the URL has to differ from the plain page: a template that ignores
         # its id would still pass the check above if the id sat in a comment.
         assert template.format(id="X") != template.format(id="Y"), kind
+
+
+async def test_applications_source_includes_archived_and_marks_them(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A search must reach an archived application, and say that it is one.
+
+    The list hides archived rows by default, which is right for a working list and wrong
+    here: archiving a record does not make it stop existing, and someone searching by
+    name is looking for that one record.
+    """
+    from types import SimpleNamespace
+
+    from app.modules.applications.service import ApplicationsService
+
+    seen: dict[str, object] = {}
+    live_id, filed_id = uuid.uuid4(), uuid.uuid4()
+
+    async def _fake_list(_self: object, **kw: object) -> object:
+        seen.update(kw)
+        return SimpleNamespace(
+            items=[
+                SimpleNamespace(id=live_id, title="Laufender Antrag", state=None, archived_at=None),
+                SimpleNamespace(
+                    id=filed_id, title="Alter Antrag", state=None, archived_at="2026-01-01"
+                ),
+            ]
+        )
+
+    monkeypatch.setattr(ApplicationsService, "list_applications", _fake_list)
+
+    svc = SearchService(session=None)  # type: ignore[arg-type]
+    principal = Principal(sub="s", email=None, display_name=None, roles=[], permissions=set())
+    hits = await svc._applications("antrag", principal, "de")
+
+    assert seen["archived"] is None, "None means both; False would hide the archived one"
+    assert [h.archived for h in hits] == [False, True]
+    assert [h.id for h in hits] == [str(live_id), str(filed_id)]
