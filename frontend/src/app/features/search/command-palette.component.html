@@ -45,7 +45,12 @@
           >
             <app-icon [name]="row.icon" [size]="16" />
             <span class="pal__rowText">
-              <span class="pal__rowTitle">{{ row.title }}</span>
+              <span class="pal__rowTitle">
+                {{ row.title }}
+                @if (row.archived) {
+                  <span class="pal__rowBadge">{{ 'search.archived' | t }}</span>
+                }
+              </span>
               @if (row.subtitle) {
                 <span class="pal__rowSub">{{ row.subtitle }}</span>
               }

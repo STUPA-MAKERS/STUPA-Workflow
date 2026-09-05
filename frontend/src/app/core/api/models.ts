@@ -1018,6 +1018,8 @@ export interface SearchHit {
   title: string;
   subtitle: string | null;
   url: string;
+  /** Applications only. The row badges it, so an archived hit is not read as current. */
+  archived?: boolean;
 }
 
 /** Everything found for one query, in one round trip. */

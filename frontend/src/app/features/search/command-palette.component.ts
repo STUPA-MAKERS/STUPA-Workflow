@@ -30,6 +30,8 @@ interface PaletteRow {
   subtitle: string | null;
   icon: IconName;
   url: string;
+  /** Applications only. The row badges it, so an archived hit is not read as current. */
+  archived?: boolean;
 }
 
 /** How long to wait after a keystroke before asking the server. */
@@ -142,6 +144,7 @@ export class CommandPaletteComponent {
       subtitle: h.subtitle,
       icon: KIND_ICON[h.kind],
       url: h.url,
+      archived: h.archived,
     })),
   );
 
