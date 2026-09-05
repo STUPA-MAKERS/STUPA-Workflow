@@ -359,9 +359,31 @@ input.exp__input {
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
 }
+/* The count leads: a large tabular digit, its noun small beside it. The second line
+   is where the delete cap speaks, so nothing is bolted onto the button. */
 .exp__bulkcount {
-  font-weight: var(--fw-semibold);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   white-space: nowrap;
+}
+.exp__bulknum {
+  font-size: 1.5rem;
+  font-weight: var(--fw-bold);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-primary);
+}
+.exp__bulklabels {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+}
+.exp__bulkcap {
+  color: var(--color-danger);
+  font-weight: var(--fw-semibold);
 }
 /* Mobile: keep the bar as one row that scrolls horizontally. It never stacks. */
 @media (max-width: 768px) {

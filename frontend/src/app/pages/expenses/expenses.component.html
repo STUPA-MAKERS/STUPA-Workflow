@@ -229,9 +229,17 @@
           role="toolbar"
           [attr.aria-label]="'expenses.bulk.selectedCount' | t: { count: selectedCount() }"
         >
-          <span class="exp__bulkcount">{{
-            'expenses.bulk.selectedCount' | t: { count: selectedCount() }
-          }}</span>
+          <span class="exp__bulkcount">
+            <b class="exp__bulknum">{{ selectedCount() }}</b>
+            <span class="exp__bulklabels">
+              <span>{{ 'expenses.bulk.selectedNoun' | t }}</span>
+              @if (bulkDeleteOverMax()) {
+                <span class="exp__bulkcap">{{
+                  'expenses.bulk.deleteMax' | t: { max: bulkDeleteMax }
+                }}</span>
+              }
+            </span>
+          </span>
           <app-button
             variant="secondary"
             size="sm"
@@ -251,7 +259,7 @@
             >
               <span class="inline-flex items-center gap-2"
                 ><app-icon name="export" [size]="14" />
-                {{ 'expenses.bulk.exportSelected' | t }}</span
+                {{ 'expenses.bulk.export' | t }}</span
               >
             </app-button>
           }
@@ -261,9 +269,11 @@
             [loading]="bulkBusy()"
             [disabled]="bulkBusy() || bulkDeleteBlocked()"
             [title]="
-              bulkDeleteBlocked()
-                ? ('expenses.bulk.deleteAllBlocked' | t)
-                : ('expenses.bulk.deleteSelected' | t)
+              bulkDeleteOverMax()
+                ? ('expenses.bulk.deleteMaxBlocked' | t: { max: bulkDeleteMax })
+                : bulkDeleteBlocked()
+                  ? ('expenses.bulk.deleteAllBlocked' | t)
+                  : ('expenses.bulk.deleteSelected' | t)
             "
             (click)="askBulk('delete')"
           >
@@ -271,10 +281,15 @@
               ><app-icon name="delete" [size]="14" /> {{ 'expenses.bulk.deleteSelected' | t }}</span
             >
           </app-button>
-          <app-button variant="ghost" size="sm" (click)="toggleSelectAll(false)">
-            <span class="inline-flex items-center gap-2"
-              ><app-icon name="remove" [size]="14" /> {{ 'expenses.bulk.clear' | t }}</span
-            >
+          <app-button
+            variant="ghost"
+            size="sm"
+            [iconOnly]="true"
+            [ariaLabel]="'expenses.bulk.clear' | t"
+            [title]="'expenses.bulk.clear' | t"
+            (click)="toggleSelectAll(false)"
+          >
+            <app-icon name="remove" [size]="14" />
           </app-button>
         </div>
       }

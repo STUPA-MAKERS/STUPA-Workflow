@@ -251,6 +251,11 @@ export const de = {
   'expenses.delete.confirm': 'Löschen',
   'expenses.bulk.selectAll': 'Alle wählen',
   'expenses.bulk.selectedCount': '{count} ausgewählt',
+  'expenses.bulk.selectedNoun': 'ausgewählt',
+  'expenses.bulk.export': 'Export',
+  'expenses.bulk.deleteMax': 'Löschen: max. {max}',
+  'expenses.bulk.deleteMaxBlocked':
+    'Sammel-Löschen gilt für höchstens {max} Buchungen — Auswahl verkleinern.',
   'expenses.bulk.clear': 'Auswahl aufheben',
   'expenses.bulk.deleteSelected': 'Löschen',
   'expenses.bulk.deleteTitle': 'Buchungen löschen',
@@ -2402,6 +2407,11 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'expenses.delete.confirm': 'Delete',
   'expenses.bulk.selectAll': 'Select all',
   'expenses.bulk.selectedCount': '{count} selected',
+  'expenses.bulk.selectedNoun': 'selected',
+  'expenses.bulk.export': 'Export',
+  'expenses.bulk.deleteMax': 'Delete: max. {max}',
+  'expenses.bulk.deleteMaxBlocked':
+    'Bulk delete takes at most {max} bookings — shorten the selection.',
   'expenses.bulk.clear': 'Clear selection',
   'expenses.bulk.deleteSelected': 'Delete',
   'expenses.bulk.deleteTitle': 'Delete bookings',
