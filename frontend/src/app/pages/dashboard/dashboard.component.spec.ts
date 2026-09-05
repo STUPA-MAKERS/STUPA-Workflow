@@ -149,6 +149,7 @@ function meeting(id: string, status: string, date: string | null = null): unknow
     endTime: null,
     status,
     activeApplicationId: null,
+    currentAgendaItemId: null,
     gremiumId: null,
     gremiumName: null,
     votes: [],

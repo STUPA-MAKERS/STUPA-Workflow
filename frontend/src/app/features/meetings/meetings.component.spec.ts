@@ -25,6 +25,7 @@ const MEETING: MeetingOutWire = {
   startTime: '17:00',
   endTime: null,
   activeApplicationId: 'app-1',
+  currentAgendaItemId: null,
   gremiumId: null,
   protocolId: 'p-1',
   canControl: true,
@@ -68,6 +69,7 @@ const MEETING_MODEL: Meeting = {
   startTime: '17:00',
   endTime: null,
   activeApplicationId: 'app-1',
+  currentAgendaItemId: null,
   gremiumId: null,
   gremiumName: null,
   protocolId: 'p-1',
@@ -306,8 +308,10 @@ describe('MeetingsComponent', () => {
 
     // Closing is irreversible: the toolbar button opens the confirmation dialog.
     // A confirm closes the meeting (PATCH status) and finalizes implicitly.
-    await userEvent.click(await screen.findByRole('button', { name: 'Schließen' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Sitzung schließen' }));
+    const bar = await screen.findByRole('toolbar', { name: 'Sitzungssteuerung' });
+    await userEvent.click(within(bar).getByRole('button', { name: 'Sitzung schließen' }));
+    const confirm = await screen.findByRole('dialog');
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Sitzung schließen' }));
     const closeReq = http.expectOne('/api/meetings/m-1');
     expect(closeReq.request.method).toBe('PATCH');
     expect(closeReq.request.body).toEqual({ status: 'closed' });
@@ -381,11 +385,16 @@ describe('MeetingsComponent', () => {
     http.expectOne('/api/meetings/m-1/agenda/assignable').flush([]);
     flushDelegationContext(http);
 
+    // The agenda lives in a popover that opens out of the dock.
+    await userEvent.click(await screen.findByTitle('Tagesordnung öffnen'));
     await screen.findByText('Vertraulich');
-    const noe = Array.from(container.querySelectorAll('app-badge')).filter(
+    // The page heading marks the open item too, so count the agenda rows alone.
+    const agendaPopover = screen.getByRole('dialog', { name: 'Tagesordnung' });
+    const noe = Array.from(agendaPopover.querySelectorAll('app-badge')).filter(
       (b) => b.textContent?.trim() === 'NÖ',
     );
     expect(noe).toHaveLength(1); // only the non-public TOP, not the public one
+    expect(container.querySelectorAll('app-badge').length).toBeGreaterThan(noe.length);
   });
 
   it('shows no NÖ badge while the meeting is still live', async () => {
@@ -399,6 +408,8 @@ describe('MeetingsComponent', () => {
     http.expectOne('/api/meetings/m-1/agenda/assignable').flush([]);
     flushDelegationContext(http);
 
+    // The agenda lives in a popover that opens out of the dock.
+    await userEvent.click(await screen.findByTitle('Tagesordnung öffnen'));
     await screen.findByText('Vertraulich');
     const noe = Array.from(container.querySelectorAll('app-badge')).filter(
       (b) => b.textContent?.trim() === 'NÖ',
@@ -517,8 +528,10 @@ describe('MeetingsComponent', () => {
     const { http } = await setup();
     flushLoad(http);
     // The toolbar close button opens the irreversible confirmation dialog.
-    await userEvent.click(await screen.findByRole('button', { name: 'Schließen' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Sitzung schließen' }));
+    const bar = await screen.findByRole('toolbar', { name: 'Sitzungssteuerung' });
+    await userEvent.click(within(bar).getByRole('button', { name: 'Sitzung schließen' }));
+    const confirm = await screen.findByRole('dialog');
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Sitzung schließen' }));
     const req = http.expectOne('/api/meetings/m-1');
     expect(req.request.method).toBe('PATCH');
     expect(req.request.body).toEqual({ status: 'closed' });
@@ -646,8 +659,8 @@ describe('MeetingsComponent', () => {
       await loadOtherProtokollant();
 
       expect(await screen.findByRole('toolbar', { name: 'Sitzungssteuerung' })).toBeInTheDocument();
+      // The start sits in the dock while the meeting is planned.
       expect(screen.getByRole('button', { name: 'Sitzung eröffnen' })).toBeEnabled();
-      expect(screen.getByRole('button', { name: 'Schließen' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Sitzung bearbeiten' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Sitzung löschen' })).toBeInTheDocument();
       // The follow view must not take the page over.
@@ -655,11 +668,14 @@ describe('MeetingsComponent', () => {
     });
 
     it('keeps the agenda editor and vote creation for a manager who is not the minute-taker', async () => {
-      await loadOtherProtokollant();
+      // A vote needs a started meeting, so the dock offers it while live only.
+      await loadOtherProtokollant({ status: 'live' });
 
+      expect(await screen.findByRole('button', { name: 'Beschlussfrage hinzufügen' })).toBeInTheDocument();
+      // The agenda editor lives in the popover that opens out of the dock.
+      await userEvent.click(screen.getByTitle('Tagesordnung öffnen'));
       expect(await screen.findByPlaceholderText(/Freitext-TOP/)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'TOP hinzufügen' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Beschlussfrage hinzufügen' })).toBeInTheDocument();
     });
 
     it('shows the protocol pane read-only to a manager who is not the minute-taker', async () => {

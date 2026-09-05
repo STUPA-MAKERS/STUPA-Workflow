@@ -176,8 +176,33 @@ export class MeetingSessionService implements OnDestroy {
     // intact. A protocol is only ever created explicitly.
     if (m.protocolId && (this.canWrite() || this.canViewAll())) this.refreshProtocol();
     this.loadAttendance(m.id);
-    this.agendaSvc.load(m.id, this.canManage());
+    this.agendaSvc.load(m.id, this.canManage(), m.currentAgendaItemId);
   }
+
+  /**
+   * Tell the room which agenda item runs now.
+   *
+   * The protokollant leads, and the session lead may take over, so the gate is
+   * `canManageVotes`. Everybody else keeps a local selection. A closed meeting has
+   * no "now", and the server refuses it.
+   */
+  setCurrentTop(itemId: Uuid): void {
+    const m = this.meeting();
+    if (!m || !m.canManageVotes || m.status === 'closed' || m.currentAgendaItemId === itemId) return;
+    this.api.patchMeeting(m.id, { currentAgendaItemId: itemId }).subscribe({
+      next: (updated) => this.meeting.set(updated),
+      error: () => this.toast.error(this.i18n.translate('meetings.toast.actionFailed')),
+    });
+  }
+
+  /** The agenda item the room handles now, when it is on the agenda. */
+  readonly currentTop = computed<AgendaItem | null>(() => {
+    const id = this.meeting()?.currentAgendaItemId;
+    return id ? (this.agendaSvc.agenda().find((a) => a.id === id) ?? null) : null;
+  });
+  readonly currentTopIndex = computed(() =>
+    this.agendaSvc.agenda().findIndex((a) => a.id === this.meeting()?.currentAgendaItemId),
+  );
 
   setStatus(status: 'live' | 'closed'): void {
     const m = this.meeting();
@@ -560,15 +585,18 @@ export class MeetingSessionService implements OnDestroy {
     const m = this.meeting();
     if (!m) return;
     switch (msg.type) {
-      case 'meeting_state':
+      case 'meeting_state': {
+        const currentAgendaItemId =
+          msg.currentAgendaItemId === undefined ? m.currentAgendaItemId : msg.currentAgendaItemId;
         this.meeting.set({
           ...m,
           status: (msg.status as Meeting['status']) ?? m.status,
           activeApplicationId: msg.activeApplicationId,
+          currentAgendaItemId,
         });
         // TOP bodies can change without a vote. Reload the agenda so live
         // followers see the current protocol state.
-        this.agendaSvc.load(m.id, this.canManage());
+        this.agendaSvc.load(m.id, this.canManage(), currentAgendaItemId);
         // The protocol status can change (rendering → final or draft). The worker
         // broadcasts meeting_state after the background render. Use GET so
         // broadcast bursts do not burn the write rate limit.
@@ -583,6 +611,7 @@ export class MeetingSessionService implements OnDestroy {
           });
         }
         break;
+      }
       case 'vote_opened':
         if (m.votes.some((v) => v.id === msg.voteId)) {
           this.patchVote(msg.voteId, { status: 'open', closesAt: msg.closesAt });

@@ -2,9 +2,12 @@
   <app-card [heading]="'meetings.follow.title' | t">
     <p class="text-text-muted mb-3">{{ 'meetings.follow.lead' | t }}</p>
     @for (item of agenda(); track item.id; let i = $index) {
-      <article class="mtg__followTop">
+      <article class="mtg__followTop" [class.mtg__followTop--now]="item.id === meeting().currentAgendaItemId" [id]="'top-' + item.id">
         <h3 class="m-0 text-base">
           {{ 'meetings.agenda.top' | t: { n: i + 1 } }}: {{ item.title || ('meetings.agenda.untitled' | t) }}
+          @if (item.id === meeting().currentAgendaItemId) {
+            <app-badge variant="primary">{{ 'meetings.follow.now' | t }}</app-badge>
+          }
           @if (stateLabelOf(item.stateLabel); as st) {
             <app-badge variant="neutral">{{ st }}</app-badge>
           }

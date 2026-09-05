@@ -1,4 +1,7 @@
 <section class="mtg__beamer" [attr.aria-label]="'meetings.beamer.heading' | t">
+  @if (top(); as t) {
+    <p class="mtg__beamerTop">{{ 'meetings.agenda.top' | t: { n: topIndex() + 1 } }} · {{ t.title || ('meetings.agenda.untitled' | t) }}</p>
+  }
   @if (vote(); as bv) {
     <app-badge [variant]="voteVariant(bv.status)">{{ voteStatusKey(bv.status) | t }}</app-badge>
     <h2 class="mtg__beamerQ">{{ bv.question || bv.title || ('meetings.vote.untitled' | t) }}</h2>

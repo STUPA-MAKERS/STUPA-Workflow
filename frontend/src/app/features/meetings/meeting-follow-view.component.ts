@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, effect, inject, input, output } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -51,6 +51,17 @@ import {
 })
 export class MeetingFollowViewComponent {
   private readonly i18n = inject(I18nService);
+
+  constructor() {
+    // Follow the room: when "now" moves, bring that item into view.
+    effect(() => {
+      const id = this.meeting().currentAgendaItemId;
+      if (!id) return;
+      queueMicrotask(() =>
+        document.getElementById(`top-${id}`)?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }),
+      );
+    });
+  }
 
   readonly meeting = input.required<Meeting>();
   readonly agenda = input.required<AgendaItem[]>();

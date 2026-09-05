@@ -42,12 +42,10 @@ import {
 import type { TranslationKey } from '@core/i18n/translations';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { MeetingAgendaService } from './meeting-agenda.service';
-import { MeetingAttendanceTableComponent } from './meeting-attendance-table.component';
 import { MeetingBeamerComponent } from './meeting-beamer.component';
-import { MeetingDelegationCardComponent } from './meeting-delegation-card.component';
 import { MeetingDialogsService } from './meeting-dialogs.service';
+import { MeetingFocusComponent } from './meeting-focus.component';
 import { MeetingFollowViewComponent } from './meeting-follow-view.component';
-import { MeetingProtocolPaneComponent } from './meeting-protocol-pane.component';
 import { MeetingSessionService } from './meeting-session.service';
 import { MeetingsTimelineService } from './meetings-timeline.service';
 import { renderMarkdown } from './meetings.util';
@@ -71,8 +69,9 @@ import {
 } from './meetings-display.util';
 
 /**
- * Meetings page: overview timeline (`/meetings`) and the 3-column session
- * detail view (`/meetings/:id`). This component is a thin facade over the
+ * Meetings page: overview timeline (`/meetings`) and the session detail view
+ * (`/meetings/:id`), which is the focus page for the protokollant, the follow
+ * view for a member and the beamer. This component is a thin facade over the
  * component-scoped services below. Its public surface also drives the specs.
  */
 @Component({
@@ -99,11 +98,9 @@ import {
     IconComponent,
     LocalizedDatePipe,
     PageHeaderComponent,
-    MeetingDelegationCardComponent,
-    MeetingAttendanceTableComponent,
     MeetingBeamerComponent,
+    MeetingFocusComponent,
     MeetingFollowViewComponent,
-    MeetingProtocolPaneComponent,
     NgTemplateOutlet,
   ],
   templateUrl: './meetings.component.html',
@@ -150,6 +147,8 @@ export class MeetingsComponent implements OnDestroy {
   readonly openingVote = this.session.openingVote;
   readonly looseVotes = this.session.looseVotes;
   readonly beamerVote = this.session.beamerVote;
+  readonly currentTop = this.session.currentTop;
+  readonly currentTopIndex = this.session.currentTopIndex;
   readonly FIXED_VOTE_OPTIONS = FIXED_VOTE_OPTIONS;
 
   readonly canManageAny = this.session.canManageAny;
@@ -370,6 +369,11 @@ export class MeetingsComponent implements OnDestroy {
     void this.router.navigate(['/meetings', id]);
   }
 
+  /** Back from the session page to the meeting list. */
+  goBack(): void {
+    void this.router.navigate(['/meetings']);
+  }
+
   openCreate(): void {
     this.dialogs.openCreate();
   }
@@ -501,6 +505,12 @@ export class MeetingsComponent implements OnDestroy {
 
   selectTop(id: Uuid): void {
     this.agendaSvc.selectTop(this.meeting()?.id ?? null, id);
+  }
+
+  /** Open a TOP and, for the room lead, make it the one the room handles now. */
+  jumpTo(id: Uuid): void {
+    this.selectTop(id);
+    this.session.setCurrentTop(id);
   }
 
   onTopBodyChange(itemId: Uuid, body: string): void {

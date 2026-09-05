@@ -48,6 +48,9 @@ class MeetingPatch(_CamelModel):
     """
 
     active_application_id: UUID | None = Field(default=None, alias="activeApplicationId")
+    # The agenda item the room handles now. ``null`` clears it. Needs
+    # ``canManageVotes``: the protokollant or the session lead.
+    current_agenda_item_id: UUID | None = Field(default=None, alias="currentAgendaItemId")
     status: MeetingStatus | None = None
     date: _date | None = None
     start_time: _time | None = Field(default=None, alias="startTime")
@@ -61,11 +64,12 @@ class MeetingPatch(_CamelModel):
             "start_time",
             "end_time",
             "protokollant_id",
+            "current_agenda_item_id",
         } & self.model_fields_set
         if self.status is None and self.active_application_id is None and not managed:
             raise ValueError(
-                "at least one of 'status', 'activeApplicationId', 'date', "
-                "'startTime', 'endTime' or 'protokollantId' required"
+                "at least one of 'status', 'activeApplicationId', 'currentAgendaItemId', "
+                "'date', 'startTime', 'endTime' or 'protokollantId' required"
             )
         return self
 
@@ -118,6 +122,8 @@ class MeetingOut(_CamelModel):
     closed_at: _datetime | None = Field(default=None, alias="closedAt")
     status: MeetingStatus
     active_application_id: UUID | None = Field(default=None, alias="activeApplicationId")
+    # The agenda item the room handles now. Followers and the beamer follow it.
+    current_agenda_item_id: UUID | None = Field(default=None, alias="currentAgendaItemId")
     protocol_id: UUID | None = Field(default=None, alias="protocolId")
     created_at: _datetime = Field(alias="createdAt")
     protokollant_id: UUID | None = Field(default=None, alias="protokollantId")

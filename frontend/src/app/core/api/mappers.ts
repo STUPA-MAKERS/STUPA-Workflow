@@ -241,6 +241,7 @@ export function mapMeeting(wire: MeetingOutWire): Meeting {
     endTime: wire.endTime ?? null,
     status: wire.status,
     activeApplicationId: wire.activeApplicationId ?? null,
+    currentAgendaItemId: wire.currentAgendaItemId ?? null,
     gremiumId: wire.gremiumId ?? null,
     gremiumName: wire.gremiumName ?? null,
     votes: (wire.votes ?? []).map(mapMeetingVote),

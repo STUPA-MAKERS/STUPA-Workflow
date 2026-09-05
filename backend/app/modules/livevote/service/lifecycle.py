@@ -12,7 +12,7 @@ from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
-from app.modules.livevote.models import Meeting
+from app.modules.livevote.models import Meeting, MeetingAgendaItem
 from app.modules.livevote.schemas import MeetingCreate, MeetingOut, MeetingPatch
 from app.modules.livevote.service.permissions import PermissionOps
 from app.modules.livevote.service.votes import VoteReadOps
@@ -82,10 +82,26 @@ class LifecycleOps(PermissionOps, VoteReadOps):
             or "protokollant_id" in payload.model_fields_set
         )
         wants_write = payload.status is not None or payload.active_application_id is not None
+        wants_now = "current_agenda_item_id" in payload.model_fields_set
         if wants_manage and not await self.can_manage(meeting.gremium_id, principal):
             raise ForbiddenError("only a session manager may plan this meeting")
         if wants_write and not await self.can_write(meeting, principal):
             raise ForbiddenError("not allowed to control this meeting")
+        # The protokollant leads the room. The session lead may take over or override.
+        if wants_now and not await self.can_manage_votes(meeting, principal):
+            raise ForbiddenError("not allowed to set the current agenda item")
+        if wants_now and meeting.status == "closed":
+            raise ConflictError("the session is closed — it has no current agenda item")
+        if wants_now and payload.current_agenda_item_id is not None:
+            owner = await self.session.scalar(
+                select(MeetingAgendaItem.meeting_id).where(
+                    MeetingAgendaItem.id == payload.current_agenda_item_id
+                )
+            )
+            if owner != meeting.id:
+                raise NotFoundError(
+                    f"agenda item {payload.current_agenda_item_id} not found in this meeting"
+                )
 
         # ``closed`` is terminal: no transition leads from closed back to live or to
         # planned. Repeating ``closed`` is a no-op.
@@ -104,6 +120,8 @@ class LifecycleOps(PermissionOps, VoteReadOps):
         going_live = payload.status == "live" and meeting.status != "live"
         if payload.active_application_id is not None:
             meeting.active_application_id = payload.active_application_id
+        if wants_now:
+            meeting.current_agenda_item_id = payload.current_agenda_item_id
         if "date" in payload.model_fields_set:
             meeting.date = payload.date
         if "start_time" in payload.model_fields_set:

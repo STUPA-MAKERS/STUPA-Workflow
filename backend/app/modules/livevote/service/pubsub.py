@@ -39,7 +39,9 @@ class BrokerPublisher:
 
     async def meeting_state(self, meeting: MeetingOut) -> None:
         event = MeetingStateEvent(
-            activeApplicationId=meeting.active_application_id, status=meeting.status
+            activeApplicationId=meeting.active_application_id,
+            currentAgendaItemId=meeting.current_agenda_item_id,
+            status=meeting.status,
         )
         await self._broker.publish(meeting_channel(meeting.id), event.dump())
 
