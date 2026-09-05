@@ -2438,7 +2438,7 @@ describe('ExpensesComponent — shared table wiring', () => {
       page: page([EXPENSE]),
     });
     fixture.detectChanges();
-    expect(container.querySelector('tbody td.dt__cell--sticky')).not.toBeNull();
+    expect(container.querySelector('tbody td.dt__cell--stickyEnd')).not.toBeNull();
   });
 
   it('has no actions column at all for a reader', async () => {
@@ -2447,7 +2447,7 @@ describe('ExpensesComponent — shared table wiring', () => {
       page: page([EXPENSE]),
     });
     fixture.detectChanges();
-    expect(container.querySelector('.dt__cell--sticky')).toBeNull();
+    expect(container.querySelector('.dt__cell--stickyEnd')).toBeNull();
   });
 
   it('offers selection to a booker only', async () => {

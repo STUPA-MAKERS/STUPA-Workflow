@@ -323,12 +323,12 @@ describe('InvoicesComponent', () => {
 
   it('pins the actions column for a user who may book', async () => {
     const { container } = await setup({ initial: [inv({ id: 'a' })], canManage: true });
-    expect(container.querySelector('td.dt__cell--sticky')).not.toBeNull();
+    expect(container.querySelector('td.dt__cell--stickyEnd')).not.toBeNull();
   });
 
   it('has no actions column at all for a user who may only read', async () => {
     const { container } = await setup({ initial: [inv({ id: 'a' })], canManage: false });
-    expect(container.querySelector('.dt__cell--sticky')).toBeNull();
+    expect(container.querySelector('.dt__cell--stickyEnd')).toBeNull();
   });
 
   it('money() formats in de-DE vs en-GB per locale', async () => {
