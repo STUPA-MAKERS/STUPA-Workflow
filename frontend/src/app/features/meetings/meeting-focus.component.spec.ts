@@ -179,7 +179,8 @@ describe('MeetingFocusComponent', () => {
     it('shows the session and hands the controls to the parent', async () => {
       const { on } = await setup();
       expect(screen.getByText('Konstituierende Sitzung')).toBeInTheDocument();
-      expect(screen.getByText(/Pia Protokoll/)).toBeInTheDocument();
+      // The minute-taker is marked in the roster, not spelled out in the bar.
+      expect(screen.queryByText(/Pia Protokoll/)).toBeNull();
       await userEvent.click(screen.getByRole('button', { name: /Sitzungen/ }));
       expect(on.back).toHaveBeenCalled();
       await userEvent.click(screen.getByRole('button', { name: 'Beamer-Ansicht' }));
@@ -312,6 +313,7 @@ describe('MeetingFocusComponent', () => {
       const popover = screen.getByRole('dialog', { name: 'Anwesenheit' });
       expect(within(popover).getByText('Anwesend 1 von 3')).toBeInTheDocument();
       expect(within(popover).getByText('Mika Mitglied')).toBeInTheDocument();
+      expect(within(popover).getByText('Protokollant')).toBeInTheDocument();
       // Once in the roster, once in the viewer list.
       expect(within(popover).getAllByText('Alina Admin')).toHaveLength(2);
       expect(within(popover).getByText('2 live')).toBeInTheDocument();
@@ -335,7 +337,6 @@ describe('MeetingFocusComponent', () => {
 
     it('offers a decision question when the open item has no vote', async () => {
       const { on } = await setup();
-      expect(screen.getByText('Keine Abstimmung')).toBeInTheDocument();
       await userEvent.click(screen.getByRole('button', { name: 'Beschlussfrage hinzufügen' }));
       expect(on.voteDialog).toHaveBeenCalledWith(AGENDA[0]);
     });
@@ -394,7 +395,8 @@ describe('MeetingFocusComponent', () => {
     it('goes quiet once the result is in the text', async () => {
       const closed = vote({ status: 'closed', result: 'passed', counts: { yes: 3 } });
       await setup({ meeting: meeting({ votes: [closed] }), top: item({ body: 'Text\n:::vote{#v-1}\n:::' }) });
-      expect(screen.getByText('Keine Abstimmung')).toBeInTheDocument();
+      expect(screen.queryByText('Angenommen')).toBeNull();
+      expect(screen.getByRole('button', { name: 'Beschlussfrage hinzufügen' })).toBeInTheDocument();
     });
 
     it('points back to now when the open item is not the one the room handles', async () => {

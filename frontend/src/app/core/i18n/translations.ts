@@ -878,7 +878,6 @@ export const de = {
   'meetings.dock.next': 'Nächster TOP',
   'meetings.dock.agenda': 'Tagesordnung öffnen',
   'meetings.dock.of': '{n} von {m}',
-  'meetings.dock.noVote': 'Keine Abstimmung',
   'meetings.dock.yourVote': 'Deine Stimme',
   'meetings.dock.insertResult': 'Ergebnis ins Protokoll übernehmen',
   'meetings.dock.present': 'Anwesend {n} von {m}',
@@ -893,6 +892,7 @@ export const de = {
   'meetings.dock.topsPrepared': '{n} TOPs vorbereitet',
   'meetings.dock.closedAt': 'Geschlossen um {time}',
   'meetings.dock.application': 'Antrag',
+  'meetings.protocol.hint': 'Hier weiterschreiben … Markdown wird beim Tippen formatiert.',
   'meetings.follow.now': 'Jetzt',
 
   'notFound.heading': 'Seite nicht gefunden',
@@ -3042,7 +3042,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.dock.next': 'Next item',
   'meetings.dock.agenda': 'Open agenda',
   'meetings.dock.of': '{n} of {m}',
-  'meetings.dock.noVote': 'No vote',
   'meetings.dock.yourVote': 'Your vote',
   'meetings.dock.insertResult': 'Insert result into the minutes',
   'meetings.dock.present': 'Present {n} of {m}',
@@ -3057,6 +3056,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.dock.topsPrepared': '{n} items prepared',
   'meetings.dock.closedAt': 'Closed at {time}',
   'meetings.dock.application': 'Application',
+  'meetings.protocol.hint': 'Continue writing here … Markdown is formatted as you type.',
   'meetings.follow.now': 'Now',
 
   'notFound.heading': 'Page not found',

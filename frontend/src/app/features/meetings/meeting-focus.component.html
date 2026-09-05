@@ -9,9 +9,6 @@
     <span class="text-text-muted text-sm fx__nowrap">{{ m.date | ldate: 'mediumDate' }}{{ timeSuffix(m.startTime) }}</span>
   }
   <app-badge [variant]="statusVariant(m.status)">{{ statusKey(m.status) | t }}</app-badge>
-  @if (m.protokollantName) {
-    <span class="text-text-muted text-sm fx__nowrap">{{ 'meetings.protokollant.label' | t }}: {{ m.protokollantName }}</span>
-  }
   <span class="fx__spacer"></span>
   <app-button variant="ghost" size="sm" (click)="toggleBeamer.emit()">{{ 'meetings.beamer.enter' | t }}</app-button>
   <!-- The meeting is closed but the protocol is a draft again: the render failed and
@@ -55,6 +52,7 @@
         [value]="top.body ?? ''"
         [disabled]="!editable()"
         [placeholder]="'meetings.protocol.placeholder' | t"
+        [hint]="'meetings.protocol.hint' | t"
         (valueChange)="bodyChange.emit({ itemId: top.id, body: $event })"
       />
     }
@@ -209,6 +207,7 @@
       </div>
       <app-meeting-attendance-table
         [rows]="attendance()"
+        [protokollantId]="m.protokollantId"
         [editAll]="m.canControl"
         [locked]="m.status === 'closed'"
         [saving]="savingAttendance()"
@@ -325,7 +324,7 @@
           }
         }
       } @else {
-        <span class="text-text-muted">{{ 'meetings.dock.noVote' | t }}</span>
+        <!-- Nothing runs, so the dock offers the next step and says nothing else. -->
         @if (top(); as t) {
           @if (m.canManageVotes && !locked() && m.status === 'live' && canAddVote(t)) {
             <app-button size="sm" variant="secondary" (click)="voteDialog.emit(t)">{{ (t.applicationId ? 'meetings.vote.openFor' : 'meetings.vote.addQuestion') | t }}</app-button>

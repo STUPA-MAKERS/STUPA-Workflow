@@ -561,9 +561,16 @@ describe('MeetingsComponent', () => {
     expect(screen.queryByRole('button', { name: 'Protokoll anlegen' })).not.toBeInTheDocument();
   });
 
-  it('persists the selected protokollant via PATCH and shows the name', async () => {
+  it('persists the selected protokollant via PATCH and marks the row in the roster', async () => {
     const { http } = await setup();
-    flushLoad(http);
+    http.expectOne('/api/meetings/m-1').flush(MEETING);
+    http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
+    http.expectOne('/api/meetings/m-1/attendance').flush([
+      { principalId: 'pr-1', displayName: 'Max P', email: 'm@x.de', status: null, source: null, isSelf: false },
+    ]);
+    http.expectOne('/api/meetings/m-1/agenda').flush([]);
+    http.expectOne('/api/meetings/m-1/agenda/assignable').flush([]);
+    flushDelegationContext(http);
     const editBtns = await screen.findAllByRole('button', { name: /Sitzung bearbeiten/i });
     await userEvent.click(editBtns[0]);
     // openSettings reloads the roster (minute-taker options).
@@ -580,8 +587,11 @@ describe('MeetingsComponent', () => {
     expect(req.request.method).toBe('PATCH');
     expect(req.request.body.protokollantId).toBe('pr-1');
     req.flush({ ...MEETING, protokollantId: 'pr-1', protokollantName: 'Max P' });
-    // The name appears after saving (card/toolbar).
-    expect(await screen.findByText(/Max P/)).toBeInTheDocument();
+    // The roster marks the minute-taker after saving.
+    await userEvent.click(await screen.findByTitle('Anwesenheit'));
+    const popover = await screen.findByRole('dialog', { name: 'Anwesenheit' });
+    expect(within(popover).getByText(/Max P/)).toBeInTheDocument();
+    expect(within(popover).getByText('Protokollant')).toBeInTheDocument();
   });
 
   it('gives non-protokollants the live read/vote view once a protokollant is assigned', async () => {
