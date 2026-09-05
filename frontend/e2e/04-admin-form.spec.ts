@@ -27,14 +27,27 @@ test('@gating Admin Form-Editor: Frage hinzufügen → Form-Version persistiert'
   const save = page.getByRole('button', { name: 'Speichern', exact: true });
   await expect(save).toBeVisible();
 
-  // "+ Frage hinzufügen" opens a menu of question types; take the first type.
-  await page.getByRole('button', { name: /Frage hinzufügen/ }).first().click();
-  await page.getByRole('menuitem').first().click();
+  // Wait for the question to EXIST before addressing it. `.last()` resolves against the
+  // DOM as it is at that moment: Playwright waits for the element it finds to be
+  // actionable, not for one more to appear. Filling too early wrote the key into the
+  // previous question, so the new one kept an empty key, `formValid()` stayed false, and
+  // the save button never enabled — a 60s wait that reads as a timeout, not as a race.
+  const group = page.locator('.fe__group').first();
+  const questions = group.locator('.fe__list > li');
+  const before = await questions.count();
 
-  // The new question is appended, so `.last()` addresses it rather than a seeded one.
+  await group.getByRole('button', { name: /Frage hinzufügen/ }).click();
+  await page.getByRole('menuitem').first().click();
+  await expect(questions).toHaveCount(before + 1);
+
+  const question = questions.last();
   const key = `e2e_frage_${Date.now()}`;
-  await page.getByRole('textbox', { name: 'Schlüssel' }).last().fill(key);
-  await page.getByRole('textbox', { name: 'Bezeichnung (DE)' }).last().fill('E2E Frage');
+  await question.getByRole('textbox', { name: 'Schlüssel' }).fill(key);
+  await question.getByRole('textbox', { name: 'Bezeichnung (DE)' }).fill('E2E Frage');
+
+  // `[disabled]="!formValid()"`. Assert the state, so a recurrence fails here in seconds
+  // instead of inside a minute-long click.
+  await expect(save).toBeEnabled();
 
   // The toast fires only on a 2xx from the server, so it proves persistence.
   await save.click();
