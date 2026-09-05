@@ -53,6 +53,14 @@ class Meeting(UUIDPkMixin, CreatedAtMixin, Base):
     active_application_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("application.id", ondelete="SET NULL"), nullable=True
     )
+    # The agenda item the room handles now. The protokollant or the session lead
+    # sets it, and the followers and the beamer read it over `meeting_state`. A
+    # deleted item clears the column. Unlike `active_application_id` this also
+    # covers free-text items.
+    current_agenda_item_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("meeting_agenda_item.id", ondelete="SET NULL", use_alter=True),
+        nullable=True,
+    )
     created_by: Mapped[str | None] = mapped_column(Text, nullable=True)
     # The one Protokollant of the meeting. This person leads the live session
     # and writes the protocol. A deleted principal sets the column to NULL.

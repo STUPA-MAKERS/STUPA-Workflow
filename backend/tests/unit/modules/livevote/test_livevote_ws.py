@@ -203,12 +203,16 @@ def test_not_in_group_gets_not_eligible_error() -> None:
 # Voter lifecycle
 def test_connect_sends_meeting_state() -> None:
     meeting = _meeting()
+    # The initial state carries the item the room handles now, so a follower who
+    # connects late lands on the right item.
+    meeting.current_agenda_item_id = uuid4()
     app, _, _ = _build(meeting=meeting, principal=_voter())
     client = TestClient(app)
     with client.websocket_connect(_url(meeting)) as ws:
         state = _recv(ws)
     assert state["type"] == "meeting_state"
     assert state["status"] == "live"
+    assert state["currentAgendaItemId"] == str(meeting.current_agenda_item_id)
 
 
 def test_subscribe_resends_state_with_open_vote() -> None:

@@ -280,7 +280,9 @@ async def test_run_dead_pump_tears_down_connection() -> None:
 
 class _StateMeetings:
     async def get(self, _meeting_id: UUID, _principal: object = None) -> Any:  # noqa: ANN001, F821
-        return SimpleNamespace(active_application_id=None, status="live")
+        return SimpleNamespace(
+            active_application_id=None, current_agenda_item_id=None, status="live"
+        )
 
     async def open_vote(self, _meeting_id: UUID) -> object:  # noqa: F821
         return None

@@ -433,6 +433,7 @@ describe('mapMeeting', () => {
     };
     const m = mapMeeting(wire);
     expect(m.activeApplicationId).toBe('app-1');
+    expect(m.currentAgendaItemId).toBeNull();
     expect(m.gremiumId).toBeNull();
     expect(m.protocolId).toBeNull();
     expect(m.votes).toHaveLength(1);

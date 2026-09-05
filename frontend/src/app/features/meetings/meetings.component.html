@@ -1,3 +1,4 @@
+@if (!meeting() || beamerMode() || isFollower()) {
 <app-page-header [title]="'meetings.title' | t" [rail]="true" [flush]="true">
   <div actions class="mtg__headActions">
     @if (!meeting()) {
@@ -31,8 +32,12 @@
     }
   </div>
 </app-page-header>
+}
 
+<!-- The focus page of the protokollant carries its own bar, so the meta line shows
+     for the beamer and the follow view only. -->
 @if (meeting(); as m) {
+  @if (beamerMode() || isFollower()) {
   <div class="mtg__meta">
     <span class="font-semibold">{{ m.title }}</span>
     @if (m.date) {
@@ -53,30 +58,26 @@
       {{ (beamerMode() ? 'meetings.beamer.exit' : 'meetings.beamer.enter') | t }}
     </app-button>
   </div>
+  }
 }
 
 @if (showForbidden()) {
   <p class="mtg__status" role="alert">{{ 'rbac.forbidden' | t }}</p>
 } @else if (loading()) {
-  <!-- The shape of a meeting page, not a sentence: two rails and a body. A bare line of
-       text gives a reader nothing to anticipate and makes the layout jump when the real
-       content lands. -->
-  <div class="mtg__shell" aria-busy="true">
-    <aside class="mtg__side mtg__side--left" aria-hidden="true">
-      <span class="skel skel--line"></span>
-      <span class="skel skel--line"></span>
-      <span class="skel skel--line"></span>
-    </aside>
-    <div>
-      <span class="skel skel--panel"></span>
-      <span class="sr-only" role="status">{{ 'meetings.loading' | t }}</span>
-    </div>
+  <!-- The shape of a meeting page, not a sentence: a bar, a body and a dock. A bare
+       line of text gives a reader nothing to anticipate and makes the layout jump when
+       the real content lands. -->
+  <div class="mtg__loadShell" aria-busy="true">
+    <span class="skel skel--line"></span>
+    <span class="skel skel--panel"></span>
+    <span class="skel skel--line"></span>
+    <span class="sr-only" role="status">{{ 'meetings.loading' | t }}</span>
   </div>
 } @else if (error()) {
   <p class="mtg__status mtg__status--error" role="alert">{{ 'meetings.error' | t }}</p>
 } @else if (meeting(); as m) {
   @if (beamerMode()) {
-    <app-meeting-beamer [vote]="beamerVote()" />
+    <app-meeting-beamer [vote]="beamerVote()" [top]="currentTop()" [topIndex]="currentTopIndex()" />
   }
 
   <!-- Member: live follow view (read the protocol, cast on open votes). -->
@@ -94,163 +95,56 @@
   }
 
   @if (!beamerMode() && !isFollower()) {
-  <!-- Toolbar above the body: control, settings and delete. Pure readers have no
-       action, so hide the bar instead of showing an empty box. -->
-  @if (m.canControl || canWrite() || m.canManage) {
-  <div class="mtg__toolbar" role="toolbar" [attr.aria-label]="'meetings.control.title' | t">
-    <!-- "closed" is terminal: all control buttons disappear after closing. -->
-    @if (m.canControl && m.status !== 'closed') {
-      <!-- A start requires a protokollant. The backend creates the protocol on start. -->
-      <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="m.status === 'live' || !m.protokollantId" [ariaLabel]="(m.protokollantId ? 'meetings.control.open' : 'meetings.control.needProtokollant') | t" [title]="(m.protokollantId ? 'meetings.control.open' : 'meetings.control.needProtokollant') | t" (click)="setStatus('live')"><app-icon name="play" /></app-button>
-      @if (m.status === 'planned' && !m.protokollantId) {
-        <span class="mtg__needProt text-text-muted">{{ 'meetings.control.needProtokollant' | t }}</span>
-      }
-      <app-button variant="danger" size="sm" [loading]="finalizing()" [title]="'meetings.control.closeSession' | t" (click)="closeConfirmOpen.set(true)">
-        <span class="inline-flex items-center gap-2"><app-icon name="stop" [size]="14" /> {{ 'meetings.control.closeShort' | t }}</span>
-      </app-button>
-    }
-    <!-- Meeting closed but the protocol is a draft again: the render failed and
-         rolled back. The explicit retry is the only path to a final protocol. -->
-    @if (m.status === 'closed' && canWrite() && protocol(); as proto) {
-      @if (!proto.isFinal && proto.status !== 'rendering') {
-        <app-button variant="ghost" size="sm" [iconOnly]="true" [loading]="finalizing()" [ariaLabel]="'meetings.protocol.finalize' | t" [title]="'meetings.protocol.finalize' | t" (click)="finalize()"><app-icon name="repeat" /></app-button>
-      }
-    }
-    <span class="mtg__toolbarSpacer"></span>
-    @if (m.canManage) {
-      <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.settings.title' | t" [title]="'meetings.settings.title' | t" (click)="openSettings(m)"><app-icon name="edit" /></app-button>
-      <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.delete.title' | t" [title]="'meetings.delete.title' | t" (click)="askDeleteMeeting(m)"><app-icon name="delete" /></app-button>
-    }
-  </div>
-  }
-
-  <!-- 3-column shell: TOPs left, protocol body center, attendance right. -->
-  <div class="mtg__shell">
-    <aside class="mtg__side mtg__side--left" [attr.aria-label]="'meetings.agenda.title' | t">
-      <h2 class="mtg__sideH">{{ 'meetings.agenda.title' | t }}</h2>
-      <ol class="mtg__tocList">
-        @for (item of agenda(); track item.id; let i = $index) {
-          <li
-            class="mtg__tocItem"
-            [class.mtg__tocItem--sel]="selectedTopId() === item.id"
-            [attr.draggable]="m.canWrite && !protocol()?.isLocked"
-            (dragstart)="onTopDragStart(i)"
-            (dragover)="onTopDragOver($event)"
-            (drop)="onTopDrop(i)"
-            (click)="selectTop(item.id)"
-          >
-            @if (m.canWrite && !protocol()?.isLocked) {
-              <span class="cursor-grab text-text-muted" aria-hidden="true">⠿</span>
-            }
-            <span class="mtg__tocNum">{{ i + 1 }}</span>
-            @if (renamingTopId() === item.id) {
-              <input
-                class="mtg__input mtg__tocRename"
-                [ngModel]="renameDraft()"
-                (ngModelChange)="renameDraft.set($event)"
-                (click)="$event.stopPropagation()"
-                (keyup.enter)="renameTop(item)"
-                (keyup.escape)="cancelRename()"
-                (blur)="renameTop(item)"
-                [placeholder]="'meetings.agenda.renamePlaceholder' | t"
-                [attr.aria-label]="'meetings.agenda.rename' | t"
-                name="renameTop"
-                autofocus
-              />
-            } @else {
-              <span class="mtg__tocTitle">{{ item.title || ('meetings.agenda.untitled' | t) }}</span>
-            }
-            @if (votesForTop(item.id).length) {
-              <span class="mtg__tocNum" [attr.aria-label]="'meetings.vote.count' | t">⚖ {{ votesForTop(item.id).length }}</span>
-            }
-            <!-- After the close, a right-aligned badge marks non-public TOPs. It
-                 shows only when the editable checkbox below stays hidden, so that
-                 the state never appears twice. -->
-            @if (item.nonPublic && m.status === 'closed' && (!m.canWrite || protocol()?.isLocked)) {
-              <app-badge class="mtg__tocNpBadge" variant="warning">{{ 'meetings.agenda.nonPublic' | t }}</app-badge>
-            }
-            @if (m.canWrite && !protocol()?.isLocked && !item.applicationId && renamingTopId() !== item.id) {
-              <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.agenda.rename' | t" [title]="'meetings.agenda.rename' | t" [disabled]="savingAgenda()" (click)="$event.stopPropagation(); startRename(item)"><app-icon name="edit" /></app-button>
-            }
-            @if (m.canWrite && !protocol()?.isLocked) {
-              <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" [disabled]="savingAgenda()" (click)="$event.stopPropagation(); removeFromAgenda(item.id)"><app-icon name="delete" /></app-button>
-              <app-checkbox class="mtg__tocNp" [ngModel]="item.nonPublic === true" [disabled]="savingAgenda()" (ngModelChange)="setNonPublic(item, $event)" (click)="$event.stopPropagation()">{{ 'meetings.agenda.nonPublic' | t }}</app-checkbox>
-            }
-          </li>
-        } @empty {
-          <li class="mtg__tocEmpty text-text-muted">{{ 'meetings.agenda.empty' | t }}</li>
-        }
-      </ol>
-      @if (m.canWrite && !protocol()?.isLocked) {
-        <div class="mtg__tocAddBlock">
-          <p class="mtg__tocAddH">{{ 'meetings.agenda.assignHeading' | t }}</p>
-          <div class="mtg__tocAdd">
-            <app-select [placeholder]="'meetings.agenda.addPlaceholder' | t" [options]="assignableOptions()" [ngModel]="agendaPick()" (ngModelChange)="agendaPick.set($event)" />
-            <app-button size="sm" [disabled]="!agendaPick() || savingAgenda()" (click)="addToAgenda()">{{ 'meetings.agenda.add' | t }}</app-button>
-          </div>
-        </div>
-        <hr class="mtg__tocDiv" />
-        <div class="mtg__tocAddBlock">
-          <p class="mtg__tocAddH">{{ 'meetings.agenda.freetextHeading' | t }}</p>
-          <div class="mtg__tocAdd">
-            <input class="mtg__input" [placeholder]="'meetings.agenda.freetextPlaceholder' | t" [ngModel]="agendaFreetext()" (ngModelChange)="agendaFreetext.set($event)" (keyup.enter)="addFreetext()" name="agendaFreetext" />
-            <app-button variant="secondary" size="sm" [disabled]="!agendaFreetext().trim() || savingAgenda()" (click)="addFreetext()">{{ 'meetings.agenda.addFreetext' | t }}</app-button>
-          </div>
-        </div>
-      }
-    </aside>
-
-    <div class="mtg__main">
-      <app-meeting-protocol-pane
-        [meeting]="m"
-        [protocol]="protocol()"
-        [canEdit]="canEditProtocol()"
-        [top]="selectedTop()"
-        [topIndex]="selectedIndex()"
-        [saveState]="saveState()"
-        [casting]="casting()"
-        [deletingVote]="deletingVote()"
-        [deletingProtocol]="deletingProtocol()"
-        [choices]="myChoices()"
-        (bodyChange)="onTopBodyChange($event.itemId, $event.body)"
-        (castVote)="cast($event.voteId, $event.choice)"
-        (voteClose)="closeVote($event)"
-        (voteCancel)="cancelVote($event)"
-        (voteDelete)="deleteVote($event)"
-        (voteDialog)="openVoteDialog($event)"
-        (protocolDelete)="askDeleteProtocol()"
-      />
-    </div>
-
-    <aside class="mtg__side mtg__side--right" [attr.aria-label]="'meetings.attendance.title' | t">
-      <h2 class="mtg__sideH">{{ 'meetings.attendance.title' | t }}</h2>
-      <app-meeting-attendance-table
-        [rows]="attendance()"
-        [editAll]="m.canControl"
-        [locked]="m.status === 'closed'"
-        [saving]="savingAttendance()"
-        (statusChange)="setAttendance($event.member, $event.status)"
-      />
-
-      <app-meeting-delegation-card [meetingId]="m.id" />
-
-      <!-- Live viewers: who has the meeting page open. Protokollant and lead only. -->
-      @if (m.canWrite) {
-        <section class="mt-5" [attr.aria-label]="'meetings.viewers.title' | t">
-          <h2 class="mtg__sideH">
-            {{ 'meetings.viewers.title' | t }} ({{ viewers().length }})
-          </h2>
-          <ul class="list-none m-0 p-0 flex flex-col gap-1 text-sm" aria-live="polite">
-            @for (name of viewers(); track name) {
-              <li class="flex items-center gap-2"><span class="mtg__viewerDot" aria-hidden="true"></span>{{ name }}</li>
-            } @empty {
-              <li class="text-text-muted">{{ 'meetings.viewers.empty' | t }}</li>
-            }
-          </ul>
-        </section>
-      }
-    </aside>
-  </div>
+  <!-- Protokollant and session lead: the page is the editor, the dock runs the session. -->
+  <app-meeting-focus
+    [meeting]="m"
+    [protocol]="protocol()"
+    [agenda]="agenda()"
+    [top]="selectedTop()"
+    [topIndex]="selectedIndex()"
+    [canEdit]="canEditProtocol()"
+    [saveState]="saveState()"
+    [attendance]="attendance()"
+    [savingAttendance]="savingAttendance()"
+    [viewers]="viewers()"
+    [casting]="casting()"
+    [deletingVote]="deletingVote()"
+    [deletingProtocol]="deletingProtocol()"
+    [finalizing]="finalizing()"
+    [choices]="myChoices()"
+    [assignableOptions]="assignableOptions()"
+    [savingAgenda]="savingAgenda()"
+    [renamingTopId]="renamingTopId()"
+    [(agendaPick)]="agendaPick"
+    [(agendaFreetext)]="agendaFreetext"
+    [(renameDraft)]="renameDraft"
+    (back)="goBack()"
+    (selectTop)="jumpTo($event)"
+    (bodyChange)="onTopBodyChange($event.itemId, $event.body)"
+    (castVote)="cast($event.voteId, $event.choice)"
+    (voteClose)="closeVote($event)"
+    (voteCancel)="cancelVote($event)"
+    (voteDelete)="deleteVote($event)"
+    (voteDialog)="openVoteDialog($event)"
+    (protocolDelete)="askDeleteProtocol()"
+    (startSession)="setStatus('live')"
+    (closeSession)="closeConfirmOpen.set(true)"
+    (finalize)="finalize()"
+    (openSettings)="openSettings(m)"
+    (deleteMeeting)="askDeleteMeeting(m)"
+    (toggleBeamer)="beamerMode.set(true)"
+    (attendanceChange)="setAttendance($event.member, $event.status)"
+    (addToAgenda)="addToAgenda()"
+    (addFreetext)="addFreetext()"
+    (removeFromAgenda)="removeFromAgenda($event)"
+    (startRename)="startRename($event)"
+    (cancelRename)="cancelRename()"
+    (renameTop)="renameTop($event)"
+    (setNonPublic)="setNonPublic($event.item, $event.nonPublic)"
+    (dragStart)="onTopDragStart($event)"
+    (dragOver)="onTopDragOver($event)"
+    (drop)="onTopDrop($event)"
+  />
 
   <!-- Meeting votes without a TOP binding (legacy or active): the control card. -->
   @if (looseVotes().length) {

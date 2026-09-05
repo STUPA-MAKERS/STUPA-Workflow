@@ -393,6 +393,7 @@ let MOCK_MEETING: MeetingOutWire = {
   title: 'STUPA-Sitzung 12.06.',
   status: 'live',
   activeApplicationId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+  currentAgendaItemId: null,
   gremiumId: null,
   gremiumName: 'Studierendenparlament',
   protocolId: MOCK_PROTOCOL_ID,
@@ -696,7 +697,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
   }
 
   if (req.method === 'PATCH' && /\/meetings\/[^/]+$/.test(p)) {
-    const body = (req.body as { status?: MeetingOutWire['status']; activeApplicationId?: string; date?: string | null; startTime?: string | null } | null) ?? {};
+    const body = (req.body as { status?: MeetingOutWire['status']; activeApplicationId?: string; currentAgendaItemId?: string | null; date?: string | null; startTime?: string | null } | null) ?? {};
     MOCK_MEETING = {
       ...MOCK_MEETING,
       status: body.status ?? MOCK_MEETING.status,
@@ -704,6 +705,10 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
         body.activeApplicationId !== undefined
           ? body.activeApplicationId
           : MOCK_MEETING.activeApplicationId,
+      currentAgendaItemId:
+        body.currentAgendaItemId !== undefined
+          ? body.currentAgendaItemId
+          : MOCK_MEETING.currentAgendaItemId,
       date: body.date !== undefined ? body.date : MOCK_MEETING.date,
       startTime: body.startTime !== undefined ? body.startTime : MOCK_MEETING.startTime,
     };

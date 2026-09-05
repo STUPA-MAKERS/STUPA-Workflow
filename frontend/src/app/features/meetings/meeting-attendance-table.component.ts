@@ -19,6 +19,8 @@ import {
 })
 export class MeetingAttendanceTableComponent {
   readonly rows = input.required<Attendance[]>();
+  /** The protokollant of the meeting. The roster marks that row. */
+  readonly protokollantId = input<string | null>(null);
   /** True for the meeting lead. False limits the edit to the own row. */
   readonly editAll = input.required<boolean>();
   readonly locked = input.required<boolean>();

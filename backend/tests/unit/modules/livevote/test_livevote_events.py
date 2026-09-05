@@ -53,14 +53,20 @@ def _vote_out(*, secret: bool, status: str) -> VoteOut:
 
 def test_meeting_state_event_camel_and_optional_active() -> None:
     aid = uuid4()
-    dumped = MeetingStateEvent(activeApplicationId=aid, status="live").dump()
+    tid = uuid4()
+    dumped = MeetingStateEvent(
+        activeApplicationId=aid, currentAgendaItemId=tid, status="live"
+    ).dump()
     assert dumped == {
         "type": "meeting_state",
         "activeApplicationId": str(aid),
+        "currentAgendaItemId": str(tid),
         "status": "live",
     }
     # Without an active application the field stays null and the beamer shows nothing.
-    assert MeetingStateEvent(status="planned").dump()["activeApplicationId"] is None
+    planned = MeetingStateEvent(status="planned").dump()
+    assert planned["activeApplicationId"] is None
+    assert planned["currentAgendaItemId"] is None
 
 
 def test_vote_opened_event_serialises_options_and_iso_closes_at() -> None:

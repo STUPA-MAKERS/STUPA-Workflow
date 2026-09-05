@@ -9,6 +9,13 @@
   padding: clamp(var(--space-6), 6vw, var(--space-8)) var(--space-4);
   text-align: center;
 }
+.mtg__beamerTop {
+  margin: 0;
+  font-size: clamp(1rem, 2vw, 1.5rem);
+  font-weight: var(--fw-semibold, 600);
+  color: var(--color-text-muted);
+  letter-spacing: 0.02em;
+}
 .mtg__beamerQ {
   font-size: clamp(1.75rem, 4vw, 3rem);
   font-weight: var(--fw-bold, 700);

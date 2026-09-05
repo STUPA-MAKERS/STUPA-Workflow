@@ -56,6 +56,7 @@ class MeetingServiceBase:
             closedAt=meeting.closed_at,
             status=meeting.status,  # type: ignore[arg-type]
             activeApplicationId=meeting.active_application_id,
+            currentAgendaItemId=meeting.current_agenda_item_id,
             protocolId=protocol_id,
             createdAt=meeting.created_at,
             protokollantId=meeting.protokollant_id,

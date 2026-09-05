@@ -3,6 +3,8 @@
 export interface MeetingStateMsg {
   type: 'meeting_state';
   activeApplicationId: string | null;
+  /** The agenda item the room handles now. Followers and the beamer follow it. */
+  currentAgendaItemId?: string | null;
   status: string;
 }
 export interface VoteOpenedMsg {

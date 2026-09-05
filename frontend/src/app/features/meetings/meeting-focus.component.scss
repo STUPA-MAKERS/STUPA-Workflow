@@ -1,0 +1,511 @@
+@use 'vote-block';
+
+/* The page fills the viewport below the app header. The main region adds its block
+   padding around the router outlet, so the host pulls that back and the dock lands on
+   the bottom edge of the viewport. */
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100dvh - var(--layout-header-height));
+  margin-block: calc(-1 * var(--space-8));
+  margin-inline: calc(-1 * var(--layout-gutter));
+}
+@media (max-width: 768px) {
+  :host {
+    margin-block: calc(-1 * var(--space-5));
+    margin-inline: calc(-1 * var(--space-4));
+  }
+}
+
+.fx__nowrap {
+  white-space: nowrap;
+}
+.fx__spacer {
+  margin-left: auto;
+}
+.fx__sep {
+  width: var(--border-width);
+  align-self: stretch;
+  background: var(--color-border);
+  flex: none;
+}
+.fx__lbl {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+.fx__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  flex: none;
+}
+.fx__dot--ok {
+  background: var(--color-success);
+}
+.fx__muted {
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+/* Bar */
+.fx__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-3) var(--space-6);
+  border-bottom: var(--border-width) solid var(--color-border);
+  background: var(--color-surface);
+}
+.fx__back {
+  white-space: nowrap;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+}
+.fx__back:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+.fx__title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Page: the editor sits flat on the surface. */
+.fx__page {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: 880px;
+  margin-inline: auto;
+  padding: var(--space-6) var(--space-5) var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.fx__top {
+  font-size: var(--fs-2xl);
+  line-height: 1.2;
+  margin: 0;
+}
+.fx__top--muted {
+  color: var(--color-text-muted);
+}
+.fx__ctx {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  font-size: var(--fs-sm);
+  padding-bottom: var(--space-3);
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+app-markdown-editor {
+  display: block;
+  flex: 1;
+}
+/* The editor is the page, so its own frame goes. The page shows the border. */
+app-markdown-editor ::ng-deep .mde__host {
+  min-height: 24rem;
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+app-markdown-editor ::ng-deep .mde__host .ProseMirror {
+  min-height: 22rem;
+}
+.fx__status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-top: auto;
+  padding-top: var(--space-3);
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+}
+.mtg__saveState {
+  min-width: 6rem;
+}
+.mtg__saveState[data-state='saved'] {
+  color: var(--color-success);
+}
+.mtg__saveState[data-state='error'] {
+  color: var(--color-danger);
+}
+
+/* Dock */
+.fx__dock {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  border-top: var(--border-width) solid var(--color-border);
+  background: var(--color-surface);
+  box-shadow: 0 -4px 14px rgba(0, 38, 21, 0.06);
+}
+.fx__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.fx__row--q {
+  padding-bottom: var(--space-3);
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+.fx__row--q .fx__q {
+  flex: 1 1 auto;
+}
+.fx__q {
+  font-weight: var(--fw-medium);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.fx__track {
+  width: 200px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--color-surface-sunken);
+  overflow: hidden;
+  flex: none;
+}
+.fx__track i {
+  display: block;
+  height: 100%;
+  background: var(--color-primary);
+}
+.fx__nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.fx__prevIcon {
+  transform: rotate(90deg);
+}
+.fx__nextIcon {
+  transform: rotate(-90deg);
+}
+.fx__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font: inherit;
+  line-height: 1;
+  color: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface-sunken);
+  min-width: 0;
+}
+.fx__chip:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+.fx__chip--now {
+  font-weight: var(--fw-semibold);
+  max-width: 34rem;
+}
+.fx__chip--tail {
+  margin-left: auto;
+  font-size: var(--fs-sm);
+}
+.fx__chip--open {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-primary);
+}
+.fx__chipMain {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fx__chipSub {
+  color: var(--color-text-muted);
+  font-weight: var(--fw-regular);
+  font-size: var(--fs-sm);
+}
+.fx__mid {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.fx__done {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.fx__done .fx__q {
+  max-width: 22rem;
+}
+.fx__hidden {
+  white-space: normal;
+}
+
+/* Popovers out of the dock */
+.fx__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: default;
+}
+.fx__sheet {
+  position: absolute;
+  bottom: 100%;
+  z-index: 2;
+  margin-bottom: var(--space-3);
+  width: 480px;
+  max-width: calc(100vw - 2 * var(--space-5));
+  max-height: calc(100dvh - var(--layout-header-height) - 8rem);
+  overflow-y: auto;
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.fx__sheet--left {
+  left: var(--space-5);
+}
+.fx__sheet--right {
+  right: var(--space-5);
+  width: 420px;
+}
+.fx__sheetHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.fx__sheetTitle {
+  margin: 0;
+  font-size: var(--fs-lg);
+}
+.fx__close {
+  margin-left: auto;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-size: var(--fs-lg);
+  color: var(--color-text-muted);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1);
+}
+.fx__close:hover {
+  color: var(--color-text);
+}
+.fx__stat {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--fs-sm);
+  padding-bottom: var(--space-3);
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+.fx__viewers {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--fs-sm);
+}
+.fx__viewers li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Agenda rows */
+.fx__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.fx__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  min-width: 0;
+}
+.fx__item:hover {
+  background: var(--color-surface-sunken);
+}
+.fx__item--sel {
+  background: var(--color-primary-subtle);
+  color: var(--color-primary);
+  font-weight: var(--fw-semibold);
+}
+.fx__item--done {
+  color: var(--color-text-muted);
+}
+.fx__num {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+  min-width: 14px;
+}
+.fx__itemTitle {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-sm);
+}
+.fx__tag {
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+.fx__tag--now {
+  color: var(--color-primary);
+  font-weight: var(--fw-semibold);
+}
+.fx__np {
+  flex: none;
+}
+.fx__empty {
+  padding: var(--space-4) var(--space-2);
+  text-align: center;
+  border: var(--border-width) dashed var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--fs-sm);
+}
+.fx__input {
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  font-size: var(--fs-sm);
+  font-family: inherit;
+  flex: 1;
+  min-width: 0;
+}
+.fx__input:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+.fx__rename {
+  flex: 1;
+  min-width: 0;
+}
+.fx__add {
+  margin-top: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: var(--border-width) solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.fx__addH {
+  margin: 0;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--color-text-muted);
+}
+.fx__addRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.fx__addRow app-select {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Phone: the dock stacks and the popovers become sheets. */
+@media (max-width: 48rem) {
+  .fx__bar {
+    padding: var(--space-3) var(--space-4);
+    gap: var(--space-2);
+  }
+  .fx__page {
+    padding: var(--space-4) var(--space-3) var(--space-3);
+  }
+  .fx__top {
+    font-size: var(--fs-lg);
+  }
+  .fx__dock {
+    padding: var(--space-3) var(--space-4);
+    gap: var(--space-2);
+  }
+  .fx__row {
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+  .fx__row--q .fx__q {
+    flex: 1 1 100%;
+    white-space: normal;
+  }
+  .fx__track {
+    flex: 1 1 auto;
+    width: auto;
+  }
+  .fx__nav {
+    flex: 1 1 100%;
+    gap: var(--space-2);
+  }
+  .fx__chip--now {
+    flex: 1 1 auto;
+    max-width: none;
+    justify-content: center;
+  }
+  .fx__row > .fx__sep {
+    display: none;
+  }
+  .fx__mid {
+    flex: 1 1 100%;
+  }
+  .fx__mid app-button {
+    flex: 1 1 auto;
+  }
+  .fx__chip--tail {
+    flex: 1 1 100%;
+    margin-left: 0;
+  }
+  .fx__sheet,
+  .fx__sheet--right {
+    left: var(--space-3);
+    right: var(--space-3);
+    width: auto;
+    max-width: none;
+  }
+}

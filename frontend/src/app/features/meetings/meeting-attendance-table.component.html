@@ -5,6 +5,7 @@
         <td class="font-medium w-full">
           {{ a.displayName || a.email || a.principalId }}
           @if (a.isSelf) { <span class="text-xs font-normal text-text-muted ml-1">{{ 'meetings.attendance.you' | t }}</span> }
+          @if (a.principalId === protokollantId()) { <app-badge class="ml-1" variant="neutral">{{ 'meetings.protokollant.label' | t }}</app-badge> }
         </td>
         <td class="mtg__attStatus">
           @if (editAll() || a.isSelf) {

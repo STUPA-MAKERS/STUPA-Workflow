@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, input } from '@angular/core';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import type { MeetingVote } from '@core/api/models';
+import type { AgendaItem, MeetingVote } from '@core/api/models';
 import { BadgeComponent } from '@stupa-makers/ui-kit';
 import {
   countEntries,
@@ -26,6 +26,9 @@ export class MeetingBeamerComponent {
 
   /** The open vote, or else the last closed vote. The parent component picks it. */
   readonly vote = input.required<MeetingVote | null>();
+  /** The agenda item the room handles now, plus its 0-based index. */
+  readonly top = input<AgendaItem | null>(null);
+  readonly topIndex = input<number>(-1);
 
   protected readonly voteVariant = voteStatusVariant;
   protected readonly voteStatusKey = voteStatusKey;

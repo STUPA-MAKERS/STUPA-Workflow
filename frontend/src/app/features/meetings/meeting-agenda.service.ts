@@ -58,14 +58,20 @@ export class MeetingAgendaService implements OnDestroy {
     if (this.bodyTimer !== null) clearTimeout(this.bodyTimer);
   }
 
-  /** Load the agenda. Later calls are quiet refreshes after a WS event or a failed drop. */
-  load(meetingId: Uuid, canManage: boolean): void {
+  /**
+   * Load the agenda. Later calls are quiet refreshes after a WS event or a failed drop.
+   *
+   * Without a valid selection the item the room handles now (`preferred`) is opened,
+   * else the first item.
+   */
+  load(meetingId: Uuid, canManage: boolean, preferred: Uuid | null = null): void {
     this.api.listAgenda(meetingId, { quiet: true }).subscribe({
       next: (rows) => {
         this.agenda.set(rows);
         const sel = this.selectedTopId();
         if (!sel || !rows.some((r) => r.id === sel)) {
-          this.selectedTopId.set(rows[0]?.id ?? null);
+          const now = preferred && rows.some((r) => r.id === preferred) ? preferred : null;
+          this.selectedTopId.set(now ?? rows[0]?.id ?? null);
         }
       },
       error: () => this.agenda.set([]),

@@ -47,6 +47,8 @@ class MeetingStateEvent(_CamelModel):
 
     type: Literal["meeting_state"] = "meeting_state"
     active_application_id: UUID | None = Field(default=None, alias="activeApplicationId")
+    # The agenda item the room handles now. Followers scroll to it, the beamer shows it.
+    current_agenda_item_id: UUID | None = Field(default=None, alias="currentAgendaItemId")
     status: Literal["planned", "live", "closed"]
 
 

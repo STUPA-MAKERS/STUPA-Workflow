@@ -166,6 +166,7 @@ async def test_publisher_meeting_state() -> None:
     assert msg == {
         "type": "meeting_state",
         "activeApplicationId": str(aid),
+        "currentAgendaItemId": None,
         "status": "live",
     }
 

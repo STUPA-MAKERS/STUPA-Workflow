@@ -24,6 +24,7 @@ const MEETING: MeetingOutWire = {
   startTime: '17:00',
   endTime: null,
   activeApplicationId: null,
+  currentAgendaItemId: null,
   gremiumId: null,
   protocolId: 'p-1',
   canControl: true,

@@ -778,6 +778,8 @@ export interface MeetingOutWire {
   endTime?: string | null;
   status: MeetingStatus;
   activeApplicationId?: Uuid | null;
+  /** The agenda item the room handles now. */
+  currentAgendaItemId?: Uuid | null;
   gremiumId?: Uuid | null;
   gremiumName?: string | null;
   votes: MeetingVoteOutWire[];
@@ -832,6 +834,8 @@ export interface MeetingCreateBody {
 export interface MeetingPatchBody {
   status?: MeetingStatus;
   activeApplicationId?: Uuid | null;
+  /** The agenda item the room handles now. `null` clears it. Protokollant or session lead. */
+  currentAgendaItemId?: Uuid | null;
   /** Planned meeting date (`YYYY-MM-DD`). Use it to schedule a planned meeting. */
   date?: string | null;
   /** Planned time (`HH:mm`). */
@@ -897,6 +901,8 @@ export interface Meeting {
   endTime: string | null;
   status: MeetingStatus;
   activeApplicationId: Uuid | null;
+  /** The agenda item the room handles now ("Jetzt"). Followers and the beamer follow it. */
+  currentAgendaItemId: Uuid | null;
   gremiumId: Uuid | null;
   /** Name of the gremium. The timeline shows it. */
   gremiumName: string | null;
