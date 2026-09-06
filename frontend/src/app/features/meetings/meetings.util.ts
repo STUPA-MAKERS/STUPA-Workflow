@@ -1,8 +1,9 @@
 /**
  * Pure, DI-free helpers for the protocol editor.
  *
- *  - Snippet builders produce markdown references to applications and votes.
- *    The pytex renderer resolves them as shortcodes (`:::antrag` / `:::vote`).
+ *  - Snippet builders produce the markdown blocks for applications and votes. A
+ *    vote is the pytex protocol callout `> [!abstimmung]`, the same block the
+ *    backend writes.
  *  - `renderMarkdown` is a minimal, dependency-free Markdown→HTML renderer for
  *    the live preview. It escapes ALL HTML entities FIRST, so no raw HTML from
  *    the editor reaches the output. Angular also sanitizes the `innerHTML`.
@@ -41,24 +42,28 @@ export function topSnippet(
 }
 
 /**
- * Markdown snippet that embeds a vote result: a readable tally table
- * (option → count) AND the `:::vote` shortcode. pytex attaches the canonical
- * evaluation to that shortcode.
+ * First line of the vote callout: the marker and the bold question. The backend
+ * writes the same line in `build_vote_snippet`, so a body that contains it already
+ * carries the vote.
+ */
+export function voteSnippetHead(vote: MeetingVote): string {
+  const head = vote.question?.trim() || vote.title?.trim() || 'Beschlussfrage';
+  return `> [!abstimmung] **${head.replace(/\r\n|\r|\n/g, ' ')}**`;
+}
+
+/**
+ * Markdown snippet that embeds a vote result as the pytex protocol callout: a
+ * `> [!abstimmung]` quote with the bold question and one tally line. pytex reads
+ * the counts from that line and renders its tally box. The backend writes the
+ * identical snippet, so one syntax serves the editor, the PDF and the mail.
  */
 export function voteSnippet(vote: MeetingVote): string {
-  const lines: string[] = [`\n:::vote{#${vote.id}}`];
-  const heading =
-    vote.title?.trim() || vote.question?.trim() || vote.applicationId || 'Beschluss';
-  lines.push(`### ${heading}`);
-  if (vote.counts && Object.keys(vote.counts).length > 0) {
-    lines.push('', '| Option | Stimmen |', '| --- | --- |');
-    for (const [option, count] of Object.entries(vote.counts)) {
-      lines.push(`| ${option} | ${count} |`);
-    }
+  const lines = [voteSnippetHead(vote)];
+  const counts = Object.entries(vote.counts ?? {});
+  if (counts.length) {
+    lines.push(`> ${counts.map(([option, n]) => `${option}: ${n}`).join(', ')}`);
   }
-  if (vote.result) lines.push('', `**Ergebnis:** ${vote.result}`);
-  lines.push(':::', '');
-  return `\n${lines.join('\n')}`;
+  return lines.join('\n');
 }
 
 /** Insert markdown at the caret position (or append at the end). */
@@ -112,13 +117,18 @@ function isTableSeparator(line: string): boolean {
   return /^\|?[\s:|-]+\|?$/.test(line.trim()) && line.includes('-') && line.includes('|');
 }
 
-// GitHub callout kinds (`> [!NOTE]` …) → title + CSS modifier.
+// Callout kinds → title + CSS modifier: the GitHub kinds (`> [!NOTE]` …) and the
+// pytex protocol kinds (`> [!abstimmung]` …).
 const CALLOUT_TITLES: Record<string, string> = {
   note: 'Note',
   tip: 'Tip',
   important: 'Important',
   warning: 'Warning',
   caution: 'Caution',
+  abstimmung: 'Abstimmung',
+  beschluss: 'Beschluss',
+  aufgabe: 'Aufgabe',
+  frist: 'Frist',
 };
 
 /**
@@ -145,7 +155,7 @@ function renderQuote(lines: string[]): string {
  * Minimal, dependency-free Markdown→HTML renderer for the preview. See the file
  * header. It supports headings, bold, italic, code, links, ordered and unordered
  * lists, quotes, pipe tables, horizontal rules and paragraphs. That is enough
- * for meeting minutes, including the `voteSnippet` tally tables.
+ * for meeting minutes, including the `voteSnippet` callouts.
  */
 export function renderMarkdown(markdown: string): string {
   const lines = (markdown ?? '').replace(/\r\n/g, '\n').split('\n');

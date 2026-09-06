@@ -12,6 +12,7 @@ from app.modules.protocol.markdown import (
     demote_headings,
     protocol_variant_for,
     sanitize_user_markdown,
+    vote_in_body,
 )
 
 
@@ -86,6 +87,17 @@ def test_vote_snippet_escapes_newlines() -> None:
     snippet = build_vote_snippet("Zeile1\nZeile2", None)
     # The title stays on one line, so the callout marker does not break.
     assert "> [!abstimmung] **Zeile1 Zeile2**" in snippet
+
+
+def test_vote_in_body_matches_the_marker_line_only() -> None:
+    snippet = build_vote_snippet("Antrag A", {"yes": 5, "no": 2, "abstain": 1})
+    # The protokollant inserted the same box from the editor, with an older tally.
+    body = "Aussprache.\n\n> [!abstimmung] **Antrag A**\n> yes: 4, no: 2, abstain: 1\n"
+    assert vote_in_body(body, snippet)
+    # Another question, or the question as plain text, is not the box.
+    assert not vote_in_body("> [!abstimmung] **Antrag B**", snippet)
+    assert not vote_in_body("Antrag A wurde besprochen.", snippet)
+    assert not vote_in_body("", snippet)
 
 
 def test_frontmatter_has_signatures_and_quorum_dataline() -> None:

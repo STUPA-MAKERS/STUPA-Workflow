@@ -6,6 +6,7 @@ import {
   renderMarkdown,
   topSnippet,
   voteSnippet,
+  voteSnippetHead,
 } from './meetings.util';
 
 function vote(overrides: Partial<MeetingVote> = {}): MeetingVote {
@@ -69,38 +70,28 @@ describe('topSnippet', () => {
 });
 
 describe('voteSnippet', () => {
-  it('renders a result table and the vote shortcode', () => {
-    const snip = voteSnippet(vote());
-    expect(snip).toContain(':::vote{#v-1}');
-    expect(snip).toContain('| Option | Stimmen |');
-    expect(snip).toContain('| yes | 12 |');
-    expect(snip).toContain('**Ergebnis:** accepted');
+  it('renders the pytex vote callout with the title and one tally line', () => {
+    // The backend's `build_vote_snippet` writes the identical block.
+    expect(voteSnippet(vote())).toBe(
+      '> [!abstimmung] **Förderung Ersti-Wochenende**\n> yes: 12, no: 3, abstain: 1',
+    );
   });
 
-  it('omits the table when no counts are present', () => {
-    const snip = voteSnippet(vote({ counts: null, result: null }));
-    expect(snip).not.toContain('| Option |');
-    expect(snip).toContain(':::vote{#v-1}');
+  it('carries no tally line without counts', () => {
+    expect(voteSnippet(vote({ counts: null }))).toBe('> [!abstimmung] **Förderung Ersti-Wochenende**');
+    expect(voteSnippet(vote({ counts: {} }))).not.toContain('\n');
   });
 
-  it('omits the table when counts is an empty object', () => {
-    const snip = voteSnippet(vote({ counts: {}, result: null }));
-    expect(snip).not.toContain('| Option |');
+  it('prefers the question over the title', () => {
+    const snip = voteSnippet(vote({ question: 'Soll X gefördert werden?' }));
+    expect(snip.startsWith('> [!abstimmung] **Soll X gefördert werden?**')).toBe(true);
   });
 
-  it('uses the question as heading when there is no title', () => {
-    const snip = voteSnippet(vote({ title: null, question: 'Soll X gefördert werden?' }));
-    expect(snip).toContain('### Soll X gefördert werden?');
-  });
-
-  it('uses the applicationId as heading when title and question are blank', () => {
-    const snip = voteSnippet(vote({ title: '  ', question: null, applicationId: 'app-42' }));
-    expect(snip).toContain('### app-42');
-  });
-
-  it('falls back to "Beschluss" when nothing identifies the vote', () => {
-    const snip = voteSnippet(vote({ title: null, question: null, applicationId: null }));
-    expect(snip).toContain('### Beschluss');
+  it('falls back to "Beschlussfrage" and keeps the marker on one line', () => {
+    expect(voteSnippet(vote({ title: '  ', question: null }))).toContain('**Beschlussfrage**');
+    expect(voteSnippetHead(vote({ question: 'Zeile 1\nZeile 2' }))).toBe(
+      '> [!abstimmung] **Zeile 1 Zeile 2**',
+    );
   });
 });
 

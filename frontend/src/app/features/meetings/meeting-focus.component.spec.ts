@@ -370,8 +370,10 @@ describe('MeetingFocusComponent', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Ergebnis ins Protokoll übernehmen' }));
       const payload = on.bodyChange.mock.calls[0][0] as { itemId: string; body: string };
       expect(payload.itemId).toBe('t-1');
-      expect(payload.body).toMatch(/^Aussprache\.\n\n:::vote\{#v-1\}/);
-      expect(payload.body).toContain('**Ergebnis:** passed');
+      // The same callout the backend writes: marker line with the bold question, one tally line.
+      expect(payload.body).toBe(
+        'Aussprache.\n\n> [!abstimmung] **Wird der Nachtragshaushalt beschlossen?**\n> yes: 3, no: 1, abstain: 0',
+      );
       await userEvent.click(screen.getByRole('button', { name: 'Beschlussfrage löschen' }));
       expect(on.voteDelete).toHaveBeenCalledWith('v-1');
     });
@@ -388,7 +390,7 @@ describe('MeetingFocusComponent', () => {
       const cancelled = vote({ id: 'v-2', status: 'cancelled', question: 'Vertagen?' });
       const { on } = await setup({
         meeting: meeting({ votes: [closed, cancelled] }),
-        top: item({ body: 'Text\n:::vote{#v-1}\n:::' }),
+        top: item({ body: 'Text\n\n> [!abstimmung] **Wird der Nachtragshaushalt beschlossen?**\n> yes: 3' }),
       });
       expect(screen.getByText('Angenommen')).toBeInTheDocument();
       expect(screen.getByText('Abgebrochen')).toBeInTheDocument();

@@ -291,6 +291,17 @@ def build_vote_snippet(
     return "\n".join(lines)
 
 
+def vote_in_body(body: str, snippet: str) -> bool:
+    """Report whether the body already carries the vote of `snippet`.
+
+    The protokollant inserts the same callout from the editor. The marker line with
+    the bold question identifies it, so the tally can differ (a re-count) and the
+    box still counts as present.
+    """
+    head = snippet.split("\n", 1)[0].strip()
+    return any(line.strip() == head for line in body.split("\n"))
+
+
 def demote_headings(markdown: str) -> str:
     """Demote all ATX headings in an agenda-item body by one level.
 

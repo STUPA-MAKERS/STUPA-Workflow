@@ -67,6 +67,7 @@ from app.modules.protocol.markdown import (
     build_vote_snippet,
     demote_headings,
     protocol_variant_for,
+    vote_in_body,
 )
 from app.modules.protocol.models import Protocol, ProtocolVoteRef
 from app.modules.protocol.schemas import ProtocolOut
@@ -697,10 +698,11 @@ class ProtocolService:
                 blocks.append("\n\n".join(block))
                 continue
             block = [f"# {heading}"]
-            if item.body and item.body.strip():
+            body = item.body.strip() if item.body and item.body.strip() else ""
+            if body:
                 # Demote the body headings by one level. Only the item heading stays
                 # top-level. Otherwise every `#` counts as its own agenda item.
-                block.append(demote_headings(item.body.strip()))
+                block.append(demote_headings(body))
             votes = (
                 await self.session.execute(
                     select(Vote)
@@ -714,13 +716,16 @@ class ProtocolService:
             ).scalars().all()
             for vote in votes:
                 view = await voting.get(vote.id)
-                block.append(
-                    build_vote_snippet(
-                        view.question or "Beschlussfrage",
-                        view.tally.counts,
-                        question=view.question,
-                    )
+                snippet = build_vote_snippet(
+                    view.question or "Beschlussfrage",
+                    view.tally.counts,
+                    question=view.question,
                 )
+                # The protokollant may have put the result into the text already,
+                # with the same snippet. One box per vote.
+                if vote_in_body(body, snippet):
+                    continue
+                block.append(snippet)
             blocks.append("\n\n".join(block))
         return "\n\n".join(blocks) + "\n"
 

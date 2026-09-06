@@ -39,7 +39,7 @@ import {
 import { MarkdownEditorComponent } from '@stupa-makers/ui-kit/markdown-editor';
 import { MeetingAttendanceTableComponent } from './meeting-attendance-table.component';
 import { MeetingDelegationCardComponent } from './meeting-delegation-card.component';
-import { voteSnippet } from './meetings.util';
+import { voteSnippet, voteSnippetHead } from './meetings.util';
 import {
   countEntries,
   meetingStatusKey,
@@ -201,7 +201,7 @@ export class MeetingFocusComponent {
     return (
       [...this.votes()]
         .reverse()
-        .find((v) => v.status === 'closed' && !body.includes(`:::vote{#${v.id}}`)) ?? null
+        .find((v) => v.status === 'closed' && !body.includes(voteSnippetHead(v))) ?? null
     );
   });
 
@@ -275,7 +275,7 @@ export class MeetingFocusComponent {
     // A phone keyboard often ends the text with a hard break, which Markdown keeps
     // as a trailing backslash. Left in place it becomes an empty line before the block.
     const body = (t.body ?? '').replace(/[\s\\]+$/, '');
-    const snippet = voteSnippet(vote).replace(/^\n+/, '');
+    const snippet = voteSnippet(vote);
     this.bodyChange.emit({ itemId: t.id, body: body ? `${body}\n\n${snippet}` : snippet });
     this.editorRev.update((r) => r + 1);
   }
