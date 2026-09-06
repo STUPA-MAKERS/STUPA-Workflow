@@ -228,7 +228,7 @@ services:
 
   pytex:
     # FastAPI wrapper around pytex_api.render_blob (md -> pdf, variant from the
-    # frontmatter). pytex v1.1.0. The tectonic bundle lands lazily in pytex_cache
+    # frontmatter). pytex v1.2.0. The tectonic bundle lands lazily in pytex_cache
     # (XDG_CACHE_HOME=/cache). POST /render also takes a multipart body that carries
     # a config object and binary assets (uploaded Corporate-Design logos).
     build:

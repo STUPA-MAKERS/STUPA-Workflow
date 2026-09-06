@@ -12,7 +12,7 @@ dependencies = [
     "uvicorn[standard]>=0.34",
     # starlette parses the `multipart/form-data` shape of POST /render with this.
     "python-multipart>=0.0.20",
-    "pytex-preprocessor==1.1.0",
+    "pytex-preprocessor==1.2.0",
 ]
 
 [project.optional-dependencies]
