@@ -356,6 +356,17 @@ describe('MeetingFocusComponent', () => {
       expect(c.progress(vote({ present: 0 }))).toBe(0);
     });
 
+    it('groups the options and the vote actions, so a phone gets clean rows', async () => {
+      const { container } = await setup({ meeting: meeting({ votes: [vote()] }) });
+      const options = container.querySelectorAll('.fx__ballot app-button');
+      expect(options).toHaveLength(3);
+      // Each option fills its share of the row, so the three read as one group.
+      options.forEach((btn) => expect(btn).toHaveClass('btn-block'));
+      const actions = container.querySelectorAll('.fx__voteAdmin app-button');
+      expect(actions).toHaveLength(2);
+      actions.forEach((btn) => expect(btn).toHaveClass('btn-block'));
+    });
+
     it('shows the revealed tally of an open vote', async () => {
       await setup({ meeting: meeting({ votes: [vote({ revealed: true, counts: { yes: 3, no: 1 }, leading: 'yes' })] }) });
       expect(screen.getByRole('button', { name: 'Ja' })).toBeInTheDocument();

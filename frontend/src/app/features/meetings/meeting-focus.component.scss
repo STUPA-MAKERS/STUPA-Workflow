@@ -253,6 +253,13 @@ app-markdown-editor ::ng-deep .mde__host .ProseMirror {
   min-width: 0;
   flex-wrap: wrap;
 }
+.fx__ballot,
+.fx__voteAdmin {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
 .fx__done {
   display: inline-flex;
   align-items: center;
@@ -507,6 +514,29 @@ app-markdown-editor ::ng-deep .mde__host .ProseMirror {
   }
   .fx__mid app-button {
     flex: 1 1 auto;
+  }
+  /* The vote rows stack: the label names the row, the options share it in equal
+     parts, and the actions of the vote manager get a row of their own. */
+  .fx__mid .fx__lbl,
+  .fx__mid .fx__ballot,
+  .fx__mid .fx__voteAdmin {
+    flex: 1 1 100%;
+  }
+  .fx__mid .fx__ballot {
+    display: flex;
+  }
+  .fx__mid .fx__ballot app-button {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  /* "Abstimmung schließen" and "Abstimmung abbrechen" do not fit next to each
+     other on a phone, and the label of a button never wraps. So they stack. */
+  .fx__mid .fx__voteAdmin {
+    display: flex;
+    flex-wrap: wrap;
+  }
+  .fx__mid .fx__voteAdmin app-button {
+    flex: 1 1 100%;
   }
   .fx__done {
     display: flex;

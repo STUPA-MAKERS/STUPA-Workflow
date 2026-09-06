@@ -292,13 +292,19 @@
       } @else if (openVote(); as vote) {
         @if (m.canVote) {
           <span class="fx__lbl">{{ 'meetings.dock.yourVote' | t }}</span>
-          @for (opt of voteOptionsFor(vote); track opt) {
-            <app-button size="sm" [variant]="myChoice(vote.id) === opt ? 'primary' : 'secondary'" [loading]="casting() === vote.id" (click)="castVote.emit({ voteId: vote.id, choice: opt })">{{ optionLabel(opt) }}@if (myChoice(vote.id) === opt) { <app-icon name="check" [size]="13" /> }</app-button>
-          }
+          <!-- The options are one group, so a phone gets one row of equal buttons
+               instead of a ragged wrap. `block` lets each button fill its share. -->
+          <span class="fx__ballot">
+            @for (opt of voteOptionsFor(vote); track opt) {
+              <app-button size="sm" [block]="true" [variant]="myChoice(vote.id) === opt ? 'primary' : 'secondary'" [loading]="casting() === vote.id" (click)="castVote.emit({ voteId: vote.id, choice: opt })">{{ optionLabel(opt) }}@if (myChoice(vote.id) === opt) { <app-icon name="check" [size]="13" /> }</app-button>
+            }
+          </span>
         }
         @if (m.canManageVotes) {
-          <app-button variant="danger" size="sm" (click)="voteClose.emit(vote.id)">{{ 'meetings.vote.close' | t }}</app-button>
-          <app-button variant="ghost" size="sm" (click)="voteCancel.emit(vote.id)">{{ 'meetings.vote.cancel' | t }}</app-button>
+          <span class="fx__voteAdmin">
+            <app-button variant="danger" size="sm" [block]="true" (click)="voteClose.emit(vote.id)">{{ 'meetings.vote.close' | t }}</app-button>
+            <app-button variant="ghost" size="sm" [block]="true" (click)="voteCancel.emit(vote.id)">{{ 'meetings.vote.cancel' | t }}</app-button>
+          </span>
         }
       } @else {
         <!-- Every finished vote of the item stays reachable: its result, and the
