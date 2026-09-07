@@ -76,7 +76,7 @@ dev = [
     # `be-contract` turns non-deterministic and passes or fails on the same commit. Exact
     # pins keep a red run reproducible and stop tool updates from moving it.
     "schemathesis==4.25.2",
-    "hypothesis==6.165.10",
+    "hypothesis==6.167.1",
     "ruff>=0.9",
     "basedpyright>=1.28",
     "testcontainers[postgres]>=4.8",
