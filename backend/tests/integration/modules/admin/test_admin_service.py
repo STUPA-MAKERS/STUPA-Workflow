@@ -31,7 +31,6 @@ from app.modules.admin.schemas import (
     GremiumCreate,
     GremiumUpdate,
     GroupMappingCreate,
-    RoleAssignmentCreate,
     RoleCreate,
     RoleUpdate,
     WebhookCreate,
@@ -40,7 +39,7 @@ from app.modules.admin.schemas import (
 from app.modules.admin.service import ConfigService
 from app.modules.admin.site_config_service import SiteConfigService
 from app.modules.audit.models import AuditEntry
-from app.modules.auth.models import Principal, Role
+from app.modules.auth.models import Principal, Role, RoleAssignment
 from app.modules.flow.models import FlowVersion, State
 from app.shared.errors import ConflictError, NotFoundError
 
@@ -304,44 +303,25 @@ async def test_role_crud_and_listing(session: AsyncSession) -> None:
         await svc.delete_role(admin.id, _ACTOR)
 
 
-async def test_role_assignment_and_group_mapping(session: AsyncSession) -> None:
+async def test_read_only_assignments_and_group_mapping(session: AsyncSession) -> None:
+    """The service lists the bootstrap assignments. Global roles come from group mappings."""
     svc = ConfigService(session)
     principal = Principal(sub=f"u-{uuid.uuid4()}", email=None, display_name="U")
     session.add(principal)
     await session.flush()
     role = (await session.scalars(select(Role).where(Role.key == "member"))).first()
     assert role is not None
+    session.add(RoleAssignment(principal_id=principal.id, role_id=role.id, granted_by="bootstrap"))
+    await session.flush()
 
-    assignment = await svc.create_role_assignment(
-        RoleAssignmentCreate.model_validate(
-            {
-                "principalId": str(principal.id),
-                "roleId": str(role.id),
-                "delegateVoting": True,
-                "validUntil": "2026-12-31T23:59:00+00:00",
-            }
-        ),
-        _ACTOR,
-    )
-    assert assignment.delegate_voting is True
-    assert assignment.granted_by == _ACTOR
-    assert assignment.valid_until is not None
-
-    # An unknown principal gives 404.
-    with pytest.raises(NotFoundError):
-        await svc.create_role_assignment(
-            RoleAssignmentCreate.model_validate(
-                {"principalId": str(uuid.uuid4()), "roleId": str(role.id)}
-            ),
-            _ACTOR,
-        )
-
+    assert not hasattr(svc, "create_role_assignment")
     mapping = await svc.create_group_mapping(
         GroupMappingCreate.model_validate({"oidcGroup": "fsr-info", "roleId": str(role.id)}),
         _ACTOR,
     )
     assert mapping.oidc_group == "fsr-info"
-    assert len(await svc.list_role_assignments()) == 1
+    [assignment] = await svc.list_role_assignments()
+    assert assignment.granted_by == "bootstrap"
     assert len(await svc.list_group_mappings()) == 1
 
 

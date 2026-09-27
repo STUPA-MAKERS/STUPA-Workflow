@@ -212,36 +212,51 @@ class GremiumRoleUpdate(_CamelModel):
 
 
 class GremiumMembershipOut(_CamelModel):
+    """A membership that the sync derived from the OIDC groups (read-only)."""
+
     id: UUID
     principal_id: UUID = Field(serialization_alias="principalId")
     gremium_id: UUID = Field(serialization_alias="gremiumId")
     gremium_role_id: UUID = Field(serialization_alias="gremiumRoleId")
-    valid_from: str | None = Field(serialization_alias="validFrom")
-    valid_until: str | None = Field(serialization_alias="validUntil")
 
 
-class GremiumMembershipCreate(_CamelModel):
-    principal_id: UUID = Field(alias="principalId")
+def _check_oidc_group(value: str) -> str:
+    """Refuse a group name in the ``vote:`` namespace that the RBAC resolver reserves."""
+    if value.startswith("vote:"):
+        raise ValueError("the prefix 'vote:' is reserved")
+    return value
+
+
+class GremiumGroupMappingOut(_CamelModel):
+    id: UUID
+    gremium_id: UUID = Field(serialization_alias="gremiumId")
+    gremium_role_id: UUID = Field(serialization_alias="gremiumRoleId")
+    oidc_group: str = Field(serialization_alias="oidcGroup")
+
+
+class GremiumGroupMappingCreate(_CamelModel):
+    oidc_group: str = Field(alias="oidcGroup", min_length=1, max_length=256)
     gremium_role_id: UUID = Field(alias="gremiumRoleId")
-    valid_from: str | None = Field(default=None, alias="validFrom")
-    valid_until: str | None = Field(default=None, alias="validUntil")
+
+    @field_validator("oidc_group")
+    @classmethod
+    def _group(cls, value: str) -> str:
+        return _check_oidc_group(value)
 
 
-class GremiumMembershipUpdate(_CamelModel):
-    """Change the role or the term of office of one membership.
+class GremiumGroupMappingUpdate(_CamelModel):
+    """Change the group or the role of one mapping. The gremium stays immutable."""
 
-    The member and the Gremium stay immutable. A different member or a
-    different Gremium is a different membership. Only the fields that the
-    payload sets change. ``validFrom`` or ``validUntil`` set to ``null`` opens
-    that end of the term.
-    """
-
+    oidc_group: str | None = Field(default=None, alias="oidcGroup", min_length=1, max_length=256)
     gremium_role_id: UUID | None = Field(default=None, alias="gremiumRoleId")
-    valid_from: str | None = Field(default=None, alias="validFrom")
-    valid_until: str | None = Field(default=None, alias="validUntil")
+
+    @field_validator("oidc_group")
+    @classmethod
+    def _group(cls, value: str | None) -> str | None:
+        return None if value is None else _check_oidc_group(value)
 
     @model_validator(mode="after")
-    def _at_least_one(self) -> GremiumMembershipUpdate:
+    def _at_least_one(self) -> GremiumGroupMappingUpdate:
         if not self.model_fields_set:
             raise ValueError("at least one field required")
         return self
@@ -339,23 +354,6 @@ class RoleAssignmentOut(_CamelModel):
     delegate_voting: bool = Field(serialization_alias="delegateVoting")
 
 
-class RoleAssignmentCreate(_CamelModel):
-    principal_id: UUID = Field(alias="principalId")
-    role_id: UUID = Field(alias="roleId")
-    gremium_id: UUID | None = Field(default=None, alias="gremiumId")
-    valid_from: str | None = Field(default=None, alias="validFrom")
-    valid_until: str | None = Field(default=None, alias="validUntil")
-    delegate_voting: bool = Field(default=False, alias="delegateVoting")
-
-
-class RoleAssignmentUpdate(_CamelModel):
-    role_id: UUID | None = Field(default=None, alias="roleId")
-    gremium_id: UUID | None = Field(default=None, alias="gremiumId")
-    valid_from: str | None = Field(default=None, alias="validFrom")
-    valid_until: str | None = Field(default=None, alias="validUntil")
-    delegate_voting: bool | None = Field(default=None, alias="delegateVoting")
-
-
 class PrincipalOut(_CamelModel):
     """OIDC principal plus its role assignments (roles/permissions UI)."""
 
@@ -366,6 +364,8 @@ class PrincipalOut(_CamelModel):
     last_login: str | None = Field(serialization_alias="lastLogin")
     active: bool = True
     assignments: list[RoleAssignmentOut]
+    # The OIDC groups as of the last login. They drive the group mappings.
+    oidc_groups: list[str] = Field(default_factory=list, serialization_alias="oidcGroups")
 
 
 class PrincipalUpdate(_CamelModel):

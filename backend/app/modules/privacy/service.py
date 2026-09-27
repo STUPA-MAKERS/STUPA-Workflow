@@ -14,6 +14,7 @@ from uuid import UUID
 from sqlalchemy import delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.admin.membership_sync import sync_principal_memberships
 from app.modules.admin.models import ApplicationType
 from app.modules.applications.models import (
     Applicant,
@@ -67,6 +68,8 @@ class PrincipalService:
         principal.calendar_token = None
         principal.oidc_groups = None
         principal.active = False
+        # Without groups the principal holds no gremium membership any more.
+        await sync_principal_memberships(self.session, principal)
         await self.session.execute(
             delete(AuthSession).where(AuthSession.principal_id == principal_id)
         )
@@ -317,7 +320,12 @@ class AuskunftService:
                     {
                         "id": a.id,
                         "typeName": _i18n(type_names.get(a.type_id), locale),
-                        "status": _i18n(state_labels.get(a.current_state_id), locale),
+                        "status": _i18n(
+                            state_labels.get(a.current_state_id)
+                            if a.current_state_id is not None
+                            else None,
+                            locale,
+                        ),
                         "createdAt": a.created_at,
                         "applicantName": applicant.name if applicant else "",
                         "data": a.data,

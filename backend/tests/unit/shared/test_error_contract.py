@@ -8,6 +8,7 @@ No stack trace and no file path reaches the client.
 import pytest
 from fastapi import FastAPI, UploadFile
 from fastapi.testclient import TestClient
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.main import create_app
 from app.middleware import RequestContextMiddleware
@@ -96,6 +97,37 @@ def test_malformed_multipart_body_is_422_problem_json() -> None:
     body = resp.json()
     _assert_problem_shape(body, 422, "validation_error")
     assert body["errors"][0]["field"] == "body"
+
+
+@pytest.mark.parametrize(
+    "detail", ["There was an error parsing the body", "Invalid multipart data."]
+)
+def test_body_parse_400_details_are_lifted_to_422(detail: str) -> None:
+    """FastAPI and Starlette 1.7+ report a broken body with different details."""
+    app = FastAPI()
+    app.add_middleware(RequestContextMiddleware)
+    register_exception_handlers(app)
+
+    @app.get("/boom")
+    async def boom() -> None:
+        raise StarletteHTTPException(status_code=400, detail=detail)
+
+    resp = TestClient(app).get("/boom")
+    assert resp.status_code == 422
+    _assert_problem_shape(resp.json(), 422, "validation_error")
+
+
+def test_other_400_with_dict_detail_stays_400() -> None:
+    app = FastAPI()
+    app.add_middleware(RequestContextMiddleware)
+    register_exception_handlers(app)
+
+    @app.get("/boom")
+    async def boom() -> None:
+        raise StarletteHTTPException(status_code=400, detail={"x": 1})  # type: ignore[arg-type]
+
+    resp = TestClient(app).get("/boom")
+    assert resp.status_code == 400
 
 
 def test_malformed_json_body_is_422() -> None:

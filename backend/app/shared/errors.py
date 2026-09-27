@@ -24,12 +24,16 @@ logger = logging.getLogger("app.error")
 
 PROBLEM_CONTENT_TYPE = "application/problem+json"
 
-# FastAPI raises exactly this HTTPException(400) when the body parsing fails in a way
-# that is not a JSON decode error, mainly a broken multipart/form-data. Invalid JSON
-# goes through RequestValidationError to 422. The handler lifts this case to 422
+# These HTTPException(400) details mean that the body parsing failed in a way that is
+# not a JSON decode error, mainly a broken multipart/form-data. FastAPI raises the first
+# one for an unknown parser error. Starlette 1.7 and later wraps a multipart parser
+# error itself and raises the second one. Invalid JSON goes through
+# RequestValidationError to 422. The handler lifts these cases to 422
 # (validation_error). An unparseable body then gives the same documented problem+json
 # status app-wide, instead of an undocumented per-endpoint 400.
-_BODY_PARSE_ERROR_DETAIL = "There was an error parsing the body"
+_BODY_PARSE_ERROR_DETAILS: frozenset[str] = frozenset(
+    {"There was an error parsing the body", "Invalid multipart data."}
+)
 
 # Status -> stable error code.
 STATUS_CODE_MAP: dict[int, str] = {
@@ -244,8 +248,12 @@ async def _http_exception_handler(
 ) -> JSONResponse:
     # Unify the body-parse errors (broken multipart and similar) onto 422, instead of
     # the endpoint-specific, undocumented 400 of FastAPI. See
-    # ``_BODY_PARSE_ERROR_DETAIL``.
-    if exc.status_code == 400 and exc.detail == _BODY_PARSE_ERROR_DETAIL:
+    # ``_BODY_PARSE_ERROR_DETAILS``.
+    if (
+        exc.status_code == 400
+        and isinstance(exc.detail, str)
+        and exc.detail in _BODY_PARSE_ERROR_DETAILS
+    ):
         return _validation_problem(
             request,
             detail="Request body could not be parsed.",

@@ -85,93 +85,13 @@
   scrollbar-width: thin;
 }
 
-.users__tag {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  flex: 0 0 auto;
-  white-space: nowrap;
-}
-
-// The × sits inside the badge, so it needs a gap from the label.
-.users__tag-label + .users__tag-x {
-  margin-left: var(--space-2);
-}
-
-.users__tag-x {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1rem;
-  height: 1rem;
-  padding: 0;
-  border: 0;
-  border-radius: var(--radius-pill);
-  background: transparent;
-  color: currentColor;
-  opacity: 0.7;
-  cursor: pointer;
-  font-size: var(--fs-sm);
-  line-height: 1;
-}
-
-.users__tag-x:hover {
-  opacity: 1;
-  color: var(--color-danger);
-}
-
-.users__tag-x + .users__tag-x {
-  margin-left: 2px;
-}
-
-/* The edit pencil is not destructive, so it must not hover in the danger color. */
-.users__tag-edit:hover {
-  color: var(--color-primary);
+/* A group name is an identifier from the IdP, so it keeps its exact spelling. */
+.users__group {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--fs-xs);
 }
 
 .users__col-actions {
   text-align: end;
   white-space: nowrap;
-}
-
-.users__assign-row td {
-  padding: 0;
-  border-bottom: var(--border-width) solid var(--color-border);
-}
-
-.users__assign {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
-  gap: var(--space-3);
-  margin: 0;
-  padding: var(--space-4);
-  background: var(--color-surface-sunken);
-  border: 0;
-}
-
-.users__assign app-checkbox {
-  min-height: var(--control-height);
-  justify-content: center;
-}
-
-.users__assign app-button {
-  align-self: end;
-}
-
-/* Keep the assign button as high as the selects and the datepicker on the left. */
-.users__assign app-button button.btn {
-  height: var(--control-height);
-}
-
-/* Give each control the full width. The selects and the datepicker stay tappable
-   at 375px. */
-@media (max-width: 768px) {
-  .users__assign > * {
-    flex: 1 1 100%;
-  }
-
-  .users__assign app-button {
-    align-self: stretch;
-  }
 }

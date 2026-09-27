@@ -56,6 +56,9 @@ TYPICAL FLOWS:
   `delete_invoice`. To attach an original PDF: `parse_invoice(file_path)` (ZUGFeRD/Factur-X →
   extracted fields + `fileToken`) or `upload_invoice_file(file_path)`, then pass `fileToken`
   to `create_invoice`.
+- Members and roles: the OIDC groups of the IdP are the only source. No tool adds a member
+  or assigns a role. Map a group to a Gremium role with `create_gremium_group_mapping`, or
+  to a global role with `create_group_mapping`. The platform then syncs the memberships.
 
 SCHEMAS: tool parameters are typed and mirror the API (camelCase keys). For guard/action
 shapes and form-field types call `get_config_schemas` (authoritative JSON-Schemas).

@@ -1,10 +1,10 @@
 import { of, throwError } from 'rxjs';
-import { ActivatedRoute, convertToParamMap } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { AuthService } from '@core/auth/auth.service';
 import { ToastService } from '@stupa-makers/ui-kit';
-import type { AdminPrincipal, Role, RoleAssignment } from '../admin.models';
+import type { AdminPrincipal, GroupMapping, Role, RoleAssignment } from '../admin.models';
 import { AdminApiService } from '../admin-api.service';
 import { UsersComponent } from './users.component';
 
@@ -53,6 +53,7 @@ const PRINCIPALS: AdminPrincipal[] = [
     displayName: 'Alex Admin',
     lastLogin: '2026-06-06T18:20:00+00:00',
     assignments: [ADMIN_ASSIGN, SCOPED_ASSIGN],
+    oidcGroups: ['stupa-referat', 'vote:g-1', 'unmapped'],
   },
   {
     id: 'p-3',
@@ -61,13 +62,22 @@ const PRINCIPALS: AdminPrincipal[] = [
     displayName: 'Sam Neu',
     lastLogin: null,
     assignments: [],
+    oidcGroups: [],
   },
 ];
 
-function makeAuth(sub: string | null, canManage = true) {
+const MAPPINGS: GroupMapping[] = [
+  { id: 'gm-1', oidcGroup: 'stupa-referat', roleId: 'r-ref', gremiumId: null },
+  // The same role as the bootstrap assignment. The column shows it once.
+  { id: 'gm-2', oidcGroup: 'stupa-referat', roleId: 'r-admin', gremiumId: null },
+  // A reserved group never gives a role, not even through a mapping.
+  { id: 'gm-3', oidcGroup: 'vote:g-1', roleId: 'r-member', gremiumId: null },
+];
+
+function makeAuth(sub: string | null, canMappings = true) {
   return {
     principal: () => (sub === null ? null : { sub }),
-    can: (p: string) => canManage && p === 'admin.users',
+    can: (p: string) => p === 'admin.users' || (canMappings && p === 'admin.group_mappings'),
   } as unknown as AuthService;
 }
 
@@ -77,8 +87,7 @@ function makeApi(over: Partial<Record<string, jest.Mock>> = {}) {
     listPrincipals: jest.fn(() =>
       of(PRINCIPALS.map((p) => ({ ...p, assignments: [...p.assignments] }))),
     ),
-    assignRole: jest.fn(() => of({ id: 'a-new' })),
-    revokeRole: jest.fn(() => of(void 0)),
+    listGroupMappings: jest.fn(() => of(MAPPINGS.map((m) => ({ ...m })))),
     setPrincipalActive: jest.fn(() => of({ id: 'p-1', active: true })),
     ...over,
   };
@@ -96,6 +105,7 @@ async function setup(
 ) {
   const view = await render(UsersComponent, {
     providers: [
+      provideRouter([]),
       { provide: AdminApiService, useValue: api },
       { provide: AuthService, useValue: auth },
       { provide: ToastService, useValue: toast },
@@ -125,12 +135,56 @@ describe('UsersComponent', () => {
     expect(inst.query()).toBe('kc|alex');
   });
 
-  it('lists principals and shows capitalized role tags', async () => {
+  it('lists principals with capitalized, read-only role tags', async () => {
     await setup();
     expect(screen.getByText('Alex Admin')).toBeInTheDocument();
     expect(screen.getAllByText('Administrator').length).toBeGreaterThan(0);
+    expect(screen.getByText('Referent')).toBeInTheDocument();
     expect(screen.queryByText('administrator')).not.toBeInTheDocument();
     expect(screen.getByText('Keine Rollen zugewiesen.')).toBeInTheDocument();
+    // No role editing is left: no assign, edit or revoke control.
+    expect(screen.queryByRole('button', { name: /Entziehen|Zuweisung|Rolle \+/ })).toBeNull();
+  });
+
+  it('shows the OIDC groups of each user, or a placeholder', async () => {
+    await setup();
+    expect(screen.getByRole('columnheader', { name: 'OIDC-Gruppen' })).toBeInTheDocument();
+    expect(screen.getByText('stupa-referat')).toBeInTheDocument();
+    expect(screen.getByText('unmapped')).toBeInTheDocument();
+    expect(screen.getByText('Keine Gruppen.')).toBeInTheDocument();
+  });
+
+  it('roleIds merges the global bootstrap roles with the mapped roles', async () => {
+    const { inst } = await setup();
+    // The scoped assignment is left out, the admin role appears once, the vote: group
+    // gives nothing.
+    expect(inst.roleIds(PRINCIPALS[0])).toEqual(['r-admin', 'r-ref']);
+    expect(inst.roleIds(PRINCIPALS[1])).toEqual([]);
+  });
+
+  it('shows the hint with a link to the group mappings when permitted', async () => {
+    await setup();
+    expect(
+      screen.getByText(/Die Rollen kommen aus den OIDC-Gruppen/),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Gruppen-Mappings verwalten' })).toHaveAttribute(
+      'href',
+      '/admin/group-mappings',
+    );
+  });
+
+  it('without admin.group_mappings: no link and no mapping request', async () => {
+    const api = makeApi();
+    const { inst } = await setup(api, makeAuth(null, false));
+    expect(api.listGroupMappings).not.toHaveBeenCalled();
+    expect(screen.queryByRole('link', { name: 'Gruppen-Mappings verwalten' })).toBeNull();
+    expect(inst.roleIds(PRINCIPALS[0])).toEqual(['r-admin']);
+  });
+
+  it('a failed mapping load falls back to the bootstrap roles', async () => {
+    const api = makeApi({ listGroupMappings: jest.fn(() => throwError(() => new Error('x'))) });
+    const { inst } = await setup(api);
+    expect(inst.roleIds(PRINCIPALS[0])).toEqual(['r-admin']);
   });
 
   it('mySub is null without a logged-in principal', async () => {
@@ -143,18 +197,9 @@ describe('UsersComponent', () => {
     expect(inst.mySub()).toBe('kc|alex');
   });
 
-  it('globalAssignments filters out gremium-scoped assignments', async () => {
-    const { inst } = await setup();
-    expect(inst.globalAssignments(PRINCIPALS[0])).toEqual([ADMIN_ASSIGN]);
-    expect(inst.globalAssignments(PRINCIPALS[1])).toEqual([]);
-  });
-
-  it('rowId + rowExpanded reflect the expanded set', async () => {
+  it('rowId exposes the principal id', async () => {
     const { inst } = await setup();
     expect(inst.rowId(PRINCIPALS[0])).toBe('p-1');
-    expect(inst.rowExpanded(PRINCIPALS[0])).toBe(false);
-    inst.toggleAssign('p-1');
-    expect(inst.rowExpanded(PRINCIPALS[0])).toBe(true);
   });
 
   it('roleLabel resolves locale→de→key, raw id when unknown', async () => {
@@ -178,23 +223,6 @@ describe('UsersComponent', () => {
     expect(inst.userLabel({ displayName: null, email: null, sub: 'sub-only' })).toBe('sub-only');
   });
 
-  it('roleOptions exposes every role with a capitalized label', async () => {
-    const { inst } = await setup();
-    expect(inst.roleOptions()).toEqual([
-      { value: 'r-admin', label: 'Administrator' },
-      { value: 'r-member', label: 'Mitglied' },
-      { value: 'r-ref', label: 'Referent' }, // no German label, so the capitalized key wins
-    ]);
-  });
-
-  it('isAdminRole protects admin + member only', async () => {
-    const { inst } = await setup();
-    expect(inst.isAdminRole('r-admin')).toBe(true);
-    expect(inst.isAdminRole('r-member')).toBe(true);
-    expect(inst.isAdminRole('r-ref')).toBe(false);
-    expect(inst.isAdminRole('unknown')).toBe(false);
-  });
-
   it('isSelf is true only when sub matches the logged-in sub', async () => {
     const { inst } = await setup(makeApi(), makeAuth('kc|alex'));
     expect(inst.isSelf(PRINCIPALS[0])).toBe(true);
@@ -204,28 +232,6 @@ describe('UsersComponent', () => {
   it('isSelf is false when there is no logged-in principal', async () => {
     const { inst } = await setup();
     expect(inst.isSelf(PRINCIPALS[0])).toBe(false);
-  });
-
-  it('toggleAssign + isExpanded toggle a row open and closed', async () => {
-    const { inst } = await setup();
-    expect(inst.isExpanded('p-1')).toBe(false);
-    inst.toggleAssign('p-1');
-    expect(inst.isExpanded('p-1')).toBe(true);
-    inst.toggleAssign('p-1');
-    expect(inst.isExpanded('p-1')).toBe(false);
-  });
-
-  it('draftFor returns an empty draft by default and patchDraft merges', async () => {
-    const { inst } = await setup();
-    expect(inst.draftFor('p-3')).toEqual({ roleId: '', validFrom: '', validUntil: '' });
-    inst.patchDraft('p-3', { roleId: 'r-member' });
-    expect(inst.draftFor('p-3')).toEqual({ roleId: 'r-member', validFrom: '', validUntil: '' });
-    inst.patchDraft('p-3', { validFrom: '2026-07-01' });
-    expect(inst.draftFor('p-3')).toEqual({
-      roleId: 'r-member',
-      validFrom: '2026-07-01',
-      validUntil: '',
-    });
   });
 
   it('searches by query', async () => {
@@ -238,64 +244,6 @@ describe('UsersComponent', () => {
   it('search error path shows an error toast', async () => {
     const api = makeApi({ listPrincipals: jest.fn(() => throwError(() => new Error('x'))) });
     const { toast } = await setup(api);
-    expect(toast.error).toHaveBeenCalled();
-  });
-
-  it('does not assign without a role selected', async () => {
-    const { api, inst } = await setup();
-    inst.assign(PRINCIPALS[1]);
-    expect(api.assignRole).not.toHaveBeenCalled();
-  });
-
-  it('assigns a role with optional validity window and resets state', async () => {
-    const { api, inst } = await setup();
-    inst.toggleAssign('p-3');
-    inst.patchDraft('p-3', {
-      roleId: 'r-member',
-      validFrom: '2026-07-01',
-      validUntil: '2026-12-31',
-    });
-    inst.assign(PRINCIPALS[1]);
-    expect(api.assignRole).toHaveBeenCalledWith({
-      principalId: 'p-3',
-      roleId: 'r-member',
-      gremiumId: null,
-      validFrom: '2026-07-01T00:00:00Z',
-      validUntil: '2026-12-31T00:00:00Z',
-    });
-    expect(inst.draftFor('p-3')).toEqual({ roleId: '', validFrom: '', validUntil: '' });
-    expect(inst.isExpanded('p-3')).toBe(false);
-    expect(api.listPrincipals).toHaveBeenCalledTimes(2);
-  });
-
-  it('assigns with empty validity → null dates (isoOrNull empty branch)', async () => {
-    const { api, inst, toast } = await setup();
-    inst.patchDraft('p-3', { roleId: 'r-member' });
-    inst.assign(PRINCIPALS[1]);
-    expect(api.assignRole).toHaveBeenCalledWith({
-      principalId: 'p-3',
-      roleId: 'r-member',
-      gremiumId: null,
-      validFrom: null,
-      validUntil: null,
-    });
-    expect(toast.success).toHaveBeenCalled();
-  });
-
-  it('assigns passing through a full ISO datetime unchanged (isoOrNull non-10 branch)', async () => {
-    const { api, inst } = await setup();
-    inst.patchDraft('p-3', { roleId: 'r-member', validFrom: '2026-07-01T08:00:00Z' });
-    inst.assign(PRINCIPALS[1]);
-    expect(api.assignRole).toHaveBeenCalledWith(
-      expect.objectContaining({ validFrom: '2026-07-01T08:00:00Z', validUntil: null }),
-    );
-  });
-
-  it('assign error path shows an error toast', async () => {
-    const api = makeApi({ assignRole: jest.fn(() => throwError(() => new Error('x'))) });
-    const { inst, toast } = await setup(api);
-    inst.patchDraft('p-3', { roleId: 'r-member' });
-    inst.assign(PRINCIPALS[1]);
     expect(toast.error).toHaveBeenCalled();
   });
 
@@ -315,117 +263,9 @@ describe('UsersComponent', () => {
     expect(toast.error).toHaveBeenCalled();
   });
 
-  it('revokes a role', async () => {
-    const { api, inst, toast } = await setup();
-    inst.revoke(ADMIN_ASSIGN);
-    expect(api.revokeRole).toHaveBeenCalledWith('a-1');
-    expect(toast.success).toHaveBeenCalled();
-  });
-
-  it('revoke error path shows an error toast', async () => {
-    const api = makeApi({ revokeRole: jest.fn(() => throwError(() => new Error('x'))) });
-    const { inst, toast } = await setup(api);
-    inst.revoke(ADMIN_ASSIGN);
-    expect(toast.error).toHaveBeenCalled();
-  });
-
   it('renders the principals as a table without the oidc-subject column', async () => {
     await setup();
     expect(screen.getByRole('table')).toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: 'OIDC-Subject' })).not.toBeInTheDocument();
-  });
-
-  describe('edit a role assignment', () => {
-    it('offers the edit control only with admin.users', async () => {
-      await setup(makeApi(), makeAuth(null, false));
-      expect(
-        screen.queryByRole('button', { name: /Zuweisung bearbeiten/ }),
-      ).not.toBeInTheDocument();
-    });
-
-    it('shows an edit control per assigned role', async () => {
-      await setup();
-      expect(
-        screen.getAllByRole('button', { name: /Zuweisung bearbeiten/ }).length,
-      ).toBeGreaterThan(0);
-    });
-
-    it('prefills the dialog from the assignment and cuts the date to YYYY-MM-DD', async () => {
-      const { inst } = await setup();
-      inst.openEdit({ ...ADMIN_ASSIGN, validUntil: '2026-12-31T00:00:00Z' });
-      expect(inst.editDraft()).toEqual({
-        roleId: 'r-admin',
-        validFrom: '',
-        validUntil: '2026-12-31',
-      });
-      inst.closeEdit();
-      expect(inst.editing()).toBeNull();
-    });
-
-    it('sends only the changed fields and reloads the list', async () => {
-      const api = makeApi({
-        updateRoleAssignment: jest.fn(() => of({ ...ADMIN_ASSIGN, roleId: 'r-ref' })),
-      });
-      const { inst, toast } = await setup(api);
-      inst.openEdit(ADMIN_ASSIGN);
-      inst.patchEdit({ roleId: 'r-ref', validUntil: '2026-12-31' });
-      inst.saveEdit();
-      expect(api.updateRoleAssignment).toHaveBeenCalledWith('a-1', {
-        roleId: 'r-ref',
-        validUntil: '2026-12-31T00:00:00Z',
-      });
-      expect(toast.success).toHaveBeenCalledWith('Zuweisung aktualisiert.');
-      expect(inst.editing()).toBeNull();
-      // The list reloads: once on init and once after the save.
-      expect(api.listPrincipals).toHaveBeenCalledTimes(2);
-    });
-
-    it('keeps an already set expiry when the field is cleared', async () => {
-      const api = makeApi({ updateRoleAssignment: jest.fn(() => of(ADMIN_ASSIGN)) });
-      const { inst } = await setup(api);
-      inst.openEdit({ ...ADMIN_ASSIGN, validUntil: '2026-12-31T00:00:00Z' });
-      inst.patchEdit({ roleId: 'r-ref', validUntil: '' });
-      inst.saveEdit();
-      // No `validUntil` in the body: the route reads null as "do not touch",
-      // so sending it would be a silent no-op instead of a clear.
-      expect(api.updateRoleAssignment).toHaveBeenCalledWith('a-1', { roleId: 'r-ref' });
-    });
-
-    it('closes without a request when nothing changed', async () => {
-      const api = makeApi({ updateRoleAssignment: jest.fn(() => of(ADMIN_ASSIGN)) });
-      const { inst } = await setup(api);
-      inst.openEdit(ADMIN_ASSIGN);
-      inst.saveEdit();
-      expect(api.updateRoleAssignment).not.toHaveBeenCalled();
-      expect(inst.editing()).toBeNull();
-    });
-
-    it.each([
-      [403, 'Die eigene Admin-Zuweisung lässt sich nicht ändern.'],
-      [500, 'Zuweisung konnte nicht geändert werden.'],
-    ])('explains a %s answer', async (status, message) => {
-      const api = makeApi({
-        updateRoleAssignment: jest.fn(() => throwError(() => ({ status }))),
-      });
-      const { inst, toast } = await setup(api);
-      inst.openEdit(ADMIN_ASSIGN);
-      inst.patchEdit({ roleId: 'r-ref' });
-      inst.saveEdit();
-      expect(toast.error).toHaveBeenCalledWith(message);
-      expect(inst.savingEdit()).toBe(false);
-    });
-
-    it('ignores a save without a target, without a role, or while one runs', async () => {
-      const api = makeApi({ updateRoleAssignment: jest.fn(() => of(ADMIN_ASSIGN)) });
-      const { inst } = await setup(api);
-      inst.saveEdit();
-      inst.openEdit(ADMIN_ASSIGN);
-      inst.patchEdit({ roleId: '' });
-      inst.saveEdit();
-      inst.patchEdit({ roleId: 'r-ref' });
-      inst.savingEdit.set(true);
-      inst.saveEdit();
-      expect(api.updateRoleAssignment).not.toHaveBeenCalled();
-    });
   });
 });

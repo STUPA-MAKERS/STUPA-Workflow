@@ -228,7 +228,7 @@ class AuditService:
         offset: int = 0,
     ) -> Page[AuditEntry]:
         """Read a filtered, offset-paged audit view, newest entry first."""
-        stmt: Select[tuple[AuditEntry]] = select(AuditEntry)
+        stmt: Select[AuditEntry] = select(AuditEntry)
         if action is not None:
             stmt = stmt.where(AuditEntry.action == action)
         if actor is not None:
@@ -282,7 +282,7 @@ class AuditService:
         Returns:
             The page items and a flag that states whether more rows follow.
         """
-        stmt: Select[tuple[AuditEntry]] = select(AuditEntry)
+        stmt: Select[AuditEntry] = select(AuditEntry)
         if action is not None:
             stmt = stmt.where(AuditEntry.action == action)
         if actor is not None:
@@ -356,7 +356,7 @@ class AuditService:
         labels: dict[tuple[str, str], str] = {}
 
         async def fill(
-            target_type: str, stmt: Select[tuple[uuid.UUID, Any]]
+            target_type: str, stmt: Select[uuid.UUID, Any]
         ) -> None:
             for row_id, label in (await self.session.execute(stmt)).all():
                 if label:
@@ -503,7 +503,7 @@ class AuditService:
                 return None
             return m.get("de") or next(iter(m.values()), None)  # pyright: ignore[reportUnknownVariableType, reportUnknownArgumentType]
 
-        async def fill(stmt: Select[tuple[uuid.UUID, Any]]) -> None:
+        async def fill(stmt: Select[uuid.UUID, Any]) -> None:
             for row_id, label in (await self.session.execute(stmt)).all():
                 if label and str(row_id) not in labels:
                     labels[str(row_id)] = label

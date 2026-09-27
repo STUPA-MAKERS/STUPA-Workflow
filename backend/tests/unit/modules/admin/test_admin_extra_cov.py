@@ -26,18 +26,14 @@ from app.modules.admin.gremium_roles import (
     FORCED_ROLE_KEYS,
     GREMIUM_PERMISSIONS,
     GremiumRoleService,
-    _iso,
-    _parse_dt,
     _role_out,
     _sanitize_perms,
     active_gremium_roles,
     gremium_ids_with_permission,
     gremium_member_ids,
-    intervals_overlap,
 )
 from app.modules.admin.models import GremiumMembership, GremiumRole, SiteConfigVersion
 from app.modules.admin.schemas import (
-    GremiumMembershipCreate,
     GremiumRoleCreate,
     GremiumRoleUpdate,
 )
@@ -47,7 +43,7 @@ from app.modules.admin.site_config_service import (
     SiteConfigService,
     _branding,
 )
-from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
+from app.shared.errors import ConflictError, NotFoundError
 from tests._support.auth_fakes import fake_session, result
 
 
@@ -89,36 +85,6 @@ def _id_on_flush(db) -> None:
         await orig_flush()
 
     db.flush = _flush
-
-
-def test_intervals_overlap_all_branches() -> None:
-    # a_from None short-circuits left_ok to True, so only right_ok stays to check.
-    assert intervals_overlap(None, _dt("2026-06-01"), _dt("2026-01-01"), _dt("2026-03-01"))
-    # b_until None makes left_ok True.
-    assert intervals_overlap(_dt("2026-01-01"), _dt("2026-02-01"), _dt("2026-01-15"), None)
-    # Disjoint: left_ok False because a_from >= b_until.
-    assert not intervals_overlap(
-        _dt("2026-06-01"), _dt("2026-09-01"), _dt("2026-01-01"), _dt("2026-03-01")
-    )
-    # right_ok False because b_from >= a_until, left_ok True.
-    assert not intervals_overlap(
-        _dt("2026-01-01"), _dt("2026-03-01"), _dt("2026-06-01"), _dt("2026-09-01")
-    )
-
-
-def test_parse_dt_variants() -> None:
-    assert _parse_dt(None) is None
-    assert _parse_dt("") is None
-    naive = _parse_dt("2026-01-01T10:00:00")
-    assert naive is not None and naive.tzinfo is UTC
-    aware = _parse_dt("2026-01-01T10:00:00+02:00")
-    assert aware is not None and aware.utcoffset() is not None
-
-
-def test_iso() -> None:
-    assert _iso(None) is None
-    iso = _iso(_dt("2026-01-01"))
-    assert iso is not None and iso.startswith("2026-01-01")
 
 
 def test_sanitize_perms() -> None:
@@ -303,6 +269,7 @@ async def test_delete_role_success() -> None:
     role = _role(key="custom")
     db = fake_session(
         result(),  # scalars(in_use) -> empty
+        result(),  # scalars(mapped) -> empty
         result(),  # audit advisory lock
         result(),  # audit prev-hash
         gets=[role],
@@ -320,138 +287,7 @@ async def test_list_memberships() -> None:
     svc = GremiumRoleService(db)
     out = await svc.list_memberships(gid)
     assert len(out) == 1
-    assert out[0].valid_from is not None and out[0].valid_until is not None
-
-
-async def test_create_membership_role_not_found() -> None:
-    db = fake_session(gets=[None])  # get(role) -> None
-    svc = GremiumRoleService(db)
-    payload = GremiumMembershipCreate(principalId=uuid4(), gremiumRoleId=uuid4())
-    with pytest.raises(NotFoundError, match="gremium role"):
-        await svc.create_membership(uuid4(), payload, "admin")
-
-
-async def test_create_membership_role_wrong_gremium() -> None:
-    role = _role(gremium_id=uuid4())  # a different gremium_id
-    db = fake_session(gets=[role])
-    svc = GremiumRoleService(db)
-    payload = GremiumMembershipCreate(principalId=uuid4(), gremiumRoleId=role.id)
-    with pytest.raises(ConflictError, match="does not belong"):
-        await svc.create_membership(uuid4(), payload, "admin")
-
-
-async def test_create_membership_unknown_principal_404() -> None:
-    gid = uuid4()
-    role = _role(gid)
-    db = fake_session(gets=[role])  # the second get (principal) -> None
-    svc = GremiumRoleService(db)
-    payload = GremiumMembershipCreate(principalId=uuid4(), gremiumRoleId=role.id)
-    with pytest.raises(NotFoundError, match="principal"):
-        await svc.create_membership(gid, payload, "admin")
-
-
-async def test_create_membership_rejects_overlap() -> None:
-    gid, pid = uuid4(), uuid4()
-    role = _role(gid)
-    existing = _membership(pid, gid, _dt("2026-01-01"), _dt("2026-12-31"))
-    db = fake_session(result(existing), gets=[role, object()])
-    svc = GremiumRoleService(db)
-    payload = GremiumMembershipCreate(
-        principalId=pid,
-        gremiumRoleId=role.id,
-        validFrom="2026-06-01",
-        validUntil="2026-09-01",
-    )
-    with pytest.raises(ConflictError, match="overlapping"):
-        await svc.create_membership(gid, payload, "admin")
-
-
-async def test_create_membership_from_after_until_rejected() -> None:
-    gid = uuid4()
-    role = _role(gid)
-    db = fake_session(gets=[role, object()])  # role plus the principal existence check
-    svc = GremiumRoleService(db)
-    payload = GremiumMembershipCreate(
-        principalId=uuid4(),
-        gremiumRoleId=role.id,
-        validFrom="2026-12-01",
-        validUntil="2026-01-01",
-    )
-    with pytest.raises(ValidationProblem):
-        await svc.create_membership(gid, payload, "admin")
-
-
-async def test_create_membership_equal_from_until_rejected() -> None:
-    gid = uuid4()
-    role = _role(gid)
-    db = fake_session(gets=[role, object()])
-    svc = GremiumRoleService(db)
-    payload = GremiumMembershipCreate(
-        principalId=uuid4(),
-        gremiumRoleId=role.id,
-        validFrom="2026-01-01T00:00:00",
-        validUntil="2026-01-01T00:00:00",
-    )
-    with pytest.raises(ValidationProblem):
-        await svc.create_membership(gid, payload, "admin")
-
-
-async def test_create_membership_success_no_overlap() -> None:
-    gid, pid = uuid4(), uuid4()
-    role = _role(gid)
-    existing = _membership(pid, gid, _dt("2025-01-01"), _dt("2026-01-01"))
-    db = fake_session(
-        result(existing),  # scalars(existing memberships)
-        result(),  # audit advisory lock
-        result(),  # audit prev-hash
-        gets=[role, object()],
-    )
-    _id_on_flush(db)
-    svc = GremiumRoleService(db)
-    payload = GremiumMembershipCreate(
-        principalId=pid,
-        gremiumRoleId=role.id,
-        validFrom="2026-01-01",
-        validUntil="2027-01-01",
-    )
-    out = await svc.create_membership(gid, payload, "admin")
-    assert out.valid_from is not None
-    assert db.committed == 1
-
-
-async def test_create_membership_open_ended_no_existing() -> None:
-    # valid_from and valid_until are None (an open term) and no membership exists.
-    gid, pid = uuid4(), uuid4()
-    role = _role(gid)
-    db = fake_session(
-        result(),  # scalars(existing) -> empty
-        result(),  # audit advisory lock
-        result(),  # audit prev-hash
-        gets=[role, object()],
-    )
-    _id_on_flush(db)
-    svc = GremiumRoleService(db)
-    payload = GremiumMembershipCreate(principalId=pid, gremiumRoleId=role.id)
-    out = await svc.create_membership(gid, payload, "admin")
-    assert out.valid_from is None
-    assert out.valid_until is None
-    assert db.committed == 1
-
-
-async def test_delete_membership_not_found() -> None:
-    db = fake_session(gets=[None])
-    svc = GremiumRoleService(db)
-    with pytest.raises(NotFoundError):
-        await svc.delete_membership(uuid4(), "admin")
-
-
-async def test_delete_membership_success() -> None:
-    m = _membership(uuid4(), uuid4(), None, None)
-    db = fake_session(result(), result(), gets=[m])  # audit runs execute twice
-    svc = GremiumRoleService(db)
-    await svc.delete_membership(m.id, "admin")
-    assert m in db.deleted
-    assert db.committed == 1
+    assert out[0].principal_id == pid and out[0].gremium_id == gid
 
 
 def _scv(version: int, *, active: bool, branding=None) -> SiteConfigVersion:

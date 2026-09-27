@@ -16,6 +16,7 @@ description: Backend identity and access. Covers OIDC login against any discover
 - `oidc.py` — OIDC primitives: discovery (`discover`, TTL-cached per issuer), PKCE/state/nonce, authorize URL, code exchange, `id_token` JWKS verify (RS256), end-session URL
 - `sessions.py` — signed cookies (itsdangerous): opaque `sid` principal session, stateless applicant token, OIDC-tx, OAuth-tx
 - `tokens.py` — magic-link token CSPRNG + HMAC-SHA256(pepper) hashing, constant-time verify
+- `service.oidc_callback` also calls `admin.membership_sync.sync_principal_memberships` after the upsert, so gremium memberships follow the IdP groups from each login on.
 - `bootstrap.py` — idempotent first-admin grant by `sub`/verified-email. It always grants the global `member` role
 - `oauth.py` — DB-free OAuth2 helpers: scope catalog, PKCE S256 verify, token gen/SHA-256 hash, scope→permission mapping
 - `oauth_service.py` — OAuth2-AS I/O: mint authorization code, exchange code→tokens, refresh rotation, `resolve_access_token`
@@ -24,10 +25,10 @@ description: Backend identity and access. Covers OIDC login against any discover
 - `mcp_router.py` — `/mcp` self-service: client config snippet + `mcp/` source package `.tar.gz` (gated on `mcp.use`)
 
 **Domain / data model:**
-- `principal` — OIDC subject. `sub` (unique), `email` (CITEXT, PII), `display_name`, `oidc_groups` (JSONB cache), `last_login`, `active` (deactivated → login refused, fail-closed), `calendar_token` (unique index, iCal feed).
+- `principal` — OIDC subject. `sub` (unique), `email` (CITEXT, PII), `display_name`, `oidc_groups` (JSONB cache, refreshed at every login; drives `group_mapping` and the gremium-membership sync), `last_login`, `active` (deactivated → login refused, fail-closed), `calendar_token` (unique index, iCal feed).
 - `role` (`key` unique, `name_i18n`) / `role_permission` (PK `role_id`+`permission`, permission strings) — app roles are the source of truth. Key roles: `admin` (bypass — has all permissions), `member` (every user always holds it).
-- `role_assignment` — principal→role with optional `gremium_id` scope and `valid_from`/`valid_until` window. `granted_by` (`"bootstrap"` for auto-grants), `delegated_by` (self-delegation marker → cast-block + "my delegations"), `delegate_voting`.
-- `group_mapping` — OIDC group → role, optionally gremium-scoped (convenience layer on top of assignments).
+- `role_assignment` — principal→role with optional `gremium_id` scope and `valid_from`/`valid_until` window. `granted_by` (`"bootstrap"` for auto-grants), `delegated_by` (self-delegation marker → cast-block + "my delegations"), `delegate_voting`. Only the bootstrap writes it now (`admin` from `BOOTSTRAP_ADMIN_*`, implicit `member`). There is no admin write API; global roles come from `group_mapping`.
+- `group_mapping` — OIDC group → global role, optionally gremium-scoped. The ONLY source of non-bootstrap global roles. Resolved live per request from the cached `principal.oidc_groups`.
 - `auth_session` — server session for an OIDC principal: opaque `sid` (signed into HttpOnly cookie), `principal_id`, `expires_at`, server-held `refresh_token`/`id_token`. No JWT in JS.
 - `oauth_authorization_code` — short-lived single-use PKCE-bound code (`code_hash`, `code_challenge` S256, `scope`, `access_ttl_seconds`, `used_at`).
 - `oauth_token` — opaque access+refresh pair, hashes only (`access_token_hash`/`refresh_token_hash`), `scope`, `access_expires_at`/`refresh_expires_at`, `revoked_at`. Refresh rotation writes a new row and sets `revoked_at` on the old one.

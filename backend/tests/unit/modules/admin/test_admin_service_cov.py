@@ -29,8 +29,6 @@ from app.modules.admin.schemas import (
     GremiumUpdate,
     GroupMappingCreate,
     GroupMappingUpdate,
-    RoleAssignmentCreate,
-    RoleAssignmentUpdate,
     RoleCreate,
     RoleUpdate,
     WebhookCreate,
@@ -226,6 +224,7 @@ def principal_row(**kw: Any) -> Any:
         "display_name": "User",
         "last_login": None,
         "active": True,
+        "oidc_groups": ["stupa"],
     }
     base.update(kw)
     return Row(**base)
@@ -881,215 +880,6 @@ async def test_list_role_assignments() -> None:
     assert len(out) == 2
 
 
-async def test_create_role_assignment_ok() -> None:
-    principal = principal_row()
-    role = role_row()
-    # Queue: the principal, the role, then the two audit results.
-    s, sess = svc([*audit_results()], gets=[principal, role])
-    out = await s.create_role_assignment(
-        RoleAssignmentCreate(
-            principalId=principal.id,
-            roleId=role.id,
-            validFrom="2026-01-01T00:00:00Z",
-            validUntil="2026-12-31T00:00:00Z",
-            delegateVoting=True,
-        ),
-        "admin",
-    )
-    assert out.delegate_voting is True
-    assert out.valid_from == "2026-01-01T00:00:00+00:00"
-    assert sess.committed == 1
-
-
-async def test_create_role_assignment_principal_not_found() -> None:
-    s, _ = svc(gets=[None])
-    with pytest.raises(NotFoundError):
-        await s.create_role_assignment(
-            RoleAssignmentCreate(principalId=uuid.uuid4(), roleId=uuid.uuid4()), "admin"
-        )
-
-
-async def test_create_role_assignment_role_not_found() -> None:
-    principal = principal_row()
-    s, _ = svc(gets=[principal, None])
-    with pytest.raises(NotFoundError):
-        await s.create_role_assignment(
-            RoleAssignmentCreate(principalId=principal.id, roleId=uuid.uuid4()), "admin"
-        )
-
-
-async def test_update_role_assignment_all_fields_non_admin_role() -> None:
-    row = assignment_row()
-    new_role = role_row(key="editor")
-    new_role_id = new_role.id
-    old_role = role_row(key="editor")  # _guard_self_admin_removal: not admin
-    gid = uuid.uuid4()
-    # Queue: the assignment row, the new role for the existence check, the old role for
-    # the guard, then the two audit results.
-    s, _ = svc([*audit_results()], gets=[row, new_role, old_role])
-    out = await s.update_role_assignment(
-        row.id,
-        RoleAssignmentUpdate(
-            roleId=new_role_id,
-            gremiumId=gid,
-            validFrom="2026-02-01T00:00:00Z",
-            validUntil="2026-03-01T00:00:00Z",
-            delegateVoting=True,
-        ),
-        "admin",
-    )
-    assert row.role_id == new_role_id
-    assert row.gremium_id == gid
-    assert out.delegate_voting is True
-
-
-async def test_update_role_assignment_same_role_guard_runs_non_admin() -> None:
-    # AUD-031: _guard_self_admin_removal now ALWAYS runs first. For a non-admin role
-    # (editor) the guard returns without a conflict.
-    # gets: the assignment row, the editor role for the guard, the role for the
-    # existence check.
-    rid = uuid.uuid4()
-    row = assignment_row(role_id=rid)
-    editor_role = role_row(id=rid)
-    s, _ = svc([*audit_results()], gets=[row, editor_role, editor_role])
-    out = await s.update_role_assignment(
-        row.id, RoleAssignmentUpdate(roleId=rid), "admin"
-    )
-    assert out.role_id == rid
-
-
-async def test_update_role_assignment_role_not_found() -> None:
-    row = assignment_row()
-    s, _ = svc(gets=[row, None])
-    with pytest.raises(NotFoundError):
-        await s.update_role_assignment(
-            row.id, RoleAssignmentUpdate(roleId=uuid.uuid4()), "admin"
-        )
-
-
-async def test_update_role_assignment_not_found() -> None:
-    s, _ = svc(gets=[None])
-    with pytest.raises(NotFoundError):
-        await s.update_role_assignment(
-            uuid.uuid4(), RoleAssignmentUpdate(delegateVoting=True), "admin"
-        )
-
-
-async def test_update_role_assignment_self_admin_removal_blocked() -> None:
-    # The row holds the admin role and principal.sub equals the actor. The role change
-    # therefore raises ConflictError.
-    principal = principal_row(sub="me")
-    row = assignment_row(principal_id=principal.id)
-    new_role = role_row(key="editor")
-    admin_role = role_row(key="admin")
-    # AUD-031: the guard runs first. gets: the row, the admin role, the principal.
-    s, _ = svc(gets=[row, admin_role, principal])
-    with pytest.raises(ConflictError):
-        await s.update_role_assignment(
-            row.id, RoleAssignmentUpdate(roleId=new_role.id), "me"
-        )
-
-
-async def test_update_role_assignment_noop() -> None:
-    row = assignment_row(delegate_voting=False)
-    s, _ = svc([*audit_results()], gets=[row])
-    out = await s.update_role_assignment(row.id, RoleAssignmentUpdate(), "admin")
-    assert out.delegate_voting is False
-
-
-async def test_update_role_assignment_self_admin_valid_until_self_expiry_blocked() -> (
-    None
-):
-    # AUD-031: a change that does not touch role_id (a past valid_until) on the OWN admin
-    # assignment must fail. Otherwise the admin can expire the own access.
-    principal = principal_row(sub="me")
-    row = assignment_row(principal_id=principal.id)
-    admin_role = role_row(key="admin")
-    # gets: the row, the admin role, the principal.
-    s, sess = svc(gets=[row, admin_role, principal])
-    with pytest.raises(ConflictError):
-        await s.update_role_assignment(
-            row.id,
-            RoleAssignmentUpdate(validUntil="2000-01-01T00:00:00Z"),
-            "me",
-        )
-    assert sess.committed == 0
-    assert row.valid_until is None  # unchanged
-
-
-async def test_delete_role_assignment_ok() -> None:
-    # gets: the assignment row, the editor role for the guard (not admin), the editor
-    # role for the member check (the key is not member). Then the two audit results.
-    row = assignment_row()
-    guard_role = role_row(key="editor")
-    member_role = role_row(key="editor")
-    s, sess = svc([*audit_results()], gets=[row, guard_role, member_role])
-    await s.delete_role_assignment(row.id, "admin")
-    assert row in sess.deleted
-
-
-async def test_delete_role_assignment_not_found() -> None:
-    s, _ = svc(gets=[None])
-    with pytest.raises(NotFoundError):
-        await s.delete_role_assignment(uuid.uuid4(), "admin")
-
-
-async def test_delete_role_assignment_member_unremovable() -> None:
-    # gets: the assignment, a non-admin role for the guard, the member role. A member
-    # role with gremium_id None raises ConflictError.
-    row = assignment_row(gremium_id=None)
-    guard_role = role_row(key="editor")
-    member_role = role_row(key="member")
-    s, _ = svc(gets=[row, guard_role, member_role])
-    with pytest.raises(ConflictError):
-        await s.delete_role_assignment(row.id, "admin")
-
-
-async def test_delete_role_assignment_member_with_gremium_ok() -> None:
-    # The member role with a set gremium_id stays deletable (branch gremium_id not None).
-    row = assignment_row(gremium_id=uuid.uuid4())
-    guard_role = role_row(key="editor")
-    member_role = role_row(key="member")
-    s, sess = svc([*audit_results()], gets=[row, guard_role, member_role])
-    await s.delete_role_assignment(row.id, "admin")
-    assert row in sess.deleted
-
-
-async def test_delete_role_assignment_self_admin_blocked() -> None:
-    principal = principal_row(sub="me")
-    row = assignment_row(principal_id=principal.id)
-    admin_role = role_row(key="admin")
-    # gets: the assignment, the admin role for the guard, the principal. The sub equals
-    # the actor, so the call raises ConflictError.
-    s, _ = svc(gets=[row, admin_role, principal])
-    with pytest.raises(ConflictError):
-        await s.delete_role_assignment(row.id, "me")
-
-
-async def test_guard_self_admin_role_none_returns() -> None:
-    # _guard_self_admin_removal returns early when the role is None. No conflict.
-    row = assignment_row()
-    s, _ = svc(gets=[None])
-    await s._guard_self_admin_removal(row, "anyone")  # must NOT raise
-
-
-async def test_guard_self_admin_other_principal_ok() -> None:
-    # The role is admin, but principal.sub differs from the actor, so no conflict.
-    row = assignment_row()
-    admin_role = role_row(key="admin")
-    other = principal_row(sub="someone-else")
-    s, _ = svc(gets=[admin_role, other])
-    await s._guard_self_admin_removal(row, "actor-sub")
-
-
-async def test_guard_self_admin_principal_none_ok() -> None:
-    # The role is admin and the principal is None, so no conflict (branch principal None).
-    row = assignment_row()
-    admin_role = role_row(key="admin")
-    s, _ = svc(gets=[admin_role, None])
-    await s._guard_self_admin_removal(row, "actor")
-
-
 async def test_search_principals_with_query_and_assignments() -> None:
     p1 = principal_row(sub="alice")
     p2 = principal_row(sub="bob")
@@ -1100,6 +890,7 @@ async def test_search_principals_with_query_and_assignments() -> None:
     by_sub = {o.sub: o for o in out}
     assert len(by_sub["alice"].assignments) == 1
     assert by_sub["bob"].assignments == []
+    assert by_sub["alice"].oidc_groups == ["stupa"]
 
 
 async def test_search_principals_no_query_no_results() -> None:

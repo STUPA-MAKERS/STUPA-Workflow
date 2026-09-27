@@ -44,18 +44,6 @@
 .gm__suggest-item--sel {
   background: var(--color-surface-sunken);
 }
-.gm__term {
-  display: flex;
-  gap: var(--space-3);
-}
-.gm__term .gm__lbl {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  flex: 1;
-}
-@media (max-width: 768px) {
-  .gm__term {
-    flex-direction: column;
-  }
+.gm__err {
+  color: var(--color-danger);
 }

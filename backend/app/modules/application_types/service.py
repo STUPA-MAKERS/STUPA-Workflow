@@ -34,7 +34,7 @@ class ApplicationTypesService:
         admin: bool = False,
     ) -> Page[ApplicationTypeListItem]:
         """List the application types as a page (public view: offerable types only)."""
-        stmt: Select[tuple[ApplicationType]] = select(ApplicationType)
+        stmt: Select[ApplicationType] = select(ApplicationType)
         if not include_inactive:
             stmt = stmt.where(ApplicationType.active_form_version_id.is_not(None))
 

@@ -1,8 +1,8 @@
-"""Unit tests without a DB: RBAC service paths, principal search, revoke, permission catalog.
+"""Unit tests without a DB: RBAC service paths, principal search, permission catalog.
 
 These tests run on ``fake_session`` with its ``scalars`` and ``get`` queues. They prove the
 mapper and the assignment join that avoids an N+1 query. They also prove the empty-path
-branch of the search and the 404 and success branches of the revoke.
+branch of the search.
 """
 
 from __future__ import annotations
@@ -13,8 +13,8 @@ import pytest
 
 from app.modules.admin.service import ConfigService
 from app.modules.admin.service.rbac import _principal_out
-from app.modules.auth.models import Principal, Role, RoleAssignment
-from app.shared.errors import ConflictError, NotFoundError
+from app.modules.auth.models import Principal, RoleAssignment
+from app.shared.errors import ConflictError
 from app.shared.permissions import PERMISSION_CATALOGUE
 from tests._support.auth_fakes import fake_session, result
 
@@ -74,56 +74,6 @@ def test_list_permissions_includes_seeded_keys() -> None:
     assert "admin.roles" in perms
 
 
-async def test_delete_role_assignment_not_found() -> None:
-    db = fake_session(gets=[None])  # session.get → None
-    with pytest.raises(NotFoundError):
-        await ConfigService(db).delete_role_assignment(
-            "00000000-0000-0000-0000-0000000000ff", "admin"  # type: ignore[arg-type]
-        )
-
-
-async def test_delete_role_assignment_ok() -> None:
-    row = _assignment(uuid4())
-    # gets: the assignment. results: the audit advisory lock and the prev-hash lookup.
-    db = fake_session(result(), result(), gets=[row])
-    await ConfigService(db).delete_role_assignment(row.id, "admin")
-    assert db.deleted == [row]
-    assert db.committed == 1
-
-
-def _admin_role() -> Role:
-    r = Role(key="admin", name_i18n={"de": "Administrator"})
-    r.id = uuid4()
-    return r
-
-
-def _member_role() -> Role:
-    r = Role(key="member", name_i18n={"de": "Mitglied"})
-    r.id = uuid4()
-    return r
-
-
-async def test_delete_role_assignment_blocks_member_removal() -> None:
-    """#61: nobody can revoke the global member role."""
-    row = _assignment(uuid4())  # gremium_id=None
-    # gets: assignment, guard role (member, not admin, so it returns early), member-check role.
-    db = fake_session(gets=[row, _member_role(), _member_role()])
-    with pytest.raises(ConflictError):
-        await ConfigService(db).delete_role_assignment(row.id, "actor")
-    assert db.deleted == []
-
-
-async def test_delete_role_assignment_blocks_self_admin_removal() -> None:
-    """#40: an admin must not revoke the own admin role."""
-    pid = uuid4()
-    row = _assignment(pid)
-    # gets: assignment → admin role → own principal (sub == actor)
-    db = fake_session(gets=[row, _admin_role(), _principal(pid, "me-sub")])
-    with pytest.raises(ConflictError):
-        await ConfigService(db).delete_role_assignment(row.id, "me-sub")
-    assert db.deleted == []
-
-
 async def test_set_principal_active_blocks_self_deactivation() -> None:
     """#44: an account must not deactivate itself."""
     pid = uuid4()
@@ -141,17 +91,3 @@ async def test_set_principal_active_allows_self_reactivation() -> None:
     assert out.active is True
 
 
-async def test_delete_role_assignment_allows_admin_of_other_principal() -> None:
-    """An actor may revoke the admin role of another principal.
-
-    The guard blocks only the self-lockout case.
-    """
-    pid = uuid4()
-    row = _assignment(pid)
-    db = fake_session(
-        result(),
-        result(),
-        gets=[row, _admin_role(), _principal(pid, "someone-else")],
-    )
-    await ConfigService(db).delete_role_assignment(row.id, "me-sub")
-    assert db.deleted == [row]

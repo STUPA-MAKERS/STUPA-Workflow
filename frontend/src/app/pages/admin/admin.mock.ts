@@ -53,6 +53,7 @@ export const MOCK_PRINCIPALS: AdminPrincipal[] = [
     email: 'alex@stupa.example',
     displayName: 'Alex Admin',
     lastLogin: '2026-06-06T18:20:00+00:00',
+    oidcGroups: ['stupa-admins'],
     assignments: [
       {
         id: 'a-1',
@@ -72,6 +73,7 @@ export const MOCK_PRINCIPALS: AdminPrincipal[] = [
     email: 'robin@stupa.example',
     displayName: 'Robin Mitglied',
     lastLogin: '2026-06-05T09:00:00+00:00',
+    oidcGroups: ['stupa-mitglieder'],
     assignments: [
       {
         id: 'a-2',
@@ -91,6 +93,7 @@ export const MOCK_PRINCIPALS: AdminPrincipal[] = [
     email: 'sam@stupa.example',
     displayName: 'Sam Neu',
     lastLogin: null,
+    oidcGroups: [],
     assignments: [],
   },
 ];

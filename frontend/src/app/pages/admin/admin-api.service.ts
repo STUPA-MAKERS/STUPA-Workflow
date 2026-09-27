@@ -42,6 +42,8 @@ import {
   type FormStatus,
   type Gremium,
   type GremiumCreateBody,
+  type GremiumGroupMapping,
+  type GremiumGroupMappingBody,
   type GremiumMembership,
   type DeadlinePolicy,
   type ErasureRequest,
@@ -58,9 +60,6 @@ import {
   type OAuthGrantAdmin,
   type OAuthGrantQuery,
   type Role,
-  type RoleAssignment,
-  type RoleAssignmentPatch,
-  type RoleAssignmentInput,
   type SiteConfig,
   type WebhookConfig,
   type WebhookDeliveryStatus,
@@ -428,60 +427,6 @@ export class AdminApiService {
     return this.http.get<AdminPrincipal[]>(url);
   }
 
-  /** Assign a role — POST /admin/role-assignments. */
-  assignRole(input: RoleAssignmentInput): Observable<RoleAssignment> {
-    if (this.mock) {
-      const assignment: RoleAssignment = {
-        id: `assign-${Math.abs(hashString(input.principalId + input.roleId + (input.validFrom ?? '')))}`,
-        principalId: input.principalId,
-        roleId: input.roleId,
-        gremiumId: input.gremiumId ?? null,
-        grantedBy: 'mock-admin',
-        validFrom: input.validFrom ?? null,
-        validUntil: input.validUntil ?? null,
-        delegateVoting: input.delegateVoting ?? false,
-      };
-      const p = this.store.principals.find((x) => x.id === input.principalId);
-      if (p) p.assignments = [...p.assignments, assignment];
-      return of(structuredCopy(assignment));
-    }
-    return this.http.post<RoleAssignment>(`${this.base}/admin/role-assignments`, input);
-  }
-
-  /**
-   * Change an existing assignment — PATCH /admin/role-assignments/{id}.
-   *
-   * The route touches only the fields the body carries. It cannot clear a
-   * validity window, and it never moves the assignment to another user.
-   */
-  updateRoleAssignment(assignmentId: Uuid, patch: RoleAssignmentPatch): Observable<RoleAssignment> {
-    if (this.mock) {
-      for (const p of this.store.principals) {
-        const found = p.assignments.find((a) => a.id === assignmentId);
-        if (!found) continue;
-        const merged: RoleAssignment = { ...found, ...patch };
-        p.assignments = p.assignments.map((a) => (a.id === assignmentId ? merged : a));
-        return of(structuredCopy(merged));
-      }
-      return of(structuredCopy({ id: assignmentId, ...patch } as unknown as RoleAssignment));
-    }
-    return this.http.patch<RoleAssignment>(
-      `${this.base}/admin/role-assignments/${assignmentId}`,
-      patch,
-    );
-  }
-
-  /** Revoke a role — DELETE /admin/role-assignments/{id}. */
-  revokeRole(assignmentId: Uuid): Observable<void> {
-    if (this.mock) {
-      for (const p of this.store.principals) {
-        p.assignments = p.assignments.filter((a) => a.id !== assignmentId);
-      }
-      return of(void 0);
-    }
-    return this.http.delete<void>(`${this.base}/admin/role-assignments/${assignmentId}`);
-  }
-
   // OAuth grants of ANY principal. Both routes need P(`admin.users`). The
   // self-service twins under `/oauth/grants` reach the caller's own grants only, so a
   // leaked agent token of somebody else can be killed here and nowhere else.
@@ -778,37 +723,49 @@ export class AdminApiService {
     return this.http.delete<void>(`${this.base}/admin/deadline-policies/${id}`);
   }
 
+  /** Memberships of one gremium (read-only). The OIDC group sync writes them. */
   listGremiumMemberships(gremiumId: Uuid): Observable<GremiumMembership[]> {
     if (this.mock) return of([]);
     return this.http.get<GremiumMembership[]>(`${this.base}/admin/gremien/${gremiumId}/memberships`);
   }
 
-  createGremiumMembership(
-    gremiumId: Uuid,
-    body: { principalId: Uuid; gremiumRoleId: Uuid; validFrom: string | null; validUntil: string | null },
-  ): Observable<GremiumMembership> {
-    return this.http.post<GremiumMembership>(`${this.base}/admin/gremien/${gremiumId}/memberships`, body);
+  /** OIDC group → gremium role mappings of one gremium. */
+  listGremiumGroupMappings(gremiumId: Uuid): Observable<GremiumGroupMapping[]> {
+    if (this.mock) return of([]);
+    return this.http.get<GremiumGroupMapping[]>(
+      `${this.base}/admin/gremien/${gremiumId}/group-mappings`,
+    );
   }
 
   /**
-   * Change the role or the term of office of one membership.
+   * Map an OIDC group to a gremium role. The backend syncs the memberships after it.
    *
-   * The member and the Gremium stay immutable — a different member is a different
-   * membership. The backend answers 409 when the new term overlaps another term of
-   * the same member, and 422 when `validFrom` is not before `validUntil`.
+   * 409: the gremium already maps the group, or the role belongs to another gremium.
+   * 422: the group name is empty or uses the reserved `vote:` prefix.
    */
-  updateGremiumMembership(
-    id: Uuid,
-    body: { gremiumRoleId?: Uuid; validFrom?: string | null; validUntil?: string | null },
-  ): Observable<GremiumMembership> {
-    return this.http.patch<GremiumMembership>(
-      `${this.base}/admin/gremium-memberships/${id}`,
+  createGremiumGroupMapping(
+    gremiumId: Uuid,
+    body: GremiumGroupMappingBody,
+  ): Observable<GremiumGroupMapping> {
+    return this.http.post<GremiumGroupMapping>(
+      `${this.base}/admin/gremien/${gremiumId}/group-mappings`,
       body,
     );
   }
 
-  deleteGremiumMembership(id: Uuid): Observable<void> {
-    return this.http.delete<void>(`${this.base}/admin/gremium-memberships/${id}`);
+  /** Change the group or the role of one mapping. Same 409/422 rules as the create. */
+  updateGremiumGroupMapping(
+    id: Uuid,
+    body: Partial<GremiumGroupMappingBody>,
+  ): Observable<GremiumGroupMapping> {
+    return this.http.patch<GremiumGroupMapping>(
+      `${this.base}/admin/gremium-group-mappings/${id}`,
+      body,
+    );
+  }
+
+  deleteGremiumGroupMapping(id: Uuid): Observable<void> {
+    return this.http.delete<void>(`${this.base}/admin/gremium-group-mappings/${id}`);
   }
 
   // Every audit-log endpoint below needs P(audit.read).
@@ -1130,13 +1087,6 @@ export class AdminApiService {
 /** Deep copy without assuming `structuredClone` is available (jsdom-safe). */
 function structuredCopy<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
-}
-
-/** Stable string hash for deterministic mock ids. It uses no `Math.random` and no `Date`. */
-function hashString(value: string): number {
-  let h = 0;
-  for (let i = 0; i < value.length; i++) h = (Math.imul(31, h) + value.charCodeAt(i)) | 0;
-  return h;
 }
 
 /**

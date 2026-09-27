@@ -1,4 +1,9 @@
-"""RBAC administration: roles, role assignments, principals, group mappings."""
+"""RBAC administration: roles, principals, group mappings, and the assignment read.
+
+Global roles come from OIDC groups through ``group_mapping``. The only
+``role_assignment`` rows are the ones that the bootstrap grants (``admin`` from the
+settings and the implicit ``member``). The admin API lists them but cannot write them.
+"""
 
 from __future__ import annotations
 
@@ -11,14 +16,12 @@ from app.modules.admin.schemas import (
     GroupMappingOut,
     GroupMappingUpdate,
     PrincipalOut,
-    RoleAssignmentCreate,
     RoleAssignmentOut,
-    RoleAssignmentUpdate,
     RoleCreate,
     RoleOut,
     RoleUpdate,
 )
-from app.modules.admin.service.service_base import ConfigServiceBase, _iso, _parse_dt
+from app.modules.admin.service.service_base import ConfigServiceBase, _iso
 from app.modules.audit.actions import AuditAction
 from app.modules.auth.models import GroupMapping, Principal, Role, RolePermission
 from app.modules.auth.models import RoleAssignment as RoleAssignmentRow
@@ -51,6 +54,7 @@ def _principal_out(
         last_login=_iso(row.last_login),
         active=True if row.active is None else row.active,
         assignments=[_assignment_out(a) for a in assignments],
+        oidc_groups=[str(g) for g in (row.oidc_groups or [])],
     )
 
 
@@ -151,87 +155,6 @@ class RbacOps(ConfigServiceBase):
     async def list_role_assignments(self) -> list[RoleAssignmentOut]:
         rows = (await self.session.scalars(select(RoleAssignmentRow))).all()
         return [_assignment_out(r) for r in rows]
-
-    async def create_role_assignment(
-        self, payload: RoleAssignmentCreate, actor: str
-    ) -> RoleAssignmentOut:
-        if await self.session.get(Principal, payload.principal_id) is None:
-            raise NotFoundError(f"principal {payload.principal_id} not found")
-        if await self.session.get(Role, payload.role_id) is None:
-            raise NotFoundError(f"role {payload.role_id} not found")
-        row = RoleAssignmentRow(
-            principal_id=payload.principal_id,
-            role_id=payload.role_id,
-            gremium_id=payload.gremium_id,
-            granted_by=actor,
-            valid_from=_parse_dt(payload.valid_from),
-            valid_until=_parse_dt(payload.valid_until),
-            delegate_voting=payload.delegate_voting,
-        )
-        self.session.add(row)
-        await self.session.flush()
-        await self._audit(actor, AuditAction.ROLE_CHANGE, "role_assignment", row.id)
-        await self.session.commit()
-        return _assignment_out(row)
-
-    async def update_role_assignment(
-        self, assignment_id: UUID, payload: RoleAssignmentUpdate, actor: str
-    ) -> RoleAssignmentOut:
-        row = await self.session.get(RoleAssignmentRow, assignment_id)
-        if row is None:
-            raise NotFoundError(f"role assignment {assignment_id} not found")
-        # Self-lockout guard: a caller must not change their own admin assignment
-        # in any way. One example is an expiry through a past valid_until. Global
-        # role permissions are not gremium-scoped on purpose, so the guard covers
-        # every field.
-        await self._guard_self_admin_removal(row, actor)
-        if payload.role_id is not None:
-            if await self.session.get(Role, payload.role_id) is None:
-                raise NotFoundError(f"role {payload.role_id} not found")
-            row.role_id = payload.role_id
-        if payload.gremium_id is not None:
-            row.gremium_id = payload.gremium_id
-        if payload.valid_from is not None:
-            row.valid_from = _parse_dt(payload.valid_from)
-        if payload.valid_until is not None:
-            row.valid_until = _parse_dt(payload.valid_until)
-        if payload.delegate_voting is not None:
-            row.delegate_voting = payload.delegate_voting
-        await self._audit(actor, AuditAction.ROLE_CHANGE, "role_assignment", row.id)
-        await self.session.commit()
-        return _assignment_out(row)
-
-    async def delete_role_assignment(self, assignment_id: UUID, actor: str) -> None:
-        """Revoke a role: delete the assignment and audit it."""
-        row = await self.session.get(RoleAssignmentRow, assignment_id)
-        if row is None:
-            raise NotFoundError(f"role assignment {assignment_id} not found")
-        await self._guard_self_admin_removal(row, actor)
-        # The member role is irrevocable at global scope. Every user keeps it.
-        role = await self.session.get(Role, row.role_id)
-        if role is not None and role.key == "member" and row.gremium_id is None:
-            raise ConflictError("the member role cannot be removed")
-        await self.session.delete(row)
-        await self._audit(actor, AuditAction.ROLE_CHANGE, "role_assignment", assignment_id)
-        await self.session.commit()
-
-    async def _guard_self_admin_removal(
-        self, row: RoleAssignmentRow, actor: str
-    ) -> None:
-        """Prevent an admin from removing their own admin role.
-
-        The caller must not delete or rewrite an admin assignment of their own
-        principal (self-lockout). ``actor`` is the OIDC ``sub`` of the caller.
-
-        Raises:
-            ConflictError: The assignment holds the admin role of the caller.
-        """
-        role = await self.session.get(Role, row.role_id)
-        if role is None or role.key != "admin":
-            return
-        principal = await self.session.get(Principal, row.principal_id)
-        if principal is not None and principal.sub == actor:
-            raise ConflictError("admins cannot remove their own admin role")
 
     async def search_principals(
         self, query: str | None, limit: int = 50

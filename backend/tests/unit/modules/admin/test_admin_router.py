@@ -28,6 +28,7 @@ from app.modules.admin.router import (
 from app.modules.admin.schemas import (
     ApplicationTypeOut,
     FlowVersionOut,
+    GremiumGroupMappingOut,
     GremiumMailRecipients,
     GremiumMembershipOut,
     GremiumOut,
@@ -172,34 +173,6 @@ class _FakeConfig:
     async def list_role_assignments(self):
         return []
 
-    async def create_role_assignment(self, payload, actor):  # noqa: ANN001
-        return RoleAssignmentOut(
-            id=uuid4(),
-            principal_id=payload.principal_id,
-            role_id=payload.role_id,
-            gremium_id=payload.gremium_id,
-            granted_by=actor,
-            valid_from=payload.valid_from,
-            valid_until=payload.valid_until,
-            delegate_voting=payload.delegate_voting,
-        )
-
-    async def update_role_assignment(self, assignment_id, payload, actor):  # noqa: ANN001
-        return RoleAssignmentOut(
-            id=assignment_id,
-            principal_id=uuid4(),
-            role_id=uuid4(),
-            gremium_id=None,
-            granted_by=actor,
-            valid_from=None,
-            valid_until=None,
-            delegate_voting=True,
-        )
-
-    async def delete_role_assignment(self, assignment_id, actor):  # noqa: ANN001
-        if str(assignment_id).startswith("00000000"):
-            raise NotFoundError("nope")
-
     async def search_principals(self, query, limit=50):  # noqa: ANN001
         return [
             PrincipalOut(
@@ -208,6 +181,7 @@ class _FakeConfig:
                 email="max@x.de",
                 display_name="Max",
                 last_login="2026-06-07T09:00:00+00:00",
+                oidc_groups=["stupa"],
                 assignments=[
                     RoleAssignmentOut(
                         id=uuid4(),
@@ -338,22 +312,33 @@ class _FakeGremiumRoles:
                 principal_id=uuid4(),
                 gremium_id=gremium_id,
                 gremium_role_id=uuid4(),
-                valid_from=None,
-                valid_until=None,
             )
         ]
 
-    async def update_membership(self, membership_id, payload, actor):  # noqa: ANN001
-        if str(membership_id).startswith("00000000"):
+    async def list_group_mappings(self, gremium_id):  # noqa: ANN001
+        return []
+
+    async def create_group_mapping(self, gremium_id, payload, actor):  # noqa: ANN001
+        return GremiumGroupMappingOut(
+            id=uuid4(),
+            gremium_id=gremium_id,
+            gremium_role_id=payload.gremium_role_id,
+            oidc_group=payload.oidc_group,
+        )
+
+    async def update_group_mapping(self, mapping_id, payload, actor):  # noqa: ANN001
+        if str(mapping_id).startswith("00000000"):
             raise NotFoundError("nope")
-        return GremiumMembershipOut(
-            id=membership_id,
-            principal_id=uuid4(),
+        return GremiumGroupMappingOut(
+            id=mapping_id,
             gremium_id=uuid4(),
             gremium_role_id=payload.gremium_role_id or uuid4(),
-            valid_from=payload.valid_from,
-            valid_until=payload.valid_until,
+            oidc_group=payload.oidc_group or "stupa",
         )
+
+    async def delete_group_mapping(self, mapping_id, actor):  # noqa: ANN001
+        if str(mapping_id).startswith("00000000"):
+            raise NotFoundError("nope")
 
 
 @pytest.fixture
@@ -503,14 +488,11 @@ def test_roles_and_assignments_and_mappings(app: FastAPI, client: TestClient) ->
     patched = client.patch(f"/api/admin/roles/{uuid4()}", json={"permissions": ["audit.read"]})
     assert patched.status_code == 200
     pid, rid = str(uuid4()), str(uuid4())
-    r = client.post(
-        "/api/admin/role-assignments",
-        json={"principalId": pid, "roleId": rid, "delegateVoting": True},
-    )
-    assert r.status_code == 201 and r.json()["delegateVoting"] is True
-    upd = client.patch(f"/api/admin/role-assignments/{uuid4()}", json={"delegateVoting": True})
-    assert upd.status_code == 200
+    # Role assignments are read-only. The roles come from the OIDC group mappings.
     assert client.get("/api/admin/role-assignments").status_code == 200
+    r = client.post("/api/admin/role-assignments", json={"principalId": pid, "roleId": rid})
+    assert r.status_code == 405
+    assert client.patch(f"/api/admin/role-assignments/{uuid4()}", json={}).status_code == 404
     gm = client.post("/api/admin/group-mappings", json={"oidcGroup": "fsr", "roleId": rid})
     assert gm.status_code == 201 and gm.json()["oidcGroup"] == "fsr"
     gmu = client.patch(f"/api/admin/group-mappings/{uuid4()}", json={"oidcGroup": "x"})
@@ -643,17 +625,10 @@ def test_permissions_need_admin_roles(app: FastAPI, client: TestClient) -> None:
     assert client.get("/api/admin/permissions").status_code == 403
 
 
-def test_revoke_role_assignment_204_and_404(app: FastAPI, client: TestClient) -> None:
+def test_role_assignment_delete_is_gone(app: FastAPI, client: TestClient) -> None:
+    """Nobody can revoke a role by hand. The roles come from the OIDC groups."""
     _as_admin(app)
-    ok = client.delete(f"/api/admin/role-assignments/{uuid4()}")
-    assert ok.status_code == 204
-    missing = client.delete("/api/admin/role-assignments/00000000-0000-0000-0000-000000000000")
-    assert missing.status_code == 404
-
-
-def test_revoke_needs_admin_roles(app: FastAPI, client: TestClient) -> None:
-    _as(app, {"admin.types"})
-    assert client.delete(f"/api/admin/role-assignments/{uuid4()}").status_code == 403
+    assert client.delete(f"/api/admin/role-assignments/{uuid4()}").status_code == 404
 
 
 def test_group_mapping_delete_204_and_gate(app: FastAPI, client: TestClient) -> None:
@@ -705,34 +680,55 @@ def test_webhook_delete_204_404_and_gate(app: FastAPI, client: TestClient) -> No
     assert client.delete(f"/api/admin/webhooks/{uuid4()}").status_code == 403
 
 
-def test_gremium_membership_patch_and_gate(app: FastAPI, client: TestClient) -> None:
-    """PATCH /admin/gremium-memberships/{id}: 200, 404, 422 empty body, 403 gate."""
+def test_gremium_membership_writes_are_gone(app: FastAPI, client: TestClient) -> None:
+    """The memberships come from the OIDC groups. The API has no write route for them."""
     app.dependency_overrides[get_gremium_role_service] = lambda: _FakeGremiumRoles()
-    mid = uuid4()
-    assert client.patch(f"/api/admin/gremium-memberships/{mid}", json={}).status_code == 401
     _as_admin(app)
-    role_id = uuid4()
-    ok = client.patch(
-        f"/api/admin/gremium-memberships/{mid}",
-        json={"gremiumRoleId": str(role_id), "validUntil": "2027-01-01T00:00:00+00:00"},
+    gid, mid = uuid4(), uuid4()
+    body = {"principalId": str(uuid4()), "gremiumRoleId": str(uuid4())}
+    assert client.post(f"/api/admin/gremien/{gid}/memberships", json=body).status_code == 405
+    assert client.patch(f"/api/admin/gremium-memberships/{mid}", json={}).status_code == 404
+    assert client.delete(f"/api/admin/gremium-memberships/{mid}").status_code == 404
+    listed = client.get(f"/api/admin/gremien/{gid}/memberships").json()
+    assert "validFrom" not in listed[0] and listed[0]["gremiumId"] == str(gid)
+
+
+def test_gremium_group_mappings_crud_and_gate(app: FastAPI, client: TestClient) -> None:
+    """The OIDC group mappings of a gremium: CRUD under admin.gremien, 401, 403, 404, 422."""
+    app.dependency_overrides[get_gremium_role_service] = lambda: _FakeGremiumRoles()
+    gid, mid, role_id = uuid4(), uuid4(), str(uuid4())
+    body = {"oidcGroup": "stupa", "gremiumRoleId": role_id}
+    assert client.post(f"/api/admin/gremien/{gid}/group-mappings", json=body).status_code == 401
+    _as(app, {"admin.gremien"})
+    assert client.get(f"/api/admin/gremien/{gid}/group-mappings").json() == []
+    created = client.post(f"/api/admin/gremien/{gid}/group-mappings", json=body)
+    assert created.status_code == 201
+    assert created.json() == {
+        "id": created.json()["id"],
+        "gremiumId": str(gid),
+        "gremiumRoleId": role_id,
+        "oidcGroup": "stupa",
+    }
+    reserved = {"oidcGroup": "vote:x", "gremiumRoleId": role_id}
+    assert (
+        client.post(f"/api/admin/gremien/{gid}/group-mappings", json=reserved).status_code
+        == 422
     )
-    assert ok.status_code == 200
-    assert ok.json()["gremiumRoleId"] == str(role_id)
-    assert ok.json()["validUntil"] == "2027-01-01T00:00:00+00:00"
-    # An empty body sets no field and fails the schema with 422.
-    assert client.patch(f"/api/admin/gremium-memberships/{mid}", json={}).status_code == 422
+    patched = client.patch(f"/api/admin/gremium-group-mappings/{mid}", json={"oidcGroup": "b"})
+    assert patched.status_code == 200 and patched.json()["oidcGroup"] == "b"
+    assert client.patch(f"/api/admin/gremium-group-mappings/{mid}", json={}).status_code == 422
     missing = "00000000-0000-0000-0000-000000000000"
-    gone = client.patch(
-        f"/api/admin/gremium-memberships/{missing}", json={"validFrom": None}
-    )
-    assert gone.status_code == 404
-    _as(app, {"admin.gremium_roles"})  # the neighbouring area permission is not enough
     assert (
         client.patch(
-            f"/api/admin/gremium-memberships/{mid}", json={"validFrom": None}
+            f"/api/admin/gremium-group-mappings/{missing}", json={"oidcGroup": "b"}
         ).status_code
-        == 403
+        == 404
     )
+    assert client.delete(f"/api/admin/gremium-group-mappings/{mid}").status_code == 204
+    assert client.delete(f"/api/admin/gremium-group-mappings/{missing}").status_code == 404
+    _as(app, {"admin.gremium_roles"})  # the neighbouring area permission is not enough
+    assert client.get(f"/api/admin/gremien/{gid}/group-mappings").status_code == 403
+    assert client.delete(f"/api/admin/gremium-group-mappings/{mid}").status_code == 403
 
 
 def test_site_config_draft_activate_cycle(app: FastAPI, client: TestClient) -> None:
@@ -788,8 +784,8 @@ def test_mutating_endpoints_declare_400(app: FastAPI) -> None:
         ("/api/admin/application-types/{type_id}", "patch"),
         ("/api/admin/roles", "post"),
         ("/api/admin/roles/{role_id}", "patch"),
-        ("/api/admin/role-assignments", "post"),
-        ("/api/admin/role-assignments/{assignment_id}", "patch"),
+        ("/api/admin/gremien/{gremium_id}/group-mappings", "post"),
+        ("/api/admin/gremium-group-mappings/{mapping_id}", "patch"),
         ("/api/admin/group-mappings", "post"),
         ("/api/admin/group-mappings/{mapping_id}", "patch"),
         ("/api/admin/webhooks", "post"),

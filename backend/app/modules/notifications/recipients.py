@@ -85,7 +85,7 @@ def principals_with_permission_stmt(
     now: datetime,
     *,
     gremium_id: uuid.UUID | None = None,
-) -> Select[tuple[str | None]]:
+) -> Select[str | None]:
     """Select the mails of active principals that hold ``perm``.
 
     The principal needs a valid role assignment. The admin bypass always counts
@@ -107,7 +107,7 @@ def principal_rows_with_permission_stmt(
     now: datetime,
     *,
     gremium_id: uuid.UUID | None = None,
-) -> Select[tuple[uuid.UUID, str, str | None, list | None]]:
+) -> Select[uuid.UUID, str, str | None, list | None]:
     """Select the identity rows of the permission holders.
 
     The WHERE clauses match the mail statement. The projection
