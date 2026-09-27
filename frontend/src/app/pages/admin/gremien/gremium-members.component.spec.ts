@@ -6,7 +6,12 @@ import { provideRouter } from '@angular/router';
 import { AuthService } from '@core/auth/auth.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { DelegationsApiService } from '@core/api/delegations.service';
-import type { AdminPrincipal, GremiumMembership, GremiumRole } from '../admin.models';
+import type {
+  AdminPrincipal,
+  GremiumGroupMapping,
+  GremiumMembership,
+  GremiumRole,
+} from '../admin.models';
 import { AdminApiService } from '../admin-api.service';
 import { GremiumMembersComponent } from './gremium-members.component';
 
@@ -15,18 +20,23 @@ const ROLES: GremiumRole[] = [
   { id: 'gr-2', gremiumId: 'g-1', key: 'beisitz', name: { en: 'Assessor' } },
 ];
 const PRINCIPALS: AdminPrincipal[] = [
-  { id: 'p-1', sub: 'kc|alex', email: 'alex@x.de', displayName: 'Alex', lastLogin: null, assignments: [] },
-  { id: 'p-2', sub: 'kc|sam', email: 'sam@x.de', displayName: 'Sam', lastLogin: null, assignments: [] },
-  { id: 'p-3', sub: 'kc|noname', email: null, displayName: '', lastLogin: null, assignments: [] },
+  { id: 'p-1', sub: 'kc|alex', email: 'alex@x.de', displayName: 'Alex', lastLogin: null, assignments: [], oidcGroups: [] },
+  { id: 'p-2', sub: 'kc|sam', email: 'sam@x.de', displayName: 'Sam', lastLogin: null, assignments: [], oidcGroups: [] },
+  { id: 'p-3', sub: 'kc|noname', email: null, displayName: '', lastLogin: null, assignments: [], oidcGroups: [] },
 ];
 const MEMBERSHIPS: GremiumMembership[] = [
-  { id: 'm-1', principalId: 'p-1', gremiumId: 'g-1', gremiumRoleId: 'gr-1', validFrom: '2026-01-01T00:00:00Z', validUntil: '2026-12-31T00:00:00Z' },
+  { id: 'm-1', principalId: 'p-1', gremiumId: 'g-1', gremiumRoleId: 'gr-1' },
   // unknown principal and unknown role force the raw-id fallbacks
-  { id: 'm-2', principalId: 'ghost', gremiumId: 'g-1', gremiumRoleId: 'gr-x', validFrom: null, validUntil: null },
+  { id: 'm-2', principalId: 'ghost', gremiumId: 'g-1', gremiumRoleId: 'gr-x' },
   // empty displayName and null email fall back to sub
-  { id: 'm-3', principalId: 'p-3', gremiumId: 'g-1', gremiumRoleId: 'gr-2', validFrom: '2026-02-01T00:00:00Z', validUntil: null },
+  { id: 'm-3', principalId: 'p-3', gremiumId: 'g-1', gremiumRoleId: 'gr-2' },
   // duplicate principal (p-1) to exercise memberOptions dedup
-  { id: 'm-4', principalId: 'p-1', gremiumId: 'g-1', gremiumRoleId: 'gr-2', validFrom: null, validUntil: '2026-06-30T00:00:00Z' },
+  { id: 'm-4', principalId: 'p-1', gremiumId: 'g-1', gremiumRoleId: 'gr-2' },
+];
+const MAPPINGS: GremiumGroupMapping[] = [
+  { id: 'gm-1', gremiumId: 'g-1', gremiumRoleId: 'gr-1', oidcGroup: 'stupa-vorsitz' },
+  // unknown role → raw id fallback
+  { id: 'gm-2', gremiumId: 'g-1', gremiumRoleId: 'gr-x', oidcGroup: 'stupa-alt' },
 ];
 
 function makeApi(over: Partial<Record<string, jest.Mock>> = {}) {
@@ -37,9 +47,10 @@ function makeApi(over: Partial<Record<string, jest.Mock>> = {}) {
     listGremiumRoles: jest.fn(() => of([...ROLES])),
     listPrincipals: jest.fn(() => of([...PRINCIPALS])),
     listGremiumMemberships: jest.fn(() => of([...MEMBERSHIPS])),
-    createGremiumMembership: jest.fn(() => of({ id: 'm-new' })),
-    updateGremiumMembership: jest.fn(() => of({ id: 'm-1' })),
-    deleteGremiumMembership: jest.fn(() => of(void 0)),
+    listGremiumGroupMappings: jest.fn(() => of([...MAPPINGS])),
+    createGremiumGroupMapping: jest.fn(() => of({ id: 'gm-new' })),
+    updateGremiumGroupMapping: jest.fn(() => of({ id: 'gm-1' })),
+    deleteGremiumGroupMapping: jest.fn(() => of(void 0)),
     ...over,
   };
 }
@@ -97,28 +108,23 @@ describe('GremiumMembersComponent', () => {
     expect(c.gremium()).toBeNull();
   });
 
-  it('builds the members table with all fallbacks', async () => {
+  it('builds the read-only members table with all fallbacks', async () => {
     const { c } = await setup();
     const members = c.members();
-    const m1 = members.find((m: { assignmentId: string }) => m.assignmentId === 'm-1');
-    expect(m1).toMatchObject({ name: 'Alex', email: 'alex@x.de', roleLabel: 'Vorsitz', term: '2026-01-01 – 2026-12-31' });
-
-    // unknown principal → principalId, unknown role → roleId, no dates → '—'
-    const m2 = members.find((m: { assignmentId: string }) => m.assignmentId === 'm-2');
-    expect(m2).toMatchObject({ name: 'ghost', email: null, roleLabel: 'gr-x', term: '—' });
-
-    // empty displayName and null email fall back to sub. Only validFrom gives "from – …".
-    const m3 = members.find((m: { assignmentId: string }) => m.assignmentId === 'm-3');
-    expect(m3).toMatchObject({ name: 'kc|noname', email: null, term: '2026-02-01 – …' });
-
-    // only validUntil → "… – until"
-    const m4 = members.find((m: { assignmentId: string }) => m.assignmentId === 'm-4');
-    expect(m4.term).toBe('… – 2026-06-30');
+    const byId = (id: string) => members.find((m: { id: string }) => m.id === id);
+    expect(byId('m-1')).toEqual({ id: 'm-1', name: 'Alex', email: 'alex@x.de', roleLabel: 'Vorsitz' });
+    // unknown principal → principalId, unknown role → roleId
+    expect(byId('m-2')).toEqual({ id: 'm-2', name: 'ghost', email: null, roleLabel: 'gr-x' });
+    // empty displayName and null email fall back to sub
+    expect(byId('m-3')).toMatchObject({ name: 'kc|noname', email: null, roleLabel: 'beisitz' });
+    // no term column and no action column on the member table
+    expect(c.columns().map((col: { key: string }) => col.key)).toEqual(['name', 'email', 'roleLabel']);
   });
 
   it('rowId + subRowId expose the ids', async () => {
     const { c } = await setup();
-    expect(c.rowId({ assignmentId: 'm-1' })).toBe('m-1');
+    expect(c.rowId({ id: 'm-1' })).toBe('m-1');
+    expect(c.mappingRowId({ id: 'gm-1' })).toBe('gm-1');
     expect(c.subRowId({ id: 'sub-1' })).toBe('sub-1');
   });
 
@@ -142,7 +148,7 @@ describe('GremiumMembersComponent', () => {
     const { c } = await setup(api);
     expect(c.roleOptions()).toEqual([]);
     // principals empty → members resolve names to principalId
-    const m1 = c.members().find((m: { assignmentId: string }) => m.assignmentId === 'm-1');
+    const m1 = c.members().find((m: { id: string }) => m.id === 'm-1');
     expect(m1.name).toBe('p-1');
   });
 
@@ -157,130 +163,6 @@ describe('GremiumMembersComponent', () => {
     const delegations = makeDelegationsApi({ substitutes: jest.fn(() => throwError(() => new Error('x'))) });
     const { c } = await setup(makeApi(), delegations);
     expect(c.substitutes()).toEqual([]);
-  });
-
-  it('openAdd resets dialog state', async () => {
-    const { c } = await setup();
-    c.query.set('x');
-    c.selected.set(PRINCIPALS[0]);
-    c.addRoleId.set('gr-1');
-    c.openAdd();
-    expect(c.query()).toBe('');
-    expect(c.selected()).toBeNull();
-    expect(c.addRoleId()).toBe('');
-    expect(c.addFrom()).toBe('');
-    expect(c.addUntil()).toBe('');
-    expect(c.candidates()).toEqual([]);
-    expect(c.addOpen()).toBe(true);
-  });
-
-  it('closeAdd closes the dialog', async () => {
-    const { c } = await setup();
-    c.openAdd();
-    c.closeAdd();
-    expect(c.addOpen()).toBe(false);
-  });
-
-  it('onSearch fills candidates capped at 8', async () => {
-    const many = Array.from({ length: 12 }, (_, i) => ({ ...PRINCIPALS[0], id: `p${i}` }));
-    const api = makeApi({ listPrincipals: jest.fn(() => of(many)) });
-    const { c } = await setup(api);
-    c.onSearch('a');
-    expect(c.query()).toBe('a');
-    expect(c.candidates()).toHaveLength(8);
-  });
-
-  it('onSearch empties candidates on error', async () => {
-    const apiErr = makeApi();
-    const { c } = await setup(apiErr);
-    apiErr.listPrincipals.mockReturnValueOnce(throwError(() => new Error('x')));
-    c.onSearch('z');
-    expect(c.candidates()).toEqual([]);
-  });
-
-  it('pick selects a candidate, fills the query and clears the list', async () => {
-    const { c } = await setup();
-    c.pick(PRINCIPALS[1]);
-    expect(c.selected()).toEqual(PRINCIPALS[1]);
-    expect(c.query()).toBe('Sam');
-    expect(c.candidates()).toEqual([]);
-    // empty displayName + null email → sub
-    c.pick(PRINCIPALS[2]);
-    expect(c.query()).toBe('kc|noname');
-    // email fallback (displayName empty, email present)
-    c.pick({ ...PRINCIPALS[1], displayName: '' });
-    expect(c.query()).toBe('sam@x.de');
-  });
-
-  it('addMember is a no-op without a selection or role', async () => {
-    const { c, api } = await setup();
-    c.addMember(); // nothing selected
-    expect(api.createGremiumMembership).not.toHaveBeenCalled();
-    c.selected.set(PRINCIPALS[1]);
-    c.addMember(); // no role
-    expect(api.createGremiumMembership).not.toHaveBeenCalled();
-  });
-
-  it('adds a membership via typeahead pick + role + term', async () => {
-    const { api, c, toast } = await setup();
-    c.openAdd();
-    c.pick(PRINCIPALS[1]);
-    c.addRoleId.set('gr-1');
-    c.addFrom.set('2026-01-01');
-    c.addMember();
-    expect(api.createGremiumMembership).toHaveBeenCalledWith('g-1', {
-      principalId: 'p-2',
-      gremiumRoleId: 'gr-1',
-      validFrom: '2026-01-01',
-      validUntil: null,
-    });
-    expect(c.addOpen()).toBe(false);
-    expect(toast.success).toHaveBeenCalled();
-  });
-
-  it('addMember sends null dates when term is left empty', async () => {
-    const { api, c } = await setup();
-    c.selected.set(PRINCIPALS[1]);
-    c.addRoleId.set('gr-1');
-    c.addMember();
-    expect(api.createGremiumMembership).toHaveBeenCalledWith('g-1', {
-      principalId: 'p-2',
-      gremiumRoleId: 'gr-1',
-      validFrom: null,
-      validUntil: null,
-    });
-  });
-
-  it('addMember 409 shows the overlap error', async () => {
-    const api409 = makeApi({ createGremiumMembership: jest.fn(() => throwError(() => ({ status: 409 }))) });
-    const { c, toast } = await setup(api409);
-    c.selected.set(PRINCIPALS[1]);
-    c.addRoleId.set('gr-1');
-    c.addMember();
-    expect(toast.error).toHaveBeenCalledWith('Überlappende Amtszeit: pro Zeitpunkt nur eine Rolle möglich.');
-  });
-
-  it('addMember non-409 shows the generic error', async () => {
-    const apiErr = makeApi({ createGremiumMembership: jest.fn(() => throwError(() => ({ status: 500 }))) });
-    const { c, toast } = await setup(apiErr);
-    c.selected.set(PRINCIPALS[1]);
-    c.addRoleId.set('gr-1');
-    c.addMember();
-    expect(toast.error).toHaveBeenCalledWith('Aktion fehlgeschlagen.');
-  });
-
-  it('removeMember deletes and reloads', async () => {
-    const { c, api, toast } = await setup();
-    c.removeMember('m-1');
-    expect(api.deleteGremiumMembership).toHaveBeenCalledWith('m-1');
-    expect(toast.success).toHaveBeenCalled();
-  });
-
-  it('removeMember error shows a toast', async () => {
-    const apiErr = makeApi({ deleteGremiumMembership: jest.fn(() => throwError(() => new Error('x'))) });
-    const { c, toast } = await setup(apiErr);
-    c.removeMember('m-1');
-    expect(toast.error).toHaveBeenCalled();
   });
 
   it('openAddSub resets the substitute dialog state', async () => {
@@ -406,140 +288,182 @@ describe('GremiumMembersComponent', () => {
     expect(toast.error).toHaveBeenCalled();
   });
 
-  // --- edit a membership ----------------------------------------------------
+  // --- OIDC group mappings --------------------------------------------------
 
-  it('openEdit seeds the dialog from the row and closeEdit clears it', async () => {
+  it('lists the mappings with resolved role labels', async () => {
     const { c } = await setup();
-    const m1 = c.members().find((m: { assignmentId: string }) => m.assignmentId === 'm-1');
-    c.openEdit(m1);
-    expect(c.editOpen()).toBe(true);
-    expect(c.editMember()).toEqual(m1);
-    expect(c.editRoleId()).toBe('gr-1');
-    expect(c.editFrom()).toBe('2026-01-01');
-    expect(c.editUntil()).toBe('2026-12-31');
-    c.closeEdit();
-    expect(c.editOpen()).toBe(false);
-    expect(c.editMember()).toBeNull();
+    expect(c.mappingRows()).toEqual([
+      { id: 'gm-1', oidcGroup: 'stupa-vorsitz', roleLabel: 'Vorsitz' },
+      { id: 'gm-2', oidcGroup: 'stupa-alt', roleLabel: 'gr-x' },
+    ]);
+    expect(screen.getByText('stupa-vorsitz')).toBeInTheDocument();
+    expect(c.mappingsLoading()).toBe(false);
   });
 
-  it('seeds empty dates for an open-ended term', async () => {
-    const { c } = await setup();
-    const m2 = c.members().find((m: { assignmentId: string }) => m.assignmentId === 'm-2');
-    c.openEdit(m2);
-    expect(c.editFrom()).toBe('');
-    expect(c.editUntil()).toBe('');
-  });
-
-  it('saves the new role and term, then reloads', async () => {
-    const { api, c, toast } = await setup();
-    c.openEdit(c.members()[0]);
-    c.editRoleId.set('gr-2');
-    c.editFrom.set('2027-01-01');
-    c.editUntil.set('2027-12-31');
-    c.saveEdit();
-    expect(api.updateGremiumMembership).toHaveBeenCalledWith('m-1', {
-      gremiumRoleId: 'gr-2',
-      validFrom: '2027-01-01',
-      validUntil: '2027-12-31',
+  it('shows an error toast and empties the mappings when their list errors', async () => {
+    const api = makeApi({
+      listGremiumGroupMappings: jest.fn(() => throwError(() => new Error('x'))),
     });
-    expect(c.editOpen()).toBe(false);
-    expect(toast.success).toHaveBeenCalledWith('Mitgliedschaft gespeichert.');
-    // The reload re-reads the memberships.
+    const { c, toast } = await setup(api);
+    expect(c.mappingRows()).toEqual([]);
+    expect(c.mappingsLoading()).toBe(false);
+    expect(toast.error).toHaveBeenCalledWith('Gruppen-Mappings konnten nicht geladen werden.');
+  });
+
+  it('openAddMapping resets the dialog, openEditMapping seeds it', async () => {
+    const { c } = await setup();
+    c.mappingGroup.set('x');
+    c.mappingRoleId.set('gr-2');
+    c.openAddMapping();
+    expect(c.mappingOpen()).toBe(true);
+    expect(c.mappingEditId()).toBeNull();
+    expect(c.mappingGroup()).toBe('');
+    expect(c.mappingRoleId()).toBe('');
+    c.openEditMapping('gm-1');
+    expect(c.mappingEditId()).toBe('gm-1');
+    expect(c.mappingGroup()).toBe('stupa-vorsitz');
+    expect(c.mappingRoleId()).toBe('gr-1');
+    c.closeMapping();
+    expect(c.mappingOpen()).toBe(false);
+  });
+
+  it('openEditMapping ignores an unknown id', async () => {
+    const { c } = await setup();
+    c.openEditMapping('nope');
+    expect(c.mappingOpen()).toBe(false);
+  });
+
+  it('validates the group name and the role before a save', async () => {
+    const { c, api } = await setup();
+    c.openAddMapping();
+    expect(c.mappingValid()).toBe(false);
+    c.mappingGroup.set('   ');
+    c.mappingRoleId.set('gr-1');
+    expect(c.mappingValid()).toBe(false);
+    c.mappingGroup.set(' vote:abc ');
+    expect(c.mappingGroupReserved()).toBe(true);
+    expect(c.mappingValid()).toBe(false);
+    c.saveMapping();
+    expect(api.createGremiumGroupMapping).not.toHaveBeenCalled();
+    c.mappingGroup.set('stupa');
+    expect(c.mappingValid()).toBe(true);
+  });
+
+  it('shows the reserved-prefix hint in the dialog', async () => {
+    const { c, fixture } = await setup();
+    c.openAddMapping();
+    c.mappingGroup.set('vote:x');
+    fixture.detectChanges();
+    expect(screen.getByText('Das Präfix „vote:“ ist reserviert.')).toBeInTheDocument();
+  });
+
+  it('creates a mapping with a trimmed group, then reloads mappings and members', async () => {
+    const { c, api, toast } = await setup();
+    c.openAddMapping();
+    c.mappingGroup.set('  stupa-mitglieder ');
+    c.mappingRoleId.set('gr-2');
+    c.saveMapping();
+    expect(api.createGremiumGroupMapping).toHaveBeenCalledWith('g-1', {
+      oidcGroup: 'stupa-mitglieder',
+      gremiumRoleId: 'gr-2',
+    });
+    expect(c.mappingOpen()).toBe(false);
+    expect(c.mappingSaving()).toBe(false);
+    expect(toast.success).toHaveBeenCalledWith('Mapping gespeichert. Die Mitglieder sind aktualisiert.');
+    // The backend re-syncs the memberships, so both lists load again.
+    expect(api.listGremiumGroupMappings).toHaveBeenCalledTimes(2);
     expect(api.listGremiumMemberships).toHaveBeenCalledTimes(2);
   });
 
-  it('sends null for an emptied term end', async () => {
-    const { api, c } = await setup();
-    c.openEdit(c.members()[0]);
-    c.editFrom.set('');
-    c.editUntil.set('');
-    c.saveEdit();
-    expect(api.updateGremiumMembership).toHaveBeenCalledWith('m-1', {
-      gremiumRoleId: 'gr-1',
-      validFrom: null,
-      validUntil: null,
+  it('updates an existing mapping', async () => {
+    const { c, api } = await setup();
+    c.openEditMapping('gm-1');
+    c.mappingRoleId.set('gr-2');
+    c.saveMapping();
+    expect(api.updateGremiumGroupMapping).toHaveBeenCalledWith('gm-1', {
+      oidcGroup: 'stupa-vorsitz',
+      gremiumRoleId: 'gr-2',
     });
+    expect(api.createGremiumGroupMapping).not.toHaveBeenCalled();
   });
 
-  it('saveEdit is a no-op without a member or without a role', async () => {
-    const { api, c } = await setup();
-    c.saveEdit(); // no member under edit
-    expect(api.updateGremiumMembership).not.toHaveBeenCalled();
-    c.openEdit(c.members()[0]);
-    c.editRoleId.set('');
-    c.saveEdit(); // no role picked
-    expect(api.updateGremiumMembership).not.toHaveBeenCalled();
+  it('does not send a second save while one runs', async () => {
+    const { c, api } = await setup();
+    c.openEditMapping('gm-1');
+    c.mappingSaving.set(true);
+    c.saveMapping();
+    expect(api.updateGremiumGroupMapping).not.toHaveBeenCalled();
   });
 
-  it('saveEdit 409 names the overlapping term', async () => {
-    const api409 = makeApi({
-      updateGremiumMembership: jest.fn(() => throwError(() => ({ status: 409 }))),
+  it.each([
+    [409, 'Diese Gruppe ist schon zugeordnet, oder die Rolle gehört zu einem anderen Gremium.'],
+    [422, 'Ungültiger Gruppenname: leer oder mit dem reservierten Präfix „vote:“.'],
+    [500, 'Aktion fehlgeschlagen.'],
+  ])('a save that answers %s names the reason and keeps the dialog open', async (status, text) => {
+    const api = makeApi({
+      createGremiumGroupMapping: jest.fn(() => throwError(() => ({ status }))),
     });
-    const { c, toast } = await setup(api409);
-    c.openEdit(c.members()[0]);
-    c.saveEdit();
-    expect(toast.error).toHaveBeenCalledWith(
-      'Überlappende Amtszeit: pro Zeitpunkt nur eine Rolle möglich.',
-    );
-    // The dialog stays open, so the user can correct the term.
-    expect(c.editOpen()).toBe(true);
+    const { c, toast } = await setup(api);
+    c.openAddMapping();
+    c.mappingGroup.set('stupa');
+    c.mappingRoleId.set('gr-1');
+    c.saveMapping();
+    expect(toast.error).toHaveBeenCalledWith(text);
+    expect(c.mappingOpen()).toBe(true);
+    expect(c.mappingSaving()).toBe(false);
   });
 
-  it('saveEdit 422 names the wrong date order', async () => {
-    const api422 = makeApi({
-      updateGremiumMembership: jest.fn(() => throwError(() => ({ status: 422 }))),
-    });
-    const { c, toast } = await setup(api422);
-    c.openEdit(c.members()[0]);
-    c.saveEdit();
-    expect(toast.error).toHaveBeenCalledWith('Das Von-Datum muss vor dem Bis-Datum liegen.');
+  it('deletes a mapping after the confirmation, then reloads', async () => {
+    const { c, api, toast } = await setup();
+    c.removeMapping(); // nothing to confirm
+    expect(api.deleteGremiumGroupMapping).not.toHaveBeenCalled();
+    c.mappingDeleteId.set('gm-2');
+    c.removeMapping();
+    expect(api.deleteGremiumGroupMapping).toHaveBeenCalledWith('gm-2');
+    expect(c.mappingDeleteId()).toBeNull();
+    expect(toast.success).toHaveBeenCalledWith('Mapping gelöscht. Die Mitglieder sind aktualisiert.');
+    expect(api.listGremiumMemberships).toHaveBeenCalledTimes(2);
   });
 
-  it('saveEdit falls back to the generic error for any other status', async () => {
-    const api500 = makeApi({
-      updateGremiumMembership: jest.fn(() => throwError(() => ({ status: 500 }))),
-    });
-    const { c, toast } = await setup(api500);
-    c.openEdit(c.members()[0]);
-    c.saveEdit();
+  it('a failed delete shows a toast and keeps the confirmation', async () => {
+    const api = makeApi({ deleteGremiumGroupMapping: jest.fn(() => throwError(() => new Error('x'))) });
+    const { c, toast } = await setup(api);
+    c.mappingDeleteId.set('gm-1');
+    c.removeMapping();
     expect(toast.error).toHaveBeenCalledWith('Aktion fehlgeschlagen.');
+    expect(c.mappingDeleteId()).toBe('gm-1');
   });
 
-  it('addMember 422 names the wrong date order too', async () => {
-    const api422 = makeApi({
-      createGremiumMembership: jest.fn(() => throwError(() => ({ status: 422 }))),
-    });
-    const { c, toast } = await setup(api422);
-    c.selected.set(PRINCIPALS[1]);
-    c.addRoleId.set('gr-1');
-    c.addMember();
-    expect(toast.error).toHaveBeenCalledWith('Das Von-Datum muss vor dem Bis-Datum liegen.');
+  it('the row controls open the edit dialog and the delete confirmation', async () => {
+    const { c } = await setup();
+    await userEvent.click(screen.getByRole('button', { name: 'Bearbeiten: stupa-vorsitz' }));
+    expect(screen.getByRole('dialog', { name: 'Mapping bearbeiten' })).toBeInTheDocument();
+    c.closeMapping();
+    await userEvent.click(screen.getByRole('button', { name: 'Löschen: stupa-alt' }));
+    expect(c.mappingDeleteId()).toBe('gm-2');
   });
 
-  it('the edit control opens the dialog with the member name', async () => {
-    await setup();
-    await userEvent.click(screen.getAllByRole('button', { name: 'Mitgliedschaft bearbeiten' })[0]);
-    expect(screen.getByRole('dialog', { name: 'Mitgliedschaft bearbeiten' })).toBeInTheDocument();
+  it('the add control opens the dialog, with a link to the roles page when none exist', async () => {
+    const api = makeApi({ listGremiumRoles: jest.fn(() => of([])) });
+    await setup(api);
+    await userEvent.click(screen.getByRole('button', { name: 'Gruppe zuordnen' }));
+    expect(screen.getByRole('dialog', { name: 'Gruppe zuordnen' })).toBeInTheDocument();
+    expect(screen.getByRole('link')).toHaveAttribute('href', '/admin/gremien/g-1/roles');
   });
 
   // --- permission gating ----------------------------------------------------
 
-  it('hides add, edit and remove without admin.gremien', async () => {
+  it('hides the mapping controls without admin.gremien', async () => {
     const { c } = await setup(makeApi(), makeDelegationsApi(), makeToast(), false);
     expect(c.canManage()).toBe(false);
-    expect(c.columns().map((col: { key: string }) => col.key)).toEqual([
-      'name',
-      'email',
-      'roleLabel',
-      'term',
-    ]);
-    expect(screen.queryByRole('button', { name: 'Mitglied hinzufügen' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Mitgliedschaft bearbeiten' })).toBeNull();
+    expect(c.mappingColumns().map((col: { key: string }) => col.key)).toEqual(['oidcGroup', 'roleLabel']);
+    expect(screen.queryByRole('button', { name: 'Gruppe zuordnen' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Bearbeiten: stupa-vorsitz' })).toBeNull();
   });
 
-  it('shows the action column with admin.gremien', async () => {
+  it('shows the mapping action column with admin.gremien', async () => {
     const { c } = await setup();
-    expect(c.columns().map((col: { key: string }) => col.key)).toContain('actions');
+    expect(c.mappingColumns().map((col: { key: string }) => col.key)).toContain('actions');
   });
 
   it('lists substitutes when present', async () => {

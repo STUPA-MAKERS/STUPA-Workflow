@@ -1,16 +1,26 @@
 """QA seed: one principal per role, each with a ready-made session cookie.
 
 This exists for the manual/Playwright QA sweep against the local stack. It writes ONLY
-identity rows — principals, role assignments, Gremium memberships and OIDC group
-mappings — plus one signed session cookie per role. Every piece of domain config (the
+identity rows — principals with their OIDC groups, the global group mappings and the
+Gremium group mappings — plus one signed session cookie per role. Every piece of domain config (the
 application type, the form, the flow, budgets, meetings) is created afterwards through
 the REST API, so the QA data goes through the same validation as real data.
 
 Minting a cookie with `create_principal_session` is the same trick `deploy/e2e/seed.py`
 uses: it is the app's own signing function, not a backdoor, and it only runs here.
 
+The IdP is the only source of global roles and Gremium memberships. The seed thus
+writes no `role_assignment` and no `gremium_membership` by hand. It sets the group cache
+`principal.oidc_groups`, which an OIDC login would fill. The RBAC resolver maps these
+groups to the global roles at each request. The seed then calls the backend sync
+`sync_all_memberships`, which writes the memberships from the Gremium group mappings. A later login or a later change of a mapping gives the same rows.
+
 The Gremium memberships matter for voting: `vote.cast` eligibility comes from an active
 membership whose Gremium role carries it, never from a global role.
+
+If you log in through a real IdP (for example the local Keycloak of
+`docker-compose.keycloak.yml`), put each user into the groups of `PEOPLE`. The sync
+replaces the memberships at each login with the groups that the IdP sends.
 
 Output: ``${E2E_ARTIFACTS}/qa.json`` with the cookie name and one cookie per role.
 """
@@ -24,15 +34,19 @@ import pathlib
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from app.db import get_sessionmaker
-from app.modules.admin.models import Gremium, GremiumMembership, GremiumRole
+from app.modules.admin.membership_sync import sync_all_memberships
+from app.modules.admin.models import Gremium, GremiumGroupMapping, GremiumRole
 from app.modules.auth.models import GroupMapping, Principal, Role, RoleAssignment
 from app.modules.auth.sessions import create_principal_session
 from app.settings import get_settings
 
 ARTIFACTS = pathlib.Path(os.environ.get("E2E_ARTIFACTS", "/artifacts"))
+
+# The actor of the role assignments that an older version of this seed wrote.
+ACTOR = "qa-seed"
 
 # (sub, email, display name, global role key or None, gremium key or None, gremium role)
 PEOPLE: list[tuple[str, str, str, str | None, str | None, str | None]] = [
@@ -46,15 +60,43 @@ PEOPLE: list[tuple[str, str, str, str | None, str | None, str | None]] = [
     ("qa-nobody", "nobody@qa.test", "Nils Ohnerolle", None, None, None),
 ]
 
-# The Keycloak realm puts each user in exactly one of these groups. Mapping them here
-# means an OIDC login lands on the same role as the minted cookie.
+
+def _role_group(role_key: str) -> str:
+    """Return the OIDC group that gives a global role."""
+    return f"role-{role_key}"
+
+
+def _gremium_group(gremium_key: str, gremium_role_key: str) -> str:
+    """Return the OIDC group that gives a role in a Gremium."""
+    return f"gremium-{gremium_key}-{gremium_role_key}"
+
+
+def _groups_of(
+    role_key: str | None, gremium_key: str | None, gremium_role_key: str | None
+) -> list[str]:
+    """Return the OIDC groups of one person in `PEOPLE`."""
+    groups: list[str] = []
+    if role_key is not None:
+        groups.append(_role_group(role_key))
+    if gremium_key is not None:
+        groups.append(_gremium_group(gremium_key, gremium_role_key or "member"))
+    return groups
+
+
+# Each global group maps to one role. An OIDC login thus lands on the same role as the
+# minted cookie.
 GROUP_MAPPINGS = [
-    ("role-admin", "admin"),
-    ("role-manager", "manager"),
-    ("role-finance", "finance"),
-    ("role-protocol", "protocol"),
-    ("role-member", "member"),
+    (_role_group(key), key) for key in ("admin", "manager", "finance", "protocol", "member")
 ]
+
+# (gremium key, gremium role key). Each pair gets the group `gremium-<gremium>-<role>`.
+GREMIUM_GROUP_MAPPINGS = sorted(
+    {
+        (gremium_key, gremium_role_key or "member")
+        for _, _, _, _, gremium_key, gremium_role_key in PEOPLE
+        if gremium_key is not None
+    }
+)
 
 
 async def _roles_by_key(session) -> dict[str, uuid.UUID]:
@@ -88,47 +130,14 @@ async def _ensure_principal(session, sub: str, email: str, name: str) -> Princip
     return row
 
 
-async def _ensure_assignment(session, principal_id, role_id) -> None:
-    existing = (
-        await session.execute(
-            select(RoleAssignment.id).where(
-                RoleAssignment.principal_id == principal_id,
-                RoleAssignment.role_id == role_id,
-                RoleAssignment.gremium_id.is_(None),
-            )
+async def _drop_manual_assignments(session, principal_id) -> None:
+    """Remove the role assignments that an older version of this seed wrote."""
+    await session.execute(
+        delete(RoleAssignment).where(
+            RoleAssignment.principal_id == principal_id,
+            RoleAssignment.granted_by == ACTOR,
         )
-    ).scalar_one_or_none()
-    if existing is None:
-        session.add(
-            RoleAssignment(
-                principal_id=principal_id,
-                role_id=role_id,
-                granted_by="qa-seed",
-                valid_from=datetime.now(UTC),
-            )
-        )
-        await session.flush()
-
-
-async def _ensure_membership(session, principal_id, gremium_id, gremium_role_id) -> None:
-    existing = (
-        await session.execute(
-            select(GremiumMembership.id).where(
-                GremiumMembership.principal_id == principal_id,
-                GremiumMembership.gremium_id == gremium_id,
-            )
-        )
-    ).scalar_one_or_none()
-    if existing is None:
-        session.add(
-            GremiumMembership(
-                principal_id=principal_id,
-                gremium_id=gremium_id,
-                gremium_role_id=gremium_role_id,
-                valid_from=datetime.now(UTC) - timedelta(days=1),
-            )
-        )
-        await session.flush()
+    )
 
 
 async def _ensure_group_mappings(session, roles: dict[str, uuid.UUID]) -> None:
@@ -146,6 +155,32 @@ async def _ensure_group_mappings(session, roles: dict[str, uuid.UUID]) -> None:
     await session.flush()
 
 
+async def _ensure_gremium_group_mappings(session, gremien: dict[str, uuid.UUID]) -> None:
+    for gremium_key, gremium_role_key in GREMIUM_GROUP_MAPPINGS:
+        gid = gremien.get(gremium_key)
+        if gid is None:
+            continue
+        grid = await _gremium_role(session, gid, gremium_role_key)
+        if grid is None:
+            continue
+        group = _gremium_group(gremium_key, gremium_role_key)
+        existing = (
+            await session.execute(
+                select(GremiumGroupMapping).where(
+                    GremiumGroupMapping.gremium_id == gid,
+                    GremiumGroupMapping.oidc_group == group,
+                )
+            )
+        ).scalar_one_or_none()
+        if existing is None:
+            session.add(
+                GremiumGroupMapping(gremium_id=gid, gremium_role_id=grid, oidc_group=group)
+            )
+        else:
+            existing.gremium_role_id = grid
+    await session.flush()
+
+
 async def main() -> None:
     settings = get_settings()
     maker = get_sessionmaker()
@@ -156,16 +191,13 @@ async def main() -> None:
         roles = await _roles_by_key(session)
         gremien = await _gremien_by_key(session)
         await _ensure_group_mappings(session, roles)
+        await _ensure_gremium_group_mappings(session, gremien)
 
         for sub, email, name, role_key, gremium_key, gremium_role_key in PEOPLE:
             principal = await _ensure_principal(session, sub, email, name)
-            if role_key is not None and role_key in roles:
-                await _ensure_assignment(session, principal.id, roles[role_key])
-            if gremium_key is not None and gremium_key in gremien:
-                gid = gremien[gremium_key]
-                grid = await _gremium_role(session, gid, gremium_role_key or "member")
-                if grid is not None:
-                    await _ensure_membership(session, principal.id, gid, grid)
+            # The group cache that an OIDC login would fill.
+            principal.oidc_groups = _groups_of(role_key, gremium_key, gremium_role_key)
+            await _drop_manual_assignments(session, principal.id)
 
             label = sub.removeprefix("qa-")
             cookies[label] = await create_principal_session(
@@ -178,6 +210,10 @@ async def main() -> None:
             )
             subs[label] = sub
 
+        # The same sync that runs after each change of a Gremium group mapping. It
+        # writes the memberships of every principal from its OIDC groups.
+        await session.flush()
+        await sync_all_memberships(session)
         await session.commit()
 
     ARTIFACTS.mkdir(parents=True, exist_ok=True)

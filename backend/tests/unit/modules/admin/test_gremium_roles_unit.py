@@ -1,296 +1,346 @@
-"""Unit tests without a DB: Gremium roles and memberships.
+"""Unit tests without a DB: OIDC group mappings of a gremium and the membership sync.
 
-The focus is the pure overlap invariant. Two terms of office must not overlap, and a
-later term without an overlap stays allowed. The tests also cover the service branches:
-a conflict on an overlap and a success on a gap.
+The memberships come from the OIDC groups only. The tests cover the mapping CRUD of
+`GremiumRoleService` and the pure branches of `membership_sync`: add, change, remove,
+the tie-break between two roles in one gremium, and the audit entry per change.
 """
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
-from uuid import uuid4
+from typing import Any
+from uuid import UUID, uuid4
 
 import pytest
+from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
 
-from app.modules.admin.gremium_roles import GremiumRoleService, intervals_overlap
-from app.modules.admin.models import GremiumMembership, GremiumRole
-from app.modules.admin.schemas import GremiumMembershipCreate, GremiumMembershipUpdate
-from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
+from app.modules.admin import gremium_roles, membership_sync
+from app.modules.admin.gremium_roles import GremiumRoleService
+from app.modules.admin.models import GremiumGroupMapping, GremiumMembership, GremiumRole
+from app.modules.admin.schemas import GremiumGroupMappingCreate, GremiumGroupMappingUpdate
+from app.modules.auth.models import Principal as PrincipalRow
+from app.shared.errors import ConflictError, NotFoundError
 from tests._support.auth_fakes import fake_session, result
 
 
-def _dt(s: str) -> datetime:
-    return datetime.fromisoformat(s).replace(tzinfo=UTC)
-
-
-def test_overlap_basic_true() -> None:
-    assert intervals_overlap(
-        _dt("2026-01-01"), _dt("2026-06-01"), _dt("2026-03-01"), _dt("2026-09-01")
+def _role(gremium_id: UUID | None = None, key: str = "member", perms=None) -> GremiumRole:
+    r = GremiumRole(
+        gremium_id=gremium_id or uuid4(),
+        key=key,
+        name_i18n={},
+        permissions=["vote.cast"] if perms is None else perms,
     )
-
-
-def test_adjacent_intervals_do_not_overlap() -> None:
-    # [Jan, Jun) and [Jun, Dec) touch, so they do not overlap (half-open intervals).
-    assert not intervals_overlap(
-        _dt("2026-01-01"), _dt("2026-06-01"), _dt("2026-06-01"), _dt("2026-12-01")
-    )
-
-
-def test_disjoint_intervals_do_not_overlap() -> None:
-    assert not intervals_overlap(
-        _dt("2026-01-01"), _dt("2026-03-01"), _dt("2026-06-01"), _dt("2026-09-01")
-    )
-
-
-def test_open_ended_overlaps_everything_after() -> None:
-    # An open end (None) overlaps every later entry.
-    assert intervals_overlap(_dt("2026-01-01"), None, _dt("2030-01-01"), None)
-
-
-def test_open_start_overlaps_everything_before() -> None:
-    assert intervals_overlap(None, _dt("2026-06-01"), _dt("2020-01-01"), _dt("2026-03-01"))
-
-
-def test_two_open_intervals_always_overlap() -> None:
-    assert intervals_overlap(None, None, None, None)
-
-
-def _role(gremium_id=None) -> GremiumRole:
-    r = GremiumRole(gremium_id=gremium_id or uuid4(), key="vorsitz", name_i18n={"de": "Vorsitz"})
     r.id = uuid4()
     return r
 
 
-def _membership(pid, gid, frm, until) -> GremiumMembership:
-    m = GremiumMembership(
-        principal_id=pid, gremium_id=gid, gremium_role_id=uuid4(), valid_from=frm, valid_until=until
-    )
+def _mapping(gremium_id: UUID, role_id: UUID, group: str = "stupa") -> GremiumGroupMapping:
+    m = GremiumGroupMapping(gremium_id=gremium_id, gremium_role_id=role_id, oidc_group=group)
     m.id = uuid4()
     return m
 
 
-async def test_create_membership_rejects_overlap() -> None:
-    pid, gid = uuid4(), uuid4()
-    existing = _membership(pid, gid, _dt("2026-01-01"), _dt("2026-12-31"))
-    # gets: the GremiumRole and the principal existence check. scalars: the memberships.
-    db = fake_session(result(existing), gets=[_role(gid), object()])
-    payload = GremiumMembershipCreate(
-        principalId=pid, gremiumRoleId=uuid4(), validFrom="2026-06-01", validUntil="2026-09-01"
-    )
-    with pytest.raises(ConflictError):
-        await GremiumRoleService(db).create_membership(gid, payload, "admin")
+def _membership(pid: UUID, gid: UUID, role_id: UUID) -> GremiumMembership:
+    m = GremiumMembership(principal_id=pid, gremium_id=gid, gremium_role_id=role_id)
+    m.id = uuid4()
+    return m
 
 
-async def test_create_membership_unknown_principal_404() -> None:
-    # An unknown principal_id gives a 404 instead of an FK IntegrityError on the commit.
-    gid = uuid4()
-    db = fake_session(gets=[_role(gid)])  # the second get (principal) returns None
-    payload = GremiumMembershipCreate(principalId=uuid4(), gremiumRoleId=uuid4())
-    with pytest.raises(NotFoundError):
-        await GremiumRoleService(db).create_membership(gid, payload, "admin")
+def _principal(groups: list[str] | None) -> PrincipalRow:
+    row = PrincipalRow(sub="sub-1", oidc_groups=groups)
+    row.id = uuid4()
+    return row
 
 
-async def test_create_membership_allows_consecutive_term() -> None:
-    pid, gid = uuid4(), uuid4()
-    existing = _membership(pid, gid, _dt("2025-01-01"), _dt("2026-01-01"))
-    db = fake_session(
-        result(existing),  # existing memberships
-        result(),  # audit advisory lock
-        result(),  # audit prev-hash
-        gets=[_role(gid), object()],  # the role and the principal existence check
-    )
+def _ids_on_flush(db: Any) -> None:
+    """Give every added object an id, because the fake ``flush`` sets no primary key."""
 
-    async def _flush_assign() -> None:  # the DB would set the PK, but the fake does not
+    async def _flush() -> None:
         for o in db.added:
             if getattr(o, "id", None) is None:
                 o.id = uuid4()
         db.flushed += 1
 
-    db.flush = _flush_assign
-    payload = GremiumMembershipCreate(
-        principalId=pid, gremiumRoleId=uuid4(), validFrom="2026-01-01", validUntil="2027-01-01"
-    )
-    out = await GremiumRoleService(db).create_membership(gid, payload, "admin")
-    assert out.valid_from is not None
+    db.flush = _flush
+
+
+@pytest.fixture
+def audits(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
+    """Record the audit entries of the sync and the service without the hash chain."""
+    seen: list[dict[str, Any]] = []
+
+    class _Audit:
+        def __init__(self, _session: Any) -> None:
+            pass
+
+        async def record(self, **kw: Any) -> None:
+            seen.append(kw)
+
+    monkeypatch.setattr(membership_sync, "AuditService", _Audit)
+    monkeypatch.setattr(gremium_roles, "AuditService", _Audit)
+    return seen
+
+
+@pytest.fixture
+def synced(monkeypatch: pytest.MonkeyPatch) -> list[Any]:
+    """Replace the full sync in the service with a recorder."""
+    calls: list[Any] = []
+
+    async def _sync_all(session: Any) -> int:
+        calls.append(session)
+        return 0
+
+    monkeypatch.setattr(gremium_roles, "sync_all_memberships", _sync_all)
+    return calls
+
+
+# ---------------------------------------------------------------- schema
+
+
+def test_mapping_create_refuses_reserved_vote_prefix() -> None:
+    with pytest.raises(ValidationError):
+        GremiumGroupMappingCreate(oidcGroup="vote:abc", gremiumRoleId=uuid4())
+
+
+def test_mapping_update_refuses_reserved_vote_prefix() -> None:
+    with pytest.raises(ValidationError):
+        GremiumGroupMappingUpdate(oidcGroup="vote:abc")
+
+
+def test_mapping_update_needs_a_field() -> None:
+    with pytest.raises(ValidationError):
+        GremiumGroupMappingUpdate()
+
+
+def test_mapping_update_accepts_role_only() -> None:
+    payload = GremiumGroupMappingUpdate(gremiumRoleId=uuid4())
+    assert payload.oidc_group is None
+
+
+# ---------------------------------------------------------------- mapping CRUD
+
+
+async def test_list_group_mappings() -> None:
+    gid = uuid4()
+    m = _mapping(gid, uuid4())
+    out = await GremiumRoleService(fake_session(result(m))).list_group_mappings(gid)
+    assert [o.oidc_group for o in out] == ["stupa"]
+    assert out[0].gremium_id == gid
+
+
+async def test_create_mapping_role_not_found() -> None:
+    svc = GremiumRoleService(fake_session(gets=[None]))
+    payload = GremiumGroupMappingCreate(oidcGroup="stupa", gremiumRoleId=uuid4())
+    with pytest.raises(NotFoundError, match="gremium role"):
+        await svc.create_group_mapping(uuid4(), payload, "admin")
+
+
+async def test_create_mapping_role_of_other_gremium() -> None:
+    role = _role()
+    svc = GremiumRoleService(fake_session(gets=[role]))
+    payload = GremiumGroupMappingCreate(oidcGroup="stupa", gremiumRoleId=role.id)
+    with pytest.raises(ConflictError, match="does not belong"):
+        await svc.create_group_mapping(uuid4(), payload, "admin")
+
+
+async def test_create_mapping_audits_syncs_and_commits(
+    audits: list[dict[str, Any]], synced: list[Any]
+) -> None:
+    gid = uuid4()
+    role = _role(gid)
+    db = fake_session(gets=[role])
+    _ids_on_flush(db)
+    payload = GremiumGroupMappingCreate(oidcGroup="stupa", gremiumRoleId=role.id)
+    out = await GremiumRoleService(db).create_group_mapping(gid, payload, "admin")
+    assert out.oidc_group == "stupa" and out.gremium_role_id == role.id
+    assert audits[0]["target_type"] == "gremium_group_mapping"
+    assert audits[0]["target_id"] == str(out.id)
+    assert synced == [db]
     assert db.committed == 1
 
 
-async def test_create_membership_db_constraint_overlap_409() -> None:
-    # AUD-029: the row passes the Python fast-path check because no overlap is known.
-    # A concurrent insert then fires the EXCLUDE constraint on the commit, which raises
-    # IntegrityError. The service must translate that to ConflictError (409), not 500.
-    pid, gid = uuid4(), uuid4()
-    db = fake_session(
-        result(),  # no existing membership, so the fast path finds no conflict
-        result(),  # audit advisory lock
-        result(),  # audit prev-hash
-        gets=[_role(gid), object()],
-    )
+async def test_create_mapping_duplicate_group_409(synced: list[Any]) -> None:
+    gid = uuid4()
+    role = _role(gid)
+    db = fake_session(gets=[role])
+    rollbacks: list[int] = []
 
-    async def _flush_assign() -> None:
-        for o in db.added:
-            if getattr(o, "id", None) is None:
-                o.id = uuid4()
-        db.flushed += 1
-
-    async def _raise_integrity() -> None:
-        raise IntegrityError("INSERT", {}, Exception("ex_gremium_membership_no_overlap"))
-
-    rollbacks = {"n": 0}
+    async def _flush() -> None:
+        raise IntegrityError("INSERT", {}, Exception("uq_gremium_group_mapping"))
 
     async def _rollback() -> None:
-        rollbacks["n"] += 1
+        rollbacks.append(1)
 
-    db.flush = _flush_assign
-    db.commit = _raise_integrity
+    db.flush = _flush
     db.rollback = _rollback
-    payload = GremiumMembershipCreate(
-        principalId=pid, gremiumRoleId=uuid4(), validFrom="2026-01-01", validUntil="2027-01-01"
-    )
-    with pytest.raises(ConflictError):
-        await GremiumRoleService(db).create_membership(gid, payload, "admin")
-    assert rollbacks["n"] == 1
+    payload = GremiumGroupMappingCreate(oidcGroup="stupa", gremiumRoleId=role.id)
+    with pytest.raises(ConflictError, match="already maps"):
+        await GremiumRoleService(db).create_group_mapping(gid, payload, "admin")
+    assert rollbacks == [1]
+    assert synced == []
 
 
-# PATCH /admin/gremium-memberships/{id}: role change plus term change under the
-# same overlap invariant as the create.
-
-
-def _flush_with_ids(db) -> None:  # noqa: ANN001
-    async def _flush_assign() -> None:
-        for o in db.added:
-            if getattr(o, "id", None) is None:
-                o.id = uuid4()
-        db.flushed += 1
-
-    db.flush = _flush_assign
-
-
-async def test_update_membership_not_found_404() -> None:
-    db = fake_session()  # get() returns None
+async def test_update_mapping_not_found() -> None:
+    svc = GremiumRoleService(fake_session(gets=[None]))
     with pytest.raises(NotFoundError):
-        await GremiumRoleService(db).update_membership(
-            uuid4(), GremiumMembershipUpdate(validFrom=None), "admin"
+        await svc.update_group_mapping(
+            uuid4(), GremiumGroupMappingUpdate(oidcGroup="x"), "admin"
         )
 
 
-async def test_update_membership_unknown_role_404() -> None:
-    pid, gid = uuid4(), uuid4()
-    row = _membership(pid, gid, None, None)
-    db = fake_session(gets=[row, None])  # the membership, then no role
-    with pytest.raises(NotFoundError):
-        await GremiumRoleService(db).update_membership(
-            row.id, GremiumMembershipUpdate(gremiumRoleId=uuid4()), "admin"
+async def test_update_mapping_role_of_other_gremium() -> None:
+    gid = uuid4()
+    row = _mapping(gid, uuid4())
+    svc = GremiumRoleService(fake_session(gets=[row, _role()]))
+    with pytest.raises(ConflictError, match="does not belong"):
+        await svc.update_group_mapping(
+            row.id, GremiumGroupMappingUpdate(gremiumRoleId=uuid4()), "admin"
         )
 
 
-async def test_update_membership_foreign_role_409() -> None:
-    pid, gid = uuid4(), uuid4()
-    row = _membership(pid, gid, None, None)
-    db = fake_session(gets=[row, _role(uuid4())])  # role of ANOTHER gremium
-    with pytest.raises(ConflictError):
-        await GremiumRoleService(db).update_membership(
-            row.id, GremiumMembershipUpdate(gremiumRoleId=uuid4()), "admin"
-        )
-
-
-async def test_update_membership_inverted_window_422() -> None:
-    pid, gid = uuid4(), uuid4()
-    row = _membership(pid, gid, None, None)
-    db = fake_session(gets=[row])
-    with pytest.raises(ValidationProblem):
-        await GremiumRoleService(db).update_membership(
-            row.id,
-            GremiumMembershipUpdate(validFrom="2027-01-01", validUntil="2026-01-01"),
-            "admin",
-        )
-
-
-async def test_update_membership_overlap_409() -> None:
-    pid, gid = uuid4(), uuid4()
-    row = _membership(pid, gid, _dt("2026-01-01"), _dt("2026-06-01"))
-    other = _membership(pid, gid, _dt("2026-06-01"), _dt("2026-12-01"))
-    db = fake_session(result(row, other), gets=[row])
-    with pytest.raises(ConflictError):
-        await GremiumRoleService(db).update_membership(
-            row.id, GremiumMembershipUpdate(validUntil="2026-09-01"), "admin"
-        )
-
-
-async def test_update_membership_ignores_own_row_and_commits() -> None:
-    # The row under edit must not conflict with itself, so the patch passes.
-    pid, gid = uuid4(), uuid4()
-    row = _membership(pid, gid, _dt("2026-01-01"), _dt("2026-06-01"))
-    new_role = _role(gid)
-    db = fake_session(
-        result(row),  # only the row itself exists
-        result(),  # audit advisory lock
-        result(),  # audit prev-hash
-        gets=[row, new_role],
-    )
-    _flush_with_ids(db)
-    out = await GremiumRoleService(db).update_membership(
+async def test_update_mapping_changes_role_and_group(
+    audits: list[dict[str, Any]], synced: list[Any]
+) -> None:
+    gid = uuid4()
+    row = _mapping(gid, uuid4())
+    new_role = _role(gid, key="vorstand")
+    db = fake_session(gets=[row, new_role])
+    out = await GremiumRoleService(db).update_group_mapping(
         row.id,
-        GremiumMembershipUpdate(gremiumRoleId=new_role.id, validUntil="2026-09-01"),
+        GremiumGroupMappingUpdate(oidcGroup="stupa-board", gremiumRoleId=new_role.id),
         "admin",
     )
+    assert out.oidc_group == "stupa-board"
     assert out.gremium_role_id == new_role.id
-    assert out.valid_until is not None and out.valid_until.startswith("2026-09-01")
-    assert row.valid_from == _dt("2026-01-01")  # untouched fields survive
-    assert db.committed == 1
+    assert len(audits) == 1 and synced == [db] and db.committed == 1
 
 
-async def test_update_membership_clears_open_end() -> None:
-    pid, gid = uuid4(), uuid4()
-    row = _membership(pid, gid, _dt("2026-01-01"), _dt("2026-06-01"))
-    db = fake_session(result(row), result(), result(), gets=[row])
-    _flush_with_ids(db)
-    out = await GremiumRoleService(db).update_membership(
-        row.id, GremiumMembershipUpdate(validUntil=None), "admin"
-    )
-    assert out.valid_until is None and row.valid_until is None
-
-
-async def test_update_membership_db_constraint_overlap_409() -> None:
-    # The Python fast path sees no overlap. A concurrent write then fires the
-    # EXCLUDE constraint on the flush, and that must give 409, not 500.
-    pid, gid = uuid4(), uuid4()
-    row = _membership(pid, gid, None, None)
-    db = fake_session(result(row), gets=[row])
-    rollbacks = {"n": 0}
-
-    async def _raise_integrity() -> None:
-        raise IntegrityError("UPDATE", {}, Exception("ex_gremium_membership_no_overlap"))
-
-    async def _rollback() -> None:
-        rollbacks["n"] += 1
-
-    db.flush = _raise_integrity
-    db.rollback = _rollback
-    with pytest.raises(ConflictError):
-        await GremiumRoleService(db).update_membership(
-            row.id, GremiumMembershipUpdate(validFrom="2026-01-01"), "admin"
-        )
-    assert rollbacks["n"] == 1
-
-
-def test_parse_dt_invalid_gives_422_not_500() -> None:
-    from app.modules.admin.gremium_roles import _parse_dt
-
-    assert _parse_dt(None) is None
-    assert _parse_dt("") is None
-    assert _parse_dt("2026-01-01") == _dt("2026-01-01")
-    with pytest.raises(ValidationProblem) as ei:
-        _parse_dt("not-a-date")
-    assert ei.value.status == 422
-
-
-async def test_update_membership_invalid_date_422() -> None:
-    pid, gid = uuid4(), uuid4()
-    row = _membership(pid, gid, None, None)
+async def test_update_mapping_group_only_keeps_role(
+    audits: list[dict[str, Any]], synced: list[Any]
+) -> None:
+    role_id = uuid4()
+    row = _mapping(uuid4(), role_id)
     db = fake_session(gets=[row])
-    with pytest.raises(ValidationProblem):
-        await GremiumRoleService(db).update_membership(
-            row.id, GremiumMembershipUpdate(validFrom="not-a-date"), "admin"
-        )
+    out = await GremiumRoleService(db).update_group_mapping(
+        row.id, GremiumGroupMappingUpdate(oidcGroup="other"), "admin"
+    )
+    assert out.gremium_role_id == role_id and out.oidc_group == "other"
+
+
+async def test_delete_mapping_not_found() -> None:
+    svc = GremiumRoleService(fake_session(gets=[None]))
+    with pytest.raises(NotFoundError):
+        await svc.delete_group_mapping(uuid4(), "admin")
+
+
+async def test_delete_mapping_syncs(audits: list[dict[str, Any]], synced: list[Any]) -> None:
+    row = _mapping(uuid4(), uuid4())
+    db = fake_session(gets=[row])
+    await GremiumRoleService(db).delete_group_mapping(row.id, "admin")
+    assert row in db.deleted
+    assert audits[0]["target_id"] == str(row.id)
+    assert synced == [db] and db.committed == 1
+
+
+async def test_delete_role_in_use_by_mapping_blocked() -> None:
+    role = _role(key="custom")
+    db = fake_session(result(), result(uuid4()), gets=[role])  # no membership, a mapping
+    with pytest.raises(ConflictError, match="group mapping"):
+        await GremiumRoleService(db).delete_role(role.id, "admin")
+
+
+# ---------------------------------------------------------------- sync
+
+
+async def test_sync_without_groups_removes_all(audits: list[dict[str, Any]]) -> None:
+    row = _principal(None)
+    old = _membership(row.id, uuid4(), uuid4())
+    db = fake_session(result(old))  # no mapping query: the group set is empty
+    assert await membership_sync.sync_principal_memberships(db, row) is True
+    assert db.deleted == [old]
+    assert [a["target_id"] for a in audits] == [str(old.id)]
+    assert audits[0]["actor"] == membership_sync.SYNC_ACTOR
+    assert db.committed == 0
+
+
+async def test_sync_adds_membership_from_mapping(audits: list[dict[str, Any]]) -> None:
+    row = _principal(["stupa"])
+    gid = uuid4()
+    role = _role(gid)
+    db = fake_session(result((gid, role)), result())
+    _ids_on_flush(db)
+    assert await membership_sync.sync_principal_memberships(db, row) is True
+    [added] = db.added
+    assert (added.principal_id, added.gremium_id, added.gremium_role_id) == (
+        row.id,
+        gid,
+        role.id,
+    )
+    assert len(audits) == 1
+
+
+async def test_sync_no_change_is_a_noop(audits: list[dict[str, Any]]) -> None:
+    row = _principal(["stupa"])
+    gid = uuid4()
+    role = _role(gid)
+    current = _membership(row.id, gid, role.id)
+    db = fake_session(result((gid, role)), result(current))
+    assert await membership_sync.sync_principal_memberships(db, row) is False
+    assert db.added == [] and db.deleted == [] and audits == []
+    assert db.flushed == 0
+
+
+async def test_sync_changes_role_in_place(audits: list[dict[str, Any]]) -> None:
+    row = _principal(["stupa-board"])
+    gid = uuid4()
+    board = _role(gid, key="vorstand", perms=["vote.cast", "vote.manage"])
+    current = _membership(row.id, gid, uuid4())
+    db = fake_session(result((gid, board)), result(current))
+    assert await membership_sync.sync_principal_memberships(db, row) is True
+    assert current.gremium_role_id == board.id
+    assert db.added == [] and db.deleted == []
+    assert [a["target_id"] for a in audits] == [str(current.id)]
+
+
+async def test_sync_drops_duplicate_row_of_one_gremium(audits: list[dict[str, Any]]) -> None:
+    row = _principal(["stupa"])
+    gid = uuid4()
+    role = _role(gid)
+    first = _membership(row.id, gid, role.id)
+    second = _membership(row.id, gid, role.id)
+    db = fake_session(result((gid, role)), result(first, second))
+    assert await membership_sync.sync_principal_memberships(db, row) is True
+    assert db.deleted == [second]
+
+
+async def test_sync_prefers_role_with_more_permissions(audits: list[dict[str, Any]]) -> None:
+    row = _principal(["stupa", "stupa-board"])
+    gid = uuid4()
+    member = _role(gid, key="member", perms=["vote.cast"])
+    board = _role(gid, key="vorstand", perms=["vote.cast", "session.manage"])
+    db = fake_session(result((gid, member), (gid, board)), result())
+    _ids_on_flush(db)
+    await membership_sync.sync_principal_memberships(db, row)
+    assert db.added[0].gremium_role_id == board.id
+
+
+async def test_sync_tie_breaks_on_lower_key(audits: list[dict[str, Any]]) -> None:
+    row = _principal(["a", "b"])
+    gid = uuid4()
+    manager = _role(gid, key="manager", perms=["vote.cast"])
+    alpha = _role(gid, key="alpha", perms=["vote.manage"])
+    db = fake_session(result((gid, manager), (gid, alpha)), result())
+    _ids_on_flush(db)
+    await membership_sync.sync_principal_memberships(db, row)
+    assert db.added[0].gremium_role_id == alpha.id
+
+
+async def test_sync_all_counts_changed_principals(audits: list[dict[str, Any]]) -> None:
+    changed = _principal(None)
+    unchanged = _principal(None)
+    db = fake_session(
+        result(changed, unchanged),  # all principals
+        result(_membership(changed.id, uuid4(), uuid4())),  # changed: one stale row
+        result(),  # unchanged: no row
+    )
+    assert await membership_sync.sync_all_memberships(db) == 1

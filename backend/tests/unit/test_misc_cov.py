@@ -520,24 +520,6 @@ class _GremiumRolesFake:
     async def delete_role(self, role_id: Any, actor: str) -> None:
         self.events.append("delete_role")
 
-    async def create_membership(
-        self, gremium_id: Any, payload: Any, actor: str
-    ) -> Any:
-        from app.modules.admin.schemas import GremiumMembershipOut
-
-        self.events.append("create_membership")
-        return GremiumMembershipOut(
-            id=uuid4(),
-            principal_id=payload.principal_id,
-            gremium_id=gremium_id,
-            gremium_role_id=payload.gremium_role_id,
-            valid_from=None,
-            valid_until=None,
-        )
-
-    async def delete_membership(self, membership_id: Any, actor: str) -> None:
-        self.events.append("delete_membership")
-
 
 class _SiteFake:
     async def manifest(self) -> dict[str, Any]:
@@ -627,22 +609,6 @@ def test_admin_gremium_role_crud(
     deleted = client.delete(f"/api/admin/gremium-roles/{rid}")
     assert deleted.status_code == 204
     assert {"create_role", "update_role", "delete_role"} <= set(groles.events)
-
-
-def test_admin_gremium_membership_create_delete(
-    admin_app: tuple[FastAPI, _AdminConfigFake, _GremiumRolesFake, _SiteFake],
-) -> None:
-    application, _cfg, groles, _site = admin_app
-    client = TestClient(application)
-    gid, mid = uuid4(), uuid4()
-    created = client.post(
-        f"/api/admin/gremien/{gid}/memberships",
-        json={"principalId": str(uuid4()), "gremiumRoleId": str(uuid4())},
-    )
-    assert created.status_code == 201
-    deleted = client.delete(f"/api/admin/gremium-memberships/{mid}")
-    assert deleted.status_code == 204
-    assert {"create_membership", "delete_membership"} <= set(groles.events)
 
 
 def test_admin_manifest_webmanifest(

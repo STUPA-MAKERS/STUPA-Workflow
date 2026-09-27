@@ -13,7 +13,6 @@ import {
   CellDirective,
   type ColumnDef,
   DataTableComponent,
-  DatepickerComponent,
   DialogComponent,
   IconComponent,
   SelectComponent,
@@ -23,25 +22,36 @@ import { ToastService } from '@stupa-makers/ui-kit';
 import { type DelegationSubstitute, DelegationsApiService } from '@core/api/delegations.service';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { AdminApiService } from '../admin-api.service';
-import type { AdminPrincipal, Gremium, GremiumMembership, GremiumRole } from '../admin.models';
+import type {
+  AdminPrincipal,
+  Gremium,
+  GremiumGroupMapping,
+  GremiumMembership,
+  GremiumRole,
+} from '../admin.models';
 
 interface Member {
-  assignmentId: string;
+  id: string;
   name: string;
   email: string | null;
   roleLabel: string;
-  term: string;
-  /** Raw membership fields. The edit dialog seeds its form from them. */
-  gremiumRoleId: string;
-  validFrom: string;
-  validUntil: string;
 }
+
+interface MappingRow {
+  id: string;
+  oidcGroup: string;
+  roleLabel: string;
+}
+
+/** The RBAC resolver reserves this group prefix. The backend refuses it with 422. */
+const RESERVED_GROUP_PREFIX = 'vote:';
 
 /**
  * Members of a gremium on its own subpage at `/admin/gremien/:id`.
  *
- * The table lists the members. "Add member" opens a dialog with an inline typeahead
- * search.
+ * The members come only from the OIDC groups of the IdP, so the member table is
+ * read-only. The admin maps an OIDC group to a gremium role here. The backend syncs
+ * the memberships at each login and after each mapping change.
  */
 @Component({
   selector: 'app-gremium-members',
@@ -54,7 +64,6 @@ interface Member {
     ButtonComponent,
     BadgeComponent,
     SelectComponent,
-    DatepickerComponent,
     DialogComponent,
     DataTableComponent,
     CellDirective,
@@ -71,14 +80,15 @@ export class GremiumMembersComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly auth = inject(AuthService);
 
-  /** `admin.gremien` as a front-end gate for add, edit and remove. The backend stays
-   *  authoritative. The value is reactive, because the principal loads asynchronously. */
   /**
    * True until the first answer. Without it the table shows its empty text while the
    * request is still out, which asserts there is nothing when nothing has arrived yet.
    */
   protected readonly loading = signal(true);
+  protected readonly mappingsLoading = signal(true);
 
+  /** `admin.gremien` as a front-end gate for the mapping controls. The backend stays
+   *  authoritative. The value is reactive, because the principal loads asynchronously. */
   readonly canManage = computed(() => this.auth.can('admin.gremien'));
 
   private readonly gremiumId = this.route.snapshot.paramMap.get('id') ?? '';
@@ -88,58 +98,75 @@ export class GremiumMembersComponent {
   private readonly principalsById = signal<Map<string, AdminPrincipal>>(new Map());
   private readonly gremiumRoles = signal<GremiumRole[]>([]);
   private readonly memberships = signal<GremiumMembership[]>([]);
+  private readonly mappings = signal<GremiumGroupMapping[]>([]);
 
-  readonly addOpen = signal(false);
-  readonly query = signal('');
-  readonly candidates = signal<AdminPrincipal[]>([]);
-  readonly selected = signal<AdminPrincipal | null>(null);
-  readonly addRoleId = signal('');
-  readonly addFrom = signal('');
-  readonly addUntil = signal('');
+  private readonly rolesById = computed(
+    () => new Map(this.gremiumRoles().map((r) => [r.id, r])),
+  );
 
   readonly roleOptions = computed<SelectOption[]>(() =>
     this.gremiumRoles().map((r) => ({ value: r.id, label: this.roleName(r) })),
   );
 
-  /** Edit dialog for one membership: the role plus the from/until window. */
-  readonly editOpen = signal(false);
-  readonly editMember = signal<Member | null>(null);
-  readonly editRoleId = signal('');
-  readonly editFrom = signal('');
-  readonly editUntil = signal('');
+  readonly columns = computed<ColumnDef[]>(() => [
+    { key: 'name', label: this.i18n.translate('admin.users.col.name') },
+    { key: 'email', label: this.i18n.translate('admin.users.col.email') },
+    { key: 'roleLabel', label: this.i18n.translate('admin.gremien.memberRole') },
+  ]);
+  readonly rowId = (m: unknown): string => (m as Member).id;
 
-  readonly columns = computed<ColumnDef[]>(() => {
+  readonly members = computed<Member[]>(() => {
+    const byId = this.principalsById();
+    return this.memberships().map((m) => {
+      const p = byId.get(m.principalId);
+      return {
+        id: m.id,
+        name: p ? p.displayName || p.email || p.sub : m.principalId,
+        email: p?.email ?? null,
+        roleLabel: this.roleLabel(m.gremiumRoleId),
+      };
+    });
+  });
+
+  // --- OIDC group mappings ---------------------------------------------------
+
+  readonly mappingColumns = computed<ColumnDef[]>(() => {
     const cols: ColumnDef[] = [
-      { key: 'name', label: this.i18n.translate('admin.users.col.name') },
-      { key: 'email', label: this.i18n.translate('admin.users.col.email') },
+      { key: 'oidcGroup', label: this.i18n.translate('admin.groupMappings.oidcGroup') },
       { key: 'roleLabel', label: this.i18n.translate('admin.gremien.memberRole') },
-      { key: 'term', label: this.i18n.translate('admin.gremien.term') },
     ];
     if (this.canManage()) {
       cols.push({ key: 'actions', label: this.i18n.translate('admin.users.col.actions'), align: 'end' });
     }
     return cols;
   });
-  readonly rowId = (m: unknown): string => (m as Member).assignmentId;
+  readonly mappingRowId = (r: unknown): string => (r as MappingRow).id;
 
-  readonly members = computed<Member[]>(() => {
-    const rolesById = new Map(this.gremiumRoles().map((r) => [r.id, r]));
-    const byId = this.principalsById();
-    return this.memberships().map((m) => {
-      const p = byId.get(m.principalId);
-      const role = rolesById.get(m.gremiumRoleId);
-      return {
-        assignmentId: m.id,
-        name: p ? p.displayName || p.email || p.sub : m.principalId,
-        email: p?.email ?? null,
-        roleLabel: role ? this.roleName(role) : m.gremiumRoleId,
-        term: this.term(m),
-        gremiumRoleId: m.gremiumRoleId,
-        validFrom: m.validFrom ? m.validFrom.slice(0, 10) : '',
-        validUntil: m.validUntil ? m.validUntil.slice(0, 10) : '',
-      };
-    });
-  });
+  readonly mappingRows = computed<MappingRow[]>(() =>
+    this.mappings().map((m) => ({
+      id: m.id,
+      oidcGroup: m.oidcGroup,
+      roleLabel: this.roleLabel(m.gremiumRoleId),
+    })),
+  );
+
+  readonly mappingOpen = signal(false);
+  /** null = the dialog creates a new mapping. */
+  readonly mappingEditId = signal<string | null>(null);
+  readonly mappingGroup = signal('');
+  readonly mappingRoleId = signal('');
+  readonly mappingSaving = signal(false);
+  readonly mappingDeleteId = signal<string | null>(null);
+
+  /** The group name uses the reserved prefix. The dialog says so before the 422. */
+  readonly mappingGroupReserved = computed(() =>
+    this.mappingGroup().trim().startsWith(RESERVED_GROUP_PREFIX),
+  );
+  readonly mappingValid = computed(
+    () => !!this.mappingGroup().trim() && !this.mappingGroupReserved() && !!this.mappingRoleId(),
+  );
+
+  // --- substitute pool -------------------------------------------------------
 
   private readonly delegationsApi = inject(DelegationsApiService);
   readonly substitutes = signal<DelegationSubstitute[]>([]);
@@ -187,8 +214,90 @@ export class GremiumMembersComponent {
       error: () => this.principalsById.set(new Map()),
     });
     this.refresh();
+    this.refreshMappings();
     this.refreshSubstitutes();
   }
+
+  private roleName(role: GremiumRole): string {
+    return role.name[this.i18n.locale()] ?? role.name['de'] ?? role.key;
+  }
+
+  private roleLabel(roleId: string): string {
+    const role = this.rolesById().get(roleId);
+    return role ? this.roleName(role) : roleId;
+  }
+
+  // --- mapping dialog ----------------------------------------------------------
+
+  openAddMapping(): void {
+    this.mappingEditId.set(null);
+    this.mappingGroup.set('');
+    this.mappingRoleId.set('');
+    this.mappingOpen.set(true);
+  }
+
+  openEditMapping(id: string): void {
+    const m = this.mappings().find((x) => x.id === id);
+    if (!m) return;
+    this.mappingEditId.set(id);
+    this.mappingGroup.set(m.oidcGroup);
+    this.mappingRoleId.set(m.gremiumRoleId);
+    this.mappingOpen.set(true);
+  }
+
+  closeMapping(): void {
+    this.mappingOpen.set(false);
+  }
+
+  saveMapping(): void {
+    if (!this.mappingValid() || this.mappingSaving()) return;
+    const body = { oidcGroup: this.mappingGroup().trim(), gremiumRoleId: this.mappingRoleId() as Uuid };
+    const id = this.mappingEditId();
+    const req = id
+      ? this.api.updateGremiumGroupMapping(id as Uuid, body)
+      : this.api.createGremiumGroupMapping(this.gremiumId as Uuid, body);
+    this.mappingSaving.set(true);
+    req.subscribe({
+      next: () => {
+        this.mappingSaving.set(false);
+        this.toast.success(this.i18n.translate('admin.gremien.mappingSaved'));
+        this.mappingOpen.set(false);
+        this.afterMappingChange();
+      },
+      // The dialog stays open, so the admin can correct the group or the role.
+      error: (err: { status?: number }) => {
+        this.mappingSaving.set(false);
+        this.toast.error(this.i18n.translate(this.mappingErrorKey(err.status)));
+      },
+    });
+  }
+
+  removeMapping(): void {
+    const id = this.mappingDeleteId();
+    if (!id) return;
+    this.api.deleteGremiumGroupMapping(id as Uuid).subscribe({
+      next: () => {
+        this.toast.success(this.i18n.translate('admin.gremien.mappingDeleted'));
+        this.mappingDeleteId.set(null);
+        this.afterMappingChange();
+      },
+      error: () => this.toast.error(this.i18n.translate('admin.gremien.mappingFailed')),
+    });
+  }
+
+  private mappingErrorKey(status: number | undefined): TranslationKey {
+    if (status === 409) return 'admin.gremien.mappingConflict';
+    if (status === 422) return 'admin.gremien.mappingInvalid';
+    return 'admin.gremien.mappingFailed';
+  }
+
+  /** The backend re-syncs the memberships on each mapping change. Show the result. */
+  private afterMappingChange(): void {
+    this.refreshMappings();
+    this.refresh();
+  }
+
+  // --- substitute pool -------------------------------------------------------
 
   openAddSub(): void {
     this.subQuery.set('');
@@ -253,123 +362,6 @@ export class GremiumMembersComponent {
     });
   }
 
-  private roleName(role: GremiumRole): string {
-    return role.name[this.i18n.locale()] ?? role.name['de'] ?? role.key;
-  }
-
-  private term(m: GremiumMembership): string {
-    const f = m.validFrom ? m.validFrom.slice(0, 10) : '';
-    const u = m.validUntil ? m.validUntil.slice(0, 10) : '';
-    if (!f && !u) return '—';
-    return `${f || '…'} – ${u || '…'}`;
-  }
-
-  openAdd(): void {
-    this.query.set('');
-    this.selected.set(null);
-    this.addRoleId.set('');
-    this.addFrom.set('');
-    this.addUntil.set('');
-    this.candidates.set([]);
-    this.addOpen.set(true);
-  }
-
-  closeAdd(): void {
-    this.addOpen.set(false);
-  }
-
-  onSearch(q: string): void {
-    this.query.set(q);
-    this.api.listPrincipals(q).subscribe({
-      next: (list) => this.candidates.set(list.slice(0, 8)),
-      error: () => this.candidates.set([]),
-    });
-  }
-
-  pick(c: AdminPrincipal): void {
-    this.selected.set(c);
-    this.query.set(c.displayName || c.email || c.sub);
-    this.candidates.set([]);
-  }
-
-  addMember(): void {
-    const s = this.selected();
-    const roleId = this.addRoleId();
-    if (!s || !roleId) return;
-    this.api
-      .createGremiumMembership(this.gremiumId as Uuid, {
-        principalId: s.id,
-        gremiumRoleId: roleId as Uuid,
-        validFrom: this.addFrom() || null,
-        validUntil: this.addUntil() || null,
-      })
-      .subscribe({
-        next: () => {
-          this.toast.success(this.i18n.translate('admin.gremien.memberAdded'));
-          this.addOpen.set(false);
-          this.refresh();
-        },
-        // 409 means an overlapping term. A member holds one role per point in time.
-        // 422 means validFrom is not before validUntil.
-        error: (err: { status?: number }) =>
-          this.toast.error(this.i18n.translate(this.memberErrorKey(err.status))),
-      });
-  }
-
-  /** Open the edit dialog for one membership. The member and the Gremium stay fixed —
-   *  only the role and the term of office change. */
-  openEdit(m: Member): void {
-    this.editMember.set(m);
-    this.editRoleId.set(m.gremiumRoleId);
-    this.editFrom.set(m.validFrom);
-    this.editUntil.set(m.validUntil);
-    this.editOpen.set(true);
-  }
-
-  closeEdit(): void {
-    this.editOpen.set(false);
-    this.editMember.set(null);
-  }
-
-  saveEdit(): void {
-    const m = this.editMember();
-    const roleId = this.editRoleId();
-    if (!m || !roleId) return;
-    this.api
-      .updateGremiumMembership(m.assignmentId as Uuid, {
-        gremiumRoleId: roleId as Uuid,
-        validFrom: this.editFrom() || null,
-        validUntil: this.editUntil() || null,
-      })
-      .subscribe({
-        next: () => {
-          this.toast.success(this.i18n.translate('admin.gremien.memberSaved'));
-          this.closeEdit();
-          this.refresh();
-        },
-        // 409 = the term overlaps another term of this member. 422 = validFrom is not
-        // before validUntil. Both need their own words, not a generic failure.
-        error: (err: { status?: number }) =>
-          this.toast.error(this.i18n.translate(this.memberErrorKey(err.status))),
-      });
-  }
-
-  private memberErrorKey(status: number | undefined): TranslationKey {
-    if (status === 409) return 'admin.gremien.memberOverlap';
-    if (status === 422) return 'admin.gremien.memberBadTerm';
-    return 'admin.gremien.memberFailed';
-  }
-
-  removeMember(membershipId: string): void {
-    this.api.deleteGremiumMembership(membershipId as Uuid).subscribe({
-      next: () => {
-        this.toast.success(this.i18n.translate('admin.gremien.memberRemoved'));
-        this.refresh();
-      },
-      error: () => this.toast.error(this.i18n.translate('admin.gremien.memberFailed')),
-    });
-  }
-
   private refresh(): void {
     this.loading.set(true);
     this.api.listGremiumMemberships(this.gremiumId as Uuid).subscribe({
@@ -382,6 +374,21 @@ export class GremiumMembersComponent {
         this.memberships.set([]);
         this.loading.set(false);
         this.toast.error(this.i18n.translate('admin.gremien.membersLoadFailed'));
+      },
+    });
+  }
+
+  private refreshMappings(): void {
+    this.mappingsLoading.set(true);
+    this.api.listGremiumGroupMappings(this.gremiumId as Uuid).subscribe({
+      next: (m) => {
+        this.mappings.set(m);
+        this.mappingsLoading.set(false);
+      },
+      error: () => {
+        this.mappings.set([]);
+        this.mappingsLoading.set(false);
+        this.toast.error(this.i18n.translate('admin.gremien.mappingsLoadFailed'));
       },
     });
   }

@@ -362,7 +362,12 @@ export interface GroupMappingBody {
   gremiumId?: Uuid | null;
 }
 
-/** Role assignment (admin API `/role-assignments`) — carries the vote delegation. */
+/**
+ * Role assignment (admin API `/role-assignments`, read-only).
+ *
+ * Only the bootstrap writes these rows: `admin` from the settings and the implicit
+ * `member`. All other global roles come from the OIDC group mappings.
+ */
 export interface RoleAssignment {
   id: Uuid;
   principalId: Uuid;
@@ -374,31 +379,6 @@ export interface RoleAssignment {
   delegateVoting: boolean;
 }
 
-/** Input for a new assignment — optional tz-aware validity window. */
-export interface RoleAssignmentInput {
-  principalId: Uuid;
-  roleId: Uuid;
-  gremiumId?: Uuid | null;
-  validFrom?: string | null;
-  validUntil?: string | null;
-  delegateVoting?: boolean;
-}
-
-/**
- * Patch of an existing assignment (`PATCH /admin/role-assignments/{id}`).
- *
- * Every field is optional and `null` means "do not touch". The route therefore
- * cannot clear a validity window back to open-ended. The UI says so.
- * `principalId` is not patchable: an assignment never moves to another user.
- */
-export interface RoleAssignmentPatch {
-  roleId?: Uuid;
-  gremiumId?: Uuid;
-  validFrom?: string;
-  validUntil?: string;
-  delegateVoting?: boolean;
-}
-
 /** OIDC principal (user) incl. its role assignments (admin API `/principals`). */
 export interface AdminPrincipal {
   id: Uuid;
@@ -408,6 +388,8 @@ export interface AdminPrincipal {
   lastLogin?: string | null;
   active?: boolean;
   assignments: RoleAssignment[];
+  /** The OIDC groups as of the last login. The group mappings read them. */
+  oidcGroups: string[];
 }
 
 export interface ApplicationTypeAdmin {
@@ -631,14 +613,31 @@ export interface OAuthGrantQuery {
   principalId?: Uuid | null;
 }
 
-/** Time-bounded gremium membership (term of office). */
+/**
+ * Gremium membership (read-only).
+ *
+ * The backend derives it from the OIDC groups of the principal through the gremium
+ * group mappings, at each login and after each mapping change.
+ */
 export interface GremiumMembership {
   id: Uuid;
   principalId: Uuid;
   gremiumId: Uuid;
   gremiumRoleId: Uuid;
-  validFrom: string | null;
-  validUntil: string | null;
+}
+
+/** Maps an OIDC group to a role of one gremium (`/admin/gremien/{id}/group-mappings`). */
+export interface GremiumGroupMapping {
+  id: Uuid;
+  gremiumId: Uuid;
+  gremiumRoleId: Uuid;
+  oidcGroup: string;
+}
+
+/** Body to create or change a gremium group mapping. The gremium stays immutable. */
+export interface GremiumGroupMappingBody {
+  oidcGroup: string;
+  gremiumRoleId: Uuid;
 }
 
 /** Append-only audit entry (`GET /admin/audit`). */

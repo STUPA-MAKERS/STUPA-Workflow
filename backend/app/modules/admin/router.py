@@ -1,7 +1,7 @@
 """Admin/config API router.
 
 Endpoints for versioned config CRUD (gremien, application types, the global
-flow), RBAC (roles/role-assignments/group-mappings), webhooks, corporate-design
+flow), RBAC (roles/group-mappings, read-only role assignments), webhooks, corporate-design
 variants, config-schemas and site-config/branding, plus a public auth-free
 branding read.
 
@@ -22,7 +22,6 @@ from uuid import UUID
 
 from fastapi import (
     APIRouter,
-    BackgroundTasks,
     Depends,
     File,
     Form,
@@ -35,7 +34,6 @@ from fastapi import (
 from app.deps import (
     DbSession,
     Principal,
-    SettingsDep,
     require_any_permission,
     require_principal,
 )
@@ -56,10 +54,11 @@ from app.modules.admin.schemas import (
     FlowVersionCreate,
     FlowVersionOut,
     GremiumCreate,
+    GremiumGroupMappingCreate,
+    GremiumGroupMappingOut,
+    GremiumGroupMappingUpdate,
     GremiumMailRecipients,
-    GremiumMembershipCreate,
     GremiumMembershipOut,
-    GremiumMembershipUpdate,
     GremiumOut,
     GremiumRoleCreate,
     GremiumRoleOut,
@@ -71,9 +70,7 @@ from app.modules.admin.schemas import (
     PrincipalOut,
     PrincipalUpdate,
     PublicSiteConfigOut,
-    RoleAssignmentCreate,
     RoleAssignmentOut,
-    RoleAssignmentUpdate,
     RoleCreate,
     RoleOut,
     RoleUpdate,
@@ -85,11 +82,6 @@ from app.modules.admin.schemas import (
 )
 from app.modules.admin.service import CdVariantService, ConfigService
 from app.modules.admin.site_config_service import SiteConfigService
-from app.modules.notifications.auto import (
-    AutoMailer,
-    assignment_mail_info,
-    get_auto_mailer,
-)
 from app.shared.antiabuse import body_cap
 from app.shared.config_schemas import FlowGraph, export_json_schemas
 from app.shared.errors import ProblemDetail
@@ -136,8 +128,6 @@ CdVariantServiceDep = Annotated[CdVariantService, Depends(get_cd_variant_service
 # the body. It adds defense in depth next to the nginx cap and the authoritative
 # in-service size check.
 _enforce_cd_logo_body = body_cap("attachment_max_bytes")
-
-AutoMailerDep = Annotated[AutoMailer, Depends(get_auto_mailer)]
 
 # Permission gates. The gate injects the principal object for the audit actor.
 GremienAdmin = Annotated[Principal, Depends(require_principal("admin.gremien"))]
@@ -302,7 +292,7 @@ async def set_gremium_mail_recipients(
     return await service.set_gremium_mail_recipients(gremium_id, payload, principal.sub)
 
 
-# Gremium roles: an own role set plus time-bound memberships.
+# Gremium roles, OIDC group mappings and the read-only memberships.
 @router.get(
     "/gremien/{gremium_id}/roles",
     response_model=list[GremiumRoleOut],
@@ -360,52 +350,63 @@ async def delete_gremium_role(
 async def list_gremium_memberships(
     gremium_id: UUID, service: GremiumRoleServiceDep
 ) -> list[GremiumMembershipOut]:
+    """List the memberships that the sync derived from the OIDC groups."""
     return await service.list_memberships(gremium_id)
 
 
+@router.get(
+    "/gremien/{gremium_id}/group-mappings",
+    response_model=list[GremiumGroupMappingOut],
+    dependencies=[_GREMIEN],
+    responses=_errors(401, 403),
+)
+async def list_gremium_group_mappings(
+    gremium_id: UUID, service: GremiumRoleServiceDep
+) -> list[GremiumGroupMappingOut]:
+    return await service.list_group_mappings(gremium_id)
+
+
 @router.post(
-    "/gremien/{gremium_id}/memberships",
-    response_model=GremiumMembershipOut,
+    "/gremien/{gremium_id}/group-mappings",
+    response_model=GremiumGroupMappingOut,
     status_code=201,
     responses=_errors(400, 401, 403, 404, 409, 422),
 )
-async def create_gremium_membership(
+async def create_gremium_group_mapping(
     gremium_id: UUID,
-    payload: GremiumMembershipCreate,
+    payload: GremiumGroupMappingCreate,
     service: GremiumRoleServiceDep,
     principal: GremienAdmin,
-) -> GremiumMembershipOut:
-    return await service.create_membership(gremium_id, payload, principal.sub)
+) -> GremiumGroupMappingOut:
+    """Map an OIDC group to a role in this gremium.
+
+    The call syncs the memberships of all principals to the new mapping. A role of
+    another gremium and a group that the gremium already maps both give 409.
+    """
+    return await service.create_group_mapping(gremium_id, payload, principal.sub)
 
 
 @router.patch(
-    "/gremium-memberships/{membership_id}",
-    response_model=GremiumMembershipOut,
+    "/gremium-group-mappings/{mapping_id}",
+    response_model=GremiumGroupMappingOut,
     responses=_errors(400, 401, 403, 404, 409, 422),
 )
-async def update_gremium_membership(
-    membership_id: UUID,
-    payload: GremiumMembershipUpdate,
+async def update_gremium_group_mapping(
+    mapping_id: UUID,
+    payload: GremiumGroupMappingUpdate,
     service: GremiumRoleServiceDep,
     principal: GremienAdmin,
-) -> GremiumMembershipOut:
-    """Change the role or the term of office of a membership.
-
-    The member and the Gremium stay immutable. A role of another Gremium and a
-    term that overlaps another term of the same member both give 409, exactly
-    as on the create. A ``validFrom`` that is not before ``validUntil`` gives
-    422.
-    """
-    return await service.update_membership(membership_id, payload, principal.sub)
+) -> GremiumGroupMappingOut:
+    return await service.update_group_mapping(mapping_id, payload, principal.sub)
 
 
 @router.delete(
-    "/gremium-memberships/{membership_id}", status_code=204, responses=_errors(401, 403, 404)
+    "/gremium-group-mappings/{mapping_id}", status_code=204, responses=_errors(401, 403, 404)
 )
-async def delete_gremium_membership(
-    membership_id: UUID, service: GremiumRoleServiceDep, principal: GremienAdmin
+async def delete_gremium_group_mapping(
+    mapping_id: UUID, service: GremiumRoleServiceDep, principal: GremienAdmin
 ) -> None:
-    await service.delete_membership(membership_id, principal.sub)
+    await service.delete_group_mapping(mapping_id, principal.sub)
 
 
 @authed_router.get(
@@ -756,69 +757,6 @@ async def delete_role(role_id: UUID, service: ServiceDep, principal: RolesAdmin)
 )
 async def list_role_assignments(service: ServiceDep) -> list[RoleAssignmentOut]:
     return await service.list_role_assignments()
-
-
-@router.post(
-    "/role-assignments",
-    response_model=RoleAssignmentOut,
-    status_code=201,
-    responses=_errors(400, 401, 403, 404, 422),
-)
-async def create_role_assignment(
-    payload: RoleAssignmentCreate,
-    service: ServiceDep,
-    principal: UsersAdmin,
-    settings: SettingsDep,
-    background: BackgroundTasks,
-    request: Request,
-    mailer: AutoMailerDep,
-) -> RoleAssignmentOut:
-    out = await service.create_role_assignment(payload, principal.sub)
-    # Notify the affected user. The user can opt out in the notification preferences.
-    info = await assignment_mail_info(getattr(service, "session", None), out.id)
-    pool = getattr(request.app.state, "arq_pool", None)
-    background.add_task(mailer.assignment_changed, settings, info, granted=True, pool=pool)
-    return out
-
-
-@router.patch(
-    "/role-assignments/{assignment_id}",
-    response_model=RoleAssignmentOut,
-    responses=_errors(400, 401, 403, 404, 422),
-)
-async def update_role_assignment(
-    assignment_id: UUID,
-    payload: RoleAssignmentUpdate,
-    service: ServiceDep,
-    principal: UsersAdmin,
-) -> RoleAssignmentOut:
-    return await service.update_role_assignment(assignment_id, payload, principal.sub)
-
-
-@router.delete(
-    "/role-assignments/{assignment_id}",
-    status_code=204,
-    responses=_errors(401, 403, 404),
-)
-async def delete_role_assignment(
-    assignment_id: UUID,
-    service: ServiceDep,
-    principal: UsersAdmin,
-    settings: SettingsDep,
-    background: BackgroundTasks,
-    request: Request,
-    mailer: AutoMailerDep,
-) -> Response:
-    """Revoke a role and delete the assignment.
-
-    The delete is idempotent and answers 204. An unknown assignment answers 404.
-    """
-    # Collect the mail data BEFORE the delete. The row is gone afterwards.
-    info = await assignment_mail_info(getattr(service, "session", None), assignment_id)
-    await service.delete_role_assignment(assignment_id, principal.sub)
-    pool = getattr(request.app.state, "arq_pool", None)
-    background.add_task(mailer.assignment_changed, settings, info, granted=False, pool=pool)
-    return Response(status_code=204)
 
 
 @router.get(

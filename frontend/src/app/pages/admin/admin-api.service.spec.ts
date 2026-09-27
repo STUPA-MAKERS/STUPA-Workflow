@@ -70,7 +70,7 @@ describe('AdminApiService — mock mode', () => {
     expect(wh.name).toBe('renamed');
   });
 
-  it('manages principals, role assignments and permissions in mock mode', async () => {
+  it('manages principals and permissions in mock mode', async () => {
     const s = svc();
     const all = await firstValueFrom(s.listPrincipals());
     expect(all.length).toBeGreaterThan(0);
@@ -79,18 +79,6 @@ describe('AdminApiService — mock mode', () => {
 
     const perms = await firstValueFrom(s.listPermissions());
     expect(perms).toContain('flow.configure');
-
-    const target = all.find((p) => p.assignments.length === 0)!;
-    const assignment = await firstValueFrom(
-      s.assignRole({ principalId: target.id, roleId: 'r-member', validFrom: '2026-07-01T00:00:00Z', delegateVoting: true }),
-    );
-    expect(assignment.id).toBeTruthy();
-    const afterAssign = await firstValueFrom(s.listPrincipals());
-    expect(afterAssign.find((p) => p.id === target.id)!.assignments).toHaveLength(1);
-
-    await firstValueFrom(s.revokeRole(assignment.id));
-    const afterRevoke = await firstValueFrom(s.listPrincipals());
-    expect(afterRevoke.find((p) => p.id === target.id)!.assignments).toHaveLength(0);
 
     const role = (await firstValueFrom(s.listRoles())).find((r) => r.key === 'member')!;
     const saved = await firstValueFrom(s.saveRolePermissions(role.id, [...role.permissions, 'flow.configure']));
@@ -182,17 +170,6 @@ describe('AdminApiService — real mode (contract)', () => {
 
     s.listPermissions().subscribe();
     http.expectOne('/api/admin/permissions').flush([]);
-
-    s.assignRole({ principalId: 'p1', roleId: 'r1' }).subscribe();
-    expect(http.expectOne('/api/admin/role-assignments').request.method).toBe('POST');
-
-    s.revokeRole('a-9').subscribe();
-    expect(http.expectOne('/api/admin/role-assignments/a-9').request.method).toBe('DELETE');
-
-    s.updateRoleAssignment('a-9', { roleId: 'r2' }).subscribe();
-    const patch = http.expectOne('/api/admin/role-assignments/a-9');
-    expect(patch.request.method).toBe('PATCH');
-    expect(patch.request.body).toEqual({ roleId: 'r2' });
 
     s.saveRolePermissions('r-9', ['flow.configure']).subscribe();
     expect(http.expectOne('/api/admin/roles/r-9').request.method).toBe('PATCH');
@@ -474,24 +451,25 @@ describe('AdminApiService — real mode (contract)', () => {
     expect(http.expectOne('/api/admin/deadline-policies/dp-9').request.method).toBe('DELETE');
   });
 
-  it('wires gremium-membership endpoints', () => {
+  it('wires the gremium membership and group-mapping endpoints', () => {
     s.listGremiumMemberships('g1').subscribe();
     http.expectOne('/api/admin/gremien/g1/memberships').flush([]);
 
-    s.createGremiumMembership('g1', { principalId: 'p1', gremiumRoleId: 'gr1', validFrom: null, validUntil: null }).subscribe();
-    expect(http.expectOne('/api/admin/gremien/g1/memberships').request.method).toBe('POST');
+    s.listGremiumGroupMappings('g1').subscribe();
+    http.expectOne('/api/admin/gremien/g1/group-mappings').flush([]);
 
-    s.updateGremiumMembership('gm-9', { gremiumRoleId: 'gr2', validFrom: '2027-01-01', validUntil: null }).subscribe();
-    const patch = http.expectOne('/api/admin/gremium-memberships/gm-9');
+    s.createGremiumGroupMapping('g1', { oidcGroup: 'stupa', gremiumRoleId: 'gr1' }).subscribe();
+    const post = http.expectOne('/api/admin/gremien/g1/group-mappings');
+    expect(post.request.method).toBe('POST');
+    expect(post.request.body).toEqual({ oidcGroup: 'stupa', gremiumRoleId: 'gr1' });
+
+    s.updateGremiumGroupMapping('gm-9', { gremiumRoleId: 'gr2' }).subscribe();
+    const patch = http.expectOne('/api/admin/gremium-group-mappings/gm-9');
     expect(patch.request.method).toBe('PATCH');
-    expect(patch.request.body).toEqual({
-      gremiumRoleId: 'gr2',
-      validFrom: '2027-01-01',
-      validUntil: null,
-    });
+    expect(patch.request.body).toEqual({ gremiumRoleId: 'gr2' });
 
-    s.deleteGremiumMembership('gm-9').subscribe();
-    expect(http.expectOne('/api/admin/gremium-memberships/gm-9').request.method).toBe('DELETE');
+    s.deleteGremiumGroupMapping('gm-9').subscribe();
+    expect(http.expectOne('/api/admin/gremium-group-mappings/gm-9').request.method).toBe('DELETE');
   });
 
   it('builds audit-log query params (defaults and all filters)', () => {
@@ -750,40 +728,6 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(fallback.id).toBe(all[0].id);
   });
 
-  it('assignRole with no validFrom/gremium uses defaults; revoke is a no-op when unknown', async () => {
-    const s = svc();
-    const target = (await firstValueFrom(s.listPrincipals())).find((p) => p.assignments.length === 0)!;
-    const a = await firstValueFrom(s.assignRole({ principalId: target.id, roleId: 'r-member' }));
-    expect(a.gremiumId).toBeNull();
-    expect(a.validFrom).toBeNull();
-    expect(a.validUntil).toBeNull();
-    expect(a.delegateVoting).toBe(false);
-    // A revoke with an unknown id leaves the assignments untouched. The mock loops
-    // over all principals.
-    await firstValueFrom(s.revokeRole('not-real'));
-    expect((await firstValueFrom(s.listPrincipals())).find((p) => p.id === target.id)!.assignments.length).toBe(1);
-  });
-
-  it('updateRoleAssignment merges into the mock store and tolerates an unknown id', async () => {
-    const s = svc();
-    const target = (await firstValueFrom(s.listPrincipals())).find((p) => p.assignments.length === 0)!;
-    const created = await firstValueFrom(s.assignRole({ principalId: target.id, roleId: 'r-member' }));
-
-    const patched = await firstValueFrom(
-      s.updateRoleAssignment(created.id, { validUntil: '2026-12-31T00:00:00Z' }),
-    );
-    expect(patched.validUntil).toBe('2026-12-31T00:00:00Z');
-    expect(patched.roleId).toBe('r-member');
-    const after = await firstValueFrom(s.listPrincipals());
-    expect(after.find((p) => p.id === target.id)!.assignments[0].validUntil).toBe(
-      '2026-12-31T00:00:00Z',
-    );
-
-    // An unknown id echoes the patch instead of crashing.
-    const echo = await firstValueFrom(s.updateRoleAssignment('nope', { roleId: 'r-member' }));
-    expect(echo.id).toBe('nope');
-  });
-
   it('returns an empty principal list when search matches nothing', async () => {
     const s = svc();
     expect(await firstValueFrom(s.listPrincipals('zzz-no-match'))).toEqual([]);
@@ -943,6 +887,7 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
   it('returns empty memberships in mock mode', async () => {
     const s = svc();
     expect(await firstValueFrom(s.listGremiumMemberships('g-stupa'))).toEqual([]);
+    expect(await firstValueFrom(s.listGremiumGroupMappings('g-stupa'))).toEqual([]);
   });
 
   it('returns empty audit page/actors in mock mode', async () => {

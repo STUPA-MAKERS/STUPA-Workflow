@@ -214,11 +214,16 @@ class GremiumRoleUpdate(WireModel):
     permissions: list[str] | None = None
 
 
-class GremiumMembershipCreate(WireModel):
-    principalId: str
-    gremiumRoleId: str
-    validFrom: str | None = None
-    validUntil: str | None = None
+class GremiumGroupMappingCreate(WireModel):
+    oidcGroup: str = Field(description="OIDC group name. The prefix 'vote:' is reserved.")
+    gremiumRoleId: str = Field(description="A role of the same Gremium")
+
+
+class GremiumGroupMappingUpdate(WireModel):
+    """Partial update. The Gremium stays the same."""
+
+    oidcGroup: str | None = None
+    gremiumRoleId: str | None = None
 
 
 class RoleCreate(WireModel):
@@ -230,23 +235,6 @@ class RoleCreate(WireModel):
 class RoleUpdate(WireModel):
     label: I18nMap | None = None
     permissions: list[str] | None = None
-
-
-class RoleAssignmentCreate(WireModel):
-    principalId: str
-    roleId: str
-    gremiumId: str | None = None
-    validFrom: str | None = None
-    validUntil: str | None = None
-    delegateVoting: bool = False
-
-
-class RoleAssignmentUpdate(WireModel):
-    roleId: str | None = None
-    gremiumId: str | None = None
-    validFrom: str | None = None
-    validUntil: str | None = None
-    delegateVoting: bool | None = None
 
 
 class GroupMappingCreate(WireModel):

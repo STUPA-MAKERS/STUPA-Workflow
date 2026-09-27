@@ -1,12 +1,12 @@
-"""Gremium roles plus time-bound memberships.
+"""Gremium roles, OIDC group mappings and the read of the memberships.
 
 This module stays separate from the global roles. It holds an own role catalog
-(``gremium_role``) and memberships with terms of office (``gremium_membership``).
+(``gremium_role``) and the mappings from an OIDC group to a gremium role
+(``gremium_group_mapping``). The memberships (``gremium_membership``) come from the
+OIDC groups only. ``membership_sync`` writes them. Nobody can set one by hand.
 
-Core invariant: for each (principal, gremium) pair exactly one role is active at
-any point in time. Overlapping terms are forbidden. Consecutive terms are
-allowed. The overlap check is a pure function. The service wraps the database
-access and the audit entry.
+Core invariant: for each (principal, gremium) pair exactly one role is active.
+The sync keeps it. The EXCLUDE constraint on the table backs it.
 """
 
 from __future__ import annotations
@@ -18,11 +18,13 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.admin.models import GremiumMembership, GremiumRole
+from app.modules.admin.membership_sync import sync_all_memberships
+from app.modules.admin.models import GremiumGroupMapping, GremiumMembership, GremiumRole
 from app.modules.admin.schemas import (
-    GremiumMembershipCreate,
+    GremiumGroupMappingCreate,
+    GremiumGroupMappingOut,
+    GremiumGroupMappingUpdate,
     GremiumMembershipOut,
-    GremiumMembershipUpdate,
     GremiumRoleCreate,
     GremiumRoleOut,
     GremiumRoleUpdate,
@@ -30,7 +32,7 @@ from app.modules.admin.schemas import (
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import AuditService
 from app.modules.auth.models import Principal as PrincipalRow
-from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
+from app.shared.errors import ConflictError, NotFoundError
 
 # Granular per-gremium-role permissions of the meeting domain. The global
 # permission set does not contain them. They apply inside the gremium only and
@@ -108,49 +110,6 @@ async def gremium_member_ids(
     return {gid for gid, _ in await active_gremium_roles(session, sub, now)}
 
 
-def intervals_overlap(
-    a_from: datetime | None,
-    a_until: datetime | None,
-    b_from: datetime | None,
-    b_until: datetime | None,
-) -> bool:
-    """Return True if the half-open intervals ``[from, until)`` overlap.
-
-    ``None`` means unbounded. Adjacent intervals (``a_until == b_from``) do not
-    overlap, because the intervals are half-open.
-    """
-    left_ok = a_from is None or b_until is None or a_from < b_until
-    right_ok = b_from is None or a_until is None or b_from < a_until
-    return left_ok and right_ok
-
-
-def _parse_dt(value: str | None) -> datetime | None:
-    """Parse a term bound into a tz-aware UTC ``datetime``. Empty means open.
-
-    A naive input counts as UTC, so a term compares correctly against
-    ``datetime.now(UTC)`` in the RBAC resolver.
-
-    Raises:
-        ValidationProblem: The value is no ISO-8601 datetime. Without this the
-            request would end as an unhandled ``ValueError`` and a 500, instead
-            of problem+json (422).
-    """
-    if value is None or value == "":
-        return None
-    try:
-        dt = datetime.fromisoformat(value)
-    except ValueError as exc:
-        raise ValidationProblem(
-            "Invalid datetime.",
-            errors=[{"field": "validFrom/validUntil", "msg": str(exc)}],
-        ) from exc
-    return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
-
-
-def _iso(value: datetime | None) -> str | None:
-    return value.isoformat() if value is not None else None
-
-
 def _sanitize_perms(perms: list[str] | None) -> list[str]:
     """Keep only known gremium permissions, deduplicated, in catalog order."""
     given = set(perms or [])
@@ -174,13 +133,20 @@ def _membership_out(row: GremiumMembership) -> GremiumMembershipOut:
         principal_id=row.principal_id,
         gremium_id=row.gremium_id,
         gremium_role_id=row.gremium_role_id,
-        valid_from=_iso(row.valid_from),
-        valid_until=_iso(row.valid_until),
+    )
+
+
+def _mapping_out(row: GremiumGroupMapping) -> GremiumGroupMappingOut:
+    return GremiumGroupMappingOut(
+        id=row.id,
+        gremium_id=row.gremium_id,
+        gremium_role_id=row.gremium_role_id,
+        oidc_group=row.oidc_group,
     )
 
 
 class GremiumRoleService:
-    """CRUD for gremium roles plus memberships (with the overlap invariant)."""
+    """CRUD for gremium roles and group mappings, plus the membership read."""
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -297,6 +263,15 @@ class GremiumRoleService:
         ).first()
         if in_use is not None:
             raise ConflictError("gremium role is in use by a membership")
+        mapped = (
+            await self.session.scalars(
+                select(GremiumGroupMapping.id).where(
+                    GremiumGroupMapping.gremium_role_id == role_id
+                )
+            )
+        ).first()
+        if mapped is not None:
+            raise ConflictError("gremium role is in use by a group mapping")
         await self.session.delete(row)
         await self._audit(actor, "gremium_role", role_id)
         await self.session.commit()
@@ -311,158 +286,85 @@ class GremiumRoleService:
         ).all()
         return [_membership_out(r) for r in rows]
 
-    async def create_membership(
-        self, gremium_id: UUID, payload: GremiumMembershipCreate, actor: str
-    ) -> GremiumMembershipOut:
-        role = await self.session.get(GremiumRole, payload.gremium_role_id)
-        if role is None:
-            raise NotFoundError(f"gremium role {payload.gremium_role_id} not found")
-        if role.gremium_id != gremium_id:
-            raise ConflictError("gremium role does not belong to this gremium")
-        # Turn an unknown principal_id into a clean 404. Without this check the
-        # database rejects the row at commit only. The IntegrityError then gives
-        # a 500.
-        if await self.session.get(PrincipalRow, payload.principal_id) is None:
-            raise NotFoundError(f"principal {payload.principal_id} not found")
-        new_from = _parse_dt(payload.valid_from)
-        new_until = _parse_dt(payload.valid_until)
-        self._assert_ordered(new_from, new_until)
-        # Overlap invariant: no time-overlapping entry for the same principal in
-        # THIS gremium.
-        await self._assert_no_overlap(
-            gremium_id, payload.principal_id, new_from, new_until
-        )
-        row = GremiumMembership(
-            principal_id=payload.principal_id,
-            gremium_id=gremium_id,
-            gremium_role_id=payload.gremium_role_id,
-            valid_from=new_from,
-            valid_until=new_until,
-        )
-        self.session.add(row)
-        # The EXCLUDE constraint fires at INSERT (flush), not at commit. A
-        # concurrent race therefore surfaces here. Guard the flush, the audit and
-        # the commit together and translate the IntegrityError into a 409 instead
-        # of a 500.
-        try:
-            await self.session.flush()
-            await self._audit(actor, "gremium_membership", row.id)
-            await self.session.commit()
-        except IntegrityError as exc:
-            await self.session.rollback()
-            raise ConflictError(
-                "overlapping membership for this member in this gremium",
-                code="conflict",
-            ) from exc
-        return _membership_out(row)
-
-    async def _assert_no_overlap(
-        self,
-        gremium_id: UUID,
-        principal_id: UUID,
-        new_from: datetime | None,
-        new_until: datetime | None,
-        *,
-        exclude_id: UUID | None = None,
-    ) -> None:
-        """Check the overlap invariant for one (principal, gremium) pair.
-
-        This Python check is only a fast path with a clear error message. The
-        EXCLUDE constraint ``ex_gremium_membership_no_overlap`` stays the
-        authoritative guard and closes the TOCTOU gap on parallel writes.
-        ``exclude_id`` leaves the row under edit out of the comparison, so a
-        patch never conflicts with itself.
-
-        Raises:
-            ConflictError: Another term of this member overlaps (409).
-        """
-        existing = (
+    async def list_group_mappings(self, gremium_id: UUID) -> list[GremiumGroupMappingOut]:
+        rows = (
             await self.session.scalars(
-                select(GremiumMembership).where(
-                    GremiumMembership.gremium_id == gremium_id,
-                    GremiumMembership.principal_id == principal_id,
-                )
+                select(GremiumGroupMapping)
+                .where(GremiumGroupMapping.gremium_id == gremium_id)
+                .order_by(GremiumGroupMapping.oidc_group)
             )
         ).all()
-        for m in existing:
-            if m.id == exclude_id:
-                continue
-            if intervals_overlap(new_from, new_until, m.valid_from, m.valid_until):
-                raise ConflictError(
-                    "overlapping membership for this member in this gremium",
-                    code="conflict",
-                )
+        return [_mapping_out(r) for r in rows]
 
-    @staticmethod
-    def _assert_ordered(new_from: datetime | None, new_until: datetime | None) -> None:
-        """Reject a term that ends before it starts.
+    async def _role_in_gremium(self, role_id: UUID, gremium_id: UUID) -> None:
+        """Check that the role exists and belongs to the gremium.
 
         Raises:
-            ValidationProblem: ``validFrom`` is not before ``validUntil`` (422).
+            NotFoundError: The role does not exist (404).
+            ConflictError: The role belongs to another gremium (409).
         """
-        if new_from is not None and new_until is not None and new_from >= new_until:
-            raise ValidationProblem(
-                "validFrom must be before validUntil.",
-                errors=[{"field": "validUntil", "msg": "must be after validFrom"}],
-            )
+        role = await self.session.get(GremiumRole, role_id)
+        if role is None:
+            raise NotFoundError(f"gremium role {role_id} not found")
+        if role.gremium_id != gremium_id:
+            raise ConflictError("gremium role does not belong to this gremium")
 
-    async def update_membership(
-        self, membership_id: UUID, payload: GremiumMembershipUpdate, actor: str
-    ) -> GremiumMembershipOut:
-        """Change the role or the term of office of a membership.
+    async def _flush_mapping(self) -> None:
+        """Flush a mapping write.
 
-        The member and the Gremium stay immutable. A new role must belong to the
-        same Gremium. The overlap invariant applies exactly as on the create: a
-        bad term gives 422 and an overlap with another term of the same member
-        gives 409, from the Python fast path or from the EXCLUDE constraint.
+        A second mapping with the same group in the same gremium violates the
+        unique constraint at the flush. That gives 409, not 500.
 
         Raises:
-            NotFoundError: The membership or the new role does not exist (404).
-            ConflictError: The role belongs to another Gremium, or the new term
-                overlaps another term of this member (409).
-            ValidationProblem: ``validFrom`` is not before ``validUntil`` (422).
+            ConflictError: The gremium already maps this group (409).
         """
-        row = await self.session.get(GremiumMembership, membership_id)
-        if row is None:
-            raise NotFoundError(f"gremium membership {membership_id} not found")
-        provided = payload.model_fields_set
-        if payload.gremium_role_id is not None:
-            role = await self.session.get(GremiumRole, payload.gremium_role_id)
-            if role is None:
-                raise NotFoundError(f"gremium role {payload.gremium_role_id} not found")
-            if role.gremium_id != row.gremium_id:
-                raise ConflictError("gremium role does not belong to this gremium")
-        new_from = _parse_dt(payload.valid_from) if "valid_from" in provided else row.valid_from
-        new_until = (
-            _parse_dt(payload.valid_until) if "valid_until" in provided else row.valid_until
-        )
-        self._assert_ordered(new_from, new_until)
-        await self._assert_no_overlap(
-            row.gremium_id, row.principal_id, new_from, new_until, exclude_id=row.id
-        )
-        if payload.gremium_role_id is not None:
-            row.gremium_role_id = payload.gremium_role_id
-        row.valid_from = new_from
-        row.valid_until = new_until
-        # The EXCLUDE constraint fires on the UPDATE flush, not on the commit. A
-        # concurrent write therefore surfaces here. Guard the flush, the audit
-        # and the commit together and answer 409 instead of 500.
         try:
             await self.session.flush()
-            await self._audit(actor, "gremium_membership", row.id)
-            await self.session.commit()
         except IntegrityError as exc:
             await self.session.rollback()
             raise ConflictError(
-                "overlapping membership for this member in this gremium",
-                code="conflict",
+                "this gremium already maps this OIDC group", code="conflict"
             ) from exc
-        return _membership_out(row)
 
-    async def delete_membership(self, membership_id: UUID, actor: str) -> None:
-        row = await self.session.get(GremiumMembership, membership_id)
-        if row is None:
-            raise NotFoundError(f"gremium membership {membership_id} not found")
-        await self.session.delete(row)
-        await self._audit(actor, "gremium_membership", membership_id)
+    async def _audit_sync_commit(self, actor: str, mapping_id: UUID) -> None:
+        """Audit the mapping change, sync all memberships to it and commit."""
+        await self._audit(actor, "gremium_group_mapping", mapping_id)
+        await sync_all_memberships(self.session)
         await self.session.commit()
+
+    async def create_group_mapping(
+        self, gremium_id: UUID, payload: GremiumGroupMappingCreate, actor: str
+    ) -> GremiumGroupMappingOut:
+        await self._role_in_gremium(payload.gremium_role_id, gremium_id)
+        row = GremiumGroupMapping(
+            gremium_id=gremium_id,
+            gremium_role_id=payload.gremium_role_id,
+            oidc_group=payload.oidc_group,
+        )
+        self.session.add(row)
+        await self._flush_mapping()
+        await self._audit_sync_commit(actor, row.id)
+        return _mapping_out(row)
+
+    async def update_group_mapping(
+        self, mapping_id: UUID, payload: GremiumGroupMappingUpdate, actor: str
+    ) -> GremiumGroupMappingOut:
+        row = await self.session.get(GremiumGroupMapping, mapping_id)
+        if row is None:
+            raise NotFoundError(f"gremium group mapping {mapping_id} not found")
+        if payload.gremium_role_id is not None:
+            await self._role_in_gremium(payload.gremium_role_id, row.gremium_id)
+            row.gremium_role_id = payload.gremium_role_id
+        if payload.oidc_group is not None:
+            row.oidc_group = payload.oidc_group
+        await self._flush_mapping()
+        await self._audit_sync_commit(actor, row.id)
+        return _mapping_out(row)
+
+    async def delete_group_mapping(self, mapping_id: UUID, actor: str) -> None:
+        row = await self.session.get(GremiumGroupMapping, mapping_id)
+        if row is None:
+            raise NotFoundError(f"gremium group mapping {mapping_id} not found")
+        await self.session.delete(row)
+        await self.session.flush()
+        await self._audit_sync_commit(actor, mapping_id)

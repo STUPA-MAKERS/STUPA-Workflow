@@ -136,25 +136,61 @@ async def delete_gremium_role(role_id: str) -> dict:
 async def list_gremium_memberships(gremium_id: str) -> dict:
     """List the memberships of a Gremium.
 
-    A membership links a member to a role of that Gremium.
+    A membership links a member to a role of that Gremium. Each item has the keys
+    id, principalId, gremiumId and gremiumRoleId. The list is read-only. The platform
+    derives the memberships from the OIDC groups of the members and the group
+    mappings of the Gremium. To change a membership, change a group mapping or the
+    groups in the IdP.
     """
     return await api().get(f"/admin/gremien/{gremium_id}/memberships")
 
 
 @group.tool
-async def create_gremium_membership(
-    gremium_id: str, membership: S.GremiumMembershipCreate
+async def list_gremium_group_mappings(gremium_id: str) -> dict:
+    """List the mappings from an OIDC group to a role of a Gremium.
+
+    A principal in a mapped group becomes a member with the mapped role. Requires
+    admin.gremien.
+    """
+    return await api().get(f"/admin/gremien/{gremium_id}/group-mappings")
+
+
+@group.tool
+async def create_gremium_group_mapping(
+    gremium_id: str, mapping: S.GremiumGroupMappingCreate
 ) -> dict:
-    """Add a member to a Gremium with a Gremium role. Requires admin.gremien."""
+    """Map an OIDC group to a role of a Gremium. Requires admin.gremien.
+
+    The platform then syncs the memberships of all principals. A group that the
+    Gremium maps already and a role of another Gremium give 409. A group with the
+    prefix `vote:` gives 422.
+    """
     return await api().post(
-        f"/admin/gremien/{gremium_id}/memberships", json=dump_create(membership)
+        f"/admin/gremien/{gremium_id}/group-mappings", json=dump_create(mapping)
     )
 
 
 @group.tool
-async def delete_gremium_membership(membership_id: str) -> dict:
-    """End a Gremium membership. Requires admin.gremien."""
-    return await api().delete(f"/admin/gremium-memberships/{membership_id}")
+async def update_gremium_group_mapping(
+    mapping_id: str, patch: S.GremiumGroupMappingUpdate
+) -> dict:
+    """Patch the group or the role of a Gremium group mapping. Requires admin.gremien.
+
+    The Gremium stays the same. The platform then syncs the memberships of all
+    principals.
+    """
+    return await api().patch(
+        f"/admin/gremium-group-mappings/{mapping_id}", json=dump_patch(patch)
+    )
+
+
+@group.tool
+async def delete_gremium_group_mapping(mapping_id: str) -> dict:
+    """Delete a Gremium group mapping. Requires admin.gremien.
+
+    The platform then removes the memberships that only this mapping gave.
+    """
+    return await api().delete(f"/admin/gremium-group-mappings/{mapping_id}")
 
 
 @group.tool
@@ -189,42 +225,21 @@ async def delete_role(role_id: str) -> dict:
 
 @group.tool
 async def list_role_assignments() -> dict:
-    """List the RBAC role assignments.
+    """List the RBAC role assignments (read-only).
 
     An assignment links a principal to a role. It can also carry a Gremium scope.
+    Only the bootstrap assignments remain. The global roles come from the OIDC
+    groups through the group mappings. See `list_group_mappings`.
     """
     return await api().get("/admin/role-assignments")
 
 
 @group.tool
-async def create_role_assignment(assignment: S.RoleAssignmentCreate) -> dict:
-    """Assign a role to a principal.
-
-    The assignment can carry a Gremium scope and a validity period.
-    Requires admin.roles.
-    """
-    return await api().post("/admin/role-assignments", json=dump_create(assignment))
-
-
-@group.tool
-async def update_role_assignment(
-    assignment_id: str, patch: S.RoleAssignmentUpdate
-) -> dict:
-    """Patch the role, the Gremium or the validity of an assignment. Requires admin.roles."""
-    return await api().patch(
-        f"/admin/role-assignments/{assignment_id}", json=dump_patch(patch)
-    )
-
-
-@group.tool
-async def delete_role_assignment(assignment_id: str) -> dict:
-    """Remove a role assignment. Requires admin.roles."""
-    return await api().delete(f"/admin/role-assignments/{assignment_id}")
-
-
-@group.tool
 async def list_principals(q: str | None = None) -> dict:
     """List the principals (users).
+
+    Each item has `oidcGroups`, the OIDC groups as of the last login. These groups
+    drive the group mappings.
 
     Args:
         q: Filter by a substring of the sub or the email.

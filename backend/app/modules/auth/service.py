@@ -17,6 +17,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.admin.membership_sync import sync_principal_memberships
 from app.modules.applications.models import Applicant as ApplicantRow
 from app.modules.applications.models import Application, MagicLink
 from app.modules.auth import oidc, sessions, tokens
@@ -231,6 +232,10 @@ async def oidc_callback(
         db, settings, row, email_verified=claims.email_verified
     )
     await ensure_member_for_principal(db, row)
+    # The gremium memberships come from the OIDC groups only. The upsert above has
+    # just refreshed the group cache, so the memberships follow the IdP from this
+    # login on.
+    await sync_principal_memberships(db, row)
     cookie = await sessions.create_principal_session(
         db,
         secret=settings.session_secret,

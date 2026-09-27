@@ -286,14 +286,14 @@ describe('Kern-Views a11y (axe)', () => {
         displayName: 'Alex Admin',
         lastLogin: null,
         assignments: [],
+        oidcGroups: ['stupa'],
       };
       return {
         listRoles: jest.fn(() => of([role])),
         listPermissions: jest.fn(() => of(['admin.roles', 'application.read'])),
         listPrincipals: jest.fn(() => of([principal])),
         listGremienOptions: jest.fn(() => of([{ id: 'g-1', name: 'StuPa' }])),
-        assignRole: jest.fn(() => of({ id: 'a-new' })),
-        revokeRole: jest.fn(() => of(void 0)),
+        listGroupMappings: jest.fn(() => of([])),
         saveRolePermissions: jest.fn(() => of(role)),
         listApplicationTypes: jest.fn(() => of([{ id: 't1', name: 'Finanzantrag' }])),
         listGremiumRoles: jest.fn(() => of([])),

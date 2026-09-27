@@ -1228,7 +1228,8 @@ async def test_oidc_callback_email_verified_bootstrap(
 ) -> None:
     """An active account with `email_verified` starts a session.
 
-    The callback runs `ensure_admin_for_principal` and `ensure_member_for_principal`.
+    The callback runs `ensure_admin_for_principal`, `ensure_member_for_principal` and
+    `sync_principal_memberships`.
     """
     settings = ENABLED
 
@@ -1248,17 +1249,23 @@ async def test_oidc_callback_email_verified_bootstrap(
     async def _ensure_member(db: object, row: object) -> None:
         seen["member"] = True
 
+    async def _sync(db: object, row: object) -> bool:
+        seen["groups"] = list(getattr(row, "oidc_groups", None) or [])
+        return False
+
     monkeypatch.setattr(service.oidc, "exchange_code", _exchange)
     monkeypatch.setattr(service.oidc, "verify_id_token", _verify)
     monkeypatch.setattr(service, "ensure_admin_for_principal", _ensure_admin)
     monkeypatch.setattr(service, "ensure_member_for_principal", _ensure_member)
+    monkeypatch.setattr(service, "sync_principal_memberships", _sync)
 
     db = fake_session(result())  # new principal
     cookie, row = await service.oidc_callback(
         db, settings, code="c", verifier="v", nonce="n"
     )
     assert cookie
-    assert seen == {"email_verified": True, "member": True}
+    # The callback syncs the gremium memberships to the fresh group claim.
+    assert seen == {"email_verified": True, "member": True, "groups": ["g"]}
 
 
 # rbac.py: vote.cast membership group

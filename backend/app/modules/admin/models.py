@@ -129,7 +129,8 @@ class GremiumRole(UUIDPkMixin, Base):
     """Gremium-specific role.
 
     Each gremium maintains its own role set, separate from the global roles
-    (``role``). `GremiumMembership` holds the membership.
+    (``role``). `GremiumGroupMapping` maps an OIDC group to a role.
+    `GremiumMembership` holds the derived membership.
     """
 
     __tablename__ = "gremium_role"
@@ -149,11 +150,13 @@ class GremiumRole(UUIDPkMixin, Base):
 
 
 class GremiumMembership(UUIDPkMixin, Base):
-    """Time-bound membership of a principal in a gremium.
+    """Membership of a principal in a gremium, derived from the OIDC groups.
 
-    For each (principal, gremium) pair exactly one role is active at any point
-    in time. Overlapping terms are forbidden. Consecutive terms are allowed.
-    ``valid_from`` and ``valid_until`` hold the term of office. NULL means open.
+    ``membership_sync`` is the only writer. It derives the rows from
+    ``principal.oidc_groups`` and ``GremiumGroupMapping``. For each (principal,
+    gremium) pair exactly one role is active. The sync leaves ``valid_from`` and
+    ``valid_until`` NULL (open). The readers still filter on them, and the
+    EXCLUDE constraint below keeps the one-row invariant.
     """
 
     __tablename__ = "gremium_membership"
@@ -196,6 +199,34 @@ class GremiumMembership(UUIDPkMixin, Base):
             using="gist",
             name="ex_gremium_membership_no_overlap",
         ),
+    )
+
+
+class GremiumGroupMapping(UUIDPkMixin, Base):
+    """Map an OIDC group to a role in one gremium.
+
+    The IdP is the only source of gremium membership. A principal whose
+    ``oidc_groups`` contain ``oidc_group`` gets a ``gremium_membership`` with
+    ``gremium_role_id`` in the gremium. The sync in ``membership_sync`` writes
+    those rows at login and after each change of a mapping.
+    """
+
+    __tablename__ = "gremium_group_mapping"
+
+    gremium_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("gremium.id", ondelete="CASCADE")
+    )
+    gremium_role_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("gremium_role.id", ondelete="RESTRICT")
+    )
+    oidc_group: Mapped[str] = mapped_column(Text)
+
+    __table_args__ = (
+        # One group gives at most one role in a gremium.
+        UniqueConstraint(
+            "gremium_id", "oidc_group", name="uq_gremium_group_mapping_gremium_group"
+        ),
+        Index("ix_gremium_group_mapping_oidc_group", "oidc_group"),
     )
 
 

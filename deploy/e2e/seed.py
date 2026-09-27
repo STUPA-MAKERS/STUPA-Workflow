@@ -19,10 +19,14 @@ It creates:
 * The **active global flow version**. Since migration ``0019`` one graph serves all
   application types, so the flow has no per-type binding. Graph: ``entwurf`` (initial,
   editable) -> ``pruefung`` (locked) -> ``angenommen`` / ``abgelehnt`` (both terminal).
-* An **admin Principal**, an **admin RoleAssignment** and an **AuthSession**. The
-  bootstrap admin works through the OIDC login only (service.py), and the gating stack
-  runs *no* Keycloak. This script therefore mints a valid server session with the app
-  function ``create_principal_session``, which knows ``SESSION_SECRET``, and writes the
+* An **admin Principal** in the OIDC group ``role-admin``, a **group mapping** from
+  ``role-admin`` to the role ``admin``, and an **AuthSession**. Global roles come from
+  the OIDC groups only, so the seed writes no ``role_assignment``. It sets the group
+  cache ``principal.oidc_groups`` instead, which a real login would fill. The RBAC
+  resolver reads that cache at each request. The bootstrap admin works through the
+  OIDC login only (service.py), and the gating stack runs *no* Keycloak. This script
+  therefore mints a valid server session with the app function
+  ``create_principal_session``, which knows ``SESSION_SECRET``, and writes the
   ``ap_session`` cookie. This is NO production backdoor. Only a test seed calls the
   normal signing function, in the same way as the ``force_login`` of Django.
 * A **budget pot** for the ``/budget/pots`` view.
@@ -41,13 +45,13 @@ import pathlib
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from app.db import get_sessionmaker
 from app.modules.admin.models import ApplicationType, Gremium
 from app.modules.admin.schemas import ApplicationTypeCreate, FlowVersionCreate
 from app.modules.admin.service import ConfigService
-from app.modules.auth.models import Principal, Role, RoleAssignment
+from app.modules.auth.models import GroupMapping, Principal, Role, RoleAssignment
 from app.modules.auth.sessions import create_principal_session
 from app.modules.flow.models import FlowVersion, State
 from app.modules.forms.models import FormField
@@ -60,6 +64,8 @@ ACTOR = "e2e-seed"
 ADMIN_SUB = "e2e-admin"
 ADMIN_EMAIL = "admin@e2e.test"
 ADMIN_ROLE_ID = uuid.UUID("00000000-0000-0000-0000-0000000000a1")  # 0002_seed
+# The OIDC group that gives the admin role. `qa_seed.py` uses the same name.
+ADMIN_GROUP = "role-admin"
 TYPE_KEY = "foerderantrag"
 # Preferred Gremium of the seeded type, in this order. Migration 0002 seeds both.
 GREMIUM_SLUGS = ("stupa", "asta")
@@ -262,7 +268,9 @@ async def _ensure_flow(session) -> dict[str, str]:
 
 
 async def _ensure_admin_session(session, settings) -> str:
-    """Make sure the admin Principal and its RoleAssignment exist, then mint a session.
+    """Make sure the admin Principal, its OIDC group and the group mapping exist.
+
+    Then mint a session.
 
     Returns:
         The signed session cookie value.
@@ -273,7 +281,9 @@ async def _ensure_admin_session(session, settings) -> str:
     if principal is None:
         principal = Principal(sub=ADMIN_SUB, email=ADMIN_EMAIL, display_name="E2E Admin")
         session.add(principal)
-        await session.flush()
+    # The group cache that an OIDC login would fill. The RBAC resolver maps it to roles.
+    principal.oidc_groups = [ADMIN_GROUP]
+    await session.flush()
 
     # Migration 0002 creates the admin role. Check for it defensively.
     role = (
@@ -286,19 +296,27 @@ async def _ensure_admin_session(session, settings) -> str:
     if role is None:
         raise SystemExit("seed: admin-Rolle fehlt — lief 0002?")
 
-    assignment = (
+    mapping = (
         await session.execute(
-            select(RoleAssignment).where(
-                RoleAssignment.principal_id == principal.id,
-                RoleAssignment.role_id == role.id,
+            select(GroupMapping).where(
+                GroupMapping.oidc_group == ADMIN_GROUP,
+                GroupMapping.role_id == role.id,
+                GroupMapping.gremium_id.is_(None),
             )
         )
     ).scalar_one_or_none()
-    if assignment is None:
-        session.add(
-            RoleAssignment(principal_id=principal.id, role_id=role.id, granted_by=ACTOR)
+    if mapping is None:
+        session.add(GroupMapping(oidc_group=ADMIN_GROUP, role_id=role.id))
+
+    # An older seed wrote a role assignment by hand. Remove it, so that the role
+    # comes from the group only.
+    await session.execute(
+        delete(RoleAssignment).where(
+            RoleAssignment.principal_id == principal.id,
+            RoleAssignment.granted_by == ACTOR,
         )
-        await session.flush()
+    )
+    await session.flush()
 
     cookie = await create_principal_session(
         session,

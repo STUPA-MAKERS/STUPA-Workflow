@@ -1,30 +1,50 @@
-
 <app-page-header
   [title]="('admin.gremien.membersOf' | t) + ': ' + (gremium()?.name ?? '…')"
   [subtitle]="'admin.gremien.membersHint' | t"
->
-  @if (canManage()) {
-    <app-button actions size="sm" (click)="openAdd()">{{ 'admin.gremien.addMember' | t }}</app-button>
-  }
-</app-page-header>
+/>
 
+<!-- Read-only. The OIDC group sync writes the memberships, not the admin. -->
 <app-data-table
     [loading]="loading()"
     [loadingText]="'common.loading' | t" [columns]="columns()" [rows]="members()" [rowKey]="rowId" [emptyText]="'admin.gremien.membersEmpty' | t">
   <ng-template appCell="email" let-m>{{ $any(m).email || '—' }}</ng-template>
   <ng-template appCell="roleLabel" let-m><app-badge variant="primary">{{ $any(m).roleLabel }}</app-badge></ng-template>
-  <ng-template appCell="term" let-m><span class="text-muted text-sm">{{ $any(m).term }}</span></ng-template>
-  <ng-template appCell="actions" let-m>
-    <span class="inline-flex items-center gap-1 justify-end">
-      <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.gremien.memberEdit' | t" (click)="openEdit($any(m))">
-        <app-icon name="edit" />
-      </app-button>
-      <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.gremien.memberRemove' | t" (click)="removeMember($any(m).assignmentId)">
-        <app-icon name="delete" />
-      </app-button>
-    </span>
-  </ng-template>
 </app-data-table>
+
+<!-- OIDC group → gremium role. The sync reads these mappings at each login and after
+     each change here. -->
+<section class="gm__pool" [attr.aria-label]="'admin.gremien.mappingsTitle' | t">
+  <header class="flex items-center justify-between gap-4 flex-wrap">
+    <div>
+      <h2 class="m-0">{{ 'admin.gremien.mappingsTitle' | t }}</h2>
+      <p class="text-muted mt-1">{{ 'admin.gremien.mappingsHint' | t }}</p>
+    </div>
+    @if (canManage()) {
+      <app-button size="sm" (click)="openAddMapping()">{{ 'admin.gremien.mappingAdd' | t }}</app-button>
+    }
+  </header>
+  <app-data-table
+    [loading]="mappingsLoading()"
+    [loadingText]="'common.loading' | t"
+    [columns]="mappingColumns()"
+    [rows]="mappingRows()"
+    [rowKey]="mappingRowId"
+    [emptyText]="'admin.gremien.mappingsEmpty' | t"
+  >
+    <ng-template appCell="oidcGroup" let-r><code>{{ $any(r).oidcGroup }}</code></ng-template>
+    <ng-template appCell="roleLabel" let-r><app-badge variant="primary">{{ $any(r).roleLabel }}</app-badge></ng-template>
+    <ng-template appCell="actions" let-r>
+      <span class="inline-flex items-center gap-1 justify-end">
+        <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="('action.edit' | t) + ': ' + $any(r).oidcGroup" (click)="openEditMapping($any(r).id)">
+          <app-icon name="edit" />
+        </app-button>
+        <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="('action.delete' | t) + ': ' + $any(r).oidcGroup" (click)="mappingDeleteId.set($any(r).id)">
+          <app-icon name="delete" />
+        </app-button>
+      </span>
+    </ng-template>
+  </app-data-table>
+</section>
 
 <!-- Substitute pool: elected or appointed substitutes. A delegation to a substitute has
      no lead-time deadline and stays possible until meeting start. A substitute does not
@@ -108,49 +128,38 @@
   </div>
 </app-dialog>
 
+<!-- Add or edit one mapping. The gremium stays fixed. -->
 <app-dialog
-  [open]="addOpen()"
-  [title]="'admin.gremien.addMember' | t"
-  [closeLabel]="'admin.gremien.cancel' | t"
-  (closed)="closeAdd()"
+  [open]="mappingOpen()"
+  [title]="(mappingEditId() ? 'admin.gremien.mappingEdit' : 'admin.gremien.mappingAdd') | t"
+  [closeLabel]="'action.cancel' | t"
+  (closed)="closeMapping()"
 >
-  <div class="flex flex-col gap-4">
-    <div class="relative flex flex-col gap-1">
-      <label class="gm__lbl" for="gm-search">{{ 'admin.gremien.memberSearch' | t }}</label>
+  <form class="flex flex-col gap-4" (submit)="$event.preventDefault(); saveMapping()">
+    <div class="flex flex-col gap-1">
+      <label class="gm__lbl" for="gm-mapping-group">{{ 'admin.groupMappings.oidcGroup' | t }}</label>
       <input
-        id="gm-search"
+        id="gm-mapping-group"
         class="gm__control"
         autocomplete="off"
-        [placeholder]="'admin.gremien.memberSearchPlaceholder' | t"
-        [ngModel]="query()"
-        (ngModelChange)="onSearch($event)"
-        (focus)="onSearch(query())"
+        [placeholder]="'admin.groupMappings.oidcGroupPlaceholder' | t"
+        [attr.aria-invalid]="mappingGroupReserved()"
+        [attr.aria-describedby]="mappingGroupReserved() ? 'gm-mapping-group-err' : null"
+        [ngModel]="mappingGroup()"
+        (ngModelChange)="mappingGroup.set($event)"
+        name="mappingGroup"
       />
-      @if (candidates().length) {
-        <ul class="gm__suggest" role="listbox">
-          @for (c of candidates(); track c.id) {
-            <li>
-              <button type="button" class="gm__suggest-item" [class.gm__suggest-item--sel]="selected()?.id === c.id" (click)="pick(c)">
-                <span class="font-medium">{{ c.displayName || c.email || c.sub }}</span>
-                @if (c.email) { <span class="text-xs text-muted">{{ c.email }}</span> }
-              </button>
-            </li>
-          }
-        </ul>
+      @if (mappingGroupReserved()) {
+        <p id="gm-mapping-group-err" class="m-0 text-sm gm__err">{{ 'admin.gremien.mappingReserved' | t }}</p>
       }
     </div>
-
-    @if (selected(); as s) {
-      <p class="m-0 text-sm">{{ 'admin.gremien.memberPicked' | t }}: <strong>{{ s.displayName || s.email || s.sub }}</strong></p>
-    }
-
     <app-select
       [label]="'admin.gremien.memberRole' | t"
       [placeholder]="'admin.gremien.memberRolePlaceholder' | t"
       [options]="roleOptions()"
-      [ngModel]="addRoleId()"
-      (ngModelChange)="addRoleId.set($event)"
-      name="memberRole"
+      [ngModel]="mappingRoleId()"
+      (ngModelChange)="mappingRoleId.set($event)"
+      name="mappingRole"
     />
     @if (roleOptions().length === 0) {
       <p class="m-0 text-sm">
@@ -158,49 +167,23 @@
         <a [routerLink]="['/admin/gremien', gremiumIdRef, 'roles']">{{ 'admin.gremiumRoles.manage' | t }}</a>
       </p>
     }
-    <div class="gm__term">
-      <label class="gm__lbl">{{ 'admin.gremien.termFrom' | t }}
-        <app-datepicker [ngModel]="addFrom()" (ngModelChange)="addFrom.set($event)" name="from" /></label>
-      <label class="gm__lbl">{{ 'admin.gremien.termUntil' | t }}
-        <app-datepicker [ngModel]="addUntil()" (ngModelChange)="addUntil.set($event)" name="until" /></label>
-    </div>
-  </div>
-  <div dialog-footer class="flex gap-3">
-    <app-button size="sm" variant="ghost" (click)="closeAdd()">{{ 'admin.gremien.cancel' | t }}</app-button>
-    <app-button size="sm" [disabled]="!selected() || !addRoleId()" (click)="addMember()">{{ 'admin.gremien.memberAdd' | t }}</app-button>
+    <p class="text-muted m-0 text-xs">{{ 'admin.gremien.mappingRuleHint' | t }}</p>
+  </form>
+  <div dialog-footer class="flex justify-end gap-3">
+    <app-button size="sm" variant="ghost" (click)="closeMapping()">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" [disabled]="!mappingValid()" [loading]="mappingSaving()" (click)="saveMapping()">{{ 'action.save' | t }}</app-button>
   </div>
 </app-dialog>
 
-<!-- Edit one membership. The member and the Gremium stay fixed. Only the role and the
-     term of office change, so no delete plus re-create is necessary. -->
 <app-dialog
-  [open]="editOpen()"
-  [title]="'admin.gremien.memberEdit' | t"
-  [closeLabel]="'admin.gremien.cancel' | t"
-  (closed)="closeEdit()"
+  [open]="!!mappingDeleteId()"
+  [title]="'admin.gremien.mappingDeleteTitle' | t"
+  [closeLabel]="'action.cancel' | t"
+  (closed)="mappingDeleteId.set(null)"
 >
-  @if (editMember(); as m) {
-    <div class="flex flex-col gap-4">
-      <p class="m-0 text-sm">{{ 'admin.gremien.memberEditFor' | t }}: <strong>{{ m.name }}</strong></p>
-      <app-select
-        [label]="'admin.gremien.memberRole' | t"
-        [placeholder]="'admin.gremien.memberRolePlaceholder' | t"
-        [options]="roleOptions()"
-        [ngModel]="editRoleId()"
-        (ngModelChange)="editRoleId.set($event)"
-        name="editMemberRole"
-      />
-      <div class="gm__term">
-        <label class="gm__lbl">{{ 'admin.gremien.termFrom' | t }}
-          <app-datepicker [ngModel]="editFrom()" (ngModelChange)="editFrom.set($event)" name="editFrom" /></label>
-        <label class="gm__lbl">{{ 'admin.gremien.termUntil' | t }}
-          <app-datepicker [ngModel]="editUntil()" (ngModelChange)="editUntil.set($event)" name="editUntil" /></label>
-      </div>
-      <p class="text-muted m-0 text-xs">{{ 'admin.gremien.memberTermHint' | t }}</p>
-    </div>
-  }
-  <div dialog-footer class="flex gap-3">
-    <app-button size="sm" variant="ghost" (click)="closeEdit()">{{ 'admin.gremien.cancel' | t }}</app-button>
-    <app-button size="sm" [disabled]="!editRoleId()" (click)="saveEdit()">{{ 'action.save' | t }}</app-button>
+  <p>{{ 'admin.gremien.mappingDeleteBody' | t }}</p>
+  <div dialog-footer class="flex justify-end gap-3">
+    <app-button size="sm" variant="ghost" (click)="mappingDeleteId.set(null)">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" variant="danger" (click)="removeMapping()">{{ 'action.delete' | t }}</app-button>
   </div>
 </app-dialog>
