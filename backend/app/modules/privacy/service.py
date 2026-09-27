@@ -320,7 +320,12 @@ class AuskunftService:
                     {
                         "id": a.id,
                         "typeName": _i18n(type_names.get(a.type_id), locale),
-                        "status": _i18n(state_labels.get(a.current_state_id), locale),
+                        "status": _i18n(
+                            state_labels.get(a.current_state_id)
+                            if a.current_state_id is not None
+                            else None,
+                            locale,
+                        ),
                         "createdAt": a.created_at,
                         "applicantName": applicant.name if applicant else "",
                         "data": a.data,
