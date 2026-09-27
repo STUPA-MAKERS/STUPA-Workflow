@@ -53,7 +53,7 @@ class PrincipalService:
     ) -> Principal:
         """Null the PII fields, deactivate the principal, and drop the sessions.
 
-        The `sub` stays as a pseudonym for the audit chain. Keycloak deletes the user
+        The `sub` stays as a pseudonym for the audit chain. The IdP deletes the user
         out of band. The pseudonymity that remains depends on that deletion.
 
         Raises:

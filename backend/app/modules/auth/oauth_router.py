@@ -4,7 +4,7 @@ The flow is authorization code plus PKCE (RFC 6749 and RFC 7636).
 
 1. `/authorize` validates the client_id, the redirect_uri (loopback only) and the PKCE
    challenge. It stores the request signed in the `ap_oauth_tx` cookie. It then sends the
-   browser through the existing Keycloak login.
+   browser through the existing OIDC login.
 2. `/finish` runs after the OIDC callback and leads to the consent screen. The consent
    mints a one-time authorization code.
 3. `/token` exchanges a code or a refresh token for an opaque, scoped token pair.

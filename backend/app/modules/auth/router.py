@@ -1,6 +1,6 @@
 """Auth endpoints.
 
-This module holds the OIDC login and callback (Keycloak, auth code plus PKCE), the
+This module holds the OIDC login and callback (auth code plus PKCE), the
 server-session cookie, the magic-link issue and verify routes, `/auth/me` and logout.
 
 A token never reaches JavaScript or the response body. The server sends it only in an
@@ -9,6 +9,7 @@ HttpOnly+Secure+SameSite=Lax cookie.
 
 from __future__ import annotations
 
+import logging
 from typing import Annotated, Any
 from uuid import UUID
 
@@ -20,7 +21,7 @@ from app.db import get_sessionmaker
 from app.deps import DbSession, Principal, SettingsDep, require_principal
 from app.modules.admin.models import Gremium
 from app.modules.auth import oidc, service, sessions
-from app.modules.auth.oidc import OidcError
+from app.modules.auth.oidc import OidcError, OidcUnavailableError
 from app.modules.auth.schemas import (
     GremiumRef,
     LogoutOut,
@@ -41,7 +42,14 @@ from app.shared.antiabuse import (
     rate_limit_magic_link_verify,
     verify_altcha,
 )
-from app.shared.errors import BadRequestError, NotFoundError, ProblemDetail
+from app.shared.errors import (
+    BadRequestError,
+    NotFoundError,
+    ProblemDetail,
+    ServiceUnavailableError,
+)
+
+logger = logging.getLogger("app.auth")
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -66,19 +74,26 @@ def _cookie_kwargs(settings: SettingsDep) -> dict[str, object]:
 @router.get(
     "/login",
     status_code=status.HTTP_307_TEMPORARY_REDIRECT,
-    responses=_errors(404),
+    responses=_errors(404, 503),
 )
-def login(settings: SettingsDep) -> RedirectResponse:
-    """Redirect to Keycloak with the auth code flow and PKCE.
+async def login(settings: SettingsDep) -> RedirectResponse:
+    """Redirect to the IdP with the auth code flow and PKCE.
 
-    The tx cookie carries the state, the code verifier and the nonce.
+    The tx cookie carries the state, the code verifier and the nonce. The authorize
+    endpoint comes from the discovery document of the IdP. If that document is
+    unusable, the route answers 503.
     """
     if not settings.oidc_enabled:
         raise NotFoundError("OIDC is not configured.")
     verifier, challenge = oidc.generate_pkce()
     state = oidc.generate_state()
     nonce = oidc.generate_nonce()
-    url = oidc.authorization_url(settings, state=state, challenge=challenge, nonce=nonce)
+    try:
+        url = await oidc.authorization_url(
+            settings, state=state, challenge=challenge, nonce=nonce
+        )
+    except OidcError as exc:
+        raise ServiceUnavailableError("The identity provider is unavailable.") from exc
     response = RedirectResponse(url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
     response.set_cookie(
         settings.oidc_tx_cookie_name,
@@ -92,7 +107,7 @@ def login(settings: SettingsDep) -> RedirectResponse:
 @router.get(
     "/callback",
     status_code=status.HTTP_307_TEMPORARY_REDIRECT,
-    responses=_errors(400, 404),
+    responses=_errors(400, 404, 503),
 )
 async def callback(
     request: Request,
@@ -103,7 +118,8 @@ async def callback(
 ) -> RedirectResponse:
     """Exchange the code for a token and open a session.
 
-    The state match and the nonce in the id_token protect against CSRF and replay.
+    The state match and the nonce in the id_token protect against CSRF and replay. An
+    IdP that cannot be reached gives 503. A rejected code or token gives 400.
     """
     if not settings.oidc_enabled:
         raise NotFoundError("OIDC is not configured.")
@@ -119,6 +135,8 @@ async def callback(
         cookie, _ = await service.oidc_callback(
             db, settings, code=code, verifier=tx["verifier"], nonce=tx["nonce"]
         )
+    except OidcUnavailableError as exc:
+        raise ServiceUnavailableError("The identity provider is unavailable.") from exc
     except OidcError as exc:
         raise BadRequestError("OIDC login failed.") from exc
     # Persist the principal and the auth_session row. `get_session` never commits.
@@ -150,9 +168,12 @@ async def logout(
     The route is idempotent. It ends the principal session and any applicant session.
 
     Returns:
-        For OIDC, the RP-initiated logout URL (Keycloak `end_session` with
-        `id_token_hint`). The frontend must send the browser there to end the IdP SSO
-        session. Without that step the SSO login survives.
+        For OIDC, the RP-initiated logout URL (the `end_session_endpoint` of the IdP
+        with `id_token_hint`). The frontend must send the browser there to end the IdP
+        SSO session. Without that step the SSO login survives. The URL is `None` when
+        the IdP has no such endpoint or its discovery document is unusable. The local
+        sessions end in every case, because a logout that fails on an IdP outage would
+        leave the session open.
     """
     logout_url: str | None = None
     cookie = request.cookies.get(settings.session_cookie_name)
@@ -164,7 +185,10 @@ async def logout(
             max_age=settings.session_ttl_hours * 3600,
         )
         if settings.oidc_enabled and ended is not None:
-            logout_url = oidc.end_session_url(settings, id_token=ended.id_token)
+            try:
+                logout_url = await oidc.end_session_url(settings, id_token=ended.id_token)
+            except OidcError:
+                logger.warning("oidc discovery failed at logout, no IdP logout URL")
     ap_cookie = request.cookies.get(settings.applicant_cookie_name)
     if ap_cookie:
         await sessions.delete_applicant_session(

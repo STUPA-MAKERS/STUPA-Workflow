@@ -70,7 +70,7 @@ async def test_principal_erase_clears_pii_and_deactivates() -> None:
     assert principal.calendar_token is None
     assert principal.oidc_groups is None
     assert principal.active is False
-    # The sub stays as a pseudonym for the audit chain and the Keycloak link.
+    # The sub stays as a pseudonym for the audit chain and the IdP link.
     assert principal.sub == "kc-123"
     assert db.committed == 1
     assert any(getattr(o, "action", None) == "principal_erased" for o in db.added)

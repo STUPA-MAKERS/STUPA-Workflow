@@ -123,7 +123,7 @@ BOOTSTRAP_ADMIN_SUBJECTS=f47ac10b-58cc-4372-a567-0e02b2c3d479,kc|alice
 BOOTSTRAP_ADMIN_EMAILS=admin@hochschule.example,vorstand@stupa.example
 ```
 
-- **Subject** = the OIDC `sub` claim from Keycloak. It is stable and hard to forge.
+- **Subject** = the OIDC `sub` claim from the IdP. It is stable and hard to forge.
   **Prefer it.**
 - **Email** = the `email` claim, matched case-insensitively. It applies **only when the
   id_token carries `email_verified: true`**. Without that check, an attacker could abuse an
@@ -140,7 +140,7 @@ BOOTSTRAP_ADMIN_EMAILS=admin@hochschule.example,vorstand@stupa.example
 
 ## Profiles
 
-- **prod** — behind NPM, with external Keycloak, SMTP and Nextcloud, ClamAV on:
+- **prod** — behind NPM, with an external OIDC IdP, SMTP and Nextcloud, ClamAV on:
   ```bash
   docker compose --profile prod up -d --build
   ```

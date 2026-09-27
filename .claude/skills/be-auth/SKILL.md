@@ -1,11 +1,11 @@
 ---
 name: be-auth
-description: Backend identity and access. Covers OIDC/Keycloak login (Auth Code + PKCE), magic-link applicant sessions, server-side principal sessions, and RBAC (role/role_permission/role_assignment/group_mapping, time-bound delegation). Also an OAuth2 authorization server that issues scoped opaque tokens for MCP agents. Use when working on login/callback/logout, /auth/me, magic-links, sessions, RBAC permission resolution, OAuth scopes/consent/grants, or bootstrap admins in backend/app/modules/auth.
+description: Backend identity and access. Covers OIDC login against any discovery-capable IdP (Auth Code + PKCE), magic-link applicant sessions, server-side principal sessions, and RBAC (role/role_permission/role_assignment/group_mapping, time-bound delegation). Also an OAuth2 authorization server that issues scoped opaque tokens for MCP agents. Use when working on login/callback/logout, /auth/me, magic-links, sessions, RBAC permission resolution, OAuth scopes/consent/grants, or bootstrap admins in backend/app/modules/auth.
 ---
 
 # Auth (Identity, RBAC, OIDC, OAuth2-AS) — `backend/app/modules/auth`
 
-**Does:** Authenticates members through Keycloak OIDC (Authorization Code + PKCE) into server-side sessions. Authenticates applicants through single-use magic-links. Resolves app-side RBAC (roles → permissions, gremium-scoped and time-bound). Acts as an OAuth2 authorization server that mints scoped opaque access/refresh tokens for native and MCP clients. CRITICAL module (100% branch coverage gate).
+**Does:** Authenticates members through OIDC (Authorization Code + PKCE) against any IdP with a discovery document (authentik in production) into server-side sessions. Authenticates applicants through single-use magic-links. Resolves app-side RBAC (roles → permissions, gremium-scoped and time-bound). Acts as an OAuth2 authorization server that mints scoped opaque access/refresh tokens for native and MCP clients. CRITICAL module (100% branch coverage gate).
 
 **Key files:**
 - `router.py` — `/auth` routes: OIDC login/callback, logout (RP-initiated), `/auth/me`, magic-link request/verify
@@ -13,7 +13,7 @@ description: Backend identity and access. Covers OIDC/Keycloak login (Auth Code 
 - `models.py` — tables: `Principal`, `Role`, `RolePermission`, `RoleAssignment`, `AuthSession`, `GroupMapping`
 - `principal.py` — leaf `Principal`/`Applicant` dataclasses + `.has()` (breaks the deps↔auth import cycle). `app.deps` re-exports them
 - `rbac.py` — `resolve_principal()`: principal row → roles/permissions/groups (the single RBAC resolution path)
-- `oidc.py` — Keycloak primitives: PKCE/state/nonce, authorize URL, code exchange, `id_token` JWKS verify (RS256), end-session URL
+- `oidc.py` — OIDC primitives: discovery (`discover`, TTL-cached per issuer), PKCE/state/nonce, authorize URL, code exchange, `id_token` JWKS verify (RS256), end-session URL
 - `sessions.py` — signed cookies (itsdangerous): opaque `sid` principal session, stateless applicant token, OIDC-tx, OAuth-tx
 - `tokens.py` — magic-link token CSPRNG + HMAC-SHA256(pepper) hashing, constant-time verify
 - `bootstrap.py` — idempotent first-admin grant by `sub`/verified-email. It always grants the global `member` role
@@ -35,9 +35,9 @@ description: Backend identity and access. Covers OIDC/Keycloak login (Auth Code 
 - OAuth scopes (`oauth.SCOPES`): `read`, `applications:write`, `votes:write`, `budget:write`, `meetings:write`, `forms:write`, `flows:write`, `admin:write`. Lifetimes 1h/8h/1d/30d/90d (cap `MAX_LIFETIME_SECONDS`=90d, no never-expire).
 
 **API surface:**
-- `GET /api/auth/login` — 307 → Keycloak authorize. State, verifier and nonce ride in the signed `oidc_tx` cookie
+- `GET /api/auth/login` — 307 → IdP authorize (503 when discovery fails). State, verifier and nonce ride in the signed `oidc_tx` cookie
 - `GET /api/auth/callback` — code→token→session. Sets the `sid` cookie. Redirects to `/api/oauth/finish` when an OAuth tx is in flight
-- `POST /api/auth/logout` — kill session + cookie (idempotent), returns Keycloak `end_session` URL for SSO logout
+- `POST /api/auth/logout` — kill session + cookie (idempotent), returns the IdP `end_session_endpoint` URL for SSO logout (`null` when the IdP has none or discovery fails; the local session ends anyway)
 - `GET /api/auth/me` — principal + roles/permissions/groups + member/manage gremien, scoped-budget & substitute-pool flags
 - `POST /api/auth/magic-link` — 202 always (anti-enumeration, constant time, delivery in background task)
 - `POST /api/auth/magic-link/verify` — token → applicant session cookie. Expired or used → 410
@@ -64,6 +64,7 @@ description: Backend identity and access. Covers OIDC/Keycloak login (Auth Code 
 - Service functions DO NOT commit. The router or the caller owns the transaction (callback/verify/logout commit explicitly, get_session never auto-commits).
 - OAuth: the server accepts only `S256` PKCE and `http` loopback redirect_uris (RFC 8252). The client must equal `oauth_mcp_client_id`. An invalid redirect gives 400 (never redirect to it). `/oauth/token` returns RFC-6749 error JSON (`x-error-contract: oauth`), exempt from the app-wide problem+json. Codes are single-use. Refresh rotates.
 - Request-time token resolution lives in `app.deps`, not in this module (`get_current_principal` through `oauth_service.resolve_access_token` for `apat_`-prefixed bearers, `get_current_applicant` through `sessions.load_applicant_token`). `app.deps` re-exports `Principal`/`Applicant`.
+- **Endpoints come from discovery, never from a path convention.** `oidc.discover` reads `{issuer}/.well-known/openid-configuration` and requires its `issuer` to equal `oidc_issuer` exactly. The `iss` check of the `id_token` is exact too, so `OIDC_ISSUER` must be the IdP's value verbatim — authentik's ends in `/`, Keycloak's does not. `OidcUnavailableError` (discovery, token or JWKS unreachable, bad document) maps to 503; any other `OidcError` maps to 400. Tests clear `oidc._discovery_cache` and `oidc._jwks_cache`.
 - See the house rules in the `conventions` skill (tz-aware, RFC-9457 problem+json, whitelist guards/no-eval, coverage gates).
 
 **Related:** be-admin, be-delegations, be-notifications, be-applications, be-flow

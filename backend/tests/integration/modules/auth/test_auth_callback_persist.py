@@ -6,7 +6,8 @@ session closes. A later `GET /auth/me` with the session cookie then returns 401 
 of 200.
 
 The test needs real Postgres (`gen_random_uuid`, jsonb groups) and an RS256-signed
-id_token (respx, as in T-10). It also needs the real ASGI request cycle through
+id_token (respx, as in T-10), with the endpoints served from a discovery document the
+way authentik shapes it. It also needs the real ASGI request cycle through
 `get_session`, which **never** commits by itself. Only this setup shows the missing
 persistence in the router.
 """
@@ -30,10 +31,18 @@ from app.main import create_app
 from app.modules.auth import oidc, sessions
 from app.settings import get_settings, load_settings
 
-ISSUER = "https://kc.example/realms/app"
+ISSUER = "https://sso.example/application/o/antrag/"
 CLIENT_ID = "antrag"
-CERTS = f"{ISSUER}/protocol/openid-connect/certs"
-TOKEN = f"{ISSUER}/protocol/openid-connect/token"
+DISCOVERY = f"{ISSUER}.well-known/openid-configuration"
+CERTS = f"{ISSUER}jwks/"
+TOKEN = "https://sso.example/application/o/token/"
+DISCOVERY_DOC = {
+    "issuer": ISSUER,
+    "authorization_endpoint": "https://sso.example/application/o/authorize/",
+    "token_endpoint": TOKEN,
+    "jwks_uri": CERTS,
+    "end_session_endpoint": f"{ISSUER}end-session/",
+}
 
 pytestmark = pytest.mark.integration
 
@@ -85,6 +94,7 @@ async def test_callback_persists_principal_then_me_returns_200(
         cookie_secure=False,  # http://testserver would not send a Secure cookie back
     )
     oidc._jwks_cache.clear()
+    oidc._discovery_cache.clear()
 
     engine = create_async_engine(async_url)
     sessionmaker = async_sessionmaker(engine, expire_on_commit=False, autoflush=False)
@@ -107,6 +117,7 @@ async def test_callback_persists_principal_then_me_returns_200(
     transport = httpx.ASGITransport(app=app)
     try:
         with respx.mock(assert_all_called=False) as mock:
+            mock.get(DISCOVERY).mock(return_value=httpx.Response(200, json=DISCOVERY_DOC))
             mock.post(TOKEN).mock(
                 return_value=httpx.Response(
                     200, json={"id_token": _id_token(nonce), "refresh_token": "rt"}

@@ -98,7 +98,7 @@ export class AuthService {
     return permissions.length === 0 || permissions.some((p) => this.can(p));
   }
 
-  /** Starts the OIDC login. It redirects the whole page to Keycloak via the backend. */
+  /** Starts the OIDC login. It redirects the whole page to the IdP via the backend. */
   login(): void {
     this.location.assign('/api/auth/login');
   }
@@ -106,7 +106,7 @@ export class AuthService {
   /**
    * Ends the server session.
    *
-   * If the backend supplies an RP-initiated logout URL for the Keycloak SSO, the
+   * If the backend supplies an RP-initiated logout URL for the IdP SSO, the
    * browser follows it. Otherwise the browser goes to the home page.
    */
   logout(): void {

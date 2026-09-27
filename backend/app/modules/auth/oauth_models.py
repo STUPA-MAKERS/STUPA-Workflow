@@ -1,6 +1,6 @@
 """OAuth2 authorization-server models: authorization codes and tokens for MCP login.
 
-The platform acts as an OAuth2 authorization server in front of the Keycloak login. After
+The platform acts as an OAuth2 authorization server in front of the OIDC login. After
 the OIDC login it mints a short-lived authorization code with PKCE (RFC 7636). A native
 client exchanges that code for an opaque access and refresh token pair. The database holds
 the tokens as SHA-256 hashes only and never stores the plaintext. The scope caps the
