@@ -39,7 +39,7 @@ class MagicLinkVerifyOut(BaseModel):
 class LogoutOut(BaseModel):
     """Result of an RP-initiated logout.
 
-    With OIDC, `logout_url` ends the Keycloak SSO session. The frontend must redirect
+    With OIDC, `logout_url` ends the SSO session at the IdP. The frontend must redirect
     the browser there. A purely local logout gives `null`.
     """
 

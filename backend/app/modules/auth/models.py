@@ -20,7 +20,7 @@ from app.db import Base, CreatedAtMixin, UUIDPkMixin
 
 
 class Principal(UUIDPkMixin, Base):
-    """OIDC subject from Keycloak.
+    """OIDC subject from the IdP.
 
     The PII, the email address, stays in this table. It never enters the audit `data`
     column.

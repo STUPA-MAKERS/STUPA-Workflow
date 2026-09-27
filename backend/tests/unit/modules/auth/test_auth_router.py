@@ -6,16 +6,19 @@ import uuid
 from collections.abc import AsyncIterator, Iterator
 from types import SimpleNamespace
 
+import httpx
 import pytest
+import respx
 from fastapi.testclient import TestClient
 
 from app.db import get_session
 from app.deps import Principal, get_current_principal
 from app.main import create_app
+from app.modules.auth import oidc
 from app.modules.auth import router as router_mod
 from app.modules.auth.models import AuthSession
 from app.modules.auth.models import Principal as PrincipalRow
-from app.modules.auth.oidc import OidcError
+from app.modules.auth.oidc import OidcError, OidcUnavailableError
 from app.settings import Settings, get_settings, load_settings
 from app.shared.errors import GoneError
 from tests._support.auth_fakes import fake_session, result
@@ -25,16 +28,47 @@ DISABLED = load_settings(
     session_secret="session-secret-0123",
     magic_link_secret="magic-link-secret-0",
 )
+ISSUER = "https://sso.example/application/o/antrag/"
+DISCOVERY = f"{ISSUER}.well-known/openid-configuration"
+AUTHORIZE = "https://sso.example/application/o/authorize/"
+END_SESSION = f"{ISSUER}end-session/"
 ENABLED = load_settings(
     database_url="postgresql+asyncpg://x/y",
     session_secret="session-secret-0123",
     magic_link_secret="magic-link-secret-0",
-    oidc_issuer="https://kc.example/realms/app",
+    oidc_issuer=ISSUER,
     oidc_client_id="antrag",
     oidc_client_secret="client-secret-01234",
     oidc_redirect_url="https://antrag.example/api/auth/callback",
     cookie_secure=False,
 )
+
+
+def _doc(**over: object) -> dict[str, object]:
+    doc: dict[str, object] = {
+        "issuer": ISSUER,
+        "authorization_endpoint": AUTHORIZE,
+        "token_endpoint": "https://sso.example/application/o/token/",
+        "jwks_uri": f"{ISSUER}jwks/",
+        "end_session_endpoint": END_SESSION,
+    }
+    doc.update(over)
+    return {k: v for k, v in doc.items() if v is not None}
+
+
+@pytest.fixture(autouse=True)
+def _clear_discovery_cache() -> Iterator[None]:
+    oidc._discovery_cache.clear()
+    yield
+    oidc._discovery_cache.clear()
+
+
+@pytest.fixture
+def idp() -> Iterator[respx.MockRouter]:
+    """Serve the discovery document. The TestClient transport bypasses respx."""
+    with respx.mock(assert_all_called=False) as mock:
+        mock.get(DISCOVERY).mock(return_value=httpx.Response(200, json=_doc()))
+        yield mock
 
 
 def _client(settings: Settings) -> Iterator[TestClient]:
@@ -73,11 +107,22 @@ def test_login_disabled_returns_404(disabled_client: TestClient) -> None:
     assert disabled_client.get("/api/auth/login").status_code == 404
 
 
-def test_login_redirects_to_keycloak(enabled_client: TestClient) -> None:
+def test_login_redirects_to_discovered_authorize_endpoint(
+    enabled_client: TestClient, idp: respx.MockRouter
+) -> None:
     resp = enabled_client.get("/api/auth/login")
     assert resp.status_code == 307
-    assert resp.headers["location"].startswith("https://kc.example/realms/app/")
+    assert resp.headers["location"].startswith(f"{AUTHORIZE}?")
     assert ENABLED.oidc_tx_cookie_name in resp.headers.get("set-cookie", "")
+
+
+def test_login_discovery_failure_returns_503(enabled_client: TestClient) -> None:
+    with respx.mock(assert_all_called=False) as mock:
+        mock.get(DISCOVERY).mock(side_effect=httpx.ConnectError("down"))
+        resp = enabled_client.get("/api/auth/login")
+    assert resp.status_code == 503
+    assert resp.headers["content-type"].startswith("application/problem+json")
+    assert ENABLED.oidc_tx_cookie_name not in resp.headers.get("set-cookie", "")
 
 
 def test_callback_disabled_returns_404(disabled_client: TestClient) -> None:
@@ -114,6 +159,22 @@ def test_callback_oidc_error_returns_400(
     assert resp.status_code == 400
 
 
+def test_callback_idp_unavailable_returns_503(
+    enabled_client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.modules.auth import sessions
+
+    async def _down(*a: object, **k: object) -> tuple[str, object]:
+        raise OidcUnavailableError("discovery unreachable")
+
+    monkeypatch.setattr(router_mod.service, "oidc_callback", _down)
+    tx = sessions.issue_oidc_tx(ENABLED.session_secret, "st", "v", "n")
+    enabled_client.cookies.set(ENABLED.oidc_tx_cookie_name, tx)
+    resp = enabled_client.get("/api/auth/callback?code=c&state=st")
+    assert resp.status_code == 503
+    assert resp.headers["content-type"].startswith("application/problem+json")
+
+
 def test_callback_success_sets_session(
     enabled_client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -137,7 +198,7 @@ def test_logout_without_cookie_local_only(enabled_client: TestClient) -> None:
 
 
 def test_logout_with_cookie_returns_rp_logout_url(
-    enabled_client: TestClient, monkeypatch: pytest.MonkeyPatch
+    enabled_client: TestClient, monkeypatch: pytest.MonkeyPatch, idp: respx.MockRouter
 ) -> None:
     async def _del(*a: object, **k: object) -> AuthSession:
         return AuthSession(sid="s", principal_id="p", id_token="idt")
@@ -148,8 +209,49 @@ def test_logout_with_cookie_returns_rp_logout_url(
     assert resp.status_code == 200
     url = resp.json()["logout_url"]
     assert url is not None
-    assert "/protocol/openid-connect/logout" in url
+    assert url.startswith(f"{END_SESSION}?")
     assert "id_token_hint=idt" in url
+
+
+def test_logout_idp_without_end_session_returns_no_url(
+    enabled_client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def _del(*a: object, **k: object) -> AuthSession:
+        return AuthSession(sid="s", principal_id="p", id_token="idt")
+
+    monkeypatch.setattr(router_mod.sessions, "delete_principal_session", _del)
+    enabled_client.cookies.set(ENABLED.session_cookie_name, "x")
+    with respx.mock(assert_all_called=False) as mock:
+        doc = _doc(end_session_endpoint=None)
+        mock.get(DISCOVERY).mock(return_value=httpx.Response(200, json=doc))
+        resp = enabled_client.post(
+            "/api/auth/logout", headers=_csrf(enabled_client, ENABLED)
+        )
+    assert resp.status_code == 200
+    assert resp.json() == {"logout_url": None}
+
+
+def test_logout_discovery_failure_still_ends_session(
+    enabled_client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An IdP outage must not keep the local session open."""
+    ended: list[str] = []
+
+    async def _del(*a: object, **k: object) -> AuthSession:
+        ended.append(str(k.get("cookie_value")))
+        return AuthSession(sid="s", principal_id="p", id_token="idt")
+
+    monkeypatch.setattr(router_mod.sessions, "delete_principal_session", _del)
+    enabled_client.cookies.set(ENABLED.session_cookie_name, "x")
+    with respx.mock(assert_all_called=False) as mock:
+        mock.get(DISCOVERY).mock(side_effect=httpx.ConnectError("down"))
+        resp = enabled_client.post(
+            "/api/auth/logout", headers=_csrf(enabled_client, ENABLED)
+        )
+    assert resp.status_code == 200
+    assert resp.json() == {"logout_url": None}
+    assert ended == ["x"]
+    assert ENABLED.session_cookie_name in resp.headers.get("set-cookie", "")
 
 
 def test_logout_revokes_applicant_session(

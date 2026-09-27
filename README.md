@@ -7,7 +7,7 @@ budgets and invoices. The platform versions and audits all of it.
 
 Monorepo, one VM, `docker compose`. Internally everything speaks plain HTTP. An
 **external Nginx Proxy Manager** in front of the stack terminates TLS. The stack does not
-handle certificates and does not contain a built-in Keycloak.
+handle certificates and does not contain a built-in identity provider.
 
 Full documentation in the [Wiki](https://github.com/STUPA-MAKERS/STUPA-Workflow/wiki).
 
@@ -27,9 +27,9 @@ Full documentation in the [Wiki](https://github.com/STUPA-MAKERS/STUPA-Workflow/
 The backend works and has tests (about 3400 unit tests plus an integration suite).
 It implements:
 
-- **Auth & RBAC** — OIDC/Keycloak (authorization code + PKCE, server session) and a
-  magic link for applicants (HMAC-hashed single-use token). Roles, permissions and
-  time-bound assignments. Each `/admin/` page has its own permission.
+- **Auth & RBAC** — OIDC against any IdP with a discovery document, such as authentik or
+  Keycloak (authorization code + PKCE, server session), and a magic link for applicants
+  (HMAC-hashed single-use token). Roles, permissions and time-bound assignments. Each `/admin/` page has its own permission.
 - **Forms** — forms as versioned JSON. The backend validates the definition and the
   answers against a schema. This covers `visibleIf` and compute through JsonLogic, with
   ReDoS-hardened patterns.

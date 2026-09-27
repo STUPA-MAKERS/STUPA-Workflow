@@ -86,8 +86,12 @@ class Settings(BaseSettings):
     redis_url: str = "redis://redis:6379/0"
     db_migration_url: str | None = None
 
-    # OIDC / Keycloak. Without the full config, OIDC stays off and login and callback
-    # answer 503. The magic link stays usable on its own.
+    # OIDC, against any IdP that serves an OpenID discovery document. The endpoints come
+    # from `{oidc_issuer}/.well-known/openid-configuration`. Set `oidc_issuer` exactly as
+    # the IdP writes it into the `iss` claim, trailing slash included: authentik uses
+    # `https://<host>/application/o/<slug>/`, Keycloak `https://<host>/realms/<realm>`.
+    # Without the full config, OIDC stays off and login and callback answer 404. The
+    # magic link stays usable on its own.
     oidc_issuer: str | None = None
     oidc_client_id: str | None = None
     oidc_client_secret: str | None = Field(default=None, min_length=_MIN_SECRET_LEN)
