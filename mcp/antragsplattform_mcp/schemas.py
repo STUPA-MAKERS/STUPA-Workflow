@@ -214,13 +214,27 @@ class GremiumRoleUpdate(WireModel):
     permissions: list[str] | None = None
 
 
-class GremiumGroupMappingCreate(WireModel):
+class GremiumMembershipMappingCreate(WireModel):
     oidcGroup: str = Field(description="OIDC group name. The prefix 'vote:' is reserved.")
-    gremiumRoleId: str = Field(description="A role of the same Gremium")
+    gremiumId: str = Field(description="The Gremium that the group gives membership in")
 
 
-class GremiumGroupMappingUpdate(WireModel):
-    """Partial update. The Gremium stays the same."""
+class GremiumMembershipMappingUpdate(WireModel):
+    """Partial update. Send at least one key."""
+
+    oidcGroup: str | None = None
+    gremiumId: str | None = None
+
+
+class GremiumRoleMappingCreate(WireModel):
+    oidcGroup: str = Field(description="OIDC group name. The prefix 'vote:' is reserved.")
+    gremiumRoleId: str = Field(
+        description="A Gremium role. It applies only to members of its Gremium."
+    )
+
+
+class GremiumRoleMappingUpdate(WireModel):
+    """Partial update. Send at least one key."""
 
     oidcGroup: str | None = None
     gremiumRoleId: str | None = None
@@ -238,15 +252,15 @@ class RoleUpdate(WireModel):
 
 
 class GroupMappingCreate(WireModel):
+    """OIDC group to a global role. A global role has no Gremium scope."""
+
     oidcGroup: str
     roleId: str
-    gremiumId: str | None = None
 
 
 class GroupMappingUpdate(WireModel):
     oidcGroup: str | None = None
     roleId: str | None = None
-    gremiumId: str | None = None
 
 
 # Admin: application types, webhooks and deadline policies.

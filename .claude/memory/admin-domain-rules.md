@@ -22,7 +22,9 @@ Also: the Users screen is now a Nextcloud-style table. Role *permissions* live o
 `/admin/roles` screen.
 
 **Membership and roles come from OIDC groups only (2026-09-27).** Nobody can set a Gremium
-membership or a global role assignment by hand. Per Gremium, the admin maps an OIDC group to a
-Gremium role (`gremium_group_mapping`). The login sync writes `gremium_membership` from it. Global
-roles come from `group_mapping`. The only `role_assignment` rows are the bootstrap ones. Do not
+membership or a global role assignment by hand. An OIDC group links in THREE SEPARATE ways, all on
+`/admin/group-mappings`: group → global role (`group_mapping`, no gremium scope), group → gremium
+membership (`gremium_membership_mapping`), group → gremium role (`gremium_role_mapping`, only for
+members). The user was explicit: global roles, gremien and gremium roles are unrelated and must
+never be combined in one mapping. The login sync writes `gremium_membership`. The only `role_assignment` rows are the bootstrap ones. Do not
 add a manual write path back. See [[nextcloud-parity-ui]], [[antragsplattform-backlog]].

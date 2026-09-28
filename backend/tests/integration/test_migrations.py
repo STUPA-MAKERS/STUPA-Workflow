@@ -274,3 +274,58 @@ def test_drop_type_flows_repairs_legacy_duplicates(engine: Engine) -> None:
     assert actives == [global_id]
     assert versions == [1, 2, 3]
     assert has_type_col is False
+
+
+def test_split_oidc_mappings_converts_gremium_group_mappings(
+    alembic_cfg: Config, engine: Engine
+) -> None:
+    """Migration 14ed7a68a641 splits one gremium group mapping into two links.
+
+    The group becomes a member of the gremium. It keeps its role through a role mapping,
+    unless the role is the forced `member`. A global mapping with a gremium scope goes.
+    """
+    command.downgrade(alembic_cfg, "097f61e33e3c")
+    with engine.begin() as conn:
+        gid = conn.execute(
+            text("INSERT INTO gremium (name, slug) VALUES ('G', 'g-split') RETURNING id")
+        ).scalar_one()
+        member, board = (
+            conn.execute(
+                text(
+                    "INSERT INTO gremium_role (gremium_id, key) VALUES (:g, :k) RETURNING id"
+                ),
+                {"g": gid, "k": key},
+            ).scalar_one()
+            for key in ("member", "vorstand")
+        )
+        conn.execute(
+            text(
+                "INSERT INTO gremium_group_mapping (gremium_id, gremium_role_id, oidc_group) "
+                "VALUES (:g, :m, 'g-members'), (:g, :b, 'g-board')"
+            ),
+            {"g": gid, "m": member, "b": board},
+        )
+        role = conn.execute(text("SELECT id FROM role WHERE key = 'member'")).scalar_one()
+        conn.execute(
+            text(
+                "INSERT INTO group_mapping (oidc_group, role_id, gremium_id) "
+                "VALUES ('global', :r, NULL), ('scoped', :r, :g)"
+            ),
+            {"r": role, "g": gid},
+        )
+
+    command.upgrade(alembic_cfg, "head")
+    with engine.connect() as conn:
+        memberships = conn.execute(
+            text("SELECT oidc_group FROM gremium_membership_mapping WHERE gremium_id = :g"),
+            {"g": gid},
+        ).scalars().all()
+        roles = conn.execute(
+            text("SELECT gremium_role_id, oidc_group FROM gremium_role_mapping")
+        ).all()
+        globals_ = conn.execute(text("SELECT oidc_group FROM group_mapping")).scalars().all()
+        old = conn.execute(text("SELECT to_regclass('gremium_group_mapping')")).scalar_one()
+    assert sorted(memberships) == ["g-board", "g-members"]
+    assert [(r[0], r[1]) for r in roles] == [(board, "g-board")]
+    assert globals_ == ["global"]
+    assert old is None

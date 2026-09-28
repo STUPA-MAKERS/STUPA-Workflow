@@ -8,7 +8,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { skipLoading } from '@core/loading/loading.interceptor';
 import { Injectable, inject } from '@angular/core';
-import { type Observable, map, of } from 'rxjs';
+import { type Observable, map, of, throwError } from 'rxjs';
 import { API_BASE_URL, USE_MOCK_API } from '@core/api/api.config';
 import { I18nService } from '@core/i18n/i18n.service';
 import { mapDiff } from '@core/api/mappers';
@@ -42,9 +42,11 @@ import {
   type FormStatus,
   type Gremium,
   type GremiumCreateBody,
-  type GremiumGroupMapping,
-  type GremiumGroupMappingBody,
   type GremiumMembership,
+  type GremiumMembershipMapping,
+  type GremiumMembershipMappingBody,
+  type GremiumRoleMapping,
+  type GremiumRoleMappingBody,
   type DeadlinePolicy,
   type ErasureRequest,
   type ErasureStatus,
@@ -71,6 +73,11 @@ import {
   MOCK_FORM_DRAFTS,
   MOCK_FORMS,
   MOCK_GREMIEN,
+  MOCK_GREMIUM_MEMBERSHIP_MAPPINGS,
+  MOCK_GREMIUM_MEMBERSHIPS,
+  MOCK_GREMIUM_ROLE_MAPPINGS,
+  MOCK_GREMIUM_ROLES,
+  MOCK_GROUP_MAPPINGS,
   MOCK_PERMISSIONS,
   MOCK_PRINCIPALS,
   MOCK_ROLES,
@@ -111,7 +118,10 @@ export class AdminApiService {
     gremien: structuredCopy(MOCK_GREMIEN),
     appTypes: structuredCopy(MOCK_APP_TYPES),
     formDrafts: structuredCopy(MOCK_FORM_DRAFTS) as Record<string, FormDraft>,
-    gremiumRoles: [] as GremiumRole[],
+    gremiumRoles: structuredCopy(MOCK_GREMIUM_ROLES),
+    groupMappings: structuredCopy(MOCK_GROUP_MAPPINGS),
+    membershipMappings: structuredCopy(MOCK_GREMIUM_MEMBERSHIP_MAPPINGS),
+    roleMappings: structuredCopy(MOCK_GREMIUM_ROLE_MAPPINGS),
     deadlinePolicies: [] as DeadlinePolicy[],
     erasures: [] as ErasureRequest[],
     backups: [...MOCK_BACKUPS] as Backup[],
@@ -281,17 +291,97 @@ export class AdminApiService {
     return this.http.get<Role[]>(`${this.base}/admin/roles`);
   }
 
+  // OIDC group mappings. There are three separate kinds: group → global role,
+  // group → gremium membership and group → gremium role. All need
+  // P(`admin.group_mappings`). The backend answers 409 for a duplicate, 404 for an
+  // unknown role or gremium, and 422 for a group name with the reserved `vote:` prefix.
+
+  /** OIDC group → global role. */
   listGroupMappings(): Observable<GroupMapping[]> {
+    if (this.mock) return of(structuredCopy(this.store.groupMappings));
     return this.http.get<GroupMapping[]>(`${this.base}/admin/group-mappings`);
   }
   createGroupMapping(body: GroupMappingBody): Observable<GroupMapping> {
+    if (this.mock) return mockInsert(this.store.groupMappings, 'gm', body);
     return this.http.post<GroupMapping>(`${this.base}/admin/group-mappings`, body);
   }
   updateGroupMapping(id: Uuid, body: Partial<GroupMappingBody>): Observable<GroupMapping> {
+    if (this.mock) return mockPatch(this.store.groupMappings, id, body);
     return this.http.patch<GroupMapping>(`${this.base}/admin/group-mappings/${id}`, body);
   }
   deleteGroupMapping(id: Uuid): Observable<void> {
+    if (this.mock) return mockRemove(this.store.groupMappings, id);
     return this.http.delete<void>(`${this.base}/admin/group-mappings/${id}`);
+  }
+
+  /** OIDC group → gremium membership (default gremium role `member`). */
+  listMembershipMappings(): Observable<GremiumMembershipMapping[]> {
+    if (this.mock) return of(structuredCopy(this.store.membershipMappings));
+    return this.http.get<GremiumMembershipMapping[]>(
+      `${this.base}/admin/gremium-membership-mappings`,
+    );
+  }
+  createMembershipMapping(body: GremiumMembershipMappingBody): Observable<GremiumMembershipMapping> {
+    if (this.mock) return mockInsert(this.store.membershipMappings, 'gmm', body);
+    return this.http.post<GremiumMembershipMapping>(
+      `${this.base}/admin/gremium-membership-mappings`,
+      body,
+    );
+  }
+  updateMembershipMapping(
+    id: Uuid,
+    body: Partial<GremiumMembershipMappingBody>,
+  ): Observable<GremiumMembershipMapping> {
+    if (this.mock) return mockPatch(this.store.membershipMappings, id, body);
+    return this.http.patch<GremiumMembershipMapping>(
+      `${this.base}/admin/gremium-membership-mappings/${id}`,
+      body,
+    );
+  }
+  deleteMembershipMapping(id: Uuid): Observable<void> {
+    if (this.mock) return mockRemove(this.store.membershipMappings, id);
+    return this.http.delete<void>(`${this.base}/admin/gremium-membership-mappings/${id}`);
+  }
+
+  /**
+   * OIDC group → role of one gremium. The role applies only to members of that
+   * gremium. `gremiumId` in the answer is the gremium of the role.
+   */
+  listRoleMappings(): Observable<GremiumRoleMapping[]> {
+    if (this.mock) return of(structuredCopy(this.store.roleMappings));
+    return this.http.get<GremiumRoleMapping[]>(`${this.base}/admin/gremium-role-mappings`);
+  }
+  createRoleMapping(body: GremiumRoleMappingBody): Observable<GremiumRoleMapping> {
+    if (this.mock) {
+      return mockInsert(this.store.roleMappings, 'grm', {
+        ...body,
+        gremiumId: this.mockRoleGremium(body.gremiumRoleId),
+      });
+    }
+    return this.http.post<GremiumRoleMapping>(`${this.base}/admin/gremium-role-mappings`, body);
+  }
+  updateRoleMapping(
+    id: Uuid,
+    body: Partial<GremiumRoleMappingBody>,
+  ): Observable<GremiumRoleMapping> {
+    if (this.mock) {
+      const patch: Partial<GremiumRoleMapping> = { ...body };
+      if (body.gremiumRoleId) patch.gremiumId = this.mockRoleGremium(body.gremiumRoleId);
+      return mockPatch(this.store.roleMappings, id, patch);
+    }
+    return this.http.patch<GremiumRoleMapping>(
+      `${this.base}/admin/gremium-role-mappings/${id}`,
+      body,
+    );
+  }
+  deleteRoleMapping(id: Uuid): Observable<void> {
+    if (this.mock) return mockRemove(this.store.roleMappings, id);
+    return this.http.delete<void>(`${this.base}/admin/gremium-role-mappings/${id}`);
+  }
+
+  /** The gremium of a gremium role in the mock store (empty for an unknown role). */
+  private mockRoleGremium(roleId: Uuid): Uuid {
+    return this.store.gremiumRoles.find((r) => r.id === roleId)?.gremiumId ?? '';
   }
 
   listMailTemplates(): Observable<MailTemplate[]> {
@@ -650,9 +740,12 @@ export class AdminApiService {
     );
   }
 
-  listGremiumRoles(gremiumId: Uuid): Observable<GremiumRole[]> {
+  /** `quiet` = the caller shows its own loading state (no overlay). */
+  listGremiumRoles(gremiumId: Uuid, opts: { quiet?: boolean } = {}): Observable<GremiumRole[]> {
     if (this.mock) return of(structuredCopy(this.store.gremiumRoles.filter((r) => r.gremiumId === gremiumId)));
-    return this.http.get<GremiumRole[]>(`${this.base}/admin/gremien/${gremiumId}/roles`);
+    return this.http.get<GremiumRole[]>(`${this.base}/admin/gremien/${gremiumId}/roles`, {
+      context: opts.quiet ? skipLoading() : undefined,
+    });
   }
 
   createGremiumRole(
@@ -725,47 +818,10 @@ export class AdminApiService {
 
   /** Memberships of one gremium (read-only). The OIDC group sync writes them. */
   listGremiumMemberships(gremiumId: Uuid): Observable<GremiumMembership[]> {
-    if (this.mock) return of([]);
+    if (this.mock) {
+      return of(structuredCopy(MOCK_GREMIUM_MEMBERSHIPS.filter((m) => m.gremiumId === gremiumId)));
+    }
     return this.http.get<GremiumMembership[]>(`${this.base}/admin/gremien/${gremiumId}/memberships`);
-  }
-
-  /** OIDC group → gremium role mappings of one gremium. */
-  listGremiumGroupMappings(gremiumId: Uuid): Observable<GremiumGroupMapping[]> {
-    if (this.mock) return of([]);
-    return this.http.get<GremiumGroupMapping[]>(
-      `${this.base}/admin/gremien/${gremiumId}/group-mappings`,
-    );
-  }
-
-  /**
-   * Map an OIDC group to a gremium role. The backend syncs the memberships after it.
-   *
-   * 409: the gremium already maps the group, or the role belongs to another gremium.
-   * 422: the group name is empty or uses the reserved `vote:` prefix.
-   */
-  createGremiumGroupMapping(
-    gremiumId: Uuid,
-    body: GremiumGroupMappingBody,
-  ): Observable<GremiumGroupMapping> {
-    return this.http.post<GremiumGroupMapping>(
-      `${this.base}/admin/gremien/${gremiumId}/group-mappings`,
-      body,
-    );
-  }
-
-  /** Change the group or the role of one mapping. Same 409/422 rules as the create. */
-  updateGremiumGroupMapping(
-    id: Uuid,
-    body: Partial<GremiumGroupMappingBody>,
-  ): Observable<GremiumGroupMapping> {
-    return this.http.patch<GremiumGroupMapping>(
-      `${this.base}/admin/gremium-group-mappings/${id}`,
-      body,
-    );
-  }
-
-  deleteGremiumGroupMapping(id: Uuid): Observable<void> {
-    return this.http.delete<void>(`${this.base}/admin/gremium-group-mappings/${id}`);
   }
 
   // Every audit-log endpoint below needs P(audit.read).
@@ -1085,6 +1141,30 @@ export class AdminApiService {
 }
 
 /** Deep copy without assuming `structuredClone` is available (jsdom-safe). */
+let mockSeq = 0;
+
+/** Mock store: add a row with a fresh id. */
+function mockInsert<T extends { id: Uuid }>(rows: T[], prefix: string, body: Omit<T, 'id'>): Observable<T> {
+  const row = { ...body, id: `${prefix}-new-${++mockSeq}` } as T;
+  rows.push(row);
+  return of(structuredCopy(row));
+}
+
+/** Mock store: change one row. An unknown id answers 404 like the backend. */
+function mockPatch<T extends { id: Uuid }>(rows: T[], id: Uuid, patch: Partial<NoInfer<T>>): Observable<T> {
+  const row = rows.find((r) => r.id === id);
+  if (!row) return throwError(() => ({ status: 404 }));
+  Object.assign(row, patch);
+  return of(structuredCopy(row));
+}
+
+/** Mock store: remove one row. An unknown id is a no-op. */
+function mockRemove<T extends { id: Uuid }>(rows: T[], id: Uuid): Observable<void> {
+  const i = rows.findIndex((r) => r.id === id);
+  if (i >= 0) rows.splice(i, 1);
+  return of(void 0);
+}
+
 function structuredCopy<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }

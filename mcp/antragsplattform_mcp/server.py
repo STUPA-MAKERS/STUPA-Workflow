@@ -57,8 +57,11 @@ TYPICAL FLOWS:
   extracted fields + `fileToken`) or `upload_invoice_file(file_path)`, then pass `fileToken`
   to `create_invoice`.
 - Members and roles: the OIDC groups of the IdP are the only source. No tool adds a member
-  or assigns a role. Map a group to a Gremium role with `create_gremium_group_mapping`, or
-  to a global role with `create_group_mapping`. The platform then syncs the memberships.
+  or assigns a role. There are three separate group mappings: a group to the membership in
+  a Gremium (`create_gremium_membership_mapping`, default role `member`), a group to a
+  Gremium role (`create_gremium_role_mapping`, applies to members of that Gremium only),
+  and a group to a global role (`create_group_mapping`). The platform then syncs the
+  memberships.
 
 SCHEMAS: tool parameters are typed and mirror the API (camelCase keys). For guard/action
 shapes and form-field types call `get_config_schemas` (authoritative JSON-Schemas).

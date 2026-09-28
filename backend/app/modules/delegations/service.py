@@ -41,7 +41,6 @@ from app.modules.admin.gremium_roles import gremium_ids_with_permission, gremium
 from app.modules.admin.models import Gremium, GremiumMembership, GremiumRole
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
-from app.modules.auth.models import GroupMapping, RoleAssignment
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.delegations.models import DelegationSubstitute, MeetingDelegation
@@ -131,48 +130,12 @@ async def _independently_eligible(
 ) -> bool:
     """Report whether the principal can vote without any delegation.
 
-    The check uses the same sources as the RBAC resolver. These are a gremium role
-    with `vote.cast`, a directly held gremium-scoped `role_assignment`, and an OIDC
-    group, either direct or through `group_mapping`.
+    The check uses the same source as the cast gate of the voting module: an active
+    gremium membership whose gremium role holds `vote.cast`. The membership comes from
+    the OIDC groups through the gremium mappings. A global role or a raw OIDC group
+    never gives the voting right in a gremium.
     """
-    if await _membership_with_vote_cast(session, principal_id, gremium_id, now):
-        return True
-    direct = (
-        await session.execute(
-            select(RoleAssignment.id)
-            .where(
-                RoleAssignment.principal_id == principal_id,
-                RoleAssignment.delegated_by.is_(None),
-                RoleAssignment.gremium_id == gremium_id,
-                (RoleAssignment.valid_from.is_(None)) | (RoleAssignment.valid_from <= now),
-                (RoleAssignment.valid_until.is_(None)) | (RoleAssignment.valid_until > now),
-            )
-            .limit(1)
-        )
-    ).first()
-    if direct is not None:
-        return True
-    row = (
-        await session.execute(
-            select(PrincipalRow.oidc_groups).where(PrincipalRow.id == principal_id)
-        )
-    ).first()
-    oidc = {str(g) for g in ((row[0] if row else None) or [])}
-    if str(gremium_id) in oidc:
-        return True
-    if not oidc:
-        return False
-    mapped = (
-        await session.execute(
-            select(GroupMapping.id)
-            .where(
-                GroupMapping.gremium_id == gremium_id,
-                GroupMapping.oidc_group.in_(oidc),
-            )
-            .limit(1)
-        )
-    ).first()
-    return mapped is not None
+    return await _membership_with_vote_cast(session, principal_id, gremium_id, now)
 
 
 async def voting_delegation_check(

@@ -72,19 +72,20 @@ async def test_resolve_principal_full_path() -> None:
     expired = RoleAssignment(
         role_id="rX", gremium_id=None, valid_from=None, valid_until=NOW - timedelta(days=1)
     )
-    mapping_global = GroupMapping(oidc_group="grpA", role_id="r2", gremium_id=None)
-    mapping_scoped = GroupMapping(oidc_group="grpA", role_id="r3", gremium_id="gid2")
+    mapping_a = GroupMapping(oidc_group="grpA", role_id="r2")
+    mapping_b = GroupMapping(oidc_group="grpA", role_id="r3")
     db = fake_session(
         result(valid, expired),
-        result(mapping_global, mapping_scoped),
+        result(mapping_a, mapping_b),
         result("application.read", "vote.cast"),
         result("member", "manager"),
     )
     p = await rbac.resolve_principal(db, row, NOW)
     assert p.permissions == {"application.read", "vote.cast"}
     assert set(p.roles) == {"member", "manager"}
-    # The OIDC group and both Gremium scopes (assignment and mapping) land in groups.
-    assert p.groups == {"grpA", "gid1", "gid2"}
+    # The OIDC group and the Gremium scope of the assignment land in groups. A global
+    # group mapping has no Gremium scope.
+    assert p.groups == {"grpA", "gid1"}
 
 
 async def test_resolve_principal_assignment_without_gremium() -> None:

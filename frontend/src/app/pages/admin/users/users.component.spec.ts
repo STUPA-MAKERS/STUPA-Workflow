@@ -67,11 +67,11 @@ const PRINCIPALS: AdminPrincipal[] = [
 ];
 
 const MAPPINGS: GroupMapping[] = [
-  { id: 'gm-1', oidcGroup: 'stupa-referat', roleId: 'r-ref', gremiumId: null },
+  { id: 'gm-1', oidcGroup: 'stupa-referat', roleId: 'r-ref' },
   // The same role as the bootstrap assignment. The column shows it once.
-  { id: 'gm-2', oidcGroup: 'stupa-referat', roleId: 'r-admin', gremiumId: null },
+  { id: 'gm-2', oidcGroup: 'stupa-referat', roleId: 'r-admin' },
   // A reserved group never gives a role, not even through a mapping.
-  { id: 'gm-3', oidcGroup: 'vote:g-1', roleId: 'r-member', gremiumId: null },
+  { id: 'gm-3', oidcGroup: 'vote:g-1', roleId: 'r-member' },
 ];
 
 function makeAuth(sub: string | null, canMappings = true) {

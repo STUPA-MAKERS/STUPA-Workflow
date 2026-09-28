@@ -1320,13 +1320,11 @@ async def test_resolve_principal_with_assignment_and_group_mappings() -> None:
 
     The test covers a valid assignment with a Gremium (groups.add) and a valid assignment
     without one (no add). It also covers an expired assignment (else branch of
-    `_assignment_valid`). For mappings it covers a GroupMapping with a Gremium (lines
-    74-75) and one without (line 73).
+    `_assignment_valid`). A global GroupMapping adds its role and no Gremium scope.
     """
     row = PrincipalRow(sub="u12", email=None, display_name=None, oidc_groups=["grpA"])
     row.id = "pid"  # type: ignore[assignment]
     gid = "77777777-7777-7777-7777-777777777777"
-    map_gid = "88888888-8888-8888-8888-888888888888"
     valid_g = RoleAssignment(
         role_id="r1", gremium_id=gid, valid_from=None, valid_until=None
     )
@@ -1337,19 +1335,17 @@ async def test_resolve_principal_with_assignment_and_group_mappings() -> None:
         role_id="rX", gremium_id=None, valid_from=None,
         valid_until=NOW - timedelta(days=1),
     )
-    map_global = GroupMapping(oidc_group="grpA", role_id="r3", gremium_id=None)
-    map_scoped = GroupMapping(oidc_group="grpA", role_id="r4", gremium_id=map_gid)
+    map_a = GroupMapping(oidc_group="grpA", role_id="r3")
+    map_b = GroupMapping(oidc_group="grpA", role_id="r4")
     db = fake_session(
         result(valid_g, valid_no_g, expired),  # assignments
-        result(map_global, map_scoped),        # group mappings
+        result(map_a, map_b),                  # group mappings
         result("application.read"),            # role permissions
         result("member"),                      # role keys
         result(),                              # membership rows
     )
     p = await rbac.resolve_principal(db, row, NOW)
-    assert str(gid) in p.groups        # assignment Gremium
-    assert str(map_gid) in p.groups    # mapping Gremium
-    assert "grpA" in p.groups          # OIDC group
+    assert p.groups == {str(gid), "grpA"}  # assignment Gremium and OIDC group
     assert p.permissions == {"application.read"}
 
 

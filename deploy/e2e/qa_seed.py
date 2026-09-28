@@ -1,8 +1,9 @@
 """QA seed: one principal per role, each with a ready-made session cookie.
 
 This exists for the manual/Playwright QA sweep against the local stack. It writes ONLY
-identity rows — principals with their OIDC groups, the global group mappings and the
-Gremium group mappings — plus one signed session cookie per role. Every piece of domain config (the
+identity rows — principals with their OIDC groups, the global group mappings, the
+Gremium membership mappings and the Gremium role mappings — plus one signed session
+cookie per role. Every piece of domain config (the
 application type, the form, the flow, budgets, meetings) is created afterwards through
 the REST API, so the QA data goes through the same validation as real data.
 
@@ -13,7 +14,13 @@ The IdP is the only source of global roles and Gremium memberships. The seed thu
 writes no `role_assignment` and no `gremium_membership` by hand. It sets the group cache
 `principal.oidc_groups`, which an OIDC login would fill. The RBAC resolver maps these
 groups to the global roles at each request. The seed then calls the backend sync
-`sync_all_memberships`, which writes the memberships from the Gremium group mappings. A later login or a later change of a mapping gives the same rows.
+`sync_all_memberships`, which writes the memberships from the Gremium membership
+mappings and the Gremium role mappings. A later login or a later change of a mapping
+gives the same rows.
+
+The group `gremium-<gremium>` makes a person a member of that Gremium, with the default
+Gremium role `member`. The group `gremium-<gremium>-<role>` gives a member a different
+Gremium role. The role group alone makes nobody a member.
 
 The Gremium memberships matter for voting: `vote.cast` eligibility comes from an active
 membership whose Gremium role carries it, never from a global role.
@@ -38,7 +45,12 @@ from sqlalchemy import delete, select
 
 from app.db import get_sessionmaker
 from app.modules.admin.membership_sync import sync_all_memberships
-from app.modules.admin.models import Gremium, GremiumGroupMapping, GremiumRole
+from app.modules.admin.models import (
+    Gremium,
+    GremiumMembershipMapping,
+    GremiumRole,
+    GremiumRoleMapping,
+)
 from app.modules.auth.models import GroupMapping, Principal, Role, RoleAssignment
 from app.modules.auth.sessions import create_principal_session
 from app.settings import get_settings
@@ -66,8 +78,17 @@ def _role_group(role_key: str) -> str:
     return f"role-{role_key}"
 
 
-def _gremium_group(gremium_key: str, gremium_role_key: str) -> str:
-    """Return the OIDC group that gives a role in a Gremium."""
+# The Gremium role that a member without a role mapping gets.
+DEFAULT_GREMIUM_ROLE = "member"
+
+
+def _membership_group(gremium_key: str) -> str:
+    """Return the OIDC group that makes a person a member of a Gremium."""
+    return f"gremium-{gremium_key}"
+
+
+def _gremium_role_group(gremium_key: str, gremium_role_key: str) -> str:
+    """Return the OIDC group that gives a member a role in a Gremium."""
     return f"gremium-{gremium_key}-{gremium_role_key}"
 
 
@@ -79,7 +100,10 @@ def _groups_of(
     if role_key is not None:
         groups.append(_role_group(role_key))
     if gremium_key is not None:
-        groups.append(_gremium_group(gremium_key, gremium_role_key or "member"))
+        groups.append(_membership_group(gremium_key))
+        role = gremium_role_key or DEFAULT_GREMIUM_ROLE
+        if role != DEFAULT_GREMIUM_ROLE:
+            groups.append(_gremium_role_group(gremium_key, role))
     return groups
 
 
@@ -89,12 +113,20 @@ GROUP_MAPPINGS = [
     (_role_group(key), key) for key in ("admin", "manager", "finance", "protocol", "member")
 ]
 
-# (gremium key, gremium role key). Each pair gets the group `gremium-<gremium>-<role>`.
-GREMIUM_GROUP_MAPPINGS = sorted(
+# Gremium keys. Each one gets the membership group `gremium-<gremium>`.
+GREMIUM_MEMBERSHIP_MAPPINGS = sorted(
+    {gremium_key for _, _, _, _, gremium_key, _ in PEOPLE if gremium_key is not None}
+)
+
+# (gremium key, gremium role key) for each role other than the default role. Each pair
+# gets the role group `gremium-<gremium>-<role>`.
+GREMIUM_ROLE_MAPPINGS = sorted(
     {
-        (gremium_key, gremium_role_key or "member")
+        (gremium_key, gremium_role_key)
         for _, _, _, _, gremium_key, gremium_role_key in PEOPLE
         if gremium_key is not None
+        and gremium_role_key is not None
+        and gremium_role_key != DEFAULT_GREMIUM_ROLE
     }
 )
 
@@ -155,29 +187,46 @@ async def _ensure_group_mappings(session, roles: dict[str, uuid.UUID]) -> None:
     await session.flush()
 
 
-async def _ensure_gremium_group_mappings(session, gremien: dict[str, uuid.UUID]) -> None:
-    for gremium_key, gremium_role_key in GREMIUM_GROUP_MAPPINGS:
+async def _ensure_gremium_membership_mappings(
+    session, gremien: dict[str, uuid.UUID]
+) -> None:
+    for gremium_key in GREMIUM_MEMBERSHIP_MAPPINGS:
+        gid = gremien.get(gremium_key)
+        if gid is None:
+            continue
+        group = _membership_group(gremium_key)
+        existing = (
+            await session.execute(
+                select(GremiumMembershipMapping.id).where(
+                    GremiumMembershipMapping.gremium_id == gid,
+                    GremiumMembershipMapping.oidc_group == group,
+                )
+            )
+        ).scalar_one_or_none()
+        if existing is None:
+            session.add(GremiumMembershipMapping(gremium_id=gid, oidc_group=group))
+    await session.flush()
+
+
+async def _ensure_gremium_role_mappings(session, gremien: dict[str, uuid.UUID]) -> None:
+    for gremium_key, gremium_role_key in GREMIUM_ROLE_MAPPINGS:
         gid = gremien.get(gremium_key)
         if gid is None:
             continue
         grid = await _gremium_role(session, gid, gremium_role_key)
         if grid is None:
             continue
-        group = _gremium_group(gremium_key, gremium_role_key)
+        group = _gremium_role_group(gremium_key, gremium_role_key)
         existing = (
             await session.execute(
-                select(GremiumGroupMapping).where(
-                    GremiumGroupMapping.gremium_id == gid,
-                    GremiumGroupMapping.oidc_group == group,
+                select(GremiumRoleMapping.id).where(
+                    GremiumRoleMapping.gremium_role_id == grid,
+                    GremiumRoleMapping.oidc_group == group,
                 )
             )
         ).scalar_one_or_none()
         if existing is None:
-            session.add(
-                GremiumGroupMapping(gremium_id=gid, gremium_role_id=grid, oidc_group=group)
-            )
-        else:
-            existing.gremium_role_id = grid
+            session.add(GremiumRoleMapping(gremium_role_id=grid, oidc_group=group))
     await session.flush()
 
 
@@ -191,7 +240,8 @@ async def main() -> None:
         roles = await _roles_by_key(session)
         gremien = await _gremien_by_key(session)
         await _ensure_group_mappings(session, roles)
-        await _ensure_gremium_group_mappings(session, gremien)
+        await _ensure_gremium_membership_mappings(session, gremien)
+        await _ensure_gremium_role_mappings(session, gremien)
 
         for sub, email, name, role_key, gremium_key, gremium_role_key in PEOPLE:
             principal = await _ensure_principal(session, sub, email, name)
@@ -210,7 +260,7 @@ async def main() -> None:
             )
             subs[label] = sub
 
-        # The same sync that runs after each change of a Gremium group mapping. It
+        # The same sync that runs after each change of a Gremium mapping. It
         # writes the memberships of every principal from its OIDC groups.
         await session.flush()
         await sync_all_memberships(session)

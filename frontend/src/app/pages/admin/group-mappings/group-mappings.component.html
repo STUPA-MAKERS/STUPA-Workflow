@@ -1,80 +1,187 @@
-<app-page-header [title]="'admin.groupMappings.title' | t" [subtitle]="'admin.groupMappings.subtitle' | t">
-  <app-button actions size="sm" (click)="openAdd()">{{ 'admin.groupMappings.add' | t }}</app-button>
-</app-page-header>
+<app-page-header [title]="'admin.groupMappings.title' | t" [subtitle]="'admin.groupMappings.subtitle' | t" />
 
-<app-data-table
-    [loading]="loading()"
+<!-- Three separate mappings. They do not depend on each other. -->
+
+<!-- 1. OIDC group → global role. -->
+<section class="gm__section" aria-labelledby="gm-global-title">
+  <header class="gm__head">
+    <div>
+      <h2 id="gm-global-title" class="gm__title">{{ 'admin.groupMappings.global.title' | t }}</h2>
+      <p class="gm__hint">{{ 'admin.groupMappings.global.hint' | t }}</p>
+    </div>
+    <app-button size="sm" (click)="openAdd('global')">{{ 'admin.groupMappings.global.add' | t }}</app-button>
+  </header>
+  <app-data-table
+    [loading]="loading().global"
     [loadingText]="'common.loading' | t"
-  [columns]="columns()"
-  [rows]="rows()"
-  [rowKey]="rowId"
-  [emptyText]="'admin.groupMappings.empty' | t"
->
-  <ng-template appCell="gremiumLabel" let-r>
-    @if ($any(r).gremiumLabel) {
-      {{ $any(r).gremiumLabel }}
-    } @else {
-      <span class="text-muted">{{ 'admin.groupMappings.global' | t }}</span>
-    }
-  </ng-template>
-  <ng-template appCell="actions" let-r>
-    <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'action.edit' | t" (click)="openEdit($any(r).id)">
+    [columns]="globalColumns()"
+    [rows]="globalRows()"
+    [rowKey]="rowId"
+    [emptyText]="'admin.groupMappings.global.empty' | t"
+  >
+    <ng-template appCell="oidcGroup" let-r><code>{{ $any(r).oidcGroup }}</code></ng-template>
+    <ng-template appCell="roleLabel" let-r><app-badge variant="primary">{{ $any(r).roleLabel }}</app-badge></ng-template>
+    <ng-template appCell="actions" let-r>
+      <ng-container *ngTemplateOutlet="rowActions; context: { kind: 'global', row: r }" />
+    </ng-template>
+  </app-data-table>
+</section>
+
+<!-- 2. OIDC group → gremium membership. -->
+<section class="gm__section" aria-labelledby="gm-membership-title">
+  <header class="gm__head">
+    <div>
+      <h2 id="gm-membership-title" class="gm__title">{{ 'admin.groupMappings.membership.title' | t }}</h2>
+      <p class="gm__hint">{{ 'admin.groupMappings.membership.hint' | t }}</p>
+    </div>
+    <app-button size="sm" (click)="openAdd('membership')">{{ 'admin.groupMappings.membership.add' | t }}</app-button>
+  </header>
+  <app-data-table
+    [loading]="loading().membership"
+    [loadingText]="'common.loading' | t"
+    [columns]="membershipColumns()"
+    [rows]="membershipRows()"
+    [rowKey]="rowId"
+    [emptyText]="'admin.groupMappings.membership.empty' | t"
+  >
+    <ng-template appCell="oidcGroup" let-r><code>{{ $any(r).oidcGroup }}</code></ng-template>
+    <ng-template appCell="actions" let-r>
+      <ng-container *ngTemplateOutlet="rowActions; context: { kind: 'membership', row: r }" />
+    </ng-template>
+  </app-data-table>
+</section>
+
+<!-- 3. OIDC group → gremium role. Only for members of that gremium. -->
+<section class="gm__section" aria-labelledby="gm-role-title">
+  <header class="gm__head">
+    <div>
+      <h2 id="gm-role-title" class="gm__title">{{ 'admin.groupMappings.role.title' | t }}</h2>
+      <p class="gm__hint">{{ 'admin.groupMappings.role.hint' | t }}</p>
+    </div>
+    <app-button size="sm" (click)="openAdd('role')">{{ 'admin.groupMappings.role.add' | t }}</app-button>
+  </header>
+  <app-data-table
+    [loading]="loading().role"
+    [loadingText]="'common.loading' | t"
+    [columns]="roleColumns()"
+    [rows]="roleRows()"
+    [rowKey]="rowId"
+    [emptyText]="'admin.groupMappings.role.empty' | t"
+  >
+    <ng-template appCell="oidcGroup" let-r><code>{{ $any(r).oidcGroup }}</code></ng-template>
+    <ng-template appCell="roleLabel" let-r><app-badge variant="primary">{{ $any(r).roleLabel }}</app-badge></ng-template>
+    <ng-template appCell="actions" let-r>
+      <ng-container *ngTemplateOutlet="rowActions; context: { kind: 'role', row: r }" />
+    </ng-template>
+  </app-data-table>
+</section>
+
+<ng-template #rowActions let-kind="kind" let-row="row">
+  <span class="inline-flex items-center gap-1 justify-end">
+    <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="('action.edit' | t) + ': ' + row.oidcGroup" (click)="openEdit(kind, row.id)">
       <app-icon name="edit" />
     </app-button>
-    <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'action.delete' | t" (click)="confirmId.set($any(r).id)">
+    <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="('action.delete' | t) + ': ' + row.oidcGroup" (click)="askDelete(kind, row.id)">
       <app-icon name="delete" />
     </app-button>
-  </ng-template>
-</app-data-table>
+  </span>
+</ng-template>
 
+<!-- Add or edit one mapping. The fields depend on the section. -->
 <app-dialog
-  [open]="dialogOpen()"
-  [title]="(editId() ? 'admin.groupMappings.editTitle' : 'admin.groupMappings.add') | t"
+  [open]="!!dialog()"
+  [title]="dialogTitle() | t"
   [closeLabel]="'action.cancel' | t"
-  (closed)="dialogOpen.set(false)"
+  (closed)="closeDialog()"
 >
-  <div class="flex flex-col gap-3">
-    <label class="gm__lbl" for="gm-oidc">{{ 'admin.groupMappings.oidcGroup' | t }}</label>
-    <input
-      id="gm-oidc"
-      class="gm__control"
-      autocomplete="off"
-      [placeholder]="'admin.groupMappings.oidcGroupPlaceholder' | t"
-      [ngModel]="oidcGroup()"
-      (ngModelChange)="oidcGroup.set($event)"
-      name="oidcGroup"
-    />
-    <app-select
-      [label]="'admin.groupMappings.role' | t"
-      [placeholder]="'admin.groupMappings.rolePlaceholder' | t"
-      [options]="roleOptions()"
-      [ngModel]="roleId()"
-      (ngModelChange)="roleId.set($event)"
-      name="role"
-    />
-    <app-select
-      [label]="'admin.groupMappings.gremium' | t"
-      [options]="gremiumOptions()"
-      [ngModel]="gremiumId()"
-      (ngModelChange)="gremiumId.set($event)"
-      name="gremium"
-    />
-  </div>
+  @if (dialog(); as kind) {
+    <form class="flex flex-col gap-4" (submit)="$event.preventDefault(); save()">
+      <div class="flex flex-col gap-1">
+        <label class="gm__lbl" for="gm-group">{{ 'admin.groupMappings.oidcGroup' | t }}</label>
+        <input
+          id="gm-group"
+          class="gm__control"
+          autocomplete="off"
+          [placeholder]="'admin.groupMappings.oidcGroupPlaceholder' | t"
+          [attr.aria-invalid]="groupReserved()"
+          [attr.aria-describedby]="groupReserved() ? 'gm-group-err' : null"
+          [ngModel]="oidcGroup()"
+          (ngModelChange)="oidcGroup.set($event)"
+          name="oidcGroup"
+        />
+        @if (groupReserved()) {
+          <p id="gm-group-err" class="m-0 text-sm gm__err">{{ 'admin.groupMappings.reserved' | t }}</p>
+        }
+      </div>
+
+      @switch (kind) {
+        @case ('global') {
+          <app-select
+            [label]="'admin.groupMappings.role' | t"
+            [placeholder]="'admin.groupMappings.rolePlaceholder' | t"
+            [options]="roleOptions()"
+            [ngModel]="roleId()"
+            (ngModelChange)="roleId.set($event)"
+            name="role"
+          />
+        }
+        @case ('membership') {
+          <app-select
+            [label]="'admin.groupMappings.gremium' | t"
+            [placeholder]="'admin.groupMappings.gremiumPlaceholder' | t"
+            [options]="gremiumOptions()"
+            [ngModel]="gremiumId()"
+            (ngModelChange)="gremiumId.set($event)"
+            name="gremium"
+          />
+        }
+        @case ('role') {
+          <app-select
+            [label]="'admin.groupMappings.gremium' | t"
+            [placeholder]="'admin.groupMappings.gremiumPlaceholder' | t"
+            [hint]="'admin.groupMappings.role.gremiumFilterHint' | t"
+            [options]="gremiumOptions()"
+            [ngModel]="gremiumId()"
+            (ngModelChange)="onDialogGremium($event)"
+            name="gremium"
+          />
+          <app-select
+            [label]="'admin.groupMappings.gremiumRole' | t"
+            [placeholder]="(gremiumId() ? 'admin.groupMappings.gremiumRolePlaceholder' : 'admin.groupMappings.gremiumFirst') | t"
+            [options]="gremiumRoleOptions()"
+            [disabled]="!gremiumId() || !gremiumRoleOptions().length"
+            [ngModel]="gremiumRoleId()"
+            (ngModelChange)="gremiumRoleId.set($event)"
+            name="gremiumRole"
+          />
+          @if (gremiumId() && dialogGremiumRoles()?.length === 0) {
+            <p class="m-0 text-sm">
+              {{ 'admin.groupMappings.gremiumRolesEmpty' | t }}
+              @if (canManageGremiumRoles()) {
+                <a [routerLink]="['/admin/gremien', gremiumId(), 'roles']">{{ 'admin.gremiumRoles.manage' | t }}</a>
+              }
+            </p>
+          }
+          <p class="text-muted m-0 text-xs">{{ 'admin.groupMappings.role.ruleHint' | t }}</p>
+        }
+      }
+    </form>
+  }
   <div dialog-footer class="flex justify-end gap-3">
-    <app-button size="sm" variant="ghost" (click)="dialogOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
-    <app-button size="sm" [disabled]="!oidcGroup().trim() || !roleId()" (click)="save()">{{ 'action.save' | t }}</app-button>
+    <app-button size="sm" variant="ghost" (click)="closeDialog()">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" [disabled]="!valid()" [loading]="saving()" (click)="save()">{{ 'action.save' | t }}</app-button>
   </div>
 </app-dialog>
 
 <app-dialog
-  [open]="!!confirmId()"
+  [open]="!!confirm()"
   [title]="'admin.groupMappings.deleteTitle' | t"
   [closeLabel]="'action.cancel' | t"
-  (closed)="confirmId.set(null)"
+  (closed)="confirm.set(null)"
 >
-  <p>{{ 'admin.groupMappings.deleteBody' | t }}</p>
+  <p>{{ confirmBody() | t }}</p>
   <div dialog-footer class="flex justify-end gap-3">
-    <app-button size="sm" variant="ghost" (click)="confirmId.set(null)">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" variant="ghost" (click)="confirm.set(null)">{{ 'action.cancel' | t }}</app-button>
     <app-button size="sm" variant="danger" (click)="remove()">{{ 'action.delete' | t }}</app-button>
   </div>
 </app-dialog>
