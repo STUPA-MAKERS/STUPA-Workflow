@@ -9,7 +9,9 @@ Manage:
 - **Users** (principals): search, (de)activate, delete, view/grant/revoke role assignments.
 - **Roles & permissions**: create / rename / delete roles, edit a role's permission set in a
   scrolling form.
-- **OIDC group-mappings**: create / edit / delete `oidc_group → role [@ gremium]` mappings.
+- **OIDC group-mappings**: create / edit / delete `oidc_group → role` mappings for the
+  global roles. A global role has no Gremium scope. Manage the Gremium membership and
+  Gremium role mappings in the admin UI or through the API.
 - **Audit log**: read-only, paged, filtered, with day separators, resolved actor names,
   color-coded actions and a full-JSON pop-out per entry.
 

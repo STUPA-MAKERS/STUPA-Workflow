@@ -185,26 +185,22 @@ def role_detail(
 
 
 def mapping_label(row: dict[str, Any]) -> str:
-    scope = fmt(row.get("gremium"))
-    return f"{fmt(row.get('oidc_group'))} → {fmt(row.get('role_key'))}" + (
-        f" @ {scope}" if scope else " (global)"
-    )
+    return f"{fmt(row.get('oidc_group'))} → {fmt(row.get('role_key'))}"
 
 
 def mapping_rows(rows: list[dict[str, Any]]) -> list[Row]:
-    """Build one line per OIDC group mapping: group → role @ scope."""
+    """Build one line per OIDC group mapping: group → global role."""
     if not rows:
         return []
     group_width = min(30, max(len(clip(fmt(r.get("oidc_group")), 30)) for r in rows))
     out: list[Row] = []
     for row in rows:
-        scope = fmt(row.get("gremium"))
         line: StyleAndTextTuples = [
             ("", "  "),
             ("class:value", f"{clip(fmt(row.get('oidc_group')), 30):<{group_width}}"),
             ("class:dim", "  →  "),
             ("class:email", fmt(row.get("role_key"))),
-            ("class:dim", f"  @ {scope}\n" if scope else "  (global)\n"),
+            ("", "\n"),
         ]
         detail: StyleAndTextTuples = [
             ("class:detail-accent", f"{mapping_label(row)}\n\n"),
@@ -214,7 +210,6 @@ def mapping_rows(rows: list[dict[str, Any]]) -> list[Row]:
                 ("id", "class:id", fmt(row.get("id"))),
                 ("OIDC group", "class:value", fmt(row.get("oidc_group"))),
                 ("role", "class:value", fmt(row.get("role_key"))),
-                ("scope", "class:value", scope or "(global)"),
             ]
         )
         out.append((line, detail, "mapping"))

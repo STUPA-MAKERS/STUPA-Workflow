@@ -227,36 +227,63 @@ def _check_oidc_group(value: str) -> str:
     return value
 
 
-class GremiumGroupMappingOut(_CamelModel):
+class _OidcGroupField(_CamelModel):
+    """The OIDC group name of a mapping, outside the reserved ``vote:`` namespace."""
+
+    @field_validator("oidc_group", check_fields=False)
+    @classmethod
+    def _group(cls, value: str | None) -> str | None:
+        return None if value is None else _check_oidc_group(value)
+
+
+class GremiumMembershipMappingOut(_CamelModel):
+    """OIDC group → membership in one gremium."""
+
+    id: UUID
+    gremium_id: UUID = Field(serialization_alias="gremiumId")
+    oidc_group: str = Field(serialization_alias="oidcGroup")
+
+
+class GremiumMembershipMappingCreate(_OidcGroupField):
+    oidc_group: str = Field(alias="oidcGroup", min_length=1, max_length=256)
+    gremium_id: UUID = Field(alias="gremiumId")
+
+
+class GremiumMembershipMappingUpdate(_OidcGroupField):
+    """Change the group or the gremium of one membership mapping."""
+
+    oidc_group: str | None = Field(default=None, alias="oidcGroup", min_length=1, max_length=256)
+    gremium_id: UUID | None = Field(default=None, alias="gremiumId")
+
+    @model_validator(mode="after")
+    def _at_least_one(self) -> GremiumMembershipMappingUpdate:
+        if not self.model_fields_set:
+            raise ValueError("at least one field required")
+        return self
+
+
+class GremiumRoleMappingOut(_CamelModel):
+    """OIDC group → role in a gremium. ``gremiumId`` is the gremium of the role."""
+
     id: UUID
     gremium_id: UUID = Field(serialization_alias="gremiumId")
     gremium_role_id: UUID = Field(serialization_alias="gremiumRoleId")
     oidc_group: str = Field(serialization_alias="oidcGroup")
 
 
-class GremiumGroupMappingCreate(_CamelModel):
+class GremiumRoleMappingCreate(_OidcGroupField):
     oidc_group: str = Field(alias="oidcGroup", min_length=1, max_length=256)
     gremium_role_id: UUID = Field(alias="gremiumRoleId")
 
-    @field_validator("oidc_group")
-    @classmethod
-    def _group(cls, value: str) -> str:
-        return _check_oidc_group(value)
 
-
-class GremiumGroupMappingUpdate(_CamelModel):
-    """Change the group or the role of one mapping. The gremium stays immutable."""
+class GremiumRoleMappingUpdate(_OidcGroupField):
+    """Change the group or the gremium role of one role mapping."""
 
     oidc_group: str | None = Field(default=None, alias="oidcGroup", min_length=1, max_length=256)
     gremium_role_id: UUID | None = Field(default=None, alias="gremiumRoleId")
 
-    @field_validator("oidc_group")
-    @classmethod
-    def _group(cls, value: str | None) -> str | None:
-        return None if value is None else _check_oidc_group(value)
-
     @model_validator(mode="after")
-    def _at_least_one(self) -> GremiumGroupMappingUpdate:
+    def _at_least_one(self) -> GremiumRoleMappingUpdate:
         if not self.model_fields_set:
             raise ValueError("at least one field required")
         return self
@@ -375,22 +402,21 @@ class PrincipalUpdate(_CamelModel):
 
 
 class GroupMappingOut(_CamelModel):
+    """OIDC group → global role. A global role has no gremium scope."""
+
     id: UUID
     oidc_group: str = Field(serialization_alias="oidcGroup")
     role_id: UUID = Field(serialization_alias="roleId")
-    gremium_id: UUID | None = Field(serialization_alias="gremiumId")
 
 
-class GroupMappingCreate(_CamelModel):
-    oidc_group: str = Field(alias="oidcGroup", min_length=1)
+class GroupMappingCreate(_OidcGroupField):
+    oidc_group: str = Field(alias="oidcGroup", min_length=1, max_length=256)
     role_id: UUID = Field(alias="roleId")
-    gremium_id: UUID | None = Field(default=None, alias="gremiumId")
 
 
-class GroupMappingUpdate(_CamelModel):
-    oidc_group: str | None = Field(default=None, alias="oidcGroup")
+class GroupMappingUpdate(_OidcGroupField):
+    oidc_group: str | None = Field(default=None, alias="oidcGroup", min_length=1, max_length=256)
     role_id: UUID | None = Field(default=None, alias="roleId")
-    gremium_id: UUID | None = Field(default=None, alias="gremiumId")
 
 
 class WebhookOut(_CamelModel):

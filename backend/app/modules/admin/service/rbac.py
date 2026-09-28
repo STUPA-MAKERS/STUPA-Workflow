@@ -63,7 +63,6 @@ def _mapping_out(row: GroupMapping) -> GroupMappingOut:
         id=row.id,
         oidc_group=row.oidc_group,
         role_id=row.role_id,
-        gremium_id=row.gremium_id,
     )
 
 
@@ -243,7 +242,6 @@ class RbacOps(ConfigServiceBase):
         row = GroupMapping(
             oidc_group=payload.oidc_group,
             role_id=payload.role_id,
-            gremium_id=payload.gremium_id,
         )
         self.session.add(row)
         await self.session.flush()
@@ -263,8 +261,6 @@ class RbacOps(ConfigServiceBase):
             row.role_id = payload.role_id
         if payload.oidc_group is not None:
             row.oidc_group = payload.oidc_group
-        if payload.gremium_id is not None:
-            row.gremium_id = payload.gremium_id
         await self._audit(actor, AuditAction.ROLE_CHANGE, "group_mapping", row.id)
         await self.session.commit()
         return _mapping_out(row)

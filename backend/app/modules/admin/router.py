@@ -40,6 +40,7 @@ from app.deps import (
 from app.modules.admin.branding import Branding
 from app.modules.admin.cd_logos import LogoSlot
 from app.modules.admin.gremium_roles import GremiumRoleService
+from app.modules.admin.oidc_mappings import OidcMappingService
 from app.modules.admin.schemas import (
     ApplicationTypeCreate,
     ApplicationTypeOut,
@@ -54,13 +55,16 @@ from app.modules.admin.schemas import (
     FlowVersionCreate,
     FlowVersionOut,
     GremiumCreate,
-    GremiumGroupMappingCreate,
-    GremiumGroupMappingOut,
-    GremiumGroupMappingUpdate,
     GremiumMailRecipients,
+    GremiumMembershipMappingCreate,
+    GremiumMembershipMappingOut,
+    GremiumMembershipMappingUpdate,
     GremiumMembershipOut,
     GremiumOut,
     GremiumRoleCreate,
+    GremiumRoleMappingCreate,
+    GremiumRoleMappingOut,
+    GremiumRoleMappingUpdate,
     GremiumRoleOut,
     GremiumRoleUpdate,
     GremiumUpdate,
@@ -112,6 +116,10 @@ def get_gremium_role_service(session: DbSession) -> GremiumRoleService:
     return GremiumRoleService(session)
 
 
+def get_oidc_mapping_service(session: DbSession) -> OidcMappingService:
+    return OidcMappingService(session)
+
+
 def get_cd_variant_service(session: DbSession, request: Request) -> CdVariantService:
     # Only the logo upload and download touch the object storage. Without MinIO
     # (development, contract CI) those two routes answer 503.
@@ -122,6 +130,7 @@ def get_cd_variant_service(session: DbSession, request: Request) -> CdVariantSer
 ServiceDep = Annotated[ConfigService, Depends(get_config_service)]
 SiteServiceDep = Annotated[SiteConfigService, Depends(get_site_config_service)]
 GremiumRoleServiceDep = Annotated[GremiumRoleService, Depends(get_gremium_role_service)]
+OidcMappingServiceDep = Annotated[OidcMappingService, Depends(get_oidc_mapping_service)]
 CdVariantServiceDep = Annotated[CdVariantService, Depends(get_cd_variant_service)]
 
 # Body cap on Content-Length for a logo upload, applied before FastAPI buffers
@@ -178,9 +187,12 @@ _CD_VARIANT_OPTIONS = Depends(require_any_permission("admin.gremien", "admin.cd_
 # Shared reads serving several admin areas (ANY-of).
 _ANY_ADMIN_AREA = Depends(require_any_permission(*_ALL_ADMIN_AREAS))
 # The gremium-members subpage (admin.gremien) needs read access to the gremium
-# roles for the role dropdown and to the principals for the names and the
-# typeahead. It does not hold the matching write permission.
-_GREMIEN_OR_GREMIUM_ROLES = Depends(require_any_permission("admin.gremien", "admin.gremium_roles"))
+# roles for the role labels and to the principals for the names. The group
+# mappings page (admin.group_mappings) needs the gremium roles for its role
+# dropdown. Neither holds the matching write permission.
+_GREMIEN_OR_GREMIUM_ROLES = Depends(
+    require_any_permission("admin.gremien", "admin.gremium_roles", "admin.group_mappings")
+)
 _GREMIEN_OR_USERS = Depends(require_any_permission("admin.gremien", "admin.users"))
 # Read gates for pages that need the data of another area only as a selection
 # source or a display source. The writes stay on the strict permission. The flow
@@ -292,7 +304,7 @@ async def set_gremium_mail_recipients(
     return await service.set_gremium_mail_recipients(gremium_id, payload, principal.sub)
 
 
-# Gremium roles, OIDC group mappings and the read-only memberships.
+# Gremium roles and the read-only memberships.
 @router.get(
     "/gremien/{gremium_id}/roles",
     response_model=list[GremiumRoleOut],
@@ -352,61 +364,6 @@ async def list_gremium_memberships(
 ) -> list[GremiumMembershipOut]:
     """List the memberships that the sync derived from the OIDC groups."""
     return await service.list_memberships(gremium_id)
-
-
-@router.get(
-    "/gremien/{gremium_id}/group-mappings",
-    response_model=list[GremiumGroupMappingOut],
-    dependencies=[_GREMIEN],
-    responses=_errors(401, 403),
-)
-async def list_gremium_group_mappings(
-    gremium_id: UUID, service: GremiumRoleServiceDep
-) -> list[GremiumGroupMappingOut]:
-    return await service.list_group_mappings(gremium_id)
-
-
-@router.post(
-    "/gremien/{gremium_id}/group-mappings",
-    response_model=GremiumGroupMappingOut,
-    status_code=201,
-    responses=_errors(400, 401, 403, 404, 409, 422),
-)
-async def create_gremium_group_mapping(
-    gremium_id: UUID,
-    payload: GremiumGroupMappingCreate,
-    service: GremiumRoleServiceDep,
-    principal: GremienAdmin,
-) -> GremiumGroupMappingOut:
-    """Map an OIDC group to a role in this gremium.
-
-    The call syncs the memberships of all principals to the new mapping. A role of
-    another gremium and a group that the gremium already maps both give 409.
-    """
-    return await service.create_group_mapping(gremium_id, payload, principal.sub)
-
-
-@router.patch(
-    "/gremium-group-mappings/{mapping_id}",
-    response_model=GremiumGroupMappingOut,
-    responses=_errors(400, 401, 403, 404, 409, 422),
-)
-async def update_gremium_group_mapping(
-    mapping_id: UUID,
-    payload: GremiumGroupMappingUpdate,
-    service: GremiumRoleServiceDep,
-    principal: GremienAdmin,
-) -> GremiumGroupMappingOut:
-    return await service.update_group_mapping(mapping_id, payload, principal.sub)
-
-
-@router.delete(
-    "/gremium-group-mappings/{mapping_id}", status_code=204, responses=_errors(401, 403, 404)
-)
-async def delete_gremium_group_mapping(
-    mapping_id: UUID, service: GremiumRoleServiceDep, principal: GremienAdmin
-) -> None:
-    await service.delete_group_mapping(mapping_id, principal.sub)
 
 
 @authed_router.get(
@@ -800,6 +757,119 @@ async def delete_group_mapping(
     mapping_id: UUID, service: ServiceDep, principal: GroupMappingsAdmin
 ) -> None:
     await service.delete_group_mapping(mapping_id, principal.sub)
+
+
+# Gremium mappings: OIDC group → gremium membership and OIDC group → gremium role.
+# They are separate from the global group mappings above and from each other.
+@router.get(
+    "/gremium-membership-mappings",
+    response_model=list[GremiumMembershipMappingOut],
+    dependencies=[_GROUP_MAPPINGS],
+    responses=_errors(401, 403),
+)
+async def list_gremium_membership_mappings(
+    service: OidcMappingServiceDep,
+) -> list[GremiumMembershipMappingOut]:
+    return await service.list_membership_mappings()
+
+
+@router.post(
+    "/gremium-membership-mappings",
+    response_model=GremiumMembershipMappingOut,
+    status_code=201,
+    responses=_errors(400, 401, 403, 404, 409, 422),
+)
+async def create_gremium_membership_mapping(
+    payload: GremiumMembershipMappingCreate,
+    service: OidcMappingServiceDep,
+    principal: GroupMappingsAdmin,
+) -> GremiumMembershipMappingOut:
+    """Make the members of an OIDC group members of a gremium.
+
+    The call syncs the memberships of all principals. A duplicate gives 409.
+    """
+    return await service.create_membership_mapping(payload, principal.sub)
+
+
+@router.patch(
+    "/gremium-membership-mappings/{mapping_id}",
+    response_model=GremiumMembershipMappingOut,
+    responses=_errors(400, 401, 403, 404, 409, 422),
+)
+async def update_gremium_membership_mapping(
+    mapping_id: UUID,
+    payload: GremiumMembershipMappingUpdate,
+    service: OidcMappingServiceDep,
+    principal: GroupMappingsAdmin,
+) -> GremiumMembershipMappingOut:
+    return await service.update_membership_mapping(mapping_id, payload, principal.sub)
+
+
+@router.delete(
+    "/gremium-membership-mappings/{mapping_id}",
+    status_code=204,
+    responses=_errors(401, 403, 404),
+)
+async def delete_gremium_membership_mapping(
+    mapping_id: UUID, service: OidcMappingServiceDep, principal: GroupMappingsAdmin
+) -> None:
+    await service.delete_membership_mapping(mapping_id, principal.sub)
+
+
+@router.get(
+    "/gremium-role-mappings",
+    response_model=list[GremiumRoleMappingOut],
+    dependencies=[_GROUP_MAPPINGS],
+    responses=_errors(401, 403),
+)
+async def list_gremium_role_mappings(
+    service: OidcMappingServiceDep,
+) -> list[GremiumRoleMappingOut]:
+    return await service.list_role_mappings()
+
+
+@router.post(
+    "/gremium-role-mappings",
+    response_model=GremiumRoleMappingOut,
+    status_code=201,
+    responses=_errors(400, 401, 403, 404, 409, 422),
+)
+async def create_gremium_role_mapping(
+    payload: GremiumRoleMappingCreate,
+    service: OidcMappingServiceDep,
+    principal: GroupMappingsAdmin,
+) -> GremiumRoleMappingOut:
+    """Give the members of an OIDC group a role in a gremium.
+
+    The role applies only to a member of the gremium of the role. The call syncs the
+    memberships of all principals. A duplicate gives 409.
+    """
+    return await service.create_role_mapping(payload, principal.sub)
+
+
+@router.patch(
+    "/gremium-role-mappings/{mapping_id}",
+    response_model=GremiumRoleMappingOut,
+    responses=_errors(400, 401, 403, 404, 409, 422),
+)
+async def update_gremium_role_mapping(
+    mapping_id: UUID,
+    payload: GremiumRoleMappingUpdate,
+    service: OidcMappingServiceDep,
+    principal: GroupMappingsAdmin,
+) -> GremiumRoleMappingOut:
+    return await service.update_role_mapping(mapping_id, payload, principal.sub)
+
+
+@router.delete(
+    "/gremium-role-mappings/{mapping_id}",
+    status_code=204,
+    responses=_errors(401, 403, 404),
+)
+async def delete_gremium_role_mapping(
+    mapping_id: UUID, service: OidcMappingServiceDep, principal: GroupMappingsAdmin
+) -> None:
+    await service.delete_role_mapping(mapping_id, principal.sub)
 
 
 @router.get(

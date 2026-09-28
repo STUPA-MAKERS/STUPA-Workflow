@@ -451,25 +451,38 @@ describe('AdminApiService — real mode (contract)', () => {
     expect(http.expectOne('/api/admin/deadline-policies/dp-9').request.method).toBe('DELETE');
   });
 
-  it('wires the gremium membership and group-mapping endpoints', () => {
+  it('wires the gremium membership and the membership/role mapping endpoints', () => {
     s.listGremiumMemberships('g1').subscribe();
     http.expectOne('/api/admin/gremien/g1/memberships').flush([]);
 
-    s.listGremiumGroupMappings('g1').subscribe();
-    http.expectOne('/api/admin/gremien/g1/group-mappings').flush([]);
+    s.listGremiumRoles('g1', { quiet: true }).subscribe();
+    http.expectOne('/api/admin/gremien/g1/roles').flush([]);
 
-    s.createGremiumGroupMapping('g1', { oidcGroup: 'stupa', gremiumRoleId: 'gr1' }).subscribe();
-    const post = http.expectOne('/api/admin/gremien/g1/group-mappings');
-    expect(post.request.method).toBe('POST');
-    expect(post.request.body).toEqual({ oidcGroup: 'stupa', gremiumRoleId: 'gr1' });
+    s.listMembershipMappings().subscribe();
+    http.expectOne('/api/admin/gremium-membership-mappings').flush([]);
+    s.createMembershipMapping({ oidcGroup: 'stupa', gremiumId: 'g1' }).subscribe();
+    const mPost = http.expectOne('/api/admin/gremium-membership-mappings');
+    expect(mPost.request.method).toBe('POST');
+    expect(mPost.request.body).toEqual({ oidcGroup: 'stupa', gremiumId: 'g1' });
+    s.updateMembershipMapping('gmm-9', { gremiumId: 'g2' }).subscribe();
+    const mPatch = http.expectOne('/api/admin/gremium-membership-mappings/gmm-9');
+    expect(mPatch.request.method).toBe('PATCH');
+    expect(mPatch.request.body).toEqual({ gremiumId: 'g2' });
+    s.deleteMembershipMapping('gmm-9').subscribe();
+    expect(http.expectOne('/api/admin/gremium-membership-mappings/gmm-9').request.method).toBe('DELETE');
 
-    s.updateGremiumGroupMapping('gm-9', { gremiumRoleId: 'gr2' }).subscribe();
-    const patch = http.expectOne('/api/admin/gremium-group-mappings/gm-9');
-    expect(patch.request.method).toBe('PATCH');
-    expect(patch.request.body).toEqual({ gremiumRoleId: 'gr2' });
-
-    s.deleteGremiumGroupMapping('gm-9').subscribe();
-    expect(http.expectOne('/api/admin/gremium-group-mappings/gm-9').request.method).toBe('DELETE');
+    s.listRoleMappings().subscribe();
+    http.expectOne('/api/admin/gremium-role-mappings').flush([]);
+    s.createRoleMapping({ oidcGroup: 'stupa', gremiumRoleId: 'gr1' }).subscribe();
+    const rPost = http.expectOne('/api/admin/gremium-role-mappings');
+    expect(rPost.request.method).toBe('POST');
+    expect(rPost.request.body).toEqual({ oidcGroup: 'stupa', gremiumRoleId: 'gr1' });
+    s.updateRoleMapping('grm-9', { gremiumRoleId: 'gr2' }).subscribe();
+    const rPatch = http.expectOne('/api/admin/gremium-role-mappings/grm-9');
+    expect(rPatch.request.method).toBe('PATCH');
+    expect(rPatch.request.body).toEqual({ gremiumRoleId: 'gr2' });
+    s.deleteRoleMapping('grm-9').subscribe();
+    expect(http.expectOne('/api/admin/gremium-role-mappings/grm-9').request.method).toBe('DELETE');
   });
 
   it('builds audit-log query params (defaults and all filters)', () => {
@@ -837,12 +850,14 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
 
   it('CRUDs gremium-roles in the mock store', async () => {
     const s = svc();
-    expect(await firstValueFrom(s.listGremiumRoles('g-stupa'))).toEqual([]);
-    const created = await firstValueFrom(s.createGremiumRole('g-stupa', { key: 'chair', name: { de: 'Vorsitz' } }));
-    expect(created.gremiumId).toBe('g-stupa');
-    expect((await firstValueFrom(s.listGremiumRoles('g-stupa'))).length).toBe(1);
+    // The seed gives each mock gremium its forced roles.
+    expect((await firstValueFrom(s.listGremiumRoles('g-stupa'))).map((r) => r.key)).toEqual(['board', 'manager', 'member']);
+    expect(await firstValueFrom(s.listGremiumRoles('g-empty'))).toEqual([]);
+    const created = await firstValueFrom(s.createGremiumRole('g-empty', { key: 'chair', name: { de: 'Vorsitz' } }));
+    expect(created.gremiumId).toBe('g-empty');
+    expect((await firstValueFrom(s.listGremiumRoles('g-empty'))).length).toBe(1);
     // The filter excludes the other gremium.
-    expect(await firstValueFrom(s.listGremiumRoles('g-asta'))).toEqual([]);
+    expect(await firstValueFrom(s.listGremiumRoles('g-other'))).toEqual([]);
 
     const updated = await firstValueFrom(s.updateGremiumRole(created.id, { name: { de: 'Neu' } }));
     expect(updated.name['de']).toBe('Neu');
@@ -858,7 +873,7 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(fallbackNoName.name).toEqual({});
 
     await firstValueFrom(s.deleteGremiumRole(created.id));
-    expect(await firstValueFrom(s.listGremiumRoles('g-stupa'))).toEqual([]);
+    expect(await firstValueFrom(s.listGremiumRoles('g-empty'))).toEqual([]);
   });
 
   it('deleteGremiumRole tolerates a nullish gremiumRoles store (defensive `?? []`)', async () => {
@@ -884,10 +899,56 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(await firstValueFrom(s.listDeadlinePolicies())).toEqual([]);
   });
 
-  it('returns empty memberships in mock mode', async () => {
+  it('returns the seeded memberships of one gremium in mock mode', async () => {
     const s = svc();
-    expect(await firstValueFrom(s.listGremiumMemberships('g-stupa'))).toEqual([]);
-    expect(await firstValueFrom(s.listGremiumGroupMappings('g-stupa'))).toEqual([]);
+    expect((await firstValueFrom(s.listGremiumMemberships('g-stupa'))).length).toBe(2);
+    expect(await firstValueFrom(s.listGremiumMemberships('g-asta'))).toEqual([]);
+  });
+
+  it('CRUDs the global group mappings in the mock store', async () => {
+    const s = svc();
+    expect((await firstValueFrom(s.listGroupMappings())).length).toBe(2);
+    const created = await firstValueFrom(s.createGroupMapping({ oidcGroup: 'x', roleId: 'r-member' }));
+    expect(created).toMatchObject({ oidcGroup: 'x', roleId: 'r-member' });
+    const updated = await firstValueFrom(s.updateGroupMapping(created.id, { roleId: 'r-admin' }));
+    expect(updated.roleId).toBe('r-admin');
+    await firstValueFrom(s.deleteGroupMapping(created.id));
+    // An unknown id is a no-op for a delete.
+    await firstValueFrom(s.deleteGroupMapping('ghost'));
+    expect((await firstValueFrom(s.listGroupMappings())).length).toBe(2);
+  });
+
+  it('answers 404 for a change of an unknown mapping in the mock store', async () => {
+    const s = svc();
+    await expect(firstValueFrom(s.updateGroupMapping('ghost', { roleId: 'r-admin' }))).rejects.toEqual({ status: 404 });
+  });
+
+  it('CRUDs the membership mappings in the mock store', async () => {
+    const s = svc();
+    expect((await firstValueFrom(s.listMembershipMappings())).length).toBe(2);
+    const created = await firstValueFrom(s.createMembershipMapping({ oidcGroup: 'x', gremiumId: 'g-asta' }));
+    const updated = await firstValueFrom(s.updateMembershipMapping(created.id, { gremiumId: 'g-stupa' }));
+    expect(updated.gremiumId).toBe('g-stupa');
+    await firstValueFrom(s.deleteMembershipMapping(created.id));
+    expect((await firstValueFrom(s.listMembershipMappings())).length).toBe(2);
+  });
+
+  it('CRUDs the role mappings in the mock store and derives the gremium from the role', async () => {
+    const s = svc();
+    expect((await firstValueFrom(s.listRoleMappings())).length).toBe(1);
+    const created = await firstValueFrom(s.createRoleMapping({ oidcGroup: 'x', gremiumRoleId: 'gr-asta-board' }));
+    expect(created.gremiumId).toBe('g-asta');
+    const moved = await firstValueFrom(s.updateRoleMapping(created.id, { gremiumRoleId: 'gr-stupa-member' }));
+    expect(moved.gremiumId).toBe('g-stupa');
+    // A change of the group only keeps the gremium.
+    const renamed = await firstValueFrom(s.updateRoleMapping(created.id, { oidcGroup: 'y' }));
+    expect(renamed).toMatchObject({ oidcGroup: 'y', gremiumId: 'g-stupa' });
+    // An unknown role gives no gremium.
+    const orphan = await firstValueFrom(s.createRoleMapping({ oidcGroup: 'z', gremiumRoleId: 'ghost' }));
+    expect(orphan.gremiumId).toBe('');
+    await firstValueFrom(s.deleteRoleMapping(created.id));
+    await firstValueFrom(s.deleteRoleMapping(orphan.id));
+    expect((await firstValueFrom(s.listRoleMappings())).length).toBe(1);
   });
 
   it('returns empty audit page/actors in mock mode', async () => {
@@ -982,12 +1043,10 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(after.items.some((b) => b.id === created.id)).toBe(false);
   });
 
-  it('listGroupMappings/mail-templates always hit HTTP even in mock mode', () => {
+  it('mail-templates always hit HTTP even in mock mode', () => {
     // These methods have no mock branch. They always call HttpClient.
     const s = svc();
     const http = TestBed.inject(HttpTestingController);
-    s.listGroupMappings().subscribe();
-    http.expectOne('/api/admin/group-mappings').flush([]);
     s.listMailTemplates().subscribe();
     http.expectOne('/api/admin/mail-templates').flush([]);
     http.verify();

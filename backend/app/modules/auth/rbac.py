@@ -1,9 +1,10 @@
 """RBAC resolution.
 
-The roles of the application are the truth. The permissions come from `role_assignment`,
-which the resolver validates against the current time for a delegation. An optional
-`group_mapping` adds a role for an OIDC group. The Gremium scope of an assignment or a
-mapping lands as a group key in `Principal.groups`. `require_group` reads that key.
+The roles of the application are the truth. The permissions come from the bootstrap
+`role_assignment` rows, which the resolver validates against the current time, and from
+`group_mapping`, which adds a global role for an OIDC group. A global role has no gremium
+scope. The gremium rights come from the active `gremium_membership`, which the resolver
+turns into the namespaced `vote:` key.
 """
 
 from __future__ import annotations
@@ -97,8 +98,6 @@ async def resolve_principal(db: AsyncSession, row: PrincipalRow, now: datetime) 
         ).scalars().all()
         for m in mappings:
             role_ids.add(m.role_id)
-            if m.gremium_id is not None:
-                groups.add(str(m.gremium_id))
 
     permissions: set[str] = set()
     role_keys: list[str] = []

@@ -157,12 +157,13 @@ class ApplicantSession(UUIDPkMixin, CreatedAtMixin, Base):
 
 
 class GroupMapping(UUIDPkMixin, Base):
-    """Optional mapping from an OIDC group to a role, scopable per Gremium."""
+    """Map an OIDC group to a global role.
+
+    A global role has no gremium scope. The rights in a gremium come from the gremium
+    roles only (``GremiumMembershipMapping`` and ``GremiumRoleMapping``).
+    """
 
     __tablename__ = "group_mapping"
 
     oidc_group: Mapped[str] = mapped_column(Text)
     role_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("role.id", ondelete="CASCADE"))
-    gremium_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("gremium.id", ondelete="CASCADE"), nullable=True
-    )

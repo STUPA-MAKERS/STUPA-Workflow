@@ -138,59 +138,104 @@ async def list_gremium_memberships(gremium_id: str) -> dict:
 
     A membership links a member to a role of that Gremium. Each item has the keys
     id, principalId, gremiumId and gremiumRoleId. The list is read-only. The platform
-    derives the memberships from the OIDC groups of the members and the group
-    mappings of the Gremium. To change a membership, change a group mapping or the
-    groups in the IdP.
+    derives the memberships from the OIDC groups of the members, the membership
+    mappings and the Gremium role mappings. To change a membership, change a mapping
+    or the groups in the IdP.
     """
     return await api().get(f"/admin/gremien/{gremium_id}/memberships")
 
 
 @group.tool
-async def list_gremium_group_mappings(gremium_id: str) -> dict:
-    """List the mappings from an OIDC group to a role of a Gremium.
+async def list_gremium_membership_mappings() -> dict:
+    """List the mappings from an OIDC group to the membership in a Gremium.
 
-    A principal in a mapped group becomes a member with the mapped role. Requires
-    admin.gremien.
+    Each item has the keys id, gremiumId and oidcGroup. A principal in a mapped group
+    becomes a member of the Gremium with the default Gremium role `member`. Requires
+    admin.group_mappings.
     """
-    return await api().get(f"/admin/gremien/{gremium_id}/group-mappings")
+    return await api().get("/admin/gremium-membership-mappings")
 
 
 @group.tool
-async def create_gremium_group_mapping(
-    gremium_id: str, mapping: S.GremiumGroupMappingCreate
+async def create_gremium_membership_mapping(
+    mapping: S.GremiumMembershipMappingCreate,
 ) -> dict:
-    """Map an OIDC group to a role of a Gremium. Requires admin.gremien.
+    """Map an OIDC group to the membership in a Gremium. Requires admin.group_mappings.
 
-    The platform then syncs the memberships of all principals. A group that the
-    Gremium maps already and a role of another Gremium give 409. A group with the
-    prefix `vote:` gives 422.
+    The platform then syncs the memberships of all principals. A pair of group and
+    Gremium that exists already gives 409. An unknown Gremium gives 404. A group with
+    the prefix `vote:` gives 422.
     """
-    return await api().post(
-        f"/admin/gremien/{gremium_id}/group-mappings", json=dump_create(mapping)
-    )
+    return await api().post("/admin/gremium-membership-mappings", json=dump_create(mapping))
 
 
 @group.tool
-async def update_gremium_group_mapping(
-    mapping_id: str, patch: S.GremiumGroupMappingUpdate
+async def update_gremium_membership_mapping(
+    mapping_id: str, patch: S.GremiumMembershipMappingUpdate
 ) -> dict:
-    """Patch the group or the role of a Gremium group mapping. Requires admin.gremien.
+    """Patch the group or the Gremium of a membership mapping.
 
-    The Gremium stays the same. The platform then syncs the memberships of all
+    Requires admin.group_mappings. The platform then syncs the memberships of all
     principals.
     """
     return await api().patch(
-        f"/admin/gremium-group-mappings/{mapping_id}", json=dump_patch(patch)
+        f"/admin/gremium-membership-mappings/{mapping_id}", json=dump_patch(patch)
     )
 
 
 @group.tool
-async def delete_gremium_group_mapping(mapping_id: str) -> dict:
-    """Delete a Gremium group mapping. Requires admin.gremien.
+async def delete_gremium_membership_mapping(mapping_id: str) -> dict:
+    """Delete a membership mapping. Requires admin.group_mappings.
 
     The platform then removes the memberships that only this mapping gave.
     """
-    return await api().delete(f"/admin/gremium-group-mappings/{mapping_id}")
+    return await api().delete(f"/admin/gremium-membership-mappings/{mapping_id}")
+
+
+@group.tool
+async def list_gremium_role_mappings() -> dict:
+    """List the mappings from an OIDC group to a role in a Gremium.
+
+    Each item has the keys id, gremiumId, gremiumRoleId and oidcGroup. gremiumId is the
+    Gremium of the role. A role mapping applies only to a principal who is a member of
+    that Gremium through a membership mapping. Requires admin.group_mappings.
+    """
+    return await api().get("/admin/gremium-role-mappings")
+
+
+@group.tool
+async def create_gremium_role_mapping(mapping: S.GremiumRoleMappingCreate) -> dict:
+    """Map an OIDC group to a role in a Gremium. Requires admin.group_mappings.
+
+    The role applies only to members of the Gremium. Map the membership with
+    `create_gremium_membership_mapping`. The platform then syncs the memberships of
+    all principals. A pair of group and role that exists already gives 409. An
+    unknown role gives 404. A group with the prefix `vote:` gives 422.
+    """
+    return await api().post("/admin/gremium-role-mappings", json=dump_create(mapping))
+
+
+@group.tool
+async def update_gremium_role_mapping(
+    mapping_id: str, patch: S.GremiumRoleMappingUpdate
+) -> dict:
+    """Patch the group or the Gremium role of a role mapping.
+
+    Requires admin.group_mappings. The platform then syncs the memberships of all
+    principals.
+    """
+    return await api().patch(
+        f"/admin/gremium-role-mappings/{mapping_id}", json=dump_patch(patch)
+    )
+
+
+@group.tool
+async def delete_gremium_role_mapping(mapping_id: str) -> dict:
+    """Delete a Gremium role mapping. Requires admin.group_mappings.
+
+    The platform then removes the Gremium roles that only this mapping gave.
+    """
+    return await api().delete(f"/admin/gremium-role-mappings/{mapping_id}")
 
 
 @group.tool
@@ -257,22 +302,23 @@ async def update_principal(principal_id: str, active: bool) -> dict:
 
 @group.tool
 async def list_group_mappings() -> dict:
-    """List the mappings from an OIDC group to a role."""
+    """List the mappings from an OIDC group to a global role."""
     return await api().get("/admin/group-mappings")
 
 
 @group.tool
 async def create_group_mapping(mapping: S.GroupMappingCreate) -> dict:
-    """Map an OIDC group to a role.
+    """Map an OIDC group to a global role. Requires admin.group_mappings.
 
-    The mapping can carry a Gremium scope. Requires admin.roles.
+    A global role has no Gremium scope. For a Gremium, use
+    `create_gremium_membership_mapping` and `create_gremium_role_mapping`.
     """
     return await api().post("/admin/group-mappings", json=dump_create(mapping))
 
 
 @group.tool
 async def update_group_mapping(mapping_id: str, patch: S.GroupMappingUpdate) -> dict:
-    """Patch an OIDC group mapping. Requires admin.roles."""
+    """Patch the group or the global role of a group mapping. Requires admin.group_mappings."""
     return await api().patch(f"/admin/group-mappings/{mapping_id}", json=dump_patch(patch))
 
 

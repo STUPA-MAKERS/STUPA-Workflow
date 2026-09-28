@@ -347,19 +347,23 @@ export interface MailPreview {
   lang: string;
 }
 
-/** OIDC group → role (+ optional gremium) mapping (admin API `/group-mappings`). */
+/**
+ * OIDC group → global role (admin API `/admin/group-mappings`).
+ *
+ * A global role has no gremium scope. Gremium membership and gremium roles have
+ * their own mappings, see {@link GremiumMembershipMapping} and
+ * {@link GremiumRoleMapping}.
+ */
 export interface GroupMapping {
   id: Uuid;
   oidcGroup: string;
   roleId: Uuid;
-  gremiumId?: Uuid | null;
 }
 
-/** Input to create/update a group mapping. */
+/** Input to create or change a global group mapping. */
 export interface GroupMappingBody {
   oidcGroup: string;
   roleId: Uuid;
-  gremiumId?: Uuid | null;
 }
 
 /**
@@ -616,8 +620,9 @@ export interface OAuthGrantQuery {
 /**
  * Gremium membership (read-only).
  *
- * The backend derives it from the OIDC groups of the principal through the gremium
- * group mappings, at each login and after each mapping change.
+ * The backend derives it from the OIDC groups of the principal: the membership
+ * mappings give the membership, the gremium role mappings give the role. It syncs
+ * at each login and after each mapping change.
  */
 export interface GremiumMembership {
   id: Uuid;
@@ -626,16 +631,40 @@ export interface GremiumMembership {
   gremiumRoleId: Uuid;
 }
 
-/** Maps an OIDC group to a role of one gremium (`/admin/gremien/{id}/group-mappings`). */
-export interface GremiumGroupMapping {
+/**
+ * OIDC group → membership in one gremium (`/admin/gremium-membership-mappings`).
+ *
+ * Each person in the group becomes a member of the gremium, with the default
+ * gremium role `member`. Only this mapping gives a membership.
+ */
+export interface GremiumMembershipMapping {
+  id: Uuid;
+  gremiumId: Uuid;
+  oidcGroup: string;
+}
+
+/** Input to create or change a membership mapping. */
+export interface GremiumMembershipMappingBody {
+  oidcGroup: string;
+  gremiumId: Uuid;
+}
+
+/**
+ * OIDC group → role of one gremium (`/admin/gremium-role-mappings`).
+ *
+ * The role applies only to persons who are members of that gremium through a
+ * {@link GremiumMembershipMapping}. It never gives a membership. `gremiumId` is the
+ * gremium of the role and is read-only.
+ */
+export interface GremiumRoleMapping {
   id: Uuid;
   gremiumId: Uuid;
   gremiumRoleId: Uuid;
   oidcGroup: string;
 }
 
-/** Body to create or change a gremium group mapping. The gremium stays immutable. */
-export interface GremiumGroupMappingBody {
+/** Input to create or change a gremium role mapping. The role sets the gremium. */
+export interface GremiumRoleMappingBody {
   oidcGroup: string;
   gremiumRoleId: Uuid;
 }

@@ -26,8 +26,8 @@ import type { AdminPrincipal, GroupMapping, Role } from '../admin.models';
  * Each row holds one principal: name, e-mail, the global roles, the OIDC groups and
  * the last login. The roles are read-only. They come from the OIDC groups through the
  * group mappings (`/admin/group-mappings`), plus the bootstrap assignments (`admin`
- * from the settings and the implicit `member`). Gremium membership comes from the
- * gremium group mappings on the gremium page. The frontend only gates the UX. The
+ * from the settings and the implicit `member`). Gremium membership and gremium roles
+ * have their own mappings on the same page. The frontend only gates the UX. The
  * server stays authoritative.
  */
 @Component({
