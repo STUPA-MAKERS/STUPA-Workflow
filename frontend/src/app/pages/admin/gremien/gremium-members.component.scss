@@ -3,6 +3,13 @@
   flex-direction: column;
   gap: var(--space-5);
 }
+/* Header and table of the substitute pool stack with a gap. Without it the add
+   button touches the table once the header wraps on a narrow screen. */
+.gm__pool {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
 .gm__lbl {
   font-size: var(--fs-sm);
   font-weight: var(--fw-medium);

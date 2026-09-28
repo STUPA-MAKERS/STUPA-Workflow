@@ -83,7 +83,7 @@ export class UsersComponent {
    * value wraps and no two rows are the same height.
    */
   protected readonly columns = computed<ColumnDef[]>(() => [
-    { key: 'name', label: this.i18n.translate('admin.users.col.name'), width: '14rem' },
+    { key: 'name', label: this.i18n.translate('admin.users.col.name'), width: '14rem', card: 'title' },
     // Long enough for a full university address without a mid-domain break.
     { key: 'email', label: this.i18n.translate('admin.users.col.email'), width: '22rem' },
     { key: 'roles', label: this.i18n.translate('admin.users.col.roles'), width: '16rem' },

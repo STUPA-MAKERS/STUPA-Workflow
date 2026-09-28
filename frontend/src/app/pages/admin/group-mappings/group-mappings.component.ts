@@ -153,6 +153,7 @@ export class GroupMappingsComponent {
   private readonly groupCol = computed<ColumnDef>(() => ({
     key: 'oidcGroup',
     label: this.i18n.translate('admin.groupMappings.oidcGroup'),
+    card: 'title',
   }));
   private readonly gremiumCol = computed<ColumnDef>(() => ({
     key: 'gremiumLabel',

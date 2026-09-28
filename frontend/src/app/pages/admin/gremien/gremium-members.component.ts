@@ -86,7 +86,7 @@ export class GremiumMembersComponent {
   );
 
   readonly columns = computed<ColumnDef[]>(() => [
-    { key: 'name', label: this.i18n.translate('admin.users.col.name') },
+    { key: 'name', label: this.i18n.translate('admin.users.col.name'), card: 'title' },
     { key: 'email', label: this.i18n.translate('admin.users.col.email') },
     { key: 'roleLabel', label: this.i18n.translate('admin.gremien.memberRole') },
   ]);
@@ -117,7 +117,11 @@ export class GremiumMembersComponent {
   readonly subMemberId = signal('');
 
   readonly subColumns = computed<ColumnDef[]>(() => [
-    { key: 'substitute', label: this.i18n.translate('admin.substitutes.col.substitute') },
+    {
+      key: 'substitute',
+      label: this.i18n.translate('admin.substitutes.col.substitute'),
+      card: 'title',
+    },
     { key: 'member', label: this.i18n.translate('admin.substitutes.col.member') },
     { key: 'actions', label: this.i18n.translate('admin.users.col.actions'), align: 'end' },
   ]);
