@@ -152,33 +152,32 @@ def set_role_permissions(db: Db, role_id: str, permissions: list[str]) -> None:
     )
 
 
+# A `group_mapping` maps an OIDC group to a global role. It has no Gremium scope. The
+# Gremium mappings (`gremium_membership_mapping`, `gremium_role_mapping`) are not in
+# this CLI. Use the admin UI or the API for them, so that the membership sync runs.
 def list_mappings(db: Db) -> list[dict[str, Any]]:
     return db.query(
         """
-        SELECT gm.id, gm.oidc_group, r.key AS role_key, gm.role_id,
-               gm.gremium_id, g.name AS gremium
+        SELECT gm.id, gm.oidc_group, r.key AS role_key, gm.role_id
           FROM group_mapping gm
           JOIN role r ON r.id = gm.role_id
-          LEFT JOIN gremium g ON g.id = gm.gremium_id
          ORDER BY gm.oidc_group, r.key
         """
     )
 
 
-def create_mapping(db: Db, oidc_group: str, role_id: str, gremium_id: str | None) -> int:
+def create_mapping(db: Db, oidc_group: str, role_id: str) -> int:
     return db.execute(
-        "INSERT INTO group_mapping (id, oidc_group, role_id, gremium_id) "
-        "VALUES (gen_random_uuid(), %s, %s, %s)",
-        (oidc_group, role_id, gremium_id),
+        "INSERT INTO group_mapping (id, oidc_group, role_id) "
+        "VALUES (gen_random_uuid(), %s, %s)",
+        (oidc_group, role_id),
     )
 
 
-def update_mapping(
-    db: Db, mapping_id: str, oidc_group: str, role_id: str, gremium_id: str | None
-) -> int:
+def update_mapping(db: Db, mapping_id: str, oidc_group: str, role_id: str) -> int:
     return db.execute(
-        "UPDATE group_mapping SET oidc_group = %s, role_id = %s, gremium_id = %s WHERE id = %s",
-        (oidc_group, role_id, gremium_id, mapping_id),
+        "UPDATE group_mapping SET oidc_group = %s, role_id = %s WHERE id = %s",
+        (oidc_group, role_id, mapping_id),
     )
 
 

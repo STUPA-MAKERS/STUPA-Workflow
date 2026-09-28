@@ -11,6 +11,11 @@ import type {
   FormDraft,
   FormOverviewItem,
   Gremium,
+  GremiumMembership,
+  GremiumMembershipMapping,
+  GremiumRole,
+  GremiumRoleMapping,
+  GroupMapping,
   Role,
   WebhookConfig,
 } from './admin.models';
@@ -44,6 +49,7 @@ export const MOCK_PERMISSIONS: string[] = [
   'admin.types_delete',
   'admin.notifications',
   'admin.roles',
+  'admin.group_mappings',
 ];
 
 export const MOCK_PRINCIPALS: AdminPrincipal[] = [
@@ -113,6 +119,36 @@ export const MOCK_ROLES: Role[] = [
   { id: 'r-referent', key: 'referent', label: { de: 'Referent:in', en: 'Officer' }, permissions: ['application.read', 'application.update', 'application.transition', 'vote.manage'] },
   { id: 'r-vorstand', key: 'vorstand', label: { de: 'Vorstand', en: 'Board' }, permissions: ['application.read', 'budget.view', 'meeting.manage'] },
   { id: 'r-admin', key: 'admin', label: { de: 'Administration', en: 'Administration' }, permissions: [...MOCK_PERMISSIONS] },
+];
+
+/** The forced roles of each mock gremium (board, manager, member). */
+export const MOCK_GREMIUM_ROLES: GremiumRole[] = MOCK_GREMIEN.flatMap((g) => [
+  { id: `gr-${g.slug}-board`, gremiumId: g.id, key: 'board', name: { de: 'Vorstand', en: 'Board' }, forced: true, permissions: ['session.manage', 'vote.manage', 'vote.cast', 'protocol.write'] },
+  { id: `gr-${g.slug}-manager`, gremiumId: g.id, key: 'manager', name: { de: 'Sitzungsleitung', en: 'Chair' }, forced: true, permissions: ['session.manage', 'vote.manage', 'vote.cast'] },
+  { id: `gr-${g.slug}-member`, gremiumId: g.id, key: 'member', name: { de: 'Mitglied', en: 'Member' }, forced: true, permissions: ['vote.cast'] },
+]);
+
+/** Read-only memberships. In the real backend the OIDC group sync writes them. */
+export const MOCK_GREMIUM_MEMBERSHIPS: GremiumMembership[] = [
+  { id: 'gms-1', principalId: 'p-1', gremiumId: 'g-stupa', gremiumRoleId: 'gr-stupa-board' },
+  { id: 'gms-2', principalId: 'p-2', gremiumId: 'g-stupa', gremiumRoleId: 'gr-stupa-member' },
+];
+
+/** OIDC group → global role. */
+export const MOCK_GROUP_MAPPINGS: GroupMapping[] = [
+  { id: 'gm-1', oidcGroup: 'stupa-admins', roleId: 'r-admin' },
+  { id: 'gm-2', oidcGroup: 'stupa-referate', roleId: 'r-referent' },
+];
+
+/** OIDC group → gremium membership. */
+export const MOCK_GREMIUM_MEMBERSHIP_MAPPINGS: GremiumMembershipMapping[] = [
+  { id: 'gmm-1', gremiumId: 'g-stupa', oidcGroup: 'stupa-mitglieder' },
+  { id: 'gmm-2', gremiumId: 'g-asta', oidcGroup: 'asta-referate' },
+];
+
+/** OIDC group → role of one gremium. */
+export const MOCK_GREMIUM_ROLE_MAPPINGS: GremiumRoleMapping[] = [
+  { id: 'grm-1', gremiumId: 'g-stupa', gremiumRoleId: 'gr-stupa-board', oidcGroup: 'stupa-praesidium' },
 ];
 
 /** Seed for the forms overview, until `/admin/application-types` is real. */

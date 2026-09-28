@@ -51,7 +51,7 @@ const MOCK_PRINCIPAL: Principal = {
   // actions on the detail page. `vote.manage` and `meeting.manage` drive the
   // beamer and manage views. `protocol.write` drives the protocol editor.
   // `admin.site`, `admin.gremien`, `admin.types`, `form.configure`,
-  // `flow.configure` and `webhook.manage` drive the admin UIs.
+  // `flow.configure`, `admin.group_mappings` and `webhook.manage` drive the admin UIs.
   permissions: [
     'application.read',
     'application.manage',
@@ -64,6 +64,7 @@ const MOCK_PRINCIPAL: Principal = {
     'admin.types',
     'admin.notifications',
     'admin.roles',
+    'admin.group_mappings',
     'form.configure',
     'flow.configure',
     'webhook.manage',

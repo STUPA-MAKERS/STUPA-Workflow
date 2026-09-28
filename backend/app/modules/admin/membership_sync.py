@@ -1,22 +1,28 @@
 """Derive the gremium memberships from the OIDC groups.
 
-The IdP is the only source of gremium membership. ``gremium_group_mapping`` maps an
-OIDC group to a role in one gremium. The sync compares the cached
-``principal.oidc_groups`` with the mappings and writes ``gremium_membership`` to match.
-Nobody else writes that table.
+The IdP is the only source of gremium membership. Two separate mappings apply:
 
-The sync runs at three points:
+- ``gremium_membership_mapping``: an OIDC group makes a principal a member of one
+  gremium.
+- ``gremium_role_mapping``: an OIDC group gives a principal a role in a gremium. The
+  role applies only when the principal is a member of that gremium. It never makes a
+  principal a member.
+
+A member without a matching role mapping gets the forced role ``member``. When two
+groups give different roles in one gremium, the role with more permissions wins, then
+the lower key. A (principal, gremium) pair thus has exactly one role, which the EXCLUDE
+constraint on ``gremium_membership`` requires.
+
+The sync compares the cached ``principal.oidc_groups`` with the mappings and writes
+``gremium_membership`` to match. Nobody else writes that table. The sync runs at three
+points:
 
 - at each OIDC login, after the upsert of the principal refreshes the group cache.
-- after each create, change or delete of a mapping, for all principals.
+- after each create, change or delete of a gremium mapping, for all principals.
 - at the erasure of a principal, whose group cache is then empty.
 
 A membership has no term of office. It holds while the IdP puts the principal into a
 mapped group, as of the last login.
-
-When two groups of a principal map to different roles in the same gremium, the role
-with more permissions wins, then the lower key. A (principal, gremium) pair thus has
-exactly one role, which the EXCLUDE constraint on ``gremium_membership`` requires.
 """
 
 from __future__ import annotations
@@ -26,7 +32,13 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.admin.models import GremiumGroupMapping, GremiumMembership, GremiumRole
+from app.modules.admin.gremium_roles import GremiumRoleService
+from app.modules.admin.models import (
+    GremiumMembership,
+    GremiumMembershipMapping,
+    GremiumRole,
+    GremiumRoleMapping,
+)
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import AuditService
 from app.modules.auth.models import Principal as PrincipalRow
@@ -34,10 +46,35 @@ from app.modules.auth.models import Principal as PrincipalRow
 # The actor of the audit entries that the sync writes.
 SYNC_ACTOR = "oidc-sync"
 
+# The forced gremium role that a member without a role mapping gets.
+DEFAULT_ROLE_KEY = "member"
+
 
 def _role_rank(role: GremiumRole) -> tuple[int, str]:
     """Sort key: more permissions first, then the lower key."""
     return (-len(role.permissions or []), role.key)
+
+
+async def _find_default_role(session: AsyncSession, gremium_id: UUID) -> GremiumRole | None:
+    return (
+        await session.scalars(
+            select(GremiumRole).where(
+                GremiumRole.gremium_id == gremium_id, GremiumRole.key == DEFAULT_ROLE_KEY
+            )
+        )
+    ).first()
+
+
+async def _default_role(session: AsyncSession, gremium_id: UUID) -> GremiumRole:
+    """Return the forced role ``member`` of the gremium. Create it when it is missing."""
+    role = await _find_default_role(session, gremium_id)
+    if role is not None:
+        return role
+    await GremiumRoleService(session).ensure_forced_roles(gremium_id)
+    role = await _find_default_role(session, gremium_id)
+    if role is None:  # pragma: no cover - ensure_forced_roles always creates it
+        raise RuntimeError(f"forced gremium role {DEFAULT_ROLE_KEY!r} missing")
+    return role
 
 
 async def _desired_roles(
@@ -46,18 +83,34 @@ async def _desired_roles(
     """Return the gremium role per gremium that ``groups`` give, as ``{gremium: role}``."""
     if not groups:
         return {}
-    rows = (
-        await session.execute(
-            select(GremiumGroupMapping.gremium_id, GremiumRole)
-            .join(GremiumRole, GremiumRole.id == GremiumGroupMapping.gremium_role_id)
-            .where(GremiumGroupMapping.oidc_group.in_(groups))
+    member_of = set(
+        (
+            await session.scalars(
+                select(GremiumMembershipMapping.gremium_id).where(
+                    GremiumMembershipMapping.oidc_group.in_(groups)
+                )
+            )
+        ).all()
+    )
+    if not member_of:
+        return {}
+    mapped = (
+        await session.scalars(
+            select(GremiumRole)
+            .join(GremiumRoleMapping, GremiumRoleMapping.gremium_role_id == GremiumRole.id)
+            .where(
+                GremiumRoleMapping.oidc_group.in_(groups),
+                GremiumRole.gremium_id.in_(member_of),
+            )
         )
     ).all()
     best: dict[UUID, GremiumRole] = {}
-    for gremium_id, role in rows:
-        current = best.get(gremium_id)
+    for role in mapped:
+        current = best.get(role.gremium_id)
         if current is None or _role_rank(role) < _role_rank(current):
-            best[gremium_id] = role
+            best[role.gremium_id] = role
+    for gremium_id in member_of - best.keys():
+        best[gremium_id] = await _default_role(session, gremium_id)
     return {gid: role.id for gid, role in best.items()}
 
 

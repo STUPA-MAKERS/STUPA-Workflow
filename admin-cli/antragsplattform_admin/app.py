@@ -890,7 +890,7 @@ class AdminCLI:
                 views.mapping_label(row),
                 [
                     ("show", "show — full record"),
-                    ("edit", "edit — group / role / scope"),
+                    ("edit", "edit — group / role"),
                     ("delete", "delete — remove the mapping"),
                 ],
                 lambda key: self._mapping_action(row, key) if key else None,
@@ -922,21 +922,14 @@ class AdminCLI:
         if not roles:
             self.error("no roles exist yet — /new-role first")
             return
-        gremien = ops.list_gremien(db)
         role_keys = [views.fmt(r["key"]) for r in roles]
         role_ids = [views.fmt(r["id"]) for r in roles]
-        scope_labels = ["(global)"] + [views.fmt(g["name"]) for g in gremien]
-        scope_ids: list[str | None] = [None, *(views.fmt(g["id"]) for g in gremien)]
 
         role_index = 0
-        scope_index = 0
         if existing is not None:
             existing_role = views.fmt(existing.get("role_id"))
             if existing_role in role_ids:
                 role_index = role_ids.index(existing_role)
-            existing_scope = views.fmt(existing.get("gremium_id")) or None
-            if existing_scope in scope_ids:
-                scope_index = scope_ids.index(existing_scope)
 
         def submit(form: Form) -> None:
             fields = form.by_key()
@@ -945,16 +938,15 @@ class AdminCLI:
                 self.error("empty OIDC group — not saved")
                 return
             role_id = role_ids[fields["role"].choice_index]
-            gremium_id = scope_ids[fields["scope"].choice_index]
             if existing is not None:
                 mapping_id = views.fmt(existing["id"])
                 self._run_write(
-                    lambda d: ops.update_mapping(d, mapping_id, group, role_id, gremium_id),
+                    lambda d: ops.update_mapping(d, mapping_id, group, role_id),
                     "mapping updated",
                 )
             else:
                 self._run_write(
-                    lambda d: ops.create_mapping(d, group, role_id, gremium_id),
+                    lambda d: ops.create_mapping(d, group, role_id),
                     "mapping created",
                 )
 
@@ -974,13 +966,6 @@ class AdminCLI:
                         kind="choice",
                         choices=role_keys,
                         choice_index=role_index,
-                    ),
-                    FormField(
-                        key="scope",
-                        label="scope",
-                        kind="choice",
-                        choices=scope_labels,
-                        choice_index=scope_index,
                     ),
                 ],
                 on_submit=submit,

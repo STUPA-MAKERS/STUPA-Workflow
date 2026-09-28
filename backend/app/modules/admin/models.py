@@ -129,7 +129,7 @@ class GremiumRole(UUIDPkMixin, Base):
     """Gremium-specific role.
 
     Each gremium maintains its own role set, separate from the global roles
-    (``role``). `GremiumGroupMapping` maps an OIDC group to a role.
+    (``role``). `GremiumRoleMapping` maps an OIDC group to a role.
     `GremiumMembership` holds the derived membership.
     """
 
@@ -153,7 +153,8 @@ class GremiumMembership(UUIDPkMixin, Base):
     """Membership of a principal in a gremium, derived from the OIDC groups.
 
     ``membership_sync`` is the only writer. It derives the rows from
-    ``principal.oidc_groups`` and ``GremiumGroupMapping``. For each (principal,
+    ``principal.oidc_groups``, ``GremiumMembershipMapping`` and
+    ``GremiumRoleMapping``. For each (principal,
     gremium) pair exactly one role is active. The sync leaves ``valid_from`` and
     ``valid_until`` NULL (open). The readers still filter on them, and the
     EXCLUDE constraint below keeps the one-row invariant.
@@ -202,31 +203,49 @@ class GremiumMembership(UUIDPkMixin, Base):
     )
 
 
-class GremiumGroupMapping(UUIDPkMixin, Base):
-    """Map an OIDC group to a role in one gremium.
+class GremiumMembershipMapping(UUIDPkMixin, Base):
+    """Map an OIDC group to the membership in one gremium.
 
     The IdP is the only source of gremium membership. A principal whose
-    ``oidc_groups`` contain ``oidc_group`` gets a ``gremium_membership`` with
-    ``gremium_role_id`` in the gremium. The sync in ``membership_sync`` writes
-    those rows at login and after each change of a mapping.
+    ``oidc_groups`` contain ``oidc_group`` is a member of the gremium. The role in
+    the gremium comes from ``GremiumRoleMapping``, or else it is the forced role
+    ``member``. ``membership_sync`` writes the ``gremium_membership`` rows.
     """
 
-    __tablename__ = "gremium_group_mapping"
+    __tablename__ = "gremium_membership_mapping"
 
     gremium_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("gremium.id", ondelete="CASCADE")
     )
+    oidc_group: Mapped[str] = mapped_column(Text)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "gremium_id", "oidc_group", name="uq_gremium_membership_mapping_gremium_group"
+        ),
+        Index("ix_gremium_membership_mapping_oidc_group", "oidc_group"),
+    )
+
+
+class GremiumRoleMapping(UUIDPkMixin, Base):
+    """Map an OIDC group to a role in a gremium.
+
+    The mapping gives the role only to a principal who is a member of the gremium
+    through ``GremiumMembershipMapping``. It never makes a principal a member.
+    """
+
+    __tablename__ = "gremium_role_mapping"
+
     gremium_role_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("gremium_role.id", ondelete="RESTRICT")
     )
     oidc_group: Mapped[str] = mapped_column(Text)
 
     __table_args__ = (
-        # One group gives at most one role in a gremium.
         UniqueConstraint(
-            "gremium_id", "oidc_group", name="uq_gremium_group_mapping_gremium_group"
+            "gremium_role_id", "oidc_group", name="uq_gremium_role_mapping_role_group"
         ),
-        Index("ix_gremium_group_mapping_oidc_group", "oidc_group"),
+        Index("ix_gremium_role_mapping_oidc_group", "oidc_group"),
     )
 
 

@@ -23,15 +23,17 @@ from app.modules.admin.branding import Branding
 from app.modules.admin.router import (
     get_config_service,
     get_gremium_role_service,
+    get_oidc_mapping_service,
     get_site_config_service,
 )
 from app.modules.admin.schemas import (
     ApplicationTypeOut,
     FlowVersionOut,
-    GremiumGroupMappingOut,
     GremiumMailRecipients,
+    GremiumMembershipMappingOut,
     GremiumMembershipOut,
     GremiumOut,
+    GremiumRoleMappingOut,
     GremiumRoleOut,
     GroupMappingOut,
     PrincipalOut,
@@ -210,11 +212,10 @@ class _FakeConfig:
             id=uuid4(),
             oidc_group=payload.oidc_group,
             role_id=payload.role_id,
-            gremium_id=payload.gremium_id,
         )
 
     async def update_group_mapping(self, mapping_id, payload, actor):  # noqa: ANN001
-        return GroupMappingOut(id=mapping_id, oidc_group="g", role_id=uuid4(), gremium_id=None)
+        return GroupMappingOut(id=mapping_id, oidc_group="g", role_id=uuid4())
 
     async def delete_group_mapping(self, mapping_id, actor):  # noqa: ANN001
         self.deleted_mapping = mapping_id
@@ -315,28 +316,53 @@ class _FakeGremiumRoles:
             )
         ]
 
-    async def list_group_mappings(self, gremium_id):  # noqa: ANN001
+
+class _FakeOidcMappings:
+    """Fake for the gremium membership and gremium role mappings."""
+
+    async def list_membership_mappings(self):
         return []
 
-    async def create_group_mapping(self, gremium_id, payload, actor):  # noqa: ANN001
-        return GremiumGroupMappingOut(
+    async def create_membership_mapping(self, payload, actor):  # noqa: ANN001
+        return GremiumMembershipMappingOut(
+            id=uuid4(), gremium_id=payload.gremium_id, oidc_group=payload.oidc_group
+        )
+
+    async def update_membership_mapping(self, mapping_id, payload, actor):  # noqa: ANN001
+        if str(mapping_id).startswith("00000000"):
+            raise NotFoundError("nope")
+        return GremiumMembershipMappingOut(
+            id=mapping_id,
+            gremium_id=payload.gremium_id or uuid4(),
+            oidc_group=payload.oidc_group or "stupa",
+        )
+
+    async def delete_membership_mapping(self, mapping_id, actor):  # noqa: ANN001
+        if str(mapping_id).startswith("00000000"):
+            raise NotFoundError("nope")
+
+    async def list_role_mappings(self):
+        return []
+
+    async def create_role_mapping(self, payload, actor):  # noqa: ANN001
+        return GremiumRoleMappingOut(
             id=uuid4(),
-            gremium_id=gremium_id,
+            gremium_id=uuid4(),
             gremium_role_id=payload.gremium_role_id,
             oidc_group=payload.oidc_group,
         )
 
-    async def update_group_mapping(self, mapping_id, payload, actor):  # noqa: ANN001
+    async def update_role_mapping(self, mapping_id, payload, actor):  # noqa: ANN001
         if str(mapping_id).startswith("00000000"):
             raise NotFoundError("nope")
-        return GremiumGroupMappingOut(
+        return GremiumRoleMappingOut(
             id=mapping_id,
             gremium_id=uuid4(),
             gremium_role_id=payload.gremium_role_id or uuid4(),
-            oidc_group=payload.oidc_group or "stupa",
+            oidc_group=payload.oidc_group or "stupa-board",
         )
 
-    async def delete_group_mapping(self, mapping_id, actor):  # noqa: ANN001
+    async def delete_role_mapping(self, mapping_id, actor):  # noqa: ANN001
         if str(mapping_id).startswith("00000000"):
             raise NotFoundError("nope")
 
@@ -693,42 +719,72 @@ def test_gremium_membership_writes_are_gone(app: FastAPI, client: TestClient) ->
     assert "validFrom" not in listed[0] and listed[0]["gremiumId"] == str(gid)
 
 
-def test_gremium_group_mappings_crud_and_gate(app: FastAPI, client: TestClient) -> None:
-    """The OIDC group mappings of a gremium: CRUD under admin.gremien, 401, 403, 404, 422."""
-    app.dependency_overrides[get_gremium_role_service] = lambda: _FakeGremiumRoles()
-    gid, mid, role_id = uuid4(), uuid4(), str(uuid4())
-    body = {"oidcGroup": "stupa", "gremiumRoleId": role_id}
-    assert client.post(f"/api/admin/gremien/{gid}/group-mappings", json=body).status_code == 401
-    _as(app, {"admin.gremien"})
-    assert client.get(f"/api/admin/gremien/{gid}/group-mappings").json() == []
-    created = client.post(f"/api/admin/gremien/{gid}/group-mappings", json=body)
+def test_global_group_mapping_has_no_gremium(app: FastAPI, client: TestClient) -> None:
+    """A global role mapping carries no gremium scope in the answer."""
+    _as(app, {"admin.group_mappings"})
+    body = {"oidcGroup": "fsr", "roleId": str(uuid4())}
+    created = client.post("/api/admin/group-mappings", json=body)
     assert created.status_code == 201
-    assert created.json() == {
-        "id": created.json()["id"],
-        "gremiumId": str(gid),
-        "gremiumRoleId": role_id,
-        "oidcGroup": "stupa",
-    }
-    reserved = {"oidcGroup": "vote:x", "gremiumRoleId": role_id}
-    assert (
-        client.post(f"/api/admin/gremien/{gid}/group-mappings", json=reserved).status_code
-        == 422
-    )
-    patched = client.patch(f"/api/admin/gremium-group-mappings/{mid}", json={"oidcGroup": "b"})
-    assert patched.status_code == 200 and patched.json()["oidcGroup"] == "b"
-    assert client.patch(f"/api/admin/gremium-group-mappings/{mid}", json={}).status_code == 422
-    missing = "00000000-0000-0000-0000-000000000000"
-    assert (
-        client.patch(
-            f"/api/admin/gremium-group-mappings/{missing}", json={"oidcGroup": "b"}
-        ).status_code
-        == 404
-    )
-    assert client.delete(f"/api/admin/gremium-group-mappings/{mid}").status_code == 204
-    assert client.delete(f"/api/admin/gremium-group-mappings/{missing}").status_code == 404
-    _as(app, {"admin.gremium_roles"})  # the neighbouring area permission is not enough
-    assert client.get(f"/api/admin/gremien/{gid}/group-mappings").status_code == 403
-    assert client.delete(f"/api/admin/gremium-group-mappings/{mid}").status_code == 403
+    assert set(created.json()) == {"id", "oidcGroup", "roleId"}
+
+
+@pytest.mark.parametrize(
+    ("base", "body", "patch_body"),
+    [
+        (
+            "/api/admin/gremium-membership-mappings",
+            {"oidcGroup": "stupa", "gremiumId": str(uuid4())},
+            {"oidcGroup": "asta"},
+        ),
+        (
+            "/api/admin/gremium-role-mappings",
+            {"oidcGroup": "stupa-board", "gremiumRoleId": str(uuid4())},
+            {"oidcGroup": "stupa-chair"},
+        ),
+    ],
+)
+def test_gremium_mappings_crud_and_gate(
+    app: FastAPI,
+    client: TestClient,
+    base: str,
+    body: dict[str, str],
+    patch_body: dict[str, str],
+) -> None:
+    """Both gremium mappings: CRUD under admin.group_mappings, 401, 403, 404, 422."""
+    app.dependency_overrides[get_oidc_mapping_service] = lambda: _FakeOidcMappings()
+    mid, missing = uuid4(), "00000000-0000-0000-0000-000000000000"
+    assert client.post(base, json=body).status_code == 401
+    _as(app, {"admin.group_mappings"})
+    assert client.get(base).json() == []
+    created = client.post(base, json=body)
+    assert created.status_code == 201
+    assert {k: created.json()[k] for k in body} == body
+    reserved = {**body, "oidcGroup": "vote:x"}
+    assert client.post(base, json=reserved).status_code == 422
+    patched = client.patch(f"{base}/{mid}", json=patch_body)
+    assert patched.status_code == 200
+    assert patched.json()["oidcGroup"] == patch_body["oidcGroup"]
+    assert client.patch(f"{base}/{mid}", json={}).status_code == 422
+    assert client.patch(f"{base}/{missing}", json=patch_body).status_code == 404
+    assert client.delete(f"{base}/{mid}").status_code == 204
+    assert client.delete(f"{base}/{missing}").status_code == 404
+    _as(app, {"admin.gremien"})  # the gremien page permission is not enough
+    assert client.get(base).status_code == 403
+    assert client.delete(f"{base}/{mid}").status_code == 403
+
+
+def test_gremium_group_mapping_routes_are_gone(app: FastAPI, client: TestClient) -> None:
+    _as_admin(app)
+    gid = uuid4()
+    assert client.get(f"/api/admin/gremien/{gid}/group-mappings").status_code == 404
+    assert client.delete(f"/api/admin/gremium-group-mappings/{gid}").status_code == 404
+
+
+def test_group_mappings_page_reads_gremium_roles(app: FastAPI, client: TestClient) -> None:
+    """The gremium role dropdown of the mappings page needs the roles of a gremium."""
+    app.dependency_overrides[get_gremium_role_service] = lambda: _FakeGremiumRoles()
+    _as(app, {"admin.group_mappings"})
+    assert client.get(f"/api/admin/gremien/{uuid4()}/roles").status_code == 200
 
 
 def test_site_config_draft_activate_cycle(app: FastAPI, client: TestClient) -> None:
@@ -784,8 +840,10 @@ def test_mutating_endpoints_declare_400(app: FastAPI) -> None:
         ("/api/admin/application-types/{type_id}", "patch"),
         ("/api/admin/roles", "post"),
         ("/api/admin/roles/{role_id}", "patch"),
-        ("/api/admin/gremien/{gremium_id}/group-mappings", "post"),
-        ("/api/admin/gremium-group-mappings/{mapping_id}", "patch"),
+        ("/api/admin/gremium-membership-mappings", "post"),
+        ("/api/admin/gremium-membership-mappings/{mapping_id}", "patch"),
+        ("/api/admin/gremium-role-mappings", "post"),
+        ("/api/admin/gremium-role-mappings/{mapping_id}", "patch"),
         ("/api/admin/group-mappings", "post"),
         ("/api/admin/group-mappings/{mapping_id}", "patch"),
         ("/api/admin/webhooks", "post"),

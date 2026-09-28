@@ -301,7 +301,6 @@ async def _ensure_admin_session(session, settings) -> str:
             select(GroupMapping).where(
                 GroupMapping.oidc_group == ADMIN_GROUP,
                 GroupMapping.role_id == role.id,
-                GroupMapping.gremium_id.is_(None),
             )
         )
     ).scalar_one_or_none()

@@ -187,67 +187,12 @@ async def test_eligible_via_membership_vote_cast() -> None:
     assert await _independently_eligible(db, uuid4(), GREMIUM_ID, NOW) is True
 
 
-async def test_eligible_via_direct_assignment() -> None:
-    # membership empty, so the direct role_assignment hits (line 138).
-    db = fake_session(
-        result(),  # membership perms: no vote.cast
-        result(SimpleNamespace(id=uuid4())),  # direct assignment
-    )
-    assert await _independently_eligible(db, uuid4(), GREMIUM_ID, NOW) is True
-
-
-async def test_eligible_via_oidc_group_direct() -> None:
-    # membership and direct empty, so the OIDC group equals str(gremium_id) (line 146).
-    db = fake_session(
-        result(),  # membership
-        result(),  # direct
-        result(([str(GREMIUM_ID)],)),  # oidc_groups holds the Gremium id
-    )
-    assert await _independently_eligible(db, uuid4(), GREMIUM_ID, NOW) is True
-
-
-async def test_eligible_via_group_mapping() -> None:
-    # The OIDC group differs from the Gremium id, but group_mapping maps it (lines 149-159).
-    db = fake_session(
-        result(),  # membership
-        result(),  # direct
-        result((["fachschaft-info"],)),  # oidc_groups
-        result(SimpleNamespace(id=uuid4())),  # mapping hits
-    )
-    assert await _independently_eligible(db, uuid4(), GREMIUM_ID, NOW) is True
-
-
-async def test_eligible_group_mapping_miss_is_false() -> None:
-    # An OIDC group exists, but no mapping matches, so the caller is not eligible (line 159).
-    db = fake_session(
-        result(),  # membership
-        result(),  # direct
-        result((["fachschaft-info"],)),  # oidc_groups
-        result(),  # mapping empty
-    )
+async def test_eligible_needs_a_vote_cast_membership() -> None:
+    # A global role, a raw OIDC group or a global group mapping never gives the voting
+    # right in a Gremium. Only the membership query runs.
+    db = fake_session(result(), result(SimpleNamespace(id=uuid4())), result(([str(GREMIUM_ID)],)))
     assert await _independently_eligible(db, uuid4(), GREMIUM_ID, NOW) is False
-
-
-async def test_eligible_no_oidc_groups_short_circuits() -> None:
-    # No OIDC groups, so the check stops early without a mapping query (line 148).
-    db = fake_session(
-        result(),  # membership
-        result(),  # direct
-        result((None,)),  # oidc_groups: None
-    )
-    assert await _independently_eligible(db, uuid4(), GREMIUM_ID, NOW) is False
-    # The mapping query must not run at all.
-    assert len(db.statements) == 3
-
-
-async def test_eligible_principal_row_missing_no_oidc() -> None:
-    # The PrincipalRow lookup is empty (row is None), so oidc stays empty.
-    db = fake_session(
-        result(),  # membership
-        result(),  # direct
-        result(),  # oidc_groups query: no row
-    )
-    assert await _independently_eligible(db, uuid4(), GREMIUM_ID, NOW) is False
+    assert len(db.statements) == 1
 
 
 async def test_names_empty_set_returns_empty_dict() -> None:
@@ -504,9 +449,7 @@ async def test_meeting_context_undated_meeting_deadline_none() -> None:
     db = fake_session(
         _membership(),  # _assert_can_view_gremium: member
         result(me),  # me lookup
-        result(),  # eligibility membership empty
-        result(),  # direct empty
-        result((None,)),  # oidc None → not eligible
+        result(),  # eligibility membership empty → not eligible
         result(),  # joined empty
         _names(),  # _out names (empty)
         result(),  # member_ids empty

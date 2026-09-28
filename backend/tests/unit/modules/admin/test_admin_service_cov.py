@@ -235,7 +235,6 @@ def mapping_row(**kw: Any) -> Any:
         "id": uuid.uuid4(),
         "oidc_group": "grp",
         "role_id": uuid.uuid4(),
-        "gremium_id": None,
     }
     base.update(kw)
     return Row(**base)
@@ -968,17 +967,13 @@ async def test_create_group_mapping_role_not_found() -> None:
 async def test_update_group_mapping_all_fields() -> None:
     row = mapping_row()
     new_role = role_row()
-    gid = uuid.uuid4()
     # Queue: the mapping row, the role for the existence check, then two audit results.
     s, _ = svc([*audit_results()], gets=[row, new_role])
     out = await s.update_group_mapping(
-        row.id,
-        GroupMappingUpdate(oidcGroup="neu", roleId=new_role.id, gremiumId=gid),
-        "admin",
+        row.id, GroupMappingUpdate(oidcGroup="neu", roleId=new_role.id), "admin"
     )
     assert row.oidc_group == "neu"
     assert row.role_id == new_role.id
-    assert row.gremium_id == gid
     assert out.oidc_group == "neu"
 
 

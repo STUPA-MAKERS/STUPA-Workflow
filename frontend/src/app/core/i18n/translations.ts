@@ -2039,32 +2039,8 @@ export const de = {
   'admin.gremien.membersEmpty': 'Noch keine Mitglieder in diesem Gremium.',
   'admin.gremien.memberSearchPlaceholder': 'Name, E-Mail oder OIDC-Subject …',
   'admin.gremien.memberRole': 'Rolle',
-  'admin.gremien.memberRolePlaceholder': 'Rolle wählen …',
   'admin.gremien.membersLoadFailed':
     'Mitglieder konnten nicht geladen werden (fehlende Berechtigung?).',
-  'admin.gremien.membersHint':
-    'Die Mitgliedschaft kommt aus den Gruppen der Person im Identity-Provider (OIDC). Die Liste ist schreibgeschützt. Sie ändert sich bei der nächsten Anmeldung der Person und wenn sich ein Gruppen-Mapping unten ändert.',
-  'admin.gremien.mappingsTitle': 'Gruppen-Mappings',
-  'admin.gremien.mappingsHint':
-    'Jede Person in einer dieser OIDC-Gruppen wird Mitglied mit der zugeordneten Rolle. Es zählen die Gruppen der letzten Anmeldung.',
-  'admin.gremien.mappingsEmpty':
-    'Noch keine Gruppe zugeordnet. Ohne Mapping hat das Gremium keine Mitglieder.',
-  'admin.gremien.mappingsLoadFailed': 'Gruppen-Mappings konnten nicht geladen werden.',
-  'admin.gremien.mappingAdd': 'Gruppe zuordnen',
-  'admin.gremien.mappingEdit': 'Mapping bearbeiten',
-  'admin.gremien.mappingReserved': 'Das Präfix „vote:“ ist reserviert.',
-  'admin.gremien.mappingRuleHint':
-    'Ist eine Person in mehreren Gruppen dieses Gremiums, gilt die Rolle mit den meisten Rechten.',
-  'admin.gremien.mappingSaved': 'Mapping gespeichert. Die Mitglieder sind aktualisiert.',
-  'admin.gremien.mappingDeleted': 'Mapping gelöscht. Die Mitglieder sind aktualisiert.',
-  'admin.gremien.mappingFailed': 'Aktion fehlgeschlagen.',
-  'admin.gremien.mappingConflict':
-    'Diese Gruppe ist schon zugeordnet, oder die Rolle gehört zu einem anderen Gremium.',
-  'admin.gremien.mappingInvalid':
-    'Ungültiger Gruppenname: leer oder mit dem reservierten Präfix „vote:“.',
-  'admin.gremien.mappingDeleteTitle': 'Mapping löschen',
-  'admin.gremien.mappingDeleteBody':
-    'Dieses Mapping wirklich löschen? Personen, die nur über diese Gruppe Mitglied sind, verlieren die Mitgliedschaft.',
   'admin.users.subtitle': 'Benutzer suchen und ihre Rollen und OIDC-Gruppen ansehen.',
   'admin.users.col.groups': 'OIDC-Gruppen',
   'admin.users.noGroups': 'Keine Gruppen.',
@@ -2116,7 +2092,6 @@ export const de = {
   'admin.home.roles': 'Rollen & Rechte',
   'admin.home.rolesDesc': 'Berechtigungen je Rolle pflegen.',
   'admin.home.groupMappings': 'Gruppen-Mappings',
-  'admin.home.groupMappingsDesc': 'OIDC-Gruppen auf Rollen abbilden.',
   'admin.home.oauthGrantsDesc': 'Agent-Zugänge ansehen und widerrufen.',
   'admin.home.mailTemplates': 'E-Mail-Vorlagen',
   'admin.home.mailTemplatesDesc': 'Betreff/Text der Benachrichtigungs-Mails anpassen.',
@@ -2153,23 +2128,61 @@ export const de = {
   'admin.mailTemplates.loadFailed': 'Vorlagen konnten nicht geladen werden.',
   'admin.mailTemplates.previewFailed': 'Vorschau fehlgeschlagen.',
   'admin.groupMappings.title': 'Gruppen-Mappings',
-  'admin.groupMappings.subtitle':
-    'Beim Login werden OIDC-Gruppen des Nutzers auf Plattform-Rollen (optional je Gremium) abgebildet.',
-  'admin.groupMappings.add': 'Mapping hinzufügen',
-  'admin.groupMappings.editTitle': 'Mapping bearbeiten',
-  'admin.groupMappings.empty': 'Noch keine Gruppen-Mappings angelegt.',
-  'admin.groupMappings.global': '— (global)',
   'admin.groupMappings.oidcGroup': 'OIDC-Gruppe',
   'admin.groupMappings.oidcGroupPlaceholder': 'Gruppenname aus dem IdP',
   'admin.groupMappings.role': 'Rolle',
   'admin.groupMappings.rolePlaceholder': 'Rolle wählen …',
   'admin.groupMappings.gremium': 'Gremium',
   'admin.groupMappings.deleteTitle': 'Mapping löschen',
-  'admin.groupMappings.deleteBody': 'Dieses Gruppen-Mapping wirklich löschen?',
   'admin.groupMappings.saved': 'Mapping gespeichert.',
   'admin.groupMappings.deleted': 'Mapping gelöscht.',
   'admin.groupMappings.failed': 'Aktion fehlgeschlagen.',
   'admin.groupMappings.loadFailed': 'Mappings konnten nicht geladen werden.',
+  'admin.gremien.membersHint':
+    'Die Mitgliedschaft kommt aus den OIDC-Gruppen der Person, über die Zuordnung „Gremien-Mitgliedschaft“. Die Liste ist schreibgeschützt. Sie ändert sich bei der nächsten Anmeldung der Person und wenn sich eine Zuordnung ändert.',
+  'admin.home.groupMappingsDesc': 'OIDC-Gruppen auf globale Rollen, Gremien und Gremien-Rollen abbilden.',
+  'admin.groupMappings.subtitle':
+    'Bei jeder Anmeldung liest die Plattform die OIDC-Gruppen der Person. Globale Rollen, Gremien-Mitgliedschaft und Gremien-Rollen sind drei getrennte Zuordnungen.',
+  'admin.groupMappings.unknown': '(unbekannt)',
+  'admin.groupMappings.reserved': 'Das Präfix „vote:“ ist reserviert.',
+  'admin.groupMappings.gremiumPlaceholder': 'Gremium wählen …',
+  'admin.groupMappings.gremiumRole': 'Gremien-Rolle',
+  'admin.groupMappings.gremiumRolePlaceholder': 'Gremien-Rolle wählen …',
+  'admin.groupMappings.gremiumFirst': 'Zuerst ein Gremium wählen',
+  'admin.groupMappings.gremiumRolesEmpty': 'Dieses Gremium hat noch keine Rollen.',
+  'admin.groupMappings.conflict': 'Diese Zuordnung gibt es schon.',
+  'admin.groupMappings.invalid':
+    'Ungültiger Gruppenname: leer oder mit dem reservierten Präfix „vote:“.',
+  'admin.groupMappings.notFound':
+    'Das Gremium oder die Rolle gibt es nicht mehr. Laden Sie die Seite neu.',
+  'admin.groupMappings.global.title': 'Globale Rollen',
+  'admin.groupMappings.global.hint':
+    'Jede Person in der OIDC-Gruppe bekommt die globale Rolle. Eine globale Rolle gilt auf der ganzen Plattform und hat keinen Bezug zu einem Gremium.',
+  'admin.groupMappings.global.add': 'Globale Rolle zuordnen',
+  'admin.groupMappings.global.editTitle': 'Globale Rolle bearbeiten',
+  'admin.groupMappings.global.empty': 'Noch keine OIDC-Gruppe einer globalen Rolle zugeordnet.',
+  'admin.groupMappings.global.deleteBody':
+    'Diese Zuordnung löschen? Personen, die die Rolle nur über diese Gruppe haben, verlieren sie bei der nächsten Anmeldung.',
+  'admin.groupMappings.membership.title': 'Gremien-Mitgliedschaft',
+  'admin.groupMappings.membership.hint':
+    'Jede Person in der OIDC-Gruppe wird Mitglied des Gremiums, mit der Gremien-Rolle „Mitglied“. Nur diese Zuordnung macht eine Person zum Mitglied.',
+  'admin.groupMappings.membership.add': 'Mitgliedschaft zuordnen',
+  'admin.groupMappings.membership.editTitle': 'Mitgliedschaft bearbeiten',
+  'admin.groupMappings.membership.empty':
+    'Noch keine OIDC-Gruppe einem Gremium zugeordnet. Ohne diese Zuordnung hat ein Gremium keine Mitglieder.',
+  'admin.groupMappings.membership.deleteBody':
+    'Diese Zuordnung löschen? Personen, die nur über diese Gruppe Mitglied sind, verlieren die Mitgliedschaft.',
+  'admin.groupMappings.role.title': 'Gremien-Rollen',
+  'admin.groupMappings.role.hint':
+    'Jede Person in der OIDC-Gruppe bekommt die Rolle in dem Gremium, aber nur, wenn sie über „Gremien-Mitgliedschaft“ Mitglied dieses Gremiums ist. Diese Zuordnung macht niemanden zum Mitglied.',
+  'admin.groupMappings.role.ruleHint':
+    'Gelten für eine Person mehrere Rollen in einem Gremium, gilt die Rolle mit den meisten Rechten.',
+  'admin.groupMappings.role.gremiumFilterHint': 'Das Gremium filtert nur die Liste der Rollen.',
+  'admin.groupMappings.role.add': 'Gremien-Rolle zuordnen',
+  'admin.groupMappings.role.editTitle': 'Gremien-Rolle bearbeiten',
+  'admin.groupMappings.role.empty': 'Noch keine OIDC-Gruppe einer Gremien-Rolle zugeordnet.',
+  'admin.groupMappings.role.deleteBody':
+    'Diese Zuordnung löschen? Die Mitglieder aus dieser Gruppe bekommen wieder die Rolle aus ihren anderen Zuordnungen, sonst „Mitglied“.',
 } as const;
 
 export const en: Partial<Record<TranslationKey, string>> = {
@@ -4168,30 +4181,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.gremien.membersEmpty': 'No members in this committee yet.',
   'admin.gremien.memberSearchPlaceholder': 'Name, email or OIDC subject …',
   'admin.gremien.memberRole': 'Role',
-  'admin.gremien.memberRolePlaceholder': 'Choose a role …',
   'admin.gremien.membersLoadFailed': 'Could not load members (missing permission?).',
-  'admin.gremien.membersHint':
-    'Membership comes from the groups of the person in the identity provider (OIDC). The list is read-only. It changes at the next login of the person and when a group mapping below changes.',
-  'admin.gremien.mappingsTitle': 'Group mappings',
-  'admin.gremien.mappingsHint':
-    'Each person in one of these OIDC groups becomes a member with the mapped role. The groups of the last login apply.',
-  'admin.gremien.mappingsEmpty':
-    'No group mapped yet. Without a mapping, the committee has no members.',
-  'admin.gremien.mappingsLoadFailed': 'Could not load the group mappings.',
-  'admin.gremien.mappingAdd': 'Map a group',
-  'admin.gremien.mappingEdit': 'Edit mapping',
-  'admin.gremien.mappingReserved': 'The prefix "vote:" is reserved.',
-  'admin.gremien.mappingRuleHint':
-    'If a person is in more than one group of this committee, the role with the most permissions applies.',
-  'admin.gremien.mappingSaved': 'Mapping saved. The members are updated.',
-  'admin.gremien.mappingDeleted': 'Mapping deleted. The members are updated.',
-  'admin.gremien.mappingFailed': 'Action failed.',
-  'admin.gremien.mappingConflict':
-    'This group already has a mapping, or the role belongs to a different committee.',
-  'admin.gremien.mappingInvalid': 'Invalid group name: empty or with the reserved prefix "vote:".',
-  'admin.gremien.mappingDeleteTitle': 'Delete mapping',
-  'admin.gremien.mappingDeleteBody':
-    'Delete this mapping? Persons who are members only through this group lose the membership.',
   'admin.users.subtitle': 'Search users and see their roles and OIDC groups.',
   'admin.users.col.groups': 'OIDC groups',
   'admin.users.noGroups': 'No groups.',
@@ -4243,7 +4233,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.home.roles': 'Roles & permissions',
   'admin.home.rolesDesc': 'Maintain permissions per role.',
   'admin.home.groupMappings': 'Group mappings',
-  'admin.home.groupMappingsDesc': 'Map OIDC groups to roles.',
   'admin.home.oauthGrantsDesc': 'See and revoke agent grants.',
   'admin.home.mailTemplates': 'Email templates',
   'admin.home.mailTemplatesDesc': 'Customise subject/body of notification emails.',
@@ -4280,23 +4269,60 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.mailTemplates.loadFailed': 'Could not load templates.',
   'admin.mailTemplates.previewFailed': 'Preview failed.',
   'admin.groupMappings.title': 'Group mappings',
-  'admin.groupMappings.subtitle':
-    "At login the user's OIDC groups are mapped to platform roles (optionally per committee).",
-  'admin.groupMappings.add': 'Add mapping',
-  'admin.groupMappings.editTitle': 'Edit mapping',
-  'admin.groupMappings.empty': 'No group mappings yet.',
-  'admin.groupMappings.global': '— (global)',
   'admin.groupMappings.oidcGroup': 'OIDC group',
   'admin.groupMappings.oidcGroupPlaceholder': 'Group name from the IdP',
   'admin.groupMappings.role': 'Role',
   'admin.groupMappings.rolePlaceholder': 'Select role …',
   'admin.groupMappings.gremium': 'Committee',
   'admin.groupMappings.deleteTitle': 'Delete mapping',
-  'admin.groupMappings.deleteBody': 'Really delete this group mapping?',
   'admin.groupMappings.saved': 'Mapping saved.',
   'admin.groupMappings.deleted': 'Mapping deleted.',
   'admin.groupMappings.failed': 'Action failed.',
   'admin.groupMappings.loadFailed': 'Could not load mappings.',
+  'admin.gremien.membersHint':
+    'Membership comes from the OIDC groups of the person, through the "Committee membership" mapping. The list is read-only. It changes at the next login of the person and when a mapping changes.',
+  'admin.home.groupMappingsDesc': 'Map OIDC groups to global roles, committees and committee roles.',
+  'admin.groupMappings.subtitle':
+    'At each login the platform reads the OIDC groups of the person. Global roles, committee membership and committee roles are three separate mappings.',
+  'admin.groupMappings.unknown': '(unknown)',
+  'admin.groupMappings.reserved': 'The prefix "vote:" is reserved.',
+  'admin.groupMappings.gremiumPlaceholder': 'Select committee …',
+  'admin.groupMappings.gremiumRole': 'Committee role',
+  'admin.groupMappings.gremiumRolePlaceholder': 'Select committee role …',
+  'admin.groupMappings.gremiumFirst': 'Select a committee first',
+  'admin.groupMappings.gremiumRolesEmpty': 'This committee has no roles yet.',
+  'admin.groupMappings.conflict': 'This mapping already exists.',
+  'admin.groupMappings.invalid': 'Invalid group name: empty or with the reserved prefix "vote:".',
+  'admin.groupMappings.notFound':
+    'The committee or the role does not exist anymore. Reload the page.',
+  'admin.groupMappings.global.title': 'Global roles',
+  'admin.groupMappings.global.hint':
+    'Each person in the OIDC group gets the global role. A global role applies to the whole platform and is not related to a committee.',
+  'admin.groupMappings.global.add': 'Map a global role',
+  'admin.groupMappings.global.editTitle': 'Edit global role',
+  'admin.groupMappings.global.empty': 'No OIDC group is mapped to a global role yet.',
+  'admin.groupMappings.global.deleteBody':
+    'Delete this mapping? Persons who have the role only through this group lose it at their next login.',
+  'admin.groupMappings.membership.title': 'Committee membership',
+  'admin.groupMappings.membership.hint':
+    'Each person in the OIDC group becomes a member of the committee, with the committee role "Member". Only this mapping makes a person a member.',
+  'admin.groupMappings.membership.add': 'Map a membership',
+  'admin.groupMappings.membership.editTitle': 'Edit membership',
+  'admin.groupMappings.membership.empty':
+    'No OIDC group is mapped to a committee yet. Without this mapping a committee has no members.',
+  'admin.groupMappings.membership.deleteBody':
+    'Delete this mapping? Persons who are members only through this group lose the membership.',
+  'admin.groupMappings.role.title': 'Committee roles',
+  'admin.groupMappings.role.hint':
+    'Each person in the OIDC group gets the role in the committee, but only if the person is a member of that committee through "Committee membership". This mapping makes nobody a member.',
+  'admin.groupMappings.role.ruleHint':
+    'If more than one role applies to a person in a committee, the role with the most permissions applies.',
+  'admin.groupMappings.role.gremiumFilterHint': 'The committee only filters the list of roles.',
+  'admin.groupMappings.role.add': 'Map a committee role',
+  'admin.groupMappings.role.editTitle': 'Edit committee role',
+  'admin.groupMappings.role.empty': 'No OIDC group is mapped to a committee role yet.',
+  'admin.groupMappings.role.deleteBody':
+    'Delete this mapping? The members from this group get the role from their other mappings again, else "Member".',
 };
 
 export const CATALOG: Record<Locale, Partial<Record<TranslationKey, string>>> = { de, en };

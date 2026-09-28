@@ -1,9 +1,9 @@
-"""Gremium roles, OIDC group mappings and the read of the memberships.
+"""Gremium roles and the read of the memberships.
 
 This module stays separate from the global roles. It holds an own role catalog
-(``gremium_role``) and the mappings from an OIDC group to a gremium role
-(``gremium_group_mapping``). The memberships (``gremium_membership``) come from the
-OIDC groups only. ``membership_sync`` writes them. Nobody can set one by hand.
+(``gremium_role``). The memberships (``gremium_membership``) come from the OIDC groups
+only. ``membership_sync`` writes them from the mappings in ``oidc_mappings``. Nobody
+can set one by hand.
 
 Core invariant: for each (principal, gremium) pair exactly one role is active.
 The sync keeps it. The EXCLUDE constraint on the table backs it.
@@ -15,15 +15,10 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.admin.membership_sync import sync_all_memberships
-from app.modules.admin.models import GremiumGroupMapping, GremiumMembership, GremiumRole
+from app.modules.admin.models import GremiumMembership, GremiumRole, GremiumRoleMapping
 from app.modules.admin.schemas import (
-    GremiumGroupMappingCreate,
-    GremiumGroupMappingOut,
-    GremiumGroupMappingUpdate,
     GremiumMembershipOut,
     GremiumRoleCreate,
     GremiumRoleOut,
@@ -136,17 +131,8 @@ def _membership_out(row: GremiumMembership) -> GremiumMembershipOut:
     )
 
 
-def _mapping_out(row: GremiumGroupMapping) -> GremiumGroupMappingOut:
-    return GremiumGroupMappingOut(
-        id=row.id,
-        gremium_id=row.gremium_id,
-        gremium_role_id=row.gremium_role_id,
-        oidc_group=row.oidc_group,
-    )
-
-
 class GremiumRoleService:
-    """CRUD for gremium roles and group mappings, plus the membership read."""
+    """CRUD for gremium roles, plus the membership read."""
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -265,8 +251,8 @@ class GremiumRoleService:
             raise ConflictError("gremium role is in use by a membership")
         mapped = (
             await self.session.scalars(
-                select(GremiumGroupMapping.id).where(
-                    GremiumGroupMapping.gremium_role_id == role_id
+                select(GremiumRoleMapping.id).where(
+                    GremiumRoleMapping.gremium_role_id == role_id
                 )
             )
         ).first()
@@ -285,86 +271,3 @@ class GremiumRoleService:
             )
         ).all()
         return [_membership_out(r) for r in rows]
-
-    async def list_group_mappings(self, gremium_id: UUID) -> list[GremiumGroupMappingOut]:
-        rows = (
-            await self.session.scalars(
-                select(GremiumGroupMapping)
-                .where(GremiumGroupMapping.gremium_id == gremium_id)
-                .order_by(GremiumGroupMapping.oidc_group)
-            )
-        ).all()
-        return [_mapping_out(r) for r in rows]
-
-    async def _role_in_gremium(self, role_id: UUID, gremium_id: UUID) -> None:
-        """Check that the role exists and belongs to the gremium.
-
-        Raises:
-            NotFoundError: The role does not exist (404).
-            ConflictError: The role belongs to another gremium (409).
-        """
-        role = await self.session.get(GremiumRole, role_id)
-        if role is None:
-            raise NotFoundError(f"gremium role {role_id} not found")
-        if role.gremium_id != gremium_id:
-            raise ConflictError("gremium role does not belong to this gremium")
-
-    async def _flush_mapping(self) -> None:
-        """Flush a mapping write.
-
-        A second mapping with the same group in the same gremium violates the
-        unique constraint at the flush. That gives 409, not 500.
-
-        Raises:
-            ConflictError: The gremium already maps this group (409).
-        """
-        try:
-            await self.session.flush()
-        except IntegrityError as exc:
-            await self.session.rollback()
-            raise ConflictError(
-                "this gremium already maps this OIDC group", code="conflict"
-            ) from exc
-
-    async def _audit_sync_commit(self, actor: str, mapping_id: UUID) -> None:
-        """Audit the mapping change, sync all memberships to it and commit."""
-        await self._audit(actor, "gremium_group_mapping", mapping_id)
-        await sync_all_memberships(self.session)
-        await self.session.commit()
-
-    async def create_group_mapping(
-        self, gremium_id: UUID, payload: GremiumGroupMappingCreate, actor: str
-    ) -> GremiumGroupMappingOut:
-        await self._role_in_gremium(payload.gremium_role_id, gremium_id)
-        row = GremiumGroupMapping(
-            gremium_id=gremium_id,
-            gremium_role_id=payload.gremium_role_id,
-            oidc_group=payload.oidc_group,
-        )
-        self.session.add(row)
-        await self._flush_mapping()
-        await self._audit_sync_commit(actor, row.id)
-        return _mapping_out(row)
-
-    async def update_group_mapping(
-        self, mapping_id: UUID, payload: GremiumGroupMappingUpdate, actor: str
-    ) -> GremiumGroupMappingOut:
-        row = await self.session.get(GremiumGroupMapping, mapping_id)
-        if row is None:
-            raise NotFoundError(f"gremium group mapping {mapping_id} not found")
-        if payload.gremium_role_id is not None:
-            await self._role_in_gremium(payload.gremium_role_id, row.gremium_id)
-            row.gremium_role_id = payload.gremium_role_id
-        if payload.oidc_group is not None:
-            row.oidc_group = payload.oidc_group
-        await self._flush_mapping()
-        await self._audit_sync_commit(actor, row.id)
-        return _mapping_out(row)
-
-    async def delete_group_mapping(self, mapping_id: UUID, actor: str) -> None:
-        row = await self.session.get(GremiumGroupMapping, mapping_id)
-        if row is None:
-            raise NotFoundError(f"gremium group mapping {mapping_id} not found")
-        await self.session.delete(row)
-        await self.session.flush()
-        await self._audit_sync_commit(actor, mapping_id)
