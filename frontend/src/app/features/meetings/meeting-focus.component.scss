@@ -82,6 +82,95 @@
   white-space: nowrap;
 }
 
+/* Stage: the page in the middle, the steps to the neighbouring items beside it.
+   The side columns only show where the room exists. */
+.fx__stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.fx__side {
+  display: none;
+}
+@media (min-width: 80rem) {
+  .fx__stage {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 880px) minmax(0, 1fr);
+  }
+  .fx__side {
+    display: block;
+    padding-inline: var(--space-6);
+  }
+  .fx__side--prev {
+    text-align: right;
+  }
+  .fx__navStep {
+    display: none;
+  }
+}
+.fx__sideBtn {
+  position: sticky;
+  top: 40vh;
+  margin-top: 28vh;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-2);
+  max-width: 13rem;
+  padding: var(--space-2);
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  text-align: right;
+  cursor: pointer;
+}
+.fx__sideBtn--next {
+  align-items: flex-start;
+  text-align: left;
+}
+.fx__sideBtn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+.fx__sideIcon {
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: 50%;
+  border: var(--border-width) solid var(--color-border);
+  background: var(--color-surface-sunken);
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease,
+    color 120ms ease;
+}
+.fx__sideBtn:hover .fx__sideIcon {
+  border-color: var(--color-primary);
+  background: var(--color-primary-subtle);
+  color: var(--color-primary);
+}
+.fx__sideNum {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.fx__sideTitle {
+  font-size: var(--fs-sm);
+  line-height: 1.35;
+  color: var(--color-text);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 /* Page: the editor sits flat on the surface. */
 .fx__page {
   flex: 1;
@@ -135,14 +224,103 @@ app-markdown-editor ::ng-deep .mde__host .ProseMirror {
   font-size: var(--fs-xs);
   color: var(--color-text-muted);
 }
-.mtg__saveState {
-  min-width: 6rem;
+/* The save state takes no fixed room of its own: a reserved width left a hole
+   before the hint while nothing was saving. While it is empty it also gives
+   back its gap. It stays in the tree, so the live region still announces. */
+.mtg__saveState:empty {
+  margin-inline-start: calc(-1 * var(--space-3));
+}
+.fx__sepDot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--color-border-strong);
+  flex: none;
 }
 .mtg__saveState[data-state='saved'] {
   color: var(--color-success);
 }
 .mtg__saveState[data-state='error'] {
   color: var(--color-danger);
+}
+
+/* Preparation checklist of a planned meeting */
+.fx__prep {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  max-width: 36rem;
+  width: 100%;
+  margin: var(--space-6) auto 0;
+}
+.fx__prepHead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.fx__prepHead .fx__muted {
+  margin: 0;
+}
+.fx__prepList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-sunken);
+}
+.fx__prepItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+}
+.fx__prepItem + .fx__prepItem {
+  border-top: var(--border-width) solid var(--color-border);
+}
+.fx__prepIcon {
+  width: 1.75rem;
+  height: 1.75rem;
+  flex: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: var(--border-width) solid var(--color-border);
+  color: var(--color-text-muted);
+}
+.fx__prepIcon[data-state='ok'] {
+  border-color: transparent;
+  background: var(--color-success-subtle);
+  color: var(--color-success);
+}
+.fx__prepIcon[data-state='todo'] {
+  border-color: transparent;
+  background: var(--color-warning-subtle);
+  color: var(--color-warning);
+}
+.fx__prepText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.fx__prepLabel {
+  font-weight: var(--fw-semibold);
+}
+.fx__prepSub {
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+.fx__prepSub--todo {
+  color: var(--color-warning);
+}
+.fx__prepStart {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
 }
 
 /* Dock */
@@ -168,8 +346,83 @@ app-markdown-editor ::ng-deep .mde__host .ProseMirror {
   padding-bottom: var(--space-3);
   border-bottom: var(--border-width) solid var(--color-border);
 }
-.fx__row--q .fx__q {
+.fx__qMain {
   flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.fx__qLine {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.fx__hint {
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+.fx__progress {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-2);
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+.fx__results {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: var(--space-3);
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+.fx__row--result {
+  min-height: 2.5rem;
+}
+.fx__row--result .fx__q {
+  max-width: 28rem;
+}
+.fx__dot--live {
+  box-shadow: 0 0 0 4px var(--color-primary-subtle);
+}
+.fx__dot[data-result='passed'] {
+  background: var(--color-success);
+}
+.fx__dot[data-result='rejected'] {
+  background: var(--color-danger);
+}
+.fx__tally {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+.fx__pill {
+  display: inline-flex;
+  gap: var(--space-2);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-sunken);
+  color: var(--color-text-muted);
+}
+.fx__pill dt,
+.fx__pill dd {
+  margin: 0;
+}
+.fx__pill dd {
+  font-weight: var(--fw-bold);
+  color: var(--color-text);
+}
+.fx__pill--lead {
+  background: var(--color-success-subtle);
+  color: var(--color-success);
+}
+.fx__pill--lead dd {
+  color: var(--color-success);
 }
 .fx__q {
   font-weight: var(--fw-medium);
@@ -231,6 +484,12 @@ app-markdown-editor ::ng-deep .mde__host .ProseMirror {
   margin-left: auto;
   font-size: var(--fs-sm);
 }
+.fx__chip--warn {
+  border-color: var(--color-warning);
+  background: var(--color-warning-subtle);
+  color: var(--color-warning);
+  font-weight: var(--fw-medium);
+}
 .fx__chip--open {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 1px var(--color-primary);
@@ -259,15 +518,6 @@ app-markdown-editor ::ng-deep .mde__host .ProseMirror {
   align-items: center;
   gap: var(--space-2);
   min-width: 0;
-}
-.fx__done {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-}
-.fx__done .fx__q {
-  max-width: 22rem;
 }
 .fx__hidden {
   white-space: normal;
@@ -303,6 +553,78 @@ app-markdown-editor ::ng-deep .mde__host .ProseMirror {
 }
 .fx__sheet--left {
   left: var(--space-5);
+}
+/* The picker hangs above its chip. */
+.fx__pickWrap {
+  position: relative;
+  display: inline-flex;
+  min-width: 0;
+}
+.fx__sheet--mid {
+  left: 0;
+  width: 360px;
+}
+.fx__people {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 18rem;
+  overflow-y: auto;
+}
+.fx__person {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--fs-sm);
+  text-align: left;
+  cursor: pointer;
+}
+.fx__person:hover {
+  background: var(--color-surface-sunken);
+}
+.fx__person:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+.fx__person--sel {
+  background: var(--color-primary-subtle);
+}
+.fx__avatar {
+  width: 1.75rem;
+  height: 1.75rem;
+  flex: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-surface-sunken);
+  border: var(--border-width) solid var(--color-border);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+}
+.fx__personName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fx__personState {
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+}
+.fx__personState[data-status='present'] {
+  color: var(--color-success);
 }
 .fx__sheet--right {
   right: var(--space-5);
@@ -493,6 +815,31 @@ app-markdown-editor ::ng-deep .mde__host .ProseMirror {
     flex: 1 1 100%;
     white-space: normal;
   }
+  /* The dot keeps its question company, so the question takes the rest of the row. */
+  .fx__row--result .fx__q {
+    flex: 1 1 calc(100% - 2rem);
+    max-width: none;
+    white-space: normal;
+  }
+  .fx__qMain {
+    flex: 1 1 calc(100% - 2rem);
+  }
+  .fx__qLine {
+    flex-wrap: wrap;
+  }
+  .fx__progress {
+    flex: 1 1 100%;
+    align-items: stretch;
+  }
+  .fx__row--result .fx__spacer {
+    display: none;
+  }
+  .fx__prep {
+    margin-top: var(--space-3);
+  }
+  .fx__prepItem {
+    flex-wrap: wrap;
+  }
   .fx__track {
     flex: 1 1 auto;
     width: auto;
@@ -538,25 +885,17 @@ app-markdown-editor ::ng-deep .mde__host .ProseMirror {
   .fx__mid .fx__voteAdmin app-button {
     flex: 1 1 100%;
   }
-  .fx__done {
-    display: flex;
-    flex: 1 1 100%;
-    flex-wrap: wrap;
-  }
-  .fx__done .fx__q {
-    flex: 1 1 100%;
-    max-width: none;
-    white-space: normal;
-  }
-  .fx__done .mtg__tally {
-    flex: 1 1 100%;
-  }
   .fx__chip--tail {
     flex: 1 1 100%;
     margin-left: 0;
   }
+  /* On a phone the picker is a sheet over the whole dock, like the others. */
+  .fx__pickWrap {
+    position: static;
+  }
   .fx__sheet,
-  .fx__sheet--right {
+  .fx__sheet--right,
+  .fx__sheet--mid {
     left: var(--space-3);
     right: var(--space-3);
     width: auto;

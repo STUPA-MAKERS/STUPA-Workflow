@@ -148,7 +148,7 @@ const OUTPUTS = [
   'voteDialog', 'startSession', 'closeSession', 'finalize', 'openSettings',
   'deleteMeeting', 'toggleBeamer', 'attendanceChange', 'addToAgenda', 'addFreetext',
   'removeFromAgenda', 'startRename', 'cancelRename', 'renameTop', 'setNonPublic', 'dragStart',
-  'dragOver', 'drop',
+  'dragOver', 'drop', 'setProtokollant',
 ] as const;
 
 async function setup(over: Partial<Inputs> = {}) {
@@ -239,9 +239,14 @@ describe('MeetingFocusComponent', () => {
     });
 
     it('says that the protocol arrives with the start', async () => {
-      await setup({ protocol: null, meeting: meeting({ status: 'planned' }) });
+      // A reader without session rights gets no checklist, only the note.
+      await setup({
+        protocol: null,
+        meeting: meeting({ status: 'planned', canControl: false, canManage: false }),
+      });
       expect(screen.getByText(/beim Start der Sitzung angelegt/)).toBeInTheDocument();
-      expect(screen.getByText('Die Sitzung ist noch nicht eröffnet.')).toBeInTheDocument();
+      expect(screen.getByText('Noch nicht eröffnet')).toBeInTheDocument();
+      expect(screen.queryByText('Sitzung vorbereiten')).toBeNull();
     });
 
     it('says that there is no protocol on a live meeting without one', async () => {
@@ -316,13 +321,20 @@ describe('MeetingFocusComponent', () => {
 
     it('offers the start while the meeting is planned', async () => {
       const { on } = await setup({ meeting: meeting({ status: 'planned' }), protocol: null });
-      await userEvent.click(screen.getByRole('button', { name: 'Sitzung eröffnen' }));
-      expect(on.startSession).toHaveBeenCalled();
+      // The checklist and the dock both carry the start.
+      const starts = screen.getAllByRole('button', { name: 'Sitzung eröffnen' });
+      expect(starts).toHaveLength(2);
+      await userEvent.click(starts[0]);
+      await userEvent.click(starts[1]);
+      expect(on.startSession).toHaveBeenCalledTimes(2);
     });
 
     it('asks for a minute-taker before the start', async () => {
       await setup({ meeting: meeting({ status: 'planned', protokollantId: null, protokollantName: null }), protocol: null });
-      expect(screen.getByRole('button', { name: /Sitzung eröffnen/ })).toBeDisabled();
+      screen
+        .getAllByRole('button', { name: /Sitzung eröffnen/ })
+        .forEach((b) => expect(b).toBeDisabled());
+      expect(screen.getByText('Protokollant zuweisen, um die Sitzung zu starten.')).toBeInTheDocument();
     });
 
     it('offers a decision question when the open item has no vote', async () => {
@@ -435,6 +447,138 @@ describe('MeetingFocusComponent', () => {
       await setup({ meeting: meeting({ canWrite: false, canManageVotes: false, canControl: false }) });
       expect(screen.getByText('Anwesend 1 von 3')).toBeInTheDocument();
       expect(screen.queryByText('2 live')).toBeNull();
+    });
+  });
+
+  describe('preparation of a planned meeting', () => {
+    const planned = (over: Partial<Meeting> = {}) => meeting({ status: 'planned', ...over });
+
+    it('lists what the start needs and opens the matching panel from every row', async () => {
+      await setup({ meeting: planned(), protocol: null });
+      expect(screen.getByRole('heading', { name: 'Sitzung vorbereiten' })).toBeInTheDocument();
+      expect(screen.getAllByText('3 TOPs vorbereitet').length).toBeGreaterThan(0);
+      expect(screen.getByText('1 von 3 anwesend')).toBeInTheDocument();
+      // No neighbour arrows before the start: there is no protocol to page through.
+      expect(screen.queryByRole('button', { name: /Nächster TOP:/ })).toBeNull();
+
+      await userEvent.click(screen.getByRole('button', { name: 'Tagesordnung bearbeiten' }));
+      expect(screen.getByRole('dialog', { name: 'Tagesordnung' })).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+      expect(screen.getByRole('dialog', { name: 'Anwesenheit' })).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Ändern' }));
+      expect(screen.getByRole('dialog', { name: 'Protokollant wählen' })).toBeInTheDocument();
+    });
+
+    it('marks a missing protokollant in the checklist and in the dock', async () => {
+      const { container } = await setup({
+        meeting: planned({ protokollantId: null, protokollantName: null }),
+        protocol: null,
+      });
+      expect(screen.getByText('Noch nicht zugewiesen – nötig zum Eröffnen')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Zuweisen' })).toBeInTheDocument();
+      const chip = screen.getByRole('button', { name: /Protokollant wählen/ });
+      expect(chip).toHaveClass('fx__chip--warn');
+      expect(chip).toHaveAttribute('aria-expanded', 'false');
+      await userEvent.click(chip);
+      expect(chip).toHaveAttribute('aria-expanded', 'true');
+      expect(container.querySelector('.fx__sheet--mid')).toBeTruthy();
+    });
+
+    it('names the protokollant on the dock chip once one is set', async () => {
+      await setup({ meeting: planned(), protocol: null });
+      const chip = screen.getByRole('button', { name: /Protokoll: Pia Protokoll/ });
+      expect(chip).not.toHaveClass('fx__chip--warn');
+    });
+
+    it('searches the roster and names the picked member', async () => {
+      const { on } = await setup({
+        meeting: planned({ protokollantId: null, protokollantName: null }),
+        protocol: null,
+      });
+      await userEvent.click(screen.getByRole('button', { name: /Protokollant wählen/ }));
+      const picker = screen.getByRole('dialog', { name: 'Protokollant wählen' });
+      // Initials, the attendance state and the open state of an unrecorded row.
+      expect(within(picker).getByText('PP')).toBeInTheDocument();
+      expect(within(picker).getByText('Anwesend')).toBeInTheDocument();
+      expect(within(picker).getByText('Offen')).toBeInTheDocument();
+
+      await userEvent.type(within(picker).getByRole('searchbox', { name: 'Mitglied suchen' }), 'mika');
+      expect(within(picker).getAllByRole('button', { name: /Mika Mitglied/ })).toHaveLength(1);
+      expect(within(picker).queryByRole('button', { name: /Alina Admin/ })).toBeNull();
+
+      await userEvent.clear(within(picker).getByRole('searchbox', { name: 'Mitglied suchen' }));
+      await userEvent.type(within(picker).getByRole('searchbox', { name: 'Mitglied suchen' }), 'zzz');
+      expect(within(picker).getByText('Kein Mitglied gefunden.')).toBeInTheDocument();
+
+      await userEvent.clear(within(picker).getByRole('searchbox', { name: 'Mitglied suchen' }));
+      await userEvent.click(within(picker).getByRole('button', { name: /Alina Admin/ }));
+      expect(on.setProtokollant).toHaveBeenCalledWith('pr-3');
+      expect(screen.queryByRole('dialog', { name: 'Protokollant wählen' })).toBeNull();
+    });
+
+    it('does not send the protokollant that is already set', async () => {
+      const { on } = await setup({ meeting: planned(), protocol: null });
+      await userEvent.click(screen.getByRole('button', { name: /Protokoll: Pia Protokoll/ }));
+      const current = screen.getByRole('button', { name: /Pia Protokoll/, pressed: true });
+      await userEvent.click(current);
+      expect(on.setProtokollant).not.toHaveBeenCalled();
+    });
+
+    it('falls back to the e-mail and the id for a member without a name', async () => {
+      await setup({
+        meeting: planned(),
+        protocol: null,
+        attendance: [
+          { principalId: 'pr-7', displayName: null, email: 'kai.klar@x.de', status: 'absent', source: null, isSelf: false },
+          { principalId: 'pr-8', displayName: null, email: null, status: null, source: null, isSelf: false },
+        ],
+      });
+      await userEvent.click(screen.getByRole('button', { name: /Protokoll: Pia Protokoll/ }));
+      const picker = screen.getByRole('dialog', { name: 'Protokollant wählen' });
+      expect(within(picker).getByText('kai.klar@x.de')).toBeInTheDocument();
+      expect(within(picker).getByText('KK')).toBeInTheDocument();
+      expect(within(picker).getByText('pr-8')).toBeInTheDocument();
+      await userEvent.type(within(picker).getByRole('searchbox', { name: 'Mitglied suchen' }), 'kai');
+      expect(within(picker).queryByText('pr-8')).toBeNull();
+    });
+
+    it('shows a plain warning to a lead who may not name the protokollant', async () => {
+      await setup({
+        meeting: planned({ protokollantId: null, protokollantName: null, canManage: false }),
+        protocol: null,
+      });
+      expect(screen.getByText('Protokollant fehlt')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /Protokollant wählen/ })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Zuweisen' })).toBeNull();
+    });
+
+    it('offers the checklist without the start to a manager who may not start', async () => {
+      await setup({ meeting: planned({ canControl: false }), protocol: null });
+      expect(screen.getByRole('heading', { name: 'Sitzung vorbereiten' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Sitzung eröffnen' })).toBeNull();
+    });
+  });
+
+  describe('neighbour arrows', () => {
+    it('steps to the items beside the open one', async () => {
+      const { on } = await setup({ top: AGENDA[1], topIndex: 1 });
+      await userEvent.click(screen.getByRole('button', { name: 'Vorheriger TOP: TOP 1 · Begrüßung' }));
+      expect(on.selectTop).toHaveBeenCalledWith('t-1');
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Nächster TOP: TOP 3 · Antrag Kulturfestival' }),
+      );
+      expect(on.selectTop).toHaveBeenCalledWith('t-3');
+    });
+
+    it('drops the arrow at an edge and names an untitled neighbour', async () => {
+      await setup({ agenda: [AGENDA[0], item({ id: 't-2', title: '', position: 1 })] });
+      expect(screen.queryByRole('button', { name: /Vorheriger TOP:/ })).toBeNull();
+      expect(screen.getByRole('button', { name: /Nächster TOP: TOP 2 · / })).toBeInTheDocument();
+    });
+
+    it('shows no arrows while no item is open', async () => {
+      await setup({ top: null, topIndex: -1 });
+      expect(screen.queryByRole('button', { name: /Nächster TOP:/ })).toBeNull();
     });
   });
 

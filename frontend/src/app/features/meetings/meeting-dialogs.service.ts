@@ -271,6 +271,21 @@ export class MeetingDialogsService {
       });
   }
 
+  /**
+   * Name the protokollant of a meeting in one PATCH, straight from the session
+   * page. The settings dialog stays the place for the date and the time.
+   */
+  setProtokollant(m: Meeting, principalId: string): void {
+    this.api.patchMeeting(m.id, { protokollantId: principalId }).subscribe({
+      next: (updated) => {
+        if (this.session.meeting()?.id === updated.id) this.session.meeting.set(updated);
+        this.timeline.replaceInTimeline(updated);
+        this.toast.success(this.i18n.translate('meetings.toast.protokollantSet'));
+      },
+      error: () => this.toast.error(this.i18n.translate('meetings.toast.actionFailed')),
+    });
+  }
+
   askDeleteMeeting(m: Meeting): void {
     this.confirmDeleteMeeting.set(m);
   }

@@ -126,6 +126,7 @@
     (closeSession)="closeConfirmOpen.set(true)"
     (finalize)="finalize()"
     (openSettings)="openSettings(m)"
+    (setProtokollant)="setProtokollant(m, $event)"
     (deleteMeeting)="askDeleteMeeting(m)"
     (toggleBeamer)="beamerMode.set(true)"
     (attendanceChange)="setAttendance($event.member, $event.status)"
@@ -206,12 +207,14 @@
       <label class="text-sm font-medium text-text-muted" for="mtg-vq">{{ 'meetings.vote.question' | t }}</label>
       <textarea id="mtg-vq" class="mtg__input mtg__voteQuestion" rows="4" [ngModel]="voteQuestion()" (ngModelChange)="voteQuestion.set($event)" name="vq" [placeholder]="'meetings.vote.questionPlaceholder' | t"></textarea>
       <span class="text-sm font-medium text-text-muted">{{ 'meetings.vote.options' | t }}</span>
+      <!-- The options are fixed. They show as one row of equal fields, not as
+           controls, and the hint below says why. -->
       <div class="mtg__voteFixed">
         @for (opt of FIXED_VOTE_OPTIONS; track opt) {
-          <app-badge variant="neutral">{{ voteOptionLabel(opt) }}</app-badge>
+          <span class="mtg__voteOption">{{ voteOptionLabel(opt) }}</span>
         }
       </div>
-      <p class="text-text-muted text-sm self-center">{{ 'meetings.vote.optionsFixedHint' | t }}</p>
+      <p class="mtg__voteHint">{{ 'meetings.vote.optionsFixedHint' | t }}</p>
       <app-checkbox [ngModel]="voteSecret()" (ngModelChange)="voteSecret.set($event)" name="voteSecret">{{ 'meetings.vote.secret' | t }}</app-checkbox>
 
       <app-select

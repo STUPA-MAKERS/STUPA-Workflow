@@ -18,6 +18,7 @@ import { RouterLink } from '@angular/router';
 import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
+import type { TranslationKey } from '@core/i18n/translations';
 import type {
   AgendaItem,
   Attendance,
@@ -56,7 +57,7 @@ import {
 
 export type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 /** The popover that is open above the dock. */
-export type DockPanel = 'none' | 'agenda' | 'attendance';
+export type DockPanel = 'none' | 'agenda' | 'attendance' | 'protokollant';
 
 /**
  * The session page of the protokollant and the session lead.
@@ -169,8 +170,12 @@ export class MeetingFocusComponent {
   readonly dragStart = output<number>();
   readonly dragOver = output<DragEvent>();
   readonly drop = output<number>();
+  /** Name the protokollant of a planned meeting, from the dock or the checklist. */
+  readonly setProtokollant = output<Uuid>();
 
   readonly panel = signal<DockPanel>('none');
+  /** The search text of the protokollant picker. */
+  protected readonly protokollantQuery = signal('');
   /**
    * The editor reloads its content only when the document key changes. An insert
    * from outside the editor, like a vote result, bumps this revision so the new
@@ -238,6 +243,18 @@ export class MeetingFocusComponent {
   protected readonly hasNext = computed(
     () => this.topIndex() >= 0 && this.topIndex() < this.agenda().length - 1,
   );
+  /** The neighbours of the open item, for the arrows beside the page. */
+  protected readonly prevTop = computed(() => this.neighbour(-1));
+  protected readonly nextTop = computed(() => this.neighbour(1));
+
+  /** The roster members that match the search of the protokollant picker. */
+  protected readonly protokollantCandidates = computed(() => {
+    const q = this.protokollantQuery().trim().toLowerCase();
+    return this.attendance().filter((a) => {
+      if (!q) return true;
+      return [a.displayName, a.email].some((v) => v?.toLowerCase().includes(q));
+    });
+  });
 
   protected readonly statusVariant = meetingStatusVariant;
   protected readonly statusKey = meetingStatusKey;
@@ -250,7 +267,14 @@ export class MeetingFocusComponent {
   protected readonly voteOptionsFor = voteOptionsFor;
 
   togglePanel(panel: Exclude<DockPanel, 'none'>): void {
+    if (panel === 'protokollant') this.protokollantQuery.set('');
     this.panel.set(this.panel() === panel ? 'none' : panel);
+  }
+
+  /** Name a roster member as the protokollant and close the picker. */
+  pickProtokollant(principalId: Uuid): void {
+    this.panel.set('none');
+    if (principalId !== this.meeting().protokollantId) this.setProtokollant.emit(principalId);
   }
 
   closePanel(): void {
@@ -301,6 +325,34 @@ export class MeetingFocusComponent {
 
   protected myChoice(voteId: Uuid): string | null {
     return this.choices()[voteId] ?? null;
+  }
+
+  protected memberName(a: Attendance): string {
+    return a.displayName || a.email || a.principalId;
+  }
+
+  /** Two letters for the avatar of a roster member. */
+  protected initials(a: Attendance): string {
+    const parts = this.memberName(a).split(/[\s@.]+/).filter(Boolean);
+    return parts
+      .slice(0, 2)
+      .map((p) => p[0].toUpperCase())
+      .join('');
+  }
+
+  protected attendanceKey(status: AttendanceStatus | null): TranslationKey {
+    return status ? `meetings.attendance.${status}` : 'meetings.attendance.unknown';
+  }
+
+  private neighbour(delta: -1 | 1): { n: number; title: string } | null {
+    const index = this.topIndex();
+    if (index < 0) return null;
+    const item = this.agenda()[index + delta];
+    if (!item) return null;
+    return {
+      n: index + delta + 1,
+      title: item.title || this.i18n.translate('meetings.agenda.untitled'),
+    };
   }
 
   protected optionLabel(opt: string): string {
