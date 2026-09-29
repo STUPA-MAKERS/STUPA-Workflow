@@ -25,8 +25,8 @@ class ProtocolPatch(_CamelModel):
     """`PATCH /protocols/{id}`: update the Markdown body of a draft."""
 
     # Deployment-independent cap. It returns a clean 422 instead of an
-    # nginx 413 or the pytex cap. 512 kB stays under the nginx limit of 1 MiB
-    # and the pytex limit of 4 MiB.
+    # nginx 413 or the render cap. 512 kB stays under the nginx limit of 1 MiB
+    # and the typst limit of 32 MiB.
     markdown: str = Field(max_length=512_000)
 
 

@@ -1,9 +1,9 @@
-"""Test fakes for the protocol unit suite (T-22, without DB, pytex, MinIO or Redis).
+"""Test fakes for the protocol unit suite (T-22, without DB, typst, MinIO or Redis).
 
 `FakeSession` combines the two access patterns of
 `app.modules.protocol.service.ProtocolService`. It answers `get(model, id)` from a store
 and `execute(stmt)` from an **ordered** result queue, as `tests._support.flow_fakes` does.
-`FakeStorage` and `FakeMailQueue` record each put and each enqueue call. `FakePytex` comes
+`FakeStorage` and `FakeMailQueue` record each put and each enqueue call. `FakeTypst` comes
 from `tests._support.pdf_fakes`.
 """
 

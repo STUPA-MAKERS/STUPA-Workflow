@@ -1,7 +1,7 @@
 # E2E tests (T-40) — Playwright against the real compose stack
 
 End-to-end coverage of the core user journeys (testing.md §3) against the **real**
-stack (FastAPI + Angular + Postgres + Redis + MinIO + pytex behind Nginx), **not**
+stack (FastAPI + Angular + Postgres + Redis + MinIO + typst behind Nginx), **not**
 against the mock API (OFF since #101). Magic-link mails land in the `mailpit` SMTP
 sink.
 
@@ -19,7 +19,7 @@ Playwright and cleans up fully (`down -v`). Precondition: run
 
 ## Covered — gating (blocking, every PR, CI job `e2e`)
 
-Deterministic. No Keycloak, pytex or ClamAV on the gate path:
+Deterministic. No Keycloak, typst or ClamAV on the gate path:
 
 - **01 apply** — the public apply wizard through ALL steps to the review summary
   (application type → contact → dynamic form of the seeded form version → review).
@@ -43,7 +43,7 @@ magic link, 2 flow, 6 admin config, 7 RBAC) **plus** budget pots and read-only.
 ## Left out on purpose — tracked as follow-up issues, not as hollow stubs
 
 Frederik's rule is "stable before flaky". A full green run of all 7 scenarios against
-the real stack is not reliably deterministic in CI (WebSocket timing, pytex-tectonic,
+the real stack is not reliably deterministic in CI (WebSocket timing, PDF render,
 Keycloak, ClamAV). These scenarios move to clearly named issues. Empty
 `test.fixme()` stubs would only fake coverage.
 
@@ -51,7 +51,7 @@ Keycloak, ClamAV). These scenarios move to clearly named issues. Empty
 |----------------|-------|
 | 3 async voting | #107 |
 | 4 live vote (WebSocket, 2 contexts + beamer) | #108 |
-| 5 protocol → PDF → send (pytex) | #109 |
+| 5 protocol → PDF → send (typst) | #109 |
 | OIDC login over a Keycloak test realm | #110 |
 
 ## Architecture notes

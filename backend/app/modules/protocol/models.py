@@ -53,8 +53,8 @@ class Protocol(UUIDPkMixin, TimestampMixin, Base):
     sent_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    # pytex CD variant from the gremium, for example `protocol-stupa` or
-    # `protocol-asta`.
+    # CD-variant key of the gremium, snapshotted at creation. `stupa` and `asta`
+    # select the render variant `protocol-stupa` and `protocol-asta`.
     cd_variant: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (

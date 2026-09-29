@@ -1,3 +1,6 @@
 [submodule "frontend/vendor/ui-kit"]
 	path = frontend/vendor/ui-kit
 	url = https://github.com/STUPA-MAKERS/ui-kit.git
+[submodule "typst/vendor/hsrtreport-typst"]
+	path = typst/vendor/hsrtreport-typst
+	url = https://github.com/frederikbeimgraben/hsrtreport-typst.git

@@ -5,7 +5,7 @@ field reads is therefore dropped without a word, and the operator gets the defau
 For `WEBHOOK_ALLOWLIST` that meant an EMPTY webhook host allowlist on a deployment
 that followed the documentation. These tests block a repeat.
 
-A key that another service reads (compose, postgres, the altcha sidecar, pytex) is
+A key that another service reads (compose, postgres, the altcha sidecar, typst) is
 listed below with its consumer. A key that nothing reads at all is listed too, so the
 list stays an explicit, reviewed inventory instead of a silent hole.
 """
@@ -33,12 +33,12 @@ _NOT_READ_BY_THE_API = {
     "ALTCHA_ROOT_PASSWORD": "altcha sidecar",
     "WEB_PORT": "compose interpolation",
     "WEB_HOST": "compose interpolation",
-    # The pytex service reads these itself (pytex/app.py).
-    "PYTEX_DEFAULT_OUTPUT": "pytex service",
-    "PYTEX_DEFAULT_TRUST": "pytex service",
-    "PYTEX_MAX_BODY_BYTES": "pytex service",
-    "PYTEX_MAX_ASSETS": "pytex service",
-    "PYTEX_MAX_ASSET_BYTES": "pytex service",
+    # The typst service reads these itself (typst/typst_service/app.py, compiler.py).
+    "TYPST_MAX_BODY_BYTES": "typst service",
+    "TYPST_MAX_ASSETS": "typst service",
+    "TYPST_MAX_ASSET_BYTES": "typst service",
+    "TYPST_COMPILE_TIMEOUT_S": "typst service",
+    "TYPST_MAX_CONCURRENCY": "typst service",
     # The "documented but dead" group is empty on purpose. Eight keys sat here — a
     # Nextcloud export that was never written, a webhook key replaced by a per-webhook
     # secret, an SMTP sender replaced by MAIL_FROM, and an audit role the migrations

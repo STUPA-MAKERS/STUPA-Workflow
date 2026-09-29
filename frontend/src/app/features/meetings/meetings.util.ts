@@ -2,7 +2,7 @@
  * Pure, DI-free helpers for the protocol editor.
  *
  *  - Snippet builders produce the markdown blocks for applications and votes. A
- *    vote is the pytex protocol callout `> [!abstimmung]`, the same block the
+ *    vote is the protocol callout `> [!abstimmung]`, the same block the
  *    backend writes.
  *  - `renderMarkdown` is a minimal, dependency-free Markdown→HTML renderer for
  *    the live preview. It escapes ALL HTML entities FIRST, so no raw HTML from
@@ -21,7 +21,7 @@ export function escapeHtml(text: string): string {
     .replace(/'/g, '&#39;');
 }
 
-/** Markdown snippet referencing an application (pytex shortcode `:::antrag`). */
+/** Markdown snippet referencing an application (editor block `:::antrag`; the renderer drops the fences). */
 export function antragSnippet(applicationId: string, title: string | null): string {
   const heading = title?.trim() ? title.trim() : applicationId;
   return `\n:::antrag{#${applicationId}}\n### ${heading}\n:::\n`;
@@ -52,8 +52,8 @@ export function voteSnippetHead(vote: MeetingVote): string {
 }
 
 /**
- * Markdown snippet that embeds a vote result as the pytex protocol callout: a
- * `> [!abstimmung]` quote with the bold question and one tally line. pytex reads
+ * Markdown snippet that embeds a vote result as the protocol callout: a
+ * `> [!abstimmung]` quote with the bold question and one tally line. The renderer reads
  * the counts from that line and renders its tally box. The backend writes the
  * identical snippet, so one syntax serves the editor, the PDF and the mail.
  */
@@ -118,7 +118,7 @@ function isTableSeparator(line: string): boolean {
 }
 
 // Callout kinds → title + CSS modifier: the GitHub kinds (`> [!NOTE]` …) and the
-// pytex protocol kinds (`> [!abstimmung]` …).
+// protocol kinds (`> [!abstimmung]` …).
 const CALLOUT_TITLES: Record<string, string> = {
   note: 'Note',
   tip: 'Tip',

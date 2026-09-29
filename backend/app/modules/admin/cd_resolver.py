@@ -1,14 +1,15 @@
 """Resolve the corporate design of a Gremium for the render path.
 
 This module is the seam between the admin CRUD and the PDF renderers. It turns
-the ``cd_variant`` rows of a Gremium into the two logo tuples that pytex expects
+the ``cd_variant`` rows of a Gremium into the two logo tuples that the render
+service expects
 plus the asset bytes that go with them.
 
-A vendored logo contributes only its name (``INF``, ``MAKERS``, ...). pytex ships
+A vendored logo contributes only its name (``INF``, ``MAKERS``, ...). The render service ships
 that file. An uploaded logo contributes a plain asset file name to the tuple AND
 its bytes to ``assets``. The caller writes those bytes next to the document
 before the render, under exactly the returned name. The name holds no path
-separator, because pytex refuses one, and it carries the logo row id, so two
+separator, because the render service refuses one, and it carries the logo row id, so two
 uploads of the same original name never collide.
 """
 
@@ -34,7 +35,7 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True, slots=True)
 class ResolvedCdVariant:
-    """The corporate design of one Gremium, ready for a pytex render.
+    """The corporate design of one Gremium, ready for a render.
 
     A design contributes LOGOS. It does not decide what kind of document is being
     rendered: one Gremium renders applications and protocols, so the shape belongs to
@@ -154,9 +155,9 @@ async def _resolve(
 
 
 def cd_render_config(cd: ResolvedCdVariant) -> dict[str, object]:
-    """Return the pytex `config` object that carries the logos of a design.
+    """Return the render `config` object that carries the logos of a design.
 
-    pytex reads the keys `logos` and `footer_logos`. An empty tuple stays out of
+    The renderer reads the keys `logos` and `footer_logos`. An empty tuple stays out of
     the object, because an empty list would override the default of the document
     shape with nothing instead of leaving it alone.
     """

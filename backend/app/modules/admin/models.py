@@ -64,7 +64,7 @@ class CdVariant(UUIDPkMixin, CreatedAtMixin, Base):
 class CdVariantLogo(UUIDPkMixin, CreatedAtMixin, Base):
     """One logo of a corporate-design variant, in one slot at one position.
 
-    A row is EITHER a vendored pytex logo (``vendored_name``) OR an uploaded
+    A row is EITHER a vendored logo (``vendored_name``) OR an uploaded
     object in MinIO (``object_key`` with ``file_name``, ``mime`` and ``size``).
     The check constraint ``ck_cd_variant_logo_source`` holds the exactly-one-of
     rule in the database, so no code path can write a row with both or neither.
@@ -105,7 +105,7 @@ class Gremium(UUIDPkMixin, CreatedAtMixin, Base):
     name: Mapped[str] = mapped_column(Text)
     slug: Mapped[str] = mapped_column(Text, unique=True)
     # Corporate design of the rendered documents. NULL = no variant, so the
-    # render path falls back to the pytex default. The FK is RESTRICT: a variant
+    # render path falls back to the renderer default. The FK is RESTRICT: a variant
     # that a gremium still references cannot be deleted (the service answers 409).
     cd_variant_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("cd_variant.id", ondelete="RESTRICT"), nullable=True

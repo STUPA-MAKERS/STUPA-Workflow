@@ -12,7 +12,7 @@ The dual render in `finalize` writes both PDFs, the internal one and the public 
 internal Markdown carries the body of the agenda item. The public Markdown carries the
 placeholder. The mail carries the public variant only.
 
-The test builds local fakes for storage, pytex and mail. `finalize` needs a
+The test builds local fakes for storage, typst and mail. `finalize` needs a
 deterministic backend that records the Markdown bytes it gets.
 """
 
@@ -37,7 +37,7 @@ from app.modules.auth.models import Principal
 from app.modules.files.storage import ObjectStorage
 from app.modules.livevote.models import Meeting, MeetingAgendaItem, MeetingAttendance
 from app.modules.notifications.mail import MailMessage
-from app.modules.pdf.pytex_client import PytexClient
+from app.modules.pdf.typst_client import TypstClient
 from app.modules.protocol.models import Protocol
 from app.modules.protocol.service import ProtocolService
 
@@ -86,27 +86,21 @@ class _FakeStorage:
         self.blobs.pop(key, None)
 
 
-class _FakePytex:
-    """Fake pytex client that returns deterministic bytes and records the Markdown."""
+class _FakeTypst:
+    """Fake typst client that returns deterministic bytes and records the Markdown."""
 
     def __init__(self) -> None:
         self.calls: list[str] = []
-        # The `trust_level` of each render. `None` means the client default, which is
-        # `trusted`. The protocol path uses that default. The sanitizer holds the RCE
-        # protection.
-        self.trust_levels: list[str | None] = []
 
     async def render_pdf(
         self,
         markdown: str,
         *,
         variant: str | None = None,
-        trust_level: str | None = None,
         config: Mapping[str, object] | None = None,
         assets: Mapping[str, bytes] | None = None,
     ) -> bytes:
         self.calls.append(markdown)
-        self.trust_levels.append(trust_level)
         # The call index makes the bytes different for each render.
         return f"%PDF-{len(self.calls)}::{markdown}".encode()
 
@@ -311,12 +305,12 @@ async def test_finalize_dual_render(session: AsyncSession) -> None:
     await session.commit()
 
     storage = _FakeStorage()
-    pytex = _FakePytex()
+    typst = _FakeTypst()
     mail_queue = _FakeMailQueue()
     svc = ProtocolService(
         session,
         storage=cast("ObjectStorage", storage),
-        pytex=cast("PytexClient", pytex),
+        typst=cast("TypstClient", typst),
         mail_queue=mail_queue,  # pyright: ignore[reportArgumentType]
     )
 

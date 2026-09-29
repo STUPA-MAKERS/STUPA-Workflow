@@ -92,7 +92,7 @@ export function errorDetail(err: unknown): string {
 
 /**
  * Assemble the protocol markdown from the ordered TOPs.
- * Top-level `#` headings are required. The protocol variant of pytex numbers them
+ * Top-level `#` headings are required. The protocol renderer numbers them
  * as "TOP n" on its own. Do not add a manual prefix and do not use `##`, because
  * that doubles the numbering.
  */

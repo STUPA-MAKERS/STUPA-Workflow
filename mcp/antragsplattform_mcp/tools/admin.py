@@ -75,7 +75,7 @@ async def delete_cd_variant(variant_id: str) -> dict:
 async def add_cd_variant_vendored_logo(
     variant_id: str, logo: S.CdVariantLogoVendoredCreate
 ) -> dict:
-    """Add a logo that pytex ships to a variant. Requires admin.cd_variants."""
+    """Add a logo that the render service ships to a variant. Requires admin.cd_variants."""
     return await api().post(
         f"/admin/cd-variants/{variant_id}/logos/vendored", json=dump_create(logo)
     )

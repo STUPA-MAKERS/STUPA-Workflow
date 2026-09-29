@@ -67,8 +67,8 @@ function errorStatus(err: unknown): number {
  * Corporate-design variants: the logo sets a Gremium renders its documents with.
  *
  * A variant carries no color and no font. It only holds an ordered list of logos per
- * slot (title page, page footer) on top of a pytex base variant. A logo is either a
- * name that pytex ships or a file an admin uploaded. Create, edit and "add a logo" all
+ * slot (title page, page footer) on top of a base variant. A logo is either a
+ * name that the render service ships or a file an admin uploaded. Create, edit and "add a logo" all
  * run in a dialog. The key is a slug that the name generates, and it is immutable after
  * the create, because the renderer refers to it.
  */

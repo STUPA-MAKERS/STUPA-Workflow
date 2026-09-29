@@ -57,7 +57,7 @@ npx playwright test             # E2E against the compose stack
 
 The jobs start in parallel, as a flat fan-out, not one after another. The required jobs
 are `be-lint`, `be-typecheck`, `be-unit`, `be-integration`, `be-contract` (Schemathesis),
-`fe-unit`, `coverage-gate`, `image-build-smoke` (main pushes only), `pytex` and
+`fe-unit`, `coverage-gate`, `image-build-smoke` (main pushes only), `typst` and
 `compose`. `e2e` (Playwright against the compose stack), `restore-smoke` and
 `real-stack-smoke` stay opt-in. A label, a manual run or a repo variable starts them. A
 red pull request stays blocked.
@@ -150,7 +150,7 @@ Set this for `main` under **Settings → Branches → Branch protection rule**:
 - ✅ **Require status checks to pass before merging** → *Require branches up to date*.
   Required checks (job names from `ci.yml`):
   `be-lint`, `be-typecheck`, `be-unit`, `be-integration`, `be-contract`, `fe-unit`,
-  `coverage-gate`, `image-build-smoke`, `pytex`, `compose`.
+  `coverage-gate`, `image-build-smoke`, `typst`, `compose`.
   `e2e` stays opt-in (see "CI stages" above) and is not a required check.
 - ✅ **Require conversation resolution before merging**.
 - ✅ **Do not allow bypassing the above settings** (admins included).

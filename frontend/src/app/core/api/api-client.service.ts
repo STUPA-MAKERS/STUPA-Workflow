@@ -782,7 +782,7 @@ export class ApiClient {
       .pipe(map(mapProtocol));
   }
 
-  /** POST /protocols/{id}/finalize — →PDF (pytex) → MinIO + MAIL_LIST. */
+  /** POST /protocols/{id}/finalize — →PDF (typst) → MinIO + MAIL_LIST. */
   finalizeProtocol(protocolId: Uuid): Observable<Protocol> {
     return this.http
       .post<ProtocolOutWire>(`${this.base}/protocols/${protocolId}/finalize`, {})

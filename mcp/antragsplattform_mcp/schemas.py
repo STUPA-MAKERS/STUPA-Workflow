@@ -197,7 +197,7 @@ class CdVariantUpdate(WireModel):
 
 
 class CdVariantLogoVendoredCreate(WireModel):
-    """Add a logo that pytex ships. Upload a file through the web UI instead."""
+    """Add a logo that the render service ships. Upload a file through the web UI instead."""
 
     slot: str
     vendoredName: str

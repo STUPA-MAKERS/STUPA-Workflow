@@ -8,11 +8,11 @@ The service binds to an `AsyncSession` and drives the protocol lifecycle.
 * `update_markdown` updates the editor body. It accepts a draft only.
 * `embed_votes` appends votes as Markdown snippets and writes
   `protocol_vote_ref`. It is idempotent and skips an already referenced vote.
-* `finalize` renders the Markdown through pytex into a PDF. It stores the PDF
+* `finalize` renders the Markdown through typst into a PDF. It stores the PDF
   in MinIO and mails it to MAIL_LIST(gremium). It sets `status='final'` and
   `sent_at`.
 
-The service reuses the pytex client, the object storage and the mail queue of
+The service reuses the typst client, the object storage and the mail queue of
 `app.modules.pdf` and `app.modules.notifications` without a change.
 
 Failure discipline: if storage is off by design (dev or demo without MinIO),
@@ -60,7 +60,7 @@ from app.modules.notifications.mail import (
 from app.modules.notifications.queue import MailQueue
 from app.modules.notifications.recipients import RecipientResolver
 from app.modules.notifications.service import filter_recipients_by_preference
-from app.modules.pdf.pytex_client import PytexClient, PytexError
+from app.modules.pdf.typst_client import TypstClient, TypstError
 from app.modules.protocol.markdown import (
     ProtocolDoc,
     build_protocol_document,
@@ -109,13 +109,13 @@ class ProtocolService:
         session: AsyncSession,
         *,
         storage: ObjectStorage | None = None,
-        pytex: PytexClient | None = None,
+        typst: TypstClient | None = None,
         mail_queue: MailQueue | None = None,
         settings: Settings | None = None,
     ) -> None:
         self.session = session
         self.storage = storage
-        self.pytex = pytex
+        self.typst = typst
         self.mail_queue = mail_queue
         self.settings = settings
 
@@ -494,8 +494,8 @@ class ProtocolService:
         if protocol.status == "final":
             return self._to_out(protocol)
 
-        # The pytex render runs BEFORE the commit. A permanent compile error (4xx) or
-        # a short pytex outage (5xx) rolls the session back and the protocol stays
+        # The typst render runs BEFORE the commit. A permanent render error (4xx) or
+        # a short typst outage (5xx) rolls the session back and the protocol stays
         # draft. The storage `put` and the mail enqueue run only AFTER a successful
         # commit, by design. A failed commit would otherwise leave an orphaned MinIO
         # object and an enqueued send job for a row that never became `final`.
@@ -687,7 +687,7 @@ class ProtocolService:
         blocks: list[str] = []
         for item in items:
             heading = (item.title or "Tagesordnungspunkt").strip()
-            # Use a top-level `#` WITHOUT a "TOP n:" prefix. The pytex service numbers
+            # Use a top-level `#` WITHOUT a "TOP n:" prefix. The typst service numbers
             # the sections itself as "TOP 1", "TOP 2" and so on. A `##` would get the
             # number "TOP 0.1", and a manual prefix would appear twice.
             if public and item.non_public:
@@ -732,7 +732,7 @@ class ProtocolService:
     async def _render_pdf(
         self, protocol: Protocol, markdown: str, *, public: bool = False
     ) -> bytes | None:
-        """Render the Markdown with pytex and return the PDF bytes.
+        """Render the Markdown with typst and return the PDF bytes.
 
         The render runs BEFORE the commit. The method sets the key column but does
         NOT upload. The storage `put` runs after the commit in `_store`.
@@ -743,13 +743,13 @@ class ProtocolService:
             renders nothing.
 
         Raises:
-            BadRequestError: pytex reported a permanent error (400).
-            ServiceUnavailableError: pytex failed for a short time (503). The draft
+            BadRequestError: typst reported a permanent error (400).
+            ServiceUnavailableError: typst failed for a short time (503). The draft
                 survives.
         """
         # Storage is the on/off switch, by design. Without it, finalize continues
         # without a PDF (demo or contract CI without MinIO).
-        if self.storage is None or self.pytex is None:
+        if self.storage is None or self.typst is None:
             return None
         try:
             # The protocol snapshots the CD key of its Gremium at creation, so it
@@ -764,23 +764,13 @@ class ProtocolService:
             variant = protocol_variant_for(protocol.cd_variant)
             config = cd_render_config(cd) if cd else None
             assets = cd.assets if cd else None
-            # RCE protection: the user-written body can carry the Markdown `eval`
-            # escape of pytex (`[//]: # "EXPR"` runs eval in the container).
-            # `sanitize_user_markdown` removes that escape UNCONDITIONALLY during the
-            # assembly in `build_protocol_document`, before the Markdown reaches
-            # pytex. The `\write18` shell escape does not apply under tectonic. This
-            # path therefore renders as `trusted`, the client default. The
-            # protocol variant needs the template machinery of pytex, and `untrusted`
-            # or `sandboxed` blocks that machinery. An untrusted render failed every
-            # protocol render with 400. As a second and independent line of defense,
-            # `PytexClient.render_pdf` checks the structure before the trusted render
-            # and proves that no eval trigger survived. A bypass of the sanitizer then
-            # becomes a contained error instead of an RCE.
-            pdf = await self.pytex.render_pdf(
+            # The body is user-written. The render service converts it into data
+            # before Typst sees it, so no part of it runs as code there.
+            pdf = await self.typst.render_pdf(
                 markdown, variant=variant, config=config, assets=assets
             )
-        except PytexError as exc:
-            # A 4xx is a permanent input or compile error, for example invalid LaTeX.
+        except TypstError as exc:
+            # A 4xx is a permanent input error, for example a malformed formula.
             # Do not retry it. Show the scrubbed reason instead of a misleading 503. A
             # 5xx or a transport error stays transient.
             if not exc.retryable:

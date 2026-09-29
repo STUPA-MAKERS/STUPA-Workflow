@@ -14,7 +14,7 @@ VM, `docker compose`.
 
 **Stack:** Backend = Python 3.13 / FastAPI / Pydantic v2 / SQLAlchemy 2.0 async + Alembic / arq
 worker. Frontend = Angular 20 (strict TS, standalone, separate `.html`/`.scss`, signals,
-ngx-formly). Postgres 16 (versioned JSONB), Redis, MinIO (S3), ClamAV, pytex (internal
+ngx-formly). Postgres 16 (versioned JSONB), Redis, MinIO (S3), ClamAV, typst (internal
 Markdown→PDF), ALTCHA.
 
 Full prose: `README.md`. Workflow & Definition of Done: `CONTRIBUTING.md`.
@@ -56,7 +56,7 @@ Backend domain modules (`backend/app/modules/<module>`):
 - **be-backup** — whole-platform age-encrypted backups + in-app restore, `/admin/backups` *(critical)*
 - **be-config-revision** — versioned config + audit + revert
 - **be-files** — MinIO attachments, ClamAV scan, signed URLs
-- **be-pdf** — client to the pytex render service (protocols only; applications no
+- **be-pdf** — client to the typst render service (protocols only; applications no
   longer render a PDF)
 - **be-privacy** — DSGVO/GDPR anonymization, export/erasure
 - **be-calendar** — calendar/ICS feed for meetings
@@ -66,7 +66,8 @@ Components:
 - **frontend** — Angular 20 SPA (`frontend/`): core/shared/features/pages, design system, build
 - **mcp** — MCP server (`mcp/`): act on the platform through its API as the logged-in user, PKCE
   browser grant
-- **pytex** — internal Markdown→PDF render service (`pytex/`), trust levels, variants
+- **typst** — internal Markdown→PDF render service (`typst/`), data-driven Typst template,
+  calibrated pytex layout, variants
 - **deploy** — docker-compose production stack (`deploy/`), services, networking
 
 ## Memory (`.claude/memory/`)

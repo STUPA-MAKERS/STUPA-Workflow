@@ -1,5 +1,5 @@
 {
-  description = "Antragsplattform (STUPA-Workflow) — FastAPI backend, Angular frontend, MCP server, admin CLI, pytex service";
+  description = "Antragsplattform (STUPA-Workflow) — FastAPI backend, Angular frontend, MCP server, admin CLI, typst render service";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
@@ -108,7 +108,7 @@
           ];
           shellHook = ''
             echo "STUPA-Workflow dev shell — node $(node --version), python ${python.version}, uv"
-            echo "Per-component shells: nix develop .#backend | .#frontend | .#mcp | .#admin-cli | .#pytex"
+            echo "Per-component shells: nix develop .#backend | .#frontend | .#mcp | .#admin-cli | .#typst"
             ${zshExec}
           '';
         };
@@ -132,8 +132,10 @@
         admin-cli = mkPyShell "admin-cli" [ pkgs.postgresql ]
           "echo 'Setup: uv venv && uv pip install -e .'";
 
-        pytex = mkPyShell "pytex" [ ]
-          "echo 'Setup: uv venv && uv pip install -e .[dev]  (pulls pytex-preprocessor)'";
+        # The typst CLI compiles the protocol PDFs. poppler-utils (pdftotext,
+        # pdftoppm) lets the integration tests read and rasterize the output.
+        typst = mkPyShell "typst" [ pkgs.typst pkgs.poppler-utils ]
+          "echo 'Setup: uv venv && uv pip install -e .[dev]  (needs the hsrtreport-typst submodule)'";
       };
     };
 }

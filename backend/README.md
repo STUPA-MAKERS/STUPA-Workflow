@@ -29,7 +29,7 @@ app/
     deadlines/       named deadline policies (the flow references them)
     budget/          cost center tree, fiscal years, allocation, bookings, invoices (ZUGFeRD)
     files/           upload, MIME sniff, ClamAV scan, MinIO/S3, signed URLs
-    pdf/             async application PDF render (pytex → MinIO)
+    pdf/             HTTP client of the typst render service (protocol PDFs)
     notifications/   mail templates and rules, per-user preferences, arq dispatch
     webhooks/        outgoing event webhooks (SSRF guard, HMAC signature)
     audit/           append-only hash chain + verification

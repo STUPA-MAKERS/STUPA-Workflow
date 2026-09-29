@@ -278,13 +278,11 @@ class Settings(BaseSettings):
         """ClamAV scan is active only when a clamd host is set."""
         return bool(self.clamav_host)
 
-    # pytex render container. `api` calls only `/render` on `pytex`. `PYTEX_URL` points
-    # at the internal container. `trusted` enables the tectonic bundle for the
-    # app-generated first-party documents. The render can be slow, because the first
-    # build fetches the bundle. That is why the timeout is generous.
-    pytex_url: str = "http://pytex:8099"
-    pytex_trust: str = "trusted"
-    pytex_timeout_seconds: int = 120
+    # typst render container. `api` and `worker` call only `/render` on `typst`.
+    # `TYPST_URL` points at the internal container. A protocol renders in well under a
+    # second; the timeout leaves room for a long protocol on a busy host.
+    typst_url: str = "http://typst:8099"
+    typst_timeout_seconds: int = 60
     # Worker retry for arq PDF render jobs: maximum tries and backoff base in seconds.
     pdf_max_tries: int = 4
     pdf_retry_backoff_seconds: int = 30

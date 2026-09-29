@@ -1,6 +1,6 @@
 """Unit tests for ProtocolService (T-22): lifecycle, vote embedding and finalize.
 
-The suite runs without a database, pytex, MinIO or Redis. `session.get` reads from a
+The suite runs without a database, typst, MinIO or Redis. `session.get` reads from a
 store and `execute` reads from an ordered result queue, which gives the branch
 coverage. The integration suite covers the real DB constraints, the UNIQUE meeting_id
 and the UNIQUE vote_ref.
@@ -17,12 +17,12 @@ import pytest
 
 from app.modules.admin.models import Gremium
 from app.modules.livevote.models import Meeting
-from app.modules.pdf.pytex_client import PytexError
+from app.modules.pdf.typst_client import TypstError
 from app.modules.protocol.models import Protocol
 from app.modules.protocol.service import ProtocolService, protocol_storage_key
 from app.settings import get_settings
 from app.shared.errors import ConflictError, NotFoundError, ServiceUnavailableError
-from tests._support.pdf_fakes import FakePytex
+from tests._support.pdf_fakes import FakeTypst
 from tests._support.protocol_fakes import FakeMailQueue, FakeSession, FakeStorage, result
 
 NOW = datetime(2026, 6, 12, 19, 0, tzinfo=UTC)
@@ -255,7 +255,7 @@ async def test_embed_votes_on_final_conflict() -> None:
 async def test_finalize_renders_stores_and_mails() -> None:
     proto = _protocol()
     storage = FakeStorage()
-    pytex = FakePytex(pdf=b"%PDF-1.4 ok")
+    typst = FakeTypst(pdf=b"%PDF-1.4 ok")
     mail = FakeMailQueue()
     session = FakeSession(
         store={MID: _meeting(), GID: _gremium("stupa")},
@@ -264,14 +264,14 @@ async def test_finalize_renders_stores_and_mails() -> None:
         results=[result(proto), result(), result("a@x.de", "b@x.de"), result()],
     )
     out = await _service(
-        session, storage=storage, pytex=pytex, mail_queue=mail
+        session, storage=storage, typst=typst, mail_queue=mail
     ).finalize(PID, now=NOW)
 
     assert out.status == "final"
     assert out.sent_at == NOW
     assert proto.pdf_storage_key == protocol_storage_key(PID)
     assert storage.puts and storage.puts[0][2] == "application/pdf"
-    assert pytex.calls and pytex.calls[0][1] == "protocol-stupa"
+    assert typst.calls and typst.calls[0][1] == "protocol-stupa"
     assert out.pdf_url is not None
     assert len(mail.sent) == 1
     assert mail.sent[0].to == ("a@x.de", "b@x.de")
@@ -281,40 +281,22 @@ async def test_finalize_renders_stores_and_mails() -> None:
     assert mail.sent[0].attachments[0].content.startswith(b"%PDF")
 
 
-async def test_finalize_renders_user_markdown_trusted() -> None:
-    """The sanitizer gives the RCE protection, not the trust level.
-
-    `sanitize_user_markdown` removes the `eval` escape unconditionally. The protocol
-    body therefore renders as `trusted`. That is the client default, because the call
-    passes no override and `trust_level` stays None. The protocol variant needs the
-    pytex template machinery, which `untrusted` refuses with a 400.
-    """
-    proto = _protocol()
-    pytex = FakePytex(pdf=b"%PDF")
-    session = FakeSession(
-        store={MID: _meeting(), GID: _gremium("stupa")},
-        results=[result(proto), result(), result(), result()],
-    )
-    await _service(session, storage=FakeStorage(), pytex=pytex).finalize(PID, now=NOW)
-    assert pytex.trust_levels == [None]
-
-
 async def test_the_design_never_decides_the_document_shape() -> None:
     """The shape comes from the document, the design only from the Gremium.
 
-    Passing the design to pytex as the shape once put every application of a
+    Passing the design to typst as the shape once put every application of a
     protocol-designed Gremium out as a meeting protocol. One Gremium renders both kinds,
     so the two must stay separate: `cd_variant` picks `protocol-stupa` here, and it is
     the protocol shape because a protocol is what is being rendered.
     """
-    pytex = FakePytex(pdf=b"%PDF")
+    typst = FakeTypst(pdf=b"%PDF")
     session = FakeSession(
         store={MID: _meeting(), GID: _gremium("stupa")},
         results=[result(_protocol()), result(), result(), result()],
     )
-    await _service(session, storage=FakeStorage(), pytex=pytex).finalize(PID, now=NOW)
+    await _service(session, storage=FakeStorage(), typst=typst).finalize(PID, now=NOW)
 
-    assert pytex.calls[0][1] == "protocol-stupa"
+    assert typst.calls[0][1] == "protocol-stupa"
 
 
 async def test_finalize_uploads_and_mails_only_after_commit() -> None:
@@ -326,14 +308,14 @@ async def test_finalize_uploads_and_mails_only_after_commit() -> None:
     """
     proto = _protocol()
     storage = FakeStorage()
-    pytex = FakePytex(pdf=b"%PDF-1.4 ok")
+    typst = FakeTypst(pdf=b"%PDF-1.4 ok")
     mail = FakeMailQueue()
     session = FakeSession(
         store={MID: _meeting(), GID: _gremium("stupa")},
         results=[result(proto), result(), result("a@x.de"), result()],
     )
     await _service(
-        session, storage=storage, pytex=pytex, mail_queue=mail
+        session, storage=storage, typst=typst, mail_queue=mail
     ).finalize(PID, now=NOW)
     assert session.committed == 1
     # Exactly one put (single render) and one mail, both from the post-commit path.
@@ -360,7 +342,7 @@ async def test_finalize_storage_error_after_commit_raises_503() -> None:
     )
     with pytest.raises(ServiceUnavailableError):
         await _service(
-            session, storage=_BoomStorage(), pytex=FakePytex()
+            session, storage=_BoomStorage(), typst=FakeTypst()
         ).finalize(PID, now=NOW)
     assert session.committed == 1  # the commit ran before the storage put
     assert proto.status == "final"
@@ -368,44 +350,44 @@ async def test_finalize_storage_error_after_commit_raises_503() -> None:
 
 async def test_finalize_without_storage_degrades_but_mails() -> None:
     proto = _protocol()
-    pytex = FakePytex()
+    typst = FakeTypst()
     mail = FakeMailQueue()
     session = FakeSession(
         store={MID: _meeting(), GID: _gremium()},
         results=[result(proto), result(), result("a@x.de"), result()],
     )
-    out = await _service(session, storage=None, pytex=pytex, mail_queue=mail).finalize(
+    out = await _service(session, storage=None, typst=typst, mail_queue=mail).finalize(
         PID, now=NOW
     )
     assert out.status == "final"
     assert out.pdf_url is None
     assert proto.pdf_storage_key is None
-    assert pytex.calls == []  # render skipped, no storage
+    assert typst.calls == []  # render skipped, no storage
     assert len(mail.sent) == 1 and mail.sent[0].attachments == ()  # no PDF, no storage
 
 
 async def test_finalize_idempotent_when_already_final() -> None:
     proto = _protocol(status="final", pdf_storage_key="pdf/protocol/x.pdf")
     storage = FakeStorage()
-    pytex = FakePytex()
+    typst = FakeTypst()
     mail = FakeMailQueue()
     session = FakeSession(results=[result(proto)])
     out = await _service(
-        session, storage=storage, pytex=pytex, mail_queue=mail
+        session, storage=storage, typst=typst, mail_queue=mail
     ).finalize(PID, now=NOW)
     assert out.status == "final"
     assert out.pdf_url is not None  # freshly signed from the existing key
-    assert storage.puts == [] and pytex.calls == [] and mail.sent == []
+    assert storage.puts == [] and typst.calls == [] and mail.sent == []
 
 
-async def test_finalize_pytex_error_raises_503() -> None:
+async def test_finalize_render_error_raises_503() -> None:
     proto = _protocol()
-    pytex = FakePytex(error=PytexError("boom", retryable=True))
+    typst = FakeTypst(error=TypstError("boom", retryable=True))
     session = FakeSession(
         store={MID: _meeting(), GID: _gremium()}, results=[result(proto)]
     )
     with pytest.raises(ServiceUnavailableError):
-        await _service(session, storage=FakeStorage(), pytex=pytex).finalize(
+        await _service(session, storage=FakeStorage(), typst=typst).finalize(
             PID, now=NOW
         )
     assert proto.status == "draft"  # the draft stays
@@ -419,7 +401,7 @@ async def test_finalize_no_recipients_skips_mail() -> None:
         results=[result(proto), result()],  # empty mail list
     )
     out = await _service(
-        session, storage=FakeStorage(), pytex=FakePytex(), mail_queue=mail
+        session, storage=FakeStorage(), typst=FakeTypst(), mail_queue=mail
     ).finalize(PID, now=NOW)
     assert out.status == "final"
     assert mail.sent == []
@@ -442,7 +424,7 @@ async def test_finalize_members_receive_even_without_maillist() -> None:
         ],
     )
     out = await _service(
-        session, storage=FakeStorage(), pytex=FakePytex(), mail_queue=mail
+        session, storage=FakeStorage(), typst=FakeTypst(), mail_queue=mail
     ).finalize(PID, now=NOW)
     assert out.status == "final"
     assert len(mail.sent) == 1
@@ -455,7 +437,7 @@ async def test_finalize_without_mail_queue_skips_send() -> None:
         store={MID: _meeting(), GID: _gremium()}, results=[result(proto)]
     )
     out = await _service(
-        session, storage=FakeStorage(), pytex=FakePytex(), mail_queue=None
+        session, storage=FakeStorage(), typst=FakeTypst(), mail_queue=None
     ).finalize(PID, now=NOW)
     assert out.status == "final"
     assert out.pdf_url is not None
@@ -469,7 +451,7 @@ async def test_finalize_deduplicates_recipients_across_lists() -> None:
         results=[result(proto), result(), result(), result(["a@x", "b@x"], ["b@x", "c@x"])],
     )
     await _service(
-        session, storage=FakeStorage(), pytex=FakePytex(), mail_queue=mail
+        session, storage=FakeStorage(), typst=FakeTypst(), mail_queue=mail
     ).finalize(PID, now=NOW)
     assert mail.sent[0].to == ("a@x", "b@x", "c@x")
 
@@ -569,7 +551,7 @@ async def test_finalize_from_rendering_completes() -> None:
         results=[result(proto), result(), result("a@x.de"), result()],
     )
     out = await _service(
-        session, storage=FakeStorage(), pytex=FakePytex(), mail_queue=FakeMailQueue()
+        session, storage=FakeStorage(), typst=FakeTypst(), mail_queue=FakeMailQueue()
     ).finalize(PID, now=NOW)
     assert out.status == "final"
 
@@ -591,7 +573,7 @@ async def test_finalize_recipients_union_members_plus_maillist() -> None:
         ],
     )
     await _service(
-        session, storage=FakeStorage(), pytex=FakePytex(), mail_queue=mail
+        session, storage=FakeStorage(), typst=FakeTypst(), mail_queue=mail
     ).finalize(PID, now=NOW)
     assert len(mail.sent) == 1
     assert mail.sent[0].to == ("member@x.de", "extra@y.de")

@@ -177,7 +177,7 @@ export interface Gremium {
   id: Uuid;
   name: string;
   slug: string;
-  /** CD variant the gremium renders its documents with. `null` = the pytex default. */
+  /** CD variant the gremium renders its documents with. `null` = the renderer default. */
   cdVariantId: Uuid | null;
   defaultLang: string;
   allowVoteDelegation: boolean;
@@ -218,7 +218,7 @@ export interface GremiumUpdateBody {
 // A variant only controls the logos of a rendered document. It carries no color
 // and no font.
 
-/** pytex document shape a variant builds on. */
+/** Document shape a variant builds on. */
 export type CdBaseVariant = 'report' | 'protocol';
 export const CD_BASE_VARIANTS: readonly CdBaseVariant[] = ['report', 'protocol'] as const;
 
@@ -226,7 +226,7 @@ export const CD_BASE_VARIANTS: readonly CdBaseVariant[] = ['report', 'protocol']
 export type CdLogoSlot = 'title' | 'footer';
 export const CD_LOGO_SLOTS: readonly CdLogoSlot[] = ['title', 'footer'] as const;
 
-/** Logo names that pytex ships (`VendoredLogoName`). They need no upload. */
+/** Logo names that the render service ships (`VendoredLogoName`). They need no upload. */
 export const VENDORED_LOGO_NAMES: readonly string[] = [
   'HSRT',
   'INF',

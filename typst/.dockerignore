@@ -1,0 +1,13 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+tests/
+*.egg-info/
+README.md
+pyproject.toml
+# Only src/ of the design submodule goes into the image.
+vendor/hsrtreport-typst/*
+!vendor/hsrtreport-typst/src
