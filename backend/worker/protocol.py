@@ -1,8 +1,8 @@
 """arq worker task: finalize a protocol asynchronously, so `finalize` never blocks.
 
-`render_protocol` builds the `ProtocolService` from the `ctx` dependencies (pytex, MinIO
+`render_protocol` builds the `ProtocolService` from the `ctx` dependencies (typst, MinIO
 and the mail queue). It runs the render and the send after the router set the protocol
-to `rendering` and enqueued the job. A transient error (pytex 5xx, transport, storage)
+to `rendering` and enqueued the job. A transient error (typst 5xx, transport, storage)
 raises `arq.Retry` with a linear backoff up to `pdf_max_tries`. A permanent error resets
 the protocol to `draft`. The protocol is then finalizable again and never stays stuck in
 `rendering`. The send belongs to the atomic finalization, so a failure rolls back
@@ -28,7 +28,7 @@ from app.modules.livevote.events import MeetingStateEvent
 from app.modules.livevote.models import Meeting
 from app.modules.livevote.service import meeting_channel
 from app.modules.notifications.queue import ArqMailQueue, MailQueue
-from app.modules.pdf.pytex_client import build_pytex_client
+from app.modules.pdf.typst_client import build_typst_client
 from app.modules.protocol.models import Protocol
 from app.modules.protocol.service import ProtocolService
 from app.settings import Settings, load_settings
@@ -53,7 +53,7 @@ def _service(ctx: dict[str, Any], session: AsyncSession) -> ProtocolService:
     return ProtocolService(
         session,
         storage=ctx.get("object_storage"),
-        pytex=ctx.get("pytex_client"),
+        typst=ctx.get("typst_client"),
         mail_queue=_mail_queue(ctx),
         settings=ctx.get("settings"),
     )
@@ -139,7 +139,7 @@ async def render_protocol(ctx: dict[str, Any], protocol_id: str) -> str:
         await _revert_to_draft(ctx, pid)
         await _broadcast_meeting_state(ctx, pid)
         return "dead"
-    except Exception as exc:  # noqa: BLE001 - permanent (e.g. pytex compile error)
+    except Exception as exc:  # noqa: BLE001 - permanent (e.g. a malformed formula)
         logger.error(
             "protocol render failed permanently (protocol=%s): %s", protocol_id, exc
         )
@@ -153,11 +153,10 @@ async def render_protocol(ctx: dict[str, Any], protocol_id: str) -> str:
 async def on_startup(ctx: dict[str, Any]) -> None:
     """Build the render dependencies once per worker.
 
-    The pytex client and the object storage were set up by the application-PDF task,
-    which no longer exists. Protocols render through the same two, so the setup moved
-    here rather than going with it.
+    Protocols render through the typst client and store into the object storage, so
+    both are built here.
     """
     settings = load_settings()
     ctx["settings"] = settings
-    ctx["pytex_client"] = build_pytex_client(settings)
+    ctx["typst_client"] = build_typst_client(settings)
     ctx["object_storage"] = build_object_storage(settings)

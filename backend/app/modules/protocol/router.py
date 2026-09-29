@@ -11,7 +11,7 @@ merge gremium-role permissions into `principal.permissions`, so the router
 delegates to the service.
 
 The router wires the service with the shared render infrastructure. Object
-storage and the arq mail pool come from the app state. The pytex client comes
+storage and the arq mail pool come from the app state. The typst client comes
 from the settings. The endpoints declare their errors as `ProblemDetail`
 (problem+json).
 """
@@ -33,7 +33,7 @@ from app.modules.auth.principal import Principal
 from app.modules.files.storage import ObjectStorage
 from app.modules.livevote.service import BrokerPublisher, MeetingService
 from app.modules.notifications.queue import ArqMailQueue, MailQueue
-from app.modules.pdf.pytex_client import build_pytex_client
+from app.modules.pdf.typst_client import build_typst_client
 from app.modules.protocol.queue import protocol_render_queue_from_pool
 from app.modules.protocol.schemas import ProtocolOut, ProtocolPatch, ProtocolVotesBody
 from app.modules.protocol.service import ProtocolService
@@ -57,12 +57,12 @@ def _mail_queue(request: Request) -> MailQueue | None:
 def get_protocol_service(
     session: DbSession, request: Request, settings: SettingsDep
 ) -> ProtocolService:
-    """Wire the service: storage and mail from the app state, pytex from settings."""
+    """Wire the service: storage and mail from the app state, typst from settings."""
     storage: ObjectStorage | None = getattr(request.app.state, "object_storage", None)
     return ProtocolService(
         session,
         storage=storage,
-        pytex=build_pytex_client(settings),
+        typst=build_typst_client(settings),
         mail_queue=_mail_queue(request),
         settings=settings,
     )
@@ -174,7 +174,7 @@ async def finalize_protocol(
     The caller needs write access AND `protocol.finalize`, either global or as
     a gremium role. This is stricter than a write to the draft.
 
-    The call does not block, because the pytex render runs in the arq worker.
+    The call does not block, because the typst render runs in the arq worker.
     The worker sets `final` and sends the mail. A permanent failure falls back
     to `draft`. Without Redis the request renders synchronously as a fallback,
     so a protocol never stays stuck in `rendering`. The call is idempotent: it

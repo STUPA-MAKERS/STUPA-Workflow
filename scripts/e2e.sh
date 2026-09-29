@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # E2E driver (T-40). The script starts the FULL stack with compose. The mock is OFF, so
-# the stack runs the real backend, frontend, pytex, Postgres, Redis and MinIO, plus
+# the stack runs the real backend, frontend, typst, Postgres, Redis and MinIO, plus
 # mailpit as the SMTP sink. The script seeds deterministic fixtures. It then runs
 # Playwright against the real `web` endpoint. It removes everything again (`down -v`).
 # The script is idempotent. It uses its own project name, so it does NOT touch another

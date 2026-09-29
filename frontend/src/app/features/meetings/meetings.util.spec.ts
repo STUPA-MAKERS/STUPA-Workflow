@@ -35,7 +35,7 @@ describe('escapeHtml', () => {
 });
 
 describe('antragSnippet', () => {
-  it('embeds the application id as a pytex shortcode with the title heading', () => {
+  it('embeds the application id as an editor block with the title heading', () => {
     const snip = antragSnippet('app-1', 'Mein Antrag');
     expect(snip).toContain(':::antrag{#app-1}');
     expect(snip).toContain('### Mein Antrag');
@@ -70,7 +70,7 @@ describe('topSnippet', () => {
 });
 
 describe('voteSnippet', () => {
-  it('renders the pytex vote callout with the title and one tally line', () => {
+  it('renders the protocol vote callout with the title and one tally line', () => {
     // The backend's `build_vote_snippet` writes the identical block.
     expect(voteSnippet(vote())).toBe(
       '> [!abstimmung] **Förderung Ersti-Wochenende**\n> yes: 12, no: 3, abstain: 1',

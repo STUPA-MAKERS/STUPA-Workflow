@@ -45,7 +45,7 @@ Theme switch: the attribute `data-theme="light|dark"` on `<html>`, set by the
 
 `--font-sans` = **Archivo**, a free grotesk (OFL, self-hosted). It replaces DIN on the web.
 Weights 400/500/600/700. Scale `--fs-xs … --fs-3xl`, base 16 px.
-`--font-mono` covers code and IDs. **DIN stays PDF-only** (pytex/T-20).
+`--font-mono` covers code and IDs. **DIN stays PDF-only** (typst render service).
 
 ## More scales
 

@@ -8,7 +8,7 @@ metadata:
 
 Run every development command inside a Nix devShell. Both repos ship a `flake.nix`:
 
-- **STUPA-Workflow** — `nix develop .#backend | .#frontend | .#mcp | .#admin-cli | .#pytex`, or
+- **STUPA-Workflow** — `nix develop .#backend | .#frontend | .#mcp | .#admin-cli | .#typst`, or
   `.#default` for the whole monorepo (Node plus Python).
 - **PyTeX-Preprocessor** — its own flake with a devShell and a package output.
 

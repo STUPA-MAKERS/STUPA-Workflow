@@ -9,13 +9,14 @@ network, so the internet cannot reach it.
 ## Start
 
 ```bash
-git submodule update --init --recursive   # frontend/vendor/ui-kit (@stupa-makers/ui-kit)
+git submodule update --init --recursive   # frontend/vendor/ui-kit, typst/vendor/hsrtreport-typst
 cp .env.example .env        # fill in the values, NEVER commit
 docker compose config -q    # validate the topology
 docker compose up -d --build
 ```
 
-> The frontend (`web`) takes the UI kit from the git submodule `frontend/vendor/ui-kit`.
+> The frontend (`web`) takes the UI kit from the git submodule `frontend/vendor/ui-kit`,
+> and `typst` takes the HSRT design (fonts, logos) from `typst/vendor/hsrtreport-typst`.
 > Check out the submodule before every `--build`. If you do not, `npm run build` fails on
 > an unresolved `@stupa-makers/ui-kit` path. `deploy/deploy.sh` does this for you and syncs
 > the submodule after `git pull`.
@@ -32,7 +33,7 @@ docker compose up -d --build
 | `redis` | Redis 7 (arq broker, rate limit, ALTCHA replay) | — |
 | `minio` | S3 object store (attachments) | — |
 | `clamav` | virus scan (the first start is slow because it loads the signatures) | — |
-| `pytex` | internal Markdown→PDF renderer | — |
+| `typst` | internal Markdown→PDF render service | — |
 | `altcha` | ALTCHA Sentinel (captcha verifier) | — |
 
 Docker builds `web` from the repository root `..` in two stages (`web/Dockerfile`). Stage 1
@@ -50,6 +51,20 @@ revisions before the application starts.
 
 `migrate` can also run as its own database user (`DB_MIGRATION_URL`), separate from the
 runtime user of the application.
+
+### Switch from pytex to typst — ONE-OFF manual step
+
+The `typst` service replaces the `pytex` service. After the deploy that carries the
+switch, remove the old container and its cache volume:
+
+```bash
+docker compose up -d --build --remove-orphans
+docker volume rm antragsplattform_pytex_cache
+```
+
+The `PYTEX_*` keys in `.env` have no effect any more. Remove them. The `TYPST_*` defaults
+fit production: the body cap is 32 MiB, the value that production set for pytex. Set
+`TYPST_URL` only when the service runs under a different name.
 
 ### Orphaned application PDFs — ONE-OFF manual step
 
@@ -96,8 +111,9 @@ Then point `DATABASE_URL` to user `app` and `DB_MIGRATION_URL` to user `migrator
 ## Networks
 
 - `internal` — bridge with no published ports, so there is no ingress. Egress stays open.
-  The worker needs SMTP, WebDAV and webhooks, pytex needs the tectonic bundle, and the api
-  needs OIDC.
+  The worker needs SMTP, WebDAV and webhooks, and the api needs OIDC.
+- `typst_net` — `internal: true`, so there is no egress. api and worker reach the typst
+  render service over it, and the typst container sits on this network only.
 - `proxy` — in production this is the network of the Nginx Proxy Manager. Set `external: true`
   there and reference the NPM network.
 

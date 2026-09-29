@@ -319,7 +319,7 @@ describe('MeetingsComponent', () => {
     // The PATCH first assembles the TOP texts into the protocol markdown …
     const saveReq = http.expectOne('/api/protocols/p-1');
     expect(saveReq.request.method).toBe('PATCH');
-    // Top-level `#` without a "TOP n:" prefix, because pytex numbers the TOPs itself.
+    // Top-level `#` without a "TOP n:" prefix, because the renderer numbers the TOPs itself.
     expect(saveReq.request.body.markdown).toContain('# Begrüßung');
     saveReq.flush(PROTOCOL);
     // … then the POST finalizes and renders it.

@@ -1,8 +1,8 @@
-"""Test fakes for the PDF unit tests. They use no real pytex, MinIO, Redis or database.
+"""Test fakes for the PDF unit tests. They use no real typst, MinIO, Redis or database.
 
 `FakePdfSession` serves the database methods that `PdfService` and `RenderPipeline` call
 (`get`, `scalar`, `add`, `flush`, `commit`) from an in-memory store. `FakeSessionmaker`
-hands that session out as an async context manager. `FakePytex` returns fixed results or
+hands that session out as an async context manager. `FakeTypst` returns fixed results or
 raises a configured error. `FakeRenderQueue` collects the enqueued job ids.
 """
 
@@ -63,17 +63,13 @@ class FakeSessionmaker:
         return None
 
 
-class FakePytex:
-    """Fake pytex client. It returns fixed PDF bytes or raises a given error."""
+class FakeTypst:
+    """Fake typst client. It returns fixed PDF bytes or raises a given error."""
 
     def __init__(self, *, pdf: bytes = b"%PDF-1.4 fake", error: Exception | None = None) -> None:
         self.pdf = pdf
         self.error = error
         self.calls: list[tuple[str, str | None]] = []
-        # The `trust_level` override recorded for each call. `None` means the client
-        # falls back to `trusted`. The protocol path keeps that fallback. The RCE
-        # protection lives in the sanitizer, not in the trust level.
-        self.trust_levels: list[str | None] = []
         # The corporate-design config and the logo assets of each call. A render
         # without a CD variant records `None` for both.
         self.configs: list[Mapping[str, object] | None] = []
@@ -84,12 +80,10 @@ class FakePytex:
         markdown: str,
         *,
         variant: str | None = None,
-        trust_level: str | None = None,
         config: Mapping[str, object] | None = None,
         assets: Mapping[str, bytes] | None = None,
     ) -> bytes:
         self.calls.append((markdown, variant))
-        self.trust_levels.append(trust_level)
         self.configs.append(config)
         self.assets.append(assets)
         if self.error is not None:

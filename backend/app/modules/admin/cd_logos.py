@@ -1,7 +1,7 @@
 """Logo policy of the corporate-design (CD) variants.
 
 A CD variant controls the logos of a rendered document and nothing else. It
-carries no color and no font. A logo entry is EITHER a vendored pytex logo name
+carries no color and no font. A logo entry is EITHER a vendored logo name
 OR an object that an admin uploaded. This module holds the closed value sets and
 the upload security contract.
 
@@ -14,9 +14,10 @@ that serves such an object back MUST force ``Content-Disposition: attachment``
 and MUST NOT answer with ``image/svg+xml``, because an SVG is an XSS vector in
 the app origin. ``get_invoice_file`` in the budget module hardens the same way.
 
-The asset name that ``cd_resolver`` hands to pytex is a plain file name without
-a path separator. pytex refuses anything else. The name carries the logo row id,
-so two uploads of the same original file name never collide.
+The asset name that ``cd_resolver`` hands to the render service is a plain
+file name without a path separator. The service refuses anything else. The
+name carries the logo row id, so two uploads of the same original file name
+never collide.
 """
 
 from __future__ import annotations
@@ -29,7 +30,8 @@ from app.modules.admin.branding import sniff_raster_image
 
 # --- closed value sets ----------------------------------------------------
 
-# Logo names that pytex ships (``pytex_hsrtreport.logos.KNOWN_LOGOS``). A
+# Logo names that the render service ships (``vendored-logos`` in
+# ``typst/template/protocol.typ``). A
 # vendored entry needs no upload and no object storage.
 VendoredLogoName = Literal[
     "HSRT",
@@ -58,7 +60,7 @@ VENDORED_LOGO_NAMES: Final[tuple[VendoredLogoName, ...]] = (
 LogoSlot = Literal["title", "footer"]
 LOGO_SLOTS: Final[tuple[LogoSlot, ...]] = ("title", "footer")
 
-# The pytex document shape that the variant builds on.
+# The document shape that the variant builds on.
 CdBaseVariant = Literal["report", "protocol"]
 CD_BASE_VARIANTS: Final[tuple[CdBaseVariant, ...]] = ("report", "protocol")
 
@@ -122,9 +124,9 @@ def sniff_cd_logo(data: bytes) -> str | None:
 
 
 def asset_file_name(logo_id: uuid.UUID, file_name: str | None, mime: str) -> str:
-    """Build the plain file name under which pytex sees an uploaded logo.
+    """Build the plain file name under which the render service sees an uploaded logo.
 
-    The name holds no path separator, so pytex resolves it inside the build
+    The name holds no path separator, so the render service resolves it inside the build
     directory. The row id prefix makes it unique, so two uploads of the same
     original name never collide inside one variant.
 

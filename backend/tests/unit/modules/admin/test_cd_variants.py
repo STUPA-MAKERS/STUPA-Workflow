@@ -4,7 +4,7 @@ The tests cover four areas.
 
 1. The upload policy `sniff_cd_logo`: SVG and PDF pass here, because these bytes
    only reach the LaTeX renderer. A mismatched magic byte is rejected.
-2. The asset name that pytex sees: plain, unique per logo row and with the
+2. The asset name that typst sees: plain, unique per logo row and with the
    extension of the SNIFFED type.
 3. `CdVariantService`: CRUD, the immutable key, the 409 on a delete while a
    Gremium still references the variant, and the storage error paths.
@@ -232,7 +232,7 @@ def test_sniff_rejects_an_svg_hidden_behind_a_long_prologue() -> None:
     assert sniff_cd_logo(b"<" + b" " * 4096 + b"<svg/>") is None
 
 
-def test_vendored_names_match_the_pytex_catalog() -> None:
+def test_vendored_names_match_the_template_catalog() -> None:
     assert set(VENDORED_LOGO_NAMES) == {
         "HSRT",
         "INF",
@@ -719,7 +719,7 @@ async def test_resolve_upload_only_variant_returns_names_and_bytes() -> None:
     name = asset_file_name(logo.id, "wappen.svg", "image/svg+xml")
     assert out.title_logos == (name,) and out.footer_logos == ()
     assert out.assets == {name: SVG}
-    assert "/" not in name  # pytex refuses a path separator
+    assert "/" not in name  # typst refuses a path separator
 
 
 async def test_resolve_mixed_variant_keeps_the_slot_order() -> None:

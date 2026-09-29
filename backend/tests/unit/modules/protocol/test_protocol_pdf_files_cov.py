@@ -6,8 +6,8 @@ public PDF variant, plus `_quorate`, `_header_meta` and `_local_end_time`. Final
 covers the `FilesService` operations `list_for_application`, `delete` and
 `delete_for_application`.
 
-The suite runs without a database, pytex, MinIO or Redis. The sessions are fakes with
-a store and ordered result queues. The storage, pytex and mail fakes come from
+The suite runs without a database, typst, MinIO or Redis. The sessions are fakes with
+a store and ordered result queues. The storage, typst and mail fakes come from
 `tests._support`.
 """
 
@@ -25,7 +25,7 @@ import pytest
 from app.modules.applications.models import Application
 from app.modules.files import service as files_service
 from app.modules.files.models import Attachment
-from app.modules.pdf.pytex_client import PytexError
+from app.modules.pdf.typst_client import TypstError
 from app.modules.protocol.models import Protocol
 from app.modules.protocol.service import (
     ProtocolService,
@@ -40,7 +40,7 @@ from app.shared.errors import (
 )
 from tests._support.files_fakes import FailingStorage, FakeScanQueue, FakeStorage
 from tests._support.notifications_fakes import FakeSession as NotifSession
-from tests._support.pdf_fakes import FakePytex
+from tests._support.pdf_fakes import FakeTypst
 from tests._support.protocol_fakes import (
     FakeMailQueue,
     FakeSession,
@@ -212,7 +212,7 @@ async def test_finalize_dual_render_with_non_public_top() -> None:
     """
     proto = _protocol()
     storage = ProtoStorage()
-    pytex = FakePytex(pdf=b"%PDF dual")
+    typst = FakeTypst(pdf=b"%PDF dual")
     mail = FakeMailQueue()
     # _has_non_public reads session.scalar, where 1 is truthy.
     # Each _build_document call, internal and public, then runs in this order:
@@ -237,13 +237,13 @@ async def test_finalize_dual_render_with_non_public_top() -> None:
         "StuPa",  # _send gremium_name
     ]
     out = await _service(
-        session, storage=storage, pytex=pytex, mail_queue=mail
+        session, storage=storage, typst=typst, mail_queue=mail
     ).finalize(PID, now=NOW)
 
     assert out.status == "final"
     assert proto.pdf_storage_key == protocol_storage_key(PID)
     assert proto.public_pdf_storage_key == protocol_public_storage_key(PID)
-    assert len(pytex.calls) == 2
+    assert len(typst.calls) == 2
     keys = {k for k, _len, _ct in storage.puts}
     assert keys == {protocol_storage_key(PID), protocol_public_storage_key(PID)}
     # The mail carries the public PDF as the attachment.
@@ -278,7 +278,7 @@ async def test_finalize_dual_render_without_storage_skips_uploads() -> None:
         "StuPa",  # _send gremium_name
     ]
     out = await _service(
-        session, storage=None, pytex=FakePytex(), mail_queue=mail
+        session, storage=None, typst=FakeTypst(), mail_queue=mail
     ).finalize(PID, now=NOW)
     assert out.status == "final"
     assert proto.pdf_storage_key is None and proto.public_pdf_storage_key is None
@@ -294,7 +294,7 @@ async def test_assemble_from_agenda_builds_blocks_with_votes() -> None:
     )
     vote = _vote_row(agenda_item_id=item_with_vote.id, question="Genehmigen?")
     storage = ProtoStorage()
-    pytex = FakePytex(pdf=b"%PDF asm")
+    typst = FakeTypst(pdf=b"%PDF asm")
     session = FakeSession(
         store={MID: _meeting(), GID: _gremium(), vote.id: vote},
         results=[
@@ -310,10 +310,10 @@ async def test_assemble_from_agenda_builds_blocks_with_votes() -> None:
     )
     session.scalar_results = [0, None, 0]  # has_non_public is 0, protokollant, members
     out = await _service(
-        session, storage=storage, pytex=pytex, mail_queue=None
+        session, storage=storage, typst=typst, mail_queue=None
     ).finalize(PID, now=NOW)
     assert out.status == "final"
-    rendered_md = pytex.calls[0][0]
+    rendered_md = typst.calls[0][0]
     assert "# Haushalt" in rendered_md
     assert "Body Haushalt" in rendered_md
     assert "# Tagesordnungspunkt" in rendered_md  # fallback title for an empty item
@@ -329,7 +329,7 @@ async def test_assemble_public_redacts_non_public_top() -> None:
     np_item = _agenda_item(title="Personalie", body="Geheim", non_public=True)
     pub_item = _agenda_item(title="Offenes", body="Sichtbar", non_public=False)
     storage = ProtoStorage()
-    pytex = FakePytex(pdf=b"%PDF red")
+    typst = FakeTypst(pdf=b"%PDF red")
     session = FakeSession(
         store={MID: _meeting(), GID: _gremium()},
         results=[
@@ -345,10 +345,10 @@ async def test_assemble_public_redacts_non_public_top() -> None:
     )
     session.scalar_results = [1, None, 0, None, 0, "StuPa"]
     await _service(
-        session, storage=storage, pytex=pytex, mail_queue=None
+        session, storage=storage, typst=typst, mail_queue=None
     ).finalize(PID, now=NOW)
-    internal_md = pytex.calls[0][0]
-    public_md = pytex.calls[1][0]
+    internal_md = typst.calls[0][0]
+    public_md = typst.calls[1][0]
     assert "Geheim" in internal_md
     assert "Geheim" not in public_md
     assert "nicht-öffentlicher Tagesordnungspunkt" in public_md
@@ -368,7 +368,7 @@ async def test_assemble_skips_cancelled_votes_in_query() -> None:
     proto = _protocol()
     item = _agenda_item(title="X", body=None)
     storage = ProtoStorage()
-    pytex = FakePytex()
+    typst = FakeTypst()
     session = FakeSession(
         store={MID: _meeting(), GID: _gremium()},
         results=[
@@ -381,10 +381,10 @@ async def test_assemble_skips_cancelled_votes_in_query() -> None:
     )
     session.scalar_results = [0, None, 0]
     out = await _service(
-        session, storage=storage, pytex=pytex, mail_queue=None
+        session, storage=storage, typst=typst, mail_queue=None
     ).finalize(PID, now=NOW)
     assert out.status == "final"
-    assert "[!abstimmung]" not in pytex.calls[0][0]
+    assert "[!abstimmung]" not in typst.calls[0][0]
 
 
 async def test_quorate_with_explicit_percent_threshold() -> None:
@@ -495,28 +495,28 @@ async def test_finalize_uses_meeting_closed_at_end_time() -> None:
     proto = _protocol()
     meeting = _meeting(closed_at=datetime(2026, 6, 12, 17, 30, tzinfo=UTC))
     storage = ProtoStorage()
-    pytex = FakePytex()
+    typst = FakeTypst()
     session = FakeSession(
         store={MID: meeting, GID: _gremium()},
         results=[result(proto), result(), result(), result()],
     )
     session.scalar_results = [0, None, 0]
     out = await _service(
-        session, storage=storage, pytex=pytex, mail_queue=None
+        session, storage=storage, typst=typst, mail_queue=None
     ).finalize(PID, now=NOW)
     assert out.status == "final"
 
 
-async def test_finalize_non_retryable_pytex_error_400() -> None:
+async def test_finalize_non_retryable_render_error_400() -> None:
     proto = _protocol()
-    pytex = FakePytex(error=PytexError("bad latex", retryable=False))
+    typst = FakeTypst(error=TypstError("bad latex", retryable=False))
     session = FakeSession(
         store={MID: _meeting(), GID: _gremium()},
         results=[result(proto), result()],
     )
     session.scalar_results = [0, None, 0]
     with pytest.raises(BadRequestError) as exc:
-        await _service(session, storage=ProtoStorage(), pytex=pytex).finalize(
+        await _service(session, storage=ProtoStorage(), typst=typst).finalize(
             PID, now=NOW
         )
     assert exc.value.code == "render_failed"
@@ -532,7 +532,7 @@ async def test_finalize_storage_error_during_render_503() -> None:
     session.scalar_results = [0, None, 0]
     with pytest.raises(ServiceUnavailableError):
         await _service(
-            session, storage=FailingStorage(), pytex=FakePytex()
+            session, storage=FailingStorage(), typst=FakeTypst()
         ).finalize(PID, now=NOW)
 
 
@@ -554,7 +554,7 @@ async def test_send_subject_and_body_include_gremium_and_date() -> None:
     # _send. _meeting sets protokollant_id to None, so no protokollant scalar is read.
     session.scalar_results = [0, 5, "StuPa"]
     await _service(
-        session, storage=ProtoStorage(), pytex=FakePytex(), mail_queue=mail
+        session, storage=ProtoStorage(), typst=FakeTypst(), mail_queue=mail
     ).finalize(PID, now=NOW)
     msg = mail.sent[0]
     assert "StuPa" in msg.subject
@@ -584,7 +584,7 @@ async def test_send_without_gremium_name_and_meeting() -> None:
     session.scalar_results = [0, 5, None]
     # Without storage there is no PDF, so the intro drops the hint and no file travels.
     await _service(
-        session, storage=None, pytex=FakePytex(), mail_queue=mail
+        session, storage=None, typst=FakeTypst(), mail_queue=mail
     ).finalize(PID, now=NOW)
     msg = mail.sent[0]
     assert msg.subject == "Sitzungsprotokoll"  # neither Gremium nor date
@@ -623,7 +623,7 @@ def test_vote_title_generic_question_fallbacks() -> None:
 
 async def test_build_document_fallback_title_without_meeting() -> None:
     proto = _protocol(markdown="# Bestehendes Markdown")
-    pytex = FakePytex()
+    typst = FakeTypst()
     # The store holds no meeting and no gremium, so both resolve to None.
     session = FakeSession(
         store={},
@@ -631,11 +631,11 @@ async def test_build_document_fallback_title_without_meeting() -> None:
     )
     session.scalar_results = [0]  # has_non_public is false. Without a gremium: None.
     out = await _service(
-        session, storage=ProtoStorage(), pytex=pytex, mail_queue=None
+        session, storage=ProtoStorage(), typst=typst, mail_queue=None
     ).finalize(PID, now=NOW)
     assert out.status == "final"
     # The build falls back to protocol.markdown because there are no agenda items.
-    assert "# Bestehendes Markdown" in pytex.calls[0][0]
+    assert "# Bestehendes Markdown" in typst.calls[0][0]
 
 
 # FilesService: list_for_application, delete and delete_for_application.

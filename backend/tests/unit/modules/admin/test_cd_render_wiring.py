@@ -1,10 +1,10 @@
 """The corporate design of a Gremium must reach the renderer.
 
 The resolver and the CRUD around it are covered elsewhere. These tests cover
-`cd_render_config`: what a resolved design turns into as pytex `config`, and what an
+`cd_render_config`: what a resolved design turns into as typst `config`, and what an
 empty slot must NOT turn into.
 
-The end-to-end seam — config and assets actually reaching pytex, and the design never
+The end-to-end seam — config and assets actually reaching typst, and the design never
 deciding the document shape — is pinned on the protocol render in
 `tests/unit/modules/protocol/test_protocol_service.py`.
 """

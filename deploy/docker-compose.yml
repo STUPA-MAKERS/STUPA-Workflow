@@ -2,8 +2,8 @@
 # One VM, plain HTTP inside, behind an external Nginx Proxy Manager (the TLS edge).
 # The stack holds no TLS, no certificate and no Keycloak. The only host port is `web`
 # (127.0.0.1:${WEB_PORT:-8080}). Every other service stays internal, so nothing enters from the
-# internet. Egress stays allowed (worker: SMTP/WebDAV/webhooks, pytex: tectonic bundle,
-# api: OIDC).
+# internet. Egress stays allowed (worker: SMTP/WebDAV/webhooks, api: OIDC). The typst
+# render service has none.
 # Reference: sds/deployment.md §1-§5, sds/overview.md §2.
 
 name: antragsplattform
@@ -102,9 +102,9 @@ services:
         condition: service_healthy
     networks:
       # The internal network carries the egress for OIDC plus the internal services.
-      # pytex_net is the render path without egress.
+      # typst_net is the render path without egress.
       - internal
-      - pytex_net
+      - typst_net
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')\" || exit 1"]
       interval: 15s
@@ -138,9 +138,9 @@ services:
         condition: service_started
     networks:
       # The internal network carries the egress for SMTP, WebDAV and webhooks, plus the
-      # internal services. pytex_net is the render path.
+      # internal services. typst_net is the render path.
       - internal
-      - pytex_net
+      - typst_net
     healthcheck:
       test: ["CMD-SHELL", "arq --check worker.main.WorkerSettings || exit 1"]
       interval: 20s
@@ -226,37 +226,35 @@ services:
       retries: 6
       start_period: 300s
 
-  pytex:
-    # FastAPI wrapper around pytex_api.render_blob (md -> pdf, variant from the
-    # frontmatter). pytex v1.2.0. The tectonic bundle lands lazily in pytex_cache
-    # (XDG_CACHE_HOME=/cache). POST /render also takes a multipart body that carries
-    # a config object and binary assets (uploaded Corporate-Design logos).
+  typst:
+    # Render service: protocol Markdown -> PDF with typst in the HSRT design. The
+    # converter turns the Markdown into data, so no part of it runs as code. POST
+    # /render also takes a multipart body that carries a config object and binary
+    # assets (uploaded Corporate-Design logos). The image holds the typst binary, the
+    # fonts, the design and the math package; a render needs no network and no cache.
     build:
-      context: ../pytex
+      context: ../typst
       dockerfile: Dockerfile
     <<: *restart
     env_file: .env
-    volumes:
-      - pytex_cache:/cache
     networks:
-      # ONLY pytex_net, which has no egress (internal: true). The render container needs
-      # no internet at runtime. The image already holds the tectonic bundle and biber, and
-      # entrypoint.sh seeds the cache. A compile-time read or exec (shell escape)
-      # therefore cannot become an exfiltration channel (#sec-audit). api and worker still
-      # reach pytex over this network.
-      - pytex_net
-    # The AUD-009 OS sandbox (read_only rootfs + size/noexec tmpfs + cap_drop ALL) is
-    # WITHDRAWN. On a read_only rootfs, tectonic and fontconfig cannot write the font and
-    # build cache. The chain is "tectonic failed to produce a PDF (exit 1)" -> pytex 400
-    # -> the protocol render aborts at finalize. Add the sandbox again only after a real
-    # protocol render verifies the writable paths: the fontconfig cache under
-    # `XDG_CACHE_HOME=/cache`, the HOME size and exec on /tmp. (#sec-audit)
+      # ONLY typst_net, which has no egress (internal: true). api and worker reach the
+      # service over this network.
+      - typst_net
+    # OS sandbox: typst writes only the per-job directory under /tmp.
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8099/health')\" || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
-      start_period: 20s
+      start_period: 10s
 
   altcha:
     # Captcha verifier: ALTCHA Sentinel (the official self-hosted image).
@@ -288,7 +286,6 @@ volumes:
   minio_data:
   redis_data:
   clamav_data:
-  pytex_cache:
   altcha_data:
 
 networks:
@@ -296,11 +293,10 @@ networks:
     # These services publish no host ports, so nothing enters from the internet.
     # Egress to the internet and the intranet stays allowed for worker and api.
     driver: bridge
-  pytex_net:
-    # Render path api/worker <-> pytex. `internal: true` means NO egress: the pytex
-    # container cannot send anything to the internet. The image already holds tectonic,
-    # biber and the cache. This closes an exfiltration channel on compile-time exec
-    # (#sec-audit).
+  typst_net:
+    # Render path api/worker <-> typst. `internal: true` means NO egress: the typst
+    # container cannot send anything to the internet. The image already holds all it
+    # needs. This closes an exfiltration channel (#sec-audit).
     driver: bridge
     internal: true
   proxy:

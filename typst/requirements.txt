@@ -1,0 +1,8 @@
+# typst render service runtime deps. The typst CLI itself is a pinned binary in
+# the Dockerfile, not a Python package.
+fastapi>=0.115
+uvicorn[standard]>=0.34
+# starlette parses the `multipart/form-data` shape of POST /render with this.
+python-multipart>=0.0.20
+marko>=2.1,<3
+pyyaml>=6.0

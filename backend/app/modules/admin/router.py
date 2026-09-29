@@ -474,7 +474,7 @@ async def add_cd_variant_vendored_logo(
     service: CdVariantServiceDep,
     principal: CdVariantsAdmin,
 ) -> CdVariantLogoOut:
-    """Append a logo that pytex ships. No upload and no object storage involved."""
+    """Append a logo that the render service ships. No upload and no object storage involved."""
     return await service.add_vendored_logo(variant_id, payload, principal.sub)
 
 

@@ -90,7 +90,7 @@ class CdVariantUpdate(_CamelModel):
 
 
 class CdVariantLogoVendoredCreate(_CamelModel):
-    """Add a logo that pytex ships. No upload and no object storage involved."""
+    """Add a logo that the render service ships. No upload and no object storage involved."""
 
     slot: LogoSlot
     vendored_name: VendoredLogoName = Field(alias="vendoredName")

@@ -178,7 +178,7 @@ class CdVariantService(ConfigServiceBase):
     async def add_vendored_logo(
         self, variant_id: UUID, payload: CdVariantLogoVendoredCreate, actor: str
     ) -> CdVariantLogoOut:
-        """Add a logo that pytex ships.
+        """Add a logo that the render service ships.
 
         Raises:
             NotFoundError: No variant has this id (404).

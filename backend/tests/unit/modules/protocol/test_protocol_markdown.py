@@ -70,7 +70,7 @@ def test_frontmatter_injection_is_quoted() -> None:
 
 def test_vote_snippet_renders_abstimmung_callout_with_tally() -> None:
     snippet = build_vote_snippet("Antrag A", {"yes": 5, "no": 2, "abstain": 1})
-    # The pytex protocol callout renders the built-in vote box: a bold title plus a
+    # The typst protocol callout renders the built-in vote box: a bold title plus a
     # tally line (yes/no/abstain). It carries NO separate `Ergebnis:` line.
     assert snippet.startswith("> [!abstimmung] **Antrag A**")
     assert "Ergebnis" not in snippet
@@ -105,7 +105,7 @@ def test_frontmatter_has_signatures_and_quorum_dataline() -> None:
     block = md.split("---")[1]
     assert "unterschriften:" in block
     assert '- "Schriftführung"' in block and '- "Vorstand"' in block
-    # The quorum gets its own frontmatter key. The pytex wrapper renders it as a
+    # The quorum gets its own frontmatter key. The typst wrapper renders it as a
     # data line on the title page.
     assert 'beschlussfaehigkeit: "Gegeben"' in block
 
@@ -150,7 +150,7 @@ def test_frontmatter_includes_protokollant_when_set() -> None:
 def test_frontmatter_start_end_time_lines() -> None:
     """#14: the start time and the end time travel as `beginn` and `ende`.
 
-    pytex renders them into the `Zeit: Start - Ende` line of the title page.
+    typst renders them into the `Zeit: Start - Ende` line of the title page.
     """
     from datetime import time
 
@@ -168,7 +168,7 @@ def test_frontmatter_end_time_omitted_when_unknown() -> None:
 
 # RCE defense in depth (FIX 1b).
 def test_sanitizer_strips_eval_comment_double_quotes() -> None:
-    """The sanitizer strips the `[//]: # "EXPR"` pytex `eval` escape, so no RCE stays."""
+    """The sanitizer strips the `[//]: # "EXPR"` typst `eval` escape, so no RCE stays."""
     out = sanitize_user_markdown('# TOP\n[//]: # "__import__(\'os\').system(\'id\')"\nText')
     assert "__import__" not in out
     assert "[//]:" not in out
@@ -247,7 +247,7 @@ def test_build_document_applies_sanitizer_to_body() -> None:
 # AUD-001: sanitizer bypass regression.
 # The old line-oriented regex let through the multiline, the container-nested and the
 # whitespace-in-label forms of the eval-capable link reference definition. They reached
-# the pytex `eval` as `LinkRefDef(label='//', dest='#')` and gave an RCE.
+# the typst `eval` as `LinkRefDef(label='//', dest='#')` and gave an RCE.
 def test_sanitizer_strips_multiline_eval_comment() -> None:
     r"""Multiline form `[//]:\n#\n"EXPR"` with the target and the title on later lines."""
     out = sanitize_user_markdown('# TOP\n[//]:\n#\n"__import__(\'os\').system(\'id\')"\nText')
@@ -280,7 +280,7 @@ def test_sanitizer_strips_container_nested_eval_comments() -> None:
 def test_sanitizer_keeps_anchor_reference_definition() -> None:
     """A real anchor reference (`[foo]: #section`) is no eval trigger.
 
-    pytex fires only when `dest == '#'`, so the sanitizer keeps the line unchanged.
+    typst fires only when `dest == '#'`, so the sanitizer keeps the line unchanged.
     """
     src = '[foo]: #section "Title"'
     assert sanitize_user_markdown(src) == src
@@ -291,7 +291,7 @@ def test_sanitizer_keeps_vote_callout_intact() -> None:
 
     `embed_protocol_votes` mixes the callout (`> [!abstimmung]` plus the tally line)
     into `protocol.markdown`, so the sanitizer sees it together with the body. Any
-    change here breaks the pytex tally box.
+    change here breaks the typst tally box.
     """
     callout = build_vote_snippet("Antrag A", {"yes": 5, "no": 2, "abstain": 1})
     assert sanitize_user_markdown(callout) == callout

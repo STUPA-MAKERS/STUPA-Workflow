@@ -241,7 +241,7 @@ export class AdminApiService {
     return this.http.post<CdVariantLogo>(`${this.base}/admin/cd-variants/${id}/logos`, form);
   }
 
-  /** POST /admin/cd-variants/{id}/logos/vendored — append a logo that pytex ships. */
+  /** POST /admin/cd-variants/{id}/logos/vendored — append a logo that the render service ships. */
   addCdVariantVendoredLogo(
     id: Uuid,
     slot: CdLogoSlot,

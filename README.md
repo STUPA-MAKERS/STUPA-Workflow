@@ -19,7 +19,7 @@ Full documentation in the [Wiki](https://github.com/STUPA-MAKERS/STUPA-Workflow/
   @ngx-formly, RxJS, signals.
 - **Data** — PostgreSQL 16 (config and submissions as versioned JSONB), Redis 7 (arq
   broker, rate limit, ALTCHA replay), MinIO (S3 attachments and receipts), ClamAV.
-- **PDF** — `pytex`, an internal Markdown→PDF renderer (tectonic), isolated from egress.
+- **PDF** — `typst`, an internal Markdown→PDF render service (Typst, HSRT design), isolated from egress.
 - **Captcha** — ALTCHA Sentinel (self-hosted, proof of work).
 
 ## Features
@@ -45,7 +45,7 @@ It implements:
   WebSocket (voter channel plus read-only beamer stream). The protocol starts with the
   meeting.
 - **Protocol** — meeting protocol (Markdown), votes as snippets, an async PDF render
-  (pytex → MinIO) and a mail dispatch when you finalize it.
+  (typst → MinIO) and a mail dispatch when you finalize it.
 - **Delegations** — meeting-bound vote and representation delegations plus a substitute
   pool.
 - **Budget** — a hierarchical cost center tree with fiscal years, top-down allocation,
@@ -86,7 +86,7 @@ only. Liveness: `/healthz` (web) and `/api/health` (api).
 ```
 backend/    FastAPI app, arq worker, modules, migrations, tests
 frontend/   Angular SPA + design system
-pytex/      Markdown→PDF renderer (FastAPI around tectonic)
+typst/      Markdown→PDF render service (FastAPI + Typst)
 mcp/        MCP server (agent/API access)
 deploy/     docker-compose.yml, web/ (nginx + multi-stage build), .env.example
 scripts/    helper scripts (smoke, role maintenance)

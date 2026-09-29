@@ -3,29 +3,28 @@
 The code here is pure and needs no database, so unit tests cover it directly.
 `build_protocol_document` puts the YAML frontmatter in front of the Markdown
 body that the editor supplies. The frontmatter carries `typ: protokoll` plus
-the `gremium` name that selects the pytex variant. `build_vote_snippet`
+the `gremium` name of the title page. `build_vote_snippet`
 renders one vote as a Markdown section. The embed step appends that section to
 the body.
 
-Injection hardening: the result reaches the pytex client as an HTTP body, and
+Injection hardening: the result reaches the typst client as an HTTP body, and
 no shell runs. Frontmatter scalars stay YAML-quoted. Snippet text stays
-Markdown-escaped. Both helpers come from `app.modules.pdf.markdown`.
+Markdown-escaped.
 
-The editor body is user-written. `sanitize_user_markdown` strips the pytex
-`eval` escape `[//]: # "EXPR"`, which runs arbitrary code in the container.
-It strips that escape in EVERY CommonMark form: one line, several lines,
-nested in a container, and with whitespace in the label. It also neutralizes
-an image with an absolute path or a `..` path. Normal Markdown survives.
+The typst render service turns the Markdown into data before Typst sees it,
+so no part of the body runs as code there. The editor body is user-written
+all the same, and `sanitize_user_markdown` stays as defense in depth. It
+strips the `[//]: # "EXPR"` eval escape of the former pytex renderer in EVERY
+CommonMark form: one line, several lines, nested in a container, and with
+whitespace in the label. It also neutralizes an image with an absolute path or
+a `..` path. Normal Markdown survives. A stored body thus stays free of the
+known escape forms, whatever renderer reads it later.
 
-This sanitizer IS the protection against remote code execution. The service
-renders the body as `trusted`, the client default, because the protocol
-variant needs the pytex template machinery. The `untrusted` level blocks that
-machinery and fails every render with 400.
-
-Variant per gremium: pytex knows the protocol variants `protocol-stupa` and
-`protocol-asta`. The `cd_variant` value of the gremium selects one of them.
-For any other value the variant stays `None`, and pytex reads the variant from
-the `typ: protokoll` frontmatter.
+Variant per gremium: the render service knows the protocol variants
+`protocol-stupa` and `protocol-asta`, which pick the default logos. The
+`cd_variant` value of the gremium selects one of them. For any other value
+the variant stays `None`, and the service reads the logos from the `gremium`
+frontmatter key.
 """
 
 from __future__ import annotations
@@ -35,19 +34,19 @@ from dataclasses import dataclass, field
 from datetime import date as _date
 from datetime import time as _time
 
-try:  # marko ships with the render path (pytex_markdown). Hardening is optional.
+try:  # marko is optional here. The primary regex protection works without it.
     import marko as _marko  # pyright: ignore[reportMissingImports]
 except ImportError:  # pragma: no cover - primary regex protection works without marko
     _marko = None  # type: ignore[assignment]
 
 
 # RCE defense in depth.
-# In `trusted` mode pytex has a Markdown `eval` escape. A link reference definition
-# of the form `[//]: # "EXPR"` stays invisible in the PDF and runs
-# `eval(EXPR, pytex_namespace())` inside the pytex container. That is an RCE.
-# pytex fires the eval ONLY when CommonMark parses the definition with
-# `label == "//"` AND `dest == "#"`. The body is user-written, and the
-# protocol variant must render as `trusted`. So THIS sanitizer is the RCE guard.
+# The former pytex renderer had a Markdown `eval` escape in its `trusted` mode. A
+# link reference definition of the form `[//]: # "EXPR"` stayed invisible in the
+# PDF and ran `eval(EXPR)` inside the render container. It fired ONLY when
+# CommonMark parsed the definition with `label == "//"` AND `dest == "#"`. The
+# typst renderer has no such escape. The strip stays, so no stored body carries
+# the trigger.
 #
 # A line-oriented regex such as `^[ \t]*[...]: #` is NOT reliable. A link
 # reference definition is a CommonMark block. It may span several lines
@@ -148,7 +147,7 @@ def _neutralize_unsafe_image(match: re.Match[str]) -> str:
 
 
 def sanitize_user_markdown(markdown: str) -> str:
-    r"""Strip pytex `eval` escapes and path-traversal images from user Markdown.
+    r"""Strip the former pytex `eval` escapes and path-traversal images from user Markdown.
 
     The function removes the RCE vectors: the `[//]: # "…"` comment eval in
     every CommonMark form, and `\iffalse{pytex(…)}\fi`. It also neutralizes
@@ -156,7 +155,7 @@ def sanitize_user_markdown(markdown: str) -> str:
     full: headings, lists, emphasis, real links and images with relative
     paths, and vote callouts. The marko parse verifies the eval trigger
     structurally. While an eval-capable `LinkRefDef` survives, the strip
-    repeats. The body therefore reaches pytex without an eval vector.
+    repeats. The body therefore leaves without an eval vector.
     """
     cleaned = _PYTEX_IFFALSE_RE.sub("", markdown)
     cleaned = _strip_eval_refdefs(cleaned)
@@ -169,12 +168,12 @@ def sanitize_user_markdown(markdown: str) -> str:
     cleaned = _UNSAFE_IMAGE_RE.sub(_neutralize_unsafe_image, cleaned)
     return cleaned
 
-# Gremium `cd_variant` values that select a pytex protocol variant.
+# Gremium `cd_variant` values that select a protocol render variant.
 _PROTOCOL_VARIANTS = {"stupa", "asta"}
 
 
 def protocol_variant_for(cd_variant: str | None) -> str | None:
-    """Map `cd_variant` to the pytex variant `protocol-<cd>`, or `None` for auto."""
+    """Map `cd_variant` to the render variant `protocol-<cd>`, or `None` for auto."""
     if cd_variant in _PROTOCOL_VARIANTS:
         return f"protocol-{cd_variant}"
     return None
@@ -191,8 +190,8 @@ class ProtocolDoc:
     markdown: str
     start_time: _time | None = None
     # Meeting end in local time, from `meeting.closed_at`. Together with the
-    # start it forms the "Zeit: Start – Ende" title-page line, which pytex
-    # builds from `beginn` and `ende`.
+    # start it forms the "Zeit: Start – Ende" title-page line, which the
+    # renderer builds from `beginn` and `ende`.
     end_time: _time | None = None
     protokollant: str | None = None
     present: list[str] = field(default_factory=list)
@@ -203,8 +202,8 @@ class ProtocolDoc:
     quorate: bool | None = None
 
 
-# Signature block for the pytex helper `signature_block_from_meta`. The
-# frontmatter supplies the name of the secretary. The board line stays a blank
+# Signature block of the renderer (`unterschriften`). The frontmatter
+# supplies the name of the secretary. The board line stays a blank
 # line for a hand signature.
 _SIGNATURES = ["Schriftführung", "Vorstand"]
 
@@ -230,7 +229,7 @@ def _frontmatter(doc: ProtocolDoc) -> list[str]:
             datum = f"{datum} {doc.start_time.strftime('%H:%M')}"
         lines.append(f"datum: {_yaml_scalar(datum)}")
         lines.append(f"date: {_yaml_scalar(doc.date.isoformat())}")
-    # pytex renders start and end into the "Zeit: Start – Ende" data line.
+    # The renderer sets start and end into the "Zeit: Start – Ende" data line.
     if doc.start_time is not None:
         lines.append(f"beginn: {_yaml_scalar(doc.start_time.strftime('%H:%M'))}")
     if doc.end_time is not None:
@@ -240,11 +239,11 @@ def _frontmatter(doc: ProtocolDoc) -> list[str]:
     lines += _yaml_list("anwesend", doc.present)
     lines += _yaml_list("abwesend", doc.absent)
     if doc.quorate is not None:
-        # Quorum as a title-page data line. The pytex wrapper registers the key.
+        # Quorum as a title-page data line.
         quorate = "Gegeben" if doc.quorate else "Nicht gegeben"
         lines.append(f"beschlussfaehigkeit: {_yaml_scalar(quorate)}")
     lines += _yaml_list("datalines", doc.datalines)
-    # Signature page: pytex renders the signature lines from this list.
+    # Signature page: the renderer sets one signature line per entry.
     lines += _yaml_list("unterschriften", _SIGNATURES)
     lines.append("---")
     return lines
@@ -254,12 +253,9 @@ def build_protocol_document(doc: ProtocolDoc) -> str:
     r"""Combine the frontmatter and the editor body into the final Markdown.
 
     The output is deterministic. `sanitize_user_markdown` cleans the
-    user-written body of pytex `eval` escapes (RCE) and path-traversal images.
-    Normal Markdown stays verbatim. Frontmatter scalars stay YAML-quoted. The
-    eval escape is gone before pytex sees the body. The `\write18` shell
-    escape does not apply under the tectonic engine anyway. The service renders
-    this path as `trusted`, the client default, because the protocol variant
-    needs the pytex template machinery, which `untrusted` blocks.
+    user-written body of the former pytex `eval` escapes and of path-traversal
+    images, as defense in depth. Normal Markdown stays verbatim. Frontmatter
+    scalars stay YAML-quoted.
     """
     body = sanitize_user_markdown(doc.markdown).strip("\n")
     out = [*_frontmatter(doc), ""]
@@ -273,10 +269,10 @@ def build_vote_snippet(
     counts: dict[str, int] | None,
     question: str | None = None,
 ) -> str:
-    """Render a vote as a pytex protocol callout (`> [!abstimmung]`).
+    """Render a vote as a protocol callout (`> [!abstimmung]`).
 
-    The counts line holds `yes/no/abstain` or `ja/nein/enthaltung`, and pytex
-    turns it into the built-in tally box of the PDF. The function escapes all
+    The counts line holds `yes/no/abstain` or `ja/nein/enthaltung`, and the
+    renderer turns it into the built-in tally box of the PDF. The function escapes all
     values and sets the title in bold. There is no separate result line,
     because the result reads from the tally box. The snippet stays part of the
     editable Markdown as a blockquote callout.
@@ -284,7 +280,7 @@ def build_vote_snippet(
     head = question.strip() if question and question.strip() else title
     lines = [f"> [!abstimmung] **{_md_escape(head)}**"]
     if counts:
-        # pytex detects the tally line by two or more of ja/nein/enthaltung
+        # The renderer detects the tally line by two or more of ja/nein/enthaltung
         # (yes/no/abstain). The ballot options carry exactly these keys.
         tally = ", ".join(f"{_md_escape(opt)}: {n}" for opt, n in counts.items())
         lines.append(f"> {tally}")
@@ -305,8 +301,8 @@ def vote_in_body(body: str, snippet: str) -> bool:
 def demote_headings(markdown: str) -> str:
     """Demote all ATX headings in an agenda-item body by one level.
 
-    The agenda-item heading is the only top-level `#`, and pytex numbers it as
-    "TOP n". Without the demotion, pytex would number every `#` heading of the
+    The agenda-item heading is the only top-level `#`, and the renderer numbers
+    it as "TOP n". Without the demotion, the renderer would number every `#` heading of the
     body as a separate agenda item. Code fences stay untouched. Level 6 stays
     at level 6.
     """
