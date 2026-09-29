@@ -669,8 +669,10 @@ describe('MeetingsComponent', () => {
       await loadOtherProtokollant();
 
       expect(await screen.findByRole('toolbar', { name: 'Sitzungssteuerung' })).toBeInTheDocument();
-      // The start sits in the dock while the meeting is planned.
-      expect(screen.getByRole('button', { name: 'Sitzung eröffnen' })).toBeEnabled();
+      // The start sits in the dock and in the checklist while the meeting is planned.
+      const starts = screen.getAllByRole('button', { name: 'Sitzung eröffnen' });
+      expect(starts).toHaveLength(2);
+      starts.forEach((b) => expect(b).toBeEnabled());
       expect(screen.getByRole('button', { name: 'Sitzung bearbeiten' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Sitzung löschen' })).toBeInTheDocument();
       // The follow view must not take the page over.
@@ -691,7 +693,7 @@ describe('MeetingsComponent', () => {
     it('shows the protocol pane read-only to a manager who is not the minute-taker', async () => {
       // Two people must not type into one protocol. That is what the exclusivity
       // was written for, so the editor is disabled — not the whole page hidden.
-      const { container } = await loadOtherProtokollant();
+      const { container } = await loadOtherProtokollant({ status: 'live' });
 
       expect(await screen.findByText('Entwurf')).toBeInTheDocument();
       expect(container.querySelector('.mde__host--disabled')).toBeTruthy();
@@ -701,6 +703,7 @@ describe('MeetingsComponent', () => {
 
     it('lets the minute-taker edit the protocol', async () => {
       const { container } = await loadOtherProtokollant({
+        status: 'live',
         protokollantId: 'pr-1',
         protokollantName: 'Ich',
         isProtokollant: true,
@@ -1691,6 +1694,25 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.savingSettings()).toBe(false);
       cmp.closeSettings();
       expect(cmp.settingsMeeting()).toBeNull();
+    });
+
+    it('names the protokollant from the session page in one PATCH', async () => {
+      const { cmp, http } = await loaded();
+      cmp.setProtokollant(cmp.meeting()!, 'pr-9');
+      const req = http.expectOne('/api/meetings/m-1');
+      expect(req.request.method).toBe('PATCH');
+      // Only the protokollant: the date and the time stay with the settings dialog.
+      expect(req.request.body).toEqual({ protokollantId: 'pr-9' });
+      req.flush({ ...MEETING, protokollantId: 'pr-9', protokollantName: 'Neu' });
+      expect(cmp.meeting()!.protokollantId).toBe('pr-9');
+    });
+
+    it('keeps the meeting when naming the protokollant fails', async () => {
+      const { cmp, http } = await loaded();
+      const before = cmp.meeting()!.protokollantId;
+      cmp.setProtokollant(cmp.meeting()!, 'pr-9');
+      http.expectOne('/api/meetings/m-1').flush(null, { status: 409, statusText: 'e' });
+      expect(cmp.meeting()!.protokollantId).toBe(before);
     });
 
     it('ignores saveSettings without a settings meeting or while saving', async () => {

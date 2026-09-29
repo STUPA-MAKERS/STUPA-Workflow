@@ -29,83 +29,171 @@
   }
 </header>
 
+<div class="fx__stage">
+  <!-- Desktop: the free room beside the page carries the step to the neighbouring
+       items. A phone has no such room and keeps the arrows in the dock. -->
+  <div class="fx__side fx__side--prev">
+    @if (m.status !== 'planned' && prevTop(); as p) {
+      <button
+        type="button"
+        class="fx__sideBtn"
+        [attr.aria-label]="('meetings.dock.prev' | t) + ': ' + ('meetings.agenda.top' | t: { n: p.n }) + ' · ' + p.title"
+        (click)="step(-1)"
+      >
+        <span class="fx__sideIcon"><app-icon name="chevron-down" class="fx__prevIcon" [size]="20" /></span>
+        <span class="fx__sideNum">{{ 'meetings.agenda.top' | t: { n: p.n } }}</span>
+        <span class="fx__sideTitle">{{ p.title }}</span>
+      </button>
+    }
+  </div>
+
 <div class="fx__page">
-  @if (top(); as top) {
-    <h1 class="fx__top">{{ 'meetings.agenda.top' | t: { n: topIndex() + 1 } }} · {{ top.title || ('meetings.agenda.untitled' | t) }}</h1>
-    @if (top.applicationId || (top.nonPublic && !canEditAgenda())) {
-      <div class="fx__ctx">
-        @if (top.applicationId) {
-          <span class="fx__lbl">{{ 'meetings.dock.application' | t }}</span>
-          @if (stateLabelOf(top.stateLabel); as st) {
-            <app-badge variant="neutral">{{ st }}</app-badge>
+  @if (m.status === 'planned' && (m.canControl || m.canManage)) {
+    <!-- Before the start there is nothing to write yet. The page lists what the
+         start needs, and every row opens the place that fixes it. -->
+    <section class="fx__prep" aria-labelledby="fx-prep-title">
+      <div class="fx__prepHead">
+        <h1 id="fx-prep-title" class="fx__top">{{ 'meetings.prep.title' | t }}</h1>
+        <p class="fx__muted">{{ 'meetings.prep.lead' | t }}</p>
+      </div>
+      <ol class="fx__prepList">
+        <li class="fx__prepItem">
+          <span class="fx__prepIcon" [attr.data-state]="agenda().length ? 'ok' : 'todo'" aria-hidden="true"><app-icon name="document" [size]="14" /></span>
+          <span class="fx__prepText">
+            <span class="fx__prepLabel">{{ 'meetings.agenda.title' | t }}</span>
+            <span class="fx__prepSub">{{ 'meetings.dock.topsPrepared' | t: { n: agenda().length } }}</span>
+          </span>
+          <app-button variant="secondary" size="sm" (click)="togglePanel('agenda')">{{ 'meetings.prep.editAgenda' | t }}</app-button>
+        </li>
+        <li class="fx__prepItem">
+          <span class="fx__prepIcon" [attr.data-state]="m.protokollantId ? 'ok' : 'todo'" aria-hidden="true"><app-icon name="user" [size]="14" /></span>
+          <span class="fx__prepText">
+            <span class="fx__prepLabel">{{ 'meetings.protokollant.label' | t }}</span>
+            @if (m.protokollantId) {
+              <span class="fx__prepSub">{{ m.protokollantName }}</span>
+            } @else {
+              <span class="fx__prepSub fx__prepSub--todo">{{ 'meetings.prep.protokollantMissing' | t }}</span>
+            }
+          </span>
+          @if (m.canManage) {
+            <app-button variant="secondary" size="sm" (click)="togglePanel('protokollant')">{{ (m.protokollantId ? 'meetings.prep.change' : 'meetings.prep.assign') | t }}</app-button>
           }
-          <a class="text-primary text-sm font-medium" [routerLink]="['/applications', top.applicationId]">{{ 'meetings.agenda.openApplication' | t }}</a>
+        </li>
+        <li class="fx__prepItem">
+          <span class="fx__prepIcon" aria-hidden="true"><app-icon name="members" [size]="14" /></span>
+          <span class="fx__prepText">
+            <span class="fx__prepLabel">{{ 'meetings.attendance.title' | t }}</span>
+            <span class="fx__prepSub">{{ 'meetings.prep.presentCount' | t: { n: presentCount(), m: attendance().length } }}</span>
+          </span>
+          <app-button variant="secondary" size="sm" (click)="togglePanel('attendance')">{{ 'meetings.prep.recordAttendance' | t }}</app-button>
+        </li>
+      </ol>
+      @if (m.canControl) {
+        <div class="fx__prepStart">
+          <app-button [disabled]="!m.protokollantId" (click)="startSession.emit()">
+            <span class="inline-flex items-center gap-2"><app-icon name="play" [size]="14" /> {{ 'meetings.control.open' | t }}</span>
+          </app-button>
+          @if (!m.protokollantId) {
+            <span class="fx__prepSub">{{ 'meetings.control.needProtokollant' | t }}</span>
+          }
+        </div>
+      }
+    </section>
+  } @else {
+    @if (top(); as top) {
+      <h1 class="fx__top">{{ 'meetings.agenda.top' | t: { n: topIndex() + 1 } }} · {{ top.title || ('meetings.agenda.untitled' | t) }}</h1>
+      @if (top.applicationId || (top.nonPublic && !canEditAgenda())) {
+        <div class="fx__ctx">
+          @if (top.applicationId) {
+            <span class="fx__lbl">{{ 'meetings.dock.application' | t }}</span>
+            @if (stateLabelOf(top.stateLabel); as st) {
+              <app-badge variant="neutral">{{ st }}</app-badge>
+            }
+            <a class="text-primary text-sm font-medium" [routerLink]="['/applications', top.applicationId]">{{ 'meetings.agenda.openApplication' | t }}</a>
+          }
+          <!-- While the agenda is editable the checkbox in the agenda popover carries
+               the state. The badge takes over once the protocol is locked. -->
+          @if (top.nonPublic && !canEditAgenda()) {
+            <app-badge variant="warning">{{ 'meetings.agenda.nonPublic' | t }}</app-badge>
+          }
+        </div>
+      }
+      @if (proto) {
+        <app-markdown-editor
+          [docKey]="docKey()"
+          [value]="top.body ?? ''"
+          [disabled]="!editable()"
+          [placeholder]="'meetings.protocol.placeholder' | t"
+          [hint]="'meetings.protocol.hint' | t"
+          (valueChange)="bodyChange.emit({ itemId: top.id, body: $event })"
+        />
+      }
+    } @else {
+      <h1 class="fx__top fx__top--muted">{{ 'meetings.dock.noTop' | t }}</h1>
+      @if (proto) {
+        <p class="fx__muted">{{ 'meetings.protocol.selectTop' | t }}</p>
+      }
+    }
+    <!-- The system creates the protocol when the meeting starts, never on demand. -->
+    @if (!proto) {
+      <p class="fx__muted">{{ (m.status === 'planned' ? 'meetings.protocol.beforeStart' : 'meetings.protocol.none') | t }}</p>
+    }
+
+    @if (proto) {
+      <div class="fx__status">
+        <app-badge [variant]="proto.isFinal ? 'success' : proto.status === 'rendering' ? 'warning' : 'neutral'">
+          {{ (proto.isFinal ? 'meetings.protocol.final' : proto.status === 'rendering' ? 'meetings.protocol.rendering' : 'meetings.protocol.draft') | t }}
+        </app-badge>
+        @if (proto.publicPdfUrl) {
+          <a class="text-primary font-medium" [href]="proto.pdfUrl" target="_blank" rel="noopener">{{ 'meetings.protocol.pdfInternal' | t }}</a>
+          <a class="text-primary font-medium" [href]="proto.publicPdfUrl" target="_blank" rel="noopener">{{ 'meetings.protocol.pdfPublic' | t }}</a>
+        } @else if (proto.pdfUrl) {
+          <a class="text-primary font-medium" [href]="proto.pdfUrl" target="_blank" rel="noopener">{{ 'meetings.protocol.pdf' | t }}</a>
         }
-        <!-- While the agenda is editable the checkbox in the agenda popover carries
-             the state. The badge takes over once the protocol is locked. -->
-        @if (top.nonPublic && !canEditAgenda()) {
-          <app-badge variant="warning">{{ 'meetings.agenda.nonPublic' | t }}</app-badge>
+        @if (!proto.isLocked && !canEdit() && m.canWrite) {
+          <span>{{ 'meetings.protocol.takenBy' | t: { name: m.protokollantName ?? '' } }}</span>
+        }
+        @if (!proto.isLocked) {
+          <span class="mtg__saveState" [attr.data-state]="saveState()" aria-live="polite">
+            @switch (saveState()) {
+              @case ('saving') { {{ 'meetings.protocol.saving' | t }} }
+              @case ('saved') { ✓ {{ 'meetings.protocol.saved' | t }} }
+              @case ('error') { {{ 'meetings.protocol.saveFailed' | t }} }
+              @default {}
+            }
+          </span>
+        }
+        <span class="fx__sepDot" aria-hidden="true"></span>
+        @if (proto.isFinal) {
+          <span>{{ 'meetings.protocol.finalizedHint' | t }}</span>
+        } @else if (proto.status === 'rendering') {
+          <span>{{ 'meetings.protocol.renderingHint' | t }}</span>
+        } @else if (m.canWrite) {
+          <span>{{ (m.status === 'closed' ? 'meetings.protocol.retryHint' : 'meetings.protocol.finalizeOnClose') | t }}</span>
+        }
+        <span class="fx__spacer"></span>
+        @if (top()) {
+          <span class="fx__nowrap">{{ 'meetings.dock.words' | t: { n: wordCount() } }}</span>
         }
       </div>
     }
-    @if (proto) {
-      <app-markdown-editor
-        [docKey]="docKey()"
-        [value]="top.body ?? ''"
-        [disabled]="!editable()"
-        [placeholder]="'meetings.protocol.placeholder' | t"
-        [hint]="'meetings.protocol.hint' | t"
-        (valueChange)="bodyChange.emit({ itemId: top.id, body: $event })"
-      />
-    }
-  } @else {
-    <h1 class="fx__top fx__top--muted">{{ 'meetings.dock.noTop' | t }}</h1>
-    @if (proto) {
-      <p class="fx__muted">{{ 'meetings.protocol.selectTop' | t }}</p>
-    }
   }
-  <!-- The system creates the protocol when the meeting starts, never on demand. -->
-  @if (!proto) {
-    <p class="fx__muted">{{ (m.status === 'planned' ? 'meetings.protocol.beforeStart' : 'meetings.protocol.none') | t }}</p>
-  }
+</div>
 
-  @if (proto) {
-    <div class="fx__status">
-      <app-badge [variant]="proto.isFinal ? 'success' : proto.status === 'rendering' ? 'warning' : 'neutral'">
-        {{ (proto.isFinal ? 'meetings.protocol.final' : proto.status === 'rendering' ? 'meetings.protocol.rendering' : 'meetings.protocol.draft') | t }}
-      </app-badge>
-      @if (proto.publicPdfUrl) {
-        <a class="text-primary font-medium" [href]="proto.pdfUrl" target="_blank" rel="noopener">{{ 'meetings.protocol.pdfInternal' | t }}</a>
-        <a class="text-primary font-medium" [href]="proto.publicPdfUrl" target="_blank" rel="noopener">{{ 'meetings.protocol.pdfPublic' | t }}</a>
-      } @else if (proto.pdfUrl) {
-        <a class="text-primary font-medium" [href]="proto.pdfUrl" target="_blank" rel="noopener">{{ 'meetings.protocol.pdf' | t }}</a>
-      }
-      @if (!proto.isLocked && !canEdit() && m.canWrite) {
-        <span>{{ 'meetings.protocol.takenBy' | t: { name: m.protokollantName ?? '' } }}</span>
-      }
-      @if (!proto.isLocked) {
-        <span class="mtg__saveState" [attr.data-state]="saveState()" aria-live="polite">
-          @switch (saveState()) {
-            @case ('saving') { {{ 'meetings.protocol.saving' | t }} }
-            @case ('saved') { ✓ {{ 'meetings.protocol.saved' | t }} }
-            @case ('error') { {{ 'meetings.protocol.saveFailed' | t }} }
-            @default {}
-          }
-        </span>
-      }
-      @if (proto.isFinal) {
-        <span>{{ 'meetings.protocol.finalizedHint' | t }}</span>
-      } @else if (proto.status === 'rendering') {
-        <span>{{ 'meetings.protocol.renderingHint' | t }}</span>
-      } @else if (m.canWrite) {
-        <span>{{ (m.status === 'closed' ? 'meetings.protocol.retryHint' : 'meetings.protocol.finalizeOnClose') | t }}</span>
-      }
-      <span class="fx__spacer"></span>
-      @if (top()) {
-        <span class="fx__nowrap">{{ 'meetings.dock.words' | t: { n: wordCount() } }}</span>
-      }
-    </div>
-  }
+  <div class="fx__side fx__side--next">
+    @if (m.status !== 'planned' && nextTop(); as n) {
+      <button
+        type="button"
+        class="fx__sideBtn fx__sideBtn--next"
+        [attr.aria-label]="('meetings.dock.next' | t) + ': ' + ('meetings.agenda.top' | t: { n: n.n }) + ' · ' + n.title"
+        (click)="step(1)"
+      >
+        <span class="fx__sideIcon"><app-icon name="chevron-down" class="fx__nextIcon" [size]="20" /></span>
+        <span class="fx__sideNum">{{ 'meetings.agenda.top' | t: { n: n.n } }}</span>
+        <span class="fx__sideTitle">{{ n.title }}</span>
+      </button>
+    }
+  </div>
 </div>
 
 <div #dock class="fx__dock" [class.fx__dock--stack]="openVote() !== null">
@@ -229,28 +317,71 @@
   }
 
   @if (openVote(); as vote) {
-    <!-- The question does not fit one row next to the controls, so it gets its own. -->
+    <!-- The question does not fit one row next to the controls, so it gets its own.
+         Its second line carries the tally, or why the tally is still hidden. -->
     <div class="fx__row fx__row--q">
-      <span class="fx__dot" aria-hidden="true"></span>
-      <span class="fx__q">{{ vote.question || ('meetings.vote.untitled' | t) }}</span>
-      <app-badge [variant]="voteVariant(vote.status)">{{ voteStatusKey(vote.status) | t }}</app-badge>
-      <span class="fx__track" aria-hidden="true"><i [style.width.%]="progress(vote)"></i></span>
-      <span class="text-sm text-text-muted fx__nowrap">{{ 'meetings.vote.progress' | t: { voted: vote.voted, present: vote.present } }}</span>
-      @if (vote.revealed && vote.counts) {
-        <dl class="mtg__tally" [attr.aria-label]="'meetings.vote.tally' | t">
-          @for (entry of countEntries(vote); track entry.key) {
-            <div [class.mtg__tally--leading]="entry.key === vote.leading"><dt>{{ optionLabel(entry.key) }}</dt><dd>{{ entry.value }}</dd></div>
+      <span class="fx__dot fx__dot--live" aria-hidden="true"></span>
+      <div class="fx__qMain">
+        <div class="fx__qLine">
+          <span class="fx__q">{{ vote.question || ('meetings.vote.untitled' | t) }}</span>
+          <app-badge [variant]="voteVariant(vote.status)">{{ voteStatusKey(vote.status) | t }}</app-badge>
+        </div>
+        @if (vote.revealed && vote.counts) {
+          <dl class="fx__tally" [attr.aria-label]="'meetings.vote.tally' | t">
+            @for (entry of countEntries(vote); track entry.key) {
+              <div class="fx__pill" [class.fx__pill--lead]="entry.key === vote.leading"><dt>{{ optionLabel(entry.key) }}</dt><dd>{{ entry.value }}</dd></div>
+            }
+          </dl>
+        } @else {
+          <span class="fx__hint">{{ 'meetings.vote.progressHidden' | t }}</span>
+        }
+      </div>
+      <div class="fx__progress">
+        <span class="fx__nowrap">{{ 'meetings.vote.progress' | t: { voted: vote.voted, present: vote.present } }}</span>
+        <span class="fx__track" aria-hidden="true"><i [style.width.%]="progress(vote)"></i></span>
+      </div>
+    </div>
+  }
+
+  <!-- Every finished vote of the item stays reachable: its result, and the delete
+       for the vote managers. The newest result that is not in the text yet offers
+       the insert. -->
+  @if (m.status !== 'planned' && !openVote() && doneVotes().length) {
+    <div class="fx__results">
+      @for (vote of doneVotes(); track vote.id) {
+        <div class="fx__row fx__row--result">
+          <span class="fx__dot" [attr.data-result]="vote.result" aria-hidden="true"></span>
+          <span class="fx__q">{{ vote.question || ('meetings.vote.untitled' | t) }}</span>
+          @if (vote.status === 'closed') {
+            <app-badge [variant]="voteResultVariant(vote.result)">{{ voteResultKey(vote.result) | t }}</app-badge>
+          } @else {
+            <app-badge [variant]="voteVariant(vote.status)">{{ voteStatusKey(vote.status) | t }}</app-badge>
           }
-        </dl>
-      } @else {
-        <span class="text-sm text-text-muted fx__hidden">{{ 'meetings.vote.progressHidden' | t }}</span>
+          @if (vote.result === 'rejected' && vote.failedReason === 'quorum') {
+            <span class="text-xs text-danger font-medium">{{ 'vote.failedQuorum' | t }}</span>
+          }
+          @if (vote.status === 'closed' && vote.counts) {
+            <dl class="fx__tally" [attr.aria-label]="'meetings.vote.tally' | t">
+              @for (entry of countEntries(vote); track entry.key) {
+                <div class="fx__pill" [class.fx__pill--lead]="entry.key === vote.leading"><dt>{{ optionLabel(entry.key) }}</dt><dd>{{ entry.value }}</dd></div>
+              }
+            </dl>
+          }
+          <span class="fx__spacer"></span>
+          @if (pendingResult()?.id === vote.id && editable()) {
+            <app-button size="sm" (click)="insertResult(vote)">{{ 'meetings.dock.insertResult' | t }}</app-button>
+          }
+          @if (m.canManageVotes && !locked()) {
+            <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.vote.delete' | t" [title]="'meetings.vote.delete' | t" [disabled]="deletingVote() === vote.id" (click)="voteDelete.emit(vote.id)"><app-icon name="delete" /></app-button>
+          }
+        </div>
       }
     </div>
   }
 
   <div class="fx__row">
     <div class="fx__nav">
-    <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="!hasPrev()" [ariaLabel]="'meetings.dock.prev' | t" [title]="'meetings.dock.prev' | t" (click)="step(-1)"><app-icon name="chevron-down" class="fx__prevIcon" /></app-button>
+    <app-button class="fx__navStep" variant="ghost" size="sm" [iconOnly]="true" [disabled]="!hasPrev()" [ariaLabel]="'meetings.dock.prev' | t" [title]="'meetings.dock.prev' | t" (click)="step(-1)"><app-icon name="chevron-down" class="fx__prevIcon" /></app-button>
     <button
       type="button"
       class="fx__chip fx__chip--now"
@@ -269,21 +400,75 @@
       }
       <app-icon name="chevron-up" [size]="12" />
     </button>
-    <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="!hasNext()" [ariaLabel]="'meetings.dock.next' | t" [title]="'meetings.dock.next' | t" (click)="step(1)"><app-icon name="chevron-down" class="fx__nextIcon" /></app-button>
+    <app-button class="fx__navStep" variant="ghost" size="sm" [iconOnly]="true" [disabled]="!hasNext()" [ariaLabel]="'meetings.dock.next' | t" [title]="'meetings.dock.next' | t" (click)="step(1)"><app-icon name="chevron-down" class="fx__nextIcon" /></app-button>
     </div>
     <span class="fx__sep" aria-hidden="true"></span>
 
     <div class="fx__mid">
       @if (m.status === 'planned') {
-        <span class="text-text-muted">{{ 'meetings.dock.notStarted' | t }}</span>
+        <app-badge variant="neutral">{{ 'meetings.dock.notStarted' | t }}</app-badge>
         @if (m.canControl) {
           <!-- A start requires a protokollant. The backend creates the protocol on start. -->
           <app-button size="sm" [disabled]="!m.protokollantId" [title]="(m.protokollantId ? 'meetings.control.open' : 'meetings.control.needProtokollant') | t" (click)="startSession.emit()">
             <span class="inline-flex items-center gap-2"><app-icon name="play" [size]="14" /> {{ 'meetings.control.open' | t }}</span>
           </app-button>
-          @if (!m.protokollantId) {
-            <span class="text-text-muted text-sm">{{ 'meetings.control.needProtokollant' | t }}</span>
-          }
+        }
+        @if (m.canManage) {
+          <!-- The picker opens above its chip, like a menu. -->
+          <span class="fx__pickWrap">
+            <button
+              type="button"
+              class="fx__chip"
+              [class.fx__chip--warn]="!m.protokollantId"
+              [class.fx__chip--open]="panel() === 'protokollant'"
+              [attr.aria-expanded]="panel() === 'protokollant'"
+              aria-haspopup="dialog"
+              [title]="'meetings.protokollant.label' | t"
+              (click)="togglePanel('protokollant')"
+            >
+              <app-icon name="user" [size]="14" />
+              <span class="fx__chipMain">{{ m.protokollantId ? ('meetings.dock.protokollantIs' | t: { name: m.protokollantName ?? '' }) : ('meetings.dock.pickProtokollant' | t) }}</span>
+              <app-icon name="chevron-up" [size]="12" />
+            </button>
+            @if (panel() === 'protokollant') {
+              <div class="fx__sheet fx__sheet--mid" role="dialog" [attr.aria-label]="'meetings.dock.pickProtokollant' | t">
+                <div class="fx__sheetHead">
+                  <h3 class="fx__sheetTitle">{{ 'meetings.dock.pickProtokollant' | t }}</h3>
+                  <button type="button" class="fx__close" [attr.aria-label]="'action.close' | t" (click)="closePanel()">✕</button>
+                </div>
+                <input
+                  class="fx__input"
+                  type="search"
+                  name="protokollantQuery"
+                  [placeholder]="'meetings.dock.searchMember' | t"
+                  [attr.aria-label]="'meetings.dock.searchMember' | t"
+                  [ngModel]="protokollantQuery()"
+                  (ngModelChange)="protokollantQuery.set($event)"
+                />
+                <ul class="fx__people">
+                  @for (a of protokollantCandidates(); track a.principalId) {
+                    <li>
+                      <button
+                        type="button"
+                        class="fx__person"
+                        [class.fx__person--sel]="a.principalId === m.protokollantId"
+                        [attr.aria-pressed]="a.principalId === m.protokollantId"
+                        (click)="pickProtokollant(a.principalId)"
+                      >
+                        <span class="fx__avatar" aria-hidden="true">{{ initials(a) }}</span>
+                        <span class="fx__personName">{{ memberName(a) }}</span>
+                        <span class="fx__personState" [attr.data-status]="a.status">{{ attendanceKey(a.status) | t }}</span>
+                      </button>
+                    </li>
+                  } @empty {
+                    <li class="fx__empty text-text-muted">{{ 'meetings.dock.noMember' | t }}</li>
+                  }
+                </ul>
+              </div>
+            }
+          </span>
+        } @else if (!m.protokollantId) {
+          <app-badge variant="warning">{{ 'meetings.dock.protokollantMissing' | t }}</app-badge>
         }
       } @else if (nowDiffers()) {
         <span class="fx__dot" aria-hidden="true"></span>
@@ -306,42 +491,9 @@
             <app-button variant="ghost" size="sm" [block]="true" (click)="voteCancel.emit(vote.id)">{{ 'meetings.vote.cancel' | t }}</app-button>
           </span>
         }
-      } @else {
-        <!-- Every finished vote of the item stays reachable: its result, and the
-             delete for the vote managers. The newest result that is not in the
-             text yet offers the insert. Nothing runs, so nothing else is said. -->
-        @for (vote of doneVotes(); track vote.id) {
-          <span class="fx__done">
-            <span class="fx__q">{{ vote.question || ('meetings.vote.untitled' | t) }}</span>
-            @if (vote.status === 'closed') {
-              <app-badge [variant]="voteResultVariant(vote.result)">{{ voteResultKey(vote.result) | t }}</app-badge>
-            } @else {
-              <app-badge [variant]="voteVariant(vote.status)">{{ voteStatusKey(vote.status) | t }}</app-badge>
-            }
-            @if (vote.result === 'rejected' && vote.failedReason === 'quorum') {
-              <span class="text-xs text-danger font-medium">{{ 'vote.failedQuorum' | t }}</span>
-            }
-            @if (pendingResult()?.id === vote.id) {
-              @if (vote.counts) {
-                <dl class="mtg__tally" [attr.aria-label]="'meetings.vote.tally' | t">
-                  @for (entry of countEntries(vote); track entry.key) {
-                    <div [class.mtg__tally--leading]="entry.key === vote.leading"><dt>{{ optionLabel(entry.key) }}</dt><dd>{{ entry.value }}</dd></div>
-                  }
-                </dl>
-              }
-              @if (editable()) {
-                <app-button size="sm" (click)="insertResult(vote)">{{ 'meetings.dock.insertResult' | t }}</app-button>
-              }
-            }
-            @if (m.canManageVotes && !locked()) {
-              <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.vote.delete' | t" [title]="'meetings.vote.delete' | t" [disabled]="deletingVote() === vote.id" (click)="voteDelete.emit(vote.id)"><app-icon name="delete" /></app-button>
-            }
-          </span>
-        }
-        @if (top(); as t) {
-          @if (m.canManageVotes && !locked() && m.status === 'live' && canAddVote(t)) {
-            <app-button size="sm" variant="secondary" (click)="voteDialog.emit(t)">{{ (t.applicationId ? 'meetings.vote.openFor' : 'meetings.vote.addQuestion') | t }}</app-button>
-          }
+      } @else if (top(); as t) {
+        @if (m.canManageVotes && !locked() && m.status === 'live' && canAddVote(t)) {
+          <app-button size="sm" variant="secondary" (click)="voteDialog.emit(t)">{{ (t.applicationId ? 'meetings.vote.openFor' : 'meetings.vote.addQuestion') | t }}</app-button>
         }
       }
     </div>

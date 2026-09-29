@@ -401,6 +401,11 @@ export class MeetingsComponent implements OnDestroy {
     this.dialogs.openSettings(m);
   }
 
+  /** Name the protokollant straight from the session page of a planned meeting. */
+  setProtokollant(m: Meeting, principalId: Uuid): void {
+    this.dialogs.setProtokollant(m, principalId);
+  }
+
   closeSettings(): void {
     this.dialogs.closeSettings();
   }
