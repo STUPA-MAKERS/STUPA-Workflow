@@ -158,7 +158,7 @@ export class MeetingsComponent implements OnDestroy {
   readonly isProtokollant = this.session.isProtokollant;
   readonly isFollower = this.session.isFollower;
   readonly canEditProtocol = this.session.canEditProtocol;
-  /** Create needs global `meeting.manage` OR a manage role in at least one Gremium. */
+  /** Create needs the admin role OR a manage role in at least one Gremium. */
   readonly canCreate = computed(
     () => this.canManageAny() || this.auth.sessionManageGremien().length > 0,
   );

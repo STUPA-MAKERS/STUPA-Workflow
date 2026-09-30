@@ -558,6 +558,7 @@ export const GREMIUM_PERMISSIONS = [
   'vote.manage',
   'vote.cast',
   'protocol.write',
+  'protocol.finalize',
 ] as const;
 
 /** Kind of a named deadline policy. */

@@ -115,16 +115,39 @@ describe('authGuard', () => {
       permissions: [],
       gremien: [{ id: 'g1', name: 'StuPa', slug: 'stupa' }],
     };
-    // Mirrors the real /meetings route data. `protocol.write` is a gremium-role
-    // permission and is deliberately not listed there.
-    const data = { permission: ['meeting.manage'], allowCommitteeMember: true };
+    // Mirrors the real /meetings route data.
+    const data = { gremiumPermission: ['session.manage'], allowCommitteeMember: true };
     expect(run(data, inCommittee)).toBe(true);
   });
 
   it('still forbids allowCommitteeMember routes when the user is in no committee', () => {
     const noCommittee: Principal = { ...MEMBER, permissions: [], gremien: [] };
-    const data = { permission: ['meeting.manage'], allowCommitteeMember: true };
+    const data = { gremiumPermission: ['session.manage'], allowCommitteeMember: true };
     expect(run(data, noCommittee)).toBeInstanceOf(UrlTree);
+  });
+
+  it('allows gremiumPermission routes with the permission in any gremium', () => {
+    const chair: Principal = {
+      ...MEMBER,
+      gremium_permissions: { g1: ['session.manage'] },
+    };
+    expect(run({ gremiumPermission: 'session.manage' }, chair)).toBe(true);
+  });
+
+  it('forbids gremiumPermission routes without the permission in any gremium', () => {
+    const member: Principal = { ...MEMBER, gremium_permissions: { g1: ['vote.cast'] } };
+    expect(run({ gremiumPermission: 'session.manage' }, member)).toBeInstanceOf(UrlTree);
+  });
+
+  it('lets the admin onto gremiumPermission routes', () => {
+    const admin: Principal = { ...MEMBER, roles: ['admin'] };
+    expect(run({ gremiumPermission: 'session.manage' }, admin)).toBe(true);
+  });
+
+  it('accepts either a global or a gremium permission when a route names both', () => {
+    const viewer: Principal = { ...MEMBER, permissions: ['meeting.view_all'] };
+    const data = { permission: ['meeting.view_all'], gremiumPermission: ['session.manage'] };
+    expect(run(data, viewer)).toBe(true);
   });
 
   it('allows scoped-budget-view members onto allowScopedBudgetView routes', () => {

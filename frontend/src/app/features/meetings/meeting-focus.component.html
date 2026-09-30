@@ -13,7 +13,7 @@
   <app-button variant="ghost" size="sm" (click)="toggleBeamer.emit()">{{ 'meetings.beamer.enter' | t }}</app-button>
   <!-- The meeting is closed but the protocol is a draft again: the render failed and
        rolled back. The explicit retry is the only path to a final protocol. -->
-  @if (m.status === 'closed' && m.canWrite && proto && !proto.isFinal && proto.status !== 'rendering') {
+  @if (m.status === 'closed' && m.canFinalize && proto && !proto.isFinal && proto.status !== 'rendering') {
     <app-button variant="ghost" size="sm" [iconOnly]="true" [loading]="finalizing()" [ariaLabel]="'meetings.protocol.finalize' | t" [title]="'meetings.protocol.finalize' | t" (click)="finalize.emit()"><app-icon name="repeat" /></app-button>
   }
   @if (m.canManage) {
@@ -168,8 +168,10 @@
           <span>{{ 'meetings.protocol.finalizedHint' | t }}</span>
         } @else if (proto.status === 'rendering') {
           <span>{{ 'meetings.protocol.renderingHint' | t }}</span>
-        } @else if (m.canWrite) {
+        } @else if (m.canFinalize) {
           <span>{{ (m.status === 'closed' ? 'meetings.protocol.retryHint' : 'meetings.protocol.finalizeOnClose') | t }}</span>
+        } @else if (m.canWrite) {
+          <span>{{ 'meetings.protocol.finalizeNeedsRight' | t }}</span>
         }
         <span class="fx__spacer"></span>
         @if (top()) {

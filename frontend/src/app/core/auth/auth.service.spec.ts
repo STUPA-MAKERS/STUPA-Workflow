@@ -122,12 +122,35 @@ describe('AuthService', () => {
     expect(auth.inSubstitutePool()).toBe(true);
   });
 
+  it('checks gremium permissions per gremium and in any gremium', () => {
+    auth.ensureLoaded().subscribe();
+    http.expectOne('/api/auth/me').flush({
+      ...PRINCIPAL,
+      gremium_permissions: { g1: ['session.manage', 'protocol.write'], g2: ['vote.cast'] },
+    });
+    expect(auth.isAdmin()).toBe(false);
+    expect(auth.canInGremium('g1', 'session.manage')).toBe(true);
+    expect(auth.canInGremium('g2', 'session.manage')).toBe(false);
+    expect(auth.canInGremium('g9', 'vote.cast')).toBe(false);
+    expect(auth.canInAnyGremium('protocol.write')).toBe(true);
+    expect(auth.canInAnyGremium('protocol.finalize')).toBe(false);
+  });
+
+  it('lets the admin pass every gremium permission check', () => {
+    auth.ensureLoaded().subscribe();
+    http.expectOne('/api/auth/me').flush({ ...PRINCIPAL, roles: ['admin'] });
+    expect(auth.isAdmin()).toBe(true);
+    expect(auth.canInGremium('g1', 'session.manage')).toBe(true);
+    expect(auth.canInAnyGremium('protocol.finalize')).toBe(true);
+  });
+
   it('defaults the derived signals when the principal omits them / is anonymous', () => {
     // Anonymous. Every derived signal uses its empty or false fallback.
     expect(auth.userId()).toBeNull();
     expect(auth.gremien()).toEqual([]);
     expect(auth.roles()).toEqual([]);
     expect(auth.sessionManageGremien()).toEqual([]);
+    expect(auth.gremiumPermissions()).toEqual({});
     expect(auth.hasScopedBudgetView()).toBe(false);
     expect(auth.inSubstitutePool()).toBe(false);
 

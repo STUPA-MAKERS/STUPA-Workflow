@@ -48,10 +48,17 @@ export class AuthService {
   /** Gremien of the logged-in principal. The "My gremien" view uses them. */
   readonly gremien = computed(() => this._principal()?.gremien ?? []);
   /** Gremien the principal MANAGES through a gremium role (`session.manage`, for
-   *  example board or manager). It gates "create meeting" without the global
-   *  `meeting.manage` permission. This is only UX. The server decides. */
+   *  example board or manager). It gates "create meeting". This is only UX. The
+   *  server decides. */
   readonly sessionManageGremien = computed(
     () => this._principal()?.session_manage_gremien ?? [],
+  );
+  /** The principal holds the global `admin` role. The admin bypasses every gremium
+   *  permission, as in the backend. */
+  readonly isAdmin = computed(() => this.roles().includes('admin'));
+  /** Gremium id to the gremium permissions of the principal in that gremium. */
+  readonly gremiumPermissions = computed(
+    () => this._principal()?.gremium_permissions ?? {},
   );
   /** At least one cost center is assigned to a member gremium as a visibility
    *  root. The budget tab opens without global budget.* permissions. */
@@ -91,6 +98,21 @@ export class AuthService {
     const p = this._principal();
     if (!p) return false;
     return p.roles.includes('admin') || p.permissions.includes(permission);
+  }
+
+  /** Gremium permission check (`session.manage`, `protocol.write`, …) in ONE
+   *  gremium. The admin passes. It is UX only and not authoritative. */
+  canInGremium(gremiumId: string, permission: string): boolean {
+    if (this.isAdmin()) return true;
+    return (this.gremiumPermissions()[gremiumId] ?? []).includes(permission);
+  }
+
+  /** Gremium permission check in ANY gremium of the principal. The admin passes. */
+  canInAnyGremium(permission: string): boolean {
+    if (this.isAdmin()) return true;
+    return Object.values(this.gremiumPermissions()).some((perms) =>
+      perms.includes(permission),
+    );
   }
 
   /** `true` if the principal holds at least one of the permissions. */

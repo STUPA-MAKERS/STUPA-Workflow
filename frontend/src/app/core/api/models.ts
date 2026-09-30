@@ -81,6 +81,10 @@ export interface Principal {
   gremien?: GremiumRef[];
   /** Gremien the principal manages through a gremium role with `session.manage`. */
   session_manage_gremien?: Uuid[];
+  /** Gremium id to the gremium permissions of the active role in that gremium
+   *  (`session.manage`, `protocol.write`, `protocol.finalize`, `vote.manage`,
+   *  `vote.cast`). */
+  gremium_permissions?: Record<Uuid, string[]>;
   /** At least one cost center belongs to a gremium of this principal. */
   has_scoped_budget_view?: boolean;
   /** The principal is in at least one substitute pool. The meeting timeline shows. */
@@ -800,6 +804,9 @@ export interface MeetingOutWire {
   canManageVotes?: boolean;
   /** Eligible to vote in this meeting. The user needs a role with `vote.cast`. */
   canVote?: boolean;
+  /** Finalize and send the protocol: write access plus the gremium permission
+   *  `protocol.finalize`. */
+  canFinalize?: boolean;
 }
 
 /** `ProtocolOut`. Meeting protocol. POST /meetings/{id}/protocol, PATCH /protocols/{id}. */
@@ -923,6 +930,9 @@ export interface Meeting {
   canManageVotes: boolean;
   /** Eligible to vote in this meeting. */
   canVote: boolean;
+  /** Finalize and send the protocol: write access plus the gremium permission
+   *  `protocol.finalize`. */
+  canFinalize: boolean;
 }
 
 /** Direction of the meeting timeline relative to *now*. */

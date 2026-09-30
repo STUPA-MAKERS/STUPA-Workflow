@@ -225,7 +225,7 @@ export class MeetingsTimelineService implements OnDestroy {
   loadList(): void {
     // Plain Gremium members also see their timeline, filtered on the server.
     if (
-      !this.auth.can('meeting.manage') &&
+      !this.auth.isAdmin() &&
       !this.auth.can('protocol.write') &&
       !(this.auth.gremien().length > 0)
     )

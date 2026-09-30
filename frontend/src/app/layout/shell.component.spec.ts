@@ -122,6 +122,22 @@ describe('ShellComponent', () => {
     http.verify();
   });
 
+  it('hides the meetings entry from a user with no gremium and no gremium right', async () => {
+    const { fixture, auth, http } = await setup();
+    login(auth, http, MEMBER);
+    fixture.detectChanges();
+    expect(screen.queryByRole('link', { name: /Sitzungen/ })).not.toBeInTheDocument();
+    http.verify();
+  });
+
+  it('shows the meetings entry for a gremium right in any gremium', async () => {
+    const { fixture, auth, http } = await setup();
+    login(auth, http, { ...MEMBER, gremium_permissions: { g1: ['protocol.write'] } });
+    fixture.detectChanges();
+    expect(screen.getByRole('link', { name: /Sitzungen/ })).toBeInTheDocument();
+    http.verify();
+  });
+
   it('names the signed-in account at the head of the menu it opens', async () => {
     const { fixture, auth, http } = await setup();
     login(auth, http, MEMBER);

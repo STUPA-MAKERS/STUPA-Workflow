@@ -32,6 +32,7 @@ const MEETING: MeetingOutWire = {
   canWrite: true,
   canManageVotes: true,
   canVote: false,
+  canFinalize: true,
   votes: [],
   createdAt: '2026-06-12T17:00:00Z',
 };
@@ -66,6 +67,7 @@ function fakeAuth(perms: string[]): Partial<AuthService> {
   return {
     can: (p: string) => set.has(p),
     canAny: (...p: string[]) => p.some((x) => set.has(x)),
+    isAdmin: (() => set.has('admin')) as unknown as AuthService['isAdmin'],
     userId: (() => 'pr-1') as unknown as AuthService['userId'],
     gremien: (() => []) as unknown as AuthService['gremien'],
     sessionManageGremien: (() => []) as unknown as AuthService['sessionManageGremien'],
@@ -94,7 +96,7 @@ async function loaded() {
       provideHttpClient(),
       provideHttpClientTesting(),
       { provide: USE_MOCK_API, useValue: false },
-      { provide: AuthService, useValue: fakeAuth(['meeting.manage', 'protocol.write']) },
+      { provide: AuthService, useValue: fakeAuth(['admin', 'protocol.write']) },
       { provide: WsService, useValue: new FakeWs() },
       { provide: Router, useValue: routerStub() },
       {

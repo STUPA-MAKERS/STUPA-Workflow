@@ -17,6 +17,7 @@ describe('PageIndexService', () => {
           useValue: {
             isAuthenticated: () => true,
             canAny: () => false,
+            canInAnyGremium: () => false,
             gremien: () => [],
             hasScopedBudgetView: () => false,
             ...auth,
@@ -69,9 +70,22 @@ describe('PageIndexService', () => {
 
   it('lets a committee member through on a route that allows it', () => {
     // `/meetings` carries allowCommitteeMember: a member sees the meetings of their
-    // gremium without meeting.manage. The guard does the same.
+    // gremium without session.manage. The guard does the same.
     const svc = setup({ gremien: () => [{ id: 'g-1' }] });
     expect(svc.visible().map((e) => e.path)).toContain('/meetings');
+  });
+
+  it('withholds the gremium-gated pages from a user in no gremium', () => {
+    const paths = setup({}).visible().map((e) => e.path);
+    expect(paths).not.toContain('/meetings');
+    expect(paths).not.toContain('/voting/beamer');
+  });
+
+  it('offers a gremium-gated page for the gremium permission in any gremium', () => {
+    const svc = setup({ canInAnyGremium: (p: string) => p === 'session.manage' });
+    const paths = svc.visible().map((e) => e.path);
+    expect(paths).toContain('/voting/beamer');
+    expect(paths).toContain('/meetings');
   });
 
   it('lets a scoped budget viewer through on a route that allows it', () => {

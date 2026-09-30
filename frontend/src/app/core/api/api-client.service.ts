@@ -501,7 +501,7 @@ export class ApiClient {
     });
   }
 
-  /** POST /meetings — create a meeting (P(meeting.manage)). */
+  /** POST /meetings — create a meeting (gremium `session.manage`, or admin). */
   createMeeting(body: MeetingCreateBody): Observable<Meeting> {
     return this.http.post<MeetingOutWire>(`${this.base}/meetings`, body).pipe(map(mapMeeting));
   }

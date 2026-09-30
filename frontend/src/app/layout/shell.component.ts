@@ -38,6 +38,8 @@ interface NavItem {
   permissions: string[];
   /** Also visible to a member of any Gremium, for example the meetings entry. */
   inAnyCommittee?: boolean;
+  /** Also visible with one of these gremium permissions in any Gremium. */
+  gremiumPermissions?: string[];
   /** Also visible with a scoped budget view. */
   scopedBudgetView?: boolean;
   /**
@@ -146,7 +148,10 @@ export class ShellComponent {
     {
       path: '/meetings',
       labelKey: 'nav.meetings',
-      permissions: ['meeting.manage', 'protocol.write'],
+      // No global key: meetings are gremium business. The admin passes through
+      // `canInAnyGremium`.
+      permissions: [],
+      gremiumPermissions: ['session.manage', 'protocol.write'],
       inAnyCommittee: true,
     },
     {
@@ -184,11 +189,19 @@ export class ShellComponent {
     const inAnyCommittee = this.auth.gremien().length > 0;
     return this.nav.filter(
       (item) =>
-        this.auth.canAny(...item.permissions) ||
+        this.globalAllows(item) ||
+        (item.gremiumPermissions ?? []).some((p) => this.auth.canInAnyGremium(p)) ||
         (!!item.inAnyCommittee && inAnyCommittee) ||
         (!!item.scopedBudgetView && this.auth.hasScopedBudgetView()),
     );
   });
+
+  /** Global permission part of the nav gate. An empty list opens the entry for
+   *  every session, unless the entry is gated by gremium permissions instead. */
+  private globalAllows(item: NavItem): boolean {
+    if (item.permissions.length === 0) return !item.gremiumPermissions;
+    return this.auth.canAny(...item.permissions);
+  }
 
   toggleTheme(): void {
     this.theme.toggle();

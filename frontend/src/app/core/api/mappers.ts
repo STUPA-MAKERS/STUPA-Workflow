@@ -255,6 +255,7 @@ export function mapMeeting(wire: MeetingOutWire): Meeting {
     canWrite,
     canManageVotes: wire.canManageVotes ?? false,
     canVote: wire.canVote ?? false,
+    canFinalize: wire.canFinalize ?? false,
   };
 }
 

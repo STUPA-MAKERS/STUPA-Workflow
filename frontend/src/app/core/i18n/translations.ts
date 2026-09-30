@@ -867,6 +867,8 @@ export const de = {
   'meetings.closeConfirm.confirm': 'Sitzung schließen',
   'meetings.protocol.finalizeOnClose':
     'Das Protokoll wird beim Schließen der Sitzung automatisch finalisiert und versandt.',
+  'meetings.protocol.finalizeNeedsRight':
+    'Finalisieren und Versenden braucht das Gremien-Recht „Protokoll finalisieren“. Das Protokoll bleibt bis dahin ein Entwurf.',
   'meetings.dock.prev': 'Vorheriger TOP',
   'meetings.dock.next': 'Nächster TOP',
   'meetings.dock.agenda': 'Tagesordnung öffnen',
@@ -1461,6 +1463,7 @@ export const de = {
   'admin.gremiumPerm.vote.manage': 'Abstimmungen führen',
   'admin.gremiumPerm.vote.cast': 'Abstimmen',
   'admin.gremiumPerm.protocol.write': 'Protokoll führen',
+  'admin.gremiumPerm.protocol.finalize': 'Protokoll finalisieren & versenden',
 
   'admin.audit.title': 'Audit-Log',
   'admin.audit.desc': 'Fortlaufendes Protokoll aller sicherheitsrelevanten Aktionen.',
@@ -3043,6 +3046,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.closeConfirm.confirm': 'Close session',
   'meetings.protocol.finalizeOnClose':
     'The minutes are finalized and sent automatically when the session is closed.',
+  'meetings.protocol.finalizeNeedsRight':
+    'Finalizing and sending needs the gremium right "Finalize minutes". Until then the minutes stay a draft.',
   'meetings.dock.prev': 'Previous item',
   'meetings.dock.next': 'Next item',
   'meetings.dock.agenda': 'Open agenda',
@@ -3628,6 +3633,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.gremiumPerm.vote.manage': 'Run votes',
   'admin.gremiumPerm.vote.cast': 'Vote',
   'admin.gremiumPerm.protocol.write': 'Write minutes',
+  'admin.gremiumPerm.protocol.finalize': 'Finalize & send minutes',
 
   'admin.audit.title': 'Audit log',
   'admin.audit.desc': 'Tamper-evident, append-only record of all security-relevant actions.',

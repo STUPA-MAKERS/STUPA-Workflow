@@ -48,8 +48,9 @@ const MOCK_PRINCIPAL: Principal = {
   roles: ['member'],
   // The mock grants every permission a gated view needs, so the dev, harness
   // and demo builds show those views. `application.manage` drives the RBAC
-  // actions on the detail page. `vote.manage` and `meeting.manage` drive the
-  // beamer and manage views. `protocol.write` drives the protocol editor.
+  // actions on the detail page. `vote.manage` drives the vote views. The gremium
+  // permissions below (`session.manage`, `protocol.write`, `protocol.finalize`)
+  // drive the beamer, the meeting management and the protocol editor.
   // `admin.site`, `admin.gremien`, `admin.types`, `form.configure`,
   // `flow.configure`, `admin.group_mappings` and `webhook.manage` drive the admin UIs.
   permissions: [
@@ -57,8 +58,6 @@ const MOCK_PRINCIPAL: Principal = {
     'application.manage',
     'vote.cast',
     'vote.manage',
-    'meeting.manage',
-    'protocol.write',
     'admin.site',
     'admin.gremien',
     'admin.types',
@@ -78,6 +77,17 @@ const MOCK_PRINCIPAL: Principal = {
     { id: 'g0000000-0000-0000-0000-000000000001', name: 'Studierendenparlament', slug: 'stupa' },
     { id: 'g0000000-0000-0000-0000-000000000002', name: 'Haushaltsausschuss', slug: 'haushalt' },
   ],
+  session_manage_gremien: ['g0000000-0000-0000-0000-000000000001'],
+  gremium_permissions: {
+    'g0000000-0000-0000-0000-000000000001': [
+      'session.manage',
+      'vote.manage',
+      'vote.cast',
+      'protocol.write',
+      'protocol.finalize',
+    ],
+    'g0000000-0000-0000-0000-000000000002': ['vote.cast'],
+  },
 };
 
 /** Running demo vote (GET /votes/{id}). */
