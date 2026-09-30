@@ -138,6 +138,14 @@ describe('ShellComponent', () => {
     http.verify();
   });
 
+  it('shows the meetings entry for the global read right meeting.view_all', async () => {
+    const { fixture, auth, http } = await setup();
+    login(auth, http, { ...MEMBER, permissions: [...MEMBER.permissions, 'meeting.view_all'] });
+    fixture.detectChanges();
+    expect(screen.getByRole('link', { name: /Sitzungen/ })).toBeInTheDocument();
+    http.verify();
+  });
+
   it('names the signed-in account at the head of the menu it opens', async () => {
     const { fixture, auth, http } = await setup();
     login(auth, http, MEMBER);

@@ -1909,6 +1909,13 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.showOverview()).toBe(false);
     });
 
+    it('shows the overview to a meeting.view_all reader without a gremium', async () => {
+      const { fixture } = await setup({ id: null, perms: ['meeting.view_all'], meetings: [] });
+      const cmp = fixture.componentInstance as Cmp;
+      expect(cmp.showOverview()).toBe(true);
+      expect(cmp.showForbidden()).toBe(false);
+    });
+
     it('reflects per-meeting flags once a meeting is loaded', async () => {
       const { cmp } = await loaded();
       expect(cmp.canManage()).toBe(true);

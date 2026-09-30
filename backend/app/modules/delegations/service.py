@@ -295,19 +295,17 @@ class DelegationService:
     async def _assert_can_view_gremium(self, gremium_id: UUID, actor: Principal) -> None:
         """Guard the roster and the pool of a gremium against cross-tenant PII reads.
 
-        Global readers and managers pass the guard. They hold the `admin` role,
-        `admin.delegations` or `meeting.view_all`. Members, the substitute pool and
-        the holders of the `session.manage` role of this gremium also pass. They see
-        the same data as in the meeting timeline.
+        Global readers and managers pass the guard. They hold `admin.delegations`
+        or `meeting.view_all`; the `admin` role holds both. Both checks go through
+        `Principal.has`, so the OAuth scope cap applies: an admin token without
+        either right in its scope does not pass as a global reader. Members, the
+        substitute pool and the holders of the `session.manage` role of this gremium
+        also pass. They see the same data as in the meeting timeline.
 
         Raises:
             ForbiddenError: The actor may not view this gremium (403).
         """
-        if (
-            "admin" in actor.roles
-            or actor.has(_ADMIN_PERM)
-            or actor.has("meeting.view_all")
-        ):
+        if actor.has(_ADMIN_PERM) or actor.has("meeting.view_all"):
             return
         if gremium_id in await gremium_member_ids(self.session, actor.sub):
             return

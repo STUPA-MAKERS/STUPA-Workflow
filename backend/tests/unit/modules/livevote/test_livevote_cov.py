@@ -2149,7 +2149,7 @@ def test_create_meeting_requires_auth(client: TestClient) -> None:
 
 
 def test_create_meeting_ok_schedules_mail(app: FastAPI, client: TestClient) -> None:
-    _login(app, "meeting.manage")
+    _login(app)
     body = {
         "gremiumId": str(uuid4()),
         "title": "GV",
@@ -2170,7 +2170,7 @@ def test_list_meeting_members_forbidden(app: FastAPI, client: TestClient, fakes)
 
 
 def test_list_meeting_members_ok(app: FastAPI, client: TestClient) -> None:
-    _login(app, "meeting.manage")
+    _login(app)
     r = client.get(f"/api/gremien/{uuid4()}/meeting-members")
     assert r.status_code == 200
     assert len(r.json()) == 1
@@ -2848,10 +2848,17 @@ async def test_delete_finalized_requires_permission(
 
     monkeypatch.setattr(MeetingService, "_protocol_final", _final)
     svc = MeetingService(_QueueSession(executes=[res(m)]))  # type: ignore[arg-type]
-    # The admin may manage the meeting. A finalized protocol still needs the
-    # meeting.delete_finalized permission.
-    with pytest.raises(ForbiddenError):
-        await svc.delete(m.id, _principal("meeting.manage", sub="mgr"))
+    # The admin may manage the meeting: the `meetings:write` scope lets
+    # `session.manage` through. A finalized protocol still needs the
+    # meeting.delete_finalized permission, and no scope carries it.
+    admin_token = Principal(
+        sub="mgr",
+        roles=["admin"],
+        permissions=set(),
+        scope_permissions=frozenset({"session.manage", "protocol.write", "protocol.finalize"}),
+    )
+    with pytest.raises(ForbiddenError, match="delete_finalized"):
+        await svc.delete(m.id, admin_token)
 
 
 async def test_delete_ok_audits(monkeypatch: pytest.MonkeyPatch) -> None:

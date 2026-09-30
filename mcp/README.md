@@ -59,6 +59,12 @@ lets them through when your role in the meeting's gremium holds them (or you are
 A token without `meetings:write` cannot manage a meeting or write minutes, whatever your
 gremium role says.
 
+The meeting lead includes the votes of the meeting. A `meetings:write` token of a holder of
+`session.manage` can thus create, open, close and cancel the votes of that gremium's
+meetings and change the current agenda item, also without `votes:write`. `votes:write`
+lets `vote.manage` through for all other people who manage votes: the minute-taker, a
+gremium role with `vote.manage` only, and the votes that no meeting holds.
+
 ## Tools
 
 Auth: `login`, `whoami`, `logout`.

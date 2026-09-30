@@ -246,9 +246,12 @@ class ListingOps(PermissionOps, VoteReadOps):
             else {}
         )
         # The same rules as `PermissionOps.can_manage`, `can_write`,
-        # `can_manage_votes` and `can_finalize`, batched. Each right applies the
-        # OAuth scope cap, the admin bypass included; a raw role read would hand a
-        # narrowly scoped token the full cross-gremium view.
+        # `can_manage_votes` and `can_finalize`, batched. Each of these rules has
+        # the admin bypass. Each right applies the OAuth scope cap, the admin bypass
+        # included; a raw role read would hand a narrowly scoped token the full
+        # cross-gremium view. Keep this block and `PermissionOps` in step: the router
+        # gates on the detail flags, so a list flag that differs offers an action
+        # that the API refuses.
         async def ids_for(perm: str) -> set[UUID]:
             if admin_bypass(principal, perm):
                 return set(all_gids)

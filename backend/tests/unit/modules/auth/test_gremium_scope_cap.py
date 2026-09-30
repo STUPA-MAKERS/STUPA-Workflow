@@ -208,3 +208,46 @@ async def test_listing_flags_of_an_admin_session(nobody: None) -> None:
     flags = out[0]
     assert flags.is_protokollant is True
     assert (flags.can_manage, flags.can_write, flags.can_finalize) == (True, True, True)
+
+
+def _flags(out: Any) -> tuple[bool, bool, bool, bool]:
+    return (out.can_manage, out.can_write, out.can_manage_votes, out.can_finalize)
+
+
+@pytest.mark.parametrize(
+    ("scopes", "expected"),
+    [
+        # `votes:write` lets the admin bypass for `vote.manage` through, and nothing more.
+        (("read", "votes:write"), (False, False, True, False)),
+        # `meetings:write` carries the meeting lead, which includes the votes.
+        (("read", "meetings:write"), (True, True, True, True)),
+        (("read",), (False, False, False, False)),
+    ],
+)
+async def test_list_and_detail_flags_agree_for_a_scoped_admin(
+    nobody: None, scopes: tuple[str, ...], expected: tuple[bool, bool, bool, bool]
+) -> None:
+    """The batched list flags equal the detail flags that the router enforces.
+
+    An admin token without a gremium membership: the router gates the vote routes on
+    the detail `canManageVotes`, so a list flag that differs offers an action that the
+    API refuses.
+    """
+    token = _scoped(*scopes, sub="a", roles=["admin"])
+    m = _row()
+    m.protokollant_id = None
+    listed = await MeetingService(fake_session())._decorate([m], token)  # type: ignore[arg-type]
+    detail = await MeetingService(fake_session())._emit(m, token)  # type: ignore[arg-type]
+    assert _flags(listed[0]) == _flags(detail) == expected
+
+
+async def test_admin_votes_token_passes_the_voting_gate_too(nobody: None) -> None:
+    """The meeting rule and the `VotingService` gate admit the same admin token."""
+    from app.modules.voting.service import VotingService
+
+    token = _scoped("read", "votes:write", sub="a", roles=["admin"])
+    meeting = _meeting()
+    assert await MeetingService(fake_session()).can_manage_votes(meeting, token) is True  # type: ignore[arg-type]
+    await VotingService(fake_session()).assert_can_manage_group(  # type: ignore[arg-type]
+        str(GID), meeting.id, token
+    )

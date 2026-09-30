@@ -142,8 +142,11 @@ export const routes: Routes = [
         // A Gremium member can reach their own meetings without session.manage.
         // `session.manage` is a GREMIUM-role permission, so it goes through
         // `gremiumPermission` and never through the global `permission` list.
+        // `meeting.view_all` is the global read right: the server shows its holder
+        // the meetings of every Gremium, also without a membership.
         data: {
           title: 'nav.meetings',
+          permission: ['meeting.view_all'],
           gremiumPermission: ['session.manage'],
           allowCommitteeMember: true,
         },
@@ -158,6 +161,7 @@ export const routes: Routes = [
         data: {
           title: 'meetings.detailCrumb',
           parent: ['meetings'],
+          permission: ['meeting.view_all'],
           gremiumPermission: ['session.manage'],
           allowCommitteeMember: true,
           allowAuthenticated: true,

@@ -148,9 +148,10 @@ export class ShellComponent {
     {
       path: '/meetings',
       labelKey: 'nav.meetings',
-      // No global key: meetings are gremium business. The admin passes through
-      // `canInAnyGremium`.
-      permissions: [],
+      // Meetings are gremium business. The admin passes through `canInAnyGremium`.
+      // The only global key is the read right `meeting.view_all`: the server shows
+      // its holder the meetings of every Gremium, also without a membership.
+      permissions: ['meeting.view_all'],
       gremiumPermissions: ['session.manage', 'protocol.write'],
       inAnyCommittee: true,
     },

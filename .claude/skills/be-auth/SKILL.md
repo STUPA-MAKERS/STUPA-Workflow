@@ -34,7 +34,7 @@ description: Backend identity and access. Covers OIDC login against any discover
 - `oauth_token` — opaque access+refresh pair, hashes only (`access_token_hash`/`refresh_token_hash`), `scope`, `access_expires_at`/`refresh_expires_at`, `revoked_at`. Refresh rotation writes a new row and sets `revoked_at` on the old one.
 - Applicant scope enum: `edit` | `view` (edit covers view, magic-link single_use when scope≠edit).
 - OAuth scopes (`oauth.SCOPES`): `read`, `applications:write`, `votes:write`, `budget:write`, `meetings:write`, `forms:write`, `flows:write`, `admin:write`. Lifetimes 1h/8h/1d/30d/90d (cap `MAX_LIFETIME_SECONDS`=90d, no never-expire).
-- A scope also caps the GREMIUM permissions: `meetings:write` = `session.manage` + `protocol.write` + `protocol.finalize`, `votes:write` = `vote.manage`. `read` holds the global `meeting.view_all`, so an admin token keeps the cross-gremium meeting view. The global keys `meeting.manage`, `protocol.finalize` and `application.create` are gone (migration `3a0b9672fcba`).
+- A scope also caps the GREMIUM permissions: `meetings:write` = `session.manage` + `protocol.write` + `protocol.finalize`, `votes:write` = `vote.manage`. The meeting lead (`session.manage`) includes the votes of the meeting, so a `meetings:write` token of a lead manages them without `votes:write`. `read` holds the global `meeting.view_all`, so an admin token keeps the cross-gremium meeting view. The global keys `meeting.manage`, `protocol.finalize` and `application.create` are gone (migration `3a0b9672fcba`).
 
 **API surface:**
 - `GET /api/auth/login` — 307 → IdP authorize (503 when discovery fails). State, verifier and nonce ride in the signed `oidc_tx` cookie

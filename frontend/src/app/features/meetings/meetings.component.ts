@@ -170,6 +170,7 @@ export class MeetingsComponent implements OnDestroy {
     () =>
       this.canManageAny() ||
       this.canWriteGlobal() ||
+      this.canViewAll() ||
       this.inAnyCommittee() ||
       this.inSubstitutePool(),
   );
@@ -178,6 +179,7 @@ export class MeetingsComponent implements OnDestroy {
       !this.detailMode() &&
       !this.canManageAny() &&
       !this.canWriteGlobal() &&
+      !this.canViewAll() &&
       !this.inAnyCommittee() &&
       !this.inSubstitutePool(),
   );

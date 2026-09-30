@@ -50,10 +50,14 @@ class PermissionOps(MeetingServiceBase):
         """Check who runs the protocol, the agenda items, and the meeting status.
 
         The manager, the assigned protokollant, and a gremium role with
-        `protocol.write` all pass this check. The protokollant path is scope-capped
-        too: a token without `protocol.write` in its scope cannot write.
+        `protocol.write` all pass this check. The admin role bypasses the gremium
+        check. The scope cap applies to every path: a token without
+        `protocol.write` in its scope cannot write through the protokollant path,
+        the gremium role, or the admin bypass.
         """
         if await self.can_manage(meeting.gremium_id, principal):
+            return True
+        if admin_bypass(principal, "protocol.write"):
             return True
         if principal.scope_allows("protocol.write") and await self._is_protokollant(
             meeting, principal
@@ -66,10 +70,19 @@ class PermissionOps(MeetingServiceBase):
     async def can_manage_votes(self, meeting: Meeting, principal: Principal) -> bool:
         """Check who opens and closes votes: manager, protokollant, or `vote.manage`.
 
-        The protokollant path is scope-capped: a token without `vote.manage` in its
-        scope cannot manage votes.
+        The admin role bypasses the gremium check. That keeps this rule equal to
+        the `principal.has("vote.manage")` gate of `VotingService` and to the
+        batched flags of the meeting list. The protokollant path, the gremium role,
+        and the admin bypass are scope-capped: through them, a token without
+        `vote.manage` in its scope cannot manage votes.
+
+        The manager path needs only `session.manage`. The meeting lead includes
+        vote management and the agenda-item change, so a `meetings:write` token
+        of a manager can manage votes without `votes:write`.
         """
         if await self.can_manage(meeting.gremium_id, principal):
+            return True
+        if admin_bypass(principal, "vote.manage"):
             return True
         if principal.scope_allows("vote.manage") and await self._is_protokollant(
             meeting, principal
