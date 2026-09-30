@@ -47,6 +47,7 @@ description: The antragsplattform_mcp MCP server, a standalone FastMCP package. 
 
 **Conventions & gotchas:**
 - **Hard rule:** the package has no `cast_ballot` tool by design. The server never grants `vote.cast`. Agents manage votes, but they never vote.
+- Votes are gremium votes. `create_application_vote` takes the gremium UUID of the application as `eligibleGroup` and no `eligibleCount` (the server counts the roster). Managing a vote needs gremium `vote.manage` or `session.manage` (or admin); there is no global vote right.
 - The server enforces every permission. A 403 means the user lacks the permission. That is expected, not a bug. Read (`get_*`/`list_*`) before you write.
 - **Prefer the atomic flow/form ops** over `set_global_flow`/`create_form_version`. Each op re-reads the current document, applies one change via `graphops`, and POSTs a new **activated** version. Transition ops use the integer **index** from `get_global_flow`. In `flow_update_transition`/`update_field`/`update_state`, a patch with an explicit `null` value **removes** that key (for example `guard: null` drops the guard).
 - Wire keys are **camelCase**, and the backend also accepts aliases. `schemas.py` uses `extra="allow"`, so new backend fields pass through without code changes. Money amounts are decimal strings (`"1500.00"`). Ids are UUID strings, but never show a raw UUID to a human (see `[[no-uuids-in-ui]]`).
