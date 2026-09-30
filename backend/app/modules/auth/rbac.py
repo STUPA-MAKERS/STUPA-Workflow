@@ -117,9 +117,11 @@ async def resolve_principal(db: AsyncSession, row: PrincipalRow, now: datetime) 
             ).scalars().all()
         )
 
-    # An active Gremium role with `vote.cast` grants the voting eligibility. The cast gate
-    # checks the namespaced key `vote:<gremium_id>` from `vote_group_key`. It never checks
-    # the bare UUID string, so a matching OIDC group claim cannot satisfy the eligibility.
+    # An active Gremium role with `vote.cast` grants the voting eligibility. It is the
+    # only source: `vote.cast` is no global permission, and a vote names a gremium UUID
+    # as its eligible group. The cast gate checks the namespaced key `vote:<gremium_id>`
+    # from `vote_group_key`. It never checks the bare UUID string, so a matching OIDC
+    # group claim cannot satisfy the eligibility.
     # A user who only follows a meeting goes through `MeetingService.is_member`, which is
     # a separate query.
     membership_rows = (

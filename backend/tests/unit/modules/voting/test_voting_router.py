@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi import FastAPI
@@ -26,6 +26,10 @@ from app.modules.voting.service import VotingService
 from app.shared.config_schemas import VoteConfig
 from app.shared.errors import ForbiddenError
 
+GID = UUID("00000000-0000-0000-0000-00000000b0c8")
+# The fake gate admits this group marker. It stands for the gremium-scoped manage right
+# (admin, gremium `vote.manage` or `session.manage`), which the service unit tests cover.
+_MANAGER = "fake:manager"
 _CONFIG = VoteConfig.model_validate({"options": ["yes", "no"], "majorityRule": "simple"})
 _TALLY = TallyOut(counts={"yes": 0, "no": 0}, eligible=0, quorumMet=True)
 
@@ -34,7 +38,7 @@ def _vote_out(status: str = "draft") -> VoteOut:
     return VoteOut(
         id=uuid4(),
         applicationId=uuid4(),
-        eligibleGroup="stupa",
+        eligibleGroup=str(GID),
         config=_CONFIG,
         status=status,  # type: ignore[arg-type]
         secret=False,
@@ -47,17 +51,17 @@ class _FakeService:
         self.cast_args: dict[str, object] | None = None
 
     async def assert_can_manage_group(self, eligible_group, meeting_id, principal):  # noqa: ANN001
-        # Mirrors the real service gate on the router path. The admin role or
-        # a global vote.manage passes. The integration test covers the per-Gremium
-        # resolution against the DB. Everything else fails closed with a 403.
-        if "admin" in principal.roles or principal.has("vote.manage"):
+        # Stands in for the real service gate on the router path. The admin role or
+        # the manager marker passes. The service tests cover the per-Gremium
+        # resolution. Everything else fails closed with a 403.
+        if "admin" in principal.roles or _MANAGER in principal.groups:
             return
         raise ForbiddenError("not allowed to manage this vote")
 
     async def assert_can_manage_vote(self, vote_id, principal):  # noqa: ANN001
-        await self.assert_can_manage_group("stupa", None, principal)
+        await self.assert_can_manage_group(str(GID), None, principal)
 
-    async def create(self, application_id, payload):  # noqa: ANN001
+    async def create(self, application_id, payload, principal):  # noqa: ANN001
         return _vote_out("draft")
 
     async def open(self, vote_id, *, now):  # noqa: ANN001
@@ -67,8 +71,11 @@ class _FakeService:
         return _vote_out("open")
 
     async def get_scoped(self, vote_id, principal):  # noqa: ANN001
-        # The real service holds the scope gate. This fake passes through like get().
-        return await self.get(vote_id)
+        # The real service holds the scope gate and sets the flags of the caller.
+        out = await self.get(vote_id)
+        return out.model_copy(
+            update={"can_manage": _MANAGER in principal.groups, "can_cast": True}
+        )
 
     async def cast(
         self, vote_id, principal, choice, *, now, as_delegation=False
@@ -112,6 +119,10 @@ def client(app: FastAPI) -> TestClient:
     return TestClient(app)
 
 
+def _as_manager(app: FastAPI) -> None:
+    _as_principal(app, groups={_MANAGER})
+
+
 def _as_principal(app: FastAPI, *perms: str, groups: set[str] | None = None) -> None:
     app.dependency_overrides[get_current_principal] = lambda: Principal(
         sub="p", permissions=set(perms), groups=groups or set()
@@ -119,54 +130,54 @@ def _as_principal(app: FastAPI, *perms: str, groups: set[str] | None = None) -> 
     app.dependency_overrides[get_current_applicant] = lambda: None
 
 
-# create, open and close: vote.manage.
+# create, open and close: the gremium-scoped manage right.
 def test_create_requires_auth_401(client: TestClient) -> None:
     assert client.post(f"/api/applications/{uuid4()}/votes", json={}).status_code == 401
 
 
 def test_create_missing_perm_403(app: FastAPI, client: TestClient) -> None:
-    _as_principal(app, "vote.cast")  # not .manage
+    _as_principal(app, groups={f"vote:{GID}"})  # a voter, no manager
     r = client.post(
         f"/api/applications/{uuid4()}/votes",
-        json={"config": _CONFIG.model_dump(by_alias=True), "eligibleGroup": "stupa"},
+        json={"config": _CONFIG.model_dump(by_alias=True), "eligibleGroup": str(GID)},
     )
     assert r.status_code == 403
     assert r.headers["content-type"] == "application/problem+json"
 
 
 def test_create_ok(app: FastAPI, client: TestClient) -> None:
-    _as_principal(app, "vote.manage")
+    _as_manager(app)
     r = client.post(
         f"/api/applications/{uuid4()}/votes",
-        json={"config": _CONFIG.model_dump(by_alias=True), "eligibleGroup": "stupa"},
+        json={"config": _CONFIG.model_dump(by_alias=True), "eligibleGroup": str(GID)},
     )
     assert r.status_code == 200
     assert r.json()["status"] == "draft"
 
 
 def test_open_ok(app: FastAPI, client: TestClient) -> None:
-    _as_principal(app, "vote.manage")
+    _as_manager(app)
     r = client.post(f"/api/votes/{uuid4()}/open")
     assert r.status_code == 200
     assert r.json()["status"] == "open"
 
 
 def test_close_ok(app: FastAPI, client: TestClient) -> None:
-    _as_principal(app, "vote.manage")
+    _as_manager(app)
     r = client.post(f"/api/votes/{uuid4()}/close")
     assert r.status_code == 200
     assert r.json()["result"] == "passed"
 
 
 def test_close_missing_perm_403(app: FastAPI, client: TestClient) -> None:
-    _as_principal(app, "vote.cast")
+    _as_principal(app, groups={f"vote:{GID}"})
     assert client.post(f"/api/votes/{uuid4()}/close").status_code == 403
 
 
 def test_open_missing_perm_403(app: FastAPI, client: TestClient) -> None:
-    # #AUD-027: open is gremium-scoped. An identity with vote.cast alone, and without a
-    # global or per-Gremium vote.manage, must NOT open a vote.
-    _as_principal(app, "vote.cast")
+    # #AUD-027: open is gremium-scoped. A voter without the manage right in the
+    # gremium must NOT open a vote.
+    _as_principal(app, groups={f"vote:{GID}"})
     r = client.post(f"/api/votes/{uuid4()}/open")
     assert r.status_code == 403
     assert r.headers["content-type"] == "application/problem+json"
@@ -174,7 +185,7 @@ def test_open_missing_perm_403(app: FastAPI, client: TestClient) -> None:
 
 def test_cancel_missing_perm_403(app: FastAPI, client: TestClient) -> None:
     # #AUD-027: cancel is gremium-scoped, symmetric to open and close.
-    _as_principal(app, "vote.cast")
+    _as_principal(app, groups={f"vote:{GID}"})
     assert client.post(f"/api/votes/{uuid4()}/cancel").status_code == 403
 
 
@@ -190,14 +201,14 @@ def test_cancel_ok_broadcasts(app: FastAPI, client: TestClient) -> None:
 
     pub = _Pub()
     app.dependency_overrides[get_meeting_publisher] = lambda: pub
-    _as_principal(app, "vote.manage")
+    _as_manager(app)
     r = client.post(f"/api/votes/{uuid4()}/cancel")
     assert r.status_code == 200
     assert r.json()["status"] == "cancelled"
     assert len(pub.cancelled) == 1
 
 
-# ballot: vote.cast. The service checks the group.
+# ballot: the gremium `vote.cast`. The service checks the group.
 def test_ballot_requires_auth_401(client: TestClient) -> None:
     r = client.post(f"/api/votes/{uuid4()}/ballot", json={"choice": "yes"})
     assert r.status_code == 401
@@ -207,9 +218,9 @@ def test_ballot_gate_is_auth_only(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
     # #delegation-rework: the gate checks authentication only. An external substitute
-    # holds no global vote.cast. The service authorizes the cast through vote.cast plus
-    # the group, or through the delegation row. Its own unit tests cover that.
-    _as_principal(app, "vote.manage")  # not .cast
+    # is in no gremium. The service authorizes the cast through the gremium key
+    # `vote:<gremium_id>`, or through the delegation row. Its own unit tests cover that.
+    _as_manager(app)  # no cast right
     r = client.post(f"/api/votes/{uuid4()}/ballot", json={"choice": "yes"})
     assert r.status_code == 200
     assert fake_service.cast_args is not None
@@ -218,7 +229,7 @@ def test_ballot_gate_is_auth_only(
 def test_ballot_ok_passes_choice(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
-    _as_principal(app, "vote.cast", groups={"stupa"})
+    _as_principal(app, groups={f"vote:{GID}"})
     vote_id = uuid4()
     r = client.post(f"/api/votes/{vote_id}/ballot", json={"choice": "yes"})
     assert r.status_code == 200
@@ -232,7 +243,7 @@ def test_ballot_ok_passes_choice(
 
 
 def test_ballot_rejects_empty_choice_422(app: FastAPI, client: TestClient) -> None:
-    _as_principal(app, "vote.cast", groups={"stupa"})
+    _as_principal(app, groups={f"vote:{GID}"})
     r = client.post(f"/api/votes/{uuid4()}/ballot", json={"choice": ""})
     assert r.status_code == 422
 
@@ -246,6 +257,38 @@ def test_get_ok(app: FastAPI, client: TestClient) -> None:
     _as_principal(app)  # logged in is enough
     r = client.get(f"/api/votes/{uuid4()}")
     assert r.status_code == 200
+    assert r.json()["canManage"] is False
+    assert r.json()["canCast"] is True
+
+
+def test_get_carries_can_manage(app: FastAPI, client: TestClient) -> None:
+    _as_manager(app)
+    assert client.get(f"/api/votes/{uuid4()}").json()["canManage"] is True
+
+
+def test_create_free_group_key_422(app: FastAPI, client: TestClient) -> None:
+    """eligibleGroup must be a gremium UUID. A free group key is a validation error."""
+    _as_manager(app)
+    r = client.post(
+        f"/api/applications/{uuid4()}/votes",
+        json={"config": _CONFIG.model_dump(by_alias=True), "eligibleGroup": "stupa"},
+    )
+    assert r.status_code == 422
+    assert r.headers["content-type"] == "application/problem+json"
+
+
+def test_create_eligible_count_in_body_422(app: FastAPI, client: TestClient) -> None:
+    """F14: the server counts the roster. A client ``eligibleCount`` is refused."""
+    _as_manager(app)
+    r = client.post(
+        f"/api/applications/{uuid4()}/votes",
+        json={
+            "config": _CONFIG.model_dump(by_alias=True),
+            "eligibleGroup": str(GID),
+            "eligibleCount": 3,
+        },
+    )
+    assert r.status_code == 422
 
 
 # DI factories and the OpenAPI contract.
@@ -291,7 +334,7 @@ def test_ballot_broadcasts_vote_tally(
 
     pub = _RecordingPublisher()
     app.dependency_overrides[get_meeting_publisher] = lambda: pub
-    _as_principal(app, "vote.cast", groups={"stupa"})
+    _as_principal(app, groups={f"vote:{GID}"})
     r = client.post(f"/api/votes/{uuid4()}/ballot", json={"choice": "yes"})
     assert r.status_code == 200
     assert len(pub.tallies) == 1  # a fresh state after the ballot
@@ -305,19 +348,19 @@ def test_delete_vote_requires_auth_401(client: TestClient) -> None:
 
 
 def test_delete_vote_missing_perm_403(app: FastAPI, client: TestClient) -> None:
-    _as_principal(app, "vote.cast")
+    _as_principal(app, groups={f"vote:{GID}"})
     assert client.delete(f"/api/votes/{uuid4()}").status_code == 403
 
 
 def test_delete_vote_204(app: FastAPI, client: TestClient, fake_service: _FakeService) -> None:
-    _as_principal(app, "vote.manage")
+    _as_manager(app)
     vid = uuid4()
     assert client.delete(f"/api/votes/{vid}").status_code == 204
     assert fake_service.deleted == (vid, "p")
 
 
 def test_delete_vote_conflict_409(app: FastAPI, client: TestClient) -> None:
-    _as_principal(app, "vote.manage")
+    _as_manager(app)
     r = client.delete("/api/votes/00000000-0000-0000-0000-000000000000")
     assert r.status_code == 409
     assert r.headers["content-type"].startswith("application/problem+json")

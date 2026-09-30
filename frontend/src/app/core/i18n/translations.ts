@@ -149,7 +149,8 @@ export const de = {
   'account.scope.votes_write.label': 'Abstimmungen verwalten',
   'account.scope.votes_write.desc': 'Abstimmungen anlegen/öffnen/schließen — KEIN Stimmen abgeben.',
   'account.scope.meetings_write.label': 'Sitzungen verwalten',
-  'account.scope.meetings_write.desc': 'Sitzungen, Tagesordnung und Beschlussfragen verwalten.',
+  'account.scope.meetings_write.desc':
+    'Sitzungen, Tagesordnung und Protokolle verwalten. Als Sitzungsleitung auch alle Abstimmungen des Gremiums anlegen/öffnen/schließen, auch Abstimmungen über Anträge ohne Sitzung — KEIN Stimmen abgeben.',
   'account.scope.budget_write.label': 'Budget verwalten',
   'account.scope.budget_write.desc': 'Kostenstellen und Buchungen verwalten.',
   'account.scope.forms_write.label': 'Formulare bearbeiten',
@@ -2341,7 +2342,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'account.scope.votes_write.label': 'Manage votes',
   'account.scope.votes_write.desc': 'Create/open/close votes — never cast a ballot.',
   'account.scope.meetings_write.label': 'Manage meetings',
-  'account.scope.meetings_write.desc': 'Manage meetings, agenda, and motions.',
+  'account.scope.meetings_write.desc':
+    'Manage meetings, agenda, and minutes. As a meeting lead, also create/open/close every vote of the gremium, including application votes outside a meeting — never cast a ballot.',
   'account.scope.budget_write.label': 'Manage budget',
   'account.scope.budget_write.desc': 'Manage cost centres and bookings.',
   'account.scope.forms_write.label': 'Edit forms',

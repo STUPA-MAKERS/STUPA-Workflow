@@ -36,8 +36,9 @@ GID = uuid.UUID("00000000-0000-0000-0000-0000000060e1")
 OPTIONS = ["yes", "no"]
 
 # The roster of the measured gremium: the sub, the permissions of the gremium role, and
-# the permissions of the global role. `manager` and `protokoll` are ordinary roles of
-# people who also sit in the committee. They carry no global `vote.cast`.
+# the permissions of the global role. The global `vote.cast` is gone from the catalog.
+# A stale role row that still holds it must grant nothing, so some entries keep it.
+# `manager` and `protokoll` are ordinary roles of people who also sit in the committee.
 _ALL_GREMIUM_PERMS = ["session.manage", "vote.manage", "vote.cast", "protocol.write"]
 _ROSTER: tuple[tuple[str, list[str] | None, set[str]], ...] = (
     ("admin", _ALL_GREMIUM_PERMS, {"vote.cast"}),
@@ -168,16 +169,13 @@ async def test_forged_oidc_group_claim_never_reaches_the_roster() -> None:
     assert await _casts(principal) is False
 
 
-async def test_free_group_key_still_needs_the_global_permission() -> None:
-    """A non-UUID group key proves no membership, so the global right stays required."""
+async def test_free_group_key_admits_nobody() -> None:
+    """A non-UUID group key proves no membership. No global right casts in it any more."""
     vote = _vote(eligible_group="stupa")
-    with_perm = Principal(sub="a", permissions={"vote.cast"}, groups={"stupa"})
-    without = Principal(sub="b", permissions=set(), groups={"stupa"})
-    db = fake_session(result(vote), result(SimpleNamespace(inserted=True)))
-    assert (await VotingService(db).cast(vote.id, with_perm, "yes", now=NOW)).status == "cast"
+    holder = Principal(sub="a", roles=["admin"], permissions={"vote.cast"}, groups={"stupa"})
     db = fake_session(result(vote))
     with pytest.raises(ForbiddenError, match="Not eligible"):
-        await VotingService(db).cast(vote.id, without, "yes", now=NOW)
+        await VotingService(db).cast(vote.id, holder, "yes", now=NOW)
 
 
 async def test_agent_token_cannot_cast_an_own_ballot() -> None:

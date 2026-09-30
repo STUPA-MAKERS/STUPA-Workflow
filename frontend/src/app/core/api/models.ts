@@ -732,6 +732,14 @@ export interface Vote {
   result: VoteResult | null;
   secret: boolean;
   tally: Tally;
+  /** The caller may open, close, cancel and delete the vote: the admin role, or the
+   *  gremium permission `vote.manage` or `session.manage` in the gremium of the vote.
+   *  Only `GET /votes/{id}` sets it. */
+  canManage?: boolean;
+  /** The caller may cast an own ballot: the gremium permission `vote.cast` in the
+   *  gremium of the vote, in a browser session. A delegated ballot has its own check.
+   *  Only `GET /votes/{id}` sets it. */
+  canCast?: boolean;
 }
 
 /** Response to an accepted ballot. POST /api/votes/{id}/ballot. */

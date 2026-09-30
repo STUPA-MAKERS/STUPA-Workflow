@@ -45,7 +45,7 @@ from app.modules.livevote.schemas import (
 )
 from app.modules.livevote.service import BrokerPublisher, MeetingService
 from app.modules.notifications.auto import AutoMailer, get_auto_mailer
-from app.modules.voting.schemas import VoteCreate
+from app.modules.voting.schemas import VoteCreateInternal
 from app.modules.voting.service import VotingService
 from app.settings import Settings, get_settings
 from app.shared.config_schemas import VoteConfig
@@ -401,9 +401,9 @@ async def open_meeting_vote(
     """Open a live vote on an agenda item of this meeting.
 
     The route creates the vote and opens it in one step. The caller must be the
-    manager, the protokollant, or hold ``vote.manage``. An application agenda item
-    allows exactly one vote, because that vote fires the pass or fail branch on
-    close. A free-text agenda item allows several generic questions.
+    manager, the protokollant, or hold the gremium permission ``vote.manage``. An
+    application agenda item allows exactly one vote, because that vote fires the pass
+    or fail branch on close. A free-text agenda item allows several generic questions.
     ``eligibleGroup`` is the Gremium of the meeting. The server derives the quorum
     denominator from the roster (members with ``vote.cast``) and never from client
     input. The route broadcasts ``vote_opened``.
@@ -446,13 +446,13 @@ async def open_meeting_vote(
     # The server always derives the quorum denominator from the real roster and
     # never from the client. A holder of ``canManageVotes`` cannot manipulate it.
     eligible = await service.vote_eligible_count(meeting.gremium_id)
-    create = VoteCreate(
+    create = VoteCreateInternal(
         config=config,
-        eligibleGroup=str(meeting.gremium_id),
+        eligibleGroup=meeting.gremium_id,
         question=payload.question,
         eligibleCount=eligible,
     )
-    vote = await voting.create(
+    vote = await voting.create_internal(
         item.application_id, create, meeting_id=meeting_id, agenda_item_id=item.id
     )
     opened = await voting.open(vote.id, now=datetime.now(UTC))
@@ -474,7 +474,8 @@ async def delete_meeting_vote(
 ) -> MeetingOut:
     """Delete a vote and its ballots.
 
-    The caller must be the manager, the protokollant, or hold ``vote.manage``.
+    The caller must be the manager, the protokollant, or hold the gremium permission
+    ``vote.manage``.
     """
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_manage_votes:
@@ -625,7 +626,7 @@ async def _authorize(
         return None
     # Voter channel: active Gremium members and the external substitutes that hold
     # a delegation for this meeting may read the live stream. The vote right itself
-    # is gated separately through ``vote.cast`` and the delegation check. The
+    # is gated separately through the gremium ``vote.cast`` and the delegation check. The
     # dedicated read-only beamer channel needs ``session.manage`` in the Gremium of
     # the meeting (or the admin role).
     eligible = (

@@ -702,7 +702,6 @@ export class ApiClient {
       options?: string[];
       majorityRule?: 'simple' | 'absolute' | 'two_thirds';
       secret?: boolean;
-      eligibleCount?: number | null;
       quorumPercent?: number | null;
     },
   ): Observable<Meeting> {
@@ -718,7 +717,8 @@ export class ApiClient {
       .pipe(map(mapMeeting));
   }
 
-  /** POST /votes/{id}/open — open a vote, a live one too (P(vote.manage)). */
+  /** POST /votes/{id}/open — open a vote, a live one too (gremium `vote.manage` or
+   *  `session.manage`). */
   openVote(voteId: Uuid): Observable<void> {
     return this.http.post<void>(`${this.base}/votes/${voteId}/open`, {});
   }

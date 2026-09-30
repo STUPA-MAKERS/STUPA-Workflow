@@ -29,8 +29,6 @@ export const MOCK_PERMISSIONS: string[] = [
   'application.delete',
   'form.configure',
   'flow.configure',
-  'vote.manage',
-  'vote.cast',
   'meeting.view_all',
   'protocol.manage',
   'protocol.write',
@@ -114,8 +112,8 @@ export const MOCK_GREMIEN: Gremium[] = [
  * (member/referent/vorstand/admin).
  */
 export const MOCK_ROLES: Role[] = [
-  { id: 'r-member', key: 'member', label: { de: 'Mitglied', en: 'Member' }, permissions: ['application.read', 'vote.cast'] },
-  { id: 'r-referent', key: 'referent', label: { de: 'Referent:in', en: 'Officer' }, permissions: ['application.read', 'application.update', 'application.transition', 'vote.manage'] },
+  { id: 'r-member', key: 'member', label: { de: 'Mitglied', en: 'Member' }, permissions: ['application.read'] },
+  { id: 'r-referent', key: 'referent', label: { de: 'Referent:in', en: 'Officer' }, permissions: ['application.read', 'application.update', 'application.transition'] },
   { id: 'r-vorstand', key: 'vorstand', label: { de: 'Vorstand', en: 'Board' }, permissions: ['application.read', 'budget.view', 'meeting.view_all'] },
   { id: 'r-admin', key: 'admin', label: { de: 'Administration', en: 'Administration' }, permissions: [...MOCK_PERMISSIONS] },
 ];

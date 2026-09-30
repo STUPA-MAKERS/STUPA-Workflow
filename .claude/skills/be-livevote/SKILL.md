@@ -36,7 +36,7 @@ description: Meetings — planned→live→closed lifecycle, agenda items, atten
 - `GET /api/gremien/{gremium_id}/meeting-members` — protokollant candidates.
 - `GET .../attendance`, `PUT .../attendance/me`, `PUT .../attendance/{principal_id}` — roster + status.
 - `GET .../agenda`, `GET .../agenda/assignable`, `POST .../agenda`, `DELETE .../agenda/{item_id}`, `PUT .../agenda/order`, `PATCH .../agenda/{item_id}` (body/title/nonPublic).
-- `POST .../votes` — create and open the decision vote of an agenda item. An application agenda item allows exactly one vote, a free-text agenda item allows many. `DELETE .../votes/{vote_id}` — delete a vote.
+- `POST .../votes` — create and open the decision vote of an agenda item. It builds a `VoteCreateInternal` (gremium of the meeting, `eligibleCount` from `vote_eligible_count`) and calls `VotingService.create_internal`. An application agenda item allows exactly one vote, a free-text agenda item allows many. `DELETE .../votes/{vote_id}` — delete a vote.
 - `WS /api/ws/meetings/{id}` — voter channel (cast/subscribe). `WS /api/ws/meetings/{id}/beamer` — read-only, carries only `meeting_state|vote_opened|vote_tally|vote_closed`.
 
 **Conventions & gotchas:**

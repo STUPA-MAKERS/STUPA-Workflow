@@ -8,7 +8,7 @@ import {
   signal,
 } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { AuthService } from '@core/auth/auth.service';
+import { ApiClient } from '@core/api/api-client.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
@@ -23,7 +23,7 @@ import { VoteBarsComponent } from './vote-bars.component';
  * thumb-friendly with large touch targets. A reconnect banner appears on
  * connection loss, and the session resyncs with `subscribe`. A viewer that
  * cannot vote gets a notice. That happens when the server sends
- * `error: not_eligible`, or when the frontend permission is missing.
+ * `error: not_eligible`, or when the meeting reports `canVote: false`.
  */
 @Component({
   selector: 'app-live-vote',
@@ -42,7 +42,7 @@ import { VoteBarsComponent } from './vote-bars.component';
 })
 export class LiveVoteComponent implements OnDestroy {
   private readonly live = inject(LiveVoteService);
-  private readonly auth = inject(AuthService);
+  private readonly api = inject(ApiClient);
   private readonly i18n = inject(I18nService);
   private readonly route = inject(ActivatedRoute);
 
@@ -54,17 +54,28 @@ export class LiveVoteComponent implements OnDestroy {
   readonly tally;
   readonly result;
   private readonly errorCode;
+  /** The `canVote` flag of the meeting. `null` until the meeting loads. The server
+   *  sets it from the gremium `vote.cast` or a voting delegation for this meeting. */
+  private readonly canVote = signal<boolean | null>(null);
 
   readonly notEligible = computed(
-    () => this.errorCode() === 'not_eligible' || !this.auth.can('vote.cast'),
+    () => this.errorCode() === 'not_eligible' || this.canVote() === false,
   );
   readonly resultKey = computed(
     () => `vote.result.${this.result()?.result ?? 'tie'}` as TranslationKey,
   );
 
   constructor() {
-    const meetingId = this.route.snapshot.paramMap.get('id') ?? 'demo';
+    const routeId = this.route.snapshot.paramMap.get('id');
+    const meetingId = routeId ?? 'demo';
     this.session = this.live.open(meetingId);
+    if (routeId) {
+      // A failed load keeps `null`: the server still refuses a cast with `not_eligible`.
+      this.api.getMeeting(routeId, { quiet: true }).subscribe({
+        next: (meeting) => this.canVote.set(meeting.canVote === true),
+        error: () => {},
+      });
+    }
     this.connection = this.session.connection;
     this.vote = this.session.openVote;
     this.tally = this.session.tally;

@@ -10,11 +10,13 @@ Race safety: the DB enforces one ballot per voter.
   lands without an identity in ``secret_ballot``. ``allowChange`` has no effect here,
   because nobody can re-link an anonymous ballot. A second cast gives 409.
 
-RBAC is fail-closed. A ``cast`` needs membership in ``vote.eligible_group``. For a
-gremium vote that membership IS the ``vote.cast`` right, because only an active gremium
-role with ``vote.cast`` writes the namespaced group key. The quorum denominator
-(``MeetingService.vote_eligible_count``) reads the same roster, so the counted set and
-the admitted set stay equal. Otherwise the call gets 403.
+RBAC is fail-closed and gremium-scoped. ``vote.eligible_group`` holds the UUID of the
+gremium that votes. A ``cast`` needs the gremium permission ``vote.cast`` there: only an
+active gremium role with ``vote.cast`` writes the namespaced group key
+``vote:<gremium_id>``. No global permission grants a vote right. The quorum denominator
+(``MeetingService.vote_eligible_count``) reads the same roster, and ``create`` stores it
+as ``eligible_count``, so the counted set and the admitted set stay equal. A vote with a
+free group key (an old row) admits nobody: the call gets 403.
 """
 
 from __future__ import annotations
@@ -43,6 +45,7 @@ from app.modules.voting.schemas import (
     TallyOut,
     VoteClosed,
     VoteCreate,
+    VoteCreateInternal,
     VoteOut,
 )
 from app.shared.config_schemas import VoteConfig
@@ -130,8 +133,8 @@ class VotingService:
         meeting-scoped ``canManageVotes`` check. Duplicating it here would give
         a second, weaker path to the same row.
 
-        The caller (router) runs the gremium-scoped ``vote.manage`` check, like
-        open, close and cancel.
+        The caller (router) runs the gremium-scoped manage check
+        (``assert_can_manage_vote``), like open, close and cancel.
 
         Raises:
             NotFoundError: No vote has this id (404).
@@ -316,27 +319,135 @@ class VotingService:
         )
 
     async def create(
+        self, application_id: UUID, payload: VoteCreate, principal: Principal
+    ) -> VoteOut:
+        """Create a draft application vote from the API body.
+
+        ``eligibleGroup`` must name an existing gremium. The vote must also belong to
+        the gremium of the application: the ``gremiumId`` of the current vote state
+        when the state sets one, else ``application.gremium_id``. Without that check a
+        vote manager of another gremium could run the vote and fire the pass or fail
+        branch of the application.
+
+        When neither names a gremium, no gremium can decide on the application. Then
+        only the admin role (``admin_bypass`` with ``vote.manage``) creates the vote.
+        Otherwise a vote manager of any gremium could fire the branch.
+
+        The caller must also pass ``assert_can_manage_group`` for ``eligibleGroup``.
+        This method does not do that check.
+
+        The server sets ``eligible_count`` from the roster of the gremium (members
+        with ``vote.cast``). The client cannot send it.
+
+        Raises:
+            NotFoundError: No application has this id (404).
+            ForbiddenError: The application has no gremium and the principal is not
+                the admin role (403).
+            ValidationProblem: The gremium does not exist (``eligible_group_invalid``)
+                or is not the gremium of the application
+                (``eligible_group_mismatch``) (422).
+        """
+        from app.modules.admin.gremium_roles import admin_bypass
+
+        gremium_id = payload.eligible_group
+        if not await self._gremium_exists(gremium_id):
+            raise ValidationProblem(
+                "eligibleGroup is not the id of a gremium.",
+                code="eligible_group_invalid",
+                errors=[{"field": "eligibleGroup", "msg": "unknown gremium"}],
+            )
+        application = await self._get_application(application_id)
+        expected = await self._application_gremium_id(application)
+        if expected is None and not admin_bypass(principal, "vote.manage"):
+            raise ForbiddenError(
+                "the application has no gremium; only the admin role can create a vote"
+            )
+        if expected is not None and expected != gremium_id:
+            raise ValidationProblem(
+                "eligibleGroup must be the gremium of the application.",
+                code="eligible_group_mismatch",
+                errors=[{"field": "eligibleGroup", "msg": "not the gremium of the application"}],
+            )
+        # Local import: `app.modules.livevote.service` imports this module.
+        from app.modules.livevote.service import MeetingService
+
+        eligible = await MeetingService(self.session).vote_eligible_count(gremium_id)
+        internal = VoteCreateInternal(
+            config=payload.config,
+            eligibleGroup=gremium_id,
+            question=payload.question,
+            eligibleCount=eligible,
+            opensStateId=payload.opens_state_id,
+            closesAt=payload.closes_at,
+            resultBranchTransitionId=payload.result_branch_transition_id,
+        )
+        return await self._insert(application_id, internal)
+
+    async def _gremium_exists(self, gremium_id: UUID) -> bool:
+        from app.modules.admin.models import Gremium
+
+        found = await self.session.scalar(select(Gremium.id).where(Gremium.id == gremium_id))
+        return found is not None
+
+    async def _application_gremium_id(self, application: Application) -> UUID | None:
+        """Return the gremium that decides on the application.
+
+        The ``gremiumId`` of the current state wins when it is a valid UUID. Otherwise
+        the method returns ``application.gremium_id``, which can be None.
+        """
+        if application.current_state_id is not None:
+            from app.modules.flow.models import State
+
+            config = await self.session.scalar(
+                select(State.config).where(State.id == application.current_state_id)
+            )
+            ref = config.get("gremiumId") if isinstance(config, dict) else None
+            if isinstance(ref, str) and ref:
+                try:
+                    return UUID(ref)
+                except ValueError:
+                    pass
+        return application.gremium_id
+
+    async def create_internal(
         self,
         application_id: UUID | None,
-        payload: VoteCreate,
+        payload: VoteCreateInternal,
         *,
         meeting_id: UUID | None = None,
         agenda_item_id: UUID | None = None,
     ) -> VoteOut:
-        """Create a draft vote.
+        """Create a draft vote from a server-side payload.
 
         ``application_id`` is optional. ``None`` marks a generic resolution question of
         a free-text agenda item. Such a vote has no application and fires no flow
         branch on close. ``meeting_id`` binds the vote to a meeting (live vote).
-        ``agenda_item_id`` binds it to the agenda item.
+        ``agenda_item_id`` binds it to the agenda item. The caller supplies the
+        ``eligible_count`` from the roster and runs the checks.
+
+        Raises:
+            NotFoundError: No application has this id (404).
         """
         if application_id is not None:
             await self._get_application(application_id)
+        return await self._insert(
+            application_id, payload, meeting_id=meeting_id, agenda_item_id=agenda_item_id
+        )
+
+    async def _insert(
+        self,
+        application_id: UUID | None,
+        payload: VoteCreateInternal,
+        *,
+        meeting_id: UUID | None = None,
+        agenda_item_id: UUID | None = None,
+    ) -> VoteOut:
+        """Write the draft vote and return it with an empty tally."""
         vote = Vote(
             application_id=application_id,
             meeting_id=meeting_id,
             agenda_item_id=agenda_item_id,
-            eligible_group=payload.eligible_group,
+            eligible_group=str(payload.eligible_group),
             question=payload.question,
             config=payload.config.model_dump(by_alias=True),
             eligible_count=payload.eligible_count,
@@ -459,39 +570,31 @@ class VotingService:
         return True
 
     @staticmethod
-    def _eligible_group_member(principal: Principal, eligible_group: str) -> bool:
-        """Check voting eligibility against ``eligible_group``.
-
-        If ``eligible_group`` is a gremium UUID, the cast MUST go through the
-        namespaced ``vote:<uuid>`` key. Meeting votes and application votes use such a
-        UUID. Only an active ``vote.cast`` membership sets that key. A matching OIDC
-        group claim can therefore not satisfy gremium eligibility. A free group key
-        (not a UUID) keeps the direct OIDC group check.
-        """
-        if not VotingService._is_gremium_group(eligible_group):
-            return principal.in_group(eligible_group)
-        return principal.in_group(vote_group_key(eligible_group))
-
-    @staticmethod
     def _may_cast(principal: Principal, eligible_group: str) -> bool:
         """Tell whether the principal may cast an OWN ballot in this vote.
 
-        For a gremium vote the namespaced key decides on its own. `resolve_principal`
-        writes ``vote:<gremium_id>`` for an active membership whose gremium role carries
-        ``vote.cast``, and for nothing else, so the key already proves the right. A
-        second check on the GLOBAL ``vote.cast`` permission would lock out a member who
-        holds the right through the gremium role alone, for example a Sachbearbeitung or
-        a Protokoll role. `MeetingService.vote_eligible_count` builds the quorum
-        denominator from exactly that roster, so both sides MUST use the same rule.
-        Otherwise the vote counts a member who cannot cast, and a percent quorum can
-        become unreachable.
+        Only the namespaced key ``vote:<gremium_id>`` decides. `resolve_principal`
+        writes it for an active membership whose gremium role carries ``vote.cast``,
+        and for nothing else, so the key proves the right. A matching OIDC group claim
+        cannot satisfy it. `MeetingService.vote_eligible_count` builds the quorum
+        denominator from exactly that roster, so both sides use the same rule.
 
-        A free group key is a raw OIDC group claim. It proves no membership and feeds no
-        server-side roster, so it keeps the global ``vote.cast`` permission next to it.
+        A free group key (not a UUID) is an old row. No global permission grants a
+        vote right any more, so such a vote admits nobody.
         """
-        if not VotingService._eligible_group_member(principal, eligible_group):
+        if not VotingService._is_gremium_group(eligible_group):
             return False
-        return VotingService._is_gremium_group(eligible_group) or principal.has("vote.cast")
+        return principal.in_group(vote_group_key(eligible_group))
+
+    def can_cast_own(self, vote: Vote, principal: Principal) -> bool:
+        """Tell whether the principal may cast an own ballot (the ``canCast`` flag).
+
+        The rule is the roster side of ``cast``: a human session (no OAuth token) and
+        ``vote.cast`` in the gremium of the vote. A delegated ballot has its own check.
+        """
+        return principal.scope_permissions is None and self._may_cast(
+            principal, vote.eligible_group
+        )
 
     async def _cast_open(
         self, vote_id: UUID, voter_sub: str, choice: str, allow_change: bool
@@ -552,12 +655,14 @@ class VotingService:
 
         A meeting-bound vote follows the meeting visibility rules of
         ``MeetingService.assert_can_read``: member, participant, or delegation
-        recipient. A vote without a meeting (application or draft vote) needs a global
-        read or manage permission. Without this check any logged-in user could read the
-        tally of another gremium through ``GET /api/votes/{id}``, including closed
-        SECRET votes.
+        recipient. A vote without a meeting (application vote) is readable with
+        ``application.read`` or ``application.read_all`` (the admin role holds both),
+        for an eligible voter of the vote, and for a holder of the gremium permission
+        ``vote.manage`` or ``session.manage`` in the gremium of the vote. Without this
+        check any logged-in user could read the tally of another gremium through
+        ``GET /api/votes/{id}``, including closed SECRET votes.
 
-        The admin role reaches this through `Principal.has` below, not through a
+        The admin role reaches this through `Principal.has`, not through a
         `principal.roles` read: `has` is where the OAuth scope cap applies.
 
         Raises:
@@ -568,19 +673,43 @@ class VotingService:
 
             await MeetingService(self.session).assert_can_read(vote.meeting_id, principal)
             return
-        if (
-            principal.has("vote.manage")
-            or principal.has("application.read")
-            or principal.has("application.read_all")
-        ):
+        if principal.has("application.read") or principal.has("application.read_all"):
+            return
+        if self._may_cast(principal, vote.eligible_group):
+            return
+        gremium_id = await self._vote_gremium_id(
+            meeting_id=None, eligible_group=vote.eligible_group
+        )
+        if gremium_id is not None and await self._manages_in_gremium(gremium_id, principal):
             return
         raise ForbiddenError("not allowed to view this vote")
 
     async def get_scoped(self, vote_id: UUID, principal: Principal) -> VoteOut:
-        """Like ``get`` but fail-closed scoped to the vote's read audience."""
+        """Like ``get`` but fail-closed scoped to the vote's read audience.
+
+        The result carries the ``canManage`` and ``canCast`` flags of the principal.
+        """
         vote = await self._get_vote(vote_id)
         await self.assert_can_read(vote, principal)
-        return await self.get(vote_id)
+        out = await self.get(vote_id)
+        return out.model_copy(
+            update={
+                "can_manage": await self.can_manage(vote, principal),
+                "can_cast": self.can_cast_own(vote, principal),
+            }
+        )
+
+    async def _manages_in_gremium(self, gremium_id: UUID, principal: Principal) -> bool:
+        """Tell whether a gremium role gives ``vote.manage`` or ``session.manage`` here.
+
+        Both go through ``gremium_ids_for``, so the OAuth scope cap applies (F16).
+        """
+        from app.modules.admin.gremium_roles import gremium_ids_for
+
+        for perm in ("vote.manage", "session.manage"):
+            if gremium_id in await gremium_ids_for(self.session, principal, perm):
+                return True
+        return False
 
     async def _vote_gremium_id(
         self, *, meeting_id: UUID | None, eligible_group: str
@@ -590,8 +719,8 @@ class VotingService:
         A meeting-bound vote inherits the gremium of the meeting. A vote without a
         meeting (application vote) carries the gremium in ``eligible_group`` as the
         gremium UUID in text form. If ``eligible_group`` is a free group key and not a
-        UUID, no gremium resolves and the method returns ``None``. Only a global
-        ``vote.manage`` or ``admin`` then grants access.
+        UUID (an old row), no gremium resolves and the method returns ``None``. Only
+        the admin role then grants access.
         """
         if meeting_id is not None:
             from app.modules.livevote.models import Meeting
@@ -632,47 +761,54 @@ class VotingService:
             return False
         return await MeetingService(self.session).can_manage_votes(meeting, principal)
 
+    async def can_manage_group(
+        self, eligible_group: str, meeting_id: UUID | None, principal: Principal
+    ) -> bool:
+        """Tell whether the principal may manage a vote of this group and meeting.
+
+        The rule is fail-closed and gremium-scoped, symmetric to ``assert_can_read``.
+        It covers create, open, close, cancel and delete. The checks run in this
+        order:
+
+        1. The admin role (``admin_bypass`` with ``vote.manage``). The OAuth scope cap
+           applies, so an admin token with only the ``read`` scope cannot manage.
+        2. For a meeting-bound vote, the meeting rule. It keeps the enforced right
+           equal to the advertised ``canManageVotes`` flag.
+        3. The gremium permission ``vote.manage`` OR ``session.manage`` in the gremium
+           of the vote. This covers the application vote that no meeting holds.
+
+        No global permission grants the right. A vote with a free group key resolves
+        no gremium, so only the admin role passes.
+        """
+        from app.modules.admin.gremium_roles import admin_bypass
+
+        if admin_bypass(principal, "vote.manage"):
+            return True
+        if meeting_id is not None and await self._meeting_grants_vote_management(
+            meeting_id, principal
+        ):
+            return True
+        gremium_id = await self._vote_gremium_id(
+            meeting_id=meeting_id, eligible_group=eligible_group
+        )
+        if gremium_id is None:
+            return False
+        return await self._manages_in_gremium(gremium_id, principal)
+
     async def assert_can_manage_group(
         self, eligible_group: str, meeting_id: UUID | None, principal: Principal
     ) -> None:
-        """Guard the write and lifecycle access to a vote.
-
-        The check is fail-closed and gremium-scoped, symmetric to
-        ``assert_can_read``. It covers create, open, close and cancel. Access goes to
-        an admin or to a holder of the GLOBAL ``vote.manage`` permission. For a
-        meeting-bound vote the meeting rule decides next, which keeps the enforced
-        right equal to the advertised ``canManageVotes`` flag. A gremium role with
-        ``vote.manage`` for the gremium of the vote also grants access. The last case
-        covers the application vote that no meeting holds. It unblocks a legitimate
-        per-gremium manager. At the same time it stops an org-wide ``vote.manage``
-        holder from opening or closing votes of OTHER gremien without membership. That
-        would be a cross-tenant mutation.
-
-        The admin case runs through `principal.has("vote.manage")`, which grants the
-        admin role the right AND applies the OAuth scope cap. It used to read
-        `principal.roles` directly and return before that check, so a token issued to
-        an admin with only the `read` scope could open, close and cancel votes.
+        """Guard the write and lifecycle access to a vote (``can_manage_group``).
 
         Raises:
             ForbiddenError: The principal cannot manage this vote.
         """
-        if principal.has("vote.manage"):
-            return
-        if meeting_id is not None and await self._meeting_grants_vote_management(
-            meeting_id, principal
-        ):
-            return
-        gremium_id = await self._vote_gremium_id(
-            meeting_id=meeting_id, eligible_group=eligible_group
-        )
-        if gremium_id is not None:
-            from app.modules.admin.gremium_roles import gremium_ids_for
+        if not await self.can_manage_group(eligible_group, meeting_id, principal):
+            raise ForbiddenError("not allowed to manage this vote")
 
-            # Scope-capped: a token without `vote.manage` in its scope gets nothing
-            # from the gremium role (F16).
-            if gremium_id in await gremium_ids_for(self.session, principal, "vote.manage"):
-                return
-        raise ForbiddenError("not allowed to manage this vote")
+    async def can_manage(self, vote: Vote, principal: Principal) -> bool:
+        """Like ``can_manage_group`` but for an already-loaded vote."""
+        return await self.can_manage_group(vote.eligible_group, vote.meeting_id, principal)
 
     async def assert_can_manage(self, vote: Vote, principal: Principal) -> None:
         """Like ``assert_can_manage_group`` but for an already-loaded vote."""

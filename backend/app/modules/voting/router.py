@@ -1,15 +1,21 @@
 """Voting API router.
 
-* ``POST /api/applications/{id}/votes`` - create a vote. P(vote.manage).
-* ``POST /api/votes/{id}/open``         - open a vote. P(vote.manage).
-* ``POST /api/votes/{id}/close``        - close -> result -> flow. P(vote.manage).
+* ``POST /api/applications/{id}/votes`` - create a vote. Manage right in the gremium.
+* ``POST /api/votes/{id}/open``         - open a vote. Manage right in the gremium.
+* ``POST /api/votes/{id}/close``        - close -> result -> flow. Manage right.
+* ``POST /api/votes/{id}/cancel``       - cancel an open vote. Manage right.
+* ``DELETE /api/votes/{id}``            - delete a draft vote. Manage right.
 * ``POST /api/votes/{id}/ballot``       - cast a vote. Roster of the vote, human only.
 * ``GET  /api/votes/{id}``              - vote state + tally (secret: only counts).
 
-RBAC is fail-closed: 401 without a session, 403 without the permission or group
-membership (``cast``). The group lives on the vote and is dynamic. The service
-therefore runs the check after it loads the vote. The routes declare their errors as
-``ProblemDetail`` (problem+json).
+The manage right is the admin role or the gremium permission ``vote.manage`` or
+``session.manage`` in the gremium of the vote (``VotingService.can_manage_group``). The
+cast right is the gremium permission ``vote.cast``. No global permission grants a vote
+right.
+
+RBAC is fail-closed: 401 without a session, 403 without the right. The gremium lives on
+the vote. The service therefore runs the check after it loads the vote. The routes
+declare their errors as ``ProblemDetail`` (problem+json).
 """
 
 from __future__ import annotations
@@ -57,11 +63,11 @@ def get_voting_service(
 
 ServiceDep = Annotated[VotingService, Depends(get_voting_service)]
 PublisherDep = Annotated[MeetingPublisher, Depends(get_meeting_publisher)]
-# The lifecycle routes (create/open/close/cancel) do not use a global-only gate. The
-# router gate requires only a session. The service then runs the fail-closed
-# gremium-scoped ``vote.manage`` check (``assert_can_manage*``), which admits admin, a
-# global ``vote.manage`` holder, or a per-gremium role. This is symmetric with the
-# scoped read (``get_scoped``).
+# The lifecycle routes (create/open/close/cancel/delete) have no permission gate of
+# their own. The router gate requires only a session. The service then runs the
+# fail-closed gremium-scoped check (``assert_can_manage*``), which admits the admin role
+# or a gremium role with ``vote.manage`` or ``session.manage`` in the gremium of the
+# vote. This is symmetric with the scoped read (``get_scoped``).
 ReaderDep = Annotated[Principal, Depends(require_principal())]
 
 
@@ -78,12 +84,18 @@ async def create_vote(
 ) -> VoteOut:
     """Create a draft vote on an application.
 
-    Gremium-scoped: admin, global ``vote.manage``, or a gremium role with
-    ``vote.manage`` for the ``eligibleGroup`` gremium. A caller cannot create a vote in
-    another gremium.
+    ``eligibleGroup`` is the UUID of a gremium. A free group key or an
+    ``eligibleCount`` in the body gives 422. The gremium must be the gremium of the
+    application (422 ``eligible_group_mismatch``). If the application and its state
+    name no gremium, only the admin role can create the vote (403). The server counts
+    the eligible voters from the roster of the gremium.
+
+    Gremium-scoped: the admin role, or a gremium role with ``vote.manage`` or
+    ``session.manage`` in the ``eligibleGroup`` gremium. A caller cannot create a vote
+    in another gremium.
     """
-    await service.assert_can_manage_group(payload.eligible_group, None, principal)
-    return await service.create(application_id, payload)
+    await service.assert_can_manage_group(str(payload.eligible_group), None, principal)
+    return await service.create(application_id, payload, principal)
 
 
 @router.post(
@@ -99,7 +111,7 @@ async def open_vote(
 ) -> VoteOut:
     """Open a vote and move it from ``draft`` to ``open``.
 
-    Gremium-scoped ``vote.manage``. The call returns 409 when the vote is not
+    Gremium-scoped manage right. The call returns 409 when the vote is not
     ``draft``. If a meeting holds the vote, the publisher broadcasts ``vote_opened``
     on the live-vote channel. Without a meeting the broadcast is a no-op.
     """
@@ -122,7 +134,7 @@ async def close_vote(
 ) -> VoteClosed:
     """Close a vote, compute the tally, set the result and fire the flow branch.
 
-    The close calls ``flow.fire(result_branch)``. Gremium-scoped ``vote.manage`` blocks
+    The close calls ``flow.fire(result_branch)``. The gremium-scoped manage right blocks
     a cross-tenant close, which would fire the flow of another application. The
     publisher broadcasts ``vote_closed`` on the meeting channel. Without a meeting the
     broadcast is a no-op.
@@ -149,7 +161,7 @@ async def cancel_vote(
     The vote moves from ``open`` to ``cancelled``. It gets no result and fires no
     branch. The application stays in the ``vote`` state. This is the escape hatch when
     the vote does not reach the quorum, because ``close`` is then blocked.
-    Gremium-scoped ``vote.manage``.
+    Gremium-scoped manage right.
     """
     await service.assert_can_manage_vote(vote_id, principal)
     vote = await service.cancel(vote_id)
@@ -175,7 +187,7 @@ async def delete_vote(
     to ``DELETE /meetings/{meeting_id}/votes/{vote_id}``, which applies the
     meeting-scoped check.
 
-    Gremium-scoped ``vote.manage``, like open, close and cancel.
+    Gremium-scoped manage right, like open, close and cancel.
     """
     await service.assert_can_manage_vote(vote_id, principal)
     await service.delete_standalone(vote_id, actor=principal.sub)
@@ -229,8 +241,9 @@ async def get_vote(
     """Return the vote state and the aggregated tally.
 
     A secret vote exposes only ``counts`` and never the voters. The service scopes the
-    read to the read audience of the vote: meeting members, meeting participants, or a
-    holder of a read or manage permission. Other gremien get 403, so there is no
-    cross-tenant read.
+    read to the read audience of the vote: meeting members, meeting participants, the
+    eligible voters, a holder of ``application.read``, or a manager of the vote. Other
+    gremien get 403, so there is no cross-tenant read. ``canManage`` and ``canCast``
+    tell what the caller may do with the vote.
     """
     return await service.get_scoped(vote_id, principal)

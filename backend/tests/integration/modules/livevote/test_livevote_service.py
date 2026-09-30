@@ -249,7 +249,7 @@ async def test_open_vote_lookup(session: AsyncSession) -> None:
     vote = Vote(
         application_id=application.id,
         meeting_id=meeting.id,
-        eligible_group="stupa",
+        eligible_group=str(gremium.id),
         config=_CONFIG.model_dump(by_alias=True),
         eligible_count=5,
         status="open",
@@ -280,15 +280,12 @@ async def test_parallel_casts_yield_single_ballot(
     session.add(vote)
     await session.commit()
 
-    # A voter needs the ``vote.cast`` permission AND the voting membership in the GREMIUM
-    # (service.cast, fail-closed). The membership is the namespaced key
-    # ``vote:<gremium>`` (AUD-066), which only a real vote.cast membership sets. The
-    # bare UUID string does not work. Set both, or the cast gives 403.
+    # A voter needs the gremium `vote.cast` in the GREMIUM of the vote (service.cast,
+    # fail-closed). The right is the namespaced key ``vote:<gremium>`` (AUD-066), which
+    # only a real vote.cast membership sets. The bare UUID string does not work.
     from app.modules.auth.rbac import vote_group_key
 
-    principal = Principal(
-        sub="alice", permissions={"vote.cast"}, groups={vote_group_key(gremium.id)}
-    )
+    principal = Principal(sub="alice", groups={vote_group_key(gremium.id)})
     from datetime import UTC, datetime
 
     now = datetime.now(UTC)

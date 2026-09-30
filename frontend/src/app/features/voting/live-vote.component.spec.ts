@@ -1,8 +1,8 @@
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
-import { Subject } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
-import { AuthService } from '@core/auth/auth.service';
+import { ApiClient } from '@core/api/api-client.service';
 import { LIVE_VOTE_SOURCE, type LiveVoteSource } from '@core/ws/live-vote.source';
 import type { MeetingChannel } from '@core/ws/ws.service';
 import type { ClientMessage, ServerMessage } from '@core/ws/ws-messages';
@@ -30,13 +30,19 @@ class FakeSource implements LiveVoteSource {
   }
 }
 
-async function setup(canVote = true, withId = true) {
+/**
+ * `canVote` is the server flag of the meeting. `'error'` makes the meeting load fail.
+ */
+async function setup(canVote: boolean | 'error' = true, withId = true) {
   const source = new FakeSource();
+  const getMeeting = jest.fn(() =>
+    canVote === 'error' ? throwError(() => ({ status: 403 })) : of({ id: 'm1', canVote }),
+  );
   const result = await render(LiveVoteComponent, {
     providers: [
       provideRouter([]),
       { provide: LIVE_VOTE_SOURCE, useValue: source },
-      { provide: AuthService, useValue: { can: () => canVote } },
+      { provide: ApiClient, useValue: { getMeeting } },
       {
         provide: ActivatedRoute,
         useValue: {
@@ -45,7 +51,7 @@ async function setup(canVote = true, withId = true) {
       },
     ],
   });
-  return { ...result, source, channel: source.channels[0] };
+  return { ...result, source, getMeeting, channel: source.channels[0] };
 }
 
 const OPEN_VOTE: ServerMessage = {
@@ -172,8 +178,23 @@ describe('LiveVoteComponent', () => {
   });
 
   it('falls back to the demo meeting id when the route has none', async () => {
-    const { source } = await setup(true, false);
+    const { source, getMeeting } = await setup(true, false);
     expect(source.lastMeetingId).toBe('demo');
+    // Without a meeting there is no canVote flag to load.
+    expect(getMeeting).not.toHaveBeenCalled();
+  });
+
+  it('reads canVote from the meeting of the route', async () => {
+    const { getMeeting } = await setup(true);
+    expect(getMeeting).toHaveBeenCalledWith('m1', { quiet: true });
+  });
+
+  it('keeps the cast UI when the meeting cannot load (the server still gates)', async () => {
+    const { channel, detectChanges } = await setup('error');
+    channel.subject.next(OPEN_VOTE);
+    detectChanges();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ja' })).toBeInTheDocument();
   });
 
   it('exposes a tie result key before any result arrives', async () => {

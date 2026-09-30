@@ -36,8 +36,9 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "application.share",
     "form.configure",
     "flow.configure",
-    "vote.cast",
-    "vote.manage",
+    # Voting rights are NOT in this catalog. They are gremium permissions
+    # (`vote.cast`, `vote.manage`) of the gremium role catalog in
+    # `app.modules.admin.gremium_roles`. A vote names its gremium in `eligibleGroup`.
     # A global READ permission that only adds. The holder sees every meeting across all
     # Gremien: timeline, list, detail, agenda, protocol and vote results. The holder
     # never writes and never votes.

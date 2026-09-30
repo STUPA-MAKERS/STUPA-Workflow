@@ -19,7 +19,7 @@ from app.modules.auth.principal import Principal
 from app.modules.auth.rbac import vote_group_key
 from app.modules.flow.schemas import TransitionOut, TransitionResult
 from app.modules.voting import service as voting_service
-from app.modules.voting.schemas import VoteCreate
+from app.modules.voting.schemas import VoteCreate, VoteCreateInternal
 from app.modules.voting.service import VotingService, open_tally_revealed
 from app.shared.config_schemas import VoteConfig
 from app.shared.errors import (
@@ -32,6 +32,8 @@ from tests._support.flow_fakes import fake_session, result
 
 NOW = datetime(2026, 6, 6, 12, 0, tzinfo=UTC)
 OPTIONS = ["yes", "no", "abstain"]
+# The gremium of the default vote. A vote names a gremium UUID as its eligible group.
+GID = UUID("00000000-0000-0000-0000-00000000a1b2")
 
 
 def _config(**over: Any) -> dict[str, Any]:
@@ -53,7 +55,7 @@ def _vote(**over: Any) -> SimpleNamespace:
         "id": uuid4(),
         "application_id": uuid4(),
         "meeting_id": None,
-        "eligible_group": "stupa",
+        "eligible_group": str(GID),
         "config": _config(),
         "eligible_count": 10,
         "opens_at": None,
@@ -65,41 +67,51 @@ def _vote(**over: Any) -> SimpleNamespace:
     return SimpleNamespace(**base)
 
 
-def _voter(*, group: str = "stupa", sub: str = "v1") -> Principal:
-    return Principal(sub=sub, permissions={"vote.cast"}, groups={group})
+def _voter(*, group: str = vote_group_key(GID), sub: str = "v1") -> Principal:
+    return Principal(sub=sub, groups={group})
+
+
+def _create_body(**over: Any) -> VoteCreate:
+    body: dict[str, Any] = {
+        "config": VoteConfig.model_validate(
+            {"options": OPTIONS, "majorityRule": "simple"}
+        ).model_dump(by_alias=True),
+        "eligibleGroup": str(GID),
+    }
+    body.update(over)
+    return VoteCreate.model_validate(body)
 
 
 async def test_create_ok() -> None:
-    app = SimpleNamespace(id=uuid4())
-    db = fake_session(result(app))
-    payload = VoteCreate.model_validate(
-        {"config": VoteConfig.model_validate(
-            {"options": OPTIONS, "majorityRule": "simple"}).model_dump(by_alias=True),
-         "eligibleGroup": "stupa"}
-    )
-    out = await VotingService(db).create(app.id, payload)
+    """The gremium exists and matches the application; the roster sets the count."""
+    app = SimpleNamespace(id=uuid4(), current_state_id=None, gremium_id=GID)
+    roster = [(uuid4(), ["vote.cast"]), (uuid4(), ["vote.cast"]), (uuid4(), ["session.manage"])]
+    db = fake_session(result(app), result(*roster))
+    db.scalar_results = [GID]  # the gremium exists
+    out = await VotingService(db).create(app.id, _create_body(), Principal(sub="m"))
     assert out.status == "draft"
-    assert out.eligible_group == "stupa"
+    assert out.eligible_group == str(GID)
     assert out.tally.counts == {"yes": 0, "no": 0, "abstain": 0}
+    assert out.tally.eligible == 2
     assert db.committed == 1
 
 
-def test_votecreate_percent_quorum_requires_eligible_count() -> None:
-    """A percent quorum without an eligible count fails closed with 422."""
+def test_votecreate_internal_percent_quorum_requires_eligible_count() -> None:
+    """A percent quorum without an eligible count fails closed."""
     with pytest.raises(ValueError, match="eligibleCount"):
-        VoteCreate.model_validate(
+        VoteCreateInternal.model_validate(
             {
                 "config": _config(quorum={"type": "percent", "value": 50}),
-                "eligibleGroup": "stupa",
+                "eligibleGroup": str(GID),
             }
         )
 
 
-def test_votecreate_percent_quorum_with_eligible_count_ok() -> None:
-    payload = VoteCreate.model_validate(
+def test_votecreate_internal_percent_quorum_with_eligible_count_ok() -> None:
+    payload = VoteCreateInternal.model_validate(
         {
             "config": _config(quorum={"type": "percent", "value": 50}),
-            "eligibleGroup": "stupa",
+            "eligibleGroup": str(GID),
             "eligibleCount": 12,
         }
     )
@@ -108,13 +120,18 @@ def test_votecreate_percent_quorum_with_eligible_count_ok() -> None:
 
 async def test_create_unknown_application_404() -> None:
     db = fake_session(result())
-    payload = VoteCreate.model_validate(
-        {"config": VoteConfig.model_validate(
-            {"options": OPTIONS, "majorityRule": "simple"}).model_dump(by_alias=True),
-         "eligibleGroup": "stupa"}
+    db.scalar_results = [GID]  # the gremium exists
+    with pytest.raises(NotFoundError):
+        await VotingService(db).create(uuid4(), _create_body(), Principal(sub="m"))
+
+
+async def test_create_internal_unknown_application_404() -> None:
+    db = fake_session(result())
+    payload = VoteCreateInternal.model_validate(
+        {"config": _config(), "eligibleGroup": str(GID), "eligibleCount": 3}
     )
     with pytest.raises(NotFoundError):
-        await VotingService(db).create(uuid4(), payload)
+        await VotingService(db).create_internal(uuid4(), payload)
 
 
 async def test_open_sets_window_keeps_roster_eligible() -> None:
@@ -603,17 +620,15 @@ async def test_cancel_closed_409() -> None:
 
 
 async def test_create_without_application_skips_lookup() -> None:
-    # With application_id=None the service runs no _get_application query (branch
-    # 195->197).
+    # With application_id=None the service runs no _get_application query.
     db = fake_session()
-    payload = VoteCreate.model_validate(
-        {"config": VoteConfig.model_validate(
-            {"options": OPTIONS, "majorityRule": "simple"}).model_dump(by_alias=True),
-         "eligibleGroup": "stupa"}
+    payload = VoteCreateInternal.model_validate(
+        {"config": _config(), "eligibleGroup": str(GID), "eligibleCount": 4}
     )
-    out = await VotingService(db).create(None, payload)
+    out = await VotingService(db).create_internal(None, payload, meeting_id=uuid4())
     assert out.status == "draft"
     assert out.application_id is None
+    assert out.tally.eligible == 4
     assert db.committed == 1
 
 
@@ -821,7 +836,7 @@ async def test_delete_standalone_draft_ok() -> None:
     assert db.committed == 1
     entries = [o for o in db.added if isinstance(o, AuditEntry)]
     assert [e.action for e in entries] == ["vote_delete"]
-    assert entries[0].data["eligibleGroup"] == "stupa"
+    assert entries[0].data["eligibleGroup"] == str(GID)
 
 
 async def test_delete_standalone_without_application_records_null() -> None:

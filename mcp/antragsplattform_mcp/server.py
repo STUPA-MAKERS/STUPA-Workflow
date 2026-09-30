@@ -4,7 +4,8 @@ Auth is transparent. See `client` and `auth`. The first tool call starts a brows
 with OAuth2 and PKCE. The server caches the token and refreshes it automatically. The
 platform caps every right server-side, at the permissions of the user intersected with
 the granted scope. One thing is forbidden by design. There is no `cast_ballot` tool and
-no token ever gets `vote.cast`. An agent manages votes but never votes.
+no token ever gets the gremium permission `vote.cast`. An agent manages votes but never
+votes.
 
 The tool definitions live in `tools`, one module per domain group. The `schemas` module
 types the request bodies as a camelCase wire mirror of the backend.
@@ -49,6 +50,9 @@ TYPICAL FLOWS:
   Meeting rights are GREMIUM rights: `session.manage`, `protocol.write`,
   `protocol.finalize` and `vote.manage` come from your role in the meeting's gremium (or
   from admin), and the `meetings:write` / `votes:write` scope must let them through.
+- Votes are GREMIUM votes: `create_application_vote` takes the gremium UUID of the
+  application as `eligibleGroup`. There is no global vote right; `vote.manage` or
+  `session.manage` in that gremium manages the vote. `get_vote` returns `canManage`.
 - Minutes (Protokoll): `get_or_create_protocol(meeting_id)` → `update_protocol(markdown)` →
   `finalize_protocol`. Finalize needs the gremium permission `protocol.finalize` on top of
   the write access (`canFinalize` on the meeting). Finalize is ASYNC: re-fetch until

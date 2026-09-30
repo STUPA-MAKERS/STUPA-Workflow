@@ -508,7 +508,7 @@ def test_roles_and_assignments_and_mappings(app: FastAPI, client: TestClient) ->
     assert client.get("/api/admin/roles").json()[0]["permissions"] == ["admin.gremien"]
     created = client.post(
         "/api/admin/roles",
-        json={"key": "r", "label": {"de": "R"}, "permissions": ["vote.cast"]},
+        json={"key": "r", "label": {"de": "R"}, "permissions": ["audit.read"]},
     )
     assert created.status_code == 201
     patched = client.patch(f"/api/admin/roles/{uuid4()}", json={"permissions": ["audit.read"]})

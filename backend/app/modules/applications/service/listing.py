@@ -271,19 +271,22 @@ class ListingOps(ApplicationsServiceBase):
 
         An application is a task when the principal can act on it:
 
-        * the application is in a `vote` state and the principal is a member of the
-          Gremium or an admin, so the principal can vote, or
+        * the application is in a `vote` state and the principal can vote: a gremium
+          role with `vote.cast` in the gremium of the application, or a membership in
+          the gremium of the vote state, or
         * at least one manual transition is firable because its guard holds, and the
           principal may fire transitions with `application.transition` or as admin.
         """
+        from app.modules.admin.gremium_roles import gremium_ids_for
         from app.modules.flow.service import FlowService
 
         flow = FlowService(self.session)
-        # Both go through `Principal.has`, never through `principal.roles`: `has` grants
-        # the admin role every right and still applies the OAuth scope cap. A vote state
-        # is actionable only for someone who may actually cast, and `vote.cast` is in
-        # FORBIDDEN_PERMISSIONS, so no token ever sees one as a task.
-        can_cast = principal.has("vote.cast")
+        # A vote state is a task for someone who may cast in the gremium of the
+        # application: the gremium permission `vote.cast`. `gremium_ids_for` applies the
+        # OAuth scope cap, and `vote.cast` is in FORBIDDEN_PERMISSIONS, so a token gets
+        # the empty set. `application.transition` goes through `Principal.has`, which
+        # grants the admin role every right and still applies the scope cap.
+        cast_gremium_ids = await gremium_ids_for(self.session, principal, "vote.cast")
         can_transition = principal.has("application.transition")
 
         apps = (
@@ -314,7 +317,7 @@ class ListingOps(ApplicationsServiceBase):
                 continue
             ok = False
             if s.kind == "vote":
-                if can_cast:
+                if app.gremium_id is not None and app.gremium_id in cast_gremium_ids:
                     ok = True
                 else:
                     cfg = s.config if isinstance(s.config, dict) else {}

@@ -202,7 +202,7 @@ describe('Kern-Views a11y (axe)', () => {
         providers: [
           provideRouter([]),
           { provide: LIVE_VOTE_SOURCE, useValue: source },
-          { provide: AuthService, useValue: { can: () => true } },
+          { provide: ApiClient, useValue: { getMeeting: () => of({ id: 'm1', canVote: true }) } },
           {
             provide: ActivatedRoute,
             useValue: { snapshot: { paramMap: convertToParamMap({ id: 'm1' }) } },

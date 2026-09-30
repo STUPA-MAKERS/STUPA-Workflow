@@ -4,7 +4,6 @@ import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { ApiClient } from '@core/api/api-client.service';
 import { DelegationsApiService, type VoteDelegationStatus } from '@core/api/delegations.service';
-import { AuthService } from '@core/auth/auth.service';
 import type { Vote } from '@core/api/models';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { VoteCastComponent } from './vote-cast.component';
@@ -13,7 +12,7 @@ function vote(overrides: Partial<Vote> = {}): Vote {
   return {
     id: 'v1',
     applicationId: 'a1',
-    eligibleGroup: 'stupa',
+    eligibleGroup: 'g1',
     config: { options: ['yes', 'no', 'abstain'], majorityRule: 'two_thirds', allowChange: true },
     status: 'open',
     opensAt: null,
@@ -30,17 +29,24 @@ async function setup(opts: {
   getError?: unknown;
   castError?: unknown;
   castResult?: { status: 'cast' | 'changed' };
+  /** The server flag `canCast` of the loaded vote (default true). */
   canVote?: boolean;
   delegation?: VoteDelegationStatus;
   delegationError?: boolean;
   routeId?: string | null;
   deleteError?: unknown;
-  /** Permissions the stubbed principal holds. `true` grants everything. */
-  permissions?: string[] | true;
+  /** The server flag `canManage` of the loaded vote (default false). */
+  canManage?: boolean;
 }) {
+  // The server sets the capability flags of the caller on GET /votes/{id}.
+  const served: Vote = {
+    canCast: opts.canVote ?? true,
+    canManage: opts.canManage ?? false,
+    ...(opts.vote ?? vote()),
+  };
   const getVote = opts.getError
     ? jest.fn(() => throwError(() => opts.getError))
-    : jest.fn(() => of(opts.vote ?? vote()));
+    : jest.fn(() => of(served));
   const castBallot = opts.castError
     ? jest.fn(() => throwError(() => opts.castError))
     : jest.fn(() => of(opts.castResult ?? { status: 'cast' as const }));
@@ -48,11 +54,6 @@ async function setup(opts: {
     ? jest.fn(() => throwError(() => opts.deleteError))
     : jest.fn(() => of(void 0));
   const api = { getVote, castBallot, deleteVote };
-  const perms = opts.permissions;
-  const auth = {
-    can: (p: string) =>
-      perms === undefined || perms === true ? (opts.canVote ?? true) : perms.includes(p),
-  };
   const voteStatus = opts.delegationError
     ? jest.fn(() => throwError(() => new Error('boom')))
     : jest.fn(() =>
@@ -78,7 +79,6 @@ async function setup(opts: {
       ]),
       { provide: ApiClient, useValue: api },
       { provide: DelegationsApiService, useValue: { voteStatus } },
-      { provide: AuthService, useValue: auth },
       { provide: ToastService, useValue: toast },
       {
         provide: ActivatedRoute,
@@ -453,7 +453,7 @@ describe('VoteCastComponent', () => {
     it('deletes a draft standalone vote after the confirmation', async () => {
       const { deleteVote, toast } = await setup({
         vote: draftVote(),
-        permissions: ['vote.manage'],
+        canManage: true,
       });
       await userEvent.click(screen.getAllByRole('button', { name: 'Abstimmung löschen' })[0]);
       const buttons = screen.getAllByRole('button', { name: 'Abstimmung löschen' });
@@ -465,28 +465,28 @@ describe('VoteCastComponent', () => {
     it('falls back to the vote overview when the vote carries no application', async () => {
       const v = draftVote();
       (v as { applicationId?: string | null }).applicationId = null;
-      const { fixture, deleteVote } = await setup({ vote: v, permissions: ['vote.manage'] });
+      const { fixture, deleteVote } = await setup({ vote: v, canManage: true });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (fixture.componentInstance as any).doDelete();
       expect(deleteVote).toHaveBeenCalledWith('v1');
     });
 
-    it('offers no delete without vote.manage', async () => {
-      await setup({ vote: draftVote(), permissions: ['vote.cast'] });
+    it('offers no delete without the server flag canManage', async () => {
+      await setup({ vote: draftVote(), canManage: false });
       expect(
         screen.queryByRole('button', { name: 'Abstimmung löschen' }),
       ).not.toBeInTheDocument();
     });
 
     it('offers no delete for a vote that already opened', async () => {
-      await setup({ vote: vote({ status: 'open' }), permissions: ['vote.manage'] });
+      await setup({ vote: vote({ status: 'open' }), canManage: true });
       expect(
         screen.queryByRole('button', { name: 'Abstimmung löschen' }),
       ).not.toBeInTheDocument();
     });
 
     it('offers no delete for a meeting-bound draft', async () => {
-      await setup({ vote: draftVote({ meetingId: 'm1' }), permissions: ['vote.manage'] });
+      await setup({ vote: draftVote({ meetingId: 'm1' }), canManage: true });
       expect(
         screen.queryByRole('button', { name: 'Abstimmung löschen' }),
       ).not.toBeInTheDocument();
@@ -506,7 +506,7 @@ describe('VoteCastComponent', () => {
     ])('explains the 409 code %s and reloads the vote', async (code, message) => {
       const { fixture, toast, getVote } = await setup({
         vote: draftVote(),
-        permissions: ['vote.manage'],
+        canManage: true,
         deleteError: conflict(code),
       });
       getVote.mockClear();
@@ -522,7 +522,7 @@ describe('VoteCastComponent', () => {
     ])('reports a %s failure with its own message', async (status, message) => {
       const { fixture, toast } = await setup({
         vote: draftVote(),
-        permissions: ['vote.manage'],
+        canManage: true,
         deleteError: { status },
       });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -533,7 +533,7 @@ describe('VoteCastComponent', () => {
     it('ignores a second delete while one runs', async () => {
       const { fixture, deleteVote } = await setup({
         vote: draftVote(),
-        permissions: ['vote.manage'],
+        canManage: true,
       });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const c = fixture.componentInstance as any;

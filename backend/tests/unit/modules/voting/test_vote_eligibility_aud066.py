@@ -26,19 +26,18 @@ def test_vote_group_key_is_namespaced() -> None:
 def test_uuid_eligible_group_requires_namespaced_membership_key() -> None:
     """A gremium-UUID vote is castable only with the namespaced membership key."""
     gid = uuid.uuid4()
-    member = Principal(sub="m", permissions={"vote.cast"}, groups={vote_group_key(gid)})
-    assert VotingService._eligible_group_member(member, str(gid)) is True
+    member = Principal(sub="m", groups={vote_group_key(gid)})
+    assert VotingService._may_cast(member, str(gid)) is True
 
 
 def test_bare_uuid_oidc_claim_does_not_satisfy_eligibility() -> None:
     """AUD-066 core: the gate rejects a raw OIDC group claim equal to the gremium UUID."""
     gid = uuid.uuid4()
-    attacker = Principal(sub="a", permissions={"vote.cast"}, groups={str(gid)})
-    assert VotingService._eligible_group_member(attacker, str(gid)) is False
+    attacker = Principal(sub="a", groups={str(gid)})
+    assert VotingService._may_cast(attacker, str(gid)) is False
 
 
-def test_non_uuid_eligible_group_uses_oidc_group_path() -> None:
-    """Free (non-UUID) group keys keep the direct OIDC-group membership check."""
-    p = Principal(sub="u", permissions={"vote.cast"}, groups={"stupa"})
-    assert VotingService._eligible_group_member(p, "stupa") is True
-    assert VotingService._eligible_group_member(p, "asta") is False
+def test_non_uuid_eligible_group_admits_nobody() -> None:
+    """A free (non-UUID) group key is an old row: no group or permission casts in it."""
+    p = Principal(sub="u", roles=["admin"], permissions={"vote.cast"}, groups={"stupa"})
+    assert VotingService._may_cast(p, "stupa") is False
