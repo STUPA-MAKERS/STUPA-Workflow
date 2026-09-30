@@ -167,7 +167,12 @@ class FlowService:
         )
 
     async def schedule_state_deadline(
-        self, app: Application, state: State, *, commit: bool = True
+        self,
+        app: Application,
+        state: State,
+        *,
+        commit: bool = True,
+        due_at: datetime | None = None,
     ) -> Deadline | None:
         """Materialize the named deadline policy of a state that the application enters.
 
@@ -186,6 +191,11 @@ class FlowService:
         `commit=False` leaves the commit to the caller. The flow activation uses it to
         move the deadlines of all applications in its own transaction.
 
+        `due_at` keeps a known due time and does not resolve the policy again. The flow
+        activation uses it when the state keeps its `deadlinePolicyKey`. A `recurring`
+        policy resolves to the next date after now, so a second resolve moves an
+        expired deadline to a later date or removes it.
+
         Returns:
             The new deadline, or `None` when the state has no resolvable policy.
         """
@@ -195,15 +205,19 @@ class FlowService:
                 Deadline.kind == "flow_deadline",
             )
         )
-        deadline = await self._materialize_deadline(app, state)
+        deadline = await self._materialize_deadline(app, state, due_at=due_at)
         if commit:
             await self.session.commit()
         return deadline
 
     async def _materialize_deadline(
-        self, app: Application, state: State
+        self, app: Application, state: State, *, due_at: datetime | None = None
     ) -> Deadline | None:
-        """Create the deadline row of `state` for `app`, without a commit."""
+        """Create the deadline row of `state` for `app`, without a commit.
+
+        A given `due_at` replaces the due time that the policy resolves to. The policy
+        must still exist.
+        """
         cfg = state.config if isinstance(state.config, dict) else {}
         key = cfg.get("deadlinePolicyKey")
         if not isinstance(key, str) or not key:
@@ -211,12 +225,13 @@ class FlowService:
         policy = await DeadlinePolicyService(self.session).get_by_key(key)
         if policy is None:
             return None
-        due_at = resolve_due_at(
-            policy,
-            now=datetime.now(UTC),
-            submitted_at=app.created_at,
-            changed_at=app.updated_at,
-        )
+        if due_at is None:
+            due_at = resolve_due_at(
+                policy,
+                now=datetime.now(UTC),
+                submitted_at=app.created_at,
+                changed_at=app.updated_at,
+            )
         if due_at is None:
             return None
         # The target is the outgoing transition of the state that must fire on an expired

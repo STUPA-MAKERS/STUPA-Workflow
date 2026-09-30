@@ -710,7 +710,7 @@ async def test_create_global_flow_version_new_version_remaps_apps() -> None:
     """
     graph = _two_state_graph()
     app_id = uuid.uuid4()
-    s, sess = svc([res((app_id, "legacy"))], scalars=[3])
+    s, sess = svc([res((app_id, "legacy", {}))], scalars=[3])
     out = await s.create_global_flow_version(FlowVersionCreate(graph=graph), "admin")
     assert out.version == 4
     assert out.active is True

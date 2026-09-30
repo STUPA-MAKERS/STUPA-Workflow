@@ -123,16 +123,19 @@ class FlowOps(ConfigServiceBase):
             ) from exc
 
         # The state KEY stays valid across versions, so remember it per application.
-        app_keys = {
-            app_id: key
-            for app_id, key in (
-                await self.session.execute(
-                    select(Application.id, State.key).join(
-                        State, State.id == Application.current_state_id
-                    )
+        # Also remember the deadline policy key of the old state (see
+        # `_move_state_deadlines`).
+        app_keys: dict[UUID, str] = {}
+        old_policy_keys: dict[UUID, str | None] = {}
+        for app_id, key, config in (
+            await self.session.execute(
+                select(Application.id, State.key, State.config).join(
+                    State, State.id == Application.current_state_id
                 )
-            ).all()
-        }
+            )
+        ).all():
+            app_keys[app_id] = key
+            old_policy_keys[app_id] = _policy_key(config)
 
         # Deactivate the active version FIRST. The partial unique index
         # uq_flow_version_one_active_global, with its WHERE active clause, allows only
@@ -217,7 +220,9 @@ class FlowOps(ConfigServiceBase):
                 updated_at=Application.updated_at,
             )
         )
-        await self._move_state_deadlines(app_keys, state_by_key, initial_state)
+        await self._move_state_deadlines(
+            app_keys, state_by_key, initial_state, old_policy_keys
+        )
 
         await ConfigRevisionService(self.session).record(
             entity_type=ENTITY_FLOW,
@@ -239,6 +244,7 @@ class FlowOps(ConfigServiceBase):
         app_keys: dict[UUID, str],
         state_by_key: dict[str, State],
         initial_state: State | None,
+        old_policy_keys: dict[UUID, str | None],
     ) -> None:
         """Re-create the flow deadlines of the moved applications on the new version.
 
@@ -246,6 +252,13 @@ class FlowOps(ConfigServiceBase):
         fire it any more, because `fire` refuses a transition of another flow version.
         So every moved application gets the deadline of its new state, with the
         target transition of the new version (`schedule_state_deadline`).
+
+        When the new state keeps the `deadlinePolicyKey` of the old state and a
+        deadline exists, the old due time stays. The policy is not resolved again. A
+        `recurring` policy resolves to the next date after now. A second resolve thus
+        moves an expired deadline to a later date, or removes it when all dates are
+        past, and `deadlinePassed` becomes false again. Only a changed policy key, or
+        an application without a deadline, gets a new due time.
 
         The reminder and consumed markers carry over when the due time stays the
         same. The applicant then gets no second reminder, and an expired deadline
@@ -284,11 +297,26 @@ class FlowOps(ConfigServiceBase):
             state = state_by_key.get(app_keys[app.id], initial_state)
             if state is None:
                 continue
-            deadline = await flow.schedule_state_deadline(app, state, commit=False)
             mark = old_marks.get(app.id)
+            new_key = _policy_key(state.config)
+            same_policy = new_key is not None and old_policy_keys.get(app.id) == new_key
+            deadline = await flow.schedule_state_deadline(
+                app,
+                state,
+                commit=False,
+                due_at=mark[0] if mark is not None and same_policy else None,
+            )
             if deadline is None or mark is None or deadline.due_at != mark[0]:
                 continue
             due_at, reminded_at, action_on_pass = mark
             deadline.reminded_at = reminded_at
             if action_on_pass is None and due_at <= now:
                 deadline.action_on_pass = None
+
+
+def _policy_key(config: object) -> str | None:
+    """Return the `deadlinePolicyKey` of a state config, or `None`."""
+    if not isinstance(config, dict):
+        return None
+    key = config.get("deadlinePolicyKey")
+    return key if isinstance(key, str) and key else None
