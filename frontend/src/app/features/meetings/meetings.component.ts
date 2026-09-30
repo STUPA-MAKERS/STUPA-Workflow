@@ -162,27 +162,9 @@ export class MeetingsComponent implements OnDestroy {
   readonly canCreate = computed(
     () => this.canManageAny() || this.auth.sessionManageGremien().length > 0,
   );
-  readonly canWriteGlobal = computed(() => this.auth.can('protocol.write'));
-  readonly inAnyCommittee = computed(() => this.auth.gremien().length > 0);
-  readonly inSubstitutePool = computed(() => this.auth.inSubstitutePool());
-  /** May see the (server-side filtered) overview timeline. */
-  readonly showOverview = computed(
-    () =>
-      this.canManageAny() ||
-      this.canWriteGlobal() ||
-      this.canViewAll() ||
-      this.inAnyCommittee() ||
-      this.inSubstitutePool(),
-  );
-  readonly showForbidden = computed(
-    () =>
-      !this.detailMode() &&
-      !this.canManageAny() &&
-      !this.canWriteGlobal() &&
-      !this.canViewAll() &&
-      !this.inAnyCommittee() &&
-      !this.inSubstitutePool(),
-  );
+  /** May see the (server-side filtered) overview timeline. Same predicate as `loadList()`. */
+  readonly showOverview = this.timeline.canReadTimeline;
+  readonly showForbidden = computed(() => !this.detailMode() && !this.showOverview());
 
   readonly agenda = this.agendaSvc.agenda;
   readonly assignable = this.agendaSvc.assignable;

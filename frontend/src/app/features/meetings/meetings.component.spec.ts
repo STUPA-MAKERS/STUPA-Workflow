@@ -1916,6 +1916,31 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.showForbidden()).toBe(false);
     });
 
+    it('loads and renders the timeline for a meeting.view_all reader without a gremium', async () => {
+      // The page and loadList() share one predicate. Before, loadList() returned early
+      // for this reader and the visible overview stayed empty.
+      const { http } = await setup({ id: null, perms: ['meeting.view_all'], skipTimelineFlush: true });
+      const reqs = http.match((r) => r.url.endsWith('/meetings/timeline') && r.method === 'GET');
+      expect(reqs.map((r) => r.request.params.get('direction')).sort()).toEqual(['past', 'upcoming']);
+      for (const req of reqs) {
+        const past = req.request.params.get('direction') === 'past';
+        req.flush({
+          items: past
+            ? [{ ...MEETING, id: 'p-9', title: 'Fremde Sitzung', status: 'closed' }]
+            : [{ ...MEETING, id: 'u-9', title: 'Kommende Sitzung', status: 'planned' }],
+          nextCursor: null,
+        });
+      }
+      expect(await screen.findByText('Fremde Sitzung')).toBeInTheDocument();
+      expect(screen.getByText('Kommende Sitzung')).toBeInTheDocument();
+    });
+
+    it('does not load the timeline for a user without any meeting read right', async () => {
+      const { http, fixture } = await setup({ id: null, perms: [], skipTimelineFlush: true });
+      expect(http.match((r) => r.url.endsWith('/meetings/timeline'))).toHaveLength(0);
+      expect((fixture.componentInstance as Cmp).showForbidden()).toBe(true);
+    });
+
     it('reflects per-meeting flags once a meeting is loaded', async () => {
       const { cmp } = await loaded();
       expect(cmp.canManage()).toBe(true);
@@ -2269,11 +2294,9 @@ describe('MeetingsComponent — methods', () => {
         { id: 'g-1', name: 'A' },
         { id: 'g-2', name: 'B' },
       ]);
-      // protocol.write grants canWriteGlobal, so loadList fires. Answer the timeline
-      // requests.
-      http.match((r) => r.url.endsWith('/meetings/timeline')).forEach((req) =>
-        req.flush({ items: [], nextCursor: null }),
-      );
+      // `protocol.write` is a gremium right and never a global one, so it does not open
+      // the timeline: this stub has no Gremium and no meeting.view_all.
+      expect(http.match((r) => r.url.endsWith('/meetings/timeline'))).toHaveLength(0);
       const cmp = view.fixture.componentInstance as Cmp;
       expect(cmp.gremiumOptions().map((o) => o.value)).toEqual(['g-2']);
       http.verify();

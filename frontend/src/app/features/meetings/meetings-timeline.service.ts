@@ -22,6 +22,20 @@ export class MeetingsTimelineService implements OnDestroy {
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
 
+  /**
+   * The user may read the overview timeline. The server filters the result: admins and
+   * `meeting.view_all` readers get every Gremium, members and substitute-pool entries get
+   * their own. The page and `loadList()` use this one predicate, so a user who sees the
+   * overview always gets its data.
+   */
+  readonly canReadTimeline = computed(
+    () =>
+      this.auth.isAdmin() ||
+      this.auth.can('meeting.view_all') ||
+      this.auth.gremien().length > 0 ||
+      this.auth.inSubstitutePool(),
+  );
+
   readonly loadingList = signal(false);
 
   /** Upcoming meetings, chronologically forward (earliest on top). */
@@ -223,13 +237,7 @@ export class MeetingsTimelineService implements OnDestroy {
 
   /** Initial load: first upcoming AND past page in parallel. */
   loadList(): void {
-    // Plain Gremium members also see their timeline, filtered on the server.
-    if (
-      !this.auth.isAdmin() &&
-      !this.auth.can('protocol.write') &&
-      !(this.auth.gremien().length > 0)
-    )
-      return;
+    if (!this.canReadTimeline()) return;
     this.didInitialScroll = false;
     this.upcomingItems.set([]);
     this.pastItems.set([]);
