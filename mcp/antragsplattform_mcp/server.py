@@ -46,9 +46,13 @@ TYPICAL FLOWS:
   `form_update_field`, `form_remove_field`, `form_move_field`. Each op creates + activates
   a new form version. `create_form_version` replaces the whole field list.
 - Run a meeting: `create_meeting` → `add_agenda_item` → `create_meeting_vote` → `close_vote`.
+  Meeting rights are GREMIUM rights: `session.manage`, `protocol.write`,
+  `protocol.finalize` and `vote.manage` come from your role in the meeting's gremium (or
+  from admin), and the `meetings:write` / `votes:write` scope must let them through.
 - Minutes (Protokoll): `get_or_create_protocol(meeting_id)` → `update_protocol(markdown)` →
-  `finalize_protocol`. Finalize is ASYNC: re-fetch until `status` is `final`, a fall back to
-  `draft` means the render failed.
+  `finalize_protocol`. Finalize needs the gremium permission `protocol.finalize` on top of
+  the write access (`canFinalize` on the meeting). Finalize is ASYNC: re-fetch until
+  `status` is `final`, a fall back to `draft` means the render failed.
 - Budget: `list_budgets` (tree), `update_budget`, `book_expense`, `set_allocation`,
   `create_budget_transfer`; bind an application via `assign_application_budget`. Browse all
   bookings flat/filtered with `list_expenses`.

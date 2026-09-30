@@ -329,3 +329,92 @@ def test_split_oidc_mappings_converts_gremium_group_mappings(
     assert [(r[0], r[1]) for r in roles] == [(board, "g-board")]
     assert globals_ == ["global"]
     assert old is None
+
+
+def test_drop_global_meeting_permissions(alembic_cfg: Config, engine: Engine) -> None:
+    """Migration 3a0b9672fcba drops the superseded global meeting keys (O7, F11).
+
+    The upgrade gives `protocol.finalize` to the forced gremium roles `vorstand` and
+    `manager` only, and deletes the three global keys from every role. The downgrade
+    restores the seed grants and takes `protocol.finalize` off every gremium role.
+    """
+    command.downgrade(alembic_cfg, "14ed7a68a641")
+    with engine.begin() as conn:
+        gid = conn.execute(
+            text("INSERT INTO gremium (name, slug) VALUES ('G', 'g-drop-meet') RETURNING id")
+        ).scalar_one()
+        for key, perms in (
+            ("vorstand", '["session.manage", "protocol.write"]'),
+            ("manager", '["session.manage"]'),
+            ("member", '["vote.cast"]'),
+            ("schrift", '["session.manage", "protocol.write"]'),
+        ):
+            conn.execute(
+                text(
+                    "INSERT INTO gremium_role (gremium_id, key, permissions) "
+                    "VALUES (:g, :k, CAST(:p AS jsonb))"
+                ),
+                {"g": gid, "k": key, "p": perms},
+            )
+        custom = conn.execute(
+            text("INSERT INTO role (key) VALUES ('sitzungsdienst') RETURNING id")
+        ).scalar_one()
+        conn.execute(
+            text(
+                "INSERT INTO role_permission (role_id, permission) VALUES "
+                "(:r, 'meeting.manage'), (:r, 'application.read')"
+            ),
+            {"r": custom},
+        )
+
+    def _gremium_perms(conn) -> dict[str, list[str]]:  # noqa: ANN001
+        rows = conn.execute(
+            text("SELECT key, permissions FROM gremium_role WHERE gremium_id = :g"),
+            {"g": gid},
+        ).all()
+        return {r[0]: list(r[1]) for r in rows}
+
+    def _dropped(conn) -> list[tuple[str, str]]:  # noqa: ANN001
+        return [
+            (r[0], r[1])
+            for r in conn.execute(
+                text(
+                    "SELECT r.key, rp.permission FROM role_permission rp "
+                    "JOIN role r ON r.id = rp.role_id WHERE rp.permission IN "
+                    "('meeting.manage', 'protocol.finalize', 'application.create') "
+                    "ORDER BY r.key, rp.permission"
+                )
+            ).all()
+        ]
+
+    command.upgrade(alembic_cfg, "head")
+    with engine.connect() as conn:
+        perms = _gremium_perms(conn)
+        dropped = _dropped(conn)
+        kept = conn.execute(
+            text("SELECT permission FROM role_permission WHERE role_id = :r"), {"r": custom}
+        ).scalars().all()
+    assert "protocol.finalize" in perms["vorstand"]
+    assert "protocol.finalize" in perms["manager"]
+    assert "protocol.finalize" not in perms["member"]
+    assert "protocol.finalize" not in perms["schrift"]
+    assert dropped == []
+    assert kept == ["application.read"]
+
+    # The downgrade restores the seed grants of the seeded roles.
+    command.downgrade(alembic_cfg, "14ed7a68a641")
+    with engine.connect() as conn:
+        perms = _gremium_perms(conn)
+        restored = _dropped(conn)
+    assert all("protocol.finalize" not in p for p in perms.values())
+    assert ("manager", "meeting.manage") in restored
+    assert ("admin", "protocol.finalize") in restored
+    assert ("protocol", "meeting.manage") in restored
+    # Lossy by design: a custom role does not get its key back.
+    assert all(key != "sitzungsdienst" for key, _ in restored)
+
+    # The upgrade runs again cleanly and adds the key exactly once.
+    command.upgrade(alembic_cfg, "head")
+    with engine.connect() as conn:
+        perms = _gremium_perms(conn)
+    assert perms["vorstand"].count("protocol.finalize") == 1

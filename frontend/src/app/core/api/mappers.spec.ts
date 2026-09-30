@@ -582,6 +582,7 @@ describe('mapMeeting permission flags', () => {
     expect(m.canManage).toBe(false);
     expect(m.canManageVotes).toBe(false);
     expect(m.canVote).toBe(false);
+    expect(m.canFinalize).toBe(false);
     expect(m.isProtokollant).toBe(false);
   });
 
@@ -601,6 +602,7 @@ describe('mapMeeting permission flags', () => {
       canManage: true,
       canManageVotes: true,
       canVote: true,
+      canFinalize: true,
     });
     expect(m.date).toBe('2026-06-20');
     expect(m.startTime).toBe('18:00');
@@ -611,6 +613,7 @@ describe('mapMeeting permission flags', () => {
     expect(m.canManage).toBe(true);
     expect(m.canManageVotes).toBe(true);
     expect(m.canVote).toBe(true);
+    expect(m.canFinalize).toBe(true);
   });
 });
 

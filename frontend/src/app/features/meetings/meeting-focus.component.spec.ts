@@ -59,6 +59,7 @@ function meeting(over: Partial<Meeting> = {}): Meeting {
     canWrite: true,
     canManageVotes: true,
     canVote: true,
+    canFinalize: true,
     ...over,
   };
 }
@@ -196,6 +197,12 @@ describe('MeetingFocusComponent', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Finalisieren & versenden' }));
       expect(on.finalize).toHaveBeenCalled();
       expect(screen.queryByRole('button', { name: 'Sitzung schließen' })).toBeNull();
+    });
+
+    it('hides the finalize retry without the finalize right and says why', async () => {
+      await setup({ meeting: meeting({ status: 'closed', canFinalize: false }) });
+      expect(screen.queryByRole('button', { name: 'Finalisieren & versenden' })).toBeNull();
+      expect(screen.getByText(/Gremien-Recht „Protokoll finalisieren“/)).toBeInTheDocument();
     });
   });
 

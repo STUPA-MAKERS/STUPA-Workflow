@@ -11,8 +11,10 @@ import { AuthService } from './auth.service';
  *    synchronously.
  * 2. If there is no session, the guard starts the OIDC login with a full redirect
  *    and cancels the navigation.
- * 3. If `route.data.permission` is set and the principal lacks it, the guard sends
- *    the user to the 403 page (`/forbidden`).
+ * 3. If `route.data.permission` (global) or `route.data.gremiumPermission` (a
+ *    gremium permission in any gremium, or the admin role) is set and the
+ *    principal holds none of them, the guard sends the user to the 403 page
+ *    (`/forbidden`).
  *
  * RBAC here is only UX. The server stays authoritative. The guard decides after it
  * loads the real principal. It never rejects before it checks the permissions.
@@ -31,9 +33,16 @@ export const authGuard: CanActivateFn = (route) => {
       }
       const permission = route.data['permission'] as string | string[] | undefined;
       const required = permission === undefined ? [] : ([] as string[]).concat(permission);
-      if (required.length > 0 && !auth.canAny(...required)) {
+      const gremiumPermission = route.data['gremiumPermission'] as string | string[] | undefined;
+      const gremiumRequired =
+        gremiumPermission === undefined ? [] : ([] as string[]).concat(gremiumPermission);
+      const gated = required.length > 0 || gremiumRequired.length > 0;
+      const allowed =
+        (required.length > 0 && auth.canAny(...required)) ||
+        gremiumRequired.some((p) => auth.canInAnyGremium(p));
+      if (gated && !allowed) {
         // A gremium member may see the meetings of that gremium without
-        // meeting.manage or protocol.write. The server also scopes and authorizes.
+        // session.manage or protocol.write. The server also scopes and authorizes.
         const allowCommittee = route.data['allowCommitteeMember'] === true;
         if (allowCommittee && auth.gremien().length > 0) {
           return true;

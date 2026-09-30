@@ -58,8 +58,12 @@ export class PageIndexService {
   private allowed(data: Record<string, unknown>): boolean {
     const permission = data['permission'] as string | string[] | undefined;
     const required = permission === undefined ? [] : ([] as string[]).concat(permission);
-    if (required.length === 0) return true;
-    if (this.auth.canAny(...required)) return true;
+    const gremiumPermission = data['gremiumPermission'] as string | string[] | undefined;
+    const gremiumRequired =
+      gremiumPermission === undefined ? [] : ([] as string[]).concat(gremiumPermission);
+    if (required.length === 0 && gremiumRequired.length === 0) return true;
+    if (required.length > 0 && this.auth.canAny(...required)) return true;
+    if (gremiumRequired.some((p) => this.auth.canInAnyGremium(p))) return true;
     if (data['allowCommitteeMember'] === true && this.auth.gremien().length > 0) return true;
     if (data['allowScopedBudgetView'] === true && this.auth.hasScopedBudgetView()) return true;
     return data['allowAuthenticated'] === true;

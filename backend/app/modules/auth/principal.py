@@ -36,6 +36,25 @@ class Principal:
         # permissions are. This is the single RBAC chokepoint.
         return "admin" in self.roles or perm in self.permissions
 
+    @property
+    def is_admin(self) -> bool:
+        """Tell if the principal holds the global `admin` role.
+
+        This flag does not apply the scope cap. Use `scope_allows` together with it,
+        or use `app.modules.admin.gremium_roles.admin_bypass`.
+        """
+        return "admin" in self.roles
+
+    def scope_allows(self, perm: str) -> bool:
+        """Tell if the OAuth scope cap lets `perm` through.
+
+        An unscoped session cookie lets every permission through. A scoped token lets
+        through only the permissions of its scope set. This check also caps the
+        gremium permissions (`session.manage`, `protocol.write`, `vote.manage`,
+        `protocol.finalize`), which do not go through `has`.
+        """
+        return self.scope_permissions is None or perm in self.scope_permissions
+
     def in_group(self, group: str) -> bool:
         return group in self.groups
 

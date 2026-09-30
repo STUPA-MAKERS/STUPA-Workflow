@@ -23,7 +23,6 @@ import type {
 /** Permission catalog (mirror of `app.shared.permissions.PERMISSION_CATALOGUE`). */
 export const MOCK_PERMISSIONS: string[] = [
   'application.read',
-  'application.create',
   'application.update',
   'application.transition',
   'application.manage',
@@ -32,7 +31,7 @@ export const MOCK_PERMISSIONS: string[] = [
   'flow.configure',
   'vote.manage',
   'vote.cast',
-  'meeting.manage',
+  'meeting.view_all',
   'protocol.manage',
   'protocol.write',
   'budget.structure',
@@ -117,13 +116,13 @@ export const MOCK_GREMIEN: Gremium[] = [
 export const MOCK_ROLES: Role[] = [
   { id: 'r-member', key: 'member', label: { de: 'Mitglied', en: 'Member' }, permissions: ['application.read', 'vote.cast'] },
   { id: 'r-referent', key: 'referent', label: { de: 'Referent:in', en: 'Officer' }, permissions: ['application.read', 'application.update', 'application.transition', 'vote.manage'] },
-  { id: 'r-vorstand', key: 'vorstand', label: { de: 'Vorstand', en: 'Board' }, permissions: ['application.read', 'budget.view', 'meeting.manage'] },
+  { id: 'r-vorstand', key: 'vorstand', label: { de: 'Vorstand', en: 'Board' }, permissions: ['application.read', 'budget.view', 'meeting.view_all'] },
   { id: 'r-admin', key: 'admin', label: { de: 'Administration', en: 'Administration' }, permissions: [...MOCK_PERMISSIONS] },
 ];
 
 /** The forced roles of each mock gremium (board, manager, member). */
 export const MOCK_GREMIUM_ROLES: GremiumRole[] = MOCK_GREMIEN.flatMap((g) => [
-  { id: `gr-${g.slug}-board`, gremiumId: g.id, key: 'board', name: { de: 'Vorstand', en: 'Board' }, forced: true, permissions: ['session.manage', 'vote.manage', 'vote.cast', 'protocol.write'] },
+  { id: `gr-${g.slug}-board`, gremiumId: g.id, key: 'board', name: { de: 'Vorstand', en: 'Board' }, forced: true, permissions: ['session.manage', 'vote.manage', 'vote.cast', 'protocol.write', 'protocol.finalize'] },
   { id: `gr-${g.slug}-manager`, gremiumId: g.id, key: 'manager', name: { de: 'Sitzungsleitung', en: 'Chair' }, forced: true, permissions: ['session.manage', 'vote.manage', 'vote.cast'] },
   { id: `gr-${g.slug}-member`, gremiumId: g.id, key: 'member', name: { de: 'Mitglied', en: 'Member' }, forced: true, permissions: ['vote.cast'] },
 ]);

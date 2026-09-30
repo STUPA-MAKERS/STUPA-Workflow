@@ -8,6 +8,7 @@ import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { Subject } from 'rxjs';
 import { EMPTY, of } from 'rxjs';
+import { ToastService } from '@stupa-makers/ui-kit';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { USE_MOCK_API } from '@core/api/api.config';
@@ -33,6 +34,7 @@ const MEETING: MeetingOutWire = {
   canWrite: true,
   canManageVotes: true,
   canVote: false,
+  canFinalize: true,
   votes: [
     {
       id: 'v-1',
@@ -82,6 +84,7 @@ const MEETING_MODEL: Meeting = {
   canWrite: true,
   canManageVotes: true,
   canVote: false,
+  canFinalize: true,
   votes: [
     {
       id: 'v-1', applicationId: 'app-1', agendaItemId: null, title: 'Antrag A',
@@ -128,6 +131,7 @@ function fakeAuth(perms: string[], userId: string | null = 'pr-1'): Partial<Auth
   return {
     can: (p: string) => set.has(p),
     canAny: (...p: string[]) => p.some((x) => set.has(x)),
+    isAdmin: (() => set.has('admin')) as unknown as AuthService['isAdmin'],
     userId: (() => userId) as unknown as AuthService['userId'],
     gremien: (() => []) as unknown as AuthService['gremien'],
     sessionManageGremien: (() => []) as unknown as AuthService['sessionManageGremien'],
@@ -159,7 +163,7 @@ async function setup(
     skipTimelineFlush?: boolean;
   } = {},
 ) {
-  const perms = opts.perms ?? ['meeting.manage', 'protocol.write'];
+  const perms = opts.perms ?? ['admin', 'protocol.write'];
   const userId = opts.userId === undefined ? 'pr-1' : opts.userId;
   const id = opts.id === undefined ? 'm-1' : opts.id;
   const ws = new FakeWs();
@@ -179,7 +183,7 @@ async function setup(
     ],
   });
   const http = view.fixture.debugElement.injector.get(HttpTestingController);
-  // The Gremium dropdown loads `/gremien` at start, only with meeting.manage.
+  // The Gremium dropdown loads `/gremien` at start, only for a meeting manager.
   http.match((r) => r.url.endsWith('/gremien')).forEach((req) => req.flush(opts.gremien ?? []));
   // The overview route loads the timeline: one cursor page each for past and upcoming.
   const isPast = (m: MeetingOutWire) => m.status === 'closed';
@@ -536,6 +540,24 @@ describe('MeetingsComponent', () => {
     expect(req.request.method).toBe('PATCH');
     expect(req.request.body).toEqual({ status: 'closed' });
     req.flush({ ...MEETING, status: 'closed' });
+    // With `canFinalize` the close finalizes: it saves the assembled protocol first.
+    expect(http.match('/api/protocols/p-1')).toHaveLength(1);
+  });
+
+  it('closes without finalizing when the gremium finalize right is missing', async () => {
+    const { http, fixture } = await setup();
+    flushLoad(http);
+    const bar = await screen.findByRole('toolbar', { name: 'Sitzungssteuerung' });
+    await userEvent.click(within(bar).getByRole('button', { name: 'Sitzung schließen' }));
+    const confirm = await screen.findByRole('dialog');
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Sitzung schließen' }));
+    http.expectOne('/api/meetings/m-1').flush({ ...MEETING, status: 'closed', canFinalize: false });
+    // No protocol save, no finalize: the protocol stays a draft.
+    expect(http.match('/api/protocols/p-1')).toHaveLength(0);
+    const toasts = fixture.debugElement.injector.get(ToastService).toasts();
+    expect(toasts.map((t) => t.message)).toContain(
+      'Finalisieren und Versenden braucht das Gremien-Recht „Protokoll finalisieren“. Das Protokoll bleibt bis dahin ein Entwurf.',
+    );
   });
 
   it('shows an error notice when the meeting fails to load', async () => {
@@ -1887,6 +1909,38 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.showOverview()).toBe(false);
     });
 
+    it('shows the overview to a meeting.view_all reader without a gremium', async () => {
+      const { fixture } = await setup({ id: null, perms: ['meeting.view_all'], meetings: [] });
+      const cmp = fixture.componentInstance as Cmp;
+      expect(cmp.showOverview()).toBe(true);
+      expect(cmp.showForbidden()).toBe(false);
+    });
+
+    it('loads and renders the timeline for a meeting.view_all reader without a gremium', async () => {
+      // The page and loadList() share one predicate. Before, loadList() returned early
+      // for this reader and the visible overview stayed empty.
+      const { http } = await setup({ id: null, perms: ['meeting.view_all'], skipTimelineFlush: true });
+      const reqs = http.match((r) => r.url.endsWith('/meetings/timeline') && r.method === 'GET');
+      expect(reqs.map((r) => r.request.params.get('direction')).sort()).toEqual(['past', 'upcoming']);
+      for (const req of reqs) {
+        const past = req.request.params.get('direction') === 'past';
+        req.flush({
+          items: past
+            ? [{ ...MEETING, id: 'p-9', title: 'Fremde Sitzung', status: 'closed' }]
+            : [{ ...MEETING, id: 'u-9', title: 'Kommende Sitzung', status: 'planned' }],
+          nextCursor: null,
+        });
+      }
+      expect(await screen.findByText('Fremde Sitzung')).toBeInTheDocument();
+      expect(screen.getByText('Kommende Sitzung')).toBeInTheDocument();
+    });
+
+    it('does not load the timeline for a user without any meeting read right', async () => {
+      const { http, fixture } = await setup({ id: null, perms: [], skipTimelineFlush: true });
+      expect(http.match((r) => r.url.endsWith('/meetings/timeline'))).toHaveLength(0);
+      expect((fixture.componentInstance as Cmp).showForbidden()).toBe(true);
+    });
+
     it('reflects per-meeting flags once a meeting is loaded', async () => {
       const { cmp } = await loaded();
       expect(cmp.canManage()).toBe(true);
@@ -1900,7 +1954,7 @@ describe('MeetingsComponent — methods', () => {
       const { fixture } = await setup({ id: null });
       const cmp = fixture.componentInstance as Cmp;
       expect(cmp.meeting()).toBeNull();
-      // canManage falls back to canManageAny (true, since meeting.manage).
+      // canManage falls back to canManageAny (true, since admin).
       expect(cmp.canManage()).toBe(true);
       expect(cmp.canWrite()).toBe(false);
       expect(cmp.canManageVotes()).toBe(false);
@@ -2209,11 +2263,12 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.filterGremien()).toEqual([]);
     });
 
-    it('restricts the create gremium dropdown to managed gremien without global manage', async () => {
+    it('restricts the create gremium dropdown to managed gremien for a non-admin', async () => {
       const managed = ['g-2'];
       const auth: Partial<AuthService> = {
         can: (p: string) => p === 'protocol.write',
         canAny: () => false,
+        isAdmin: (() => false) as unknown as AuthService['isAdmin'],
         userId: (() => 'pr-1') as unknown as AuthService['userId'],
         gremien: (() => []) as unknown as AuthService['gremien'],
         sessionManageGremien: (() => managed) as unknown as AuthService['sessionManageGremien'],
@@ -2239,11 +2294,9 @@ describe('MeetingsComponent — methods', () => {
         { id: 'g-1', name: 'A' },
         { id: 'g-2', name: 'B' },
       ]);
-      // protocol.write grants canWriteGlobal, so loadList fires. Answer the timeline
-      // requests.
-      http.match((r) => r.url.endsWith('/meetings/timeline')).forEach((req) =>
-        req.flush({ items: [], nextCursor: null }),
-      );
+      // `protocol.write` is a gremium right and never a global one, so it does not open
+      // the timeline: this stub has no Gremium and no meeting.view_all.
+      expect(http.match((r) => r.url.endsWith('/meetings/timeline'))).toHaveLength(0);
       const cmp = view.fixture.componentInstance as Cmp;
       expect(cmp.gremiumOptions().map((o) => o.value)).toEqual(['g-2']);
       http.verify();
@@ -2253,6 +2306,7 @@ describe('MeetingsComponent — methods', () => {
       const auth: Partial<AuthService> = {
         can: (p: string) => p === 'protocol.write',
         canAny: () => false,
+        isAdmin: (() => false) as unknown as AuthService['isAdmin'],
         userId: (() => 'pr-1') as unknown as AuthService['userId'],
         gremien: (() => []) as unknown as AuthService['gremien'],
         sessionManageGremien: (() => ['g-2']) as unknown as AuthService['sessionManageGremien'],
@@ -2604,7 +2658,7 @@ describe('MeetingsComponent — methods', () => {
           provideHttpClient(),
           provideHttpClientTesting(),
           { provide: USE_MOCK_API, useValue: true },
-          { provide: AuthService, useValue: fakeAuth(['meeting.manage', 'protocol.write']) },
+          { provide: AuthService, useValue: fakeAuth(['admin', 'protocol.write']) },
           { provide: WsService, useValue: ws },
           { provide: Router, useValue: routerStub() },
           { provide: ActivatedRoute, useValue: { paramMap: of(convertToParamMap({ id: 'm-1' })) } },

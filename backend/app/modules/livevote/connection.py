@@ -6,8 +6,9 @@ is the broker fan-out from the server to the client.
 
 Authentication at the handshake: the session cookie resolves to a principal.
 Without a valid cookie the handler closes with `4401`. The voter channel needs
-Gremium membership. The beamer channel needs `meeting.manage`. On a violation
-the handler sends `not_eligible` and closes with `4403`.
+Gremium membership. The beamer channel needs `session.manage` in the Gremium
+of the meeting, or the admin role. On a violation the handler sends
+`not_eligible` and closes with `4403`.
 
 The beamer is read-only. It receives only `meeting_state`, `vote_opened`,
 `vote_tally` and `vote_closed` through the filtered fan-out. A cast from the

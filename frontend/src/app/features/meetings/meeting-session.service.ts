@@ -92,7 +92,9 @@ export class MeetingSessionService implements OnDestroy {
   private channel: MeetingChannel | null = null;
 
   // Permission flags, per meeting where loaded. The backend checks them per Gremium.
-  readonly canManageAny = computed(() => this.auth.can('meeting.manage'));
+  /** The admin manages the meetings of every Gremium. Everybody else manages per
+   *  Gremium through `session.manage`, which the server reports as `canManage`. */
+  readonly canManageAny = computed(() => this.auth.isAdmin());
   readonly canManage = computed(() => this.meeting()?.canManage ?? this.canManageAny());
   readonly canWrite = computed(() => this.meeting()?.canWrite ?? false);
   readonly canManageVotes = computed(() => this.meeting()?.canManageVotes ?? false);
@@ -232,8 +234,14 @@ export class MeetingSessionService implements OnDestroy {
         this.meeting.set(updated);
         const proto = this.protocol();
         // The finalize step is implicit: render the PDF and mail it to the list.
+        // It needs the gremium permission `protocol.finalize`. Without it the
+        // protocol stays a draft for a holder of that right.
         if (proto && !proto.isLocked) {
-          this.finalize();
+          if (updated.canFinalize) {
+            this.finalize();
+          } else {
+            this.toast.show(this.i18n.translate('meetings.protocol.finalizeNeedsRight'), 'info');
+          }
         }
       },
       error: () => this.toast.error(this.i18n.translate('meetings.toast.actionFailed')),

@@ -80,7 +80,7 @@ async def get_meeting(meeting_id: str) -> dict:
 
 @group.tool
 async def create_meeting(meeting: S.MeetingCreate) -> dict:
-    """Create a meeting. Requires meeting.manage."""
+    """Create a meeting. Requires session.manage in the target gremium (or admin)."""
     return await api().post("/meetings", json=dump_create(meeting))
 
 
@@ -89,14 +89,17 @@ async def update_meeting(meeting_id: str, patch: S.MeetingPatch) -> dict:
     """Patch a meeting.
 
     The fields are `status` (planned, live or closed), `date`, `startTime`,
-    `protokollantId` and `activeApplicationId`. Requires meeting.manage.
+    `protokollantId` and `activeApplicationId`. Date, time and minute-taker need
+    session.manage in the meeting's gremium (or admin). Status and active application
+    need write access (session.manage or protocol.write in the gremium, or the
+    assigned minute-taker).
     """
     return await api().patch(f"/meetings/{meeting_id}", json=dump_patch(patch))
 
 
 @group.tool
 async def delete_meeting(meeting_id: str) -> dict:
-    """Delete a meeting. Requires meeting.manage."""
+    """Delete a meeting. Requires session.manage in the meeting's gremium (or admin)."""
     return await api().delete(f"/meetings/{meeting_id}")
 
 
@@ -112,7 +115,11 @@ async def set_attendance(
     principal_id: str,
     status: Literal["present", "excused", "absent"],
 ) -> dict:
-    """Set the attendance of a member for a meeting. Requires meeting.manage."""
+    """Set the attendance of a member for a meeting.
+
+    Requires write access to the meeting: session.manage or protocol.write in its
+    gremium, the assigned minute-taker, or admin.
+    """
     return await api().put(
         f"/meetings/{meeting_id}/attendance/{principal_id}", json={"status": status}
     )
@@ -127,7 +134,8 @@ async def add_agenda_item(
     """Add an agenda item to a meeting.
 
     Give EXACTLY ONE of `application_id` for an application item or `title` for a
-    free-text item. Requires meeting.manage.
+    free-text item. Requires write access to the meeting: session.manage
+    or protocol.write in its gremium, the assigned minute-taker, or admin.
     """
     return await api().post(
         f"/meetings/{meeting_id}/agenda",
@@ -145,7 +153,8 @@ async def update_agenda_item(
     """Update an agenda item.
 
     The `body` sets the markdown text. The `title` renames a free-text item. An
-    application item inherits its title. Requires meeting.manage.
+    application item inherits its title. Requires write access to the meeting: session.manage
+    or protocol.write in its gremium, the assigned minute-taker, or admin.
     """
     return await api().patch(
         f"/meetings/{meeting_id}/agenda/{item_id}",
@@ -155,13 +164,21 @@ async def update_agenda_item(
 
 @group.tool
 async def delete_agenda_item(meeting_id: str, item_id: str) -> dict:
-    """Remove an agenda item from a meeting. Requires meeting.manage."""
+    """Remove an agenda item from a meeting.
+
+    Requires write access to the meeting: session.manage
+    or protocol.write in its gremium, the assigned minute-taker, or admin.
+    """
     return await api().delete(f"/meetings/{meeting_id}/agenda/{item_id}")
 
 
 @group.tool
 async def reorder_agenda(meeting_id: str, item_ids: list[str]) -> dict:
-    """Reorder the agenda. Give `item_ids` in the desired order. Requires meeting.manage."""
+    """Reorder the agenda. Give `item_ids` in the desired order.
+
+    Requires write access to the meeting: session.manage
+    or protocol.write in its gremium, the assigned minute-taker, or admin.
+    """
     return await api().put(
         f"/meetings/{meeting_id}/agenda/order", json={"itemIds": item_ids}
     )
@@ -194,7 +211,8 @@ async def get_or_create_protocol(meeting_id: str) -> dict:
     """Create OR load the protocol of a meeting.
 
     The call is idempotent. A meeting holds exactly one protocol.
-    Requires meeting.manage.
+    Requires write access to the meeting: session.manage
+    or protocol.write in its gremium, the assigned minute-taker, or admin.
     """
     return await api().post(f"/meetings/{meeting_id}/protocol")
 
@@ -204,7 +222,8 @@ async def update_protocol(protocol_id: str, markdown: str) -> dict:
     """Update the markdown body of a protocol.
 
     The call gives a 409 while the protocol is final or rendering.
-    Requires meeting.manage.
+    Requires write access to the meeting: session.manage
+    or protocol.write in its gremium, the assigned minute-taker, or admin.
     """
     return await api().patch(f"/protocols/{protocol_id}", json={"markdown": markdown})
 
@@ -213,7 +232,8 @@ async def update_protocol(protocol_id: str, markdown: str) -> dict:
 async def embed_protocol_votes(protocol_id: str, vote_ids: list[str]) -> dict:
     """Append closed votes to the protocol as markdown snippets.
 
-    The call is idempotent per vote. Requires meeting.manage.
+    The call is idempotent per vote. Requires write access to the meeting: session.manage
+    or protocol.write in its gremium, the assigned minute-taker, or admin.
     """
     return await api().post(
         f"/protocols/{protocol_id}/votes", json={"voteIds": vote_ids}
@@ -227,7 +247,9 @@ async def finalize_protocol(protocol_id: str) -> dict:
     The call is ASYNC. It returns `status: "rendering"` while a worker renders the PDF
     and mails it to the Gremium. Re-fetch with `get_or_create_protocol(meeting_id)`
     until `status` is `final`. A fall back to `draft` means the render failed. Fix the
-    content and finalize again. The call is idempotent. Requires meeting.manage.
+    content and finalize again. The call is idempotent. Requires the write access to
+    the meeting AND the gremium permission protocol.finalize in its gremium (or
+    admin).
     """
     return await api().post(f"/protocols/{protocol_id}/finalize")
 

@@ -99,7 +99,7 @@ async def get_protocol(
 
     This is the reload and poll path. The read scope is the meeting view
     (`assert_can_read`): gremium members, pool substitutes, delegation
-    recipients, plus the global `meeting.view_all`, `meeting.manage` and admin.
+    recipients, plus the global `meeting.view_all` and admin.
     """
     await service.authorize_read_meeting(meeting_id, principal)
     return await service.get_by_meeting(meeting_id)
@@ -171,8 +171,9 @@ async def finalize_protocol(
 ) -> ProtocolOut:
     """Start the finalization: set `status=rendering` and enqueue `render_protocol`.
 
-    The caller needs write access AND `protocol.finalize`, either global or as
-    a gremium role. This is stricter than a write to the draft.
+    The caller needs write access AND the gremium permission `protocol.finalize`
+    in the gremium of the meeting (or the admin role). This is stricter than a
+    write to the draft.
 
     The call does not block, because the typst render runs in the arq worker.
     The worker sets `final` and sends the mail. A permanent failure falls back

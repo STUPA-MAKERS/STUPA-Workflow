@@ -25,7 +25,9 @@ from tests._support.flow_fakes import fake_session, result
 def _patch_permitted(
     monkeypatch: pytest.MonkeyPatch, permitted: set[object]
 ) -> None:
-    async def _fake(_session: object, _sub: str, _perm: str) -> set[object]:
+    async def _fake(
+        _session: object, _sub: str, _perm: str, _now: object = None
+    ) -> set[object]:
         return permitted
 
     monkeypatch.setattr(gremium_roles_mod, "gremium_ids_with_permission", _fake)
@@ -53,6 +55,19 @@ async def test_manage_gremium_role_ok(monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_permitted(monkeypatch, {gid})
     principal = Principal(sub="g")
     await VotingService(fake_session()).assert_can_manage_group(str(gid), None, principal)
+
+
+async def test_manage_gremium_role_capped_by_scope(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """F16: a token without `vote.manage` in its scope gets nothing from the role."""
+    gid = uuid4()
+    _patch_permitted(monkeypatch, {gid})
+    principal = Principal(sub="g", scope_permissions=frozenset({"application.read"}))
+    with pytest.raises(ForbiddenError):
+        await VotingService(fake_session()).assert_can_manage_group(
+            str(gid), None, principal
+        )
 
 
 async def test_manage_gremium_role_denied(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -87,18 +87,17 @@ export class MeetingDialogsService {
   readonly deletingMeeting = signal(false);
 
   constructor() {
-    // Only a meeting manager gets the create dropdown. Without the global
-    // `meeting.manage` permission the dropdown offers only the Gremien that the user
-    // manages through a Gremium role. The server answers 403 for every other Gremium.
-    const canCreate =
-      this.auth.can('meeting.manage') || this.auth.sessionManageGremien().length > 0;
+    // Only a meeting manager gets the create dropdown. An admin gets every Gremium.
+    // Everybody else gets only the Gremien that the user manages through a Gremium
+    // role with `session.manage`. The server answers 403 for every other Gremium.
+    const canCreate = this.auth.isAdmin() || this.auth.sessionManageGremien().length > 0;
     if (canCreate) {
       this.options
         .gremiumOptions()
         .pipe(takeUntilDestroyed())
         .subscribe({
           next: (opts) => {
-            if (this.auth.can('meeting.manage')) {
+            if (this.auth.isAdmin()) {
               this.gremiumOptions.set(opts);
               return;
             }

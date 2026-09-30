@@ -158,29 +158,13 @@ export class MeetingsComponent implements OnDestroy {
   readonly isProtokollant = this.session.isProtokollant;
   readonly isFollower = this.session.isFollower;
   readonly canEditProtocol = this.session.canEditProtocol;
-  /** Create needs global `meeting.manage` OR a manage role in at least one Gremium. */
+  /** Create needs the admin role OR a manage role in at least one Gremium. */
   readonly canCreate = computed(
     () => this.canManageAny() || this.auth.sessionManageGremien().length > 0,
   );
-  readonly canWriteGlobal = computed(() => this.auth.can('protocol.write'));
-  readonly inAnyCommittee = computed(() => this.auth.gremien().length > 0);
-  readonly inSubstitutePool = computed(() => this.auth.inSubstitutePool());
-  /** May see the (server-side filtered) overview timeline. */
-  readonly showOverview = computed(
-    () =>
-      this.canManageAny() ||
-      this.canWriteGlobal() ||
-      this.inAnyCommittee() ||
-      this.inSubstitutePool(),
-  );
-  readonly showForbidden = computed(
-    () =>
-      !this.detailMode() &&
-      !this.canManageAny() &&
-      !this.canWriteGlobal() &&
-      !this.inAnyCommittee() &&
-      !this.inSubstitutePool(),
-  );
+  /** May see the (server-side filtered) overview timeline. Same predicate as `loadList()`. */
+  readonly showOverview = this.timeline.canReadTimeline;
+  readonly showForbidden = computed(() => !this.detailMode() && !this.showOverview());
 
   readonly agenda = this.agendaSvc.agenda;
   readonly assignable = this.agendaSvc.assignable;

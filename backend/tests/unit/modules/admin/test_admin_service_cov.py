@@ -808,33 +808,33 @@ async def test_update_role_label_and_permissions() -> None:
     role = role_row()
     # Queue: the role, the permission delete, two audit results, the permissions after.
     s, _ = svc(
-        [res(), *audit_results(), res("application.read", "application.create")],
+        [res(), *audit_results(), res("application.read", "application.archive")],
         gets=[role],
     )
     out = await s.update_role(
         role.id,
         RoleUpdate(
             label={"de": "Neu"},
-            permissions=["application.read", "application.create"],
+            permissions=["application.read", "application.archive"],
         ),
         "admin",
     )
     assert role.name_i18n == {"de": "Neu"}
-    assert out.permissions == ["application.create", "application.read"]
+    assert out.permissions == ["application.archive", "application.read"]
 
 
 async def test_update_role_permissions_only_label_none() -> None:
     # A None label skips the branch 572->574. The payload sets the permissions.
     role = role_row(name_i18n={"de": "Alt"})
     s, _ = svc(
-        [res(), *audit_results(), res("application.create")],
+        [res(), *audit_results(), res("application.archive")],
         gets=[role],
     )
     out = await s.update_role(
-        role.id, RoleUpdate(permissions=["application.create"]), "admin"
+        role.id, RoleUpdate(permissions=["application.archive"]), "admin"
     )
     assert role.name_i18n == {"de": "Alt"}  # unchanged
-    assert out.permissions == ["application.create"]
+    assert out.permissions == ["application.archive"]
 
 
 async def test_update_role_no_permissions_change() -> None:
@@ -1201,9 +1201,9 @@ def test_role_create_rejects_unknown_permission() -> None:
 def test_role_create_accepts_known_and_dedups() -> None:
     role = RoleCreate(
         key="r",
-        permissions=["application.read", "application.read", "application.create"],
+        permissions=["application.read", "application.read", "application.archive"],
     )
-    assert role.permissions == ["application.read", "application.create"]
+    assert role.permissions == ["application.read", "application.archive"]
 
 
 def test_role_update_rejects_unknown_permission() -> None:

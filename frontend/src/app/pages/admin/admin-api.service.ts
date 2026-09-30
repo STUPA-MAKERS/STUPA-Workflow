@@ -155,7 +155,7 @@ export class AdminApiService {
    * Gremien master data as a dropdown source — GET `/gremien`. Any logged-in principal
    * can call it. No admin right is necessary. Unlike {@link listGremien}
    * (`/admin/gremien`, P `admin.gremien`), it also works for "create meeting" and for
-   * budget, where the actor only holds `meeting.manage` or `budget.*`.
+   * budget, where the actor only holds a gremium role or `budget.*`.
    */
   listGremienOptions(): Observable<Gremium[]> {
     if (this.mock) return of(structuredCopy(this.store.gremien));

@@ -276,7 +276,7 @@ async def test_finalize_renders_stores_and_mails() -> None:
     assert len(mail.sent) == 1
     assert mail.sent[0].to == ("a@x.de", "b@x.de")
     # The PDF travels as an attachment. The earlier link needed a
-    # login plus meeting.manage and was worthless for the recipients.
+    # login plus a meeting right and was worthless for the recipients.
     assert [a.filename for a in mail.sent[0].attachments] == ["protokoll.pdf"]
     assert mail.sent[0].attachments[0].content.startswith(b"%PDF")
 

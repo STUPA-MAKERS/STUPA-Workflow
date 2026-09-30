@@ -12,7 +12,6 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "application.read",
     # Read every application, independent of Gremium and ownership. This is global.
     "application.read_all",
-    "application.create",
     "application.transition",
     # Force an application into ANY state directly. This bypasses the flow guards and
     # the transitions. The override is audit-sensitive: the log records every use as
@@ -39,14 +38,17 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "flow.configure",
     "vote.cast",
     "vote.manage",
-    "meeting.manage",
     # A global READ permission that only adds. The holder sees every meeting across all
     # Gremien: timeline, list, detail, agenda, protocol and vote results. The holder
     # never writes and never votes.
     "meeting.view_all",
-    "protocol.finalize",
-    # Delete a meeting that has a finalized protocol. This is separate from
-    # meeting.manage. The audit log records each delete as meeting_delete.
+    # Meeting management, protocol writing and protocol finalization are NOT in
+    # this catalog. They are gremium permissions (`session.manage`,
+    # `protocol.write`, `protocol.finalize`) of the gremium role catalog in
+    # `app.modules.admin.gremium_roles`.
+    # Delete a meeting that has a finalized protocol. This is separate from the
+    # gremium permission session.manage. The audit log records each delete as
+    # meeting_delete.
     "meeting.delete_finalized",
     "budget.view",
     "budget.structure",

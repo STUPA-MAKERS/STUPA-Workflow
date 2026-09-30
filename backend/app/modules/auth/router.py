@@ -217,7 +217,8 @@ async def me(
         permissions=sorted(principal.permissions),
         groups=sorted(principal.groups),
         gremien=await _gremien_for(db, principal.sub),
-        session_manage_gremien=await _session_manage_gremien(db, principal.sub),
+        session_manage_gremien=await _session_manage_gremien(db, principal),
+        gremium_permissions=await _gremium_permissions(db, principal),
         has_scoped_budget_view=await _has_scoped_budget_view(db, principal.sub),
         in_substitute_pool=await _in_substitute_pool(db, principal.sub),
     )
@@ -258,17 +259,36 @@ async def _has_scoped_budget_view(db: DbSession, sub: str) -> bool:
     return hit is not None
 
 
-async def _session_manage_gremien(db: DbSession, sub: str) -> list[UUID]:
-    """Return the Gremien that `sub` manages through a gremium role (`session.manage`).
+async def _session_manage_gremien(db: DbSession, principal: Principal) -> list[UUID]:
+    """Return the Gremien that the principal manages through a gremium role.
 
-    This reads the same source as `MeetingService.can_manage`. The frontend gate for
-    "create meeting" and the server decision therefore stay congruent.
+    The gremium role must hold `session.manage`. This reads the same scope-capped
+    source as `MeetingService.can_manage`. The frontend gate for "create meeting"
+    and the server decision therefore stay congruent.
     """
-    from app.modules.admin.gremium_roles import gremium_ids_with_permission
+    from app.modules.admin.gremium_roles import gremium_ids_for
 
-    return sorted(
-        await gremium_ids_with_permission(db, sub, "session.manage"), key=str
-    )
+    return sorted(await gremium_ids_for(db, principal, "session.manage"), key=str)
+
+
+async def _gremium_permissions(
+    db: DbSession, principal: Principal
+) -> dict[UUID, list[str]]:
+    """Return the gremium permissions of the principal per Gremium.
+
+    Only the active memberships count. The OAuth scope cap removes each key that
+    the token scope does not let through. A Gremium without a remaining key stays
+    in the map with an empty list, because the membership itself still counts.
+    """
+    from app.modules.admin.gremium_roles import GREMIUM_PERMISSIONS, active_gremium_roles
+
+    out: dict[UUID, list[str]] = {}
+    for gid, role in await active_gremium_roles(db, principal.sub):
+        held = set(role.permissions or [])
+        out[gid] = [
+            p for p in GREMIUM_PERMISSIONS if p in held and principal.scope_allows(p)
+        ]
+    return out
 
 
 async def _gremien_for(db: DbSession, sub: str) -> list[GremiumRef]:

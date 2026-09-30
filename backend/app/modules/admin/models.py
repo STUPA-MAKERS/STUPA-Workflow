@@ -141,7 +141,7 @@ class GremiumRole(UUIDPkMixin, Base):
     key: Mapped[str] = mapped_column(Text)
     name_i18n: Mapped[dict] = mapped_column(JSONB, server_default="{}")
     # Granular meeting-domain permissions of this role, as a list of keys:
-    # session.manage, vote.manage, vote.cast, protocol.write.
+    # session.manage, vote.manage, vote.cast, protocol.write, protocol.finalize.
     permissions: Mapped[list] = mapped_column(JSONB, server_default="[]")
 
     __table_args__ = (

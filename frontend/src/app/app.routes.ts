@@ -5,7 +5,8 @@ import { ShellComponent } from './layout/shell.component';
 
 /**
  * Routing skeleton. `authGuard` protects the OIDC areas. Some areas also need an RBAC
- * permission (`data.permission`).
+ * permission: a global one (`data.permission`) or a gremium one in any gremium
+ * (`data.gremiumPermission`).
  */
 export const routes: Routes = [
   {
@@ -103,14 +104,15 @@ export const routes: Routes = [
       {
         // Read-only beamer view for the projector. Declared before `vote/:id`.
         path: 'voting/beamer',
-        data: { title: 'voting.beamer.heading', permission: 'meeting.manage' },
+        // The beamer WebSocket needs `session.manage` in the gremium of the meeting.
+        data: { title: 'voting.beamer.heading', gremiumPermission: 'session.manage' },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./features/voting/beamer.component').then((m) => m.BeamerComponent),
       },
       {
         path: 'voting/beamer/:id',
-        data: { title: 'voting.beamer.heading', permission: 'meeting.manage' },
+        data: { title: 'voting.beamer.heading', gremiumPermission: 'session.manage' },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./features/voting/beamer.component').then((m) => m.BeamerComponent),
@@ -137,12 +139,15 @@ export const routes: Routes = [
       },
       {
         path: 'meetings',
-        // A Gremium member can reach their own meetings without meeting.manage.
-        // `protocol.write` is NOT listed: it is a GREMIUM-role permission and never
-        // enters the global permission set, so it could never match here.
+        // A Gremium member can reach their own meetings without session.manage.
+        // `session.manage` is a GREMIUM-role permission, so it goes through
+        // `gremiumPermission` and never through the global `permission` list.
+        // `meeting.view_all` is the global read right: the server shows its holder
+        // the meetings of every Gremium, also without a membership.
         data: {
           title: 'nav.meetings',
-          permission: ['meeting.manage'],
+          permission: ['meeting.view_all'],
+          gremiumPermission: ['session.manage'],
           allowCommitteeMember: true,
         },
         canActivate: [authGuard],
@@ -152,12 +157,12 @@ export const routes: Routes = [
       {
         path: 'meetings/:id',
         // `allowAuthenticated`: a delegation recipient can be neither a member nor
-        // permitted. The server scopes the meeting view. `protocol.write` is a
-        // GREMIUM-role permission and never matches globally, so it is not listed.
+        // permitted. The server scopes the meeting view.
         data: {
           title: 'meetings.detailCrumb',
           parent: ['meetings'],
-          permission: ['meeting.manage'],
+          permission: ['meeting.view_all'],
+          gremiumPermission: ['session.manage'],
           allowCommitteeMember: true,
           allowAuthenticated: true,
           wide: true,

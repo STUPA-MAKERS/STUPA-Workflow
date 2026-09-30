@@ -38,7 +38,8 @@ description: Angular 20 standalone SPA for STUPA-Workflow — apply wizard, meet
 
 **Conventions & gotchas:**
 - Standalone components, `OnPush`, signals. Use **separate `.html`/`.scss` files** (no inline templates). Components use **only Semantic tokens** (`--color-*`), never Primitives (`--c-*`). Add a primitive first, then map it per theme. Theme goes on `<html>` as `data-theme`.
-- Routes are lazy + permission-gated: set `data.permission` (string or array → OR), plus `allowCommitteeMember`/`allowScopedBudgetView`/`allowAuthenticated` to widen. Missing permission → `/forbidden`. The backend also enforces RBAC. The guard is UX only.
+- Routes are lazy + permission-gated: set `data.permission` (global keys, string or array → OR) and/or `data.gremiumPermission` (gremium keys such as `session.manage`, held in ANY gremium, or admin), plus `allowCommitteeMember`/`allowScopedBudgetView`/`allowAuthenticated` to widen. Missing permission → `/forbidden`. The backend also enforces RBAC. The guard is UX only.
+- Gremium rights never sit in `principal.permissions`, so `auth.can('session.manage')` is always false for a non-admin. Use `auth.canInGremium(gid, perm)` / `auth.canInAnyGremium(perm)` (from `/auth/me` `gremium_permissions`) or, per meeting, the server flags `canManage`/`canWrite`/`canManageVotes`/`canFinalize`. `auth.isAdmin()` replaces the former global `meeting.manage` check.
 - Never show raw UUIDs in UI — resolve to names server-side ([[no-uuids-in-ui]]). Use the global `.empty-state` utility for empty tables/lists ([[empty-state-convention]]).
 - The loading overlay is **GET-driven**. Mutations, polls and typeahead opt out with the `X-Skip-Loading` header or `skipLoading()` ([[loading-overlay-convention]]). Toasts go through `ToastService`.
 - All errors come back as `application/problem+json` (`ProblemDetail`). Show them with a toast.

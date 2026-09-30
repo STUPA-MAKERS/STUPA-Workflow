@@ -95,6 +95,11 @@ class _FakeMeetingService:
         # through the group.
         return "admin" in principal.roles or principal.in_group(str(gremium_id))
 
+    async def can_manage(self, gremium_id: UUID, principal: Principal) -> bool:
+        # `session.manage` in the gremium. The fake mirrors it through the group
+        # `manage:<gremium id>`.
+        return "admin" in principal.roles or principal.in_group(f"manage:{gremium_id}")
+
     async def is_participant(
         self, _meeting_id: UUID, gremium_id: UUID, principal: Principal
     ) -> bool:
@@ -311,14 +316,33 @@ def test_malformed_json_frame_does_not_crash_connection() -> None:
         assert _recv(ws)["type"] == "meeting_state"
 
 
-# Beamer stream: read only, needs the meeting.manage permission
+# Beamer stream: read only, needs session.manage in the gremium of the meeting
 def _beamer() -> Principal:
-    return Principal(sub="adm", permissions={"meeting.manage"}, groups=set())
+    return Principal(sub="chair", groups={str(_GREMIUM), f"manage:{_GREMIUM}"})
 
 
 def test_beamer_requires_manage_permission() -> None:
     meeting = _meeting()
     app, _, _ = _build(meeting=meeting, principal=_voter(groups=set()))
+    client = TestClient(app)
+    with client.websocket_connect(_url(meeting) + "/beamer") as ws:
+        assert _recv(ws) == {"type": "error", "code": "not_eligible"}
+
+
+def test_beamer_refuses_a_member_without_session_manage() -> None:
+    """A plain member of the gremium follows the voter channel, not the beamer."""
+    meeting = _meeting()
+    app, _, _ = _build(meeting=meeting, principal=_voter())
+    client = TestClient(app)
+    with client.websocket_connect(_url(meeting) + "/beamer") as ws:
+        assert _recv(ws) == {"type": "error", "code": "not_eligible"}
+
+
+def test_beamer_refuses_session_manage_of_another_gremium() -> None:
+    """`session.manage` counts only in the gremium of the meeting (4403 otherwise)."""
+    meeting = _meeting()
+    other = Principal(sub="chair", groups={f"manage:{uuid4()}"})
+    app, _, _ = _build(meeting=meeting, principal=other)
     client = TestClient(app)
     with client.websocket_connect(_url(meeting) + "/beamer") as ws:
         assert _recv(ws) == {"type": "error", "code": "not_eligible"}

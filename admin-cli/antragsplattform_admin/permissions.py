@@ -13,7 +13,6 @@ from __future__ import annotations
 PERMISSION_CATALOGUE: tuple[str, ...] = (
     "application.read",
     "application.read_all",
-    "application.create",
     "application.transition",
     "application.manage",
     "application.edit_any",
@@ -21,9 +20,7 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "flow.configure",
     "vote.cast",
     "vote.manage",
-    "meeting.manage",
     "meeting.view_all",
-    "protocol.finalize",
     "meeting.delete_finalized",
     "budget.view",
     "budget.structure",

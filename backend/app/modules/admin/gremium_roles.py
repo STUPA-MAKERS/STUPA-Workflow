@@ -27,6 +27,7 @@ from app.modules.admin.schemas import (
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import AuditService
 from app.modules.auth.models import Principal as PrincipalRow
+from app.modules.auth.principal import Principal as AuthPrincipal
 from app.shared.errors import ConflictError, NotFoundError
 
 # Granular per-gremium-role permissions of the meeting domain. The global
@@ -36,11 +37,16 @@ from app.shared.errors import ConflictError, NotFoundError
 #   vote.manage     — open/close votes
 #   vote.cast       — vote in meeting votes
 #   protocol.write  — assignable as minute-taker / write the protocol
+#   protocol.finalize — finalize and send the protocol (together with the
+#                     write access to the meeting)
+# An OAuth token caps these permissions through its scope. See
+# ``gremium_ids_for``.
 GREMIUM_PERMISSIONS: tuple[str, ...] = (
     "session.manage",
     "vote.manage",
     "vote.cast",
     "protocol.write",
+    "protocol.finalize",
 )
 _ALL_PERMS: list[str] = list(GREMIUM_PERMISSIONS)
 
@@ -96,6 +102,37 @@ async def gremium_ids_with_permission(
         for gid, role in await active_gremium_roles(session, sub, now)
         if perm in (role.permissions or [])
     }
+
+
+async def gremium_ids_for(
+    session: AsyncSession,
+    principal: AuthPrincipal,
+    perm: str,
+    now: datetime | None = None,
+) -> set[UUID]:
+    """Return the gremium ids where ``principal`` can use ``perm``, scope-capped.
+
+    Use this function on every path that acts for a logged-in principal. A scoped
+    OAuth token gets the empty set when its scope does not contain ``perm``. Thus a
+    ``read`` token cannot use ``session.manage`` or ``protocol.write``, whatever the
+    gremium roles of its owner are.
+
+    The sub-based ``gremium_ids_with_permission`` stays for the system and roster
+    paths that have no request principal (principal resolution, quorum count,
+    delegation eligibility, mail recipients).
+    """
+    if not principal.scope_allows(perm):
+        return set()
+    return await gremium_ids_with_permission(session, principal.sub, perm, now)
+
+
+def admin_bypass(principal: AuthPrincipal, perm: str) -> bool:
+    """Tell if the admin role lets ``principal`` use ``perm`` in every gremium.
+
+    The bypass applies the scope cap: an admin token without ``perm`` in its scope
+    does not get it.
+    """
+    return principal.is_admin and principal.scope_allows(perm)
 
 
 async def gremium_member_ids(
