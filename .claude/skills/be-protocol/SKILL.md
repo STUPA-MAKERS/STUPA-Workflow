@@ -23,16 +23,16 @@ description: Protocol — a Markdown editor backing per meeting, embedded vote s
 - Migration 0001 (the baseline) creates the tables via `Base.metadata.create_all`, idempotently on both a fresh and an existing schema.
 
 **API surface:**
-- `POST /api/meetings/{meeting_id}/protocol` — create OR load, idempotent. It answers 409 while the meeting is still `planned`, because the service creates the protocol when the meeting starts, not before. `meeting.manage`.
-- `GET /api/meetings/{meeting_id}/protocol` — read, 404 if none. The frontend polls this path during a background render. `meeting.manage` OR `meeting.view_all`.
-- `PATCH /api/protocols/{protocol_id}` — update the Markdown body. It answers 409 when the status is final or rendering. `meeting.manage`.
-- `POST /api/protocols/{protocol_id}/votes` — embed votes as snippets (idempotent). `meeting.manage`.
-- `POST /api/protocols/{protocol_id}/finalize` — set `rendering` and enqueue `render_protocol`. Without Redis it renders synchronously. The call is idempotent. `protocol.finalize`.
-- `GET /api/protocols/{protocol_id}/pdf` — stream the internal PDF bytes server-side. `meeting.manage` OR `meeting.view_all`.
+- `POST /api/meetings/{meeting_id}/protocol` — create OR load, idempotent. It answers 409 while the meeting is still `planned`, because the service creates the protocol when the meeting starts, not before. write access (`MeetingService.can_write`: `session.manage` or `protocol.write` in the Gremium, the assigned protokollant, or admin).
+- `GET /api/meetings/{meeting_id}/protocol` — read, 404 if none. The frontend polls this path during a background render. read access (`assert_can_read`: Gremium member, pool substitute, delegation recipient, `meeting.view_all`, admin).
+- `PATCH /api/protocols/{protocol_id}` — update the Markdown body. It answers 409 when the status is final or rendering. Write access.
+- `POST /api/protocols/{protocol_id}/votes` — embed votes as snippets (idempotent). Write access.
+- `POST /api/protocols/{protocol_id}/finalize` — set `rendering` and enqueue `render_protocol`. Without Redis it renders synchronously. The call is idempotent. `MeetingService.can_finalize`: write access AND the GREMIUM permission `protocol.finalize` in the Gremium of the meeting (or admin). Otherwise 403 `Missing permission(s): protocol.finalize`.
+- `GET /api/protocols/{protocol_id}/pdf` — stream the internal PDF bytes server-side. Read access.
 - `GET /api/protocols/{protocol_id}/pdf/public` — stream the redacted public variant (404 unless a non-public agenda item exists). Same read perms.
 
 **Conventions & gotchas:**
-- **RBAC server-side, fail-closed.** Write needs `meeting.manage`. Finalize has its own permission `protocol.finalize` (#6). Read also accepts `meeting.view_all`. A global permission gates the reads, with no per-gremium scope check.
+- **RBAC server-side, fail-closed, per Gremium.** The service delegates every check to `MeetingService` (`can_write`, `can_finalize`, `assert_can_read`), so the protocol and the live stack share one rule and the OAuth scope cap. There is no global `meeting.manage` or `protocol.finalize` any more (migration `3a0b9672fcba`, decisions O2/O7). The forced Gremium roles `vorstand` and `manager` hold `protocol.finalize`; a custom role with `session.manage` but without it can write but gets 403 on finalize. The meeting payload carries `canFinalize`, and the frontend auto-finalizes on close only when it is true.
 - **Source of truth for the body is the per-agenda-item editor** when agenda items exist: `_assemble_from_agenda` stitches each `MeetingAgendaItem.body` (with `demote_headings`) + its non-cancelled `Vote` tally snippets. It falls back to the free-edited `protocol.markdown` only when the meeting has zero agenda items.
 - **Agenda item headings are top-level `#` with NO "TOP n:" prefix** — the renderer numbers the sections automatically as "TOP 1", "TOP 2". The builder demotes body headings one level, so the renderer does not count them as new agenda items.
 - **Public vs internal (dual render):** if any agenda item has `non_public=True`, finalize renders BOTH a full internal PDF and a redacted public PDF. The redacted variant replaces the non-public agenda item bodies and votes with a placeholder and keeps the heading and the numbering. Only the **public** variant goes to the mailing list. Otherwise finalize renders one internal PDF and mails it.
