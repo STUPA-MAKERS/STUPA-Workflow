@@ -15,7 +15,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
-from sqlalchemy import Engine, select
+from sqlalchemy import Engine, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.modules.admin.schemas import FlowVersionCreate
@@ -133,6 +133,52 @@ async def test_activation_points_the_deadline_at_the_new_version(
     assert after.due_at == due
     # Same due time: no second reminder.
     assert after.reminded_at == reminded
+
+
+async def test_activation_keeps_a_relative_changed_deadline(
+    session: AsyncSession,
+) -> None:
+    """A flow edit is no change of the application.
+
+    The remap must not set `updated_at` to the activation time. Otherwise every
+    `relative_changed` deadline moves later and the applicant gets a second reminder.
+    """
+    key = await _policy(session, kind="relative_changed", offset_days=5)
+    v1 = await _save(session, _graph(key))
+    app = await _application(session, v1)
+    changed = datetime.now(UTC) - timedelta(days=2)
+    await session.execute(
+        update(Application).where(Application.id == app.id).values(updated_at=changed)
+    )
+    await session.commit()
+    await session.refresh(app)
+    review = (
+        await session.scalars(
+            select(State).where(State.flow_version_id == v1, State.key == "review")
+        )
+    ).one()
+    await FlowService(session).schedule_state_deadline(app, review)
+    before = await _deadline(session, app.id)
+    assert before.due_at == changed + timedelta(days=5)
+    reminded = datetime.now(UTC)
+    before.reminded_at = reminded
+    await session.commit()
+
+    v2 = await _save(session, _graph(key, label="Prüfung neu"))
+
+    moved = (
+        await session.scalars(
+            select(Application)
+            .where(Application.id == app.id)
+            .execution_options(populate_existing=True)
+        )
+    ).one()
+    assert moved.flow_version_id == v2
+    assert moved.updated_at == changed
+    after = await _deadline(session, app.id)
+    assert after.due_at == changed + timedelta(days=5)
+    assert after.reminded_at == reminded
+    assert after.action_on_pass == {"transitionId": await _transition_id(session, v2)}
 
 
 async def test_consumed_expired_deadline_stays_consumed(session: AsyncSession) -> None:

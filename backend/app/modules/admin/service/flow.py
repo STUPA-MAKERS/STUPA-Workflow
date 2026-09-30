@@ -195,6 +195,9 @@ class FlowOps(ConfigServiceBase):
                 )
             )
 
+        # The remap keeps `updated_at` unchanged. A flow edit does not change the
+        # application. Without the explicit value, `onupdate=func.now()` sets the
+        # activation time, and every `relative_changed` deadline moves later.
         for app_id, key in app_keys.items():
             await self.session.execute(
                 update(Application)
@@ -202,12 +205,17 @@ class FlowOps(ConfigServiceBase):
                 .values(
                     current_state_id=id_by_key.get(key, initial_id),
                     flow_version_id=version.id,
+                    updated_at=Application.updated_at,
                 )
             )
         await self.session.execute(
             update(Application)
             .where(Application.current_state_id.is_(None))
-            .values(current_state_id=initial_id, flow_version_id=version.id)
+            .values(
+                current_state_id=initial_id,
+                flow_version_id=version.id,
+                updated_at=Application.updated_at,
+            )
         )
         await self._move_state_deadlines(app_keys, state_by_key, initial_state)
 
