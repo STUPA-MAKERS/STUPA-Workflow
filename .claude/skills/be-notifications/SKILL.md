@@ -1,11 +1,11 @@
 ---
 name: be-notifications
-description: Email notifications backend — Jinja2 SandboxedEnvironment mail templates (i18n DE/EN, builtin catalog + DB overrides), per-user opt-out preferences (NOTIFICATION_KINDS), recipient resolution (group/role/gremium/applicant/email/permission). Also branded HTML layout, arq enqueue + idempotency keys, flow notify/task dispatch, comment/role/delegation/meeting/privacy auto-mails, magic-link. Use when working on mail templates, notification rules, recipients, preferences, /api/notifications, /api/admin/mail-templates, or send_mail dispatch in backend/app/modules/notifications.
+description: Email notifications backend — Jinja2 SandboxedEnvironment mail templates (i18n DE/EN, builtin catalog + DB overrides), per-user opt-out preferences (NOTIFICATION_KINDS), recipient resolution (group/role/gremium/applicant/email/permission). Also branded HTML layout, arq enqueue + idempotency keys, flow notify/task dispatch, comment/delegation/meeting/privacy auto-mails, magic-link. Use when working on mail templates, notification rules, recipients, preferences, /api/notifications, /api/admin/mail-templates, or send_mail dispatch in backend/app/modules/notifications.
 ---
 
 # Notifications (mail) — `backend/app/modules/notifications`
 
-**Does:** Renders i18n mail templates (Jinja2 sandbox, DE/EN) into branded HTML/text and enqueues them to an arq worker for async SMTP delivery. It drives every platform email — flow status/task notices, comment/role/delegation/meeting/privacy auto-mails, task reminders, magic-link — with per-user opt-out preferences, recipient resolution, and idempotent de-duplication.
+**Does:** Renders i18n mail templates (Jinja2 sandbox, DE/EN) into branded HTML/text and enqueues them to an arq worker for async SMTP delivery. It drives every platform email — flow status/task notices, comment/delegation/meeting/privacy auto-mails, task reminders, magic-link — with per-user opt-out preferences, recipient resolution, and idempotent de-duplication.
 
 **Key files:**
 - `service.py` — `NotificationService`: template CRUD + preview, preferences merge/upsert, `handle_notify_action` (flow `notify`), `send_kind_mail` (generic), `send_magic_link`, `filter_recipients_by_preference`. `_enqueue` drops silently when the queue is None (no Redis).
@@ -18,8 +18,8 @@ description: Email notifications backend — Jinja2 SandboxedEnvironment mail te
 - `queue.py` — `MailQueue` protocol. `ArqMailQueue` (enqueues the `send_mail` job, `_job_id = idempotency_key` → dedup) or `DirectMailQueue` (inline, tests).
 - `provider.py` — best-effort arq pool lifecycle. `mail_queue_from_pool` returns None when there is no Redis.
 - `layout.py` — `render_layout` branded HTML wrapper + per-kind footer reason text + `text_to_html`/`_linkify`.
-- `action_dispatcher.py` — `NotificationActionDispatcher` implements the flow `ActionDispatcher`. It handles `notify` + `taskNotify` and logs other action types.
-- `auto.py` — `AutoMailer` background best-effort mails: meeting created, role assigned/revoked, delegation granted/revoked.
+- `action_dispatcher.py` — `NotificationActionDispatcher` implements the flow `ActionDispatcher`. It handles `notify` + `taskNotify` and logs other action types. `flow.dispatch.build_worker_dispatcher` builds it for the API and the worker.
+- `auto.py` — `AutoMailer` background best-effort mails: meeting created, delegation granted/revoked. The role mails (`role_assigned`/`role_revoked`) are gone: since the OIDC-only memberships no route assigns a role, so nothing sent them (F10).
 - `comments.py` — `send_comment_notifications` (applicant↔team, #4-1).
 - `privacy.py` — GDPR erasure mails (requested/executed/rejected).
 - `models.py` — SQLAlchemy tables. `router.py`/`schemas.py` — API + camelCase DTOs.
@@ -29,9 +29,9 @@ description: Email notifications backend — Jinja2 SandboxedEnvironment mail te
 - `notification_preference` (`NotificationPreference`): PK `(principal_id, kind)`, `enabled`. Opt-out store: the table holds only deviations from the all-enabled default. `kind ∈ NOTIFICATION_KINDS`.
 - `notification_settings` (`NotificationSettings`): single row (`CheckConstraint id=1`), `task_reminder_enabled`, `task_reminder_after_days` (≥1), `task_reminder_repeat_days` (≥0, 0=once per state stay).
 - `task_reminder_log` (`TaskReminderLog`): PK `application_id`, `status_event_id` (binds the reminder to a state stay, a state change restarts the count), `reminded_at`.
-- `NOTIFICATION_KINDS`: status_update, comment, task, task_reminder, meeting, vote, role_change, delegation, protocol, deadline, privacy.
+- `NOTIFICATION_KINDS`: status_update, comment, task, task_reminder, meeting, delegation, protocol, deadline, privacy. The kinds `vote` and `role_change` are removed, because no code sent them (F10). Migration `1a9feecb23a5` deleted their stored preferences and the `role_assigned`/`role_revoked` overrides. A save of them gives 422.
 - Recipient spec kinds: `group` (oidc_groups), `role` (active RoleAssignment), `gremium` (active members), `applicant` (non-anonymized applicant email), `email` (literal), `permission` (holders of a permission, admin role always counts).
-- Mail template keys (catalog): status_update, task_new, task_reminder, deadline_approaching, comment_applicant, comment_team, meeting_created, role_assigned, role_revoked, delegation_granted, delegation_revoked, magic_link, erasure_requested, erasure_executed, erasure_rejected.
+- Mail template keys (catalog): status_update, task_new, task_reminder, deadline_approaching, comment_applicant, comment_team, meeting_created, delegation_granted, delegation_revoked, magic_link, erasure_requested, erasure_executed, erasure_rejected.
 
 **API surface:**
 - `GET /api/notifications/preferences` — own effective switches (full catalog, default on). Any logged-in principal.
