@@ -39,12 +39,23 @@ class _FakeService:
             )
         ]
 
-    async def fire(self, application_id, transition_id, principal, *, note=None):  # noqa: ANN001
+    async def fire(  # noqa: ANN201
+        self,
+        application_id,  # noqa: ANN001
+        transition_id,  # noqa: ANN001
+        principal,  # noqa: ANN001
+        *,
+        note=None,  # noqa: ANN001
+        meeting_id=None,  # noqa: ANN001
+        non_public=False,  # noqa: ANN001
+    ):
         self.fired = {
             "application_id": application_id,
             "transition_id": transition_id,
             "principal": principal,
             "note": note,
+            "meeting_id": meeting_id,
+            "non_public": non_public,
         }
         return TransitionResult(
             newStateId=uuid4(), statusEventId=uuid4(), dispatchedActions=["notify"]
@@ -132,6 +143,39 @@ def test_fire_ok_passes_note(
     assert fake_service.fired["application_id"] == app_id
     assert fake_service.fired["transition_id"] == transition_id
     assert fake_service.fired["note"] == "freigegeben"
+
+
+def test_fire_passes_meeting_and_visibility(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    _as_principal(app, "application.transition")
+    meeting_id = uuid4()
+    r = client.post(
+        f"/api/applications/{uuid4()}/transition",
+        json={
+            "transitionId": str(uuid4()),
+            "meetingId": str(meeting_id),
+            "nonPublic": True,
+        },
+    )
+    assert r.status_code == 200
+    assert fake_service.fired is not None
+    assert fake_service.fired["meeting_id"] == meeting_id
+    assert fake_service.fired["non_public"] is True
+
+
+def test_fire_without_meeting_defaults(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    _as_principal(app, "application.transition")
+    r = client.post(
+        f"/api/applications/{uuid4()}/transition",
+        json={"transitionId": str(uuid4())},
+    )
+    assert r.status_code == 200
+    assert fake_service.fired is not None
+    assert fake_service.fired["meeting_id"] is None
+    assert fake_service.fired["non_public"] is False
 
 
 def test_fire_rejects_bad_body_422(app: FastAPI, client: TestClient) -> None:

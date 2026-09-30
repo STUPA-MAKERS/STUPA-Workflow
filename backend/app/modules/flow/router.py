@@ -43,9 +43,11 @@ def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
 
 
 def get_action_dispatcher() -> ActionDispatcher:
-    """Return the worker dispatcher.
+    """Return the flow action dispatcher.
 
-    The default dispatcher only logs. The concrete queue wiring lives elsewhere.
+    The default dispatcher only logs. `app.main` overrides this dependency with the
+    full chain (`build_worker_dispatcher`). The voting and live-vote routers use the
+    same dependency, so the override reaches every route that fires a transition.
     """
     return NullActionDispatcher()
 
@@ -88,12 +90,20 @@ async def fire_transition(
     service: ServiceDep,
     principal: PrincipalDep,
 ) -> TransitionResult:
-    """Fire a transition: 200 with `{newStateId}`, or 409 on a guard or state conflict."""
+    """Fire a transition: 200 with `{newStateId}`, or 409 on a guard or state conflict.
+
+    With `meetingId` the application goes on the agenda of that meeting in the same
+    transaction. The call gives 422 when the transition has no `addToNextSession`
+    action, its target is not a vote state, or the meeting is not visible, not
+    `planned` or of another Gremium.
+    """
     return await service.fire(
         application_id,
         payload.transition_id,
         principal,
         note=payload.note,
+        meeting_id=payload.meeting_id,
+        non_public=payload.non_public,
     )
 
 

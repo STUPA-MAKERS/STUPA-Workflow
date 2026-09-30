@@ -5,7 +5,8 @@ Operations:
 * `FlowService.available_transitions` — the manual transitions from the current state
   whose guard is `True` for the actor. Guards run server-side. Actor gates are
   fail-closed. This backs the trigger UI in the application detail view.
-* `FlowService.fire` — execute a transition atomically.
+* `FlowService.fire` — execute a transition atomically. With `meeting_id` it also puts
+  the application on the agenda of that meeting in the same transaction.
 * `FlowService.auto_advance` — fire the first automatic transition whose guard holds.
   The worker or cron calls it in a cycle with `manual=False`.
 * `FlowService.fire_branch` — fire the `pass` or `fail` exit of a `vote` state. The
@@ -45,7 +46,12 @@ from app.modules.flow.dispatch import (
 )
 from app.modules.flow.models import State, Transition
 from app.modules.flow.schemas import TransitionOut, TransitionResult
-from app.shared.errors import ConflictError, ForbiddenError, NotFoundError
+from app.shared.errors import (
+    ConflictError,
+    ForbiddenError,
+    NotFoundError,
+    ValidationProblem,
+)
 from app.shared.guards import GuardContext, eval_guard, guard_requires_applicant
 
 
@@ -71,6 +77,43 @@ def _guard_fires_on_deadline(guard: Any, *, negated: bool = False) -> bool:
             if any(_guard_fires_on_deadline(g, negated=not negated) for g in children):
                 return True
     return False
+
+
+def agenda_gremium_id(actions: Any) -> UUID | None:
+    """Return the Gremium of the first `addToNextSession` action, or `None`.
+
+    `None` also comes back when the action holds no valid Gremium UUID. The
+    transition then does not count as an agenda transition.
+    """
+    if not isinstance(actions, list):
+        return None
+    for action in actions:
+        if isinstance(action, dict) and action.get("type") == "addToNextSession":
+            try:
+                return UUID(str(action.get("gremiumId")))
+            except ValueError:
+                return None
+    return None
+
+
+def _transition_out(t: Transition) -> TransitionOut:
+    gremium_id = agenda_gremium_id(t.actions)
+    return TransitionOut(
+        id=t.id,
+        fromStateId=t.from_state_id,
+        toStateId=t.to_state_id,
+        label=t.label_i18n,
+        color=t.color,
+        requiresAction=t.requires_action,
+        addsToAgenda=gremium_id is not None,
+        agendaGremiumId=gremium_id,
+    )
+
+
+def _meeting_problem(msg: str) -> ValidationProblem:
+    return ValidationProblem(
+        msg, code="agenda_meeting_invalid", errors=[{"field": "meetingId", "msg": msg}]
+    )
 
 
 class FlowService:
@@ -261,14 +304,7 @@ class FlowService:
             self.session, app, principal, manual=True, deadline_passed=deadline_passed
         )
         return [
-            TransitionOut(
-                id=t.id,
-                fromStateId=t.from_state_id,
-                toStateId=t.to_state_id,
-                label=t.label_i18n,
-                color=t.color,
-                requiresAction=t.requires_action,
-            )
+            _transition_out(t)
             for t in await self._outgoing(app)
             if not t.automatic and not t.branch and eval_guard(t.guard, ctx)
         ]
@@ -291,14 +327,7 @@ class FlowService:
             self.session, app, self._APPLICANT, manual=True, as_applicant=True
         )
         return [
-            TransitionOut(
-                id=t.id,
-                fromStateId=t.from_state_id,
-                toStateId=t.to_state_id,
-                label=t.label_i18n,
-                color=t.color,
-                requiresAction=t.requires_action,
-            )
+            _transition_out(t)
             for t in await self._outgoing(app)
             if not t.automatic
             and not t.branch
@@ -423,16 +452,26 @@ class FlowService:
         deadline_passed: bool | None = None,
         manual: bool = True,
         as_applicant: bool = False,
+        meeting_id: UUID | None = None,
+        non_public: bool = False,
     ) -> TransitionResult:
         """Fire a transition.
 
         `deadline_passed=None` means derive the value from the database, as the manual
         paths do. The deadline worker passes `True` on its own.
 
+        `meeting_id` puts the application on the agenda of that meeting. The engine
+        checks the meeting before the state change: the principal can read it, it is
+        `planned`, its Gremium is the Gremium of the `addToNextSession` action of the
+        transition, and the target state is a vote state. The agenda item then comes
+        in the same transaction as the state change, with `non_public` as its
+        visibility. The `addToNextSession` action does not run again after the commit.
+
         Raises:
             NotFoundError: The application or the transition does not exist (404).
             ConflictError: The state does not match, the guard fails, or another
                 transition won the race (409).
+            ValidationProblem: `meeting_id` does not fit the transition (422).
         """
         app = await self._load_app(application_id)
         transition = await self._load_transition(transition_id)
@@ -461,6 +500,8 @@ class FlowService:
         )
         if not eval_guard(transition.guard, ctx):
             raise ConflictError("Transition guard not satisfied.", code="guard_failed")
+        if meeting_id is not None:
+            await self._check_agenda_meeting(transition, meeting_id, principal)
 
         # Optimistic locking through the `from`-state condition. A concurrent transition
         # has already moved `current_state_id`, so rowcount is 0 and the caller gets 409.
@@ -521,6 +562,8 @@ class FlowService:
                 "hasNote": note is not None,
             },
         )
+        if meeting_id is not None:
+            await self._add_to_agenda_in_tx(app.id, meeting_id, non_public=non_public)
         await self.session.commit()
 
         # Materialize the deadline of the new state. If the state carries a named
@@ -538,6 +581,9 @@ class FlowService:
             transition_id=transition.id,
             status_event_id=status_event_id,
         )
+        if meeting_id is not None:
+            # The agenda item is already in place. Do not add it a second time.
+            dispatched = [a for a in dispatched if a.type != "addToNextSession"]
         dispatched += build_implicit_notifications(
             transition.actions,
             application_id=app.id,
@@ -551,6 +597,53 @@ class FlowService:
             statusEventId=status_event_id,
             dispatchedActions=[a.type for a in dispatched],
         )
+
+    async def _check_agenda_meeting(
+        self, transition: Transition, meeting_id: UUID, principal: Principal
+    ) -> None:
+        """Check the meeting that a manual fire picks for the agenda item.
+
+        Raises:
+            ValidationProblem: The transition has no `addToNextSession` action, its
+                target is not a vote state, or the meeting is unknown, not readable,
+                not `planned` or of another Gremium (422).
+        """
+        # Local import: `livevote` imports the voting module, and that imports
+        # FlowService. A module-level import here would create a cycle.
+        from app.modules.livevote.models import Meeting
+        from app.modules.livevote.service import MeetingService
+
+        gremium_id = agenda_gremium_id(transition.actions)
+        if gremium_id is None:
+            raise _meeting_problem("This transition does not add to an agenda.")
+        to_state = await self._load_state(transition.to_state_id)
+        if to_state is None or to_state.kind != "vote":
+            raise _meeting_problem("The target state of this transition is no vote state.")
+        try:
+            await MeetingService(self.session).assert_can_read(meeting_id, principal)
+        except (NotFoundError, ForbiddenError) as exc:
+            raise _meeting_problem("The meeting is unknown or not visible.") from exc
+        meeting = await self.session.get(Meeting, meeting_id)
+        if meeting is None or meeting.status != "planned":
+            raise _meeting_problem("The meeting is not planned.")
+        if meeting.gremium_id != gremium_id:
+            raise _meeting_problem("The meeting belongs to another Gremium.")
+
+    async def _add_to_agenda_in_tx(
+        self, application_id: UUID, meeting_id: UUID, *, non_public: bool
+    ) -> None:
+        """Add the agenda item in the open transaction. Roll back on a refusal."""
+        from app.modules.livevote.agenda_service import AgendaService
+
+        try:
+            await AgendaService(self.session).add_in_tx(
+                meeting_id, application_id=application_id, non_public=non_public
+            )
+        except (NotFoundError, ConflictError) as exc:
+            await self.session.rollback()
+            raise _meeting_problem(
+                "The application cannot go on the agenda of this meeting."
+            ) from exc
 
     async def revert_status(
         self,

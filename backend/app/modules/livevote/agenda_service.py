@@ -249,15 +249,42 @@ class AgendaService:
         title: str | None = None,
         non_public: bool = False,
     ) -> list[AgendaItemOut]:
-        """Add an agenda item for an application or for free text.
+        """Add an agenda item for an application or for free text, then commit.
+
+        The rules are those of `add_in_tx`. The method commits only when it added
+        an item.
+
+        Raises:
+            NotFoundError: The application does not exist.
+            ConflictError: The application is not in a vote state of the Gremium.
+        """
+        if await self.add_in_tx(
+            meeting_id, application_id=application_id, title=title, non_public=non_public
+        ):
+            await self.session.commit()
+        return await self.list(meeting_id)
+
+    async def add_in_tx(
+        self,
+        meeting_id: UUID,
+        application_id: UUID | None = None,
+        title: str | None = None,
+        non_public: bool = False,
+    ) -> bool:
+        """Add an agenda item in the transaction of the caller. It does not commit.
 
         A `title` creates a free-text item. The method then ignores
         `application_id`. Without a title the application must be in a vote
         state of the Gremium of the meeting. A second add for the same
-        application changes nothing.
+        application changes nothing. The flow engine calls this method before its
+        own commit, so the state change and the new item stay atomic.
+
+        Returns:
+            `True` when the method added an item, `False` when the application
+            was already on the agenda.
 
         Raises:
-            NotFoundError: The application does not exist.
+            NotFoundError: The meeting or the application does not exist.
             ConflictError: The application is not in a vote state of the Gremium.
         """
         meeting = await self._meeting(meeting_id)
@@ -272,10 +299,13 @@ class AgendaService:
                 )
             )
             await self.session.flush()
-            await self.session.commit()
-            return await self.list(meeting_id)
+            return True
 
-        app = await self.session.get(Application, application_id)
+        # `populate_existing`: the flow engine moved the state with a bulk UPDATE in
+        # this transaction. Read the current state from the database.
+        app = await self.session.get(
+            Application, application_id, populate_existing=True
+        )
         if app is None:
             raise NotFoundError(f"application {application_id} not found")
         vote_states = await self._vote_states(meeting.gremium_id)
@@ -291,18 +321,18 @@ class AgendaService:
                 )
             )
         ).scalar_one_or_none()
-        if existing is None:
-            self.session.add(
-                MeetingAgendaItem(
-                    meeting_id=meeting_id,
-                    application_id=application_id,
-                    position=await self._next_position(meeting_id),
-                    non_public=non_public,
-                )
+        if existing is not None:
+            return False
+        self.session.add(
+            MeetingAgendaItem(
+                meeting_id=meeting_id,
+                application_id=application_id,
+                position=await self._next_position(meeting_id),
+                non_public=non_public,
             )
-            await self.session.flush()
-            await self.session.commit()
-        return await self.list(meeting_id)
+        )
+        await self.session.flush()
+        return True
 
     async def remove(self, meeting_id: UUID, item_id: UUID) -> list[AgendaItemOut]:
         row = (
