@@ -36,7 +36,8 @@ async def create_application_vote(application_id: str, vote: S.VoteCreate) -> di
 
     `eligibleGroup` is the UUID of the gremium of the application. The server counts
     the eligible voters. Requires the gremium permission `vote.manage` or
-    `session.manage` in that gremium (or admin).
+    `session.manage` in that gremium (or admin). If the application and its state name
+    no gremium, only admin can create the vote (403).
     """
     return await api().post(
         f"/applications/{application_id}/votes", json=dump_create(vote)

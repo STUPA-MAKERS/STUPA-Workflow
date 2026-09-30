@@ -86,15 +86,16 @@ async def create_vote(
 
     ``eligibleGroup`` is the UUID of a gremium. A free group key or an
     ``eligibleCount`` in the body gives 422. The gremium must be the gremium of the
-    application (422 ``eligible_group_mismatch``). The server counts the eligible
-    voters from the roster of the gremium.
+    application (422 ``eligible_group_mismatch``). If the application and its state
+    name no gremium, only the admin role can create the vote (403). The server counts
+    the eligible voters from the roster of the gremium.
 
     Gremium-scoped: the admin role, or a gremium role with ``vote.manage`` or
     ``session.manage`` in the ``eligibleGroup`` gremium. A caller cannot create a vote
     in another gremium.
     """
     await service.assert_can_manage_group(str(payload.eligible_group), None, principal)
-    return await service.create(application_id, payload)
+    return await service.create(application_id, payload, principal)
 
 
 @router.post(

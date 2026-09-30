@@ -34,6 +34,9 @@ from tests._support.flow_fakes import fake_session, result
 
 GID = UUID("00000000-0000-0000-0000-0000000c0de1")
 OTHER = UUID("00000000-0000-0000-0000-0000000c0de2")
+# `create` takes the caller. The router checks the manage right before the call.
+MANAGER = Principal(sub="m")
+ADMIN = Principal(sub="a", roles=["admin"])
 
 
 def _config(**over: Any) -> dict[str, Any]:
@@ -112,7 +115,7 @@ async def test_create_stores_the_roster_count() -> None:
     app = _application()
     db = fake_session(result(app), result(*_roster(3, others=2)))
     db.scalar_results = [GID]
-    out = await VotingService(db).create(app.id, _body())
+    out = await VotingService(db).create(app.id, _body(), MANAGER)
     assert out.tally.eligible == 3
     stored = [o for o in db.added if hasattr(o, "eligible_count")]
     assert stored[0].eligible_count == 3
@@ -125,7 +128,7 @@ async def test_create_percent_quorum_needs_no_client_count() -> None:
     db = fake_session(result(app), result(*_roster(4)))
     db.scalar_results = [GID]
     body = _body(config=_config(quorum={"type": "percent", "value": 50}))
-    out = await VotingService(db).create(app.id, body)
+    out = await VotingService(db).create(app.id, body, MANAGER)
     assert out.tally.eligible == 4
     assert out.config.quorum is not None
 
@@ -134,7 +137,7 @@ async def test_create_unknown_gremium_422() -> None:
     db = fake_session()
     db.scalar_results = [None]  # no gremium with this id
     with pytest.raises(ValidationProblem) as err:
-        await VotingService(db).create(uuid4(), _body())
+        await VotingService(db).create(uuid4(), _body(), MANAGER)
     assert err.value.code == "eligible_group_invalid"
 
 
@@ -144,7 +147,7 @@ async def test_create_other_gremium_than_the_application_422() -> None:
     db = fake_session(result(app))
     db.scalar_results = [GID]
     with pytest.raises(ValidationProblem) as err:
-        await VotingService(db).create(app.id, _body())
+        await VotingService(db).create(app.id, _body(), MANAGER)
     assert err.value.code == "eligible_group_mismatch"
 
 
@@ -153,7 +156,7 @@ async def test_create_state_gremium_wins_over_the_application_gremium() -> None:
     app = _application(current_state_id=uuid4(), gremium_id=OTHER)
     db = fake_session(result(app), result(*_roster(1)))
     db.scalar_results = [GID, {"gremiumId": str(GID)}]
-    out = await VotingService(db).create(app.id, _body())
+    out = await VotingService(db).create(app.id, _body(), MANAGER)
     assert out.eligible_group == str(GID)
 
 
@@ -162,7 +165,7 @@ async def test_create_state_gremium_mismatch_422() -> None:
     db = fake_session(result(app))
     db.scalar_results = [GID, {"gremiumId": str(OTHER)}]
     with pytest.raises(ValidationProblem) as err:
-        await VotingService(db).create(app.id, _body())
+        await VotingService(db).create(app.id, _body(), MANAGER)
     assert err.value.code == "eligible_group_mismatch"
 
 
@@ -175,17 +178,37 @@ async def test_create_state_without_usable_gremium_falls_back(state_config: Any)
     app = _application(current_state_id=uuid4(), gremium_id=GID)
     db = fake_session(result(app), result(*_roster(2)))
     db.scalar_results = [GID, state_config]
-    out = await VotingService(db).create(app.id, _body())
+    out = await VotingService(db).create(app.id, _body(), MANAGER)
     assert out.tally.eligible == 2
 
 
-async def test_create_application_without_gremium_takes_any_gremium() -> None:
-    """With no gremium on the application or the state there is nothing to compare."""
+async def test_create_application_without_gremium_only_the_admin() -> None:
+    """With no gremium on the application or the state, only the admin role creates.
+
+    Else a vote manager of any gremium could run the vote and fire the branch.
+    """
     app = _application(gremium_id=None)
+    db = fake_session(result(app))
+    db.scalar_results = [GID]
+    with pytest.raises(ForbiddenError):
+        await VotingService(db).create(app.id, _body(), MANAGER)
+
     db = fake_session(result(app), result(*_roster(1)))
     db.scalar_results = [GID]
-    out = await VotingService(db).create(app.id, _body())
+    out = await VotingService(db).create(app.id, _body(), ADMIN)
     assert out.eligible_group == str(GID)
+
+
+async def test_create_application_without_gremium_scoped_admin_token_403() -> None:
+    """The scope cap applies: an admin token without `vote.manage` cannot create."""
+    app = _application(gremium_id=None)
+    db = fake_session(result(app))
+    db.scalar_results = [GID]
+    token = Principal(
+        sub="a", roles=["admin"], scope_permissions=frozenset({"application.read"})
+    )
+    with pytest.raises(ForbiddenError):
+        await VotingService(db).create(app.id, _body(), token)
 
 
 # Manage right of a standalone vote.

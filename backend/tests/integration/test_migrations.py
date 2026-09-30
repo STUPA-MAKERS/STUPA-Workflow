@@ -387,7 +387,8 @@ def test_drop_global_meeting_permissions(alembic_cfg: Config, engine: Engine) ->
             ).all()
         ]
 
-    command.upgrade(alembic_cfg, "head")
+    # Stop at 3a0b9672fcba: b0c8fd389e10 also gives the key to `schrift`.
+    command.upgrade(alembic_cfg, "3a0b9672fcba")
     with engine.connect() as conn:
         perms = _gremium_perms(conn)
         dropped = _dropped(conn)
@@ -427,13 +428,27 @@ def test_drop_global_vote_permissions(
 
     The upgrade reports the votes without a gremium as eligible group and the
     application votes of another gremium, and keeps them. It deletes the two keys
-    from every global role. The downgrade restores the seed grants of 0002.
+    from every global role, and gives `protocol.finalize` to each gremium role with
+    `session.manage`. The downgrade restores the seed grants of 0002 and keeps
+    `protocol.finalize`.
     """
     command.downgrade(alembic_cfg, "3a0b9672fcba")
     with engine.begin() as conn:
         gid = conn.execute(
             text("INSERT INTO gremium (name, slug) VALUES ('G', 'g-drop-vote') RETURNING id")
         ).scalar_one()
+        for key, perms in (
+            ("sitzungsleitung", '["session.manage", "protocol.write"]'),
+            ("schrift", '["protocol.write"]'),
+            ("vorsitz", '["session.manage", "protocol.finalize"]'),
+        ):
+            conn.execute(
+                text(
+                    "INSERT INTO gremium_role (gremium_id, key, permissions) "
+                    "VALUES (:g, :k, CAST(:p AS jsonb))"
+                ),
+                {"g": gid, "k": key, "p": perms},
+            )
         other = conn.execute(
             text("INSERT INTO gremium (name, slug) VALUES ('O', 'o-drop-vote') RETURNING id")
         ).scalar_one()
@@ -486,6 +501,13 @@ def test_drop_global_vote_permissions(
             {"r": custom},
         )
 
+    def _gremium_perms(conn) -> dict[str, list[str]]:  # noqa: ANN001
+        rows = conn.execute(
+            text("SELECT key, permissions FROM gremium_role WHERE gremium_id = :g"),
+            {"g": gid},
+        ).all()
+        return {r[0]: list(r[1]) for r in rows}
+
     def _dropped(conn) -> list[tuple[str, str]]:  # noqa: ANN001
         return [
             (r[0], r[1])
@@ -510,7 +532,11 @@ def test_drop_global_vote_permissions(
             text("SELECT permission FROM role_permission WHERE role_id = :r"), {"r": custom}
         ).scalars().all()
         votes = set(conn.execute(text("SELECT id FROM vote")).scalars().all())
+        perms = _gremium_perms(conn)
     assert dropped == []
+    assert perms["sitzungsleitung"] == ["session.manage", "protocol.write", "protocol.finalize"]
+    assert perms["schrift"] == ["protocol.write"]
+    assert perms["vorsitz"] == ["session.manage", "protocol.finalize"]
     assert kept == ["application.read"]
     # Report, delete nothing.
     assert {free_vote, foreign_vote, good_vote} <= votes
@@ -528,8 +554,16 @@ def test_drop_global_vote_permissions(
     assert ("manager", "vote.manage") in restored
     assert ("member", "vote.cast") in restored
     assert all(key != "wahlleitung" for key, _ in restored)
+    # The downgrade keeps the `protocol.finalize` grants (see the migration docstring).
+    with engine.connect() as conn:
+        perms = _gremium_perms(conn)
+    assert "protocol.finalize" in perms["sitzungsleitung"]
 
-    # The upgrade runs again cleanly.
+    # The upgrade runs again cleanly and adds the key exactly once.
     command.upgrade(alembic_cfg, "head")
     with engine.connect() as conn:
         assert _dropped(conn) == []
+        perms = _gremium_perms(conn)
+    assert perms["sitzungsleitung"].count("protocol.finalize") == 1
+    assert perms["vorsitz"].count("protocol.finalize") == 1
+    assert "protocol.finalize" not in perms["schrift"]

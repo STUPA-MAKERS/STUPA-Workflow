@@ -88,7 +88,7 @@ async def test_create_ok() -> None:
     roster = [(uuid4(), ["vote.cast"]), (uuid4(), ["vote.cast"]), (uuid4(), ["session.manage"])]
     db = fake_session(result(app), result(*roster))
     db.scalar_results = [GID]  # the gremium exists
-    out = await VotingService(db).create(app.id, _create_body())
+    out = await VotingService(db).create(app.id, _create_body(), Principal(sub="m"))
     assert out.status == "draft"
     assert out.eligible_group == str(GID)
     assert out.tally.counts == {"yes": 0, "no": 0, "abstain": 0}
@@ -122,7 +122,7 @@ async def test_create_unknown_application_404() -> None:
     db = fake_session(result())
     db.scalar_results = [GID]  # the gremium exists
     with pytest.raises(NotFoundError):
-        await VotingService(db).create(uuid4(), _create_body())
+        await VotingService(db).create(uuid4(), _create_body(), Principal(sub="m"))
 
 
 async def test_create_internal_unknown_application_404() -> None:

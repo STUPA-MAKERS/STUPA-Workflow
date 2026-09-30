@@ -61,7 +61,7 @@ class _FakeService:
     async def assert_can_manage_vote(self, vote_id, principal):  # noqa: ANN001
         await self.assert_can_manage_group(str(GID), None, principal)
 
-    async def create(self, application_id, payload):  # noqa: ANN001
+    async def create(self, application_id, payload, principal):  # noqa: ANN001
         return _vote_out("draft")
 
     async def open(self, vote_id, *, now):  # noqa: ANN001

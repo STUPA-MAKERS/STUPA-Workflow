@@ -52,7 +52,7 @@ clients.
 | `applications:write` | comment / transition / manage applications |
 | `votes:write` | create / open / close / cancel / manage votes through the gremium right `vote.manage` (NEVER cast a ballot — only a human may do that. `vote.cast` is in `FORBIDDEN_PERMISSIONS` and is never grantable) |
 | `budget:write` | book expenses, manage cost centers & invoices |
-| `meetings:write` | the gremium rights `session.manage` (meetings & agendas), `protocol.write` (minutes) and `protocol.finalize` (finalize & send the minutes) |
+| `meetings:write` | the gremium rights `session.manage` (meetings & agendas, and every vote of the gremium: the votes of its meetings and the application votes that no meeting holds), `protocol.write` (minutes) and `protocol.finalize` (finalize & send the minutes) |
 
 The meeting and vote rights are gremium rights. No global permission grants them. The
 scope does not grant them either. It only

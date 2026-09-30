@@ -22,10 +22,19 @@ The upgrade:
    principal gets the right back only through an IdP group that maps to a gremium
    role.
 4. deletes the `role_permission` rows of the two keys.
+5. gives the gremium permission `protocol.finalize` to each gremium role that holds
+   `session.manage` and does not hold `protocol.finalize` yet. Revision 3a0b9672fcba
+   gave it to the forced roles `vorstand` and `manager` only. A custom role that runs
+   the sessions must also finalize their protocols.
 
 The downgrade is LOSSY. It restores the seed grants of revision 0002 for the seeded
 roles that still exist (`admin`: both keys; `manager`: `vote.manage`; `member`:
 `vote.cast`). A custom global role does not get its keys back.
+
+The downgrade does NOT undo step 5. After the upgrade, a role that got
+`protocol.finalize` here looks the same as a role that held it before, so the
+downgrade cannot find the rows of step 5. The downgrade of 3a0b9672fcba removes
+`protocol.finalize` from every gremium role, so a full downgrade removes the key.
 
 Both directions are idempotent.
 
@@ -162,12 +171,23 @@ def _report() -> None:
             )
 
 
+# Step 5: a gremium role that runs the sessions also finalizes their protocols.
+_GRANT_FINALIZE = """
+    UPDATE gremium_role
+    SET permissions = COALESCE(permissions, '[]'::jsonb) || '["protocol.finalize"]'::jsonb
+    WHERE COALESCE(permissions, '[]'::jsonb) ? 'session.manage'
+      AND NOT COALESCE(permissions, '[]'::jsonb) ? 'protocol.finalize'
+"""
+
+
 def upgrade() -> None:
     _report()
     op.execute(f"DELETE FROM role_permission WHERE permission IN ({_DROPPED_SQL})")
+    op.execute(_GRANT_FINALIZE)
 
 
 def downgrade() -> None:
+    # Step 5 of the upgrade stays: see the module docstring.
     for role_key, perms in _SEED_GRANTS.items():
         for perm in perms:
             op.execute(

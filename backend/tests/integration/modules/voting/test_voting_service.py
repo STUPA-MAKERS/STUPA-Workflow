@@ -528,7 +528,8 @@ async def test_create_counts_the_roster_and_binds_the_gremium(
             "eligibleGroup": str(gremium_id),
         }
     )
-    out = await svc.create(app.id, body)
+    manager = Principal(sub="m")
+    out = await svc.create(app.id, body, manager)
     stored = await session.get(Vote, out.id)
     assert stored is not None
     assert stored.eligible_count == 2
@@ -543,11 +544,13 @@ async def test_create_counts_the_roster_and_binds_the_gremium(
             VoteCreate.model_validate(
                 {"config": _config(), "eligibleGroup": str(other.id)}
             ),
+            manager,
         )
     assert err.value.code == "eligible_group_mismatch"
     with pytest.raises(ValidationProblem) as err:
         await svc.create(
             app.id,
             VoteCreate.model_validate({"config": _config(), "eligibleGroup": str(uuid.uuid4())}),
+            manager,
         )
     assert err.value.code == "eligible_group_invalid"

@@ -318,24 +318,37 @@ class VotingService:
             tally=tally_out,
         )
 
-    async def create(self, application_id: UUID, payload: VoteCreate) -> VoteOut:
+    async def create(
+        self, application_id: UUID, payload: VoteCreate, principal: Principal
+    ) -> VoteOut:
         """Create a draft application vote from the API body.
 
         ``eligibleGroup`` must name an existing gremium. The vote must also belong to
         the gremium of the application: the ``gremiumId`` of the current vote state
         when the state sets one, else ``application.gremium_id``. Without that check a
         vote manager of another gremium could run the vote and fire the pass or fail
-        branch of the application. When neither names a gremium, any gremium passes.
+        branch of the application.
+
+        When neither names a gremium, no gremium can decide on the application. Then
+        only the admin role (``admin_bypass`` with ``vote.manage``) creates the vote.
+        Otherwise a vote manager of any gremium could fire the branch.
+
+        The caller must also pass ``assert_can_manage_group`` for ``eligibleGroup``.
+        This method does not do that check.
 
         The server sets ``eligible_count`` from the roster of the gremium (members
         with ``vote.cast``). The client cannot send it.
 
         Raises:
             NotFoundError: No application has this id (404).
+            ForbiddenError: The application has no gremium and the principal is not
+                the admin role (403).
             ValidationProblem: The gremium does not exist (``eligible_group_invalid``)
                 or is not the gremium of the application
                 (``eligible_group_mismatch``) (422).
         """
+        from app.modules.admin.gremium_roles import admin_bypass
+
         gremium_id = payload.eligible_group
         if not await self._gremium_exists(gremium_id):
             raise ValidationProblem(
@@ -345,6 +358,10 @@ class VotingService:
             )
         application = await self._get_application(application_id)
         expected = await self._application_gremium_id(application)
+        if expected is None and not admin_bypass(principal, "vote.manage"):
+            raise ForbiddenError(
+                "the application has no gremium; only the admin role can create a vote"
+            )
         if expected is not None and expected != gremium_id:
             raise ValidationProblem(
                 "eligibleGroup must be the gremium of the application.",
