@@ -36,8 +36,8 @@ Configure it in your MCP client. Set the platform URL with `ANTRAGSPLATTFORM_URL
 
 - `ANTRAGSPLATTFORM_URL` (required) — the platform base URL.
 - `ANTRAGSPLATTFORM_SCOPE` (optional) — space-separated OAuth scopes. The default is the
-  full curated set (`read applications:write votes:write budget:write meetings:write`).
-  Narrow it to limit what the agent can do.
+  full curated set (`read applications:write votes:write budget:write meetings:write
+  forms:write flows:write admin:write`). Narrow it to limit what the agent can do.
 
 The platform must have OIDC configured. It must also register the public client id of
 this server (`antragsplattform-mcp`, set with `OAUTH_MCP_CLIENT_ID`). The platform accepts
@@ -48,11 +48,16 @@ clients.
 
 | Scope | Grants (capped by the user's own rights) |
 |-------|------------------------------------------|
-| `read` | read applications, budgets, votes, meetings, audit, exports |
-| `applications:write` | create / comment / transition applications |
-| `votes:write` | create / open / close / cancel / manage votes (NEVER cast a ballot — only a human may do that. `vote.cast` is in `FORBIDDEN_PERMISSIONS` and is never grantable) |
+| `read` | read applications, budgets, votes, meetings (incl. `meeting.view_all`), audit, exports |
+| `applications:write` | comment / transition / manage applications |
+| `votes:write` | create / open / close / cancel / manage votes through `vote.manage` (NEVER cast a ballot — only a human may do that. `vote.cast` is in `FORBIDDEN_PERMISSIONS` and is never grantable) |
 | `budget:write` | book expenses, manage cost centers & invoices |
-| `meetings:write` | manage meetings & agendas |
+| `meetings:write` | the gremium rights `session.manage` (meetings & agendas), `protocol.write` (minutes) and `protocol.finalize` (finalize & send the minutes) |
+
+The meeting and vote rights are gremium rights. The scope does not grant them. It only
+lets them through when your role in the meeting's gremium holds them (or you are admin).
+A token without `meetings:write` cannot manage a meeting or write minutes, whatever your
+gremium role says.
 
 ## Tools
 

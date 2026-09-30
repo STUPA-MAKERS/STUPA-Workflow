@@ -25,8 +25,10 @@ except Exception:  # noqa: BLE001
     _BAKED_URL = ""
 
 # Ask for the full curated set by default. The server caps the grant at the rights of the
-# user and never grants vote.cast, because only a human may cast a ballot. Narrow the set
-# with ANTRAGSPLATTFORM_SCOPE.
+# user and never grants vote.cast, because only a human may cast a ballot. The scope also
+# caps the gremium rights: `meetings:write` lets session.manage, protocol.write and
+# protocol.finalize through, `votes:write` lets vote.manage through. Narrow the set with
+# ANTRAGSPLATTFORM_SCOPE.
 DEFAULT_SCOPE = (
     "read applications:write votes:write budget:write "
     "meetings:write forms:write flows:write admin:write"
