@@ -123,7 +123,9 @@ class FlowService:
             .all()
         )
 
-    async def schedule_state_deadline(self, app: Application, state: State) -> None:
+    async def schedule_state_deadline(
+        self, app: Application, state: State, *, commit: bool = True
+    ) -> Deadline | None:
         """Materialize the named deadline policy of a state that the application enters.
 
         A `deadlinePolicyKey` in `state.config` selects the policy. The service resolves
@@ -137,6 +139,12 @@ class FlowService:
         The service always removes the flow deadlines of the state that the application
         leaves, even the consumed ones. Deadlines must not stack. A state without a
         policy must not keep a stale deadline.
+
+        `commit=False` leaves the commit to the caller. The flow activation uses it to
+        move the deadlines of all applications in its own transaction.
+
+        Returns:
+            The new deadline, or `None` when the state has no resolvable policy.
         """
         await self.session.execute(
             delete(Deadline).where(
@@ -144,15 +152,22 @@ class FlowService:
                 Deadline.kind == "flow_deadline",
             )
         )
+        deadline = await self._materialize_deadline(app, state)
+        if commit:
+            await self.session.commit()
+        return deadline
+
+    async def _materialize_deadline(
+        self, app: Application, state: State
+    ) -> Deadline | None:
+        """Create the deadline row of `state` for `app`, without a commit."""
         cfg = state.config if isinstance(state.config, dict) else {}
         key = cfg.get("deadlinePolicyKey")
         if not isinstance(key, str) or not key:
-            await self.session.commit()
-            return
+            return None
         policy = await DeadlinePolicyService(self.session).get_by_key(key)
         if policy is None:
-            await self.session.commit()
-            return
+            return None
         due_at = resolve_due_at(
             policy,
             now=datetime.now(UTC),
@@ -160,8 +175,7 @@ class FlowService:
             changed_at=app.updated_at,
         )
         if due_at is None:
-            await self.session.commit()
-            return
+            return None
         # The target is the outgoing transition of the state that must fire on an expired
         # deadline, under the `deadlinePassed` polarity including negation. With several
         # candidates, take the one with the smallest `order` for a deterministic result.
@@ -177,13 +191,14 @@ class FlowService:
         ).scalars().all()
         candidates = [t for t in transitions if _guard_fires_on_deadline(t.guard)]
         target = self._pick_deadline_transition(candidates)
-        await DeadlineService(self.session).create(
+        return await DeadlineService(self.session).create(
             kind="flow_deadline",
             due_at=due_at,
             application_id=app.id,
             action_on_pass=(
                 {"transitionId": str(target.id)} if target is not None else None
             ),
+            commit=False,
         )
 
     # Minimal context: only the deadline counts as satisfied. There are no roles, no

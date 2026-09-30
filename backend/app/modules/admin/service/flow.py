@@ -5,6 +5,8 @@ Exactly one global flow exists for all application types.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select, update
@@ -153,7 +155,9 @@ class FlowOps(ConfigServiceBase):
         await self.session.flush()
 
         id_by_key: dict[str, UUID] = {}
+        state_by_key: dict[str, State] = {}
         initial_id: UUID | None = None
+        initial_state: State | None = None
         for state in payload.graph.states:
             row = State(
                 flow_version_id=version.id,
@@ -169,8 +173,10 @@ class FlowOps(ConfigServiceBase):
             self.session.add(row)
             await self.session.flush()
             id_by_key[state.key] = row.id
+            state_by_key[state.key] = row
             if state.is_initial:
                 initial_id = row.id
+                initial_state = row
 
         for order, trans in enumerate(payload.graph.transitions):
             self.session.add(
@@ -203,6 +209,7 @@ class FlowOps(ConfigServiceBase):
             .where(Application.current_state_id.is_(None))
             .values(current_state_id=initial_id, flow_version_id=version.id)
         )
+        await self._move_state_deadlines(app_keys, state_by_key, initial_state)
 
         await ConfigRevisionService(self.session).record(
             entity_type=ENTITY_FLOW,
@@ -218,3 +225,62 @@ class FlowOps(ConfigServiceBase):
             version=version.version,
             active=True,
         )
+
+    async def _move_state_deadlines(
+        self,
+        app_keys: dict[UUID, str],
+        state_by_key: dict[str, State],
+        initial_state: State | None,
+    ) -> None:
+        """Re-create the flow deadlines of the moved applications on the new version.
+
+        An open deadline points at a transition of the old version. The cron cannot
+        fire it any more, because `fire` refuses a transition of another flow version.
+        So every moved application gets the deadline of its new state, with the
+        target transition of the new version (`schedule_state_deadline`).
+
+        The reminder and consumed markers carry over when the due time stays the
+        same. The applicant then gets no second reminder, and an expired deadline
+        that already fired or failed does not fire again because of a flow edit.
+        Everything runs in the transaction of the caller.
+        """
+        from app.modules.applications.models import Application
+        from app.modules.deadlines.models import Deadline
+        from app.modules.flow.service import FlowService
+
+        if not app_keys:
+            return
+        app_ids = list(app_keys)
+        old_marks: dict[UUID, tuple[datetime, datetime | None, Any]] = {
+            d.application_id: (d.due_at, d.reminded_at, d.action_on_pass)
+            for d in (
+                await self.session.scalars(
+                    select(Deadline).where(
+                        Deadline.application_id.in_(app_ids),
+                        Deadline.kind == "flow_deadline",
+                    )
+                )
+            ).all()
+            if d.application_id is not None
+        }
+        apps = (
+            await self.session.scalars(
+                select(Application)
+                .where(Application.id.in_(app_ids))
+                .execution_options(populate_existing=True)
+            )
+        ).all()
+        flow = FlowService(self.session)
+        now = datetime.now(UTC)
+        for app in apps:
+            state = state_by_key.get(app_keys[app.id], initial_state)
+            if state is None:
+                continue
+            deadline = await flow.schedule_state_deadline(app, state, commit=False)
+            mark = old_marks.get(app.id)
+            if deadline is None or mark is None or deadline.due_at != mark[0]:
+                continue
+            due_at, reminded_at, action_on_pass = mark
+            deadline.reminded_at = reminded_at
+            if action_on_pass is None and due_at <= now:
+                deadline.action_on_pass = None
