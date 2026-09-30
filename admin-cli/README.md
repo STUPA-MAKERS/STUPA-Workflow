@@ -85,5 +85,7 @@ Its segments are clickable shortcuts.
 - The permission catalog is vendored in `antragsplattform_admin/permissions.py`. Keep it in sync
   with `backend/app/shared/permissions.py`. The role editor also shows any permission that the DB
   already holds, even when the vendored list misses it.
-- `vote.cast` is human-only. The API never grants it. The permission form flags it and asks for
-  an explicit confirmation before it writes the grant straight into the DB. Do not grant it.
+- `vote.cast` and `vote.manage` are gremium permissions. They are not in the global catalog.
+  A global role that holds one of them gets no voting right from it. If the DB still holds
+  `vote.cast` on a global role, the permission form flags it and asks for an explicit
+  confirmation before it writes the grant. Do not grant it.

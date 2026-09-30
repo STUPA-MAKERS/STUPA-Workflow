@@ -381,6 +381,9 @@ class _FakeForms:
 class _FakeFlow:
     scheduled: list[tuple[Any, Any]] = []
     available: list[Any] = []
+    # The gremien where the principal holds the gremium permission `vote.cast`
+    # (`gremium_ids_for` in `list_tasks`).
+    cast_gids: set[Any] = set()
 
     def __init__(self, session: object) -> None:
         self.session = session
@@ -411,6 +414,12 @@ def _patch_forms(monkeypatch: pytest.MonkeyPatch) -> type[_FakeForms]:
 @pytest.fixture
 def _patch_flow(monkeypatch: pytest.MonkeyPatch) -> type[_FakeFlow]:
     monkeypatch.setattr("app.modules.flow.service.FlowService", _FakeFlow)
+    _FakeFlow.cast_gids = set()
+
+    async def _gremium_ids_for(_session: Any, _principal: Any, perm: str) -> set[Any]:
+        return set(_FakeFlow.cast_gids) if perm == "vote.cast" else set()
+
+    monkeypatch.setattr("app.modules.admin.gremium_roles.gremium_ids_for", _gremium_ids_for)
     return _FakeFlow
 
 
@@ -983,17 +992,50 @@ async def test_list_tasks_no_apps_returns_empty(_patch_flow: type[_FakeFlow]) ->
     assert out == []
 
 
-async def test_list_tasks_vote_state_admin(_patch_flow: type[_FakeFlow]) -> None:
-    app = _app(current_state_id=uuid4())
+async def test_list_tasks_vote_state_cast_right_in_app_gremium(
+    _patch_flow: type[_FakeFlow],
+) -> None:
+    """The gremium permission `vote.cast` in the gremium of the application makes a task."""
+    gid = uuid4()
+    app = _app(current_state_id=uuid4(), gremium_id=gid)
     vote_state = _state(kind="vote")
     vote_state.id = app.current_state_id
+    _FakeFlow.cast_gids = {gid}
     session = _Session(
         execute_results=[[("draft", "#z")]],  # _resolve_state_colors
         scalars_results=[[app], [vote_state]],
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
-    out = await svc.list_tasks(_principal(roles=["admin"]))
+    out = await svc.list_tasks(_principal())
     assert len(out) == 1
+
+
+async def test_list_tasks_vote_state_cast_right_elsewhere_is_no_task(
+    _patch_flow: type[_FakeFlow],
+) -> None:
+    """`vote.cast` in another gremium, or the admin role, makes no vote task."""
+    app = _app(current_state_id=uuid4(), created_by="other")
+    vote_state = _state(kind="vote")
+    vote_state.id = app.current_state_id
+    _FakeFlow.cast_gids = {uuid4()}
+    _FakeFlow.available = []
+    session = _Session(scalars_results=[[app], [vote_state]])
+    svc = ApplicationsService(session)  # type: ignore[arg-type]
+    assert await svc.list_tasks(_principal(roles=["admin"])) == []
+
+
+async def test_list_tasks_vote_state_app_without_gremium(
+    _patch_flow: type[_FakeFlow],
+) -> None:
+    """An application without a gremium never matches the cast set."""
+    app = _app(current_state_id=uuid4(), gremium_id=None, created_by="other")
+    vote_state = _state(kind="vote")
+    vote_state.id = app.current_state_id
+    _FakeFlow.cast_gids = {uuid4()}
+    _FakeFlow.available = []
+    session = _Session(scalars_results=[[app], [vote_state]])
+    svc = ApplicationsService(session)  # type: ignore[arg-type]
+    assert await svc.list_tasks(_principal()) == []
 
 
 async def test_list_tasks_vote_state_member_in_gremium(
@@ -1009,7 +1051,7 @@ async def test_list_tasks_vote_state_member_in_gremium(
         scalar_results=[uuid4()],  # _in_gremium → membership row exists
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
-    out = await svc.list_tasks(_principal(_perms={"vote.cast"}))
+    out = await svc.list_tasks(_principal())
     assert len(out) == 1
 
 

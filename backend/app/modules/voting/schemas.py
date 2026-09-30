@@ -18,11 +18,35 @@ class _CamelModel(BaseModel):
 
 
 class VoteCreate(_CamelModel):
-    """``POST /applications/{id}/votes`` - create a vote (status ``draft``)."""
+    """``POST /applications/{id}/votes`` - create a vote (status ``draft``).
+
+    ``eligibleGroup`` is the UUID of the gremium that votes. A free group key is not
+    valid (422). The server sets the eligible-voter count from the roster of that
+    gremium, so the body has no ``eligibleCount``. An unknown field gives 422.
+    """
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     config: VoteConfig
-    eligible_group: str = Field(alias="eligibleGroup", min_length=1)
+    eligible_group: UUID = Field(alias="eligibleGroup")
     # The resolution question, for the protocol.
+    question: str | None = None
+    opens_state_id: UUID | None = Field(default=None, alias="opensStateId")
+    closes_at: datetime | None = Field(default=None, alias="closesAt")
+    result_branch_transition_id: UUID | None = Field(
+        default=None, alias="resultBranchTransitionId"
+    )
+
+
+class VoteCreateInternal(_CamelModel):
+    """The server-side create payload with the eligible-voter count.
+
+    ``VotingService.create`` builds it from ``VoteCreate`` and the roster of the
+    gremium. The live-vote route builds it from the meeting. No client sends it.
+    """
+
+    config: VoteConfig
+    eligible_group: UUID = Field(alias="eligibleGroup")
     question: str | None = None
     # Authoritative eligible-voter count (roster basis) and the denominator of the
     # percent quorum. It does NOT come from the logged-in users, because that would be
@@ -35,7 +59,7 @@ class VoteCreate(_CamelModel):
     )
 
     @model_validator(mode="after")
-    def _percent_quorum_needs_eligible(self) -> VoteCreate:
+    def _percent_quorum_needs_eligible(self) -> VoteCreateInternal:
         """A percent quorum requires an eligible-voter count (fail-closed)."""
         quorum = self.config.quorum
         if quorum is not None and quorum.type == "percent" and self.eligible_count is None:
@@ -100,6 +124,13 @@ class VoteOut(_CamelModel):
     result: Literal["passed", "rejected", "tie"] | None = None
     secret: bool
     tally: TallyOut
+    # What the calling principal may do with this vote. Only ``GET /votes/{id}`` sets
+    # them. Every other response and the live-vote events leave them False.
+    # ``canManage``: open, close, cancel and delete (``assert_can_manage``).
+    # ``canCast``: cast an OWN ballot (roster of the gremium, human session). A
+    # delegated ballot has its own check.
+    can_manage: bool = Field(default=False, alias="canManage")
+    can_cast: bool = Field(default=False, alias="canCast")
 
 
 class BallotAccepted(_CamelModel):

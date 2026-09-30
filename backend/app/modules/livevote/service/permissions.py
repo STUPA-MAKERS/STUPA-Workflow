@@ -71,10 +71,11 @@ class PermissionOps(MeetingServiceBase):
         """Check who opens and closes votes: manager, protokollant, or `vote.manage`.
 
         The admin role bypasses the gremium check. That keeps this rule equal to
-        the `principal.has("vote.manage")` gate of `VotingService` and to the
-        batched flags of the meeting list. The protokollant path, the gremium role,
-        and the admin bypass are scope-capped: through them, a token without
-        `vote.manage` in its scope cannot manage votes.
+        the `admin_bypass(principal, "vote.manage")` gate of
+        `VotingService.can_manage_group` and to the batched flags of the meeting
+        list. The protokollant path, the gremium role, and the admin bypass are
+        scope-capped: through them, a token without `vote.manage` in its scope cannot
+        manage votes.
 
         The manager path needs only `session.manage`. The meeting lead includes
         vote management and the agenda-item change, so a `meetings:write` token
@@ -115,9 +116,9 @@ class PermissionOps(MeetingServiceBase):
         substitute.
 
         The flag mirrors the cast gate of `VotingService`, which admits the gremium
-        roster of the vote and nobody else. A GLOBAL `vote.cast` permission is
-        therefore not enough on its own: an admin without a membership in this gremium
-        would see a ballot UI that the API then refuses with 403. The quorum counts
+        roster of the vote and nobody else. The admin role is therefore not enough on
+        its own: an admin without a membership in this gremium would see a ballot UI
+        that the API then refuses with 403. The quorum counts
         that admin as little as the gate admits them.
 
         Voting also stays human. `vote.cast` sits in FORBIDDEN_PERMISSIONS, and the

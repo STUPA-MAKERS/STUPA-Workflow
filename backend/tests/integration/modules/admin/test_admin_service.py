@@ -281,10 +281,12 @@ async def test_role_crud_and_listing(session: AsyncSession) -> None:
     svc = ConfigService(session)
     key = f"role-{uuid.uuid4().hex[:8]}"
     created = await svc.create_role(
-        RoleCreate(key=key, label={"de": "Sonderrolle"}, permissions=["vote.cast", "audit.read"]),
+        RoleCreate(
+            key=key, label={"de": "Sonderrolle"}, permissions=["application.read", "audit.read"]
+        ),
         _ACTOR,
     )
-    assert set(created.permissions) == {"vote.cast", "audit.read"}
+    assert set(created.permissions) == {"application.read", "audit.read"}
     with pytest.raises(ConflictError):
         await svc.create_role(RoleCreate(key=key), _ACTOR)
     updated = await svc.update_role(

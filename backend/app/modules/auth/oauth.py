@@ -19,7 +19,8 @@ import hmac
 import secrets
 
 # Permissions that no agent gets, whatever the scope or the admin status says. To cast a
-# ballot with `vote.cast` stays strictly human. Every scope resolution removes it.
+# ballot with the gremium permission `vote.cast` stays strictly human. Every scope
+# resolution removes it, so `scope_allows("vote.cast")` is False for every token.
 # `backup.manage` joins it for the same reason: a backup holds the whole database in
 # readable form, and a restore replaces it. Both stay with a human at a browser.
 FORBIDDEN_PERMISSIONS: frozenset[str] = frozenset({"vote.cast", "backup.manage"})
@@ -29,7 +30,7 @@ FORBIDDEN_PERMISSIONS: frozenset[str] = frozenset({"vote.cast", "backup.manage"}
 # create, open and close. It never covers `vote.cast`, because voting stays human.
 # `vote.manage`, `session.manage`, `protocol.write` and `protocol.finalize` are gremium
 # permissions: a gremium role grants them, and the scope only lets them through.
-# The meeting lead (`session.manage`) includes the votes of the meeting, so a
+# The meeting lead (`session.manage`) includes the votes of the gremium, so a
 # `meetings:write` token of a lead can manage those votes also without `votes:write`.
 # `read` holds `meeting.view_all`, a global read-only key, so an admin token keeps the
 # view over the meetings of every gremium.

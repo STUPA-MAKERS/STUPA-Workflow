@@ -3,7 +3,8 @@
 The suite runs without a database. It covers every branch of `_vote_gremium_id`,
 `assert_can_manage_group`, `assert_can_manage` and `assert_can_manage_vote`, because
 this module is critical and needs 100 % branch coverage. The cases are the admin role,
-the global `vote.manage` permission and a per-Gremium role that allows or denies. They
+a stale global `vote.manage` that grants nothing, and a per-Gremium role with
+`vote.manage` or `session.manage` that allows or denies. They
 also cover a Gremium that does not resolve and the meeting-bound resolution through
 `meeting_id`.
 """
@@ -39,10 +40,42 @@ async def test_manage_admin_ok() -> None:
     await VotingService(fake_session()).assert_can_manage_group("stupa", None, principal)
 
 
-async def test_manage_global_vote_manage_ok() -> None:
-    """The global `vote.manage` permission is enough (second branch)."""
+async def test_manage_global_vote_manage_is_gone() -> None:
+    """A stale global `vote.manage` row grants nothing: the key is gremium-only."""
     principal = Principal(sub="m", permissions={"vote.manage"})
-    await VotingService(fake_session()).assert_can_manage_group("stupa", None, principal)
+    with pytest.raises(ForbiddenError):
+        await VotingService(fake_session()).assert_can_manage_group(
+            "stupa", None, principal
+        )
+
+
+async def test_manage_admin_read_token_denied() -> None:
+    """The admin bypass is scope-capped: an admin `read` token cannot manage."""
+    principal = Principal(
+        sub="a", roles=["admin"], scope_permissions=frozenset({"application.read"})
+    )
+    with pytest.raises(ForbiddenError):
+        await VotingService(fake_session()).assert_can_manage_group(
+            "stupa", None, principal
+        )
+
+
+async def test_manage_gremium_session_manage_ok(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The gremium permission `session.manage` alone manages a standalone vote."""
+    gid = uuid4()
+
+    async def _fake(
+        _session: object, _sub: str, perm: str, _now: object = None
+    ) -> set[object]:
+        return {gid} if perm == "session.manage" else set()
+
+    monkeypatch.setattr(gremium_roles_mod, "gremium_ids_with_permission", _fake)
+    principal = Principal(sub="lead")
+    service = VotingService(fake_session())
+    await service.assert_can_manage_group(str(gid), None, principal)
+    # The lead of another gremium gets 403.
+    with pytest.raises(ForbiddenError):
+        await service.assert_can_manage_group(str(uuid4()), None, principal)
 
 
 async def test_manage_gremium_role_ok(monkeypatch: pytest.MonkeyPatch) -> None:

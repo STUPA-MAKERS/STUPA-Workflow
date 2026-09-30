@@ -418,3 +418,118 @@ def test_drop_global_meeting_permissions(alembic_cfg: Config, engine: Engine) ->
     with engine.connect() as conn:
         perms = _gremium_perms(conn)
     assert perms["vorstand"].count("protocol.finalize") == 1
+
+
+def test_drop_global_vote_permissions(
+    alembic_cfg: Config, engine: Engine, capfd: pytest.CaptureFixture[str]
+) -> None:
+    """Migration b0c8fd389e10 drops the global `vote.cast` and `vote.manage`.
+
+    The upgrade reports the votes without a gremium as eligible group and the
+    application votes of another gremium, and keeps them. It deletes the two keys
+    from every global role. The downgrade restores the seed grants of 0002.
+    """
+    command.downgrade(alembic_cfg, "3a0b9672fcba")
+    with engine.begin() as conn:
+        gid = conn.execute(
+            text("INSERT INTO gremium (name, slug) VALUES ('G', 'g-drop-vote') RETURNING id")
+        ).scalar_one()
+        other = conn.execute(
+            text("INSERT INTO gremium (name, slug) VALUES ('O', 'o-drop-vote') RETURNING id")
+        ).scalar_one()
+        type_id = _new_type(conn)
+        fv = conn.execute(
+            text(
+                "INSERT INTO form_version (application_type_id, version) "
+                "VALUES (:t, 1) RETURNING id"
+            ),
+            {"t": type_id},
+        ).scalar_one()
+        flv = conn.execute(
+            text("INSERT INTO flow_version (version) VALUES (1) RETURNING id")
+        ).scalar_one()
+        app_id = conn.execute(
+            text(
+                "INSERT INTO application (type_id, form_version_id, flow_version_id, "
+                "gremium_id) VALUES (:t, :fv, :flv, :g) RETURNING id"
+            ),
+            {"t": type_id, "fv": fv, "flv": flv, "g": gid},
+        ).scalar_one()
+        free_vote = conn.execute(
+            text(
+                "INSERT INTO vote (eligible_group, config, status) "
+                "VALUES ('stupa', '{}'::jsonb, 'closed') RETURNING id"
+            )
+        ).scalar_one()
+        foreign_vote = conn.execute(
+            text(
+                "INSERT INTO vote (application_id, eligible_group, config, status) "
+                "VALUES (:a, :g, '{}'::jsonb, 'draft') RETURNING id"
+            ),
+            {"a": app_id, "g": str(other)},
+        ).scalar_one()
+        good_vote = conn.execute(
+            text(
+                "INSERT INTO vote (application_id, eligible_group, config, status) "
+                "VALUES (:a, :g, '{}'::jsonb, 'draft') RETURNING id"
+            ),
+            {"a": app_id, "g": str(gid)},
+        ).scalar_one()
+        custom = conn.execute(
+            text("INSERT INTO role (key) VALUES ('wahlleitung') RETURNING id")
+        ).scalar_one()
+        conn.execute(
+            text(
+                "INSERT INTO role_permission (role_id, permission) VALUES "
+                "(:r, 'vote.manage'), (:r, 'application.read')"
+            ),
+            {"r": custom},
+        )
+
+    def _dropped(conn) -> list[tuple[str, str]]:  # noqa: ANN001
+        return [
+            (r[0], r[1])
+            for r in conn.execute(
+                text(
+                    "SELECT r.key, rp.permission FROM role_permission rp "
+                    "JOIN role r ON r.id = rp.role_id "
+                    "WHERE rp.permission IN ('vote.cast', 'vote.manage') "
+                    "ORDER BY r.key, rp.permission"
+                )
+            ).all()
+        ]
+
+    # `env.py` runs `fileConfig`, which resets the handlers of the alembic loggers. The
+    # console handler of `alembic.ini` writes the report to stderr, so read it there.
+    capfd.readouterr()
+    command.upgrade(alembic_cfg, "head")
+    report = capfd.readouterr().err
+    with engine.connect() as conn:
+        dropped = _dropped(conn)
+        kept = conn.execute(
+            text("SELECT permission FROM role_permission WHERE role_id = :r"), {"r": custom}
+        ).scalars().all()
+        votes = set(conn.execute(text("SELECT id FROM vote")).scalars().all())
+    assert dropped == []
+    assert kept == ["application.read"]
+    # Report, delete nothing.
+    assert {free_vote, foreign_vote, good_vote} <= votes
+    assert str(free_vote) in report
+    assert str(foreign_vote) in report
+    assert str(good_vote) not in report
+    assert "'wahlleitung' loses the permission(s): vote.manage" in report
+
+    # The downgrade restores the seed grants of the seeded roles only.
+    command.downgrade(alembic_cfg, "3a0b9672fcba")
+    with engine.connect() as conn:
+        restored = _dropped(conn)
+    assert ("admin", "vote.cast") in restored
+    assert ("admin", "vote.manage") in restored
+    assert ("manager", "vote.manage") in restored
+    assert ("member", "vote.cast") in restored
+    assert all(key != "wahlleitung" for key, _ in restored)
+
+    # The upgrade runs again cleanly.
+    command.upgrade(alembic_cfg, "head")
+    with engine.connect() as conn:
+        assert _dropped(conn) == []

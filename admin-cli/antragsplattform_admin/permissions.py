@@ -18,8 +18,6 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "application.edit_any",
     "form.configure",
     "flow.configure",
-    "vote.cast",
-    "vote.manage",
     "meeting.view_all",
     "meeting.delete_finalized",
     "budget.view",
@@ -46,7 +44,7 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "mcp.use",
 )
 
-# The API never grants vote.cast, because voting is human-only. The CLI writes to the
-# database directly, so it can still set the key. The editor shows a warning. This module
-# does not block the key.
+# `vote.cast` is a gremium permission now and not in the global catalog. A global role
+# row that still holds the key has no effect. The editor shows the key with a warning
+# when the database holds it. This module does not block the key.
 FORBIDDEN_PERMISSIONS: frozenset[str] = frozenset({"vote.cast"})

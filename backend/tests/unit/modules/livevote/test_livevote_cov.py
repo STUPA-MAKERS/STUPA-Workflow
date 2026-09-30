@@ -2087,7 +2087,7 @@ class _FakeVotingService:
         self.deleted: list[Any] = []
         self._vote = SimpleNamespace(id=uuid4(), meeting_id=None)
 
-    async def create(self, application_id, payload, *, meeting_id, agenda_item_id):  # noqa: ANN001
+    async def create_internal(self, application_id, payload, *, meeting_id, agenda_item_id):  # noqa: ANN001
         self.created.append((application_id, meeting_id, agenda_item_id))
         self.last_payload = payload
         return self._vote
