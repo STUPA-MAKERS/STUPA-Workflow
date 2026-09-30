@@ -2,7 +2,6 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ApiClient } from '@core/api/api-client.service';
 import { DelegationsApiService, type VoteDelegationStatus } from '@core/api/delegations.service';
-import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
@@ -32,8 +31,9 @@ const DELETE_CONFLICT_KEYS: Record<string, TranslationKey> = {
  * - `closed`: a read-only view with the result.
  * - not eligible: a notice replaces the cast controls.
  *
- * A missing frontend permission or a server 403 marks the user as not eligible. RBAC
- * stays authoritative on the server. A `secret` vote shows no counts while it is open.
+ * The server flags `canCast` and `canManage` decide the controls. A missing `canCast`
+ * or a server 403 marks the user as not eligible. RBAC stays authoritative on the
+ * server. A `secret` vote shows no counts while it is open.
  */
 @Component({
   selector: 'app-vote-cast',
@@ -55,7 +55,6 @@ const DELETE_CONFLICT_KEYS: Record<string, TranslationKey> = {
 export class VoteCastComponent {
   private readonly api = inject(ApiClient);
   private readonly delegations = inject(DelegationsApiService);
-  private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
   private readonly route = inject(ActivatedRoute);
@@ -86,12 +85,7 @@ export class VoteCastComponent {
   readonly deleting = signal(false);
   readonly canDelete = computed(() => {
     const vote = this.vote();
-    return (
-      !!vote &&
-      vote.status === 'draft' &&
-      !vote.meetingId &&
-      this.auth.can('vote.manage')
-    );
+    return !!vote && vote.status === 'draft' && !vote.meetingId && vote.canManage === true;
   });
 
   readonly castCount = computed(() => {
@@ -120,9 +114,6 @@ export class VoteCastComponent {
       this.phase.set('error');
       return;
     }
-    // Eligibility UX: if the permission is missing, show a notice. The server stays
-    // authoritative.
-    this.notEligible.set(!this.auth.can('vote.cast'));
     // The delegation status explains a 403 (the user handed the voting right over) or it
     // unlocks the separate proxy block. Important: `exercising` does not free the own
     // vote. An external substitute can cast the proxy ballot only. The two submissions
@@ -137,6 +128,9 @@ export class VoteCastComponent {
     this.api.getVote(id).subscribe({
       next: (vote) => {
         this.vote.set(vote);
+        // Eligibility UX: the server flag `canCast` decides. The server stays
+        // authoritative on the cast.
+        if (vote.canCast !== true) this.notEligible.set(true);
         this.phase.set('ready');
       },
       error: (err: { status?: number }) => {

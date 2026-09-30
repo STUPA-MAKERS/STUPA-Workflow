@@ -4,6 +4,13 @@ import { homeRedirectGuard } from '@core/auth/home-redirect.guard';
 import { ShellComponent } from './layout/shell.component';
 
 /**
+ * The gremium permissions that open the voting pages. Casting is `vote.cast`. Running a
+ * vote is `vote.manage`, or the meeting lead `session.manage`. All three are gremium
+ * permissions: no global permission grants a voting right.
+ */
+const VOTING_GREMIUM_PERMISSIONS = ['vote.cast', 'vote.manage', 'session.manage'];
+
+/**
  * Routing skeleton. `authGuard` protects the OIDC areas. Some areas also need an RBAC
  * permission: a global one (`data.permission`) or a gremium one in any gremium
  * (`data.gremiumPermission`).
@@ -96,7 +103,9 @@ export const routes: Routes = [
       },
       {
         path: 'voting',
-        data: { title: 'nav.voting', permission: ['vote.cast', 'vote.manage'] },
+        // Voting rights are GREMIUM rights. No global permission grants them, so the
+        // gate goes through `gremiumPermission` (any gremium, or the admin role).
+        data: { title: 'nav.voting', gremiumPermission: VOTING_GREMIUM_PERMISSIONS },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./features/voting/live-vote.component').then((m) => m.LiveVoteComponent),
@@ -119,18 +128,19 @@ export const routes: Routes = [
       },
       {
         path: 'voting/meeting/:id',
-        data: { title: 'voting.live.heading', permission: ['vote.cast', 'vote.manage'] },
+        data: { title: 'voting.live.heading', gremiumPermission: VOTING_GREMIUM_PERMISSIONS },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./features/voting/live-vote.component').then((m) => m.LiveVoteComponent),
       },
       {
         path: 'voting/vote/:id',
-        // A delegation recipient can reach the ballot without vote.cast. The server
-        // decides the voting rights with the delegation check.
+        // A delegation recipient can reach the ballot without vote.cast, and a reader
+        // with `application.read` can view a standalone vote. The server decides the
+        // rights and reports them as `canCast` and `canManage` on the vote.
         data: {
           title: 'voting.cast.heading',
-          permission: ['vote.cast', 'vote.manage'],
+          gremiumPermission: VOTING_GREMIUM_PERMISSIONS,
           allowAuthenticated: true,
         },
         canActivate: [authGuard],

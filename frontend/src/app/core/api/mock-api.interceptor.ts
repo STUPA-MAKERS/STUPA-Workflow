@@ -48,16 +48,14 @@ const MOCK_PRINCIPAL: Principal = {
   roles: ['member'],
   // The mock grants every permission a gated view needs, so the dev, harness
   // and demo builds show those views. `application.manage` drives the RBAC
-  // actions on the detail page. `vote.manage` drives the vote views. The gremium
-  // permissions below (`session.manage`, `protocol.write`, `protocol.finalize`)
-  // drive the beamer, the meeting management and the protocol editor.
+  // actions on the detail page. The gremium permissions below (`session.manage`,
+  // `vote.manage`, `vote.cast`, `protocol.write`, `protocol.finalize`) drive the
+  // vote views, the beamer, the meeting management and the protocol editor.
   // `admin.site`, `admin.gremien`, `admin.types`, `form.configure`,
   // `flow.configure`, `admin.group_mappings` and `webhook.manage` drive the admin UIs.
   permissions: [
     'application.read',
     'application.manage',
-    'vote.cast',
-    'vote.manage',
     'admin.site',
     'admin.gremien',
     'admin.types',
@@ -94,7 +92,8 @@ const MOCK_PRINCIPAL: Principal = {
 const MOCK_VOTE: Vote = {
   id: 'vote-demo',
   applicationId: 'app-demo',
-  eligibleGroup: 'stupa',
+  // A vote names the gremium that votes by its id.
+  eligibleGroup: 'g0000000-0000-0000-0000-000000000001',
   config: {
     options: ['yes', 'no', 'abstain'],
     majorityRule: 'two_thirds',
@@ -110,6 +109,8 @@ const MOCK_VOTE: Vote = {
   result: null,
   secret: false,
   tally: { counts: { yes: 5, no: 2, abstain: 1 }, eligible: 12, quorumMet: true, leading: 'yes' },
+  canManage: true,
+  canCast: true,
 };
 
 const MOCK_TYPES: Page<ApplicationTypeListItemWire> = {
