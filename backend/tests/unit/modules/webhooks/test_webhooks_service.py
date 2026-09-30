@@ -1,4 +1,4 @@
-"""WebhookService (T-19): dispatch_event dedup and deliver (ok/retry/dead/ssrf)."""
+"""WebhookService (T-19): dispatch_to_webhook dedup and deliver (ok/retry/dead/ssrf)."""
 
 from __future__ import annotations
 
@@ -58,72 +58,6 @@ _IP_URL = f"https://{_IP}/h"  # target after pinning, the Host header stays hook
 
 def _public_resolver(_host: str) -> list[str]:
     return [_IP]
-
-
-async def test_dispatch_no_matching_webhooks() -> None:
-    session = FakeSession(scalars=[[]])
-    assert await _svc(session, FakeWebhookQueue()).dispatch_event("status_changed") == 0
-    assert session.committed == 0
-
-
-async def test_dispatch_creates_and_enqueues() -> None:
-    h1, h2 = _hook(), _hook()
-    queue = FakeWebhookQueue()
-    session = FakeSession(scalars=[[h1, h2]])
-    n = await _svc(session, queue).dispatch_event("status_changed", payload={"x": 1})
-    assert n == 2
-    assert session.committed == 1
-    assert len(queue.enqueued) == 2
-    assert all(d.idempotency_key is None for d in session.added)
-
-
-async def test_dispatch_dedup_skips_existing() -> None:
-    h1 = _hook()
-    base = "app:evt:0:webhook"
-    existing = f"{base}:{h1.id}"
-    session = FakeSession(scalars=[[h1], [existing]])
-    n = await _svc(session, FakeWebhookQueue()).dispatch_event(
-        "status_changed", idempotency_base=base
-    )
-    assert n == 0
-    assert session.committed == 0
-
-
-async def test_dispatch_dedup_partial() -> None:
-    h1, h2 = _hook(), _hook()
-    base = "app:evt:0:webhook"
-    session = FakeSession(scalars=[[h1, h2], [f"{base}:{h1.id}"]])
-    queue = FakeWebhookQueue()
-    n = await _svc(session, queue).dispatch_event(
-        "status_changed", idempotency_base=base
-    )
-    assert n == 1
-    assert len(queue.enqueued) == 1
-
-
-async def test_dispatch_without_queue_stays_pending() -> None:
-    session = FakeSession(scalars=[[_hook()]])
-    assert await _svc(session, None).dispatch_event("status_changed") == 1
-    assert session.committed == 1
-
-
-async def test_dispatch_race_integrity_error_is_deduped() -> None:
-    # A concurrent insert violates unique(webhook_id, idempotency_key). The delivery
-    # already exists and is enqueued, so the service skips it. It neither counts nor
-    # enqueues the delivery again.
-    from sqlalchemy.exc import IntegrityError
-
-    h1 = _hook()
-    base = "app:evt:0:webhook"
-    err = IntegrityError("INSERT", {}, Exception("duplicate key"))
-    session = FakeSession(scalars=[[h1], []], flush_errors=[err])
-    queue = FakeWebhookQueue()
-    n = await _svc(session, queue).dispatch_event(
-        "status_changed", idempotency_base=base
-    )
-    assert n == 0
-    assert queue.enqueued == []
-    assert session.added == []  # the savepoint rollback discarded the delivery
 
 
 # Tests for dispatch_to_webhook.

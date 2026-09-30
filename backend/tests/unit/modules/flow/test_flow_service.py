@@ -843,3 +843,180 @@ async def test_list_states_unknown_application_404() -> None:
     db = fake_session(result())  # no application
     with pytest.raises(NotFoundError):
         await FlowService(db).list_states(uuid4())
+
+
+# A1: the agenda pick on a manual transition.
+def test_agenda_gremium_id_reads_the_first_agenda_action() -> None:
+    gid = uuid4()
+    assert flow_service.agenda_gremium_id(None) is None
+    assert flow_service.agenda_gremium_id([{"type": "notify"}]) is None
+    assert flow_service.agenda_gremium_id(
+        ["junk", {"type": "addToNextSession", "gremiumId": str(gid)}]
+    ) == gid
+    assert flow_service.agenda_gremium_id(
+        [{"type": "addToNextSession", "gremiumId": "not-a-uuid"}]
+    ) is None
+
+
+async def test_schedule_deadline_without_commit_leaves_it_to_the_caller() -> None:
+    app = SimpleNamespace(id=uuid4(), created_at=None, updated_at=None, flow_version_id=uuid4())
+    state = SimpleNamespace(id=uuid4(), config={})
+    db = fake_session(result())  # the DELETE of the old deadlines
+    out = await FlowService(db).schedule_state_deadline(  # pyright: ignore[reportArgumentType]
+        app, state, commit=False  # pyright: ignore[reportArgumentType]
+    )
+    assert out is None
+    assert db.committed == 0
+
+
+async def test_fire_with_meeting_adds_in_tx_and_skips_the_action(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    flow_id, draft, voting, gid, meeting_id = uuid4(), uuid4(), uuid4(), uuid4(), uuid4()
+    app = _app(draft, flow_id)
+    t = _transition(
+        flow_id=flow_id, from_id=draft, to_id=voting,
+        actions=[{"type": "addToNextSession", "gremiumId": str(gid)}],
+    )
+    calls: list[tuple[str, object]] = []
+
+    async def _check(_self: object, transition: object, mid: object, _p: object) -> None:
+        calls.append(("check", mid))
+
+    async def _add(_self: object, app_id: object, mid: object, *, non_public: bool) -> None:
+        calls.append(("add", (app_id, mid, non_public)))
+
+    monkeypatch.setattr(FlowService, "_check_agenda_meeting", _check)
+    monkeypatch.setattr(FlowService, "_add_to_agenda_in_tx", _add)
+    db = fake_session(
+        result(app), result(t), result(rowcount=1),  # _load_app, _load_transition, UPDATE
+        result(), result(), result(),  # _cancel_open_votes + audit (lock, prev-hash)
+    )
+    rec = _Recorder()
+    res = await FlowService(db, rec).fire(
+        app.id, t.id, _principal(), meeting_id=meeting_id, non_public=True
+    )
+    assert calls == [("check", meeting_id), ("add", (app.id, meeting_id, True))]
+    assert "addToNextSession" not in res.dispatched_actions
+    assert all(a.type != "addToNextSession" for a in rec.batches[0])
+
+
+def _agenda_transition(gid: object | None = None) -> SimpleNamespace:
+    actions = (
+        [{"type": "addToNextSession", "gremiumId": str(gid)}] if gid is not None else []
+    )
+    return _transition(flow_id=uuid4(), from_id=uuid4(), to_id=uuid4(), actions=actions)
+
+
+class _MeetingSvc:
+    """Stand-in for `MeetingService` with a fixed read decision."""
+
+    error: Exception | None = None
+
+    def __init__(self, _session: object) -> None: ...
+
+    async def assert_can_read(self, _meeting_id: object, _principal: object) -> None:
+        if _MeetingSvc.error is not None:
+            raise _MeetingSvc.error
+
+
+@pytest.fixture
+def meeting_svc(monkeypatch: pytest.MonkeyPatch) -> type[_MeetingSvc]:
+    import app.modules.livevote.service as livevote_service
+
+    _MeetingSvc.error = None
+    monkeypatch.setattr(livevote_service, "MeetingService", _MeetingSvc)
+    return _MeetingSvc
+
+
+async def _check(
+    transition: SimpleNamespace, *, to_state: object, meeting: object = None
+) -> None:
+    db = fake_session(result(to_state) if to_state is not None else result())
+    db.get_results = [meeting]
+    await FlowService(db)._check_agenda_meeting(  # noqa: SLF001
+        transition, uuid4(), _principal()  # pyright: ignore[reportArgumentType]
+    )
+
+
+@pytest.mark.parametrize("case", ["no_action", "no_state", "normal_state"])
+async def test_check_agenda_meeting_refuses_the_transition(
+    meeting_svc: type[_MeetingSvc], case: str
+) -> None:
+    from app.shared.errors import ValidationProblem
+
+    gid = uuid4()
+    transition = _agenda_transition(None if case == "no_action" else gid)
+    to_state = None if case == "no_state" else SimpleNamespace(kind="normal")
+    if case == "no_action":
+        to_state = SimpleNamespace(kind="vote")
+    with pytest.raises(ValidationProblem):
+        await _check(transition, to_state=to_state)
+
+
+@pytest.mark.parametrize("case", ["hidden", "missing", "live", "other_gremium"])
+async def test_check_agenda_meeting_refuses_the_meeting(
+    meeting_svc: type[_MeetingSvc], case: str
+) -> None:
+    from app.shared.errors import ValidationProblem
+
+    gid = uuid4()
+    meeting: object = SimpleNamespace(status="planned", gremium_id=gid)
+    if case == "hidden":
+        meeting_svc.error = ForbiddenError("no")
+    elif case == "missing":
+        meeting = None
+    elif case == "live":
+        meeting = SimpleNamespace(status="live", gremium_id=gid)
+    else:
+        meeting = SimpleNamespace(status="planned", gremium_id=uuid4())
+    with pytest.raises(ValidationProblem) as exc:
+        await _check(
+            _agenda_transition(gid), to_state=SimpleNamespace(kind="vote"), meeting=meeting
+        )
+    assert exc.value.code == "agenda_meeting_invalid"
+
+
+async def test_check_agenda_meeting_accepts_a_fitting_meeting(
+    meeting_svc: type[_MeetingSvc],
+) -> None:
+    gid = uuid4()
+    await _check(
+        _agenda_transition(gid),
+        to_state=SimpleNamespace(kind="vote"),
+        meeting=SimpleNamespace(status="planned", gremium_id=gid),
+    )
+
+
+@pytest.mark.parametrize("error", [None, ConflictError("no"), NotFoundError("gone")])
+async def test_add_to_agenda_in_tx(
+    monkeypatch: pytest.MonkeyPatch, error: Exception | None
+) -> None:
+    import app.modules.livevote.agenda_service as agenda_mod
+    from app.shared.errors import ValidationProblem
+
+    added: list[tuple[object, object, bool]] = []
+
+    class _Agenda:
+        def __init__(self, _session: object) -> None: ...
+
+        async def add_in_tx(
+            self, meeting_id: object, *, application_id: object, non_public: bool
+        ) -> bool:
+            if error is not None:
+                raise error
+            added.append((meeting_id, application_id, non_public))
+            return True
+
+    monkeypatch.setattr(agenda_mod, "AgendaService", _Agenda)
+    db = fake_session()
+    app_id, meeting_id = uuid4(), uuid4()
+    svc = FlowService(db)
+    if error is None:
+        await svc._add_to_agenda_in_tx(app_id, meeting_id, non_public=False)  # noqa: SLF001
+        assert added == [(meeting_id, app_id, False)]
+        assert db.rolled_back == 0
+    else:
+        with pytest.raises(ValidationProblem):
+            await svc._add_to_agenda_in_tx(app_id, meeting_id, non_public=False)  # noqa: SLF001
+        assert db.rolled_back == 1

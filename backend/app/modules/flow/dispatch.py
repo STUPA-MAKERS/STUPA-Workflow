@@ -11,8 +11,14 @@ from __future__ import annotations
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 from uuid import UUID
+
+if TYPE_CHECKING:
+    from arq.connections import ArqRedis
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+    from app.settings import Settings
 
 logger = logging.getLogger("app.flow.dispatch")
 
@@ -23,6 +29,7 @@ WORKER_ACTION_TYPES: frozenset[str] = frozenset(
         "webhook",
         "addToNextSession",
         "assignBudget",
+        "assignBudgetFromField",
     }
 )
 
@@ -155,3 +162,40 @@ class ChainActionDispatcher:
     async def dispatch(self, actions: Sequence[DispatchedAction]) -> None:
         for dispatcher in self.dispatchers:
             await dispatcher.dispatch(actions)
+
+
+def build_worker_dispatcher(
+    redis: ArqRedis | None,
+    sessionmaker: async_sessionmaker[AsyncSession],
+    settings: Settings | None = None,
+) -> ChainActionDispatcher:
+    """Build the full flow action dispatcher: notify, webhook and the extras.
+
+    The API (`app.main`) and the arq worker use the same chain. So a transition that
+    a vote close, a deadline or an automatic advance fires runs the same actions as a
+    manual transition. `redis` is the arq pool. Without a pool the notify and webhook
+    dispatchers log the mails and the deliveries and keep them pending.
+
+    The imports are local: the notify and webhook dispatchers import this module.
+    """
+    from app.modules.flow.extras_dispatcher import FlowExtrasActionDispatcher
+    from app.modules.notifications.action_dispatcher import (
+        NotificationActionDispatcher,
+    )
+    from app.modules.notifications.provider import mail_queue_from_pool
+    from app.modules.webhooks.action_dispatcher import WebhookActionDispatcher
+    from app.modules.webhooks.queue import webhook_queue_from_pool
+    from app.settings import get_settings
+
+    resolved = settings or get_settings()
+    return ChainActionDispatcher(
+        [
+            NotificationActionDispatcher(
+                sessionmaker, mail_queue_from_pool(redis), resolved
+            ),
+            WebhookActionDispatcher(
+                sessionmaker, webhook_queue_from_pool(redis), resolved
+            ),
+            FlowExtrasActionDispatcher(sessionmaker),
+        ]
+    )

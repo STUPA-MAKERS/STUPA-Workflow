@@ -23,7 +23,9 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from app.db import get_sessionmaker
 from app.modules.budget.stats import BudgetStatsService
+from app.modules.flow.dispatch import build_worker_dispatcher
 from worker.backup import create_backup, restore_backup, scheduled_backup
 from worker.backup import on_startup as backup_on_startup
 from worker.deadlines import on_startup as deadlines_on_startup
@@ -58,13 +60,21 @@ _BACKUP_JOB_TIMEOUT_SECONDS = 7200.0
 
 
 async def _on_startup(ctx: dict[str, Any]) -> None:
-    """Set up the mail, scan, protocol render, webhook and deadline dependencies."""
+    """Set up the mail, scan, protocol render, webhook and deadline dependencies.
+
+    It also builds the flow action dispatcher once. The deadline cron, the automatic
+    transitions and the vote auto-close read it from `ctx['flow_dispatcher']`, so a
+    transition that the worker fires runs the same actions as one from the API.
+    """
     await mail_on_startup(ctx)
     await scan_on_startup(ctx)
     await protocol_on_startup(ctx)
     await webhook_on_startup(ctx)
     await deadlines_on_startup(ctx)
     await backup_on_startup(ctx)
+    ctx["flow_dispatcher"] = build_worker_dispatcher(
+        ctx.get("redis"), get_sessionmaker(), ctx.get("settings")
+    )
 
 
 @lru_cache(maxsize=1)

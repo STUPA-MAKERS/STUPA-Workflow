@@ -52,10 +52,12 @@ class DeadlineService:
         application_id: UUID | None = None,
         type_id: UUID | None = None,
         action_on_pass: dict | None = None,
+        commit: bool = True,
     ) -> Deadline:
         """Create and store a deadline.
 
-        This is a programmatic API. No HTTP route creates a deadline.
+        This is a programmatic API. No HTTP route creates a deadline. `commit=False`
+        only flushes the row and leaves the commit to the caller.
         """
         deadline = Deadline(
             kind=kind,
@@ -66,7 +68,8 @@ class DeadlineService:
         )
         self.session.add(deadline)
         await self.session.flush()
-        await self.session.commit()
+        if commit:
+            await self.session.commit()
         return deadline
 
     async def due_action_deadline_ids(
@@ -225,6 +228,25 @@ async def flow_deadline_passed(session: AsyncSession, application_id: UUID) -> b
         .limit(1)
     )
     return row is not None
+
+
+async def state_deadline_follows_edits(
+    session: AsyncSession, state_config: object
+) -> bool:
+    """Return whether the deadline of a state moves with every edit.
+
+    That is the case when the `deadlinePolicyKey` in `state_config` names a
+    `relative_changed` policy: its due time is `updated_at + offset_days`. An
+    unknown key, a missing key or another policy kind gives `False`.
+    """
+    cfg = state_config if isinstance(state_config, dict) else {}
+    key = cfg.get("deadlinePolicyKey")
+    if not isinstance(key, str) or not key:
+        return False
+    kind = await session.scalar(
+        select(DeadlinePolicy.kind).where(DeadlinePolicy.key == key)
+    )
+    return kind == "relative_changed"
 
 
 _HHMM_RE = re.compile(r"^(\d{2}):(\d{2})$")

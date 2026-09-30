@@ -36,7 +36,13 @@ def test_builtins_are_shared_objects() -> None:
     assert CATALOGUE_BY_KEY["task_new"].subject_i18n is action_dispatcher._BUILTIN_TASK_SUBJECT  # noqa: SLF001
     assert CATALOGUE_BY_KEY["comment_team"].body_i18n is comments._BUILTIN_TEAM_BODY  # noqa: SLF001
     assert CATALOGUE_BY_KEY["meeting_created"].subject_i18n is auto._BUILTIN_MEETING_SUBJECT  # noqa: SLF001
-    assert CATALOGUE_BY_KEY["role_revoked"].body_i18n is auto._BUILTIN_ROLE_REVOKED_BODY  # noqa: SLF001
+    assert CATALOGUE_BY_KEY["delegation_revoked"].body_i18n is auto._BUILTIN_DELEGATION_REVOKED_BODY  # noqa: SLF001
+
+
+def test_dead_role_templates_are_gone() -> None:
+    # F10: no code sends the role mails, so the catalogue does not offer them.
+    assert "role_assigned" not in CATALOGUE_BY_KEY
+    assert "role_revoked" not in CATALOGUE_BY_KEY
 
 
 def test_status_update_team_mirrors_status_update() -> None:
@@ -68,8 +74,6 @@ def test_all_sent_keys_are_catalogued() -> None:
         "comment_applicant",
         "comment_team",
         "meeting_created",
-        "role_assigned",
-        "role_revoked",
         "delegation_granted",
         "delegation_revoked",
         "magic_link",

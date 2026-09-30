@@ -28,7 +28,8 @@ from fastapi import APIRouter, Depends
 
 from app.deps import DbSession, require_principal
 from app.modules.auth.principal import Principal
-from app.modules.flow.dispatch import ActionDispatcher, NullActionDispatcher
+from app.modules.flow.dispatch import ActionDispatcher
+from app.modules.flow.router import get_action_dispatcher
 from app.modules.livevote.publisher import MeetingPublisher, get_meeting_publisher
 from app.modules.voting.schemas import (
     BallotAccepted,
@@ -49,13 +50,10 @@ def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
     return {code: _PROBLEM for code in codes}
 
 
-def get_action_dispatcher() -> ActionDispatcher:
-    """Dispatcher for flow actions on close (default: no-op/log)."""
-    return NullActionDispatcher()
-
-
 def get_voting_service(
     session: DbSession,
+    # The flow dependency, so the override in `app.main` also reaches the close
+    # route. A close fires the pass or fail branch with all its actions.
     dispatcher: Annotated[ActionDispatcher, Depends(get_action_dispatcher)],
 ) -> VotingService:
     return VotingService(session, dispatcher)

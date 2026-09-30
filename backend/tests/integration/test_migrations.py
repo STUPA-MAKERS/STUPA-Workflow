@@ -7,6 +7,8 @@ the default roles. A deleted application cascades to its applicant rows.
 
 from __future__ import annotations
 
+import uuid
+
 import pytest
 from alembic import command
 from alembic.config import Config
@@ -567,3 +569,64 @@ def test_drop_global_vote_permissions(
     assert perms["sitzungsleitung"].count("protocol.finalize") == 1
     assert perms["vorsitz"].count("protocol.finalize") == 1
     assert "protocol.finalize" not in perms["schrift"]
+
+
+def test_drop_vote_notification_kind(
+    alembic_cfg: Config, engine: Engine, capfd: pytest.CaptureFixture[str]
+) -> None:
+    """Migration 1a9feecb23a5 drops the dead kinds `vote` and `role_change`.
+
+    The upgrade deletes their preference rows and the stored overrides of the role
+    mail templates, and logs each deleted template. It keeps every other row. The
+    downgrade changes nothing.
+    """
+    command.downgrade(alembic_cfg, "b0c8fd389e10")
+    with engine.begin() as conn:
+        pid = conn.execute(
+            text("INSERT INTO principal (sub) VALUES (:s) RETURNING id"),
+            {"s": f"mig-kind-{uuid.uuid4()}"},
+        ).scalar_one()
+        for kind in ("vote", "role_change", "comment"):
+            conn.execute(
+                text(
+                    "INSERT INTO notification_preference (principal_id, kind, enabled) "
+                    "VALUES (:p, :k, false)"
+                ),
+                {"p": pid, "k": kind},
+            )
+        for key in ("role_assigned", "role_revoked", "meeting_created"):
+            conn.execute(
+                text("INSERT INTO mail_template (key) VALUES (:k) ON CONFLICT DO NOTHING"),
+                {"k": key},
+            )
+
+    capfd.readouterr()
+    command.upgrade(alembic_cfg, "head")
+    report = capfd.readouterr().err
+    with engine.connect() as conn:
+        kinds = set(
+            conn.execute(
+                text("SELECT kind FROM notification_preference WHERE principal_id = :p"),
+                {"p": pid},
+            ).scalars()
+        )
+        keys = set(conn.execute(text("SELECT key FROM mail_template")).scalars())
+    assert kinds == {"comment"}
+    assert "role_assigned" not in keys
+    assert "role_revoked" not in keys
+    assert "meeting_created" in keys
+    assert "'role_assigned'" in report
+    assert "'role_revoked'" in report
+
+    # The downgrade is a no-op, and a second upgrade finds nothing to delete.
+    command.downgrade(alembic_cfg, "b0c8fd389e10")
+    with engine.connect() as conn:
+        assert conn.execute(
+            text("SELECT count(*) FROM notification_preference WHERE principal_id = :p"),
+            {"p": pid},
+        ).scalar_one() == 1
+    command.upgrade(alembic_cfg, "head")
+    # `principal` and `mail_template` are not in the truncate list of the fixture.
+    with engine.begin() as conn:
+        conn.execute(text("DELETE FROM principal WHERE id = :p"), {"p": pid})
+        conn.execute(text("DELETE FROM mail_template WHERE key = 'meeting_created'"))

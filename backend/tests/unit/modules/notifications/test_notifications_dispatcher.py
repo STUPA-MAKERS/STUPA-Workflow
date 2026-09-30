@@ -108,12 +108,6 @@ async def test_dispatch_notify_merges_context(monkeypatch: pytest.MonkeyPatch) -
     assert "applicationId" in ctx
 
 
-def test_build_notify_dispatcher_uses_settings() -> None:
-    disp = mod.build_notify_dispatcher(None)
-    assert isinstance(disp, NotificationActionDispatcher)
-    assert disp.queue is None
-
-
 async def test_dispatch_task_notify_sends_kind_mail(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

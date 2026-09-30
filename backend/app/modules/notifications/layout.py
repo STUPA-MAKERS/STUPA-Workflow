@@ -60,18 +60,6 @@ _REASONS: dict[str, dict[str, str]] = {
         "en": "You are receiving this email because a meeting of one of "
         "your committees was scheduled or changed.",
     },
-    "vote": {
-        "de": "Sie erhalten diese E-Mail, weil eine Abstimmung geöffnet "
-        "oder geschlossen wurde, die Sie betrifft.",
-        "en": "You are receiving this email because a vote that concerns "
-        "you was opened or closed.",
-    },
-    "role_change": {
-        "de": "Sie erhalten diese E-Mail, weil sich Ihre Rollen auf der "
-        "Plattform geändert haben.",
-        "en": "You are receiving this email because your roles on the "
-        "platform changed.",
-    },
     "delegation": {
         "de": "Sie erhalten diese E-Mail, weil eine Stimm-Delegation "
         "erteilt oder widerrufen wurde, die Sie betrifft.",

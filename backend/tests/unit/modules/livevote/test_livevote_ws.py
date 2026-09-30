@@ -478,6 +478,50 @@ def test_handshake_foreign_origin_is_rejected() -> None:
     assert exc.value.code == 4403
 
 
+@pytest.mark.parametrize("suffix", ["", "/beamer"])
+def test_real_flow_dispatcher_override_reaches_the_socket(suffix: str) -> None:
+    """Regression: the `get_action_dispatcher` override of `app.main` works on a socket.
+
+    `get_voting_service_ws` depends on `get_action_dispatcher`. `create_app()` replaces
+    that provider with `_flow_action_dispatcher`. FastAPI does not inject a `Request`
+    into a WebSocket dependency, so an override that takes `request: Request` raised
+    `TypeError` before the handshake. This test keeps the real voting service and the
+    real override. Without a cookie the socket must close normally (no principal).
+    """
+    meeting = _meeting()
+    app = create_app()
+    app.dependency_overrides[get_session] = _auth_db(naive=False)
+    app.dependency_overrides[get_meeting_service_ws] = (
+        lambda: _FakeMeetingService(meeting, None)
+    )
+    app.dependency_overrides[get_broker_ws] = lambda: InMemoryBroker()
+    app.dependency_overrides[get_locker_ws] = lambda: InMemoryLocker()
+    assert get_voting_service_ws not in app.dependency_overrides
+    client = TestClient(app)
+    with pytest.raises(WebSocketDisconnect) as exc, client.websocket_connect(
+        _url(meeting) + suffix
+    ):
+        pass
+    assert exc.value.code == 4401
+
+
+def test_real_flow_dispatcher_override_opens_the_socket_with_a_cookie() -> None:
+    """With a valid cookie the socket opens through the real dispatcher override."""
+    meeting = _meeting()
+    app = create_app()
+    app.dependency_overrides[get_session] = _auth_db(naive=False)
+    app.dependency_overrides[get_meeting_service_ws] = (
+        lambda: _FakeMeetingService(meeting, None)
+    )
+    app.dependency_overrides[get_broker_ws] = lambda: InMemoryBroker()
+    app.dependency_overrides[get_locker_ws] = lambda: InMemoryLocker()
+    client = TestClient(app)
+    name, value = _signed_cookie()
+    client.cookies.set(name, value)
+    with client.websocket_connect(_url(meeting)) as ws:
+        assert _recv(ws)["type"] == "meeting_state"
+
+
 # FIX 5: connection cap per meeting and principal
 from app.modules.livevote import router as lv_router  # noqa: E402
 

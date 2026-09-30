@@ -38,11 +38,11 @@ from app.modules.deadlines.service import (
     DeadlineService,
     transition_ref,
 )
+from app.modules.flow.dispatch import ActionDispatcher, build_worker_dispatcher
 from app.modules.flow.models import Transition
 from app.modules.flow.service import FlowService
 from app.modules.livevote.broker import RedisBroker
 from app.modules.livevote.service import BrokerPublisher
-from app.modules.notifications.action_dispatcher import build_notify_dispatcher
 from app.modules.notifications.queue import ArqMailQueue, MailQueue
 from app.modules.notifications.service import NotificationService
 from app.modules.voting.schemas import VoteClosed
@@ -64,6 +64,21 @@ def _sessionmaker(ctx: dict[str, Any]) -> async_sessionmaker[AsyncSession]:
     """Return the DB sessionmaker (tests inject one via `ctx['deadlines_sessionmaker']`)."""
     maker = ctx.get("deadlines_sessionmaker")
     return maker if maker is not None else get_sessionmaker()
+
+
+def _flow_dispatcher(ctx: dict[str, Any]) -> ActionDispatcher:
+    """Return the flow action dispatcher of the worker.
+
+    `worker.main` sets `ctx['flow_dispatcher']` on startup. Without it the worker
+    builds the same full chain (notify, webhook, extras) over the arq pool. A cron
+    transition therefore runs every configured action, not only the mails.
+    """
+    dispatcher = ctx.get("flow_dispatcher")
+    if dispatcher is not None:
+        return dispatcher  # type: ignore[no-any-return]
+    return build_worker_dispatcher(
+        ctx.get("redis"), _sessionmaker(ctx), ctx.get("settings")
+    )
 
 
 def _now() -> datetime:
@@ -213,7 +228,7 @@ async def _process_actions(
 
 async def _fire_one(ctx: dict[str, Any], deadline_id: UUID, now: datetime) -> bool:
     maker = _sessionmaker(ctx)
-    dispatcher = ctx.get("flow_dispatcher") or build_notify_dispatcher(ctx.get("redis"))
+    dispatcher = _flow_dispatcher(ctx)
     async with maker() as session:
         svc = DeadlineService(session)
         deadline = await svc.lock_action_deadline(deadline_id, now)
@@ -264,7 +279,7 @@ async def _process_auto_transitions(ctx: dict[str, Any]) -> int:
     `flow.fire` keeps the step idempotent. Each application gets its own session.
     """
     maker = _sessionmaker(ctx)
-    dispatcher = ctx.get("flow_dispatcher") or build_notify_dispatcher(ctx.get("redis"))
+    dispatcher = _flow_dispatcher(ctx)
     async with maker() as session:
         auto_states = select(Transition.from_state_id).where(Transition.automatic)
         # Capped per tick, oldest first: a large cohort drains over several ticks
@@ -314,7 +329,7 @@ async def _process_votes(ctx: dict[str, Any], now: datetime) -> int:
 
 async def _close_one(ctx: dict[str, Any], vote_id: UUID, now: datetime) -> bool:
     maker = _sessionmaker(ctx)
-    dispatcher = ctx.get("flow_dispatcher") or build_notify_dispatcher(ctx.get("redis"))
+    dispatcher = _flow_dispatcher(ctx)
     async with maker() as session:
         svc = DeadlineService(session)
         vote = await svc.lock_open_vote(vote_id, now)

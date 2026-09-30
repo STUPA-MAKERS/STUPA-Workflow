@@ -1540,3 +1540,27 @@ async def test_delete_comment_unknown_404() -> None:
             viewer_is_applicant=False,
             can_manage=True,
         )
+
+
+async def test_patch_moves_a_relative_changed_deadline(
+    monkeypatch: pytest.MonkeyPatch, _patch_flow: type[_FakeFlow]
+) -> None:
+    """F7: a state whose policy follows edits gets its deadline re-created."""
+    from app.modules.applications.service import edits as edits_mod
+
+    app = _app(data={"title": "old"})
+    state = _state(edit_allowed=True, config={"deadlinePolicyKey": "k"})
+    app_type = _Obj(id=app.type_id, has_budget=False)
+    _patch_pinned(monkeypatch, [_ff("title", required=True)])
+
+    async def _follows(_session: Any, config: Any) -> bool:
+        return config == {"deadlinePolicyKey": "k"}
+
+    monkeypatch.setattr(edits_mod, "state_deadline_follows_edits", _follows)
+    session = _Session(
+        get_results=[app, state, app_type, state],
+        execute_results=[[("draft", "#z")]],
+        scalar_results=[1, None],
+    )
+    await ApplicationsService(session).patch(app.id, {"title": "new"}, changed_by="u")  # type: ignore[arg-type]
+    assert _FakeFlow.scheduled == [(app, state)]

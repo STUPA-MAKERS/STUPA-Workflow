@@ -15,6 +15,8 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, WebSock
 
 from app.deps import DbSession, require_principal
 from app.modules.auth.principal import Principal
+from app.modules.flow.dispatch import ActionDispatcher
+from app.modules.flow.router import get_action_dispatcher
 from app.modules.livevote.agenda_service import AgendaService
 from app.modules.livevote.attendance_service import AttendanceService
 from app.modules.livevote.broker import InMemoryBroker, MeetingBroker
@@ -136,13 +138,20 @@ def get_agenda_service(session: DbSession) -> AgendaService:
     return AgendaService(session)
 
 
-def get_voting_service(session: DbSession) -> VotingService:
-    return VotingService(session)
+def get_voting_service(
+    session: DbSession,
+    dispatcher: Annotated[ActionDispatcher, Depends(get_action_dispatcher)],
+) -> VotingService:
+    """Voting service with the app flow dispatcher (override in `app.main`)."""
+    return VotingService(session, dispatcher)
 
 
-def get_voting_service_ws(session: DbSession) -> VotingService:
-    """Voting service for the WebSocket cast path (own session, default flow dispatch)."""
-    return VotingService(session)
+def get_voting_service_ws(
+    session: DbSession,
+    dispatcher: Annotated[ActionDispatcher, Depends(get_action_dispatcher)],
+) -> VotingService:
+    """Voting service for the WebSocket cast path, with the app flow dispatcher."""
+    return VotingService(session, dispatcher)
 
 
 async def get_ws_principal(

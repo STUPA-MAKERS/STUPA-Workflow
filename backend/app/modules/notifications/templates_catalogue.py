@@ -182,20 +182,6 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
         },
     ),
     MailTemplateSpec(
-        "role_assigned",
-        "role_change",
-        auto._BUILTIN_ROLE_ASSIGNED_SUBJECT,  # noqa: SLF001
-        auto._BUILTIN_ROLE_ASSIGNED_BODY,  # noqa: SLF001
-        {"roleLabel": "Bezeichnung der Rolle", "gremiumName": "Gremium"},
-    ),
-    MailTemplateSpec(
-        "role_revoked",
-        "role_change",
-        auto._BUILTIN_ROLE_REVOKED_SUBJECT,  # noqa: SLF001
-        auto._BUILTIN_ROLE_REVOKED_BODY,  # noqa: SLF001
-        {"roleLabel": "Bezeichnung der Rolle", "gremiumName": "Gremium"},
-    ),
-    MailTemplateSpec(
         "delegation_granted",
         "delegation",
         auto._BUILTIN_DELEGATION_GRANTED_SUBJECT,  # noqa: SLF001

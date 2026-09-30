@@ -35,6 +35,10 @@ class AuditAction(StrEnum):
     # versions, status events, magic links, comments, budget entries and votes.
     # ``data`` carries only id references and metadata, never raw PII.
     APPLICATION_DELETE = "application_delete"
+    # Application data edited (PATCH). ``data`` carries the new version number and
+    # the keys of the added, removed and changed fields. It never carries a value,
+    # because a field value can hold PII. The version diff keeps the values.
+    APPLICATION_UPDATE = "application_update"
     # Application archived or brought back. Reversible, unlike the delete above, but it
     # changes what the working list shows, so both directions are recorded. ``data``
     # carries id references and the direction, never raw PII.

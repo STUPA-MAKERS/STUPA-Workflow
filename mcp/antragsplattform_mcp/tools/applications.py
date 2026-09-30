@@ -150,16 +150,31 @@ async def list_transitions(application_id: str) -> dict:
 
 @group.tool
 async def fire_transition(
-    application_id: str, transition_id: str, note: str | None = None
+    application_id: str,
+    transition_id: str,
+    note: str | None = None,
+    meeting_id: str | None = None,
+    non_public: bool | None = None,
 ) -> dict:
     """Decide on an application and fire a manual flow transition.
 
     A transition can approve the application, reject it, or move it in another way.
     Read the valid transition ids from `list_transitions`.
+
+    A transition with `addsToAgenda` puts the application on the agenda of a meeting of
+    `agendaGremiumId`. Give `meeting_id` to pick a `planned` meeting of that Gremium.
+    The server then adds the agenda item in the same step and answers 422 when the
+    meeting does not fit. `non_public` marks that agenda item as not public. Without
+    `meeting_id` the server picks the next planned meeting after the step.
     """
     return await api().post(
         f"/applications/{application_id}/transition",
-        json=params(transitionId=transition_id, note=note),
+        json=params(
+            transitionId=transition_id,
+            note=note,
+            meetingId=meeting_id,
+            nonPublic=non_public,
+        ),
     )
 
 

@@ -73,7 +73,9 @@ export const AUDIT_ACTIONS = [
   'webhook_config',
   'attachment_quarantine',
   'attachment_delete',
-  // Content mutations that leave a trace outside the flow: comments, protocols, votes.
+  // Content mutations that leave a trace outside the flow: application data, comments,
+  // protocols, votes.
+  'application_update',
   'comment_update',
   'comment_delete',
   'protocol_delete',
@@ -115,6 +117,7 @@ const ACTION_ICONS: Record<string, IconName> = {
   webhook_config: 'webhook',
   attachment_quarantine: 'paperclip',
   attachment_delete: 'paperclip',
+  application_update: 'form',
   comment_update: 'form',
   comment_delete: 'form',
   protocol_delete: 'document',

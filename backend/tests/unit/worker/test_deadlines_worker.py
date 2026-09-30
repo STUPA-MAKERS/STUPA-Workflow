@@ -131,7 +131,7 @@ def patched(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(wd, "FlowService", _FlowFake)
     monkeypatch.setattr(wd, "VotingService", _VotingFake)
     monkeypatch.setattr(wd, "NotificationService", _NotifyFake)
-    monkeypatch.setattr(wd, "build_notify_dispatcher", lambda _pool: object())
+    monkeypatch.setattr(wd, "build_worker_dispatcher", lambda *_a: object())
 
 
 def _ctx(sessions: list[FakeSession]) -> dict[str, Any]:
@@ -529,3 +529,15 @@ def test_sessionmaker_default_falls_back() -> None:
 
 def test_now_is_tz_aware() -> None:
     assert wd._now().tzinfo is not None
+
+
+def test_flow_dispatcher_prefers_the_ctx_and_falls_back_to_the_full_chain() -> None:
+    from app.modules.flow.dispatch import ChainActionDispatcher
+
+    sentinel = object()
+    assert wd._flow_dispatcher({"flow_dispatcher": sentinel}) is sentinel
+    chain = wd._flow_dispatcher(
+        {"settings": SETTINGS, "deadlines_sessionmaker": _maker([])}
+    )
+    assert isinstance(chain, ChainActionDispatcher)
+    assert len(chain.dispatchers) == 3
