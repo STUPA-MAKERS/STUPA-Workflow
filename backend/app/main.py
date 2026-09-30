@@ -11,7 +11,8 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import APIRouter, FastAPI, Request
+from fastapi import APIRouter, FastAPI
+from starlette.requests import HTTPConnection
 
 from app.db import dispose_engine, get_sessionmaker
 from app.logging_config import configure_logging
@@ -163,15 +164,20 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await livevote_redis.aclose()
 
 
-def _flow_action_dispatcher(request: Request) -> ActionDispatcher:
+def _flow_action_dispatcher(conn: HTTPConnection) -> ActionDispatcher:
     """Build the flow action dispatcher: notify, webhook, addToNextSession, assignBudget.
 
     The dispatcher reads the arq pool from the app state. Without a pool it logs the
     notify mails and the webhook deliveries and keeps them pending. The API never
     blocks. The override on `get_action_dispatcher` reaches every route that fires a
     transition: the flow routes, `POST /votes/{id}/close` and the live-vote routes.
+
+    The parameter is an `HTTPConnection`, not a `Request`. FastAPI injects an
+    `HTTPConnection` for HTTP routes and for WebSocket routes. The live-vote sockets
+    (`/ws/meetings/{id}` and the beamer) also resolve this override. A `Request`
+    parameter makes these sockets fail with `TypeError` before the handshake.
     """
-    pool = getattr(request.app.state, "arq_pool", None)
+    pool = getattr(conn.app.state, "arq_pool", None)
     return build_worker_dispatcher(pool, get_sessionmaker())
 
 
