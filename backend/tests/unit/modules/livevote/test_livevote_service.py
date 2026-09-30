@@ -346,6 +346,9 @@ class _ListResult:
     def all(self) -> list:
         return self._rows
 
+    def scalar_one_or_none(self) -> object:
+        return self._rows[0] if self._rows else None
+
 
 class _ListSession:
     """Return the rows queued for each `execute` call, in FIFO order."""
@@ -394,8 +397,9 @@ async def test_service_list_empty_returns_empty() -> None:
 def _principal():  # noqa: ANN202
     from app.modules.auth.principal import Principal
 
-    # For an admin, can_control short-circuits without a query against the fake session.
-    return Principal(sub="mgr", permissions={"meeting.manage"}, roles=["admin"])
+    # For an admin, the permission flags short-circuit without a gremium query
+    # against the fake session.
+    return Principal(sub="mgr", roles=["admin"])
 
 
 def test_meeting_patch_requires_at_least_one_field() -> None:
@@ -491,17 +495,20 @@ async def test_service_delete_finalized_requires_special_permission(
     session = _DeletableSession(existing=meeting)
     svc = MeetingService(session)  # type: ignore[arg-type]
 
-    manager = Principal(sub="mgr", permissions={"meeting.manage"}, roles=["manager"])
+    # The manager holds `session.manage` through a gremium role of the meeting.
+    from app.modules.admin import gremium_roles as gremium_roles_mod
+
+    async def _manages(_s, _sub, perm, _now=None):  # noqa: ANN001, ANN202
+        return {meeting.gremium_id} if perm == "session.manage" else set()
+
+    monkeypatch.setattr(gremium_roles_mod, "gremium_ids_with_permission", _manages)
+    manager = Principal(sub="mgr")
     with pytest.raises(ForbiddenError):
         await svc.delete(meeting.id, manager)
     assert session.deleted == []
     assert calls == []
 
-    privileged = Principal(
-        sub="archiv",
-        permissions={"meeting.manage", "meeting.delete_finalized"},
-        roles=["manager"],
-    )
+    privileged = Principal(sub="archiv", permissions={"meeting.delete_finalized"})
     await svc.delete(meeting.id, privileged)
     assert session.deleted == [meeting]
     assert calls[0]["action"].value == "meeting_delete"
@@ -635,8 +642,8 @@ async def test_assert_can_read_allows_member(monkeypatch: pytest.MonkeyPatch) ->
 async def test_view_all_sees_every_committee() -> None:
     """#meeting-view-all: the global read holder sees every Gremium.
 
-    `_visible_gremium_ids` returns `None`, which means no Gremium filter. The
-    `meeting.manage` permission and the admin role behave the same way.
+    `_visible_gremium_ids` returns `None`, which means no Gremium filter. The admin
+    role behaves the same way.
     """
     from app.modules.auth.principal import Principal
     from tests._support.auth_fakes import fake_session

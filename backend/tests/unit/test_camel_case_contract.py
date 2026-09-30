@@ -24,6 +24,7 @@ _ALLOWED: frozenset[str] = frozenset(
         # `frontend/src/app/core/api/models.ts` mirrors it field for field.
         "display_name",
         "session_manage_gremien",
+        "gremium_permissions",
         "has_scoped_budget_view",
         "in_substitute_pool",
         # `LogoutOut.logout_url`, mirrored the same way.

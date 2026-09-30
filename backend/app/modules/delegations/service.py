@@ -37,7 +37,7 @@ from sqlalchemy import or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
-from app.modules.admin.gremium_roles import gremium_ids_with_permission, gremium_member_ids
+from app.modules.admin.gremium_roles import gremium_ids_for, gremium_member_ids
 from app.modules.admin.models import Gremium, GremiumMembership, GremiumRole
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
@@ -296,9 +296,9 @@ class DelegationService:
         """Guard the roster and the pool of a gremium against cross-tenant PII reads.
 
         Global readers and managers pass the guard. They hold the `admin` role,
-        `admin.delegations`, `meeting.manage` or `meeting.view_all`. Members, the
-        substitute pool and the holders of the `session.manage` role of this gremium
-        also pass. They see the same data as in the meeting timeline.
+        `admin.delegations` or `meeting.view_all`. Members, the substitute pool and
+        the holders of the `session.manage` role of this gremium also pass. They see
+        the same data as in the meeting timeline.
 
         Raises:
             ForbiddenError: The actor may not view this gremium (403).
@@ -306,7 +306,6 @@ class DelegationService:
         if (
             "admin" in actor.roles
             or actor.has(_ADMIN_PERM)
-            or actor.has("meeting.manage")
             or actor.has("meeting.view_all")
         ):
             return
@@ -314,9 +313,7 @@ class DelegationService:
             return
         if gremium_id in await self._pool_member_gremium_ids(actor.sub):
             return
-        if gremium_id in await gremium_ids_with_permission(
-            self.session, actor.sub, _POOL_MANAGE_PERM
-        ):
+        if gremium_id in await gremium_ids_for(self.session, actor, _POOL_MANAGE_PERM):
             return
         raise ForbiddenError("Not allowed to view this gremium's delegation roster.")
 
@@ -767,7 +764,7 @@ class DelegationService:
     async def _require_pool_manage(self, gremium_id: UUID, actor: Principal) -> None:
         if actor.has(_ADMIN_PERM):
             return
-        allowed = await gremium_ids_with_permission(self.session, actor.sub, _POOL_MANAGE_PERM)
+        allowed = await gremium_ids_for(self.session, actor, _POOL_MANAGE_PERM)
         if gremium_id not in allowed:
             raise ForbiddenError(
                 "Managing the substitute pool requires admin.delegations "
@@ -778,8 +775,8 @@ class DelegationService:
         """List the substitute pool of a gremium.
 
         Only members, pool substitutes and managers of this gremium may read the
-        pool. A manager holds `admin.delegations`, a `meeting.*` permission or
-        `session.manage`.
+        pool. A manager holds `admin.delegations`, `meeting.view_all` or the
+        gremium permission `session.manage`.
 
         Raises:
             NotFoundError: The gremium does not exist (404).

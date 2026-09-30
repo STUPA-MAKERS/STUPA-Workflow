@@ -369,7 +369,7 @@ def test_expense_list_readable_by_booker(fake: _FakeService) -> None:
 
 
 def test_expense_list_forbidden_without_budget_perm(fake: _FakeService) -> None:
-    assert _app_as(fake, {"meeting.manage"}).get("/api/expenses").status_code == 403
+    assert _app_as(fake, {"meeting.view_all"}).get("/api/expenses").status_code == 403
 
 
 def test_expense_list_id_filter_passthrough(fake: _FakeService) -> None:

@@ -666,11 +666,11 @@ class VotingService:
             meeting_id=meeting_id, eligible_group=eligible_group
         )
         if gremium_id is not None:
-            from app.modules.admin.gremium_roles import gremium_ids_with_permission
+            from app.modules.admin.gremium_roles import gremium_ids_for
 
-            if gremium_id in await gremium_ids_with_permission(
-                self.session, principal.sub, "vote.manage"
-            ):
+            # Scope-capped: a token without `vote.manage` in its scope gets nothing
+            # from the gremium role (F16).
+            if gremium_id in await gremium_ids_for(self.session, principal, "vote.manage"):
                 return
         raise ForbiddenError("not allowed to manage this vote")
 

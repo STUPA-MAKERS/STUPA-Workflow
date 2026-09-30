@@ -8,7 +8,7 @@ from uuid import UUID
 
 from sqlalchemy import and_, or_, select
 
-from app.modules.admin.gremium_roles import gremium_ids_with_permission
+from app.modules.admin.gremium_roles import admin_bypass, gremium_ids_for
 from app.modules.admin.models import Gremium
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
@@ -214,7 +214,7 @@ class ListingOps(PermissionOps, VoteReadOps):
         ).all()
         proto_by_meeting = {meeting_id: pid for meeting_id, pid in proto_rows}
         # Load the Gremium scopes of the principal once, to avoid one query per
-        # meeting. An admin or a global ``meeting.manage`` skips all Gremium queries.
+        # meeting. The admin bypass skips the Gremium query of each right.
         all_gids = {m.gremium_id for m in meetings}
         # One batched query for the Gremium names, which the timeline shows.
         gremium_names: dict[UUID, str] = {
@@ -245,39 +245,41 @@ class ListingOps(PermissionOps, VoteReadOps):
             if prot_ids
             else {}
         )
-        # `has` covers the admin role and applies the OAuth scope cap; a raw role read
-        # would hand a narrowly scoped token the full cross-gremium view.
-        if principal.has("meeting.manage"):
-            manage_ids = write_ids = votes_mgmt_ids = all_gids
-            my_id: UUID | None = None
-        else:
-            manage_ids = await gremium_ids_with_permission(
-                self.session, principal.sub, "session.manage"
-            )
-            write_ids = manage_ids | await gremium_ids_with_permission(
-                self.session, principal.sub, "protocol.write"
-            )
-            votes_mgmt_ids = manage_ids | await gremium_ids_with_permission(
-                self.session, principal.sub, "vote.manage"
-            )
-            my_id = await self._principal_id(principal.sub)
+        # The same rules as `PermissionOps.can_manage`, `can_write`,
+        # `can_manage_votes` and `can_finalize`, batched. Each right applies the
+        # OAuth scope cap, the admin bypass included; a raw role read would hand a
+        # narrowly scoped token the full cross-gremium view.
+        async def ids_for(perm: str) -> set[UUID]:
+            if admin_bypass(principal, perm):
+                return set(all_gids)
+            return await gremium_ids_for(self.session, principal, perm)
+
+        manage_ids = await ids_for("session.manage")
+        write_ids = manage_ids | await ids_for("protocol.write")
+        votes_mgmt_ids = manage_ids | await ids_for("vote.manage")
+        finalize_ids = await ids_for("protocol.finalize")
+        my_id = await self._principal_id(principal.sub)
+        prot_writes = principal.scope_allows("protocol.write")
+        prot_votes = principal.scope_allows("vote.manage")
         # A management right never grants a ballot. Only an active gremium role with
         # `vote.cast` passes the cast gate, so `canVote` reads that roster for every
-        # principal, the global meeting manager included. `PermissionOps.can_vote`
+        # principal, the admin included. `PermissionOps.can_vote`
         # applies the same rule to the meeting detail.
         vote_ids = await self._vote_cast_gremium_ids(principal)
         votes_by_meeting = await self._votes_for([m.id for m in meetings])
         out: list[MeetingOut] = []
         for m in meetings:
             is_prot = m.protokollant_id is not None and m.protokollant_id == my_id
+            can_write = (m.gremium_id in write_ids) or (is_prot and prot_writes)
             out.append(
                 self._to_out(
                     m,
                     proto_by_meeting.get(m.id),
                     can_manage=m.gremium_id in manage_ids,
-                    can_write=(m.gremium_id in write_ids) or is_prot,
-                    can_manage_votes=(m.gremium_id in votes_mgmt_ids) or is_prot,
+                    can_write=can_write,
+                    can_manage_votes=(m.gremium_id in votes_mgmt_ids) or (is_prot and prot_votes),
                     can_vote=m.gremium_id in vote_ids,
+                    can_finalize=can_write and m.gremium_id in finalize_ids,
                     is_protokollant=is_prot,
                     gremium_name=gremium_names.get(m.gremium_id),
                     protokollant_name=(

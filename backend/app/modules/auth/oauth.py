@@ -4,6 +4,11 @@ A scope caps the rights of the logged-in principal. A scoped token gets exactly 
 intersection of the RBAC permissions of the user and the permission set of the scope. See
 `Principal.scope_permissions`. This also applies to an admin. The admin bypass in
 `Principal.has` works only for in-scope permissions.
+
+The cap applies to the gremium permissions too (`session.manage`, `protocol.write`,
+`protocol.finalize`, `vote.manage`). A gremium role grants such a permission to a token
+only when the scope of the token contains the key. See `Principal.scope_allows` and
+`app.modules.admin.gremium_roles.gremium_ids_for`.
 """
 
 from __future__ import annotations
@@ -22,6 +27,10 @@ FORBIDDEN_PERMISSIONS: frozenset[str] = frozenset({"vote.cast", "backup.manage"}
 # Scope key to the allowed permission keys. `read` covers every reading endpoint. The
 # `*:write` scopes add the mutations. `votes:write` covers vote management only, that is
 # create, open and close. It never covers `vote.cast`, because voting stays human.
+# `vote.manage`, `session.manage`, `protocol.write` and `protocol.finalize` are gremium
+# permissions: a gremium role grants them, and the scope only lets them through.
+# `read` holds `meeting.view_all`, a global read-only key, so an admin token keeps the
+# view over the meetings of every gremium.
 SCOPES: dict[str, frozenset[str]] = {
     "read": frozenset(
         {
@@ -31,14 +40,13 @@ SCOPES: dict[str, frozenset[str]] = {
             "budget.export",
             "audit.read",
             "audit.verify",
+            "meeting.view_all",
         }
     ),
-    "applications:write": frozenset(
-        {"application.create", "application.transition", "application.manage"}
-    ),
+    "applications:write": frozenset({"application.transition", "application.manage"}),
     "votes:write": frozenset({"vote.manage"}),
     "budget:write": frozenset({"budget.structure", "budget.book"}),
-    "meetings:write": frozenset({"meeting.manage", "protocol.finalize"}),
+    "meetings:write": frozenset({"session.manage", "protocol.write", "protocol.finalize"}),
     "forms:write": frozenset({"form.configure"}),
     "flows:write": frozenset({"flow.configure"}),
     "admin:write": frozenset(

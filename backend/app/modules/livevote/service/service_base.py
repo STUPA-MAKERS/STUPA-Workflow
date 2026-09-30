@@ -40,6 +40,7 @@ class MeetingServiceBase:
         can_write: bool = False,
         can_manage_votes: bool = False,
         can_vote: bool = False,
+        can_finalize: bool = False,
         is_protokollant: bool = False,
         protokollant_name: str | None = None,
         gremium_name: str | None = None,
@@ -70,6 +71,7 @@ class MeetingServiceBase:
             canWrite=can_write,
             canManageVotes=can_manage_votes,
             canVote=can_vote,
+            canFinalize=can_finalize,
             votes=votes or [],
         )
 

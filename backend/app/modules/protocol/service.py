@@ -38,7 +38,6 @@ from app.modules.admin.cd_resolver import (
     cd_variant_key_for_gremium,
     resolve_cd_variant_by_key,
 )
-from app.modules.admin.gremium_roles import gremium_ids_with_permission
 from app.modules.admin.models import Gremium, GremiumMembership, MailList
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
@@ -131,9 +130,8 @@ class ProtocolService:
 
     # The protocol assembles the per-item bodies. The live stack already authorizes
     # these bodies PER GREMIUM: the assigned protokollant plus the Gremium roles with
-    # `session.manage` or `protocol.write`. A global `meeting.manage` alone would lock
-    # those users out. The service therefore delegates to `MeetingService` and applies
-    # the same scope rules as `/api/meetings/…`.
+    # `session.manage` or `protocol.write`. The service therefore delegates to
+    # `MeetingService` and applies the same scope rules as `/api/meetings/…`.
     def _meeting_service(self) -> MeetingService:
         return MeetingService(self.session)
 
@@ -148,9 +146,9 @@ class ProtocolService:
     ) -> None:
         """Check the write access to the protocol of a meeting (create or load).
 
-        One of these rights is enough: the manager permission `meeting.manage`, the
-        Gremium permission `session.manage`, the assigned protokollant role, or a
-        Gremium role with `protocol.write`. The rule is the same as `can_write`.
+        One of these rights is enough: the admin role, the Gremium permission
+        `session.manage`, the assigned protokollant role, or a Gremium role with
+        `protocol.write`. The rule is the same as `can_write`.
 
         Raises:
             ForbiddenError: The principal must not write the minutes of this meeting.
@@ -167,9 +165,10 @@ class ProtocolService:
     async def authorize_finalize(self, protocol_id: UUID, principal: Principal) -> None:
         """Check the right to finalize and send a protocol.
 
-        The caller needs the write access AND `protocol.finalize`. The permission
-        counts as a global permission OR as a Gremium role of this Gremium. This rule
-        is stricter than the rule for a draft write.
+        The caller needs the write access AND the Gremium permission
+        `protocol.finalize` in the Gremium of the meeting (or the admin role). This
+        rule is stricter than the rule for a draft write. `MeetingService.can_finalize`
+        holds the rule, so the `canFinalize` flag of the meeting agrees with it.
 
         Raises:
             ForbiddenError: The caller has no write access or lacks
@@ -180,13 +179,8 @@ class ProtocolService:
         svc = self._meeting_service()
         if not await svc.can_write(meeting, principal):
             raise ForbiddenError("not allowed to write this meeting's minutes")
-        if principal.has("protocol.finalize"):
-            return
-        if meeting.gremium_id in await gremium_ids_with_permission(
-            self.session, principal.sub, "protocol.finalize"
-        ):
-            return
-        raise ForbiddenError("Missing permission(s): protocol.finalize")
+        if not await svc.can_finalize(meeting, principal):
+            raise ForbiddenError("Missing permission(s): protocol.finalize")
 
     async def authorize_read(self, protocol_id: UUID, principal: Principal) -> None:
         """Check the read access with the meeting visibility rule `assert_can_read`."""
@@ -821,8 +815,8 @@ class ProtocolService:
         The mail carries the PDF as an attachment. The subject and the body name the
         Gremium and the meeting. The HTML version uses the branded mail layout. The
         mail holds no link, by design. The former `/api/protocols/{id}/pdf` link
-        needed a login and `meeting.manage`. It was broken for the members and for the
-        external list addresses.
+        needed a login and a meeting management right. It was broken for the members
+        and for the external list addresses.
         """
         if self.mail_queue is None:
             return

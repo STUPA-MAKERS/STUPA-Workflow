@@ -59,7 +59,6 @@ from app.shared.errors import (
 router = APIRouter(tags=["livevote"])
 
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
-MANAGE_PERMISSION = "meeting.manage"
 
 # Single-process fallback for the case where the lifespan does not wire a broker
 # or a locker onto the app state, for example in tests. Production uses Redis.
@@ -160,7 +159,6 @@ AttendanceDep = Annotated[AttendanceService, Depends(get_attendance_service)]
 AgendaDep = Annotated[AgendaService, Depends(get_agenda_service)]
 VotingDep = Annotated[VotingService, Depends(get_voting_service)]
 BrokerRestDep = Annotated[MeetingBroker, Depends(get_broker_rest)]
-ManagerDep = Annotated[Principal, Depends(require_principal(MANAGE_PERMISSION))]
 ReaderDep = Annotated[Principal, Depends(require_principal())]
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 AutoMailerDep = Annotated[AutoMailer, Depends(get_auto_mailer)]
@@ -184,10 +182,9 @@ async def create_meeting(
 ) -> MeetingOut:
     """Create a meeting in status ``planned``.
 
-    The caller must be a meeting manager (``session.manage``) or an admin. RBAC is
-    scoped to the Gremium: a Gremium board or manager, or the global
-    ``meeting.manage``. The service raises 403 when the principal may not manage the
-    Gremium. The members of the Gremium receive a meeting mail.
+    The caller must hold the gremium permission ``session.manage`` in the Gremium of
+    the meeting, or the admin role. The service raises 403 when the principal may not
+    manage the Gremium. The members of the Gremium receive a meeting mail.
     """
     meeting = await service.create(payload, principal)
     pool = getattr(request.app.state, "arq_pool", None)
@@ -629,9 +626,10 @@ async def _authorize(
     # Voter channel: active Gremium members and the external substitutes that hold
     # a delegation for this meeting may read the live stream. The vote right itself
     # is gated separately through ``vote.cast`` and the delegation check. The
-    # dedicated read-only beamer channel stays gated by ``meeting.manage``.
+    # dedicated read-only beamer channel needs ``session.manage`` in the Gremium of
+    # the meeting (or the admin role).
     eligible = (
-        principal.has(MANAGE_PERMISSION)
+        await meetings.can_manage(meeting.gremium_id, principal)
         if beamer
         else await meetings.is_participant(meeting_id, meeting.gremium_id, principal)
     )

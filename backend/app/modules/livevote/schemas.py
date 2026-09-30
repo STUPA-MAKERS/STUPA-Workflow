@@ -139,6 +139,9 @@ class MeetingOut(_CamelModel):
     can_write: bool = Field(default=False, alias="canWrite")
     can_manage_votes: bool = Field(default=False, alias="canManageVotes")
     can_vote: bool = Field(default=False, alias="canVote")
+    # The principal may finalize and send the protocol: the write access plus the
+    # gremium permission ``protocol.finalize``.
+    can_finalize: bool = Field(default=False, alias="canFinalize")
     votes: list[MeetingVoteOut] = Field(default_factory=list)
 
 
