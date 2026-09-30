@@ -124,3 +124,24 @@ async def test_flow_deadline_passed_true_when_row_due() -> None:
 async def test_flow_deadline_passed_false_without_due_row() -> None:
     # An empty scalar queue gives None, so no deadline is due.
     assert await flow_deadline_passed(fake_session(), uuid4()) is False
+
+
+@pytest.mark.parametrize(
+    ("config", "kind", "expected"),
+    [
+        (None, None, False),
+        ({}, None, False),
+        ({"deadlinePolicyKey": ""}, None, False),
+        ({"deadlinePolicyKey": "k"}, "relative_changed", True),
+        ({"deadlinePolicyKey": "k"}, "relative_submitted", False),
+        ({"deadlinePolicyKey": "k"}, None, False),
+    ],
+)
+async def test_state_deadline_follows_edits(
+    config: Any, kind: str | None, expected: bool
+) -> None:
+    from app.modules.deadlines.service import state_deadline_follows_edits
+
+    session = fake_session()
+    session.scalar_results = [kind]
+    assert await state_deadline_follows_edits(session, config) is expected
