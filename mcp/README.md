@@ -50,20 +50,22 @@ clients.
 |-------|------------------------------------------|
 | `read` | read applications, budgets, votes, meetings (incl. `meeting.view_all`), audit, exports |
 | `applications:write` | comment / transition / manage applications |
-| `votes:write` | create / open / close / cancel / manage votes through `vote.manage` (NEVER cast a ballot — only a human may do that. `vote.cast` is in `FORBIDDEN_PERMISSIONS` and is never grantable) |
+| `votes:write` | create / open / close / cancel / manage votes through the gremium right `vote.manage` (NEVER cast a ballot — only a human may do that. `vote.cast` is in `FORBIDDEN_PERMISSIONS` and is never grantable) |
 | `budget:write` | book expenses, manage cost centers & invoices |
 | `meetings:write` | the gremium rights `session.manage` (meetings & agendas), `protocol.write` (minutes) and `protocol.finalize` (finalize & send the minutes) |
 
-The meeting and vote rights are gremium rights. The scope does not grant them. It only
+The meeting and vote rights are gremium rights. No global permission grants them. The
+scope does not grant them either. It only
 lets them through when your role in the meeting's gremium holds them (or you are admin).
 A token without `meetings:write` cannot manage a meeting or write minutes, whatever your
 gremium role says.
 
 The meeting lead includes the votes of the meeting. A `meetings:write` token of a holder of
 `session.manage` can thus create, open, close and cancel the votes of that gremium's
-meetings and change the current agenda item, also without `votes:write`. `votes:write`
-lets `vote.manage` through for all other people who manage votes: the minute-taker, a
-gremium role with `vote.manage` only, and the votes that no meeting holds.
+meetings, the votes of its applications that no meeting holds, and change the current
+agenda item, also without `votes:write`. `votes:write` lets `vote.manage` through for all
+other people who manage votes: the minute-taker and a gremium role with `vote.manage`
+only. A vote names the gremium UUID as `eligibleGroup`.
 
 ## Tools
 

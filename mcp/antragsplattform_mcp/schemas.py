@@ -420,17 +420,25 @@ class MeetingVoteOpenBody(WireModel):
     options: list[str] = Field(default_factory=lambda: ["yes", "no", "abstain"])
     majorityRule: Literal["simple", "absolute", "two_thirds"] = "simple"
     secret: bool = False
-    eligibleCount: int | None = None
+    # The server counts the eligible voters from the roster of the gremium.
     quorumPercent: int | None = None
 
 
 class VoteCreate(WireModel):
-    """Application-bound vote (voting module)."""
+    """Application-bound vote (voting module).
+
+    The server counts the eligible voters from the roster of the gremium. The body has
+    no `eligibleCount`.
+    """
 
     config: dict[str, Any] = Field(description="Vote config (options/majority/secret …)")
-    eligibleGroup: str
+    eligibleGroup: str = Field(
+        description=(
+            "UUID of the gremium that votes. It must be the gremium of the application "
+            "(see `get_application` / `list_gremien`). A free group key gives 422."
+        )
+    )
     question: str | None = None
-    eligibleCount: int | None = None
     opensStateId: str | None = None
     closesAt: str | None = Field(default=None, description="ISO datetime")
     resultBranchTransitionId: str | None = None

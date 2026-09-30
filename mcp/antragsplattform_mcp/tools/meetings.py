@@ -32,7 +32,12 @@ async def get_vote(vote_id: str) -> dict:
 
 @group.tool
 async def create_application_vote(application_id: str, vote: S.VoteCreate) -> dict:
-    """Create a vote bound to an application. Requires vote.manage."""
+    """Create a vote bound to an application.
+
+    `eligibleGroup` is the UUID of the gremium of the application. The server counts
+    the eligible voters. Requires the gremium permission `vote.manage` or
+    `session.manage` in that gremium (or admin).
+    """
     return await api().post(
         f"/applications/{application_id}/votes", json=dump_create(vote)
     )
@@ -40,7 +45,11 @@ async def create_application_vote(application_id: str, vote: S.VoteCreate) -> di
 
 @group.tool
 async def open_vote(vote_id: str) -> dict:
-    """Open a vote for balloting. Requires vote.manage."""
+    """Open a vote for balloting.
+
+    Requires the gremium permission `vote.manage` or `session.manage` in the gremium of
+    the vote (or admin).
+    """
     return await api().post(f"/votes/{vote_id}/open")
 
 
@@ -50,7 +59,8 @@ async def close_vote(vote_id: str) -> dict:
 
     The call gives a 409 while the quorum is not met. Collect more ballots or call
     `cancel_vote`. An agent manages a vote but cannot cast a ballot. Casting is
-    human-only. Requires vote.manage.
+    human-only. Requires the gremium permission `vote.manage` or `session.manage` in
+    the gremium of the vote (or admin).
     """
     return await api().post(f"/votes/{vote_id}/close")
 
@@ -61,7 +71,8 @@ async def cancel_vote(vote_id: str) -> dict:
 
     The status becomes `cancelled`. There is no result and no flow branch. The
     application stays in its vote state. This is the way out when the quorum cannot be
-    reached, because `close_vote` is blocked then. Requires vote.manage.
+    reached, because `close_vote` is blocked then. Requires the gremium permission
+    `vote.manage` or `session.manage` in the gremium of the vote (or admin).
     """
     return await api().post(f"/votes/{vote_id}/cancel")
 
@@ -194,15 +205,20 @@ async def list_assignable_agenda_items(meeting_id: str) -> dict:
 async def create_meeting_vote(meeting_id: str, vote: S.MeetingVoteOpenBody) -> dict:
     """Open a live vote on an agenda item of a meeting.
 
-    The agenda item can be a free-text item or an application item.
-    Requires vote.manage.
+    The agenda item can be a free-text item or an application item. The gremium of the
+    meeting votes, and the server counts its eligible voters. Requires the lead of the
+    meeting, the minute-taker, or the gremium permission `vote.manage`.
     """
     return await api().post(f"/meetings/{meeting_id}/votes", json=dump_create(vote))
 
 
 @group.tool
 async def delete_meeting_vote(meeting_id: str, vote_id: str) -> dict:
-    """Delete a meeting vote. Requires vote.manage."""
+    """Delete a meeting vote.
+
+    Requires the lead of the meeting, the minute-taker, or the gremium permission
+    `vote.manage`.
+    """
     return await api().delete(f"/meetings/{meeting_id}/votes/{vote_id}")
 
 
