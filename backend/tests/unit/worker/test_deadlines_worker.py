@@ -131,7 +131,7 @@ def patched(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(wd, "FlowService", _FlowFake)
     monkeypatch.setattr(wd, "VotingService", _VotingFake)
     monkeypatch.setattr(wd, "NotificationService", _NotifyFake)
-    monkeypatch.setattr(wd, "build_notify_dispatcher", lambda _pool: object())
+    monkeypatch.setattr(wd, "build_worker_dispatcher", lambda *_a: object())
 
 
 def _ctx(sessions: list[FakeSession]) -> dict[str, Any]:

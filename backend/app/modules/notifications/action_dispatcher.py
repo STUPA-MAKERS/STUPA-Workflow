@@ -19,17 +19,15 @@ from dataclasses import dataclass
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.db import get_sessionmaker
 from app.modules.applications.models import Application
 from app.modules.flow.dispatch import DispatchedAction
 from app.modules.flow.models import State
-from app.modules.notifications.provider import mail_queue_from_pool
 from app.modules.notifications.queue import MailQueue
 from app.modules.notifications.service import (
     NotificationService,
     resolve_application_lang,
 )
-from app.settings import Settings, get_settings
+from app.settings import Settings
 
 logger = logging.getLogger("app.notifications")
 
@@ -214,12 +212,3 @@ _BUILTIN_TASK_BODY = {
     "step where you can act"
     "{% if status %} (status: {{ status }}){% endif %}.\n",
 }
-
-
-def build_notify_dispatcher(pool: object) -> NotificationActionDispatcher:
-    """Build the dispatcher from the optional arq pool (app wiring)."""
-    return NotificationActionDispatcher(
-        get_sessionmaker(),
-        mail_queue_from_pool(pool),  # type: ignore[arg-type]
-        get_settings(),
-    )

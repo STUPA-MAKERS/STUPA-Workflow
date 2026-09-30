@@ -367,8 +367,3 @@ async def test_top_level_stops_on_cycle() -> None:
     session = _Session(store={a.id: a, b.id: b})
     top = await FlowExtrasActionDispatcher._top_level(session, a)  # pyright: ignore[reportArgumentType]
     assert top is b  # a → b → a is already seen, so the walk stops
-
-
-def test_build_flow_extras_dispatcher_needs_no_pool() -> None:
-    disp = extras_mod.build_flow_extras_dispatcher(None)
-    assert isinstance(disp, FlowExtrasActionDispatcher)

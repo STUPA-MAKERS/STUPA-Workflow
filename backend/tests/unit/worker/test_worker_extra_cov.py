@@ -430,8 +430,21 @@ async def test_main_on_startup_calls_all_inits(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setattr(wmain, "protocol_on_startup", await _mk("protocol"))
     monkeypatch.setattr(wmain, "webhook_on_startup", await _mk("webhook"))
     monkeypatch.setattr(wmain, "deadlines_on_startup", await _mk("deadlines"))
-    await wmain._on_startup({})
-    assert called == ["mail", "scan", "protocol", "webhook", "deadlines"]
+    monkeypatch.setattr(wmain, "backup_on_startup", await _mk("backup"))
+    sentinel = object()
+    built: list[tuple[Any, ...]] = []
+
+    def _build(*args: Any) -> object:
+        built.append(args)
+        return sentinel
+
+    monkeypatch.setattr(wmain, "build_worker_dispatcher", _build)
+    ctx: dict[str, Any] = {"redis": "pool", "settings": "cfg"}
+    await wmain._on_startup(ctx)
+    assert called == ["mail", "scan", "protocol", "webhook", "deadlines", "backup"]
+    # F2: the worker builds the full flow dispatcher once, over the arq pool.
+    assert ctx["flow_dispatcher"] is sentinel
+    assert built and built[0][0] == "pool" and built[0][2] == "cfg"
 
 
 # worker/deadlines.py: the discard log and the auto-transitions
@@ -481,7 +494,7 @@ async def test_discard_unconfirmed_none_rowcount() -> None:
 
 @pytest.fixture
 def _patched_auto(monkeypatch: pytest.MonkeyPatch) -> Any:
-    monkeypatch.setattr(wd, "build_notify_dispatcher", lambda _pool: object())
+    monkeypatch.setattr(wd, "build_worker_dispatcher", lambda *_a: object())
     yield
 
 

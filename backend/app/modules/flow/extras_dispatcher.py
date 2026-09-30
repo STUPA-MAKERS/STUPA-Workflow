@@ -1,11 +1,13 @@
-"""Flow action handlers for `addToNextSession` and `assignBudget`.
+"""Flow action handlers for `addToNextSession`, `assignBudget` and `assignBudgetFromField`.
 
-`addToNextSession` appends the application as an agenda item to the earliest upcoming
-meeting of the given Gremium. If no such meeting exists, the handler logs the case and
-skips the action. `assignBudget` attaches a cost center. It derives the fiscal year
-from the single active fiscal year of the top-level node. The dispatcher logs an error
-of a single action and never propagates it. A failed action must not roll back the
-committed state change.
+`addToNextSession` appends the application as an agenda item to the earliest meeting of
+the given Gremium that is still `planned` and whose date is today or later in local time.
+A live or closed meeting never gets the item. If no such meeting exists, the handler logs
+the case and skips the action. `assignBudget` attaches a cost center. It derives the
+fiscal year from the single active fiscal year of the top-level node.
+`assignBudgetFromField` does the same with the cost center id that a form field holds.
+The dispatcher logs an error of a single action and never propagates it. A failed action
+must not roll back the committed state change.
 """
 
 from __future__ import annotations
@@ -13,13 +15,13 @@ from __future__ import annotations
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.db import get_sessionmaker
 from app.modules.applications.models import Application
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
@@ -27,6 +29,7 @@ from app.modules.budget.tree_models import Budget, FiscalYear
 from app.modules.flow.dispatch import DispatchedAction
 from app.modules.livevote.agenda_service import AgendaService
 from app.modules.livevote.models import Meeting
+from app.settings import get_settings
 from app.shared.errors import ConflictError, NotFoundError
 
 logger = logging.getLogger("app.flow.actions")
@@ -74,7 +77,10 @@ class FlowExtrasActionDispatcher:
         except ValueError:
             logger.warning("addToNextSession invalid gremiumId %r — skipped", gremium_ref)
             return
-        today = datetime.now(UTC).date()
+        # `Meeting.date` is a local calendar day, so compare it with the local date.
+        # Only a `planned` meeting takes a new agenda item. A live or closed meeting
+        # of today is not "the next session".
+        today = datetime.now(ZoneInfo(get_settings().local_timezone)).date()
         async with self.sessionmaker() as session:
             meeting = await session.scalar(
                 select(Meeting)
@@ -82,7 +88,7 @@ class FlowExtrasActionDispatcher:
                     Meeting.gremium_id == gremium_id,
                     Meeting.date.is_not(None),
                     Meeting.date >= today,
-                    Meeting.status != "finalized",
+                    Meeting.status == "planned",
                 )
                 .order_by(Meeting.date.asc(), Meeting.start_time.asc().nullslast())
                 .limit(1)
@@ -152,13 +158,25 @@ class FlowExtrasActionDispatcher:
     ) -> bool:
         """Assign the cost center and its single active fiscal year, then write the audit.
 
+        The call is idempotent. A retry of the same action (same idempotency key)
+        finds the cost center already set and changes nothing, so it writes no second
+        audit entry.
+
         Returns:
             `True` after the assignment. The caller commits. `False` when the node is
-            missing. Nothing changed in that case.
+            missing or the application already has this cost center. Nothing changed in
+            that case.
         """
         node = await session.get(Budget, budget_id)
         if node is None:
             logger.warning("assignBudget: budget %s missing — skipped", budget_id)
+            return False
+        if app.budget_id == node.id:
+            logger.info(
+                "assignBudget: application %s already has budget %s — no change",
+                app.id,
+                node.id,
+            )
             return False
         app.budget_id = node.id
         top = await self._top_level(session, node)
@@ -219,8 +237,3 @@ def _parse_budget_uuid(label: str, ref: object) -> UUID | None:
     except ValueError:
         logger.warning("%s: invalid budget id %r — skipped", label, ref)
         return None
-
-
-def build_flow_extras_dispatcher(pool: object) -> FlowExtrasActionDispatcher:
-    """Build the dispatcher for the app wiring. It needs no arq pool."""
-    return FlowExtrasActionDispatcher(get_sessionmaker())

@@ -22,6 +22,7 @@ from app.deps import get_current_principal
 from app.main import create_app
 from app.modules.admin import gremium_roles as gremium_roles_mod
 from app.modules.auth.principal import Principal
+from app.modules.flow.dispatch import NullActionDispatcher
 from app.modules.livevote import router as router_mod
 from app.modules.livevote.agenda_service import AgendaService, _title_of
 from app.modules.livevote.attendance_service import AttendanceService
@@ -145,7 +146,7 @@ class _QueueSession:
     async def scalar(self, _stmt: Any) -> Any:
         return self.scalar_q.pop(0) if self.scalar_q else None
 
-    async def get(self, _model: Any, _ident: Any) -> Any:
+    async def get(self, _model: Any, _ident: Any, **_kwargs: Any) -> Any:
         return self.get_q.pop(0) if self.get_q else None
 
     def add(self, obj: Any) -> None:
@@ -1933,8 +1934,13 @@ def test_router_di_factories() -> None:
     assert isinstance(get_meeting_service_ws(sess, broker), MeetingService)  # type: ignore[arg-type]
     assert isinstance(get_attendance_service(sess), AttendanceService)  # type: ignore[arg-type]
     assert isinstance(get_agenda_service(sess), AgendaService)  # type: ignore[arg-type]
-    assert get_voting_service(sess) is not None  # type: ignore[arg-type]
-    assert get_voting_service_ws(sess) is not None  # type: ignore[arg-type]
+    # F2: both voting factories take the flow dispatcher, so the override in
+    # `app.main` reaches the live-vote routes too.
+    flow_dispatcher = NullActionDispatcher()
+    rest_voting = get_voting_service(sess, flow_dispatcher)  # type: ignore[arg-type]
+    ws_voting = get_voting_service_ws(sess, flow_dispatcher)  # type: ignore[arg-type]
+    assert rest_voting.dispatcher is flow_dispatcher
+    assert ws_voting.dispatcher is flow_dispatcher
 
 
 # router.py: REST through TestClient with service fakes in dependency_overrides
