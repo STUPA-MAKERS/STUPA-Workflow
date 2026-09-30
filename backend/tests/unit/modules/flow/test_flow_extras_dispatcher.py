@@ -317,7 +317,7 @@ async def test_assign_from_field_assigns_from_data(monkeypatch: pytest.MonkeyPat
     app = SimpleNamespace(
         id=app_id, budget_id=None, fiscal_year_id=None, data={"ziel": str(node_id)}
     )
-    node = SimpleNamespace(id=node_id, parent_id=None)
+    node = SimpleNamespace(id=node_id, parent_id=None, active=True)
     session = _Session(store={app_id: app, node_id: node}, active_fy=(fy_id,))
     await FlowExtrasActionDispatcher(_maker(session)).dispatch(
         [_action("assignBudgetFromField", field="ziel", application_id=app_id)]
@@ -341,6 +341,43 @@ async def test_assign_from_field_node_missing_no_commit(monkeypatch: pytest.Monk
     )
     assert app.budget_id is None
     assert session.committed == 0
+
+
+async def test_assign_from_field_inactive_node_skipped(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The form offers only active cost centers. An applicant who stores the id of an
+    # inactive (closed) cost center through the API gets no assignment (fail closed).
+    calls = _stub_audit(monkeypatch)
+    app_id, node_id = uuid4(), uuid4()
+    app = SimpleNamespace(
+        id=app_id, budget_id=None, fiscal_year_id=None, data={"ziel": str(node_id)}
+    )
+    node = SimpleNamespace(id=node_id, parent_id=None, active=False)
+    session = _Session(store={app_id: app, node_id: node}, active_fy=(uuid4(),))
+    await FlowExtrasActionDispatcher(_maker(session)).dispatch(
+        [_action("assignBudgetFromField", field="ziel", application_id=app_id)]
+    )
+    assert app.budget_id is None
+    assert app.fiscal_year_id is None
+    assert session.committed == 0
+    assert calls == []
+
+
+async def test_assign_from_field_keeps_existing_budget(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Staff already set a different cost center. The applicant value does not overwrite it.
+    calls = _stub_audit(monkeypatch)
+    app_id, node_id, staff_id, fy_id = uuid4(), uuid4(), uuid4(), uuid4()
+    app = SimpleNamespace(
+        id=app_id, budget_id=staff_id, fiscal_year_id=fy_id, data={"ziel": str(node_id)}
+    )
+    node = SimpleNamespace(id=node_id, parent_id=None, active=True)
+    session = _Session(store={app_id: app, node_id: node}, active_fy=(uuid4(),))
+    await FlowExtrasActionDispatcher(_maker(session)).dispatch(
+        [_action("assignBudgetFromField", field="ziel", application_id=app_id)]
+    )
+    assert app.budget_id == staff_id
+    assert app.fiscal_year_id == fy_id
+    assert session.committed == 0
+    assert calls == []
 
 
 async def test_top_level_walks_parent_chain() -> None:

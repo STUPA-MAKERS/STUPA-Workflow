@@ -122,6 +122,12 @@ class FlowExtrasActionDispatcher:
 
         The field is a picker such as `gremium_select` or `budget_select`. One dynamic
         pick replaces many fixed triage edges in the flow graph.
+
+        The applicant controls the field value, so the handler accepts only the set that
+        the form offered (see `FormService._budget_field_options`). It skips the action
+        (fail closed) when the node is missing or inactive. It also does not overwrite a
+        different cost center that the application already has, because a staff decision
+        wins over an applicant value.
         """
         field = action.params.get("field")
         if not field:
@@ -138,6 +144,22 @@ class FlowExtrasActionDispatcher:
             raw = app.data.get(str(field)) if isinstance(app.data, dict) else None
             budget_id = _parse_budget_uuid(f"assignBudgetFromField field {field!r}", raw)
             if budget_id is None:
+                return
+            node = await session.get(Budget, budget_id)
+            if node is None or not node.active:
+                logger.warning(
+                    "assignBudgetFromField: budget %s missing or inactive — skipped",
+                    budget_id,
+                )
+                return
+            if app.budget_id is not None and app.budget_id != node.id:
+                logger.warning(
+                    "assignBudgetFromField: application %s already has budget %s — "
+                    "no overwrite with %s",
+                    app.id,
+                    app.budget_id,
+                    node.id,
+                )
                 return
             if await self._assign_node(session, app, budget_id, source="flow:field"):
                 await session.commit()

@@ -429,8 +429,9 @@ def _validate_uuid_ref(
     The picker fields are `gremium_select` and `budget_select`. The server injects their
     options only at render time in ``effective_form``, from the current Gremien or from
     the budget tree. This answer validation is pure and has no DB access, so it checks the
-    UUID form only. A value that names no real entity finds no transition in the flow,
-    which fails closed.
+    UUID form only. The consumers of the value check it against the DB and fail closed.
+    For example, the flow action `assignBudgetFromField` skips a budget id that names no
+    active cost center.
     """
     if not isinstance(value, str) or not value:
         _err(errors, field.key, f"must be a {label}")

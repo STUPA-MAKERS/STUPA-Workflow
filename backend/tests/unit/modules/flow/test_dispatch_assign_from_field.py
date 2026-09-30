@@ -89,7 +89,7 @@ async def test_assign_from_field_runs_once_per_idempotency_key(
     app = SimpleNamespace(
         id=app_id, budget_id=None, fiscal_year_id=None, data={"ziel": str(node_id)}
     )
-    node = SimpleNamespace(id=node_id, parent_id=None)
+    node = SimpleNamespace(id=node_id, parent_id=None, active=True)
     session = _Session({app_id: app, node_id: node}, (fy_id,))
     actions = build_dispatched_actions(
         [{"type": "assignBudgetFromField", "field": "ziel"}],
