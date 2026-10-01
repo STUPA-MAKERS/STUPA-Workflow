@@ -569,7 +569,13 @@ def application_id_of(attachment: Attachment) -> uuid.UUID:
 
 
 def upload_audit_data(attachment: Attachment) -> dict[str, object]:
-    """Build the ``attachment_upload`` audit data, without the file name (PII)."""
+    """Build the ``attachment_upload`` audit data.
+
+    The audit chain is append-only, and anonymization cannot remove a row from it.
+    Thus the data holds no client text: not the file name (PII) and not the raw
+    ``field_key``. The caller sends ``field_key`` as free text, so the data records
+    only whether the upload has one (``hasFieldKey``).
+    """
     owner: dict[str, object] = (
         {"application_id": str(attachment.application_id)}
         if attachment.application_id is not None
@@ -577,7 +583,7 @@ def upload_audit_data(attachment: Attachment) -> dict[str, object]:
     )
     return {
         **owner,
-        "fieldKey": attachment.field_key,
+        "hasFieldKey": attachment.field_key is not None,
         "isComparisonOffer": attachment.is_comparison_offer,
         "mime": attachment.mime,
         "size": attachment.size,

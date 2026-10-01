@@ -90,7 +90,7 @@ async def test_upload_clean_path_stores_and_enqueues() -> None:
     assert UPLOAD_AUDITS[0]["target_id"] == str(out.id)
     assert UPLOAD_AUDITS[0]["data"] == {
         "application_id": str(app_id),
-        "fieldKey": None,
+        "hasFieldKey": False,
         "isComparisonOffer": False,
         "mime": "application/pdf",
         "size": len(PDF),

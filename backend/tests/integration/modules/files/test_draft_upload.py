@@ -167,7 +167,7 @@ async def test_first_upload_issues_a_token_and_later_uploads_extend_it(
     assert audits[0].actor == "applicant"
     assert audits[0].data == {
         "draft": True,
-        "fieldKey": "angebote",
+        "hasFieldKey": True,
         "isComparisonOffer": True,
         "mime": "application/pdf",
         "size": len(_PDF),

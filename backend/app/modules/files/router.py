@@ -162,7 +162,7 @@ async def upload_attachment(
     service: ServiceDep,
     access: Annotated[Access, Depends(require_app_edit)],
     file: Annotated[UploadFile, File()],
-    field_key: Annotated[str | None, Form()] = None,
+    field_key: Annotated[str | None, Form(max_length=256)] = None,
     is_comparison_offer: Annotated[bool, Form()] = False,
 ) -> AttachmentOut:
     """Upload an attachment.

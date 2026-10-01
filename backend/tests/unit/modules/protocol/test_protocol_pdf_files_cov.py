@@ -881,5 +881,7 @@ async def test_upload_with_field_key_and_comparison_offer(
     added = [a for a in session.added if isinstance(a, Attachment)]
     assert added and added[0].field_key == "kostenaufstellung"
     assert len(queue.enqueued) == 1
-    assert audits[0]["data"]["fieldKey"] == "kostenaufstellung"  # type: ignore[index]
+    # The audit records only that a field key exists, never the client text.
+    assert audits[0]["data"]["hasFieldKey"] is True  # type: ignore[index]
+    assert "fieldKey" not in audits[0]["data"]  # type: ignore[operator]
     assert audits[0]["data"]["isComparisonOffer"] is True  # type: ignore[index]

@@ -28,7 +28,7 @@ the object storage. It then drops the token table, restores NOT NULL and drops t
 indexes, the checks and the columns.
 
 Revision ID: 1ee8a0d3928c
-Revises: d5569d5542c6
+Revises: 96421ecdbc54
 Create Date: 2026-10-01 22:22:19.896748
 """
 
@@ -39,7 +39,7 @@ from collections.abc import Sequence
 from alembic import op
 
 revision: str = "1ee8a0d3928c"
-down_revision: str | None = "d5569d5542c6"
+down_revision: str | None = "96421ecdbc54"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

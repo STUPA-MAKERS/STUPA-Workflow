@@ -1130,7 +1130,7 @@ def test_attachment_drafts(alembic_cfg: Config, engine: Engine) -> None:
     table. An existing row stays. The downgrade drops the token table, deletes the
     drafts, restores NOT NULL and drops the columns.
     """
-    command.downgrade(alembic_cfg, "d5569d5542c6")
+    command.downgrade(alembic_cfg, "96421ecdbc54")
     with engine.begin() as conn:
         cols = _attachment_columns(conn)
         assert cols["application_id"] == "NO"
@@ -1219,7 +1219,7 @@ def test_attachment_drafts(alembic_cfg: Config, engine: Engine) -> None:
         with pytest.raises(IntegrityError), engine.begin() as conn:
             conn.execute(text(bad), {"a": app_id})
 
-    command.downgrade(alembic_cfg, "d5569d5542c6")
+    command.downgrade(alembic_cfg, "96421ecdbc54")
     with engine.begin() as conn:
         cols = _attachment_columns(conn)
         assert cols["application_id"] == "NO"
