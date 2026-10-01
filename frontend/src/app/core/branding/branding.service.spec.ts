@@ -68,6 +68,23 @@ describe('BrandingService', () => {
     expect(svc.appName()).toBe(i18n.translate('app.title'));
   });
 
+  it('starts with the default confirmation window of 12 hours', () => {
+    expect(svc.confirmTtlHours()).toBe(BrandingService.DEFAULT_CONFIRM_TTL_HOURS);
+    expect(svc.confirmTtlHours()).toBe(12);
+  });
+
+  it('takes the confirmation window from the public config', () => {
+    svc.init();
+    http.expectOne('/api/site-config').flush({ version: 1, branding: null, confirmTtlHours: 48 });
+    expect(svc.confirmTtlHours()).toBe(48);
+  });
+
+  it('keeps the default window when the config has none or a bad value', () => {
+    svc.init();
+    http.expectOne('/api/site-config').flush({ version: 1, branding: null, confirmTtlHours: 0 });
+    expect(svc.confirmTtlHours()).toBe(12);
+  });
+
   it('keeps the i18n fallback when the config request errors', () => {
     svc.init();
     http

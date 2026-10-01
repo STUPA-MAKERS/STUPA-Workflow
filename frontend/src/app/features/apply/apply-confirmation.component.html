@@ -23,7 +23,7 @@
         <app-badge variant="warning">{{ 'apply.confirm.badge' | t }}</app-badge>
       </div>
       <p class="done__text">{{ 'apply.confirm.body' | t }}</p>
-      <p class="done__expiry" role="note">{{ 'apply.confirm.expiry' | t }}</p>
+      <p class="done__expiry" role="note">{{ 'apply.confirm.expiry' | t: { hours: confirmTtlHours() } }}</p>
       @if (applicationId()) {
         <p class="mt-4 text-muted text-sm">
           {{ 'apply.confirm.ref' | t }} <code>{{ shortRef() }}</code>

@@ -43,8 +43,9 @@ interface ReadonlyRow {
  *
  * The page verifies the token. It shows the status, the history and the public
  * comments. The applicant can also edit the answer data. The page stays read-only
- * if the current status forbids edits (`state.editAllowed`) or if the link has only
- * the `view` scope.
+ * if the current status forbids edits (`state.editAllowed`). The backend gives every
+ * new link the `edit` scope (O3, O4), so `state.editAllowed` is the gate that hides
+ * the data edit in a locked status. The `view` check stays for old sessions.
  */
 @Component({
   selector: 'app-status-timeline',

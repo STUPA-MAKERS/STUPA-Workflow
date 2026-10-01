@@ -383,6 +383,8 @@ describe('AuditLogComponent', () => {
       'agenda_item_update',
       'agenda_item_remove',
       'agenda_reorder',
+      'application_create',
+      'guest_application_discard',
     ] as const;
     for (const action of fresh) {
       // Every one of them is in the catalog, so the filter offers it.
@@ -428,6 +430,11 @@ describe('AuditLogComponent', () => {
     expect(cmp.targetLink(entry(1, { targetType: 'invoice', targetId: 'i-9' }))).toEqual([
       '/invoices',
     ]);
+    // The guest settings live on the deadlines admin page (Z1).
+    expect(
+      cmp.targetLink(entry(1, { targetType: 'guest_application_settings', targetId: '1' })),
+    ).toEqual(['/admin/deadlines']);
+    expect(cmp.targetTypeLabel('guest_application_settings')).toBe('Anträge ohne Konto');
   });
 
   it('targetLink resolves the admin-list routes for the remaining target types', async () => {

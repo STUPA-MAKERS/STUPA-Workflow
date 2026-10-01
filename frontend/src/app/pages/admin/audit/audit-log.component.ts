@@ -74,7 +74,10 @@ export const AUDIT_ACTIONS = [
   'attachment_quarantine',
   'attachment_delete',
   // Content mutations that leave a trace outside the flow: application data, comments,
-  // protocols, votes.
+  // protocols, votes. application_create (F12) and guest_application_discard (Z1) mark the
+  // start and the discard of an application.
+  'application_create',
+  'guest_application_discard',
   'application_update',
   'comment_update',
   'comment_delete',
@@ -130,6 +133,8 @@ const ACTION_ICONS: Record<string, IconName> = {
   webhook_config: 'webhook',
   attachment_quarantine: 'paperclip',
   attachment_delete: 'paperclip',
+  application_create: 'form',
+  guest_application_discard: 'form',
   application_update: 'form',
   comment_update: 'form',
   comment_delete: 'form',
@@ -178,6 +183,7 @@ const TARGET_ROUTES: Record<string, (id: string) => string[]> = {
   group_mapping: () => ['/admin/users'],
   webhook: () => ['/admin/webhooks'],
   site_config: () => ['/admin/branding'],
+  guest_application_settings: () => ['/admin/deadlines'],
   // Each budget target goes to the tab that owns it. Cost centers, allocations and transfers
   // go to the budget dashboard. Bookings go to the expenses list. Invoices go to the invoice
   // list.

@@ -31,6 +31,11 @@ export interface PublicFooterLink {
 
 export interface PublicSiteConfig {
   version: number;
+  /**
+   * Hours a guest has to confirm the email before the platform discards the
+   * application (admin setting `guest_application_settings.confirm_ttl_hours`).
+   */
+  confirmTtlHours?: number;
   branding?: {
     /** Configured app name (language neutral). Empty falls back to i18n or the default. */
     appName?: string;
