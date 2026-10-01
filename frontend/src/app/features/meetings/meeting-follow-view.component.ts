@@ -5,7 +5,6 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type {
   AgendaItem,
   Attendance,
-  AttendanceStatus,
   I18nMap,
   Meeting,
   MeetingVote,
@@ -17,7 +16,10 @@ import {
   CardComponent,
   IconComponent,
 } from '@stupa-makers/ui-kit';
-import { MeetingAttendanceTableComponent } from './meeting-attendance-table.component';
+import {
+  type AttendanceChange,
+  MeetingAttendanceTableComponent,
+} from './meeting-attendance-table.component';
 import { MeetingDelegationCardComponent } from './meeting-delegation-card.component';
 import { renderMarkdown } from './meetings.util';
 import {
@@ -72,7 +74,7 @@ export class MeetingFollowViewComponent {
   readonly choices = input.required<Record<string, string>>();
 
   readonly castVote = output<{ voteId: Uuid; choice: string }>();
-  readonly attendanceChange = output<{ member: Attendance; status: AttendanceStatus }>();
+  readonly attendanceChange = output<AttendanceChange>();
 
   protected readonly voteVariant = voteStatusVariant;
   protected readonly voteStatusKey = voteStatusKey;

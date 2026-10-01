@@ -90,9 +90,9 @@ function protocol(over: Partial<Protocol> = {}): Protocol {
 }
 
 const ATTENDANCE: Attendance[] = [
-  { principalId: 'pr-1', displayName: 'Pia Protokoll', email: null, status: 'present', source: 'self', isSelf: true },
-  { principalId: 'pr-2', displayName: 'Mika Mitglied', email: null, status: 'excused', source: 'lead', isSelf: false },
-  { principalId: 'pr-3', displayName: 'Alina Admin', email: null, status: null, source: null, isSelf: false },
+  { principalId: 'pr-1', displayName: 'Pia Protokoll', email: null, status: 'present', source: 'self', note: null, isSelf: true },
+  { principalId: 'pr-2', displayName: 'Mika Mitglied', email: null, status: 'excused', source: 'lead', note: null, isSelf: false },
+  { principalId: 'pr-3', displayName: 'Alina Admin', email: null, status: null, source: null, note: null, isSelf: false },
 ];
 
 type Inputs = {
@@ -147,7 +147,7 @@ function inputs(over: Partial<Inputs> = {}): Inputs {
 const OUTPUTS = [
   'back', 'selectTop', 'bodyChange', 'castVote', 'voteClose', 'voteCancel', 'voteDelete',
   'voteDialog', 'startSession', 'closeSession', 'finalize', 'openSettings',
-  'deleteMeeting', 'toggleBeamer', 'attendanceChange', 'addToAgenda', 'addFreetext',
+  'deleteMeeting', 'toggleBeamer', 'attendanceChange', 'attendanceReset', 'addToAgenda', 'addFreetext',
   'removeFromAgenda', 'startRename', 'cancelRename', 'renameTop', 'setNonPublic', 'dragStart',
   'dragOver', 'drop', 'setProtokollant',
 ] as const;
@@ -310,7 +310,7 @@ describe('MeetingFocusComponent', () => {
     });
 
     it('opens the attendance popover with the room state and the viewers', async () => {
-      const { http } = await setup();
+      const { http, on } = await setup();
       await userEvent.click(screen.getByTitle('Anwesenheit'));
       const popover = screen.getByRole('dialog', { name: 'Anwesenheit' });
       expect(within(popover).getByText('Anwesend 1 von 3')).toBeInTheDocument();
@@ -319,6 +319,15 @@ describe('MeetingFocusComponent', () => {
       // Once in the roster, once in the viewer list.
       expect(within(popover).getAllByText('Alina Admin')).toHaveLength(2);
       expect(within(popover).getByText('2 live')).toBeInTheDocument();
+      // The lead resets a member to open and sets the status of a member.
+      const [, mika] = within(popover).getAllByRole('group', { name: 'Anwesenheit' });
+      await userEvent.click(within(mika).getByRole('button', { name: 'Auf „Offen“ zurücksetzen' }));
+      expect(on.attendanceReset).toHaveBeenCalledWith(expect.objectContaining({ principalId: 'pr-2' }));
+      await userEvent.click(within(mika).getByRole('button', { name: 'Unentschuldigt' }));
+      expect(on.attendanceChange).toHaveBeenCalledWith({
+        member: expect.objectContaining({ principalId: 'pr-2' }),
+        status: 'absent',
+      });
       http.match((r) => r.url.includes('/delegations/')).forEach((req) => req.flush({
         meetingId: 'm-1', gremiumId: 'g-1', allowVoteDelegation: false, votingDelegationEnabled: false,
         delegationAllowExternal: false, deadline: null, deadlinePassed: false, meetingStarted: true,
@@ -547,8 +556,8 @@ describe('MeetingFocusComponent', () => {
         meeting: planned(),
         protocol: null,
         attendance: [
-          { principalId: 'pr-7', displayName: null, email: 'kai.klar@x.de', status: 'absent', source: null, isSelf: false },
-          { principalId: 'pr-8', displayName: null, email: null, status: null, source: null, isSelf: false },
+          { principalId: 'pr-7', displayName: null, email: 'kai.klar@x.de', status: 'absent', source: null, note: null, isSelf: false },
+          { principalId: 'pr-8', displayName: null, email: null, status: null, source: null, note: null, isSelf: false },
         ],
       });
       await userEvent.click(screen.getByRole('button', { name: /Protokoll: Pia Protokoll/ }));

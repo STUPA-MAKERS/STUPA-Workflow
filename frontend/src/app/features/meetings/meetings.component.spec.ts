@@ -1202,53 +1202,119 @@ describe('MeetingsComponent — methods', () => {
   });
 
   describe('attendance', () => {
-    it('sets own attendance via the me-endpoint', async () => {
-      const { cmp, http } = await loaded();
-      cmp.setAttendance(
-        { principalId: 'pr-1', displayName: 'Me', email: null, status: null, source: null, isSelf: true } as never,
-        'present',
-      );
+    const SELF = { principalId: 'pr-1', displayName: 'Me', email: null, status: null, source: null, note: null, isSelf: true };
+    const OTHER = { principalId: 'pr-2', displayName: 'X', email: null, status: 'absent', source: null, note: null, isSelf: false };
+
+    /** A member without the lead rights of the meeting. */
+    async function asMember() {
+      const view = await loaded();
+      view.cmp.meeting.set({ ...view.cmp.meeting()!, canControl: false, canWrite: false });
+      return view;
+    }
+
+    it('reports the own attendance via the me-endpoint (member)', async () => {
+      const { cmp, http } = await asMember();
+      cmp.setAttendance(SELF as never, 'excused', 'Krank');
       const req = http.expectOne('/api/meetings/m-1/attendance/me');
       expect(req.request.method).toBe('PUT');
-      expect(req.request.body).toEqual({ status: 'present' });
+      expect(req.request.body).toEqual({ status: 'excused', note: 'Krank' });
       req.flush([]);
       expect(cmp.savingAttendance()).toBe(false);
     });
 
-    it('sets a member attendance via the principal endpoint', async () => {
+    it('never sends absent, another row or a lead record as a member (Z2, O15)', async () => {
+      const { cmp, http } = await asMember();
+      cmp.setAttendance(SELF as never, 'absent');
+      cmp.setAttendance(OTHER as never, 'present');
+      cmp.setAttendance({ ...SELF, status: 'absent', source: 'lead' } as never, 'present');
+      http.verify();
+    });
+
+    it('sets any row via the principal endpoint as the lead, the own row too', async () => {
       const { cmp, http } = await loaded();
-      cmp.setAttendance(
-        { principalId: 'pr-2', displayName: 'X', email: null, status: 'absent', source: null, isSelf: false } as never,
-        'present',
-      );
+      cmp.setAttendance(OTHER as never, 'present');
       const req = http.expectOne('/api/meetings/m-1/attendance/pr-2');
       expect(req.request.method).toBe('PUT');
+      expect(req.request.body).toEqual({ status: 'present' });
       req.flush([]);
+      cmp.setAttendance(SELF as never, 'absent');
+      http.expectOne('/api/meetings/m-1/attendance/pr-1').flush([]);
       expect(cmp.savingAttendance()).toBe(false);
+    });
+
+    it('saves a changed reason with the same status', async () => {
+      const { cmp, http } = await loaded();
+      const excused = { ...OTHER, status: 'excused', note: 'Alt' };
+      cmp.setAttendance(excused as never, 'excused', 'Alt'); // unchanged → return
+      http.verify();
+      cmp.setAttendance(excused as never, 'excused', 'Neu');
+      const req = http.expectOne('/api/meetings/m-1/attendance/pr-2');
+      expect(req.request.body).toEqual({ status: 'excused', note: 'Neu' });
+      req.flush([]);
     });
 
     it('skips when the status is unchanged or already saving', async () => {
       const { cmp, http } = await loaded();
-      cmp.setAttendance(
-        { principalId: 'pr-2', displayName: 'X', email: null, status: 'present', source: null, isSelf: false } as never,
-        'present', // unchanged → return
-      );
+      cmp.setAttendance({ ...OTHER, status: 'present' } as never, 'present'); // unchanged → return
       cmp.savingAttendance.set(true);
-      cmp.setAttendance(
-        { principalId: 'pr-2', displayName: 'X', email: null, status: 'absent', source: null, isSelf: false } as never,
-        'present',
-      );
+      cmp.setAttendance(OTHER as never, 'present');
+      cmp.resetAttendance(OTHER as never);
       http.verify();
     });
 
-    it('handles an attendance error', async () => {
-      const { cmp, http } = await loaded();
-      cmp.setAttendance(
-        { principalId: 'pr-1', displayName: 'Me', email: null, status: null, source: null, isSelf: true } as never,
-        'present',
-      );
-      http.expectOne('/api/meetings/m-1/attendance/me').flush(null, { status: 500, statusText: 'e' });
+    it('handles an attendance error with the server reason', async () => {
+      const { cmp, http, fixture } = await asMember();
+      const toast = fixture.debugElement.injector.get(ToastService);
+      const spy = jest.spyOn(toast, 'error');
+      cmp.setAttendance(SELF as never, 'present');
+      http
+        .expectOne('/api/meetings/m-1/attendance/me')
+        .flush({ detail: 'kaputt' }, { status: 500, statusText: 'e' });
       expect(cmp.savingAttendance()).toBe(false);
+      expect(spy).toHaveBeenCalledWith('Aktion fehlgeschlagen.: kaputt');
+      cmp.setAttendance(SELF as never, 'present');
+      http.expectOne('/api/meetings/m-1/attendance/me').flush(null, { status: 500, statusText: 'e' });
+      expect(spy).toHaveBeenLastCalledWith('Aktion fehlgeschlagen.');
+    });
+
+    it('explains an active delegation (O23) and reloads the roster', async () => {
+      const { cmp, http, fixture } = await loaded();
+      const spy = jest.spyOn(fixture.debugElement.injector.get(ToastService), 'error');
+      cmp.setAttendance(OTHER as never, 'present');
+      http
+        .expectOne('/api/meetings/m-1/attendance/pr-2')
+        .flush({ code: 'delegation_active' }, { status: 409, statusText: 'Conflict' });
+      expect(spy).toHaveBeenCalledWith(expect.stringContaining('Vertretung'));
+      http.expectOne('/api/meetings/m-1/attendance').flush([OTHER]);
+      expect(cmp.attendance()).toEqual([OTHER]);
+    });
+
+    it('explains a record that the lead set (O15) and reloads the roster', async () => {
+      const { cmp, http, fixture } = await asMember();
+      const spy = jest.spyOn(fixture.debugElement.injector.get(ToastService), 'error');
+      cmp.setAttendance(SELF as never, 'present');
+      http
+        .expectOne('/api/meetings/m-1/attendance/me')
+        .flush({ code: 'attendance_set_by_lead' }, { status: 409, statusText: 'Conflict' });
+      expect(spy).toHaveBeenCalledWith(expect.stringContaining('Sitzungsleitung'));
+      http.expectOne('/api/meetings/m-1/attendance').flush([]);
+    });
+
+    it('resets a member to open as the lead', async () => {
+      const { cmp, http } = await loaded();
+      cmp.resetAttendance(OTHER as never);
+      const req = http.expectOne('/api/meetings/m-1/attendance/pr-2');
+      expect(req.request.method).toBe('DELETE');
+      req.flush([{ ...OTHER, status: null }]);
+      expect(cmp.attendance()[0].status).toBeNull();
+    });
+
+    it('does not reset an open row or as a member', async () => {
+      const { cmp, http } = await loaded();
+      cmp.resetAttendance({ ...OTHER, status: null } as never);
+      cmp.meeting.set({ ...cmp.meeting()!, canControl: false });
+      cmp.resetAttendance(OTHER as never);
+      http.verify();
     });
   });
 

@@ -87,7 +87,7 @@
       [casting]="casting()"
       [choices]="myChoices()"
       (castVote)="cast($event.voteId, $event.choice)"
-      (attendanceChange)="setAttendance($event.member, $event.status)"
+      (attendanceChange)="setAttendance($event.member, $event.status, $event.note)"
     />
   }
 
@@ -129,7 +129,8 @@
     (setProtokollant)="setProtokollant(m, $event)"
     (deleteMeeting)="askDeleteMeeting(m)"
     (toggleBeamer)="beamerMode.set(true)"
-    (attendanceChange)="setAttendance($event.member, $event.status)"
+    (attendanceChange)="setAttendance($event.member, $event.status, $event.note)"
+    (attendanceReset)="resetAttendance($event)"
     (addToAgenda)="addToAgenda()"
     (addFreetext)="addFreetext()"
     (removeFromAgenda)="removeFromAgenda($event)"

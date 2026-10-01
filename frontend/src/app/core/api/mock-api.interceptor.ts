@@ -447,13 +447,14 @@ interface MockAttendance {
   email: string | null;
   status: 'present' | 'excused' | 'absent' | null;
   source: 'self' | 'lead' | null;
+  note: string | null;
   isSelf: boolean;
 }
 
 let MOCK_ATTENDANCE: MockAttendance[] = [
-  { principalId: 'me', displayName: 'Demo-Nutzer:in', email: null, status: null, source: null, isSelf: true },
-  { principalId: 'p-2', displayName: 'Max Mustermann', email: 'max@example.com', status: 'present', source: 'lead', isSelf: false },
-  { principalId: 'p-3', displayName: 'Erika Beispiel', email: 'erika@example.com', status: 'excused', source: 'self', isSelf: false },
+  { principalId: 'me', displayName: 'Demo-Nutzer:in', email: null, status: null, source: null, note: null, isSelf: true },
+  { principalId: 'p-2', displayName: 'Max Mustermann', email: 'max@example.com', status: 'present', source: 'lead', note: null, isSelf: false },
+  { principalId: 'p-3', displayName: 'Erika Beispiel', email: 'erika@example.com', status: 'excused', source: 'self', note: 'Prüfung', isSelf: false },
 ];
 
 interface MockAgendaItem {
@@ -568,13 +569,17 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     }
     const att = /\/meetings\/[^/]+\/attendance\/([^/]+)$/.exec(p);
     if (att) {
-      const status = (req.body as { status?: string } | null)?.status ?? 'present';
+      const body = (req.body as { status?: string; note?: string | null } | null) ?? {};
+      const status = (body.status ?? 'present') as MockAttendance['status'];
       const target = att[1];
+      // Like the server: only an excuse keeps a reason; an omitted note keeps the stored one.
+      const noteFor = (a: MockAttendance): string | null =>
+        status !== 'excused' ? null : body.note !== undefined ? body.note : a.note;
       MOCK_ATTENDANCE = MOCK_ATTENDANCE.map((a) =>
         a.isSelf && target === 'me'
-          ? { ...a, status: status as MockAttendance['status'], source: 'self' }
+          ? { ...a, status, source: 'self', note: noteFor(a) }
           : a.principalId === target
-            ? { ...a, status: status as MockAttendance['status'], source: 'lead' }
+            ? { ...a, status, source: 'lead', note: noteFor(a) }
             : a,
       );
       return ok([...MOCK_ATTENDANCE]);
@@ -752,6 +757,13 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     if (agenda) {
       MOCK_AGENDA = MOCK_AGENDA.filter((a) => a.id !== agenda[1]);
       return ok([...MOCK_AGENDA]);
+    }
+    const att = /\/meetings\/[^/]+\/attendance\/([^/]+)$/.exec(p);
+    if (att) {
+      MOCK_ATTENDANCE = MOCK_ATTENDANCE.map((a) =>
+        a.principalId === att[1] ? { ...a, status: null, source: null, note: null } : a,
+      );
+      return ok([...MOCK_ATTENDANCE]);
     }
   }
 

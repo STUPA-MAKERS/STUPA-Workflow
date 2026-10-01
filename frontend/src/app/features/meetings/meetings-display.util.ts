@@ -4,10 +4,12 @@ import { toFormatLocale } from '@core/i18n/i18n.service';
 import type { TranslationKey } from '@core/i18n/translations';
 import type {
   AgendaItem,
+  Attendance,
   AttendanceStatus,
   I18nMap,
   Meeting,
   MeetingVote,
+  SelfAttendanceStatus,
 } from '@core/api/models';
 import type { BadgeVariant, IconName } from '@stupa-makers/ui-kit';
 import type { ServerMessage } from '@core/ws/ws-messages';
@@ -57,6 +59,22 @@ export function attendanceIcon(status: AttendanceStatus): IconName {
 
 export function attendanceBadgeVariant(status: AttendanceStatus): BadgeVariant {
   return status === 'present' ? 'success' : status === 'excused' ? 'warning' : 'danger';
+}
+
+/** The statuses a member reports for the own record (Z2). Only the lead records `absent`. */
+export const SELF_ATTENDANCE_STATUSES: readonly SelfAttendanceStatus[] = ['present', 'excused'];
+
+/** The member labels: "Anwesend / Abwesend", where "Abwesend" is `excused` (Z2). */
+export function selfAttendanceKey(status: SelfAttendanceStatus): TranslationKey {
+  return status === 'present' ? 'meetings.attendance.selfPresent' : 'meetings.attendance.selfExcused';
+}
+
+/**
+ * True when a member may report this status for this record: the own row, a status
+ * other than `absent`, and a record that the meeting lead did not set (O15).
+ */
+export function canReportOwn(member: Attendance, status: AttendanceStatus): boolean {
+  return member.isSelf && member.source !== 'lead' && status !== 'absent';
 }
 
 export function countEntries(vote: MeetingVote): { key: string; value: number }[] {

@@ -458,8 +458,12 @@ export class MeetingsComponent implements OnDestroy {
     this.session.refreshProtocol();
   }
 
-  setAttendance(member: Attendance, status: AttendanceStatus): void {
-    this.session.setAttendance(member, status);
+  setAttendance(member: Attendance, status: AttendanceStatus, note?: string | null): void {
+    this.session.setAttendance(member, status, note);
+  }
+
+  resetAttendance(member: Attendance): void {
+    this.session.resetAttendance(member);
   }
 
   canAddVote(item: AgendaItem): boolean {

@@ -38,7 +38,10 @@ import {
   type SelectOption,
 } from '@stupa-makers/ui-kit';
 import { MarkdownEditorComponent } from '@stupa-makers/ui-kit/markdown-editor';
-import { MeetingAttendanceTableComponent } from './meeting-attendance-table.component';
+import {
+  type AttendanceChange,
+  MeetingAttendanceTableComponent,
+} from './meeting-attendance-table.component';
 import { MeetingDelegationCardComponent } from './meeting-delegation-card.component';
 import { voteSnippet, voteSnippetHead } from './meetings.util';
 import {
@@ -159,7 +162,8 @@ export class MeetingFocusComponent {
   readonly openSettings = output<void>();
   readonly deleteMeeting = output<void>();
   readonly toggleBeamer = output<void>();
-  readonly attendanceChange = output<{ member: Attendance; status: AttendanceStatus }>();
+  readonly attendanceChange = output<AttendanceChange>();
+  readonly attendanceReset = output<Attendance>();
   readonly addToAgenda = output<void>();
   readonly addFreetext = output<void>();
   readonly removeFromAgenda = output<Uuid>();

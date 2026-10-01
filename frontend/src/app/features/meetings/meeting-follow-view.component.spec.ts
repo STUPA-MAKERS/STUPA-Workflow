@@ -60,8 +60,8 @@ const AGENDA: AgendaItem[] = [
 ];
 
 const ATTENDANCE: Attendance[] = [
-  { principalId: 'me', displayName: 'Ich', email: null, status: null, source: null, isSelf: true },
-  { principalId: 'pr-2', displayName: 'Mika', email: null, status: 'present', source: 'lead', isSelf: false },
+  { principalId: 'me', displayName: 'Ich', email: null, status: null, source: null, note: null, isSelf: true },
+  { principalId: 'pr-2', displayName: 'Mika', email: null, status: 'present', source: 'lead', note: null, isSelf: false },
 ];
 
 async function setup(over: { meeting?: Partial<Meeting>; agenda?: AgendaItem[] } = {}) {

@@ -193,10 +193,12 @@ export interface ApplicationCreatedWire {
   applicationId: Uuid;
 }
 
-/** Attendance status of a member in a meeting. */
+/** Attendance status of a member in a meeting. `absent` means absent without an excuse. */
 export type AttendanceStatus = 'present' | 'excused' | 'absent';
 
-/** `AttendanceOut`. Attendance of a gremium member. GET/PUT …/attendance. */
+/** The statuses a member reports for the own record (Z2). Only the lead records `absent`. */
+export type SelfAttendanceStatus = 'present' | 'excused';
+
 /** A current gremium member. This is a protokollant candidate for a new meeting. */
 export interface MeetingMember {
   principalId: Uuid;
@@ -204,13 +206,20 @@ export interface MeetingMember {
   email: string | null;
 }
 
+/** `AttendanceOut`. Attendance of a gremium member. GET/PUT/DELETE …/attendance. */
 export interface Attendance {
   principalId: Uuid;
   displayName: string | null;
   email: string | null;
-  /** `null` = not recorded yet. */
+  /** `null` = not recorded yet ("open"). */
   status: AttendanceStatus | null;
+  /** Who set the record. A `lead` record wins: the member cannot change it (O15). */
   source: 'self' | 'lead' | null;
+  /**
+   * The reason of an excuse. The server sends it only to the member and to the
+   * meeting lead (`canWrite`). All other readers get `null`.
+   */
+  note: string | null;
   /** True if this row is the requesting user. It enables self-marking. */
   isSelf: boolean;
 }

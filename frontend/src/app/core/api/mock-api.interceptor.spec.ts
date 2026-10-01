@@ -301,6 +301,43 @@ describe('mockApiInterceptor', () => {
       expect(member?.source).toBe('lead');
     });
 
+    it('PUT …/attendance/{principalId} keeps the reason of an excuse unless a note is given', async () => {
+      type Row = { principalId: string; status: string | null; note: string | null };
+      const kept = await firstValueFrom(
+        http.put<Row[]>('/api/meetings/m1/attendance/p-3', { status: 'excused' }),
+      );
+      expect(kept.find((r) => r.principalId === 'p-3')?.note).toBe('Prüfung');
+      const changed = await firstValueFrom(
+        http.put<Row[]>('/api/meetings/m1/attendance/p-3', { status: 'excused', note: 'Reise' }),
+      );
+      expect(changed.find((r) => r.principalId === 'p-3')?.note).toBe('Reise');
+      const present = await firstValueFrom(
+        http.put<Row[]>('/api/meetings/m1/attendance/p-3', { status: 'present' }),
+      );
+      expect(present.find((r) => r.principalId === 'p-3')?.note).toBeNull();
+    });
+
+    it('PUT …/attendance/{principalId} without a body sets present', async () => {
+      const res = await firstValueFrom(
+        http.put<{ principalId: string; status: string | null }[]>(
+          '/api/meetings/m1/attendance/p-2',
+          null,
+        ),
+      );
+      expect(res.find((r) => r.principalId === 'p-2')?.status).toBe('present');
+    });
+
+    it('DELETE …/attendance/{principalId} resets the member to open', async () => {
+      const res = await firstValueFrom(
+        http.delete<{ principalId: string; status: string | null; source: string | null }[]>(
+          '/api/meetings/m1/attendance/p-2',
+        ),
+      );
+      const member = res.find((r) => r.principalId === 'p-2');
+      expect(member?.status).toBeNull();
+      expect(member?.source).toBeNull();
+    });
+
     it('POST /auth/logout → logout out', async () => {
       const res = await firstValueFrom(http.post<{ logout_url: null }>('/api/auth/logout', {}));
       expect(res.logout_url).toBeNull();
