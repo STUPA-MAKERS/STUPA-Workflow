@@ -172,6 +172,26 @@ async def test_publisher_meeting_state() -> None:
 
 
 # MeetingService against a fake session
+@pytest.fixture(autouse=True)
+def _no_audit_chain(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep the audit chain off the fake session, and find no open vote.
+
+    `_FakeSession.execute` answers every query with the same row. The audit chain
+    would read that row as the previous hash, and the open-vote check of the close
+    would read it as an open vote.
+    """
+    import app.modules.livevote.service.lifecycle as lifecycle_mod
+
+    async def _record(_session, **_kw):  # noqa: ANN001, ANN202
+        return None
+
+    async def _no_open_vote(_self, _meeting_id):  # noqa: ANN001, ANN202
+        return None
+
+    monkeypatch.setattr(lifecycle_mod, "audit_record", _record)
+    monkeypatch.setattr(MeetingService, "open_vote", _no_open_vote)
+
+
 class _Scalars:
     def __init__(self, rows: list) -> None:
         self._rows = rows
@@ -303,7 +323,7 @@ async def test_service_patch_to_live_without_protokollant_conflicts() -> None:
 async def test_service_patch_without_publisher_is_silent() -> None:
     meeting = Meeting(gremium_id=uuid4(), title="GV")
     meeting.id = uuid4()
-    meeting.status = "planned"
+    meeting.status = "live"
     meeting.date = None
     meeting.active_application_id = None
     meeting.created_at = datetime(2026, 6, 8, tzinfo=UTC)
@@ -332,7 +352,10 @@ async def test_service_patch_closed_session_cannot_reopen() -> None:
 async def test_service_open_vote_returns_row() -> None:
     vote = Vote(application_id=uuid4(), eligible_group="stupa", config={})
     svc = MeetingService(_FakeSession(existing=vote))  # type: ignore[arg-type]
-    assert await svc.open_vote(uuid4()) is vote
+    # The autouse fixture stubs `open_vote` on the facade. Call the real one.
+    from app.modules.livevote.service.votes import VoteReadOps
+
+    assert await VoteReadOps.open_vote(svc, uuid4()) is vote
 
 
 # The list endpoint finds meetings again.
@@ -424,7 +447,7 @@ def _meeting(status: str = "planned") -> Meeting:
 @pytest.mark.asyncio
 async def test_service_patch_close_sets_closed_at() -> None:
     """#14: a change to closed stamps `closed_at` once, for the end of the protocol."""
-    meeting = _meeting()
+    meeting = _meeting(status="live")
     svc = MeetingService(_FakeSession(existing=meeting))  # type: ignore[arg-type]
     out = await svc.patch(meeting.id, MeetingPatch(status="closed"), _principal())
     assert out.status == "closed"

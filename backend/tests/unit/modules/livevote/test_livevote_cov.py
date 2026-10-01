@@ -24,7 +24,7 @@ from app.modules.admin import gremium_roles as gremium_roles_mod
 from app.modules.auth.principal import Principal
 from app.modules.flow.dispatch import NullActionDispatcher
 from app.modules.livevote import router as router_mod
-from app.modules.livevote.agenda_service import AgendaService, _title_of
+from app.modules.livevote.agenda_service import AgendaService, title_of
 from app.modules.livevote.attendance_service import AttendanceService
 from app.modules.livevote.broker import InMemoryBroker
 from app.modules.livevote.connection import (
@@ -165,6 +165,26 @@ class _QueueSession:
 
     async def commit(self) -> None:
         self.committed += 1
+
+
+@pytest.fixture(autouse=True)
+def audit_calls(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
+    """Capture the audit writes of the meeting, agenda and voting services.
+
+    The real ``record`` runs two statements (the chain lock and the previous hash).
+    They would consume the FIFO results of ``_QueueSession``.
+    """
+    import app.modules.livevote.agenda_service as agenda_mod
+    import app.modules.voting.service as voting_service_mod
+
+    calls: list[dict[str, Any]] = []
+
+    async def _record(_session: Any, **kw: Any) -> None:
+        calls.append(kw)
+
+    for mod in (agenda_mod, lifecycle_mod, voting_service_mod):
+        monkeypatch.setattr(mod, "audit_record", _record)
+    return calls
 
 
 def _principal(*perms: str, roles: list[str] | None = None, sub: str = "p") -> Principal:
@@ -1217,9 +1237,10 @@ async def test_patch_going_live_ok_with_publisher() -> None:
 
 
 async def test_patch_close_stamps_closed_at() -> None:
-    m = _meeting()
+    m = _meeting(status="live")
     from app.modules.livevote.schemas import MeetingPatch
 
+    # _get, then the open-vote check and the draft cancel find nothing.
     svc = MeetingService(_QueueSession(executes=[res(m)]))  # type: ignore[arg-type]
     out = await svc.patch(m.id, MeetingPatch(status="closed"), _admin())
     assert out.status == "closed"
@@ -1419,11 +1440,11 @@ async def test_assert_can_read_delegation_branch(monkeypatch: pytest.MonkeyPatch
 
 # agenda_service.py
 def test_title_of_variants() -> None:
-    assert _title_of(None) is None
-    assert _title_of({}) is None
-    assert _title_of({"title": "  Hi  "}) == "Hi"
-    assert _title_of({"title": "   "}) is None
-    assert _title_of({"title": 5}) is None
+    assert title_of(None) is None
+    assert title_of({}) is None
+    assert title_of({"title": "  Hi  "}) == "Hi"
+    assert title_of({"title": "   "}) is None
+    assert title_of({"title": 5}) is None
 
 
 def _agenda_item(
@@ -1562,24 +1583,53 @@ async def test_agenda_list_app_missing() -> None:
     assert out[0].title is None  # app is None, so the title falls back to r.title
 
 
-async def test_set_body_not_found() -> None:
+async def test_set_body_meeting_not_found() -> None:
     svc = AgendaService(_QueueSession(executes=[res()]))  # type: ignore[arg-type]
     with pytest.raises(NotFoundError):
         await svc.set_body(uuid4(), uuid4(), body="x")
 
 
-async def test_set_body_updates_all_fields() -> None:
-    m = _meeting()
+async def test_set_body_item_not_found() -> None:
+    m = _meeting(status="live")
+    svc = AgendaService(_QueueSession(executes=[res(m), res()]))  # type: ignore[arg-type]
+    with pytest.raises(NotFoundError):
+        await svc.set_body(m.id, uuid4(), body="x")
+
+
+async def test_set_body_updates_all_fields(audit_calls: list[dict[str, Any]]) -> None:
+    m = _meeting(status="live")
     item = _agenda_item(application_id=None, title="old")
     sess = _QueueSession(
-        executes=[res(item), res(m)],  # set_body lookup, then list()._meeting
+        # _meeting, the item lookup, then list()._meeting
+        executes=[res(m), res(item), res(m)],
         scalars_q=[[]],  # list() agenda items empty
     )
     svc = AgendaService(sess)  # type: ignore[arg-type]
-    await svc.set_body(m.id, item.id, body="**md**", title="new", non_public=True)
+    await svc.set_body(
+        m.id, item.id, body="**md**", title=" new ", non_public=True, actor="mgr"
+    )
     assert item.body == "**md**"
     assert item.title == "new"
     assert item.non_public is True
+    assert sess.committed == 1
+    # The live minutes are not audited, the rename and the flag are (F12).
+    [entry] = audit_calls
+    assert entry["action"].value == "agenda_item_update"
+    assert entry["actor"] == "mgr"
+    assert entry["data"]["fields"] == ["title", "nonPublic"]
+    assert entry["target_id"] == str(item.meeting_id)
+
+
+async def test_set_body_without_change_writes_no_audit(
+    audit_calls: list[dict[str, Any]],
+) -> None:
+    m = _meeting(status="live")
+    item = _agenda_item(application_id=None, title="same", body="text")
+    sess = _QueueSession(executes=[res(m), res(item), res(m)], scalars_q=[[]])
+    await AgendaService(sess).set_body(  # type: ignore[arg-type]
+        m.id, item.id, body="text", title="same", non_public=False, actor="mgr"
+    )
+    assert audit_calls == []
     assert sess.committed == 1
 
 
@@ -1587,7 +1637,7 @@ async def test_set_body_title_ignored_for_application_top() -> None:
     m = _meeting()
     item = _agenda_item(application_id=uuid4(), title="orig")
     sess = _QueueSession(
-        executes=[res(item), res(m)],
+        executes=[res(m), res(item), res(m)],
         scalars_q=[[]],
     )
     svc = AgendaService(sess)  # type: ignore[arg-type]
@@ -1595,12 +1645,75 @@ async def test_set_body_title_ignored_for_application_top() -> None:
     assert item.title == "orig"  # an application agenda item inherits its title
 
 
-async def test_reorder() -> None:
+async def test_set_body_on_planned_meeting_conflicts() -> None:
+    """The minutes need a started meeting."""
+    m = _meeting(status="planned")
+    item = _agenda_item()
+    sess = _QueueSession(executes=[res(m), res(item)])
+    with pytest.raises(ConflictError) as ei:
+        await AgendaService(sess).set_body(m.id, item.id, body="x")  # type: ignore[arg-type]
+    assert ei.value.code == "meeting_not_started"
+    assert sess.committed == 0
+
+
+async def test_set_non_public_on_planned_meeting_ok() -> None:
+    """Marking an item non-public is planning work and passes before the start."""
+    m = _meeting(status="planned")
+    item = _agenda_item()
+    sess = _QueueSession(executes=[res(m), res(item), res(m)], scalars_q=[[]])
+    await AgendaService(sess).set_body(m.id, item.id, non_public=True)  # type: ignore[arg-type]
+    assert item.non_public is True
+
+
+async def test_set_body_after_close_with_draft_protocol_is_audited(
+    audit_calls: list[dict[str, Any]],
+) -> None:
+    """O22: the minutes stay open after the close while the protocol is a draft."""
+    m = _meeting(status="closed")
+    item = _agenda_item(body="old")
+    sess = _QueueSession(
+        executes=[res(m), res(item), res(m)], scalars_q=[[]], scalar_q=["draft"]
+    )
+    await AgendaService(sess).set_body(m.id, item.id, body="fixed", actor="mgr")  # type: ignore[arg-type]
+    assert item.body == "fixed"
+    # A correction after the close goes into the audit log, without the text.
+    [entry] = audit_calls
+    assert entry["data"]["fields"] == ["body"]
+    assert "fixed" not in str(entry["data"])
+
+
+@pytest.mark.parametrize("protocol_status", ["rendering", "final", None])
+@pytest.mark.parametrize("field", ["body", "non_public"])
+async def test_set_body_after_close_with_locked_protocol_conflicts(
+    protocol_status: str | None, field: str
+) -> None:
+    m = _meeting(status="closed")
+    item = _agenda_item(body="old")
+    sess = _QueueSession(executes=[res(m), res(item)], scalar_q=[protocol_status])
+    kwargs: dict[str, Any] = {"body": "x"} if field == "body" else {"non_public": True}
+    with pytest.raises(ConflictError) as ei:
+        await AgendaService(sess).set_body(m.id, item.id, **kwargs)  # type: ignore[arg-type]
+    assert ei.value.code == "protocol_locked"
+    assert item.body == "old"
+
+
+async def test_rename_after_close_conflicts() -> None:
+    """O25: a rename is a change of the agenda and stops with the close."""
+    m = _meeting(status="closed")
+    item = _agenda_item(application_id=None, title="old")
+    sess = _QueueSession(executes=[res(m), res(item)])
+    with pytest.raises(ConflictError) as ei:
+        await AgendaService(sess).set_body(m.id, item.id, title="new")  # type: ignore[arg-type]
+    assert ei.value.code == "meeting_closed"
+    assert item.title == "old"
+
+
+async def test_reorder(audit_calls: list[dict[str, Any]]) -> None:
     m = _meeting()
     a = _agenda_item(position=5)
     b = _agenda_item(position=9)
     sess = _QueueSession(
-        executes=[res(m)],  # list()._meeting
+        executes=[res(m), res(m)],  # _meeting, list()._meeting
         scalars_q=[
             [a, b],  # reorder rows
             [],  # list() items
@@ -1608,9 +1721,21 @@ async def test_reorder() -> None:
     )
     svc = AgendaService(sess)  # type: ignore[arg-type]
     # First b, then a, then an unknown id for the None branch.
-    await svc.reorder(m.id, [b.id, a.id, uuid4()])
+    await svc.reorder(m.id, [b.id, a.id, uuid4()], actor="mgr")
     assert b.position == 0
     assert a.position == 1
+    [entry] = audit_calls
+    assert entry["action"].value == "agenda_reorder"
+    assert entry["data"] == {"itemIds": [str(b.id), str(a.id)]}
+
+
+async def test_reorder_after_close_conflicts() -> None:
+    m = _meeting(status="closed")
+    sess = _QueueSession(executes=[res(m)])
+    with pytest.raises(ConflictError) as ei:
+        await AgendaService(sess).reorder(m.id, [uuid4()])  # type: ignore[arg-type]
+    assert ei.value.code == "meeting_closed"
+    assert sess.committed == 0
 
 
 async def test_assignable_no_vote_states() -> None:
@@ -1665,7 +1790,7 @@ async def test_next_position_empty_and_existing() -> None:
     assert await svc2._next_position(uuid4()) == 5
 
 
-async def test_add_freetext() -> None:
+async def test_add_freetext(audit_calls: list[dict[str, Any]]) -> None:
     m = _meeting()
     sess = _QueueSession(
         executes=[
@@ -1676,9 +1801,23 @@ async def test_add_freetext() -> None:
         scalars_q=[[]],  # list() items
     )
     svc = AgendaService(sess)  # type: ignore[arg-type]
-    await svc.add(m.id, title="  Begrüßung  ")
+    await svc.add(m.id, title="  Begrüßung  ", actor="mgr")
     assert sess.added[0].title == "Begrüßung"
     assert sess.committed == 1
+    [entry] = audit_calls
+    assert entry["action"].value == "agenda_item_add"
+    assert entry["data"]["applicationId"] is None
+    assert entry["data"]["nonPublic"] is False
+
+
+async def test_add_after_close_conflicts() -> None:
+    """O25: a closed meeting takes no new agenda item."""
+    m = _meeting(status="closed")
+    sess = _QueueSession(executes=[res(m)])
+    with pytest.raises(ConflictError) as ei:
+        await AgendaService(sess).add(m.id, title="spät")  # type: ignore[arg-type]
+    assert ei.value.code == "meeting_closed"
+    assert sess.added == []
 
 
 async def test_add_application_not_found() -> None:
@@ -1702,7 +1841,7 @@ async def test_add_application_not_in_vote_state() -> None:
         await svc.add(m.id, application_id=app.id)
 
 
-async def test_add_application_new() -> None:
+async def test_add_application_new(audit_calls: list[dict[str, Any]]) -> None:
     m = _meeting()
     gid = m.gremium_id
     state = _state_row(gremium_id=gid)
@@ -1724,6 +1863,10 @@ async def test_add_application_new() -> None:
     await svc.add(m.id, application_id=app.id)
     assert sess.added and sess.added[0].application_id == app.id
     assert sess.committed == 1
+    # A system add (no actor) is audited too.
+    [entry] = audit_calls
+    assert entry["actor"] is None
+    assert entry["data"]["applicationId"] == str(app.id)
 
 
 async def test_add_application_already_present() -> None:
@@ -1749,27 +1892,74 @@ async def test_add_application_already_present() -> None:
     assert sess.committed == 0
 
 
-async def test_remove_existing_and_missing() -> None:
+async def test_remove_existing_and_missing(audit_calls: list[dict[str, Any]]) -> None:
     m = _meeting()
     item = _agenda_item()
     sess = _QueueSession(
-        executes=[res(item), res(m)],  # remove lookup, list()._meeting
+        # _meeting, the item lookup, the votes of the item (none), list()._meeting
+        executes=[res(m), res(item), res(), res(m)],
         scalars_q=[[]],  # list() items
     )
     svc = AgendaService(sess)  # type: ignore[arg-type]
-    await svc.remove(m.id, item.id)
+    await svc.remove(m.id, item.id, actor="mgr", may_delete_votes=True)
     assert sess.deleted == [item]
     assert sess.committed == 1
+    [entry] = audit_calls
+    assert entry["action"].value == "agenda_item_remove"
+    assert entry["data"]["deletedVoteIds"] == []
 
     # A missing item causes no delete and no commit.
     sess2 = _QueueSession(
-        executes=[res(), res(m)],
+        executes=[res(m), res(), res(m)],
         scalars_q=[[]],
     )
     svc2 = AgendaService(sess2)  # type: ignore[arg-type]
-    await svc2.remove(m.id, uuid4())
+    await svc2.remove(m.id, uuid4(), actor="mgr", may_delete_votes=True)
     assert sess2.deleted == []
     assert sess2.committed == 0
+
+
+async def test_remove_deletes_draft_and_cancelled_votes(
+    audit_calls: list[dict[str, Any]],
+) -> None:
+    """F24: the vote FK no longer cascades, so the remove deletes these votes itself."""
+    from types import SimpleNamespace
+
+    m = _meeting(status="live")
+    item = _agenda_item()
+    draft = SimpleNamespace(
+        id=uuid4(), status="draft", application_id=None, meeting_id=m.id,
+        agenda_item_id=item.id, eligible_group=str(m.gremium_id),
+    )
+    sess = _QueueSession(executes=[res(m), res(item), res(draft), res(m)], scalars_q=[[]])
+    await AgendaService(sess).remove(m.id, item.id, actor="mgr", may_delete_votes=True)  # type: ignore[arg-type]
+    assert sess.deleted == [draft, item]
+    assert [c["action"].value for c in audit_calls] == ["vote_delete", "agenda_item_remove"]
+    assert audit_calls[1]["data"]["deletedVoteIds"] == [str(draft.id)]
+
+
+@pytest.mark.parametrize("vote_status", ["open", "closed"])
+async def test_remove_with_open_or_closed_vote_conflicts(vote_status: str) -> None:
+    """O25: an item with an open or closed vote stays on the agenda."""
+    from types import SimpleNamespace
+
+    m = _meeting(status="live")
+    item = _agenda_item()
+    vote = SimpleNamespace(id=uuid4(), status=vote_status)
+    sess = _QueueSession(executes=[res(m), res(item), res(vote)])
+    with pytest.raises(ConflictError) as ei:
+        await AgendaService(sess).remove(m.id, item.id, actor="mgr", may_delete_votes=True)  # type: ignore[arg-type]
+    assert ei.value.code == "agenda_item_has_vote"
+    assert sess.deleted == []
+    assert sess.committed == 0
+
+
+async def test_remove_after_close_conflicts() -> None:
+    m = _meeting(status="closed")
+    sess = _QueueSession(executes=[res(m)])
+    with pytest.raises(ConflictError) as ei:
+        await AgendaService(sess).remove(m.id, uuid4(), actor="mgr", may_delete_votes=True)  # type: ignore[arg-type]
+    assert ei.value.code == "meeting_closed"
 
 
 # attendance_service.py
@@ -2059,6 +2249,7 @@ class _FakeAgendaService:
 
         self.item_row = SimpleNamespace(id=uuid4(), application_id=None)
         self.calls: list[str] = []
+        self.actors: list[str] = []
 
     async def list(self, meeting_id: UUID) -> list[Any]:
         self.calls.append("list")
@@ -2071,22 +2262,33 @@ class _FakeAgendaService:
     async def item(self, meeting_id: UUID, item_id: UUID) -> Any:
         return self.item_row
 
-    async def add(self, meeting_id: UUID, application_id, title, non_public=False) -> list[Any]:  # noqa: ANN001
+    async def add(  # noqa: ANN001
+        self, meeting_id: UUID, application_id, title, non_public=False, *, actor
+    ) -> list[Any]:
         self.calls.append("add")
+        self.actors.append(actor)
         return []
 
-    async def remove(self, meeting_id: UUID, item_id: UUID) -> list[Any]:
+    async def remove(
+        self, meeting_id: UUID, item_id: UUID, *, actor: str, may_delete_votes: bool
+    ) -> list[Any]:
         self.calls.append("remove")
+        self.actors.append(actor)
+        self.may_delete_votes = may_delete_votes
         return []
 
-    async def reorder(self, meeting_id: UUID, item_ids: list[UUID]) -> list[Any]:
+    async def reorder(
+        self, meeting_id: UUID, item_ids: list[UUID], *, actor: str
+    ) -> list[Any]:
         self.calls.append("reorder")
+        self.actors.append(actor)
         return []
 
     async def set_body(  # noqa: ANN001
-        self, meeting_id, item_id, body=None, title=None, non_public=None
+        self, meeting_id, item_id, body=None, title=None, non_public=None, *, actor
     ) -> list[Any]:
         self.calls.append("set_body")
+        self.actors.append(actor)
         return []
 
 
@@ -2120,8 +2322,8 @@ class _FakeVotingService:
             tally=TallyOut(counts={}, eligible=0, quorumMet=True),
         )
 
-    async def delete(self, vote_id, *, meeting_id):  # noqa: ANN001
-        self.deleted.append((vote_id, meeting_id))
+    async def delete(self, vote_id, *, meeting_id, actor):  # noqa: ANN001
+        self.deleted.append((vote_id, meeting_id, actor))
 
 
 @pytest.fixture
@@ -2323,12 +2525,19 @@ def test_remove_agenda_item_forbidden(app: FastAPI, client: TestClient, fakes) -
     assert r.status_code == 403
 
 
-def test_remove_agenda_item_ok(app: FastAPI, client: TestClient, fakes) -> None:
-    fakes["meeting"]._meeting_out = _meeting_out(can_write=True)
+@pytest.mark.parametrize("can_manage_votes", [True, False])
+def test_remove_agenda_item_ok(
+    app: FastAPI, client: TestClient, fakes, can_manage_votes: bool
+) -> None:
+    fakes["meeting"]._meeting_out = _meeting_out(
+        can_write=True, can_manage_votes=can_manage_votes
+    )
     _login(app)
     r = client.delete(f"/api/meetings/{uuid4()}/agenda/{uuid4()}")
     assert r.status_code == 200
     assert "remove" in fakes["agenda"].calls
+    # The vote right decides whether the remove may delete the votes of the item.
+    assert fakes["agenda"].may_delete_votes is can_manage_votes
 
 
 def test_reorder_agenda_forbidden(app: FastAPI, client: TestClient, fakes) -> None:
@@ -2357,13 +2566,22 @@ def test_set_agenda_body_forbidden(app: FastAPI, client: TestClient, fakes) -> N
     assert r.status_code == 403
 
 
-def test_set_agenda_body_conflict_when_not_live(
+def test_set_agenda_body_passes_the_state_rules_to_the_service(
     app: FastAPI, client: TestClient, fakes
 ) -> None:
+    # The service owns the state rules (O22): a planned meeting reaches it, and the
+    # service decides on the 409.
     fakes["meeting"]._meeting_out = _meeting_out(status="planned", can_write=True)
+
+    async def _refuse(*_a: Any, **_kw: Any) -> list[Any]:
+        raise ConflictError("not started", code="meeting_not_started")
+
+    fakes["agenda"].set_body = _refuse  # type: ignore[assignment]
     _login(app)
     r = client.patch(f"/api/meetings/{uuid4()}/agenda/{uuid4()}", json={"body": "x"})
     assert r.status_code == 409
+    assert r.json()["code"] == "meeting_not_started"
+    assert fakes["meeting"].broadcasts == 0
 
 
 def test_set_agenda_body_ok_broadcasts(app: FastAPI, client: TestClient, fakes) -> None:
@@ -2492,13 +2710,30 @@ def test_delete_meeting_vote_forbidden(app: FastAPI, client: TestClient, fakes) 
     assert r.status_code == 403
 
 
-def test_delete_meeting_vote_ok(app: FastAPI, client: TestClient, fakes) -> None:
-    fakes["meeting"]._meeting_out = _meeting_out(can_manage_votes=True)
+@pytest.mark.parametrize("status", ["planned", "live"])
+def test_delete_meeting_vote_ok(
+    app: FastAPI, client: TestClient, fakes, status: str
+) -> None:
+    fakes["meeting"]._meeting_out = _meeting_out(status=status, can_manage_votes=True)
     _login(app)
     vid = uuid4()
     r = client.delete(f"/api/meetings/{uuid4()}/votes/{vid}")
     assert r.status_code == 200
     assert fakes["voting"].deleted and fakes["voting"].deleted[0][0] == vid
+    # The service writes `vote_delete` for this actor (O24).
+    assert fakes["voting"].deleted[0][2] == "p"
+
+
+def test_delete_meeting_vote_closed_meeting_conflict(
+    app: FastAPI, client: TestClient, fakes
+) -> None:
+    """O24: after the close a meeting vote is part of the record."""
+    fakes["meeting"]._meeting_out = _meeting_out(status="closed", can_manage_votes=True)
+    _login(app)
+    r = client.delete(f"/api/meetings/{uuid4()}/votes/{uuid4()}")
+    assert r.status_code == 409
+    assert r.json()["code"] == "meeting_closed"
+    assert fakes["voting"].deleted == []
 
 
 # router.py: WebSocket _authorize and _serve without a real WS connection

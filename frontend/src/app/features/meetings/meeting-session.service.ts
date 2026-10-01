@@ -27,6 +27,7 @@ import { MeetingAgendaService } from './meeting-agenda.service';
 import {
   FIXED_VOTE_OPTIONS,
   assembleProtocolMarkdown,
+  errorCode,
   errorDetail,
   liveOpenedVote,
   pickBeamerVote,
@@ -205,8 +206,13 @@ export class MeetingSessionService implements OnDestroy {
   setStatus(status: 'live' | 'closed'): void {
     const m = this.meeting();
     if (!m) return;
-    // "closed" is terminal. Nobody reopens a meeting, and the server refuses it.
-    if (m.status === 'closed') return;
+    // The status runs only planned → live → closed. The server refuses every other
+    // change (409 `invalid_status_transition`), so the UI does not offer it.
+    if (status === 'closed') {
+      this.closeMeeting();
+      return;
+    }
+    if (m.status !== 'planned') return;
     // A start requires a protokollant. Check it here instead of showing the
     // server 409 after the click.
     if (status === 'live' && !m.protokollantId) {
@@ -221,14 +227,20 @@ export class MeetingSessionService implements OnDestroy {
           this.refreshProtocol();
         }
       },
-      error: () => this.toast.error(this.i18n.translate('meetings.toast.actionFailed')),
+      error: (err: unknown) => this.statusChangeFailed(err),
     });
   }
 
-  /** Close the meeting irrevocably: set the status to closed and finalize the protocol. */
+  /**
+   * Close the meeting irrevocably: set the status to closed and finalize the protocol.
+   *
+   * Only a live meeting closes. A planned meeting that does not take place is
+   * deleted. The server refuses the close while a vote is open (409 `open_vote`):
+   * the protocol then stays a draft and nothing is finalized.
+   */
   closeMeeting(): void {
     const m = this.meeting();
-    if (!m || this.finalizing()) return;
+    if (!m || m.status !== 'live' || this.finalizing()) return;
     this.api.patchMeeting(m.id, { status: 'closed' }).subscribe({
       next: (updated) => {
         this.meeting.set(updated);
@@ -244,8 +256,30 @@ export class MeetingSessionService implements OnDestroy {
           }
         }
       },
-      error: () => this.toast.error(this.i18n.translate('meetings.toast.actionFailed')),
+      error: (err: unknown) => this.statusChangeFailed(err),
     });
+  }
+
+  /**
+   * Show why the server refused a status change, then reload the meeting. A close
+   * with an open vote gets its own message. Any other refusal shows the server
+   * reason, because the meeting may have changed in another tab.
+   */
+  private statusChangeFailed(err: unknown): void {
+    if (errorCode(err) === 'open_vote') {
+      this.toast.error(this.i18n.translate('meetings.toast.closeOpenVote'));
+    } else {
+      const detail = errorDetail(err);
+      const base = this.i18n.translate('meetings.toast.actionFailed');
+      this.toast.error(detail ? `${base}: ${detail}` : base);
+    }
+    const m = this.meeting();
+    if (m) {
+      this.api.getMeeting(m.id, { quiet: true }).subscribe({
+        next: (updated) => this.meeting.set(updated),
+        error: () => {},
+      });
+    }
   }
 
   savePlannedDate(): void {
@@ -350,9 +384,11 @@ export class MeetingSessionService implements OnDestroy {
         this.meeting.set(updated);
         this.toast.success(this.i18n.translate('meetings.toast.voteDeleted'));
       },
-      error: () => {
+      error: (err: unknown) => {
         this.deletingVote.set(null);
-        this.toast.error(this.i18n.translate('meetings.toast.actionFailed'));
+        // A closed meeting keeps its votes (409 `meeting_closed`), and an open or
+        // closed vote stays (409 `vote_not_deletable`). Show the reason.
+        this.voteActionFailed(err);
       },
     });
   }

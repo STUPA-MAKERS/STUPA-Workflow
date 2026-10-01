@@ -115,13 +115,28 @@ async def update_meeting(meeting_id: str, patch: S.MeetingPatch) -> dict:
     session.manage in the meeting's gremium (or admin). Status and active application
     need write access (session.manage or protocol.write in the gremium, or the
     assigned minute-taker).
+
+    The status runs only planned -> live -> closed. A repeat of the current status
+    changes nothing. Every other change gives 409 `invalid_status_transition`: a
+    meeting never goes back, and a meeting that does not take place is deleted
+    (`delete_meeting`), not closed. The start needs a minute-taker and sets
+    `startedAt`. The close gives 409 `open_vote` while a vote of the meeting is open
+    (close or cancel it first), and it cancels the draft votes. A closed meeting
+    keeps its date, time and minute-taker.
     """
     return await api().patch(f"/meetings/{meeting_id}", json=dump_patch(patch))
 
 
 @group.tool
 async def delete_meeting(meeting_id: str) -> dict:
-    """Delete a meeting. Requires session.manage in the meeting's gremium (or admin)."""
+    """Delete a meeting. Requires session.manage in the meeting's gremium (or admin).
+
+    This is also the way to cancel a planned meeting that does not take place. A
+    meeting with a final protocol also needs `meeting.delete_finalized`. A meeting
+    with an open vote does not delete (409 `open_vote`): close or cancel the vote
+    first. The delete cancels the draft votes. The other votes of the meeting and
+    their ballots stay.
+    """
     return await api().delete(f"/meetings/{meeting_id}")
 
 
@@ -157,7 +172,9 @@ async def add_agenda_item(
 
     Give EXACTLY ONE of `application_id` for an application item or `title` for a
     free-text item. Requires write access to the meeting: session.manage
-    or protocol.write in its gremium, the assigned minute-taker, or admin.
+    or protocol.write in its gremium, the assigned minute-taker, or admin. Only a
+    planned or live meeting takes a new item; a closed meeting gives 409
+    `meeting_closed`.
     """
     return await api().post(
         f"/meetings/{meeting_id}/agenda",
@@ -177,6 +194,10 @@ async def update_agenda_item(
     The `body` sets the markdown text. The `title` renames a free-text item. An
     application item inherits its title. Requires write access to the meeting: session.manage
     or protocol.write in its gremium, the assigned minute-taker, or admin.
+
+    The `body` needs a live meeting, or a closed meeting whose protocol is still a
+    draft (409 `meeting_not_started` or `protocol_locked` otherwise). The `title`
+    needs a planned or live meeting (409 `meeting_closed` otherwise).
     """
     return await api().patch(
         f"/meetings/{meeting_id}/agenda/{item_id}",
@@ -189,7 +210,12 @@ async def delete_agenda_item(meeting_id: str, item_id: str) -> dict:
     """Remove an agenda item from a meeting.
 
     Requires write access to the meeting: session.manage
-    or protocol.write in its gremium, the assigned minute-taker, or admin.
+    or protocol.write in its gremium, the assigned minute-taker, or admin. Only a
+    planned or live meeting removes an item (409 `meeting_closed` otherwise). An item
+    with an open or closed vote stays (409 `agenda_item_has_vote`). Its draft and
+    cancelled votes are deleted with it. To delete these votes you also need the
+    vote right of the meeting (manager, minute-taker or gremium vote.manage), else
+    403.
     """
     return await api().delete(f"/meetings/{meeting_id}/agenda/{item_id}")
 
@@ -199,7 +225,8 @@ async def reorder_agenda(meeting_id: str, item_ids: list[str]) -> dict:
     """Reorder the agenda. Give `item_ids` in the desired order.
 
     Requires write access to the meeting: session.manage
-    or protocol.write in its gremium, the assigned minute-taker, or admin.
+    or protocol.write in its gremium, the assigned minute-taker, or admin. Only a
+    planned or live meeting changes its order (409 `meeting_closed` otherwise).
     """
     return await api().put(
         f"/meetings/{meeting_id}/agenda/order", json={"itemIds": item_ids}
@@ -228,7 +255,10 @@ async def delete_meeting_vote(meeting_id: str, vote_id: str) -> dict:
     """Delete a meeting vote.
 
     Requires the lead of the meeting, the minute-taker, or the gremium permission
-    `vote.manage`.
+    `vote.manage`. Only a planned or live meeting deletes a vote; after the close the
+    vote is part of the record (409 `meeting_closed`). Only a draft or cancelled vote
+    can go; an open or closed vote gives 409 `vote_not_deletable` (cancel an open vote
+    first). Every delete is audited.
     """
     return await api().delete(f"/meetings/{meeting_id}/votes/{vote_id}")
 

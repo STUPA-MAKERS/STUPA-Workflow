@@ -4,7 +4,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import type { SelectOption } from '@stupa-makers/ui-kit';
 import type { AgendaItem, AssignableApplication, Uuid } from '@core/api/models';
-import { resolveI18n } from './meetings-display.util';
+import { errorDetail, resolveI18n } from './meetings-display.util';
 
 /** Idle time after the last keystroke before the service autosaves the TOP body. */
 const AUTOSAVE_DELAY_MS = 1000;
@@ -54,6 +54,17 @@ export class MeetingAgendaService implements OnDestroy {
     }),
   );
 
+  /**
+   * Show a refused agenda change with the server reason. A closed meeting answers
+   * 409 `meeting_closed`, and an item with an open or closed vote answers 409
+   * `agenda_item_has_vote`.
+   */
+  private failed(err: unknown): void {
+    const detail = errorDetail(err);
+    const base = this.i18n.translate('meetings.toast.actionFailed');
+    this.toast.error(detail ? `${base}: ${detail}` : base);
+  }
+
   ngOnDestroy(): void {
     if (this.bodyTimer !== null) clearTimeout(this.bodyTimer);
   }
@@ -97,9 +108,9 @@ export class MeetingAgendaService implements OnDestroy {
         this.agendaPick.set('');
         this.refreshAssignable(meetingId);
       },
-      error: () => {
+      error: (err: unknown) => {
         this.savingAgenda.set(false);
-        this.toast.error(this.i18n.translate('meetings.toast.actionFailed'));
+        this.failed(err);
       },
     });
   }
@@ -114,9 +125,9 @@ export class MeetingAgendaService implements OnDestroy {
         this.agenda.set(rows);
         this.agendaFreetext.set('');
       },
-      error: () => {
+      error: (err: unknown) => {
         this.savingAgenda.set(false);
-        this.toast.error(this.i18n.translate('meetings.toast.actionFailed'));
+        this.failed(err);
       },
     });
   }
@@ -130,9 +141,9 @@ export class MeetingAgendaService implements OnDestroy {
         this.agenda.set(rows);
         this.refreshAssignable(meetingId);
       },
-      error: () => {
+      error: (err: unknown) => {
         this.savingAgenda.set(false);
-        this.toast.error(this.i18n.translate('meetings.toast.actionFailed'));
+        this.failed(err);
       },
     });
   }
@@ -165,9 +176,9 @@ export class MeetingAgendaService implements OnDestroy {
         this.agenda.set(rows);
         this.renameDraft.set('');
       },
-      error: () => {
+      error: (err: unknown) => {
         this.savingAgenda.set(false);
-        this.toast.error(this.i18n.translate('meetings.toast.actionFailed'));
+        this.failed(err);
       },
     });
   }
@@ -180,9 +191,9 @@ export class MeetingAgendaService implements OnDestroy {
         this.savingAgenda.set(false);
         this.agenda.set(rows);
       },
-      error: () => {
+      error: (err: unknown) => {
         this.savingAgenda.set(false);
-        this.toast.error(this.i18n.translate('meetings.toast.actionFailed'));
+        this.failed(err);
       },
     });
   }
@@ -205,8 +216,8 @@ export class MeetingAgendaService implements OnDestroy {
     this.agenda.set(items); // optimistic update
     this.api.reorderAgenda(meetingId, items.map((i) => i.id)).subscribe({
       next: (rows) => this.agenda.set(rows),
-      error: () => {
-        this.toast.error(this.i18n.translate('meetings.toast.actionFailed'));
+      error: (err: unknown) => {
+        this.failed(err);
         this.load(meetingId, canManage);
       },
     });

@@ -766,3 +766,102 @@ def test_vote_closed_at_backfill_and_allow_change_strip(
         ).all()
     assert cols == []
     command.upgrade(alembic_cfg, "head")
+
+
+def _agenda_fk_rule(conn) -> str:  # noqa: ANN001
+    """Return `confdeltype` of the foreign key on `vote.agenda_item_id` (c, n, ...)."""
+    return conn.execute(
+        text(
+            "SELECT con.confdeltype FROM pg_constraint AS con "
+            "JOIN pg_attribute AS att ON att.attrelid = con.conrelid "
+            "AND att.attnum = ANY (con.conkey) "
+            "WHERE con.conrelid = 'vote'::regclass AND con.contype = 'f' "
+            "AND att.attname = 'agenda_item_id'"
+        )
+    ).scalar_one()
+
+
+def test_meeting_started_at_and_vote_agenda_fk(
+    alembic_cfg: Config, engine: Engine, capfd: pytest.CaptureFixture[str]
+) -> None:
+    """Migration eff772f93d8e adds `meeting.started_at` and keeps agenda votes (Z7, F21).
+
+    The upgrade adds the column without a backfill and logs the live and closed
+    meetings that stay NULL. It changes the foreign key `vote.agenda_item_id` from
+    CASCADE to SET NULL, so a meeting delete keeps the votes and their ballots. The
+    downgrade restores CASCADE and drops the column.
+    """
+    command.downgrade(alembic_cfg, "863a6833fea5")
+    with engine.begin() as conn:
+        assert _agenda_fk_rule(conn) == "c"
+        gremium = conn.execute(
+            text("INSERT INTO gremium (name, slug) VALUES ('G', :s) RETURNING id"),
+            {"s": f"g-started-{uuid.uuid4()}"},
+        ).scalar_one()
+        meetings = [
+            conn.execute(
+                text(
+                    "INSERT INTO meeting (gremium_id, title, status) "
+                    "VALUES (:g, 'M', :s) RETURNING id"
+                ),
+                {"g": gremium, "s": status},
+            ).scalar_one()
+            for status in ("planned", "live", "closed")
+        ]
+
+    capfd.readouterr()
+    command.upgrade(alembic_cfg, "head")
+    report = capfd.readouterr().err
+    assert "2 live or closed meeting(s) without a known start stay NULL" in report
+
+    closed = meetings[2]
+    with engine.begin() as conn:
+        assert _agenda_fk_rule(conn) == "n"
+        assert conn.execute(
+            text("SELECT count(*) FROM meeting WHERE started_at IS NULL")
+        ).scalar_one() == 3
+        item = conn.execute(
+            text(
+                "INSERT INTO meeting_agenda_item (meeting_id, title) "
+                "VALUES (:m, 'TOP') RETURNING id"
+            ),
+            {"m": closed},
+        ).scalar_one()
+        vote = conn.execute(
+            text(
+                "INSERT INTO vote (eligible_group, config, status, result, meeting_id, "
+                "agenda_item_id) VALUES (:g, CAST(:c AS jsonb), 'closed', 'passed', "
+                ":m, :i) RETURNING id"
+            ),
+            {
+                "g": str(gremium),
+                "c": '{"options": ["yes", "no"], "majorityRule": "simple"}',
+                "m": closed,
+                "i": item,
+            },
+        ).scalar_one()
+        conn.execute(
+            text("INSERT INTO ballot (vote_id, voter_sub, choice) VALUES (:v, 's', 'yes')"),
+            {"v": vote},
+        )
+        conn.execute(text("DELETE FROM meeting WHERE id = :m"), {"m": closed})
+        kept = conn.execute(
+            text("SELECT meeting_id, agenda_item_id FROM vote WHERE id = :v"), {"v": vote}
+        ).one()
+        ballots = conn.execute(
+            text("SELECT count(*) FROM ballot WHERE vote_id = :v"), {"v": vote}
+        ).scalar_one()
+    assert tuple(kept) == (None, None)
+    assert ballots == 1
+
+    command.downgrade(alembic_cfg, "863a6833fea5")
+    with engine.connect() as conn:
+        assert _agenda_fk_rule(conn) == "c"
+        cols = conn.execute(
+            text(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name = 'meeting' AND column_name = 'started_at'"
+            )
+        ).all()
+    assert cols == []
+    command.upgrade(alembic_cfg, "head")

@@ -286,11 +286,15 @@ async def get_meeting(meeting_id: UUID, service: ServiceDep, principal: ReaderDe
     return await service.get(meeting_id, principal)
 
 
-@router.delete("/meetings/{meeting_id}", status_code=204, responses=_errors(401, 403, 404))
+@router.delete(
+    "/meetings/{meeting_id}", status_code=204, responses=_errors(401, 403, 404, 409)
+)
 async def delete_meeting(meeting_id: UUID, service: ServiceDep, principal: ReaderDep) -> None:
     """Delete a meeting.
 
     Only a meeting manager (``session.manage``) or an admin may delete a meeting.
+    A meeting with an open vote gives 409 ``open_vote``. The delete cancels the
+    draft votes of the meeting.
     """
     await service.delete(meeting_id, principal)
 
@@ -298,7 +302,7 @@ async def delete_meeting(meeting_id: UUID, service: ServiceDep, principal: Reade
 @router.patch(
     "/meetings/{meeting_id}",
     response_model=MeetingOut,
-    responses=_errors(400, 401, 403, 404, 422),
+    responses=_errors(400, 401, 403, 404, 409, 422),
 )
 async def patch_meeting(
     meeting_id: UUID, payload: MeetingPatch, service: ServiceDep, principal: ReaderDep
@@ -311,6 +315,10 @@ async def patch_meeting(
     router creates the protocol, and that step is idempotent. The protocol is
     created only here, never by hand. The service has already checked that a
     protokollant is set, else it answers 409.
+
+    The status runs only planned, live, closed (409 ``invalid_status_transition``
+    otherwise). The close answers 409 ``open_vote`` while a vote of the meeting is
+    open, and it cancels the draft votes of the meeting.
     """
     updated = await service.patch(meeting_id, payload, principal)
     if payload.status == "live" and updated.status == "live":
@@ -475,7 +483,7 @@ async def open_meeting_vote(
 @router.delete(
     "/meetings/{meeting_id}/votes/{vote_id}",
     response_model=MeetingOut,
-    responses=_errors(401, 403, 404),
+    responses=_errors(401, 403, 404, 409),
 )
 async def delete_meeting_vote(
     meeting_id: UUID,
@@ -487,12 +495,20 @@ async def delete_meeting_vote(
     """Delete a vote and its ballots.
 
     The caller must be the manager, the protokollant, or hold the gremium permission
-    ``vote.manage``.
+    ``vote.manage``. Only a ``planned`` or ``live`` meeting deletes a vote (O24): after
+    the close the vote is part of the record, and the route answers 409
+    ``meeting_closed``. Only a ``draft`` or ``cancelled`` vote can go: an open or
+    closed vote gives 409 ``vote_not_deletable``. Every delete writes ``vote_delete``.
     """
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_manage_votes:
         raise ForbiddenError("not allowed to delete a vote in this meeting")
-    await voting.delete(vote_id, meeting_id=meeting_id)
+    if meeting.status == "closed":
+        raise ConflictError(
+            "the meeting is closed — its votes can no longer be deleted",
+            code="meeting_closed",
+        )
+    await voting.delete(vote_id, meeting_id=meeting_id, actor=principal.sub)
     return await service.get(meeting_id, principal)
 
 
@@ -523,20 +539,25 @@ async def add_agenda_item(
 ) -> list[AgendaItemOut]:
     """Add an agenda item, either an application or a free-text item.
 
-    Only the meeting lead or an admin may edit the agenda.
+    Only the meeting lead or an admin may edit the agenda. A closed meeting answers
+    409 ``meeting_closed``.
     """
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_write:
         raise ForbiddenError("not allowed to edit the agenda")
     return await agenda.add(
-        meeting_id, payload.application_id, payload.title, non_public=payload.non_public
+        meeting_id,
+        payload.application_id,
+        payload.title,
+        non_public=payload.non_public,
+        actor=principal.sub,
     )
 
 
 @router.delete(
     "/meetings/{meeting_id}/agenda/{item_id}",
     response_model=list[AgendaItemOut],
-    responses=_errors(401, 403, 404),
+    responses=_errors(401, 403, 404, 409),
 )
 async def remove_agenda_item(
     meeting_id: UUID,
@@ -547,18 +568,27 @@ async def remove_agenda_item(
 ) -> list[AgendaItemOut]:
     """Remove an agenda item.
 
-    Only the meeting lead or an admin may edit the agenda.
+    Only the meeting lead or an admin may edit the agenda. A closed meeting answers
+    409 ``meeting_closed``. An item with an open or closed vote answers 409
+    ``agenda_item_has_vote``. The draft and cancelled votes of the item go with it.
+    To delete them the caller also needs ``canManageVotes``, as on
+    ``DELETE /meetings/{id}/votes/{voteId}``, else 403.
     """
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_write:
         raise ForbiddenError("not allowed to edit the agenda")
-    return await agenda.remove(meeting_id, item_id)
+    return await agenda.remove(
+        meeting_id,
+        item_id,
+        actor=principal.sub,
+        may_delete_votes=meeting.can_manage_votes,
+    )
 
 
 @router.put(
     "/meetings/{meeting_id}/agenda/order",
     response_model=list[AgendaItemOut],
-    responses=_errors(401, 403, 404, 422),
+    responses=_errors(401, 403, 404, 409, 422),
 )
 async def reorder_agenda(
     meeting_id: UUID,
@@ -569,18 +599,19 @@ async def reorder_agenda(
 ) -> list[AgendaItemOut]:
     """Reorder the agenda items.
 
-    Only the meeting lead or an admin may edit the agenda.
+    Only the meeting lead or an admin may edit the agenda. A closed meeting answers
+    409 ``meeting_closed``.
     """
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_write:
         raise ForbiddenError("not allowed to edit the agenda")
-    return await agenda.reorder(meeting_id, payload.item_ids)
+    return await agenda.reorder(meeting_id, payload.item_ids, actor=principal.sub)
 
 
 @router.patch(
     "/meetings/{meeting_id}/agenda/{item_id}",
     response_model=list[AgendaItemOut],
-    responses=_errors(401, 403, 404, 422),
+    responses=_errors(401, 403, 404, 409, 422),
 )
 async def set_agenda_body(
     meeting_id: UUID,
@@ -593,21 +624,20 @@ async def set_agenda_body(
     """Set the markdown body or the title of an agenda item.
 
     The per-item editor calls this route. Only the meeting lead or an admin may
-    edit the agenda.
+    edit the agenda (``canWrite``). The body needs a live meeting, or a closed
+    meeting whose protocol is still a draft (O22). A rename needs a planned or live
+    meeting (O25). The service answers 409 otherwise.
     """
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_write:
         raise ForbiddenError("not allowed to edit the agenda")
-    # The minutes of an agenda item need a started meeting. Renaming a free-text
-    # agenda item is planning work and stays allowed before ``live``.
-    if payload.body is not None and meeting.status != "live":
-        raise ConflictError("the meeting has not started — start it before taking minutes")
     items = await agenda.set_body(
         meeting_id,
         item_id,
         body=payload.body,
         title=payload.title,
         non_public=payload.non_public,
+        actor=principal.sub,
     )
     # Tell the live followers about the changed agenda-item text.
     await service.broadcast_state(meeting_id, principal)

@@ -125,6 +125,15 @@ class MeetingVoteOut(_CamelModel):
     represented_cast: bool = Field(default=False, alias="representedCast")
 
 
+class CurrentAgendaItemOut(_CamelModel):
+    """The agenda item the room handles now, for the start page and the timeline (A2)."""
+
+    # The 1-based number of the item in the agenda order ("TOP 3").
+    position: int
+    # The title of a free-text item, or the title of the application.
+    title: str | None = None
+
+
 class MeetingOut(_CamelModel):
     """Meeting state (``GET /api/meetings/{id}``)."""
 
@@ -135,12 +144,22 @@ class MeetingOut(_CamelModel):
     date: _date | None = None
     start_time: _time | None = Field(default=None, alias="startTime")
     end_time: _time | None = Field(default=None, alias="endTime")
+    # The real start (Z7). The start sets it once. ``None`` for a meeting that has not
+    # started, or that started before the field existed: a reader then uses the
+    # planned start.
+    started_at: _datetime | None = Field(default=None, alias="startedAt")
     # The close sets this field. It fills the end line of the protocol title page.
     closed_at: _datetime | None = Field(default=None, alias="closedAt")
     status: MeetingStatus
     active_application_id: UUID | None = Field(default=None, alias="activeApplicationId")
     # The agenda item the room handles now. Followers and the beamer follow it.
     current_agenda_item_id: UUID | None = Field(default=None, alias="currentAgendaItemId")
+    # A2: number and title of the current agenda item, and the size of the agenda. The
+    # reader of the meeting also reads its agenda, so both carry no new data.
+    current_agenda_item: CurrentAgendaItemOut | None = Field(
+        default=None, alias="currentAgendaItem"
+    )
+    agenda_item_count: int = Field(default=0, alias="agendaItemCount")
     protocol_id: UUID | None = Field(default=None, alias="protocolId")
     created_at: _datetime = Field(alias="createdAt")
     protokollant_id: UUID | None = Field(default=None, alias="protokollantId")

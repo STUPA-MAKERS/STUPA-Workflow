@@ -244,6 +244,7 @@ class PermissionOps(MeetingServiceBase):
         """Build the `MeetingOut` with the permission flags of the principal."""
         name = await self._name_for(self.session, meeting.protokollant_id)
         gremium_name = await self._gremium_name_for(meeting.gremium_id)
+        agenda = (await self._agenda_summaries([meeting]))[meeting.id]
         if principal is None:
             return self._to_out(
                 meeting,
@@ -251,6 +252,7 @@ class PermissionOps(MeetingServiceBase):
                 protokollant_name=name,
                 gremium_name=gremium_name,
                 votes=votes,
+                agenda=agenda,
             )
         return self._to_out(
             meeting,
@@ -264,4 +266,5 @@ class PermissionOps(MeetingServiceBase):
             protokollant_name=name,
             gremium_name=gremium_name,
             votes=votes,
+            agenda=agenda,
         )

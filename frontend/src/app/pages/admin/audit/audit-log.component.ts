@@ -85,6 +85,14 @@ export const AUDIT_ACTIONS = [
   'vote_close',
   'vote_cancel',
   'vote_branch_blocked',
+  // Meeting and agenda (F12). They mirror the MEETING_* and AGENDA_* values in actions.py.
+  'meeting_create',
+  'meeting_update',
+  'meeting_delete',
+  'agenda_item_add',
+  'agenda_item_update',
+  'agenda_item_remove',
+  'agenda_reorder',
   // Budget and money mutations. They mirror the BUDGET_* values in actions.py.
   'budget_node_create',
   'budget_node_update',
@@ -131,6 +139,14 @@ const ACTION_ICONS: Record<string, IconName> = {
   vote_close: 'check',
   vote_cancel: 'check',
   vote_branch_blocked: 'check',
+  // Meetings and their agenda use the glyph of the meetings page.
+  meeting_create: 'parliament',
+  meeting_update: 'parliament',
+  meeting_delete: 'parliament',
+  agenda_item_add: 'parliament',
+  agenda_item_update: 'parliament',
+  agenda_item_remove: 'parliament',
+  agenda_reorder: 'parliament',
   // Money mutations use the euro glyph. The cost center structure uses the pie glyph of the
   // budget tab.
   budget_node_create: 'chart-pie',
@@ -153,6 +169,7 @@ const ACTION_ICONS: Record<string, IconName> = {
 const TARGET_ROUTES: Record<string, (id: string) => string[]> = {
   application: (id) => ['/applications', id],
   vote: (id) => ['/voting/vote', id],
+  meeting: (id) => ['/meetings', id],
   gremium: () => ['/admin/gremien'],
   application_type: () => ['/admin/forms'],
   role: () => ['/admin/roles'],

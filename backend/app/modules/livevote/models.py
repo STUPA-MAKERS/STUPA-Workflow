@@ -1,8 +1,9 @@
 """Meeting table that the live votes bind to.
 
 `Meeting` is one meeting of a Gremium. `status` drives the live-vote channel
-and runs from `planned` over `live` to `closed`. `active_application_id` is the
-application that the beamer shows now.
+and runs from `planned` over `live` to `closed`. No other transition exists: a
+meeting never goes back, and a meeting that does not take place is deleted.
+`active_application_id` is the application that the beamer shows now.
 """
 
 from __future__ import annotations
@@ -45,6 +46,12 @@ class Meeting(UUIDPkMixin, CreatedAtMixin, Base):
     # one hour from `start_time`. With it the value must be after `start_time`.
     end_time: Mapped[_time | None] = mapped_column(Time, nullable=True)
     status: Mapped[str] = mapped_column(Text, server_default="planned")
+    # The real start (Z7). The transition from `planned` to `live` sets it once. It
+    # stays NULL for a meeting that started before the column existed: the audit log
+    # holds no start time for it. A reader then falls back to the planned start.
+    started_at: Mapped[_datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     # The transition to `closed`, which is terminal, sets this automatically. It
     # gives the end line on the title page of the protocol.
     closed_at: Mapped[_datetime | None] = mapped_column(

@@ -405,7 +405,8 @@ async def test_broker_publisher_roundtrip_over_redis(redis_url: str) -> None:
 async def test_agenda_set_body_renames_freetext_top_only(session: AsyncSession) -> None:
     """``set_body(title=...)`` renames free-text agenda items but never application ones."""
     gremium, application = await _gremium_and_application(session)
-    meeting = Meeting(gremium_id=gremium.id, title="GV", status="planned")
+    # The body needs a live meeting (O22). The rename alone also passes when planned.
+    meeting = Meeting(gremium_id=gremium.id, title="GV", status="live")
     session.add(meeting)
     await session.flush()
     free = MeetingAgendaItem(

@@ -19,6 +19,7 @@ from app.modules.auth.principal import Principal
 from app.modules.auth.rbac import vote_group_key
 from app.modules.flow.schemas import TransitionOut, TransitionResult
 from app.modules.voting import service as voting_service
+from app.modules.voting.models import Vote
 from app.modules.voting.schemas import VoteCreate, VoteCreateInternal
 from app.modules.voting.service import VotingService, open_tally_revealed
 from app.shared.config_schemas import VoteConfig
@@ -54,6 +55,7 @@ def _vote(**over: Any) -> SimpleNamespace:
         "id": uuid4(),
         "application_id": uuid4(),
         "meeting_id": None,
+        "agenda_item_id": None,
         "eligible_group": str(GID),
         "config": _config(),
         "eligible_count": 10,
@@ -174,6 +176,27 @@ async def test_open_unknown_vote_404() -> None:
     db = fake_session(result())
     with pytest.raises(NotFoundError):
         await VotingService(db).open(uuid4(), now=NOW)
+
+
+async def test_open_meeting_vote_in_a_closed_meeting_409() -> None:
+    """O12: the open re-reads the meeting status under the meeting row lock."""
+    mid = uuid4()
+    vote = _vote(status="draft", meeting_id=mid)
+    db = fake_session(result(vote))
+    db.scalar_results = [mid, "closed"]  # the meeting of the vote, its locked status
+    with pytest.raises(ConflictError) as ei:
+        await VotingService(db).open(vote.id, now=NOW)
+    assert ei.value.code == "meeting_closed"
+    assert vote.status == "draft"
+
+
+async def test_open_meeting_vote_in_a_live_meeting() -> None:
+    mid = uuid4()
+    vote = _vote(status="draft", meeting_id=mid)
+    db = fake_session(result(vote))
+    db.scalar_results = [mid, "live"]
+    out = await VotingService(db).open(vote.id, now=NOW)
+    assert out.status == "open"
 
 
 async def test_cast_not_open_409() -> None:
@@ -813,6 +836,7 @@ async def test_cancel_closed_409() -> None:
 async def test_create_without_application_skips_lookup() -> None:
     # With application_id=None the service runs no _get_application query.
     db = fake_session()
+    db.scalar_results = ["live"]  # the locked status read of the meeting
     payload = VoteCreateInternal.model_validate(
         {"config": _config(), "eligibleGroup": str(GID), "eligibleCount": 4}
     )
@@ -823,21 +847,141 @@ async def test_create_without_application_skips_lookup() -> None:
     assert db.committed == 1
 
 
-async def test_delete_vote_in_meeting_removes_and_commits() -> None:
-    mid = uuid4()
-    vote = _vote(meeting_id=mid)
+@pytest.mark.parametrize(
+    ("status", "code"), [("planned", "meeting_not_started"), ("closed", "meeting_closed")]
+)
+async def test_create_in_a_meeting_that_is_not_live_conflicts(status: str, code: str) -> None:
+    """O12: a meeting vote needs a live meeting, read under the meeting row lock."""
+    db = fake_session()
+    db.scalar_results = [status]
+    payload = VoteCreateInternal.model_validate(
+        {"config": _config(), "eligibleGroup": str(GID), "eligibleCount": 4}
+    )
+    with pytest.raises(ConflictError) as ei:
+        await VotingService(db).create_internal(None, payload, meeting_id=uuid4())
+    assert ei.value.code == code
+    assert db.added == []
+
+
+async def test_create_with_a_missing_meeting_or_agenda_item_is_404() -> None:
+    payload = VoteCreateInternal.model_validate(
+        {"config": _config(), "eligibleGroup": str(GID), "eligibleCount": 4}
+    )
+    db = fake_session()  # no meeting status
+    with pytest.raises(NotFoundError):
+        await VotingService(db).create_internal(None, payload, meeting_id=uuid4())
+    db = fake_session()
+    db.scalar_results = ["live", None]  # the agenda item is gone
+    with pytest.raises(NotFoundError, match="agenda item"):
+        await VotingService(db).create_internal(
+            None, payload, meeting_id=uuid4(), agenda_item_id=uuid4()
+        )
+    assert db.added == []
+
+
+async def test_create_on_an_agenda_item_of_the_live_meeting() -> None:
+    """The agenda item exists in the live meeting: the draft binds to it."""
+    payload = VoteCreateInternal.model_validate(
+        {"config": _config(), "eligibleGroup": str(GID), "eligibleCount": 4}
+    )
+    mid, item = uuid4(), uuid4()
+    db = fake_session()
+    db.scalar_results = ["live", item]
+    out = await VotingService(db).create_internal(
+        None, payload, meeting_id=mid, agenda_item_id=item
+    )
+    assert out.status == "draft"
+    [vote] = [o for o in db.added if isinstance(o, Vote)]
+    assert vote.meeting_id == mid
+    assert vote.agenda_item_id == item
+    assert db.committed == 1
+
+
+@pytest.mark.parametrize("status", ["draft", "cancelled"])
+async def test_delete_vote_in_meeting_removes_audits_and_commits(status: str) -> None:
+    mid, item = uuid4(), uuid4()
+    vote = _vote(meeting_id=mid, agenda_item_id=item, status=status)
     db = fake_session(result(vote))
-    await VotingService(db).delete(vote.id, meeting_id=mid)
+    await VotingService(db).delete(vote.id, meeting_id=mid, actor="mgr")
     assert vote in db.deleted
     assert db.committed == 1
+    # O24: every delete of a meeting vote goes into the audit log.
+    [entry] = _audits(db)
+    assert entry.action == "vote_delete"
+    assert entry.actor == "mgr"
+    assert entry.data["meetingId"] == str(mid)
+    assert entry.data["agendaItemId"] == str(item)
+    assert entry.data["status"] == status
+
+
+@pytest.mark.parametrize("status", ["open", "closed"])
+async def test_delete_open_or_closed_vote_in_meeting_conflicts(status: str) -> None:
+    """An open or closed vote is part of the record; it also keeps its TOP (O25)."""
+    mid = uuid4()
+    vote = _vote(meeting_id=mid, agenda_item_id=uuid4(), status=status)
+    db = fake_session(result(vote))
+    with pytest.raises(ConflictError) as ei:
+        await VotingService(db).delete(vote.id, meeting_id=mid, actor="mgr")
+    assert ei.value.code == "vote_not_deletable"
+    assert db.deleted == []
+    assert db.committed == 0
+    assert _audits(db) == []
 
 
 async def test_delete_vote_from_other_meeting_404() -> None:
     vote = _vote(meeting_id=uuid4())
     db = fake_session(result(vote))
     with pytest.raises(NotFoundError, match="not found in this meeting"):
-        await VotingService(db).delete(vote.id, meeting_id=uuid4())
+        await VotingService(db).delete(vote.id, meeting_id=uuid4(), actor="mgr")
     assert db.deleted == []
+    assert _audits(db) == []
+
+
+async def test_delete_for_agenda_item_deletes_drafts_and_cancelled() -> None:
+    """F24: the agenda-item remove deletes the draft and cancelled votes with audit."""
+    item = uuid4()
+    draft = _vote(meeting_id=uuid4(), agenda_item_id=item, status="draft")
+    cancelled = _vote(meeting_id=uuid4(), agenda_item_id=item, status="cancelled")
+    db = fake_session(result(draft, cancelled))
+    out = await VotingService(db).delete_for_agenda_item(item, actor="mgr", may_delete=True)
+    assert out == [draft.id, cancelled.id]
+    assert db.deleted == [draft, cancelled]
+    assert [e.data["status"] for e in _audits(db)] == ["draft", "cancelled"]
+    # The caller commits together with the agenda-item remove.
+    assert db.committed == 0
+
+
+async def test_delete_for_agenda_item_without_votes_is_empty() -> None:
+    db = fake_session(result())
+    # Without votes the agenda right alone is enough: nothing is deleted.
+    out = await VotingService(db).delete_for_agenda_item(uuid4(), actor="mgr", may_delete=False)
+    assert out == []
+    assert db.deleted == []
+
+
+async def test_delete_for_agenda_item_needs_the_vote_right() -> None:
+    """The agenda right alone does not delete a vote, not even a cancelled one."""
+    item = uuid4()
+    cancelled = _vote(agenda_item_id=item, status="cancelled")
+    db = fake_session(result(cancelled))
+    with pytest.raises(ForbiddenError):
+        await VotingService(db).delete_for_agenda_item(item, actor="pw", may_delete=False)
+    assert db.deleted == []
+    assert _audits(db) == []
+
+
+@pytest.mark.parametrize("blocking", ["open", "closed"])
+async def test_delete_for_agenda_item_refuses_open_or_closed_vote(blocking: str) -> None:
+    """O25: an open or closed vote is part of the record and blocks the remove."""
+    item = uuid4()
+    draft = _vote(agenda_item_id=item, status="draft")
+    kept = _vote(agenda_item_id=item, status=blocking)
+    db = fake_session(result(draft, kept))
+    with pytest.raises(ConflictError) as ei:
+        await VotingService(db).delete_for_agenda_item(item, actor="mgr", may_delete=True)
+    assert ei.value.code == "agenda_item_has_vote"
+    assert db.deleted == []
+    assert _audits(db) == []
 
 
 # A meeting vote reveals the counts only when every expected ballot arrived. The

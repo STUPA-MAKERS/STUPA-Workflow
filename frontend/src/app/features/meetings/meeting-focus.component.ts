@@ -189,6 +189,14 @@ export class MeetingFocusComponent {
     () => this.protocol() !== null && !this.locked() && this.canEdit(),
   );
   protected readonly canEditAgenda = computed(() => this.meeting().canWrite && !this.locked());
+  /**
+   * Change the agenda structure: add, rename, reorder and remove. Only a planned or
+   * live meeting allows it (the server answers 409 `meeting_closed` otherwise). The
+   * `nonPublic` flag stays open after the close, while the protocol is a draft.
+   */
+  protected readonly canChangeAgenda = computed(
+    () => this.canEditAgenda() && this.meeting().status !== 'closed',
+  );
 
   protected readonly votes = computed<MeetingVote[]>(() => {
     const t = this.top();
@@ -311,6 +319,26 @@ export class MeetingFocusComponent {
 
   protected votesFor(topId: Uuid): MeetingVote[] {
     return this.meeting().votes.filter((v) => v.agendaItemId === topId);
+  }
+
+  /** An open or closed vote is part of the record and keeps its item on the agenda. */
+  protected hasRecordedVote(topId: Uuid): boolean {
+    return this.votesFor(topId).some((v) => v.status === 'open' || v.status === 'closed');
+  }
+
+  /**
+   * Give the i18n key of the reason why the item cannot be removed, or `null`.
+   *
+   * An open or closed vote keeps the item (409 `agenda_item_has_vote`). A draft or
+   * cancelled vote goes with the item, but only for a person with the vote right
+   * (`canManageVotes`). The agenda right alone gets 403.
+   */
+  protected removeBlockedReason(topId: Uuid): TranslationKey | null {
+    if (this.hasRecordedVote(topId)) return 'meetings.agenda.removeBlocked';
+    if (!this.meeting().canManageVotes && this.votesFor(topId).length > 0) {
+      return 'meetings.agenda.removeNeedsVoteRight';
+    }
+    return null;
   }
 
   /** An item before "now" in the agenda order counts as handled. */

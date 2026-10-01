@@ -84,6 +84,12 @@ export function voteOptionLabel(
   return label === key ? opt : label;
 }
 
+/** The stable problem+json `code` of an HTTP error (for example `open_vote`), or `''`. */
+export function errorCode(err: unknown): string {
+  const body = (err as { error?: { code?: string } } | null)?.error;
+  return typeof body?.code === 'string' ? body.code : '';
+}
+
 /** The problem+json `detail` message of an HTTP error, or an empty string. */
 export function errorDetail(err: unknown): string {
   const body = (err as { error?: { detail?: string } } | null)?.error;
