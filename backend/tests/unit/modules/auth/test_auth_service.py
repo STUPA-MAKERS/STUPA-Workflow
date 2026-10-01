@@ -45,9 +45,9 @@ async def test_request_magic_link_no_match_is_silent() -> None:
     assert db.added == []
 
 
-async def test_request_magic_link_edit_scope_no_state() -> None:
+async def test_request_magic_link_edit_scope_unlimited_by_default() -> None:
     settings = _settings()
-    db = fake_session(result(_app()))  # current_state_id is None, so the scope is edit
+    db = fake_session(result(_app()))
     sent: list[tuple[str, str]] = []
     await service.request_magic_link(
         db, settings, email="x@y.de", deliver=lambda e, link: sent.append((e, link))
@@ -57,20 +57,7 @@ async def test_request_magic_link_edit_scope_no_state() -> None:
     assert "/antrag/aid-1#t=" in link  # the token sits in the fragment, not in the query
     assert db.added[0].scope == "edit"
     assert db.added[0].single_use is False
-
-
-async def test_request_magic_link_view_scope_when_locked() -> None:
-    settings = _settings()
-    locked = State()
-    locked.edit_allowed = False  # type: ignore[assignment]
-    db = fake_session(result(_app(state_id="s1")), result(locked))
-    sent: list[tuple[str, str]] = []
-    await service.request_magic_link(
-        db, settings, email="x@y.de", application_id="aid-1",
-        deliver=lambda e, link: sent.append((e, link)),
-    )
-    assert db.added[0].scope == "view"
-    assert db.added[0].single_use is True
+    assert db.added[0].expires_at is None  # no settings row: no expiry
 
 
 async def test_request_magic_link_default_deliver_runs() -> None:
@@ -79,15 +66,6 @@ async def test_request_magic_link_default_deliver_runs() -> None:
     # Without `deliver`, `_default_deliver` runs. It logs the recipient domain, no token.
     await service.request_magic_link(db, settings, email="x@y.de")
     assert len(db.added) == 1
-
-
-async def test_request_magic_link_edit_scope_when_open_state() -> None:
-    settings = _settings()
-    open_state = State()
-    open_state.edit_allowed = True  # type: ignore[assignment]
-    db = fake_session(result(_app(state_id="s1")), result(open_state))
-    await service.request_magic_link(db, settings, email="x@y.de", deliver=lambda e, link: None)
-    assert db.added[0].scope == "edit"
 
 
 async def test_request_magic_link_awaits_async_deliver() -> None:
@@ -158,7 +136,7 @@ async def test_verify_magic_link_single_use_ok(monkeypatch: pytest.MonkeyPatch) 
     db = fake_session(result(row), result("claimed-id"))
     app_id, scope, token = await service.verify_magic_link(db, settings, token="tok")
     assert app_id == "aid-1"
-    assert scope == "view"
+    assert scope == "edit"  # O4: an old view link opens an edit session too
     assert token  # a signed applicant token
 
 
@@ -247,6 +225,7 @@ async def test_verify_magic_link_survives_a_failed_flow_start(
         result(row),  # the magic link
         result("claimed-id"),  # the single-use claim
         result("aid-1"),  # the confirmation UPDATE
+        result(),  # the UPDATE that expires the older links
         result(app),  # FlowService._load_app
         result(State()),  # FlowService._load_state
         result("event-1"),  # the latest status event of the task mail
@@ -254,7 +233,7 @@ async def test_verify_magic_link_survives_a_failed_flow_start(
     app_id, scope, token = await service.verify_magic_link(
         db, settings, token="tok", dispatcher=_FailingDispatcher()  # pyright: ignore[reportArgumentType]
     )
-    assert (app_id, scope) == ("aid-1", "view")
+    assert (app_id, scope) == ("aid-1", "edit")
     assert token
     assert db.rolled_back == 1
 

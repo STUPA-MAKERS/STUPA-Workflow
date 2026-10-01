@@ -6,12 +6,12 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
 from app.modules.admin.models import ApplicationType
 from app.modules.applications.diff import DataDiff, compute_diff, is_empty_diff
-from app.modules.applications.models import SubmissionVersion
+from app.modules.applications.models import MagicLink, SubmissionVersion
 from app.modules.applications.schemas import ApplicationOut, VersionOut
 from app.modules.applications.service.service_base import (
     ApplicationsServiceBase,
@@ -142,6 +142,11 @@ class EditOps(ApplicationsServiceBase):
         Setting the state it already has is a no-op rather than an error: two clicks on
         the same row should not fail, and re-archiving must not overwrite who archived it
         first.
+
+        Archiving also expires every magic link of the application (Z1). A link can
+        live without an expiry, so the archive is one of the events that end it.
+        Bringing the application back does not revive the links. The applicant
+        requests a new one.
         """
         app = await self._get_app(application_id)
         already = app.archived_at is not None
@@ -166,7 +171,17 @@ class EditOps(ApplicationsServiceBase):
                 ),
             },
         )
-        app.archived_at = datetime.now(UTC) if archived else None
+        now = datetime.now(UTC)
+        if archived:
+            await self.session.execute(
+                update(MagicLink)
+                .where(
+                    MagicLink.application_id == app.id,
+                    or_(MagicLink.expires_at.is_(None), MagicLink.expires_at > now),
+                )
+                .values(expires_at=now)
+            )
+        app.archived_at = now if archived else None
         app.archived_by = actor if archived else None
         await self.session.commit()
         await self.session.refresh(app)

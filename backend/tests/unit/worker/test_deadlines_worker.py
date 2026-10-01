@@ -29,8 +29,7 @@ NOW = datetime(2026, 6, 7, 12, 0, tzinfo=UTC)
 class FakeResult:
     def __init__(self, items: list[Any]) -> None:
         self._items = items
-        # `rowcount` feeds DELETE and UPDATE statements, such as the guest application
-        # discard.
+        # `rowcount` feeds DELETE and UPDATE statements.
         self.rowcount = len(items)
 
     def scalars(self) -> FakeResult:
@@ -56,6 +55,9 @@ class FakeSession:
 
     async def scalar(self, _stmt: Any) -> Any:
         return self._scalar
+
+    async def get(self, _model: Any, _ident: Any) -> Any:
+        return None  # no guest settings row: the defaults apply
 
     async def commit(self) -> None:
         self.committed += 1

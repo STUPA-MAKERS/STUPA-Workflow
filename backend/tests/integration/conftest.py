@@ -104,6 +104,9 @@ _DATA_TABLES = (
     "deadline",
     "deadline_policy",
     "task_reminder_log",
+    # Single-row settings (Z1). After the truncate the code falls back to the
+    # defaults, so a test that changes them does not leak into the next one.
+    "guest_application_settings",
 )
 
 

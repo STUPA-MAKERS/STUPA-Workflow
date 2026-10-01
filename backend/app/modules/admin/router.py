@@ -8,7 +8,7 @@ branding read.
 RBAC is server-side authoritative. ``require_principal`` answers 401 or 403.
 The frontend is only a UX gate. Per-area permissions: ``admin.gremien``,
 ``admin.types``, ``admin.site``, ``admin.roles``, ``admin.cd_variants``,
-``webhook.manage``.
+``admin.deadlines`` (guest settings), ``webhook.manage``.
 
 ``notification-rules`` and ``mail-templates`` live in the notifications module.
 ``/admin/audit`` lives in audit and the form versions live in forms. This
@@ -71,6 +71,8 @@ from app.modules.admin.schemas import (
     GroupMappingCreate,
     GroupMappingOut,
     GroupMappingUpdate,
+    GuestSettingsOut,
+    GuestSettingsUpdate,
     PrincipalOut,
     PrincipalUpdate,
     PublicSiteConfigOut,
@@ -86,6 +88,7 @@ from app.modules.admin.schemas import (
 )
 from app.modules.admin.service import CdVariantService, ConfigService
 from app.modules.admin.site_config_service import SiteConfigService
+from app.modules.applications.guest_settings import GuestSettingsService
 from app.shared.antiabuse import body_cap
 from app.shared.config_schemas import FlowGraph, export_json_schemas
 from app.shared.errors import ProblemDetail
@@ -941,6 +944,56 @@ async def list_webhook_delivery_status(
     no response body.
     """
     return await service.list_webhook_delivery_status()
+
+
+# Applications without an account (Z1): the confirmation window and the link
+# lifetime. The deadlines page (admin.deadlines) maintains them.
+DeadlinesAdmin = Annotated[Principal, Depends(require_principal("admin.deadlines"))]
+
+
+def get_guest_settings_service(session: DbSession) -> GuestSettingsService:
+    return GuestSettingsService(session)
+
+
+GuestSettingsServiceDep = Annotated[GuestSettingsService, Depends(get_guest_settings_service)]
+
+
+@router.get(
+    "/guest-settings",
+    response_model=GuestSettingsOut,
+    dependencies=[Depends(require_principal("admin.deadlines"))],
+    responses=_errors(401, 403),
+)
+async def get_guest_settings(service: GuestSettingsServiceDep) -> GuestSettingsOut:
+    """Return the confirmation window (hours) and the magic-link lifetime (days)."""
+    row = await service.get()
+    await service.session.commit()
+    return GuestSettingsOut.model_validate(row, from_attributes=True)
+
+
+@router.put(
+    "/guest-settings",
+    response_model=GuestSettingsOut,
+    responses=_errors(400, 401, 403, 422),
+)
+async def put_guest_settings(
+    payload: GuestSettingsUpdate,
+    service: GuestSettingsServiceDep,
+    principal: DeadlinesAdmin,
+) -> GuestSettingsOut:
+    """Replace both values. ``linkTtlDays: null`` gives magic links without an expiry.
+
+    A new ``confirmTtlHours`` applies to the waiting applications at the next
+    worker run. A new ``linkTtlDays`` applies to the links requested from now on;
+    the existing links keep their expiry. The change writes a ``config_change``
+    audit entry that the audit log cannot revert.
+    """
+    row = await service.update(
+        confirm_ttl_hours=payload.confirm_ttl_hours,
+        link_ttl_days=payload.link_ttl_days,
+        actor=principal.sub,
+    )
+    return GuestSettingsOut.model_validate(row, from_attributes=True)
 
 
 # Site config and branding with draft and activate semantics.

@@ -15,6 +15,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import pytest
 from pydantic import AliasChoices
 
 from app.settings import Settings
@@ -84,3 +85,30 @@ def test_webhook_allowlist_uses_the_canonical_name() -> None:
     """The template must name the allowlist the way the field is named."""
     assert re.search(r"^WEBHOOK_HOST_ALLOWLIST=", _EXAMPLE, re.MULTILINE)
     assert not re.search(r"^WEBHOOK_ALLOWLIST=", _EXAMPLE, re.MULTILINE)
+
+
+# The magic-link lifetime moved into `guest_application_settings` (Z1). These keys
+# are gone from `Settings` and from the template.
+_REMOVED_KEYS = ("MAGIC_LINK_EDIT_TTL_DAYS", "MAGIC_LINK_ACTION_TTL_MINUTES")
+
+
+def test_removed_magic_link_ttl_keys_are_gone() -> None:
+    assert not set(_REMOVED_KEYS) & _example_keys()
+    assert not set(_REMOVED_KEYS) & _settings_env_names()
+
+
+def test_an_old_env_with_the_removed_keys_still_loads(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`extra="ignore"` drops the old keys, so an old `.env` keeps starting."""
+    from app.settings import load_settings
+
+    for key in _REMOVED_KEYS:
+        monkeypatch.setenv(key, "7")
+    settings = load_settings(
+        database_url="postgresql+asyncpg://x/y",
+        session_secret="sess-secret-0123456",
+        magic_link_secret="ml-pepper-0123456",
+    )
+    assert not hasattr(settings, "magic_link_edit_ttl_days")
+    assert not hasattr(settings, "magic_link_action_ttl_minutes")

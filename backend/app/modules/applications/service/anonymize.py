@@ -96,7 +96,9 @@ class AnonymizeOps(ApplicationsServiceBase):
             )
             .values(body="[anonymisiert]")
         )
-        # A magic link is a direct access path to the PII through the mail.
+        # A magic link is a direct access path to the PII through the mail. A link
+        # can live without an expiry, so delete them all (Z1). Deleting is stronger
+        # than expiring them, and the retention would purge them anyway.
         await self.session.execute(
             delete(MagicLink).where(MagicLink.application_id == application_id)
         )

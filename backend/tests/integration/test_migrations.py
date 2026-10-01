@@ -865,3 +865,97 @@ def test_meeting_started_at_and_vote_agenda_fk(
         ).all()
     assert cols == []
     command.upgrade(alembic_cfg, "head")
+
+
+def test_guest_application_settings_and_unlimited_links(
+    alembic_cfg: Config, engine: Engine
+) -> None:
+    """Migration d5569d5542c6 (Z1, O3).
+
+    The upgrade creates the settings row (12 hours, no link expiry), makes
+    `magic_link.expires_at` nullable and allows NULL only for an edit link. The
+    existing links keep their expiry. The downgrade gives a link without an expiry
+    seven days, restores NOT NULL and drops the table.
+    """
+    command.downgrade(alembic_cfg, "eff772f93d8e")
+    with engine.begin() as conn:
+        assert conn.execute(
+            text("SELECT to_regclass('guest_application_settings')")
+        ).scalar_one() is None
+        type_id = _new_type(conn)
+        fv = conn.execute(
+            text(
+                "INSERT INTO form_version (application_type_id, version) "
+                "VALUES (:t, 1) RETURNING id"
+            ),
+            {"t": type_id},
+        ).scalar_one()
+        flv = conn.execute(
+            text("INSERT INTO flow_version (version) VALUES (1) RETURNING id")
+        ).scalar_one()
+        app_id = conn.execute(
+            text(
+                "INSERT INTO application (type_id, form_version_id, flow_version_id) "
+                "VALUES (:t, :fv, :flv) RETURNING id"
+            ),
+            {"t": type_id, "fv": fv, "flv": flv},
+        ).scalar_one()
+        conn.execute(
+            text(
+                "INSERT INTO magic_link (application_id, token_hash, scope, expires_at, "
+                "single_use) VALUES (:a, '\\x01', 'view', "
+                "'2026-06-01 10:00:00+00', true)"
+            ),
+            {"a": app_id},
+        )
+
+    command.upgrade(alembic_cfg, "head")
+    with engine.begin() as conn:
+        row = conn.execute(
+            text(
+                "SELECT id, confirm_ttl_hours, link_ttl_days, updated_by "
+                "FROM guest_application_settings"
+            )
+        ).one()
+        assert tuple(row) == (1, 12, None, None)
+        kept = conn.execute(text("SELECT expires_at FROM magic_link")).scalar_one()
+        assert kept.isoformat().startswith("2026-06-01T10:00")
+        conn.execute(
+            text(
+                "INSERT INTO magic_link (application_id, token_hash, scope, expires_at) "
+                "VALUES (:a, '\\x02', 'edit', NULL)"
+            ),
+            {"a": app_id},
+        )
+    for bad in (
+        "INSERT INTO magic_link (application_id, token_hash, scope, expires_at) "
+        "VALUES (:a, '\\x03', 'view', NULL)",
+        "UPDATE guest_application_settings SET confirm_ttl_hours = 0",
+        "UPDATE guest_application_settings SET confirm_ttl_hours = 721",
+        "UPDATE guest_application_settings SET link_ttl_days = 0",
+        "INSERT INTO guest_application_settings (id) VALUES (2)",
+    ):
+        with pytest.raises(IntegrityError), engine.begin() as conn:
+            conn.execute(text(bad), {"a": app_id})
+
+    command.downgrade(alembic_cfg, "eff772f93d8e")
+    with engine.begin() as conn:
+        assert conn.execute(
+            text("SELECT to_regclass('guest_application_settings')")
+        ).scalar_one() is None
+        nullable = conn.execute(
+            text(
+                "SELECT is_nullable FROM information_schema.columns "
+                "WHERE table_name = 'magic_link' AND column_name = 'expires_at'"
+            )
+        ).scalar_one()
+        assert nullable == "NO"
+        week = conn.execute(
+            text(
+                "SELECT bool_and(expires_at > now() + interval '6 days') "
+                "FROM magic_link WHERE token_hash = '\\x02'"
+            )
+        ).scalar_one()
+        assert week is True
+        conn.execute(text("DELETE FROM magic_link"))
+    command.upgrade(alembic_cfg, "head")
