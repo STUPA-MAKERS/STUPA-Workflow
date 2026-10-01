@@ -432,7 +432,8 @@ async def get_guest_settings() -> dict:
 async def update_guest_settings(settings: S.GuestSettingsUpdate) -> dict:
     """Replace the settings for applications without an account.
 
-    Send both fields. `linkTtlDays: null` gives magic links without an expiry. A new
+    Send both fields. `linkTtlDays` is required: `null` gives magic links without an
+    expiry. To keep the current lifetime, read it with `get_guest_settings` first. A new
     `confirmTtlHours` applies to the waiting applications too. Requires admin.deadlines.
     """
     return await api().put(
