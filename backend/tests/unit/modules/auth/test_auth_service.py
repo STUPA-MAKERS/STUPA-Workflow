@@ -60,6 +60,18 @@ async def test_request_magic_link_edit_scope_unlimited_by_default() -> None:
     assert db.added[0].expires_at is None  # no settings row: no expiry
 
 
+async def test_request_magic_link_filters_by_application_id() -> None:
+    """With an application id, the lookup also filters on that id."""
+    db = fake_session(result(_app()))
+    sent: list[tuple[str, str]] = []
+    await service.request_magic_link(
+        db, _settings(), email="x@y.de", application_id="aid-1",
+        deliver=lambda e, link: sent.append((e, link)),
+    )
+    assert len(sent) == 1
+    assert db.added[0].application_id == "aid-1"
+
+
 async def test_request_magic_link_default_deliver_runs() -> None:
     settings = _settings()
     db = fake_session(result(_app()))
