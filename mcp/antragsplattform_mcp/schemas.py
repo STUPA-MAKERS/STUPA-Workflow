@@ -459,6 +459,18 @@ class NotificationSettingsUpdate(WireModel):
     taskReminderRepeatDays: int | None = None
 
 
+class GuestSettingsUpdate(WireModel):
+    confirmTtlHours: int = Field(
+        ge=1, le=720, description="Hours a guest has to confirm the email (1..720)"
+    )
+    linkTtlDays: int | None = Field(
+        default=None,
+        ge=1,
+        le=3650,
+        description="Lifetime of a new magic link in days; None = no expiry",
+    )
+
+
 class DelegationCreate(WireModel):
     meetingId: str
     delegateId: str
