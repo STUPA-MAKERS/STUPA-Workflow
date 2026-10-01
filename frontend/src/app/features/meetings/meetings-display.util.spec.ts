@@ -12,6 +12,8 @@ import {
   meetingStatusKey,
   meetingTimeSuffix,
   meetingStatusVariant,
+  memberAttendanceBadgeVariant,
+  memberAttendanceKey,
   pickBeamerVote,
   resolveI18n,
   shortTime,
@@ -74,6 +76,15 @@ describe('meetings-display.util', () => {
     expect(attendanceBadgeVariant('present')).toBe('success');
     expect(attendanceBadgeVariant('excused')).toBe('warning');
     expect(attendanceBadgeVariant('absent')).toBe('danger');
+  });
+
+  it('gives a member only the labels "Anwesend" and "Abwesend" (Z2)', () => {
+    expect(memberAttendanceKey('present')).toBe('meetings.attendance.selfPresent');
+    expect(memberAttendanceKey('excused')).toBe('meetings.attendance.selfExcused');
+    expect(memberAttendanceKey('absent')).toBe('meetings.attendance.selfExcused');
+    expect(memberAttendanceBadgeVariant('present')).toBe('success');
+    expect(memberAttendanceBadgeVariant('excused')).toBe('warning');
+    expect(memberAttendanceBadgeVariant('absent')).toBe('warning');
   });
 
   it('lists tally entries and vote options with the count-key fallback', () => {

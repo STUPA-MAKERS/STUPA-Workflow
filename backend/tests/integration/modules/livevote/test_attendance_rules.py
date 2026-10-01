@@ -2,7 +2,7 @@
 
 * A member reports the own attendance as present or excused only (422 for absent).
 * The record of the meeting lead wins: the member gets 409 until the lead resets it.
-* The lead cannot set a member present while a delegation of that member exists.
+* Nobody sets a member present while a delegation of that member exists.
 * The reason of an excuse goes only to the member and to the lead.
 * The lead's set and reset are audited, never with the reason. The own report is not.
 """
@@ -163,6 +163,35 @@ async def test_present_refused_while_delegation_is_active(
     assert excused.status_code == 200, excused.text
     # Only the delegator is blocked, not the delegate.
     assert delegate_present.status_code == 200, delegate_present.text
+
+
+async def test_own_present_refused_while_delegation_is_active(
+    maker: async_sessionmaker[AsyncSession], api: FastAPI
+) -> None:
+    """O23 also holds for the own report. The delegator can still report an excuse."""
+    s = await seed(maker, status="live", items=0)
+    sub, delegator = await _member(maker, s.gremium_id, "Anna")
+    _, delegate = await _member(maker, s.gremium_id, "Bert")
+    async with maker() as session:
+        session.add(
+            MeetingDelegation(
+                meeting_id=s.meeting_id,
+                gremium_id=s.gremium_id,
+                delegator_principal_id=delegator,
+                delegate_principal_id=delegate,
+                delegate_voting=True,
+            )
+        )
+        await session.commit()
+    _as(api, sub)
+    url = f"/api/meetings/{s.meeting_id}/attendance/me"
+    with TestClient(api) as client:
+        present = client.put(url, json={"status": "present"})
+        excused = client.put(url, json={"status": "excused"})
+    assert present.status_code == 409, present.text
+    assert present.json()["code"] == "delegation_active"
+    assert excused.status_code == 200, excused.text
+    assert _row(excused.json(), delegator)["status"] == "excused"
 
 
 async def test_note_only_for_the_member_and_the_lead(

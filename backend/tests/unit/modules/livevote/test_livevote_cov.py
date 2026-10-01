@@ -2040,6 +2040,7 @@ async def test_set_self_inserts_new() -> None:
             res(meeting),  # _meeting
             res(member),  # _current_members (set_self)
             res(),  # _upsert finds no existing row, so it inserts
+            res(),  # no delegation of the member (O23)
             res(meeting),  # roster _meeting
             res(member),  # roster _current_members
             res(),  # roster records
@@ -2064,6 +2065,7 @@ async def test_set_self_updates_existing() -> None:
             res(meeting),  # _meeting
             res(member),  # _current_members
             res(existing),  # _upsert existing
+            res(),  # no delegation of the member (O23)
             res(meeting),  # roster _meeting
             res(member),  # roster members
             res(existing),  # roster records, used only for the mapping

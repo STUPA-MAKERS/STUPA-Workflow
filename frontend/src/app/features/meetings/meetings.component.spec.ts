@@ -1289,6 +1289,17 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.attendance()).toEqual([OTHER]);
     });
 
+    it('explains the own delegation (O23) to a member and reloads the roster', async () => {
+      const { cmp, http, fixture } = await asMember();
+      const spy = jest.spyOn(fixture.debugElement.injector.get(ToastService), 'error');
+      cmp.setAttendance(SELF as never, 'present');
+      http
+        .expectOne('/api/meetings/m-1/attendance/me')
+        .flush({ code: 'delegation_active' }, { status: 409, statusText: 'Conflict' });
+      expect(spy).toHaveBeenCalledWith(expect.stringContaining('Du hast für diese Sitzung eine Vertretung'));
+      http.expectOne('/api/meetings/m-1/attendance').flush([]);
+    });
+
     it('explains a record that the lead set (O15) and reloads the roster', async () => {
       const { cmp, http, fixture } = await asMember();
       const spy = jest.spyOn(fixture.debugElement.injector.get(ToastService), 'error');

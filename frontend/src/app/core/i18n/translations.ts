@@ -834,7 +834,9 @@ export const de = {
   'meetings.toast.createFailed': 'Sitzung konnte nicht angelegt werden.',
   'meetings.toast.actionFailed': 'Aktion fehlgeschlagen.',
   'meetings.toast.attendanceDelegationActive':
-    'Für dieses Mitglied ist eine Vertretung eingerichtet. Widerrufe sie zuerst, dann kannst du es auf „Anwesend“ setzen.',
+    'Für dieses Mitglied ist eine Vertretung eingerichtet. Widerrufe sie zuerst, dann kannst du es auf „Anwesend“ setzen. Nach dem Sitzungsbeginn kann nur ein Admin sie widerrufen.',
+  'meetings.toast.ownDelegationActive':
+    'Du hast für diese Sitzung eine Vertretung eingerichtet. Widerrufe sie zuerst, dann kannst du dich als „Anwesend“ melden. Nach dem Sitzungsbeginn kann nur ein Admin sie widerrufen.',
   'meetings.toast.attendanceSetByLead':
     'Die Sitzungsleitung hat deine Anwesenheit festgelegt. Nur sie kann sie ändern.',
   'meetings.toast.protokollantRequired':
@@ -3065,7 +3067,9 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.toast.createFailed': 'The meeting could not be created.',
   'meetings.toast.actionFailed': 'Action failed.',
   'meetings.toast.attendanceDelegationActive':
-    'This member has a delegation for the meeting. Revoke it first, then you can set the member “present”.',
+    'This member has a delegation for the meeting. Revoke it first, then you can set the member “present”. After the meeting start, only an admin can revoke it.',
+  'meetings.toast.ownDelegationActive':
+    'You have a delegation for this meeting. Revoke it first, then you can report yourself “present”. After the meeting start, only an admin can revoke it.',
   'meetings.toast.attendanceSetByLead':
     'The chair has set your attendance. Only the chair can change it.',
   'meetings.toast.protokollantRequired': 'Assign a minute-taker first, then start the meeting.',

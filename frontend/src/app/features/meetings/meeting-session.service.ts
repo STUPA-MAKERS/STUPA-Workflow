@@ -566,7 +566,7 @@ export class MeetingSessionService implements OnDestroy {
     const req = asLead
       ? this.api.setMemberAttendance(m.id, member.principalId, status, note)
       : this.api.setOwnAttendance(m.id, status as SelfAttendanceStatus, note);
-    this.saveAttendance(m.id, req);
+    this.saveAttendance(m.id, req, asLead);
   }
 
   /** Reset a member to "open" (meeting lead only). The member can then report again. */
@@ -577,7 +577,7 @@ export class MeetingSessionService implements OnDestroy {
     this.saveAttendance(m.id, this.api.resetMemberAttendance(m.id, member.principalId));
   }
 
-  private saveAttendance(meetingId: Uuid, req: Observable<Attendance[]>): void {
+  private saveAttendance(meetingId: Uuid, req: Observable<Attendance[]>, asLead = true): void {
     req.subscribe({
       next: (rows) => {
         this.savingAttendance.set(false);
@@ -585,20 +585,24 @@ export class MeetingSessionService implements OnDestroy {
       },
       error: (err: unknown) => {
         this.savingAttendance.set(false);
-        this.attendanceFailed(meetingId, err);
+        this.attendanceFailed(meetingId, err, asLead);
       },
     });
   }
 
   /**
-   * Explain a refused attendance change. O23: a member with a delegation cannot be set
-   * present. O15: the lead set the record of the member. Both reload the roster, because
-   * it changed in another tab or by the lead.
+   * Explain a refused attendance change. O23: a member with a delegation cannot be set or
+   * report present. O15: the lead set the record of the member. Both reload the roster,
+   * because it changed in another tab or by the lead.
    */
-  private attendanceFailed(meetingId: Uuid, err: unknown): void {
+  private attendanceFailed(meetingId: Uuid, err: unknown, asLead: boolean): void {
     const code = errorCode(err);
     if (code === 'delegation_active') {
-      this.toast.error(this.i18n.translate('meetings.toast.attendanceDelegationActive'));
+      this.toast.error(
+        this.i18n.translate(
+          asLead ? 'meetings.toast.attendanceDelegationActive' : 'meetings.toast.ownDelegationActive',
+        ),
+      );
     } else if (code === 'attendance_set_by_lead') {
       this.toast.error(this.i18n.translate('meetings.toast.attendanceSetByLead'));
     } else {

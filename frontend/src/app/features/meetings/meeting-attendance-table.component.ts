@@ -4,9 +4,10 @@ import type { Attendance, AttendanceStatus, SelfAttendanceStatus } from '@core/a
 import { BadgeComponent, IconComponent } from '@stupa-makers/ui-kit';
 import {
   SELF_ATTENDANCE_STATUSES,
-  attendanceBadgeVariant,
   attendanceIcon,
   attendanceKey,
+  memberAttendanceBadgeVariant,
+  memberAttendanceKey,
   selfAttendanceKey,
 } from './meetings-display.util';
 
@@ -24,6 +25,13 @@ export interface AttendanceChange {
  * resets a row to "open". A member reports only the own row, as present or absent
  * (`excused`), with an optional reason. A row that the lead set shows read-only to the
  * member. The reason shows only when the server sends it: to the member and to the lead.
+ *
+ * Labels (Z2): the lead sees "Anwesend / Entschuldigt / Unentschuldigt / Offen". A member
+ * sees "Anwesend / Abwesend" on every row; `excused` and `absent` both show as "Abwesend".
+ *
+ * Every change of the lead takes the record over (`source='lead'`, O15). So the lead
+ * edits the reason only on a row that the lead set and on the own row. The reason of a
+ * member's own excuse stays the member's and shows read-only to the lead.
  */
 @Component({
   selector: 'app-meeting-attendance-table',
@@ -50,16 +58,23 @@ export class MeetingAttendanceTableComponent {
   protected readonly key = attendanceKey;
   protected readonly selfKey = selfAttendanceKey;
   protected readonly icon = attendanceIcon;
-  protected readonly badge = attendanceBadgeVariant;
+  protected readonly memberKey = memberAttendanceKey;
+  protected readonly memberBadge = memberAttendanceBadgeVariant;
 
   /** The member edits the own row while the lead did not set it (O15). */
   protected selfEditable(a: Attendance): boolean {
     return !this.editAll() && a.isSelf && a.source !== 'lead';
   }
 
-  /** The reason field shows for an excused row that the viewer may edit. */
+  /**
+   * The reason field shows for an excused row that the viewer may edit. The lead edits
+   * it on a lead row and on the own row only: a save from the lead takes the record
+   * over (O15), so the member's own excuse stays read-only for the lead.
+   */
   protected noteEditable(a: Attendance): boolean {
-    return a.status === 'excused' && (this.editAll() || this.selfEditable(a));
+    if (a.status !== 'excused') return false;
+    if (this.editAll()) return a.source === 'lead' || a.isSelf;
+    return this.selfEditable(a);
   }
 
   protected pickSelf(a: Attendance, status: SelfAttendanceStatus): void {

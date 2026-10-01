@@ -12,9 +12,11 @@ The rules (Z2, O15, O23, F12):
   (`source='lead'`), `absent` included. A record that the lead set wins: the
   member cannot change it any more (409 `attendance_set_by_lead`) until the lead
   resets it to "open" with a delete of the record.
-- The lead cannot set a member `present` while a delegation of that member for
-  the meeting exists (409 `delegation_active`). The delegation must be revoked
-  first.
+- Nobody can set a member `present` while a delegation of that member for the
+  meeting exists (409 `delegation_active`): not the lead, and not the member
+  with the own report. The delegation must be revoked first. The delegator can
+  revoke it only before the meeting start. After the start, only an admin can
+  revoke it.
 - `note` is the reason of an excuse and is personal data. Only the member and
   the lead see it. The lead's set and reset write `attendance_set` and
   `attendance_reset` to the audit log, never with the note.
@@ -28,6 +30,7 @@ from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.admin.models import GremiumMembership
@@ -43,6 +46,11 @@ from app.modules.livevote.schemas import (
     SelfAttendanceStatus,
 )
 from app.shared.errors import ConflictError, ForbiddenError, NotFoundError
+
+_DELEGATION_ACTIVE = (
+    "The member delegated for this meeting. Revoke the delegation first. After the"
+    " meeting start, only an admin can revoke it."
+)
 
 
 def _resolve_note(
@@ -205,6 +213,25 @@ class AttendanceService:
             existing.source = source
             existing.note = note
 
+    async def _flush_write(self) -> None:
+        """Flush an attendance write. A parallel first write gives 409, not 500.
+
+        `_record` locks an existing row only. When no row exists, a self report and
+        a lead set of the same member can both insert one, and the unique constraint
+        refuses the second insert. The caller then loads the roster again.
+
+        Raises:
+            ConflictError: A parallel change wrote the record first (409).
+        """
+        try:
+            await self.session.flush()
+        except IntegrityError as exc:
+            await self.session.rollback()
+            raise ConflictError(
+                "Another change of this attendance ran at the same time. Try again.",
+                code="conflict",
+            ) from exc
+
     @staticmethod
     def _ensure_not_closed(meeting: Meeting) -> None:
         """Refuse a change when the meeting is closed.
@@ -251,10 +278,16 @@ class AttendanceService:
     ) -> list[AttendanceOut]:
         """Report the own attendance of the requester (Z2).
 
+        `present` is refused while the member has a delegation for the meeting
+        (O23), as for the lead. Else the member counts as present but stays
+        blocked from the vote.
+
         Raises:
             ForbiddenError: The requester is not a current member of the Gremium.
-            ConflictError: The meeting is closed, or the meeting lead set the
-                record (O15, code `attendance_set_by_lead`).
+            ConflictError: The meeting is closed, the meeting lead set the record
+                (O15, code `attendance_set_by_lead`), the status is `present` while
+                a delegation of the member exists (O23, code `delegation_active`),
+                or a parallel change wrote the record first (code `conflict`).
         """
         meeting = await self._meeting(meeting_id, for_write=True)
         self._ensure_not_closed(meeting)
@@ -270,6 +303,8 @@ class AttendanceService:
                 "The meeting lead set this attendance. Only the lead can change it.",
                 code="attendance_set_by_lead",
             )
+        if status == "present" and await self._has_delegation(meeting_id, member.id):
+            raise ConflictError(_DELEGATION_ACTIVE, code="delegation_active")
         self._write(
             existing,
             meeting_id=meeting_id,
@@ -278,7 +313,7 @@ class AttendanceService:
             source="self",
             note=_resolve_note(status, existing=existing, note=note, replace_note=replace_note),
         )
-        await self.session.flush()
+        await self._flush_write()
         await self.session.commit()
         return await self.roster(meeting_id, requester_sub, can_write=can_write)
 
@@ -311,8 +346,9 @@ class AttendanceService:
 
         Raises:
             NotFoundError: The principal is not a current member of the Gremium.
-            ConflictError: The meeting is closed, or the status is `present` while
-                a delegation of the member exists (O23, code `delegation_active`).
+            ConflictError: The meeting is closed, the status is `present` while a
+                delegation of the member exists (O23, code `delegation_active`), or
+                a parallel change wrote the record first (code `conflict`).
         """
         meeting = await self._meeting(meeting_id, for_write=True)
         self._ensure_not_closed(meeting)
@@ -320,10 +356,7 @@ class AttendanceService:
         if not any(m.id == principal_id for m in members):
             raise NotFoundError("principal is not a current member of this committee")
         if status == "present" and await self._has_delegation(meeting_id, principal_id):
-            raise ConflictError(
-                "The member delegated for this meeting. Revoke the delegation first.",
-                code="delegation_active",
-            )
+            raise ConflictError(_DELEGATION_ACTIVE, code="delegation_active")
         existing = await self._record(meeting_id, principal_id)
         before = existing.status if existing is not None else None
         before_source = existing.source if existing is not None else None
@@ -335,6 +368,7 @@ class AttendanceService:
             source="lead",
             note=_resolve_note(status, existing=existing, note=note, replace_note=replace_note),
         )
+        await self._flush_write()
         await self._audit(
             AuditAction.ATTENDANCE_SET,
             actor=requester_sub,
@@ -343,7 +377,6 @@ class AttendanceService:
             status={"from": before, "to": status},
             source={"from": before_source, "to": "lead"},
         )
-        await self.session.flush()
         await self.session.commit()
         return await self.roster(meeting_id, requester_sub, can_write=True)
 

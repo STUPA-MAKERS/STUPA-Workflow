@@ -7,15 +7,16 @@ carries the lists. A later change makes the PDF and the system disagree.
 from __future__ import annotations
 
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 from uuid import uuid4
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 
 from app.modules.livevote import attendance_service as attendance_mod
 from app.modules.livevote.attendance_service import AttendanceService
 from app.shared.errors import ConflictError
-from tests._support.flow_fakes import fake_session, result
+from tests._support.flow_fakes import FakeSession, fake_session, result
 
 
 def _meeting(status: str = "closed") -> SimpleNamespace:
@@ -103,9 +104,59 @@ async def test_set_self_present_drops_note() -> None:
     meeting = _meeting("live")
     me = _member("me")
     row = _row(me.id, status="excused", source="self", note="ill")
-    db = fake_session(result(meeting), result(me), result(row), result(meeting))
+    db = fake_session(result(meeting), result(me), result(row), result(), result(meeting))
     await AttendanceService(db).set_self(meeting.id, "present", "me", note=None, replace_note=False)
     assert (row.status, row.note) == ("present", None)
+
+
+async def test_set_self_present_conflict_with_delegation() -> None:
+    """O23 also holds for the own report: a delegator cannot report "present"."""
+    meeting = _meeting("live")
+    me = _member("me")
+    db = fake_session(result(meeting), result(me), result(), result(uuid4()))
+    with pytest.raises(ConflictError) as ei:
+        await AttendanceService(db).set_self(meeting.id, "present", "me")
+    assert ei.value.code == "delegation_active"
+    assert db.added == []
+    assert db.committed == 0
+
+
+async def test_set_self_excused_skips_the_delegation_check() -> None:
+    """A delegator may still report the own excuse."""
+    meeting = _meeting("live")
+    me = _member("me")
+    db = fake_session(result(meeting), result(me), result(), result(meeting))
+    await AttendanceService(db).set_self(meeting.id, "excused", "me")
+    [added] = db.added
+    assert (added.status, added.source) == ("excused", "self")
+    assert db.committed == 1
+
+
+class _RacingSession(FakeSession):
+    """A session whose flush fails as with a parallel first insert of the same record."""
+
+    async def flush(self) -> None:
+        raise IntegrityError("INSERT", {}, Exception("uq_attendance_meeting_principal"))
+
+
+@pytest.mark.parametrize("lead", [False, True])
+async def test_parallel_first_write_gives_conflict(
+    audit_calls: list[dict[str, Any]], lead: bool
+) -> None:
+    """A lost race on the unique constraint gives 409, not 500, and no audit entry."""
+    meeting = _meeting("live")
+    me = _member("me")
+    db = _RacingSession([result(meeting), result(me), result()])
+    svc = AttendanceService(cast(Any, db))
+    with pytest.raises(ConflictError) as ei:
+        if lead:
+            await svc.set_for(meeting.id, me.id, "absent", "lead")
+        else:
+            await svc.set_self(meeting.id, "excused", "me")
+    assert ei.value.code == "conflict"
+    assert db.rolled_back == 1
+    assert db.committed == 0
+    assert audit_calls == []
 
 
 async def test_set_for_present_conflict_with_delegation(

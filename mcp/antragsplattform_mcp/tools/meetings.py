@@ -166,7 +166,8 @@ async def set_attendance(
     - The lead's value wins: the member can no longer change it until the lead
       resets it with `reset_attendance`.
     - `present` gives 409 `delegation_active` while the member has a delegation for
-      this meeting. Revoke the delegation first.
+      this meeting. Revoke the delegation first. After the meeting start, only an
+      admin can revoke it.
     - `note` (the reason, max. 500 characters) is allowed only with `excused`.
       Without `note` an excused member keeps the stored reason.
     The change goes into the audit log (`attendance_set`), without the note.

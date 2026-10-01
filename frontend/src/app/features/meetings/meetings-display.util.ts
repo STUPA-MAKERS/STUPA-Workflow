@@ -70,6 +70,20 @@ export function selfAttendanceKey(status: SelfAttendanceStatus): TranslationKey 
 }
 
 /**
+ * The status label that a member sees on any row (Z2): "Anwesend" or "Abwesend".
+ * A member does not see the difference between `excused` and `absent`; only the
+ * meeting lead sees "Entschuldigt" and "Unentschuldigt".
+ */
+export function memberAttendanceKey(status: AttendanceStatus): TranslationKey {
+  return selfAttendanceKey(status === 'present' ? 'present' : 'excused');
+}
+
+/** The badge colour that a member sees. `excused` and `absent` look the same (Z2). */
+export function memberAttendanceBadgeVariant(status: AttendanceStatus): BadgeVariant {
+  return status === 'present' ? 'success' : 'warning';
+}
+
+/**
  * True when a member may report this status for this record: the own row, a status
  * other than `absent`, and a record that the meeting lead did not set (O15).
  */

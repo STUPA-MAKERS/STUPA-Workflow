@@ -44,7 +44,9 @@ describe('MeetingAttendanceTableComponent', () => {
   it('hides the own control when the lead set the record (O15)', async () => {
     await setup([row({ status: 'absent', source: 'lead', note: null })]);
     expect(screen.queryByRole('group')).not.toBeInTheDocument();
-    expect(screen.getByText('Unentschuldigt')).toBeInTheDocument();
+    // Z2: a member sees "Abwesend" for both excused and unexcused.
+    expect(screen.getByText('Abwesend')).toBeInTheDocument();
+    expect(screen.queryByText('Unentschuldigt')).not.toBeInTheDocument();
     expect(screen.getByText(/durch Sitzungsleitung/)).toBeInTheDocument();
   });
 
@@ -54,10 +56,17 @@ describe('MeetingAttendanceTableComponent', () => {
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
   });
 
-  it('shows another member as a badge without controls', async () => {
-    await setup([row({ principalId: 'p-2', isSelf: false, status: 'excused', source: 'self' })]);
+  it('shows other members as badges with the member labels (Z2)', async () => {
+    await setup([
+      row({ principalId: 'p-2', isSelf: false, status: 'excused', source: 'self' }),
+      row({ principalId: 'p-3', isSelf: false, status: 'absent', source: 'lead' }),
+      row({ principalId: 'p-4', isSelf: false, status: 'present', source: 'self' }),
+    ]);
     expect(screen.queryByRole('group')).not.toBeInTheDocument();
-    expect(screen.getByText('Entschuldigt')).toBeInTheDocument();
+    expect(screen.getAllByText('Abwesend')).toHaveLength(2);
+    expect(screen.getByText('Anwesend')).toBeInTheDocument();
+    expect(screen.queryByText('Entschuldigt')).not.toBeInTheDocument();
+    expect(screen.queryByText('Unentschuldigt')).not.toBeInTheDocument();
   });
 
   it('lets the member give, change and remove the reason of an excuse', async () => {
@@ -85,7 +94,7 @@ describe('MeetingAttendanceTableComponent', () => {
 
   it('gives the lead all statuses, the reset and the reason field', async () => {
     const rows = [
-      row({ status: 'excused', source: 'self', note: 'Krank' }),
+      row({ status: 'excused', source: 'lead', note: 'Krank' }),
       row({ principalId: 'p-2', displayName: 'Max', isSelf: false }),
     ];
     const { statusChange, reset } = await setup(rows, { editAll: true });
@@ -102,6 +111,24 @@ describe('MeetingAttendanceTableComponent', () => {
     expect(reset).toHaveBeenCalledWith(rows[0]);
     // A row without a record has nothing to reset.
     expect(within(second).getByRole('button', { name: 'Auf „Offen“ zurücksetzen' })).toBeDisabled();
+    expect(screen.getByRole('textbox', { name: 'Grund' })).toHaveValue('Krank');
+  });
+
+  it('shows the reason of a member\'s own excuse read-only to the lead (O15)', async () => {
+    const rows = [
+      row({ principalId: 'p-2', displayName: 'Max', isSelf: false, status: 'excused', source: 'self', note: 'Krank' }),
+      row({ principalId: 'p-3', displayName: 'Eva', isSelf: false, status: 'excused', source: 'lead', note: 'Reise' }),
+    ];
+    const { statusChange } = await setup(rows, { editAll: true });
+    expect(screen.getByText('Grund: Krank')).toBeInTheDocument();
+    const [input] = screen.getAllByRole('textbox', { name: 'Grund' });
+    expect(input).toHaveValue('Reise');
+    expect(screen.getAllByRole('textbox')).toHaveLength(1);
+    expect(statusChange).not.toHaveBeenCalled();
+  });
+
+  it('lets the lead edit the reason on the own self-reported row', async () => {
+    await setup([row({ status: 'excused', source: 'self', note: 'Krank' })], { editAll: true });
     expect(screen.getByRole('textbox', { name: 'Grund' })).toHaveValue('Krank');
   });
 

@@ -373,7 +373,8 @@ async def set_own_attendance(
     The status is `present` or `excused`, else 422. A `note` (the reason) is
     allowed only with `excused`. The meeting must be `planned` or `live`, else
     409. When the meeting lead set the record, the member cannot change it: 409
-    `attendance_set_by_lead` (O15).
+    `attendance_set_by_lead` (O15). `present` gives 409 `delegation_active` while
+    the caller has a delegation for this meeting (O23).
     """
     can_write = await service.can_write_meeting(meeting_id, principal)
     return await attendance.set_self(

@@ -69,8 +69,8 @@
               }
             </span>
           } @else {
-            <app-badge [variant]="a.status ? badge(a.status) : 'neutral'">
-              {{ (a.status ? key(a.status) : 'meetings.attendance.unknown') | t }}
+            <app-badge [variant]="a.status ? memberBadge(a.status) : 'neutral'">
+              {{ (a.status ? memberKey(a.status) : 'meetings.attendance.unknown') | t }}
             </app-badge>
             @if (a.source === 'lead') {
               <span class="text-text-muted"> ({{ 'meetings.attendance.bySession' | t }})</span>
