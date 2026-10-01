@@ -499,10 +499,18 @@ class FlowService:
 
         1. Schedule the deadline of the current state. This also deletes the stale
            flow deadlines of the application.
-        2. Run `auto_advance`. A `ConflictError` or a `NotFoundError` only gives a log
-           line, as in the cron. The cron tries the automatic transitions again.
+        2. Run `auto_advance`.
         3. When no transition fired, send the task mail of the current state to the
            people who can act there. A fired transition sends its own mails.
+
+        Step 1 commits the confirmation. After that commit, an error in step 2 or 3
+        must not fail the verify or the create request: the email is confirmed, a
+        single-use link is spent, and a logged-in create already has its
+        application. So, as in the cron, the method catches every error of steps 2
+        and 3, rolls the session back and writes a log line. A `ConflictError` or a
+        `NotFoundError` is an expected race and gets an info line. Every other error
+        gets a log line with the traceback. The cron tries the automatic transitions
+        again.
 
         The idempotency key of the task mail holds the id of the latest status event.
         A second call therefore sends no second mail.
@@ -522,13 +530,20 @@ class FlowService:
             await self.session.commit()
         try:
             fired = await self.auto_advance(application_id, self._SYSTEM)
+            if fired is None:
+                await self._announce_current_state(application_id)
         except (ConflictError, NotFoundError) as exc:
+            await self.session.rollback()
             logger.info(
                 "auto-transition on confirmation skipped (app=%s): %s", application_id, exc
             )
             return None
-        if fired is None:
-            await self._announce_current_state(application_id)
+        except Exception:  # noqa: BLE001 - a failed start must not fail the committed confirmation
+            # Roll back the failed step, so the caller can still use the session (the
+            # verify commits, the create refreshes the application).
+            await self.session.rollback()
+            logger.exception("flow start on confirmation failed (app=%s)", application_id)
+            return None
         return fired
 
     async def _announce_current_state(self, application_id: UUID) -> None:

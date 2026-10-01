@@ -213,6 +213,52 @@ async def test_verify_magic_link_second_click_starts_nothing(
     assert _FakeFlow.started == []
 
 
+class _FailingDispatcher:
+    async def dispatch(self, _actions: object) -> None:
+        raise RuntimeError("mail queue down")
+
+
+async def test_verify_magic_link_survives_a_failed_flow_start(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A failed flow start after the commit does not fail the verify.
+
+    The confirmation and the applicant session are already committed. The verify must
+    still return the session token, else the cookie is lost and a second click starts
+    nothing.
+    """
+    from app.modules.flow.service import FlowService
+
+    settings = _settings()
+    monkeypatch.setattr(service, "_now", lambda: NOW)
+
+    async def _schedule(_self: object, _app: object, _state: object) -> None:
+        return None
+
+    async def _advance(_self: object, _application_id: object, _principal: object) -> None:
+        return None
+
+    monkeypatch.setattr(FlowService, "schedule_state_deadline", _schedule)
+    monkeypatch.setattr(FlowService, "auto_advance", _advance)
+    row = _link("tok", settings, scope="view", single_use=True)
+    app = _app(state_id="s1")
+    app.email_confirmed_at = NOW  # type: ignore[assignment]
+    db = fake_session(
+        result(row),  # the magic link
+        result("claimed-id"),  # the single-use claim
+        result("aid-1"),  # the confirmation UPDATE
+        result(app),  # FlowService._load_app
+        result(State()),  # FlowService._load_state
+        result("event-1"),  # the latest status event of the task mail
+    )
+    app_id, scope, token = await service.verify_magic_link(
+        db, settings, token="tok", dispatcher=_FailingDispatcher()  # pyright: ignore[reportArgumentType]
+    )
+    assert (app_id, scope) == ("aid-1", "view")
+    assert token
+    assert db.rolled_back == 1
+
+
 # The OIDC login path.
 async def test_upsert_principal_new() -> None:
     db = fake_session(result())  # no existing principal

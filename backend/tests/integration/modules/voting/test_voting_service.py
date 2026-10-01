@@ -41,7 +41,12 @@ from app.modules.voting.models import Ballot, SecretBallot, Vote, VotedMarker
 from app.modules.voting.schemas import VoteCreate
 from app.modules.voting.service import VotingService
 from app.shared.config_schemas import FormFieldDef, VoteConfig
-from app.shared.errors import ConflictError, ForbiddenError, ValidationProblem
+from app.shared.errors import (
+    ConflictError,
+    ForbiddenError,
+    NotFoundError,
+    ValidationProblem,
+)
 
 pytestmark = pytest.mark.integration
 
@@ -130,6 +135,8 @@ async def _seed(session: AsyncSession) -> tuple[Application, dict[str, State]]:
     app_row = await session.get(Application, app.id)
     assert app_row is not None
     app_row.current_state_id = states["voting"].id
+    # A vote needs a confirmed application. An unconfirmed one rests in the flow.
+    app_row.email_confirmed_at = datetime.now(UTC)
     await session.commit()
     return app_row, states
 
@@ -449,6 +456,25 @@ async def _add_member(
         GremiumMembership(principal_id=row.id, gremium_id=gremium_id, gremium_role_id=role.id)
     )
     await session.commit()
+
+
+async def test_create_hides_an_unconfirmed_application(session: AsyncSession) -> None:
+    """An unconfirmed guest application rests in the flow: a vote on it gives 404."""
+    app, _ = await _seed(session)
+    assert app.gremium_id is not None
+    gremium_id = app.gremium_id
+    app.email_confirmed_at = None
+    await session.commit()
+    body = VoteCreate.model_validate(
+        {"config": _config(), "eligibleGroup": str(gremium_id)}
+    )
+    with pytest.raises(NotFoundError):
+        await VotingService(session).create(app.id, body, Principal(sub="m"))
+    assert (
+        await session.scalar(
+            select(func.count()).select_from(Vote).where(Vote.application_id == app.id)
+        )
+    ) == 0
 
 
 async def test_create_counts_the_roster_and_binds_the_gremium(

@@ -126,6 +126,15 @@ async def test_create_unknown_application_404() -> None:
         await VotingService(db).create(uuid4(), _create_body(), Principal(sub="m"))
 
 
+async def test_create_reads_only_a_confirmed_application() -> None:
+    """The application query of `create` hides an unconfirmed guest application."""
+    db = fake_session(result())
+    db.scalar_results = [GID]  # the gremium exists
+    with pytest.raises(NotFoundError):
+        await VotingService(db).create(uuid4(), _create_body(), Principal(sub="m"))
+    assert "email_confirmed_at IS NOT NULL" in str(db.statements[0])
+
+
 async def test_create_internal_unknown_application_404() -> None:
     db = fake_session(result())
     payload = VoteCreateInternal.model_validate(
