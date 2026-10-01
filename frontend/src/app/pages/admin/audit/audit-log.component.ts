@@ -96,6 +96,9 @@ export const AUDIT_ACTIONS = [
   'agenda_item_update',
   'agenda_item_remove',
   'agenda_reorder',
+  // Attendance set or reset by the meeting lead (F12). They mirror ATTENDANCE_* in actions.py.
+  'attendance_set',
+  'attendance_reset',
   // Budget and money mutations. They mirror the BUDGET_* values in actions.py.
   'budget_node_create',
   'budget_node_update',
@@ -152,6 +155,8 @@ const ACTION_ICONS: Record<string, IconName> = {
   agenda_item_update: 'parliament',
   agenda_item_remove: 'parliament',
   agenda_reorder: 'parliament',
+  attendance_set: 'parliament',
+  attendance_reset: 'parliament',
   // Money mutations use the euro glyph. The cost center structure uses the pie glyph of the
   // budget tab.
   budget_node_create: 'chart-pie',

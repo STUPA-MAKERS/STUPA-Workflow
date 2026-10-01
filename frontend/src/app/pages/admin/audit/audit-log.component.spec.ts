@@ -385,6 +385,8 @@ describe('AuditLogComponent', () => {
       'agenda_reorder',
       'application_create',
       'guest_application_discard',
+      'attendance_set',
+      'attendance_reset',
     ] as const;
     for (const action of fresh) {
       // Every one of them is in the catalog, so the filter offers it.
