@@ -868,6 +868,20 @@ def test_meeting_started_at_and_vote_agenda_fk(
     command.upgrade(alembic_cfg, "head")
 
 
+_SEED_MAGIC_LINK_BODY = {
+    "de": (
+        "Hallo,\n\nüber diesen Link gelangen Sie zu Ihrem Antrag:\n{{ link }}\n\n"
+        "Der Link ist zeitlich begrenzt gültig. Wenn Sie das nicht angefordert "
+        "haben, ignorieren Sie diese Mail.\n"
+    ),
+    "en": (
+        "Hello,\n\nuse this link to access your application:\n{{ link }}\n\n"
+        "The link is valid for a limited time. If you did not request it, "
+        "ignore this email.\n"
+    ),
+}
+
+
 def test_guest_application_settings_and_unlimited_links(
     alembic_cfg: Config, engine: Engine
 ) -> None:
