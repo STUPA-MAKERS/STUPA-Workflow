@@ -6,15 +6,18 @@ permissions, votes, listing, and lifecycle concerns all use them.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import TYPE_CHECKING
 from uuid import UUID
 
 from sqlalchemy import select
 
 from app.modules.admin.models import Gremium
+from app.modules.applications.models import Application
 from app.modules.auth.models import Principal as PrincipalRow
-from app.modules.livevote.models import Meeting
-from app.modules.livevote.schemas import MeetingOut, MeetingVoteOut
+from app.modules.livevote.agenda_service import agenda_order, title_of
+from app.modules.livevote.models import Meeting, MeetingAgendaItem
+from app.modules.livevote.schemas import CurrentAgendaItemOut, MeetingOut, MeetingVoteOut
 from app.modules.protocol.models import Protocol
 from app.shared.errors import NotFoundError
 
@@ -22,6 +25,9 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from app.modules.livevote.service.pubsub import BrokerPublisher
+
+# Per meeting: the number of agenda items and the current item (A2).
+AgendaSummary = tuple[int, CurrentAgendaItemOut | None]
 
 
 class MeetingServiceBase:
@@ -45,6 +51,7 @@ class MeetingServiceBase:
         protokollant_name: str | None = None,
         gremium_name: str | None = None,
         votes: list[MeetingVoteOut] | None = None,
+        agenda: AgendaSummary = (0, None),
     ) -> MeetingOut:
         return MeetingOut(
             id=meeting.id,
@@ -54,10 +61,13 @@ class MeetingServiceBase:
             date=meeting.date,
             startTime=meeting.start_time,
             endTime=meeting.end_time,
+            startedAt=meeting.started_at,
             closedAt=meeting.closed_at,
             status=meeting.status,  # type: ignore[arg-type]
             activeApplicationId=meeting.active_application_id,
             currentAgendaItemId=meeting.current_agenda_item_id,
+            currentAgendaItem=agenda[1],
+            agendaItemCount=agenda[0],
             protocolId=protocol_id,
             createdAt=meeting.created_at,
             protokollantId=meeting.protokollant_id,
@@ -74,6 +84,60 @@ class MeetingServiceBase:
             canFinalize=can_finalize,
             votes=votes or [],
         )
+
+    async def _agenda_summaries(self, meetings: Sequence[Meeting]) -> dict[UUID, AgendaSummary]:
+        """Count the agenda items of each meeting and describe its current item (A2).
+
+        Two batched queries for any number of meetings: the agenda items in agenda
+        order, then the titles of the applications behind the current items. The
+        position is the 1-based number of the item in the agenda order, as the agenda
+        list shows it.
+        """
+        if not meetings:
+            return {}
+        rows = (
+            await self.session.execute(
+                select(
+                    MeetingAgendaItem.meeting_id,
+                    MeetingAgendaItem.id,
+                    MeetingAgendaItem.application_id,
+                    MeetingAgendaItem.title,
+                )
+                .where(MeetingAgendaItem.meeting_id.in_([m.id for m in meetings]))
+                .order_by(MeetingAgendaItem.meeting_id, *agenda_order())
+            )
+        ).all()
+        current = {m.id: m.current_agenda_item_id for m in meetings}
+        counts: dict[UUID, int] = {}
+        hits: dict[UUID, tuple[int, UUID | None, str | None]] = {}
+        for meeting_id, item_id, application_id, title in rows:
+            counts[meeting_id] = counts.get(meeting_id, 0) + 1
+            if item_id == current.get(meeting_id):
+                hits[meeting_id] = (counts[meeting_id], application_id, title)
+        app_ids = {app_id for _, app_id, _ in hits.values() if app_id is not None}
+        app_titles: dict[UUID, str | None] = {}
+        if app_ids:
+            app_titles = {
+                app_id: title_of(data)
+                for app_id, data in (
+                    await self.session.execute(
+                        select(Application.id, Application.data).where(
+                            Application.id.in_(app_ids)
+                        )
+                    )
+                ).all()
+            }
+        out: dict[UUID, AgendaSummary] = {}
+        for meeting in meetings:
+            hit = hits.get(meeting.id)
+            item: CurrentAgendaItemOut | None = None
+            if hit is not None:
+                position, application_id, title = hit
+                if application_id is not None:
+                    title = app_titles.get(application_id)
+                item = CurrentAgendaItemOut(position=position, title=title)
+            out[meeting.id] = (counts.get(meeting.id, 0), item)
+        return out
 
     async def _principal_id(self, sub: str) -> UUID | None:
         """Return the `principal.id` for an OIDC `sub`, used for the protokollant check."""

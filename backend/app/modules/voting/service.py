@@ -99,11 +99,12 @@ class VotingService:
             raise NotFoundError(f"vote {vote_id} not found")
         return vote
 
-    async def delete(self, vote_id: UUID, *, meeting_id: UUID) -> None:
-        """Delete a meeting-bound vote.
+    async def delete(self, vote_id: UUID, *, meeting_id: UUID, actor: str) -> None:
+        """Delete a meeting-bound vote and write a ``vote_delete`` audit entry (O24).
 
         The ballots cascade through the foreign key. The method deletes only a vote of
-        this meeting. The caller (router) checks the authorization.
+        this meeting. The caller (router) checks the authorization and the meeting
+        status: only a ``planned`` or ``live`` meeting deletes a vote.
 
         Raises:
             NotFoundError: The vote does not belong to this meeting.
@@ -111,9 +112,61 @@ class VotingService:
         vote = await self._get_vote(vote_id)
         if vote.meeting_id != meeting_id:
             raise NotFoundError(f"vote {vote_id} not found in this meeting")
+        await self._delete_audited(vote, actor=actor)
+        await self.session.commit()
+
+    async def delete_for_agenda_item(self, agenda_item_id: UUID, *, actor: str) -> list[UUID]:
+        """Delete the draft and cancelled votes of an agenda item, without a commit.
+
+        The agenda-item remove calls this first (F24, O25). The foreign key
+        ``vote.agenda_item_id`` no longer cascades, so the remove deletes these votes
+        itself, each with a ``vote_delete`` audit entry. An open or closed vote is part
+        of the record of the meeting and blocks the remove.
+
+        Returns:
+            The ids of the deleted votes.
+
+        Raises:
+            ConflictError: The agenda item has an open or closed vote
+                (``agenda_item_has_vote``). The method then deletes nothing.
+        """
+        rows = (
+            (
+                await self.session.execute(
+                    select(Vote)
+                    .where(Vote.agenda_item_id == agenda_item_id)
+                    .order_by(Vote.created_at)
+                    .with_for_update()
+                )
+            )
+            .scalars()
+            .all()
+        )
+        if any(vote.status in ("open", "closed") for vote in rows):
+            raise ConflictError(
+                "This agenda item has an open or closed vote and cannot be removed.",
+                code="agenda_item_has_vote",
+            )
+        for vote in rows:
+            await self._delete_audited(vote, actor=actor)
+        return [vote.id for vote in rows]
+
+    async def _delete_audited(self, vote: Vote, *, actor: str) -> None:
+        """Write ``vote_delete`` for a loaded vote and delete it, without a commit."""
+        await audit_record(
+            self.session,
+            actor=actor,
+            action=AuditAction.VOTE_DELETE,
+            target_type="vote",
+            target_id=str(vote.id),
+            data={
+                **self._audit_refs(vote),
+                "agendaItemId": str(vote.agenda_item_id) if vote.agenda_item_id else None,
+                "status": vote.status,
+            },
+        )
         await self.session.delete(vote)
         await self.session.flush()
-        await self.session.commit()
 
     async def _ballot_count(self, vote_id: UUID) -> int:
         """Count every recorded participation of a vote, open and secret.
@@ -165,19 +218,7 @@ class VotingService:
                 "This vote already holds ballots and cannot be deleted.",
                 code="vote_has_ballots",
             )
-        await audit_record(
-            self.session,
-            actor=actor,
-            action=AuditAction.VOTE_DELETE,
-            target_type="vote",
-            target_id=str(vote_id),
-            data={
-                "applicationId": str(vote.application_id) if vote.application_id else None,
-                "eligibleGroup": vote.eligible_group,
-            },
-        )
-        await self.session.delete(vote)
-        await self.session.flush()
+        await self._delete_audited(vote, actor=actor)
         await self.session.commit()
 
     async def _get_application(

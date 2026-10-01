@@ -55,10 +55,13 @@ class Vote(UUIDPkMixin, CreatedAtMixin, Base):
     meeting_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("meeting.id", ondelete="SET NULL"), nullable=True
     )
-    # The agenda item that the vote belongs to (live vote). CASCADE: a delete of the
-    # agenda item also removes the generic resolution question.
+    # The agenda item that the vote belongs to (live vote). SET NULL (F21): a meeting
+    # delete cascades to its agenda items, and the votes and their ballots must survive
+    # it, as ``meeting_id`` does. An agenda item with an open or closed vote cannot be
+    # removed (O25), and its remove deletes the draft and cancelled votes explicitly
+    # with a ``vote_delete`` audit entry.
     agenda_item_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("meeting_agenda_item.id", ondelete="CASCADE"), nullable=True
+        ForeignKey("meeting_agenda_item.id", ondelete="SET NULL"), nullable=True
     )
     eligible_group: Mapped[str] = mapped_column(Text)
     # The vote question that the protocol snippet shows. NULL means no explicit question.

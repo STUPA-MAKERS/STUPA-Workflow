@@ -196,7 +196,7 @@ class ListingOps(PermissionOps, VoteReadOps):
         return MeetingPage(items=items, nextCursor=next_cursor)
 
     async def _decorate(self, meetings: list[Meeting], principal: Principal) -> list[MeetingOut]:
-        """Enrich meetings with the protocol id, the votes and per-principal RBAC flags.
+        """Enrich meetings with the protocol id, the votes, the agenda summary and the flags.
 
         `list` and `list_timeline` share this helper. It loads everything in batches
         and creates no N+1 queries. It filters NO meetings: the visibility rule is
@@ -270,6 +270,7 @@ class ListingOps(PermissionOps, VoteReadOps):
         # applies the same rule to the meeting detail.
         vote_ids = await self._vote_cast_gremium_ids(principal)
         votes_by_meeting = await self._votes_for([m.id for m in meetings], principal)
+        agenda_by_meeting = await self._agenda_summaries(meetings)
         out: list[MeetingOut] = []
         for m in meetings:
             is_prot = m.protokollant_id is not None and m.protokollant_id == my_id
@@ -289,6 +290,7 @@ class ListingOps(PermissionOps, VoteReadOps):
                         prot_names.get(m.protokollant_id) if m.protokollant_id is not None else None
                     ),
                     votes=votes_by_meeting.get(m.id, []),
+                    agenda=agenda_by_meeting[m.id],
                 )
             )
         return out

@@ -31,6 +31,18 @@ class AuditAction(StrEnum):
     EXPORT = "export"
     # Meeting deleted. To delete a finalized meeting you need ``meeting.delete_finalized``.
     MEETING_DELETE = "meeting_delete"
+    # Meeting and agenda (F12). ``data`` carries id references and planning values
+    # only. MEETING_UPDATE records a status change and a change of the date, the times
+    # or the protokollant, each as ``{"from": ..., "to": ...}``. The current agenda item
+    # and the beamer focus change many times in a meeting and are not recorded.
+    # AGENDA_ITEM_UPDATE names the changed fields, never the Markdown text: a body
+    # edit is recorded only after the close, as a correction of the minutes (O22).
+    MEETING_CREATE = "meeting_create"
+    MEETING_UPDATE = "meeting_update"
+    AGENDA_ITEM_ADD = "agenda_item_add"
+    AGENDA_ITEM_UPDATE = "agenda_item_update"
+    AGENDA_ITEM_REMOVE = "agenda_item_remove"
+    AGENDA_REORDER = "agenda_reorder"
     # Application deleted. This admin action is irreversible. It cascades to PII,
     # versions, status events, magic links, comments, budget entries and votes.
     # ``data`` carries only id references and metadata, never raw PII.

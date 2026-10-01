@@ -940,8 +940,10 @@ async def test_fire_with_meeting_adds_in_tx_and_skips_the_action(
     async def _check(_self: object, transition: object, mid: object, _p: object) -> None:
         calls.append(("check", mid))
 
-    async def _add(_self: object, app_id: object, mid: object, *, non_public: bool) -> None:
-        calls.append(("add", (app_id, mid, non_public)))
+    async def _add(
+        _self: object, app_id: object, mid: object, *, non_public: bool, actor: str
+    ) -> None:
+        calls.append(("add", (app_id, mid, non_public, actor)))
 
     monkeypatch.setattr(FlowService, "_check_agenda_meeting", _check)
     monkeypatch.setattr(FlowService, "_add_to_agenda_in_tx", _add)
@@ -953,7 +955,10 @@ async def test_fire_with_meeting_adds_in_tx_and_skips_the_action(
     res = await FlowService(db, rec).fire(
         app.id, t.id, _principal(), meeting_id=meeting_id, non_public=True
     )
-    assert calls == [("check", meeting_id), ("add", (app.id, meeting_id, True))]
+    assert calls == [
+        ("check", meeting_id),
+        ("add", (app.id, meeting_id, True, _principal().sub)),
+    ]
     assert "addToNextSession" not in res.dispatched_actions
     assert all(a.type != "addToNextSession" for a in rec.batches[0])
 
@@ -1052,17 +1057,17 @@ async def test_add_to_agenda_in_tx(
     import app.modules.livevote.agenda_service as agenda_mod
     from app.shared.errors import ValidationProblem
 
-    added: list[tuple[object, object, bool]] = []
+    added: list[tuple[object, object, bool, str]] = []
 
     class _Agenda:
         def __init__(self, _session: object) -> None: ...
 
         async def add_in_tx(
-            self, meeting_id: object, *, application_id: object, non_public: bool
+            self, meeting_id: object, *, application_id: object, non_public: bool, actor: str
         ) -> bool:
             if error is not None:
                 raise error
-            added.append((meeting_id, application_id, non_public))
+            added.append((meeting_id, application_id, non_public, actor))
             return True
 
     monkeypatch.setattr(agenda_mod, "AgendaService", _Agenda)
@@ -1070,12 +1075,16 @@ async def test_add_to_agenda_in_tx(
     app_id, meeting_id = uuid4(), uuid4()
     svc = FlowService(db)
     if error is None:
-        await svc._add_to_agenda_in_tx(app_id, meeting_id, non_public=False)  # noqa: SLF001
-        assert added == [(meeting_id, app_id, False)]
+        await svc._add_to_agenda_in_tx(  # noqa: SLF001
+            app_id, meeting_id, non_public=False, actor="mgr"
+        )
+        assert added == [(meeting_id, app_id, False, "mgr")]
         assert db.rolled_back == 0
     else:
         with pytest.raises(ValidationProblem):
-            await svc._add_to_agenda_in_tx(app_id, meeting_id, non_public=False)  # noqa: SLF001
+            await svc._add_to_agenda_in_tx(  # noqa: SLF001
+                app_id, meeting_id, non_public=False, actor="mgr"
+            )
         assert db.rolled_back == 1
 
 

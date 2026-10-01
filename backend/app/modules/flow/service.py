@@ -865,7 +865,9 @@ class FlowService:
             },
         )
         if meeting_id is not None:
-            await self._add_to_agenda_in_tx(app.id, meeting_id, non_public=non_public)
+            await self._add_to_agenda_in_tx(
+                app.id, meeting_id, non_public=non_public, actor=principal.sub
+            )
         return StagedFire(
             application=app,
             transition=transition,
@@ -958,14 +960,14 @@ class FlowService:
             raise _meeting_problem("The meeting belongs to another Gremium.")
 
     async def _add_to_agenda_in_tx(
-        self, application_id: UUID, meeting_id: UUID, *, non_public: bool
+        self, application_id: UUID, meeting_id: UUID, *, non_public: bool, actor: str
     ) -> None:
         """Add the agenda item in the open transaction. Roll back on a refusal."""
         from app.modules.livevote.agenda_service import AgendaService
 
         try:
             await AgendaService(self.session).add_in_tx(
-                meeting_id, application_id=application_id, non_public=non_public
+                meeting_id, application_id=application_id, non_public=non_public, actor=actor
             )
         except (NotFoundError, ConflictError) as exc:
             await self.session.rollback()
