@@ -25,7 +25,10 @@ group = ToolGroup()
 async def get_vote(vote_id: str) -> dict:
     """Fetch the state and the aggregated tally of a vote.
 
-    A secret vote exposes the counts only.
+    A secret vote exposes the counts only. `openedAt` and `closedAt` are the real open
+    and end times; `closesAt` is the planned end of the cast window. `myBallot`
+    (`cast`, `choice`) is the own ballot of the caller; a secret vote gives no choice.
+    `representedCast` tells whether the caller cast the ballot of a delegator.
     """
     return await api().get(f"/votes/{vote_id}")
 
@@ -59,7 +62,10 @@ async def close_vote(vote_id: str) -> dict:
     """Close a vote, tally it, and fire the result branch.
 
     The call gives a 409 while the quorum is not met. Collect more ballots or call
-    `cancel_vote`. An agent manages a vote but cannot cast a ballot. Casting is
+    `cancel_vote`. The close always ends the vote. `branchFired` is false when the pass
+    or fail transition did not fire (its guard failed, or the state has no such
+    transition). The audit log then holds `vote_branch_blocked`, and a person must move
+    the application with `fire_transition`. An agent manages a vote but cannot cast a ballot. Casting is
     human-only. Requires the gremium permission `vote.manage` or `session.manage` in
     the gremium of the vote (or admin).
     """
