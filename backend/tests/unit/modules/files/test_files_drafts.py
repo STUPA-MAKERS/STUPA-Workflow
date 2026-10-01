@@ -25,10 +25,18 @@ from app.modules.files.drafts import (
     hash_draft_token,
 )
 from app.modules.files.models import Attachment
-from app.modules.files.service import FilesService
+from app.modules.files.router import get_draft_attachments
+from app.modules.files.service import FilesService, application_id_of
 from app.settings import load_settings
-from app.shared.errors import NotFoundError, PayloadTooLargeError, ValidationProblem
+from app.shared.errors import (
+    NotFoundError,
+    PayloadTooLargeError,
+    ServiceUnavailableError,
+    UnsupportedMediaTypeError,
+    ValidationProblem,
+)
 from tests._support.files_fakes import FailingStorage, FakeScanQueue, FakeStorage
+from tests._support.notifications_fakes import FakeSession
 
 SETTINGS = load_settings()
 PDF = b"%PDF-1.4 draft"
@@ -274,3 +282,41 @@ async def test_bind_drafts_updates_and_skips_an_empty_list() -> None:
         pepper="p",
     )
     assert session.statements[0].startswith("UPDATE attachment SET application_id")
+
+
+def test_validate_rejects_large_empty_and_storage_off() -> None:
+    files = FilesService(_Session(), storage=FakeStorage(), settings=SETTINGS)  # type: ignore[arg-type]
+    with pytest.raises(PayloadTooLargeError):
+        files.validate("a.pdf", b"x" * (files.max_bytes + 1))
+    with pytest.raises(UnsupportedMediaTypeError):
+        files.validate("a.pdf", b"")
+    off = FilesService(_Session(), storage=None, settings=SETTINGS)  # type: ignore[arg-type]
+    with pytest.raises(ServiceUnavailableError):
+        off.validate("a.pdf", PDF)
+
+
+async def test_put_object_without_storage_gives_503() -> None:
+    off = FilesService(_Session(), storage=None, settings=SETTINGS)  # type: ignore[arg-type]
+    with pytest.raises(ServiceUnavailableError):
+        await off.put_object("k", PDF, "application/pdf")
+
+
+def test_application_id_of_a_draft_gives_404() -> None:
+    bound = _draft_row(application_id=uuid.uuid4(), draft_token_hash=None)
+    assert application_id_of(bound) == bound.application_id
+    with pytest.raises(NotFoundError):
+        application_id_of(_draft_row())
+
+
+async def test_get_attachment_hides_a_draft() -> None:
+    session = FakeSession()
+    draft = _draft_row()
+    session.add(draft)
+    files = FilesService(session, settings=SETTINGS)  # type: ignore[arg-type]
+    with pytest.raises(NotFoundError):
+        await files.get_attachment(draft.id)
+
+
+def test_get_draft_attachments_wraps_the_files_service() -> None:
+    files = FilesService(_Session(), settings=SETTINGS)  # type: ignore[arg-type]
+    assert get_draft_attachments(files).files is files

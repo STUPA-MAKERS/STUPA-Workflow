@@ -853,8 +853,17 @@ def test_max_bytes_clamps_to_model_cap() -> None:
     assert svc.max_bytes == min(SETTINGS.attachment_max_bytes, MAX_ATTACHMENT_BYTES)
 
 
-async def test_upload_with_field_key_and_comparison_offer() -> None:
+async def test_upload_with_field_key_and_comparison_offer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """An upload with field_key and is_comparison_offer sets both on the row."""
+    audits: list[dict[str, object]] = []
+
+    async def _record(session: object, **kw: object) -> None:
+        audits.append(kw)
+
+    # The upload writes an audit entry (F12). `NotifSession` cannot run the hash chain.
+    monkeypatch.setattr(files_service, "audit_record", _record)
     session = NotifSession()
     app = Application()
     app.id = uuid.uuid4()
@@ -872,3 +881,5 @@ async def test_upload_with_field_key_and_comparison_offer() -> None:
     added = [a for a in session.added if isinstance(a, Attachment)]
     assert added and added[0].field_key == "kostenaufstellung"
     assert len(queue.enqueued) == 1
+    assert audits[0]["data"]["fieldKey"] == "kostenaufstellung"  # type: ignore[index]
+    assert audits[0]["data"]["isComparisonOffer"] is True  # type: ignore[index]
