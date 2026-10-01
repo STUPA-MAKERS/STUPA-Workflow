@@ -9,7 +9,7 @@ import { ToastService, type SelectOption } from '@stupa-makers/ui-kit';
 import { AdminOptionsService } from '../../pages/admin/admin-options.service';
 import { MeetingSessionService } from './meeting-session.service';
 import { MeetingsTimelineService } from './meetings-timeline.service';
-import { longDate } from './meetings-display.util';
+import { errorCode, errorDetail, longDate } from './meetings-display.util';
 
 /**
  * Meeting metadata dialogs: the two-step create dialog, the settings dialog for
@@ -301,9 +301,17 @@ export class MeetingDialogsService {
         this.toast.success(this.i18n.translate('meetings.toast.deleted'));
         if (this.session.meeting()?.id === m.id) void this.router.navigate(['/meetings']);
       },
-      error: () => {
+      error: (err: unknown) => {
         this.deletingMeeting.set(false);
-        this.toast.error(this.i18n.translate('meetings.toast.actionFailed'));
+        // The server refuses the delete while a vote of the meeting is open
+        // (409 `open_vote`). Any other refusal shows the server reason.
+        if (errorCode(err) === 'open_vote') {
+          this.toast.error(this.i18n.translate('meetings.toast.closeOpenVote'));
+          return;
+        }
+        const detail = errorDetail(err);
+        const base = this.i18n.translate('meetings.toast.actionFailed');
+        this.toast.error(detail ? `${base}: ${detail}` : base);
       },
     });
   }

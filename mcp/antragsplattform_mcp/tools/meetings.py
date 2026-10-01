@@ -132,8 +132,10 @@ async def delete_meeting(meeting_id: str) -> dict:
     """Delete a meeting. Requires session.manage in the meeting's gremium (or admin).
 
     This is also the way to cancel a planned meeting that does not take place. A
-    meeting with a final protocol also needs `meeting.delete_finalized`. The votes of
-    the meeting and their ballots stay.
+    meeting with a final protocol also needs `meeting.delete_finalized`. A meeting
+    with an open vote does not delete (409 `open_vote`): close or cancel the vote
+    first. The delete cancels the draft votes. The other votes of the meeting and
+    their ballots stay.
     """
     return await api().delete(f"/meetings/{meeting_id}")
 

@@ -286,11 +286,15 @@ async def get_meeting(meeting_id: UUID, service: ServiceDep, principal: ReaderDe
     return await service.get(meeting_id, principal)
 
 
-@router.delete("/meetings/{meeting_id}", status_code=204, responses=_errors(401, 403, 404))
+@router.delete(
+    "/meetings/{meeting_id}", status_code=204, responses=_errors(401, 403, 404, 409)
+)
 async def delete_meeting(meeting_id: UUID, service: ServiceDep, principal: ReaderDep) -> None:
     """Delete a meeting.
 
     Only a meeting manager (``session.manage``) or an admin may delete a meeting.
+    A meeting with an open vote gives 409 ``open_vote``. The delete cancels the
+    draft votes of the meeting.
     """
     await service.delete(meeting_id, principal)
 

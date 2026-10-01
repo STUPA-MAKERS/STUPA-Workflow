@@ -106,9 +106,10 @@ class VotingService:
     ) -> None:
         """Lock the meeting row and require a ``live`` meeting (O12, O25).
 
-        The meeting close and the agenda-item remove take the same lock. Thus a vote
-        cannot open in a meeting that closes at the same time, and it cannot bind to
-        an agenda item that is removed at the same time. Take this lock BEFORE a vote
+        The meeting close, the meeting delete and the agenda-item remove take the
+        same lock. Thus a vote cannot open in a meeting that closes or is deleted at
+        the same time, and it cannot bind to an agenda item that is removed at the
+        same time. Take this lock BEFORE a vote
         row lock: the close locks the meeting first and the draft votes after it.
 
         Raises:
@@ -1165,13 +1166,19 @@ class VotingService:
         return branch is not None
 
     async def cancel_drafts_for_meeting(
-        self, meeting_id: UUID, *, now: datetime, actor: str | None = None
+        self,
+        meeting_id: UUID,
+        *,
+        now: datetime,
+        actor: str | None = None,
+        reason: str = "meeting_closed",
     ) -> list[Vote]:
         """Cancel the ``draft`` votes of a meeting, without a commit.
 
-        The meeting close uses this: a draft of a closed meeting can never open. Each
-        vote gets ``closed_at`` and a ``vote_cancel`` audit entry with the reason
-        ``meeting_closed``.
+        The meeting close and the meeting delete use this: a draft of a closed or
+        deleted meeting can never open. Each vote gets ``closed_at`` and a
+        ``vote_cancel`` audit entry with ``reason`` (``meeting_closed`` or
+        ``meeting_deleted``).
 
         Returns:
             The cancelled votes.
@@ -1189,7 +1196,7 @@ class VotingService:
             .all()
         )
         for vote in rows:
-            await self._mark_cancelled(vote, now=now, actor=actor, reason="meeting_closed")
+            await self._mark_cancelled(vote, now=now, actor=actor, reason=reason)
         await self.session.flush()
         return list(rows)
 

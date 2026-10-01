@@ -1859,6 +1859,35 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.deletingMeeting()).toBe(false);
     });
 
+    it('names the open vote when the server refuses the delete', async () => {
+      const { cmp, http, fixture } = await loaded();
+      cmp.askDeleteMeeting(cmp.meeting()!);
+      cmp.doDeleteMeeting();
+      http
+        .expectOne('/api/meetings/m-1')
+        .flush(
+          { detail: 'a vote of this meeting is still open', code: 'open_vote' },
+          { status: 409, statusText: 'Conflict' },
+        );
+      expect(cmp.deletingMeeting()).toBe(false);
+      expect(cmp.confirmDeleteMeeting()).not.toBeNull();
+      const toasts = fixture.debugElement.injector.get(ToastService).toasts();
+      expect(toasts.map((t) => t.message)).toContain(
+        'Eine Abstimmung der Sitzung ist noch offen. Bitte die Abstimmung zuerst schließen oder abbrechen.',
+      );
+    });
+
+    it('shows the server reason for another refused delete', async () => {
+      const { cmp, http, fixture } = await loaded();
+      cmp.askDeleteMeeting(cmp.meeting()!);
+      cmp.doDeleteMeeting();
+      http
+        .expectOne('/api/meetings/m-1')
+        .flush({ detail: 'not allowed' }, { status: 403, statusText: 'Forbidden' });
+      const toasts = fixture.debugElement.injector.get(ToastService).toasts();
+      expect(toasts.map((t) => t.message)).toContain('Aktion fehlgeschlagen.: not allowed');
+    });
+
     it('ignores doDeleteMeeting without a target or while deleting', async () => {
       const { cmp, http } = await loaded();
       cmp.doDeleteMeeting(); // confirmDeleteMeeting null → return

@@ -66,3 +66,48 @@ async def test_meeting_delete_keeps_votes_and_ballots(
     [entry] = await audit_actions(maker, target_id=s.meeting_id)
     assert entry.action == "meeting_delete"
     assert entry.data["finalizedProtocol"] is (protocol == "final")
+
+
+async def test_meeting_delete_with_open_vote_is_refused(
+    maker: async_sessionmaker[AsyncSession], api: FastAPI
+) -> None:
+    """An open vote blocks the delete, else it stays open without its meeting scope."""
+    s = await seed(maker, status="live", votes=("open", "draft"), protocol="draft")
+    with TestClient(api) as client:
+        resp = client.delete(f"/api/meetings/{s.meeting_id}")
+    assert resp.status_code == 409, resp.text
+    assert resp.headers["content-type"] == "application/problem+json"
+    assert resp.json()["code"] == "open_vote"
+    async with maker() as session:
+        assert await session.get(Meeting, s.meeting_id) is not None
+        for status, vote_id in s.vote_ids.items():
+            vote = await session.get(Vote, vote_id)
+            assert vote is not None
+            assert vote.status == status
+            assert vote.meeting_id == s.meeting_id
+    assert await audit_actions(maker, target_id=s.meeting_id) == []
+    assert await audit_actions(maker, target_id=s.vote_ids["draft"]) == []
+
+
+@pytest.mark.parametrize("status", ["planned", "live"])
+async def test_meeting_delete_cancels_draft_votes(
+    maker: async_sessionmaker[AsyncSession], api: FastAPI, status: str
+) -> None:
+    """A draft of a deleted meeting does not survive as a draft that can open later."""
+    s = await seed(maker, status=status, votes=("draft", "closed"))
+    with TestClient(api) as client:
+        resp = client.delete(f"/api/meetings/{s.meeting_id}")
+    assert resp.status_code == 204, resp.text
+    async with maker() as session:
+        assert await session.get(Meeting, s.meeting_id) is None
+        draft = await session.get(Vote, s.vote_ids["draft"])
+        closed = await session.get(Vote, s.vote_ids["closed"])
+        assert draft is not None and closed is not None
+        assert draft.status == "cancelled"
+        assert draft.closed_at is not None
+        assert draft.meeting_id is None
+        assert closed.status == "closed"
+    cancel = await audit_actions(maker, target_id=s.vote_ids["draft"])
+    assert [(e.action, e.data["reason"]) for e in cancel] == [("vote_cancel", "meeting_deleted")]
+    [entry] = await audit_actions(maker, target_id=s.meeting_id)
+    assert entry.action == "meeting_delete"

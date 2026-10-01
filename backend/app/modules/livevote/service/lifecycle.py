@@ -25,6 +25,7 @@ from app.modules.livevote.schemas import MeetingCreate, MeetingOut, MeetingPatch
 from app.modules.livevote.service.permissions import PermissionOps
 from app.modules.livevote.service.votes import VoteReadOps
 from app.modules.voting.models import Vote
+from app.modules.voting.schemas import VoteOut
 from app.shared.errors import (
     BadRequestError,
     ConflictError,
@@ -256,30 +257,42 @@ class LifecycleOps(PermissionOps, VoteReadOps):
                 data={"gremiumId": str(meeting.gremium_id), "changes": changes},
             )
         await self.session.flush()
+        cancelled_events = await self._cancelled_events(cancelled)
         await self.session.commit()
-        await self._publish_cancelled(cancelled)
+        await self._publish_cancelled(cancelled_events)
         votes = (await self._votes_for([meeting.id], principal)).get(meeting.id, [])
         out = await self._emit(meeting, principal, votes=votes)
         if self.publisher is not None:
             await self.publisher.meeting_state(out)
         return out
 
-    async def _publish_cancelled(self, votes: list[Vote]) -> None:
-        """Send ``vote_cancelled`` for the drafts that the close cancelled.
+    async def _cancelled_events(self, votes: list[Vote]) -> list[VoteOut]:
+        """Read the ``vote_cancelled`` payloads before the commit.
 
-        The method runs after the commit. A broker fault must not fail the committed
-        close, so the method only logs it.
+        The method runs before the commit, while each vote still has its
+        ``meeting_id``. After a meeting delete the database sets that reference to
+        ``NULL``, and a payload read after the commit has no meeting channel.
         """
         if self.publisher is None or not votes:
-            return
+            return []
         from app.modules.voting.service import VotingService
 
         voting = VotingService(self.session)
-        for vote in votes:
+        return [await voting.get(vote.id) for vote in votes]
+
+    async def _publish_cancelled(self, events: list[VoteOut]) -> None:
+        """Send ``vote_cancelled`` for the drafts that a close or a delete cancelled.
+
+        The method runs after the commit. A broker fault must not fail the committed
+        change, so the method only logs it.
+        """
+        if self.publisher is None:
+            return
+        for event in events:
             try:
-                await self.publisher.vote_cancelled(await voting.get(vote.id))
+                await self.publisher.vote_cancelled(event)
             except Exception:  # noqa: BLE001 - the broadcast is best effort
-                logger.warning("vote_cancelled broadcast failed (vote=%s)", vote.id)
+                logger.warning("vote_cancelled broadcast failed (vote=%s)", event.id)
 
     async def broadcast_state(self, meeting_id: UUID, principal: Principal) -> None:
         """Re-send ``meeting_state`` without a state change.
@@ -312,12 +325,25 @@ class LifecycleOps(PermissionOps, VoteReadOps):
         ``meeting.delete_finalized`` permission, because the protocol is a signed
         and mailed document. The service audits every delete.
 
+        The delete locks the meeting row, as the close and the vote open do. A
+        meeting with an open vote does not delete: the lead closes or cancels the
+        vote first. The delete cancels the draft votes of the meeting in the same
+        transaction (reason ``meeting_deleted``), then sends ``vote_cancelled``
+        after the commit. Thus no vote of a deleted meeting can open later.
+
         The cascade removes the protocol, the agenda and the attendance. The
         database detaches bound votes with ``SET NULL`` on ``meeting_id`` and on
         ``agenda_item_id`` (F21), so the votes, their ballots and their results
         survive.
+
+        Raises:
+            ForbiddenError: The caller does not manage the meeting, or the protocol
+                is final and the caller does not hold ``meeting.delete_finalized``.
+            ConflictError: The meeting still has an open vote (``open_vote``).
         """
-        meeting = await self._get(meeting_id)
+        # The lock serializes the delete with the vote open and the close. Without
+        # it, a vote could open between the check below and the delete.
+        meeting = await self._get(meeting_id, for_update=True)
         if not await self.can_manage(meeting.gremium_id, principal):
             raise ForbiddenError("not allowed to delete this meeting")
         finalized = await self._protocol_final(meeting_id)
@@ -326,6 +352,21 @@ class LifecycleOps(PermissionOps, VoteReadOps):
                 "this meeting has a finalized protocol — deleting it requires "
                 "the meeting.delete_finalized permission"
             )
+        # An open vote of a deleted meeting would stay open without its meeting
+        # scope: interim counts, present count and delegation checks all depend on
+        # it.
+        if await self.open_vote(meeting.id) is not None:
+            raise ConflictError(
+                "a vote of this meeting is still open — close or cancel it first",
+                code="open_vote",
+            )
+        # Local import: the voting service imports the flow engine, which reaches
+        # back into this module.
+        from app.modules.voting.service import VotingService
+
+        cancelled = await VotingService(self.session).cancel_drafts_for_meeting(
+            meeting.id, now=datetime.now(UTC), actor=principal.sub, reason="meeting_deleted"
+        )
         await audit_record(
             self.session,
             actor=principal.sub,
@@ -338,5 +379,7 @@ class LifecycleOps(PermissionOps, VoteReadOps):
                 "finalizedProtocol": finalized,
             },
         )
+        cancelled_events = await self._cancelled_events(cancelled)
         await self.session.delete(meeting)
         await self.session.commit()
+        await self._publish_cancelled(cancelled_events)
