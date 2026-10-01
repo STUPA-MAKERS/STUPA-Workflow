@@ -172,10 +172,19 @@ class VotingService:
         await self.session.flush()
         await self.session.commit()
 
-    async def _get_application(self, application_id: UUID) -> Application:
-        app = (
-            await self.session.execute(select(Application).where(Application.id == application_id))
-        ).scalar_one_or_none()
+    async def _get_application(
+        self, application_id: UUID, *, confirmed_only: bool = False
+    ) -> Application:
+        """Load the application, or raise 404.
+
+        `confirmed_only=True` also gives 404 for an unconfirmed guest application
+        (`email_confirmed_at IS NULL`). Such an application rests in the flow and stays
+        invisible, as on the flow routes.
+        """
+        stmt = select(Application).where(Application.id == application_id)
+        if confirmed_only:
+            stmt = stmt.where(Application.email_confirmed_at.is_not(None))
+        app = (await self.session.execute(stmt)).scalar_one_or_none()
         if app is None:
             raise NotFoundError(f"application {application_id} not found")
         return app
@@ -340,7 +349,8 @@ class VotingService:
         with ``vote.cast``). The client cannot send it.
 
         Raises:
-            NotFoundError: No application has this id (404).
+            NotFoundError: No application has this id, or its email is not confirmed
+                (404).
             ForbiddenError: The application has no gremium and the principal is not
                 the admin role (403).
             ValidationProblem: The gremium does not exist (``eligible_group_invalid``)
@@ -356,7 +366,9 @@ class VotingService:
                 code="eligible_group_invalid",
                 errors=[{"field": "eligibleGroup", "msg": "unknown gremium"}],
             )
-        application = await self._get_application(application_id)
+        # An unconfirmed guest application rests in the flow. A vote on it could fire
+        # its pass or fail branch on close, so it gets 404 as on the flow routes.
+        application = await self._get_application(application_id, confirmed_only=True)
         expected = await self._application_gremium_id(application)
         if expected is None and not admin_bypass(principal, "vote.manage"):
             raise ForbiddenError(

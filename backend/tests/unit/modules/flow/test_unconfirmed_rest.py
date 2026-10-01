@@ -211,3 +211,36 @@ async def test_start_confirmed_swallows_a_failed_advance(
     assert out is None
     assert steps["scheduled"] == [(app, state)]
     assert recorder.batches == []
+
+
+async def test_start_confirmed_logs_an_unexpected_advance_error(
+    steps: dict[str, Any],
+) -> None:
+    """An unexpected error after the commit rolls back, logs and returns None."""
+    state = SimpleNamespace(id=uuid4())
+    app = _app(confirmed=True, state_id=state.id)
+    steps["outcome"] = RuntimeError("budget action failed")
+    db = fake_session(result(app), result(state))
+    recorder = _Recorder()
+    out = await FlowService(db, recorder).start_confirmed(app.id)
+    assert out is None
+    assert db.rolled_back == 1
+    assert recorder.batches == []
+
+
+class _FailingDispatcher:
+    async def dispatch(self, actions: Sequence[DispatchedAction]) -> None:
+        raise RuntimeError("mail queue down")
+
+
+async def test_start_confirmed_logs_a_failed_announcement(
+    steps: dict[str, Any],
+) -> None:
+    """A failed task mail enqueue does not fail the start."""
+    state = SimpleNamespace(id=uuid4())
+    app = _app(confirmed=True, state_id=state.id)
+    db = fake_session(result(app), result(state))
+    db.scalar_results.append(uuid4())
+    out = await FlowService(db, _FailingDispatcher()).start_confirmed(app.id)
+    assert out is None
+    assert db.rolled_back == 1
