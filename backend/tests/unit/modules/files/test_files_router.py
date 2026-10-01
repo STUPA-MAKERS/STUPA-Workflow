@@ -9,14 +9,15 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.deps import Principal, get_current_principal, get_session
+from app.deps import Principal, get_current_applicant, get_current_principal, get_session
 from app.main import create_app
+from app.modules.auth.principal import Applicant
 from app.modules.files.models import Attachment
 from app.modules.files.router import get_files_service
 from app.modules.files.schemas import AttachmentOut, SignedUrlOut
 from app.modules.files.service import FilesService
 from app.settings import load_settings
-from app.shared.errors import NotFoundError
+from app.shared.errors import ConflictError, NotFoundError
 
 APP_ID = uuid4()
 ATT_ID = uuid4()
@@ -27,6 +28,8 @@ class _FakeService:
 
     def __init__(self) -> None:
         self.uploaded: list[tuple[UUID, str | None, int]] = []
+        self.locked = False
+        self.lock_checked: list[UUID] = []
 
     async def upload(
         self,
@@ -79,6 +82,11 @@ class _FakeService:
             yield b"BYTES"
 
         return _iter(), "doc.pdf", "application/pdf", len(b"PDF-BYTES")
+
+    async def assert_editable(self, application_id: UUID) -> None:
+        self.lock_checked.append(application_id)
+        if self.locked:
+            raise ConflictError("Application is locked for editing in its current state.")
 
     async def delete(self, attachment_id: UUID, *, actor: str) -> None:
         self.deleted = attachment_id
@@ -325,6 +333,52 @@ def test_delete_ok_with_edit_any(
     r = client.delete(f"/api/attachments/{ATT_ID}")
     assert r.status_code == 204
     assert fake_service.deleted == ATT_ID
+
+
+def _as_applicant(app: FastAPI) -> None:
+    app.dependency_overrides[get_current_principal] = lambda: None
+    app.dependency_overrides[get_current_applicant] = lambda: Applicant(
+        application_id=str(APP_ID), scope="edit"
+    )
+
+
+def test_delete_applicant_open_state_ok(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    _as_applicant(app)
+    r = client.delete(f"/api/attachments/{ATT_ID}")
+    assert r.status_code == 204
+    assert fake_service.lock_checked == [APP_ID]
+    assert fake_service.deleted == ATT_ID
+
+
+def test_delete_applicant_locked_state_409(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    # A delete is a data change. In a locked state the applicant can upload, but not
+    # delete (Z1, O4).
+    fake_service.locked = True
+    _as_applicant(app)
+    r = client.delete(f"/api/attachments/{ATT_ID}")
+    assert r.status_code == 409
+    assert not hasattr(fake_service, "deleted")
+
+
+def test_delete_manage_bypasses_lock(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    fake_service.locked = True
+    _as(app, "application.manage")
+    r = client.delete(f"/api/attachments/{ATT_ID}")
+    assert r.status_code == 204
+    assert fake_service.lock_checked == []
+
+
+def test_delete_declares_409(app: FastAPI) -> None:
+    responses = app.openapi()["paths"]["/api/attachments/{attachment_id}"]["delete"][
+        "responses"
+    ]
+    assert list(responses["409"]["content"]) == ["application/problem+json"]
 
 
 # Attachment read covers the same paths as require_app_read, not only the global

@@ -108,7 +108,9 @@ export class StatusTimelineComponent {
 
   /**
    * The applicant can add attachments in locked states too, for example receipts and
-   * invoices after the decision. Only the magic-link scope counts here.
+   * invoices after the decision. Only the magic-link scope counts here. A delete is a
+   * data change: the panel gets `canEdit()` for it, and the backend answers 409 in a
+   * locked state.
    */
   readonly canUploadAttachments = computed(() => this.editScope());
 

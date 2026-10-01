@@ -37,6 +37,7 @@ from app.modules.files.queue import ScanQueue
 from app.modules.files.scanner import ScanVerdict
 from app.modules.files.schemas import AttachmentOut, SignedUrlOut
 from app.modules.files.storage import ObjectStorage, StorageError
+from app.modules.flow.models import State
 from app.settings import Settings, get_settings
 from app.shared.errors import (
     ConflictError,
@@ -320,11 +321,30 @@ class FilesService:
             raise ServiceUnavailableError("Attachment temporarily unavailable.") from exc
         return stream, attachment.filename, attachment.mime, attachment.size
 
+    async def assert_editable(self, application_id: uuid.UUID) -> None:
+        """Make sure that the current state of the application allows data edits.
+
+        The router calls this before an applicant or a creator deletes an attachment.
+        A delete is a data change, like a PATCH. An upload is not, so the upload route
+        does not call it (Z1, O4). An application without a state passes.
+
+        Raises:
+            ConflictError: The current state has ``edit_allowed = false`` (HTTP 409).
+        """
+        edit_allowed = await self.session.scalar(
+            select(State.edit_allowed)
+            .join(Application, Application.current_state_id == State.id)
+            .where(Application.id == application_id)
+        )
+        if edit_allowed is False:
+            raise ConflictError("Application is locked for editing in its current state.")
+
     async def delete(self, attachment_id: uuid.UUID, *, actor: str) -> None:
         """Delete an attachment: the database row, the storage object and an audit entry.
 
-        A missing attachment gives 404. The router checks access (A/P, edit scope). The
-        method removes the storage object as best effort. If the object is already gone,
+        A missing attachment gives 404. The router checks access (A/P, edit scope) and,
+        for an applicant or a creator, the state lock (``assert_editable``). The method
+        removes the storage object as best effort. If the object is already gone,
         the deletion still stands.
         """
         attachment = await self.get_attachment(attachment_id)

@@ -21,9 +21,9 @@ function wire(over: Partial<AttachmentOutWire> = {}): AttachmentOutWire {
   };
 }
 
-async function setup(canUpload = true) {
+async function setup(canUpload = true, canDelete?: boolean) {
   const view = await render(AttachmentsPanelComponent, {
-    inputs: { applicationId: APP_ID, canUpload },
+    inputs: { applicationId: APP_ID, canUpload, canDelete },
     providers: [
       provideHttpClient(),
       provideHttpClientTesting(),
@@ -90,6 +90,24 @@ describe('AttachmentsPanelComponent', () => {
 
     expect(screen.queryByText('plan.pdf')).not.toBeInTheDocument();
     expect(success).toHaveBeenCalled();
+    http.verify();
+  });
+
+  it('uploads but offers no delete when canDelete is false (locked state)', async () => {
+    const { http, detectChanges, fixture } = await setup(true, false);
+    await uploadFile();
+    http.expectOne(uploadUrl).flush(wire(), { status: 201, statusText: 'Created' });
+    detectChanges();
+
+    expect(screen.getByText('plan.pdf')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Anhang löschen' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    // The guards also hold when a caller bypasses the template.
+    const cmp = fixture.componentInstance;
+    cmp.remove(cmp.attachments()[0]);
+    cmp.toggleSelect('att-1', true);
+    cmp.bulkDelete();
+    http.expectNone((r) => r.method === 'DELETE');
     http.verify();
   });
 

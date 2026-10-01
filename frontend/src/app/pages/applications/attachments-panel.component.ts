@@ -67,6 +67,13 @@ export class AttachmentsPanelComponent {
 
   readonly applicationId = input.required<Uuid>();
   readonly canUpload = input(false);
+  /**
+   * Delete is a data change. The backend refuses it for an applicant in a locked state
+   * (409), although an upload works there. Without this input the panel uses
+   * `canUpload`.
+   */
+  readonly canDelete = input<boolean | undefined>(undefined);
+  readonly deleteAllowed = computed(() => this.canDelete() ?? this.canUpload());
 
   readonly attachments = signal<Attachment[]>([]);
   readonly uploading = signal(false);
@@ -214,7 +221,7 @@ export class AttachmentsPanelComponent {
   /** Delete the selected attachments sequentially (concatMap), then clear the selection. */
   bulkDelete(): void {
     const ids = [...this.selected()];
-    if (!ids.length || this.bulkDeleting()) return;
+    if (!this.deleteAllowed() || !ids.length || this.bulkDeleting()) return;
     this.bulkDeleting.set(true);
     let failed = false;
     from(ids)
@@ -346,7 +353,7 @@ export class AttachmentsPanelComponent {
   }
 
   remove(att: Attachment): void {
-    if (this.removingId()) return;
+    if (!this.deleteAllowed() || this.removingId()) return;
     this.removingId.set(att.id);
     this.api.deleteAttachment(att.id).subscribe({
       next: () => {
