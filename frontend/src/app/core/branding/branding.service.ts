@@ -35,6 +35,17 @@ export class BrandingService {
   private readonly _copyright = signal<I18nMap | null>(null);
   private readonly _legalLinks = signal<PublicFooterLink[]>([]);
 
+  /** Default confirmation window of a guest application, in hours. */
+  static readonly DEFAULT_CONFIRM_TTL_HOURS = 12;
+
+  private readonly _confirmTtlHours = signal(BrandingService.DEFAULT_CONFIRM_TTL_HOURS);
+
+  /**
+   * Hours a guest has to confirm the email. The wizard confirmation page shows it.
+   * The value is the backend default (12) until the config is loaded.
+   */
+  readonly confirmTtlHours = this._confirmTtlHours.asReadonly();
+
   /** Footer copyright per locale, or `null` for the built-in co-branding text. */
   readonly copyright = this._copyright.asReadonly();
   /** Maintained footer links; empty means the built-in imprint/privacy pair. */
@@ -67,6 +78,9 @@ export class BrandingService {
         this._configuredName.set(cfg.branding?.appName ?? '');
         this._copyright.set(cfg.branding?.copyright ?? null);
         this._legalLinks.set(cfg.branding?.legalLinks ?? []);
+        if (typeof cfg.confirmTtlHours === 'number' && cfg.confirmTtlHours > 0) {
+          this._confirmTtlHours.set(cfg.confirmTtlHours);
+        }
       },
       error: () => {
         /* Keep everything empty so the i18n default fallbacks stay. */

@@ -51,7 +51,8 @@ description: Admin/config API — gremien, gremium-roles, the OIDC group mapping
 - `GET|POST /api/admin/group-mappings`, `PATCH|DELETE /api/admin/group-mappings/{id}` — OIDC group → global role, NO gremium scope (admin.group_mappings).
 - `GET|POST /api/admin/webhooks`, `PATCH /api/admin/webhooks/{id}` (webhook.manage, list also flow.configure).
 - `GET /api/admin/site-config`, `PUT /api/admin/site-config/draft`, `POST /api/admin/site-config/activate` (admin.site).
-- `GET /api/site-config` (auth-free public branding, `Cache-Control: public, max-age=300`), `GET /api/manifest.webmanifest` (auth-free dynamic PWA manifest).
+- `GET`, `PUT /api/admin/guest-settings` (admin.deadlines) — the single row `guest_application_settings` (Z1): `confirmTtlHours` (1..720) and `linkTtlDays` (null = magic links without expiry, else 1..3650). PUT is a full replacement and writes `config_change` (target `guest_application_settings`, old/new values) WITHOUT a revision, so the audit log offers no revert. The service lives in `applications/guest_settings.py`.
+- `GET /api/site-config` (auth-free public branding plus `confirmTtlHours` for the wizard confirmation page, `Cache-Control: public, max-age=300`), `GET /api/manifest.webmanifest` (auth-free dynamic PWA manifest).
 
 **Conventions & gotchas:**
 - **One permission per admin page.** Migration 0017 split `admin.config` into `admin.gremien/.types/.site/.roles` (`admin.roles` itself predates that migration). A later per-page split added `admin.users/.group_mappings/.gremium_roles/.delegations/.deadlines`. Reads shared across pages use `require_any_permission(...)`, for example `_FLOW_READABLE`, `_ROLES_READ`, and `_GREMIEN_OR_USERS`. Writes always gate on the strict key. The router enforces RBAC through `require_principal`. The FE is UX only.

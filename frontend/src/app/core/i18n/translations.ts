@@ -443,10 +443,10 @@ export const de = {
   'apply.confirm.body':
     'Vielen Dank! Wir haben dir eine E-Mail mit einem persönlichen Link gesendet. Bestätige darüber deine Adresse – erst dann wird dein Antrag eingereicht und sichtbar. Über denselben Link verfolgst du jederzeit den Status und bearbeitest deinen Antrag, ohne dich anzumelden.',
   'apply.confirm.expiry':
-    'Ohne Bestätigung wird dein Antrag nach 12 Stunden automatisch verworfen.',
+    'Ohne Bestätigung wird dein Antrag nach {hours} Stunden automatisch verworfen.',
   'apply.confirm.ref': 'Vorgangsnummer:',
   'apply.confirm.hint':
-    'Keine Mail erhalten? Prüfe den Spam-Ordner. Der Link ist zeitlich begrenzt gültig.',
+    'Keine Mail erhalten? Prüfe den Spam-Ordner. Bewahre den Link vertraulich auf – er öffnet deinen Antrag.',
   'apply.confirm.home': 'Zur Startseite',
 
   // Angemeldete Person: das Backend bestätigt die Adresse schon beim Anlegen.
@@ -1511,6 +1511,8 @@ export const de = {
   'admin.audit.action.webhook_config': 'Webhook-Konfiguration',
   'admin.audit.action.attachment_quarantine': 'Anhang-Quarantäne',
   'admin.audit.action.attachment_delete': 'Anhang gelöscht',
+  'admin.audit.action.application_create': 'Antrag angelegt',
+  'admin.audit.action.guest_application_discard': 'Unbestätigter Antrag verworfen',
   'admin.audit.action.application_update': 'Antrag bearbeitet',
   'admin.audit.action.comment_update': 'Kommentar geändert',
   'admin.audit.action.comment_delete': 'Kommentar gelöscht',
@@ -1569,6 +1571,7 @@ export const de = {
   'admin.audit.targetType.flow': 'Ablauf',
   'admin.audit.targetType.cd_variant': 'Corporate-Design-Variante',
   'admin.audit.targetType.meeting': 'Sitzung',
+  'admin.audit.targetType.guest_application_settings': 'Anträge ohne Konto',
   // Quotation marks around a resolved target name. Each locale brings its own pair.
   'admin.audit.targetQuoted': '„{label}“',
   'admin.audit.msg.login': '{actor} hat sich angemeldet.',
@@ -1624,6 +1627,9 @@ export const de = {
   'admin.audit.msg.attachment_quarantine':
     '{actor} hat einen Anhang in Quarantäne verschoben ({target}).',
   'admin.audit.msg.attachment_delete': '{actor} hat einen Anhang gelöscht ({target}).',
+  'admin.audit.msg.application_create': '{actor} hat den Antrag {target} angelegt.',
+  'admin.audit.msg.guest_application_discard':
+    'Der Antrag {target} wurde ohne bestätigte E-Mail-Adresse verworfen.',
   'admin.audit.msg.application_update': '{actor} hat den Antrag {target} bearbeitet.',
   'admin.audit.msg.comment_update': '{actor} hat einen Kommentar geändert ({target}).',
   'admin.audit.msg.comment_delete': '{actor} hat einen Kommentar gelöscht ({target}).',
@@ -2661,10 +2667,10 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'apply.confirm.body':
     'Thank you! We have sent you an email with a personal link. Use it to confirm your address — only then is your application submitted and visible. The same link lets you track the status and edit your application anytime, without signing in.',
   'apply.confirm.expiry':
-    'Without confirmation, your application is automatically discarded after 12 hours.',
+    'Without confirmation, your application is automatically discarded after {hours} hours.',
   'apply.confirm.ref': 'Reference number:',
   'apply.confirm.hint':
-    'No email received? Check your spam folder. The link is valid for a limited time.',
+    'No email received? Check your spam folder. Keep the link private – it opens your application.',
   'apply.confirm.home': 'Back to start',
 
   // Signed-in submitter: the backend confirms the address at creation time.
@@ -3713,6 +3719,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.audit.action.webhook_config': 'Webhook configuration',
   'admin.audit.action.attachment_quarantine': 'Attachment quarantine',
   'admin.audit.action.attachment_delete': 'Attachment deleted',
+  'admin.audit.action.application_create': 'Application created',
+  'admin.audit.action.guest_application_discard': 'Unconfirmed application discarded',
   'admin.audit.action.application_update': 'Application edited',
   'admin.audit.action.comment_update': 'Comment changed',
   'admin.audit.action.comment_delete': 'Comment deleted',
@@ -3771,6 +3779,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.audit.targetType.flow': 'Workflow',
   'admin.audit.targetType.cd_variant': 'Corporate design variant',
   'admin.audit.targetType.meeting': 'Meeting',
+  'admin.audit.targetType.guest_application_settings': 'Applications without an account',
   'admin.audit.targetQuoted': '“{label}”',
   'admin.audit.msg.login': '{actor} signed in.',
   'admin.audit.msg.status_change': '{actor} changed the status of {target}.',
@@ -3819,6 +3828,9 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.audit.msg.webhook_config': '{actor} configured a webhook ({target}).',
   'admin.audit.msg.attachment_quarantine': '{actor} quarantined an attachment ({target}).',
   'admin.audit.msg.attachment_delete': '{actor} deleted an attachment ({target}).',
+  'admin.audit.msg.application_create': '{actor} created the application {target}.',
+  'admin.audit.msg.guest_application_discard':
+    'The application {target} was discarded without a confirmed email address.',
   'admin.audit.msg.application_update': '{actor} edited the application {target}.',
   'admin.audit.msg.comment_update': '{actor} changed a comment ({target}).',
   'admin.audit.msg.comment_delete': '{actor} deleted a comment ({target}).',

@@ -8,12 +8,17 @@ definitions come from the ``config_schemas`` models. The branding model is
 
 from __future__ import annotations
 
+from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.modules.admin.branding import Branding
 from app.modules.admin.cd_logos import CdBaseVariant, LogoSlot, VendoredLogoName
+from app.modules.applications.models import (
+    DEFAULT_CONFIRM_TTL_HOURS,
+    MAX_CONFIRM_TTL_HOURS,
+)
 from app.shared.config_schemas import ComparisonOffers, EventName, FlowGraph
 from app.shared.i18n import I18nMap
 from app.shared.permissions import PERMISSION_CATALOGUE
@@ -486,7 +491,42 @@ class SiteConfigOut(_CamelModel):
 
 
 class PublicSiteConfigOut(_CamelModel):
-    """Public (auth-free) active branding config for frontend rendering."""
+    """Public (auth-free) active branding config for frontend rendering.
+
+    ``confirmTtlHours`` is the time a guest has to confirm the email. The
+    confirmation page of the wizard shows it.
+    """
 
     version: int
     branding: Branding
+    confirm_ttl_hours: int = Field(
+        default=DEFAULT_CONFIRM_TTL_HOURS, serialization_alias="confirmTtlHours"
+    )
+
+
+# The API caps the link lifetime at ten years. A larger value adds nothing, and a
+# far-future expiry can overflow the datetime arithmetic.
+MAX_LINK_TTL_DAYS = 3650
+
+
+class GuestSettingsOut(_CamelModel):
+    """Settings for applications without an account (Z1).
+
+    ``linkTtlDays`` null means: a new magic link has no expiry.
+    """
+
+    confirm_ttl_hours: int = Field(serialization_alias="confirmTtlHours")
+    link_ttl_days: int | None = Field(serialization_alias="linkTtlDays")
+    updated_at: datetime | None = Field(default=None, serialization_alias="updatedAt")
+    updated_by: str | None = Field(default=None, serialization_alias="updatedBy")
+
+
+class GuestSettingsUpdate(_CamelModel):
+    """Full replacement of the guest settings. Send ``linkTtlDays: null`` for no expiry."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    confirm_ttl_hours: int = Field(
+        alias="confirmTtlHours", ge=1, le=MAX_CONFIRM_TTL_HOURS
+    )
+    link_ttl_days: int | None = Field(alias="linkTtlDays", ge=1, le=MAX_LINK_TTL_DAYS)

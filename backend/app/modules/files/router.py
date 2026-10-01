@@ -288,7 +288,8 @@ async def download_attachment(
 @router.delete(
     "/attachments/{attachment_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    responses=_errors(401, 403, 404),
+    # 409: an applicant or a creator deletes in a locked state.
+    responses=_errors(401, 403, 404, 409),
 )
 async def delete_attachment(
     attachment_id: UUID,
@@ -306,6 +307,12 @@ async def delete_attachment(
     This mirrors ``require_app_edit`` on the upload route on purpose.
     ``application.edit_any`` is a global write permission. It must also delete the same
     attachment. Otherwise RBAC would be inconsistent: upload allowed, delete 404.
+
+    A delete is a data change, not an upload. An applicant and a creator without
+    ``application.manage`` can delete only while the current state has
+    ``edit_allowed``. In a locked state they get 409, as for a PATCH. They can still
+    upload in every state (Z1, O4). ``application.manage`` and
+    ``application.edit_any`` keep the bypass.
     """
     if principal is None and applicant is None:
         raise UnauthorizedError("Authentication required.")
@@ -324,4 +331,6 @@ async def delete_attachment(
         )
     except ForbiddenError as exc:
         raise NotFoundError(f"attachment {attachment_id} not found") from exc
+    if access.principal is None or not access.principal.has(MANAGE_PERMISSION):
+        await service.assert_editable(attachment.application_id)
     await service.delete(attachment_id, actor=access.actor)

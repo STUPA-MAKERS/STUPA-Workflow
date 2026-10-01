@@ -459,6 +459,23 @@ class NotificationSettingsUpdate(WireModel):
     taskReminderRepeatDays: int | None = None
 
 
+class GuestSettingsUpdate(WireModel):
+    confirmTtlHours: int = Field(
+        ge=1, le=720, description="Hours a guest has to confirm the email (1..720)"
+    )
+    # Required on purpose, like in the backend: the PUT replaces both fields, and
+    # null means "no expiry". A default would silently remove the expiry when a
+    # caller changes only confirmTtlHours.
+    linkTtlDays: int | None = Field(
+        ge=1,
+        le=3650,
+        description=(
+            "Lifetime of a new magic link in days. Required: send null for no expiry, "
+            "or the current value from get_guest_settings to keep it"
+        ),
+    )
+
+
 class DelegationCreate(WireModel):
     meetingId: str
     delegateId: str

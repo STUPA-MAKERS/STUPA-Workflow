@@ -9,7 +9,7 @@ description: Backend attachment storage for applications: multipart upload, libm
 
 **Key files:**
 - `router.py` — FastAPI routes: upload, list, signed-url, download stream, delete. The access checks mirror application read and edit. A cross-tenant request gets 404, so there is no existence oracle.
-- `service.py` — `FilesService`: `upload`, `list_for_application`, `get_attachment`, `signed_url`, `download_bytes`, `delete`, `delete_for_application` (GDPR), `finalize_scan` (worker callback). `max_bytes`, `_is_infected`, `_ready_attachment` (quarantine gates).
+- `service.py` — `FilesService`: `upload`, `list_for_application`, `get_attachment`, `signed_url`, `download_bytes`, `assert_editable` (state lock for an applicant or creator delete), `delete`, `delete_for_application` (GDPR), `finalize_scan` (worker callback). `max_bytes`, `_is_infected`, `_ready_attachment` (quarantine gates).
 - `models.py` — `Attachment` ORM model + `MAX_ATTACHMENT_BYTES` (10 MiB) DB CHECK.
 - `schemas.py` — `AttachmentOut` (id/filename/mime/size/scanned/is_comparison_offer), `SignedUrlOut` (url/expiresIn).
 - `mime.py` — libmagic sniff + `ALLOWED_MIME_TYPES` allowlist, `_EXT_TO_MIME` ext↔mime match, `validate_upload`, `sanitize_filename` (path-traversal hardening), `MimeRejected`.
@@ -28,7 +28,7 @@ description: Backend attachment storage for applications: multipart upload, libm
 - `GET /api/applications/{application_id}/attachments` — list the attachments (app-read).
 - `GET /api/attachments/{attachment_id}` — returns `SignedUrlOut` that points at the `/download` route, not at a presigned bucket URL. It gives 409 while the scan runs, 410 for a quarantined or removed file, and 503 without storage.
 - `GET /api/attachments/{attachment_id}/download` — streams the bytes server-side with `Content-Disposition: attachment`. The same gates apply.
-- `DELETE /api/attachments/{attachment_id}` — 204. Open to a principal with `application.manage`, to an applicant in edit scope, and to the logged-in creator.
+- `DELETE /api/attachments/{attachment_id}` — 204. Open to a principal with `application.manage` or `application.edit_any`, to an applicant in edit scope, and to the logged-in creator. The applicant and the creator without `application.manage` get 409 when the current state has `edit_allowed = false` (`FilesService.assert_editable`). A delete is a data change, like a PATCH.
 
 **Conventions & gotchas:**
 - **Fail-closed quarantine** (`_ready_attachment`): an unscanned file (`scanned=false`) gives 409. An infected or removed file (`storage_key is None` or `_is_infected`) gives 410. NEVER loosen or invert the `if not attachment.scanned` check. It would serve unscanned content.
@@ -36,7 +36,7 @@ description: Backend attachment storage for applications: multipart upload, libm
 - **No existence oracle:** an authenticated caller without read access to the application of the attachment gets 404, not 403. The auth check runs before the DB access on the URL, download and delete routes.
 - **Access mirrors application read and edit** (not only the global `application.read`): `_resolve_attachment_read` covers `read_all`, view-applicant, the logged-in creator, and committee-read. See `be-applications`.
 - **Content decides, not the extension:** `validate_upload` needs the sniffed MIME in the allowlist AND a matching `_EXT_TO_MIME` entry for the file extension. OOXML may sniff as `application/zip`, which is allowed only for `.docx/.xlsx/.pptx`. A mismatch or an empty result gives 415.
-- **Upload is NOT edit-locked:** a user may add an attachment in a locked state (submitted or approved, for example a late invoice). The form data stays PATCH-locked elsewhere.
+- **Upload is NOT edit-locked, delete IS:** a user may add an attachment in a locked state (submitted or approved, for example a late invoice). The form data stays PATCH-locked elsewhere. An applicant or creator DELETE in a locked state gives 409, so the receipts and comparison offers of a decided application stay. `application.manage` and `application.edit_any` keep the bypass. The applicant status page shows the delete control only with `canEdit()` (`[canDelete]` on `app-attachments-panel`).
 - **Optional infrastructure degrades safely:** without MinIO an upload gives 503. Without a Redis/arq pool the file stays quarantined, because the scan is never enqueued. The API does not block. The module imports the heavy libraries (`magic`, `minio`, `clamd`) lazily, which keeps them out of the contract CI.
 - **Enqueue is idempotent:** the job id `scan:<attachment_id>` coalesces duplicate enqueues.
 - The quarantine and delete actions write audit rows (`ATTACHMENT_QUARANTINE`, `ATTACHMENT_DELETE`), see `be-audit`. `delete_for_application` (GDPR anonymization) does NOT commit. The caller commits atomically.

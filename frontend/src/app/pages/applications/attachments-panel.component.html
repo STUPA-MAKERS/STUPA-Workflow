@@ -29,7 +29,7 @@
   }
 
   @if (attachments().length) {
-    @if (canUpload()) {
+    @if (deleteAllowed()) {
       <div class="att__bulkbar">
         <app-checkbox
           [ngModel]="allSelected()"
@@ -55,7 +55,7 @@
       @for (att of attachments(); track att.id) {
         <li class="flex items-center justify-between gap-4 pb-3 border-0 border-b border-solid border-line flex-wrap">
           <div class="att__meta">
-            @if (canUpload()) {
+            @if (deleteAllowed()) {
               <app-checkbox
                 [ngModel]="isSelected(att.id)"
                 (ngModelChange)="toggleSelect(att.id, $event)"
@@ -97,7 +97,7 @@
             >
               {{ 'applications.attachments.download' | t }}
             </app-button>
-            @if (canUpload()) {
+            @if (deleteAllowed()) {
               <app-button
                 variant="ghost"
                 size="sm"

@@ -94,15 +94,19 @@ class _FakeService:
     def __init__(self) -> None:
         self.created: object | None = None
         self.created_actor: str | None = None
+        self.created_email_confirmed: bool | None = None
         self.last_include_pii: bool | None = None
         self.comment_args: dict[str, object] | None = None
         self.comment_write_args: dict[str, object] | None = None
         self.session = _FakeAuditSession()
 
-    async def create(self, payload, *, actor="applicant", dispatcher=None):  # noqa: ANN001
+    async def create(  # noqa: ANN001
+        self, payload, *, actor="applicant", dispatcher=None, email_confirmed=None
+    ):
         self.created = payload
         self.created_actor = actor
         self.created_dispatcher = dispatcher
+        self.created_email_confirmed = email_confirmed
         return _FakeApp(uuid4()), str(payload.applicant_email)
 
     async def get(  # noqa: ANN001
@@ -331,6 +335,8 @@ def test_create_application_logged_in_skips_altcha_and_derives_identity(
     assert sent and sent[0][0] == "user@example.org"
     # The route hands the flow action dispatcher to the create, which starts the flow.
     assert fake_service.created_dispatcher is not None
+    # The account email confirms the submission at once.
+    assert fake_service.created_email_confirmed is True
 
 
 def test_create_application_logged_in_explicit_email_on_behalf(
@@ -343,6 +349,26 @@ def test_create_application_logged_in_explicit_email_on_behalf(
     # The explicit value wins over the account derivation (creation for another person).
     assert fake_service.created.applicant_email == "applicant@example.org"  # type: ignore[union-attr]
     assert fake_service.created_actor == "verwalter"
+    # F23: the account does not prove the other address, so it stays unconfirmed.
+    assert fake_service.created_email_confirmed is False
+
+
+def test_create_application_logged_in_same_email_other_case_is_confirmed(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    _login(app, sub="u-8", email="User@Example.org", display_name="U")
+    body = _create_body() | {"applicantEmail": "user@EXAMPLE.org"}
+    r = client.post("/api/applications", json=body)
+    assert r.status_code == 201
+    assert fake_service.created_email_confirmed is True
+
+
+def test_create_application_anonymous_is_unconfirmed(
+    client: TestClient, fake_service: _FakeService
+) -> None:
+    r = client.post("/api/applications", json=_create_body())
+    assert r.status_code == 201
+    assert fake_service.created_email_confirmed is False
 
 
 def test_create_application_oversize_payload_413(

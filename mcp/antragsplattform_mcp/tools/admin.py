@@ -418,6 +418,34 @@ async def update_notification_settings(patch: S.NotificationSettingsUpdate) -> d
 
 
 @group.tool
+async def get_guest_settings() -> dict:
+    """Get the settings for applications without an account.
+
+    `confirmTtlHours` is the time a guest has to confirm the email before the platform
+    discards the application. `linkTtlDays` is the lifetime of a new magic link
+    (null = no expiry). Requires admin.deadlines.
+    """
+    return await api().get("/admin/guest-settings")
+
+
+@group.tool
+async def update_guest_settings(settings: S.GuestSettingsUpdate) -> dict:
+    """Replace the settings for applications without an account.
+
+    Send both fields. `linkTtlDays` is required: `null` gives magic links without an
+    expiry. To keep the current lifetime, read it with `get_guest_settings` first. A new
+    `confirmTtlHours` applies to the waiting applications too. Requires admin.deadlines.
+    """
+    return await api().put(
+        "/admin/guest-settings",
+        json={
+            "confirmTtlHours": settings.confirmTtlHours,
+            "linkTtlDays": settings.linkTtlDays,
+        },
+    )
+
+
+@group.tool
 async def get_notification_preferences() -> dict:
     """Get the notification preferences of the logged-in user."""
     return await api().get("/notifications/preferences")

@@ -15,6 +15,11 @@ idempotent steps:
    tallies the vote and fires the result branch. The close always ends the vote, also
    when the branch is blocked (`branchFired=false`, audit `vote_branch_blocked`), so
    the cron never grabs the same vote again.
+4. Auto-transitions. A confirmed application in a state with an `automatic`
+   transition fires it when the guard passes.
+5. Discard. An application whose email stays unconfirmed longer than
+   `guest_application_settings.confirm_ttl_hours` is deleted, with its MinIO
+   objects and a `guest_application_discard` audit entry without PII.
 
 An unconfirmed guest application (`email_confirmed_at IS NULL`) rests in the flow. The
 reminder, deadline-action and auto-transition scans skip it. The magic-link verify
@@ -30,20 +35,25 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime, timedelta
-from typing import Any, cast
+from typing import Any
 from uuid import UUID
 
-from sqlalchemy import CursorResult, delete, select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.db import get_sessionmaker
+from app.modules.applications.guest_settings import load_guest_settings
 from app.modules.applications.models import Application
+from app.modules.audit.actions import AuditAction
+from app.modules.audit.service import record as audit_record
 from app.modules.auth.principal import Principal
 from app.modules.deadlines.service import (
     DEFAULT_SCAN_LIMIT,
     DeadlineService,
     transition_ref,
 )
+from app.modules.files.models import Attachment
+from app.modules.files.storage import ObjectStorage, StorageError, build_object_storage
 from app.modules.flow.dispatch import ActionDispatcher, build_worker_dispatcher
 from app.modules.flow.models import Transition
 from app.modules.flow.service import FlowService
@@ -58,8 +68,8 @@ from app.shared.errors import ConflictError, NotFoundError
 
 logger = logging.getLogger("app.deadlines")
 
-# The worker deletes guest applications without email confirmation after this window.
-_GUEST_CONFIRM_TTL = timedelta(hours=12)
+# The audit actor of the discard of unconfirmed applications.
+_DISCARD_ACTOR = "system:deadlines"
 
 
 async def on_startup(ctx: dict[str, Any]) -> None:
@@ -135,39 +145,102 @@ async def process_deadlines(ctx: dict[str, Any]) -> str:
     fired = await _process_actions(ctx, settings, now)
     closed = await _process_votes(ctx, now)
     advanced = await _process_auto_transitions(ctx)
-    discarded = await _discard_unconfirmed(ctx, now)
+    discarded = await _discard_unconfirmed(ctx, now, settings)
     return (
         f"reminders={reminded} actions={fired} votes={closed} "
         f"auto={advanced} discarded={discarded}"
     )
 
 
-async def _discard_unconfirmed(ctx: dict[str, Any], now: datetime) -> int:
-    """Delete guest applications that stay unconfirmed past the TTL window.
+async def _discard_unconfirmed(
+    ctx: dict[str, Any], now: datetime, settings: Settings | None = None
+) -> int:
+    """Delete the applications that stay unconfirmed past the confirmation window.
 
-    The delete covers only anonymous (`created_by IS NULL`) and unconfirmed
-    (`email_confirmed_at IS NULL`) applications older than the TTL. Rows that depend
-    on them through a foreign key cascade. The step is idempotent, so a second run
-    finds nothing.
+    The window is `guest_application_settings.confirm_ttl_hours`. The step reads it
+    on every run, so a changed value applies to the waiting applications too (Z1).
+    The step covers every application with `email_confirmed_at IS NULL`, also one
+    that a logged-in person submitted for another email address (F23).
+
+    The order is fixed. The step locks the due rows (`FOR UPDATE SKIP LOCKED`) and
+    reads their attachment storage keys. It deletes the rows (the dependent rows
+    cascade) and writes one `guest_application_discard` audit entry per
+    application, without PII. After the commit it removes the MinIO objects as best
+    effort. A second run finds nothing.
     """
     maker = _sessionmaker(ctx)
-    cutoff = now - _GUEST_CONFIRM_TTL
     async with maker() as session:
-        result = cast(
-            "CursorResult[Any]",
+        ttl_hours = (await load_guest_settings(session)).confirm_ttl_hours
+        cutoff = now - timedelta(hours=ttl_hours)
+        due = (
             await session.execute(
-                delete(Application).where(
-                    Application.created_by.is_(None),
+                select(Application.id, Application.type_id, Application.gremium_id)
+                .where(
                     Application.email_confirmed_at.is_(None),
                     Application.created_at < cutoff,
                 )
-            ),
-        )
+                .order_by(Application.created_at)
+                .limit(DEFAULT_SCAN_LIMIT)
+                .with_for_update(skip_locked=True)
+            )
+        ).all()
+        if not due:
+            return 0
+        ids = [row.id for row in due]
+        attachments = (
+            await session.execute(
+                select(Attachment.application_id, Attachment.storage_key).where(
+                    Attachment.application_id.in_(ids)
+                )
+            )
+        ).all()
+        await session.execute(delete(Application).where(Application.id.in_(ids)))
+        for row in due:
+            await audit_record(
+                session,
+                actor=_DISCARD_ACTOR,
+                action=AuditAction.GUEST_APPLICATION_DISCARD,
+                target_type="application",
+                target_id=str(row.id),
+                data={
+                    "typeId": str(row.type_id),
+                    "gremiumId": str(row.gremium_id) if row.gremium_id else None,
+                    "attachments": sum(
+                        1 for a in attachments if a.application_id == row.id
+                    ),
+                    "confirmTtlHours": ttl_hours,
+                },
+            )
         await session.commit()
-    discarded = result.rowcount or 0
-    if discarded:
-        logger.info("discarded %d unconfirmed guest application(s)", discarded)
-    return discarded
+    keys = [a.storage_key for a in attachments if a.storage_key is not None]
+    await _remove_objects(ctx, settings, keys)
+    logger.info("discarded %d unconfirmed guest application(s)", len(ids))
+    return len(ids)
+
+
+async def _remove_objects(
+    ctx: dict[str, Any], settings: Settings | None, keys: list[str]
+) -> None:
+    """Remove the storage objects of discarded attachments (best effort).
+
+    The rows are already gone. A failed removal leaves an orphan object and a
+    warning in the log, but it does not undo the discard.
+    """
+    if not keys:
+        return
+    storage: ObjectStorage | None = ctx.get("object_storage")
+    if storage is None and settings is not None:
+        storage = build_object_storage(settings)
+    if storage is None:
+        logger.warning(
+            "no object storage: %d object(s) of discarded applications stay", len(keys)
+        )
+        return
+    for key in keys:
+        try:
+            await storage.remove(key)
+        except StorageError:
+            logger.warning("could not remove an object of a discarded application")
 
 
 async def _process_reminders(

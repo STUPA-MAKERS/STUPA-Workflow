@@ -3,6 +3,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs';
 import { AuthService } from '@core/auth/auth.service';
+import { BrandingService } from '@core/branding/branding.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { BadgeComponent } from '@stupa-makers/ui-kit';
 import { CardComponent } from '@stupa-makers/ui-kit';
@@ -37,6 +38,12 @@ export class ApplyConfirmationComponent {
    * contact step and Altcha, and the backend confirms such a submitter immediately.
    */
   protected readonly loggedIn = this.auth.isAuthenticated;
+
+  /**
+   * Hours until an unconfirmed application is discarded. The admin sets the value;
+   * the public site config carries it (`confirmTtlHours`, default 12).
+   */
+  protected readonly confirmTtlHours = inject(BrandingService).confirmTtlHours;
 
   readonly applicationId = toSignal(
     this.route.queryParamMap.pipe(map((p) => p.get('id'))),

@@ -122,7 +122,7 @@
             <!-- Attachments: the same panel as the internal view. Upload also works in
                  locked states, so the applicant can add receipts and invoices later.
                  Only the magic-link edit scope counts, not the state lock. -->
-            <app-attachments-panel [applicationId]="app.id" [canUpload]="canUploadAttachments()" />
+            <app-attachments-panel [applicationId]="app.id" [canUpload]="canUploadAttachments()" [canDelete]="canEdit()" />
           </div>
 
           <!-- RIGHT: comments as a chat, identical to the internal detail view.

@@ -47,6 +47,14 @@ class AuditAction(StrEnum):
     # versions, status events, magic links, comments, budget entries and votes.
     # ``data`` carries only id references and metadata, never raw PII.
     APPLICATION_DELETE = "application_delete"
+    # Application created (F12). ``data`` carries the type, the gremium, the initial
+    # state and whether the email still needs a confirmation. It never carries the
+    # email, the name or a field value.
+    APPLICATION_CREATE = "application_create"
+    # An application without a confirmed email was discarded after
+    # ``guest_application_settings.confirm_ttl_hours`` (Z1). ``data`` carries the
+    # type, the gremium, the attachment count and the window, never PII.
+    GUEST_APPLICATION_DISCARD = "guest_application_discard"
     # Application data edited (PATCH). ``data`` carries the new version number and
     # the keys of the added, removed and changed fields. It never carries a value,
     # because a field value can hold PII. The version diff keeps the values.

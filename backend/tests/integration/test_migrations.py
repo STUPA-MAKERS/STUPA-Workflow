@@ -7,6 +7,7 @@ the default roles. A deleted application cascades to its applicant rows.
 
 from __future__ import annotations
 
+import json
 import uuid
 
 import pytest
@@ -864,4 +865,146 @@ def test_meeting_started_at_and_vote_agenda_fk(
             )
         ).all()
     assert cols == []
+    command.upgrade(alembic_cfg, "head")
+
+
+_SEED_MAGIC_LINK_BODY = {
+    "de": (
+        "Hallo,\n\nüber diesen Link gelangen Sie zu Ihrem Antrag:\n{{ link }}\n\n"
+        "Der Link ist zeitlich begrenzt gültig. Wenn Sie das nicht angefordert "
+        "haben, ignorieren Sie diese Mail.\n"
+    ),
+    "en": (
+        "Hello,\n\nuse this link to access your application:\n{{ link }}\n\n"
+        "The link is valid for a limited time. If you did not request it, "
+        "ignore this email.\n"
+    ),
+}
+
+
+def test_guest_application_settings_and_unlimited_links(
+    alembic_cfg: Config, engine: Engine
+) -> None:
+    """Migration d5569d5542c6 (Z1, O3).
+
+    The upgrade creates the settings row (12 hours, no link expiry), makes
+    `magic_link.expires_at` nullable and allows NULL only for an edit link. The
+    existing links keep their expiry. The downgrade gives a link without an expiry
+    seven days, restores NOT NULL and drops the table.
+    """
+    command.downgrade(alembic_cfg, "eff772f93d8e")
+    with engine.begin() as conn:
+        assert conn.execute(
+            text("SELECT to_regclass('guest_application_settings')")
+        ).scalar_one() is None
+        type_id = _new_type(conn)
+        fv = conn.execute(
+            text(
+                "INSERT INTO form_version (application_type_id, version) "
+                "VALUES (:t, 1) RETURNING id"
+            ),
+            {"t": type_id},
+        ).scalar_one()
+        flv = conn.execute(
+            text("INSERT INTO flow_version (version) VALUES (1) RETURNING id")
+        ).scalar_one()
+        app_id = conn.execute(
+            text(
+                "INSERT INTO application (type_id, form_version_id, flow_version_id) "
+                "VALUES (:t, :fv, :flv) RETURNING id"
+            ),
+            {"t": type_id, "fv": fv, "flv": flv},
+        ).scalar_one()
+        conn.execute(
+            text(
+                "INSERT INTO magic_link (application_id, token_hash, scope, expires_at, "
+                "single_use) VALUES (:a, '\\x01', 'view', "
+                "'2026-06-01 10:00:00+00', true)"
+            ),
+            {"a": app_id},
+        )
+        # The seed text of the magic-link mail. Another template with the same text
+        # must stay as it is.
+        conn.execute(
+            text(
+                "INSERT INTO mail_template (key, body_i18n) VALUES ('magic_link', "
+                "CAST(:b AS jsonb)) ON CONFLICT (key) DO UPDATE SET body_i18n = "
+                "EXCLUDED.body_i18n"
+            ),
+            {"b": json.dumps(_SEED_MAGIC_LINK_BODY)},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO mail_template (key, body_i18n) VALUES ('mig_probe', "
+                "CAST(:b AS jsonb)) ON CONFLICT (key) DO UPDATE SET body_i18n = "
+                "EXCLUDED.body_i18n"
+            ),
+            {"b": json.dumps(_SEED_MAGIC_LINK_BODY)},
+        )
+
+    command.upgrade(alembic_cfg, "head")
+    with engine.begin() as conn:
+        body = conn.execute(
+            text("SELECT body_i18n FROM mail_template WHERE key = 'magic_link'")
+        ).scalar_one()
+        assert "zeitlich begrenzt" not in body["de"]
+        assert "Bewahren Sie den Link vertraulich auf. Er öffnet Ihren Antrag." in body["de"]
+        assert "limited time" not in body["en"]
+        assert "Keep this link private. It opens your application." in body["en"]
+        probe = conn.execute(
+            text("SELECT body_i18n FROM mail_template WHERE key = 'mig_probe'")
+        ).scalar_one()
+        assert probe == _SEED_MAGIC_LINK_BODY
+        row = conn.execute(
+            text(
+                "SELECT id, confirm_ttl_hours, link_ttl_days, updated_by "
+                "FROM guest_application_settings"
+            )
+        ).one()
+        assert tuple(row) == (1, 12, None, None)
+        kept = conn.execute(text("SELECT expires_at FROM magic_link")).scalar_one()
+        assert kept.isoformat().startswith("2026-06-01T10:00")
+        conn.execute(
+            text(
+                "INSERT INTO magic_link (application_id, token_hash, scope, expires_at) "
+                "VALUES (:a, '\\x02', 'edit', NULL)"
+            ),
+            {"a": app_id},
+        )
+    for bad in (
+        "INSERT INTO magic_link (application_id, token_hash, scope, expires_at) "
+        "VALUES (:a, '\\x03', 'view', NULL)",
+        "UPDATE guest_application_settings SET confirm_ttl_hours = 0",
+        "UPDATE guest_application_settings SET confirm_ttl_hours = 721",
+        "UPDATE guest_application_settings SET link_ttl_days = 0",
+        "INSERT INTO guest_application_settings (id) VALUES (2)",
+    ):
+        with pytest.raises(IntegrityError), engine.begin() as conn:
+            conn.execute(text(bad), {"a": app_id})
+
+    command.downgrade(alembic_cfg, "eff772f93d8e")
+    with engine.begin() as conn:
+        assert conn.execute(
+            text("SELECT to_regclass('guest_application_settings')")
+        ).scalar_one() is None
+        nullable = conn.execute(
+            text(
+                "SELECT is_nullable FROM information_schema.columns "
+                "WHERE table_name = 'magic_link' AND column_name = 'expires_at'"
+            )
+        ).scalar_one()
+        assert nullable == "NO"
+        week = conn.execute(
+            text(
+                "SELECT bool_and(expires_at > now() + interval '6 days') "
+                "FROM magic_link WHERE token_hash = '\\x02'"
+            )
+        ).scalar_one()
+        assert week is True
+        conn.execute(text("DELETE FROM magic_link"))
+        body = conn.execute(
+            text("SELECT body_i18n FROM mail_template WHERE key = 'magic_link'")
+        ).scalar_one()
+        assert body == _SEED_MAGIC_LINK_BODY
+        conn.execute(text("DELETE FROM mail_template WHERE key = 'mig_probe'"))
     command.upgrade(alembic_cfg, "head")

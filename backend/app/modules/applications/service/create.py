@@ -21,6 +21,8 @@ from app.modules.applications.service.service_base import (
     _amount_currency,
     _whitelist,
 )
+from app.modules.audit.actions import AuditAction
+from app.modules.audit.service import record as audit_record
 from app.modules.flow.models import FlowVersion, State
 from app.modules.forms.service import FormsService
 from app.modules.forms.validation import AnswerValidationError, validate_answers
@@ -39,6 +41,7 @@ class CreateOps(ApplicationsServiceBase):
         *,
         actor: str = "applicant",
         dispatcher: ActionDispatcher | None = None,
+        email_confirmed: bool | None = None,
     ) -> tuple[Application, str]:
         """Create an application.
 
@@ -60,6 +63,16 @@ class CreateOps(ApplicationsServiceBase):
         A public submission starts unconfirmed and rests in the flow: no deadline,
         no automatic transition and no mail. The magic-link verify starts the flow
         (``auth.service.verify_magic_link``).
+
+        ``email_confirmed`` tells whether the applicant email is already confirmed.
+        The router sets it to False for a logged-in person who enters an email
+        other than the account email (F23). That application then rests like a
+        guest submission. ``None`` keeps the old rule: only a guest submission
+        (``actor == "applicant"``) is unconfirmed.
+
+        The create writes an ``application_create`` audit entry in the same
+        transaction (F12). It holds the type, the gremium, the initial state and
+        the confirmation flag, never PII.
 
         Returns:
             The application and the applicant email, for the magic-link mail.
@@ -83,6 +96,7 @@ class CreateOps(ApplicationsServiceBase):
                 errors=[{"field": e.field, "msg": e.msg} for e in exc.errors],
             ) from exc
 
+        confirmed = actor != "applicant" if email_confirmed is None else email_confirmed
         initial = await self._initial_state(flow_version_id)
         # Store the known field keys only. The code discards an unknown key.
         clean = _whitelist(fields, payload.data)
@@ -101,10 +115,9 @@ class CreateOps(ApplicationsServiceBase):
             # A logged-in submission remembers the creator. An anonymous one
             # stores None.
             created_by=actor if actor != "applicant" else None,
-            # A guest submission starts unconfirmed. It stays invisible until the
-            # magic-link verify, and the platform discards it after 12 h. The mail
-            # of a logged-in submitter counts as confirmed at once.
-            email_confirmed_at=None if actor == "applicant" else datetime.now(UTC),
+            # An unconfirmed submission stays invisible until the magic-link
+            # verify. The worker discards it after `confirm_ttl_hours`.
+            email_confirmed_at=datetime.now(UTC) if confirmed else None,
         )
         self.session.add(app)
         await self.session.flush()
@@ -133,11 +146,25 @@ class CreateOps(ApplicationsServiceBase):
                 actor=actor,
             )
         )
+        await audit_record(
+            self.session,
+            actor=actor,
+            action=AuditAction.APPLICATION_CREATE,
+            target_type="application",
+            target_id=str(app.id),
+            data={
+                "typeId": str(app.type_id),
+                "gremiumId": str(app.gremium_id) if app.gremium_id else None,
+                "initialStateId": str(initial.id),
+                "emailConfirmed": confirmed,
+            },
+        )
         await self.session.commit()
 
         if app.email_confirmed_at is not None:
-            # A logged-in submission is confirmed at once. Start its flow now. A
-            # guest submission waits for the magic-link verify.
+            # A logged-in submission with the account email is confirmed at once.
+            # Start its flow now. Any other submission waits for the magic-link
+            # verify.
             from app.modules.flow.service import FlowService
 
             await FlowService(self.session, dispatcher).start_confirmed(app.id)

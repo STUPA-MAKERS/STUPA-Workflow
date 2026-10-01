@@ -30,6 +30,10 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, CreatedAtMixin, TimestampMixin, UUIDPkMixin
 
+# Guest applications: the default and the upper bound of the confirmation window.
+DEFAULT_CONFIRM_TTL_HOURS = 12
+MAX_CONFIRM_TTL_HOURS = 720
+
 
 class Application(UUIDPkMixin, TimestampMixin, Base):
     """One application.
@@ -173,10 +177,19 @@ class MagicLink(UUIDPkMixin, CreatedAtMixin, Base):
     """Magic link for an applicant.
 
     The database holds only `sha256(token||pepper)`. The plaintext token exists
-    only in the mail link. The scope binds the link to exactly one
-    `application_id` and to `edit` or `view`. The expiry and `single_use`
-    (`used_at`) enforce the one-shot rule. The verify route answers 410 for a
-    used or expired link.
+    only in the mail link. The link binds to exactly one `application_id`.
+
+    A new link always has `scope = 'edit'` and `single_use = false` (O3, O4). The
+    session it opens has no fixed scope: each action checks the current state. The
+    `view` scope and `single_use` stay only for the rows written before that change.
+
+    `expires_at` NULL means "no expiry" (`guest_application_settings.link_ttl_days`
+    is NULL). Only an `edit` link can be unlimited. A link stops working when it
+    expires, when a newer link of the same application is redeemed, or when the
+    application is archived or anonymized. Archiving ends only the existing links:
+    the applicant can still request a new link for an archived application, because
+    an archived application stays readable. Anonymizing removes the email, so no new
+    link is possible. The verify route answers 410 for a used or expired link.
     """
 
     __tablename__ = "magic_link"
@@ -186,7 +199,9 @@ class MagicLink(UUIDPkMixin, CreatedAtMixin, Base):
     )
     token_hash: Mapped[bytes] = mapped_column(LargeBinary)
     scope: Mapped[str] = mapped_column(Text)
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     used_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
@@ -194,10 +209,51 @@ class MagicLink(UUIDPkMixin, CreatedAtMixin, Base):
 
     __table_args__ = (
         CheckConstraint("scope IN ('edit','view')", name="magic_link_scope"),
+        # Only an edit link can live without an expiry. The old short view links
+        # always have one.
+        CheckConstraint(
+            "expires_at IS NOT NULL OR scope = 'edit'",
+            name="magic_link_unlimited_edit_only",
+        ),
         # The UNIQUE index backs the atomic single-use redemption
         # (UPDATE ... WHERE used_at IS NULL). It also prevents an ambiguous hash
         # collision.
         Index("ix_magic_link_token_hash", "token_hash", unique=True),
+    )
+
+
+class GuestApplicationSettings(Base):
+    """Settings for applications without an account (single row id=1).
+
+    `confirm_ttl_hours` is the time a guest has to confirm the email. After it the
+    worker discards the unconfirmed application. The worker reads the value on each
+    run, so a change applies to the waiting applications too.
+
+    `link_ttl_days` is the lifetime of a new magic link. NULL means no expiry.
+    """
+
+    __tablename__ = "guest_application_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    confirm_ttl_hours: Mapped[int] = mapped_column(
+        Integer, server_default="12", default=DEFAULT_CONFIRM_TTL_HOURS
+    )
+    link_ttl_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_by: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (
+        CheckConstraint("id = 1", name="singleton"),
+        CheckConstraint(
+            f"confirm_ttl_hours BETWEEN 1 AND {MAX_CONFIRM_TTL_HOURS}",
+            name="confirm_ttl",
+        ),
+        CheckConstraint(
+            "link_ttl_days IS NULL OR link_ttl_days > 0",
+            name="link_ttl",
+        ),
     )
 
 

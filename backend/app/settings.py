@@ -146,8 +146,11 @@ class Settings(BaseSettings):
     # answers 404.
     mcp_package_dir: str | None = None
 
-    magic_link_edit_ttl_days: int = 7
-    magic_link_action_ttl_minutes: int = 15
+    # The magic-link lifetime is no environment setting any more. It lives in
+    # `guest_application_settings.link_ttl_days` (admin UI, default: no expiry). An old
+    # `.env` that still sets `MAGIC_LINK_EDIT_TTL_DAYS` or
+    # `MAGIC_LINK_ACTION_TTL_MINUTES` keeps starting, because `extra="ignore"` drops
+    # the keys.
 
     # Mail/SMTP. Without `smtp_host` the app sends nothing. The worker logs the mail
     # and drops it, so DEV and the tests run without a real MTA. The password is a

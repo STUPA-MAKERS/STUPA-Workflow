@@ -4,6 +4,7 @@ import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
 import { AuthService } from '@core/auth/auth.service';
+import { BrandingService } from '@core/branding/branding.service';
 import { ApplyConfirmationComponent } from './apply-confirmation.component';
 
 const FULL_ID = '1195a615-3a71-4cfe-9ae0-3ba0c2c4b7e9';
@@ -13,10 +14,13 @@ describe('ApplyConfirmationComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
   afterEach(() => localStorage.clear());
 
-  async function setup(loggedIn = false, id: string | null = FULL_ID) {
+  async function setup(loggedIn = false, id: string | null = FULL_ID, hours?: number) {
     return render(ApplyConfirmationComponent, {
       providers: [
         provideRouter([]),
+        ...(hours === undefined
+          ? []
+          : [{ provide: BrandingService, useValue: { confirmTtlHours: signal(hours) } }]),
         { provide: AuthService, useValue: { isAuthenticated: signal(loggedIn) } },
         {
           provide: ActivatedRoute,
@@ -100,6 +104,13 @@ describe('ApplyConfirmationComponent', () => {
   it('shows an id shorter than 8 characters as it is', async () => {
     await setup(false, 'ab12');
     expect(screen.getByText('AB12')).toBeInTheDocument();
+  });
+
+  // The admin sets the confirmation window; the public site config carries it.
+  it('shows the configured confirmation window instead of the default', async () => {
+    await setup(false, FULL_ID, 48);
+    expect(screen.getByText(/nach 48 Stunden automatisch verworfen/)).toBeInTheDocument();
+    expect(screen.queryByText(/nach 12 Stunden/)).not.toBeInTheDocument();
   });
 
   it('hides the reference line when the query has no id', async () => {
