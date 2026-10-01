@@ -844,6 +844,14 @@ export interface MeetingOutWire {
   activeApplicationId?: Uuid | null;
   /** The agenda item the room handles now. */
   currentAgendaItemId?: Uuid | null;
+  /** Number (1-based, in agenda order) and title of the current agenda item. */
+  currentAgendaItem?: CurrentAgendaItem | null;
+  /** Number of items on the agenda. */
+  agendaItemCount?: number;
+  /** The real start. `null` before the start and for an older meeting. */
+  startedAt?: IsoDateTime | null;
+  /** The close sets it. */
+  closedAt?: IsoDateTime | null;
   gremiumId?: Uuid | null;
   gremiumName?: string | null;
   votes: MeetingVoteOutWire[];
@@ -959,6 +967,13 @@ export interface MeetingVote {
   myBallot?: MyBallot | null;
 }
 
+/** The agenda item the room handles now, as `MeetingOut.currentAgendaItem` sends it. */
+export interface CurrentAgendaItem {
+  /** 1-based number in the agenda order ("TOP 3"). */
+  position: number;
+  title: string | null;
+}
+
 /** Meeting, frontend view. */
 export interface Meeting {
   id: Uuid;
@@ -973,6 +988,15 @@ export interface Meeting {
   activeApplicationId: Uuid | null;
   /** The agenda item the room handles now ("Jetzt"). Followers and the beamer follow it. */
   currentAgendaItemId: Uuid | null;
+  /** Number (1-based, in agenda order) and title of the current agenda item. */
+  currentAgendaItem?: CurrentAgendaItem | null;
+  /** Number of items on the agenda. */
+  agendaItemCount?: number;
+  /** The real start. The start sets it once. `null` before the start, and for a
+   *  meeting that started before the field existed: show the planned start then. */
+  startedAt?: IsoDateTime | null;
+  /** The close sets it. */
+  closedAt?: IsoDateTime | null;
   gremiumId: Uuid | null;
   /** Name of the gremium. The timeline shows it. */
   gremiumName: string | null;

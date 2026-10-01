@@ -20,9 +20,9 @@
     <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.settings.title' | t" [title]="'meetings.settings.title' | t" (click)="openSettings.emit()"><app-icon name="edit" /></app-button>
     <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.delete.title' | t" [title]="'meetings.delete.title' | t" (click)="deleteMeeting.emit()"><app-icon name="delete" /></app-button>
   }
-  <!-- "closed" is terminal, so the close leaves with it. A planned meeting closes
-       too: that is how a meeting that does not take place is put to rest. -->
-  @if (m.canControl && m.status !== 'closed') {
+  <!-- Only a live meeting closes, and "closed" is terminal. A planned meeting that
+       does not take place is deleted, not closed. -->
+  @if (m.canControl && m.status === 'live') {
     <app-button variant="secondary" size="sm" [loading]="finalizing()" [title]="'meetings.control.closeSession' | t" (click)="closeSession.emit()">
       <span class="inline-flex items-center gap-2"><app-icon name="stop" [size]="14" /> {{ 'meetings.control.closeSession' | t }}</span>
     </app-button>
@@ -215,13 +215,13 @@
             class="fx__item"
             [class.fx__item--sel]="top()?.id === item.id"
             [class.fx__item--done]="isDone(i) && item.id !== m.currentAgendaItemId"
-            [attr.draggable]="canEditAgenda()"
+            [attr.draggable]="canChangeAgenda()"
             (dragstart)="dragStart.emit(i)"
             (dragover)="dragOver.emit($event)"
             (drop)="drop.emit(i)"
             (click)="jump(item.id)"
           >
-            @if (canEditAgenda()) {
+            @if (canChangeAgenda()) {
               <span class="cursor-grab text-text-muted" aria-hidden="true">⠿</span>
             }
             <span class="fx__num">{{ i + 1 }}</span>
@@ -253,11 +253,15 @@
             @if (item.nonPublic && m.status === 'closed' && !canEditAgenda()) {
               <app-badge variant="warning">{{ 'meetings.agenda.nonPublic' | t }}</app-badge>
             }
-            @if (canEditAgenda() && !item.applicationId && renamingTopId() !== item.id) {
+            @if (canChangeAgenda() && !item.applicationId && renamingTopId() !== item.id) {
               <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.agenda.rename' | t" [title]="'meetings.agenda.rename' | t" [disabled]="savingAgenda()" (click)="$event.stopPropagation(); startRename.emit(item)"><app-icon name="edit" /></app-button>
             }
+            <!-- An item with an open or closed vote stays on the agenda (409
+                 `agenda_item_has_vote`), so its remove is disabled with the reason. -->
+            @if (canChangeAgenda()) {
+              <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" [title]="(hasRecordedVote(item.id) ? 'meetings.agenda.removeBlocked' : 'admin.common.remove') | t" [disabled]="savingAgenda() || hasRecordedVote(item.id)" (click)="$event.stopPropagation(); removeFromAgenda.emit(item.id)"><app-icon name="delete" /></app-button>
+            }
             @if (canEditAgenda()) {
-              <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" [disabled]="savingAgenda()" (click)="$event.stopPropagation(); removeFromAgenda.emit(item.id)"><app-icon name="delete" /></app-button>
               <app-checkbox class="fx__np" [ngModel]="item.nonPublic === true" [disabled]="savingAgenda()" (ngModelChange)="setNonPublic.emit({ item, nonPublic: $event })" (click)="$event.stopPropagation()">{{ 'meetings.agenda.nonPublic' | t }}</app-checkbox>
             }
           </li>
@@ -265,7 +269,7 @@
           <li class="fx__empty text-text-muted">{{ 'meetings.agenda.empty' | t }}</li>
         }
       </ol>
-      @if (canEditAgenda()) {
+      @if (canChangeAgenda()) {
         <div class="fx__add">
           <p class="fx__addH">{{ 'meetings.agenda.assignHeading' | t }}</p>
           <div class="fx__addRow">
@@ -373,7 +377,8 @@
           @if (pendingResult()?.id === vote.id && editable()) {
             <app-button size="sm" (click)="insertResult(vote)">{{ 'meetings.dock.insertResult' | t }}</app-button>
           }
-          @if (m.canManageVotes && !locked()) {
+          <!-- A closed meeting keeps its votes as part of the record (409 `meeting_closed`). -->
+          @if (m.canManageVotes && !locked() && m.status !== 'closed') {
             <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.vote.delete' | t" [title]="'meetings.vote.delete' | t" [disabled]="deletingVote() === vote.id" (click)="voteDelete.emit(vote.id)"><app-icon name="delete" /></app-button>
           }
         </div>

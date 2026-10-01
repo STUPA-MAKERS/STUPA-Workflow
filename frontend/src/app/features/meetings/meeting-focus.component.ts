@@ -189,6 +189,14 @@ export class MeetingFocusComponent {
     () => this.protocol() !== null && !this.locked() && this.canEdit(),
   );
   protected readonly canEditAgenda = computed(() => this.meeting().canWrite && !this.locked());
+  /**
+   * Change the agenda structure: add, rename, reorder and remove. Only a planned or
+   * live meeting allows it (the server answers 409 `meeting_closed` otherwise). The
+   * `nonPublic` flag stays open after the close, while the protocol is a draft.
+   */
+  protected readonly canChangeAgenda = computed(
+    () => this.canEditAgenda() && this.meeting().status !== 'closed',
+  );
 
   protected readonly votes = computed<MeetingVote[]>(() => {
     const t = this.top();
@@ -311,6 +319,11 @@ export class MeetingFocusComponent {
 
   protected votesFor(topId: Uuid): MeetingVote[] {
     return this.meeting().votes.filter((v) => v.agendaItemId === topId);
+  }
+
+  /** An open or closed vote is part of the record and keeps its item on the agenda. */
+  protected hasRecordedVote(topId: Uuid): boolean {
+    return this.votesFor(topId).some((v) => v.status === 'open' || v.status === 'closed');
   }
 
   /** An item before "now" in the agenda order counts as handled. */

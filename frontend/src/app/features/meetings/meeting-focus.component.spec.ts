@@ -437,10 +437,18 @@ describe('MeetingFocusComponent', () => {
       expect(screen.getByText(/Zwischenstand sichtbar/)).toBeInTheDocument();
     });
 
-    it('lets the lead close a planned meeting that does not take place', async () => {
+    it('offers no close on a planned meeting: one that does not take place is deleted', async () => {
       const { on } = await setup({ meeting: meeting({ status: 'planned' }), protocol: null });
-      await userEvent.click(screen.getByRole('button', { name: 'Sitzung schließen' }));
-      expect(on.closeSession).toHaveBeenCalled();
+      expect(screen.queryByRole('button', { name: 'Sitzung schließen' })).toBeNull();
+      await userEvent.click(screen.getByRole('button', { name: 'Sitzung löschen' }));
+      expect(on.deleteMeeting).toHaveBeenCalled();
+    });
+
+    it('keeps the votes of a closed meeting: no vote delete after the close', async () => {
+      const closed = vote({ status: 'closed', result: 'passed', counts: { yes: 3 } });
+      await setup({ meeting: meeting({ status: 'closed', votes: [closed] }) });
+      expect(screen.getByText('Angenommen')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Beschlussfrage löschen' })).toBeNull();
     });
 
     it('points back to now when the open item is not the one the room handles', async () => {
@@ -631,6 +639,35 @@ describe('MeetingFocusComponent', () => {
       const popover = screen.getByRole('dialog', { name: 'Tagesordnung' });
       expect(within(popover).queryByPlaceholderText(/Freitext-TOP/)).toBeNull();
       expect(within(popover).queryByRole('button', { name: 'Entfernen' })).toBeNull();
+    });
+
+    it('keeps only the non-public flag once the meeting is closed', async () => {
+      await setup({ meeting: meeting({ status: 'closed' }) });
+      await userEvent.click(screen.getByTitle('Tagesordnung öffnen'));
+      const popover = screen.getByRole('dialog', { name: 'Tagesordnung' });
+      expect(within(popover).queryByPlaceholderText(/Freitext-TOP/)).toBeNull();
+      expect(within(popover).queryByRole('button', { name: 'Entfernen' })).toBeNull();
+      expect(within(popover).queryByRole('button', { name: 'TOP umbenennen' })).toBeNull();
+      expect(within(popover).getAllByRole('listitem')[0].getAttribute('draggable')).toBe('false');
+      // The protocol is still a draft, so the flag for the public PDF stays open.
+      expect(within(popover).getAllByRole('checkbox')).toHaveLength(AGENDA.length);
+    });
+
+    it('disables the remove of an item with an open or closed vote and says why', async () => {
+      const votes = [
+        vote({ agendaItemId: 't-1', status: 'closed', result: 'passed' }),
+        vote({ id: 'v-2', agendaItemId: 't-2', status: 'cancelled' }),
+        vote({ id: 'v-3', agendaItemId: 't-3', status: 'open' }),
+      ];
+      await setup({ meeting: meeting({ votes }) });
+      await userEvent.click(screen.getByTitle('Tagesordnung öffnen'));
+      const popover = screen.getByRole('dialog', { name: 'Tagesordnung' });
+      const removes = within(popover).getAllByRole('button', { name: 'Entfernen' });
+      expect(removes[0]).toBeDisabled();
+      expect(removes[0].getAttribute('title')).toMatch(/bleibt auf der Tagesordnung/);
+      // A cancelled vote goes with its item.
+      expect(removes[1]).not.toBeDisabled();
+      expect(removes[2]).toBeDisabled();
     });
 
     it('shows the empty agenda hint', async () => {

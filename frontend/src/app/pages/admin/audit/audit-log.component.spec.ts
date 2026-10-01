@@ -376,6 +376,13 @@ describe('AuditLogComponent', () => {
       'vote_close',
       'vote_cancel',
       'vote_branch_blocked',
+      'meeting_create',
+      'meeting_update',
+      'meeting_delete',
+      'agenda_item_add',
+      'agenda_item_update',
+      'agenda_item_remove',
+      'agenda_reorder',
     ] as const;
     for (const action of fresh) {
       // Every one of them is in the catalog, so the filter offers it.
@@ -389,6 +396,11 @@ describe('AuditLogComponent', () => {
     expect(cmp.targetTypeLabel('fiscal_year')).toBe('Haushaltsjahr');
     expect(cmp.targetTypeLabel('protocol')).toBe('Protokoll');
     expect(cmp.targetTypeLabel('comment')).toBe('Kommentar');
+    expect(cmp.targetTypeLabel('meeting')).toBe('Sitzung');
+    expect(cmp.targetLink(entry(2, { targetType: 'meeting', targetId: 'm-1' }))).toEqual([
+      '/meetings',
+      'm-1',
+    ]);
   });
 
   it('targetTypeLabel localizes known types and echoes unknown ones', async () => {

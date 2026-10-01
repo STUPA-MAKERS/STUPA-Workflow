@@ -1285,11 +1285,52 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.meeting()).toBeNull();
     });
 
-    it('reports an error on a failed status change', async () => {
+    it('reports an error on a failed status change and reloads the meeting', async () => {
+      const { cmp, http, fixture } = await loaded();
+      cmp.meeting.set({ ...cmp.meeting()!, status: 'planned', protokollantId: 'pr-9' });
+      cmp.setStatus('live');
+      http
+        .expectOne('/api/meetings/m-1')
+        .flush(
+          { detail: 'a meeting cannot change from closed to live', code: 'invalid_status_transition' },
+          { status: 409, statusText: 'Conflict' },
+        );
+      const toasts = fixture.debugElement.injector.get(ToastService).toasts();
+      expect(toasts.map((t) => t.message)).toContain(
+        'Aktion fehlgeschlagen.: a meeting cannot change from closed to live',
+      );
+      http.expectOne('/api/meetings/m-1').flush({ ...MEETING, status: 'closed' });
+      expect(cmp.meeting()!.status).toBe('closed');
+    });
+
+    it('offers only planned → live → closed', async () => {
       const { cmp, http } = await loaded();
+      // A live meeting does not start again, and a planned one does not close.
+      cmp.setStatus('live');
       cmp.meeting.set({ ...cmp.meeting()!, status: 'planned', protokollantId: 'pr-9' });
       cmp.setStatus('closed');
-      http.expectOne('/api/meetings/m-1').flush(null, { status: 500, statusText: 'e' });
+      cmp.closeMeeting();
+      http.verify();
+    });
+
+    it('keeps the protocol a draft when the close meets an open vote', async () => {
+      const { cmp, http, fixture } = await loaded();
+      cmp.setStatus('closed');
+      http
+        .expectOne('/api/meetings/m-1')
+        .flush(
+          { detail: 'a vote of this meeting is still open', code: 'open_vote' },
+          { status: 409, statusText: 'Conflict' },
+        );
+      const toasts = fixture.debugElement.injector.get(ToastService).toasts();
+      expect(toasts.map((t) => t.message)).toContain(
+        'Eine Abstimmung der Sitzung ist noch offen. Bitte die Abstimmung zuerst schließen oder abbrechen.',
+      );
+      // Only the quiet reload follows: no protocol save and no finalize.
+      http.expectOne('/api/meetings/m-1').flush(MEETING);
+      expect(http.match('/api/protocols/p-1')).toHaveLength(0);
+      expect(cmp.meeting()!.status).toBe('live');
+      http.verify();
     });
 
     it('sets the active application', async () => {
@@ -1585,8 +1626,16 @@ describe('MeetingsComponent — methods', () => {
       cmp.deleteVote('v-1'); // deletingVote → return
       cmp.deletingVote.set(null);
       cmp.deleteVote('v-1');
-      http.expectOne('/api/meetings/m-1/votes/v-1').flush(null, { status: 500, statusText: 'e' });
+      http
+        .expectOne('/api/meetings/m-1/votes/v-1')
+        .flush(
+          { detail: 'the meeting is closed', code: 'meeting_closed' },
+          { status: 409, statusText: 'Conflict' },
+        );
       expect(cmp.deletingVote()).toBeNull();
+      // The refusal reloads the meeting, which may have closed in another tab.
+      http.expectOne('/api/meetings/m-1').flush({ ...MEETING, status: 'closed' });
+      expect(cmp.meeting()!.status).toBe('closed');
     });
   });
 

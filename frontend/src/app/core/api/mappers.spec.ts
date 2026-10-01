@@ -450,6 +450,30 @@ describe('mapMeeting', () => {
     } as unknown as MeetingOutWire;
     expect(mapMeeting(wire).votes).toEqual([]);
   });
+
+  it('maps the agenda summary and the real start, with defaults (A2, Z7)', () => {
+    const base = {
+      id: 'm-3',
+      title: 'Sitzung',
+      status: 'live',
+      votes: [],
+      createdAt: '2026-06-12T17:00:00Z',
+    } as MeetingOutWire;
+    const empty = mapMeeting(base);
+    expect(empty.currentAgendaItem).toBeNull();
+    expect(empty.agendaItemCount).toBe(0);
+    expect(empty.startedAt).toBeNull();
+    expect(empty.closedAt).toBeNull();
+    const full = mapMeeting({
+      ...base,
+      currentAgendaItem: { position: 2, title: 'Haushalt' },
+      agendaItemCount: 5,
+      startedAt: '2026-06-12T17:04:00Z',
+    });
+    expect(full.currentAgendaItem).toEqual({ position: 2, title: 'Haushalt' });
+    expect(full.agendaItemCount).toBe(5);
+    expect(full.startedAt).toBe('2026-06-12T17:04:00Z');
+  });
 });
 
 describe('mapProtocol', () => {
