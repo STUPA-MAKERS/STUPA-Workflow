@@ -64,7 +64,8 @@ class _FakeService:
     async def create(self, application_id, payload, principal):  # noqa: ANN001
         return _vote_out("draft")
 
-    async def open(self, vote_id, *, now):  # noqa: ANN001
+    async def open(self, vote_id, *, now, actor=None):  # noqa: ANN001
+        self.open_actor = actor
         return _vote_out("open")
 
     async def get(self, vote_id):  # noqa: ANN001
@@ -91,7 +92,8 @@ class _FakeService:
     async def close(self, vote_id, principal):  # noqa: ANN001
         return VoteClosed(id=vote_id, result="passed", tally=_TALLY)
 
-    async def cancel(self, vote_id):  # noqa: ANN001
+    async def cancel(self, vote_id, *, now=None, actor=None):  # noqa: ANN001
+        self.cancel_actor = actor
         return _vote_out("cancelled")
 
     async def delete_standalone(self, vote_id, *, actor):  # noqa: ANN001
@@ -155,11 +157,13 @@ def test_create_ok(app: FastAPI, client: TestClient) -> None:
     assert r.json()["status"] == "draft"
 
 
-def test_open_ok(app: FastAPI, client: TestClient) -> None:
+def test_open_ok(app: FastAPI, client: TestClient, fake_service: _FakeService) -> None:
     _as_manager(app)
     r = client.post(f"/api/votes/{uuid4()}/open")
     assert r.status_code == 200
     assert r.json()["status"] == "open"
+    # F12: the router passes the caller as the audit actor.
+    assert fake_service.open_actor == "p"
 
 
 def test_close_ok(app: FastAPI, client: TestClient) -> None:
@@ -189,7 +193,9 @@ def test_cancel_missing_perm_403(app: FastAPI, client: TestClient) -> None:
     assert client.post(f"/api/votes/{uuid4()}/cancel").status_code == 403
 
 
-def test_cancel_ok_broadcasts(app: FastAPI, client: TestClient) -> None:
+def test_cancel_ok_broadcasts(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
     from app.modules.livevote.publisher import get_meeting_publisher
 
     class _Pub:
@@ -206,6 +212,7 @@ def test_cancel_ok_broadcasts(app: FastAPI, client: TestClient) -> None:
     assert r.status_code == 200
     assert r.json()["status"] == "cancelled"
     assert len(pub.cancelled) == 1
+    assert fake_service.cancel_actor == "p"
 
 
 # ballot: the gremium `vote.cast`. The service checks the group.

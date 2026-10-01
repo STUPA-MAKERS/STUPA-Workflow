@@ -9,8 +9,15 @@ Operations:
   the application on the agenda of that meeting in the same transaction.
 * `FlowService.auto_advance` — fire the first automatic transition whose guard holds.
   The worker or cron calls it in a cycle with `manual=False`.
-* `FlowService.fire_branch` — fire the `pass` or `fail` exit of a `vote` state. The
-  voting module calls it when it closes a vote.
+* `FlowService.stage_branch` — stage the `pass` or `fail` exit of a `vote` state
+  without a commit. The voting module calls it in a SAVEPOINT when it closes a vote,
+  and commits the close and the transition once.
+
+A transition without a branch, a forced status and an audit revert leave the current
+state. They cancel the votes of the application that cannot finish any more
+(`VotingService.cancel_for_application`, F19 and F22). After the commit the engine
+sends `vote_cancelled` for each cancelled meeting vote through the optional
+`MeetingPublisher`.
 
 Edit lock: it comes from `state.edit_allowed` of the target state. The `patch` path
 checks the lock and returns 409. The engine handles this inline and dispatches nothing.
@@ -18,8 +25,10 @@ checks the lock and returns 409. The engine handles this inline and dispatches n
 
 from __future__ import annotations
 
+import logging
+from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID
 
 from sqlalchemy import CursorResult, delete, select, update
@@ -53,6 +62,11 @@ from app.shared.errors import (
     ValidationProblem,
 )
 from app.shared.guards import GuardContext, eval_guard, guard_requires_applicant
+
+if TYPE_CHECKING:
+    from app.modules.livevote.publisher import MeetingPublisher
+
+logger = logging.getLogger("app.flow")
 
 
 def _guard_fires_on_deadline(guard: Any, *, negated: bool = False) -> bool:
@@ -116,14 +130,43 @@ def _meeting_problem(msg: str) -> ValidationProblem:
     )
 
 
+@dataclass(frozen=True, slots=True)
+class StagedFire:
+    """A transition that `stage_fire` wrote into the open transaction.
+
+    The caller commits. `after_commit` then materializes the deadline of the new
+    state, publishes the cancelled votes and dispatches the actions.
+    """
+
+    application: Application
+    transition: Transition
+    to_state_id: UUID
+    status_event_id: UUID
+    # The agenda item came in the same transaction. The engine does not run the
+    # `addToNextSession` action again.
+    agenda_added: bool
+    # The votes that the transition cancelled. Their `vote_cancelled` events go out
+    # after the commit.
+    cancelled_vote_ids: tuple[UUID, ...]
+
+
 class FlowService:
-    """Engine bound to an `AsyncSession` and an `ActionDispatcher`."""
+    """Engine bound to an `AsyncSession` and an `ActionDispatcher`.
+
+    `publisher` sends `vote_cancelled` for the meeting votes that a state change
+    cancels. Without it no event goes out, and a live client sees the change on its
+    next reload.
+    """
 
     def __init__(
-        self, session: AsyncSession, dispatcher: ActionDispatcher | None = None
+        self,
+        session: AsyncSession,
+        dispatcher: ActionDispatcher | None = None,
+        publisher: MeetingPublisher | None = None,
     ) -> None:
         self.session = session
         self.dispatcher: ActionDispatcher = dispatcher or NullActionDispatcher()
+        self.publisher = publisher
 
     async def _load_app(self, application_id: UUID) -> Application:
         app = (
@@ -431,31 +474,99 @@ class FlowService:
         *,
         note: str | None = None,
     ) -> TransitionResult:
-        """Fire the `pass` or `fail` transition of the current `vote` state.
+        """Fire the `pass` or `fail` transition of the current `vote` state and commit.
+
+        The vote close does not use this method. It stages the branch with
+        `stage_branch` in a SAVEPOINT and commits the close once.
 
         Raises:
             NotFoundError: No matching branch transition exists (404).
+            ConflictError: The guard fails, or another transition won the race (409).
+        """
+        staged = await self.stage_branch(
+            application_id, branch, principal, note=note, rollback_on_conflict=True
+        )
+        await self.session.commit()
+        return await self.after_commit(staged)
+
+    async def stage_branch(
+        self,
+        application_id: UUID,
+        branch: str,
+        principal: Principal,
+        *,
+        note: str | None = None,
+        rollback_on_conflict: bool = False,
+    ) -> StagedFire:
+        """Stage the `pass` or `fail` transition of the current `vote` state.
+
+        The method does not commit. By default it does not roll back either: the voting
+        module runs it in a SAVEPOINT (`session.begin_nested()`). On an error only the
+        SAVEPOINT rolls back, and the vote close still commits (F20). After the commit
+        the caller runs `after_commit`.
+
+        Raises:
+            NotFoundError: No matching branch transition exists (404).
+            ConflictError: The guard fails, or another transition won the race (409).
         """
         t = await self.branch_transition(application_id, branch)
         if t is None:
             raise NotFoundError(
                 f"no '{branch}' transition from the application's current state"
             )
-        return await self.fire(
-            application_id, t.id, principal, note=note or branch, manual=False
+        return await self.stage_fire(
+            application_id,
+            t.id,
+            principal,
+            note=note or branch,
+            manual=False,
+            rollback_on_conflict=rollback_on_conflict,
         )
 
-    async def _cancel_open_votes(self, application_id: UUID) -> None:
-        """Cancel the open votes of the application (`open` becomes `cancelled`)."""
+    async def _cancel_votes(
+        self,
+        application_id: UUID,
+        *,
+        actor: str,
+        keep_drafts_for_state: UUID | None = None,
+    ) -> tuple[UUID, ...]:
+        """Cancel the votes of the application that the state change orphans.
+
+        The votes are the open votes and the draft votes. A draft whose
+        `opens_state_id` is `keep_drafts_for_state` (the state the application
+        enters) stays, because it belongs to that state. The method does not commit.
+
+        Returns:
+            The ids of the cancelled votes.
+        """
         # Local import: `voting.service` imports FlowService. A module-level import here
         # would create a cycle.
-        from app.modules.voting.models import Vote
+        from app.modules.voting.service import VotingService
 
-        await self.session.execute(
-            update(Vote)
-            .where(Vote.application_id == application_id, Vote.status == "open")
-            .values(status="cancelled")
+        votes = await VotingService(self.session).cancel_for_application(
+            application_id,
+            now=datetime.now(UTC),
+            actor=actor,
+            keep_drafts_for_state=keep_drafts_for_state,
         )
+        return tuple(v.id for v in votes)
+
+    async def _publish_cancelled(self, vote_ids: tuple[UUID, ...]) -> None:
+        """Send `vote_cancelled` for each cancelled vote, after the commit.
+
+        The publisher drops a vote without a meeting. A broker fault must not fail
+        the committed state change, so the method only logs it.
+        """
+        if self.publisher is None or not vote_ids:
+            return
+        from app.modules.voting.service import VotingService
+
+        voting = VotingService(self.session)
+        for vote_id in vote_ids:
+            try:
+                await self.publisher.vote_cancelled(await voting.get(vote_id))
+            except Exception:  # noqa: BLE001 - the broadcast is best effort
+                logger.warning("vote_cancelled broadcast failed (vote=%s)", vote_id)
 
     async def fire(
         self,
@@ -488,6 +599,46 @@ class FlowService:
                 transition won the race (409).
             ValidationProblem: `meeting_id` does not fit the transition (422).
         """
+        staged = await self.stage_fire(
+            application_id,
+            transition_id,
+            principal,
+            note=note,
+            deadline_passed=deadline_passed,
+            manual=manual,
+            as_applicant=as_applicant,
+            meeting_id=meeting_id,
+            non_public=non_public,
+        )
+        await self.session.commit()
+        return await self.after_commit(staged)
+
+    async def stage_fire(
+        self,
+        application_id: UUID,
+        transition_id: UUID,
+        principal: Principal,
+        *,
+        note: str | None = None,
+        deadline_passed: bool | None = None,
+        manual: bool = True,
+        as_applicant: bool = False,
+        meeting_id: UUID | None = None,
+        non_public: bool = False,
+        rollback_on_conflict: bool = True,
+    ) -> StagedFire:
+        """Write a transition into the open transaction, without a commit.
+
+        `fire` documents the arguments. `rollback_on_conflict=False` leaves a lost race
+        to the caller: the voting close runs this in a SAVEPOINT, and a full rollback
+        there would also drop the staged vote close.
+
+        Raises:
+            NotFoundError: The application or the transition does not exist (404).
+            ConflictError: The state does not match, the guard fails, or another
+                transition won the race (409).
+            ValidationProblem: `meeting_id` does not fit the transition (422).
+        """
         app = await self._load_app(application_id)
         transition = await self._load_transition(transition_id)
 
@@ -499,8 +650,9 @@ class FlowService:
                 code="conflict",
             )
         # Only the vote outcome fires a branch transition, the pass or fail exit of a
-        # vote state. It arrives through fire_branch with manual=False. A user must never
-        # fire one directly, because that would set the vote outcome without a vote.
+        # vote state. It arrives through stage_branch with manual=False. A user must
+        # never fire one directly, because that would set the vote outcome without a
+        # vote.
         if manual and transition.branch is not None:
             raise ConflictError(
                 "Branch transitions are fired by the vote outcome, not manually.",
@@ -534,7 +686,8 @@ class FlowService:
             ),
         )
         if result.rowcount != 1:
-            await self.session.rollback()
+            if rollback_on_conflict:
+                await self.session.rollback()
             raise ConflictError(
                 "Concurrent transition detected; application state changed.",
                 code="conflict",
@@ -553,12 +706,16 @@ class FlowService:
         status_event_id = event.id
 
         # A non-branch exit is a manual vote cancel or an automatic deadline exit from a
-        # vote state. It cancels the open votes of the application in the same
-        # transaction. Otherwise a vote would stay open and its close() would find no
-        # branch in the new state, which gives 409 and an open vote forever. A
-        # vote-outcome branch cancels nothing, because close() already closed the vote.
+        # vote state. It cancels the open and draft votes of the application in the
+        # same transaction (F19). Otherwise a vote would stay open and its close()
+        # would find no branch in the new state, and a draft could open later outside
+        # its vote state. A vote-outcome branch cancels nothing, because close()
+        # already closed the vote.
+        cancelled: tuple[UUID, ...] = ()
         if transition.branch is None:
-            await self._cancel_open_votes(app.id)
+            cancelled = await self._cancel_votes(
+                app.id, actor=principal.sub, keep_drafts_for_state=to_state_id
+            )
 
         # Audit trail: record the status change append-only in the same transaction as
         # the state change, so both stay atomic. The entry holds id references only, no
@@ -579,37 +736,63 @@ class FlowService:
         )
         if meeting_id is not None:
             await self._add_to_agenda_in_tx(app.id, meeting_id, non_public=non_public)
-        await self.session.commit()
+        return StagedFire(
+            application=app,
+            transition=transition,
+            to_state_id=to_state_id,
+            status_event_id=status_event_id,
+            agenda_added=meeting_id is not None,
+            cancelled_vote_ids=cancelled,
+        )
 
-        # Materialize the deadline of the new state. If the state carries a named
-        # deadline policy, this creates a due deadline that the cron fires.
-        to_state = await self._load_state(to_state_id)
+    async def schedule_staged_deadline(
+        self, staged: StagedFire, *, commit: bool = True
+    ) -> None:
+        """Materialize the deadline of the state that a staged transition enters.
+
+        If the state carries a named deadline policy, this creates a due deadline that
+        the cron fires. `commit=False` keeps it in the open transaction, so the vote
+        close commits it together with the transition.
+        """
+        to_state = await self._load_state(staged.to_state_id)
         if to_state is not None:
-            await self.session.refresh(app)
-            await self.schedule_state_deadline(app, to_state)
+            await self.session.refresh(staged.application)
+            await self.schedule_state_deadline(staged.application, to_state, commit=commit)
 
-        # After the commit: dispatch the worker actions. They are idempotent and
-        # retryable.
+    async def after_commit(
+        self, staged: StagedFire, *, schedule_deadline: bool = True
+    ) -> TransitionResult:
+        """Run the work that follows the commit of a staged transition.
+
+        The work is the deadline of the new state (unless the caller already staged
+        it, `schedule_deadline=False`), the `vote_cancelled` events and the worker
+        actions. The actions are idempotent and retryable.
+        """
+        if schedule_deadline:
+            await self.schedule_staged_deadline(staged)
+        await self._publish_cancelled(staged.cancelled_vote_ids)
+        transition = staged.transition
+        app_id = staged.application.id
         dispatched = build_dispatched_actions(
             transition.actions,
-            application_id=app.id,
+            application_id=app_id,
             transition_id=transition.id,
-            status_event_id=status_event_id,
+            status_event_id=staged.status_event_id,
         )
-        if meeting_id is not None:
+        if staged.agenda_added:
             # The agenda item is already in place. Do not add it a second time.
             dispatched = [a for a in dispatched if a.type != "addToNextSession"]
         dispatched += build_implicit_notifications(
             transition.actions,
-            application_id=app.id,
+            application_id=app_id,
             transition_id=transition.id,
-            status_event_id=status_event_id,
+            status_event_id=staged.status_event_id,
         )
         await self.dispatcher.dispatch(dispatched)
 
         return TransitionResult(
-            newStateId=to_state_id,
-            statusEventId=status_event_id,
+            newStateId=staged.to_state_id,
+            statusEventId=staged.status_event_id,
             dispatchedActions=[a.type for a in dispatched],
         )
 
@@ -678,9 +861,14 @@ class FlowService:
         application then sits in a different state row. The method writes a reversed
         `StatusEvent` without a transition and a `status_change` audit entry. That entry
         is itself revertable, which gives a redo. The method also re-materializes the
-        deadline of the restored state. It deliberately undoes no side effect of the
-        original change, such as cancelled votes or fired webhooks and mails. The revert
-        touches only the state.
+        deadline of the restored state.
+
+        The application leaves `to_state_id`, so the method cancels its votes like a
+        transition without a branch does (F22): the open votes and the draft votes that
+        do not belong to the restored state. Otherwise a vote of an undone vote state
+        stays open, and every close gives 409. The method deliberately undoes no other
+        side effect of the original change: a cancelled vote stays cancelled, and fired
+        webhooks and mails stay sent.
 
         Returns:
             The id of the new status event.
@@ -721,6 +909,9 @@ class FlowService:
         self.session.add(event)
         await self.session.flush()
         status_event_id = event.id
+        cancelled = await self._cancel_votes(
+            app.id, actor=actor, keep_drafts_for_state=from_state_id
+        )
         # Audit as a reversed status_change, so the revert is itself revertable (redo).
         await AuditService(self.session).record(
             actor=actor,
@@ -744,6 +935,7 @@ class FlowService:
         if restored_state is not None:
             await self.session.refresh(app)
             await self.schedule_state_deadline(app, restored_state)
+        await self._publish_cancelled(cancelled)
         return status_event_id
 
     async def list_states(self, application_id: UUID) -> list[StateOut]:
@@ -793,8 +985,10 @@ class FlowService:
         and no `from_state` adjacency check. It mirrors the direct state flip of
         `revert_status`: an optimistic-locked `UPDATE`, a `StatusEvent` without a
         transition, and a `status_change` audit entry marked `forced`. That audit entry
-        is itself revertable. The method also cancels the open votes, so a vote state
-        that you leave by force does not hang open. It then re-materializes the deadline.
+        is itself revertable. The method also cancels the open votes and the draft votes
+        that do not belong to the target state (F19), so a vote state that you leave by
+        force does not hang open. It then re-materializes the deadline and sends
+        `vote_cancelled` for the cancelled meeting votes.
         It deliberately sends no applicant notification and no task notification, and it
         fires no webhook. A manual override stays silent.
 
@@ -850,8 +1044,11 @@ class FlowService:
         status_event_id = event.id
         # The force leaves a state that may be a vote state. Cancel the open votes so
         # that none hangs open. Its close() would otherwise find no branch in the new
-        # state and the vote would stay open forever.
-        await self._cancel_open_votes(app.id)
+        # state and the vote would stay open forever. Cancel the drafts of the old
+        # state too, so that none opens later outside its vote state.
+        cancelled = await self._cancel_votes(
+            app.id, actor=principal.sub, keep_drafts_for_state=target_state_id
+        )
         # Audit as a forced status_change with id references only, no PII and no raw
         # note. The entry carries both state ids, so the audit log can revert it and undo
         # a mistake.
@@ -876,6 +1073,7 @@ class FlowService:
         if to_state is not None:
             await self.session.refresh(app)
             await self.schedule_state_deadline(app, to_state)
+        await self._publish_cancelled(cancelled)
         return TransitionResult(
             newStateId=target_state_id,
             statusEventId=status_event_id,

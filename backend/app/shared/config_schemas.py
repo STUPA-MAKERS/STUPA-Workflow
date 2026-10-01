@@ -443,12 +443,18 @@ class Quorum(_CamelModel):
 
 
 class VoteConfig(_CamelModel):
+    """The rules of one vote, stored as JSONB in ``vote.config``.
+
+    A ballot can never change after the cast (O11), so the config has no
+    ``allowChange``. Migration ``vote_closed_at`` removes the key from the old rows,
+    because ``extra=forbid`` refuses it.
+    """
+
     options: list[str] = Field(min_length=2)
     majority_rule: Literal["simple", "absolute", "two_thirds"] = Field(alias="majorityRule")
     quorum: Quorum | None = None
     abstain_counts_quorum: bool = Field(default=True, alias="abstainCountsQuorum")
     secret: bool = False
-    allow_change: bool = Field(default=True, alias="allowChange")
     tie_break: Literal["passed", "rejected", "tie"] = Field(default="rejected", alias="tieBreak")
 
     @field_validator("options")

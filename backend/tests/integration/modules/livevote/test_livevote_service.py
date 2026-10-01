@@ -49,7 +49,7 @@ from app.shared.errors import BadRequestError, ConflictError
 pytestmark = pytest.mark.integration
 
 _CONFIG = VoteConfig.model_validate(
-    {"options": ["yes", "no"], "majorityRule": "simple", "allowChange": False}
+    {"options": ["yes", "no"], "majorityRule": "simple"}
 )
 
 

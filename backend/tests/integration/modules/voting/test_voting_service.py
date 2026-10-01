@@ -3,10 +3,11 @@
 The test uses a real Postgres from testcontainers and a real schema. It checks
 data-model section 5.3 and flows section 4.
 
-`UNIQUE(vote,voter)` turns a double vote into a 409. `allowChange` lets a voter update
-the ballot until the vote closes. The secret path writes `voted_marker` and
+`UNIQUE(vote,voter)` turns a double vote into a 409 `already_voted`: a ballot never
+changes after the cast (O11). The secret path writes `voted_marker` and
 `secret_ballot` without a link to the identity. The percent quorum comes from the
-eligible snapshot. `close` computes the `result` and fires `flow.fire(result_branch)`.
+eligible snapshot. `close` computes the `result` and fires the result branch in the
+same transaction.
 """
 
 from __future__ import annotations
@@ -34,7 +35,6 @@ from app.modules.auth.principal import Principal
 from app.modules.auth.rbac import vote_group_key
 from app.modules.flow.dispatch import DispatchedAction
 from app.modules.flow.models import FlowVersion, State, Transition
-from app.modules.flow.service import FlowService
 from app.modules.forms.schemas import FormVersionCreate
 from app.modules.forms.service import FormsService
 from app.modules.voting.models import Ballot, SecretBallot, Vote, VotedMarker
@@ -159,31 +159,19 @@ def _voter(sub: str, vote: Vote) -> Principal:
 
 async def test_double_vote_conflict_409(session: AsyncSession) -> None:
     app, _ = await _seed(session)
-    vote = await _make_vote(session, app, allowChange=False)
+    vote = await _make_vote(session, app)
     svc = VotingService(session)
     await svc.open(vote.id, now=NOW)
 
     assert (await svc.cast(vote.id, _voter("v1", vote), "yes", now=NOW)).status == "cast"
-    with pytest.raises(ConflictError):
+    with pytest.raises(ConflictError) as ei:
         await svc.cast(vote.id, _voter("v1", vote), "no", now=NOW)
-    count = (await session.execute(
-        select(func.count()).select_from(Ballot).where(Ballot.vote_id == vote.id)
-    )).scalar_one()
-    assert count == 1
-
-
-async def test_allow_change_updates_ballot(session: AsyncSession) -> None:
-    app, _ = await _seed(session)
-    vote = await _make_vote(session, app, allowChange=True)
-    svc = VotingService(session)
-    await svc.open(vote.id, now=NOW)
-
-    await svc.cast(vote.id, _voter("v1", vote), "yes", now=NOW)
-    assert (await svc.cast(vote.id, _voter("v1", vote), "no", now=NOW)).status == "changed"
+    assert ei.value.code == "already_voted"
+    # O11: the first ballot stays as it was.
     rows = (await session.execute(
         select(Ballot.choice).where(Ballot.vote_id == vote.id)
     )).scalars().all()
-    assert rows == ["no"]  # one row, updated in place
+    assert rows == ["yes"]
 
 
 async def test_not_in_group_forbidden(session: AsyncSession) -> None:
@@ -208,8 +196,9 @@ async def test_secret_vote_unlinks_choice_from_voter(session: AsyncSession) -> N
     await svc.cast(vote.id, _voter("v1", vote), "yes", now=NOW)
     await svc.cast(vote.id, _voter("v2", vote), "no", now=NOW)
     # The secret path also rejects a double vote with a 409.
-    with pytest.raises(ConflictError):
+    with pytest.raises(ConflictError) as ei:
         await svc.cast(vote.id, _voter("v1", vote), "no", now=NOW)
+    assert ei.value.code == "already_voted"
 
     markers = (await session.execute(
         select(VotedMarker.voter_sub).where(VotedMarker.vote_id == vote.id)
@@ -296,51 +285,6 @@ async def test_close_branches_to_flow(
     assert vote_row.result == result
 
 
-async def test_close_atomic_rolls_back_on_fire_failure(
-    session: AsyncSession, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Keep the vote open when `fire` fails during the close.
-
-    The session dependency rolls back, so the vote never gets stuck. A stuck vote is
-    closed but never fired its branch.
-    """
-    app, states = await _seed(session)
-    vote = await _make_vote(session, app)
-    # Hold the ids before the rollback. The rollback expires the ORM objects, so a
-    # later attribute access would start synchronous lazy IO.
-    app_id, vote_id = app.id, vote.id
-    voting_state_id, approved_state_id = states["voting"].id, states["approved"].id
-    svc = VotingService(session)
-    await svc.open(vote_id, now=NOW)
-    await svc.cast(vote_id, _voter("v1", vote), "yes", now=NOW)
-
-    async def _boom(*_a: object, **_k: object) -> object:
-        raise ConflictError("forced", code="guard_failed")
-
-    monkeypatch.setattr(FlowService, "fire", _boom)
-    closer = Principal(sub="mgr")
-    with pytest.raises(ConflictError):
-        await svc.close(vote_id, closer)
-    await session.rollback()  # emulates get_session on an exception
-
-    vote_row = await session.get(Vote, vote_id)
-    assert vote_row is not None
-    await session.refresh(vote_row)
-    assert vote_row.status == "open"
-    assert vote_row.result is None
-
-    refreshed = await session.get(Application, app_id)
-    assert refreshed is not None
-    await session.refresh(refreshed)
-    assert refreshed.current_state_id == voting_state_id
-
-    # The close is repeatable once `fire` works again.
-    monkeypatch.undo()
-    out = await svc.close(vote_id, closer)
-    assert out.result == "passed"
-    assert out.new_state_id == approved_state_id
-
-
 async def test_concurrent_cast_same_voter_exactly_one_wins(
     migrated: tuple[str, str], session: AsyncSession
 ) -> None:
@@ -351,7 +295,7 @@ async def test_concurrent_cast_same_voter_exactly_one_wins(
     application logic.
     """
     app, _ = await _seed(session)
-    vote = await _make_vote(session, app, allowChange=False)
+    vote = await _make_vote(session, app)
     await VotingService(session).open(vote.id, now=NOW)
 
     eng = create_async_engine(migrated[1])

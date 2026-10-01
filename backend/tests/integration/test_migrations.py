@@ -630,3 +630,139 @@ def test_drop_vote_notification_kind(
     with engine.begin() as conn:
         conn.execute(text("DELETE FROM principal WHERE id = :p"), {"p": pid})
         conn.execute(text("DELETE FROM mail_template WHERE key = 'meeting_created'"))
+
+
+def test_vote_closed_at_backfill_and_allow_change_strip(
+    alembic_cfg: Config, engine: Engine, capfd: pytest.CaptureFixture[str]
+) -> None:
+    """Migration 863a6833fea5 adds `vote.closed_at` (Z9, O10, O11, O18).
+
+    The upgrade backfills `closed_at` from the `status_change` audit entry of the result
+    branch, at or after the open time, and keeps NULL where the audit log has no such
+    entry. It removes `allowChange` from every vote config and reports the meeting
+    votes with the result `tie`. The downgrade drops the column.
+    """
+    command.downgrade(alembic_cfg, "1a9feecb23a5")
+    with engine.begin() as conn:
+        type_id = _new_type(conn)
+        fv = conn.execute(
+            text(
+                "INSERT INTO form_version (application_type_id, version) "
+                "VALUES (:t, 1) RETURNING id"
+            ),
+            {"t": type_id},
+        ).scalar_one()
+        flv = conn.execute(
+            text("INSERT INTO flow_version (version) VALUES (1) RETURNING id")
+        ).scalar_one()
+        voting, approved = (
+            conn.execute(
+                text(
+                    "INSERT INTO state (flow_version_id, key) VALUES (:f, :k) RETURNING id"
+                ),
+                {"f": flv, "k": key},
+            ).scalar_one()
+            for key in ("voting", "approved")
+        )
+        branch = conn.execute(
+            text(
+                "INSERT INTO transition (flow_version_id, from_state_id, to_state_id, "
+                "branch) VALUES (:f, :a, :b, 'pass') RETURNING id"
+            ),
+            {"f": flv, "a": voting, "b": approved},
+        ).scalar_one()
+        app_id = conn.execute(
+            text(
+                "INSERT INTO application (type_id, form_version_id, flow_version_id) "
+                "VALUES (:t, :fv, :flv) RETURNING id"
+            ),
+            {"t": type_id, "fv": fv, "flv": flv},
+        ).scalar_one()
+
+        def _vote(status: str, config: str, **cols: object) -> uuid.UUID:
+            names = ", ".join(["eligible_group", "config", "status", *cols])
+            values = ", ".join([":g", "CAST(:c AS jsonb)", ":s", *(f":{k}" for k in cols)])
+            return conn.execute(
+                text(f"INSERT INTO vote ({names}) VALUES ({values}) RETURNING id"),  # noqa: S608
+                {"g": "g", "c": config, "s": status, **cols},
+            ).scalar_one()
+
+        opened = "2026-06-01 10:00:00+00"
+        fired = _vote(
+            "closed",
+            '{"options": ["yes", "no"], "majorityRule": "simple", "allowChange": false}',
+            application_id=app_id,
+            result_branch_transition_id=branch,
+            opens_at=opened,
+            result="passed",
+        )
+        no_audit = _vote(
+            "closed",
+            '{"options": ["yes", "no"], "majorityRule": "simple"}',
+            application_id=app_id,
+            opens_at=opened,
+            result="rejected",
+        )
+        gremium = conn.execute(
+            text(
+                "INSERT INTO gremium (name, slug) VALUES ('G', :s) RETURNING id"
+            ),
+            {"s": f"g-closed-at-{uuid.uuid4()}"},
+        ).scalar_one()
+        meeting = conn.execute(
+            text("INSERT INTO meeting (gremium_id, title) VALUES (:g, 'M') RETURNING id"),
+            {"g": gremium},
+        ).scalar_one()
+        tie = _vote(
+            "closed",
+            '{"options": ["yes", "no"], "majorityRule": "simple", "allowChange": true}',
+            meeting_id=meeting,
+            result="tie",
+        )
+        running = _vote("open", '{"options": ["yes", "no"], "majorityRule": "simple"}')
+        # Two status changes of the branch: one BEFORE the open (an older vote of the
+        # same application) and the real one. The backfill takes the first one at or
+        # after the open time.
+        for at in ("2026-05-01 09:00:00+00", "2026-06-01 10:07:00+00",
+                   "2026-06-01 11:00:00+00"):
+            conn.execute(
+                text(
+                    "INSERT INTO audit_entry (actor, action, target_type, target_id, at, "
+                    "data, hash) VALUES ('mgr', 'status_change', 'application', :a, "
+                    ":at, CAST(:d AS jsonb), '\\x00')"
+                ),
+                {"a": str(app_id), "at": at,
+                 "d": f'{{"transitionId": "{branch}"}}'},
+            )
+
+    capfd.readouterr()
+    command.upgrade(alembic_cfg, "head")
+    report = capfd.readouterr().err
+    with engine.connect() as conn:
+        rows = {
+            r[0]: (r[1], r[2])
+            for r in conn.execute(
+                text("SELECT id, closed_at, config FROM vote")
+            ).all()
+        }
+    closed_at, config = rows[fired]
+    assert closed_at is not None
+    assert closed_at.isoformat().startswith("2026-06-01T10:07")
+    assert "allowChange" not in config
+    assert rows[no_audit][0] is None
+    assert rows[running][0] is None
+    assert "allowChange" not in rows[tie][1]
+    assert "1 vote(s) backfilled" in report
+    assert "removed allowChange from the config of 2 vote(s)" in report
+    assert str(tie) in report and "'tie'" in report
+
+    command.downgrade(alembic_cfg, "1a9feecb23a5")
+    with engine.connect() as conn:
+        cols = conn.execute(
+            text(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name = 'vote' AND column_name = 'closed_at'"
+            )
+        ).all()
+    assert cols == []
+    command.upgrade(alembic_cfg, "head")

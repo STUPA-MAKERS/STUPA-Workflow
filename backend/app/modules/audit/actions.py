@@ -63,6 +63,16 @@ class AuditAction(StrEnum):
     PROTOCOL_DELETE = "protocol_delete"
     # Vote removed before it ever opened. A vote with ballots is not deletable.
     VOTE_DELETE = "vote_delete"
+    # Vote lifecycle (F12). ``data`` carries id references and aggregates only, never
+    # a voter: VOTE_CLOSE holds the result and the counts per option. VOTE_CANCEL
+    # holds the reason (a person cancelled, or the application left the vote state).
+    # VOTE_BRANCH_BLOCKED records a close whose pass or fail transition did not fire
+    # (the guard failed, or the state has no such transition). The vote then stays
+    # closed and the application stays in its state.
+    VOTE_OPEN = "vote_open"
+    VOTE_CLOSE = "vote_close"
+    VOTE_CANCEL = "vote_cancel"
+    VOTE_BRANCH_BLOCKED = "vote_branch_blocked"
     # GDPR/PII: access (Art. 15), erasure/anonymization (Art. 17), retention
     # (Art. 5(1)(e)) plus the erasure-request queue. ``data`` carries only
     # id/email references and metadata, never raw PII values.

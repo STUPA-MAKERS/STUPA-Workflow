@@ -219,9 +219,15 @@ def test_fire_applicant_transition_ok(
 def test_di_factories_build_real_objects() -> None:
     assert isinstance(get_action_dispatcher(), NullActionDispatcher)
     dispatcher = NullActionDispatcher()
-    service = get_flow_service(session=object(), dispatcher=dispatcher)  # type: ignore[arg-type]
+    publisher = object()
+    service = get_flow_service(
+        session=object(),  # type: ignore[arg-type]
+        dispatcher=dispatcher,
+        publisher=publisher,  # type: ignore[arg-type]
+    )
     assert isinstance(service, FlowService)
     assert service.dispatcher is dispatcher
+    assert service.publisher is publisher
 
 
 def test_openapi_declares_flow_error_responses(client: TestClient) -> None:

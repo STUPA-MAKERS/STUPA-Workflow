@@ -15,8 +15,10 @@ The beamer is read-only. It receives only `meeting_state`, `vote_opened`,
 beamer gets `read_only`.
 
 Cast: the distributed lock `vote:{id}:cast:{sub}` serializes the casts of one
-voter. `VotingService.cast` then runs. The cast is idempotent, because a unique
-constraint in the database backs it. The handler broadcasts `vote_tally`.
+voter. `VotingService.cast` then runs. A unique constraint in the database backs
+the cast. A ballot never changes after the cast (O11): a second cast gets the error
+frame `already_voted`, the same code as the REST 409. The handler broadcasts
+`vote_tally`.
 
 Disconnect: `WebSocketDisconnect` tears both tasks down. The broker context
 manager closes the subscription.

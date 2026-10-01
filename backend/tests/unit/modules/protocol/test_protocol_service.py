@@ -78,7 +78,6 @@ def _vote(**over: Any) -> SimpleNamespace:
             "options": ["yes", "no", "abstain"],
             "majorityRule": "simple",
             "secret": False,
-            "allowChange": True,
             "tieBreak": "rejected",
             "abstainCountsQuorum": True,
             "quorum": None,
@@ -86,6 +85,7 @@ def _vote(**over: Any) -> SimpleNamespace:
         "eligible_count": 10,
         "opens_at": None,
         "closes_at": None,
+        "closed_at": None,
         "status": "closed",
         "result": "passed",
     }

@@ -304,12 +304,24 @@ async def test_fire_default_dispatcher_when_none() -> None:
 
 # fire cancels the open votes on a non-branch exit.
 def _vote_cancel_updates(db) -> list:
-    """Return the `UPDATE vote` statements of the session that cancel open votes."""
+    """Return the locking `SELECT ... FROM vote` statements that load the votes to cancel."""
     return [
         s
         for s in db.statements
-        if getattr(getattr(s, "table", None), "name", None) == "vote"
+        if "FROM vote" in str(s) and "FOR UPDATE" in str(s)
     ]
+
+
+def _open_vote(application_id: object, *, status: str = "open", opens_state_id: object = None):
+    return SimpleNamespace(
+        id=uuid4(),
+        application_id=application_id,
+        meeting_id=None,
+        eligible_group="g",
+        status=status,
+        opens_state_id=opens_state_id,
+        closed_at=None,
+    )
 
 
 async def test_fire_manual_exit_cancels_open_votes() -> None:
@@ -321,13 +333,61 @@ async def test_fire_manual_exit_cancels_open_votes() -> None:
     flow_id, voting, aborted = uuid4(), uuid4(), uuid4()
     app = _app(voting, flow_id)
     abort = _transition(flow_id=flow_id, from_id=voting, to_id=aborted)
-    db = fake_session(result(app), result(abort), result(rowcount=1))
+    vote = _open_vote(app.id)
+    draft = _open_vote(app.id, status="draft")
+    # A draft of the state the application enters stays (it belongs to that state).
+    kept = _open_vote(app.id, status="draft", opens_state_id=aborted)
+    db = fake_session(
+        result(app), result(abort), result(rowcount=1), result(vote, draft, kept)
+    )
     res = await FlowService(db, _Recorder()).fire(app.id, abort.id, _principal())
     assert res.new_state_id == aborted
     updates = _vote_cancel_updates(db)
     assert len(updates) == 1
     compiled = str(updates[0])
     assert "status" in compiled and "application_id" in compiled
+    assert vote.status == "cancelled" and vote.closed_at is not None
+    assert draft.status == "cancelled" and draft.closed_at is not None
+    assert kept.status == "draft" and kept.closed_at is None
+
+
+async def test_fire_publishes_vote_cancelled_after_commit() -> None:
+    """F19: each cancelled vote goes out as `vote_cancelled`. A broker fault is logged."""
+    flow_id, voting, aborted = uuid4(), uuid4(), uuid4()
+    app = _app(voting, flow_id)
+    abort = _transition(flow_id=flow_id, from_id=voting, to_id=aborted)
+    first, second = _open_vote(app.id), _open_vote(app.id)
+    db = fake_session(
+        result(app), result(abort), result(rowcount=1), result(first, second)
+    )
+
+    class _Pub:
+        def __init__(self) -> None:
+            self.sent: list[object] = []
+
+        async def vote_cancelled(self, vote: object) -> None:
+            if not self.sent:
+                self.sent.append(vote)
+                raise RuntimeError("broker down")
+            self.sent.append(vote)
+
+    loaded: list[object] = []
+
+    async def _get(_self: object, vote_id: object) -> object:
+        loaded.append(vote_id)
+        return vote_id
+
+    from app.modules.voting.service import VotingService
+
+    pub = _Pub()
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(VotingService, "get", _get)
+        await FlowService(db, _Recorder(), pub).fire(  # type: ignore[arg-type]
+            app.id, abort.id, _principal()
+        )
+    assert loaded == [first.id, second.id]
+    assert pub.sent == [first.id, second.id]
+    assert db.committed >= 1
 
 
 async def test_fire_branch_exit_does_not_cancel_votes() -> None:
@@ -480,7 +540,7 @@ async def test_fire_materializes_deadline_of_entered_state() -> None:
     to_state = SimpleNamespace(id=review, config={})  # no policy key, so schedule only commits
     db = fake_session(
         result(app), result(t), result(rowcount=1),  # _load_app, _load_transition, UPDATE
-        result(), result(), result(),  # _cancel_open_votes + audit (lock, prev-hash)
+        result(), result(), result(),  # vote cancel SELECT + audit (lock, prev-hash)
         result(to_state),  # _load_state(to_state)
         result(),  # schedule_state_deadline: DELETE of the old deadlines
     )
@@ -690,9 +750,9 @@ async def test_revert_status_reschedules_restored_state_deadline() -> None:
     to_id, from_id = uuid4(), uuid4()
     app = _app(to_id, uuid4())
     restored = SimpleNamespace(id=from_id, config={})
-    # _load_app, UPDATE, record(lock, prev), _load_state→restored.
+    # _load_app, UPDATE, vote cancel SELECT, record(lock, prev), _load_state→restored.
     db = fake_session(
-        result(app), result(rowcount=1), result(), result(), result(restored)
+        result(app), result(rowcount=1), result(), result(), result(), result(restored)
     )
     await FlowService(db).revert_status(
         app.id, from_state_id=from_id, to_state_id=to_id, actor="admin",
@@ -708,11 +768,7 @@ def _target_state(state_id: object, flow_id: object) -> SimpleNamespace:
 
 
 def _vote_cancel_stmts(db) -> list:
-    return [
-        s
-        for s in db.statements
-        if getattr(getattr(s, "table", None), "name", None) == "vote"
-    ]
+    return _vote_cancel_updates(db)
 
 
 async def test_force_status_no_current_state_conflicts() -> None:
@@ -785,7 +841,7 @@ async def test_force_status_happy_writes_event_audit_and_cancels_votes() -> None
     to_state = SimpleNamespace(id=target_id, config={})  # no policy key, schedule only commits
     db = fake_session(
         result(app), result(target), result(rowcount=1),  # _load_app, _load_state, UPDATE
-        result(), result(), result(),  # _cancel_open_votes + audit (lock, prev-hash)
+        result(), result(), result(),  # vote cancel SELECT + audit (lock, prev-hash)
         result(to_state),  # _load_state(to_state)
         result(),  # schedule_state_deadline: DELETE of the old deadlines
     )
@@ -802,7 +858,7 @@ async def test_force_status_happy_writes_event_audit_and_cancels_votes() -> None
     assert event.transition_id is None
     assert event.actor == "mgr-1"
     assert event.note == "admin override"
-    # One UPDATE vote cancels the open votes.
+    # One locking SELECT loads the votes to cancel.
     assert len(_vote_cancel_stmts(db)) == 1
 
 
@@ -890,7 +946,7 @@ async def test_fire_with_meeting_adds_in_tx_and_skips_the_action(
     monkeypatch.setattr(FlowService, "_add_to_agenda_in_tx", _add)
     db = fake_session(
         result(app), result(t), result(rowcount=1),  # _load_app, _load_transition, UPDATE
-        result(), result(), result(),  # _cancel_open_votes + audit (lock, prev-hash)
+        result(), result(), result(),  # vote cancel SELECT + audit (lock, prev-hash)
     )
     rec = _Recorder()
     res = await FlowService(db, rec).fire(
@@ -1020,3 +1076,44 @@ async def test_add_to_agenda_in_tx(
         with pytest.raises(ValidationProblem):
             await svc._add_to_agenda_in_tx(app_id, meeting_id, non_public=False)  # noqa: SLF001
         assert db.rolled_back == 1
+
+
+async def test_stage_branch_race_leaves_the_rollback_to_the_savepoint() -> None:
+    """F20: a lost race in the vote close does not roll back the whole transaction.
+
+    The vote close stages its branch in a SAVEPOINT. A full rollback here would also
+    drop the staged vote close, so `stage_branch` raises without a rollback.
+    """
+    flow_id, voting = uuid4(), uuid4()
+    app = _app(voting, flow_id)
+    passed = _transition(flow_id=flow_id, from_id=voting, to_id=uuid4(), branch="pass")
+    db = fake_session(
+        result(app),  # branch_transition: _load_app
+        result(passed),  # branch_transition: the pass exit
+        result(app),  # stage_fire: _load_app
+        result(passed),  # stage_fire: _load_transition
+        result(rowcount=0),  # the optimistic UPDATE lost the race
+    )
+    with pytest.raises(ConflictError):
+        await FlowService(db, _Recorder()).stage_branch(app.id, "pass", _principal())
+    assert db.rolled_back == 0
+    assert db.committed == 0
+
+
+async def test_after_commit_can_skip_the_deadline() -> None:
+    """The vote close already staged the deadline, so `after_commit` skips it."""
+    flow_id, voting, approved = uuid4(), uuid4(), uuid4()
+    app = _app(voting, flow_id)
+    passed = _transition(flow_id=flow_id, from_id=voting, to_id=approved, branch="pass")
+    staged = flow_service.StagedFire(
+        application=app,  # type: ignore[arg-type]
+        transition=passed,  # type: ignore[arg-type]
+        to_state_id=approved,
+        status_event_id=uuid4(),
+        agenda_added=False,
+        cancelled_vote_ids=(),
+    )
+    db = fake_session()
+    res = await FlowService(db, _Recorder()).after_commit(staged, schedule_deadline=False)
+    assert res.new_state_id == approved
+    assert db.statements == []  # no state load, no deadline query

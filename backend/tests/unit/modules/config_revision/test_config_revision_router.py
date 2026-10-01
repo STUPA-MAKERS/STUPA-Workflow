@@ -150,7 +150,7 @@ def test_audit_revert_delegates_to_revert_service(monkeypatch: pytest.MonkeyPatc
     seen: list[Principal | None] = []
 
     class _FakeRevert:
-        def __init__(self, _session: Any) -> None: ...
+        def __init__(self, _session: Any, _publisher: Any = None) -> None: ...
 
         async def revert(
             self, entry_id: int, _actor: str, principal: Principal | None = None

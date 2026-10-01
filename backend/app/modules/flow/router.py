@@ -23,6 +23,7 @@ from app.modules.flow.schemas import (
     TransitionResult,
 )
 from app.modules.flow.service import FlowService
+from app.modules.livevote.publisher import MeetingPublisher, get_meeting_publisher
 from app.shared.errors import ProblemDetail
 
 router = APIRouter(tags=["flow"])
@@ -55,8 +56,11 @@ def get_action_dispatcher() -> ActionDispatcher:
 def get_flow_service(
     session: DbSession,
     dispatcher: Annotated[ActionDispatcher, Depends(get_action_dispatcher)],
+    # A transition that leaves a vote state cancels its votes. The publisher sends
+    # `vote_cancelled` to the live clients of the meeting.
+    publisher: Annotated[MeetingPublisher, Depends(get_meeting_publisher)],
 ) -> FlowService:
-    return FlowService(session, dispatcher)
+    return FlowService(session, dispatcher, publisher)
 
 
 ServiceDep = Annotated[FlowService, Depends(get_flow_service)]
