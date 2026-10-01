@@ -528,13 +528,14 @@ class FlowService:
         application_id: UUID,
         *,
         actor: str,
-        keep_drafts_for_state: UUID | None = None,
+        left_state_id: UUID | None,
+        entered_state_id: UUID | None,
     ) -> tuple[UUID, ...]:
         """Cancel the votes of the application that the state change orphans.
 
-        The votes are the open votes and the draft votes. A draft whose
-        `opens_state_id` is `keep_drafts_for_state` (the state the application
-        enters) stays, because it belongs to that state. The method does not commit.
+        The votes are the open votes and the drafts of the state that the application
+        leaves (see `VotingService.cancel_for_application`). The other drafts stay. The
+        method does not commit.
 
         Returns:
             The ids of the cancelled votes.
@@ -547,7 +548,8 @@ class FlowService:
             application_id,
             now=datetime.now(UTC),
             actor=actor,
-            keep_drafts_for_state=keep_drafts_for_state,
+            left_state_id=left_state_id,
+            entered_state_id=entered_state_id,
         )
         return tuple(v.id for v in votes)
 
@@ -714,7 +716,10 @@ class FlowService:
         cancelled: tuple[UUID, ...] = ()
         if transition.branch is None:
             cancelled = await self._cancel_votes(
-                app.id, actor=principal.sub, keep_drafts_for_state=to_state_id
+                app.id,
+                actor=principal.sub,
+                left_state_id=from_state_id,
+                entered_state_id=to_state_id,
             )
 
         # Audit trail: record the status change append-only in the same transaction as
@@ -910,7 +915,10 @@ class FlowService:
         await self.session.flush()
         status_event_id = event.id
         cancelled = await self._cancel_votes(
-            app.id, actor=actor, keep_drafts_for_state=from_state_id
+            app.id,
+            actor=actor,
+            left_state_id=to_state_id,
+            entered_state_id=from_state_id,
         )
         # Audit as a reversed status_change, so the revert is itself revertable (redo).
         await AuditService(self.session).record(
@@ -1047,7 +1055,10 @@ class FlowService:
         # state and the vote would stay open forever. Cancel the drafts of the old
         # state too, so that none opens later outside its vote state.
         cancelled = await self._cancel_votes(
-            app.id, actor=principal.sub, keep_drafts_for_state=target_state_id
+            app.id,
+            actor=principal.sub,
+            left_state_id=from_state_id,
+            entered_state_id=target_state_id,
         )
         # Audit as a forced status_change with id references only, no PII and no raw
         # note. The entry carries both state ids, so the audit log can revert it and undo

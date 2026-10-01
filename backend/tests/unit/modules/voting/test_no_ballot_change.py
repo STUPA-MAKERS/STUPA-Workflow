@@ -57,6 +57,24 @@ def test_vote_config_refuses_allow_change() -> None:
         )
 
 
+def test_stored_config_drops_only_the_legacy_allow_change() -> None:
+    """An old container can write allowChange during a deploy. A read must not 500."""
+    config = VoteConfig.from_stored(
+        {"options": ["yes", "no"], "majorityRule": "simple", "allowChange": True}
+    )
+    assert config.options == ["yes", "no"]
+    with pytest.raises(ValidationError, match="other"):
+        VoteConfig.from_stored(
+            {"options": ["yes", "no"], "majorityRule": "simple", "other": 1}
+        )
+
+
+def test_service_reads_a_vote_with_a_legacy_allow_change() -> None:
+    vote: Any = _vote(secret=False)
+    vote.config = {**vote.config, "allowChange": True}
+    assert VotingService._config(vote).majority_rule == "simple"
+
+
 def test_ballot_accepted_has_only_the_cast_status() -> None:
     assert BallotAccepted().status == "cast"
     with pytest.raises(ValidationError):

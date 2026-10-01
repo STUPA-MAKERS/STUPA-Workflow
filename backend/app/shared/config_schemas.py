@@ -14,6 +14,7 @@ types.
 from __future__ import annotations
 
 from collections import deque
+from collections.abc import Mapping
 from decimal import Decimal
 from typing import Any, Literal
 from uuid import UUID
@@ -442,12 +443,18 @@ class Quorum(_CamelModel):
     value: float = Field(ge=0)
 
 
+# Keys that an old vote row can still hold. VoteConfig.from_stored drops them.
+_LEGACY_VOTE_KEYS = frozenset({"allowChange", "allow_change"})
+
+
 class VoteConfig(_CamelModel):
     """The rules of one vote, stored as JSONB in ``vote.config``.
 
     A ballot can never change after the cast (O11), so the config has no
     ``allowChange``. Migration ``vote_closed_at`` removes the key from the old rows,
-    because ``extra=forbid`` refuses it.
+    because ``extra=forbid`` refuses it. The API still refuses the key on create. To
+    read a stored row, use ``from_stored``: an old container can write the key during a
+    deploy, after the migration ran.
     """
 
     options: list[str] = Field(min_length=2)
@@ -463,6 +470,18 @@ class VoteConfig(_CamelModel):
         if len(set(v)) != len(v):
             raise ValueError("vote options must be unique")
         return v
+
+    @classmethod
+    def from_stored(cls, data: Mapping[str, Any] | VoteConfig) -> VoteConfig:
+        """Validate a stored ``vote.config`` row.
+
+        The method drops the legacy ``allowChange`` key (and only that key) before the
+        validation. ``extra=forbid`` still refuses every other unknown key. A
+        ``VoteConfig`` instance passes as it is.
+        """
+        if isinstance(data, VoteConfig):
+            return data
+        return cls.model_validate({k: v for k, v in data.items() if k not in _LEGACY_VOTE_KEYS})
 
 
 # Notification rule

@@ -372,6 +372,10 @@ describe('AuditLogComponent', () => {
       'protocol_delete',
       'vote_delete',
       'budget_fiscal_year_delete',
+      'vote_open',
+      'vote_close',
+      'vote_cancel',
+      'vote_branch_blocked',
     ] as const;
     for (const action of fresh) {
       // Every one of them is in the catalog, so the filter offers it.
@@ -379,7 +383,7 @@ describe('AuditLogComponent', () => {
       // Neither the label nor the sentence falls back to the raw key.
       expect(cmp.actionLabel(action)).not.toBe(action);
       const msg = cmp.message(entry(1, { action, targetType: 'comment', targetId: 'c-1' }));
-      expect(msg).not.toMatch(/comment_update|comment_delete|protocol_delete|vote_delete|budget_fiscal_year_delete/);
+      expect(msg).not.toContain(action);
       expect(cmp.icon(action)).not.toBe('audit');
     }
     expect(cmp.targetTypeLabel('fiscal_year')).toBe('Haushaltsjahr');

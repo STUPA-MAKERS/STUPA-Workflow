@@ -31,7 +31,7 @@
         <app-button
           class="live__option"
           size="lg"
-          [variant]="myChoice() === option ? 'primary' : 'secondary'"
+          [variant]="shownChoice() === option ? 'primary' : 'secondary'"
           [disabled]="locked()"
           (click)="cast(option)"
         >
@@ -39,9 +39,9 @@
         </app-button>
       }
     </div>
-    @if (myChoice(); as choice) {
+    @if (shownChoice(); as choice) {
       <p class="m-0 font-medium text-center" role="status">{{ 'voting.live.voted' | t: { choice: optionLabel(choice) } }}</p>
-    } @else if (alreadyVoted()) {
+    } @else if (castWithoutChoice()) {
       <p class="m-0 font-medium text-center" role="status">{{ 'voting.live.alreadyVoted' | t }}</p>
     }
     @if (tally(); as t) {

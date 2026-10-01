@@ -1411,7 +1411,7 @@ describe('MeetingsComponent — methods', () => {
         expect.objectContaining({
           variant: 'warning',
           message:
-            'Abstimmung geschlossen. Der Folgeschritt des Antrags ist blockiert. Bitte den Antrag von Hand weiterschalten.',
+            'Abstimmung geschlossen. Der Folgeschritt des Antrags ist blockiert. Der Antrag bleibt im Abstimmungszustand. Bitte am Antrag „Status setzen“ verwenden.',
         }),
       );
     });

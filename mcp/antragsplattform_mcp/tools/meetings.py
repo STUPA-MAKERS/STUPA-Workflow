@@ -64,10 +64,14 @@ async def close_vote(vote_id: str) -> dict:
     The call gives a 409 while the quorum is not met. Collect more ballots or call
     `cancel_vote`. The close always ends the vote. `branchFired` is false when the pass
     or fail transition did not fire (its guard failed, or the state has no such
-    transition). The audit log then holds `vote_branch_blocked`, and a person must move
-    the application with `fire_transition`. An agent manages a vote but cannot cast a ballot. Casting is
-    human-only. Requires the gremium permission `vote.manage` or `session.manage` in
-    the gremium of the vote (or admin).
+    transition). The audit log then holds `vote_branch_blocked`, and the application
+    stays in the vote state. `fire_transition` cannot fire a pass or fail transition
+    (409), because only the vote outcome fires it. A person with
+    `application.force_status` moves the application with "Set status" (force status),
+    or fires a manual exit of the vote state that is not a branch, if the flow has one.
+    An agent manages a vote but cannot cast a ballot. Casting is human-only. Requires
+    the gremium permission `vote.manage` or `session.manage` in the gremium of the vote
+    (or admin).
     """
     return await api().post(f"/votes/{vote_id}/close")
 

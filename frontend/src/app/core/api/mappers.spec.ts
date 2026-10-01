@@ -523,6 +523,7 @@ describe('mapMeetingVote', () => {
       present: 0,
       revealed: true,
       failedReason: null,
+      myBallot: null,
     });
   });
 
@@ -551,6 +552,15 @@ describe('mapMeetingVote', () => {
     expect(v.voted).toBe(10);
     expect(v.present).toBe(12);
     expect(v.result).toBe('rejected');
+  });
+
+  it('keeps the own ballot of the caller', () => {
+    const wire = {
+      id: 'v-3',
+      status: 'open',
+      myBallot: { cast: true, choice: 'ja' },
+    } as MeetingVoteOutWire;
+    expect(mapMeetingVote(wire).myBallot).toEqual({ cast: true, choice: 'ja' });
   });
 });
 

@@ -73,7 +73,7 @@ class VoteReadOps(MeetingServiceBase):
         for v in rows:
             if v.meeting_id is None:
                 continue
-            config = VoteConfig.model_validate(v.config)
+            config = VoteConfig.from_stored(v.config)
             opts = config.options
             secret = config.secret
             counts, leading, reason = tallies.get(v.id, (None, None, None))
@@ -280,7 +280,7 @@ class VoteReadOps(MeetingServiceBase):
             tuple[dict[str, int] | None, str | None, Literal["quorum", "majority"] | None],
         ] = {}
         for v in votes:
-            config = VoteConfig.model_validate(v.config)
+            config = VoteConfig.from_stored(v.config)
             choices = secret_by_vote.get(v.id, []) if config.secret else open_by_vote.get(v.id, [])
             counts = tally_mod.tally(config.options, choices)
             outcome = tally_mod.result(config, counts, v.eligible_count or 0)

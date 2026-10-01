@@ -1,9 +1,10 @@
 """F19: a state change out of a vote state cancels the votes of the application.
 
 A transition without a branch and a forced status move the open AND the draft votes to
-`cancelled`, set `closed_at` and write `vote_cancel`. A draft of the state the
-application enters stays. After the commit the publisher sends `vote_cancelled` for
-each cancelled vote (real Postgres).
+`cancelled`, set `closed_at` and write `vote_cancel`. Only the drafts of the state that
+the application leaves go. A draft of another state stays, and a draft without
+`opens_state_id` survives the transition into the vote state. After the commit the
+publisher sends `vote_cancelled` for each cancelled vote (real Postgres).
 """
 
 from __future__ import annotations
@@ -101,4 +102,39 @@ async def test_branch_exit_cancels_nothing(session: AsyncSession) -> None:
     flow_svc = FlowService(session, publisher=publisher)  # type: ignore[arg-type]
     await flow_svc.fire_branch(flow.app_id, "pass", manager())
     assert await _status(session, other) == ("draft", None)
+    assert publisher.cancelled == []
+
+
+async def test_unbound_draft_survives_the_entry_into_the_vote_state(
+    session: AsyncSession,
+) -> None:
+    """A draft without opens_state_id, made before the vote state, stays on A -> V."""
+    flow = await seed_vote_flow(session, start="review")
+    draft = await add_vote(session, flow, status="draft")
+    later = await add_vote(session, flow, status="draft", opens_state="voting")
+    publisher = RecordingPublisher()
+
+    await FlowService(session, publisher=publisher).fire(  # type: ignore[arg-type]
+        flow.app_id, flow.transitions["start"], manager()
+    )
+
+    assert await _status(session, draft) == ("draft", None)
+    assert await _status(session, later) == ("draft", None)
+    assert await audit_actions(session, draft) == []
+    assert publisher.cancelled == []
+
+
+async def test_draft_for_another_state_survives_a_force(session: AsyncSession) -> None:
+    """A forced exit out of a normal state keeps a draft that belongs to the vote state."""
+    flow = await seed_vote_flow(session, start="review")
+    draft = await add_vote(session, flow, status="draft", opens_state="voting")
+    unbound = await add_vote(session, flow, status="draft")
+    publisher = RecordingPublisher()
+
+    await FlowService(session, publisher=publisher).force_status(  # type: ignore[arg-type]
+        flow.app_id, flow.states["approved"], manager(), note="admin override"
+    )
+
+    assert await _status(session, draft) == ("draft", None)
+    assert await _status(session, unbound) == ("draft", None)
     assert publisher.cancelled == []

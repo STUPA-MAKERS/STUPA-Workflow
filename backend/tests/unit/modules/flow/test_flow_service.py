@@ -334,7 +334,8 @@ async def test_fire_manual_exit_cancels_open_votes() -> None:
     app = _app(voting, flow_id)
     abort = _transition(flow_id=flow_id, from_id=voting, to_id=aborted)
     vote = _open_vote(app.id)
-    draft = _open_vote(app.id, status="draft")
+    # A draft of the state the application leaves goes.
+    draft = _open_vote(app.id, status="draft", opens_state_id=voting)
     # A draft of the state the application enters stays (it belongs to that state).
     kept = _open_vote(app.id, status="draft", opens_state_id=aborted)
     db = fake_session(

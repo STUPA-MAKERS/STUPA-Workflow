@@ -954,6 +954,9 @@ export interface MeetingVote {
   /** Reason for the rejection. `quorum` means the vote missed the quorum.
    *  `majority` means the vote missed the majority. */
   failedReason: 'quorum' | 'majority' | null;
+  /** The own ballot of the caller. A secret vote gives only `cast`. `null` when the
+   *  server sent none (for example a broadcast). */
+  myBallot?: MyBallot | null;
 }
 
 /** Meeting, frontend view. */

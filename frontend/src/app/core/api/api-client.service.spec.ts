@@ -352,7 +352,23 @@ describe('ApiClient', () => {
     api.castBallot('v1', 'no', true).subscribe();
     const req = http.expectOne('/api/votes/v1/ballot');
     expect(req.request.body).toEqual({ choice: 'no', asDelegation: true });
-    req.flush({ status: 'changed' });
+    req.flush({ status: 'cast' });
+  });
+
+  it('propagates a 409 already_voted on a second ballot', (done) => {
+    api.castBallot('v1', 'yes').subscribe({
+      error: (err: { status: number; error: { code: string } }) => {
+        expect(err.status).toBe(409);
+        expect(err.error.code).toBe('already_voted');
+        done();
+      },
+    });
+    http
+      .expectOne('/api/votes/v1/ballot')
+      .flush(
+        { title: 'Already voted.', status: 409, code: 'already_voted' },
+        { status: 409, statusText: 'Conflict' },
+      );
   });
 
   it('POSTs an empty body to /auth/logout', () => {

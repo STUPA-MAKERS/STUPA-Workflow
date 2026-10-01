@@ -190,7 +190,7 @@ class VotingService:
 
     @staticmethod
     def _config(vote: Vote) -> VoteConfig:
-        return VoteConfig.model_validate(vote.config)
+        return VoteConfig.from_stored(vote.config)
 
     @staticmethod
     def _audit_refs(vote: Vote) -> dict[str, str | None]:
@@ -962,16 +962,24 @@ class VotingService:
         *,
         now: datetime,
         actor: str | None = None,
-        keep_drafts_for_state: UUID | None = None,
+        left_state_id: UUID | None = None,
+        entered_state_id: UUID | None = None,
     ) -> list[Vote]:
         """Cancel the votes that a state change of the application orphans (F19).
 
         The flow calls this when the application leaves its state without a vote
         branch: a transition without a branch, a forced status, or an audit revert.
-        The votes are the ``open`` votes and the ``draft`` votes. A draft whose
-        ``opens_state_id`` is ``keep_drafts_for_state`` stays, because it belongs to
-        the state that the application enters. Each vote gets ``closed_at`` and a
-        ``vote_cancel`` audit entry.
+
+        * Every ``open`` vote of the application is cancelled.
+        * A ``draft`` vote is cancelled only when it belongs to the state that the
+          application leaves (``left_state_id``). That is a draft whose
+          ``opens_state_id`` is the left state, or a draft without ``opens_state_id``
+          when the left state is a vote state.
+        * Every other draft stays. Examples: a draft without ``opens_state_id`` that
+          was prepared before the application enters its vote state, or a draft for a
+          later vote state. A transition back into the same state keeps every draft.
+
+        Each cancelled vote gets ``closed_at`` and a ``vote_cancel`` audit entry.
 
         The method does not commit. The caller commits together with the state change
         and then sends ``vote_cancelled`` for the returned votes.
@@ -994,18 +1002,41 @@ class VotingService:
             .scalars()
             .all()
         )
+        left_is_vote: bool | None = None
         cancelled: list[Vote] = []
         for vote in rows:
-            if (
-                vote.status == "draft"
-                and keep_drafts_for_state is not None
-                and vote.opens_state_id == keep_drafts_for_state
-            ):
-                continue
+            if vote.status == "draft":
+                if left_state_id is None or left_state_id == entered_state_id:
+                    continue
+                if vote.opens_state_id is None:
+                    if left_is_vote is None:
+                        left_is_vote = await self._is_vote_state(left_state_id)
+                    if not left_is_vote:
+                        continue
+                elif vote.opens_state_id != left_state_id:
+                    continue
             await self._mark_cancelled(vote, now=now, actor=actor, reason="state_left")
             cancelled.append(vote)
         await self.session.flush()
         return cancelled
+
+    async def _is_vote_state(self, state_id: UUID) -> bool:
+        """Tell if the state is a vote state.
+
+        A vote state has ``kind == 'vote'`` or at least one ``pass``/``fail`` branch
+        exit.
+        """
+        from app.modules.flow.models import State, Transition
+
+        kind = await self.session.scalar(select(State.kind).where(State.id == state_id))
+        if kind == "vote":
+            return True
+        branch = await self.session.scalar(
+            select(Transition.id)
+            .where(Transition.from_state_id == state_id, Transition.branch.is_not(None))
+            .limit(1)
+        )
+        return branch is not None
 
     async def cancel_drafts_for_meeting(
         self, meeting_id: UUID, *, now: datetime, actor: str | None = None

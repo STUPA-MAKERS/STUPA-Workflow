@@ -684,22 +684,24 @@ async def test_cancel_without_now_stamps_the_current_time() -> None:
 
 
 async def test_cancel_for_application_cancels_open_and_drafts() -> None:
-    """F19: the open vote and the drafts go to cancelled, without a commit.
+    """F19: the open vote and the drafts of the left state go to cancelled.
 
-    A draft of the state the application enters stays.
+    The method does not commit. A draft for another state stays.
     """
-    app_id, entering = uuid4(), uuid4()
+    app_id, leaving, entering = uuid4(), uuid4(), uuid4()
     running = _vote(application_id=app_id)
-    stale = _vote(application_id=app_id, status="draft", opens_state_id=uuid4())
+    stale = _vote(application_id=app_id, status="draft", opens_state_id=leaving)
     kept = _vote(application_id=app_id, status="draft", opens_state_id=entering)
-    db = fake_session(result(running, stale, kept))
+    later = _vote(application_id=app_id, status="draft", opens_state_id=uuid4())
+    db = fake_session(result(running, stale, kept, later))
     out = await VotingService(db).cancel_for_application(
-        app_id, now=NOW, actor="mgr", keep_drafts_for_state=entering
+        app_id, now=NOW, actor="mgr", left_state_id=leaving, entered_state_id=entering
     )
     assert out == [running, stale]
     assert running.status == "cancelled" and running.closed_at == NOW
     assert stale.status == "cancelled" and stale.closed_at == NOW
     assert kept.status == "draft" and kept.closed_at is None
+    assert later.status == "draft" and later.closed_at is None
     assert db.committed == 0
     entries = _audits(db)
     assert [e.data["previousStatus"] for e in entries] == ["open", "draft"]
@@ -708,13 +710,65 @@ async def test_cancel_for_application_cancels_open_and_drafts() -> None:
     assert "FOR UPDATE" in stmt
 
 
-async def test_cancel_for_application_without_keep_cancels_every_draft() -> None:
+async def test_cancel_for_application_without_left_state_keeps_drafts() -> None:
     app_id = uuid4()
     draft = _vote(application_id=app_id, status="draft", opens_state_id=uuid4())
     db = fake_session(result(draft))
     out = await VotingService(db).cancel_for_application(app_id, now=NOW)
+    assert out == []
+    assert draft.status == "draft"
+
+
+async def test_cancel_for_application_same_state_keeps_drafts() -> None:
+    app_id, state = uuid4(), uuid4()
+    draft = _vote(application_id=app_id, status="draft", opens_state_id=state)
+    db = fake_session(result(draft))
+    out = await VotingService(db).cancel_for_application(
+        app_id, now=NOW, left_state_id=state, entered_state_id=state
+    )
+    assert out == []
+    assert draft.status == "draft"
+
+
+async def test_cancel_for_application_unbound_draft_of_vote_state() -> None:
+    """A draft without opens_state_id goes when the app leaves a vote state."""
+    app_id = uuid4()
+    draft = _vote(application_id=app_id, status="draft", opens_state_id=None)
+    db = fake_session(result(draft))
+    db.scalar_results = ["vote"]
+    out = await VotingService(db).cancel_for_application(
+        app_id, now=NOW, left_state_id=uuid4(), entered_state_id=uuid4()
+    )
     assert out == [draft]
     assert draft.status == "cancelled"
+
+
+async def test_cancel_for_application_unbound_draft_of_branch_state() -> None:
+    """A normal state with a pass/fail exit counts as a vote state too."""
+    app_id = uuid4()
+    draft = _vote(application_id=app_id, status="draft", opens_state_id=None)
+    db = fake_session(result(draft))
+    db.scalar_results = ["normal", uuid4()]
+    out = await VotingService(db).cancel_for_application(
+        app_id, now=NOW, left_state_id=uuid4(), entered_state_id=uuid4()
+    )
+    assert out == [draft]
+
+
+async def test_cancel_for_application_unbound_draft_of_normal_state_stays() -> None:
+    """A draft without opens_state_id survives a transition out of a normal state."""
+    app_id = uuid4()
+    first = _vote(application_id=app_id, status="draft", opens_state_id=None)
+    second = _vote(application_id=app_id, status="draft", opens_state_id=None)
+    db = fake_session(result(first, second))
+    db.scalar_results = ["normal", None, "vote"]
+    out = await VotingService(db).cancel_for_application(
+        app_id, now=NOW, left_state_id=uuid4(), entered_state_id=uuid4()
+    )
+    assert out == []
+    assert first.status == second.status == "draft"
+    # The state kind is read once for all drafts, so the "vote" stays unread.
+    assert db.scalar_results == ["vote"]
 
 
 async def test_cancel_drafts_for_meeting() -> None:

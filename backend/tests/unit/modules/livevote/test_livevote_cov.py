@@ -729,7 +729,7 @@ async def test_votes_for_config_not_dict() -> None:
     svc = MeetingService(sess)  # type: ignore[arg-type]
     out = await svc._votes_for([mid])
     item = out[mid][0]
-    # `VoteConfig.model_validate` accepts a VoteConfig instance as it is.
+    # `VoteConfig.from_stored` accepts a VoteConfig instance as it is.
     assert item.options == ["yes", "no"]
     assert item.majority_rule == "simple"
     # Without a principal (a broadcast) the vote carries no own ballot.
