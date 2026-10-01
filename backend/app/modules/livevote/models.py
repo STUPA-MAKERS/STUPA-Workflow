@@ -87,9 +87,10 @@ class MeetingAttendance(UUIDPkMixin, TimestampMixin, Base):
     """Attendance of one member at one meeting.
 
     `status` is `present`, `excused` or `absent`. `source` says who set the
-    value. `self` is the member and `lead` is the meeting lead. Each pair of
-    meeting and principal has exactly one row. The unique constraint drives the
-    upsert.
+    value. `self` is the member and `lead` is the meeting lead. A member reports
+    only `present` or `excused` (Z2). Only the lead records `absent`. Each pair
+    of meeting and principal has exactly one row. The unique constraint drives
+    the upsert. `note` is the reason of an excuse. It is personal data.
     """
 
     __tablename__ = "meeting_attendance"
@@ -110,6 +111,11 @@ class MeetingAttendance(UUIDPkMixin, TimestampMixin, Base):
             "status IN ('present','excused','absent')", name="attendance_status"
         ),
         CheckConstraint("source IN ('self','lead')", name="attendance_source"),
+        # Z2: a self-reported row is `present` or `excused`. Migration 'self status'
+        # adds it NOT VALID, so the older (self, absent) rows stay as they are.
+        CheckConstraint(
+            "source <> 'self' OR status IN ('present','excused')", name="self_status"
+        ),
         Index("ix_attendance_meeting", "meeting_id"),
     )
 

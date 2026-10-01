@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import delete, or_, select
+from sqlalchemy import delete, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.admin.membership_sync import sync_principal_memberships
@@ -29,6 +29,7 @@ from app.modules.auth.models import AuthSession, Principal
 from app.modules.files.models import Attachment
 from app.modules.files.service import FilesService
 from app.modules.flow.models import State
+from app.modules.livevote.models import Meeting, MeetingAttendance
 from app.modules.privacy.models import ErasureRequest, PrivacySettings
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 
@@ -70,6 +71,17 @@ class PrincipalService:
         principal.active = False
         # Without groups the principal holds no gremium membership any more.
         await sync_principal_memberships(self.session, principal)
+        # The reason of an excuse is personal data (Z2). The attendance status stays,
+        # because the protocols carry it. Only the rows with a reason change, so an
+        # older (self, absent) row does not meet the self-status check.
+        await self.session.execute(
+            update(MeetingAttendance)
+            .where(
+                MeetingAttendance.principal_id == principal_id,
+                MeetingAttendance.note.is_not(None),
+            )
+            .values(note=None)
+        )
         await self.session.execute(
             delete(AuthSession).where(AuthSession.principal_id == principal_id)
         )
@@ -407,6 +419,28 @@ class AuskunftService:
         principal_row = await self.session.scalar(
             select(Principal).where(Principal.email == email)
         )
+        attendance: list[dict[str, Any]] = []
+        if principal_row is not None:
+            # The attendance of the principal, with the reason of an excuse (Z2).
+            arows = (
+                await self.session.execute(
+                    select(MeetingAttendance, Meeting)
+                    .join(Meeting, Meeting.id == MeetingAttendance.meeting_id)
+                    .where(MeetingAttendance.principal_id == principal_row.id)
+                    .order_by(Meeting.date, Meeting.id)
+                )
+            ).all()
+            attendance = [
+                {
+                    "meetingId": meeting.id,
+                    "meetingTitle": meeting.title,
+                    "meetingDate": meeting.date,
+                    "status": rec.status,
+                    "source": rec.source,
+                    "note": rec.note,
+                }
+                for rec, meeting in arows
+            ]
         principal = (
             {
                 "sub": principal_row.sub,
@@ -424,6 +458,7 @@ class AuskunftService:
             "versions": versions,
             "comments": comments,
             "attachments": attachments,
+            "attendance": attendance,
             "principal": principal,
         }
 
@@ -440,11 +475,13 @@ def build_auskunft_workbook(
     principal: Mapping[str, Any] | None,
     comments: Sequence[Mapping[str, Any]] = (),
     attachments: Sequence[Mapping[str, Any]] = (),
+    attendance: Sequence[Mapping[str, Any]] = (),
 ) -> bytes:
     """Build the GDPR access request (Art. 15) as `.xlsx` bytes.
 
     This function extends the shared `app.shared.xlsx.build_auskunft_workbook`. It adds
-    two sheets: the comments that the subject can see, and the attachment metadata.
+    three sheets: the comments that the subject can see, the attachment metadata, and
+    the meeting attendance with the reason of an excuse.
     """
     from io import BytesIO
 
@@ -511,6 +548,21 @@ def build_auskunft_workbook(
                 _fmt_dt(at.get("createdAt")),
             ]
             for at in attachments
+        ],
+    )
+    _add_sheet(
+        "Anwesenheit",
+        ["Sitzungs-ID", "Sitzung", "Datum", "Status", "Erfasst durch", "Grund"],
+        [
+            [
+                str(a.get("meetingId") or ""),
+                a.get("meetingTitle") or "",
+                a["meetingDate"].isoformat() if a.get("meetingDate") else "",
+                a.get("status") or "",
+                a.get("source") or "",
+                a.get("note") or "",
+            ]
+            for a in attendance
         ],
     )
 

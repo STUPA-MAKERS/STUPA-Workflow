@@ -1,41 +1,90 @@
 """Attendance service for a meeting.
 
 The roster holds the current members of the Gremium of the meeting. A
-membership counts when its term window is valid now. A member marks the own
-attendance (`source='self'`). The meeting lead sets the attendance of anyone
-(`source='lead'`). Each pair of meeting and member has exactly one record. The
-unique constraint drives the upsert.
+membership counts when its term window is valid now. Each pair of meeting and
+member has exactly one record. The unique constraint drives the upsert.
+
+The rules (Z2, O15, O23, F12):
+
+- A member reports the own attendance (`source='self'`) as `present` or
+  `excused` only, while the meeting is `planned` or `live`.
+- The meeting lead (`canWrite`) sets the attendance of any member
+  (`source='lead'`), `absent` included. A record that the lead set wins: the
+  member cannot change it any more (409 `attendance_set_by_lead`) until the lead
+  resets it to "open" with a delete of the record.
+- The lead cannot set a member `present` while a delegation of that member for
+  the meeting exists (409 `delegation_active`). The delegation must be revoked
+  first.
+- `note` is the reason of an excuse and is personal data. Only the member and
+  the lead see it. The lead's set and reset write `attendance_set` and
+  `attendance_reset` to the audit log, never with the note.
+- A closed meeting freezes the attendance (409), because the protocol carries it.
 """
 
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.admin.models import GremiumMembership
+from app.modules.audit.actions import AuditAction
+from app.modules.audit.service import record as audit_record
 from app.modules.auth.models import Principal as PrincipalRow
+from app.modules.delegations.models import MeetingDelegation
 from app.modules.livevote.models import Meeting, MeetingAttendance
 from app.modules.livevote.schemas import (
     AttendanceOut,
     AttendanceStatus,
     MeetingMemberOut,
+    SelfAttendanceStatus,
 )
 from app.shared.errors import ConflictError, ForbiddenError, NotFoundError
 
 
+def _resolve_note(
+    status: str,
+    *,
+    existing: MeetingAttendance | None,
+    note: str | None,
+    replace_note: bool,
+) -> str | None:
+    """Return the note to store with `status`.
+
+    Only an excuse has a reason. Any other status drops it. An excuse keeps the
+    stored reason unless the caller gives a new one (`replace_note`).
+    """
+    if status != "excused":
+        return None
+    if replace_note:
+        return note
+    return existing.note if existing is not None else None
+
+
 class AttendanceService:
-    """Read the roster of a meeting and upsert the attendance records."""
+    """Read the roster of a meeting and change the attendance records."""
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def _meeting(self, meeting_id: UUID) -> Meeting:
-        meeting = (
-            await self.session.execute(select(Meeting).where(Meeting.id == meeting_id))
-        ).scalar_one_or_none()
+    async def _meeting(self, meeting_id: UUID, *, for_write: bool = False) -> Meeting:
+        """Load a meeting by id.
+
+        `for_write` takes a share lock on the meeting row and reads the current
+        values again. A status change locks the row for update, so a close and an
+        attendance change run one after the other, and a change cannot slip in
+        after the close.
+
+        Raises:
+            NotFoundError: No meeting has this id.
+        """
+        stmt = select(Meeting).where(Meeting.id == meeting_id)
+        if for_write:
+            stmt = stmt.with_for_update(read=True).execution_options(populate_existing=True)
+        meeting = (await self.session.execute(stmt)).scalar_one_or_none()
         if meeting is None:
             raise NotFoundError(f"meeting {meeting_id} not found")
         return meeting
@@ -47,52 +96,60 @@ class AttendanceService:
         """
         now = datetime.now(UTC)
         rows = (
-            await self.session.execute(
-                select(PrincipalRow)
-                .join(
-                    GremiumMembership,
-                    GremiumMembership.principal_id == PrincipalRow.id,
+            (
+                await self.session.execute(
+                    select(PrincipalRow)
+                    .join(
+                        GremiumMembership,
+                        GremiumMembership.principal_id == PrincipalRow.id,
+                    )
+                    .where(
+                        GremiumMembership.gremium_id == gremium_id,
+                        (GremiumMembership.valid_from.is_(None))
+                        | (GremiumMembership.valid_from <= now),
+                        (GremiumMembership.valid_until.is_(None))
+                        | (GremiumMembership.valid_until > now),
+                    )
+                    .order_by(PrincipalRow.display_name)
+                    .distinct()
                 )
-                .where(
-                    GremiumMembership.gremium_id == gremium_id,
-                    (GremiumMembership.valid_from.is_(None))
-                    | (GremiumMembership.valid_from <= now),
-                    (GremiumMembership.valid_until.is_(None))
-                    | (GremiumMembership.valid_until > now),
-                )
-                .order_by(PrincipalRow.display_name)
-                .distinct()
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         return list(rows)
 
     async def members(self, gremium_id: UUID) -> list[MeetingMemberOut]:
         """Return the current Gremium members as Protokollant candidates."""
         return [
-            MeetingMemberOut(
-                principalId=m.id, displayName=m.display_name, email=m.email
-            )
+            MeetingMemberOut(principalId=m.id, displayName=m.display_name, email=m.email)
             for m in await self._current_members(gremium_id)
         ]
 
-    async def roster(self, meeting_id: UUID, requester_sub: str) -> list[AttendanceOut]:
+    async def roster(
+        self, meeting_id: UUID, requester_sub: str, *, can_write: bool = False
+    ) -> list[AttendanceOut]:
         """Return the members with the attendance they have for this meeting.
 
-        A member without a record gets `status` and `source` as `None`.
+        A member without a record gets `status` and `source` as `None`. The `note`
+        goes only to the member and to the meeting lead (`can_write`).
         """
         meeting = await self._meeting(meeting_id)
         members = await self._current_members(meeting.gremium_id)
         records = (
-            await self.session.execute(
-                select(MeetingAttendance).where(
-                    MeetingAttendance.meeting_id == meeting_id
+            (
+                await self.session.execute(
+                    select(MeetingAttendance).where(MeetingAttendance.meeting_id == meeting_id)
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         by_principal = {r.principal_id: r for r in records}
         out: list[AttendanceOut] = []
         for m in members:
             rec = by_principal.get(m.id)
+            is_self = m.sub == requester_sub
             out.append(
                 AttendanceOut(
                     principalId=m.id,
@@ -100,26 +157,39 @@ class AttendanceService:
                     email=m.email,
                     status=rec.status if rec else None,  # type: ignore[arg-type]
                     source=rec.source if rec else None,  # type: ignore[arg-type]
-                    isSelf=m.sub == requester_sub,
+                    note=rec.note if rec and (is_self or can_write) else None,
+                    isSelf=is_self,
                 )
             )
         return out
 
-    async def _upsert(
-        self,
-        meeting_id: UUID,
-        principal_id: UUID,
-        status: AttendanceStatus,
-        source: str,
-    ) -> None:
-        existing = (
+    async def _record(self, meeting_id: UUID, principal_id: UUID) -> MeetingAttendance | None:
+        """Load the record of one member with a row lock.
+
+        The lock orders a self report and a lead change of the same record, so
+        the O15 check and the write see the same row.
+        """
+        return (
             await self.session.execute(
-                select(MeetingAttendance).where(
+                select(MeetingAttendance)
+                .where(
                     MeetingAttendance.meeting_id == meeting_id,
                     MeetingAttendance.principal_id == principal_id,
                 )
+                .with_for_update()
             )
         ).scalar_one_or_none()
+
+    def _write(
+        self,
+        existing: MeetingAttendance | None,
+        *,
+        meeting_id: UUID,
+        principal_id: UUID,
+        status: str,
+        source: str,
+        note: str | None,
+    ) -> None:
         if existing is None:
             self.session.add(
                 MeetingAttendance(
@@ -127,13 +197,13 @@ class AttendanceService:
                     principal_id=principal_id,
                     status=status,
                     source=source,
+                    note=note,
                 )
             )
         else:
             existing.status = status
             existing.source = source
-        await self.session.flush()
-        await self.session.commit()
+            existing.note = note
 
     @staticmethod
     def _ensure_not_closed(meeting: Meeting) -> None:
@@ -150,29 +220,79 @@ class AttendanceService:
                 "Attendance is read-only once the meeting is closed.", code="conflict"
             )
 
+    async def _audit(
+        self,
+        action: AuditAction,
+        *,
+        actor: str,
+        meeting_id: UUID,
+        principal_id: UUID,
+        **extra: Any,
+    ) -> None:
+        """Write one attendance audit entry, never with the note."""
+        await audit_record(
+            self.session,
+            actor=actor,
+            action=action,
+            target_type="meeting",
+            target_id=str(meeting_id),
+            data={"principalId": str(principal_id), **extra},
+        )
+
     async def set_self(
-        self, meeting_id: UUID, status: AttendanceStatus, requester_sub: str
+        self,
+        meeting_id: UUID,
+        status: SelfAttendanceStatus,
+        requester_sub: str,
+        *,
+        note: str | None = None,
+        replace_note: bool = False,
+        can_write: bool = False,
     ) -> list[AttendanceOut]:
-        """Set the own attendance of the requester.
+        """Report the own attendance of the requester (Z2).
 
         Raises:
             ForbiddenError: The requester is not a current member of the Gremium.
-            ConflictError: The meeting is closed.
+            ConflictError: The meeting is closed, or the meeting lead set the
+                record (O15, code `attendance_set_by_lead`).
         """
-        meeting = await self._meeting(meeting_id)
+        meeting = await self._meeting(meeting_id, for_write=True)
         self._ensure_not_closed(meeting)
         member = next(
-            (
-                m
-                for m in await self._current_members(meeting.gremium_id)
-                if m.sub == requester_sub
-            ),
+            (m for m in await self._current_members(meeting.gremium_id) if m.sub == requester_sub),
             None,
         )
         if member is None:
             raise ForbiddenError("only committee members can mark their attendance")
-        await self._upsert(meeting_id, member.id, status, source="self")
-        return await self.roster(meeting_id, requester_sub)
+        existing = await self._record(meeting_id, member.id)
+        if existing is not None and existing.source == "lead":
+            raise ConflictError(
+                "The meeting lead set this attendance. Only the lead can change it.",
+                code="attendance_set_by_lead",
+            )
+        self._write(
+            existing,
+            meeting_id=meeting_id,
+            principal_id=member.id,
+            status=status,
+            source="self",
+            note=_resolve_note(status, existing=existing, note=note, replace_note=replace_note),
+        )
+        await self.session.flush()
+        await self.session.commit()
+        return await self.roster(meeting_id, requester_sub, can_write=can_write)
+
+    async def _has_delegation(self, meeting_id: UUID, principal_id: UUID) -> bool:
+        """Return True when the member delegated for this meeting (O23)."""
+        found = (
+            await self.session.execute(
+                select(MeetingDelegation.id).where(
+                    MeetingDelegation.meeting_id == meeting_id,
+                    MeetingDelegation.delegator_principal_id == principal_id,
+                )
+            )
+        ).first()
+        return found is not None
 
     async def set_for(
         self,
@@ -180,17 +300,78 @@ class AttendanceService:
         principal_id: UUID,
         status: AttendanceStatus,
         requester_sub: str,
+        *,
+        note: str | None = None,
+        replace_note: bool = False,
     ) -> list[AttendanceOut]:
         """Set the attendance of a member as the meeting lead.
 
+        The router checks `canWrite` before the call. The change writes
+        `attendance_set` with the status before and after it.
+
         Raises:
             NotFoundError: The principal is not a current member of the Gremium.
-            ConflictError: The meeting is closed.
+            ConflictError: The meeting is closed, or the status is `present` while
+                a delegation of the member exists (O23, code `delegation_active`).
         """
-        meeting = await self._meeting(meeting_id)
+        meeting = await self._meeting(meeting_id, for_write=True)
         self._ensure_not_closed(meeting)
         members = await self._current_members(meeting.gremium_id)
         if not any(m.id == principal_id for m in members):
             raise NotFoundError("principal is not a current member of this committee")
-        await self._upsert(meeting_id, principal_id, status, source="lead")
-        return await self.roster(meeting_id, requester_sub)
+        if status == "present" and await self._has_delegation(meeting_id, principal_id):
+            raise ConflictError(
+                "The member delegated for this meeting. Revoke the delegation first.",
+                code="delegation_active",
+            )
+        existing = await self._record(meeting_id, principal_id)
+        before = existing.status if existing is not None else None
+        before_source = existing.source if existing is not None else None
+        self._write(
+            existing,
+            meeting_id=meeting_id,
+            principal_id=principal_id,
+            status=status,
+            source="lead",
+            note=_resolve_note(status, existing=existing, note=note, replace_note=replace_note),
+        )
+        await self._audit(
+            AuditAction.ATTENDANCE_SET,
+            actor=requester_sub,
+            meeting_id=meeting_id,
+            principal_id=principal_id,
+            status={"from": before, "to": status},
+            source={"from": before_source, "to": "lead"},
+        )
+        await self.session.flush()
+        await self.session.commit()
+        return await self.roster(meeting_id, requester_sub, can_write=True)
+
+    async def reset(
+        self, meeting_id: UUID, principal_id: UUID, requester_sub: str
+    ) -> list[AttendanceOut]:
+        """Reset the attendance of a member to "open" as the meeting lead.
+
+        The call deletes the record, so the member can report again. It writes
+        `attendance_reset`. Without a record the call changes nothing and writes
+        no audit entry. The router checks `canWrite` before the call.
+
+        Raises:
+            ConflictError: The meeting is closed.
+        """
+        meeting = await self._meeting(meeting_id, for_write=True)
+        self._ensure_not_closed(meeting)
+        existing = await self._record(meeting_id, principal_id)
+        if existing is not None:
+            await self._audit(
+                AuditAction.ATTENDANCE_RESET,
+                actor=requester_sub,
+                meeting_id=meeting_id,
+                principal_id=principal_id,
+                status={"from": existing.status, "to": None},
+                source={"from": existing.source, "to": None},
+            )
+            await self.session.delete(existing)
+            await self.session.flush()
+            await self.session.commit()
+        return await self.roster(meeting_id, requester_sub, can_write=True)

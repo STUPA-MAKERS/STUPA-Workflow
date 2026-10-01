@@ -175,6 +175,7 @@ def audit_calls(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
     They would consume the FIFO results of ``_QueueSession``.
     """
     import app.modules.livevote.agenda_service as agenda_mod
+    import app.modules.livevote.attendance_service as attendance_mod
     import app.modules.voting.service as voting_service_mod
 
     calls: list[dict[str, Any]] = []
@@ -182,7 +183,7 @@ def audit_calls(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
     async def _record(_session: Any, **kw: Any) -> None:
         calls.append(kw)
 
-    for mod in (agenda_mod, lifecycle_mod, voting_service_mod):
+    for mod in (agenda_mod, attendance_mod, lifecycle_mod, voting_service_mod):
         monkeypatch.setattr(mod, "audit_record", _record)
     return calls
 
@@ -308,6 +309,14 @@ async def test_is_protokollant_none_and_match() -> None:
     m.protokollant_id = pid
     svc2 = MeetingService(_QueueSession(executes=[res(pid)]))  # type: ignore[arg-type]
     assert await svc2._is_protokollant(m, _principal()) is True
+
+
+async def test_can_write_meeting_loads_the_meeting() -> None:
+    m = _meeting()
+    svc = MeetingService(_QueueSession(executes=[res(m)]))  # type: ignore[arg-type]
+    assert await svc.can_write_meeting(m.id, _admin()) is True
+    with pytest.raises(NotFoundError):
+        await MeetingService(_QueueSession()).can_write_meeting(uuid4(), _admin())  # type: ignore[arg-type]
 
 
 async def test_can_write_paths(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1992,7 +2001,7 @@ async def test_roster_maps_records_and_self() -> None:
     meeting = _meeting()
     member = _member(sub="me", display_name="Me")
     other = _member(sub="other", display_name="Other")
-    rec = SimpleNamespace(principal_id=member.id, status="present", source="self")
+    rec = SimpleNamespace(principal_id=member.id, status="present", source="self", note=None)
     sess = _QueueSession(
         executes=[
             res(meeting),  # _meeting
@@ -2048,7 +2057,8 @@ async def test_set_self_updates_existing() -> None:
 
     meeting = _meeting(status="live")
     member = _member(sub="me")
-    existing = SimpleNamespace(status="absent", source="lead")
+    # An older self report with "absent" (before Z2) moves to an allowed status.
+    existing = SimpleNamespace(status="absent", source="self", note=None)
     sess = _QueueSession(
         executes=[
             res(meeting),  # _meeting
@@ -2065,6 +2075,7 @@ async def test_set_self_updates_existing() -> None:
     await svc.set_self(meeting.id, "present", "me")
     assert existing.status == "present"
     assert existing.source == "self"
+    assert existing.note is None
 
 
 async def test_set_for_not_member_not_found() -> None:
@@ -2197,6 +2208,9 @@ class _FakeMeetingService:
     async def get(self, meeting_id: UUID, principal: Principal | None = None) -> Any:
         return self._meeting_out
 
+    async def can_write_meeting(self, meeting_id: UUID, principal: Principal) -> bool:
+        return self._meeting_out.can_write
+
     async def delete(self, meeting_id: UUID, principal: Principal) -> None:
         self.deleted.append(meeting_id)
 
@@ -2228,18 +2242,27 @@ class _FakeAttendanceService:
 
         return [MeetingMemberOut(principalId=uuid4(), displayName="A", email="a@x")]
 
-    async def roster(self, meeting_id: UUID, requester_sub: str) -> list[Any]:
+    async def roster(self, meeting_id: UUID, requester_sub: str, **kw: Any) -> list[Any]:
         self.calls.append("roster")
+        self.kwargs = kw
         return []
 
-    async def set_self(self, meeting_id: UUID, status: Any, requester_sub: str) -> list[Any]:
+    async def set_self(
+        self, meeting_id: UUID, status: Any, requester_sub: str, **kw: Any
+    ) -> list[Any]:
         self.calls.append("set_self")
+        self.kwargs = kw
         return []
 
     async def set_for(
-        self, meeting_id: UUID, principal_id: UUID, status: Any, requester_sub: str
+        self, meeting_id: UUID, principal_id: UUID, status: Any, requester_sub: str, **kw: Any
     ) -> list[Any]:
         self.calls.append("set_for")
+        self.kwargs = kw
+        return []
+
+    async def reset(self, meeting_id: UUID, principal_id: UUID, requester_sub: str) -> list[Any]:
+        self.calls.append("reset")
         return []
 
 
@@ -2487,6 +2510,96 @@ def test_set_member_attendance_ok(app: FastAPI, client: TestClient, fakes) -> No
     )
     assert r.status_code == 200
     assert "set_for" in fakes["attendance"].calls
+
+
+def test_list_attendance_passes_lead_flag(app: FastAPI, client: TestClient, fakes) -> None:
+    """A7: the roster gets ``can_write`` so it can show the note to the lead."""
+    fakes["meeting"]._meeting_out = _meeting_out(can_write=True)
+    _login(app)
+    assert client.get(f"/api/meetings/{uuid4()}/attendance").status_code == 200
+    assert fakes["attendance"].kwargs == {"can_write": True}
+
+
+def test_set_own_attendance_absent_is_422(app: FastAPI, client: TestClient, fakes) -> None:
+    """Z2: a member reports only present or excused."""
+    _login(app)
+    r = client.put(f"/api/meetings/{uuid4()}/attendance/me", json={"status": "absent"})
+    assert r.status_code == 422
+    assert "set_self" not in fakes["attendance"].calls
+
+
+def test_set_own_attendance_note_needs_excused(
+    app: FastAPI, client: TestClient, fakes
+) -> None:
+    _login(app)
+    r = client.put(
+        f"/api/meetings/{uuid4()}/attendance/me", json={"status": "present", "note": "x"}
+    )
+    assert r.status_code == 422
+
+
+def test_set_own_attendance_note_too_long(app: FastAPI, client: TestClient, fakes) -> None:
+    _login(app)
+    r = client.put(
+        f"/api/meetings/{uuid4()}/attendance/me",
+        json={"status": "excused", "note": "x" * 501},
+    )
+    assert r.status_code == 422
+
+
+def test_set_own_attendance_passes_note(app: FastAPI, client: TestClient, fakes) -> None:
+    fakes["meeting"]._meeting_out = _meeting_out(can_write=False)
+    _login(app)
+    r = client.put(
+        f"/api/meetings/{uuid4()}/attendance/me",
+        json={"status": "excused", "note": "  ill  "},
+    )
+    assert r.status_code == 200
+    assert fakes["attendance"].kwargs == {
+        "note": "ill",
+        "replace_note": True,
+        "can_write": False,
+    }
+
+
+def test_set_own_attendance_without_note_keeps_it(
+    app: FastAPI, client: TestClient, fakes
+) -> None:
+    _login(app)
+    r = client.put(f"/api/meetings/{uuid4()}/attendance/me", json={"status": "excused"})
+    assert r.status_code == 200
+    assert fakes["attendance"].kwargs["replace_note"] is False
+    assert fakes["attendance"].kwargs["note"] is None
+
+
+def test_set_member_attendance_null_note_clears(
+    app: FastAPI, client: TestClient, fakes
+) -> None:
+    fakes["meeting"]._meeting_out = _meeting_out(can_write=True)
+    _login(app)
+    r = client.put(
+        f"/api/meetings/{uuid4()}/attendance/{uuid4()}",
+        json={"status": "excused", "note": None},
+    )
+    assert r.status_code == 200
+    assert fakes["attendance"].kwargs == {"note": None, "replace_note": True}
+
+
+def test_reset_member_attendance_forbidden(app: FastAPI, client: TestClient, fakes) -> None:
+    fakes["meeting"]._meeting_out = _meeting_out(can_write=False)
+    _login(app)
+    r = client.delete(f"/api/meetings/{uuid4()}/attendance/{uuid4()}")
+    assert r.status_code == 403
+    assert r.headers["content-type"].startswith("application/problem+json")
+    assert "reset" not in fakes["attendance"].calls
+
+
+def test_reset_member_attendance_ok(app: FastAPI, client: TestClient, fakes) -> None:
+    fakes["meeting"]._meeting_out = _meeting_out(can_write=True)
+    _login(app)
+    r = client.delete(f"/api/meetings/{uuid4()}/attendance/{uuid4()}")
+    assert r.status_code == 200
+    assert "reset" in fakes["attendance"].calls
 
 
 def test_list_agenda_ok(app: FastAPI, client: TestClient, fakes) -> None:

@@ -36,6 +36,7 @@ from app.modules.livevote.schemas import (
     AgendaReorderBody,
     AssignableApplicationOut,
     AttendanceOut,
+    AttendanceSelfBody,
     AttendanceSetBody,
     MeetingCreate,
     MeetingGremiumOut,
@@ -344,31 +345,57 @@ async def list_attendance(
     service: ServiceDep,
     principal: ReaderDep,
 ) -> list[AttendanceOut]:
-    """Attendance roster: the current Gremium members and their status."""
+    """Attendance roster: the current Gremium members and their status.
+
+    The reason of an excuse (`note`) goes only to the member and to the meeting
+    lead (`canWrite`).
+    """
     # Only a principal that may read the meeting sees the names and the emails.
     await service.assert_can_read(meeting_id, principal)
-    return await attendance.roster(meeting_id, principal.sub)
+    can_write = await service.can_write_meeting(meeting_id, principal)
+    return await attendance.roster(meeting_id, principal.sub, can_write=can_write)
 
 
 @router.put(
     "/meetings/{meeting_id}/attendance/me",
     response_model=list[AttendanceOut],
-    responses=_errors(401, 403, 404, 422),
+    responses=_errors(401, 403, 404, 409, 422),
 )
 async def set_own_attendance(
     meeting_id: UUID,
-    payload: AttendanceSetBody,
+    payload: AttendanceSelfBody,
     attendance: AttendanceDep,
+    service: ServiceDep,
     principal: ReaderDep,
 ) -> list[AttendanceOut]:
-    """Mark the attendance of the caller (Gremium members only)."""
-    return await attendance.set_self(meeting_id, payload.status, principal.sub)
+    """Report the attendance of the caller (Gremium members only, Z2).
+
+    The status is `present` or `excused`, else 422. A `note` (the reason) is
+    allowed only with `excused`. The meeting must be `planned` or `live`, else
+    409. When the meeting lead set the record, the member cannot change it: 409
+    `attendance_set_by_lead` (O15).
+    """
+    can_write = await service.can_write_meeting(meeting_id, principal)
+    return await attendance.set_self(
+        meeting_id,
+        payload.status,
+        principal.sub,
+        note=payload.clean_note(),
+        replace_note=payload.note_given,
+        can_write=can_write,
+    )
+
+
+async def _require_lead(service: MeetingService, meeting_id: UUID, principal: Principal) -> None:
+    """Allow only the meeting lead (`canWrite`): manager, protokollant or `protocol.write`."""
+    if not await service.can_write_meeting(meeting_id, principal):
+        raise ForbiddenError("not allowed to set members' attendance")
 
 
 @router.put(
     "/meetings/{meeting_id}/attendance/{principal_id}",
     response_model=list[AttendanceOut],
-    responses=_errors(401, 403, 404, 422),
+    responses=_errors(401, 403, 404, 409, 422),
 )
 async def set_member_attendance(
     meeting_id: UUID,
@@ -378,14 +405,42 @@ async def set_member_attendance(
     service: ServiceDep,
     principal: ReaderDep,
 ) -> list[AttendanceOut]:
-    """Set the attendance of a member.
+    """Set the attendance of a member as the meeting lead (`canWrite`).
 
-    The caller must lead the meeting as protokollant or as manager.
+    The lead's record wins over the own report of the member (O15). `present`
+    gives 409 `delegation_active` while the member has a delegation for this
+    meeting (O23). The change writes `attendance_set` without the note.
     """
-    meeting = await service.get(meeting_id, principal)
-    if not meeting.can_write:
-        raise ForbiddenError("not allowed to set members' attendance")
-    return await attendance.set_for(meeting_id, principal_id, payload.status, principal.sub)
+    await _require_lead(service, meeting_id, principal)
+    return await attendance.set_for(
+        meeting_id,
+        principal_id,
+        payload.status,
+        principal.sub,
+        note=payload.clean_note(),
+        replace_note=payload.note_given,
+    )
+
+
+@router.delete(
+    "/meetings/{meeting_id}/attendance/{principal_id}",
+    response_model=list[AttendanceOut],
+    responses=_errors(401, 403, 404, 409),
+)
+async def reset_member_attendance(
+    meeting_id: UUID,
+    principal_id: UUID,
+    attendance: AttendanceDep,
+    service: ServiceDep,
+    principal: ReaderDep,
+) -> list[AttendanceOut]:
+    """Reset the attendance of a member to "open" as the meeting lead (`canWrite`).
+
+    The record goes away, so the member can report again. The reset writes
+    `attendance_reset`. A closed meeting gives 409.
+    """
+    await _require_lead(service, meeting_id, principal)
+    return await attendance.reset(meeting_id, principal_id, principal.sub)
 
 
 @router.get(
