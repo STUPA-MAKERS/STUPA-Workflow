@@ -942,6 +942,7 @@ class _CreateServiceFake:
         actor: str = "applicant",
         dispatcher: Any = None,
         email_confirmed: bool | None = None,
+        draft_pepper: str | None = None,
     ) -> Any:
         self.created = True
         return SimpleNamespace(id=uuid4()), str(payload.applicant_email)

@@ -27,12 +27,13 @@ from collections.abc import AsyncIterator
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.exc import StaleDataError
 
 from app.modules.applications.models import Application
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.files.mime import MimeRejected, sanitize_filename, validate_upload
-from app.modules.files.models import MAX_ATTACHMENT_BYTES, Attachment
+from app.modules.files.models import BOUND, MAX_ATTACHMENT_BYTES, Attachment
 from app.modules.files.queue import ScanQueue
 from app.modules.files.scanner import ScanVerdict
 from app.modules.files.schemas import AttachmentOut, SignedUrlOut
@@ -78,6 +79,47 @@ class FilesService:
     def max_bytes(self) -> int:
         return min(self.settings.attachment_max_bytes, MAX_ATTACHMENT_BYTES)
 
+    def validate(self, filename: str | None, data: bytes) -> tuple[str, str]:
+        """Check the size, the content and the storage of an upload.
+
+        The application upload and the draft upload share this check.
+
+        Returns:
+            The sniffed MIME type and the sanitized file name.
+
+        Raises:
+            PayloadTooLargeError: The file is larger than ``max_bytes`` (HTTP 413).
+            UnsupportedMediaTypeError: The file is empty, or its content does not match
+                the allowlist or the extension (HTTP 415).
+            ServiceUnavailableError: Object storage is off (HTTP 503).
+        """
+        if len(data) > self.max_bytes:
+            raise PayloadTooLargeError(
+                f"Attachment exceeds {self.max_bytes} bytes."
+            )
+        if not data:
+            raise UnsupportedMediaTypeError("Empty file.")
+        try:
+            mime = validate_upload(filename, data)
+        except MimeRejected as exc:
+            raise UnsupportedMediaTypeError(str(exc)) from exc
+        if self.storage is None:
+            raise ServiceUnavailableError("Object storage unavailable.")
+        return mime, sanitize_filename(filename)
+
+    async def put_object(self, storage_key: str, data: bytes, mime: str) -> None:
+        """Write the object to storage.
+
+        Raises:
+            ServiceUnavailableError: Storage is off or the write failed (HTTP 503).
+        """
+        if self.storage is None:
+            raise ServiceUnavailableError("Object storage unavailable.")
+        try:
+            await self.storage.put(storage_key, data, mime)
+        except StorageError as exc:
+            raise ServiceUnavailableError("Object storage write failed.") from exc
+
     async def upload(
         self,
         application_id: uuid.UUID,
@@ -88,7 +130,12 @@ class FilesService:
         field_key: str | None = None,
         is_comparison_offer: bool = False,
     ) -> AttachmentOut:
-        """Validate the file, store in MinIO, create the row, enqueue the scan."""
+        """Validate the file, store in MinIO, create the row, enqueue the scan.
+
+        The upload writes an ``attachment_upload`` audit entry in the same transaction
+        (F12). It holds the application, the field key, the MIME type and the size,
+        never the file name, because a file name can hold PII.
+        """
         if len(data) > self.max_bytes:
             raise PayloadTooLargeError(
                 f"Attachment exceeds {self.max_bytes} bytes."
@@ -105,22 +152,13 @@ class FilesService:
         # invoice or a receipt after the decision. The PATCH lock still protects the form
         # data. The RBAC and applicant check in the router still guards access.
 
-        try:
-            mime = validate_upload(filename, data)
-        except MimeRejected as exc:
-            raise UnsupportedMediaTypeError(str(exc)) from exc
-
-        if self.storage is None:
-            raise ServiceUnavailableError("Object storage unavailable.")
-
-        safe_name = sanitize_filename(filename)
+        mime, safe_name = self.validate(filename, data)
         storage_key = f"{application_id}/{uuid.uuid4().hex}/{safe_name}"
-        try:
-            await self.storage.put(storage_key, data, mime)
-        except StorageError as exc:
-            raise ServiceUnavailableError("Object storage write failed.") from exc
+        await self.put_object(storage_key, data, mime)
 
         attachment = Attachment(
+            # A client-side id: the audit entry below needs it before the commit.
+            id=uuid.uuid4(),
             application_id=application_id,
             field_key=field_key,
             filename=safe_name,
@@ -132,10 +170,22 @@ class FilesService:
             is_comparison_offer=is_comparison_offer,
         )
         self.session.add(attachment)
+        await audit_record(
+            self.session,
+            actor=by,
+            action=AuditAction.ATTACHMENT_UPLOAD,
+            target_type="attachment",
+            target_id=str(attachment.id),
+            data=upload_audit_data(attachment),
+        )
         await self.session.commit()
 
         await self._enqueue_scan(attachment.id, actor=by)
         return _attachment_out(attachment)
+
+    async def enqueue_scan(self, attachment_id: uuid.UUID, *, actor: str) -> None:
+        """Enqueue the scan job of an attachment (best effort, see ``_enqueue_scan``)."""
+        await self._enqueue_scan(attachment_id, actor=actor)
 
     async def _enqueue_scan(self, attachment_id: uuid.UUID, *, actor: str) -> None:
         """Enqueue the scan job as best effort.
@@ -195,15 +245,24 @@ class FilesService:
         rows = (
             await self.session.scalars(
                 select(Attachment)
-                .where(Attachment.application_id == application_id)
+                .where(BOUND, Attachment.application_id == application_id)
                 .order_by(Attachment.created_at)
             )
         ).all()
         return [_attachment_out(a) for a in rows]
 
     async def get_attachment(self, attachment_id: uuid.UUID) -> Attachment:
+        """Load a bound attachment for an application path.
+
+        A draft (Z4) has no application and gives 404 here, so no application route
+        reads, streams or deletes it. ``application_id_of`` narrows the type of the
+        result.
+
+        Raises:
+            NotFoundError: No bound attachment has this id (HTTP 404).
+        """
         attachment = await self.session.get(Attachment, attachment_id)
-        if attachment is None:
+        if attachment is None or attachment.application_id is None:
             raise NotFoundError(f"attachment {attachment_id} not found")
         return attachment
 
@@ -250,7 +309,7 @@ class FilesService:
         """
         attachment = await self.get_attachment(attachment_id)
         await self._assert_app_visible(
-            attachment.application_id, allow_unconfirmed=allow_unconfirmed
+            application_id_of(attachment), allow_unconfirmed=allow_unconfirmed
         )
         await self._ready_attachment(attachment_id)
         return SignedUrlOut(
@@ -276,7 +335,7 @@ class FilesService:
         """
         loaded = await self.get_attachment(attachment_id)
         await self._assert_app_visible(
-            loaded.application_id, allow_unconfirmed=allow_unconfirmed
+            application_id_of(loaded), allow_unconfirmed=allow_unconfirmed
         )
         attachment = await self._ready_attachment(attachment_id)
         # _ready_attachment guarantees both values, else it raises 410 or 503. The
@@ -308,7 +367,7 @@ class FilesService:
         """
         loaded = await self.get_attachment(attachment_id)
         await self._assert_app_visible(
-            loaded.application_id, allow_unconfirmed=allow_unconfirmed
+            application_id_of(loaded), allow_unconfirmed=allow_unconfirmed
         )
         attachment = await self._ready_attachment(attachment_id)
         # _ready_attachment guarantees both values, else it raises 410 or 503. The
@@ -380,7 +439,9 @@ class FilesService:
         """
         rows = (
             await self.session.scalars(
-                select(Attachment).where(Attachment.application_id == application_id)
+                select(Attachment).where(
+                    BOUND, Attachment.application_id == application_id
+                )
             )
         ).all()
         for attachment in rows:
@@ -410,27 +471,51 @@ class FilesService:
         verdict: ScanVerdict,
         *,
         actor: str = "system",
-    ) -> None:
+    ) -> bool:
         """Persist the scan result.
 
         On a finding the method deletes the object and writes an audit entry
-        (quarantine).
+        (quarantine). The entry names the application of a bound file. For a draft
+        (Z4) it carries ``draft: true`` instead.
+
+        The method loads the row again by id. A row that a delete, a draft purge or
+        an anonymization removed during the scan is no error: the method skips it and
+        returns False.
+
+        Returns:
+            True when the result was stored, False when the row is gone.
         """
-        attachment = await self.session.get(Attachment, attachment_id)
+        attachment = await self.session.get(
+            Attachment, attachment_id, populate_existing=True
+        )
         if attachment is None:
             logger.info("scan result for unknown attachment %s — skipped", attachment_id)
-            return
+            return False
 
         attachment.scanned = True
         if verdict.clean:
             attachment.scan_result = SCAN_RESULT_CLEAN
-            await self.session.commit()
-            return
+            return await self._commit_scan(attachment_id)
 
         signature = verdict.signature or "unknown"
         attachment.scan_result = signature
         storage_key = attachment.storage_key
         attachment.storage_key = None
+        owner: dict[str, object] = (
+            {"application_id": str(attachment.application_id)}
+            if attachment.application_id is not None
+            else {"draft": True}
+        )
+        await audit_record(
+            self.session,
+            actor=actor,
+            action=AuditAction.ATTACHMENT_QUARANTINE,
+            target_type="attachment",
+            target_id=str(attachment_id),
+            data={**owner, "signature": signature},
+        )
+        if not await self._commit_scan(attachment_id):
+            return False
         if self.storage is not None and storage_key is not None:
             try:
                 await self.storage.remove(storage_key)
@@ -438,18 +523,51 @@ class FilesService:
                 # The object may already be gone. The quarantine still stands, because
                 # storage_key is NULL now.
                 logger.warning("could not remove infected object for %s", attachment_id)
-        await audit_record(
-            self.session,
-            actor=actor,
-            action=AuditAction.ATTACHMENT_QUARANTINE,
-            target_type="attachment",
-            target_id=str(attachment_id),
-            data={
-                "application_id": str(attachment.application_id),
-                "signature": signature,
-            },
-        )
-        await self.session.commit()
+        return True
+
+    async def _commit_scan(self, attachment_id: uuid.UUID) -> bool:
+        """Commit the scan result, and tolerate a row that is gone since the load.
+
+        Returns:
+            True after the commit, False when the UPDATE found no row.
+        """
+        try:
+            await self.session.commit()
+        except StaleDataError:
+            await self.session.rollback()
+            logger.info("attachment %s removed during the scan — skipped", attachment_id)
+            return False
+        return True
+
+
+def application_id_of(attachment: Attachment) -> uuid.UUID:
+    """Return the application of a bound attachment.
+
+    ``get_attachment`` loads bound rows only. This helper narrows the type for the
+    callers and fails closed with 404 if a draft ever reaches an application path.
+
+    Raises:
+        NotFoundError: The attachment is a draft (HTTP 404).
+    """
+    if attachment.application_id is None:
+        raise NotFoundError(f"attachment {attachment.id} not found")
+    return attachment.application_id
+
+
+def upload_audit_data(attachment: Attachment) -> dict[str, object]:
+    """Build the ``attachment_upload`` audit data, without the file name (PII)."""
+    owner: dict[str, object] = (
+        {"application_id": str(attachment.application_id)}
+        if attachment.application_id is not None
+        else {"draft": True}
+    )
+    return {
+        **owner,
+        "fieldKey": attachment.field_key,
+        "isComparisonOffer": attachment.is_comparison_offer,
+        "mime": attachment.mime,
+        "size": attachment.size,
+    }
 
 
 def _attachment_out(attachment: Attachment) -> AttachmentOut:

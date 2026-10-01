@@ -130,6 +130,23 @@ def body_cap(limit_attr: str) -> Callable[[Request, Settings], None]:
 enforce_auth_payload_limit = body_cap("max_auth_payload_bytes")
 enforce_application_payload_limit = body_cap("max_application_payload_bytes")
 
+# Room for the multipart frame around the file: boundaries, part headers and the small
+# form fields (field key, flag, ALTCHA solution).
+_MULTIPART_OVERHEAD_BYTES = 64 * 1024
+
+
+def enforce_attachment_body_cap(request: Request, settings: SettingsDep) -> None:
+    """Answer 413 when the ``Content-Length`` of an upload is clearly too large.
+
+    The limit is ``attachment_max_bytes`` plus room for the multipart frame. Like
+    ``body_cap`` this is an early, cheap check only. The route reads the file under the
+    authoritative cap (``_read_capped``), also for a chunked body.
+    """
+    limit = settings.attachment_max_bytes + _MULTIPART_OVERHEAD_BYTES
+    raw = request.headers.get("content-length")
+    if raw is not None and raw.isdigit() and int(raw) > limit:
+        raise PayloadTooLargeError(f"Request body exceeds {limit} bytes.")
+
 
 async def _enforce(
     limiter: RateLimiter, key: str, *, limit: int, window: int, detail: str
@@ -252,7 +269,7 @@ async def rate_limit_attachments(
     principal: Annotated[Principal | None, Depends(get_current_principal)],
     applicant: Annotated[Applicant | None, Depends(get_current_applicant)],
 ) -> None:
-    """``POST /attachments``: 30/h per applicant.
+    """``POST /attachments`` and ``POST /apply/attachments``: 30/h per identity.
 
     The key follows the identity. It uses the principal ``sub``, or the bound
     ``application_id`` of the applicant, or the IP when neither exists. The auth

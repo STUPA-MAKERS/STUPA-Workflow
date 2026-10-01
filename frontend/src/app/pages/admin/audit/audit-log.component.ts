@@ -71,6 +71,9 @@ export const AUDIT_ACTIONS = [
   'principal_erased',
   'retention_anonymize',
   'webhook_config',
+  // attachment_upload (F12) covers the application upload and the draft upload of the
+  // wizard (Z4).
+  'attachment_upload',
   'attachment_quarantine',
   'attachment_delete',
   // Content mutations that leave a trace outside the flow: application data, comments,
@@ -134,6 +137,7 @@ const ACTION_ICONS: Record<string, IconName> = {
   delegation_substitute_remove: 'handshake',
   export: 'export',
   webhook_config: 'webhook',
+  attachment_upload: 'paperclip',
   attachment_quarantine: 'paperclip',
   attachment_delete: 'paperclip',
   application_create: 'form',

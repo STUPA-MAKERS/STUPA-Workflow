@@ -101,9 +101,16 @@ class _FakeService:
         self.session = _FakeAuditSession()
 
     async def create(  # noqa: ANN001
-        self, payload, *, actor="applicant", dispatcher=None, email_confirmed=None
+        self,
+        payload,
+        *,
+        actor="applicant",
+        dispatcher=None,
+        email_confirmed=None,
+        draft_pepper=None,
     ):
         self.created = payload
+        self.created_draft_pepper = draft_pepper
         self.created_actor = actor
         self.created_dispatcher = dispatcher
         self.created_email_confirmed = email_confirmed

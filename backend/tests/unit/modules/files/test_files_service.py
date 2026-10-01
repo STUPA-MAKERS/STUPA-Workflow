@@ -34,6 +34,20 @@ SETTINGS = load_settings()
 PDF = b"%PDF-1.4 fake pdf bytes"
 
 
+UPLOAD_AUDITS: list[dict[str, object]] = []
+
+
+@pytest.fixture(autouse=True)
+def _mock_audit(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Capture the audit entries. `FakeSession` cannot run the hash chain."""
+    UPLOAD_AUDITS.clear()
+
+    async def _record(session: object, **kw: object) -> None:
+        UPLOAD_AUDITS.append(kw)
+
+    monkeypatch.setattr(files_service, "audit_record", _record)
+
+
 @pytest.fixture(autouse=True)
 def _mock_mime(monkeypatch: pytest.MonkeyPatch) -> None:
     """Mock sniff and validate to accept PDF without libmagic."""
@@ -71,6 +85,16 @@ async def test_upload_clean_path_stores_and_enqueues() -> None:
     assert len(storage.put_calls) == 1
     assert len(queue.enqueued) == 1
     assert session.committed == 1
+    # F12: the upload writes an audit entry without the file name.
+    assert [a["action"] for a in UPLOAD_AUDITS] == ["attachment_upload"]
+    assert UPLOAD_AUDITS[0]["target_id"] == str(out.id)
+    assert UPLOAD_AUDITS[0]["data"] == {
+        "application_id": str(app_id),
+        "fieldKey": None,
+        "isComparisonOffer": False,
+        "mime": "application/pdf",
+        "size": len(PDF),
+    }
 
 
 async def test_upload_allowed_in_locked_state() -> None:

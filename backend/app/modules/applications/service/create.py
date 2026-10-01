@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from sqlalchemy import select
@@ -23,9 +24,12 @@ from app.modules.applications.service.service_base import (
 )
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
+from app.modules.files.drafts import DRAFT_ATTACHMENTS_MISSING, bind_drafts, check_drafts
 from app.modules.flow.models import FlowVersion, State
 from app.modules.forms.service import FormsService
 from app.modules.forms.validation import AnswerValidationError, validate_answers
+from app.settings import get_settings
+from app.shared.config_schemas import FormFieldDef
 from app.shared.errors import NotFoundError, ValidationProblem
 
 if TYPE_CHECKING:
@@ -42,6 +46,7 @@ class CreateOps(ApplicationsServiceBase):
         actor: str = "applicant",
         dispatcher: ActionDispatcher | None = None,
         email_confirmed: bool | None = None,
+        draft_pepper: str | None = None,
     ) -> tuple[Application, str]:
         """Create an application.
 
@@ -49,8 +54,10 @@ class CreateOps(ApplicationsServiceBase):
 
         1. Load the effective form.
         2. Run ``validate_answers``. A bad answer raises 422 before any DB write.
+           Check and lock the draft uploads of the wizard (Z4, ``_check_drafts``).
+           A missing, expired, foreign or infected draft raises 422 too.
         3. Write the application, the PII row, version 1, the initial state and
-           the status event.
+           the status event. Bind the drafts to the application.
         4. Start the flow of a confirmed application
            (``FlowService.start_confirmed``): the deadline of the initial state,
            the automatic transitions and the task mail. ``dispatcher`` sends the
@@ -71,8 +78,12 @@ class CreateOps(ApplicationsServiceBase):
         (``actor == "applicant"``) is unconfirmed.
 
         The create writes an ``application_create`` audit entry in the same
-        transaction (F12). It holds the type, the gremium, the initial state and
-        the confirmation flag, never PII.
+        transaction (F12). It holds the type, the gremium, the initial state, the
+        confirmation flag and the number of bound drafts, never PII.
+
+        ``draft_pepper`` is the pepper of the draft-token hash
+        (``MAGIC_LINK_SECRET``). The router passes the value of its settings.
+        ``None`` reads it from ``get_settings``.
 
         Returns:
             The application and the applicant email, for the magic-link mail.
@@ -101,6 +112,9 @@ class CreateOps(ApplicationsServiceBase):
         # Store the known field keys only. The code discards an unknown key.
         clean = _whitelist(fields, payload.data)
         amount, currency = _amount_currency(fields, clean)
+        # Draft uploads of the wizard (Z4). The check locks the drafts, so nothing
+        # removes them before the bind below. It runs before the first write.
+        pepper = await self._check_drafts(payload, fields, clean, draft_pepper)
 
         app = Application(
             type_id=payload.type_id,
@@ -121,6 +135,14 @@ class CreateOps(ApplicationsServiceBase):
         )
         self.session.add(app)
         await self.session.flush()
+        if pepper is not None and payload.draft_token is not None:
+            await bind_drafts(
+                self.session,
+                application_id=app.id,
+                attachment_ids=payload.attachment_ids,
+                token=payload.draft_token,
+                pepper=pepper,
+            )
 
         self.session.add(
             Applicant(
@@ -157,6 +179,7 @@ class CreateOps(ApplicationsServiceBase):
                 "gremiumId": str(app.gremium_id) if app.gremium_id else None,
                 "initialStateId": str(initial.id),
                 "emailConfirmed": confirmed,
+                "attachments": len(set(payload.attachment_ids)),
             },
         )
         await self.session.commit()
@@ -170,6 +193,53 @@ class CreateOps(ApplicationsServiceBase):
             await FlowService(self.session, dispatcher).start_confirmed(app.id)
             await self.session.refresh(app)
         return app, str(payload.applicant_email)
+
+    async def _check_drafts(
+        self,
+        payload: ApplicationCreate,
+        fields: list[FormFieldDef],
+        clean: dict[str, Any],
+        draft_pepper: str | None = None,
+    ) -> str | None:
+        """Check the draft uploads that the create binds (Z4).
+
+        Without ``attachmentIds`` and ``draftToken`` the method does nothing. With
+        them, it checks three things and answers 422 for each failure:
+
+        1. A list of ids needs the token.
+        2. Every reference in a ``file`` field is one of ``attachmentIds``.
+        3. The token owns every listed draft, and each draft is neither expired nor
+           infected. A pending scan passes. The errors name each failed id.
+
+        Returns:
+            The pepper of the token hash for the bind, or None without drafts.
+        """
+        ids = payload.attachment_ids
+        if not ids and payload.draft_token is None:
+            return None
+        if payload.draft_token is None:
+            raise ValidationProblem(
+                "attachmentIds needs a draftToken.",
+                errors=[{"field": "draftToken", "msg": "required with attachmentIds"}],
+            )
+        listed = set(ids)
+        foreign = [
+            {"field": f"data.{key}", "msg": f"{ref} is not in attachmentIds"}
+            for key, ref in _file_refs(fields, clean)
+            if _as_uuid(ref) not in listed
+        ]
+        if foreign:
+            raise ValidationProblem(
+                "A file field names an attachment that is not part of the submission.",
+                code=DRAFT_ATTACHMENTS_MISSING,
+                errors=foreign,
+            )
+        pepper = draft_pepper or get_settings().magic_link_secret
+        if ids:
+            await check_drafts(
+                self.session, attachment_ids=ids, token=payload.draft_token, pepper=pepper
+            )
+        return pepper
 
     async def _resolve_flow_version_id(self, app_type: ApplicationType) -> UUID:
         """Resolve the active global flow for a new application.
@@ -196,3 +266,26 @@ class CreateOps(ApplicationsServiceBase):
         if state is None:
             raise NotFoundError("flow has no initial state")
         return state
+
+
+def _file_refs(
+    fields: list[FormFieldDef], data: dict[str, Any]
+) -> Iterator[tuple[str, str]]:
+    """Yield ``(field key, reference)`` for each value of a ``file`` field."""
+    for field in fields:
+        if field.type != "file":
+            continue
+        value = data.get(field.key)
+        refs = [value] if isinstance(value, str) else value
+        if isinstance(refs, list):
+            for ref in refs:
+                if isinstance(ref, str) and ref:
+                    yield field.key, ref
+
+
+def _as_uuid(ref: str) -> UUID | None:
+    """Parse an attachment reference. A value that is no UUID gives None."""
+    try:
+        return UUID(ref)
+    except ValueError:
+        return None

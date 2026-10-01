@@ -1520,6 +1520,7 @@ export const de = {
   'admin.audit.action.principal_erased': 'Konto gelöscht',
   'admin.audit.action.retention_anonymize': 'Aufbewahrungs-Anonymisierung',
   'admin.audit.action.webhook_config': 'Webhook-Konfiguration',
+  'admin.audit.action.attachment_upload': 'Anhang hochgeladen',
   'admin.audit.action.attachment_quarantine': 'Anhang-Quarantäne',
   'admin.audit.action.attachment_delete': 'Anhang gelöscht',
   'admin.audit.action.application_create': 'Antrag angelegt',
@@ -1637,6 +1638,7 @@ export const de = {
   'admin.audit.msg.retention_anonymize':
     '{actor} hat Daten nach Ablauf der Aufbewahrung anonymisiert ({target}).',
   'admin.audit.msg.webhook_config': '{actor} hat einen Webhook konfiguriert ({target}).',
+  'admin.audit.msg.attachment_upload': '{actor} hat einen Anhang hochgeladen ({target}).',
   'admin.audit.msg.attachment_quarantine':
     '{actor} hat einen Anhang in Quarantäne verschoben ({target}).',
   'admin.audit.msg.attachment_delete': '{actor} hat einen Anhang gelöscht ({target}).',
@@ -3743,6 +3745,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.audit.action.principal_erased': 'Account erased',
   'admin.audit.action.retention_anonymize': 'Retention anonymisation',
   'admin.audit.action.webhook_config': 'Webhook configuration',
+  'admin.audit.action.attachment_upload': 'Attachment uploaded',
   'admin.audit.action.attachment_quarantine': 'Attachment quarantine',
   'admin.audit.action.attachment_delete': 'Attachment deleted',
   'admin.audit.action.application_create': 'Application created',
@@ -3854,6 +3857,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.audit.msg.retention_anonymize':
     '{actor} anonymised data past its retention window ({target}).',
   'admin.audit.msg.webhook_config': '{actor} configured a webhook ({target}).',
+  'admin.audit.msg.attachment_upload': '{actor} uploaded an attachment ({target}).',
   'admin.audit.msg.attachment_quarantine': '{actor} quarantined an attachment ({target}).',
   'admin.audit.msg.attachment_delete': '{actor} deleted an attachment ({target}).',
   'admin.audit.msg.application_create': '{actor} created the application {target}.',

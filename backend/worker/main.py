@@ -30,6 +30,7 @@ from worker.backup import create_backup, restore_backup, scheduled_backup
 from worker.backup import on_startup as backup_on_startup
 from worker.deadlines import on_startup as deadlines_on_startup
 from worker.deadlines import process_deadlines
+from worker.files_drafts import purge_draft_attachments
 from worker.mail import on_startup as mail_on_startup
 from worker.mail import send_mail
 from worker.protocol import on_startup as protocol_on_startup
@@ -124,6 +125,7 @@ class WorkerSettings:
         process_deadlines,
         process_task_reminders,
         process_retention,
+        purge_draft_attachments,
         func(create_backup, timeout=_BACKUP_JOB_TIMEOUT_SECONDS),
         func(restore_backup, timeout=_BACKUP_JOB_TIMEOUT_SECONDS),
         func(scheduled_backup, timeout=_BACKUP_JOB_TIMEOUT_SECONDS),
@@ -139,6 +141,8 @@ class WorkerSettings:
         # Task reminders run hourly. The thresholds are in days. The task_reminder_log
         # table prevents duplicate sends.
         cron(process_task_reminders, minute=10),
+        # Expired draft uploads of the wizard (Z4) go hourly, with their objects.
+        cron(purge_draft_attachments, minute=20),
         # Nightly backup. It runs after the retention job, so the archive holds the
         # already-anonymized state rather than PII that retention is about to drop.
         cron(scheduled_backup, hour=4, minute=0),

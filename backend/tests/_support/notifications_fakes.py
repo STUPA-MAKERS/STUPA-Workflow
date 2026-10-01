@@ -47,7 +47,7 @@ class FakeSession:
     async def commit(self) -> None:
         self.committed += 1
 
-    async def get(self, model: type, ident: uuid.UUID) -> Any:
+    async def get(self, model: type, ident: uuid.UUID, **_options: Any) -> Any:
         obj = self.store.get(ident)
         return obj if isinstance(obj, model) else None
 

@@ -7,6 +7,11 @@ transient storage or scanner error raises `arq.Retry` with a linear backoff up t
 `scan_max_tries`. After the last try the job is dead. The worker logs it and never
 requeues it again. Idempotency comes from the job key `scan:<id>`. A second run on an
 already scanned attachment is harmless, because it writes the same result.
+
+The task loads the row by id only. It scans a draft upload of the wizard (Z4) like a
+bound file, and the quarantine audit of a draft carries `draft: true`. A row can
+disappear during the scan: a delete, the draft purge or an anonymization. The task then
+returns `"gone"` and writes nothing.
 """
 
 from __future__ import annotations
@@ -47,7 +52,8 @@ async def scan_attachment(ctx: dict[str, Any], attachment_id: str) -> str:
     A transient error retries with a linear backoff.
 
     Returns:
-        `"skipped"` without ClamAV or storage, `"gone"` when the attachment is gone,
+        `"skipped"` without ClamAV or storage, `"gone"` when the attachment is gone
+        before or during the scan,
         `"clean"` or `"infected"` after a scan, and `"dead"` after the last failed try.
     """
     settings: Settings = ctx["settings"]
@@ -71,9 +77,12 @@ async def scan_attachment(ctx: dict[str, Any], attachment_id: str) -> str:
             verdict = await scanner.scan(data)
         except (StorageError, ScannerError) as exc:
             return _retry_or_dead(ctx, settings, attachment_id, exc)
-        await FilesService(session, storage=storage, settings=settings).finalize_scan(
-            aid, verdict, actor="system"
-        )
+        stored = await FilesService(
+            session, storage=storage, settings=settings
+        ).finalize_scan(aid, verdict, actor="system")
+    if not stored:
+        logger.info("scan target %s removed during the scan — skipped", attachment_id)
+        return "gone"
     return "clean" if verdict.clean else "infected"
 
 

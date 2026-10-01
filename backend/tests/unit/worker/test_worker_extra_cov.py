@@ -75,8 +75,9 @@ class _FinalizeFilesService:
 
     async def finalize_scan(
         self, aid: uuid.UUID, verdict: ScanVerdict, *, actor: str = "system"
-    ) -> None:
+    ) -> bool:
         _FinalizeFilesService.calls.append((aid, verdict, actor))
+        return True
 
 
 @pytest.fixture(autouse=True)

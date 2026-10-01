@@ -37,6 +37,10 @@ class ApplicationCreate(_CamelModel):
     the ALTCHA solution. A logged-in user needs no ALTCHA. The server derives an
     empty ``applicantEmail`` or ``applicantName`` from the account. The router
     enforces the fields that an anonymous submission requires.
+
+    ``attachmentIds`` and ``draftToken`` bind the draft uploads of the wizard
+    (Z4). With them, every reference in a ``file`` field must be one of
+    ``attachmentIds``.
     """
 
     type_id: UUID = Field(alias="typeId")
@@ -50,6 +54,15 @@ class ApplicationCreate(_CamelModel):
     # The schema validates the structure and answers 422 for a malformed value.
     # `require_altcha` runs the cryptographic verification.
     altcha: AltchaSolutionStr | None = None
+    # Draft uploads of the wizard (Z4). The create binds these drafts of the token in
+    # its own transaction. A list without a token answers 422. Both stay optional:
+    # the upload after the create (`POST /applications/{id}/attachments`) still works.
+    attachment_ids: list[UUID] = Field(
+        default_factory=list, alias="attachmentIds", max_length=100
+    )
+    draft_token: str | None = Field(
+        default=None, alias="draftToken", min_length=1, max_length=128
+    )
 
 
 class ApplicationCreated(_CamelModel):
