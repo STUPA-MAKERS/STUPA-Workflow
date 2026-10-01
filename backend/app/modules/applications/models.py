@@ -186,8 +186,10 @@ class MagicLink(UUIDPkMixin, CreatedAtMixin, Base):
     `expires_at` NULL means "no expiry" (`guest_application_settings.link_ttl_days`
     is NULL). Only an `edit` link can be unlimited. A link stops working when it
     expires, when a newer link of the same application is redeemed, or when the
-    application is archived or anonymized. The verify route answers 410 for a used
-    or expired link.
+    application is archived or anonymized. Archiving ends only the existing links:
+    the applicant can still request a new link for an archived application, because
+    an archived application stays readable. Anonymizing removes the email, so no new
+    link is possible. The verify route answers 410 for a used or expired link.
     """
 
     __tablename__ = "magic_link"

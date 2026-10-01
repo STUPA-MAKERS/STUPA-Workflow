@@ -12,12 +12,18 @@ The upgrade:
    `CHECK (expires_at IS NOT NULL OR scope = 'edit')`. Only an edit link can live
    without an expiry. The existing links keep their expiry, so all of them satisfy
    the check.
+3. rewrites the lifetime sentence of the `magic_link` mail template. The seed said
+   that the link is valid for a limited time. By default a link now has no expiry,
+   so the sentence becomes a neutral hint to keep the link private. The step
+   replaces only that exact sentence. The rest of the text, and a text without the
+   sentence, stays as it is.
 
-Both steps are idempotent. A fresh database gets the table and the check from the
+All steps are idempotent. A fresh database gets the table and the check from the
 `create_all` baseline (0001), because the models already declare them.
 
 The downgrade gives every link without an expiry `now() + 7 days` (the old default
-of `MAGIC_LINK_EDIT_TTL_DAYS`), restores NOT NULL, and drops the check and the table.
+of `MAGIC_LINK_EDIT_TTL_DAYS`), restores NOT NULL, drops the check and the table, and
+puts back the seed sentence of the mail template.
 
 Revision ID: d5569d5542c6
 Revises: eff772f93d8e
@@ -28,6 +34,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+import sqlalchemy as sa
 from alembic import op
 
 revision: str = "d5569d5542c6"
@@ -59,6 +66,31 @@ ON CONFLICT (id) DO NOTHING
 
 _CHECK = "ck_magic_link_magic_link_unlimited_edit_only"
 
+# (old seed sentence, new sentence). The new sentences match the builtin fallback in
+# app/modules/notifications/service.py.
+_MAIL_SENTENCES = (
+    (
+        "Der Link ist zeitlich begrenzt gültig.",
+        "Bewahren Sie den Link vertraulich auf. Er öffnet Ihren Antrag.",
+    ),
+    (
+        "The link is valid for a limited time.",
+        "Keep this link private. It opens your application.",
+    ),
+)
+
+_REWRITE_MAIL = """
+UPDATE mail_template
+SET body_i18n = replace(body_i18n::text, :old, :new)::jsonb
+WHERE key = 'magic_link' AND strpos(body_i18n::text, :old) > 0
+"""
+
+
+def _rewrite_mail(*, forward: bool) -> None:
+    for old, new in _MAIL_SENTENCES:
+        src, dst = (old, new) if forward else (new, old)
+        op.get_bind().execute(sa.text(_REWRITE_MAIL), {"old": src, "new": dst})
+
 
 def upgrade() -> None:
     op.execute(_CREATE_TABLE)
@@ -69,6 +101,7 @@ def upgrade() -> None:
         f"ALTER TABLE magic_link ADD CONSTRAINT {_CHECK} "
         "CHECK (expires_at IS NOT NULL OR scope = 'edit')"
     )
+    _rewrite_mail(forward=True)
 
 
 def downgrade() -> None:
@@ -78,3 +111,4 @@ def downgrade() -> None:
     op.execute(f"ALTER TABLE magic_link DROP CONSTRAINT IF EXISTS {_CHECK}")
     op.execute("ALTER TABLE magic_link ALTER COLUMN expires_at SET NOT NULL")
     op.execute("DROP TABLE IF EXISTS guest_application_settings")
+    _rewrite_mail(forward=False)

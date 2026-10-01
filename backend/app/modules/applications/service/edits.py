@@ -145,8 +145,10 @@ class EditOps(ApplicationsServiceBase):
 
         Archiving also expires every magic link of the application (Z1). A link can
         live without an expiry, so the archive is one of the events that end it.
-        Bringing the application back does not revive the links. The applicant
-        requests a new one.
+        Bringing the application back does not revive the links. Archiving ends the
+        existing links only, not the access: an archived application stays readable,
+        so the applicant can still request a new link to the same mailbox, with or
+        without the application being brought back.
         """
         app = await self._get_app(application_id)
         already = app.archived_at is not None

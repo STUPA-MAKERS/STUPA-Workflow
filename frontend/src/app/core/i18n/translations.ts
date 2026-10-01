@@ -446,7 +446,7 @@ export const de = {
     'Ohne Bestätigung wird dein Antrag nach {hours} Stunden automatisch verworfen.',
   'apply.confirm.ref': 'Vorgangsnummer:',
   'apply.confirm.hint':
-    'Keine Mail erhalten? Prüfe den Spam-Ordner. Der Link ist zeitlich begrenzt gültig.',
+    'Keine Mail erhalten? Prüfe den Spam-Ordner. Bewahre den Link vertraulich auf – er öffnet deinen Antrag.',
   'apply.confirm.home': 'Zur Startseite',
 
   // Angemeldete Person: das Backend bestätigt die Adresse schon beim Anlegen.
@@ -2670,7 +2670,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
     'Without confirmation, your application is automatically discarded after {hours} hours.',
   'apply.confirm.ref': 'Reference number:',
   'apply.confirm.hint':
-    'No email received? Check your spam folder. The link is valid for a limited time.',
+    'No email received? Check your spam folder. Keep the link private – it opens your application.',
   'apply.confirm.home': 'Back to start',
 
   // Signed-in submitter: the backend confirms the address at creation time.

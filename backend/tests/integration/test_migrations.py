@@ -7,6 +7,7 @@ the default roles. A deleted application cascades to its applicant rows.
 
 from __future__ import annotations
 
+import json
 import uuid
 
 import pytest
@@ -908,9 +909,38 @@ def test_guest_application_settings_and_unlimited_links(
             ),
             {"a": app_id},
         )
+        # The seed text of the magic-link mail. Another template with the same text
+        # must stay as it is.
+        conn.execute(
+            text(
+                "INSERT INTO mail_template (key, body_i18n) VALUES ('magic_link', "
+                "CAST(:b AS jsonb)) ON CONFLICT (key) DO UPDATE SET body_i18n = "
+                "EXCLUDED.body_i18n"
+            ),
+            {"b": json.dumps(_SEED_MAGIC_LINK_BODY)},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO mail_template (key, body_i18n) VALUES ('mig_probe', "
+                "CAST(:b AS jsonb)) ON CONFLICT (key) DO UPDATE SET body_i18n = "
+                "EXCLUDED.body_i18n"
+            ),
+            {"b": json.dumps(_SEED_MAGIC_LINK_BODY)},
+        )
 
     command.upgrade(alembic_cfg, "head")
     with engine.begin() as conn:
+        body = conn.execute(
+            text("SELECT body_i18n FROM mail_template WHERE key = 'magic_link'")
+        ).scalar_one()
+        assert "zeitlich begrenzt" not in body["de"]
+        assert "Bewahren Sie den Link vertraulich auf. Er öffnet Ihren Antrag." in body["de"]
+        assert "limited time" not in body["en"]
+        assert "Keep this link private. It opens your application." in body["en"]
+        probe = conn.execute(
+            text("SELECT body_i18n FROM mail_template WHERE key = 'mig_probe'")
+        ).scalar_one()
+        assert probe == _SEED_MAGIC_LINK_BODY
         row = conn.execute(
             text(
                 "SELECT id, confirm_ttl_hours, link_ttl_days, updated_by "
@@ -958,4 +988,9 @@ def test_guest_application_settings_and_unlimited_links(
         ).scalar_one()
         assert week is True
         conn.execute(text("DELETE FROM magic_link"))
+        body = conn.execute(
+            text("SELECT body_i18n FROM mail_template WHERE key = 'magic_link'")
+        ).scalar_one()
+        assert body == _SEED_MAGIC_LINK_BODY
+        conn.execute(text("DELETE FROM mail_template WHERE key = 'mig_probe'"))
     command.upgrade(alembic_cfg, "head")

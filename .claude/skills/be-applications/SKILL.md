@@ -39,7 +39,7 @@ description: Application lifecycle — public create with Altcha/magic-link, ver
 - `GET /api/applications/{id}/form` — effective form from the *pinned* version.
 - `PATCH /api/applications/{id}` — A(edit)/P. A `data` change writes a new version plus a diff. A locked state gives 409 unless the caller holds `application.edit_any`.
 - `DELETE /api/applications/{id}` — **admin only**, irreversible (manager/creator cannot).
-- `POST` / `DELETE /api/applications/{id}/archive` — needs `application.archive`. Reversible and destroys nothing: the application stays fully readable, it only leaves the working list. Archiving expires every magic link of the application (Z1); un-archiving revives none. `archived_at` is a timestamp, not a flag. The list filter is a tri-state (`archived=false|true|all`, default `false`).
+- `POST` / `DELETE /api/applications/{id}/archive` — needs `application.archive`. Reversible and destroys nothing: the application stays fully readable, it only leaves the working list. Archiving expires every magic link of the application (Z1); un-archiving revives none. The applicant can still request a new link for an archived application (archive ends the links, not the access; see `be-auth`). `archived_at` is a timestamp, not a flag. The list filter is a tri-state (`archived=false|true|all`, default `false`).
 - `POST` / `GET` / `DELETE /api/applications/{id}/shares[/{share_id}]` — needs `application.share`. Mint, list and revoke public links. The POST response is the ONLY place the plaintext token ever appears; a listing returns `url: null`.
 - `GET /s/{token}` — **public, unauthenticated, outside `/api`**. Server-rendered HTML for one shared application.
 - `GET /api/applications/{id}/timeline` — A/P status history.

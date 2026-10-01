@@ -54,17 +54,18 @@ logger = logging.getLogger("app.notifications")
 MAGIC_LINK_TEMPLATE_KEY = "magic_link"
 
 # The sender uses this builtin fallback when the DB has no `magic_link` template.
+# The body states no lifetime: by default a link has no expiry (link_ttl_days NULL).
 _BUILTIN_MAGIC_LINK_SUBJECT = {
     "de": "Ihr Zugangslink zur Antragsplattform",
     "en": "Your access link for the application platform",
 }
 _BUILTIN_MAGIC_LINK_BODY = {
     "de": "Hallo,\n\nüber diesen Link gelangen Sie zu Ihrem Antrag:\n{{ link }}\n\n"
-    "Der Link ist zeitlich begrenzt gültig. Wenn Sie das nicht angefordert haben, "
-    "ignorieren Sie diese Mail.\n",
+    "Bewahren Sie den Link vertraulich auf. Er öffnet Ihren Antrag. Wenn Sie das "
+    "nicht angefordert haben, ignorieren Sie diese Mail.\n",
     "en": "Hello,\n\nuse this link to access your application:\n{{ link }}\n\n"
-    "The link is valid for a limited time. If you did not request it, ignore this "
-    "email.\n",
+    "Keep this link private. It opens your application. If you did not request it, "
+    "ignore this email.\n",
 }
 
 # Default template for a ``notify`` action without an explicit ``templateKey``.
