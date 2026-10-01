@@ -13,7 +13,7 @@ function vote(overrides: Partial<Vote> = {}): Vote {
     id: 'v1',
     applicationId: 'a1',
     eligibleGroup: 'g1',
-    config: { options: ['yes', 'no', 'abstain'], majorityRule: 'two_thirds', allowChange: true },
+    config: { options: ['yes', 'no', 'abstain'], majorityRule: 'two_thirds' },
     status: 'open',
     opensAt: null,
     closesAt: null,
@@ -28,7 +28,6 @@ async function setup(opts: {
   vote?: Vote;
   getError?: unknown;
   castError?: unknown;
-  castResult?: { status: 'cast' | 'changed' };
   /** The server flag `canCast` of the loaded vote (default true). */
   canVote?: boolean;
   delegation?: VoteDelegationStatus;
@@ -49,7 +48,7 @@ async function setup(opts: {
     : jest.fn(() => of(served));
   const castBallot = opts.castError
     ? jest.fn(() => throwError(() => opts.castError))
-    : jest.fn(() => of(opts.castResult ?? { status: 'cast' as const }));
+    : jest.fn(() => of({ status: 'cast' as const }));
   const deleteVote = opts.deleteError
     ? jest.fn(() => throwError(() => opts.deleteError))
     : jest.fn(() => of(void 0));
@@ -123,14 +122,46 @@ describe('VoteCastComponent', () => {
     expect(screen.queryByRole('button', { name: 'Ja' })).not.toBeInTheDocument();
   });
 
-  it('locks changing the vote when allowChange is false', async () => {
-    const { castBallot } = await setup({
-      vote: vote({ config: { options: ['yes', 'no'], majorityRule: 'simple', allowChange: false } }),
-    });
+  it('locks the ballot after the cast: a vote never changes', async () => {
+    const { castBallot } = await setup({});
     await userEvent.click(screen.getByRole('button', { name: 'Ja' }));
     expect(castBallot).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('button', { name: 'Nein' })).toBeDisabled();
-    expect(screen.getByText(/nicht möglich/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ja' })).toBeDisabled();
+    expect(screen.getByText(/nicht geändert werden/i)).toBeInTheDocument();
+  });
+
+  it('restores the lock from the server ballot on a reload', async () => {
+    const { castBallot } = await setup({
+      vote: vote({ myBallot: { cast: true, choice: 'no' } }),
+    });
+    expect(screen.getByText(/Deine Stimme: Nein/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ja' })).toBeDisabled();
+    await userEvent.click(screen.getByRole('button', { name: 'Ja' }));
+    expect(castBallot).not.toHaveBeenCalled();
+  });
+
+  it('shows a cast secret ballot without its choice', async () => {
+    await setup({
+      vote: vote({ secret: true, myBallot: { cast: true, choice: null } }),
+    });
+    expect(screen.getByText(/geheim abgestimmt/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ja' })).toBeDisabled();
+  });
+
+  it('restores the proxy lock from representedCast', async () => {
+    await setup({
+      canVote: false,
+      vote: vote({ representedCast: true }),
+      delegation: {
+        blocked: false,
+        delegatedToName: null,
+        exercising: true,
+        delegatedByName: 'Alice Beispiel',
+      },
+    });
+    expect(screen.getByText(/Vertretungs-Stimme ist abgegeben/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ja' })).toBeDisabled();
   });
 
   it('hides counts for a secret ballot while open', async () => {
@@ -149,11 +180,37 @@ describe('VoteCastComponent', () => {
     expect(screen.getByText(/nicht geladen/i)).toBeInTheDocument();
   });
 
-  it('surfaces a 409 conflict as already-voted', async () => {
-    const { getVote } = await setup({ castError: { status: 409 } });
+  it('surfaces a 409 already_voted, locks the ballot and reloads', async () => {
+    const { getVote, toast } = await setup({
+      castError: { status: 409, error: { code: 'already_voted' } },
+    });
     await userEvent.click(screen.getByRole('button', { name: 'Ja' }));
+    expect(toast.error).toHaveBeenCalledWith('Du hast bereits abgestimmt.');
     // The initial load plus the refetch after the conflict.
     expect(getVote).toHaveBeenCalledTimes(2);
+  });
+
+  it('locks a proxy ballot on a 409 already_voted', async () => {
+    const { fixture } = await setup({
+      canVote: false,
+      castError: { status: 409, error: { code: 'already_voted' } },
+      delegation: {
+        blocked: false,
+        delegatedToName: null,
+        exercising: true,
+        delegatedByName: 'Alice Beispiel',
+      },
+    });
+    fixture.componentInstance.cast('yes', true);
+    expect(fixture.componentInstance.proxyLocked()).toBe(true);
+    expect(fixture.componentInstance.proxyChoice()).toBeNull();
+  });
+
+  it('surfaces another 409 as a vote that is no longer open', async () => {
+    const { toast, fixture } = await setup({ castError: { status: 409 } });
+    await userEvent.click(screen.getByRole('button', { name: 'Ja' }));
+    expect(toast.error).toHaveBeenCalledWith('Die Abstimmung ist nicht mehr offen.');
+    expect(fixture.componentInstance.locked()).toBe(false);
   });
 
   it('explains a delegated-away voting right instead of a bare not-eligible hint', async () => {
@@ -221,10 +278,11 @@ describe('VoteCastComponent', () => {
     expect(screen.getByRole('button', { name: 'Ja' })).toBeInTheDocument();
   });
 
-  it('shows a changed toast when the server reports a changed ballot', async () => {
-    const { castBallot } = await setup({ castResult: { status: 'changed' } });
+  it('shows the cast toast after a ballot', async () => {
+    const { castBallot, toast } = await setup({});
     await userEvent.click(screen.getByRole('button', { name: 'Nein' }));
     expect(castBallot).toHaveBeenCalledWith('v1', 'no', false);
+    expect(toast.success).toHaveBeenCalledWith('Stimme gezählt.');
     expect(screen.getByText(/Deine Stimme: Nein/)).toBeInTheDocument();
   });
 
@@ -275,7 +333,6 @@ describe('VoteCastComponent', () => {
         config: {
           options: ['yes', 'no'],
           majorityRule: 'simple',
-          allowChange: true,
           quorum: { type: 'percent', value: 50 },
         },
       }),
@@ -289,7 +346,6 @@ describe('VoteCastComponent', () => {
         config: {
           options: ['yes', 'no'],
           majorityRule: 'simple',
-          allowChange: true,
           quorum: { type: 'count', value: 7 },
         },
       }),
@@ -299,10 +355,8 @@ describe('VoteCastComponent', () => {
     expect(subtitle.textContent).not.toContain('7%');
   });
 
-  it('does nothing when casting an already-chosen, change-locked option', async () => {
-    const { castBallot } = await setup({
-      vote: vote({ config: { options: ['yes', 'no'], majorityRule: 'simple', allowChange: false } }),
-    });
+  it('does nothing when casting an already-chosen option', async () => {
+    const { castBallot } = await setup({});
     await userEvent.click(screen.getByRole('button', { name: 'Ja' }));
     expect(castBallot).toHaveBeenCalledTimes(1);
     await userEvent.click(screen.getByRole('button', { name: 'Ja' }));
@@ -324,7 +378,7 @@ describe('VoteCastComponent', () => {
   it('keeps unknown option keys as their raw label', async () => {
     await setup({
       vote: vote({
-        config: { options: ['yes', 'wildcard'], majorityRule: 'simple', allowChange: true },
+        config: { options: ['yes', 'wildcard'], majorityRule: 'simple' },
         tally: { counts: { yes: 1, wildcard: 0 }, eligible: 5, quorumMet: false, leading: 'yes' },
       }),
     });
@@ -362,16 +416,6 @@ describe('VoteCastComponent', () => {
     expect(castBallot).toHaveBeenCalledWith('v1', 'yes', false);
   });
 
-  it('defaults allowChange to true when the config omits it', async () => {
-    const v = vote();
-    delete (v.config as { allowChange?: unknown }).allowChange;
-    const { castBallot } = await setup({ vote: v });
-    await userEvent.click(screen.getByRole('button', { name: 'Ja' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Nein' }));
-    expect(castBallot).toHaveBeenCalledTimes(2);
-    expect(screen.queryByText(/nicht möglich/i)).not.toBeInTheDocument();
-  });
-
   it('renders the tie fallback for a closed vote without a recorded result', async () => {
     await setup({ vote: vote({ status: 'closed', result: null }) });
     expect(screen.getByText('Stimmengleichheit')).toBeInTheDocument();
@@ -397,10 +441,9 @@ describe('VoteCastComponent', () => {
     expect(castBallot).not.toHaveBeenCalled();
   });
 
-  it('cast(asDelegation) is a no-op after a change-locked proxy ballot', async () => {
+  it('cast(asDelegation) is a no-op after the proxy ballot', async () => {
     const { fixture, castBallot } = await setup({
       canVote: false,
-      vote: vote({ config: { options: ['yes', 'no'], majorityRule: 'simple', allowChange: false } }),
       delegation: {
         blocked: false,
         delegatedToName: null,
@@ -410,7 +453,7 @@ describe('VoteCastComponent', () => {
     });
     fixture.componentInstance.cast('yes', true);
     expect(castBallot).toHaveBeenCalledTimes(1);
-    // A set proxyChoice with allowChange=false blocks all further proxy casts.
+    // A cast proxy ballot blocks all further proxy casts.
     fixture.componentInstance.cast('no', true);
     expect(castBallot).toHaveBeenCalledTimes(1);
   });
@@ -423,20 +466,17 @@ describe('VoteCastComponent', () => {
     expect(screen.queryByRole('button', { name: 'Ja' })).not.toBeInTheDocument();
   });
 
-  it('cast() is a no-op when re-selecting the same change-locked own choice', async () => {
-    const { fixture, castBallot } = await setup({
-      vote: vote({ config: { options: ['yes', 'no'], majorityRule: 'simple', allowChange: false } }),
-    });
+  it('cast() is a no-op after the own ballot, also for another option', async () => {
+    const { fixture, castBallot } = await setup({});
     fixture.componentInstance.cast('yes');
     expect(castBallot).toHaveBeenCalledTimes(1);
-    fixture.componentInstance.cast('yes');
+    fixture.componentInstance.cast('no');
     expect(castBallot).toHaveBeenCalledTimes(1);
   });
 
-  it('locks a change-blocked proxy cast after the first proxy ballot', async () => {
+  it('locks the proxy cast after the first proxy ballot', async () => {
     const { castBallot } = await setup({
       canVote: false,
-      vote: vote({ config: { options: ['yes', 'no'], majorityRule: 'simple', allowChange: false } }),
       delegation: {
         blocked: false,
         delegatedToName: null,

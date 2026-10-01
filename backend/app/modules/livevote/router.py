@@ -442,6 +442,9 @@ async def open_meeting_vote(
         "options": payload.options,
         "majorityRule": payload.majority_rule,
         "secret": payload.secret,
+        # A meeting vote has no casting vote (O18): a tie is ``rejected``. The body
+        # has no ``tieBreak``, so the client cannot change this.
+        "tieBreak": "rejected",
     }
     # Gremium quorum default: without an explicit percent, the vote inherits the
     # percent quorum configured on the Gremium.
@@ -464,7 +467,7 @@ async def open_meeting_vote(
     vote = await voting.create_internal(
         item.application_id, create, meeting_id=meeting_id, agenda_item_id=item.id
     )
-    opened = await voting.open(vote.id, now=datetime.now(UTC))
+    opened = await voting.open(vote.id, now=datetime.now(UTC), actor=principal.sub)
     await BrokerPublisher(broker).vote_opened(opened)
     return await service.get(meeting_id, principal)
 

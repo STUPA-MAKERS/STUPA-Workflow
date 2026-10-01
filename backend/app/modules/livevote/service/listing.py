@@ -37,7 +37,7 @@ class ListingOps(PermissionOps, VoteReadOps):
         need the flags and calls without one.
         """
         meeting = await self._get(meeting_id)
-        votes = (await self._votes_for([meeting.id])).get(meeting.id, [])
+        votes = (await self._votes_for([meeting.id], principal)).get(meeting.id, [])
         return await self._emit(
             meeting,
             principal,
@@ -269,7 +269,7 @@ class ListingOps(PermissionOps, VoteReadOps):
         # principal, the admin included. `PermissionOps.can_vote`
         # applies the same rule to the meeting detail.
         vote_ids = await self._vote_cast_gremium_ids(principal)
-        votes_by_meeting = await self._votes_for([m.id for m in meetings])
+        votes_by_meeting = await self._votes_for([m.id for m in meetings], principal)
         out: list[MeetingOut] = []
         for m in meetings:
             is_prot = m.protokollant_id is not None and m.protokollant_id == my_id

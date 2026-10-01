@@ -282,9 +282,18 @@ export class MeetingSessionService implements OnDestroy {
     });
   }
 
+  /** Close a vote. The close always ends the vote. When the pass or fail
+   *  transition of the application is blocked (`branchFired: false`), a warning
+   *  tells the manager to move the application by hand. */
   closeVote(voteId: Uuid): void {
     this.api.closeVote(voteId).subscribe({
-      next: () => this.patchVote(voteId, { status: 'closed' }),
+      next: (closed) => {
+        this.patchVote(voteId, { status: 'closed' });
+        // A generic motion has no application and fires no branch on purpose.
+        if (closed.applicationId && !closed.branchFired) {
+          this.toast.show(this.i18n.translate('meetings.toast.voteBranchBlocked'), 'warning', 10000);
+        }
+      },
       error: (err: unknown) => this.voteActionFailed(err),
     });
   }

@@ -105,7 +105,7 @@ class _VotingFake:
 
     async def close(self, vote_id: Any, principal: Any, *, now: Any = None) -> Any:
         _VotingFake.calls.append(vote_id)
-        return SimpleNamespace()
+        return SimpleNamespace(application_id=None, branch_fired=False)
 
 
 class _NotifyFake:
@@ -230,6 +230,8 @@ async def test_close_meeting_vote_broadcasts_vote_closed(
         meeting_id=meeting_id,
         result="passed",
         tally=SimpleNamespace(counts={"yes": 1}, failed_reason=None),
+        application_id=None,
+        branch_fired=False,
     )
 
     class _Closing(_VotingFake):
@@ -264,6 +266,8 @@ async def test_close_standalone_vote_no_broadcast(
         meeting_id=None,
         result="passed",
         tally=SimpleNamespace(counts={"yes": 1}, failed_reason=None),
+        application_id=None,
+        branch_fired=False,
     )
 
     class _Closing(_VotingFake):
@@ -296,6 +300,8 @@ async def test_close_broadcast_failure_does_not_fail_close(
         meeting_id=uuid4(),
         result="passed",
         tally=SimpleNamespace(counts={"yes": 1}, failed_reason=None),
+        application_id=None,
+        branch_fired=False,
     )
 
     class _Closing(_VotingFake):
@@ -333,14 +339,73 @@ async def test_close_conflict_skips(patched: None, monkeypatch: pytest.MonkeyPat
 
 
 @freeze_time(FROZEN)
-async def test_close_notfound_skips(patched: None, monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_close_with_blocked_branch_counts_as_closed(
+    patched: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """F20: a blocked result branch still closes the vote. The cron does not retry it."""
+    closed = SimpleNamespace(
+        id=uuid4(),
+        meeting_id=None,
+        result="passed",
+        tally=SimpleNamespace(counts={"yes": 1}, failed_reason=None),
+        application_id=uuid4(),
+        branch_fired=False,
+    )
+
+    class _Blocked(_VotingFake):
+        async def close(self, vote_id: Any, principal: Any, *, now: Any = None) -> Any:
+            _VotingFake.calls.append(vote_id)
+            return closed
+
+    monkeypatch.setattr(wd, "VotingService", _Blocked)
+    # Another test may disable the app loggers (alembic `fileConfig`), so record the
+    # warning call itself instead of the log output.
+    warnings: list[str] = []
+    monkeypatch.setattr(wd.logger, "warning", lambda msg, *_a: warnings.append(msg))
+    vote = SimpleNamespace(id=uuid4())
+    assert await wd._close_one(_ctx([FakeSession([[vote]])]), vote.id, NOW) is True
+    assert any("result branch blocked" in w for w in warnings)
+
+
+@freeze_time(FROZEN)
+async def test_close_with_fired_branch_logs_info(
+    patched: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    closed = SimpleNamespace(
+        id=uuid4(),
+        meeting_id=None,
+        result="passed",
+        tally=SimpleNamespace(counts={"yes": 1}, failed_reason=None),
+        application_id=uuid4(),
+        branch_fired=True,
+    )
+
+    class _Fired(_VotingFake):
+        async def close(self, vote_id: Any, principal: Any, *, now: Any = None) -> Any:
+            return closed
+
+    monkeypatch.setattr(wd, "VotingService", _Fired)
+    vote = SimpleNamespace(id=uuid4())
+    assert await wd._close_one(_ctx([FakeSession([[vote]])]), vote.id, NOW) is True
+
+
+@freeze_time(FROZEN)
+async def test_close_notfound_propagates(
+    patched: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The close no longer raises NotFoundError for a missing branch (F20).
+
+    A missing vote after the row lock is a real fault: the cycle logs it.
+    """
+
     class _Gone(_VotingFake):
         async def close(self, *_a: Any, **_k: Any) -> Any:
-            raise NotFoundError("app gone")
+            raise NotFoundError("vote gone")
 
     monkeypatch.setattr(wd, "VotingService", _Gone)
     vote = SimpleNamespace(id=uuid4())
-    assert await wd._close_one(_ctx([FakeSession([[vote]])]), vote.id, NOW) is False
+    with pytest.raises(NotFoundError):
+        await wd._close_one(_ctx([FakeSession([[vote]])]), vote.id, NOW)
 
 
 @freeze_time(FROZEN)
@@ -541,3 +606,9 @@ def test_flow_dispatcher_prefers_the_ctx_and_falls_back_to_the_full_chain() -> N
     )
     assert isinstance(chain, ChainActionDispatcher)
     assert len(chain.dispatchers) == 3
+
+
+def test_publisher_needs_redis() -> None:
+    """The flow gets a live-vote publisher only with Redis (F19 `vote_cancelled`)."""
+    assert wd._publisher({}) is None
+    assert isinstance(wd._publisher({"redis": object()}), wd.BrokerPublisher)

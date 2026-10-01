@@ -228,6 +228,7 @@ export function mapMeetingVote(wire: MeetingVoteOutWire): MeetingVote {
     present: wire.present ?? 0,
     revealed: wire.revealed ?? true,
     failedReason: wire.failedReason ?? null,
+    myBallot: wire.myBallot ?? null,
   };
 }
 

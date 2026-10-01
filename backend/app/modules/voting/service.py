@@ -1,14 +1,18 @@
-"""Voting service: create -> open -> cast -> close.
+"""Voting service: create -> open -> cast -> close (or cancel).
 
-Race safety: the DB enforces one ballot per voter.
+Race safety: the DB enforces one ballot per voter. A ballot never changes after the
+cast (O11).
 
-* open (``secret=false``): ``INSERT ... ON CONFLICT (vote_id, voter_sub)``. With
-  ``allowChange`` the statement runs ``DO UPDATE`` for an idempotent update. Without
-  it the statement runs ``DO NOTHING`` and returns an empty ``RETURNING`` -> 409
-  (double vote).
+* open (``secret=false``): ``INSERT ... ON CONFLICT (vote_id, voter_sub) DO NOTHING``.
+  An empty ``RETURNING`` means a second cast -> 409 ``already_voted``.
 * secret (``secret=true``): ``voted_marker`` (UNIQUE) records 'has voted'. The ballot
-  lands without an identity in ``secret_ballot``. ``allowChange`` has no effect here,
-  because nobody can re-link an anonymous ballot. A second cast gives 409.
+  lands without an identity in ``secret_ballot``. A second cast gives 409
+  ``already_voted`` too.
+
+Close and cancel set ``closed_at``. Open, close and cancel write an audit entry
+(F12). A close always ends the vote: when the pass or fail transition of the
+application cannot fire, the close still commits, writes ``vote_branch_blocked`` and
+returns ``branchFired=false`` (F20).
 
 RBAC is fail-closed and gremium-scoped. ``vote.eligible_group`` holds the UUID of the
 gremium that votes. A ``cast`` needs the gremium permission ``vote.cast`` there: only an
@@ -22,11 +26,11 @@ free group key (an old row) admits nobody: the call gets 403.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import cast
 from uuid import UUID
 
-from sqlalchemy import func, literal_column, select
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -37,11 +41,12 @@ from app.modules.auth.principal import Principal
 from app.modules.auth.rbac import vote_group_key
 from app.modules.delegations.service import voting_delegation_check
 from app.modules.flow.dispatch import ActionDispatcher, NullActionDispatcher
-from app.modules.flow.service import FlowService
+from app.modules.flow.service import FlowService, StagedFire
 from app.modules.voting import tally as tally_mod
 from app.modules.voting.models import Ballot, SecretBallot, Vote, VotedMarker
 from app.modules.voting.schemas import (
     BallotAccepted,
+    MyBallot,
     TallyOut,
     VoteClosed,
     VoteCreate,
@@ -50,6 +55,9 @@ from app.modules.voting.schemas import (
 )
 from app.shared.config_schemas import VoteConfig
 from app.shared.errors import ConflictError, ForbiddenError, NotFoundError, ValidationProblem
+
+# The problem code of a second cast (REST 409 and the live-vote error frame).
+ALREADY_VOTED = "already_voted"
 
 
 def open_tally_revealed(present: int, voted: int, expected: int) -> bool:
@@ -182,7 +190,16 @@ class VotingService:
 
     @staticmethod
     def _config(vote: Vote) -> VoteConfig:
-        return VoteConfig.model_validate(vote.config)
+        return VoteConfig.from_stored(vote.config)
+
+    @staticmethod
+    def _audit_refs(vote: Vote) -> dict[str, str | None]:
+        """Return the id references of a vote for its audit entries (no voter)."""
+        return {
+            "applicationId": str(vote.application_id) if vote.application_id else None,
+            "meetingId": str(vote.meeting_id) if vote.meeting_id else None,
+            "eligibleGroup": vote.eligible_group,
+        }
 
     async def _aggregate(self, vote: Vote, config: VoteConfig) -> dict[str, int]:
         """Count the votes per option: open from ``ballot``, secret from ``secret_ballot``."""
@@ -315,6 +332,10 @@ class VotingService:
             closesAt=vote.closes_at,
             result=vote.result,  # type: ignore[arg-type]
             secret=config.secret,
+            majorityRule=config.majority_rule,
+            quorum=config.quorum,
+            openedAt=vote.opens_at,
+            closedAt=vote.closed_at,
             tally=tally_out,
         )
 
@@ -465,8 +486,13 @@ class VotingService:
             vote, config, await self._tally_out(vote, config, empty, vote.eligible_count or 0)
         )
 
-    async def open(self, vote_id: UUID, *, now: datetime) -> VoteOut:
+    async def open(
+        self, vote_id: UUID, *, now: datetime, actor: str | None = None
+    ) -> VoteOut:
         """Move the vote from ``draft`` to ``open`` and open the time window.
+
+        ``opens_at`` records the real open time (``openedAt`` in the DTO). The method
+        writes a ``vote_open`` audit entry for ``actor``.
 
         The quorum denominator ``eligible_count`` comes from the authoritative roster.
         The create call sets it. It does NOT come from the logged-in users, because
@@ -476,12 +502,20 @@ class VotingService:
         Raises:
             ConflictError: The vote is not in ``draft``.
         """
-        vote = await self._get_vote(vote_id)
+        vote = await self._get_vote(vote_id, for_update=True)
         if vote.status != "draft":
             raise ConflictError(f"vote is {vote.status}, cannot open.", code="conflict")
         config = self._config(vote)
         vote.opens_at = now
         vote.status = "open"
+        await audit_record(
+            self.session,
+            actor=actor,
+            action=AuditAction.VOTE_OPEN,
+            target_type="vote",
+            target_id=str(vote.id),
+            data=self._audit_refs(vote),
+        )
         await self.session.flush()
         await self.session.commit()
         empty = {opt: 0 for opt in config.options}
@@ -558,7 +592,7 @@ class VotingService:
             )
         if config.secret:
             return await self._cast_secret(vote.id, voter_sub, choice)
-        return await self._cast_open(vote.id, voter_sub, choice, config.allow_change)
+        return await self._cast_open(vote.id, voter_sub, choice)
 
     @staticmethod
     def _is_gremium_group(eligible_group: str) -> bool:
@@ -596,31 +630,15 @@ class VotingService:
             principal, vote.eligible_group
         )
 
-    async def _cast_open(
-        self, vote_id: UUID, voter_sub: str, choice: str, allow_change: bool
-    ) -> BallotAccepted:
-        values = {"vote_id": vote_id, "voter_sub": voter_sub, "choice": choice}
-        if allow_change:
-            # ``xmax = 0`` separates an INSERT (first vote -> "cast") from the ON
-            # CONFLICT UPDATE (change -> "changed"). A fresh tuple has a deleting
-            # txid of 0.
-            stmt = (
-                pg_insert(Ballot)
-                .values(**values)
-                .on_conflict_do_update(
-                    constraint="uq_ballot_vote_voter",
-                    set_={"choice": choice, "at": func.now()},
-                )
-                .returning(literal_column("(xmax = 0)").label("inserted"))
-            )
-            row = (await self.session.execute(stmt)).first()
-            await self.session.commit()
-            inserted = bool(row.inserted) if row is not None else False
-            return BallotAccepted(status="cast" if inserted else "changed")
+    async def _cast_open(self, vote_id: UUID, voter_sub: str, choice: str) -> BallotAccepted:
+        """Insert the open ballot. A second cast of the same voter gives 409.
 
+        ``ON CONFLICT DO NOTHING`` keeps the first ballot. An empty ``RETURNING``
+        means the voter already voted. A ballot never changes after the cast (O11).
+        """
         stmt = (
             pg_insert(Ballot)
-            .values(**values)
+            .values(vote_id=vote_id, voter_sub=voter_sub, choice=choice)
             .on_conflict_do_nothing(constraint="uq_ballot_vote_voter")
             .returning(Ballot.id)
         )
@@ -628,15 +646,14 @@ class VotingService:
         if inserted is None:
             # ON CONFLICT DO NOTHING wrote nothing, so no rollback is needed. The
             # session dependency ``get_session`` ends the transaction on the exception.
-            raise ConflictError("Already voted.", code="conflict")
+            raise ConflictError("Already voted.", code=ALREADY_VOTED)
         await self.session.commit()
         return BallotAccepted(status="cast")
 
     async def _cast_secret(self, vote_id: UUID, voter_sub: str, choice: str) -> BallotAccepted:
         # `voted_marker` (UNIQUE) is the 'has voted' identity anchor. The code writes
         # the identity-less ballot only when the marker is new. There is no link from
-        # choice to voter. allowChange cannot work on an anonymous ballot, so a second
-        # cast gives 409.
+        # choice to voter. A second cast gives 409, as on the open path.
         marker = (
             pg_insert(VotedMarker)
             .values(vote_id=vote_id, voter_sub=voter_sub)
@@ -645,7 +662,7 @@ class VotingService:
         )
         inserted = (await self.session.execute(marker)).first()
         if inserted is None:
-            raise ConflictError("Already voted.", code="conflict")
+            raise ConflictError("Already voted.", code=ALREADY_VOTED)
         self.session.add(SecretBallot(vote_id=vote_id, choice=choice))
         await self.session.commit()
         return BallotAccepted(status="cast")
@@ -687,7 +704,8 @@ class VotingService:
     async def get_scoped(self, vote_id: UUID, principal: Principal) -> VoteOut:
         """Like ``get`` but fail-closed scoped to the vote's read audience.
 
-        The result carries the ``canManage`` and ``canCast`` flags of the principal.
+        The result carries the ``canManage`` and ``canCast`` flags of the principal,
+        the own ballot (``myBallot``) and ``representedCast``.
         """
         vote = await self._get_vote(vote_id)
         await self.assert_can_read(vote, principal)
@@ -696,8 +714,51 @@ class VotingService:
             update={
                 "can_manage": await self.can_manage(vote, principal),
                 "can_cast": self.can_cast_own(vote, principal),
+                "my_ballot": await self.my_ballot(vote, principal.sub, secret=out.secret),
+                "represented_cast": await self.represented_cast(
+                    vote, principal.sub, secret=out.secret
+                ),
             }
         )
+
+    async def my_ballot(self, vote: Vote, voter_sub: str, *, secret: bool) -> MyBallot:
+        """Return the ballot that ``voter_sub`` cast in this vote.
+
+        An open vote reads the ``ballot`` row and returns its choice. A secret vote
+        reads only the ``voted_marker``: the choice has no link to the voter, so
+        ``choice`` stays None.
+        """
+        if secret:
+            marker = await self.session.scalar(
+                select(VotedMarker.id).where(
+                    VotedMarker.vote_id == vote.id, VotedMarker.voter_sub == voter_sub
+                )
+            )
+            return MyBallot(cast=marker is not None)
+        row = (
+            await self.session.execute(
+                select(Ballot.choice).where(
+                    Ballot.vote_id == vote.id, Ballot.voter_sub == voter_sub
+                )
+            )
+        ).first()
+        if row is None:
+            return MyBallot(cast=False)
+        return MyBallot(cast=True, choice=row.choice)
+
+    async def represented_cast(self, vote: Vote, sub: str, *, secret: bool) -> bool:
+        """Tell whether ``sub`` holds a voting delegation and cast the represented ballot.
+
+        The represented ballot runs under the ``sub`` of the delegator
+        (``voting_delegation_check``). The method returns False without an incoming
+        voting delegation for the meeting of the vote.
+        """
+        _, delegator_sub = await voting_delegation_check(
+            self.session, sub, vote.meeting_id, vote.eligible_group, datetime.now(UTC)
+        )
+        if delegator_sub is None:
+            return False
+        return (await self.my_ballot(vote, delegator_sub, secret=secret)).cast
 
     async def _manages_in_gremium(self, gremium_id: UUID, principal: Principal) -> bool:
         """Tell whether a gremium role gives ``vote.manage`` or ``session.manage`` here.
@@ -851,12 +912,15 @@ class VotingService:
             )
         return self._to_out(vote, config, tally_out)
 
-    async def cancel(self, vote_id: UUID) -> VoteOut:
+    async def cancel(
+        self, vote_id: UUID, *, now: datetime | None = None, actor: str | None = None
+    ) -> VoteOut:
         """Move the vote from ``open`` to ``cancelled`` without a result or a branch.
 
         The application stays in the ``vote`` state. An operator can then create a new
         vote or fire a manual exit. This is the only way out when the vote does not
-        reach the quorum, because ``close`` is then blocked.
+        reach the quorum, because ``close`` is then blocked. The method sets
+        ``closed_at`` and writes a ``vote_cancel`` audit entry for ``actor``.
 
         Raises:
             ConflictError: The vote is not open.
@@ -864,7 +928,9 @@ class VotingService:
         vote = await self._get_vote(vote_id, for_update=True)
         if vote.status != "open":
             raise ConflictError(f"vote is {vote.status}, cannot cancel.", code="conflict")
-        vote.status = "cancelled"
+        await self._mark_cancelled(
+            vote, now=now or datetime.now(UTC), actor=actor, reason="manual"
+        )
         await self.session.commit()
         config = self._config(vote)
         counts = await self._aggregate(vote, config)
@@ -874,30 +940,161 @@ class VotingService:
             await self._tally_out(vote, config, counts, vote.eligible_count or 0),
         )
 
+    async def _mark_cancelled(
+        self, vote: Vote, *, now: datetime, actor: str | None, reason: str
+    ) -> None:
+        """Set a loaded vote to ``cancelled`` and audit it, without a commit."""
+        previous = vote.status
+        vote.status = "cancelled"
+        vote.closed_at = now
+        await audit_record(
+            self.session,
+            actor=actor,
+            action=AuditAction.VOTE_CANCEL,
+            target_type="vote",
+            target_id=str(vote.id),
+            data={**self._audit_refs(vote), "reason": reason, "previousStatus": previous},
+        )
+
+    async def cancel_for_application(
+        self,
+        application_id: UUID,
+        *,
+        now: datetime,
+        actor: str | None = None,
+        left_state_id: UUID | None = None,
+        entered_state_id: UUID | None = None,
+    ) -> list[Vote]:
+        """Cancel the votes that a state change of the application orphans (F19).
+
+        The flow calls this when the application leaves its state without a vote
+        branch: a transition without a branch, a forced status, or an audit revert.
+
+        * Every ``open`` vote of the application is cancelled.
+        * A ``draft`` vote is cancelled only when it belongs to the state that the
+          application leaves (``left_state_id``). That is a draft whose
+          ``opens_state_id`` is the left state, or a draft without ``opens_state_id``
+          when the left state is a vote state.
+        * Every other draft stays. Examples: a draft without ``opens_state_id`` that
+          was prepared before the application enters its vote state, or a draft for a
+          later vote state. A transition back into the same state keeps every draft.
+
+        Each cancelled vote gets ``closed_at`` and a ``vote_cancel`` audit entry.
+
+        The method does not commit. The caller commits together with the state change
+        and then sends ``vote_cancelled`` for the returned votes.
+
+        Returns:
+            The cancelled votes.
+        """
+        rows = (
+            (
+                await self.session.execute(
+                    select(Vote)
+                    .where(
+                        Vote.application_id == application_id,
+                        Vote.status.in_(("open", "draft")),
+                    )
+                    .order_by(Vote.created_at)
+                    .with_for_update()
+                )
+            )
+            .scalars()
+            .all()
+        )
+        left_is_vote: bool | None = None
+        cancelled: list[Vote] = []
+        for vote in rows:
+            if vote.status == "draft":
+                if left_state_id is None or left_state_id == entered_state_id:
+                    continue
+                if vote.opens_state_id is None:
+                    if left_is_vote is None:
+                        left_is_vote = await self._is_vote_state(left_state_id)
+                    if not left_is_vote:
+                        continue
+                elif vote.opens_state_id != left_state_id:
+                    continue
+            await self._mark_cancelled(vote, now=now, actor=actor, reason="state_left")
+            cancelled.append(vote)
+        await self.session.flush()
+        return cancelled
+
+    async def _is_vote_state(self, state_id: UUID) -> bool:
+        """Tell if the state is a vote state.
+
+        A vote state has ``kind == 'vote'`` or at least one ``pass``/``fail`` branch
+        exit.
+        """
+        from app.modules.flow.models import State, Transition
+
+        kind = await self.session.scalar(select(State.kind).where(State.id == state_id))
+        if kind == "vote":
+            return True
+        branch = await self.session.scalar(
+            select(Transition.id)
+            .where(Transition.from_state_id == state_id, Transition.branch.is_not(None))
+            .limit(1)
+        )
+        return branch is not None
+
+    async def cancel_drafts_for_meeting(
+        self, meeting_id: UUID, *, now: datetime, actor: str | None = None
+    ) -> list[Vote]:
+        """Cancel the ``draft`` votes of a meeting, without a commit.
+
+        The meeting close uses this: a draft of a closed meeting can never open. Each
+        vote gets ``closed_at`` and a ``vote_cancel`` audit entry with the reason
+        ``meeting_closed``.
+
+        Returns:
+            The cancelled votes.
+        """
+        rows = (
+            (
+                await self.session.execute(
+                    select(Vote)
+                    .where(Vote.meeting_id == meeting_id, Vote.status == "draft")
+                    .order_by(Vote.created_at)
+                    .with_for_update()
+                )
+            )
+            .scalars()
+            .all()
+        )
+        for vote in rows:
+            await self._mark_cancelled(vote, now=now, actor=actor, reason="meeting_closed")
+        await self.session.flush()
+        return list(rows)
+
     async def close(
         self, vote_id: UUID, principal: Principal, *, now: datetime | None = None
     ) -> VoteClosed:
         """Close an open vote, compute the tally and the result, then fire the branch.
 
-        The close calls ``flow.fire(result_branch)``. It is atomic. The vote change
-        (``status=closed`` plus ``result``) and the ``voteResult`` transition commit in
-        one transaction. ``fire`` commits the staged vote changes. If ``fire`` fails on
-        a guard or a race, the session dependency rolls everything back. The vote then
-        stays open and the caller can retry, instead of ending 'closed but branch never
-        fired'.
+        One transaction, one commit (F20). The method stages the tally result,
+        ``status=closed`` and ``closed_at``, and a ``vote_close`` audit entry. It then
+        stages the ``pass`` or ``fail`` transition of the application in a SAVEPOINT.
+        The commit writes the close and the transition together.
+
+        A blocked branch does not block the close. When the guard of the transition
+        fails, another transition wins the race, or the current state has no such
+        transition, only the SAVEPOINT rolls back. The vote stays closed, the audit log
+        gets ``vote_branch_blocked`` (vote, branch, reason), and the application stays
+        in its state. ``branchFired`` is then False, and a person must move the
+        application by hand. The cron therefore never retries a closed vote.
 
         An expired quorum vote is a special case. Such a vote is time-bound and
         quorum-gated, and its window ``closes_at`` passed with the quorum unmet. It has
         finally failed, because no more ballots are possible. On a manual close
-        (``now=None``) the earlier fail-closed 409 applies. If the caller (cron) passes
-        ``now`` and the window already expired, the close is different. It marks the
-        vote as terminal QUORUM-MISSED and fires the ``fail`` branch. Without that rule
-        the application would hang in the ``vote`` state forever. The cron would also
-        re-grab the same unclosable vote on each tick.
+        (``now=None``) the fail-closed 409 applies. If the caller (cron) passes ``now``
+        and the window already expired, the close marks the vote as terminal
+        QUORUM-MISSED and fires the ``fail`` branch. Without that rule the application
+        would hang in the ``vote`` state forever.
 
         Raises:
-            ConflictError: The vote is not open, the quorum is not met, or the flow has
-                no matching branch transition.
+            ConflictError: The vote is not open, or the quorum is not met before the
+                window expired.
         """
         # The row lock serializes this call against cast(). No last-second ballot can
         # land between the tally and ``status=closed``.
@@ -930,6 +1127,27 @@ class VotingService:
         result_value: tally_mod.VoteResult = (
             outcome.result if outcome.quorum_met else "rejected"
         )
+        closed_at = now or datetime.now(UTC)
+
+        # Stage the vote state. The commit at the end writes it together with the
+        # transition, or alone when the branch is blocked.
+        vote.status = "closed"
+        vote.result = result_value
+        vote.closed_at = closed_at
+        await audit_record(
+            self.session,
+            actor=principal.sub,
+            action=AuditAction.VOTE_CLOSE,
+            target_type="vote",
+            target_id=str(vote.id),
+            # Aggregates only, never a voter.
+            data={
+                **self._audit_refs(vote),
+                "result": result_value,
+                "counts": dict(counts),
+                "quorumMet": outcome.quorum_met,
+            },
+        )
 
         # A ``vote`` state has two fixed exits with ``branch`` ``pass`` and ``fail``.
         # ``passed`` fires pass. ``rejected`` and ``tie`` are fail-closed and fire fail.
@@ -937,37 +1155,26 @@ class VotingService:
         # holds the result for the protocol.
         branch_name = "pass" if result_value == "passed" else "fail"
         flow = FlowService(self.session, self.dispatcher)
-        branch = (
-            await flow.branch_transition(vote.application_id, branch_name)
-            if vote.application_id is not None
-            else None
-        )
-        # An application-bound vote WITHOUT a matching branch transition is fail-closed.
-        # This happens on a misconfigured flow, or on a vote in a non-``vote`` state.
-        # A silent close would fix the result but leave the application in the pre-vote
-        # state.
-        if vote.application_id is not None and branch is None:
-            raise ConflictError(
-                f"no '{branch_name}' branch transition for the vote's current state; "
-                "flow is misconfigured.",
-                code="conflict",
+        staged: StagedFire | None = None
+        if vote.application_id is not None:
+            staged = await self._stage_branch(
+                flow,
+                vote,
+                vote.application_id,
+                branch_name,
+                principal,
+                note=f"vote:{result_value}",
             )
-
-        # Stage the vote state and do NOT commit it here. `fire` writes it atomically
-        # with the transition and the status_event. Without a branch the code below
-        # commits.
-        vote.status = "closed"
-        vote.result = result_value
-        vote.result_branch_transition_id = branch.id if branch is not None else None
+        if staged is not None:
+            vote.result_branch_transition_id = staged.transition.id
+            # The deadline of the new state joins the same commit.
+            await flow.schedule_staged_deadline(staged, commit=False)
+        await self.session.commit()
 
         new_state_id: UUID | None = None
-        if branch is not None and vote.application_id is not None:
-            fired = await flow.fire_branch(
-                vote.application_id, branch_name, principal, note=f"vote:{result_value}"
-            )
+        if staged is not None:
+            fired = await flow.after_commit(staged, schedule_deadline=False)
             new_state_id = fired.new_state_id
-        else:
-            await self.session.commit()
 
         tally_out = TallyOut(
             counts=counts,
@@ -980,8 +1187,48 @@ class VotingService:
         return VoteClosed(
             id=vote.id,
             meetingId=vote.meeting_id,
+            applicationId=vote.application_id,
             result=result_value,
             tally=tally_out,
-            firedTransitionId=branch.id if branch is not None else None,
+            closedAt=closed_at,
+            firedTransitionId=staged.transition.id if staged is not None else None,
             newStateId=new_state_id,
+            branchFired=staged is not None,
         )
+
+    async def _stage_branch(
+        self,
+        flow: FlowService,
+        vote: Vote,
+        application_id: UUID,
+        branch_name: str,
+        principal: Principal,
+        *,
+        note: str,
+    ) -> StagedFire | None:
+        """Stage the result branch in a SAVEPOINT, or audit why it is blocked.
+
+        The SAVEPOINT keeps the staged vote close safe: a guard failure, a lost race or
+        a missing branch transition rolls back only the branch. The method then writes
+        ``vote_branch_blocked`` and returns None.
+        """
+        try:
+            async with self.session.begin_nested():
+                return await flow.stage_branch(
+                    application_id, branch_name, principal, note=note
+                )
+        except ConflictError as exc:
+            reason = exc.code
+        except NotFoundError:
+            # The current state has no such branch: a misconfigured flow, or a vote
+            # outside its vote state.
+            reason = "no_branch"
+        await audit_record(
+            self.session,
+            actor=principal.sub,
+            action=AuditAction.VOTE_BRANCH_BLOCKED,
+            target_type="vote",
+            target_id=str(vote.id),
+            data={**self._audit_refs(vote), "branch": branch_name, "reason": reason},
+        )
+        return None

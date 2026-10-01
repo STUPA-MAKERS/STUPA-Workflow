@@ -158,7 +158,7 @@ class LifecycleOps(PermissionOps, VoteReadOps):
             meeting.status = payload.status
         await self.session.flush()
         await self.session.commit()
-        votes = (await self._votes_for([meeting.id])).get(meeting.id, [])
+        votes = (await self._votes_for([meeting.id], principal)).get(meeting.id, [])
         out = await self._emit(meeting, principal, votes=votes)
         if self.publisher is not None:
             await self.publisher.meeting_state(out)

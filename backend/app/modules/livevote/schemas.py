@@ -10,6 +10,9 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.modules.voting.schemas import MyBallot
+from app.shared.config_schemas import Quorum
+
 MeetingStatus = Literal["planned", "live", "closed"]
 
 
@@ -106,6 +109,20 @@ class MeetingVoteOut(_CamelModel):
     failed_reason: Literal["quorum", "majority"] | None = Field(
         default=None, alias="failedReason"
     )
+    # The rules of the vote, for the vote card (A5).
+    majority_rule: Literal["simple", "absolute", "two_thirds"] = Field(
+        default="simple", alias="majorityRule"
+    )
+    secret: bool = False
+    quorum: Quorum | None = None
+    # The real open time (``opens_at``) and the real end time (close or cancel).
+    opened_at: _datetime | None = Field(default=None, alias="openedAt")
+    closed_at: _datetime | None = Field(default=None, alias="closedAt")
+    # The own ballot of the caller. A secret vote gives only ``cast``. None when the
+    # payload has no caller (a broadcast).
+    my_ballot: MyBallot | None = Field(default=None, alias="myBallot")
+    # True when the caller cast the ballot of a delegator in this vote.
+    represented_cast: bool = Field(default=False, alias="representedCast")
 
 
 class MeetingOut(_CamelModel):
@@ -234,6 +251,9 @@ class MeetingVoteOpenBody(_CamelModel):
     fires the pass or fail branch of the application on close. A free-text agenda
     item allows several generic questions. ``question`` goes into the protocol
     snippet.
+
+    The body has no ``tieBreak``: a meeting vote has no casting vote, and the route
+    always stores ``tieBreak=rejected`` (O18).
     """
 
     agenda_item_id: UUID = Field(alias="agendaItemId")

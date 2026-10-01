@@ -8,7 +8,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from app.shared.config_schemas import VoteConfig
+from app.shared.config_schemas import Quorum, VoteConfig
 
 
 class _CamelModel(BaseModel):
@@ -104,6 +104,18 @@ class TallyOut(_CamelModel):
     )
 
 
+class MyBallot(_CamelModel):
+    """The own ballot of the calling principal in one vote.
+
+    ``cast`` tells whether the principal has cast the own ballot. ``choice`` is the
+    chosen option. A secret vote keeps the choice apart from the identity, so there
+    ``choice`` is always None and only ``cast`` (from the voted marker) travels.
+    """
+
+    cast: bool = False
+    choice: str | None = None
+
+
 class VoteOut(_CamelModel):
     """Vote state + tally (``GET /votes/{id}``)."""
 
@@ -120,10 +132,26 @@ class VoteOut(_CamelModel):
     # ``cancelled``: the application left the vote state manually and aborted the vote.
     status: Literal["draft", "open", "closed", "cancelled"]
     opens_at: datetime | None = Field(default=None, alias="opensAt")
+    # The planned end of the cast window (deadline). It is not the real close time.
     closes_at: datetime | None = Field(default=None, alias="closesAt")
     result: Literal["passed", "rejected", "tie"] | None = None
     secret: bool
+    # Copies of ``config`` for the vote card, so a client needs no config parse.
+    majority_rule: Literal["simple", "absolute", "two_thirds"] = Field(
+        default="simple", alias="majorityRule"
+    )
+    quorum: Quorum | None = None
+    # The real moment when the vote opened (``open`` sets ``opens_at``).
+    opened_at: datetime | None = Field(default=None, alias="openedAt")
+    # The real moment when the vote ended (close or cancel). None while it runs.
+    closed_at: datetime | None = Field(default=None, alias="closedAt")
     tally: TallyOut
+    # The own ballot of the caller. Only ``GET /votes/{id}`` sets it. Other responses
+    # and the live-vote events leave it None.
+    my_ballot: MyBallot | None = Field(default=None, alias="myBallot")
+    # True when the caller holds a voting delegation for this vote and has cast the
+    # represented ballot. Only ``GET /votes/{id}`` sets it.
+    represented_cast: bool = Field(default=False, alias="representedCast")
     # What the calling principal may do with this vote. Only ``GET /votes/{id}`` sets
     # them. Every other response and the live-vote events leave them False.
     # ``canManage``: open, close, cancel and delete (``assert_can_manage``).
@@ -134,19 +162,34 @@ class VoteOut(_CamelModel):
 
 
 class BallotAccepted(_CamelModel):
-    """Response for an accepted ballot."""
+    """Response for an accepted ballot.
 
-    status: Literal["cast", "changed"]
+    A ballot never changes after the cast (O11). A second cast gives 409
+    ``already_voted``, so the only status is ``cast``.
+    """
+
+    status: Literal["cast"] = "cast"
 
 
 class VoteClosed(_CamelModel):
-    """Result of a vote close (``POST /votes/{id}/close``)."""
+    """Result of a vote close (``POST /votes/{id}/close``).
+
+    The close always ends the vote. ``branchFired`` tells whether the pass or fail
+    transition of the application also fired. It is False when the guard of that
+    transition failed, when the current state has no such transition, or when the
+    vote has no application (``applicationId`` is None). In the first two cases the
+    audit log holds a ``vote_branch_blocked`` entry, and a person must move the
+    application by hand.
+    """
 
     id: UUID
     meeting_id: UUID | None = Field(default=None, alias="meetingId")
+    application_id: UUID | None = Field(default=None, alias="applicationId")
     result: Literal["passed", "rejected", "tie"]
     tally: TallyOut
+    closed_at: datetime | None = Field(default=None, alias="closedAt")
     fired_transition_id: UUID | None = Field(
         default=None, alias="firedTransitionId"
     )
     new_state_id: UUID | None = Field(default=None, alias="newStateId")
+    branch_fired: bool = Field(default=False, alias="branchFired")

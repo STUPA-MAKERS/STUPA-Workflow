@@ -33,10 +33,16 @@ class FakeSource implements LiveVoteSource {
 /**
  * `canVote` is the server flag of the meeting. `'error'` makes the meeting load fail.
  */
-async function setup(canVote: boolean | 'error' = true, withId = true) {
+async function setup(
+  canVote: boolean | 'error' = true,
+  withId = true,
+  votes: { id: string; myBallot: { cast: boolean; choice: string | null } | null }[] = [],
+) {
   const source = new FakeSource();
   const getMeeting = jest.fn(() =>
-    canVote === 'error' ? throwError(() => ({ status: 403 })) : of({ id: 'm1', canVote }),
+    canVote === 'error'
+      ? throwError(() => ({ status: 403 }))
+      : of({ id: 'm1', canVote, votes }),
   );
   const result = await render(LiveVoteComponent, {
     providers: [
@@ -156,6 +162,75 @@ describe('LiveVoteComponent', () => {
     detectChanges();
     fixture.componentInstance.cast('yes');
     expect(channel.sent.some((m) => m.type === 'cast')).toBe(false);
+  });
+
+  it('locks the options after the cast: a ballot never changes', async () => {
+    const { fixture, channel, detectChanges } = await setup();
+    channel.subject.next(OPEN_VOTE);
+    detectChanges();
+    await userEvent.click(screen.getByRole('button', { name: 'Ja' }));
+    detectChanges();
+    expect(screen.getByRole('button', { name: 'Nein' })).toBeDisabled();
+    fixture.componentInstance.cast('no');
+    expect(channel.sent.filter((m) => m.type === 'cast')).toHaveLength(1);
+  });
+
+  it('shows already-voted and locks on an already_voted error frame', async () => {
+    const { fixture, channel, detectChanges } = await setup();
+    channel.subject.next(OPEN_VOTE);
+    channel.subject.next({ type: 'error', code: 'already_voted' });
+    detectChanges();
+    expect(screen.getByText(/bereits abgestimmt/)).toBeInTheDocument();
+    expect(fixture.componentInstance.locked()).toBe(true);
+    fixture.componentInstance.cast('yes');
+    expect(channel.sent.some((m) => m.type === 'cast')).toBe(false);
+  });
+
+  it('restores the own choice of an open vote from myBallot after a reload', async () => {
+    const { fixture, channel, detectChanges } = await setup(true, true, [
+      { id: 'v1', myBallot: { cast: true, choice: 'no' } },
+    ]);
+    channel.subject.next(OPEN_VOTE);
+    detectChanges();
+    expect(fixture.componentInstance.locked()).toBe(true);
+    expect(screen.getByText(/Danke! Deine Stimme: Nein/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ja' })).toBeDisabled();
+    fixture.componentInstance.cast('yes');
+    expect(channel.sent.some((m) => m.type === 'cast')).toBe(false);
+  });
+
+  it('locks a secret vote from myBallot.cast without a choice', async () => {
+    const { fixture, channel, detectChanges } = await setup(true, true, [
+      { id: 'v1', myBallot: { cast: true, choice: null } },
+    ]);
+    channel.subject.next(OPEN_VOTE);
+    detectChanges();
+    expect(fixture.componentInstance.locked()).toBe(true);
+    expect(screen.getByText(/bereits abgestimmt/)).toBeInTheDocument();
+  });
+
+  it('keeps the options free when myBallot belongs to another vote or is not cast', async () => {
+    const { fixture, channel, detectChanges } = await setup(true, true, [
+      { id: 'v0', myBallot: { cast: true, choice: 'yes' } },
+      { id: 'v1', myBallot: { cast: false, choice: null } },
+      { id: 'v9', myBallot: null },
+    ]);
+    channel.subject.next(OPEN_VOTE);
+    detectChanges();
+    expect(fixture.componentInstance.locked()).toBe(false);
+    expect(fixture.componentInstance.shownChoice()).toBeNull();
+  });
+
+  it('frees the options again when the server refuses a cast', async () => {
+    const { fixture, channel, detectChanges } = await setup();
+    channel.subject.next(OPEN_VOTE);
+    detectChanges();
+    fixture.componentInstance.cast('yes');
+    expect(fixture.componentInstance.locked()).toBe(true);
+    channel.subject.next({ type: 'error', code: 'locked' });
+    detectChanges();
+    expect(fixture.componentInstance.myChoice()).toBeNull();
+    expect(fixture.componentInstance.locked()).toBe(false);
   });
 
   it('resets the own choice when a new vote opens', async () => {

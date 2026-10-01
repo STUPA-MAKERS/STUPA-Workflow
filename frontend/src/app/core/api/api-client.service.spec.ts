@@ -327,7 +327,7 @@ describe('ApiClient', () => {
       id: 'v1',
       applicationId: 'app-1',
       eligibleGroup: 'stupa',
-      config: { options: ['yes', 'no', 'abstain'], majorityRule: 'two_thirds', allowChange: true },
+      config: { options: ['yes', 'no', 'abstain'], majorityRule: 'two_thirds' },
       status: 'open',
       opensAt: null,
       closesAt: null,
@@ -352,7 +352,23 @@ describe('ApiClient', () => {
     api.castBallot('v1', 'no', true).subscribe();
     const req = http.expectOne('/api/votes/v1/ballot');
     expect(req.request.body).toEqual({ choice: 'no', asDelegation: true });
-    req.flush({ status: 'changed' });
+    req.flush({ status: 'cast' });
+  });
+
+  it('propagates a 409 already_voted on a second ballot', (done) => {
+    api.castBallot('v1', 'yes').subscribe({
+      error: (err: { status: number; error: { code: string } }) => {
+        expect(err.status).toBe(409);
+        expect(err.error.code).toBe('already_voted');
+        done();
+      },
+    });
+    http
+      .expectOne('/api/votes/v1/ballot')
+      .flush(
+        { title: 'Already voted.', status: 409, code: 'already_voted' },
+        { status: 409, statusText: 'Conflict' },
+      );
   });
 
   it('POSTs an empty body to /auth/logout', () => {
@@ -830,11 +846,18 @@ describe('ApiClient', () => {
     req.flush(null);
   });
 
-  it('closes a vote', () => {
-    api.closeVote('v-1').subscribe();
+  it('closes a vote and returns branchFired', () => {
+    let fired: boolean | undefined;
+    api.closeVote('v-1').subscribe((closed) => (fired = closed.branchFired));
     const req = http.expectOne('/api/votes/v-1/close');
     expect(req.request.method).toBe('POST');
-    req.flush(null);
+    req.flush({
+      id: 'v-1',
+      result: 'passed',
+      tally: { counts: {}, eligible: 0, quorumMet: true, leading: null },
+      branchFired: false,
+    });
+    expect(fired).toBe(false);
   });
 
   it('cancels a vote', () => {

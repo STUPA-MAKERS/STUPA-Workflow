@@ -80,6 +80,11 @@ export const AUDIT_ACTIONS = [
   'comment_delete',
   'protocol_delete',
   'vote_delete',
+  // Vote lifecycle (F12). vote_branch_blocked marks an application that a person must move.
+  'vote_open',
+  'vote_close',
+  'vote_cancel',
+  'vote_branch_blocked',
   // Budget and money mutations. They mirror the BUDGET_* values in actions.py.
   'budget_node_create',
   'budget_node_update',
@@ -122,6 +127,10 @@ const ACTION_ICONS: Record<string, IconName> = {
   comment_delete: 'form',
   protocol_delete: 'document',
   vote_delete: 'check',
+  vote_open: 'check',
+  vote_close: 'check',
+  vote_cancel: 'check',
+  vote_branch_blocked: 'check',
   // Money mutations use the euro glyph. The cost center structure uses the pie glyph of the
   // budget tab.
   budget_node_create: 'chart-pie',

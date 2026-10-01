@@ -114,7 +114,7 @@ async def open_vote(
     on the live-vote channel. Without a meeting the broadcast is a no-op.
     """
     await service.assert_can_manage_vote(vote_id, principal)
-    vote = await service.open(vote_id, now=datetime.now(UTC))
+    vote = await service.open(vote_id, now=datetime.now(UTC), actor=principal.sub)
     await publisher.vote_opened(vote)
     return vote
 
@@ -132,8 +132,11 @@ async def close_vote(
 ) -> VoteClosed:
     """Close a vote, compute the tally, set the result and fire the flow branch.
 
-    The close calls ``flow.fire(result_branch)``. The gremium-scoped manage right blocks
-    a cross-tenant close, which would fire the flow of another application. The
+    The close and the ``pass`` or ``fail`` transition commit together. When the branch
+    cannot fire (guard failed, lost race, no such transition), the vote still closes:
+    ``branchFired`` is False, the audit log holds ``vote_branch_blocked``, and a person
+    must move the application by hand. The gremium-scoped manage right blocks a
+    cross-tenant close, which would fire the flow of another application. The
     publisher broadcasts ``vote_closed`` on the meeting channel. Without a meeting the
     broadcast is a no-op.
     """
@@ -162,7 +165,7 @@ async def cancel_vote(
     Gremium-scoped manage right.
     """
     await service.assert_can_manage_vote(vote_id, principal)
-    vote = await service.cancel(vote_id)
+    vote = await service.cancel(vote_id, now=datetime.now(UTC), actor=principal.sub)
     await publisher.vote_cancelled(vote)
     return vote
 
@@ -209,7 +212,8 @@ async def cast_ballot(
     """Cast a vote.
 
     The call returns 403 when the caller is not in the group. It returns 409 when the
-    vote is closed or the caller already voted. It returns 422 for an unknown option.
+    vote is closed, or 409 ``already_voted`` when the caller already voted: a ballot
+    never changes after the cast. It returns 422 for an unknown option.
     The router then broadcasts ``vote_tally`` so the 'N of M voted' counter of every
     client stays fresh. The event carries aggregates only. The reveal rule hides the
     counts and the leading option until all present members have voted
@@ -242,6 +246,9 @@ async def get_vote(
     read to the read audience of the vote: meeting members, meeting participants, the
     eligible voters, a holder of ``application.read``, or a manager of the vote. Other
     gremien get 403, so there is no cross-tenant read. ``canManage`` and ``canCast``
-    tell what the caller may do with the vote.
+    tell what the caller may do with the vote. ``myBallot`` holds the own ballot of the
+    caller (a secret vote gives only ``cast``), and ``representedCast`` tells whether
+    the caller cast the ballot of a delegator. ``openedAt`` and ``closedAt`` are the real
+    open and end times. ``closesAt`` is the planned end of the cast window.
     """
     return await service.get_scoped(vote_id, principal)

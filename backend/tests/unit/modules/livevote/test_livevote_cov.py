@@ -549,6 +549,8 @@ def _vote_row(
         status=status,
         result=result,
         eligible_count=eligible,
+        opens_at=None,
+        closed_at=None,
         created_at=datetime(2026, 6, 8, tzinfo=UTC),
     )
 
@@ -727,8 +729,11 @@ async def test_votes_for_config_not_dict() -> None:
     svc = MeetingService(sess)  # type: ignore[arg-type]
     out = await svc._votes_for([mid])
     item = out[mid][0]
-    # The call cfg.get("options") on the non-dict VoteConfig gives an empty list.
-    assert item.options == []
+    # `VoteConfig.from_stored` accepts a VoteConfig instance as it is.
+    assert item.options == ["yes", "no"]
+    assert item.majority_rule == "simple"
+    # Without a principal (a broadcast) the vote carries no own ballot.
+    assert item.my_ballot is None
 
 
 async def test_vote_tallies_failed_reason_set() -> None:
@@ -2098,7 +2103,7 @@ class _FakeVotingService:
         self.last_payload = payload
         return self._vote
 
-    async def open(self, vote_id, *, now):  # noqa: ANN001
+    async def open(self, vote_id, *, now, actor=None):  # noqa: ANN001
         from app.modules.voting.schemas import TallyOut, VoteOut
         from app.shared.config_schemas import VoteConfig
 
@@ -2803,6 +2808,9 @@ async def test_get_with_votes_and_protocol() -> None:
             res((vrow.id, "yes")),  # open ballots
             res(),  # secret ballots
             res((mid, 1)),  # present
+            res(),  # _ballots_of: voting delegations of the caller
+            res(),  # _ballots_of: own open ballots
+            res(),  # _ballots_of: own voted markers
             res(uuid4()),  # _protocol_id
         ]
     )
@@ -2810,6 +2818,8 @@ async def test_get_with_votes_and_protocol() -> None:
     out = await svc.get(mid, _admin())
     assert out.protocol_id is not None
     assert len(out.votes) == 1
+    assert out.votes[0].my_ballot is not None
+    assert out.votes[0].my_ballot.cast is False
 
 
 async def test_list_timeline_upcoming_with_cursor() -> None:

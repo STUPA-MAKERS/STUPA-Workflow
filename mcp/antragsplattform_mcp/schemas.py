@@ -415,6 +415,8 @@ class MeetingPatch(WireModel):
 
 
 class MeetingVoteOpenBody(WireModel):
+    """Open a live vote. A meeting vote has no casting vote: a tie is `rejected`."""
+
     agendaItemId: str
     question: str | None = None
     options: list[str] = Field(default_factory=lambda: ["yes", "no", "abstain"])
@@ -431,7 +433,13 @@ class VoteCreate(WireModel):
     no `eligibleCount`.
     """
 
-    config: dict[str, Any] = Field(description="Vote config (options/majority/secret …)")
+    config: dict[str, Any] = Field(
+        description=(
+            "Vote config: options, majorityRule, quorum, abstainCountsQuorum, secret, "
+            "tieBreak. A ballot never changes after the cast, so there is no "
+            "`allowChange` (the server refuses the key with 422)."
+        )
+    )
     eligibleGroup: str = Field(
         description=(
             "UUID of the gremium that votes. It must be the gremium of the application "

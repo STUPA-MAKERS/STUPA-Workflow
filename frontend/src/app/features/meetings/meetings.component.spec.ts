@@ -285,7 +285,13 @@ describe('MeetingsComponent', () => {
     await userEvent.click(closeBtn);
     const req = http.expectOne('/api/votes/v-1/close');
     expect(req.request.method).toBe('POST');
-    req.flush(null, { status: 204, statusText: 'No Content' });
+    req.flush({
+      id: 'v-1',
+      applicationId: 'app-1',
+      result: 'passed',
+      tally: { counts: {}, eligible: 0, quorumMet: true, leading: null },
+      branchFired: true,
+    });
   });
 
   it('sets the active application via PATCH', async () => {
@@ -1377,11 +1383,47 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.meeting()?.votes.find((v) => v.id === 'v-2')?.status).toBe('open');
     });
 
+    const closedBody = (over: Record<string, unknown> = {}) => ({
+      id: 'v-1',
+      applicationId: 'app-1',
+      result: 'passed',
+      tally: { counts: { yes: 1 }, eligible: 3, quorumMet: true, leading: 'yes' },
+      branchFired: true,
+      ...over,
+    });
+
     it('closes a vote and patches its status', async () => {
-      const { cmp, http } = await loaded();
+      const { cmp, http, fixture } = await loaded();
       cmp.closeVote('v-1');
-      http.expectOne('/api/votes/v-1/close').flush(null, { status: 204, statusText: 'No Content' });
+      http.expectOne('/api/votes/v-1/close').flush(closedBody());
       expect(cmp.meeting()?.votes.find((v) => v.id === 'v-1')?.status).toBe('closed');
+      const toasts = fixture.debugElement.injector.get(ToastService).toasts();
+      expect(toasts.some((t) => t.variant === 'warning')).toBe(false);
+    });
+
+    it('warns when the close could not fire the result branch', async () => {
+      const { cmp, http, fixture } = await loaded();
+      cmp.closeVote('v-1');
+      http.expectOne('/api/votes/v-1/close').flush(closedBody({ branchFired: false }));
+      expect(cmp.meeting()?.votes.find((v) => v.id === 'v-1')?.status).toBe('closed');
+      const toasts = fixture.debugElement.injector.get(ToastService).toasts();
+      expect(toasts).toContainEqual(
+        expect.objectContaining({
+          variant: 'warning',
+          message:
+            'Abstimmung geschlossen. Der Folgeschritt des Antrags ist blockiert. Der Antrag bleibt im Abstimmungszustand. Bitte am Antrag „Status setzen“ verwenden.',
+        }),
+      );
+    });
+
+    it('does not warn for a generic motion without an application', async () => {
+      const { cmp, http, fixture } = await loaded();
+      cmp.closeVote('v-1');
+      http
+        .expectOne('/api/votes/v-1/close')
+        .flush(closedBody({ applicationId: null, branchFired: false }));
+      const toasts = fixture.debugElement.injector.get(ToastService).toasts();
+      expect(toasts.some((t) => t.variant === 'warning')).toBe(false);
     });
 
     it('cancels a vote and patches its status', async () => {

@@ -73,7 +73,7 @@
                 class="vote__option"
                 size="lg"
                 [variant]="myChoice() === option ? 'primary' : 'secondary'"
-                [disabled]="submitting() || (locked() && myChoice() !== option)"
+                [disabled]="submitting() || locked()"
                 (click)="cast(option)"
               >
                 {{ optionLabel(option) }}
@@ -84,9 +84,11 @@
           @if (myChoice(); as choice) {
             <p class="m-0 font-medium" role="status">
               {{ 'voting.cast.yourChoice' | t: { choice: optionLabel(choice) } }}
-              @if (!allowChange()) {
-                — {{ 'voting.cast.locked' | t }}
-              }
+              — {{ 'voting.cast.locked' | t }}
+            </p>
+          } @else if (ownCast()) {
+            <p class="m-0 font-medium" role="status">
+              {{ 'voting.cast.secretCast' | t }} — {{ 'voting.cast.locked' | t }}
             </p>
           }
         }
@@ -107,7 +109,7 @@
                 class="vote__option"
                 size="lg"
                 [variant]="proxyChoice() === option ? 'primary' : 'secondary'"
-                [disabled]="submitting() || (proxyChoice() !== null && !allowChange() && proxyChoice() !== option)"
+                [disabled]="submitting() || proxyLocked()"
                 (click)="cast(option, true)"
               >
                 {{ optionLabel(option) }}
@@ -118,9 +120,11 @@
           @if (proxyChoice(); as choice) {
             <p class="m-0 font-medium" role="status">
               {{ 'voting.cast.delegation.proxyChoice' | t: { choice: optionLabel(choice) } }}
-              @if (!allowChange()) {
-                — {{ 'voting.cast.locked' | t }}
-              }
+              — {{ 'voting.cast.locked' | t }}
+            </p>
+          } @else if (proxyCast()) {
+            <p class="m-0 font-medium" role="status">
+              {{ 'voting.cast.delegation.proxyCast' | t }} — {{ 'voting.cast.locked' | t }}
             </p>
           }
         }

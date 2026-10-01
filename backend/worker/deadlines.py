@@ -12,7 +12,9 @@ idempotent steps:
    clears `action_on_pass` as the idempotency marker. `kind="requeue"` returns the
    application through the referenced transition.
 3. Vote auto-close. An open vote past `closes_at` goes to `voting.close`, which
-   tallies the vote and fires the result branch.
+   tallies the vote and fires the result branch. The close always ends the vote, also
+   when the branch is blocked (`branchFired=false`, audit `vote_branch_blocked`), so
+   the cron never grabs the same vote again.
 
 Concurrency: each unit gets a lock in its own session with `FOR UPDATE SKIP LOCKED`.
 A second worker skips a locked unit, so nothing runs twice. The operations are also
@@ -79,6 +81,16 @@ def _flow_dispatcher(ctx: dict[str, Any]) -> ActionDispatcher:
     return build_worker_dispatcher(
         ctx.get("redis"), _sessionmaker(ctx), ctx.get("settings")
     )
+
+
+def _publisher(ctx: dict[str, Any]) -> BrokerPublisher | None:
+    """Return the live-vote publisher over the arq Redis pool, or `None` without Redis.
+
+    A transition that leaves a vote state cancels its votes. The publisher sends
+    `vote_cancelled` to the live clients of the meeting.
+    """
+    redis = ctx.get("redis")
+    return BrokerPublisher(RedisBroker(redis)) if redis is not None else None
 
 
 def _now() -> datetime:
@@ -243,7 +255,7 @@ async def _fire_one(ctx: dict[str, Any], deadline_id: UUID, now: datetime) -> bo
             )
             await svc.consume_action(deadline)  # do not scan it again
             return False
-        flow = FlowService(session, dispatcher)
+        flow = FlowService(session, dispatcher, _publisher(ctx))
         fired = False
         # Stage the marker before the fire: `fire` commits it together with the state
         # change. No window stays open for a second worker to re-grab an already-fired
@@ -303,7 +315,7 @@ async def _process_auto_transitions(ctx: dict[str, Any]) -> int:
     for application_id in ids:
         try:
             async with maker() as session:
-                flow = FlowService(session, dispatcher)
+                flow = FlowService(session, dispatcher, _publisher(ctx))
                 if await flow.auto_advance(application_id, _system_principal()) is not None:
                     advanced += 1
         except (ConflictError, NotFoundError) as exc:
@@ -344,10 +356,12 @@ async def _close_one(ctx: dict[str, Any], vote_id: UUID, now: datetime) -> bool:
         except ConflictError as exc:
             logger.info("vote %s auto-close skipped: %s", vote_id, exc)
             return False
-        except NotFoundError as exc:
-            logger.warning("vote %s auto-close — app missing: %s", vote_id, exc)
-            return False
-    logger.info("vote auto-closed (vote=%s)", vote_id)
+    if closed.application_id is not None and not closed.branch_fired:
+        # The vote is closed for good. The audit log holds `vote_branch_blocked`, and
+        # a person moves the application by hand. The cron does not retry.
+        logger.warning("vote auto-closed, result branch blocked (vote=%s)", vote_id)
+    else:
+        logger.info("vote auto-closed (vote=%s)", vote_id)
     # Replay the `vote_closed` broadcast that the REST router normally sends. Without
     # it the beamer and the voters show the time-closed vote as open until a reload.
     # This runs after the commit and is best effort: a broker fault must not fail the

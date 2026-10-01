@@ -8,14 +8,18 @@ from typing import Literal
 from uuid import UUID
 
 from sqlalchemy import func, select
+from sqlalchemy.orm import aliased
 
 from app.modules.admin.gremium_roles import _time_valid_clause
 from app.modules.admin.models import Gremium, GremiumMembership, GremiumRole
+from app.modules.auth.models import Principal as PrincipalRow
+from app.modules.auth.principal import Principal
 from app.modules.delegations.models import MeetingDelegation
 from app.modules.livevote.models import MeetingAttendance
 from app.modules.livevote.schemas import MeetingVoteOut
 from app.modules.livevote.service.service_base import MeetingServiceBase
-from app.modules.voting.models import Vote
+from app.modules.voting.models import Ballot, Vote, VotedMarker
+from app.modules.voting.schemas import MyBallot
 from app.modules.voting.service import open_tally_revealed
 from app.shared.config_schemas import VoteConfig
 
@@ -23,8 +27,14 @@ from app.shared.config_schemas import VoteConfig
 class VoteReadOps(MeetingServiceBase):
     """Reload-path vote aggregation and vote-related lookup helpers."""
 
-    async def _votes_for(self, meeting_ids: list[UUID]) -> dict[UUID, list[MeetingVoteOut]]:
-        """Return the votes bound to the meetings, grouped per `meeting_id`."""
+    async def _votes_for(
+        self, meeting_ids: list[UUID], principal: Principal | None = None
+    ) -> dict[UUID, list[MeetingVoteOut]]:
+        """Return the votes bound to the meetings, grouped per `meeting_id`.
+
+        With a `principal` each vote carries `myBallot` and `representedCast` for that
+        caller. Without one (a broadcast) both stay empty.
+        """
         if not meeting_ids:
             return {}
         rows = (
@@ -55,13 +65,17 @@ class VoteReadOps(MeetingServiceBase):
         absent_deleg = (
             await self._absent_delegated_by_meeting(meeting_ids) if needs_deleg else {}
         )
+        own: dict[UUID, MyBallot] = {}
+        represented: set[UUID] = set()
+        if principal is not None and rows:
+            own, represented = await self._ballots_of(principal.sub, rows)
         out: dict[UUID, list[MeetingVoteOut]] = {}
         for v in rows:
             if v.meeting_id is None:
                 continue
-            cfg = v.config if isinstance(v.config, dict) else {}
-            opts = cfg.get("options") or []
-            secret = bool(cfg.get("secret"))
+            config = VoteConfig.from_stored(v.config)
+            opts = config.options
+            secret = config.secret
             counts, leading, reason = tallies.get(v.id, (None, None, None))
             voted = sum((counts or {}).values())
             present = present_by_meeting.get(v.meeting_id, 0)
@@ -92,9 +106,81 @@ class VoteReadOps(MeetingServiceBase):
                     present=present,
                     revealed=revealed,
                     failedReason=reason,
+                    majorityRule=config.majority_rule,
+                    secret=secret,
+                    quorum=config.quorum,
+                    openedAt=v.opens_at,
+                    closedAt=v.closed_at,
+                    myBallot=own.get(v.id, MyBallot()) if principal is not None else None,
+                    representedCast=v.id in represented,
                 )
             )
         return out
+
+    async def _ballots_of(
+        self, sub: str, votes: Sequence[Vote]
+    ) -> tuple[dict[UUID, MyBallot], set[UUID]]:
+        """Return the own ballots of `sub` and the votes with a represented ballot.
+
+        The own ballot of an open vote carries the choice. A secret vote gives only
+        `cast` from the voted marker, because the choice has no link to the voter. A
+        represented ballot runs under the `sub` of the delegator: the active voting
+        delegation of this meeting and gremium, where `sub` is the delegate. One
+        batched query per table keeps this free of N+1.
+        """
+        ids = [v.id for v in votes]
+        meeting_ids = {v.meeting_id for v in votes if v.meeting_id is not None}
+        delegate = aliased(PrincipalRow)
+        delegator = aliased(PrincipalRow)
+        deleg_rows = (
+            await self.session.execute(
+                select(MeetingDelegation.meeting_id, MeetingDelegation.gremium_id, delegator.sub)
+                .join(delegate, delegate.id == MeetingDelegation.delegate_principal_id)
+                .join(delegator, delegator.id == MeetingDelegation.delegator_principal_id)
+                .where(
+                    delegate.sub == sub,
+                    MeetingDelegation.meeting_id.in_(meeting_ids),
+                    MeetingDelegation.delegate_voting.is_(True),
+                )
+            )
+        ).all()
+        delegator_of = {(mid, str(gid)): d_sub for mid, gid, d_sub in deleg_rows}
+        subs = {sub, *delegator_of.values()}
+        choices = {
+            (vid, voter): choice
+            for vid, voter, choice in (
+                await self.session.execute(
+                    select(Ballot.vote_id, Ballot.voter_sub, Ballot.choice).where(
+                        Ballot.vote_id.in_(ids), Ballot.voter_sub.in_(subs)
+                    )
+                )
+            ).all()
+        }
+        markers = {
+            (vid, voter)
+            for vid, voter in (
+                await self.session.execute(
+                    select(VotedMarker.vote_id, VotedMarker.voter_sub).where(
+                        VotedMarker.vote_id.in_(ids), VotedMarker.voter_sub.in_(subs)
+                    )
+                )
+            ).all()
+        }
+
+        def has_cast(vote_id: UUID, voter: str) -> bool:
+            return (vote_id, voter) in choices or (vote_id, voter) in markers
+
+        own: dict[UUID, MyBallot] = {}
+        represented: set[UUID] = set()
+        for v in votes:
+            if (v.id, sub) in choices:
+                own[v.id] = MyBallot(cast=True, choice=choices[(v.id, sub)])
+            elif (v.id, sub) in markers:
+                own[v.id] = MyBallot(cast=True)
+            d_sub = delegator_of.get((v.meeting_id, v.eligible_group)) if v.meeting_id else None
+            if d_sub is not None and has_cast(v.id, d_sub):
+                represented.add(v.id)
+        return own, represented
 
     async def _present_by_meeting(self, meeting_ids: list[UUID]) -> dict[UUID, int]:
         """Return `{meeting_id: number of present members}`, the reveal denominator."""
@@ -194,7 +280,7 @@ class VoteReadOps(MeetingServiceBase):
             tuple[dict[str, int] | None, str | None, Literal["quorum", "majority"] | None],
         ] = {}
         for v in votes:
-            config = VoteConfig.model_validate(v.config)
+            config = VoteConfig.from_stored(v.config)
             choices = secret_by_vote.get(v.id, []) if config.secret else open_by_vote.get(v.id, [])
             counts = tally_mod.tally(config.options, choices)
             outcome = tally_mod.result(config, counts, v.eligible_count or 0)

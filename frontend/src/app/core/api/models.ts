@@ -686,8 +686,9 @@ export interface Quorum {
 
 /**
  * Vote configuration (`VoteConfig`). The backend `_CamelModel` sends the fields in
- * camelCase. The defaults mirror the Pydantic defaults: `abstainCountsQuorum` and
- * `allowChange` are true, `secret` is false.
+ * camelCase. The defaults mirror the Pydantic defaults: `abstainCountsQuorum` is
+ * true, `secret` is false. A ballot never changes after the cast, so the config has
+ * no `allowChange` (the server refuses the key).
  */
 export interface VoteConfig {
   options: string[];
@@ -695,8 +696,17 @@ export interface VoteConfig {
   quorum?: Quorum | null;
   abstainCountsQuorum?: boolean;
   secret?: boolean;
-  allowChange?: boolean;
   tieBreak?: VoteResult;
+}
+
+/**
+ * The own ballot of the caller in one vote (`MyBallot`). `choice` is the chosen
+ * option. A secret vote keeps the choice apart from the identity, so there `choice`
+ * is always `null` and only `cast` tells that the caller voted.
+ */
+export interface MyBallot {
+  cast: boolean;
+  choice: string | null;
 }
 
 /**
@@ -728,10 +738,23 @@ export interface Vote {
   config: VoteConfig;
   status: VoteStatus;
   opensAt: IsoDateTime | null;
+  /** The planned end of the cast window (a deadline), not the real end. */
   closesAt: IsoDateTime | null;
   result: VoteResult | null;
   secret: boolean;
+  /** Copies of `config.majorityRule` and `config.quorum` for the vote card. */
+  majorityRule?: MajorityRule;
+  quorum?: Quorum | null;
+  /** The real moment when the vote opened. */
+  openedAt?: IsoDateTime | null;
+  /** The real moment when the vote ended (close or cancel). `null` while it runs. */
+  closedAt?: IsoDateTime | null;
   tally: Tally;
+  /** The own ballot of the caller. Only `GET /votes/{id}` sets it. */
+  myBallot?: MyBallot | null;
+  /** The caller cast the ballot of a delegator in this vote. Only `GET /votes/{id}`
+   *  sets it. */
+  representedCast?: boolean;
   /** The caller may open, close, cancel and delete the vote: the admin role, or the
    *  gremium permission `vote.manage` or `session.manage` in the gremium of the vote.
    *  Only `GET /votes/{id}` sets it. */
@@ -742,9 +765,28 @@ export interface Vote {
   canCast?: boolean;
 }
 
-/** Response to an accepted ballot. POST /api/votes/{id}/ballot. */
+/** Response to an accepted ballot. POST /api/votes/{id}/ballot. A ballot never
+ *  changes after the cast: a second cast gives 409 `already_voted`. */
 export interface BallotResult {
-  status: 'cast' | 'changed';
+  status: 'cast';
+}
+
+/**
+ * Result of `POST /votes/{id}/close` (`VoteClosed`). The close always ends the vote.
+ * `branchFired` is false when the pass or fail transition of the application did not
+ * fire (the guard failed, or the state has no such transition). A person must then
+ * move the application by hand.
+ */
+export interface VoteClosed {
+  id: Uuid;
+  meetingId?: Uuid | null;
+  applicationId?: Uuid | null;
+  result: VoteResult;
+  tally: Tally;
+  closedAt?: IsoDateTime | null;
+  firedTransitionId?: Uuid | null;
+  newStateId?: Uuid | null;
+  branchFired: boolean;
 }
 
 // Meetings and protocol. The wire form is camelCase (`_CamelModel`).
@@ -779,6 +821,16 @@ export interface MeetingVoteOutWire {
   /** Reason for the rejection. `quorum` means the vote missed the quorum.
    *  `majority` means the vote missed the majority. */
   failedReason?: 'quorum' | 'majority' | null;
+  majorityRule?: MajorityRule;
+  secret?: boolean;
+  quorum?: Quorum | null;
+  /** The real open time and the real end time (close or cancel). */
+  openedAt?: IsoDateTime | null;
+  closedAt?: IsoDateTime | null;
+  /** The own ballot of the caller. A secret vote gives only `cast`. */
+  myBallot?: MyBallot | null;
+  /** The caller cast the ballot of a delegator in this vote. */
+  representedCast?: boolean;
 }
 
 /** `MeetingOut`. Meeting state and votes. GET /meetings/{id}. */
@@ -902,6 +954,9 @@ export interface MeetingVote {
   /** Reason for the rejection. `quorum` means the vote missed the quorum.
    *  `majority` means the vote missed the majority. */
   failedReason: 'quorum' | 'majority' | null;
+  /** The own ballot of the caller. A secret vote gives only `cast`. `null` when the
+   *  server sent none (for example a broadcast). */
+  myBallot?: MyBallot | null;
 }
 
 /** Meeting, frontend view. */

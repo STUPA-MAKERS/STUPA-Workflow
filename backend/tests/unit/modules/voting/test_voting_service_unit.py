@@ -43,7 +43,6 @@ def _config(**over: Any) -> dict[str, Any]:
         "quorum": None,
         "abstainCountsQuorum": True,
         "secret": False,
-        "allowChange": True,
         "tieBreak": "rejected",
     }
     base.update(over)
@@ -60,8 +59,10 @@ def _vote(**over: Any) -> SimpleNamespace:
         "eligible_count": 10,
         "opens_at": None,
         "closes_at": None,
+        "closed_at": None,
         "status": "open",
         "result": None,
+        "result_branch_transition_id": None,
     }
     base.update(over)
     return SimpleNamespace(**base)
@@ -139,10 +140,18 @@ async def test_open_sets_window_keeps_roster_eligible() -> None:
     # so open() recounts nothing.
     vote = _vote(status="draft", eligible_count=20)
     db = fake_session(result(vote))  # only _get_vote, no count query
-    out = await VotingService(db).open(vote.id, now=NOW)
+    out = await VotingService(db).open(vote.id, now=NOW, actor="mgr")
     assert out.status == "open"
     assert out.opens_at == NOW
+    assert out.opened_at == NOW
+    assert out.closed_at is None
     assert out.tally.eligible == 20
+    # F12: the open writes a vote_open audit entry with id references only.
+    entries = [a for a in db.added if type(a).__name__ == "AuditEntry"]
+    assert [e.action for e in entries] == ["vote_open"]
+    assert entries[0].actor == "mgr"
+    assert entries[0].data["applicationId"] == str(vote.application_id)
+    assert entries[0].data["meetingId"] is None
 
 
 async def test_open_non_draft_409() -> None:
@@ -222,7 +231,7 @@ async def test_cast_exercising_delegated_vote_is_audited() -> None:
         result((False, True, "delegator-1")),  # incoming vote delegation
         result(),  # audit advisory lock
         result(),  # audit prev-hash
-        result(SimpleNamespace(inserted=True)),  # ballot insert (allowChange → xmax)
+        result(SimpleNamespace(inserted=True)),  # ballot insert
     )
     out = await VotingService(db).cast(
         vote.id, _voter(group="somewhere-else"), "yes", now=NOW, as_delegation=True
@@ -275,48 +284,27 @@ async def test_cast_unknown_option_422() -> None:
 
 
 async def test_cast_open_first_vote() -> None:
-    vote = _vote(config=_config(allowChange=False))
+    vote = _vote()
     db = fake_session(result(vote), result(SimpleNamespace(id=uuid4())))
     out = await VotingService(db).cast(vote.id, _voter(), "yes", now=NOW)
     assert out.status == "cast"
     assert db.committed == 1
+    # O11: the insert never updates an existing ballot.
+    insert = str(db.statements[-1])
+    assert "ON CONFLICT" in insert and "DO NOTHING" in insert
+    assert "DO UPDATE" not in insert
 
 
-async def test_cast_open_double_no_change_409() -> None:
-    vote = _vote(config=_config(allowChange=False))
+async def test_cast_open_double_409_already_voted() -> None:
+    """O11: a second cast never changes the ballot. It gives 409 ``already_voted``."""
+    vote = _vote()
     db = fake_session(result(vote), result())  # an empty RETURNING means conflict
-    with pytest.raises(ConflictError, match="Already voted"):
-        await VotingService(db).cast(vote.id, _voter(), "yes", now=NOW)
+    with pytest.raises(ConflictError, match="Already voted") as ei:
+        await VotingService(db).cast(vote.id, _voter(), "no", now=NOW)
+    assert ei.value.code == "already_voted"
     # ON CONFLICT DO NOTHING wrote nothing, so there is no commit. get_session
     # rolls the transaction back.
     assert db.committed == 0
-
-
-async def test_cast_open_allowchange_first_vote_is_cast() -> None:
-    # allowChange plus a first ballot (INSERT, xmax=0) gives "cast", not "changed".
-    vote = _vote(config=_config(allowChange=True))
-    db = fake_session(result(vote), result(SimpleNamespace(inserted=True)))
-    out = await VotingService(db).cast(vote.id, _voter(), "yes", now=NOW)
-    assert out.status == "cast"
-    assert db.committed == 1
-
-
-async def test_cast_open_change_updates() -> None:
-    # allowChange plus an existing ballot (UPDATE through ON CONFLICT) gives "changed".
-    vote = _vote(config=_config(allowChange=True))
-    db = fake_session(result(vote), result(SimpleNamespace(inserted=False)))
-    out = await VotingService(db).cast(vote.id, _voter(), "no", now=NOW)
-    assert out.status == "changed"
-    assert db.committed == 1
-
-
-async def test_cast_open_allowchange_empty_returning_is_changed() -> None:
-    # Defensive: an empty RETURNING gives no row. The service sees no insert and
-    # reports "changed".
-    vote = _vote(config=_config(allowChange=True))
-    db = fake_session(result(vote), result())
-    out = await VotingService(db).cast(vote.id, _voter(), "no", now=NOW)
-    assert out.status == "changed"
 
 
 async def test_cast_secret_first_vote_writes_anonymous() -> None:
@@ -333,8 +321,9 @@ async def test_cast_secret_first_vote_writes_anonymous() -> None:
 async def test_cast_secret_double_409() -> None:
     vote = _vote(config=_config(secret=True))
     db = fake_session(result(vote), result())  # the marker exists, so conflict
-    with pytest.raises(ConflictError, match="Already voted"):
+    with pytest.raises(ConflictError, match="Already voted") as ei:
         await VotingService(db).cast(vote.id, _voter(), "yes", now=NOW)
+    assert ei.value.code == "already_voted"
     assert db.committed == 0
 
 
@@ -366,29 +355,44 @@ async def test_get_secret_hides_counts_until_close() -> None:
 
 
 class _FakeFlow:
+    """Stand-in for `FlowService` on the close path.
+
+    `branch` None means that the current state has no such branch: `stage_branch` then
+    raises NotFoundError, as the real engine does. `fire_raises` makes the stage fail
+    with another error (a guard, a lost race).
+    """
+
     available: ClassVar[list[TransitionOut]] = []
     calls: ClassVar[list[str | None]] = []
     new_state: ClassVar[Any] = uuid4()
     fire_raises: ClassVar[Exception | None] = None
     branch: ClassVar[Any] = None
     branch_calls: ClassVar[list[str]] = []
+    notes: ClassVar[list[str | None]] = []
+    staged_deadlines: ClassVar[list[bool]] = []
+    after: ClassVar[list[bool]] = []
 
     def __init__(self, session: object, dispatcher: object) -> None:
-        self.fired: dict[str, object] | None = None
         self._available: list[TransitionOut] = _FakeFlow.available
-
-    async def branch_transition(self, application_id, branch):  # noqa: ANN001
-        _FakeFlow.branch_calls.append(branch)
-        return _FakeFlow.branch
 
     async def available_transitions(self, application_id, principal, *, deadline_passed=False):  # noqa: ANN001
         _FakeFlow.calls.append("called")
         return self._available
 
-    async def fire_branch(self, application_id, branch, principal, *, note=None):  # noqa: ANN001
+    async def stage_branch(self, application_id, branch, principal, *, note=None):  # noqa: ANN001
+        _FakeFlow.branch_calls.append(branch)
+        _FakeFlow.notes.append(note)
         if _FakeFlow.fire_raises is not None:
             raise _FakeFlow.fire_raises
-        self.fired = {"branch": branch, "note": note}
+        if _FakeFlow.branch is None:
+            raise NotFoundError(f"no '{branch}' transition")
+        return SimpleNamespace(transition=SimpleNamespace(id=_FakeFlow.branch.id))
+
+    async def schedule_staged_deadline(self, staged, *, commit=True):  # noqa: ANN001
+        _FakeFlow.staged_deadlines.append(commit)
+
+    async def after_commit(self, staged, *, schedule_deadline=True):  # noqa: ANN001
+        _FakeFlow.after.append(schedule_deadline)
         return TransitionResult(
             newStateId=_FakeFlow.new_state, statusEventId=uuid4(), dispatchedActions=[]
         )
@@ -402,8 +406,15 @@ def _patch_flow(monkeypatch: pytest.MonkeyPatch) -> type[_FakeFlow]:
     _FakeFlow.fire_raises = None
     _FakeFlow.branch = None
     _FakeFlow.branch_calls = []
+    _FakeFlow.notes = []
+    _FakeFlow.staged_deadlines = []
+    _FakeFlow.after = []
     monkeypatch.setattr(voting_service, "FlowService", _FakeFlow)
     return _FakeFlow
+
+
+def _audits(db: Any) -> list[Any]:
+    return [a for a in db.added if type(a).__name__ == "AuditEntry"]
 
 
 async def test_close_fires_matching_branch(_patch_flow: type[_FakeFlow]) -> None:
@@ -413,12 +424,42 @@ async def test_close_fires_matching_branch(_patch_flow: type[_FakeFlow]) -> None
     _patch_flow.branch = branch_t
     vote = _vote()
     db = fake_session(result(vote), result("yes", "yes", "yes", "no"))
-    out = await VotingService(db).close(vote.id, _voter())
+    out = await VotingService(db).close(vote.id, _voter(), now=NOW)
     assert out.result == "passed"
     assert out.tally.result == "passed"
     assert out.fired_transition_id == branch_t.id
     assert out.new_state_id == _patch_flow.new_state
+    assert out.branch_fired is True
+    assert out.application_id == vote.application_id
+    assert out.closed_at == NOW
+    assert vote.closed_at == NOW
+    assert vote.result_branch_transition_id == branch_t.id
     assert _patch_flow.branch_calls == ["pass"]
+    assert _patch_flow.notes == ["vote:passed"]
+    # F20: the branch runs in a SAVEPOINT and the close commits ONCE, the deadline of
+    # the new state included. after_commit does not schedule it a second time.
+    assert db.savepoints == 1
+    assert db.savepoint_rollbacks == 0
+    assert db.committed == 1
+    assert _patch_flow.staged_deadlines == [False]
+    assert _patch_flow.after == [False]
+    # F12: a vote_close entry with the result and the counts, never a voter.
+    entries = _audits(db)
+    assert [e.action for e in entries] == ["vote_close"]
+    assert entries[0].data["result"] == "passed"
+    assert entries[0].data["counts"] == {"yes": 3, "no": 1, "abstain": 0}
+    assert entries[0].data["quorumMet"] is True
+
+
+async def test_close_without_now_stamps_the_current_time(
+    _patch_flow: type[_FakeFlow],
+) -> None:
+    _patch_flow.branch = TransitionOut(id=uuid4(), fromStateId=uuid4(), toStateId=uuid4(), label={})
+    vote = _vote()
+    db = fake_session(result(vote), result("yes"))
+    out = await VotingService(db).close(vote.id, _voter())
+    assert out.closed_at is not None
+    assert vote.closed_at == out.closed_at
 
 
 async def test_close_prefers_global_flow_branch(_patch_flow: type[_FakeFlow]) -> None:
@@ -437,21 +478,31 @@ async def test_close_prefers_global_flow_branch(_patch_flow: type[_FakeFlow]) ->
     assert _patch_flow.calls == []  # the guard path stays unused
 
 
-async def test_close_application_vote_without_branch_raises_conflict(
+async def test_close_application_vote_without_branch_closes_and_audits(
     _patch_flow: type[_FakeFlow],
 ) -> None:
-    """Fail closed with 409 when an application vote finds no matching branch.
+    """F20: a missing branch transition does not block the close.
 
-    The service must not close the vote in silence. The result would be final while
-    the application stays forever in the state before the vote. The vote result and
-    the flow state would drift apart.
+    The vote closes, the audit log gets ``vote_branch_blocked`` with the reason
+    ``no_branch``, and ``branchFired`` is False. A person moves the application.
     """
-    _patch_flow.available = []  # no matching transition
-    vote = _vote()  # application_id is set
+    vote = _vote()  # application_id is set, and the state has no `fail` branch
     db = fake_session(result(vote), result("no", "no", "yes"))
-    with pytest.raises(ConflictError):
-        await VotingService(db).close(vote.id, _voter())
-    assert db.committed == 0  # no silent partial commit
+    out = await VotingService(db).close(vote.id, _voter())
+    assert out.result == "rejected"
+    assert out.branch_fired is False
+    assert out.fired_transition_id is None
+    assert out.new_state_id is None
+    assert vote.status == "closed"
+    assert vote.closed_at is not None
+    assert db.committed == 1
+    assert db.savepoint_rollbacks == 1
+    assert _patch_flow.after == []
+    entries = _audits(db)
+    assert [e.action for e in entries] == ["vote_close", "vote_branch_blocked"]
+    assert entries[1].data["branch"] == "fail"
+    assert entries[1].data["reason"] == "no_branch"
+    assert entries[1].target_id == str(vote.id)
 
 
 async def test_close_generic_vote_without_application_just_closes(
@@ -468,29 +519,44 @@ async def test_close_generic_vote_without_application_just_closes(
     assert out.result == "rejected"
     assert out.fired_transition_id is None
     assert out.new_state_id is None
+    assert out.branch_fired is False
     assert db.committed == 1
+    assert db.savepoints == 0
+    # No branch was due, so nothing is blocked.
+    assert [e.action for e in _audits(db)] == ["vote_close"]
 
 
-async def test_close_atomic_fire_failure_does_not_commit(
+async def test_close_guard_failure_keeps_the_vote_closed(
     _patch_flow: type[_FakeFlow],
 ) -> None:
-    """A `fire` error during the close writes NO commit.
+    """F20: a guard failure rolls back only the SAVEPOINT.
 
-    The vote stays open and the caller can repeat the close. There is no state where
-    the vote is closed but the branch never fired. The close is atomic with `fire`.
+    The vote stays closed, the close commits, and the audit log records the reason.
+    There is no 409, so the cron never retries the vote.
     """
-    branch_t = TransitionOut(
+    _patch_flow.branch = TransitionOut(
         id=uuid4(), fromStateId=uuid4(), toStateId=uuid4(), label={}
     )
-    _patch_flow.branch = branch_t
     _patch_flow.fire_raises = ConflictError("guard", code="guard_failed")
     vote = _vote()
     db = fake_session(result(vote), result("yes", "yes"))
-    with pytest.raises(ConflictError):
-        await VotingService(db).close(vote.id, _voter())
-    # The close never committed. The vote change stays unsaved in the session, and
-    # get_session rolls back on the exception.
-    assert db.committed == 0
+    out = await VotingService(db).close(vote.id, _voter())
+    assert out.result == "passed"
+    assert out.branch_fired is False
+    assert out.fired_transition_id is None
+    assert vote.status == "closed"
+    assert vote.result_branch_transition_id is None
+    assert db.committed == 1
+    assert db.savepoint_rollbacks == 1
+    blocked = _audits(db)[-1]
+    assert blocked.action == "vote_branch_blocked"
+    assert blocked.data == {
+        "applicationId": str(vote.application_id),
+        "meetingId": None,
+        "eligibleGroup": str(GID),
+        "branch": "pass",
+        "reason": "guard_failed",
+    }
 
 
 async def test_close_non_open_409() -> None:
@@ -599,10 +665,126 @@ async def test_close_now_untimed_vote_still_blocks(
 async def test_cancel_open_vote_sets_cancelled_without_branch() -> None:
     vote = _vote()
     db = fake_session(result(vote), result())
-    out = await VotingService(db).cancel(vote.id)
+    out = await VotingService(db).cancel(vote.id, now=NOW, actor="mgr")
     assert vote.status == "cancelled"
     assert out.status == "cancelled"
+    assert out.closed_at == NOW
     assert db.committed == 1
+    entries = _audits(db)
+    assert [e.action for e in entries] == ["vote_cancel"]
+    assert entries[0].data["reason"] == "manual"
+    assert entries[0].data["previousStatus"] == "open"
+
+
+async def test_cancel_without_now_stamps_the_current_time() -> None:
+    vote = _vote()
+    db = fake_session(result(vote), result())
+    await VotingService(db).cancel(vote.id)
+    assert vote.closed_at is not None
+
+
+async def test_cancel_for_application_cancels_open_and_drafts() -> None:
+    """F19: the open vote and the drafts of the left state go to cancelled.
+
+    The method does not commit. A draft for another state stays.
+    """
+    app_id, leaving, entering = uuid4(), uuid4(), uuid4()
+    running = _vote(application_id=app_id)
+    stale = _vote(application_id=app_id, status="draft", opens_state_id=leaving)
+    kept = _vote(application_id=app_id, status="draft", opens_state_id=entering)
+    later = _vote(application_id=app_id, status="draft", opens_state_id=uuid4())
+    db = fake_session(result(running, stale, kept, later))
+    out = await VotingService(db).cancel_for_application(
+        app_id, now=NOW, actor="mgr", left_state_id=leaving, entered_state_id=entering
+    )
+    assert out == [running, stale]
+    assert running.status == "cancelled" and running.closed_at == NOW
+    assert stale.status == "cancelled" and stale.closed_at == NOW
+    assert kept.status == "draft" and kept.closed_at is None
+    assert later.status == "draft" and later.closed_at is None
+    assert db.committed == 0
+    entries = _audits(db)
+    assert [e.data["previousStatus"] for e in entries] == ["open", "draft"]
+    assert {e.data["reason"] for e in entries} == {"state_left"}
+    stmt = str(db.statements[0])
+    assert "FOR UPDATE" in stmt
+
+
+async def test_cancel_for_application_without_left_state_keeps_drafts() -> None:
+    app_id = uuid4()
+    draft = _vote(application_id=app_id, status="draft", opens_state_id=uuid4())
+    db = fake_session(result(draft))
+    out = await VotingService(db).cancel_for_application(app_id, now=NOW)
+    assert out == []
+    assert draft.status == "draft"
+
+
+async def test_cancel_for_application_same_state_keeps_drafts() -> None:
+    app_id, state = uuid4(), uuid4()
+    draft = _vote(application_id=app_id, status="draft", opens_state_id=state)
+    db = fake_session(result(draft))
+    out = await VotingService(db).cancel_for_application(
+        app_id, now=NOW, left_state_id=state, entered_state_id=state
+    )
+    assert out == []
+    assert draft.status == "draft"
+
+
+async def test_cancel_for_application_unbound_draft_of_vote_state() -> None:
+    """A draft without opens_state_id goes when the app leaves a vote state."""
+    app_id = uuid4()
+    draft = _vote(application_id=app_id, status="draft", opens_state_id=None)
+    db = fake_session(result(draft))
+    db.scalar_results = ["vote"]
+    out = await VotingService(db).cancel_for_application(
+        app_id, now=NOW, left_state_id=uuid4(), entered_state_id=uuid4()
+    )
+    assert out == [draft]
+    assert draft.status == "cancelled"
+
+
+async def test_cancel_for_application_unbound_draft_of_branch_state() -> None:
+    """A normal state with a pass/fail exit counts as a vote state too."""
+    app_id = uuid4()
+    draft = _vote(application_id=app_id, status="draft", opens_state_id=None)
+    db = fake_session(result(draft))
+    db.scalar_results = ["normal", uuid4()]
+    out = await VotingService(db).cancel_for_application(
+        app_id, now=NOW, left_state_id=uuid4(), entered_state_id=uuid4()
+    )
+    assert out == [draft]
+
+
+async def test_cancel_for_application_unbound_draft_of_normal_state_stays() -> None:
+    """A draft without opens_state_id survives a transition out of a normal state."""
+    app_id = uuid4()
+    first = _vote(application_id=app_id, status="draft", opens_state_id=None)
+    second = _vote(application_id=app_id, status="draft", opens_state_id=None)
+    db = fake_session(result(first, second))
+    db.scalar_results = ["normal", None, "vote"]
+    out = await VotingService(db).cancel_for_application(
+        app_id, now=NOW, left_state_id=uuid4(), entered_state_id=uuid4()
+    )
+    assert out == []
+    assert first.status == second.status == "draft"
+    # The state kind is read once for all drafts, so the "vote" stays unread.
+    assert db.scalar_results == ["vote"]
+
+
+async def test_cancel_drafts_for_meeting() -> None:
+    mid = uuid4()
+    first = _vote(meeting_id=mid, status="draft")
+    second = _vote(meeting_id=mid, status="draft", application_id=None)
+    db = fake_session(result(first, second))
+    out = await VotingService(db).cancel_drafts_for_meeting(mid, now=NOW, actor="mgr")
+    assert out == [first, second]
+    assert first.status == second.status == "cancelled"
+    assert first.closed_at == second.closed_at == NOW
+    entries = _audits(db)
+    assert [e.data["reason"] for e in entries] == ["meeting_closed", "meeting_closed"]
+    assert entries[1].data["applicationId"] is None
+    assert entries[0].data["meetingId"] == str(mid)
+    assert db.committed == 0
 
 
 async def test_cancel_non_open_409() -> None:
@@ -820,6 +1002,48 @@ async def test_get_scoped_checks_then_returns_tally() -> None:
     p = Principal(sub="u", permissions={"application.read"})
     out = await VotingService(db).get_scoped(vote.id, p)
     assert out.tally.counts == {"yes": 1, "no": 0, "abstain": 0}
+    # A5: the caller holds no ballot and no delegation.
+    assert out.my_ballot is not None
+    assert out.my_ballot.cast is False
+    assert out.my_ballot.choice is None
+    assert out.represented_cast is False
+    assert out.majority_rule == "simple"
+    assert out.quorum is None
+
+
+async def test_my_ballot_open_vote_returns_the_choice() -> None:
+    vote = _vote()
+    db = fake_session(result(SimpleNamespace(choice="no")))
+    mine = await VotingService(db).my_ballot(vote, "v1", secret=False)  # pyright: ignore[reportArgumentType]
+    assert mine.cast is True
+    assert mine.choice == "no"
+
+
+async def test_my_ballot_secret_vote_never_returns_a_choice() -> None:
+    vote = _vote(config=_config(secret=True))
+    db = fake_session()
+    db.scalar_results = [uuid4()]  # the voted marker exists
+    mine = await VotingService(db).my_ballot(vote, "v1", secret=True)  # pyright: ignore[reportArgumentType]
+    assert mine.cast is True
+    assert mine.choice is None
+    db.scalar_results = [None]
+    mine = await VotingService(db).my_ballot(vote, "v1", secret=True)  # pyright: ignore[reportArgumentType]
+    assert mine.cast is False
+
+
+async def test_represented_cast_reads_the_ballot_of_the_delegator() -> None:
+    vote = _vote(meeting_id=uuid4())
+    db = fake_session(
+        result((False, True, "delegator-1")),  # incoming voting delegation
+        result(SimpleNamespace(choice="yes")),  # the ballot of the delegator
+    )
+    assert await VotingService(db).represented_cast(vote, "proxy", secret=False) is True  # pyright: ignore[reportArgumentType]
+
+
+async def test_represented_cast_without_delegation_is_false() -> None:
+    vote = _vote(meeting_id=uuid4())
+    db = fake_session(result())  # no delegation row
+    assert await VotingService(db).represented_cast(vote, "proxy", secret=False) is False  # pyright: ignore[reportArgumentType]
 
 
 # DELETE /votes/{id}: a standalone draft vote that never ran. Everything further

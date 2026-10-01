@@ -26,6 +26,7 @@ from app.modules.audit.schemas import (
 )
 from app.modules.audit.service import AuditService, data_uuid_strings
 from app.modules.config_revision.revert import RevertService
+from app.modules.livevote.publisher import MeetingPublisher, get_meeting_publisher
 from app.shared.errors import ProblemDetail
 from app.shared.paging import DEFAULT_LIMIT, MAX_LIMIT
 
@@ -142,6 +143,9 @@ async def revert_audit_entry(
     entry_id: int,
     session: DbSession,
     principal: Annotated[Principal, Depends(require_principal("audit.revert"))],
+    # A status revert that leaves a vote state cancels its votes. The publisher sends
+    # `vote_cancelled` to the live clients of the meeting.
+    publisher: Annotated[MeetingPublisher, Depends(get_meeting_publisher)],
 ) -> AuditRevertOut:
     """Revert the change that ``entry_id`` describes.
 
@@ -151,7 +155,7 @@ async def revert_audit_entry(
     # audit.revert gates the route. RevertService also re-asserts the granular
     # permission of the original operation. That is why the route passes the
     # principal through.
-    result = await RevertService(session).revert(entry_id, principal.sub, principal)
+    result = await RevertService(session, publisher).revert(entry_id, principal.sub, principal)
     return AuditRevertOut(
         revertedAuditId=result.reverted_audit_id,
         entityType=result.entity_type,

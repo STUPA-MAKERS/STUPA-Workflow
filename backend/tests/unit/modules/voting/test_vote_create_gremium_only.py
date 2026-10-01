@@ -73,6 +73,7 @@ def _vote(**over: Any) -> SimpleNamespace:
         "eligible_count": 3,
         "opens_at": None,
         "closes_at": None,
+        "closed_at": None,
         "status": "open",
         "result": None,
     }
