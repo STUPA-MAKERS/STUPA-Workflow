@@ -2,6 +2,9 @@
 
 RBAC is fail-closed. A request without a session gets 401. A request without the
 permission gets 403. Every error is declared as `ProblemDetail` (problem+json contract).
+
+An unconfirmed guest application rests in the flow until the magic link confirms it.
+Every route here passes `allow_unconfirmed=False` and answers 404 for it.
 """
 
 from __future__ import annotations
@@ -75,7 +78,9 @@ async def list_transitions(
     principal: PrincipalDep,
 ) -> list[TransitionOut]:
     """List the transitions whose guard the principal satisfies."""
-    return await service.available_transitions(application_id, principal)
+    return await service.available_transitions(
+        application_id, principal, allow_unconfirmed=False
+    )
 
 
 @router.post(
@@ -104,6 +109,7 @@ async def fire_transition(
         note=payload.note,
         meeting_id=payload.meeting_id,
         non_public=payload.non_public,
+        allow_unconfirmed=False,
     )
 
 
@@ -118,7 +124,7 @@ async def list_flow_states(
     principal: ForcePrincipalDep,
 ) -> list[StateOut]:
     """List all states of the application flow. These are the force-status picker options."""
-    return await service.list_states(application_id)
+    return await service.list_states(application_id, allow_unconfirmed=False)
 
 
 @router.post(
@@ -144,6 +150,7 @@ async def force_status(
         payload.state_id,
         principal,
         note=payload.note,
+        allow_unconfirmed=False,
     )
 
 
@@ -158,7 +165,9 @@ async def list_applicant_transitions(
     access: Annotated[Access, Depends(require_app_read)],
 ) -> list[TransitionOut]:
     """List the transitions the applicant may fire. Only `actorIsApplicant` opens one."""
-    return await service.available_applicant_transitions(access.application_id)
+    return await service.available_applicant_transitions(
+        access.application_id, allow_unconfirmed=False
+    )
 
 
 @router.post(
@@ -178,5 +187,8 @@ async def fire_applicant_transition(
     A transition that `actorIsApplicant` does not open gives 403.
     """
     return await service.fire_as_applicant(
-        access.application_id, payload.transition_id, note=payload.note
+        access.application_id,
+        payload.transition_id,
+        note=payload.note,
+        allow_unconfirmed=False,
     )

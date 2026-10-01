@@ -17,9 +17,10 @@ from datetime import UTC, date, datetime, timedelta
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from sqlalchemy import select
+from sqlalchemy import ColumnElement, exists, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.applications.models import Application
 from app.modules.deadlines.models import Deadline, DeadlinePolicy
 from app.modules.voting.models import Vote
 from app.settings import get_settings
@@ -36,6 +37,23 @@ _RELATIVE_KINDS = frozenset({"relative_submitted", "relative_changed"})
 def _is_relative(kind: str) -> bool:
     """Return whether `kind` adds a day offset to an application timestamp."""
     return kind in _RELATIVE_KINDS
+
+
+def _not_resting() -> ColumnElement[bool]:
+    """Match a deadline whose application is confirmed, or that has no application.
+
+    An unconfirmed guest application (`email_confirmed_at IS NULL`) rests in the
+    flow. Its deadlines get no reminder and fire no transition. The magic-link verify
+    schedules the deadline again, and the discard deletes the row with the
+    application.
+    """
+    return or_(
+        Deadline.application_id.is_(None),
+        exists().where(
+            Application.id == Deadline.application_id,
+            Application.email_confirmed_at.is_not(None),
+        ),
+    )
 
 
 class DeadlineService:
@@ -78,8 +96,9 @@ class DeadlineService:
         """List the ids of the due auto-deadlines.
 
         A deadline is due when `due_at` is at or before `now` and
-        `action_on_pass` is set. The scan returns the oldest rows first and
-        stops at `limit` rows.
+        `action_on_pass` is set. The scan skips the deadlines of unconfirmed
+        guest applications. It returns the oldest rows first and stops at
+        `limit` rows.
         """
         rows = (
             await self.session.execute(
@@ -87,6 +106,7 @@ class DeadlineService:
                 .where(
                     Deadline.action_on_pass.isnot(None),
                     Deadline.due_at <= now,
+                    _not_resting(),
                 )
                 .order_by(Deadline.due_at)
                 .limit(limit)
@@ -105,7 +125,8 @@ class DeadlineService:
         would never match the row again. The reminder would never go out and the
         row would leak in the partial index. With one bound the worker sends
         exactly one reminder, possibly late. `reminded_at` then takes the row
-        out of the scan. The scan stops at `limit` rows.
+        out of the scan. The scan skips the deadlines of unconfirmed guest
+        applications. It stops at `limit` rows.
         """
         rows = (
             await self.session.execute(
@@ -113,6 +134,7 @@ class DeadlineService:
                 .where(
                     Deadline.reminded_at.is_(None),
                     Deadline.due_at <= now + lead,
+                    _not_resting(),
                 )
                 .order_by(Deadline.due_at)
                 .limit(limit)

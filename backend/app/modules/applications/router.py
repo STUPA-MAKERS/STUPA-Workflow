@@ -56,6 +56,8 @@ from app.modules.applications.share import ShareService
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth import service as auth_service
+from app.modules.flow.dispatch import ActionDispatcher
+from app.modules.flow.router import get_action_dispatcher
 from app.modules.forms.schemas import EffectiveFormOut
 from app.modules.notifications.privacy import notify_erasure_requested
 from app.modules.notifications.provider import mail_queue_from_pool
@@ -161,6 +163,7 @@ async def create_application(
     request: Request,
     principal: Annotated[Principal | None, Depends(get_current_principal)],
     send_magic_link: Annotated[MagicLinkSender, Depends(get_magic_link_sender)],
+    dispatcher: Annotated[ActionDispatcher, Depends(get_action_dispatcher)],
 ) -> ApplicationCreated:
     """Create an application.
 
@@ -169,6 +172,10 @@ async def create_application(
     ``applicantEmail`` or ``applicantName`` from the account and audits the
     ``sub`` of that account as the actor. An anonymous submission requires
     ALTCHA and ``applicantEmail``.
+
+    A logged-in submission is confirmed at once, and its flow starts in this
+    request. An anonymous submission rests in the flow until the magic-link
+    verify.
     """
     # Authoritative bound on the serialized field values, free of Content-Length.
     if len(json.dumps(payload.data)) > settings.max_application_payload_bytes:
@@ -191,7 +198,7 @@ async def create_application(
         payload.applicant_name = principal.display_name
     actor = principal.sub if principal else "applicant"
 
-    app, email = await service.create(payload, actor=actor)
+    app, email = await service.create(payload, actor=actor, dispatcher=dispatcher)
     pool = getattr(request.app.state, "arq_pool", None)
     background.add_task(send_magic_link, settings, email, app.id, pool)
     return ApplicationCreated(applicationId=app.id)

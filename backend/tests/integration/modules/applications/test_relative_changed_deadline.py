@@ -85,7 +85,10 @@ async def _create(session: AsyncSession, type_id: uuid.UUID) -> Application:
         ApplicationCreate.model_validate(
             {"typeId": str(type_id), "data": {"title": "Alt", "note": "geheim"},
              "applicantEmail": "a@example.org"}
-        )
+        ),
+        # A logged-in submission is confirmed at once, so the create schedules the
+        # deadline. A guest submission rests in the flow until the verify (O14).
+        actor="member-1",
     )
     app = await session.get(Application, out.id)
     assert app is not None

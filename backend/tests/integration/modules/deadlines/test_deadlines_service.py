@@ -125,6 +125,9 @@ async def _make_app(session: AsyncSession, app_type: ApplicationType, state: Sta
     row = await session.get(Application, app.id)
     assert row is not None
     row.current_state_id = state.id
+    # The cron skips unconfirmed guest applications (O14). Confirm the email, as the
+    # magic-link verify does.
+    row.email_confirmed_at = datetime.now(UTC)
     await session.commit()
     return row
 
