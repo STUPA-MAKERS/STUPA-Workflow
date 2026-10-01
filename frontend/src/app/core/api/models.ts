@@ -204,6 +204,8 @@ export interface MeetingMember {
   principalId: Uuid;
   displayName: string | null;
   email: string | null;
+  /** O20: the member holds `protocol.write` in the gremium and can keep the minutes. */
+  canKeepProtocol?: boolean;
 }
 
 /** `AttendanceOut`. Attendance of a gremium member. GET/PUT/DELETE …/attendance. */
@@ -222,6 +224,8 @@ export interface Attendance {
   note: string | null;
   /** True if this row is the requesting user. It enables self-marking. */
   isSelf: boolean;
+  /** O20: the member holds `protocol.write` in the gremium and can keep the minutes. */
+  canKeepProtocol?: boolean;
 }
 
 /** `AgendaItemOut`. An agenda item holds a linked application or free text. */
@@ -848,6 +852,25 @@ export interface MeetingVoteOutWire {
 }
 
 /** `MeetingOut`. Meeting state and votes. GET /meetings/{id}. */
+/**
+ * `KeeperPeriodOut`. One period of a protocol keeper (Z3, A13). `fromAt` is `null`
+ * for the planned handover, `toAt` is `null` while the period runs. The positions
+ * are 1-based numbers in the current agenda order, `null` without an item.
+ */
+export interface KeeperPeriod {
+  principalId: Uuid;
+  name: string | null;
+  fromAt: IsoDateTime | null;
+  toAt: IsoDateTime | null;
+  fromAgendaItemId: Uuid | null;
+  toAgendaItemId: Uuid | null;
+  fromPosition: number | null;
+  toPosition: number | null;
+}
+
+/** How the minutes change hands: at once, or with the next agenda item. */
+export type HandoverMode = 'now' | 'next_item';
+
 export interface MeetingOutWire {
   id: Uuid;
   title: string;
@@ -889,6 +912,10 @@ export interface MeetingOutWire {
   /** Finalize and send the protocol: write access plus the gremium permission
    *  `protocol.finalize`. */
   canFinalize?: boolean;
+  /** The periods of the protocol keepers, running and ended, in time order. */
+  keeperPeriods?: KeeperPeriod[];
+  /** The handover planned for the next agenda item. */
+  plannedHandover?: KeeperPeriod | null;
 }
 
 /** `ProtocolOut`. Meeting protocol. POST /meetings/{id}/protocol, PATCH /protocols/{id}. */
@@ -1034,6 +1061,10 @@ export interface Meeting {
   /** Finalize and send the protocol: write access plus the gremium permission
    *  `protocol.finalize`. */
   canFinalize: boolean;
+  /** The periods of the protocol keepers, running and ended, in time order (Z3). */
+  keeperPeriods: KeeperPeriod[];
+  /** The handover planned for the next agenda item, or `null`. */
+  plannedHandover: KeeperPeriod | null;
 }
 
 /** Direction of the meeting timeline relative to *now*. */

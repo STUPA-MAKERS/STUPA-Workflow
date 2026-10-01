@@ -85,6 +85,7 @@ export const AUDIT_ACTIONS = [
   'comment_update',
   'comment_delete',
   'protocol_delete',
+  'protocol_finalize',
   'vote_delete',
   // Vote lifecycle (F12). vote_branch_blocked marks an application that a person must move.
   'vote_open',
@@ -102,6 +103,7 @@ export const AUDIT_ACTIONS = [
   // Attendance set or reset by the meeting lead (F12). They mirror ATTENDANCE_* in actions.py.
   'attendance_set',
   'attendance_reset',
+  'protokollant_handover',
   // Budget and money mutations. They mirror the BUDGET_* values in actions.py.
   'budget_node_create',
   'budget_node_update',
@@ -146,6 +148,7 @@ const ACTION_ICONS: Record<string, IconName> = {
   comment_update: 'form',
   comment_delete: 'form',
   protocol_delete: 'document',
+  protocol_finalize: 'document',
   vote_delete: 'check',
   vote_open: 'check',
   vote_close: 'check',
@@ -161,6 +164,7 @@ const ACTION_ICONS: Record<string, IconName> = {
   agenda_reorder: 'parliament',
   attendance_set: 'parliament',
   attendance_reset: 'parliament',
+  protokollant_handover: 'parliament',
   // Money mutations use the euro glyph. The cost center structure uses the pie glyph of the
   // budget tab.
   budget_node_create: 'chart-pie',

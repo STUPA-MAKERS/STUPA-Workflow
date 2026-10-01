@@ -21,6 +21,7 @@ import type {
   AgendaItem,
   Attendance,
   AttendanceStatus,
+  HandoverMode,
   I18nMap,
   Meeting,
   MeetingVote,
@@ -388,6 +389,20 @@ export class MeetingsComponent implements OnDestroy {
   /** Name the protokollant straight from the session page of a planned meeting. */
   setProtokollant(m: Meeting, principalId: Uuid): void {
     this.dialogs.setProtokollant(m, principalId);
+  }
+
+  /**
+   * Hand the minutes of a live meeting over (Z3). The open text of the item is saved
+   * first, because the write right can move with the handover.
+   */
+  handOver(m: Meeting, principalId: Uuid, mode: HandoverMode): void {
+    this.flushPendingBody();
+    this.dialogs.handOver(m, principalId, mode);
+  }
+
+  /** Discard the planned handover. */
+  cancelHandover(m: Meeting): void {
+    this.dialogs.cancelHandover(m);
   }
 
   closeSettings(): void {

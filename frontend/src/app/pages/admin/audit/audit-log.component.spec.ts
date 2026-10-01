@@ -370,6 +370,7 @@ describe('AuditLogComponent', () => {
       'comment_update',
       'comment_delete',
       'protocol_delete',
+      'protocol_finalize',
       'vote_delete',
       'budget_fiscal_year_delete',
       'vote_open',
@@ -388,6 +389,7 @@ describe('AuditLogComponent', () => {
       'attendance_set',
       'attendance_reset',
       'attachment_upload',
+      'protokollant_handover',
     ] as const;
     for (const action of fresh) {
       // Every one of them is in the catalog, so the filter offers it.

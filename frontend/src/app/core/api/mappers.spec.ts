@@ -618,6 +618,25 @@ describe('mapMeeting permission flags', () => {
     expect(m.canVote).toBe(false);
     expect(m.canFinalize).toBe(false);
     expect(m.isProtokollant).toBe(false);
+    expect(m.keeperPeriods).toEqual([]);
+    expect(m.plannedHandover).toBeNull();
+  });
+
+  it('passes the keeper periods and the planned handover through (Z3)', () => {
+    const period = {
+      principalId: 'p-1',
+      name: 'Anna',
+      fromAt: '2026-06-20T16:00:00Z',
+      toAt: null,
+      fromAgendaItemId: 't-1',
+      toAgendaItemId: null,
+      fromPosition: 1,
+      toPosition: null,
+    };
+    const planned = { ...period, principalId: 'p-2', name: 'Bert', fromAt: null };
+    const m = mapMeeting({ ...base, keeperPeriods: [period], plannedHandover: planned });
+    expect(m.keeperPeriods).toEqual([period]);
+    expect(m.plannedHandover).toEqual(planned);
   });
 
   it('passes through all the explicit camelCase flags and names', () => {

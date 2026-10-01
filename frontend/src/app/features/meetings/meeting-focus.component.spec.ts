@@ -60,6 +60,8 @@ function meeting(over: Partial<Meeting> = {}): Meeting {
     canManageVotes: true,
     canVote: true,
     canFinalize: true,
+    keeperPeriods: [],
+    plannedHandover: null,
     ...over,
   };
 }
@@ -90,9 +92,14 @@ function protocol(over: Partial<Protocol> = {}): Protocol {
 }
 
 const ATTENDANCE: Attendance[] = [
-  { principalId: 'pr-1', displayName: 'Pia Protokoll', email: null, status: 'present', source: 'self', note: null, isSelf: true },
-  { principalId: 'pr-2', displayName: 'Mika Mitglied', email: null, status: 'excused', source: 'lead', note: null, isSelf: false },
-  { principalId: 'pr-3', displayName: 'Alina Admin', email: null, status: null, source: null, note: null, isSelf: false },
+  { principalId: 'pr-1', displayName: 'Pia Protokoll', email: null, status: 'present', source: 'self', note: null, isSelf: true, canKeepProtocol: true },
+  { principalId: 'pr-2', displayName: 'Mika Mitglied', email: null, status: 'excused', source: 'lead', note: null, isSelf: false, canKeepProtocol: true },
+  { principalId: 'pr-3', displayName: 'Alina Admin', email: null, status: null, source: null, note: null, isSelf: false, canKeepProtocol: true },
+];
+/** O20: a member without `protocol.write` cannot keep the minutes. */
+const WITH_VOTER: Attendance[] = [
+  ...ATTENDANCE,
+  { principalId: 'pr-4', displayName: 'Vera Votum', email: null, status: 'present', source: 'self', note: null, isSelf: false, canKeepProtocol: false },
 ];
 
 type Inputs = {
@@ -149,7 +156,7 @@ const OUTPUTS = [
   'voteDialog', 'startSession', 'closeSession', 'finalize', 'openSettings',
   'deleteMeeting', 'toggleBeamer', 'attendanceChange', 'attendanceReset', 'addToAgenda', 'addFreetext',
   'removeFromAgenda', 'startRename', 'cancelRename', 'renameTop', 'setNonPublic', 'dragStart',
-  'dragOver', 'drop', 'setProtokollant',
+  'dragOver', 'drop', 'setProtokollant', 'handOver', 'cancelHandover',
 ] as const;
 
 async function setup(over: Partial<Inputs> = {}) {
@@ -179,7 +186,7 @@ describe('MeetingFocusComponent', () => {
       const { on } = await setup();
       expect(screen.getByText('Konstituierende Sitzung')).toBeInTheDocument();
       // The minute-taker is marked in the roster, not spelled out in the bar.
-      expect(screen.queryByText(/Pia Protokoll/)).toBeNull();
+      expect(within(screen.getByRole('toolbar')).queryByText(/Pia Protokoll/)).toBeNull();
       await userEvent.click(screen.getByRole('button', { name: /Sitzungen/ }));
       expect(on.back).toHaveBeenCalled();
       await userEvent.click(screen.getByRole('button', { name: 'Beamer-Ansicht' }));
@@ -535,12 +542,24 @@ describe('MeetingFocusComponent', () => {
 
       await userEvent.clear(within(picker).getByRole('searchbox', { name: 'Mitglied suchen' }));
       await userEvent.type(within(picker).getByRole('searchbox', { name: 'Mitglied suchen' }), 'zzz');
-      expect(within(picker).getByText('Kein Mitglied gefunden.')).toBeInTheDocument();
+      expect(within(picker).getByText('Kein Mitglied mit Protokollrecht gefunden.')).toBeInTheDocument();
 
       await userEvent.clear(within(picker).getByRole('searchbox', { name: 'Mitglied suchen' }));
       await userEvent.click(within(picker).getByRole('button', { name: /Alina Admin/ }));
       expect(on.setProtokollant).toHaveBeenCalledWith('pr-3');
       expect(screen.queryByRole('dialog', { name: 'Protokollant wählen' })).toBeNull();
+    });
+
+    it('offers only the members who can keep the minutes (O20)', async () => {
+      await setup({
+        meeting: planned({ protokollantId: null, protokollantName: null }),
+        protocol: null,
+        attendance: WITH_VOTER,
+      });
+      await userEvent.click(screen.getByRole('button', { name: /Protokollant wählen/ }));
+      const picker = screen.getByRole('dialog', { name: 'Protokollant wählen' });
+      expect(within(picker).getByRole('button', { name: /Mika Mitglied/ })).toBeInTheDocument();
+      expect(within(picker).queryByRole('button', { name: /Vera Votum/ })).toBeNull();
     });
 
     it('does not send the protokollant that is already set', async () => {
@@ -556,8 +575,8 @@ describe('MeetingFocusComponent', () => {
         meeting: planned(),
         protocol: null,
         attendance: [
-          { principalId: 'pr-7', displayName: null, email: 'kai.klar@x.de', status: 'absent', source: null, note: null, isSelf: false },
-          { principalId: 'pr-8', displayName: null, email: null, status: null, source: null, note: null, isSelf: false },
+          { principalId: 'pr-7', displayName: null, email: 'kai.klar@x.de', status: 'absent', source: null, note: null, isSelf: false, canKeepProtocol: true },
+          { principalId: 'pr-8', displayName: null, email: null, status: null, source: null, note: null, isSelf: false, canKeepProtocol: true },
         ],
       });
       await userEvent.click(screen.getByRole('button', { name: /Protokoll: Pia Protokoll/ }));
@@ -583,6 +602,85 @@ describe('MeetingFocusComponent', () => {
       await setup({ meeting: planned({ canControl: false }), protocol: null });
       expect(screen.getByRole('heading', { name: 'Sitzung vorbereiten' })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Sitzung eröffnen' })).toBeNull();
+    });
+  });
+
+  describe('handover during a live meeting (Z3)', () => {
+    const chip = (): HTMLElement => screen.getByTitle('Protokollführung übergeben');
+
+    it('hides the handover from a member who neither leads nor keeps the minutes', async () => {
+      await setup({ meeting: meeting({ canManage: false, isProtokollant: false }) });
+      expect(screen.queryByTitle('Protokollführung übergeben')).toBeNull();
+    });
+
+    it('offers the handover to the minute-taker', async () => {
+      await setup({ meeting: meeting({ canManage: false, isProtokollant: true }) });
+      expect(chip()).toHaveTextContent('Pia Protokoll');
+    });
+
+    it('hands over now to a member who can keep the minutes', async () => {
+      const { on } = await setup({ attendance: WITH_VOTER });
+      await userEvent.click(chip());
+      const sheet = screen.getByRole('dialog', { name: 'Protokollführung übergeben' });
+      expect(within(sheet).getByText('Protokoll: Pia Protokoll')).toBeInTheDocument();
+      expect(within(sheet).queryByRole('button', { name: /Vera Votum/ })).toBeNull();
+      // The current minute-taker is no target.
+      await userEvent.click(within(sheet).getByRole('button', { name: /Pia Protokoll/, pressed: true }));
+      expect(on.handOver).not.toHaveBeenCalled();
+      await userEvent.click(chip());
+      const again = screen.getByRole('dialog', { name: 'Protokollführung übergeben' });
+      await userEvent.click(within(again).getByRole('button', { name: /Mika Mitglied/ }));
+      expect(on.handOver).toHaveBeenCalledWith({ principalId: 'pr-2', mode: 'now' });
+      expect(screen.queryByRole('dialog', { name: 'Protokollführung übergeben' })).toBeNull();
+    });
+
+    it('plans the handover for the next item', async () => {
+      const { on } = await setup();
+      await userEvent.click(chip());
+      const sheet = screen.getByRole('dialog', { name: 'Protokollführung übergeben' });
+      const next = within(sheet).getByRole('button', { name: 'Ab nächstem TOP' });
+      expect(next).not.toBeDisabled();
+      await userEvent.click(next);
+      expect(next).toHaveAttribute('aria-pressed', 'true');
+      await userEvent.click(within(sheet).getByRole('button', { name: /Alina Admin/ }));
+      expect(on.handOver).toHaveBeenCalledWith({ principalId: 'pr-3', mode: 'next_item' });
+    });
+
+    it('hands over now on the last item, which has no next one', async () => {
+      const { on, fixture } = await setup({ meeting: meeting({ currentAgendaItemId: 't-3' }) });
+      await userEvent.click(chip());
+      const sheet = screen.getByRole('dialog', { name: 'Protokollführung übergeben' });
+      const next = within(sheet).getByRole('button', { name: 'Ab nächstem TOP' });
+      expect(next).toBeDisabled();
+      // A stale choice from before the last item still sends `now`.
+      (fixture.componentInstance as unknown as { handoverMode: { set(v: string): void } }).handoverMode.set(
+        'next_item',
+      );
+      fixture.detectChanges();
+      await userEvent.click(within(sheet).getByRole('button', { name: /Mika Mitglied/ }));
+      expect(on.handOver).toHaveBeenCalledWith({ principalId: 'pr-2', mode: 'now' });
+    });
+
+    it('shows and discards the planned handover', async () => {
+      const plan = {
+        principalId: 'pr-2',
+        name: 'Mika Mitglied',
+        fromAt: null,
+        toAt: null,
+        fromAgendaItemId: null,
+        toAgendaItemId: null,
+        fromPosition: null,
+        toPosition: null,
+      };
+      const { on } = await setup({ meeting: meeting({ plannedHandover: plan }) });
+      expect(within(chip()).getByText(/Übergabe geplant/)).toBeInTheDocument();
+      await userEvent.click(chip());
+      const sheet = screen.getByRole('dialog', { name: 'Protokollführung übergeben' });
+      expect(
+        within(sheet).getByText('Übergabe an Mika Mitglied mit dem nächsten TOP geplant.'),
+      ).toBeInTheDocument();
+      await userEvent.click(within(sheet).getByRole('button', { name: 'Verwerfen' }));
+      expect(on.cancelHandover).toHaveBeenCalled();
     });
   });
 

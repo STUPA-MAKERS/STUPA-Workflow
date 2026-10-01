@@ -13,6 +13,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -23,6 +24,7 @@ import type {
   AgendaItem,
   Attendance,
   AttendanceStatus,
+  HandoverMode,
   I18nMap,
   Meeting,
   MeetingVote,
@@ -76,6 +78,7 @@ export type DockPanel = 'none' | 'agenda' | 'attendance' | 'protokollant';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule,
+    NgTemplateOutlet,
     RouterLink,
     TranslatePipe,
     LocalizedDatePipe,
@@ -176,10 +179,16 @@ export class MeetingFocusComponent {
   readonly drop = output<number>();
   /** Name the protokollant of a planned meeting, from the dock or the checklist. */
   readonly setProtokollant = output<Uuid>();
+  /** Hand the minutes of a live meeting over, now or with the next agenda item (Z3). */
+  readonly handOver = output<{ principalId: Uuid; mode: HandoverMode }>();
+  /** Discard the planned handover. */
+  readonly cancelHandover = output<void>();
 
   readonly panel = signal<DockPanel>('none');
   /** The search text of the protokollant picker. */
   protected readonly protokollantQuery = signal('');
+  /** When the minutes change hands in a live meeting: at once or with the next item. */
+  protected readonly handoverMode = signal<HandoverMode>('now');
   /**
    * The editor reloads its content only when the document key changes. An insert
    * from outside the editor, like a vote result, bumps this revision so the new
@@ -259,13 +268,30 @@ export class MeetingFocusComponent {
   protected readonly prevTop = computed(() => this.neighbour(-1));
   protected readonly nextTop = computed(() => this.neighbour(1));
 
-  /** The roster members that match the search of the protokollant picker. */
+  /**
+   * The roster members that can keep the minutes and match the search of the
+   * protokollant picker. O20: only a member with `protocol.write` qualifies, the
+   * server answers 422 for any other.
+   */
   protected readonly protokollantCandidates = computed(() => {
     const q = this.protokollantQuery().trim().toLowerCase();
     return this.attendance().filter((a) => {
+      if (!a.canKeepProtocol) return false;
       if (!q) return true;
       return [a.displayName, a.email].some((v) => v?.toLowerCase().includes(q));
     });
+  });
+
+  /** The session lead and the current protokollant hand the minutes of a live meeting over. */
+  protected readonly canHandOver = computed(() => {
+    const m = this.meeting();
+    return m.status === 'live' && (m.canManage || m.isProtokollant);
+  });
+
+  /** A handover with the next item needs an agenda item after the current one. */
+  protected readonly hasNextForHandover = computed(() => {
+    const count = this.agenda().length;
+    return count > 0 && this.nowIndex() < count - 1;
   });
 
   protected readonly statusVariant = meetingStatusVariant;
@@ -279,14 +305,27 @@ export class MeetingFocusComponent {
   protected readonly voteOptionsFor = voteOptionsFor;
 
   togglePanel(panel: Exclude<DockPanel, 'none'>): void {
-    if (panel === 'protokollant') this.protokollantQuery.set('');
+    if (panel === 'protokollant') {
+      this.protokollantQuery.set('');
+      this.handoverMode.set('now');
+    }
     this.panel.set(this.panel() === panel ? 'none' : panel);
   }
 
-  /** Name a roster member as the protokollant and close the picker. */
+  /**
+   * Name a roster member as the protokollant and close the picker. A planned meeting
+   * assigns the person. A live meeting hands the minutes over in the chosen mode.
+   */
   pickProtokollant(principalId: Uuid): void {
     this.panel.set('none');
-    if (principalId !== this.meeting().protokollantId) this.setProtokollant.emit(principalId);
+    const m = this.meeting();
+    if (principalId === m.protokollantId) return;
+    if (m.status === 'live') {
+      const mode = this.hasNextForHandover() ? this.handoverMode() : 'now';
+      this.handOver.emit({ principalId, mode });
+      return;
+    }
+    this.setProtokollant.emit(principalId);
   }
 
   closePanel(): void {

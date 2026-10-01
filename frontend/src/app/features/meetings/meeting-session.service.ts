@@ -501,6 +501,9 @@ export class MeetingSessionService implements OnDestroy {
     const proto = this.protocol();
     // `isLocked` also covers `rendering`: no second start, no 409 on PATCH.
     if (!proto || proto.isLocked || this.finalizing() || this.agendaSvc.savingTop()) return;
+    // F8, O13: the protocol is finalized only after the close (409 otherwise).
+    // `closeMeeting()` calls this method with the closed meeting from the response.
+    if (this.meeting()?.status !== 'closed') return;
     this.finalizing.set(true);
     // First persist the assembled TOP markdown, then finalize/render.
     this.api.updateProtocol(proto.id, assembleProtocolMarkdown(this.agendaSvc.agenda())).subscribe({
