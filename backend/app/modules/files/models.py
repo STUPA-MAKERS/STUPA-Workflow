@@ -112,3 +112,26 @@ class Attachment(UUIDPkMixin, Base):
 # The filter of every application-scoped query. A draft has no application, so this
 # excludes it explicitly, also where an id lookup would not.
 BOUND = Attachment.application_id.is_not(None)
+
+
+class AttachmentDraftToken(Base):
+    """The lifetime of one draft token of the wizard (Z4).
+
+    The token lives on its own, independent of its draft rows. It stays valid until
+    ``expires_at``, also when the owner deletes the last draft. Each upload with the
+    token moves ``expires_at`` to now + ``attachment_draft_ttl_days``. The hourly purge
+    removes the expired rows.
+
+    Attributes:
+        token_hash: HMAC-SHA256 of the draft token, as in ``Attachment.draft_token_hash``.
+        expires_at: End of the token.
+    """
+
+    __tablename__ = "attachment_draft_token"
+
+    token_hash: Mapped[bytes] = mapped_column(LargeBinary, primary_key=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        Index("ix_attachment_draft_token_expires_at", "expires_at"),
+    )

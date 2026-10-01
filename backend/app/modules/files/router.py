@@ -35,7 +35,7 @@ from app.modules.applications.access import (
     require_app_read,
 )
 from app.modules.auth.principal import Applicant, Principal
-from app.modules.files.drafts import DraftAttachments
+from app.modules.files.drafts import DraftAttachments, invalid_token
 from app.modules.files.queue import scan_queue_from_pool
 from app.modules.files.schemas import AttachmentOut, DraftAttachmentOut, SignedUrlOut
 from app.modules.files.service import FilesService, application_id_of
@@ -385,15 +385,21 @@ async def upload_draft_attachment(
     header. An anonymous caller then sends an ALTCHA solution in the multipart field
     ``altcha``; a logged-in principal needs none. The response carries the new
     ``draftToken``. Each later upload of the same draft sends the token in the
-    header and needs no ALTCHA. The draft lives ``attachment_draft_ttl_days`` after
-    the last upload. One token holds at most ``attachment_draft_max_files`` files
-    and ``attachment_draft_max_bytes`` bytes.
+    header and needs no ALTCHA. The route checks such a token before it reads the
+    file, so an unknown or expired token costs no read and no sniff and gives 422 at
+    once. The token and its drafts live ``attachment_draft_ttl_days`` after the last
+    upload. The token stays valid when the owner deletes all its drafts. One token
+    holds at most ``attachment_draft_max_files`` files and
+    ``attachment_draft_max_bytes`` bytes.
 
     Size cap, rate limit and MIME sniff work as on the application upload. The file
     stays quarantined until the scan is clean. ``POST /applications`` binds the
     drafts with ``attachmentIds`` and ``draftToken``.
     """
-    if draft_token is None and principal is None:
+    if draft_token is not None:
+        if not await drafts.token_is_valid(draft_token):
+            raise invalid_token()
+    elif principal is None:
         try:
             await verifier.verify(altcha)
         except AltchaError as exc:

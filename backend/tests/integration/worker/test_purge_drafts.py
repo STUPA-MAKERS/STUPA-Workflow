@@ -4,6 +4,7 @@
 * A draft that has not expired stays, and so does a bound attachment.
 * The purge works in batches until a batch comes back short.
 * A second run finds nothing.
+* An expired draft token goes, a live one stays.
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ import pytest
 from sqlalchemy import Engine, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.modules.files.models import Attachment
+from app.modules.files.models import Attachment, AttachmentDraftToken
 from tests._support.guest_apps import create_guest_application, seed_guest_flow
 from worker import files_drafts as wfd
 
@@ -89,3 +90,29 @@ async def test_purge_removes_expired_drafts_only(
     assert left == {alive.id, bound.id}
 
     assert await wfd.purge_draft_attachments(ctx, now=now) == 0
+
+
+async def test_purge_removes_expired_tokens_only(
+    maker: async_sessionmaker[AsyncSession],
+) -> None:
+    now = datetime.now(UTC)
+    async with maker() as session:
+        session.add_all(
+            [
+                AttachmentDraftToken(token_hash=b"\x02" * 32, expires_at=now),
+                AttachmentDraftToken(
+                    token_hash=b"\x03" * 32, expires_at=now - timedelta(days=1)
+                ),
+                AttachmentDraftToken(
+                    token_hash=b"\x04" * 32, expires_at=now + timedelta(minutes=1)
+                ),
+            ]
+        )
+        await session.commit()
+
+    ctx = {"files_sessionmaker": maker, "object_storage": _Storage()}
+    assert await wfd.purge_draft_attachments(ctx, now=now) == 0
+
+    async with maker() as session:
+        left = set((await session.scalars(select(AttachmentDraftToken.token_hash))).all())
+    assert left == {b"\x04" * 32}

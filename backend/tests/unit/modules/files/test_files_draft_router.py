@@ -34,6 +34,12 @@ class _FakeDrafts:
         self.files = _Files()
         self.uploads: list[dict[str, object]] = []
         self.deletes: list[tuple[UUID, str, str]] = []
+        self.valid_tokens = {"tok"}
+        self.checked: list[str] = []
+
+    async def token_is_valid(self, token: str) -> bool:
+        self.checked.append(token)
+        return token in self.valid_tokens
 
     async def upload(self, **kw: object) -> DraftAttachmentOut:
         self.uploads.append(kw)
@@ -126,6 +132,40 @@ def test_later_upload_with_token_needs_no_altcha(
     )
     assert r.status_code == 201, r.text
     assert drafts.uploads[0]["token"] == "tok"
+    assert drafts.checked == ["tok"]
+    assert verifier.seen == []
+
+
+class _NoRead:
+    """Fail the test when the route reads the file."""
+
+    @property
+    def max_bytes(self) -> int:
+        raise AssertionError("the route read the file before the token check")
+
+
+@pytest.mark.parametrize("logged_in", [False, True])
+def test_unknown_token_gives_422_before_the_file_read(
+    app: FastAPI,
+    client: TestClient,
+    drafts: _FakeDrafts,
+    verifier: _Verifier,
+    logged_in: bool,
+) -> None:
+    if logged_in:
+        app.dependency_overrides[get_current_principal] = lambda: Principal(sub="p-1")
+    drafts.files = _NoRead()  # type: ignore[assignment]
+    r = client.post(
+        "/api/apply/attachments",
+        files={"file": ("a.pdf", b"%PDF", "application/pdf")},
+        data={"altcha": "solved"},
+        headers={"X-Draft-Token": "random"},
+    )
+    assert r.status_code == 422, r.text
+    assert r.headers["content-type"].startswith("application/problem+json")
+    assert r.json()["code"] == "draft_token_invalid"
+    assert drafts.checked == ["random"]
+    assert drafts.uploads == []
     assert verifier.seen == []
 
 

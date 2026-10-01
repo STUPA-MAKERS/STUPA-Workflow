@@ -506,15 +506,9 @@ class FilesService:
             if attachment.application_id is not None
             else {"draft": True}
         )
-        await audit_record(
-            self.session,
-            actor=actor,
-            action=AuditAction.ATTACHMENT_QUARANTINE,
-            target_type="attachment",
-            target_id=str(attachment_id),
-            data={**owner, "signature": signature},
-        )
-        if not await self._commit_scan(attachment_id):
+        if not await self._commit_scan(
+            attachment_id, actor=actor, quarantine={**owner, "signature": signature}
+        ):
             return False
         if self.storage is not None and storage_key is not None:
             try:
@@ -525,13 +519,33 @@ class FilesService:
                 logger.warning("could not remove infected object for %s", attachment_id)
         return True
 
-    async def _commit_scan(self, attachment_id: uuid.UUID) -> bool:
+    async def _commit_scan(
+        self,
+        attachment_id: uuid.UUID,
+        *,
+        actor: str = "system",
+        quarantine: dict[str, object] | None = None,
+    ) -> bool:
         """Commit the scan result, and tolerate a row that is gone since the load.
+
+        With ``quarantine`` the method first writes the quarantine audit entry with
+        this data. The audit write flushes the attachment UPDATE, so the same guard
+        covers it: a row that a parallel delete, purge or anonymization removed gives
+        False there too, and the rollback also drops the audit entry.
 
         Returns:
             True after the commit, False when the UPDATE found no row.
         """
         try:
+            if quarantine is not None:
+                await audit_record(
+                    self.session,
+                    actor=actor,
+                    action=AuditAction.ATTACHMENT_QUARANTINE,
+                    target_type="attachment",
+                    target_id=str(attachment_id),
+                    data=quarantine,
+                )
             await self.session.commit()
         except StaleDataError:
             await self.session.rollback()

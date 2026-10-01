@@ -19,6 +19,21 @@ from app.settings import load_settings
 
 NOW = datetime(2026, 10, 1, 12, 0, tzinfo=UTC)
 
+# The real token purge. The fixture below replaces it for the loop tests.
+_PURGE_TOKENS = wfd._purge_tokens
+TOKEN_RUNS: list[datetime] = []
+
+
+@pytest.fixture(autouse=True)
+def _no_token_purge(monkeypatch: pytest.MonkeyPatch) -> None:
+    TOKEN_RUNS.clear()
+
+    async def _tokens(_maker: Any, now: datetime) -> int:  # noqa: ANN401
+        TOKEN_RUNS.append(now)
+        return 1
+
+    monkeypatch.setattr(wfd, "_purge_tokens", _tokens)
+
 
 class _Storage:
     def __init__(self, *, fail: bool = False) -> None:
@@ -48,6 +63,8 @@ async def test_purge_loops_until_a_short_batch(monkeypatch: pytest.MonkeyPatch) 
     ctx = {"files_sessionmaker": object(), "object_storage": storage}
     assert await wfd.purge_draft_attachments(ctx, now=NOW) == 5
     assert storage.removed == ["a", "b", "c", "d"]
+    # The token purge runs once, after the drafts.
+    assert TOKEN_RUNS == [NOW]
 
 
 async def test_purge_with_nothing_due(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -134,3 +151,11 @@ async def test_purge_batch_deletes_the_locked_rows() -> None:
     empty = _Session([])
     assert await wfd._purge_batch(lambda: empty, NOW) == (0, [])  # type: ignore[arg-type]
     assert empty.committed == 0
+
+
+async def test_purge_tokens_deletes_the_expired_tokens() -> None:
+    session = _Session([SimpleNamespace(token_hash=b"a"), SimpleNamespace(token_hash=b"b")])
+    assert await _PURGE_TOKENS(lambda: session, NOW) == 2  # type: ignore[arg-type]
+    assert session.statements[0].startswith("DELETE FROM attachment_draft_token")
+    assert "RETURNING" in session.statements[0]
+    assert session.committed == 1

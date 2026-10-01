@@ -10,6 +10,11 @@ as best effort. A failed removal leaves an orphan object and a warning, but it d
 not undo the purge. A second worker skips the locked rows, and a second run finds
 nothing. A bound attachment has no draft columns, so the task never touches it.
 
+After the drafts the task deletes the expired draft tokens (`attachment_draft_token`).
+An upload moves the end of a token and of its drafts together, so an expired token
+has no live draft. An upload in parallel that extends the token keeps it: Postgres
+checks the end again on the new row version.
+
 The purge writes no audit entry. A draft never belonged to an application, and the
 upload and the quarantine are already in the log.
 """
@@ -24,7 +29,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.db import get_sessionmaker
-from app.modules.files.models import Attachment
+from app.modules.files.models import Attachment, AttachmentDraftToken
 from app.modules.files.storage import ObjectStorage, StorageError, build_object_storage
 from app.settings import load_settings
 
@@ -80,6 +85,24 @@ async def _purge_batch(
     return len(rows), [row.storage_key for row in rows if row.storage_key is not None]
 
 
+async def _purge_tokens(maker: async_sessionmaker[AsyncSession], now: datetime) -> int:
+    """Delete the expired draft tokens.
+
+    Returns:
+        The number of deleted tokens.
+    """
+    async with maker() as session:
+        deleted = (
+            await session.execute(
+                delete(AttachmentDraftToken)
+                .where(AttachmentDraftToken.expires_at <= now)
+                .returning(AttachmentDraftToken.token_hash)
+            )
+        ).all()
+        await session.commit()
+    return len(deleted)
+
+
 async def _remove_objects(ctx: dict[str, Any], keys: list[str]) -> None:
     """Remove the objects of purged drafts (best effort)."""
     if not keys:
@@ -112,6 +135,9 @@ async def purge_draft_attachments(
         purged += count
         if count < PURGE_BATCH:
             break
-    if purged:
-        logger.info("purged %d expired draft attachment(s)", purged)
+    tokens = await _purge_tokens(maker, moment)
+    if purged or tokens:
+        logger.info(
+            "purged %d expired draft attachment(s) and %d draft token(s)", purged, tokens
+        )
     return purged

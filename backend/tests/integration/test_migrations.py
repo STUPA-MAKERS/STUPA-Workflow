@@ -1107,6 +1107,10 @@ def test_attendance_self_status_check_not_valid(
     command.upgrade(alembic_cfg, "head")
 
 
+def _has_table(conn, name: str) -> bool:  # noqa: ANN001
+    return conn.execute(text("SELECT to_regclass(:n)"), {"n": name}).scalar_one() is not None
+
+
 def _attachment_columns(conn) -> dict[str, str]:  # noqa: ANN001
     return dict(
         conn.execute(
@@ -1122,14 +1126,16 @@ def test_attachment_drafts(alembic_cfg: Config, engine: Engine) -> None:
     """Migration 1ee8a0d3928c (Z4).
 
     The upgrade makes `attachment.application_id` nullable, adds the two draft
-    columns, both checks and the two partial indexes. An existing row stays. The
-    downgrade deletes the drafts, restores NOT NULL and drops the columns.
+    columns, both checks, the two partial indexes and the `attachment_draft_token`
+    table. An existing row stays. The downgrade drops the token table, deletes the
+    drafts, restores NOT NULL and drops the columns.
     """
     command.downgrade(alembic_cfg, "d5569d5542c6")
     with engine.begin() as conn:
         cols = _attachment_columns(conn)
         assert cols["application_id"] == "NO"
         assert "draft_token_hash" not in cols
+        assert not _has_table(conn, "attachment_draft_token")
         type_id = _new_type(conn)
         fv = conn.execute(
             text(
@@ -1178,6 +1184,25 @@ def test_attachment_drafts(alembic_cfg: Config, engine: Engine) -> None:
                 "now() + interval '7 days')"
             )
         )
+        assert _has_table(conn, "attachment_draft_token")
+        conn.execute(
+            text(
+                "INSERT INTO attachment_draft_token (token_hash, expires_at) "
+                "VALUES ('\\x01', now() + interval '7 days')"
+            )
+        )
+        token_indexes = set(
+            conn.execute(
+                text(
+                    "SELECT indexname FROM pg_indexes "
+                    "WHERE tablename = 'attachment_draft_token'"
+                )
+            ).scalars()
+        )
+        assert {
+            "pk_attachment_draft_token",
+            "ix_attachment_draft_token_expires_at",
+        } <= token_indexes
     for bad in (
         # Neither an application nor a draft token.
         "INSERT INTO attachment (filename, mime, size) VALUES ('x', 'a/b', 1)",
@@ -1200,6 +1225,7 @@ def test_attachment_drafts(alembic_cfg: Config, engine: Engine) -> None:
         assert cols["application_id"] == "NO"
         assert "draft_token_hash" not in cols
         assert "draft_expires_at" not in cols
+        assert not _has_table(conn, "attachment_draft_token")
         ids = list(conn.execute(text("SELECT id FROM attachment")).scalars())
         assert ids == [bound]
         conn.execute(text("DELETE FROM attachment"))

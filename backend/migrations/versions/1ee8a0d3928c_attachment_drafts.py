@@ -11,18 +11,21 @@ The upgrade:
    also adds `CHECK ((draft_token_hash IS NULL) = (draft_expires_at IS NULL))`.
 4. adds two partial indexes on the drafts only: one on `draft_expires_at` for the
    hourly purge, one on `draft_token_hash` for the token lookup.
+5. adds the table `attachment_draft_token` (`token_hash` bytea primary key,
+   `expires_at` timestamptz) with an index on `expires_at`. A draft token lives
+   there on its own, so it stays valid when its owner deletes the last draft.
 
 There is no data migration. Every existing row has `application_id` and no draft
 columns, so it satisfies both checks.
 
-All steps are idempotent. A fresh database gets the columns, the checks and the
-indexes from the `create_all` baseline (0001), because the model already declares
-them.
+All steps are idempotent. A fresh database gets the columns, the checks, the
+indexes and the token table from the `create_all` baseline (0001), because the
+models already declare them.
 
 The downgrade deletes the draft rows, because they cannot satisfy NOT NULL. Their
 MinIO objects under `drafts/` stay as orphans, because a migration does not reach
-the object storage. It then restores NOT NULL and drops the indexes, the checks and
-the columns.
+the object storage. It then drops the token table, restores NOT NULL and drops the
+indexes, the checks and the columns.
 
 Revision ID: 1ee8a0d3928c
 Revises: d5569d5542c6
@@ -44,6 +47,8 @@ _XOR = "ck_attachment_draft_xor_application"
 _PAIRED = "ck_attachment_draft_columns_paired"
 _IX_EXPIRES = "ix_attachment_draft_expires_at"
 _IX_TOKEN = "ix_attachment_draft_token_hash"
+_TOKENS = "attachment_draft_token"
+_IX_TOKEN_EXPIRES = "ix_attachment_draft_token_expires_at"
 
 
 def upgrade() -> None:
@@ -70,9 +75,19 @@ def upgrade() -> None:
         f"CREATE INDEX IF NOT EXISTS {_IX_TOKEN} ON attachment (draft_token_hash) "
         "WHERE draft_token_hash IS NOT NULL"
     )
+    op.execute(
+        f"CREATE TABLE IF NOT EXISTS {_TOKENS} ("
+        "token_hash bytea NOT NULL, "
+        "expires_at timestamptz NOT NULL, "
+        f"CONSTRAINT pk_{_TOKENS} PRIMARY KEY (token_hash))"
+    )
+    op.execute(
+        f"CREATE INDEX IF NOT EXISTS {_IX_TOKEN_EXPIRES} ON {_TOKENS} (expires_at)"
+    )
 
 
 def downgrade() -> None:
+    op.execute(f"DROP TABLE IF EXISTS {_TOKENS}")
     op.execute("DELETE FROM attachment WHERE application_id IS NULL")
     op.execute(f"DROP INDEX IF EXISTS {_IX_TOKEN}")
     op.execute(f"DROP INDEX IF EXISTS {_IX_EXPIRES}")

@@ -2,9 +2,11 @@
 
 `POST /apply/attachments` stores a file before the application exists. The first
 upload issues a draft token, each later upload sends it in `X-Draft-Token` and moves
-the end of all drafts of the token. One token holds a limited number of files and
-bytes. `DELETE /apply/attachments/{id}` with the token removes one draft. Each upload
-and each delete writes an audit entry with `draft: true` (F12).
+the end of the token and of all its drafts. One token holds a limited number of files
+and bytes. `DELETE /apply/attachments/{id}` with the token removes one draft. The
+token stays valid after the delete of its last draft. A delete that races with the
+bind of the create does not remove the bound file. Each upload and each delete writes
+an audit entry with `draft: true` (F12).
 
 ALTCHA is off in these settings, so the no-op verifier passes. The router unit tests
 cover the ALTCHA gate.
@@ -12,6 +14,7 @@ cover the ALTCHA gate.
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
@@ -23,11 +26,13 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.deps import DbSession, SettingsDep
 from app.modules.audit.models import AuditEntry
-from app.modules.files.models import Attachment
+from app.modules.files.drafts import DraftAttachments, bind_drafts, check_drafts
+from app.modules.files.models import Attachment, AttachmentDraftToken
 from app.modules.files.router import get_files_service
 from app.modules.files.service import FilesService
 from app.modules.files.storage import ObjectStorage
 from app.settings import Settings
+from app.shared.errors import NotFoundError
 from tests._support.guest_apps import (
     build_api,
     create_guest_application,
@@ -186,9 +191,12 @@ async def test_unknown_or_expired_token_is_rejected(
         assert resp.json()["code"] == "draft_token_invalid"
 
         token = _upload(client)["draftToken"]
+        past = datetime.now(UTC) - timedelta(minutes=1)
         async with maker() as session:
             for row in (await session.scalars(select(Attachment))).all():
-                row.draft_expires_at = datetime.now(UTC) - timedelta(minutes=1)
+                row.draft_expires_at = past
+            for tok in (await session.scalars(select(AttachmentDraftToken))).all():
+                tok.expires_at = past
             await session.commit()
         resp = client.post(
             "/api/apply/attachments",
@@ -313,3 +321,87 @@ async def test_delete_needs_the_owning_token(
     assert deletes[0].data == {"draft": True}
     async with maker() as session:
         assert await session.get(Attachment, bound_id) is not None
+
+
+async def test_token_stays_valid_after_the_last_draft_is_deleted(
+    migrated: tuple[str, str],
+    maker: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = guest_settings(migrated[1])
+    storage = _MemoryStorage()
+    with _client(migrated, settings, monkeypatch, storage) as client:
+        first = _upload(client)
+        token = str(first["draftToken"])
+        resp = client.delete(
+            f"/api/apply/attachments/{first['id']}", headers={"X-Draft-Token": token}
+        )
+        assert resp.status_code == 204, resp.text
+        assert await _drafts(maker) == []
+
+        # The replacement upload uses the same token and needs no new ALTCHA.
+        second = _upload(client, token, name="ersatz.pdf")
+        assert second["draftToken"] == token
+
+    (row,) = await _drafts(maker)
+    assert str(row.id) == second["id"]
+    async with maker() as session:
+        (tok,) = (await session.scalars(select(AttachmentDraftToken))).all()
+    assert tok.token_hash == row.draft_token_hash
+    assert tok.expires_at == row.draft_expires_at
+    assert list(storage.blobs) == [row.storage_key]
+
+
+async def test_delete_that_races_with_the_bind_keeps_the_bound_file(
+    migrated: tuple[str, str],
+    maker: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The create locks and binds the draft. A parallel delete waits, then gives 404."""
+    settings = guest_settings(migrated[1])
+    storage = _MemoryStorage()
+    seed = await seed_guest_flow(maker)
+    app_id = await create_guest_application(maker, seed)
+    with _client(migrated, settings, monkeypatch, storage) as client:
+        draft = _upload(client)
+    token = str(draft["draftToken"])
+    draft_id = uuid.UUID(str(draft["id"]))
+    pepper = settings.magic_link_secret
+
+    async with maker() as create:
+        # The create: lock the draft row and bind it, but do not commit yet.
+        await check_drafts(create, attachment_ids=[draft_id], token=token, pepper=pepper)
+        await bind_drafts(
+            create,
+            application_id=app_id,
+            attachment_ids=[draft_id],
+            token=token,
+            pepper=pepper,
+        )
+
+        async def _delete() -> None:
+            async with maker() as session:
+                files = FilesService(
+                    session,
+                    storage=storage,  # pyright: ignore[reportArgumentType]
+                    queue=None,
+                    settings=settings,
+                )
+                await DraftAttachments(files).delete(draft_id, token=token, actor="applicant")
+
+        racing = asyncio.create_task(_delete())
+        await asyncio.sleep(0.5)
+        # The DELETE waits for the row lock of the create.
+        assert not racing.done()
+        await create.commit()
+        with pytest.raises(NotFoundError):
+            await racing
+
+    async with maker() as session:
+        bound = await session.get(Attachment, draft_id)
+    assert bound is not None
+    assert bound.application_id == app_id
+    assert bound.storage_key is not None
+    assert bound.storage_key in storage.blobs
+    deletes = [a for a in await _audits(maker) if a.action == "attachment_delete"]
+    assert deletes == []

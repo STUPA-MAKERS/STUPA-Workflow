@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -51,6 +52,9 @@ class _Result:
     def one(self) -> Any:  # noqa: ANN401
         return self._row
 
+    def first(self) -> Any:  # noqa: ANN401
+        return self._row
+
     def all(self) -> list[Any]:
         return list(self._rows)
 
@@ -64,10 +68,12 @@ class _Session:
         scalar: list[Any] | None = None,
         scalars: list[list[Any]] | None = None,
         quota: tuple[int, int] = (0, 0),
+        removed: list[Any] | None = None,
     ) -> None:
         self._scalar = list(scalar or [])
         self._scalars = list(scalars or [])
         self.quota = quota
+        self._removed = list(removed or [])
         self.statements: list[str] = []
         self.added: list[Any] = []
         self.deleted: list[Any] = []
@@ -78,6 +84,8 @@ class _Session:
         self.statements.append(sql)
         if "count(" in sql:
             return _Result(row=self.quota)
+        if sql.startswith("DELETE FROM attachment"):
+            return _Result(row=self._removed.pop(0) if self._removed else None)
         return _Result()
 
     async def scalar(self, stmt: Any) -> Any:  # noqa: ANN401
@@ -147,6 +155,10 @@ async def test_first_upload_issues_a_token() -> None:
     assert session.committed == 1
     # The new token needs no validity check, but the advisory lock and the quota run.
     assert any("pg_advisory_xact_lock" in s for s in session.statements)
+    assert not any("FROM attachment_draft_token" in s for s in session.statements)
+    # The upload stores the token on its own and moves its end.
+    (upsert,) = [s for s in session.statements if "INSERT INTO attachment_draft_token" in s]
+    assert "ON CONFLICT (token_hash) DO UPDATE" in upsert
     assert AUDITS[0]["action"] == "attachment_upload"
     assert AUDITS[0]["data"]["draft"] is True
 
@@ -183,8 +195,12 @@ async def test_quota_gives_413(quota: tuple[int, int], message: str) -> None:
     assert caught.value.code == DRAFT_QUOTA_EXCEEDED
 
 
-async def test_token_is_valid_reads_the_database() -> None:
-    assert await _drafts(_Session(scalar=[uuid.uuid4()])).token_is_valid("t") is True
+async def test_token_is_valid_reads_the_token_table() -> None:
+    session = _Session(scalar=[b"hash"])
+    assert await _drafts(session).token_is_valid("t") is True
+    # The check reads the token table, not the drafts: a token without drafts is valid.
+    assert "FROM attachment_draft_token" in session.statements[0]
+    assert "FROM attachment " not in session.statements[0]
     assert await _drafts(_Session(scalar=[None])).token_is_valid("t", now=NOW) is False
 
 
@@ -205,33 +221,46 @@ def _draft_row(**over: Any) -> Attachment:  # noqa: ANN401
     return Attachment(**base)
 
 
+def _removed(key: str | None = "drafts/x/d.pdf") -> SimpleNamespace:
+    return SimpleNamespace(storage_key=key)
+
+
 async def test_delete_removes_row_object_and_audits() -> None:
-    row = _draft_row()
-    session = _Session(scalar=[row])
+    session = _Session(removed=[_removed()])
     storage = FakeStorage()
-    await _drafts(session, storage=storage).delete(row.id, token="t", actor="applicant")
-    assert session.deleted == [row]
+    att_id = uuid.uuid4()
+    await _drafts(session, storage=storage).delete(att_id, token="t", actor="applicant")
+    # One DELETE carries every condition, so a parallel bind cannot slip in between.
+    (stmt,) = [s for s in session.statements if s.startswith("DELETE FROM attachment")]
+    assert "application_id IS NULL" in stmt
+    assert "draft_token_hash" in stmt
+    assert "RETURNING attachment.storage_key" in stmt
+    assert session.committed == 1
     assert storage.removed == ["drafts/x/d.pdf"]
     assert AUDITS[0]["action"] == "attachment_delete"
+    assert AUDITS[0]["target_id"] == str(att_id)
     assert AUDITS[0]["data"] == {"draft": True}
 
 
 async def test_delete_tolerates_a_storage_error_and_a_missing_key() -> None:
-    row = _draft_row()
-    await _drafts(_Session(scalar=[row]), storage=FailingStorage()).delete(
-        row.id, token="t", actor="a"
+    await _drafts(_Session(removed=[_removed()]), storage=FailingStorage()).delete(
+        uuid.uuid4(), token="t", actor="a"
     )
-    quarantined = _draft_row(storage_key=None)
     storage = FakeStorage()
-    await _drafts(_Session(scalar=[quarantined]), storage=storage).delete(
-        quarantined.id, token="t", actor="a"
+    await _drafts(_Session(removed=[_removed(None)]), storage=storage).delete(
+        uuid.uuid4(), token="t", actor="a"
     )
     assert storage.removed == []
 
 
-async def test_delete_of_a_foreign_draft_gives_404() -> None:
+async def test_delete_of_a_foreign_draft_gives_404_without_audit() -> None:
+    session = _Session()
+    storage = FakeStorage()
     with pytest.raises(NotFoundError):
-        await _drafts(_Session(scalar=[None])).delete(uuid.uuid4(), token="t", actor="a")
+        await _drafts(session, storage=storage).delete(uuid.uuid4(), token="t", actor="a")
+    assert AUDITS == []
+    assert session.committed == 0
+    assert storage.removed == []
 
 
 async def test_check_drafts_names_each_unusable_id() -> None:

@@ -112,6 +112,39 @@ async def test_row_removed_during_the_scan_is_skipped(clean: bool) -> None:
     assert storage.removed == []
 
 
+async def test_row_removed_before_the_audit_flush_is_skipped(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The quarantine audit flushes the UPDATE first. A gone row fails there."""
+
+    class _RollbackSession(FakeSession):
+        def __init__(self) -> None:
+            super().__init__()
+            self.rolled_back = 0
+            self.committed = 0
+
+        async def commit(self) -> None:
+            self.committed += 1
+
+        async def rollback(self) -> None:
+            self.rolled_back += 1
+
+    async def _stale(session: object, **kw: Any) -> None:  # noqa: ANN401
+        raise StaleDataError("row is gone")
+
+    monkeypatch.setattr(files_service, "audit_record", _stale)
+    session = _RollbackSession()
+    att = _draft(session)
+    storage = FakeStorage()
+    stored = await FilesService(session, storage=storage, settings=SETTINGS).finalize_scan(  # type: ignore[arg-type]
+        att.id, ScanVerdict(clean=False, signature="Eicar")
+    )
+    assert stored is False
+    assert session.rolled_back == 1
+    assert session.committed == 0
+    assert storage.removed == []
+
+
 async def test_unknown_row_returns_false() -> None:
     stored = await FilesService(FakeSession(), settings=SETTINGS).finalize_scan(  # type: ignore[arg-type]
         uuid.uuid4(), ScanVerdict(clean=True)
