@@ -158,6 +158,40 @@ describe('LiveVoteComponent', () => {
     expect(channel.sent.some((m) => m.type === 'cast')).toBe(false);
   });
 
+  it('locks the options after the cast: a ballot never changes', async () => {
+    const { fixture, channel, detectChanges } = await setup();
+    channel.subject.next(OPEN_VOTE);
+    detectChanges();
+    await userEvent.click(screen.getByRole('button', { name: 'Ja' }));
+    detectChanges();
+    expect(screen.getByRole('button', { name: 'Nein' })).toBeDisabled();
+    fixture.componentInstance.cast('no');
+    expect(channel.sent.filter((m) => m.type === 'cast')).toHaveLength(1);
+  });
+
+  it('shows already-voted and locks on an already_voted error frame', async () => {
+    const { fixture, channel, detectChanges } = await setup();
+    channel.subject.next(OPEN_VOTE);
+    channel.subject.next({ type: 'error', code: 'already_voted' });
+    detectChanges();
+    expect(screen.getByText(/bereits abgestimmt/)).toBeInTheDocument();
+    expect(fixture.componentInstance.locked()).toBe(true);
+    fixture.componentInstance.cast('yes');
+    expect(channel.sent.some((m) => m.type === 'cast')).toBe(false);
+  });
+
+  it('frees the options again when the server refuses a cast', async () => {
+    const { fixture, channel, detectChanges } = await setup();
+    channel.subject.next(OPEN_VOTE);
+    detectChanges();
+    fixture.componentInstance.cast('yes');
+    expect(fixture.componentInstance.locked()).toBe(true);
+    channel.subject.next({ type: 'error', code: 'locked' });
+    detectChanges();
+    expect(fixture.componentInstance.myChoice()).toBeNull();
+    expect(fixture.componentInstance.locked()).toBe(false);
+  });
+
   it('resets the own choice when a new vote opens', async () => {
     const { fixture, channel, detectChanges } = await setup();
     channel.subject.next(OPEN_VOTE);

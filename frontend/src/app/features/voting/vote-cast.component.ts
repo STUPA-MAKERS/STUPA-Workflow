@@ -26,8 +26,9 @@ const DELETE_CONFLICT_KEYS: Record<string, TranslationKey> = {
 /**
  * Vote UI: load a single vote and cast a ballot.
  *
- * - `open`: the user selects an option. With `allowChange` a new vote replaces the old
- *   one. Without it the choice locks.
+ * - `open`: the user selects an option. A ballot never changes after the cast, so the
+ *   choice locks. `myBallot` and `representedCast` of the server restore the lock on
+ *   a reload. A 409 `already_voted` locks it too.
  * - `closed`: a read-only view with the result.
  * - not eligible: a notice replaces the cast controls.
  *
@@ -63,8 +64,12 @@ export class VoteCastComponent {
   readonly phase = signal<Phase>('loading');
   readonly vote = signal<Vote | null>(null);
   readonly myChoice = signal<string | null>(null);
+  /** The own ballot is cast. A secret vote has no known choice, only this flag. */
+  readonly ownCast = signal(false);
   /** The choice for the proxy ballot. It goes to the server as a separate submission. */
   readonly proxyChoice = signal<string | null>(null);
+  /** The proxy ballot is cast (also known from the server after a reload). */
+  readonly proxyCast = signal(false);
   readonly submitting = signal(false);
   readonly notEligible = signal(false);
   /** Delegation state: the user handed the voting right over, or the user acts as a proxy. */
@@ -72,11 +77,12 @@ export class VoteCastComponent {
 
   readonly isOpen = computed(() => this.vote()?.status === 'open');
   readonly isClosed = computed(() => this.vote()?.status === 'closed');
-  readonly allowChange = computed(() => this.vote()?.config.allowChange ?? true);
   readonly options = computed(() => this.vote()?.config.options ?? []);
   readonly secret = computed(() => Boolean(this.vote()?.secret));
   readonly showBars = computed(() => Boolean(this.vote()) && (!this.secret() || this.isClosed()));
-  readonly locked = computed(() => this.myChoice() !== null && !this.allowChange());
+  /** A ballot never changes after the cast (the server answers 409 `already_voted`). */
+  readonly locked = computed(() => this.ownCast());
+  readonly proxyLocked = computed(() => this.proxyCast());
 
   // Delete a standalone vote. The route accepts it only while the vote is a
   // draft with no ballots, and it refuses a meeting-bound vote: that one is
@@ -128,6 +134,9 @@ export class VoteCastComponent {
     this.api.getVote(id).subscribe({
       next: (vote) => {
         this.vote.set(vote);
+        this.ownCast.set(vote.myBallot?.cast === true);
+        this.myChoice.set(vote.myBallot?.choice ?? null);
+        this.proxyCast.set(vote.representedCast === true);
         // Eligibility UX: the server flag `canCast` decides. The server stays
         // authoritative on the cast.
         if (vote.canCast !== true) this.notEligible.set(true);
@@ -194,24 +203,17 @@ export class VoteCastComponent {
     const vote = this.vote();
     if (!vote || this.submitting() || !this.isOpen()) return;
     if (asDelegation) {
-      if (!this.delegation()?.exercising) return;
-      if (this.proxyChoice() !== null && !this.allowChange()) return;
-    } else {
-      if (this.notEligible() || this.locked()) return;
-      if (this.myChoice() === choice && !this.allowChange()) return;
+      if (!this.delegation()?.exercising || this.proxyLocked()) return;
+    } else if (this.notEligible() || this.locked()) {
+      return;
     }
 
     this.submitting.set(true);
     this.api.castBallot(vote.id, choice, asDelegation).subscribe({
-      next: (res) => {
-        if (asDelegation) this.proxyChoice.set(choice);
-        else this.myChoice.set(choice);
+      next: () => {
+        this.markCast(asDelegation, choice);
         this.submitting.set(false);
-        this.toast.success(
-          this.i18n.translate(
-            res.status === 'changed' ? 'voting.cast.toast.changed' : 'voting.cast.toast.cast',
-          ),
-        );
+        this.toast.success(this.i18n.translate('voting.cast.toast.cast'));
         // Reload the current tally from the server. Do not guess it optimistically.
         this.api.getVote(vote.id, { quiet: true }).subscribe((v) => this.vote.set(v));
       },
@@ -221,12 +223,30 @@ export class VoteCastComponent {
           if (!asDelegation) this.notEligible.set(true);
           this.toast.error(this.i18n.translate('voting.cast.notEligible'));
         } else if (err.status === 409) {
-          this.toast.error(this.i18n.translate('voting.cast.toast.conflict'));
+          // `already_voted`: the ballot exists (another tab, the live page). Lock it.
+          const already = err.error?.code === 'already_voted';
+          if (already) this.markCast(asDelegation, null);
+          this.toast.error(
+            this.i18n.translate(
+              already ? 'voting.cast.toast.alreadyVoted' : 'voting.cast.toast.conflict',
+            ),
+          );
           this.api.getVote(vote.id, { quiet: true }).subscribe((v) => this.vote.set(v));
         } else {
           this.toast.error(err.error?.detail ?? this.i18n.translate('voting.cast.toast.failed'));
         }
       },
     });
+  }
+
+  /** Lock the own or the proxy ballot. `choice` is `null` when it is not known. */
+  private markCast(asDelegation: boolean, choice: string | null): void {
+    if (asDelegation) {
+      this.proxyCast.set(true);
+      if (choice !== null) this.proxyChoice.set(choice);
+    } else {
+      this.ownCast.set(true);
+      if (choice !== null) this.myChoice.set(choice);
+    }
   }
 }

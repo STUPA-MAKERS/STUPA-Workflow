@@ -83,6 +83,7 @@ import type {
   Uuid,
   VersionOutWire,
   Vote,
+  VoteClosed,
   BallotResult,
 } from './models';
 
@@ -490,9 +491,9 @@ export class ApiClient {
   /**
    * POST /votes/{id}/ballot — cast a ballot (`choice` ∈ config.options).
    *
-   * The call is idempotent. The same choice again stays `cast`. A different
-   * choice returns `changed`, but only when `config.allowChange` is set. 409 =
-   * duplicate or closed, 403 = not eligible. The components evaluate the status.
+   * A ballot never changes after the cast. A second cast gives 409 with the code
+   * `already_voted`. Another 409 means that the vote is not open. 403 = not
+   * eligible. The components evaluate the status.
    */
   castBallot(id: Uuid, choice: string, asDelegation = false): Observable<BallotResult> {
     return this.http.post<BallotResult>(`${this.base}/votes/${id}/ballot`, {
@@ -723,9 +724,11 @@ export class ApiClient {
     return this.http.post<void>(`${this.base}/votes/${voteId}/open`, {});
   }
 
-  /** POST /votes/{id}/close — close a vote → result → flow branch. */
-  closeVote(voteId: Uuid): Observable<void> {
-    return this.http.post<void>(`${this.base}/votes/${voteId}/close`, {});
+  /** POST /votes/{id}/close — close a vote → result → flow branch. The close
+   *  always ends the vote. `branchFired: false` means that the pass or fail
+   *  transition is blocked and a person must fire it by hand. */
+  closeVote(voteId: Uuid): Observable<VoteClosed> {
+    return this.http.post<VoteClosed>(`${this.base}/votes/${voteId}/close`, {});
   }
 
   /** POST /votes/{id}/cancel — cancel a vote: no result, no branch. */

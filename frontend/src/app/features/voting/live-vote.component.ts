@@ -24,6 +24,9 @@ import { VoteBarsComponent } from './vote-bars.component';
  * connection loss, and the session resyncs with `subscribe`. A viewer that
  * cannot vote gets a notice. That happens when the server sends
  * `error: not_eligible`, or when the meeting reports `canVote: false`.
+ *
+ * A ballot never changes after the cast. The options lock after the first tap, and
+ * the server answers a second cast with `error: already_voted`.
  */
 @Component({
   selector: 'app-live-vote',
@@ -61,6 +64,10 @@ export class LiveVoteComponent implements OnDestroy {
   readonly notEligible = computed(
     () => this.errorCode() === 'not_eligible' || this.canVote() === false,
   );
+  /** The server refused a second cast: a ballot never changes. */
+  readonly alreadyVoted = computed(() => this.errorCode() === 'already_voted');
+  /** The own ballot is cast (or the server says so). The options lock. */
+  readonly locked = computed(() => this.myChoice() !== null || this.alreadyVoted());
   readonly resultKey = computed(
     () => `vote.result.${this.result()?.result ?? 'tie'}` as TranslationKey,
   );
@@ -91,6 +98,11 @@ export class LiveVoteComponent implements OnDestroy {
         this.myChoice.set(null);
       }
     });
+    // A refused cast (other than `already_voted`) did not count. Free the options again.
+    effect(() => {
+      const code = this.errorCode();
+      if (code !== null && code !== 'already_voted') this.myChoice.set(null);
+    });
   }
 
   optionLabel(option: string): string {
@@ -100,7 +112,7 @@ export class LiveVoteComponent implements OnDestroy {
   }
 
   cast(choice: string): void {
-    if (this.notEligible() || this.result()) return;
+    if (this.notEligible() || this.result() || this.locked()) return;
     this.session.cast(choice);
     this.myChoice.set(choice);
   }

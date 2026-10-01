@@ -327,7 +327,7 @@ describe('ApiClient', () => {
       id: 'v1',
       applicationId: 'app-1',
       eligibleGroup: 'stupa',
-      config: { options: ['yes', 'no', 'abstain'], majorityRule: 'two_thirds', allowChange: true },
+      config: { options: ['yes', 'no', 'abstain'], majorityRule: 'two_thirds' },
       status: 'open',
       opensAt: null,
       closesAt: null,
@@ -830,11 +830,18 @@ describe('ApiClient', () => {
     req.flush(null);
   });
 
-  it('closes a vote', () => {
-    api.closeVote('v-1').subscribe();
+  it('closes a vote and returns branchFired', () => {
+    let fired: boolean | undefined;
+    api.closeVote('v-1').subscribe((closed) => (fired = closed.branchFired));
     const req = http.expectOne('/api/votes/v-1/close');
     expect(req.request.method).toBe('POST');
-    req.flush(null);
+    req.flush({
+      id: 'v-1',
+      result: 'passed',
+      tally: { counts: {}, eligible: 0, quorumMet: true, leading: null },
+      branchFired: false,
+    });
+    expect(fired).toBe(false);
   });
 
   it('cancels a vote', () => {

@@ -32,6 +32,7 @@
           class="live__option"
           size="lg"
           [variant]="myChoice() === option ? 'primary' : 'secondary'"
+          [disabled]="locked()"
           (click)="cast(option)"
         >
           {{ optionLabel(option) }}
@@ -40,6 +41,8 @@
     </div>
     @if (myChoice(); as choice) {
       <p class="m-0 font-medium text-center" role="status">{{ 'voting.live.voted' | t: { choice: optionLabel(choice) } }}</p>
+    } @else if (alreadyVoted()) {
+      <p class="m-0 font-medium text-center" role="status">{{ 'voting.live.alreadyVoted' | t }}</p>
     }
     @if (tally(); as t) {
       <app-vote-bars [options]="v.options" [counts]="t.counts" [eligible]="t.eligible" [leading]="t.leading" />
