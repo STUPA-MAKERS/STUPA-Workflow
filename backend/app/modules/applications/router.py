@@ -173,9 +173,11 @@ async def create_application(
     ``sub`` of that account as the actor. An anonymous submission requires
     ALTCHA and ``applicantEmail``.
 
-    A logged-in submission is confirmed at once, and its flow starts in this
-    request. An anonymous submission rests in the flow until the magic-link
-    verify.
+    A logged-in submission with the account email is confirmed at once, and its
+    flow starts in this request. An anonymous submission rests in the flow until
+    the magic-link verify. So does a logged-in submission for another email
+    address (F23, compared without case): the account does not prove that the
+    person owns that address.
     """
     # Authoritative bound on the serialized field values, free of Content-Length.
     if len(json.dumps(payload.data)) > settings.max_application_payload_bytes:
@@ -197,8 +199,15 @@ async def create_application(
     if not payload.applicant_name and principal:
         payload.applicant_name = principal.display_name
     actor = principal.sub if principal else "applicant"
+    email_confirmed = (
+        principal is not None
+        and principal.email is not None
+        and principal.email.casefold() == email.casefold()
+    )
 
-    app, email = await service.create(payload, actor=actor, dispatcher=dispatcher)
+    app, email = await service.create(
+        payload, actor=actor, dispatcher=dispatcher, email_confirmed=email_confirmed
+    )
     pool = getattr(request.app.state, "arq_pool", None)
     background.add_task(send_magic_link, settings, email, app.id, pool)
     return ApplicationCreated(applicationId=app.id)
