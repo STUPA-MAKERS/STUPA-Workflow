@@ -400,7 +400,10 @@ class AuskunftService:
                 (
                     await self.session.scalars(
                         select(Attachment)
-                        .where(Attachment.application_id.in_(app_ids))
+                        .where(
+                            Attachment.application_id.is_not(None),
+                            Attachment.application_id.in_(app_ids),
+                        )
                         .order_by(Attachment.application_id, Attachment.created_at)
                     )
                 ).all()
