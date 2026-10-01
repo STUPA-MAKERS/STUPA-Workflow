@@ -12,12 +12,19 @@ Operations:
 * `FlowService.stage_branch` — stage the `pass` or `fail` exit of a `vote` state
   without a commit. The voting module calls it in a SAVEPOINT when it closes a vote,
   and commits the close and the transition once.
+* `FlowService.start_confirmed` — start the flow of an application when its email is
+  confirmed. It schedules the deadline of the current state, runs `auto_advance` and
+  sends the task mail of the state.
 
 A transition without a branch, a forced status and an audit revert leave the current
 state. They cancel the votes of the application that cannot finish any more
 (`VotingService.cancel_for_application`, F19 and F22). After the commit the engine
 sends `vote_cancelled` for each cancelled meeting vote through the optional
 `MeetingPublisher`.
+
+Unconfirmed guest applications (`email_confirmed_at IS NULL`) rest in the flow: they get
+no deadline, no automatic transition and no mail until the magic link confirms them. The
+routes pass `allow_unconfirmed=False`, so such an application gives 404 there.
 
 Edit lock: it comes from `state.edit_allowed` of the target state. The `patch` path
 checks the lock and returns 409. The engine handles this inline and dispatches nothing.
@@ -49,6 +56,7 @@ from app.modules.deadlines.service import (
 from app.modules.flow import context as flow_context
 from app.modules.flow.dispatch import (
     ActionDispatcher,
+    DispatchedAction,
     NullActionDispatcher,
     build_dispatched_actions,
     build_implicit_notifications,
@@ -168,13 +176,22 @@ class FlowService:
         self.dispatcher: ActionDispatcher = dispatcher or NullActionDispatcher()
         self.publisher = publisher
 
-    async def _load_app(self, application_id: UUID) -> Application:
+    async def _load_app(
+        self, application_id: UUID, *, allow_unconfirmed: bool = True
+    ) -> Application:
+        """Load the application, or raise 404.
+
+        `allow_unconfirmed=False` also gives 404 for an unconfirmed guest application
+        (`email_confirmed_at IS NULL`). The routes use it: such an application rests in
+        the flow and stays invisible, and 404 instead of 403 gives no existence oracle.
+        The internal callers (worker, vote close, revert) keep the default.
+        """
         app = (
             await self.session.execute(
                 select(Application).where(Application.id == application_id)
             )
         ).scalar_one_or_none()
-        if app is None:
+        if app is None or (not allow_unconfirmed and app.email_confirmed_at is None):
             raise NotFoundError(f"application {application_id} not found")
         return app
 
@@ -343,6 +360,7 @@ class FlowService:
         principal: Principal,
         *,
         deadline_passed: bool | None = None,
+        allow_unconfirmed: bool = True,
     ) -> list[TransitionOut]:
         """List the manual transitions the actor may fire, with the guards checked.
 
@@ -351,9 +369,10 @@ class FlowService:
         as the pass and fail exits of a vote or approval state. Only the vote decides
         those through `close_vote`, never a manual action. Actor gates in the guard refine
         which of the remaining transitions stay visible. `deadline_passed=None` means
-        derive the value from the database.
+        derive the value from the database. `allow_unconfirmed` works as in
+        `_load_app`.
         """
-        app = await self._load_app(application_id)
+        app = await self._load_app(application_id, allow_unconfirmed=allow_unconfirmed)
         if app.current_state_id is None:
             return []
         if deadline_passed is None:
@@ -370,15 +389,15 @@ class FlowService:
     _APPLICANT = Principal(sub="applicant", roles=[], permissions=set())
 
     async def available_applicant_transitions(
-        self, application_id: UUID
+        self, application_id: UUID, *, allow_unconfirmed: bool = True
     ) -> list[TransitionOut]:
         """List the transitions the magic-link applicant may fire.
 
         A transition qualifies when it is manual, when its guard holds in the applicant
         context, and when `actorIsApplicant` opens it. Nothing else qualifies. There is
-        no implicit applicant access.
+        no implicit applicant access. `allow_unconfirmed` works as in `_load_app`.
         """
-        app = await self._load_app(application_id)
+        app = await self._load_app(application_id, allow_unconfirmed=allow_unconfirmed)
         if app.current_state_id is None:
             return []
         ctx = await flow_context.build_context(
@@ -394,19 +413,30 @@ class FlowService:
         ]
 
     async def fire_as_applicant(
-        self, application_id: UUID, transition_id: UUID, *, note: str | None = None
+        self,
+        application_id: UUID,
+        transition_id: UUID,
+        *,
+        note: str | None = None,
+        allow_unconfirmed: bool = True,
     ) -> TransitionResult:
         """Fire a transition as the applicant.
 
         Only a manual transition that `actorIsApplicant` opens may fire. Every other
         transition gives 403. This path bypasses the `application.manage` gate on
         purpose, but only for the transitions that the admin opened.
+        `allow_unconfirmed` works as in `_load_app`.
         """
         transition = await self._load_transition(transition_id)
         if transition.automatic or not guard_requires_applicant(transition.guard):
             raise ForbiddenError("transition is not open to the applicant")
         return await self.fire(
-            application_id, transition_id, self._APPLICANT, note=note, as_applicant=True
+            application_id,
+            transition_id,
+            self._APPLICANT,
+            note=note,
+            as_applicant=True,
+            allow_unconfirmed=allow_unconfirmed,
         )
 
     async def auto_advance(
@@ -451,6 +481,96 @@ class FlowService:
                     manual=False,
                 )
         return None
+
+    # Actor of the automatic transitions that a confirmation starts. No user stands
+    # behind it. It has the roles and permissions of the cron actor, so a guard gives
+    # the same result on both paths.
+    _SYSTEM = Principal(
+        sub="system:confirmation", roles=["system"], permissions={"application.manage"}
+    )
+
+    async def start_confirmed(self, application_id: UUID) -> TransitionResult | None:
+        """Start the flow of an application whose email is confirmed.
+
+        An unconfirmed guest application rests in the flow. The magic-link verify
+        confirms it and then calls this method one time. A logged-in submission is
+        confirmed at once, so the create calls this method directly. The method runs
+        three steps:
+
+        1. Schedule the deadline of the current state. This also deletes the stale
+           flow deadlines of the application.
+        2. Run `auto_advance`.
+        3. When no transition fired, send the task mail of the current state to the
+           people who can act there. A fired transition sends its own mails.
+
+        Step 1 commits the confirmation. After that commit, an error in step 2 or 3
+        must not fail the verify or the create request: the email is confirmed, a
+        single-use link is spent, and a logged-in create already has its
+        application. So, as in the cron, the method catches every error of steps 2
+        and 3, rolls the session back and writes a log line. A `ConflictError` or a
+        `NotFoundError` is an expected race and gets an info line. Every other error
+        gets a log line with the traceback. The cron tries the automatic transitions
+        again.
+
+        The idempotency key of the task mail holds the id of the latest status event.
+        A second call therefore sends no second mail.
+
+        Returns:
+            The result of the automatic transition, or `None` when none fired.
+        """
+        app = await self._load_app(application_id)
+        if app.current_state_id is None:
+            return None
+        state = await self._load_state(app.current_state_id)
+        if state is not None:
+            await self.schedule_state_deadline(app, state)
+        else:
+            # The dispatchers read in their own sessions. Commit the confirmation
+            # first, so that they see the application as confirmed.
+            await self.session.commit()
+        try:
+            fired = await self.auto_advance(application_id, self._SYSTEM)
+            if fired is None:
+                await self._announce_current_state(application_id)
+        except (ConflictError, NotFoundError) as exc:
+            await self.session.rollback()
+            logger.info(
+                "auto-transition on confirmation skipped (app=%s): %s", application_id, exc
+            )
+            return None
+        except Exception:  # noqa: BLE001 - a failed start must not fail the committed confirmation
+            # Roll back the failed step, so the caller can still use the session (the
+            # verify commits, the create refreshes the application).
+            await self.session.rollback()
+            logger.exception("flow start on confirmation failed (app=%s)", application_id)
+            return None
+        return fired
+
+    async def _announce_current_state(self, application_id: UUID) -> None:
+        """Send the task mail of the current state, keyed on the latest status event.
+
+        The notify dispatcher resolves the recipients at send time. It sends nothing
+        when the state is not actionable or nobody can act there.
+        """
+        status_event_id = await self.session.scalar(
+            select(StatusEvent.id)
+            .where(StatusEvent.application_id == application_id)
+            .order_by(StatusEvent.at.desc())
+            .limit(1)
+        )
+        if status_event_id is None:
+            return
+        await self.dispatcher.dispatch(
+            [
+                DispatchedAction(
+                    type="taskNotify",
+                    application_id=application_id,
+                    transition_id=None,
+                    status_event_id=status_event_id,
+                    idempotency_key=f"{application_id}:{status_event_id}:auto:task",
+                )
+            ]
+        )
 
     async def branch_transition(
         self, application_id: UUID, branch: str
@@ -582,6 +702,7 @@ class FlowService:
         as_applicant: bool = False,
         meeting_id: UUID | None = None,
         non_public: bool = False,
+        allow_unconfirmed: bool = True,
     ) -> TransitionResult:
         """Fire a transition.
 
@@ -594,6 +715,8 @@ class FlowService:
         transition, and the target state is a vote state. The agenda item then comes
         in the same transaction as the state change, with `non_public` as its
         visibility. The `addToNextSession` action does not run again after the commit.
+
+        `allow_unconfirmed` works as in `_load_app`.
 
         Raises:
             NotFoundError: The application or the transition does not exist (404).
@@ -611,6 +734,7 @@ class FlowService:
             as_applicant=as_applicant,
             meeting_id=meeting_id,
             non_public=non_public,
+            allow_unconfirmed=allow_unconfirmed,
         )
         await self.session.commit()
         return await self.after_commit(staged)
@@ -627,6 +751,7 @@ class FlowService:
         as_applicant: bool = False,
         meeting_id: UUID | None = None,
         non_public: bool = False,
+        allow_unconfirmed: bool = True,
         rollback_on_conflict: bool = True,
     ) -> StagedFire:
         """Write a transition into the open transaction, without a commit.
@@ -641,7 +766,7 @@ class FlowService:
                 transition won the race (409).
             ValidationProblem: `meeting_id` does not fit the transition (422).
         """
-        app = await self._load_app(application_id)
+        app = await self._load_app(application_id, allow_unconfirmed=allow_unconfirmed)
         transition = await self._load_transition(transition_id)
 
         if transition.flow_version_id != app.flow_version_id:
@@ -946,7 +1071,9 @@ class FlowService:
         await self._publish_cancelled(cancelled)
         return status_event_id
 
-    async def list_states(self, application_id: UUID) -> list[StateOut]:
+    async def list_states(
+        self, application_id: UUID, *, allow_unconfirmed: bool = True
+    ) -> list[StateOut]:
         """List all states of the own flow version of the application.
 
         The force-status picker uses this list. The query is scoped to
@@ -954,8 +1081,9 @@ class FlowService:
         therefore a valid target for `force_status`. It is a state row in the same graph
         that the application lives in. A running application may sit on an older flow
         version. The order is initial-first, then by key, which keeps the list stable.
+        `allow_unconfirmed` works as in `_load_app`.
         """
-        app = await self._load_app(application_id)
+        app = await self._load_app(application_id, allow_unconfirmed=allow_unconfirmed)
         states = (
             (
                 await self.session.execute(
@@ -986,6 +1114,7 @@ class FlowService:
         principal: Principal,
         *,
         note: str,
+        allow_unconfirmed: bool = True,
     ) -> TransitionResult:
         """Force an application directly into `target_state_id` and bypass the flow.
 
@@ -998,7 +1127,8 @@ class FlowService:
         force does not hang open. It then re-materializes the deadline and sends
         `vote_cancelled` for the cancelled meeting votes.
         It deliberately sends no applicant notification and no task notification, and it
-        fires no webhook. A manual override stays silent.
+        fires no webhook. A manual override stays silent. `allow_unconfirmed` works as
+        in `_load_app`.
 
         Raises:
             NotFoundError: The target state does not belong to the flow of the
@@ -1006,7 +1136,7 @@ class FlowService:
             ConflictError: The application has no current state, already sits in the
                 target state, or a concurrent change moved it first (409).
         """
-        app = await self._load_app(application_id)
+        app = await self._load_app(application_id, allow_unconfirmed=allow_unconfirmed)
         from_state_id = app.current_state_id
         if from_state_id is None:
             raise ConflictError(

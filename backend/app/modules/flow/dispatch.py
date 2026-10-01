@@ -40,11 +40,14 @@ class DispatchedAction:
 
     `idempotency_key` is stable over the application, the status event, the position
     and the type. A retried worker run with the same key must not fire twice.
+
+    `transition_id` is `None` only for the task mail that a confirmation sends for the
+    current state (`FlowService.start_confirmed`). No transition led there.
     """
 
     type: str
     application_id: UUID
-    transition_id: UUID
+    transition_id: UUID | None
     status_event_id: UUID
     idempotency_key: str
     params: dict[str, Any] = field(default_factory=dict)

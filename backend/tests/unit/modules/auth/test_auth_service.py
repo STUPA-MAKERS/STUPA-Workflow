@@ -171,6 +171,94 @@ async def test_verify_magic_link_edit_not_marked_used(monkeypatch: pytest.Monkey
     assert scope == "edit"
 
 
+class _FakeFlow:
+    """Stand-in for `FlowService` that records `start_confirmed` calls."""
+
+    started: list[tuple[object, object]] = []
+
+    def __init__(self, _db: object, dispatcher: object = None) -> None:
+        self.dispatcher = dispatcher
+
+    async def start_confirmed(self, application_id: object) -> None:
+        _FakeFlow.started.append((application_id, self.dispatcher))
+
+
+async def test_verify_magic_link_first_confirmation_starts_the_flow(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """F18/O14: the verify that confirms the email starts the resting flow."""
+    settings = _settings()
+    monkeypatch.setattr(service, "_now", lambda: NOW)
+    monkeypatch.setattr(service, "FlowService", _FakeFlow)
+    _FakeFlow.started = []
+    row = _link("tok", settings, scope="edit", single_use=False)
+    dispatcher = object()
+    # The confirmation UPDATE matches the row and returns its id.
+    db = fake_session(result(row), result("aid-1"))
+    await service.verify_magic_link(db, settings, token="tok", dispatcher=dispatcher)  # pyright: ignore[reportArgumentType]
+    assert _FakeFlow.started == [("aid-1", dispatcher)]
+
+
+async def test_verify_magic_link_second_click_starts_nothing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The email is already confirmed: no second start, so no second mail."""
+    settings = _settings()
+    monkeypatch.setattr(service, "_now", lambda: NOW)
+    monkeypatch.setattr(service, "FlowService", _FakeFlow)
+    _FakeFlow.started = []
+    row = _link("tok", settings, scope="edit", single_use=False)
+    db = fake_session(result(row), result())  # the UPDATE matches no row
+    await service.verify_magic_link(db, settings, token="tok")
+    assert _FakeFlow.started == []
+
+
+class _FailingDispatcher:
+    async def dispatch(self, _actions: object) -> None:
+        raise RuntimeError("mail queue down")
+
+
+async def test_verify_magic_link_survives_a_failed_flow_start(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A failed flow start after the commit does not fail the verify.
+
+    The confirmation and the applicant session are already committed. The verify must
+    still return the session token, else the cookie is lost and a second click starts
+    nothing.
+    """
+    from app.modules.flow.service import FlowService
+
+    settings = _settings()
+    monkeypatch.setattr(service, "_now", lambda: NOW)
+
+    async def _schedule(_self: object, _app: object, _state: object) -> None:
+        return None
+
+    async def _advance(_self: object, _application_id: object, _principal: object) -> None:
+        return None
+
+    monkeypatch.setattr(FlowService, "schedule_state_deadline", _schedule)
+    monkeypatch.setattr(FlowService, "auto_advance", _advance)
+    row = _link("tok", settings, scope="view", single_use=True)
+    app = _app(state_id="s1")
+    app.email_confirmed_at = NOW  # type: ignore[assignment]
+    db = fake_session(
+        result(row),  # the magic link
+        result("claimed-id"),  # the single-use claim
+        result("aid-1"),  # the confirmation UPDATE
+        result(app),  # FlowService._load_app
+        result(State()),  # FlowService._load_state
+        result("event-1"),  # the latest status event of the task mail
+    )
+    app_id, scope, token = await service.verify_magic_link(
+        db, settings, token="tok", dispatcher=_FailingDispatcher()  # pyright: ignore[reportArgumentType]
+    )
+    assert (app_id, scope) == ("aid-1", "view")
+    assert token
+    assert db.rolled_back == 1
+
+
 # The OIDC login path.
 async def test_upsert_principal_new() -> None:
     db = fake_session(result())  # no existing principal

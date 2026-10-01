@@ -380,16 +380,22 @@ class _FakeForms:
 
 class _FakeFlow:
     scheduled: list[tuple[Any, Any]] = []
+    # The `start_confirmed` calls as (application id, dispatcher).
+    started: list[tuple[Any, Any]] = []
     available: list[Any] = []
     # The gremien where the principal holds the gremium permission `vote.cast`
     # (`gremium_ids_for` in `list_tasks`).
     cast_gids: set[Any] = set()
 
-    def __init__(self, session: object) -> None:
+    def __init__(self, session: object, dispatcher: object = None) -> None:
         self.session = session
+        self.dispatcher = dispatcher
 
     async def schedule_state_deadline(self, app: Any, state: Any) -> None:
         _FakeFlow.scheduled.append((app, state))
+
+    async def start_confirmed(self, application_id: Any) -> None:
+        _FakeFlow.started.append((application_id, self.dispatcher))
 
     async def available_transitions(
         self, _app_id: Any, _principal: Any, *, deadline_passed: Any = None
@@ -400,6 +406,7 @@ class _FakeFlow:
 @pytest.fixture(autouse=True)
 def _reset_flow() -> None:
     _FakeFlow.scheduled = []
+    _FakeFlow.started = []
     _FakeFlow.available = []
     _FakeForms.effective = None
 
@@ -499,7 +506,10 @@ async def test_create_anonymous_ok(
     assert session.committed == 1
     kinds = {type(o).__name__ for o in session.added}
     assert {"Application", "Applicant", "SubmissionVersion", "StatusEvent"} <= kinds
-    assert _FakeFlow.scheduled  # the deadline is materialized
+    # O14: a guest application rests in the flow until the magic-link verify. The
+    # create schedules no deadline and starts nothing.
+    assert _FakeFlow.scheduled == []
+    assert _FakeFlow.started == []
 
 
 async def test_create_logged_in_actor_confirms_immediately(
@@ -514,11 +524,16 @@ async def test_create_logged_in_actor_confirms_immediately(
         execute_results=[[fv_id], [initial]],
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
+    dispatcher = object()
     app, _ = await svc.create(
-        _payload(data={"title": "T"}), actor="principal-sub-1"  # type: ignore[arg-type]
+        _payload(data={"title": "T"}),  # type: ignore[arg-type]
+        actor="principal-sub-1",
+        dispatcher=dispatcher,  # type: ignore[arg-type]
     )
     assert app.created_by == "principal-sub-1"
     assert app.email_confirmed_at is not None
+    # A confirmed application starts its flow at once, with the route dispatcher.
+    assert _FakeFlow.started == [(app.id, dispatcher)]
 
 
 async def test_effective_form_delegates_with_pinned_version(

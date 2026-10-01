@@ -47,6 +47,7 @@ class FakeSession:
         self.deleted: list[Any] = []
         self.flushed = 0
         self.committed = 0
+        self.rolled_back = 0
 
     async def execute(self, _stmt: Any) -> FakeResult:
         if not self._results:
@@ -75,6 +76,9 @@ class FakeSession:
 
     async def commit(self) -> None:
         self.committed += 1
+
+    async def rollback(self) -> None:
+        self.rolled_back += 1
 
 
 def result(*items: Any) -> FakeResult:

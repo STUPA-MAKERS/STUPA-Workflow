@@ -16,6 +16,10 @@ idempotent steps:
    when the branch is blocked (`branchFired=false`, audit `vote_branch_blocked`), so
    the cron never grabs the same vote again.
 
+An unconfirmed guest application (`email_confirmed_at IS NULL`) rests in the flow. The
+reminder, deadline-action and auto-transition scans skip it. The magic-link verify
+starts its flow (`FlowService.start_confirmed`).
+
 Concurrency: each unit gets a lock in its own session with `FOR UPDATE SKIP LOCKED`.
 A second worker skips a locked unit, so nothing runs twice. The operations are also
 idempotent by themselves: `flow.fire` uses optimistic locking, `voting.close` checks
@@ -286,9 +290,10 @@ async def _fire_one(ctx: dict[str, Any], deadline_id: UUID, now: datetime) -> bo
 async def _process_auto_transitions(ctx: dict[str, Any]) -> int:
     """Fire the configured automatic transitions whose guard passes.
 
-    The scan finds applications whose current state has an outgoing `automatic`
-    transition. It fires the first match with `manual=False`. Optimistic locking in
-    `flow.fire` keeps the step idempotent. Each application gets its own session.
+    The scan finds confirmed applications whose current state has an outgoing
+    `automatic` transition. It fires the first match with `manual=False`. Optimistic
+    locking in `flow.fire` keeps the step idempotent. Each application gets its own
+    session.
     """
     maker = _sessionmaker(ctx)
     dispatcher = _flow_dispatcher(ctx)
@@ -303,6 +308,7 @@ async def _process_auto_transitions(ctx: dict[str, Any]) -> int:
                     .where(
                         Application.current_state_id.is_not(None),
                         Application.current_state_id.in_(auto_states),
+                        Application.email_confirmed_at.is_not(None),
                     )
                     .order_by(Application.created_at)
                     .limit(DEFAULT_SCAN_LIMIT)

@@ -99,9 +99,10 @@ class _FakeService:
         self.comment_write_args: dict[str, object] | None = None
         self.session = _FakeAuditSession()
 
-    async def create(self, payload, *, actor="applicant"):  # noqa: ANN001
+    async def create(self, payload, *, actor="applicant", dispatcher=None):  # noqa: ANN001
         self.created = payload
         self.created_actor = actor
+        self.created_dispatcher = dispatcher
         return _FakeApp(uuid4()), str(payload.applicant_email)
 
     async def get(  # noqa: ANN001
@@ -328,6 +329,8 @@ def test_create_application_logged_in_skips_altcha_and_derives_identity(
     assert fake_service.created.applicant_name == "Userin"  # type: ignore[union-attr]
     assert fake_service.created_actor == "u-7"
     assert sent and sent[0][0] == "user@example.org"
+    # The route hands the flow action dispatcher to the create, which starts the flow.
+    assert fake_service.created_dispatcher is not None
 
 
 def test_create_application_logged_in_explicit_email_on_behalf(
