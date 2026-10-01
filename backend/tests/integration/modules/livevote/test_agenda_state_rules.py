@@ -2,19 +2,27 @@
 
 * Add, reorder, rename and remove need a planned or live meeting (409 otherwise).
 * Remove answers 409 while the item has an open or closed vote. It deletes the
-  draft and cancelled votes of the item first, each with ``vote_delete``.
+  draft and cancelled votes of the item first, each with ``vote_delete``. To delete
+  them the caller needs ``canManageVotes``: ``protocol.write`` alone gives 403.
 * The body needs a live meeting, or a closed meeting with a draft protocol.
 """
 
 from __future__ import annotations
 
+import uuid
+
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.deps import get_current_principal
+from app.modules.admin.models import GremiumMembership, GremiumRole
+from app.modules.auth.models import Principal as PrincipalRow
+from app.modules.auth.principal import Principal
 from app.modules.livevote.models import MeetingAgendaItem
-from app.modules.voting.models import Vote
+from app.modules.voting.models import Ballot, Vote
 from tests.integration.modules.livevote.conftest import ADMIN_SUB, audit_actions, seed
 
 pytestmark = pytest.mark.integration
@@ -159,3 +167,61 @@ async def test_body_after_close_with_locked_protocol_is_refused(
         )
     assert resp.status_code == 409, resp.text
     assert resp.json()["code"] == "protocol_locked"
+
+
+async def _protocol_writer(maker: async_sessionmaker[AsyncSession], gremium_id: uuid.UUID) -> str:
+    """Write a member whose gremium role holds only ``protocol.write``. Return its sub."""
+    sub = f"pw-{uuid.uuid4().hex[:8]}"
+    async with maker() as session:
+        row = PrincipalRow(sub=sub, display_name="PW", email=f"{sub}@x.de")
+        role = GremiumRole(
+            gremium_id=gremium_id,
+            key=f"pw-{sub}",
+            name_i18n={"de": "Protokoll"},
+            permissions=["protocol.write"],
+        )
+        session.add_all([row, role])
+        await session.flush()
+        session.add(
+            GremiumMembership(
+                principal_id=row.id, gremium_id=gremium_id, gremium_role_id=role.id
+            )
+        )
+        await session.commit()
+    return sub
+
+
+async def test_protocol_writer_cannot_remove_an_item_with_votes(
+    maker: async_sessionmaker[AsyncSession], api: FastAPI
+) -> None:
+    """``protocol.write`` edits the agenda, but deleting a vote needs ``canManageVotes``.
+
+    A cancelled vote can hold ballots. Without this gate the agenda right alone would
+    delete the vote and its ballots, past the gate of the vote delete route.
+    """
+    s = await seed(maker, status="live", items=2, votes=("cancelled",))
+    async with maker() as session:
+        session.add(Ballot(vote_id=s.vote_ids["cancelled"], voter_sub="voter", choice="yes"))
+        await session.commit()
+    sub = await _protocol_writer(maker, s.gremium_id)
+    api.dependency_overrides[get_current_principal] = lambda: Principal(sub=sub)
+    base = f"/api/meetings/{s.meeting_id}/agenda"
+    with TestClient(api) as client:
+        refused = client.delete(f"{base}/{s.item_ids[0]}")
+        # The same member removes an item without votes.
+        allowed = client.delete(f"{base}/{s.item_ids[1]}")
+    assert refused.status_code == 403, refused.text
+    assert allowed.status_code == 200, allowed.text
+    assert [i["id"] for i in allowed.json()] == [str(s.item_ids[0])]
+    async with maker() as session:
+        assert await session.get(MeetingAgendaItem, s.item_ids[0]) is not None
+        assert await session.get(Vote, s.vote_ids["cancelled"]) is not None
+        ballots = await session.scalar(
+            select(func.count()).select_from(Ballot).where(
+                Ballot.vote_id == s.vote_ids["cancelled"]
+            )
+        )
+        assert ballots == 1
+    actions = [e.action for e in await audit_actions(maker)]
+    assert "vote_delete" not in actions
+    assert actions.count("agenda_item_remove") == 1

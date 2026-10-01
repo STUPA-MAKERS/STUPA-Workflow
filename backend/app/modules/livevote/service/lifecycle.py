@@ -128,7 +128,9 @@ class LifecycleOps(PermissionOps, VoteReadOps):
                 open vote on close (``open_vote``), the start has no protokollant, or
                 the meeting is closed and the patch changes its planning.
         """
-        meeting = await self._get(meeting_id)
+        # A status change locks the meeting row. The open of a vote takes the same
+        # lock, so the open-vote check below and the close cannot race (O12).
+        meeting = await self._get(meeting_id, for_update=payload.status is not None)
         wants_manage = (
             "date" in payload.model_fields_set
             or "start_time" in payload.model_fields_set

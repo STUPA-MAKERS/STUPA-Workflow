@@ -1901,7 +1901,7 @@ async def test_remove_existing_and_missing(audit_calls: list[dict[str, Any]]) ->
         scalars_q=[[]],  # list() items
     )
     svc = AgendaService(sess)  # type: ignore[arg-type]
-    await svc.remove(m.id, item.id, actor="mgr")
+    await svc.remove(m.id, item.id, actor="mgr", may_delete_votes=True)
     assert sess.deleted == [item]
     assert sess.committed == 1
     [entry] = audit_calls
@@ -1914,7 +1914,7 @@ async def test_remove_existing_and_missing(audit_calls: list[dict[str, Any]]) ->
         scalars_q=[[]],
     )
     svc2 = AgendaService(sess2)  # type: ignore[arg-type]
-    await svc2.remove(m.id, uuid4(), actor="mgr")
+    await svc2.remove(m.id, uuid4(), actor="mgr", may_delete_votes=True)
     assert sess2.deleted == []
     assert sess2.committed == 0
 
@@ -1932,7 +1932,7 @@ async def test_remove_deletes_draft_and_cancelled_votes(
         agenda_item_id=item.id, eligible_group=str(m.gremium_id),
     )
     sess = _QueueSession(executes=[res(m), res(item), res(draft), res(m)], scalars_q=[[]])
-    await AgendaService(sess).remove(m.id, item.id, actor="mgr")  # type: ignore[arg-type]
+    await AgendaService(sess).remove(m.id, item.id, actor="mgr", may_delete_votes=True)  # type: ignore[arg-type]
     assert sess.deleted == [draft, item]
     assert [c["action"].value for c in audit_calls] == ["vote_delete", "agenda_item_remove"]
     assert audit_calls[1]["data"]["deletedVoteIds"] == [str(draft.id)]
@@ -1948,7 +1948,7 @@ async def test_remove_with_open_or_closed_vote_conflicts(vote_status: str) -> No
     vote = SimpleNamespace(id=uuid4(), status=vote_status)
     sess = _QueueSession(executes=[res(m), res(item), res(vote)])
     with pytest.raises(ConflictError) as ei:
-        await AgendaService(sess).remove(m.id, item.id, actor="mgr")  # type: ignore[arg-type]
+        await AgendaService(sess).remove(m.id, item.id, actor="mgr", may_delete_votes=True)  # type: ignore[arg-type]
     assert ei.value.code == "agenda_item_has_vote"
     assert sess.deleted == []
     assert sess.committed == 0
@@ -1958,7 +1958,7 @@ async def test_remove_after_close_conflicts() -> None:
     m = _meeting(status="closed")
     sess = _QueueSession(executes=[res(m)])
     with pytest.raises(ConflictError) as ei:
-        await AgendaService(sess).remove(m.id, uuid4(), actor="mgr")  # type: ignore[arg-type]
+        await AgendaService(sess).remove(m.id, uuid4(), actor="mgr", may_delete_votes=True)  # type: ignore[arg-type]
     assert ei.value.code == "meeting_closed"
 
 
@@ -2269,9 +2269,12 @@ class _FakeAgendaService:
         self.actors.append(actor)
         return []
 
-    async def remove(self, meeting_id: UUID, item_id: UUID, *, actor: str) -> list[Any]:
+    async def remove(
+        self, meeting_id: UUID, item_id: UUID, *, actor: str, may_delete_votes: bool
+    ) -> list[Any]:
         self.calls.append("remove")
         self.actors.append(actor)
+        self.may_delete_votes = may_delete_votes
         return []
 
     async def reorder(
@@ -2522,12 +2525,19 @@ def test_remove_agenda_item_forbidden(app: FastAPI, client: TestClient, fakes) -
     assert r.status_code == 403
 
 
-def test_remove_agenda_item_ok(app: FastAPI, client: TestClient, fakes) -> None:
-    fakes["meeting"]._meeting_out = _meeting_out(can_write=True)
+@pytest.mark.parametrize("can_manage_votes", [True, False])
+def test_remove_agenda_item_ok(
+    app: FastAPI, client: TestClient, fakes, can_manage_votes: bool
+) -> None:
+    fakes["meeting"]._meeting_out = _meeting_out(
+        can_write=True, can_manage_votes=can_manage_votes
+    )
     _login(app)
     r = client.delete(f"/api/meetings/{uuid4()}/agenda/{uuid4()}")
     assert r.status_code == 200
     assert "remove" in fakes["agenda"].calls
+    # The vote right decides whether the remove may delete the votes of the item.
+    assert fakes["agenda"].may_delete_votes is can_manage_votes
 
 
 def test_reorder_agenda_forbidden(app: FastAPI, client: TestClient, fakes) -> None:

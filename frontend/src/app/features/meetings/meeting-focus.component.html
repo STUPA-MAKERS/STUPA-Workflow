@@ -257,9 +257,11 @@
               <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.agenda.rename' | t" [title]="'meetings.agenda.rename' | t" [disabled]="savingAgenda()" (click)="$event.stopPropagation(); startRename.emit(item)"><app-icon name="edit" /></app-button>
             }
             <!-- An item with an open or closed vote stays on the agenda (409
-                 `agenda_item_has_vote`), so its remove is disabled with the reason. -->
+                 `agenda_item_has_vote`). An item with other votes needs the vote right
+                 (403). The remove is then disabled with the reason. -->
             @if (canChangeAgenda()) {
-              <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" [title]="(hasRecordedVote(item.id) ? 'meetings.agenda.removeBlocked' : 'admin.common.remove') | t" [disabled]="savingAgenda() || hasRecordedVote(item.id)" (click)="$event.stopPropagation(); removeFromAgenda.emit(item.id)"><app-icon name="delete" /></app-button>
+              @let blocked = removeBlockedReason(item.id);
+              <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" [title]="(blocked ?? 'admin.common.remove') | t" [disabled]="savingAgenda() || blocked !== null" (click)="$event.stopPropagation(); removeFromAgenda.emit(item.id)"><app-icon name="delete" /></app-button>
             }
             @if (canEditAgenda()) {
               <app-checkbox class="fx__np" [ngModel]="item.nonPublic === true" [disabled]="savingAgenda()" (ngModelChange)="setNonPublic.emit({ item, nonPublic: $event })" (click)="$event.stopPropagation()">{{ 'meetings.agenda.nonPublic' | t }}</app-checkbox>

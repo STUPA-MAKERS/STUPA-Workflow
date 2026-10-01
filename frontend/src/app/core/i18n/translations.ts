@@ -751,6 +751,8 @@ export const de = {
   'meetings.agenda.rename': 'TOP umbenennen',
   'meetings.agenda.removeBlocked':
     'Dieser TOP hat eine offene oder abgeschlossene Abstimmung und bleibt auf der Tagesordnung.',
+  'meetings.agenda.removeNeedsVoteRight':
+    'Dieser TOP hat Abstimmungen. Nur wer die Abstimmungen der Sitzung leitet, kann ihn entfernen.',
   'meetings.agenda.renamePlaceholder': 'TOP-Titel …',
   'meetings.agenda.openApplication': 'Antrag öffnen',
   'meetings.agenda.top': 'TOP {n}',
@@ -2965,6 +2967,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.agenda.rename': 'Rename item',
   'meetings.agenda.removeBlocked':
     'This item has an open or closed vote and stays on the agenda.',
+  'meetings.agenda.removeNeedsVoteRight':
+    'This item has votes. Only a person who manages the votes of the meeting can remove it.',
   'meetings.agenda.renamePlaceholder': 'Item title …',
   'meetings.agenda.openApplication': 'Open application',
   'meetings.agenda.top': 'Item {n}',

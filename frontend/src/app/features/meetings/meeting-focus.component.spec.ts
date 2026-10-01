@@ -670,6 +670,18 @@ describe('MeetingFocusComponent', () => {
       expect(removes[2]).toBeDisabled();
     });
 
+    it('disables the remove of an item with votes without the vote right', async () => {
+      const votes = [vote({ id: 'v-2', agendaItemId: 't-2', status: 'cancelled' })];
+      await setup({ meeting: meeting({ votes, canManageVotes: false }) });
+      await userEvent.click(screen.getByTitle('Tagesordnung öffnen'));
+      const popover = screen.getByRole('dialog', { name: 'Tagesordnung' });
+      const removes = within(popover).getAllByRole('button', { name: 'Entfernen' });
+      // The agenda right alone removes an item without votes.
+      expect(removes[0]).not.toBeDisabled();
+      expect(removes[1]).toBeDisabled();
+      expect(removes[1].getAttribute('title')).toMatch(/Nur wer die Abstimmungen/);
+    });
+
     it('shows the empty agenda hint', async () => {
       await setup({ agenda: [], top: null, topIndex: -1 });
       expect(screen.getByText('0 TOPs vorbereitet')).toBeInTheDocument();

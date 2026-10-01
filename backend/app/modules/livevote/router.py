@@ -566,11 +566,18 @@ async def remove_agenda_item(
     Only the meeting lead or an admin may edit the agenda. A closed meeting answers
     409 ``meeting_closed``. An item with an open or closed vote answers 409
     ``agenda_item_has_vote``. The draft and cancelled votes of the item go with it.
+    To delete them the caller also needs ``canManageVotes``, as on
+    ``DELETE /meetings/{id}/votes/{voteId}``, else 403.
     """
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_write:
         raise ForbiddenError("not allowed to edit the agenda")
-    return await agenda.remove(meeting_id, item_id, actor=principal.sub)
+    return await agenda.remove(
+        meeting_id,
+        item_id,
+        actor=principal.sub,
+        may_delete_votes=meeting.can_manage_votes,
+    )
 
 
 @router.put(

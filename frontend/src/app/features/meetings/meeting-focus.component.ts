@@ -326,6 +326,21 @@ export class MeetingFocusComponent {
     return this.votesFor(topId).some((v) => v.status === 'open' || v.status === 'closed');
   }
 
+  /**
+   * Give the i18n key of the reason why the item cannot be removed, or `null`.
+   *
+   * An open or closed vote keeps the item (409 `agenda_item_has_vote`). A draft or
+   * cancelled vote goes with the item, but only for a person with the vote right
+   * (`canManageVotes`). The agenda right alone gets 403.
+   */
+  protected removeBlockedReason(topId: Uuid): TranslationKey | null {
+    if (this.hasRecordedVote(topId)) return 'meetings.agenda.removeBlocked';
+    if (!this.meeting().canManageVotes && this.votesFor(topId).length > 0) {
+      return 'meetings.agenda.removeNeedsVoteRight';
+    }
+    return null;
+  }
+
   /** An item before "now" in the agenda order counts as handled. */
   protected isDone(index: number): boolean {
     const now = this.nowIndex();

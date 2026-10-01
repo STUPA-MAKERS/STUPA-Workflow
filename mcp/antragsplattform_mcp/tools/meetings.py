@@ -211,7 +211,9 @@ async def delete_agenda_item(meeting_id: str, item_id: str) -> dict:
     or protocol.write in its gremium, the assigned minute-taker, or admin. Only a
     planned or live meeting removes an item (409 `meeting_closed` otherwise). An item
     with an open or closed vote stays (409 `agenda_item_has_vote`). Its draft and
-    cancelled votes are deleted with it.
+    cancelled votes are deleted with it. To delete these votes you also need the
+    vote right of the meeting (manager, minute-taker or gremium vote.manage), else
+    403.
     """
     return await api().delete(f"/meetings/{meeting_id}/agenda/{item_id}")
 

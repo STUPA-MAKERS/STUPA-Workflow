@@ -158,10 +158,20 @@ class MeetingServiceBase:
         row = await self.session.get(Gremium, gremium_id)
         return row.name if row is not None else None
 
-    async def _get(self, meeting_id: UUID) -> Meeting:
-        meeting = (
-            await self.session.execute(select(Meeting).where(Meeting.id == meeting_id))
-        ).scalar_one_or_none()
+    async def _get(self, meeting_id: UUID, *, for_update: bool = False) -> Meeting:
+        """Load a meeting by id.
+
+        ``for_update`` locks the meeting row until the commit and reads the current
+        values again. A status change, an agenda change and a vote open all take this
+        lock first, so they run one after the other (O12, O25).
+
+        Raises:
+            NotFoundError: No meeting has this id.
+        """
+        stmt = select(Meeting).where(Meeting.id == meeting_id)
+        if for_update:
+            stmt = stmt.with_for_update().execution_options(populate_existing=True)
+        meeting = (await self.session.execute(stmt)).scalar_one_or_none()
         if meeting is None:
             raise NotFoundError(f"meeting {meeting_id} not found")
         return meeting

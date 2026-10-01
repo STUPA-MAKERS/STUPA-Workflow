@@ -11,7 +11,9 @@ State rules (F24, O22, O25):
   meeting gives 409 `meeting_closed`.
 * Remove gives 409 `agenda_item_has_vote` while the item has an open or closed vote.
   It deletes the draft and cancelled votes of the item first, each with a
-  `vote_delete` audit entry.
+  `vote_delete` audit entry. To delete these votes the caller needs the
+  `canManageVotes` right, else 403.
+* Add and remove lock the meeting row, as the meeting close and the vote open do.
 * The Markdown body needs a `live` meeting, or a closed meeting whose protocol is
   still a draft. The `nonPublic` flag is open from the planning until the protocol
   leaves the draft.
@@ -70,10 +72,20 @@ class AgendaService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def _meeting(self, meeting_id: UUID) -> Meeting:
-        meeting = (
-            await self.session.execute(select(Meeting).where(Meeting.id == meeting_id))
-        ).scalar_one_or_none()
+    async def _meeting(self, meeting_id: UUID, *, for_update: bool = False) -> Meeting:
+        """Load a meeting by id.
+
+        ``for_update`` locks the meeting row until the commit and reads the current
+        values again. The meeting close and the vote open take the same lock, so an
+        add or a remove cannot race them (O12, O25).
+
+        Raises:
+            NotFoundError: No meeting has this id.
+        """
+        stmt = select(Meeting).where(Meeting.id == meeting_id)
+        if for_update:
+            stmt = stmt.with_for_update().execution_options(populate_existing=True)
+        meeting = (await self.session.execute(stmt)).scalar_one_or_none()
         if meeting is None:
             raise NotFoundError(f"meeting {meeting_id} not found")
         return meeting
@@ -429,7 +441,7 @@ class AgendaService:
             ConflictError: The meeting is closed (O25), or the application is not in
                 a vote state of the Gremium.
         """
-        meeting = await self._meeting(meeting_id)
+        meeting = await self._meeting(meeting_id, for_update=True)
         self._assert_agenda_open(meeting)
         if title is not None:
             item = MeetingAgendaItem(
@@ -482,25 +494,37 @@ class AgendaService:
         return True
 
     async def remove(
-        self, meeting_id: UUID, item_id: UUID, *, actor: str
+        self,
+        meeting_id: UUID,
+        item_id: UUID,
+        *,
+        actor: str,
+        may_delete_votes: bool,
     ) -> list[AgendaItemOut]:
         """Remove an agenda item (F24, O25).
 
         The meeting must be `planned` or `live`. An open or closed vote of the item
         blocks the remove. The draft and cancelled votes of the item are deleted
-        first, each with `vote_delete`. The remove writes `agenda_item_remove`. An
-        unknown item id changes nothing, as before.
+        first, each with `vote_delete`. To delete them, the caller must be allowed to
+        delete a vote of the meeting (`may_delete_votes`, the `canManageVotes` gate of
+        `DELETE /meetings/{id}/votes/{voteId}`). The remove writes
+        `agenda_item_remove`. An unknown item id changes nothing, as before.
+
+        The method locks the meeting row first. The vote open takes the same lock, so
+        no vote can open on the item while the remove runs.
 
         Raises:
             NotFoundError: The meeting does not exist.
             ConflictError: The meeting is closed (``meeting_closed``), or the item has
                 an open or closed vote (``agenda_item_has_vote``).
+            ForbiddenError: The item has a draft or cancelled vote and
+                `may_delete_votes` is false.
         """
         # Local import: the voting service imports the flow engine, and the flow
         # engine imports this module.
         from app.modules.voting.service import VotingService
 
-        meeting = await self._meeting(meeting_id)
+        meeting = await self._meeting(meeting_id, for_update=True)
         self._assert_agenda_open(meeting)
         row = (
             await self.session.execute(
@@ -512,7 +536,7 @@ class AgendaService:
         ).scalar_one_or_none()
         if row is not None:
             deleted = await VotingService(self.session).delete_for_agenda_item(
-                row.id, actor=actor
+                row.id, actor=actor, may_delete=may_delete_votes
             )
             await self._audit(
                 AuditAction.AGENDA_ITEM_REMOVE,

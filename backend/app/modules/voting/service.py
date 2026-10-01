@@ -93,11 +93,57 @@ class VotingService:
         """
         stmt = select(Vote).where(Vote.id == vote_id)
         if for_update:
-            stmt = stmt.with_for_update()
+            # A locked read must see the committed values, not a stale identity-map
+            # copy from an earlier unlocked read in this transaction.
+            stmt = stmt.with_for_update().execution_options(populate_existing=True)
         vote = (await self.session.execute(stmt)).scalar_one_or_none()
         if vote is None:
             raise NotFoundError(f"vote {vote_id} not found")
         return vote
+
+    async def _lock_live_meeting(
+        self, meeting_id: UUID, *, agenda_item_id: UUID | None = None
+    ) -> None:
+        """Lock the meeting row and require a ``live`` meeting (O12, O25).
+
+        The meeting close and the agenda-item remove take the same lock. Thus a vote
+        cannot open in a meeting that closes at the same time, and it cannot bind to
+        an agenda item that is removed at the same time. Take this lock BEFORE a vote
+        row lock: the close locks the meeting first and the draft votes after it.
+
+        Raises:
+            NotFoundError: The meeting does not exist, or ``agenda_item_id`` is not
+                an agenda item of the meeting.
+            ConflictError: The meeting is not ``live`` (``meeting_not_started`` or
+                ``meeting_closed``).
+        """
+        # Local import: the livevote models import this module.
+        from app.modules.livevote.models import Meeting, MeetingAgendaItem
+
+        status = await self.session.scalar(
+            select(Meeting.status).where(Meeting.id == meeting_id).with_for_update()
+        )
+        if status is None:
+            raise NotFoundError(f"meeting {meeting_id} not found")
+        if status == "planned":
+            raise ConflictError(
+                "The meeting has not started. Start it before opening a vote.",
+                code="meeting_not_started",
+            )
+        if status != "live":
+            raise ConflictError(
+                "The meeting is closed. A vote can no longer open.",
+                code="meeting_closed",
+            )
+        if agenda_item_id is not None:
+            found = await self.session.scalar(
+                select(MeetingAgendaItem.id).where(
+                    MeetingAgendaItem.id == agenda_item_id,
+                    MeetingAgendaItem.meeting_id == meeting_id,
+                )
+            )
+            if found is None:
+                raise NotFoundError(f"agenda item {agenda_item_id} not found")
 
     async def delete(self, vote_id: UUID, *, meeting_id: UUID, actor: str) -> None:
         """Delete a meeting-bound vote and write a ``vote_delete`` audit entry (O24).
@@ -115,7 +161,9 @@ class VotingService:
         await self._delete_audited(vote, actor=actor)
         await self.session.commit()
 
-    async def delete_for_agenda_item(self, agenda_item_id: UUID, *, actor: str) -> list[UUID]:
+    async def delete_for_agenda_item(
+        self, agenda_item_id: UUID, *, actor: str, may_delete: bool
+    ) -> list[UUID]:
         """Delete the draft and cancelled votes of an agenda item, without a commit.
 
         The agenda-item remove calls this first (F24, O25). The foreign key
@@ -123,12 +171,18 @@ class VotingService:
         itself, each with a ``vote_delete`` audit entry. An open or closed vote is part
         of the record of the meeting and blocks the remove.
 
+        ``may_delete`` tells if the caller may delete a vote of the meeting. The
+        agenda right alone (``protocol.write``) does not delete a vote: that needs
+        ``canManageVotes``, as on ``DELETE /meetings/{id}/votes/{voteId}``.
+
         Returns:
             The ids of the deleted votes.
 
         Raises:
             ConflictError: The agenda item has an open or closed vote
                 (``agenda_item_has_vote``). The method then deletes nothing.
+            ForbiddenError: The agenda item has a draft or cancelled vote and
+                ``may_delete`` is false. The method then deletes nothing.
         """
         rows = (
             (
@@ -146,6 +200,11 @@ class VotingService:
             raise ConflictError(
                 "This agenda item has an open or closed vote and cannot be removed.",
                 code="agenda_item_has_vote",
+            )
+        if rows and not may_delete:
+            raise ForbiddenError(
+                "This agenda item has votes. Only a person who manages the votes of "
+                "the meeting can remove it."
             )
         for vote in rows:
             await self._delete_audited(vote, actor=actor)
@@ -499,9 +558,16 @@ class VotingService:
         ``agenda_item_id`` binds it to the agenda item. The caller supplies the
         ``eligible_count`` from the roster and runs the checks.
 
+        A meeting vote locks the meeting row and needs a ``live`` meeting that still
+        has the agenda item (see ``_lock_live_meeting``).
+
         Raises:
-            NotFoundError: No application has this id (404).
+            NotFoundError: No application has this id, or the agenda item is not in
+                the meeting (404).
+            ConflictError: The meeting is not ``live`` (409).
         """
+        if meeting_id is not None:
+            await self._lock_live_meeting(meeting_id, agenda_item_id=agenda_item_id)
         if application_id is not None:
             await self._get_application(application_id)
         return await self._insert(
@@ -552,9 +618,16 @@ class VotingService:
         that would be fail-open. Without it a percent quorum stays fail-closed and
         never counts as met.
 
+        A meeting vote opens only in a ``live`` meeting. The method locks the meeting
+        row before the vote row, as the meeting close does (O12).
+
         Raises:
-            ConflictError: The vote is not in ``draft``.
+            ConflictError: The vote is not in ``draft``, or its meeting is not
+                ``live``.
         """
+        meeting_id = await self.session.scalar(select(Vote.meeting_id).where(Vote.id == vote_id))
+        if meeting_id is not None:
+            await self._lock_live_meeting(meeting_id)
         vote = await self._get_vote(vote_id, for_update=True)
         if vote.status != "draft":
             raise ConflictError(f"vote is {vote.status}, cannot open.", code="conflict")
