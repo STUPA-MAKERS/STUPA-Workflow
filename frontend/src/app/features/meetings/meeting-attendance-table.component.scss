@@ -57,6 +57,28 @@
   border-color: var(--color-danger);
   color: #fff;
 }
+.mtg__attNote {
+  display: block;
+  width: 100%;
+  margin-top: var(--space-1);
+  padding: 2px var(--space-1);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-weight: normal;
+  font-size: var(--fs-xs);
+}
+.mtg__attNote:disabled {
+  opacity: 0.5;
+}
+.mtg__attNoteText {
+  display: block;
+  font-weight: normal;
+  font-size: var(--fs-xs);
+  overflow-wrap: anywhere;
+}
 .mtg__tocEmpty {
   padding: var(--space-4) var(--space-2);
   text-align: center;

@@ -749,6 +749,26 @@ describe('ApiClient', () => {
     req.flush([]);
   });
 
+  it('PUTs the reason of an excuse only when given', () => {
+    api.setOwnAttendance('m-1', 'excused', 'Krank').subscribe();
+    expect(http.expectOne('/api/meetings/m-1/attendance/me').request.body).toEqual({
+      status: 'excused',
+      note: 'Krank',
+    });
+    api.setMemberAttendance('m-1', 'p-2', 'excused', null).subscribe();
+    expect(http.expectOne('/api/meetings/m-1/attendance/p-2').request.body).toEqual({
+      status: 'excused',
+      note: null,
+    });
+  });
+
+  it('DELETEs a member attendance (reset to open)', () => {
+    api.resetMemberAttendance('m-1', 'p-2').subscribe();
+    const req = http.expectOne('/api/meetings/m-1/attendance/p-2');
+    expect(req.request.method).toBe('DELETE');
+    req.flush([]);
+  });
+
   it('lists the agenda', () => {
     api.listAgenda('m-1').subscribe();
     const req = http.expectOne('/api/meetings/m-1/agenda');

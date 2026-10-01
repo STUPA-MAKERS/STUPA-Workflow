@@ -142,7 +142,12 @@ async def delete_meeting(meeting_id: str) -> dict:
 
 @group.tool
 async def get_attendance(meeting_id: str) -> dict:
-    """Get the attendance list of a meeting: present, excused or absent per member."""
+    """Get the attendance list of a meeting: present, excused or absent per member.
+
+    `status` null means "open" (nothing recorded). `source` is `self` (the member
+    reported it) or `lead` (the meeting lead set it). `note` is the reason of an
+    excuse. Only the member and the meeting lead see it; it is null for all others.
+    """
     return await api().get(f"/meetings/{meeting_id}/attendance")
 
 
@@ -151,15 +156,39 @@ async def set_attendance(
     meeting_id: str,
     principal_id: str,
     status: Literal["present", "excused", "absent"],
+    note: str | None = None,
 ) -> dict:
-    """Set the attendance of a member for a meeting.
+    """Set the attendance of a member for a meeting as the meeting lead.
 
     Requires write access to the meeting: session.manage or protocol.write in its
-    gremium, the assigned minute-taker, or admin.
+    gremium, the assigned minute-taker, or admin. Rules:
+    - Only while the meeting is planned or live; a closed meeting gives 409.
+    - The lead's value wins: the member can no longer change it until the lead
+      resets it with `reset_attendance`.
+    - `present` gives 409 `delegation_active` while the member has a delegation for
+      this meeting. Revoke the delegation first. After the meeting start, only an
+      admin can revoke it.
+    - `note` (the reason, max. 500 characters) is allowed only with `excused`.
+      Without `note` an excused member keeps the stored reason.
+    The change goes into the audit log (`attendance_set`), without the note.
     """
+    body: dict[str, str] = {"status": status}
+    if note is not None:
+        body["note"] = note
     return await api().put(
-        f"/meetings/{meeting_id}/attendance/{principal_id}", json={"status": status}
+        f"/meetings/{meeting_id}/attendance/{principal_id}", json=body
     )
+
+
+@group.tool
+async def reset_attendance(meeting_id: str, principal_id: str) -> dict:
+    """Reset the attendance of a member to "open" as the meeting lead.
+
+    Deletes the record, so the member can report the own attendance again.
+    Same access and state rules as `set_attendance`; a closed meeting gives 409.
+    The reset goes into the audit log (`attendance_reset`). Returns the roster.
+    """
+    return await api().delete(f"/meetings/{meeting_id}/attendance/{principal_id}")
 
 
 @group.tool

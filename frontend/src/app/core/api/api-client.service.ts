@@ -57,6 +57,7 @@ import type {
   AssignableApplication,
   Attendance,
   AttendanceStatus,
+  SelfAttendanceStatus,
   MeetingOutWire,
   MeetingPage,
   SearchResults,
@@ -609,11 +610,20 @@ export class ApiClient {
     });
   }
 
-  /** PUT /meetings/{id}/attendance/me — mark own attendance. */
-  setOwnAttendance(meetingId: Uuid, status: AttendanceStatus): Observable<Attendance[]> {
-    return this.http.put<Attendance[]>(`${this.base}/meetings/${meetingId}/attendance/me`, {
-      status,
-    });
+  /**
+   * PUT /meetings/{id}/attendance/me — report the own attendance (present or excused).
+   * `note` is the reason of an excuse. Leave it out to keep the stored reason; `null`
+   * removes it.
+   */
+  setOwnAttendance(
+    meetingId: Uuid,
+    status: SelfAttendanceStatus,
+    note?: string | null,
+  ): Observable<Attendance[]> {
+    return this.http.put<Attendance[]>(
+      `${this.base}/meetings/${meetingId}/attendance/me`,
+      attendanceBody(status, note),
+    );
   }
 
   /** PUT /meetings/{id}/attendance/{principalId} — set a member (meeting lead). */
@@ -621,10 +631,18 @@ export class ApiClient {
     meetingId: Uuid,
     principalId: Uuid,
     status: AttendanceStatus,
+    note?: string | null,
   ): Observable<Attendance[]> {
     return this.http.put<Attendance[]>(
       `${this.base}/meetings/${meetingId}/attendance/${principalId}`,
-      { status },
+      attendanceBody(status, note),
+    );
+  }
+
+  /** DELETE /meetings/{id}/attendance/{principalId} — reset a member to "open" (meeting lead). */
+  resetMemberAttendance(meetingId: Uuid, principalId: Uuid): Observable<Attendance[]> {
+    return this.http.delete<Attendance[]>(
+      `${this.base}/meetings/${meetingId}/attendance/${principalId}`,
     );
   }
 
@@ -850,4 +868,12 @@ export class ApiClient {
   downloadMcpPackage(): Observable<Blob> {
     return this.http.get(`${this.base}/mcp/package`, { responseType: 'blob' });
   }
+}
+
+/** Build an attendance body. It sends `note` only when the caller gives one (or `null`). */
+function attendanceBody(
+  status: AttendanceStatus,
+  note: string | null | undefined,
+): { status: AttendanceStatus; note?: string | null } {
+  return note === undefined ? { status } : { status, note };
 }

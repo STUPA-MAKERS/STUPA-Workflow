@@ -1,14 +1,38 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import type { Attendance, AttendanceStatus } from '@core/api/models';
+import type { Attendance, AttendanceStatus, SelfAttendanceStatus } from '@core/api/models';
 import { BadgeComponent, IconComponent } from '@stupa-makers/ui-kit';
 import {
-  attendanceBadgeVariant,
+  SELF_ATTENDANCE_STATUSES,
   attendanceIcon,
   attendanceKey,
+  memberAttendanceBadgeVariant,
+  memberAttendanceKey,
+  selfAttendanceKey,
 } from './meetings-display.util';
 
-/** Attendance roster table. A user edits the own row. The meeting lead edits all rows. */
+/** One attendance change. `note` is the reason of an excuse; omitted keeps the stored one. */
+export interface AttendanceChange {
+  member: Attendance;
+  status: AttendanceStatus;
+  note?: string | null;
+}
+
+/**
+ * Attendance roster table (Z2, O15).
+ *
+ * The meeting lead (`editAll`) sets every row to present, excused or unexcused, and
+ * resets a row to "open". A member reports only the own row, as present or absent
+ * (`excused`), with an optional reason. A row that the lead set shows read-only to the
+ * member. The reason shows only when the server sends it: to the member and to the lead.
+ *
+ * Labels (Z2): the lead sees "Anwesend / Entschuldigt / Unentschuldigt / Offen". A member
+ * sees "Anwesend / Abwesend" on every row; `excused` and `absent` both show as "Abwesend".
+ *
+ * Every change of the lead takes the record over (`source='lead'`, O15). So the lead
+ * edits the reason only on a row that the lead set and on the own row. The reason of a
+ * member's own excuse stays the member's and shows read-only to the lead.
+ */
 @Component({
   selector: 'app-meeting-attendance-table',
   standalone: true,
@@ -25,10 +49,42 @@ export class MeetingAttendanceTableComponent {
   readonly editAll = input.required<boolean>();
   readonly locked = input.required<boolean>();
   readonly saving = input.required<boolean>();
-  readonly statusChange = output<{ member: Attendance; status: AttendanceStatus }>();
+  readonly statusChange = output<AttendanceChange>();
+  /** The lead resets a row to "open". */
+  readonly reset = output<Attendance>();
 
   protected readonly statuses: readonly AttendanceStatus[] = ['present', 'excused', 'absent'];
+  protected readonly selfStatuses = SELF_ATTENDANCE_STATUSES;
   protected readonly key = attendanceKey;
+  protected readonly selfKey = selfAttendanceKey;
   protected readonly icon = attendanceIcon;
-  protected readonly badge = attendanceBadgeVariant;
+  protected readonly memberKey = memberAttendanceKey;
+  protected readonly memberBadge = memberAttendanceBadgeVariant;
+
+  /** The member edits the own row while the lead did not set it (O15). */
+  protected selfEditable(a: Attendance): boolean {
+    return !this.editAll() && a.isSelf && a.source !== 'lead';
+  }
+
+  /**
+   * The reason field shows for an excused row that the viewer may edit. The lead edits
+   * it on a lead row and on the own row only: a save from the lead takes the record
+   * over (O15), so the member's own excuse stays read-only for the lead.
+   */
+  protected noteEditable(a: Attendance): boolean {
+    if (a.status !== 'excused') return false;
+    if (this.editAll()) return a.source === 'lead' || a.isSelf;
+    return this.selfEditable(a);
+  }
+
+  protected pickSelf(a: Attendance, status: SelfAttendanceStatus): void {
+    this.statusChange.emit({ member: a, status });
+  }
+
+  /** Save a changed reason. An empty field removes it. */
+  protected saveNote(a: Attendance, value: string): void {
+    const note = value.trim() || null;
+    if (note === a.note) return;
+    this.statusChange.emit({ member: a, status: 'excused', note });
+  }
 }

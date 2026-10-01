@@ -341,6 +341,7 @@ async def test_auskunft_xlsx_and_audit_records_subject_email(
     assert entry.data.get("email") == canonical_email
     assert entry.data.get("hasPrincipal") is False
     assert entry.data.get("applications") == 1
+    assert entry.data.get("attendance") == 0
 
 
 async def test_applicant_self_service_erasure_request(

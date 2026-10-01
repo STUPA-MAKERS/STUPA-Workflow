@@ -7,6 +7,7 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import type { Observable } from 'rxjs';
 import { ApiClient } from '@core/api/api-client.service';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { AuthService } from '@core/auth/auth.service';
@@ -18,6 +19,7 @@ import type {
   Meeting,
   MeetingVote,
   Protocol,
+  SelfAttendanceStatus,
   Uuid,
 } from '@core/api/models';
 import { WsService, type MeetingChannel } from '@core/ws/ws.service';
@@ -27,6 +29,7 @@ import { MeetingAgendaService } from './meeting-agenda.service';
 import {
   FIXED_VOTE_OPTIONS,
   assembleProtocolMarkdown,
+  canReportOwn,
   errorCode,
   errorDetail,
   liveOpenedVote,
@@ -547,24 +550,68 @@ export class MeetingSessionService implements OnDestroy {
     });
   }
 
-  setAttendance(member: Attendance, status: AttendanceStatus): void {
+  /**
+   * Change an attendance record. The meeting lead (`canControl`) sets any status of any
+   * member through the lead endpoint. A member reports only the own record, only as
+   * present or excused (Z2), and only while the lead did not set it (O15). `note` is
+   * the reason of an excuse: leave it out to keep the stored reason.
+   */
+  setAttendance(member: Attendance, status: AttendanceStatus, note?: string | null): void {
     const m = this.meeting();
-    if (!m || this.savingAttendance() || member.status === status) return;
+    if (!m || this.savingAttendance()) return;
+    if (member.status === status && (note === undefined || note === member.note)) return;
+    const asLead = m.canControl;
+    if (!asLead && !canReportOwn(member, status)) return;
     this.savingAttendance.set(true);
-    // Own attendance goes through the self endpoint. The lead sets it for members.
-    const req = member.isSelf
-      ? this.api.setOwnAttendance(m.id, status)
-      : this.api.setMemberAttendance(m.id, member.principalId, status);
+    const req = asLead
+      ? this.api.setMemberAttendance(m.id, member.principalId, status, note)
+      : this.api.setOwnAttendance(m.id, status as SelfAttendanceStatus, note);
+    this.saveAttendance(m.id, req, asLead);
+  }
+
+  /** Reset a member to "open" (meeting lead only). The member can then report again. */
+  resetAttendance(member: Attendance): void {
+    const m = this.meeting();
+    if (!m || !m.canControl || this.savingAttendance() || member.status === null) return;
+    this.savingAttendance.set(true);
+    this.saveAttendance(m.id, this.api.resetMemberAttendance(m.id, member.principalId));
+  }
+
+  private saveAttendance(meetingId: Uuid, req: Observable<Attendance[]>, asLead = true): void {
     req.subscribe({
       next: (rows) => {
         this.savingAttendance.set(false);
         this.attendance.set(rows);
       },
-      error: () => {
+      error: (err: unknown) => {
         this.savingAttendance.set(false);
-        this.toast.error(this.i18n.translate('meetings.toast.actionFailed'));
+        this.attendanceFailed(meetingId, err, asLead);
       },
     });
+  }
+
+  /**
+   * Explain a refused attendance change. O23: a member with a delegation cannot be set or
+   * report present. O15: the lead set the record of the member. Both reload the roster,
+   * because it changed in another tab or by the lead.
+   */
+  private attendanceFailed(meetingId: Uuid, err: unknown, asLead: boolean): void {
+    const code = errorCode(err);
+    if (code === 'delegation_active') {
+      this.toast.error(
+        this.i18n.translate(
+          asLead ? 'meetings.toast.attendanceDelegationActive' : 'meetings.toast.ownDelegationActive',
+        ),
+      );
+    } else if (code === 'attendance_set_by_lead') {
+      this.toast.error(this.i18n.translate('meetings.toast.attendanceSetByLead'));
+    } else {
+      const detail = errorDetail(err);
+      const base = this.i18n.translate('meetings.toast.actionFailed');
+      this.toast.error(detail ? `${base}: ${detail}` : base);
+      return;
+    }
+    this.loadAttendance(meetingId);
   }
 
   private connectLive(meetingId: Uuid): void {

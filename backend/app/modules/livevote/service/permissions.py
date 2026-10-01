@@ -67,6 +67,14 @@ class PermissionOps(MeetingServiceBase):
             self.session, principal, "protocol.write"
         )
 
+    async def can_write_meeting(self, meeting_id: UUID, principal: Principal) -> bool:
+        """Load the meeting and run `can_write` (the meeting lead check).
+
+        Raises:
+            NotFoundError: The meeting does not exist.
+        """
+        return await self.can_write(await self._get(meeting_id), principal)
+
     async def can_manage_votes(self, meeting: Meeting, principal: Principal) -> bool:
         """Check who opens and closes votes: manager, protokollant, or `vote.manage`.
 

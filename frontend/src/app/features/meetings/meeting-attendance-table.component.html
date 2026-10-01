@@ -6,9 +6,25 @@
           {{ a.displayName || a.email || a.principalId }}
           @if (a.isSelf) { <span class="text-xs font-normal text-text-muted ml-1">{{ 'meetings.attendance.you' | t }}</span> }
           @if (a.principalId === protokollantId()) { <app-badge class="ml-1" variant="neutral">{{ 'meetings.protokollant.label' | t }}</app-badge> }
+          @if (noteEditable(a)) {
+            <input
+              #noteInput
+              type="text"
+              class="mtg__attNote"
+              maxlength="500"
+              [value]="a.note ?? ''"
+              [attr.aria-label]="'meetings.attendance.note' | t"
+              [placeholder]="'meetings.attendance.notePlaceholder' | t"
+              [disabled]="saving() || locked()"
+              (keydown.enter)="noteInput.blur()"
+              (blur)="saveNote(a, noteInput.value)"
+            />
+          } @else if (a.note) {
+            <span class="mtg__attNoteText text-text-muted">{{ 'meetings.attendance.note' | t }}: {{ a.note }}</span>
+          }
         </td>
         <td class="mtg__attStatus">
-          @if (editAll() || a.isSelf) {
+          @if (editAll()) {
             <span class="mtg__attBtns" role="group" [attr.aria-label]="'meetings.attendance.title' | t">
               @for (s of statuses; track s) {
                 <button
@@ -24,10 +40,37 @@
                   <app-icon [name]="icon(s)" [size]="13" />
                 </button>
               }
+              <button
+                type="button"
+                class="mtg__attBtn mtg__attBtn--reset"
+                [attr.aria-label]="'meetings.attendance.reset' | t"
+                [title]="'meetings.attendance.reset' | t"
+                [disabled]="saving() || locked() || a.status === null"
+                (click)="reset.emit(a)"
+              >
+                <app-icon name="repeat" [size]="13" />
+              </button>
+            </span>
+          } @else if (selfEditable(a)) {
+            <span class="mtg__attBtns" role="group" [attr.aria-label]="'meetings.attendance.title' | t">
+              @for (s of selfStatuses; track s) {
+                <button
+                  type="button"
+                  [class]="'mtg__attBtn mtg__attBtn--' + s"
+                  [class.mtg__attBtn--on]="a.status === s"
+                  [attr.aria-pressed]="a.status === s"
+                  [attr.aria-label]="selfKey(s) | t"
+                  [title]="selfKey(s) | t"
+                  [disabled]="saving() || locked()"
+                  (click)="pickSelf(a, s)"
+                >
+                  <app-icon [name]="icon(s)" [size]="13" />
+                </button>
+              }
             </span>
           } @else {
-            <app-badge [variant]="a.status ? badge(a.status) : 'neutral'">
-              {{ (a.status ? key(a.status) : 'meetings.attendance.unknown') | t }}
+            <app-badge [variant]="a.status ? memberBadge(a.status) : 'neutral'">
+              {{ (a.status ? memberKey(a.status) : 'meetings.attendance.unknown') | t }}
             </app-badge>
             @if (a.source === 'lead') {
               <span class="text-text-muted"> ({{ 'meetings.attendance.bySession' | t }})</span>

@@ -18,14 +18,14 @@ description: DSGVO/GDPR backend — erasure-request queue (Art. 17), application
 - `erasure_request` — UUID PK + `created_at`. Columns: `subject_type` ∈ {`applicant`,`principal`}, `application_id`/`principal_id` FKs `ON DELETE SET NULL`, `email` (CITEXT), `status` ∈ {`open`,`executed`,`rejected`} (server_default `open`, indexed), `requested_by`, `handled_by`, `handled_at`, `reason`. The FKs use SET NULL so the queue row survives as proof after a hard delete of the subject. The service captures `email` before anonymization for the confirmation mail.
 - Status machine: `open → executed | rejected`. Only an `open` row may transition. Any other status raises `ConflictError code=erasure_not_open`.
 - **applicant** erasure → `ApplicationsService.anonymize`. It sets the PII to NULL, sets `Applicant.anonymized_at`, and drops the attachments plus their storage objects. The application row stays.
-- **principal** erasure → `PrincipalService.erase`. It sets email/display_name/calendar_token/oidc_groups to NULL, sets `active=False`, and deletes the `AuthSession` rows. It keeps `sub` as a pseudonym for the audit chain and the Keycloak link. Deletion of the Keycloak user itself happens out of band.
+- **principal** erasure → `PrincipalService.erase`. It sets email/display_name/calendar_token/oidc_groups to NULL, sets `active=False`, and deletes the `AuthSession` rows. It also sets `meeting_attendance.note` (the reason of an excuse, Z2) to NULL. The attendance status stays, because the protocols carry it. The update touches only rows `WHERE note IS NOT NULL`, so an older `(self, absent)` row does not meet the NOT VALID self-status check. It keeps `sub` as a pseudonym for the audit chain and the Keycloak link. Deletion of the Keycloak user itself happens out of band.
 
 **API surface:**
 - `GET /api/admin/privacy/erasures?status=` — erasure queue, newest first.
 - `POST /api/admin/privacy/erasures/{id}/execute` — run erasure (anonymize/erase), atomic with status flip.
 - `POST /api/admin/privacy/erasures/{id}/reject` — reject with `reason`.
 - `POST /api/admin/privacy/principals/{id}/erase` — direct principal erasure (204).
-- `GET /api/admin/privacy/auskunft?email=` — Art. 15 personal-data export as XLSX (applicants, applications+`data`, submission-version history, principal row).
+- `GET /api/admin/privacy/auskunft?email=` — Art. 15 personal-data export as XLSX (applicants, applications+`data`, submission-version history, principal row, visible comments, attachment metadata, and the sheet `Anwesenheit`: the meeting attendance of the principal with status, source and the reason of an excuse). The `pii_export` audit entry counts the rows per kind (`attendance` included).
 - `GET|PUT /api/admin/privacy/settings` — global retention default.
 - The public entry point lives in **be-applications**: `POST /api/applications/{id}/erasure-request` (202). Applicant self-service (magic-link, creator, or authorized reader) creates an `open` queue row. `require_app_read` gates it, not `privacy.manage`.
 

@@ -43,6 +43,12 @@ class AuditAction(StrEnum):
     AGENDA_ITEM_UPDATE = "agenda_item_update"
     AGENDA_ITEM_REMOVE = "agenda_item_remove"
     AGENDA_REORDER = "agenda_reorder"
+    # Attendance set or reset by the meeting lead (F12, Z2). ``data`` carries the
+    # principal id and the status before and after the change. It never carries the
+    # note, because the reason of an excuse is personal data. The own report of a
+    # member is not recorded.
+    ATTENDANCE_SET = "attendance_set"
+    ATTENDANCE_RESET = "attendance_reset"
     # Application deleted. This admin action is irreversible. It cascades to PII,
     # versions, status events, magic links, comments, budget entries and votes.
     # ``data`` carries only id references and metadata, never raw PII.

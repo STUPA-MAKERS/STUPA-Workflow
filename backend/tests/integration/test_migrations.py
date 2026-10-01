@@ -1007,4 +1007,101 @@ def test_guest_application_settings_and_unlimited_links(
         ).scalar_one()
         assert body == _SEED_MAGIC_LINK_BODY
         conn.execute(text("DELETE FROM mail_template WHERE key = 'mig_probe'"))
+    # Leave the schema at head: the teardown truncates `guest_application_settings`.
+    command.upgrade(alembic_cfg, "head")
+
+
+def _self_status_check(conn) -> tuple[str, bool] | None:  # noqa: ANN001
+    """Return the definition and `convalidated` of the self-status check, or None."""
+    row = conn.execute(
+        text(
+            "SELECT pg_get_constraintdef(oid), convalidated FROM pg_constraint "
+            "WHERE conrelid = 'meeting_attendance'::regclass "
+            "AND conname = 'ck_meeting_attendance_self_status'"
+        )
+    ).one_or_none()
+    return None if row is None else (row[0], row[1])
+
+
+def test_attendance_self_status_check_not_valid(
+    alembic_cfg: Config, engine: Engine, capfd: pytest.CaptureFixture[str]
+) -> None:
+    """Migration 96421ecdbc54 adds the self-status check as NOT VALID (Z2).
+
+    An older (self, absent) row survives the upgrade, and the upgrade logs it. A new
+    such row fails. A change of the older row must set an allowed status. The
+    downgrade drops the check.
+    """
+    command.downgrade(alembic_cfg, "d5569d5542c6")
+    with engine.begin() as conn:
+        assert _self_status_check(conn) is None
+        gremium = conn.execute(
+            text("INSERT INTO gremium (name, slug) VALUES ('G', :s) RETURNING id"),
+            {"s": f"g-att-{uuid.uuid4()}"},
+        ).scalar_one()
+        meeting = conn.execute(
+            text(
+                "INSERT INTO meeting (gremium_id, title, status) "
+                "VALUES (:g, 'M', 'closed') RETURNING id"
+            ),
+            {"g": gremium},
+        ).scalar_one()
+        people = [
+            conn.execute(
+                text("INSERT INTO principal (sub) VALUES (:s) RETURNING id"),
+                {"s": f"att-{n}-{uuid.uuid4()}"},
+            ).scalar_one()
+            for n in range(2)
+        ]
+        legacy = conn.execute(
+            text(
+                "INSERT INTO meeting_attendance (meeting_id, principal_id, status, source) "
+                "VALUES (:m, :p, 'absent', 'self') RETURNING id"
+            ),
+            {"m": meeting, "p": people[0]},
+        ).scalar_one()
+
+    capfd.readouterr()
+    command.upgrade(alembic_cfg, "head")
+    report = capfd.readouterr().err
+    assert "1 older self-reported row(s) with status 'absent'" in report
+
+    with engine.begin() as conn:
+        check = _self_status_check(conn)
+        assert check is not None
+        assert check[1] is False  # NOT VALID
+        assert "source <> 'self'" in check[0]
+        status = conn.execute(
+            text("SELECT status FROM meeting_attendance WHERE id = :i"), {"i": legacy}
+        ).scalar_one()
+        assert status == "absent"
+    with pytest.raises(IntegrityError), engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO meeting_attendance (meeting_id, principal_id, status, source) "
+                "VALUES (:m, :p, 'absent', 'self')"
+            ),
+            {"m": meeting, "p": people[1]},
+        )
+    with pytest.raises(IntegrityError), engine.begin() as conn:
+        conn.execute(
+            text("UPDATE meeting_attendance SET note = 'x' WHERE id = :i"), {"i": legacy}
+        )
+    with engine.begin() as conn:
+        # A lead row keeps "absent", and the older row moves to an allowed status.
+        conn.execute(
+            text(
+                "INSERT INTO meeting_attendance (meeting_id, principal_id, status, source) "
+                "VALUES (:m, :p, 'absent', 'lead')"
+            ),
+            {"m": meeting, "p": people[1]},
+        )
+        conn.execute(
+            text("UPDATE meeting_attendance SET status = 'excused' WHERE id = :i"),
+            {"i": legacy},
+        )
+
+    command.downgrade(alembic_cfg, "d5569d5542c6")
+    with engine.connect() as conn:
+        assert _self_status_check(conn) is None
     command.upgrade(alembic_cfg, "head")

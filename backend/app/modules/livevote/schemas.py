@@ -210,6 +210,11 @@ class MeetingGremiumOut(_CamelModel):
 
 
 AttendanceStatus = Literal["present", "excused", "absent"]
+# A member reports only "present" or "excused" for the own record (Z2). Only the
+# meeting lead records "absent", that is absent without an excuse.
+SelfAttendanceStatus = Literal["present", "excused"]
+# Upper limit for the reason of an excuse. The reason is personal data, so keep it short.
+ATTENDANCE_NOTE_MAX = 500
 
 
 class AttendanceOut(_CamelModel):
@@ -221,6 +226,9 @@ class AttendanceOut(_CamelModel):
     # ``None`` means not yet recorded: a roster member without an entry.
     status: AttendanceStatus | None = None
     source: Literal["self", "lead"] | None = None
+    # The reason of an excuse (A7). It is personal data: only the member and the
+    # meeting lead (``canWrite``) see it. All other readers get ``None``.
+    note: str | None = None
     # True when the requesting principal is this member, which allows self-marking.
     is_self: bool = Field(default=False, alias="isSelf")
 
@@ -233,10 +241,56 @@ class MeetingMemberOut(_CamelModel):
     email: str | None = None
 
 
-class AttendanceSetBody(_CamelModel):
-    """``PUT …/attendance/{principalId}`` or ``…/me`` — set attendance."""
+class _AttendanceNoteBody(_CamelModel):
+    """Shared ``note`` field of the attendance bodies.
+
+    ``note`` is the reason of an excuse. It is allowed only with ``excused``, else
+    422. An omitted ``note`` keeps the stored reason while the status stays
+    ``excused``. An explicit ``null`` or an empty text removes it. Any status other
+    than ``excused`` removes the stored reason.
+    """
+
+    note: str | None = Field(default=None, max_length=ATTENDANCE_NOTE_MAX)
+
+    @property
+    def note_given(self) -> bool:
+        """Return True when the body sets ``note``, also when it sets ``null``."""
+        return "note" in self.model_fields_set
+
+    def clean_note(self) -> str | None:
+        """Return the stripped note, or ``None`` for an empty text."""
+        text = (self.note or "").strip()
+        return text or None
+
+
+def _note_only_when_excused(status: str, note: str | None) -> None:
+    if status != "excused" and (note or "").strip():
+        raise ValueError("note is allowed only with status 'excused'")
+
+
+class AttendanceSetBody(_AttendanceNoteBody):
+    """``PUT …/attendance/{principalId}`` — the meeting lead sets the attendance."""
 
     status: AttendanceStatus
+
+    @model_validator(mode="after")
+    def _note_with_excused(self) -> AttendanceSetBody:
+        _note_only_when_excused(self.status, self.note)
+        return self
+
+
+class AttendanceSelfBody(_AttendanceNoteBody):
+    """``PUT …/attendance/me`` — a member reports the own attendance.
+
+    Only ``present`` and ``excused`` are allowed (Z2). ``absent`` gives 422.
+    """
+
+    status: SelfAttendanceStatus
+
+    @model_validator(mode="after")
+    def _note_with_excused(self) -> AttendanceSelfBody:
+        _note_only_when_excused(self.status, self.note)
+        return self
 
 
 class AgendaItemOut(_CamelModel):

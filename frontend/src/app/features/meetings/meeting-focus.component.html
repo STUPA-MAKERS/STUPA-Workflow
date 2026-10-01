@@ -307,6 +307,7 @@
         [locked]="m.status === 'closed'"
         [saving]="savingAttendance()"
         (statusChange)="attendanceChange.emit($event)"
+        (reset)="attendanceReset.emit($event)"
       />
       <app-meeting-delegation-card [meetingId]="m.id" />
       @if (m.canWrite) {
