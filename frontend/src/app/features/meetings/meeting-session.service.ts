@@ -386,7 +386,8 @@ export class MeetingSessionService implements OnDestroy {
       },
       error: (err: unknown) => {
         this.deletingVote.set(null);
-        // A closed meeting keeps its votes (409 `meeting_closed`). Show the reason.
+        // A closed meeting keeps its votes (409 `meeting_closed`), and an open or
+        // closed vote stays (409 `vote_not_deletable`). Show the reason.
         this.voteActionFailed(err);
       },
     });

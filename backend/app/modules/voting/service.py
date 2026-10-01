@@ -150,15 +150,26 @@ class VotingService:
         """Delete a meeting-bound vote and write a ``vote_delete`` audit entry (O24).
 
         The ballots cascade through the foreign key. The method deletes only a vote of
-        this meeting. The caller (router) checks the authorization and the meeting
-        status: only a ``planned`` or ``live`` meeting deletes a vote.
+        this meeting, and only a ``draft`` or ``cancelled`` vote. An open or closed
+        vote is part of the record of the meeting, and a closed result may already
+        have fired a flow branch. The same rule keeps an agenda item with such a vote
+        (O25), so two deletes cannot get around it. The caller cancels an open vote
+        first. The caller (router) checks the authorization and the meeting status:
+        only a ``planned`` or ``live`` meeting deletes a vote.
 
         Raises:
             NotFoundError: The vote does not belong to this meeting.
+            ConflictError: The vote is open or closed (``vote_not_deletable``).
         """
-        vote = await self._get_vote(vote_id)
+        vote = await self._get_vote(vote_id, for_update=True)
         if vote.meeting_id != meeting_id:
             raise NotFoundError(f"vote {vote_id} not found in this meeting")
+        if vote.status in ("open", "closed"):
+            raise ConflictError(
+                "An open or closed vote is part of the record of the meeting and "
+                "cannot be deleted. Cancel an open vote instead.",
+                code="vote_not_deletable",
+            )
         await self._delete_audited(vote, actor=actor)
         await self.session.commit()
 

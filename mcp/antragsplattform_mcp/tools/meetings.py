@@ -256,7 +256,9 @@ async def delete_meeting_vote(meeting_id: str, vote_id: str) -> dict:
 
     Requires the lead of the meeting, the minute-taker, or the gremium permission
     `vote.manage`. Only a planned or live meeting deletes a vote; after the close the
-    vote is part of the record (409 `meeting_closed`). Every delete is audited.
+    vote is part of the record (409 `meeting_closed`). Only a draft or cancelled vote
+    can go; an open or closed vote gives 409 `vote_not_deletable` (cancel an open vote
+    first). Every delete is audited.
     """
     return await api().delete(f"/meetings/{meeting_id}/votes/{vote_id}")
 

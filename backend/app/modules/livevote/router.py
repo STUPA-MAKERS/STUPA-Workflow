@@ -497,7 +497,8 @@ async def delete_meeting_vote(
     The caller must be the manager, the protokollant, or hold the gremium permission
     ``vote.manage``. Only a ``planned`` or ``live`` meeting deletes a vote (O24): after
     the close the vote is part of the record, and the route answers 409
-    ``meeting_closed``. Every delete writes ``vote_delete``.
+    ``meeting_closed``. Only a ``draft`` or ``cancelled`` vote can go: an open or
+    closed vote gives 409 ``vote_not_deletable``. Every delete writes ``vote_delete``.
     """
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_manage_votes:

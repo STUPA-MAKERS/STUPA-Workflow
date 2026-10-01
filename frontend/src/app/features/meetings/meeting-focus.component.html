@@ -379,8 +379,10 @@
           @if (pendingResult()?.id === vote.id && editable()) {
             <app-button size="sm" (click)="insertResult(vote)">{{ 'meetings.dock.insertResult' | t }}</app-button>
           }
-          <!-- A closed meeting keeps its votes as part of the record (409 `meeting_closed`). -->
-          @if (m.canManageVotes && !locked() && m.status !== 'closed') {
+          <!-- A closed meeting keeps its votes as part of the record (409 `meeting_closed`).
+               A closed vote is part of the record too (409 `vote_not_deletable`): only a
+               cancelled one offers the delete. -->
+          @if (m.canManageVotes && !locked() && m.status !== 'closed' && vote.status === 'cancelled') {
             <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.vote.delete' | t" [title]="'meetings.vote.delete' | t" [disabled]="deletingVote() === vote.id" (click)="voteDelete.emit(vote.id)"><app-icon name="delete" /></app-button>
           }
         </div>

@@ -404,8 +404,9 @@ describe('MeetingFocusComponent', () => {
       expect(payload.body).toBe(
         'Aussprache.\n\n> [!abstimmung] **Wird der Nachtragshaushalt beschlossen?**\n> yes: 3, no: 1, abstain: 0',
       );
-      await userEvent.click(screen.getByRole('button', { name: 'Beschlussfrage löschen' }));
-      expect(on.voteDelete).toHaveBeenCalledWith('v-1');
+      // A closed vote is part of the record: no delete (409 `vote_not_deletable`).
+      expect(screen.queryByRole('button', { name: 'Beschlussfrage löschen' })).toBeNull();
+      expect(on.voteDelete).not.toHaveBeenCalled();
     });
 
     it('names a quorum failure and hides the insert for a reader', async () => {
@@ -425,9 +426,10 @@ describe('MeetingFocusComponent', () => {
       expect(screen.getByText('Angenommen')).toBeInTheDocument();
       expect(screen.getByText('Abgebrochen')).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Ergebnis ins Protokoll übernehmen' })).toBeNull();
+      // Only the cancelled vote offers the delete; the closed one is part of the record.
       const deletes = screen.getAllByRole('button', { name: 'Beschlussfrage löschen' });
-      expect(deletes).toHaveLength(2);
-      await userEvent.click(deletes[1]);
+      expect(deletes).toHaveLength(1);
+      await userEvent.click(deletes[0]);
       expect(on.voteDelete).toHaveBeenCalledWith('v-2');
       expect(screen.getByRole('button', { name: 'Beschlussfrage hinzufügen' })).toBeInTheDocument();
     });
@@ -445,9 +447,10 @@ describe('MeetingFocusComponent', () => {
     });
 
     it('keeps the votes of a closed meeting: no vote delete after the close', async () => {
-      const closed = vote({ status: 'closed', result: 'passed', counts: { yes: 3 } });
-      await setup({ meeting: meeting({ status: 'closed', votes: [closed] }) });
-      expect(screen.getByText('Angenommen')).toBeInTheDocument();
+      // A cancelled vote is deletable in a live meeting, but not after the close.
+      const cancelled = vote({ status: 'cancelled', question: 'Vertagen?' });
+      await setup({ meeting: meeting({ status: 'closed', votes: [cancelled] }) });
+      expect(screen.getByText('Abgebrochen')).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Beschlussfrage löschen' })).toBeNull();
     });
 
