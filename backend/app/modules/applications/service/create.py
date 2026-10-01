@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from sqlalchemy import select
@@ -25,12 +26,19 @@ from app.modules.forms.service import FormsService
 from app.modules.forms.validation import AnswerValidationError, validate_answers
 from app.shared.errors import NotFoundError, ValidationProblem
 
+if TYPE_CHECKING:
+    from app.modules.flow.dispatch import ActionDispatcher
+
 
 class CreateOps(ApplicationsServiceBase):
     """Public and managed application creation."""
 
     async def create(
-        self, payload: ApplicationCreate, *, actor: str = "applicant"
+        self,
+        payload: ApplicationCreate,
+        *,
+        actor: str = "applicant",
+        dispatcher: ActionDispatcher | None = None,
     ) -> tuple[Application, str]:
         """Create an application.
 
@@ -40,10 +48,18 @@ class CreateOps(ApplicationsServiceBase):
         2. Run ``validate_answers``. A bad answer raises 422 before any DB write.
         3. Write the application, the PII row, version 1, the initial state and
            the status event.
+        4. Start the flow of a confirmed application
+           (``FlowService.start_confirmed``): the deadline of the initial state,
+           the automatic transitions and the task mail. ``dispatcher`` sends the
+           mails and the other flow actions.
 
         ``actor`` names the audit actor. A public submission passes
         ``"applicant"``. A manual creation by a manager passes the ``sub`` of the
         principal.
+
+        A public submission starts unconfirmed and rests in the flow: no deadline,
+        no automatic transition and no mail. The magic-link verify starts the flow
+        (``auth.service.verify_magic_link``).
 
         Returns:
             The application and the applicant email, for the magic-link mail.
@@ -119,12 +135,13 @@ class CreateOps(ApplicationsServiceBase):
         )
         await self.session.commit()
 
-        # Materialize the deadline of the initial state. A named deadline policy
-        # on that state, such as "submitted + X days", creates the due deadline row.
-        from app.modules.flow.service import FlowService
+        if app.email_confirmed_at is not None:
+            # A logged-in submission is confirmed at once. Start its flow now. A
+            # guest submission waits for the magic-link verify.
+            from app.modules.flow.service import FlowService
 
-        await self.session.refresh(app)
-        await FlowService(self.session).schedule_state_deadline(app, initial)
+            await FlowService(self.session, dispatcher).start_confirmed(app.id)
+            await self.session.refresh(app)
         return app, str(payload.applicant_email)
 
     async def _resolve_flow_version_id(self, app_type: ApplicationType) -> UUID:

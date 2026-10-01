@@ -27,7 +27,9 @@ from app.modules.auth.bootstrap import (
 )
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import ApplicantScope
+from app.modules.flow.dispatch import ActionDispatcher
 from app.modules.flow.models import State
+from app.modules.flow.service import FlowService
 from app.settings import Settings
 from app.shared.errors import ForbiddenError, GoneError
 
@@ -127,11 +129,22 @@ async def request_magic_link(
 
 
 async def verify_magic_link(
-    db: AsyncSession, settings: Settings, *, token: str
+    db: AsyncSession,
+    settings: Settings,
+    *,
+    token: str,
+    dispatcher: ActionDispatcher | None = None,
 ) -> tuple[str, ApplicantScope, str]:
     """Verify a magic-link token.
 
     A single-use token gets `used_at` set.
+
+    The first verify of a guest application confirms its email. The application
+    then leaves its rest in the flow: `FlowService.start_confirmed` schedules the
+    deadline of the current state, runs the automatic transitions and sends the
+    task mail. `dispatcher` sends the mails and the other flow actions. The start
+    commits the session. A later verify finds the email confirmed and starts
+    nothing, so a second click sends no second mail.
 
     Returns:
         The application id, the scope and the applicant session token.
@@ -167,15 +180,19 @@ async def verify_magic_link(
             raise GoneError("Magic-Link already used.")
     # Email confirmation: the first successful verify makes a guest submission visible
     # and protects it from the 12-hour discard. The update is idempotent because it
-    # runs only while the column is NULL.
-    await db.execute(
-        update(Application)
-        .where(
-            Application.id == row.application_id,
-            Application.email_confirmed_at.is_(None),
+    # runs only while the column is NULL. Of two concurrent verifies, only one gets
+    # the row back.
+    confirmed = (
+        await db.execute(
+            update(Application)
+            .where(
+                Application.id == row.application_id,
+                Application.email_confirmed_at.is_(None),
+            )
+            .values(email_confirmed_at=now)
+            .returning(Application.id)
         )
-        .values(email_confirmed_at=now)
-    )
+    ).scalar_one_or_none()
     scope: ApplicantScope = "edit" if row.scope == "edit" else "view"
     app_id = str(row.application_id)
     # Create a server-side session instead of a stateless token. The opaque `sid` is
@@ -189,6 +206,8 @@ async def verify_magic_link(
         scope=scope,
         expires_at=expires_at,
     )
+    if confirmed is not None:
+        await FlowService(db, dispatcher).start_confirmed(row.application_id)
     return app_id, scope, session_token
 
 

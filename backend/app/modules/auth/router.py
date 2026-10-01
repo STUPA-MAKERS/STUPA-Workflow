@@ -30,6 +30,8 @@ from app.modules.auth.schemas import (
     MagicLinkVerifyRequest,
     MeOut,
 )
+from app.modules.flow.dispatch import ActionDispatcher
+from app.modules.flow.router import get_action_dispatcher
 from app.modules.notifications.provider import mail_queue_from_pool
 from app.modules.notifications.service import (
     NotificationService,
@@ -396,6 +398,7 @@ async def verify_magic_link(
     db: DbSession,
     settings: SettingsDep,
     response: Response,
+    dispatcher: Annotated[ActionDispatcher, Depends(get_action_dispatcher)],
 ) -> MagicLinkVerifyOut:
     """Verify a token and open an applicant session scoped to one application.
 
@@ -403,9 +406,12 @@ async def verify_magic_link(
 
     The server sets the session only as an HttpOnly cookie. It never returns the token
     in the body, so JavaScript cannot read it.
+
+    The first verify of a guest application starts its flow (deadline, automatic
+    transitions, task mail) through the flow action dispatcher.
     """
     app_id, scope, token = await service.verify_magic_link(
-        db, settings, token=body.token
+        db, settings, token=body.token, dispatcher=dispatcher
     )
     await db.commit()
     response.set_cookie(
