@@ -1007,6 +1007,8 @@ def test_guest_application_settings_and_unlimited_links(
         ).scalar_one()
         assert body == _SEED_MAGIC_LINK_BODY
         conn.execute(text("DELETE FROM mail_template WHERE key = 'mig_probe'"))
+    # Leave the schema at head: the teardown truncates `guest_application_settings`.
+    command.upgrade(alembic_cfg, "head")
 
 
 def _self_status_check(conn) -> tuple[str, bool] | None:  # noqa: ANN001
