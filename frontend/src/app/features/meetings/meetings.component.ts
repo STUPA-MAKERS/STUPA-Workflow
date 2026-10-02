@@ -393,11 +393,13 @@ export class MeetingsComponent implements OnDestroy {
 
   /**
    * Hand the minutes of a live meeting over (Z3). The open text of the item is saved
-   * first, because the write right can move with the handover.
+   * first, because the write right can move with the handover. The handover request
+   * starts only after the response of that save.
    */
   handOver(m: Meeting, principalId: Uuid, mode: HandoverMode): void {
-    this.flushPendingBody();
-    this.dialogs.handOver(m, principalId, mode);
+    this.agendaSvc
+      .settlePendingBody(this.meeting()?.id ?? null)
+      .subscribe(() => this.dialogs.handOver(m, principalId, mode));
   }
 
   /** Discard the planned handover. */

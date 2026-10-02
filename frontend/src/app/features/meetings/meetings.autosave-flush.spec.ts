@@ -167,6 +167,41 @@ describe('MeetingsComponent — AUD-012 autosave flush on TOP switch', () => {
     }
   });
 
+  it('sends the handover only after the pending TOP body is saved (Z3)', async () => {
+    jest.useFakeTimers();
+    try {
+      const { cmp, http } = await loaded();
+      cmp.agenda.set([AGENDA_ITEM()] as never);
+      cmp.onTopBodyChange('t-1', 'Letzter Satz');
+      cmp.handOver(cmp.meeting()!, 'pr-2', 'now');
+      const save = http.expectOne('/api/meetings/m-1/agenda/t-1');
+      expect(save.request.body).toEqual({ body: 'Letzter Satz' });
+      // The write right can move with the handover, so the POST waits for the save.
+      http.expectNone('/api/meetings/m-1/protokollant-handover');
+      save.flush([AGENDA_ITEM({ body: 'Letzter Satz' })]);
+      const handover = http.expectOne('/api/meetings/m-1/protokollant-handover');
+      expect(handover.request.body).toEqual({ principalId: 'pr-2', mode: 'now' });
+      handover.flush({ ...MEETING, protokollantId: 'pr-2' });
+      jest.advanceTimersByTime(5000);
+      http.verify();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('sends the handover also when the TOP body save fails', async () => {
+    const { cmp, http } = await loaded();
+    cmp.agenda.set([AGENDA_ITEM()] as never);
+    cmp.onTopBodyChange('t-1', 'Text');
+    cmp.handOver(cmp.meeting()!, 'pr-2', 'next_item');
+    http
+      .expectOne('/api/meetings/m-1/agenda/t-1')
+      .flush(null, { status: 403, statusText: 'Forbidden' });
+    expect(cmp.saveState()).toBe('error');
+    http.expectOne('/api/meetings/m-1/protokollant-handover').flush(MEETING);
+    http.verify();
+  });
+
   it('switching TOPs without a pending edit fires no extra save', async () => {
     const { cmp, http } = await loaded();
     cmp.agenda.set([

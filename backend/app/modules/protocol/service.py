@@ -144,12 +144,16 @@ class ProtocolService:
         self.mail_queue = mail_queue
         self.settings = settings
 
-    async def _get(self, protocol_id: UUID) -> Protocol:
-        protocol = (
-            await self.session.execute(
-                select(Protocol).where(Protocol.id == protocol_id)
-            )
-        ).scalar_one_or_none()
+    async def _get(self, protocol_id: UUID, *, for_update: bool = False) -> Protocol:
+        """Load a protocol.
+
+        With `for_update`, the method locks the row (`SELECT … FOR UPDATE`) and
+        reads the columns again, also when the session holds the row already.
+        """
+        stmt = select(Protocol).where(Protocol.id == protocol_id)
+        if for_update:
+            stmt = stmt.with_for_update().execution_options(populate_existing=True)
+        protocol = (await self.session.execute(stmt)).scalar_one_or_none()
         if protocol is None:
             raise NotFoundError(f"protocol {protocol_id} not found")
         return protocol
@@ -481,13 +485,15 @@ class ProtocolService:
 
         The finalization happens once, after the close of the meeting (F8, O13, O2).
         A protocol under render or a final protocol gives 409. That rule blocks a
-        double render and a double send.
+        double render and a double send. The method locks the protocol row, so two
+        parallel calls run one after the other: the second call sees `rendering`
+        and gets 409.
 
         Raises:
             ConflictError: The meeting is not closed (`meeting_not_closed`), or the
                 protocol is not a draft (`protocol_not_draft`).
         """
-        protocol = await self._get(protocol_id)
+        protocol = await self._get(protocol_id, for_update=True)
         meeting = await self._meeting(protocol.meeting_id)
         if meeting.status != "closed":
             raise ConflictError(

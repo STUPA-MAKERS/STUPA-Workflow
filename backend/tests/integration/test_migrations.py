@@ -1256,10 +1256,10 @@ def test_protocol_keeper_period_backfill(
         ).scalar_one()
 
         def meeting(status: str, **cols: object) -> uuid.UUID:
-            names = ["gremium_id", "title", "status", "protokollant_id", *cols]
             values = {"gremium_id": gremium, "title": "M", "status": status}
             values["protokollant_id"] = cols.pop("protokollant_id", keeper)
             values.update(cols)
+            names = list(values)
             placeholders = ", ".join(f":{n}" for n in names)
             return conn.execute(
                 text(f"INSERT INTO meeting ({', '.join(names)}) VALUES ({placeholders}) "

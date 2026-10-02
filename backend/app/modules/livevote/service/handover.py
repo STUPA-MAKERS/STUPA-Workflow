@@ -21,7 +21,9 @@ caller manages the meeting (`can_manage`) or is the current keeper (403). The ne
 keeper is an active member of the gremium (403) with the gremium permission
 `protocol.write` (O20: 422 `protokollant_needs_protocol_write`). Every handover,
 every discard and every start of a planned period writes `protokollant_handover`
-and sends `meeting_state`.
+and sends `meeting_state`. The start of a planned period checks the new keeper
+again (O20). When the check fails, the plan goes away (audit mode `cancel`) and
+the running keeper stays.
 """
 
 from __future__ import annotations
@@ -73,6 +75,14 @@ class HandoverOps(PermissionOps, VoteReadOps):
                 code="protokollant_needs_protocol_write",
             )
         return row
+
+    async def _is_valid_keeper(self, gremium_id: UUID, principal_id: UUID) -> bool:
+        """Return True when `check_keeper` accepts the principal (O20)."""
+        try:
+            await self.check_keeper(gremium_id, principal_id)
+        except (NotFoundError, ForbiddenError, ValidationProblem):
+            return False
+        return True
 
     async def can_hand_over(self, meeting: Meeting, principal: Principal) -> bool:
         """Check who hands the minutes over: the meeting manager or the current keeper.
@@ -190,6 +200,11 @@ class HandoverOps(PermissionOps, VoteReadOps):
         order, or when no item was current before. A move back, a repeat of the
         same item, and a clear of the item keep the planned period.
 
+        The method checks the planned keeper again before the start (O20), because
+        the membership or the gremium role can change after the plan. When the
+        check fails, the method deletes the planned period, keeps the running one
+        and writes a `protokollant_handover` entry with the mode `cancel`.
+
         Returns:
             True when the method started a planned period.
         """
@@ -202,6 +217,17 @@ class HandoverOps(PermissionOps, VoteReadOps):
             order = await self._agenda_ids(meeting.id)
             if old_item in order and order.index(new_item) <= order.index(old_item):
                 return False
+        if not await self._is_valid_keeper(meeting.gremium_id, planned.principal_id):
+            target = planned.principal_id
+            await self._drop_planned(meeting.id)
+            await self._audit_handover(
+                meeting,
+                actor,
+                mode=_MODE_CANCEL,
+                previous=meeting.protokollant_id,
+                target=target,
+            )
+            return False
         previous = meeting.protokollant_id
         await self._end_running(meeting, now, old_item)
         planned.from_at = now

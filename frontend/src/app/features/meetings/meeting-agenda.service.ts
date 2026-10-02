@@ -2,6 +2,7 @@ import { Injectable, type OnDestroy, computed, inject, signal } from '@angular/c
 import { ApiClient } from '@core/api/api-client.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { ToastService } from '@stupa-makers/ui-kit';
+import { AsyncSubject, type Observable, of } from 'rxjs';
 import type { SelectOption } from '@stupa-makers/ui-kit';
 import type { AgendaItem, AssignableApplication, Uuid } from '@core/api/models';
 import { errorDetail, resolveI18n } from './meetings-display.util';
@@ -37,6 +38,8 @@ export class MeetingAgendaService implements OnDestroy {
   private bodyTimer: ReturnType<typeof setTimeout> | null = null;
   /** Debounced TOP edit that the server does not hold yet: the item and the text. */
   private pendingBody: { itemId: Uuid; body: string } | null = null;
+  /** The running body save. It emits once and completes after the response. */
+  private runningSave: Observable<void> | null = null;
   private dragTopIndex: number | null = null;
 
   readonly selectedTop = computed<AgendaItem | null>(
@@ -260,20 +263,42 @@ export class MeetingAgendaService implements OnDestroy {
     this.saveBody(meetingId, itemId, body);
   }
 
+  /**
+   * Run a pending autosave at once and wait for the body save.
+   *
+   * The observable emits once and completes when no body save runs anymore, also
+   * after a failed save. A caller that changes the write right (the handover)
+   * waits for it, so that the save does not race the change.
+   */
+  settlePendingBody(meetingId: Uuid | null): Observable<void> {
+    this.flushPendingBody(meetingId);
+    return this.runningSave ?? of(undefined);
+  }
+
   private saveBody(meetingId: Uuid, itemId: Uuid, body: string): void {
     this.bodyTimer = null;
     this.pendingBody = null;
     this.savingTop.set(true);
     this.saveState.set('saving');
+    const done = new AsyncSubject<void>();
+    const running = done.asObservable();
+    this.runningSave = running;
+    const settle = (): void => {
+      if (this.runningSave === running) this.runningSave = null;
+      done.next();
+      done.complete();
+    };
     this.api.setAgendaBody(meetingId, itemId, body).subscribe({
       next: (rows) => {
         this.savingTop.set(false);
         this.agenda.set(rows);
         this.saveState.set('saved');
+        settle();
       },
       error: () => {
         this.savingTop.set(false);
         this.saveState.set('error');
+        settle();
       },
     });
   }

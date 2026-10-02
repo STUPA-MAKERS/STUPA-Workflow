@@ -3,9 +3,13 @@
 * A live meeting gives 409 `meeting_not_closed`, and the protocol stays a draft.
 * A closed meeting finalizes. The start writes `protocol_finalize`.
 * A second finalize gives 409 `protocol_not_draft`.
+* Two parallel finalize calls start one render only: the row lock makes the second
+  call see `rendering`.
 """
 
 from __future__ import annotations
+
+import asyncio
 
 import pytest
 from fastapi import FastAPI
@@ -14,6 +18,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.modules.livevote.models import Meeting
 from app.modules.protocol.models import Protocol
+from app.modules.protocol.service import ProtocolService
+from app.shared.errors import ConflictError
 from tests.integration.modules.livevote.conftest import ADMIN_SUB, audit_actions, seed
 
 pytestmark = pytest.mark.integration
@@ -61,3 +67,27 @@ async def test_planned_meeting_cannot_finalize(
     async with maker() as session:
         meeting = await session.get(Meeting, s.meeting_id)
         assert meeting is not None and meeting.status == "planned"
+
+
+async def test_parallel_finalize_starts_once(
+    maker: async_sessionmaker[AsyncSession],
+) -> None:
+    s = await seed(maker, status="closed", items=0, protocol="draft")
+    assert s.protocol_id is not None
+    protocol_id = s.protocol_id
+
+    async def _start(actor: str) -> str:
+        async with maker() as session:
+            try:
+                out = await ProtocolService(session).start_finalize(protocol_id, actor=actor)
+            except ConflictError as exc:
+                return exc.code
+            return out.status
+
+    results = await asyncio.gather(_start("lead-a"), _start("lead-b"))
+    assert sorted(results) == ["protocol_not_draft", "rendering"]
+    entries = [
+        e for e in await audit_actions(maker, target_id=protocol_id)
+        if e.action == "protocol_finalize"
+    ]
+    assert len(entries) == 1

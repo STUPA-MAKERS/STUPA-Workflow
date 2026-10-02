@@ -7,7 +7,8 @@
 * A handover `next_item` waits for the next forward move of the current agenda item.
   A new plan replaces the old one, the last agenda item has no next item, and a
   DELETE discards the plan.
-* The new keeper needs `protocol.write` in the gremium (O20, 422).
+* The new keeper needs `protocol.write` in the gremium (O20, 422). The start of a
+  planned period checks this again and drops the plan when the check fails.
 * Each handover writes `protokollant_handover` and sends `meeting_state`.
 """
 
@@ -235,6 +236,52 @@ async def test_next_item_starts_on_a_forward_move(
     # The handover is not a planning change of the meeting.
     updates = [e.data["changes"] for e in entries if e.action == "meeting_update"]
     assert all("protokollantId" not in c for c in updates)
+
+
+@pytest.mark.parametrize("loss", ["membership", "permission"])
+async def test_planned_keeper_is_checked_again_on_the_move(
+    maker: async_sessionmaker[AsyncSession], api: FastAPI, loss: str
+) -> None:
+    """O20: the start of a planned period checks the new keeper again."""
+    s = await seed(maker, status="live", items=2)
+    _, anna = await _member(maker, s.gremium_id, "Anna", ["protocol.write"])
+    _, bert = await _member(maker, s.gremium_id, "Bert", ["protocol.write"])
+    await _set_keeper(maker, s.meeting_id, anna, current=s.item_ids[0])
+    url = f"/api/meetings/{s.meeting_id}"
+    with TestClient(api) as client:
+        planned = client.post(
+            f"{url}/protokollant-handover",
+            json={"principalId": str(bert), "mode": "next_item"},
+        )
+        assert planned.status_code == 200, planned.text
+        async with maker() as session:
+            membership = (
+                await session.scalars(
+                    select(GremiumMembership).where(GremiumMembership.principal_id == bert)
+                )
+            ).one()
+            if loss == "membership":
+                await session.delete(membership)
+            else:
+                role = await session.get(GremiumRole, membership.gremium_role_id)
+                assert role is not None
+                role.permissions = ["vote.cast"]
+            await session.commit()
+        moved = client.patch(url, json={"currentAgendaItemId": str(s.item_ids[1])})
+    assert moved.status_code == 200, moved.text
+    body = moved.json()
+    assert body["protokollantId"] == str(anna)
+    assert body["plannedHandover"] is None
+    # The seed gives Anna no running period, so no period exists. The planned
+    # period of Bert is deleted and does not start.
+    assert body["keeperPeriods"] == []
+    assert await _periods(maker, s.meeting_id) == []
+    entries = await audit_actions(maker, target_id=s.meeting_id)
+    handovers = [e.data for e in entries if e.action == "protokollant_handover"]
+    assert [(h["mode"], h["to"]) for h in handovers] == [
+        ("next_item", str(bert)),
+        ("cancel", str(bert)),
+    ]
 
 
 async def test_new_plan_replaces_the_old_and_delete_discards_it(

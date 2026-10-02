@@ -1945,6 +1945,62 @@ describe('MeetingsComponent — methods', () => {
       expect(success).toHaveBeenLastCalledWith('Übergabe mit dem nächsten TOP geplant.');
     });
 
+    it('reads the meeting again on meeting_state, so a handover reaches the new keeper (Z3)', async () => {
+      // Viewer B: a member with protocol.write in the gremium, not the keeper yet.
+      const { http, ws, fixture } = await setup({ perms: ['protocol.write'] });
+      const cmp = fixture.componentInstance as Cmp;
+      http.expectOne('/api/meetings/m-1').flush({
+        ...MEETING,
+        canManage: false,
+        canWrite: false,
+        canManageVotes: false,
+        canFinalize: false,
+        isProtokollant: false,
+        protokollantId: 'pr-a',
+        protokollantName: 'A',
+      });
+      http.expectOne('/api/meetings/m-1/attendance').flush([]);
+      http.expectOne('/api/meetings/m-1/agenda').flush([]);
+      http.match('/api/meetings/m-1/agenda/assignable').forEach((r) => r.flush([]));
+      flushDelegationContext(http);
+      http.expectNone('/api/meetings/m-1/protocol'); // no write right yet
+      expect(cmp.canWrite()).toBe(false);
+
+      // A hands the minutes over to B. The event carries no rights.
+      ws.subject.next({ type: 'meeting_state', activeApplicationId: 'app-1', status: 'live' });
+      http.expectOne('/api/meetings/m-1/agenda').flush([]);
+      http.match('/api/meetings/m-1/agenda/assignable').forEach((r) => r.flush([]));
+      const plan = {
+        principalId: 'pr-c',
+        name: 'C',
+        fromAt: null,
+        toAt: null,
+        fromAgendaItemId: null,
+        toAgendaItemId: null,
+        fromPosition: null,
+        toPosition: null,
+      };
+      http.expectOne('/api/meetings/m-1').flush({
+        ...MEETING,
+        canManage: false,
+        canWrite: true,
+        canManageVotes: true,
+        canFinalize: false,
+        isProtokollant: true,
+        protokollantId: 'pr-1',
+        protokollantName: 'B',
+        plannedHandover: plan,
+      });
+      expect(cmp.canWrite()).toBe(true);
+      expect(cmp.meeting()!.canManageVotes).toBe(true);
+      expect(cmp.meeting()!.isProtokollant).toBe(true);
+      expect(cmp.meeting()!.protokollantName).toBe('B');
+      expect(cmp.meeting()!.plannedHandover?.principalId).toBe('pr-c');
+      // B can write now, so the editor loads the protocol.
+      http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
+      expect(cmp.protocol()?.id).toBe('p-1');
+    });
+
     it('reports a refused handover', async () => {
       const { cmp, http, fixture } = await loaded();
       const error = jest.spyOn(fixture.debugElement.injector.get(ToastService), 'error');
