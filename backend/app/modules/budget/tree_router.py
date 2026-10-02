@@ -130,6 +130,15 @@ async def _require_node_view(
         raise ForbiddenError("no access to this cost centre")
 
 
+async def _booking_scope(
+    service: BudgetTreeService, principal: Principal
+) -> set[UUID] | None:
+    """Return the gremium scope for linked bookings, or ``None`` for the full view."""
+    if _has_full_view(principal):
+        return None
+    return await _member_gremium_ids(service, principal.sub)
+
+
 @router.get(
     "/budgets",
     response_model=list[BudgetTreeNodeOut],
@@ -603,6 +612,7 @@ _INVOICE_READ = Depends(require_any_permission("budget.view", "budget.structure"
 )
 async def list_invoices(
     service: ServiceDep,
+    principal: Annotated[Principal, Depends(require_principal())],
     invoice_id: Annotated[UUID | None, Query(alias="id")] = None,
     q: Annotated[str | None, Query()] = None,
     status: Annotated[InvoiceStatus | None, Query()] = None,
@@ -621,7 +631,7 @@ async def list_invoices(
     The newest issue date comes first. ``q`` searches number, supplier and note.
     ``status`` is ``open`` or ``paid``. ``grossMin`` and ``grossMax`` bound the
     gross amount. ``issueFrom``/``issueTo`` and ``dueFrom``/``dueTo`` bound the
-    dates.
+    dates. ``linkedBookings`` holds only the bookings on visible cost centres.
     """
     return await service.list_invoices_paged(
         invoice_id=invoice_id,
@@ -633,6 +643,7 @@ async def list_invoices(
         issue_to=issue_to,
         due_from=due_from,
         due_to=due_to,
+        visible_gremium_ids=await _booking_scope(service, principal),
         limit=limit,
         offset=offset,
     )
@@ -644,8 +655,15 @@ async def list_invoices(
     dependencies=[_INVOICE_READ],
     responses=_errors(401, 403, 404),
 )
-async def get_invoice(invoice_id: UUID, service: ServiceDep) -> InvoiceOut:
-    return await service.get_invoice(invoice_id)
+async def get_invoice(
+    invoice_id: UUID,
+    service: ServiceDep,
+    principal: Annotated[Principal, Depends(require_principal())],
+) -> InvoiceOut:
+    """Read one invoice with the bookings on visible cost centres."""
+    return await service.get_invoice(
+        invoice_id, visible_gremium_ids=await _booking_scope(service, principal)
+    )
 
 
 @router.post(

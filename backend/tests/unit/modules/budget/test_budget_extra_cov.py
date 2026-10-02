@@ -15,7 +15,7 @@ import xml.etree.ElementTree as ET
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from fastapi.testclient import TestClient
@@ -299,8 +299,11 @@ class _FakeService:
             transferId=uuid.uuid4(), expenseId=uuid.uuid4(), incomeId=uuid.uuid4()
         )
 
-    async def get_invoice(self, invoice_id: uuid.UUID) -> InvoiceOut:
+    async def get_invoice(
+        self, invoice_id: uuid.UUID, *, visible_gremium_ids: set[uuid.UUID] | None = None
+    ) -> InvoiceOut:
         self.calls["get_invoice"] = invoice_id
+        self.calls["get_invoice_scope"] = visible_gremium_ids
         return _invoice_out()
 
     async def update_invoice(self, invoice_id: uuid.UUID, payload: Any) -> InvoiceOut:
@@ -721,7 +724,34 @@ def test_get_invoice(fake: _FakeService) -> None:
     resp = _client(fake, ("budget.view",)).get(f"/api/invoices/{_IID}")
     assert resp.status_code == 200
     assert resp.json()["number"] == "R-2026-1"
+    assert resp.json()["linkedBookings"] == []
     assert fake.calls["get_invoice"] == _IID
+    # budget.view is the full view: the linked bookings carry no gremium filter (A6).
+    assert fake.calls["get_invoice_scope"] is None
+
+
+def test_list_invoices_passes_the_full_view_scope(fake: _FakeService) -> None:
+    resp = _client(fake, ("budget.book",)).get("/api/invoices")
+    assert resp.status_code == 200
+    assert fake.calls["list_invoices_paged"]["visible_gremium_ids"] is None
+
+
+async def test_booking_scope_without_full_view_uses_the_member_gremien(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A6: a reader without the full view sees only the bookings of member Gremien."""
+    from app.modules.budget import tree_router
+
+    gid = uuid.uuid4()
+
+    async def _members(_service: object, sub: str) -> set[uuid.UUID]:
+        assert sub == "member-1"
+        return {gid}
+
+    monkeypatch.setattr(tree_router, "_member_gremium_ids", _members)
+    principal = Principal(sub="member-1", permissions=set())
+    scope = await tree_router._booking_scope(cast(Any, object()), principal)
+    assert scope == {gid}
 
 
 def test_update_invoice(fake: _FakeService) -> None:
