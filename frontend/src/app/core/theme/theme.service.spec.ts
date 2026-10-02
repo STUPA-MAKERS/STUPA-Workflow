@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { ThemeService } from './theme.service';
+import { THEME_COLOR, ThemeService } from './theme.service';
 
 describe('ThemeService', () => {
   let matchesMock: boolean;
@@ -102,5 +102,34 @@ describe('ThemeService', () => {
     expect(() => svc.setPreference('dark')).not.toThrow();
     expect(svc.preference()).toBe('dark');
     setItem.mockRestore();
+  });
+
+  describe('theme-color meta tags', () => {
+    let metas: HTMLMetaElement[];
+
+    beforeEach(() => {
+      metas = ['(prefers-color-scheme: light)', '(prefers-color-scheme: dark)'].map((media) => {
+        const meta = document.createElement('meta');
+        meta.setAttribute('name', 'theme-color');
+        meta.setAttribute('media', media);
+        meta.setAttribute('content', '#000000');
+        document.head.appendChild(meta);
+        return meta;
+      });
+    });
+
+    afterEach(() => metas.forEach((m) => m.remove()));
+
+    it('colours the browser bars with the page background of the theme in effect', () => {
+      const svc = service();
+      svc.init();
+      expect(metas.map((m) => m.getAttribute('content'))).toEqual([THEME_COLOR.light, THEME_COLOR.light]);
+      svc.setPreference('dark');
+      expect(metas.map((m) => m.getAttribute('content'))).toEqual([THEME_COLOR.dark, THEME_COLOR.dark]);
+    });
+
+    it('uses the background tokens of the design system, not the old brand green', () => {
+      expect(THEME_COLOR).toEqual({ light: '#f6f7f5', dark: '#101211' });
+    });
   });
 });

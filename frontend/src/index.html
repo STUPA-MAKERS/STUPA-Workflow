@@ -9,7 +9,10 @@
       content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
     />
     <meta name="color-scheme" content="light dark" />
-    <meta name="theme-color" content="#004225" />
+    <!-- Browser and PWA bars follow the page background of the theme. ThemeService sets
+         both tags to the chosen theme when the user picks one in the app. -->
+    <meta name="theme-color" content="#f6f7f5" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#101211" media="(prefers-color-scheme: dark)" />
     <meta
       name="description"
       content="Antragsplattform des Studierendenparlaments — Anträge, Abstimmungen, Sitzungsprotokolle und Budget."
