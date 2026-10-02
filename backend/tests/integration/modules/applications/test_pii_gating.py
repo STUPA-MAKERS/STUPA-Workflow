@@ -6,6 +6,7 @@ through the Gremium read scope gets the detail and the version history without t
 `isPII` fields and without the applicant block. An editor with `application.manage`
 alone cannot see them either, so the patch keeps their stored values. The XLSX export
 holds no form field value at all. The search finds no application by a hidden value.
+The attachments of an `isPII` field stay out of the list and the downloads too.
 """
 
 from __future__ import annotations
@@ -24,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.modules.applications.models import Application
 from app.modules.applications.service import ApplicationsService
 from app.modules.auth.principal import Principal
+from app.modules.files.models import Attachment
 from app.modules.forms.models import FormField, FormVersion
 from tests._support.read_models import (
     IBAN,
@@ -369,3 +371,98 @@ async def test_xlsx_export_holds_no_pii(
     assert not any(IBAN in c or _NEW_IBAN in c for c in cells)
     assert not any("antrag@example.org" in c for c in cells)
     assert str(app_id) not in cells
+
+
+async def _attachments(
+    maker: async_sessionmaker[AsyncSession], app_id: uuid.UUID
+) -> tuple[uuid.UUID, uuid.UUID, uuid.UUID]:
+    """Three quarantined attachments: by PII field key, by PII answer, and a plain one."""
+    async with maker() as session:
+        by_key = Attachment(
+            application_id=app_id,
+            field_key="iban",
+            filename="ausweis.pdf",
+            mime="application/pdf",
+            size=10,
+            storage_key="k1",
+        )
+        by_ref = Attachment(
+            application_id=app_id,
+            field_key=None,
+            filename="nachweis.pdf",
+            mime="application/pdf",
+            size=10,
+            storage_key="k2",
+        )
+        plain = Attachment(
+            application_id=app_id,
+            field_key="note",
+            filename="angebot.pdf",
+            mime="application/pdf",
+            size=10,
+            storage_key="k3",
+        )
+        session.add_all([by_key, by_ref, plain])
+        await session.flush()
+        # The answer of an isPII field refers to the attachment, like a file field.
+        row = await session.get(Application, app_id)
+        assert row is not None
+        row.data = {**row.data, "iban": str(by_ref.id)}
+        await session.commit()
+        return by_key.id, by_ref.id, plain.id
+
+
+def _attachment_codes(api: FastAPI, ids: tuple[uuid.UUID, ...]) -> list[tuple[int, int]]:
+    """The status of the URL route and of the download route for each attachment."""
+    with TestClient(api) as client:
+        return [
+            (
+                client.get(f"/api/attachments/{i}").status_code,
+                client.get(f"/api/attachments/{i}/download").status_code,
+            )
+            for i in ids
+        ]
+
+
+async def test_committee_reader_gets_no_pii_attachment(
+    migrated: tuple[str, str],
+    maker: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seed, app_id = await _world(maker)
+    by_key, by_ref, plain = await _attachments(maker, app_id)
+    api = build_read_api(migrated[1], monkeypatch)
+
+    as_principal(api, Principal(sub=seed.member_sub, display_name=MEMBER_NAME))
+    listed = get_json(api, f"/api/applications/{app_id}/attachments")
+    assert isinstance(listed, list)
+    assert [a["id"] for a in listed] == [str(plain)]
+    # 404 for the hidden files, the quarantine gate (409) for the plain one.
+    assert _attachment_codes(api, (by_key, by_ref, plain)) == [
+        (404, 404),
+        (404, 404),
+        (409, 409),
+    ]
+
+
+@pytest.mark.parametrize("who", ["reader", "creator", "applicant"])
+async def test_pii_readers_get_every_attachment(
+    migrated: tuple[str, str],
+    maker: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+    who: str,
+) -> None:
+    seed, app_id = await _world(maker)
+    ids = await _attachments(maker, app_id)
+    api = build_read_api(migrated[1], monkeypatch)
+    if who == "reader":
+        as_principal(api, Principal(sub="reader", permissions={"application.read"}))
+    elif who == "creator":
+        as_principal(api, Principal(sub=seed.owner_sub, display_name=OWNER_NAME))
+    else:
+        as_applicant(api, app_id)
+
+    listed = get_json(api, f"/api/applications/{app_id}/attachments")
+    assert isinstance(listed, list)
+    assert sorted(a["id"] for a in listed) == sorted(str(i) for i in ids)
+    assert _attachment_codes(api, ids) == [(409, 409)] * 3

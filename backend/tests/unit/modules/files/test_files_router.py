@@ -92,7 +92,11 @@ class _FakeService:
         self.deleted = attachment_id
 
     async def list_for_application(
-        self, application_id: UUID, *, allow_unconfirmed: bool = True
+        self,
+        application_id: UUID,
+        *,
+        allow_unconfirmed: bool = True,
+        hidden: object = None,
     ) -> list[AttachmentOut]:
         self.listed = application_id
         return [
@@ -424,12 +428,13 @@ def _patch_creator(monkeypatch: pytest.MonkeyPatch, *, is_creator: bool) -> None
 
 
 def _patch_committee(monkeypatch: pytest.MonkeyPatch, *, can_read: bool) -> None:
-    import app.modules.files.router as router_mod
+    # The files router resolves read access through `access.resolve_app_read`.
+    import app.modules.applications.access as access_mod
 
     async def _fake_committee(*_a: object, **_k: object) -> bool:
         return can_read
 
-    monkeypatch.setattr(router_mod, "_committee_can_read", _fake_committee)
+    monkeypatch.setattr(access_mod, "_committee_can_read", _fake_committee)
 
 
 def test_get_url_creator_fallback_ok(

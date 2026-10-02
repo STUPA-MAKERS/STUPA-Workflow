@@ -16,26 +16,30 @@ quarantined.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, Header, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.deps import DbSession, SettingsDep, get_current_applicant, get_current_principal
 from app.modules.applications.access import (
     EDIT_ANY_PERMISSION,
     MANAGE_PERMISSION,
-    READ_ALL_PERMISSION,
-    READ_PERMISSION,
     Access,
-    _committee_can_read,
     _resolve_with_creator,
+    hidden_pii_keys,
     require_app_edit,
     require_app_read,
+    resolve_app_read,
 )
+from app.modules.applications.models import Application
 from app.modules.auth.principal import Applicant, Principal
 from app.modules.files.drafts import DraftAttachments, invalid_token
+from app.modules.files.models import Attachment
 from app.modules.files.queue import scan_queue_from_pool
 from app.modules.files.schemas import AttachmentOut, DraftAttachmentOut, SignedUrlOut
 from app.modules.files.service import FilesService, application_id_of
@@ -103,27 +107,60 @@ async def _resolve_attachment_read(
 ) -> Access:
     """Resolve read access to the application of an attachment.
 
-    The check covers the same paths as ``require_app_read``, not only the global
-    ``application.read`` permission through ``resolve_access``. The accepted paths are
-    ``application.read_all``, an applicant with ``view`` scope, the logged-in creator,
-    and a member of the Gremium in read scope.
+    The check is `resolve_app_read`, the same as ``require_app_read``, not only the
+    global ``application.read`` permission through ``resolve_access``. The accepted
+    paths are ``application.read_all``, an applicant with ``view`` scope, a member of
+    the Gremium in read scope, and the logged-in creator.
 
-    This mirrors the application read logic on purpose. An application that a caller may
-    read must also yield its attachments, so there is no availability gap. The router
-    still maps a cross-object miss to 404, so the API is no existence oracle.
+    An application that a caller may read must also yield its attachments, so there is
+    no availability gap. The router still maps a cross-object miss to 404, so the API
+    is no existence oracle.
     """
-    if principal is not None and principal.has(READ_ALL_PERMISSION):
-        return Access(application_id, principal, None)
-    try:
-        return await _resolve_with_creator(
-            db, application_id, principal, applicant, perm=READ_PERMISSION, scope="view"
-        )
-    except ForbiddenError:
-        if principal is not None and await _committee_can_read(
-            db, application_id, principal
-        ):
-            return Access(application_id, principal, None)
-        raise
+    return await resolve_app_read(db, application_id, principal, applicant)
+
+
+async def _pii_attachment_filter(
+    db: AsyncSession, access: Access
+) -> Callable[[Attachment], bool] | None:
+    """Return a test for the attachments of the ``isPII`` fields (O21).
+
+    The result is ``None`` when the caller reads the ``isPII`` fields (`can_read_pii`).
+    Otherwise the test is true for an attachment that belongs to an ``isPII`` field. An
+    attachment belongs to a field when its ``field_key`` names the field, or when the
+    answer of the field refers to the attachment id. The detail view removes the same
+    fields from ``data``, so the file is not available one call away.
+    """
+    keys = await hidden_pii_keys(db, access)
+    if not keys:
+        return None
+    data = await db.scalar(select(Application.data).where(Application.id == access.application_id))
+    refs: set[str] = set()
+    if isinstance(data, dict):
+        for key in keys:
+            value = data.get(key)
+            if isinstance(value, str):
+                refs.add(value)
+            elif isinstance(value, list):
+                refs.update(v for v in value if isinstance(v, str))
+
+    def hidden(attachment: Attachment) -> bool:
+        return attachment.field_key in keys or str(attachment.id) in refs
+
+    return hidden
+
+
+async def _assert_not_pii_hidden(db: AsyncSession, access: Access, attachment: Attachment) -> None:
+    """Answer 404 for an attachment of an ``isPII`` field that the caller may not read.
+
+    A 404 and not a 403, so the route is no existence oracle (O21).
+
+    Raises:
+        NotFoundError: The attachment belongs to an ``isPII`` field and the caller
+            does not read the ``isPII`` fields (HTTP 404).
+    """
+    hidden = await _pii_attachment_filter(db, access)
+    if hidden is not None and hidden(attachment):
+        raise NotFoundError(f"attachment {attachment.id} not found")
 
 
 async def _read_capped(file: UploadFile, max_bytes: int) -> bytes:
@@ -188,18 +225,24 @@ async def upload_attachment(
 async def list_attachments(
     application_id: UUID,
     service: ServiceDep,
+    db: DbSession,
     access: Annotated[Access, Depends(require_app_read)],
 ) -> list[AttachmentOut]:
     """List the attachments of an application.
 
     The frontend uses this route to fill the panel again after a reload. Access is A/P.
 
+    A caller without the PII right (`can_read_pii`) does not see the attachments of the
+    ``isPII`` fields (O21).
+
     An unconfirmed guest submission stays invisible to a principal or a member of the
     Gremium and gives 404. Only the owning magic-link applicant reads it. This mirrors
     the list semantics.
     """
     return await service.list_for_application(
-        access.application_id, allow_unconfirmed=access.is_owning_applicant
+        access.application_id,
+        allow_unconfirmed=access.is_owning_applicant,
+        hidden=await _pii_attachment_filter(db, access),
     )
 
 
@@ -235,6 +278,7 @@ async def get_attachment_url(
         )
     except ForbiddenError as exc:
         raise NotFoundError(f"attachment {attachment_id} not found") from exc
+    await _assert_not_pii_hidden(db, access, attachment)
     # An unconfirmed guest submission stays invisible to a principal or a member of the
     # Gremium and gives 404. Only the owning magic-link applicant reads it. This mirrors
     # the list and detail gates.
@@ -278,6 +322,7 @@ async def download_attachment(
         )
     except ForbiddenError as exc:
         raise NotFoundError(f"attachment {attachment_id} not found") from exc
+    await _assert_not_pii_hidden(db, access, attachment)
     # An unconfirmed guest submission stays invisible to a principal or a member of the
     # Gremium and gives 404. Only the owning magic-link applicant downloads it. This
     # mirrors the list and detail gates. The quarantine gates (409/410/503) run in the

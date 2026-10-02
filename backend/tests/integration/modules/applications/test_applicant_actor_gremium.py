@@ -1,25 +1,33 @@
 """A12/O16: the applicant sees the Gremium as the actor, not the member (real Postgres).
 
-In the applicant view (magic link, or the creator without a read permission) the
-timeline actor and the author of a member comment are the name of the Gremium of the
-application. The own actions keep the applicant. A member still sees the names.
+In the applicant view (magic link, or the creator who is no member) the timeline
+actor and the author of a member comment are the name of the Gremium of the
+application. The own actions keep the applicant. A member still sees the names. A
+creator who reads through the Gremium read scope, or who holds a member right, is a
+member.
 """
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import AsyncIterator
 
 import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 from sqlalchemy import Engine, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from app.modules.applications.router import get_comment_mail_sender
 from app.modules.applications.service import ApplicationsService
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from tests._support.read_models import (
     GREMIUM_NAME,
+    IBAN,
     MEMBER_NAME,
     OWNER_NAME,
+    ReadSeed,
     as_applicant,
     as_principal,
     build_read_api,
@@ -158,3 +166,115 @@ async def test_magic_link_applicant_keeps_the_own_name_as_creator(
     timeline = get_json(api, f"/api/applications/{app_id}/timeline")
     assert isinstance(timeline, list)
     assert [e["actor"] for e in timeline] == [OWNER_NAME]
+
+
+async def _internal_and_public(
+    maker: async_sessionmaker[AsyncSession], app_id: uuid.UUID, author: str
+) -> None:
+    async with maker() as session:
+        for visibility in ("internal", "public"):
+            await ApplicationsService(session).add_comment(
+                app_id,
+                author=author,
+                author_kind="principal",
+                body=f"{visibility} note",
+                visibility=visibility,
+            )
+
+
+async def _no_mail(*_args: object) -> None:
+    return None
+
+
+def _assert_reads_as_member(api: FastAPI, app_id: uuid.UUID, own_name: str) -> None:
+    """Internal comments, member names in the timeline, and the full version data."""
+    comments = get_json(api, f"/api/applications/{app_id}/comments")
+    timeline = get_json(api, f"/api/applications/{app_id}/timeline")
+    versions = get_json(api, f"/api/applications/{app_id}/versions")
+    assert isinstance(comments, list) and isinstance(timeline, list)
+    assert isinstance(versions, list)
+    assert sorted(c["body"] for c in comments) == ["internal note", "public note"]
+    assert [e["actor"] for e in timeline] == [own_name, MEMBER_NAME]
+    assert GREMIUM_NAME not in [e["actor"] for e in timeline]
+    # The creator reads the own isPII fields, and as a member the values too.
+    assert versions[0]["data"]["iban"] == IBAN
+    assert versions[0]["changedBy"] == own_name
+    # No comment mail: the test checks the access, not the delivery.
+    api.dependency_overrides[get_comment_mail_sender] = lambda: _no_mail
+    with TestClient(api) as client:
+        resp = client.post(
+            f"/api/applications/{app_id}/comments",
+            json={"body": "intern", "visibility": "internal"},
+        )
+    assert resp.status_code == 201, resp.text
+
+
+async def _created_by(
+    maker: async_sessionmaker[AsyncSession], seed: ReadSeed, sub: str, *, in_scope: bool
+) -> uuid.UUID:
+    app_id = await create_app(maker, seed, actor=sub, in_read_scope=in_scope)
+    await fire(maker, app_id, seed.to_review_id, staff(seed))
+    await _internal_and_public(maker, app_id, seed.member_sub)
+    return app_id
+
+
+async def test_creator_in_the_gremium_read_scope_reads_as_a_member(
+    migrated: tuple[str, str],
+    maker: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """F23: a member submits for a student and still reads the own Gremium work.
+
+    The member has no global permission and reads through the view cost centre of
+    the Gremium. The Gremium read scope comes before the creator path.
+    """
+    seed = await seed_read_world(maker)
+    app_id = await _created_by(maker, seed, seed.member_sub, in_scope=True)
+
+    api = build_read_api(migrated[1], monkeypatch)
+    as_principal(api, Principal(sub=seed.member_sub, display_name=MEMBER_NAME))
+    _assert_reads_as_member(api, app_id, MEMBER_NAME)
+    detail = get_json(api, f"/api/applications/{app_id}")
+    assert isinstance(detail, dict)
+    assert detail["data"]["iban"] == IBAN
+    assert detail["hiddenKeys"] == []
+
+
+@pytest.mark.parametrize(
+    "perm",
+    ["application.manage", "application.transition", "application.edit_any"],
+)
+async def test_creator_with_a_member_right_reads_as_a_member(
+    migrated: tuple[str, str],
+    maker: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+    perm: str,
+) -> None:
+    """A creator who works on applications is no applicant, also outside the scope."""
+    seed = await seed_read_world(maker)
+    app_id = await _created_by(maker, seed, seed.owner_sub, in_scope=False)
+
+    api = build_read_api(migrated[1], monkeypatch)
+    as_principal(api, Principal(sub=seed.owner_sub, display_name=OWNER_NAME, permissions={perm}))
+    _assert_reads_as_member(api, app_id, OWNER_NAME)
+
+
+async def test_creator_without_a_member_right_outside_the_scope_reads_as_applicant(
+    migrated: tuple[str, str],
+    maker: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The counterpart: a right that is no member right keeps the applicant view."""
+    seed = await seed_read_world(maker)
+    app_id = await _created_by(maker, seed, seed.owner_sub, in_scope=False)
+
+    api = build_read_api(migrated[1], monkeypatch)
+    as_principal(
+        api,
+        Principal(sub=seed.owner_sub, display_name=OWNER_NAME, permissions={"application.share"}),
+    )
+    comments = get_json(api, f"/api/applications/{app_id}/comments")
+    timeline = get_json(api, f"/api/applications/{app_id}/timeline")
+    assert isinstance(comments, list) and isinstance(timeline, list)
+    assert [c["body"] for c in comments] == ["public note"]
+    assert [e["actor"] for e in timeline] == [OWNER_NAME, GREMIUM_NAME]

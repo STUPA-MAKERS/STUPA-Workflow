@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -229,7 +229,11 @@ class FilesService:
             raise NotFoundError(f"application {application_id} not found")
 
     async def list_for_application(
-        self, application_id: uuid.UUID, *, allow_unconfirmed: bool = True
+        self,
+        application_id: uuid.UUID,
+        *,
+        allow_unconfirmed: bool = True,
+        hidden: Callable[[Attachment], bool] | None = None,
     ) -> list[AttachmentOut]:
         """Return all attachments of an application, oldest first.
 
@@ -238,6 +242,9 @@ class FilesService:
         A read by a principal or a member of the Gremium passes
         ``allow_unconfirmed=False``. The method then hides the attachments of an
         unconfirmed guest submission with a 404. This mirrors the list semantics.
+
+        ``hidden`` removes each attachment for which it returns true. The router
+        uses it for the attachments of the ``isPII`` fields (O21).
         """
         await self._assert_app_visible(
             application_id, allow_unconfirmed=allow_unconfirmed
@@ -249,7 +256,7 @@ class FilesService:
                 .order_by(Attachment.created_at)
             )
         ).all()
-        return [_attachment_out(a) for a in rows]
+        return [_attachment_out(a) for a in rows if hidden is None or not hidden(a)]
 
     async def get_attachment(self, attachment_id: uuid.UUID) -> Attachment:
         """Load a bound attachment for an application path.

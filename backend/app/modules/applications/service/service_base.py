@@ -103,6 +103,27 @@ def state_since_subquery() -> Subquery:
 APPLICANT_ACTOR = "applicant"
 
 
+async def pii_keys_for_type(session: AsyncSession, type_id: UUID) -> set[str]:
+    """Collect the `isPII` field keys across all form versions of a type.
+
+    Anonymization uses this set. An application is pinned to its `form_version_id`.
+    A field that only a later version marks as PII is unknown to the pinned row.
+    GDPR erasure follows the current intent, so the function takes the union. The
+    O21 strip of the detail, the versions and the attachments uses the same set.
+    """
+    from app.modules.forms.models import FormField, FormVersion
+
+    rows = await session.scalars(
+        select(FormField.key)
+        .join(FormVersion, FormVersion.id == FormField.form_version_id)
+        .where(
+            FormVersion.application_type_id == type_id,
+            FormField.is_pii.is_(True),
+        )
+    )
+    return set(rows)
+
+
 def _without_keys(data: dict[str, Any] | None, keys: set[str]) -> dict[str, Any]:
     """Return a copy of ``data`` without ``keys``."""
     return {k: v for k, v in (data or {}).items() if k not in keys}
@@ -223,23 +244,8 @@ class ApplicationsServiceBase:
         return [_field_from_row(r) for r in rows]
 
     async def _pii_keys_for_type(self, type_id: UUID) -> set[str]:
-        """Collect the `isPII` field keys across all form versions of a type.
-
-        Anonymization uses this set. An application is pinned to its `form_version_id`.
-        A field that only a later version marks as PII is unknown to the pinned row.
-        GDPR erasure follows the current intent, so the function takes the union.
-        """
-        from app.modules.forms.models import FormField, FormVersion
-
-        rows = await self.session.scalars(
-            select(FormField.key)
-            .join(FormVersion, FormVersion.id == FormField.form_version_id)
-            .where(
-                FormVersion.application_type_id == type_id,
-                FormField.is_pii.is_(True),
-            )
-        )
-        return set(rows)
+        """Collect the `isPII` field keys of a type (see `pii_keys_for_type`)."""
+        return await pii_keys_for_type(self.session, type_id)
 
     async def _state_since_map(self, app_ids: Iterable[UUID]) -> dict[UUID, datetime]:
         """Map each application id to the time of its last status change (A9).
