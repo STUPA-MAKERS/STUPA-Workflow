@@ -110,6 +110,9 @@ _DATA_TABLES = (
     # Draft tokens of the wizard (Z4). No FK reaches this table, so the `application`
     # CASCADE does not clear it.
     "attachment_draft_token",
+    # Faculty substitute groups (Z5). The CASCADE clears their members. No FK from
+    # the listed tables reaches them.
+    "substitute_group",
 )
 
 

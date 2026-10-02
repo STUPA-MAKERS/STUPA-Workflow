@@ -229,19 +229,13 @@ async def me(
 async def _in_substitute_pool(db: DbSession, sub: str) -> bool:
     """Tell if `sub` is in at least one substitute pool.
 
-    The frontend uses the flag to show the meeting timeline to pool substitutes that
+    The pool covers `delegation_substitute` and the faculty groups (Z5). The
+    frontend uses the flag to show the meeting timeline to pool substitutes that
     have no own membership.
     """
-    from app.modules.auth.models import Principal as PrincipalRow
-    from app.modules.delegations.models import DelegationSubstitute
+    from app.modules.delegations.pool import substitute_gremien_for_sub
 
-    pid_subq = select(PrincipalRow.id).where(PrincipalRow.sub == sub).scalar_subquery()
-    hit = await db.scalar(
-        select(DelegationSubstitute.id)
-        .where(DelegationSubstitute.substitute_principal_id == pid_subq)
-        .limit(1)
-    )
-    return hit is not None
+    return bool(await substitute_gremien_for_sub(db, sub))
 
 
 async def _has_scoped_budget_view(db: DbSession, sub: str) -> bool:

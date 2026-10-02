@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.modules.voting.schemas import MyBallot
 from app.shared.config_schemas import Quorum
+from app.shared.i18n import I18nMap
 
 MeetingStatus = Literal["planned", "live", "closed"]
 
@@ -271,6 +272,8 @@ class AttendanceOut(_CamelModel):
     # O20: the member holds the gremium permission ``protocol.write`` and can keep
     # the minutes. The keeper pickers offer only these members.
     can_keep_protocol: bool = Field(default=False, alias="canKeepProtocol")
+    # A8: name of the faculty group of the member (Z5), or ``None`` without one.
+    substitute_group_name: I18nMap | None = Field(default=None, alias="substituteGroupName")
 
 
 class MeetingMemberOut(_CamelModel):
@@ -282,6 +285,8 @@ class MeetingMemberOut(_CamelModel):
     # O20: only a member with the gremium permission ``protocol.write`` can keep the
     # minutes. Another member gives 422 ``protokollant_needs_protocol_write``.
     can_keep_protocol: bool = Field(default=False, alias="canKeepProtocol")
+    # A8: name of the faculty group of the member (Z5), or ``None`` without one.
+    substitute_group_name: I18nMap | None = Field(default=None, alias="substituteGroupName")
 
 
 class _AttendanceNoteBody(_CamelModel):

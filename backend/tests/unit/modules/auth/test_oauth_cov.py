@@ -1154,10 +1154,10 @@ async def test_has_scoped_budget_view_branches(monkeypatch: pytest.MonkeyPatch) 
 
 
 async def test_in_substitute_pool_branches() -> None:
-    hit_db = fake_session()
-    hit_db.scalar_results.append("sub-id")
+    """The flag is true when the pool helper (Z5) finds at least one gremium."""
+    hit_db = fake_session(result("gremium-id"))
     assert await router_mod._in_substitute_pool(hit_db, "u1") is True
-    assert await router_mod._in_substitute_pool(fake_session(), "u1") is False
+    assert await router_mod._in_substitute_pool(fake_session(result()), "u1") is False
 
 
 def test_me_endpoint_aggregates(monkeypatch: pytest.MonkeyPatch) -> None:

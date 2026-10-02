@@ -444,7 +444,7 @@ async def test_revoke_not_found_404() -> None:
 async def test_revoke_foreign_without_admin_403() -> None:
     row = SimpleNamespace(id=uuid4(), meeting_id=MEETING_ID, delegator_principal_id=uuid4())
     db = fake_session(result(_me()))
-    db.get_results = [row]
+    db.get_results = [row, _meeting()]  # planned: no lead path
     with pytest.raises(ForbiddenError):
         await _svc(db).revoke(row.id, _actor())
 
@@ -452,7 +452,7 @@ async def test_revoke_foreign_without_admin_403() -> None:
 async def test_revoke_after_meeting_start_422() -> None:
     me = _me()
     row = SimpleNamespace(id=uuid4(), meeting_id=MEETING_ID, delegator_principal_id=me.id)
-    db = fake_session(result(me))
+    db = fake_session(result(), result(me))  # no session.manage role, then me
     db.get_results = [row, _meeting(status="live")]
     with pytest.raises(ValidationProblem, match="started"):
         await _svc(db).revoke(row.id, _actor())

@@ -480,6 +480,25 @@ class DelegationCreate(WireModel):
     meetingId: str
     delegateId: str
     delegateVoting: bool = False
+    delegatorId: str | None = Field(
+        default=None,
+        description=(
+            "Meeting lead only, while the meeting is live (O6): the missing member to "
+            "substitute. The delegate must be a substitute of the member's faculty group. "
+            "Leave unset to delegate for yourself while the meeting is planned."
+        ),
+    )
+
+
+class SubstituteGroupCreate(WireModel):
+    gremiumId: str
+    nameI18n: I18nMap = Field(description='Group name per language, e.g. {"de": "Informatik"}')
+    position: int = Field(default=0, ge=0, description="Sort order in the gremium")
+
+
+class SubstituteGroupUpdate(WireModel):
+    nameI18n: I18nMap | None = None
+    position: int | None = Field(default=None, ge=0)
 
 
 class SubstituteCreate(WireModel):

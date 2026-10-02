@@ -1349,3 +1349,106 @@ def test_protocol_keeper_period_backfill(
     with engine.connect() as conn:
         assert conn.execute(text("SELECT to_regclass('protocol_keeper_period')")).scalar() is None
     command.upgrade(alembic_cfg, "head")
+
+
+def test_substitute_groups(alembic_cfg: Config, engine: Engine) -> None:
+    """Migration 92f23ad77fc5 adds the faculty substitute groups (Z5).
+
+    The upgrade creates both tables with the composite foreign key, the CHECK on
+    `kind` and the partial unique index for members. The existing pool entries
+    stay. The downgrade drops both tables. A second upgrade runs clean.
+    """
+    command.downgrade(alembic_cfg, "734556b61a72")
+    with engine.begin() as conn:
+        assert conn.execute(text("SELECT to_regclass('substitute_group')")).scalar() is None
+        assert conn.execute(text("SELECT to_regclass('substitute_group_member')")).scalar() is None
+        gremium = conn.execute(
+            text("INSERT INTO gremium (name, slug) VALUES ('G', :s) RETURNING id"),
+            {"s": f"g-sg-{uuid.uuid4()}"},
+        ).scalar_one()
+        other = conn.execute(
+            text("INSERT INTO gremium (name, slug) VALUES ('H', :s) RETURNING id"),
+            {"s": f"g-sg-{uuid.uuid4()}"},
+        ).scalar_one()
+        person = conn.execute(
+            text("INSERT INTO principal (sub) VALUES (:s) RETURNING id"),
+            {"s": f"sg-{uuid.uuid4()}"},
+        ).scalar_one()
+        conn.execute(
+            text(
+                "INSERT INTO delegation_substitute (gremium_id, substitute_principal_id) "
+                "VALUES (:g, :p)"
+            ),
+            {"g": gremium, "p": person},
+        )
+
+    command.upgrade(alembic_cfg, "head")
+    with engine.begin() as conn:
+        names = set(
+            conn.execute(
+                text(
+                    "SELECT conname FROM pg_constraint WHERE conrelid IN "
+                    "('substitute_group'::regclass, 'substitute_group_member'::regclass)"
+                )
+            ).scalars()
+        )
+        assert {
+            "uq_substitute_group_id_gremium",
+            "pk_substitute_group_member",
+            "fk_substitute_group_member_group",
+            "ck_substitute_group_member_kind",
+        } <= names
+        assert conn.execute(
+            text("SELECT to_regclass('uq_substitute_group_member_gremium_member')")
+        ).scalar() is not None
+        # The pool entry from before the upgrade stays.
+        assert conn.execute(
+            text("SELECT count(*) FROM delegation_substitute WHERE gremium_id = :g"),
+            {"g": gremium},
+        ).scalar_one() == 1
+        group = conn.execute(
+            text(
+                "INSERT INTO substitute_group (gremium_id, name_i18n) "
+                "VALUES (:g, '{\"de\": \"Info\"}') RETURNING id"
+            ),
+            {"g": gremium},
+        ).scalar_one()
+        conn.execute(
+            text(
+                "INSERT INTO substitute_group_member (group_id, principal_id, gremium_id, kind) "
+                "VALUES (:grp, :p, :g, 'member')"
+            ),
+            {"grp": group, "p": person, "g": gremium},
+        )
+
+    # The composite foreign key refuses a gremium copy that differs from the group.
+    with pytest.raises(IntegrityError), engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO substitute_group_member (group_id, principal_id, gremium_id, kind) "
+                "VALUES (:grp, :p, :g, 'substitute')"
+            ),
+            {"grp": group, "p": person, "g": other},
+        )
+    # The CHECK refuses an unknown kind.
+    with pytest.raises(IntegrityError), engine.begin() as conn:
+        conn.execute(
+            text(
+                "UPDATE substitute_group_member SET kind = 'lead' WHERE group_id = :grp"
+            ),
+            {"grp": group},
+        )
+    # The group delete cascades to its rows.
+    with engine.begin() as conn:
+        conn.execute(text("DELETE FROM substitute_group WHERE id = :grp"), {"grp": group})
+        assert conn.execute(
+            text("SELECT count(*) FROM substitute_group_member WHERE group_id = :grp"),
+            {"grp": group},
+        ).scalar_one() == 0
+
+    command.downgrade(alembic_cfg, "734556b61a72")
+    with engine.connect() as conn:
+        assert conn.execute(text("SELECT to_regclass('substitute_group')")).scalar() is None
+    command.upgrade(alembic_cfg, "head")
+    with engine.connect() as conn:
+        assert conn.execute(text("SELECT to_regclass('substitute_group')")).scalar() is not None

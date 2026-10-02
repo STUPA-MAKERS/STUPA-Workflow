@@ -21,7 +21,8 @@ from app.modules.admin.gremium_roles import (
 )
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
-from app.modules.delegations.models import DelegationSubstitute, MeetingDelegation
+from app.modules.delegations.models import MeetingDelegation
+from app.modules.delegations.pool import substitute_gremien_for_sub
 from app.modules.livevote.keepers import keeper_summaries
 from app.modules.livevote.models import Meeting
 from app.modules.livevote.schemas import MeetingOut, MeetingVoteOut
@@ -235,12 +236,11 @@ class PermissionOps(MeetingServiceBase):
         return member | pool
 
     async def _substitute_pool_gremium_ids(self, sub: str) -> set[UUID]:
-        """Return the gremien whose substitute pool contains `sub`."""
-        pid_subq = select(PrincipalRow.id).where(PrincipalRow.sub == sub).scalar_subquery()
-        stmt = select(DelegationSubstitute.gremium_id).where(
-            DelegationSubstitute.substitute_principal_id == pid_subq
-        )
-        return set((await self.session.execute(stmt)).scalars().all())
+        """Return the gremien whose substitute pool contains `sub`.
+
+        The pool covers `delegation_substitute` and the faculty groups (Z5).
+        """
+        return await substitute_gremien_for_sub(self.session, sub)
 
     async def _emit(
         self,
