@@ -279,7 +279,7 @@ async def test_application_type_crud_and_conflict(session: AsyncSession) -> None
 
 async def test_role_crud_and_listing(session: AsyncSession) -> None:
     svc = ConfigService(session)
-    key = f"role-{uuid.uuid4().hex[:8]}"
+    key = f"role_{uuid.uuid4().hex[:8]}"
     created = await svc.create_role(
         RoleCreate(
             key=key, label={"de": "Sonderrolle"}, permissions=["application.read", "audit.read"]

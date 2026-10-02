@@ -27,6 +27,12 @@ from app.shared.permissions import PERMISSION_CATALOGUE
 # changes after the create.
 CD_VARIANT_KEY_PATTERN = r"^[a-z0-9]+(?:-[a-z0-9]+)*$"
 
+# A role key (global role and gremium role, A10) starts with a lowercase letter and
+# holds lowercase letters, digits and underscores. The key is the stable handle that
+# seeds, migrations and the forced gremium roles use. A key that breaks the pattern
+# gives 422 on create. The update schemas have no key, because a key never changes.
+ROLE_KEY_PATTERN = r"^[a-z][a-z0-9_]*$"
+
 
 def _validate_permissions(perms: list[str] | None) -> list[str] | None:
     """Reject a key that is not in PERMISSION_CATALOGUE, keep the order, drop duplicates.
@@ -206,7 +212,7 @@ class GremiumRoleOut(_CamelModel):
 
 
 class GremiumRoleCreate(_CamelModel):
-    key: str = Field(min_length=1)
+    key: str = Field(min_length=1, pattern=ROLE_KEY_PATTERN)
     name: I18nMap = Field(default_factory=dict)
     permissions: list[str] = Field(default_factory=list)
 
@@ -355,7 +361,7 @@ class RoleOut(_CamelModel):
 
 
 class RoleCreate(_CamelModel):
-    key: str = Field(min_length=1)
+    key: str = Field(min_length=1, pattern=ROLE_KEY_PATTERN)
     label: I18nMap = Field(default_factory=dict)
     permissions: list[str] = Field(default_factory=list)
 
