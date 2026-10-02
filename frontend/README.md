@@ -29,8 +29,7 @@ Feature routes load lazily and a permission gate protects them.
 
 ```
 src/
-  styles/            Design system (tokens, fonts, base) — see DESIGN_SYSTEM.md
-  assets/fonts/      Archivo (OFL, self-hosted woff2) — web substitute for DIN
+  styles.scss        Global styles: loads the ui-kit fonts, tokens and base, adds app utilities
   assets/logos/      Official STUPA CD logos (mark + word mark)
   app/
     core/            App-wide singletons (no UI)
@@ -40,7 +39,7 @@ src/
       i18n/          I18nService (DE/EN, fallback DE) + `t` pipe
       theme/         ThemeService (system + toggle, persisted)
     shared/
-      ui/            UI kit: Button/Input/Card/Table/Stepper/Dialog/Toast/Badge
+      ui/            App building blocks (empty state, page header, skeleton)
       formly/        Formly binding to the UI kit (field type `input`)
     layout/          ShellComponent (Header/Nav/Theme/Language/Footer/Toasts)
     pages/           Home, Dashboard, Applications, Voting, Budget/Expenses/Invoices,
@@ -49,19 +48,26 @@ src/
                      voting/ (live vote, beamer)
     app.config.ts    Composition root (providers, interceptor chain, init)
     app.routes.ts    Routing (feature routes lazy, permission-gated)
+vendor/ui-kit/       Submodule STUPA-MAKERS/ui-kit: tokens, fonts, breakpoints, components
 ```
 
 ## Design system
 
-The CD tokens are CSS custom properties from the STUPA palette. British Racing Green is the
-primary color. The tokens have two levels: primitive and semantic. The `data-theme` attribute
-on `<html>` selects **light** or **dark**. `ThemeService` follows the operating system and
-remembers a manual toggle. For the full token reference, see
-**[DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md)**.
+The design system has one accent colour (green `#72a384`), neutral grey surfaces and two
+signal colours. The ui-kit submodule (`vendor/ui-kit`) holds the tokens, the fonts, the
+breakpoints and the components. The tokens have two levels: primitive and semantic. The
+`data-theme` attribute on `<html>` selects **light** or **dark**. `ThemeService` follows the
+operating system and remembers a manual toggle. It also sets the `theme-color` meta tags to
+the page background of the theme, so the browser and PWA bars follow the theme. For the
+tokens, the breakpoints and the binding UI rules, see **[DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md)**.
 
-- **Web font:** Archivo, a free grotesque face close to DIN, under the OFL license. The app
-  hosts it in `assets/fonts`. Change the token `--font-sans` to use another face. **DIN stays
-  PDF only** (requirements N1, Q15b). There is no DIN web font.
+- **Web fonts:** IBM Plex Sans (400/500/600/700) and IBM Plex Mono (400/500), under the SIL
+  Open Font License. The kit ships the `woff2` files in `vendor/ui-kit/src/assets/fonts`, and
+  `angular.json` copies them to `/assets/fonts`. The CSP allows only fonts from the own
+  origin, so do not load fonts from a CDN. Change the tokens `--font-sans` and `--font-mono`
+  to use another face. **DIN stays PDF only** (requirements N1, Q15b). There is no DIN web
+  font.
+- **Icons:** `app-icon` draws line icons as inline SVG. The app loads no icon font.
 - **Logos:** The official STUPA CD assets come from Nextcloud and hold the mark and the word
   mark. Use STUPA logos only. Do not use the logo of the university. The word mark has a light
   variant (black text) and a dark variant (white text). `ShellComponent` picks the variant from
