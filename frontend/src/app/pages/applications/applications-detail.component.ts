@@ -710,7 +710,10 @@ export class ApplicationsDetailComponent {
 
   startEdit(app: Application): void {
     const lang = this.i18n.locale();
-    this.editFields.set(toFormlyFields(this.formFields(), lang, { has_budget: true }));
+    // A reader without the PII right gets `data` without the isPII fields (O21). The
+    // form leaves them out, because the server keeps their stored values anyway.
+    const fields = this.formFields().filter((f) => !(f.isPII && !(f.key in app.data)));
+    this.editFields.set(toFormlyFields(fields, lang, { has_budget: true }));
     this.editModel = structuredClone(app.data);
     this.editForm = new FormGroup({});
     this.editing.set(true);

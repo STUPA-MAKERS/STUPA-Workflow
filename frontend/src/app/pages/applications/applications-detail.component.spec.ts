@@ -1133,6 +1133,50 @@ describe('ApplicationsDetailComponent', () => {
     http.verify();
   });
 
+  it('leaves a stripped PII field out of the edit form (O21)', async () => {
+    // A reader without the PII right gets `data` without the isPII field.
+    const { http, cmp } = await setupWithFields(
+      [
+        { key: 'title', type: 'text', label: { de: 'Titel' } },
+        { key: 'iban', type: 'text', label: { de: 'IBAN' }, isPII: true, required: true },
+        { key: 'mail', type: 'text', label: { de: 'Mail' }, isPII: true },
+      ],
+      { title: 'Förderung Fest', mail: 'a@b.de' },
+    );
+    flushAttachments(http);
+    const keys = (fields: { key?: unknown; fieldGroup?: unknown[] }[]): unknown[] =>
+      fields.flatMap((f) => [
+        f.key,
+        ...keys((f.fieldGroup ?? []) as { key?: unknown; fieldGroup?: unknown[] }[]),
+      ]);
+
+    cmp.startEdit(cmp.app() as Application);
+    const editKeys = keys(cmp.editFields() as { key?: unknown; fieldGroup?: unknown[] }[]);
+    expect(editKeys).toContain('title');
+    // A PII field that came with the data stays editable.
+    expect(editKeys).toContain('mail');
+    expect(editKeys).not.toContain('iban');
+    expect(screen.queryByText('IBAN')).not.toBeInTheDocument();
+  });
+
+  it('lists the changed keys of a version without values (A11 metadata view)', async () => {
+    const { http, detectChanges } = await setup();
+    http.expectOne(url('')).flush(appWire());
+    http.expectOne(url('/versions')).flush([
+      { version: 1, data: null, diff: null, changedKeys: [], changedBy: 'applicant', at: '2026-06-05T10:00:00Z' },
+      { version: 2, data: null, diff: null, changedKeys: ['projectNote'], changedBy: 'StuPa', at: '2026-06-05T11:00:00Z' },
+    ]);
+    http.expectOne(url('/comments')).flush([]);
+    detectChanges();
+    await userEvent.click(screen.getByRole('button', { name: /Versionshistorie/ }));
+    detectChanges();
+    expect(screen.getByText('projectNote')).toBeInTheDocument();
+    expect(screen.queryByText('Keine Feldänderungen.')).not.toBeInTheDocument();
+    flushForm(http);
+    flushAttachments(http);
+    http.verify();
+  });
+
   it('does not save while the edit form is invalid or already saving', async () => {
     const { http, detectChanges, cmp } = await setup();
     flushAll(http);

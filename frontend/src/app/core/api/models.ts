@@ -172,6 +172,8 @@ export interface ApplicationOutWire {
   canEdit?: boolean;
   isOwner?: boolean;
   archivedAt?: IsoDateTime | null;
+  /** Time of the last status change (A9). */
+  stateSince?: IsoDateTime | null;
 }
 
 /** `ApplicationListItem`. A list entry without `data` and without `applicant`. */
@@ -186,6 +188,8 @@ export interface ApplicationListItemWire {
   createdAt: IsoDateTime;
   updatedAt: IsoDateTime;
   archivedAt?: IsoDateTime | null;
+  /** Time of the last status change (A9). */
+  stateSince?: IsoDateTime | null;
 }
 
 /** `ApplicationCreated`. The 201 response of `POST /applications`. It holds only the id. */
@@ -263,6 +267,9 @@ export interface TimelineEventOutWire {
   fromStateId?: Uuid | null;
   toStateId: Uuid;
   toState?: StateOutWire | null;
+  /** Label of the fired transition (A3). Null for the creation and for a revert. */
+  transitionLabel?: I18nMap | null;
+  /** In the applicant view, the Gremium for every action of a member (A12). */
   actor?: string | null;
   at: IsoDateTime;
   note?: string | null;
@@ -324,11 +331,18 @@ export interface DataDiffWire {
   changed: Record<string, FieldChangeWire>;
 }
 
-/** `VersionOut`. One submission version and its diff. */
+/**
+ * `VersionOut`. One submission version and its diff.
+ *
+ * The applicant view gets the metadata only (A11): `data` and `diff` are null, and
+ * `changedKeys` lists the changed fields. A reader without the PII right gets no
+ * `isPII` field in `data`, `diff` and `changedKeys` (O21).
+ */
 export interface VersionOutWire {
   version: number;
-  data: Record<string, unknown>;
+  data?: Record<string, unknown> | null;
   diff?: DataDiffWire | null;
+  changedKeys?: string[];
   changedBy?: string | null;
   at: IsoDateTime;
 }
@@ -448,6 +462,8 @@ export interface Application {
    * left the working list. `be-privacy` owns the DSGVO erasure people confuse this with.
    */
   archivedAt: IsoDateTime | null;
+  /** Time of the last status change (A9), for "since" on the status page. */
+  stateSince?: IsoDateTime | null;
 }
 
 /**
@@ -484,6 +500,8 @@ export interface ApplicationListItem {
   updatedAt: IsoDateTime;
   /** Set when the row is archived, so a combined list can mark it. */
   archivedAt: IsoDateTime | null;
+  /** Time of the last status change (A9), for "waiting since". */
+  stateSince?: IsoDateTime | null;
 }
 
 /** Result of `POST /applications`, frontend view. */
@@ -496,6 +514,8 @@ export interface TimelineEntry {
   toStateId: Uuid;
   toState: ApplicationState | null;
   label: string;
+  /** Label of the fired transition (A3), resolved to the locale. */
+  transitionLabel?: string | null;
   actor: string | null;
   at: IsoDateTime;
   note: string | null;
@@ -558,6 +578,8 @@ export interface ApplicationVersion {
   version: number;
   data: Record<string, unknown>;
   diff: DataDiff | null;
+  /** Keys of the changed fields. The applicant view gets only these (A11). */
+  changedKeys?: string[];
   changedBy: string | null;
   at: IsoDateTime;
 }

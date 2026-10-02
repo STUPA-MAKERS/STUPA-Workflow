@@ -107,7 +107,13 @@ describe('mapApplication', () => {
       isOwner: false,
       // Absent on the wire means not archived, not "unknown".
       archivedAt: null,
+      stateSince: null,
     });
+  });
+
+  it('passes stateSince through (A9)', () => {
+    const view = mapApplication({ ...wire, stateSince: '2026-09-28T14:30:00Z' }, 'de');
+    expect(view.stateSince).toBe('2026-09-28T14:30:00Z');
   });
 
   it('normalises omitted optionals to null and missing data to {}', () => {
@@ -145,6 +151,21 @@ describe('mapApplicationListItem', () => {
     expect(view.state?.label).toBe('Submitted');
     expect(view.gremiumId).toBeNull();
     expect(view.amount).toBe('10.00');
+    expect(view.stateSince).toBeNull();
+  });
+
+  it('passes stateSince through (A9)', () => {
+    const view = mapApplicationListItem(
+      {
+        id: 'a1',
+        typeId: 't1',
+        createdAt: '2026-06-05T10:00:00Z',
+        updatedAt: '2026-06-05T10:00:00Z',
+        stateSince: '2026-09-28T14:30:00Z',
+      },
+      'de',
+    );
+    expect(view.stateSince).toBe('2026-09-28T14:30:00Z');
   });
 });
 
@@ -163,10 +184,22 @@ describe('mapTimelineEvent', () => {
       toStateId: 's1',
       toState: { id: 's1', key: 'submitted', label: 'Submitted', color: '#4a90d9', editAllowed: true, kind: 'normal' },
       label: 'Submitted',
+      transitionLabel: null,
       actor: 'Referat',
       at: '2026-06-05T10:00:00Z',
       note: 'ok',
     });
+  });
+
+  it('resolves the transition label to the locale (A3)', () => {
+    const wire: TimelineEventOutWire = {
+      toStateId: 's1',
+      toState: STATE,
+      transitionLabel: { de: 'Genehmigen', en: 'Approve' },
+      at: '2026-06-05T10:00:00Z',
+    };
+    expect(mapTimelineEvent(wire, 'en').transitionLabel).toBe('Approve');
+    expect(mapTimelineEvent(wire, 'de').transitionLabel).toBe('Genehmigen');
   });
 
   it('falls back to an empty label and null defaults when toState is absent', () => {
@@ -375,6 +408,23 @@ describe('mapVersion', () => {
     expect(v.diff?.added).toEqual([{ key: 'a', value: 1 }]);
     expect(v.diff?.removed).toEqual([]);
     expect(v.diff?.changed).toEqual([]);
+    expect(v.changedKeys).toEqual([]);
+  });
+
+  it('maps the metadata view of the applicant without values (A11)', () => {
+    const wire: VersionOutWire = {
+      version: 2,
+      data: null,
+      diff: null,
+      changedKeys: ['note', 'title'],
+      changedBy: 'StuPa',
+      at: '2026-06-02T10:00:00Z',
+    };
+    const v = mapVersion(wire);
+    expect(v.data).toEqual({});
+    expect(v.diff).toBeNull();
+    expect(v.changedKeys).toEqual(['note', 'title']);
+    expect(v.changedBy).toBe('StuPa');
   });
 });
 

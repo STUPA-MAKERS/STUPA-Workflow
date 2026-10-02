@@ -93,6 +93,7 @@ export function mapApplication(wire: ApplicationOutWire, lang: string): Applicat
     canEdit: wire.canEdit ?? false,
     isOwner: wire.isOwner ?? false,
     archivedAt: wire.archivedAt ?? null,
+    stateSince: wire.stateSince ?? null,
   };
 }
 
@@ -111,6 +112,7 @@ export function mapApplicationListItem(
     createdAt: wire.createdAt,
     updatedAt: wire.updatedAt,
     archivedAt: wire.archivedAt ?? null,
+    stateSince: wire.stateSince ?? null,
   };
 }
 
@@ -124,6 +126,7 @@ export function mapTimelineEvent(wire: TimelineEventOutWire, lang: string): Time
     toStateId: wire.toStateId,
     toState,
     label: toState?.label ?? '',
+    transitionLabel: wire.transitionLabel ? resolveI18n(wire.transitionLabel, lang) : null,
     actor: wire.actor ?? null,
     at: wire.at,
     note: wire.note ?? null,
@@ -206,6 +209,7 @@ export function mapVersion(wire: VersionOutWire): ApplicationVersion {
     version: wire.version,
     data: wire.data ?? {},
     diff: mapDiff(wire.diff),
+    changedKeys: wire.changedKeys ?? [],
     changedBy: wire.changedBy ?? null,
     at: wire.at,
   };
