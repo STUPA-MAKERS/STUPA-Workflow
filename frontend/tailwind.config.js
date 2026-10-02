@@ -4,7 +4,7 @@
  * 1. `preflight: false` turns off the base reset. The reset would change h1, button, ul and
  *    other elements globally.
  * 2. All scales (spacing, colors, radii, font, shadow, z-index) alias the existing design
- *    tokens from `src/styles/tokens.scss`. So `gap-5` gives exactly `var(--space-5)`, which
+ *    tokens from `vendor/ui-kit/src/styles/tokens.scss`. So `gap-5` gives exactly `var(--space-5)`, which
  *    is 1.5rem and identical to the previous SCSS rule. A migration from `var(--space-5)` to
  *    `gap-5` therefore stays pixel exact.
  *
@@ -50,6 +50,8 @@ module.exports = {
       md: 'var(--radius-md)',
       lg: 'var(--radius-lg)',
       xl: 'var(--radius-xl)',
+      field: 'var(--radius-field)',
+      '2xl': 'var(--radius-2xl)',
       pill: 'var(--radius-pill)',
       full: 'var(--radius-pill)',
     },
@@ -81,6 +83,7 @@ module.exports = {
       DEFAULT: 'var(--shadow-md)',
       md: 'var(--shadow-md)',
       lg: 'var(--shadow-lg)',
+      elevated: 'var(--shadow-elevated)',
     },
     zIndex: {
       auto: 'auto',
@@ -100,10 +103,17 @@ module.exports = {
       'bg-elevated': 'var(--color-bg-elevated)',
       surface: 'var(--color-surface)',
       'surface-sunken': 'var(--color-surface-sunken)',
+      'surface-1': 'var(--color-surface-1)',
+      'surface-2': 'var(--color-surface-2)',
+      'surface-3': 'var(--color-surface-3)',
+      'surface-4': 'var(--color-surface-4)',
+      selected: 'var(--color-selected)',
+      'on-selected': 'var(--color-on-selected)',
       line: 'var(--color-border)',
       'line-strong': 'var(--color-border-strong)',
       text: 'var(--color-text)',
       muted: 'var(--color-text-muted)',
+      subtle: 'var(--color-text-subtle)',
       inverse: 'var(--color-text-inverse)',
       primary: 'var(--color-primary)',
       'primary-hover': 'var(--color-primary-hover)',
@@ -111,6 +121,10 @@ module.exports = {
       'primary-subtle': 'var(--color-primary-subtle)',
       'on-primary': 'var(--color-on-primary)',
       accent: 'var(--color-accent)',
+      'on-accent': 'var(--color-on-accent)',
+      'accent-text': 'var(--color-accent-text)',
+      'accent-container': 'var(--color-accent-container)',
+      'on-accent-container': 'var(--color-on-accent-container)',
       success: 'var(--color-success)',
       'success-subtle': 'var(--color-success-subtle)',
       warning: 'var(--color-warning)',

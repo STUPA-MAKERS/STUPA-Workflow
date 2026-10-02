@@ -35,6 +35,16 @@ type Cmp = AuditLogComponent & {
   entries(): AuditEntry[];
 };
 
+/** The collapsed toggle of the first audit entry. The filter chip is a collapsed toggle
+ *  too, so the query keeps only the entry rows. */
+function entryToggle(): HTMLElement {
+  const rows = screen
+    .getAllByRole('button', { expanded: false })
+    .filter((b) => b.classList.contains('audit__row'));
+  expect(rows.length).toBeGreaterThan(0);
+  return rows[0];
+}
+
 function entry(id: number, over: Partial<AuditEntry> = {}): AuditEntry {
   return {
     id,
@@ -88,7 +98,7 @@ describe('AuditLogComponent', () => {
     expect(
       screen.getByText(/Root Admin hat Rollen\/Rechte geändert \(Benutzer:p-1\)\./),
     ).toBeInTheDocument();
-    screen.getByRole('button', { expanded: false }).click();
+    entryToggle().click();
     fixture.detectChanges();
     expect(screen.getAllByText('Rollen/Rechte').length).toBeGreaterThan(0);
   });
@@ -135,7 +145,7 @@ describe('AuditLogComponent', () => {
     });
     expect(screen.getByRole('heading', { level: 2 }).textContent).toMatch(/2026/);
     expect(screen.queryByText('rows')).not.toBeInTheDocument();
-    screen.getByRole('button', { expanded: false }).click();
+    entryToggle().click();
     fixture.detectChanges();
     expect(screen.getByText('rows')).toBeInTheDocument();
     expect(screen.getByText('7')).toBeInTheDocument();
@@ -154,7 +164,7 @@ describe('AuditLogComponent', () => {
         hasMore: false,
       },
     });
-    screen.getByRole('button', { expanded: false }).click();
+    entryToggle().click();
     fixture.detectChanges();
     expect(screen.getByText('Finanzausschuss · g-1')).toBeInTheDocument();
     expect(screen.getByText('Root Admin · kc|root')).toBeInTheDocument();
@@ -164,7 +174,7 @@ describe('AuditLogComponent', () => {
     const { fixture } = await setup({
       page: { items: [entry(1, { data: { gremiumId: 'g-unknown' } })], nextCursor: null, hasMore: false },
     });
-    screen.getByRole('button', { expanded: false }).click();
+    entryToggle().click();
     fixture.detectChanges();
     expect(screen.getByText('g-unknown')).toBeInTheDocument();
   });
@@ -480,7 +490,7 @@ describe('AuditLogComponent', () => {
         hasMore: false,
       },
     });
-    screen.getByRole('button', { expanded: false }).click();
+    entryToggle().click();
     fixture.detectChanges();
     const link = screen.getByRole('link');
     expect(link.getAttribute('href')).toBe('/applications/a-1');
@@ -544,7 +554,7 @@ describe('AuditLogComponent', () => {
     });
     expect(screen.getByText(/hat die Konfiguration geändert \(Formular\)\./)).toBeInTheDocument();
     expect(screen.queryByText(new RegExp(TYPE_UUID))).not.toBeInTheDocument();
-    screen.getByRole('button', { expanded: false }).click();
+    entryToggle().click();
     fixture.detectChanges();
     expect(screen.getByText(new RegExp(TYPE_UUID))).toBeInTheDocument();
   });
@@ -567,7 +577,7 @@ describe('AuditLogComponent', () => {
         hasMore: false,
       },
     });
-    screen.getByRole('button', { expanded: false }).click();
+    entryToggle().click();
     fixture.detectChanges();
     expect(screen.getByText(new RegExp(TYPE_UUID))).toBeInTheDocument();
   });
