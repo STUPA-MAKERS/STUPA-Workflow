@@ -43,7 +43,12 @@ from app.modules.budget.tree_models import (
 )
 from app.modules.config_revision.models import ConfigRevision
 from app.modules.deadlines.models import Deadline, DeadlinePolicy
-from app.modules.delegations.models import DelegationSubstitute, MeetingDelegation
+from app.modules.delegations.models import (
+    DelegationSubstitute,
+    MeetingDelegation,
+    SubstituteGroup,
+    SubstituteGroupMember,
+)
 from app.modules.files.models import Attachment, AttachmentDraftToken
 from app.modules.flow.models import FlowVersion, State, Transition
 from app.modules.forms.models import FormField, FormVersion
@@ -83,6 +88,8 @@ __all__ = [
     "DeadlinePolicy",
     "DelegationSubstitute",
     "MeetingDelegation",
+    "SubstituteGroup",
+    "SubstituteGroupMember",
     "FlowVersion",
     "FormField",
     "FormVersion",

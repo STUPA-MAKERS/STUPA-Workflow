@@ -977,7 +977,7 @@ async def test_revoke_not_found() -> None:
 async def test_revoke_foreign_non_admin_forbidden() -> None:
     row = SimpleNamespace(id=uuid4(), meeting_id=MEETING_ID, delegator_principal_id=uuid4())
     db = fake_session(result(_me()))  # me is not the delegator
-    db.get_results = [row]
+    db.get_results = [row, _meeting()]  # planned: no lead path
     with pytest.raises(ForbiddenError, match="delegator"):
         await _svc(db).revoke(row.id, _actor())
 
@@ -985,8 +985,8 @@ async def test_revoke_foreign_non_admin_forbidden() -> None:
 async def test_revoke_owner_after_start_validation() -> None:
     me = _me()
     row = SimpleNamespace(id=uuid4(), meeting_id=MEETING_ID, delegator_principal_id=me.id)
-    db = fake_session(result(me))
-    db.get_results = [row, _meeting(status="live")]  # live meeting: _revocable False (line 302)
+    db = fake_session(result(), result(me))  # no session.manage role, then me
+    db.get_results = [row, _meeting(status="live")]  # live meeting: _revocable False
     with pytest.raises(ValidationProblem, match="started"):
         await _svc(db).revoke(row.id, _actor())
 

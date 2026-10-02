@@ -15,8 +15,9 @@ The rules (Z2, O15, O23, F12):
 - Nobody can set a member `present` while a delegation of that member for the
   meeting exists (409 `delegation_active`): not the lead, and not the member
   with the own report. The delegation must be revoked first. The delegator can
-  revoke it only before the meeting start. After the start, only an admin can
-  revoke it.
+  revoke it only before the meeting start. During the live meeting, the meeting
+  lead (`can_manage`) can revoke it, for example a substitution that the lead
+  entered for a missing member (O6). An admin can revoke it at any time.
 - `note` is the reason of an excuse and is personal data. Only the member and
   the lead see it. The lead's set and reset write `attendance_set` and
   `attendance_reset` to the audit log, never with the note.
@@ -38,6 +39,7 @@ from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.delegations.models import MeetingDelegation
+from app.modules.delegations.pool import group_names_for
 from app.modules.livevote.keepers import keeper_principal_ids
 from app.modules.livevote.models import Meeting, MeetingAttendance
 from app.modules.livevote.schemas import (
@@ -50,7 +52,8 @@ from app.shared.errors import ConflictError, ForbiddenError, NotFoundError
 
 _DELEGATION_ACTIVE = (
     "The member delegated for this meeting. Revoke the delegation first. After the"
-    " meeting start, only an admin can revoke it."
+    " meeting start, the meeting lead can revoke it while the meeting is live, and"
+    " an admin at any time."
 )
 
 
@@ -132,16 +135,19 @@ class AttendanceService:
         """Return the current Gremium members as Protokollant candidates.
 
         `canKeepProtocol` marks the members with `protocol.write` (O20). Only they
-        can keep the minutes.
+        can keep the minutes. `substituteGroupName` names the faculty group of the
+        member (A8).
         """
         members = await self._current_members(gremium_id)
         keepers = await keeper_principal_ids(self.session, gremium_id)
+        groups = await group_names_for(self.session, gremium_id, (m.id for m in members))
         return [
             MeetingMemberOut(
                 principalId=m.id,
                 displayName=m.display_name,
                 email=m.email,
                 canKeepProtocol=m.id in keepers,
+                substituteGroupName=groups.get(m.id),
             )
             for m in members
         ]
@@ -154,7 +160,8 @@ class AttendanceService:
         A member without a record gets `status` and `source` as `None`. The `note`
         goes only to the member and to the meeting lead (`can_write`).
         `canKeepProtocol` marks the members who can keep the minutes (O20), for the
-        keeper picker and the handover.
+        keeper picker and the handover. `substituteGroupName` names the faculty
+        group of the member (A8).
         """
         meeting = await self._meeting(meeting_id)
         members = await self._current_members(meeting.gremium_id)
@@ -169,6 +176,9 @@ class AttendanceService:
         )
         by_principal = {r.principal_id: r for r in records}
         keepers = await keeper_principal_ids(self.session, meeting.gremium_id)
+        groups = await group_names_for(
+            self.session, meeting.gremium_id, (m.id for m in members)
+        )
         out: list[AttendanceOut] = []
         for m in members:
             rec = by_principal.get(m.id)
@@ -183,6 +193,7 @@ class AttendanceService:
                     note=rec.note if rec and (is_self or can_write) else None,
                     isSelf=is_self,
                     canKeepProtocol=m.id in keepers,
+                    substituteGroupName=groups.get(m.id),
                 )
             )
         return out
