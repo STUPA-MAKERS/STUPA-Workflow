@@ -208,8 +208,9 @@ async def set_attendance(
     - The lead's value wins: the member can no longer change it until the lead
       resets it with `reset_attendance`.
     - `present` gives 409 `delegation_active` while the member has a delegation for
-      this meeting. Revoke the delegation first. After the meeting start, only an
-      admin can revoke it.
+      this meeting. Revoke the delegation first. After the meeting start, the
+      meeting lead (session.manage) can revoke it while the meeting is live, and an
+      admin at any time.
     - `note` (the reason, max. 500 characters) is allowed only with `excused`.
       Without `note` an excused member keeps the stored reason.
     The change goes into the audit log (`attendance_set`), without the note.
@@ -396,21 +397,88 @@ async def list_delegations() -> dict:
 async def create_delegation(delegation: S.DelegationCreate) -> dict:
     """Delegate attendance for a meeting to another member.
 
-    The delegation can also transfer the vote.
+    The delegation can also transfer the vote. Without `delegatorId` the caller
+    delegates for themselves while the meeting is planned. With `delegatorId` the
+    meeting lead (session.manage in the gremium) enters a substitution for a missing
+    member (no attendance record, excused or absent) while the meeting is live. The
+    delegate must then be a substitute of the member's faculty group.
     """
     return await api().post("/delegations", json=dump_create(delegation))
 
 
 @group.tool
 async def revoke_delegation(delegation_id: str) -> dict:
-    """Revoke a delegation."""
+    """Revoke a delegation.
+
+    The delegator can revoke before the meeting start. The meeting lead can revoke
+    while the meeting is live; a ballot that the delegate already cast stays.
+    """
     return await api().delete(f"/delegations/{delegation_id}")
 
 
 @group.tool
-async def list_substitutes() -> dict:
-    """List the substitute pool of standing stand-ins per Gremium."""
-    return await api().get("/delegations/substitutes")
+async def list_substitutes(gremium_id: str) -> dict:
+    """List the substitute pool (personal and gremium-wide stand-ins) of one Gremium."""
+    return await api().get("/delegations/substitutes", params=params(gremiumId=gremium_id))
+
+
+@group.tool
+async def list_substitute_groups(gremium_id: str) -> dict:
+    """List the faculty substitute groups of one Gremium with members and substitutes.
+
+    A substitute of a group may represent every member of that group without the
+    lead-time deadline. A member counts only while the gremium membership is active
+    (`active`). `tooManySubstitutes` warns above two substitutes; it is no limit.
+    """
+    return await api().get(
+        "/delegations/substitute-groups", params=params(gremiumId=gremium_id)
+    )
+
+
+@group.tool
+async def create_substitute_group(group: S.SubstituteGroupCreate) -> dict:
+    """Create a faculty substitute group in a Gremium.
+
+    Requires admin.delegations or session.manage in the gremium.
+    """
+    return await api().post("/delegations/substitute-groups", json=dump_create(group))
+
+
+@group.tool
+async def update_substitute_group(group_id: str, patch: S.SubstituteGroupUpdate) -> dict:
+    """Rename a faculty substitute group or change its position."""
+    return await api().patch(
+        f"/delegations/substitute-groups/{group_id}", json=dump_patch(patch)
+    )
+
+
+@group.tool
+async def delete_substitute_group(group_id: str) -> dict:
+    """Delete a faculty substitute group with its members and substitutes."""
+    return await api().delete(f"/delegations/substitute-groups/{group_id}")
+
+
+@group.tool
+async def add_substitute_group_member(
+    group_id: str, principal_id: str, kind: Literal["member", "substitute"]
+) -> dict:
+    """Add a person to a faculty substitute group as a member or as a substitute.
+
+    A member is in at most one group per Gremium (409 otherwise). A substitute may
+    be in several groups.
+    """
+    return await api().post(
+        f"/delegations/substitute-groups/{group_id}/members",
+        json={"principalId": principal_id, "kind": kind},
+    )
+
+
+@group.tool
+async def remove_substitute_group_member(group_id: str, principal_id: str) -> dict:
+    """Remove a person from a faculty substitute group."""
+    return await api().delete(
+        f"/delegations/substitute-groups/{group_id}/members/{principal_id}"
+    )
 
 
 @group.tool
