@@ -122,6 +122,8 @@ async def test_foreign_email_stays_unconfirmed_until_the_link(
         "gremiumId": str(seed.gremium_id),
         "initialStateId": str(seed.open_state_id),
         "emailConfirmed": False,
+        # Z4: the number of bound draft uploads.
+        "attachments": 0,
     }
 
     # The owner of the address confirms it through the link.

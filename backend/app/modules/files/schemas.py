@@ -8,6 +8,7 @@ authorization on its own. ``expiresIn`` is only a cache hint for the frontend.
 
 from __future__ import annotations
 
+from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -22,6 +23,18 @@ class AttachmentOut(BaseModel):
     size: int
     scanned: bool
     is_comparison_offer: bool
+
+
+class DraftAttachmentOut(AttachmentOut):
+    """201 response of ``POST /apply/attachments`` (Z4).
+
+    ``draftToken`` is the token of the draft. The first upload issues it, every later
+    upload echoes it. The wizard sends it with each further upload, with a delete and
+    with the submit. ``draftExpiresAt`` is the end of all drafts of the token.
+    """
+
+    draftToken: str
+    draftExpiresAt: datetime
 
 
 class SignedUrlOut(BaseModel):

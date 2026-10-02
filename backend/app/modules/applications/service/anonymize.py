@@ -114,7 +114,10 @@ class AnonymizeOps(ApplicationsServiceBase):
             await files.delete_for_application(application_id, actor=actor)
         else:
             await self.session.execute(
-                delete(Attachment).where(Attachment.application_id == application_id)
+                delete(Attachment).where(
+                    Attachment.application_id.is_not(None),
+                    Attachment.application_id == application_id,
+                )
             )
         if commit:
             await self.session.commit()

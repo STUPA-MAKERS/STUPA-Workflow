@@ -190,7 +190,8 @@ async def _discard_unconfirmed(
         attachments = (
             await session.execute(
                 select(Attachment.application_id, Attachment.storage_key).where(
-                    Attachment.application_id.in_(ids)
+                    Attachment.application_id.is_not(None),
+                    Attachment.application_id.in_(ids),
                 )
             )
         ).all()

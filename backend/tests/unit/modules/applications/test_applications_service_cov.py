@@ -354,6 +354,9 @@ def _payload(**over: Any) -> SimpleNamespace:
         "applicant_email": "a@b.de",
         "applicant_name": "Alice",
         "lang": "de",
+        # Z4: no draft uploads unless a test sets them.
+        "attachment_ids": [],
+        "draft_token": None,
     }
     base.update(over)
     return SimpleNamespace(**base)

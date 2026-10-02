@@ -449,8 +449,10 @@ class AuditService:
 
             await fill(
                 "attachment",
+                # A draft (Z4) has no application yet. Its file name stays out of
+                # the log view until the create binds it.
                 select(Attachment.id, Attachment.filename).where(
-                    Attachment.id.in_(ids)
+                    Attachment.id.in_(ids), Attachment.application_id.is_not(None)
                 ),
             )
         if ids := by_type.get("cd_variant"):
@@ -535,7 +537,7 @@ class AuditService:
         await fill(select(Vote.id, Vote.question).where(Vote.id.in_(candidates)))
         await fill(
             select(Attachment.id, Attachment.filename).where(
-                Attachment.id.in_(candidates)
+                Attachment.id.in_(candidates), Attachment.application_id.is_not(None)
             )
         )
 

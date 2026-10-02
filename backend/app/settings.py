@@ -189,6 +189,12 @@ class Settings(BaseSettings):
     # Upload cap (the data model holds CHECK(size <= 10485760)) and signed-URL lifetime.
     attachment_max_bytes: int = 10 * 1024 * 1024
     attachment_url_ttl_seconds: int = 300
+    # Draft uploads of the wizard (Z4, POST /apply/attachments). Each upload moves the
+    # end of all drafts of the token to now + this many days. One token holds at most
+    # this many files and bytes.
+    attachment_draft_ttl_days: int = Field(default=7, ge=1)
+    attachment_draft_max_files: int = Field(default=20, ge=1)
+    attachment_draft_max_bytes: int = Field(default=50 * 1024 * 1024, ge=1)
 
     # Whole-platform backups (/admin/backups). An archive holds the pg_dump plus a
     # mirror of the attachment bucket, age-encrypted, in its own MinIO bucket. Without

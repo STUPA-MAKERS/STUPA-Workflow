@@ -202,6 +202,20 @@ def test_upload_missing_file_422(app: FastAPI, client: TestClient) -> None:
     assert r.status_code == 422
 
 
+def test_upload_long_field_key_422(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    """A field key longer than 256 characters gives 422 before the service."""
+    _as(app, "application.manage")
+    r = client.post(
+        f"/api/applications/{APP_ID}/attachments",
+        files={"file": ("doc.pdf", b"%PDF-data", "application/pdf")},
+        data={"field_key": "k" * 257},
+    )
+    assert r.status_code == 422
+    assert fake_service.uploaded == []
+
+
 def test_upload_too_large_413(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:

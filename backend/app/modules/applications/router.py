@@ -178,6 +178,11 @@ async def create_application(
     the magic-link verify. So does a logged-in submission for another email
     address (F23, compared without case): the account does not prove that the
     person owns that address.
+
+    ``attachmentIds`` and ``draftToken`` bind the draft uploads of the wizard
+    (``POST /apply/attachments``, Z4) in the same transaction. A missing,
+    expired, foreign or infected draft answers 422 and names the ids. A draft
+    whose scan is still pending is allowed; it stays quarantined.
     """
     # Authoritative bound on the serialized field values, free of Content-Length.
     if len(json.dumps(payload.data)) > settings.max_application_payload_bytes:
@@ -206,7 +211,11 @@ async def create_application(
     )
 
     app, email = await service.create(
-        payload, actor=actor, dispatcher=dispatcher, email_confirmed=email_confirmed
+        payload,
+        actor=actor,
+        dispatcher=dispatcher,
+        email_confirmed=email_confirmed,
+        draft_pepper=settings.magic_link_secret,
     )
     pool = getattr(request.app.state, "arq_pool", None)
     background.add_task(send_magic_link, settings, email, app.id, pool)

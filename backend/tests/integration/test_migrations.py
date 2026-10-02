@@ -1105,3 +1105,128 @@ def test_attendance_self_status_check_not_valid(
     with engine.connect() as conn:
         assert _self_status_check(conn) is None
     command.upgrade(alembic_cfg, "head")
+
+
+def _has_table(conn, name: str) -> bool:  # noqa: ANN001
+    return conn.execute(text("SELECT to_regclass(:n)"), {"n": name}).scalar_one() is not None
+
+
+def _attachment_columns(conn) -> dict[str, str]:  # noqa: ANN001
+    return dict(
+        conn.execute(
+            text(
+                "SELECT column_name, is_nullable FROM information_schema.columns "
+                "WHERE table_name = 'attachment'"
+            )
+        ).all()
+    )
+
+
+def test_attachment_drafts(alembic_cfg: Config, engine: Engine) -> None:
+    """Migration 1ee8a0d3928c (Z4).
+
+    The upgrade makes `attachment.application_id` nullable, adds the two draft
+    columns, both checks, the two partial indexes and the `attachment_draft_token`
+    table. An existing row stays. The downgrade drops the token table, deletes the
+    drafts, restores NOT NULL and drops the columns.
+    """
+    command.downgrade(alembic_cfg, "96421ecdbc54")
+    with engine.begin() as conn:
+        cols = _attachment_columns(conn)
+        assert cols["application_id"] == "NO"
+        assert "draft_token_hash" not in cols
+        assert not _has_table(conn, "attachment_draft_token")
+        type_id = _new_type(conn)
+        fv = conn.execute(
+            text(
+                "INSERT INTO form_version (application_type_id, version) "
+                "VALUES (:t, 1) RETURNING id"
+            ),
+            {"t": type_id},
+        ).scalar_one()
+        flv = conn.execute(
+            text("INSERT INTO flow_version (version) VALUES (1) RETURNING id")
+        ).scalar_one()
+        app_id = conn.execute(
+            text(
+                "INSERT INTO application (type_id, form_version_id, flow_version_id) "
+                "VALUES (:t, :fv, :flv) RETURNING id"
+            ),
+            {"t": type_id, "fv": fv, "flv": flv},
+        ).scalar_one()
+        bound = conn.execute(
+            text(
+                "INSERT INTO attachment (application_id, filename, mime, size) "
+                "VALUES (:a, 'b.pdf', 'application/pdf', 1) RETURNING id"
+            ),
+            {"a": app_id},
+        ).scalar_one()
+
+    command.upgrade(alembic_cfg, "head")
+    with engine.begin() as conn:
+        cols = _attachment_columns(conn)
+        assert cols["application_id"] == "YES"
+        assert cols["draft_token_hash"] == "YES"
+        assert cols["draft_expires_at"] == "YES"
+        indexes = set(
+            conn.execute(
+                text("SELECT indexname FROM pg_indexes WHERE tablename = 'attachment'")
+            ).scalars()
+        )
+        assert {"ix_attachment_draft_expires_at", "ix_attachment_draft_token_hash"} <= indexes
+        assert conn.execute(
+            text("SELECT application_id FROM attachment WHERE id = :i"), {"i": bound}
+        ).scalar_one() == app_id
+        conn.execute(
+            text(
+                "INSERT INTO attachment (filename, mime, size, draft_token_hash, "
+                "draft_expires_at) VALUES ('d.pdf', 'application/pdf', 1, '\\x01', "
+                "now() + interval '7 days')"
+            )
+        )
+        assert _has_table(conn, "attachment_draft_token")
+        conn.execute(
+            text(
+                "INSERT INTO attachment_draft_token (token_hash, expires_at) "
+                "VALUES ('\\x01', now() + interval '7 days')"
+            )
+        )
+        token_indexes = set(
+            conn.execute(
+                text(
+                    "SELECT indexname FROM pg_indexes "
+                    "WHERE tablename = 'attachment_draft_token'"
+                )
+            ).scalars()
+        )
+        assert {
+            "pk_attachment_draft_token",
+            "ix_attachment_draft_token_expires_at",
+        } <= token_indexes
+    for bad in (
+        # Neither an application nor a draft token.
+        "INSERT INTO attachment (filename, mime, size) VALUES ('x', 'a/b', 1)",
+        # Both an application and a draft token.
+        "INSERT INTO attachment (application_id, filename, mime, size, "
+        "draft_token_hash, draft_expires_at) VALUES (:a, 'x', 'a/b', 1, '\\x01', now())",
+        # A draft token without an end.
+        "INSERT INTO attachment (filename, mime, size, draft_token_hash) "
+        "VALUES ('x', 'a/b', 1, '\\x01')",
+        # A bound row with an end but no token.
+        "INSERT INTO attachment (application_id, filename, mime, size, "
+        "draft_expires_at) VALUES (:a, 'x', 'a/b', 1, now())",
+    ):
+        with pytest.raises(IntegrityError), engine.begin() as conn:
+            conn.execute(text(bad), {"a": app_id})
+
+    command.downgrade(alembic_cfg, "96421ecdbc54")
+    with engine.begin() as conn:
+        cols = _attachment_columns(conn)
+        assert cols["application_id"] == "NO"
+        assert "draft_token_hash" not in cols
+        assert "draft_expires_at" not in cols
+        assert not _has_table(conn, "attachment_draft_token")
+        ids = list(conn.execute(text("SELECT id FROM attachment")).scalars())
+        assert ids == [bound]
+        conn.execute(text("DELETE FROM attachment"))
+    command.upgrade(alembic_cfg, "head")

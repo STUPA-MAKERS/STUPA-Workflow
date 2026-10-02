@@ -387,6 +387,7 @@ describe('AuditLogComponent', () => {
       'guest_application_discard',
       'attendance_set',
       'attendance_reset',
+      'attachment_upload',
     ] as const;
     for (const action of fresh) {
       // Every one of them is in the catalog, so the filter offers it.

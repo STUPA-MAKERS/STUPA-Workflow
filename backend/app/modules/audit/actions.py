@@ -76,6 +76,12 @@ class AuditAction(StrEnum):
     APPLICATION_SHARE = "application_share"
     APPLICATION_SHARE_REVOKE = "application_share_revoke"
     WEBHOOK_CONFIG = "webhook_config"
+    # Attachment uploaded (F12). ``data`` names the application, or carries
+    # ``draft: true`` for a draft upload of the wizard (Z4). It holds the field key,
+    # the comparison-offer flag, the MIME type and the size, never the file name,
+    # because a file name can hold PII. The quarantine and the delete of a draft carry
+    # ``draft: true`` the same way.
+    ATTACHMENT_UPLOAD = "attachment_upload"
     ATTACHMENT_QUARANTINE = "attachment_quarantine"
     ATTACHMENT_DELETE = "attachment_delete"
     # Application comment edited or removed in place. A comment keeps no version
