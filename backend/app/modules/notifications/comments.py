@@ -11,6 +11,10 @@ current state (task semantics). For a `vote` state these are the members of the
 voting Gremium. For any other state these are exactly the principals that can
 fire at least one manual `requires_action` transition.
 
+The mail to the applicant names the Gremium of the application as the author, not
+the member (A12, O16). This matches the applicant view of the comment list. Only
+the mail to the team keeps a display name.
+
 Both paths respect the opt-out of the `comment` kind. Both use the DB templates
 `comment_applicant` and `comment_team`, with a builtin fallback. The caller runs
 this as a background task with its own session after the comment response.
@@ -25,6 +29,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.applications.models import Application
+from app.modules.applications.service.service_base import gremium_actor_name
 from app.modules.flow.models import State
 from app.modules.notifications.mail import MailMessage, compute_idempotency_key
 from app.modules.notifications.queue import MailQueue
@@ -126,6 +131,9 @@ _BUILTIN_TEAM_BODY_HTML = {
 
 # Author label used when no display name is known (applicant comments).
 _APPLICANT_AUTHOR_FALLBACK = {"de": "Antragsteller:in", "en": "Applicant"}
+# Author label of a member comment for an application without a Gremium. It is
+# the same label as the web UI shows.
+_COMMITTEE_AUTHOR_FALLBACK = {"de": "Gremium", "en": "Committee"}
 
 
 def _initials(name: str) -> str:
@@ -152,6 +160,9 @@ async def send_comment_notifications(
 ) -> int:
     """Send the comment mails.
 
+    The function uses ``author_name`` only for the mail to the team. The mail to
+    the applicant names the Gremium of the application instead.
+
     Returns:
         The number of mail jobs that went to the queue.
     """
@@ -160,12 +171,13 @@ async def send_comment_notifications(
             select(
                 Application.data,
                 Application.current_state_id,
+                Application.gremium_id,
             ).where(Application.id == application_id)
         )
     ).first()
     if app_row is None:
         return 0
-    data, state_id = app_row
+    data, state_id, gremium_id = app_row
     # Applicants never see an internal comment, so send no mail. The check comes
     # before every other read, because it makes them all pointless.
     if author_kind == "principal" and visibility != "public":
@@ -190,13 +202,18 @@ async def send_comment_notifications(
             iter(state.label_i18n.values())
         )
 
-    # Author label for the chat bubble: the display name, or else the localized
-    # applicant fallback. This matches the author fallback of the web UI.
-    author_label = (author_name or "").strip()
+    # Author label for the chat bubble. The applicant never sees a member name: a
+    # member comment names the Gremium (A12, O16). A comment from the applicant
+    # keeps the display name, or else the localized applicant fallback. This
+    # matches the author fallback of the web UI.
+    if author_kind == "principal":
+        author_label = (await gremium_actor_name(session, gremium_id) or "").strip()
+        fallback = _COMMITTEE_AUTHOR_FALLBACK
+    else:
+        author_label = (author_name or "").strip()
+        fallback = _APPLICANT_AUTHOR_FALLBACK
     if not author_label:
-        author_label = _APPLICANT_AUTHOR_FALLBACK.get(
-            lang, _APPLICANT_AUTHOR_FALLBACK["de"]
-        )
+        author_label = fallback.get(lang, fallback["de"])
 
     context = {
         "applicationId": str(application_id),

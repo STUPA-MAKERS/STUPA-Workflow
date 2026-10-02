@@ -103,6 +103,20 @@ def state_since_subquery() -> Subquery:
 APPLICANT_ACTOR = "applicant"
 
 
+async def gremium_actor_name(session: AsyncSession, gremium_id: UUID | None) -> str | None:
+    """Return the name of a Gremium, as the applicant view shows it for a member.
+
+    The applicant view and the comment mail to the applicant show this name
+    instead of a member name (A12, O16). Without a Gremium the result is None, so
+    no member name leaks either.
+    """
+    if gremium_id is None:
+        return None
+    from app.modules.admin.models import Gremium
+
+    return await session.scalar(select(Gremium.name).where(Gremium.id == gremium_id))
+
+
 async def pii_keys_for_type(session: AsyncSession, type_id: UUID) -> set[str]:
     """Collect the `isPII` field keys across all form versions of a type.
 
@@ -268,11 +282,7 @@ class ApplicationsServiceBase:
         The applicant view shows this name instead of a member name (A12, O16).
         Without a Gremium the result is None, so no member name leaks either.
         """
-        if app.gremium_id is None:
-            return None
-        from app.modules.admin.models import Gremium
-
-        return await self.session.scalar(select(Gremium.name).where(Gremium.id == app.gremium_id))
+        return await gremium_actor_name(self.session, app.gremium_id)
 
     async def _applicant_actors(self, app: Application, *, magic_link_view: bool) -> set[str]:
         """Return the actor values that name the applicant of one application.

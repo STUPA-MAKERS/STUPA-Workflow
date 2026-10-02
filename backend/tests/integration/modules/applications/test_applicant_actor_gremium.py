@@ -4,7 +4,7 @@ In the applicant view (magic link, or the creator who is no member) the timeline
 actor and the author of a member comment are the name of the Gremium of the
 application. The own actions keep the applicant. A member still sees the names. A
 creator who reads through the Gremium read scope, or who holds a member right, is a
-member.
+member. The comment mail to the applicant names the Gremium too.
 """
 
 from __future__ import annotations
@@ -22,6 +22,9 @@ from app.modules.applications.router import get_comment_mail_sender
 from app.modules.applications.service import ApplicationsService
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
+from app.modules.notifications.comments import send_comment_notifications
+from tests._support.guest_apps import guest_settings
+from tests._support.notifications_fakes import FakeQueue
 from tests._support.read_models import (
     GREMIUM_NAME,
     IBAN,
@@ -278,3 +281,61 @@ async def test_creator_without_a_member_right_outside_the_scope_reads_as_applica
     assert isinstance(comments, list) and isinstance(timeline, list)
     assert [c["body"] for c in comments] == ["public note"]
     assert [e["actor"] for e in timeline] == [OWNER_NAME, GREMIUM_NAME]
+
+
+async def test_comment_mail_to_the_applicant_names_the_gremium(
+    migrated: tuple[str, str],
+    maker: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A12/O16: the mailbox shows the Gremium, as the comment list does.
+
+    The route gives the display name of the member to the mail sender. The mail to
+    the applicant must not show it.
+    """
+    seed = await seed_read_world(maker)
+    app_id = await create_app(maker, seed, actor="applicant")
+
+    calls: list[tuple[object, ...]] = []
+
+    async def _record(*args: object) -> None:
+        calls.append(args)
+
+    api = build_read_api(migrated[1], monkeypatch)
+    api.dependency_overrides[get_comment_mail_sender] = lambda: _record
+    as_principal(
+        api,
+        Principal(sub=seed.member_sub, display_name=MEMBER_NAME, permissions={"application.read"}),
+    )
+    with TestClient(api) as client:
+        resp = client.post(
+            f"/api/applications/{app_id}/comments",
+            json={"body": "Bitte Angebot nachreichen.", "visibility": "public"},
+        )
+    assert resp.status_code == 201, resp.text
+    assert len(calls) == 1
+    _settings, _app_id, comment_id, author_kind, visibility, body, author_name, _pool = calls[0]
+    # The route still hands over the member name. The team mail may use it.
+    assert (author_kind, author_name) == ("principal", MEMBER_NAME)
+
+    queue = FakeQueue()
+    async with maker() as session:
+        sent = await send_comment_notifications(
+            session,
+            queue=queue,
+            settings=guest_settings(migrated[1]),
+            application_id=app_id,
+            comment_id=comment_id,  # type: ignore[arg-type]
+            author_kind=str(author_kind),
+            visibility=str(visibility),
+            body=str(body),
+            author_name=str(author_name),
+        )
+    assert sent == 1
+    [msg] = queue.messages
+    assert msg.to == ("antrag@example.org",)
+    assert GREMIUM_NAME in msg.text
+    assert GREMIUM_NAME in (msg.html or "")
+    assert MEMBER_NAME not in msg.text + (msg.html or "")
+    # The avatar shows the initials of the Gremium, not "MM".
+    assert ">MM<" not in (msg.html or "")

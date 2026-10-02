@@ -788,7 +788,8 @@ async def add_comment(
         access.author_kind,
         payload.visibility,
         payload.body,
-        comment.author,  # resolved display name for the mail bubble
+        # Display name for the team mail. The applicant mail names the Gremium.
+        comment.author,
         pool,
     )
     return comment
