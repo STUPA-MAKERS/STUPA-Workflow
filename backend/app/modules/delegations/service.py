@@ -260,8 +260,22 @@ class DelegationService:
         ).all()
         return {pid: (name or email) for pid, name, email in rows}
 
-    async def _meeting(self, meeting_id: UUID) -> Meeting:
-        meeting = await self.session.get(Meeting, meeting_id)
+    async def _meeting(self, meeting_id: UUID, *, lock: bool = False) -> Meeting:
+        """Load a meeting by id.
+
+        `lock` takes the meeting row FOR UPDATE and reads the current values again.
+        The attendance writers hold a share lock on the same row, so a lead entry
+        and an attendance change run one after the other (O23).
+
+        Raises:
+            NotFoundError: No meeting has this id (404).
+        """
+        if lock:
+            meeting = await self.session.get(
+                Meeting, meeting_id, with_for_update=True, populate_existing=True
+            )
+        else:
+            meeting = await self.session.get(Meeting, meeting_id)
         if meeting is None:
             raise NotFoundError(f"meeting {meeting_id} not found")
         return meeting
@@ -325,16 +339,18 @@ class DelegationService:
         return gremium_id in await gremium_ids_for(self.session, actor, _POOL_MANAGE_PERM)
 
     def _revocable(
-        self, meeting: Meeting, now: datetime, *, lead: bool = False
+        self, meeting: Meeting, now: datetime, *, lead: bool = False, own: bool = True
     ) -> bool:
         """Tell if the viewer can revoke a delegation of this meeting.
 
         The delegator can revoke while the meeting is planned and has not started.
         The meeting lead (`lead`) can also revoke while the meeting is live (O6).
+        `own` is False for a row that the viewer sees only as the meeting lead.
+        The lead cannot revoke such a row before the start, so it is not revocable.
         """
         if lead and meeting.status == "live":
             return True
-        if meeting.status != "planned":
+        if not own or meeting.status != "planned":
             return False
         start = meeting_start_utc(meeting, self.settings.local_timezone)
         return start is None or now < start
@@ -355,8 +371,14 @@ class DelegationService:
         now: datetime,
         me_id: UUID | None = None,
         lead_gremien: set[UUID] | None = None,
+        *,
+        admin: bool = False,
     ) -> list[DelegationOut]:
-        """Build the views. `lead_gremien` holds the gremien that the viewer leads."""
+        """Build the views.
+
+        `lead_gremien` holds the gremien that the viewer leads. `admin` tells that
+        the viewer may revoke every row.
+        """
         lead_gremien = lead_gremien or set()
         ids: set[UUID] = set()
         for d, _, _ in rows:
@@ -380,7 +402,12 @@ class DelegationService:
                 # For a fresh row the database default fills `created_at` only on
                 # the next select. Use the creation time until then.
                 created_at=d.created_at or now,
-                revocable=self._revocable(meeting, now, lead=d.gremium_id in lead_gremien),
+                revocable=self._revocable(
+                    meeting,
+                    now,
+                    lead=d.gremium_id in lead_gremien,
+                    own=admin or self._direction(d, me_id) is not None,
+                ),
                 direction=self._direction(d, me_id),
             )
             for d, meeting, gremium in rows
@@ -491,13 +518,14 @@ class DelegationService:
         and a substitute B of the faculty group of A. The checks are the same as
         before the meeting: the gremium allows delegations, A may vote, the vote
         transfer switch, and no chains. A is missing when A has no attendance
-        record, or the record is `excused` or `absent`. The row stores the lead as
-        `created_by` and `via_pool = true`.
+        record, or the record is `excused` or `absent`. The lead cannot name
+        themselves as B. The row stores the lead as `created_by` and
+        `via_pool = true`.
 
         Raises:
             ForbiddenError: The caller is not the meeting lead, the gremium does not
-                allow delegations, A may not vote, or B is no substitute of the
-                faculty group of A (403).
+                allow delegations, B is the lead, A may not vote, or B is no
+                substitute of the faculty group of A (403).
             NotFoundError: The meeting, A or B does not exist (404).
             ConflictError: A already has a delegation, or B already carries a
                 delegated vote (409).
@@ -512,6 +540,11 @@ class DelegationService:
             raise ForbiddenError(
                 "Only the meeting lead may enter a substitution for another member."
             )
+        # Lock the meeting row before the status and attendance reads. The
+        # attendance writers hold a share lock on this row and then look for a
+        # delegation. Thus a `present` report of A and this entry for A cannot
+        # both commit (O23).
+        meeting = await self._meeting(payload.meeting_id, lock=True)
         if not gremium.allow_vote_delegation:
             raise ForbiddenError("Delegation is not enabled for this gremium.")
         self._check_voting_enabled(payload)
@@ -531,6 +564,10 @@ class DelegationService:
                 "A member cannot substitute for themselves.",
                 errors=[{"field": "delegateId", "msg": "must differ from delegator"}],
             )
+        if delegate.sub == actor.sub:
+            # The missing member does not consent to this entry. Thus the lead
+            # must not give the vote to themselves.
+            raise ForbiddenError("The meeting lead cannot name themselves as the substitute.")
         if not await _independently_eligible(self.session, delegator.id, gremium.id, now):
             raise ForbiddenError(
                 "Only a voting member of the meeting's gremium can be substituted."
@@ -684,7 +721,11 @@ class DelegationService:
                 )
             )
         return await self._out(
-            await self._joined(*where), now, me.id if me else None, lead_gremien
+            await self._joined(*where),
+            now,
+            me.id if me else None,
+            lead_gremien,
+            admin=actor.has(_ADMIN_PERM),
         )
 
     async def revoke(self, delegation_id: UUID, actor: Principal) -> None:

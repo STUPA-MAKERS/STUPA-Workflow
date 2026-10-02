@@ -392,9 +392,23 @@ def _lead_payload(a: Any, b: Any, *, voting: bool = True) -> DelegationCreate:
 
 
 def _lead_db(*tail: Any, meeting: Any = None, gremium: Any = None) -> FakeSession:
+    """Queue the reads of a lead entry: meeting, gremium, then the locked meeting."""
     db = fake_session(_lead_roles(), *tail)
-    db.get_results = [meeting or _meeting(), gremium or _gremium()]
+    meeting = meeting or _meeting()
+    db.get_results = [meeting, gremium or _gremium(), meeting]
     return db
+
+
+class _LockSpySession(FakeSession):
+    """Fake session that records the keyword arguments of each `get`."""
+
+    def __init__(self, *results: Any) -> None:
+        super().__init__(results)
+        self.get_kwargs: list[dict[str, Any]] = []
+
+    async def get(self, model: Any, ident: Any, **kw: Any) -> Any:
+        self.get_kwargs.append(kw)
+        return await super().get(model, ident, **kw)
 
 
 async def test_lead_entry_for_missing_member() -> None:
@@ -486,6 +500,41 @@ async def test_lead_entry_same_person_422() -> None:
         await _svc(db).create(_lead_payload(a, a), _actor())
 
 
+async def test_lead_entry_refuses_the_lead_as_substitute() -> None:
+    """The member does not consent, so the lead cannot take the vote."""
+    a, lead = _person("a"), _person("lead")
+    db = _lead_db(result(a), result(lead))
+    with pytest.raises(ForbiddenError, match="themselves as the substitute"):
+        await _svc(db).create(_lead_payload(a, lead), _actor("lead"))
+    assert not db.added
+
+
+async def test_lead_entry_locks_the_meeting_row() -> None:
+    """The lead entry reads the meeting FOR UPDATE before the attendance read (O23)."""
+    a, b = _person("a"), _person("b")
+    db = _LockSpySession(
+        _lead_roles(),
+        result(a),
+        result(b),
+        result(["vote.cast"]),
+        result(b.id),
+    )
+    db.get_results = [_meeting(), _gremium(), _meeting()]
+    db.scalar_results = ["present"]
+    with pytest.raises(ValidationProblem, match="present"):
+        await _svc(db).create(_lead_payload(a, b), _actor())
+    assert db.get_kwargs[2] == {"with_for_update": True, "populate_existing": True}
+    assert db.get_kwargs[0] == {}
+
+
+async def test_lead_entry_rechecks_the_status_under_the_lock() -> None:
+    """A meeting that closed before the lock gives 422, though the first read saw it live."""
+    db = fake_session(_lead_roles())
+    db.get_results = [_meeting("live"), _gremium(), _meeting("closed")]
+    with pytest.raises(ValidationProblem, match="live"):
+        await _svc(db).create(_lead_payload(_person("a"), _person("b")), _actor())
+
+
 async def test_lead_entry_needs_a_voting_member() -> None:
     a, b = _person("a"), _person("b")
     db = _lead_db(result(a), result(b), result())
@@ -550,6 +599,46 @@ async def test_list_for_the_lead_shows_the_whole_meeting() -> None:
     assert out[0].revocable is True
     where = str(db.statements[2]).split("WHERE", 1)[1]
     assert "delegator_principal_id" not in where
+
+
+def _row(delegator: UUID, delegate: UUID) -> SimpleNamespace:
+    return SimpleNamespace(
+        id=uuid4(),
+        meeting_id=MEETING_ID,
+        gremium_id=GREMIUM_ID,
+        delegator_principal_id=delegator,
+        delegate_principal_id=delegate,
+        delegate_voting=True,
+        via_pool=False,
+        created_at=datetime.now(UTC),
+    )
+
+
+async def test_list_for_the_lead_before_the_start_marks_only_own_rows() -> None:
+    """Before the start the lead revokes only the own delegation, not the others."""
+    me = _person("lead")
+    planned = _meeting("planned")
+    foreign = _row(uuid4(), uuid4())
+    own = _row(me.id, uuid4())
+    db = fake_session(
+        result(me),
+        _lead_roles(),
+        result((foreign, planned, _gremium()), (own, planned, _gremium())),
+        result(),
+    )
+    db.get_results = [planned]
+    out = await _svc(db).list(_actor(), MEETING_ID)
+    assert {o.id: o.revocable for o in out} == {foreign.id: False, own.id: True}
+
+
+async def test_list_for_the_admin_marks_foreign_rows_before_the_start() -> None:
+    """The admin may revoke every delegation, so a foreign row stays revocable."""
+    me = _person("root")
+    planned = _meeting("planned")
+    foreign = _row(uuid4(), uuid4())
+    db = fake_session(result(me), result((foreign, planned, _gremium())), result())
+    out = await _svc(db).list(_actor("root", _ADMIN))
+    assert [o.revocable for o in out] == [True]
 
 
 async def test_list_for_a_member_with_meeting_filter() -> None:
@@ -742,7 +831,7 @@ async def test_lead_entry_by_the_admin_role() -> None:
         result(),
         result(),
     )
-    db.get_results = [_meeting(), _gremium()]
+    db.get_results = [_meeting(), _gremium(), _meeting()]
     admin = Principal(sub="root", roles=["admin"])
     out = await _svc(db).create(_lead_payload(a, b), admin)
     assert out.delegator_id == a.id

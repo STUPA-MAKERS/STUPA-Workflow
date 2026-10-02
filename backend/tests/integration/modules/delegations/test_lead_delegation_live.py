@@ -9,10 +9,13 @@
   delegation.
 * The row stores the lead as `created_by` and `via_pool = true`.
 * The lead revokes while live. A ballot that the delegate already cast stays.
+* The lead cannot name themselves as the substitute.
+* The entry waits for a parallel attendance change of the member (O23).
 """
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 
 import pytest
@@ -22,10 +25,16 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.modules.audit.models import AuditEntry
+from app.modules.auth.models import Principal as PrincipalRow
+from app.modules.auth.principal import Principal
 from app.modules.delegations.models import DelegationSubstitute, MeetingDelegation
-from app.modules.livevote.models import MeetingAttendance
+from app.modules.delegations.schemas import DelegationCreate
+from app.modules.delegations.service import DelegationService
+from app.modules.livevote.models import Meeting, MeetingAttendance
 from app.modules.voting.models import Ballot, Vote
+from app.settings import load_settings
 from app.shared.config_schemas import VoteConfig
+from app.shared.errors import ValidationProblem
 from tests.integration.modules.delegations.conftest import (
     act,
     faculty_group,
@@ -64,6 +73,13 @@ async def _setup(maker: async_sessionmaker[AsyncSession], *, status: str = "live
     await faculty_group(maker, s.gremium_id, members=(s.a,), substitutes=(s.b,))
     s.meeting_id = await meeting(maker, s.gremium_id, status=status)
     return s
+
+
+async def _principal_id(maker: async_sessionmaker[AsyncSession], sub: str) -> uuid.UUID:
+    async with maker() as session:
+        pid = await session.scalar(select(PrincipalRow.id).where(PrincipalRow.sub == sub))
+    assert pid is not None
+    return pid
 
 
 def _body(s: _Setup, *, voting: bool = True, delegate: uuid.UUID | None = None) -> dict:
@@ -243,5 +259,69 @@ async def test_lead_cannot_revoke_a_planned_delegation_of_another_member(
         )
         assert own.status_code == 201, own.text
         act(api, s.lead)
+        listed = client.get("/api/delegations", params={"meetingId": str(s.meeting_id)})
         refused = client.delete(f"/api/delegations/{own.json()['id']}")
     assert refused.status_code == 403, refused.text
+    # The flag agrees with the refusal: the lead sees the row but cannot revoke it.
+    assert [(d["id"], d["revocable"]) for d in listed.json()] == [(own.json()["id"], False)]
+
+
+async def test_lead_cannot_name_themselves(
+    maker: async_sessionmaker[AsyncSession], api: FastAPI
+) -> None:
+    s = await _setup(maker)
+    lead_id = await _principal_id(maker, s.lead)
+    # The lead is also a substitute of the group of A. Still the lead cannot take
+    # the vote of A without the consent of A.
+    await faculty_group(maker, s.gremium_id, substitutes=(lead_id,), name="Technik")
+    act(api, s.lead)
+    with TestClient(api) as client:
+        refused = client.post("/api/delegations", json=_body(s, delegate=lead_id))
+    assert refused.status_code == 403, refused.text
+    async with maker() as session:
+        rows = (
+            await session.scalars(
+                select(MeetingDelegation).where(MeetingDelegation.meeting_id == s.meeting_id)
+            )
+        ).all()
+    assert rows == []
+
+
+async def test_lead_entry_waits_for_a_parallel_present_report(
+    maker: async_sessionmaker[AsyncSession],
+) -> None:
+    """A holds the share lock of the attendance writer and reports present (O23).
+
+    The lead entry for A must wait for the lock. After the commit it reads the
+    present record and refuses. Without the wait both changes would commit.
+    """
+    s = await _setup(maker)
+    service_settings = load_settings(delegation_voting_enabled=True)
+    payload = DelegationCreate.model_validate(_body(s))
+    async with maker() as writer, maker() as lead_session:
+        await writer.execute(
+            select(Meeting.id).where(Meeting.id == s.meeting_id).with_for_update(read=True)
+        )
+        writer.add(
+            MeetingAttendance(
+                meeting_id=s.meeting_id, principal_id=s.a, status="present", source="self"
+            )
+        )
+        await writer.flush()
+        entry = asyncio.create_task(
+            DelegationService(lead_session, service_settings).create(
+                payload, Principal(sub=s.lead)
+            )
+        )
+        await asyncio.sleep(0.5)
+        assert not entry.done()
+        await writer.commit()
+        with pytest.raises(ValidationProblem, match="present"):
+            await asyncio.wait_for(entry, timeout=10)
+    async with maker() as session:
+        rows = (
+            await session.scalars(
+                select(MeetingDelegation).where(MeetingDelegation.meeting_id == s.meeting_id)
+            )
+        ).all()
+    assert rows == []

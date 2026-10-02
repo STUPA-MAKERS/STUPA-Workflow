@@ -85,7 +85,7 @@ class FakeSession:
             return FakeResult()
         return self._results.pop(0)
 
-    async def get(self, _model: Any, _ident: Any) -> Any:
+    async def get(self, _model: Any, _ident: Any, **_kw: Any) -> Any:
         """Stand-in for `session.get` that returns the `get_results` queue in order."""
         if self.get_results:
             return self.get_results.pop(0)
