@@ -283,8 +283,8 @@ describe('WebhooksComponent', () => {
     expect(c.stateVariant('sent')).toBe('success');
     expect(c.stateVariant('dead')).toBe('danger');
     expect(c.stateVariant('pending')).toBe('info');
-    expect(c.stateVariant('never')).toBe('neutral');
-    expect(c.stateVariant('from_a_newer_backend')).toBe('neutral');
+    expect(c.stateVariant('never')).toBe('info');
+    expect(c.stateVariant('from_a_newer_backend')).toBe('info');
   });
 
   it('reads an unknown reason class back raw', async () => {

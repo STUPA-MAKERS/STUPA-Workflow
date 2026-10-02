@@ -27,7 +27,7 @@
               <app-badge variant="success">{{ 'vote.option.yes' | t }}</app-badge>
             }
             @if (isClosed()) {
-              <app-badge variant="neutral">{{ 'voting.cast.closedHint' | t }}</app-badge>
+              <app-badge variant="info">{{ 'voting.cast.closedHint' | t }}</app-badge>
               <app-badge [variant]="v.result === 'passed' ? 'success' : 'danger'">
                 {{ resultKey() | t }}
               </app-badge>

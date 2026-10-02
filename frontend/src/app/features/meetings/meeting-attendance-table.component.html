@@ -69,7 +69,7 @@
               }
             </span>
           } @else {
-            <app-badge [variant]="a.status ? memberBadge(a.status) : 'neutral'">
+            <app-badge [variant]="a.status ? memberBadge(a.status) : 'info'">
               {{ (a.status ? memberKey(a.status) : 'meetings.attendance.unknown') | t }}
             </app-badge>
             @if (a.source === 'lead') {

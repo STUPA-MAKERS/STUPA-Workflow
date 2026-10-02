@@ -41,7 +41,7 @@ function emptyHook(): WebhookConfig {
 
 /** Badge colour per delivery state. A dead letter reads as danger. */
 const STATE_VARIANTS: Record<WebhookDeliveryState, BadgeVariant> = {
-  never: 'neutral',
+  never: 'info',
   pending: 'info',
   sent: 'success',
   dead: 'danger',
@@ -174,7 +174,7 @@ export class WebhooksComponent {
   }
 
   protected stateVariant(state: WebhookDeliveryState): BadgeVariant {
-    return STATE_VARIANTS[state] ?? 'neutral';
+    return STATE_VARIANTS[state] ?? 'info';
   }
 
   protected stateLabel(state: WebhookDeliveryState): string {

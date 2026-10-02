@@ -31,9 +31,9 @@
         >
           <div actions class="flex flex-col items-end gap-2">
             <div class="inline-flex gap-2 flex-wrap">
-              <app-badge variant="primary">{{ app.state?.label }}</app-badge>
+              <app-badge variant="info" [color]="app.state?.color">{{ app.state?.label }}</app-badge>
               @if (!canEdit()) {
-                <app-badge variant="neutral">{{ 'status.locked' | t }}</app-badge>
+                <app-badge variant="info">{{ 'status.locked' | t }}</app-badge>
               }
             </div>
             <app-button variant="danger" size="sm" (click)="confirmErase.set(true)">{{ 'applications.detail.eraseRequest' | t }}</app-button>

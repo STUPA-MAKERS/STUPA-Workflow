@@ -47,14 +47,14 @@ const VOTE = (over: Partial<MeetingVote> = {}): MeetingVote => ({
 describe('meetings-display.util', () => {
   it('maps meeting status to badge variants and keys', () => {
     expect(meetingStatusVariant('live')).toBe('success');
-    expect(meetingStatusVariant('closed')).toBe('neutral');
+    expect(meetingStatusVariant('closed')).toBe('info');
     expect(meetingStatusVariant('planned')).toBe('info');
     expect(meetingStatusKey('live')).toBe('meetings.status.live');
   });
 
   it('maps vote status and results', () => {
     expect(voteStatusVariant('open')).toBe('success');
-    expect(voteStatusVariant('closed')).toBe('neutral');
+    expect(voteStatusVariant('closed')).toBe('info');
     expect(voteStatusVariant('cancelled')).toBe('danger');
     expect(voteStatusVariant('pending')).toBe('warning');
     expect(voteStatusKey('open')).toBe('meetings.voteStatus.open');
@@ -62,7 +62,22 @@ describe('meetings-display.util', () => {
     expect(voteResultKey(null)).toBe('vote.result.tie');
     expect(voteResultVariant('passed')).toBe('success');
     expect(voteResultVariant('rejected')).toBe('danger');
-    expect(voteResultVariant('tie')).toBe('neutral');
+    expect(voteResultVariant('tie')).toBe('info');
+  });
+
+  it('never maps a status to the neutral tag variant', () => {
+    // `neutral` is a tag (a grey plate). A status shows as coloured text only.
+    const variants = [
+      ...(['planned', 'live', 'closed'] as const).map(meetingStatusVariant),
+      ...(['pending', 'open', 'closed', 'cancelled'] as const).map(voteStatusVariant),
+      ...['passed', 'rejected', 'tie', null, undefined, 'unknown'].map(voteResultVariant),
+      ...(['present', 'excused', 'absent'] as const).flatMap((s) => [
+        attendanceBadgeVariant(s),
+        memberAttendanceBadgeVariant(s),
+      ]),
+    ];
+    expect(variants).not.toContain('neutral');
+    expect(variants).not.toContain('accent');
   });
 
   it('maps attendance to keys, variants and icons', () => {

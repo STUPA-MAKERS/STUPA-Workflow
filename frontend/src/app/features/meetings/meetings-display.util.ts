@@ -17,8 +17,12 @@ import type { ServerMessage } from '@core/ws/ws-messages';
 /** Canonical ballot options. The pass/fail evaluation needs yes, no and abstain. */
 export const FIXED_VOTE_OPTIONS = ['yes', 'no', 'abstain'] as const;
 
+/**
+ * The status mappers return status variants only (coloured text). `neutral` is a tag
+ * (a grey plate), so a status that has no colour of its own uses `info` (muted text).
+ */
 export function meetingStatusVariant(status: Meeting['status']): BadgeVariant {
-  return status === 'live' ? 'success' : status === 'closed' ? 'neutral' : 'info';
+  return status === 'live' ? 'success' : 'info';
 }
 
 export function meetingStatusKey(status: Meeting['status']): TranslationKey {
@@ -27,7 +31,7 @@ export function meetingStatusKey(status: Meeting['status']): TranslationKey {
 
 export function voteStatusVariant(status: MeetingVote['status']): BadgeVariant {
   if (status === 'open') return 'success';
-  if (status === 'closed') return 'neutral';
+  if (status === 'closed') return 'info';
   return status === 'cancelled' ? 'danger' : 'warning';
 }
 
@@ -40,7 +44,7 @@ export function voteResultKey(result: string | null | undefined): TranslationKey
 }
 
 export function voteResultVariant(result: string | null | undefined): BadgeVariant {
-  return result === 'passed' ? 'success' : result === 'rejected' ? 'danger' : 'neutral';
+  return result === 'passed' ? 'success' : result === 'rejected' ? 'danger' : 'info';
 }
 
 export function attendanceKey(status: AttendanceStatus | 'unknown'): TranslationKey {

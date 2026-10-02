@@ -318,7 +318,7 @@ describe('DashboardComponent', () => {
     expect(c.sessionStatusKey('live')).toBe('meetings.status.live');
     expect(c.sessionVariant('live')).toBe('success');
     expect(c.sessionVariant('planned')).toBe('info');
-    expect(c.sessionVariant('closed')).toBe('neutral');
+    expect(c.sessionVariant('closed')).toBe('info');
     http.verify();
   });
 

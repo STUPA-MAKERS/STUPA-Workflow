@@ -36,7 +36,7 @@
     <ng-template appCell="name" let-p>
       <span class="font-medium">{{ userLabel($any(p)) }}</span>
       @if ($any(p).active === false) {
-        <app-badge variant="neutral">{{ 'admin.users.inactive' | t }}</app-badge>
+        <app-badge variant="info">{{ 'admin.users.inactive' | t }}</app-badge>
       }
     </ng-template>
     <ng-template appCell="email" let-p

@@ -107,7 +107,7 @@
           @if (top.applicationId) {
             <span class="fx__lbl">{{ 'meetings.dock.application' | t }}</span>
             @if (stateLabelOf(top.stateLabel); as st) {
-              <app-badge variant="neutral">{{ st }}</app-badge>
+              <app-badge variant="info">{{ st }}</app-badge>
             }
             <a class="text-primary text-sm font-medium" [routerLink]="['/applications', top.applicationId]">{{ 'meetings.agenda.openApplication' | t }}</a>
           }
@@ -141,7 +141,7 @@
 
     @if (proto) {
       <div class="fx__status">
-        <app-badge [variant]="proto.isFinal ? 'success' : proto.status === 'rendering' ? 'warning' : 'neutral'">
+        <app-badge [variant]="proto.isFinal ? 'success' : proto.status === 'rendering' ? 'warning' : 'info'">
           {{ (proto.isFinal ? 'meetings.protocol.final' : proto.status === 'rendering' ? 'meetings.protocol.rendering' : 'meetings.protocol.draft') | t }}
         </app-badge>
         @if (proto.publicPdfUrl) {
@@ -442,7 +442,7 @@
 
     <div class="fx__mid">
       @if (m.status === 'planned') {
-        <app-badge variant="neutral">{{ 'meetings.dock.notStarted' | t }}</app-badge>
+        <app-badge variant="info">{{ 'meetings.dock.notStarted' | t }}</app-badge>
         @if (m.canControl) {
           <!-- A start requires a protokollant. The backend creates the protocol on start. -->
           <app-button size="sm" [disabled]="!m.protokollantId" [title]="(m.protokollantId ? 'meetings.control.open' : 'meetings.control.needProtokollant') | t" (click)="startSession.emit()">
