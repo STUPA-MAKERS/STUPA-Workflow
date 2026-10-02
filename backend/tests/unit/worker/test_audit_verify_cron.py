@@ -12,10 +12,11 @@ from datetime import UTC, datetime
 from typing import Any
 
 import pytest
+from arq.worker import Function
 
 from app.modules.audit.models import AuditVerification
 from worker import audit_verify
-from worker.main import WorkerSettings
+from worker.main import _AUDIT_VERIFY_JOB_TIMEOUT_SECONDS, WorkerSettings
 
 _AT = datetime(2026, 10, 2, 2, 30, tzinfo=UTC)
 
@@ -83,7 +84,23 @@ def test_cron_runs_at_four_thirty_independent_of_the_backup() -> None:
     assert len(jobs) == 1
     assert jobs[0].hour == 4
     assert jobs[0].minute == 30
-    assert audit_verify.process_audit_verification in WorkerSettings.functions
+
+
+def test_check_has_a_job_timeout_above_the_arq_default() -> None:
+    """A large log must not hit the arq default of 300 s and lose the result."""
+    funcs = [
+        f for f in WorkerSettings.functions
+        if isinstance(f, Function)
+        and f.coroutine is audit_verify.process_audit_verification
+    ]
+    assert len(funcs) == 1
+    assert funcs[0].timeout_s == _AUDIT_VERIFY_JOB_TIMEOUT_SECONDS
+    (job,) = [
+        j for j in WorkerSettings.cron_jobs
+        if j.coroutine is audit_verify.process_audit_verification
+    ]
+    assert job.timeout_s == _AUDIT_VERIFY_JOB_TIMEOUT_SECONDS
+    assert _AUDIT_VERIFY_JOB_TIMEOUT_SECONDS > 300
 
 
 async def test_cron_stores_a_check_with_trigger_cron(calls: _Calls) -> None:
