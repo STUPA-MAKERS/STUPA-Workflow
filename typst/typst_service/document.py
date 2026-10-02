@@ -82,9 +82,7 @@ _SIGNER_KEYS: Final[dict[str, tuple[str, ...]]] = {
 
 _DATE_RE: Final[re.Pattern[str]] = re.compile(r"(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{1,2}:\d{2}))?")
 # The signature roles that the protocol keepers sign.
-_KEEPER_ROLES: Final[frozenset[str]] = frozenset(
-    {"schriftführung", "schriftfuehrung", "protokoll"}
-)
+_KEEPER_ROLES: Final[frozenset[str]] = frozenset({"schriftführung", "schriftfuehrung", "protokoll"})
 
 
 def _keepers(records: Records) -> list[dict[str, str]]:
@@ -205,9 +203,7 @@ def _started(options: Mapping[str, object]) -> tuple[str, str]:
     return f"{match[1]}-{match[2]}-{match[3]}", match[4] or ""
 
 
-def _data_lines(
-    options: Mapping[str, object], keepers: list[dict[str, str]]
-) -> list[list[str]]:
+def _data_lines(options: Mapping[str, object], keepers: list[dict[str, str]]) -> list[list[str]]:
     rows: list[list[str]] = []
     started_date, started_time = _started(options)
     datum = _scalar(options, "datum", "date")

@@ -294,6 +294,7 @@ async def test_check_drafts_passes_usable_drafts() -> None:
         attachment_ids=[r.id for r in rows],
         token="t",
         pepper="p",
+        now=NOW,
     )
 
 
