@@ -25,7 +25,10 @@ Theme switch: the attribute `data-theme="light|dark"` on `<html>`. `ThemeService
 Each theme also sets `color-scheme`.
 
 The semantic **names** are stable. A redesign changes their values only, so a page that uses
-`--color-primary` keeps working.
+`--color-primary` keeps working. One meaning changed: `--color-primary` is now the accent as
+**text**. A fill (button, bar, dot, selected chip) uses `--color-accent` with
+`--color-on-accent`, or `--color-selected` with `--color-on-selected` for a selection. Do not
+use `--color-primary` as a background, or the page shows a second green.
 
 ## Palette (primitive)
 
@@ -122,7 +125,9 @@ These rules are binding for every page.
 
 - **One accent.** Only the accent is green. Everything else is grey or a signal colour.
 - **A status is coloured text.** No dot and no pill. Use `app-badge` with a status variant
-  (`success`, `warning`, `danger`, `info`, `primary`).
+  (`success`, `warning`, `danger`, `info`, `primary`). `app-badge [color]` (the configured
+  colour of a flow state) is a status too: text in that colour, made darker or lighter per
+  theme until it has AA contrast.
 - **A tag is a feature, not a status** (NÖ, Stimmrecht, Pool, Pflichtrolle, fest). Use
   `app-badge` with `neutral` or `accent`.
 - **A destructive action is an outlined red button** (`app-button variant="danger"`). Never
@@ -132,7 +137,9 @@ These rules are binding for every page.
 - **No noise text.** Show only text that has a function. Do not add hint or filler
   sentences.
 - **Input fields have no shadow and no edge.** A field is filled (surface 2, radius 14).
-  Focus draws a 2px accent line inside the field.
+  Focus draws a 2px accent line inside the field. A field outside the kit (a formly type, a
+  native `.field__control`) uses the same look; the kit mixins are in `_field.scss`
+  (`@use 'field' as f;`).
 - **Long names get an ellipsis and a `title`** with the full text (`.ell`).
 - **Avatars only for persons.** Do not put an initials circle on a row of a thing (an
   application, a meeting).

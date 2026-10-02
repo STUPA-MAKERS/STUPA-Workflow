@@ -25,18 +25,23 @@
   height: var(--control-height);
   max-width: 10rem;
   box-sizing: border-box;
-  padding: 0 var(--space-3);
+  padding: 0 var(--space-4);
   font: inherit;
   font-size: var(--fs-md);
   line-height: var(--lh-normal);
   color: var(--color-text);
-  background: var(--color-surface);
-  border: var(--border-width) solid var(--color-border-strong);
-  border-radius: var(--radius-md);
-  transition: border-color var(--motion-fast) var(--ease-standard);
+  background: var(--color-surface-sunken);
+  border: 0;
+  border-radius: var(--radius-field);
+  transition: box-shadow var(--motion-fast) var(--ease-standard);
+}
+/* The filled field of the ui-kit: no edge; focus draws a 2px accent line inside. */
+.field__control:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--color-focus-ring);
 }
 .field__control:hover:not(:disabled) {
-  border-color: var(--color-text-muted);
+  background: color-mix(in srgb, var(--color-surface-sunken) 60%, var(--color-surface-3));
 }
 .field__control:disabled {
   opacity: 0.6;

@@ -79,18 +79,20 @@ _TEXT: dict[str, dict[str, str]] = {
 #: The stylesheet, as a module constant rather than part of the template: the CSP
 #: below hashes exactly these bytes.
 #:
-#: The colours are the product's own (British Racing Green plus the bronze accent from
-#: the ui-kit tokens), written out rather than imported: this page ships without the SPA's
-#: stylesheet and a preview bot follows no link. They are the same for every instance —
-#: the branding a deployment really configures is its name and its logo, and both reach
-#: the page through `render_share_page`.
+#: The colours are the product's own, from the ui-kit tokens (`tokens.scss`): one accent
+#: `--brand` (#72a384) as a fill with `--on-brand` text, the accent as text `--pt`, the
+#: warning colour `--warn` and grey surfaces. They are written out rather than imported:
+#: this page ships without the SPA's stylesheet and a preview bot follows no link. They
+#: are the same for every instance. The branding a deployment really configures is its
+#: name and its logo, and both reach the page through `render_share_page`.
 _CSS = """:root { color-scheme: light dark;
-  --fg: #141815; --muted: #666c67; --bg: #f7f8f7; --line: #e0e3e0; --card: #ffffff;
-  --brand: #004225; --on-brand: #ffffff; --accent: #8c6820; --sunken: #eef0ee; }
+  --fg: #191c1a; --muted: #666c68; --bg: #f6f7f5; --line: #dcdfdb; --card: #ffffff;
+  --brand: #72a384; --on-brand: #0b1d12; --pt: #3c6a4d; --warn: #8a5a00;
+  --sunken: #f0f2ef; }
 @media (prefers-color-scheme: dark) {
-  :root { --fg: #eef0ee; --muted: #9aa19c; --bg: #141815; --line: #3a3f3b;
-    --card: #1b1f1c; --brand: #72a384; --on-brand: #0c0f0d; --accent: #c8a25a;
-    --sunken: #232724; }
+  :root { --fg: #e2e5e2; --muted: #878d89; --bg: #101211; --line: #303431;
+    --card: #171a18; --brand: #72a384; --on-brand: #0b1d12; --pt: #8dbb9d;
+    --warn: #dcb065; --sunken: #1d201e; }
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--fg);
@@ -148,16 +150,16 @@ dd { margin: 0; overflow-wrap: anywhere; white-space: pre-line; }
 .offer .tag { flex: 0 0 auto; align-self: baseline; }
 .tag { font-size: 0.75rem; border-radius: 999px; padding: 0.05rem 0.5rem;
   border: 1px solid currentColor; white-space: nowrap; }
-.tag--pref { color: var(--brand); }
-.tag--none { color: var(--accent); }
+.tag--pref { color: var(--pt); }
+.tag--none { color: var(--warn); }
 .pos__note { margin: 0.6rem 0 0; font-size: 0.9375rem; color: var(--muted); }
 .total { display: flex; justify-content: space-between; gap: 1rem; font-weight: 600;
   border-top: 2px solid var(--line); padding-top: 0.75rem; margin-top: 0.25rem; }
 .cta { display: block; text-align: center; background: var(--brand);
   color: var(--on-brand); text-decoration: none; font-weight: 600;
   padding: 0.8rem 1.5rem; border-radius: 10px; }
-.cta:hover { filter: brightness(1.12); }
-.cta:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.cta:hover { filter: brightness(1.08); }
+.cta:focus-visible { outline: 3px solid var(--pt); outline-offset: 2px; }
 .cta__hint { color: var(--muted); font-size: 0.875rem; text-align: center;
   margin: 0.6rem 0 0; }
 footer { color: var(--muted); font-size: 0.875rem; margin-top: 2.5rem; }

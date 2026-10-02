@@ -10,8 +10,8 @@
   top: -3rem;
   z-index: var(--z-toast);
   padding: var(--space-2) var(--space-4);
-  background: var(--color-primary);
-  color: var(--color-on-primary);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
   border-radius: var(--radius-md);
   transition: top var(--motion-fast) var(--ease-standard);
 }
@@ -175,9 +175,10 @@
 .lang__select {
   appearance: none;
   -webkit-appearance: none;
-  // Compact layout: globe icon on the left, narrow code (DE/EN), chevron on the
-  // right. The Font Awesome globe is wide, so the left inner padding is large.
-  padding-inline: calc(var(--space-2) + 1.6rem) var(--space-5);
+  // Compact layout: the 16px language icon on the left, the narrow code (DE/EN), the
+  // chevron on the right. The left inner padding is the icon inset, the icon and one
+  // gap of the same size.
+  padding-inline: calc(2 * var(--space-2) + 16px) var(--space-5);
 }
 .lang::after {
   // The chevron mask takes the text color, so it stays visible on hover and in dark mode.
@@ -316,13 +317,14 @@
   white-space: nowrap;
 }
 .account__btn--primary {
-  background: var(--color-primary);
-  color: var(--color-on-primary);
-  border-color: var(--color-primary);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border-color: var(--color-accent);
 }
 .account__btn--primary:hover {
-  background: var(--color-primary-hover);
-  border-color: var(--color-primary-hover);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  filter: brightness(1.08);
 }
 
 @media (max-width: 720px) {

@@ -60,10 +60,11 @@
   font-size: var(--fs-sm);
 }
 
+/* A chip that is on takes the selection colour, as the kit chip. */
 .chip--active {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
-  color: var(--color-on-primary);
+  background: var(--color-selected);
+  border-color: transparent;
+  color: var(--color-on-selected);
 }
 
 .consent__actions {
@@ -94,9 +95,9 @@
 }
 
 .btn--primary {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
-  color: var(--color-on-primary);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-on-accent);
 }
 
 .btn--ghost {

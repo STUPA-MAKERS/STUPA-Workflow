@@ -41,7 +41,7 @@
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  background: var(--color-primary);
+  background: var(--color-accent);
   flex: none;
 }
 .fx__dot--ok {
@@ -443,7 +443,7 @@ app-markdown-editor ::ng-deep .mde__host .ProseMirror {
 .fx__track i {
   display: block;
   height: 100%;
-  background: var(--color-primary);
+  background: var(--color-accent);
 }
 .fx__nav {
   display: flex;

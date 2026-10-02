@@ -16,26 +16,29 @@ interface SelectOption {
   imports: [ReactiveFormsModule, TranslatePipe],
   template: `
     <div class="field">
-      <label class="field__label" [for]="controlId">
-        {{ props.label }}
-        @if (props.required) {
-          <span class="field__req" aria-hidden="true">*</span>
-        }
-      </label>
-      <select
-        class="field__control"
-        [id]="controlId"
-        [formControl]="formControl"
-        [attr.aria-invalid]="showError ? 'true' : null"
-        [attr.aria-describedby]="describedBy"
-      >
-        <option value="" disabled>
-          {{ props.placeholder ?? ('formly.select.placeholder' | t) }}
-        </option>
-        @for (opt of optionList; track opt.value) {
-          <option [value]="opt.value">{{ opt.label }}</option>
-        }
-      </select>
+      <div class="field__box" [class.field__box--invalid]="showError">
+        <label class="field__label" [for]="controlId">
+          {{ props.label }}
+          @if (props.required) {
+            <span class="field__req" aria-hidden="true">*</span>
+          }
+        </label>
+        <select
+          class="field__control"
+          [id]="controlId"
+          [formControl]="formControl"
+          [attr.aria-invalid]="showError ? 'true' : null"
+          [attr.aria-describedby]="describedBy"
+        >
+          <option value="" disabled>
+            {{ props.placeholder ?? ('formly.select.placeholder' | t) }}
+          </option>
+          @for (opt of optionList; track opt.value) {
+            <option [value]="opt.value">{{ opt.label }}</option>
+          }
+        </select>
+        <svg class="field__chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+      </div>
       @if (props.description && !showError) {
         <p class="field__hint" [id]="controlId + '-hint'">{{ props.description }}</p>
       }
@@ -46,43 +49,7 @@ interface SelectOption {
       }
     </div>
   `,
-  styles: [
-    `
-      .field {
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-2);
-      }
-      .field__label {
-        font-size: var(--fs-sm);
-        font-weight: var(--fw-medium);
-        color: var(--color-text);
-      }
-      .field__req {
-        color: var(--color-danger);
-      }
-      .field__control {
-        padding: var(--space-3) var(--space-4);
-        font: inherit;
-        font-size: var(--fs-md);
-        color: var(--color-text);
-        background: var(--color-surface);
-        border: var(--border-width) solid var(--color-border-strong);
-        border-radius: var(--radius-md);
-      }
-      .field__control[aria-invalid='true'] {
-        border-color: var(--color-danger);
-      }
-      .field__hint {
-        font-size: var(--fs-xs);
-        color: var(--color-text-muted);
-      }
-      .field__error {
-        font-size: var(--fs-xs);
-        color: var(--color-danger);
-      }
-    `,
-  ],
+  styleUrl: './formly-select.type.scss',
 })
 export class FormlySelectType extends FieldType<FieldTypeConfig> {
   get controlId(): string {
