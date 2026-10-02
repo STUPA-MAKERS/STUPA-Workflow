@@ -161,9 +161,15 @@ class _FakeService:
         return _out(application_id, with_pii=False)
 
     async def timeline(  # noqa: ANN001
-        self, application_id, *, allow_unconfirmed=True, applicant_view=False
+        self,
+        application_id,
+        *,
+        allow_unconfirmed=True,
+        applicant_view=False,
+        magic_link_view=False,
     ):
         self.timeline_applicant_view = applicant_view
+        self.timeline_magic_link_view = magic_link_view
         return [
             TimelineEventOut(
                 fromStateId=None, toStateId=uuid4(), actor="applicant", at=_NOW, note=None
@@ -171,8 +177,15 @@ class _FakeService:
         ]
 
     async def versions(  # noqa: ANN001
-        self, application_id, *, allow_unconfirmed=True, applicant_view=False, strip_pii=False
+        self,
+        application_id,
+        *,
+        allow_unconfirmed=True,
+        applicant_view=False,
+        magic_link_view=False,
+        strip_pii=False,
     ):
+        self.versions_magic_link_view = magic_link_view
         self.versions_allow_unconfirmed = allow_unconfirmed
         self.versions_applicant_view = applicant_view
         self.versions_strip_pii = strip_pii
@@ -593,6 +606,7 @@ def test_timeline_ap(app: FastAPI, client: TestClient, fake_service: _FakeServic
     assert len(r.json()) == 1
     # A12: the applicant reads the timeline in the applicant view.
     assert fake_service.timeline_applicant_view is True
+    assert fake_service.timeline_magic_link_view is True
 
 
 def test_versions_principal_full(
@@ -615,6 +629,7 @@ def test_versions_applicant_gets_metadata_view(
     r = client.get(f"/api/applications/{app_id}/versions")
     assert r.status_code == 200
     assert fake_service.versions_applicant_view is True
+    assert fake_service.versions_magic_link_view is True
     assert fake_service.versions_allow_unconfirmed is True
 
 
@@ -639,6 +654,8 @@ def test_list_applications_filters_passed(
     assert fake_service.list_kwargs["limit"] == 10
     # With application.read there is no owner filter. All applications stay visible.
     assert fake_service.list_kwargs["owner_sub"] is None
+    # O21: the reader with the PII right searches the isPII values too.
+    assert fake_service.list_kwargs["hide_pii_in_search"] is False
 
 
 def test_list_applications_without_read_scopes_to_own(
@@ -649,6 +666,8 @@ def test_list_applications_without_read_scopes_to_own(
     r = client.get("/api/applications")
     assert r.status_code == 200
     assert fake_service.list_kwargs["owner_sub"] == "admin"  # principal.sub of the fake
+    # O21: no search over the isPII values of the committee-scope applications.
+    assert fake_service.list_kwargs["hide_pii_in_search"] is True
 
 
 def test_list_applications_mine_forces_owner_filter(

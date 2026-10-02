@@ -34,6 +34,7 @@ from app.modules.applications.access import (
     SHARE_PERMISSION,
     Access,
     can_read_pii,
+    principal_reads_pii,
     require_app_edit,
     require_app_read,
 )
@@ -305,6 +306,9 @@ async def list_applications(
         # The committee read scope applies to a restricted principal only.
         # "mine" stays owner-only on purpose.
         committee_sub=principal.sub if restricted else None,
+        # O21: a reader without the PII right must not find an application by the
+        # value of an isPII field. The own applications stay searchable in full.
+        hide_pii_in_search=not can_read,
         limit=page.limit,
         offset=page.offset,
     )
@@ -350,6 +354,8 @@ async def export_applications_xlsx(
         created_to=created_to,
         sort=sort,
         order=order,
+        # O21: an exporter without the PII right must not filter on isPII values.
+        hide_pii_in_search=not principal_reads_pii(principal),
         # One row over the cap. This detects "more than EXPORT_MAX_ROWS" even
         # when the query does not count ``total``.
         limit=EXPORT_MAX_ROWS + 1,
@@ -401,7 +407,9 @@ async def get_application(
     pii = await can_read_pii(service.session, access)
     return await service.get(
         access.application_id,
-        include_pii=access.can_see_internal and pii,
+        # The applicant block goes to a principal with the PII right, also to the
+        # logged-in creator. The magic-link applicant gets none.
+        include_pii=principal is not None and pii,
         requester_sub=principal.sub if principal is not None else None,
         requester_can_manage=principal.has("application.manage")
         if principal is not None
@@ -658,6 +666,7 @@ async def get_timeline(
         access.application_id,
         allow_unconfirmed=access.is_owning_applicant,
         applicant_view=access.is_applicant_view,
+        magic_link_view=access.is_owning_applicant,
     )
 
 
@@ -687,6 +696,7 @@ async def get_versions(
         # answers 404, like the list. The magic-link applicant reads it.
         allow_unconfirmed=access.is_owning_applicant,
         applicant_view=access.is_applicant_view,
+        magic_link_view=access.is_owning_applicant,
         strip_pii=not await can_read_pii(service.session, access),
     )
 
@@ -751,7 +761,8 @@ async def add_comment(
     """Add a comment.
 
     An applicant may post a ``public`` comment only. An internal comment from an
-    applicant answers 403.
+    applicant answers 403. This also holds for the logged-in creator without a
+    read permission, who reads as the applicant.
 
     The route triggers comment mails. A public principal comment goes to the
     applicant. An applicant comment goes to everybody who can act on the current
@@ -794,8 +805,9 @@ async def list_comments(
 ) -> list[CommentOut]:
     """List the comments.
 
-    An applicant sees the ``public`` comments only. The applicant view names the
-    Gremium as the author of a member comment (A12, O16).
+    An applicant sees the ``public`` comments only. So does the logged-in creator
+    without a read permission. The applicant view names the Gremium as the author
+    of a member comment (A12, O16).
     """
     return await service.list_comments(
         access.application_id,

@@ -8,10 +8,7 @@ from sqlalchemy import select
 
 from app.modules.applications.models import StatusEvent
 from app.modules.applications.schemas import ApplicationOut, TimelineEventOut
-from app.modules.applications.service.service_base import (
-    ApplicationsServiceBase,
-    applicant_actors,
-)
+from app.modules.applications.service.service_base import ApplicationsServiceBase
 from app.modules.flow.models import Transition
 from app.modules.forms.schemas import EffectiveFormOut
 from app.modules.forms.service import FormsService
@@ -68,13 +65,16 @@ class ReadOps(ApplicationsServiceBase):
         *,
         allow_unconfirmed: bool = True,
         applicant_view: bool = False,
+        magic_link_view: bool = False,
     ) -> list[TimelineEventOut]:
         """Return the status timeline, oldest event first.
 
         Each event carries the label of the fired transition (A3). In the
         ``applicant_view`` the actor of every event that the applicant did not do is
         the name of the Gremium of the application (A12, O16). The applicant then
-        never sees the name of a member.
+        never sees the name of a member. ``magic_link_view`` marks the magic-link
+        reader; see `_applicant_actors` for the creator who submitted for another
+        email (F23).
         """
         app = await self._get_app(application_id, allow_unconfirmed=allow_unconfirmed)
         rows = (
@@ -89,7 +89,7 @@ class ReadOps(ApplicationsServiceBase):
         # Map the actor sub to a display name. The user interface must never show a
         # raw UUID.
         names = await self._author_names({ev.actor for ev, _ in rows if ev.actor})
-        own = applicant_actors(app.created_by)
+        own = await self._applicant_actors(app, magic_link_view=magic_link_view)
         gremium = await self._gremium_actor(app) if applicant_view else None
         for ev, label in rows:
             to_state = await self._get_state(ev.to_state_id)

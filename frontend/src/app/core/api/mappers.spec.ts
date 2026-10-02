@@ -108,7 +108,13 @@ describe('mapApplication', () => {
       // Absent on the wire means not archived, not "unknown".
       archivedAt: null,
       stateSince: null,
+      hiddenKeys: [],
     });
+  });
+
+  it('passes hiddenKeys through (O21)', () => {
+    const view = mapApplication({ ...wire, hiddenKeys: ['iban'] }, 'de');
+    expect(view.hiddenKeys).toEqual(['iban']);
   });
 
   it('passes stateSince through (A9)', () => {

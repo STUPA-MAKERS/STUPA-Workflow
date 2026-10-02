@@ -5,7 +5,7 @@ The right is `application.read`, `application.read_all` or admin. The applicant
 through the Gremium read scope gets the detail and the version history without the
 `isPII` fields and without the applicant block. An editor with `application.manage`
 alone cannot see them either, so the patch keeps their stored values. The XLSX export
-holds no form field value at all.
+holds no form field value at all. The search finds no application by a hidden value.
 """
 
 from __future__ import annotations
@@ -18,11 +18,13 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from openpyxl import load_workbook
-from sqlalchemy import Engine
+from sqlalchemy import Engine, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.modules.applications.models import Application
+from app.modules.applications.service import ApplicationsService
 from app.modules.auth.principal import Principal
+from app.modules.forms.models import FormField, FormVersion
 from tests._support.read_models import (
     IBAN,
     MEMBER_NAME,
@@ -101,6 +103,7 @@ async def test_reader_with_the_right_sees_pii(
     detail = _detail(api, app_id)
     assert detail["data"]["iban"] == _NEW_IBAN
     assert detail["applicant"]["email"] == "antrag@example.org"
+    assert detail["hiddenKeys"] == []
 
     versions = _versions(api, app_id)
     assert versions[0]["data"]["iban"] == IBAN
@@ -122,6 +125,8 @@ async def test_committee_reader_gets_no_pii(
     assert "iban" not in detail["data"]
     assert detail["data"]["note"] == "zweite"
     assert detail["applicant"] is None
+    # The client hides exactly these fields in the edit form.
+    assert detail["hiddenKeys"] == ["iban"]
 
     versions = _versions(api, app_id)
     assert [v["version"] for v in versions] == [1, 2]
@@ -149,6 +154,24 @@ async def test_applicant_and_creator_read_the_own_pii(
     assert detail["data"]["iban"] == _NEW_IBAN
     assert detail["applicant"]["name"] == "Anna Antrag"
     assert detail["isOwner"] is True
+    assert detail["hiddenKeys"] == []
+
+
+async def test_reader_with_the_right_gets_an_unanswered_pii_field_as_editable(
+    migrated: tuple[str, str],
+    maker: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A missing key is not a hidden key: the full reader can still fill the field."""
+    seed = await seed_read_world(maker)
+    app_id = await create_app(maker, seed, actor=seed.owner_sub)
+    await patch(maker, app_id, {"title": "Antrag", "note": "ohne"}, changed_by=seed.owner_sub)
+    api = build_read_api(migrated[1], monkeypatch)
+    as_principal(api, Principal(sub="reader", permissions={"application.read"}))
+
+    detail = _detail(api, app_id)
+    assert "iban" not in detail["data"]
+    assert detail["hiddenKeys"] == []
 
 
 async def test_editor_without_read_keeps_the_stored_pii(
@@ -196,6 +219,135 @@ async def test_archive_response_strips_pii_without_read(
     assert archived.status_code == 200, archived.text
     assert "iban" not in archived.json()["data"]
     assert "iban" not in restored.json()["data"]
+
+
+async def test_idempotent_archive_strips_pii_without_read(
+    migrated: tuple[str, str],
+    maker: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The no-op path of archive and unarchive applies O21 too."""
+    _, app_id = await _world(maker)
+    api = build_read_api(migrated[1], monkeypatch)
+    as_principal(api, Principal(sub="archivar", permissions={"application.archive"}))
+    with TestClient(api) as client:
+        unarchived_noop = client.delete(f"/api/applications/{app_id}/archive")
+        first = client.post(f"/api/applications/{app_id}/archive")
+        second = client.post(f"/api/applications/{app_id}/archive")
+    for resp in (unarchived_noop, first, second):
+        assert resp.status_code == 200, resp.text
+        assert "iban" not in resp.json()["data"]
+        assert resp.json()["hiddenKeys"] == ["iban"]
+    assert second.json()["archivedAt"] == first.json()["archivedAt"]
+
+
+def _search_total(api: FastAPI, q: str) -> int:
+    body = get_json(api, f"/api/applications?q={q}")
+    assert isinstance(body, dict)
+    return int(body["total"])
+
+
+async def test_search_finds_no_application_by_a_hidden_pii_value(
+    migrated: tuple[str, str],
+    maker: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The search is no oracle for a PII value (O21).
+
+    A Gremium reader without the PII right finds the application by its title, but
+    not by its IBAN. The reader with the right and the creator find it by both.
+    """
+    seed, app_id = await _world(maker)
+    api = build_read_api(migrated[1], monkeypatch)
+
+    as_principal(api, Principal(sub=seed.member_sub, display_name=MEMBER_NAME))
+    assert _search_total(api, "Antrag") == 1
+    assert _search_total(api, _NEW_IBAN) == 0
+
+    as_principal(api, Principal(sub="reader", permissions={"application.read"}))
+    assert _search_total(api, _NEW_IBAN) == 1
+
+    as_principal(api, Principal(sub=seed.owner_sub, display_name=OWNER_NAME))
+    assert _search_total(api, _NEW_IBAN) == 1
+    assert str(app_id) in str(get_json(api, f"/api/applications?q={_NEW_IBAN}"))
+
+
+async def test_creator_without_read_gets_no_internal_comment(
+    migrated: tuple[str, str],
+    maker: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The creator without a read permission reads as the applicant (A12)."""
+    seed, app_id = await _world(maker)
+    async with maker() as session:
+        for visibility in ("internal", "public"):
+            await ApplicationsService(session).add_comment(
+                app_id,
+                author=seed.member_sub,
+                author_kind="principal",
+                body=f"{visibility} note",
+                visibility=visibility,
+            )
+    api = build_read_api(migrated[1], monkeypatch)
+    as_principal(api, Principal(sub=seed.owner_sub, display_name=OWNER_NAME))
+    comments = get_json(api, f"/api/applications/{app_id}/comments")
+    assert isinstance(comments, list)
+    assert [c["body"] for c in comments] == ["public note"]
+    with TestClient(api) as client:
+        resp = client.post(
+            f"/api/applications/{app_id}/comments",
+            json={"body": "intern", "visibility": "internal"},
+        )
+    assert resp.status_code == 403, resp.text
+
+    # A member with the read permission still reads both.
+    as_principal(api, Principal(sub="reader", permissions={"application.read"}))
+    comments = get_json(api, f"/api/applications/{app_id}/comments")
+    assert isinstance(comments, list)
+    assert sorted(c["body"] for c in comments) == ["internal note", "public note"]
+
+
+async def test_editor_without_read_is_not_blocked_by_a_missing_required_pii_field(
+    migrated: tuple[str, str],
+    maker: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A required isPII field without a stored value does not stop the blind editor."""
+    seed = await seed_read_world(maker)
+    app_id = await create_app(maker, seed, actor=seed.owner_sub)
+    # The IBAN goes away, then the field becomes required: old data, new rule.
+    await patch(maker, app_id, {"title": "Antrag", "note": "ohne"}, changed_by=seed.owner_sub)
+    async with maker() as session:
+        await session.execute(
+            update(FormField)
+            .where(
+                FormField.key == "iban",
+                FormField.form_version_id.in_(
+                    select(FormVersion.id).where(FormVersion.application_type_id == seed.type_id)
+                ),
+            )
+            .values(required=True)
+        )
+        await session.commit()
+
+    api = build_read_api(migrated[1], monkeypatch)
+    as_principal(api, staff(seed))
+    with TestClient(api) as client:
+        blind = client.patch(
+            f"/api/applications/{app_id}", json={"data": {"title": "Antrag", "note": "neu"}}
+        )
+    assert blind.status_code == 200, blind.text
+
+    # The reader who sees the field still gets the 422.
+    as_principal(
+        api, Principal(sub="editor", permissions={"application.read", "application.manage"})
+    )
+    with TestClient(api) as client:
+        full = client.patch(
+            f"/api/applications/{app_id}", json={"data": {"title": "Antrag", "note": "neu"}}
+        )
+    assert full.status_code == 422, full.text
+    assert "iban" in full.text
 
 
 async def test_xlsx_export_holds_no_pii(

@@ -94,6 +94,7 @@ export function mapApplication(wire: ApplicationOutWire, lang: string): Applicat
     isOwner: wire.isOwner ?? false,
     archivedAt: wire.archivedAt ?? null,
     stateSince: wire.stateSince ?? null,
+    hiddenKeys: wire.hiddenKeys ?? [],
   };
 }
 

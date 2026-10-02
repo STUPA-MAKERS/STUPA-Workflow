@@ -174,6 +174,11 @@ export interface ApplicationOutWire {
   archivedAt?: IsoDateTime | null;
   /** Time of the last status change (A9). */
   stateSince?: IsoDateTime | null;
+  /**
+   * The `isPII` field keys that the server removed from `data` for this reader (O21).
+   * Empty for a reader with the PII right.
+   */
+  hiddenKeys?: string[];
 }
 
 /** `ApplicationListItem`. A list entry without `data` and without `applicant`. */
@@ -464,6 +469,12 @@ export interface Application {
   archivedAt: IsoDateTime | null;
   /** Time of the last status change (A9), for "since" on the status page. */
   stateSince?: IsoDateTime | null;
+  /**
+   * The `isPII` field keys that the server removed from `data` (O21). The edit form
+   * leaves out these fields. A key that is only missing from `data` was never
+   * answered, and the field stays editable.
+   */
+  hiddenKeys?: string[];
 }
 
 /**

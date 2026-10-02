@@ -10,10 +10,11 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 
 import pytest
-from sqlalchemy import Engine
+from sqlalchemy import Engine, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.modules.applications.service import ApplicationsService
+from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from tests._support.read_models import (
     GREMIUM_NAME,
@@ -105,3 +106,55 @@ async def test_logged_in_creator_sees_the_gremium_and_the_own_name(
     assert [e["actor"] for e in timeline] == [OWNER_NAME, GREMIUM_NAME]
     assert [c["author"] for c in comments] == [OWNER_NAME, GREMIUM_NAME]
     assert [c["isOwn"] for c in comments] == [True, False]
+
+
+async def _set_creator_email(
+    maker: async_sessionmaker[AsyncSession], sub: str, email: str
+) -> None:
+    async with maker() as session:
+        await session.execute(
+            update(PrincipalRow).where(PrincipalRow.sub == sub).values(email=email)
+        )
+        await session.commit()
+
+
+async def test_magic_link_applicant_sees_the_gremium_for_a_creator_of_another_email(
+    migrated: tuple[str, str],
+    maker: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """F23: a member submits for another email. The applicant sees no member name."""
+    seed = await seed_read_world(maker)
+    await _set_creator_email(maker, seed.owner_sub, "member@example.org")
+    app_id = await create_app(maker, seed, actor=seed.owner_sub)
+    await _comment(maker, app_id, seed.owner_sub, "principal")
+
+    api = build_read_api(migrated[1], monkeypatch)
+    as_applicant(api, app_id)
+    timeline = get_json(api, f"/api/applications/{app_id}/timeline")
+    versions = get_json(api, f"/api/applications/{app_id}/versions")
+    comments = get_json(api, f"/api/applications/{app_id}/comments")
+    assert isinstance(timeline, list) and isinstance(versions, list)
+    assert isinstance(comments, list)
+    assert [e["actor"] for e in timeline] == [GREMIUM_NAME]
+    assert [v["changedBy"] for v in versions] == [GREMIUM_NAME]
+    assert [c["author"] for c in comments] == [GREMIUM_NAME]
+    assert OWNER_NAME not in str(timeline) + str(versions) + str(comments)
+
+
+async def test_magic_link_applicant_keeps_the_own_name_as_creator(
+    migrated: tuple[str, str],
+    maker: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The creator submitted with the own account email: the magic link is the same person."""
+    seed = await seed_read_world(maker)
+    # The applicant email of `create_app`, with another case.
+    await _set_creator_email(maker, seed.owner_sub, "Antrag@Example.org")
+    app_id = await create_app(maker, seed, actor=seed.owner_sub)
+
+    api = build_read_api(migrated[1], monkeypatch)
+    as_applicant(api, app_id)
+    timeline = get_json(api, f"/api/applications/{app_id}/timeline")
+    assert isinstance(timeline, list)
+    assert [e["actor"] for e in timeline] == [OWNER_NAME]

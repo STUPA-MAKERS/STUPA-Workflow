@@ -103,15 +103,6 @@ def state_since_subquery() -> Subquery:
 APPLICANT_ACTOR = "applicant"
 
 
-def applicant_actors(created_by: str | None) -> set[str]:
-    """Return the actor values that name the applicant of one application.
-
-    These are the magic-link actor and the ``sub`` of the logged-in creator. The
-    applicant view keeps these actors and shows the Gremium for all others (A12).
-    """
-    return {APPLICANT_ACTOR} | ({created_by} if created_by else set())
-
-
 def _without_keys(data: dict[str, Any] | None, keys: set[str]) -> dict[str, Any]:
     """Return a copy of ``data`` without ``keys``."""
     return {k: v for k, v in (data or {}).items() if k not in keys}
@@ -265,16 +256,6 @@ class ApplicationsServiceBase:
         ).all()
         return {app_id: since for app_id, since in rows}
 
-    async def _strip_pii_fields(
-        self, type_id: UUID, data: dict[str, Any] | None
-    ) -> dict[str, Any]:
-        """Remove the ``isPII`` fields from ``data`` for a reader without the PII right (O21).
-
-        The key set is the union over every form version of the type, as for the
-        anonymization. A field that a later version marks as PII stays hidden too.
-        """
-        return _without_keys(data, await self._pii_keys_for_type(type_id))
-
     async def _gremium_actor(self, app: Application) -> str | None:
         """Return the name of the Gremium of the application.
 
@@ -286,6 +267,40 @@ class ApplicationsServiceBase:
         from app.modules.admin.models import Gremium
 
         return await self.session.scalar(select(Gremium.name).where(Gremium.id == app.gremium_id))
+
+    async def _applicant_actors(self, app: Application, *, magic_link_view: bool) -> set[str]:
+        """Return the actor values that name the applicant of one application.
+
+        The applicant view keeps these actors and shows the Gremium for all others
+        (A12, O16). The magic-link actor is always one of them.
+
+        The ``sub`` of the logged-in creator is one of them in two cases: the viewer
+        is that creator, or the creator submitted with the own account email. A
+        creator can submit for another email (F23), for example a member who
+        submits for a student. The magic-link view then belongs to a different
+        person, and the creator is a member like any other. The comparison ignores
+        case, as the create route does.
+        """
+        own = {APPLICANT_ACTOR}
+        if app.created_by is None:
+            return own
+        if not magic_link_view:
+            return own | {app.created_by}
+        from app.modules.auth.models import Principal as PrincipalRow
+
+        creator_email = await self.session.scalar(
+            select(PrincipalRow.email).where(PrincipalRow.sub == app.created_by)
+        )
+        applicant_email = await self.session.scalar(
+            select(Applicant.email).where(Applicant.application_id == app.id)
+        )
+        if (
+            creator_email
+            and applicant_email
+            and creator_email.casefold() == applicant_email.casefold()
+        ):
+            own.add(app.created_by)
+        return own
 
     async def _to_out(
         self,
@@ -299,16 +314,14 @@ class ApplicationsServiceBase:
         """Serialize one application.
 
         ``include_pii`` adds the applicant block (email, name). ``strip_pii_fields``
-        removes the ``isPII`` form fields from ``data`` (O21).
+        removes the ``isPII`` form fields from ``data`` (O21) and lists their keys in
+        ``hiddenKeys``, so the client can tell a removed field from an empty one.
         """
         state = await self._get_state(app.current_state_id)
         version = await self._current_version(app.id)
         since = (await self._state_since_map([app.id])).get(app.id, app.created_at)
-        data = (
-            await self._strip_pii_fields(app.type_id, app.data)
-            if strip_pii_fields
-            else app.data
-        )
+        hidden = await self._pii_keys_for_type(app.type_id) if strip_pii_fields else set()
+        data = _without_keys(app.data, hidden) if hidden else app.data
         applicant_out: ApplicantOut | None = None
         if include_pii:
             applicant = (
@@ -341,6 +354,7 @@ class ApplicationsServiceBase:
             isOwner=is_owner,
             archivedAt=app.archived_at,
             stateSince=since,
+            hiddenKeys=sorted(hidden),
         )
 
     async def _author_names(self, subs: set[str]) -> dict[str, str]:

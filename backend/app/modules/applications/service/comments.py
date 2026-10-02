@@ -8,10 +8,7 @@ from sqlalchemy import select
 
 from app.modules.applications.models import Comment
 from app.modules.applications.schemas import CommentOut
-from app.modules.applications.service.service_base import (
-    ApplicationsServiceBase,
-    applicant_actors,
-)
+from app.modules.applications.service.service_base import ApplicationsServiceBase
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.shared.errors import ForbiddenError, NotFoundError
@@ -88,7 +85,8 @@ class CommentOps(ApplicationsServiceBase):
 
         In the ``applicant_view`` a comment of a member names the Gremium of the
         application as its author (A12, O16). A comment of the logged-in creator
-        keeps the own name.
+        keeps the own name, unless the creator submitted for another email (F23)
+        and the viewer is the magic-link applicant.
         """
         app = await self._get_app(application_id, allow_unconfirmed=allow_unconfirmed)
         stmt = select(Comment).where(Comment.application_id == application_id)
@@ -96,7 +94,7 @@ class CommentOps(ApplicationsServiceBase):
             stmt = stmt.where(Comment.visibility == "public")
         rows = (await self.session.scalars(stmt.order_by(Comment.at))).all()
         names = await self._author_names({c.author for c in rows if c.author})
-        own = applicant_actors(app.created_by)
+        own = await self._applicant_actors(app, magic_link_view=viewer_is_applicant)
         gremium = await self._gremium_actor(app) if applicant_view else None
 
         def _author(c: Comment) -> str | None:

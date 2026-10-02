@@ -8,7 +8,8 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import ColumnElement, Text, cast, false, func, or_, select
+from sqlalchemy import ARRAY, ColumnElement, Text, case, cast, false, func, or_, select
+from sqlalchemy.dialects.postgresql import JSONB, array
 
 from app.modules.admin.models import ApplicationType, Gremium, GremiumMembership
 from app.modules.applications.models import Application
@@ -44,6 +45,7 @@ class ListingOps(ApplicationsServiceBase):
         order: str = "desc",
         owner_sub: str | None = None,
         committee_sub: str | None = None,
+        hide_pii_in_search: bool = False,
         limit: int,
         offset: int,
     ) -> Page[ApplicationListItem]:
@@ -65,6 +67,11 @@ class ListingOps(ApplicationsServiceBase):
 
         Each item carries `stateSince`, the time of the last status change (A9). One
         grouped subquery over `status_event` gives it for the whole page.
+
+        `hide_pii_in_search` is for a caller without the PII right (O21). The search
+        `q` then skips the `isPII` field values, except in the own applications
+        (`created_by == owner_sub`). Without this rule the search is an oracle: a
+        guessed name or IBAN would tell which readable application holds it.
 
         `archived` defaults to False, so the working list hides archived applications
         without every caller remembering to ask. `True` lists only the archived ones and
@@ -110,17 +117,15 @@ class ListingOps(ApplicationsServiceBase):
                 )
                 filters.append(Application.budget_id.in_(descendants))
         # The fuzzy search reads meaningful text only: the title and the string answer
-        # values of the `data` JSONB. It skips ids, enums and numbers. Postgres uses the
-        # IMMUTABLE `app_search_text(data)` function, which is the trigram index
-        # expression. The SQLite fallback for the unit stubs has no such function and
-        # searches the whole `data` blob as text with a substring ILIKE.
+        # values of the `data` JSONB. It skips ids, enums and numbers. See
+        # `_search_text` for the dialects and for the PII projection (O21).
         rank_expr: ColumnElement[Any] | None = None
         if q and q.strip():
             dialect = dialect_of(self.session)
-            search_col = (
-                func.app_search_text(Application.data)
-                if dialect == "postgresql"
-                else cast(Application.data, Text)
+            search_col = self._search_text(
+                dialect,
+                hidden_keys=await self._all_pii_keys() if hide_pii_in_search else set(),
+                owner_sub=owner_sub,
             )
             where, rank_expr = trigram_rank(q, [search_col], dialect=dialect)
             filters.append(where)
@@ -174,6 +179,55 @@ class ListingOps(ApplicationsServiceBase):
                 )
             )
         return Page(items=items, total=total or 0, limit=limit, offset=offset)
+
+    async def _all_pii_keys(self) -> set[str]:
+        """Collect the ``isPII`` field keys of every form version of every type.
+
+        The search hides these keys for a reader without the PII right. The union
+        over all types is stricter than the set of one type: a key that is PII in
+        one type also leaves the search of another type. That loses some recall,
+        but it never leaks.
+        """
+        from app.modules.forms.models import FormField
+
+        rows = await self.session.scalars(
+            select(FormField.key).where(FormField.is_pii.is_(True)).distinct()
+        )
+        return set(rows)
+
+    @staticmethod
+    def _search_text(
+        dialect: str, *, hidden_keys: set[str], owner_sub: str | None
+    ) -> ColumnElement[Any]:
+        """Build the text expression that the fuzzy search reads.
+
+        Postgres uses `app_search_text(data)`, the trigram index expression. The
+        SQLite fallback of the unit stubs reads the whole `data` blob as text.
+        ``hidden_keys`` leaves these top-level keys out of `data` first (O21). An
+        application with ``created_by == owner_sub`` keeps all keys, because the
+        creator reads the own PII. The projection cannot use the trigram index;
+        the read scope of such a caller is small.
+        """
+        full: ColumnElement[Any]
+        projected: ColumnElement[Any]
+        keys = sorted(hidden_keys)
+        if dialect == "postgresql":
+            full = func.app_search_text(Application.data)
+            if not keys:
+                return full
+            stripped = Application.data.op("-", return_type=JSONB)(
+                cast(array(keys, type_=Text), ARRAY(Text))
+            )
+            projected = func.app_search_text(stripped)
+        else:
+            full = cast(Application.data, Text)
+            if not keys:
+                return full
+            paths = ['$."' + k.replace('"', '\\"') + '"' for k in keys]
+            projected = cast(func.json_remove(Application.data, *paths), Text)
+        if owner_sub is None:
+            return projected
+        return case((Application.created_by == owner_sub, full), else_=projected)
 
     async def _committee_read_clauses(self, sub: str) -> list[ColumnElement[bool]]:
         """Build the Gremium read scope as SQL clauses.

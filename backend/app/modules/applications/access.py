@@ -7,7 +7,8 @@ one `Access` object. They raise 401 without an identity and 403 without
 sufficient rights.
 
 `Access.can_see_internal` alone controls internal-comment visibility. Only a
-principal gets it. An applicant sees ``public`` comments only.
+principal that reads as a member gets it. The magic-link applicant and the
+logged-in creator without a read permission see ``public`` comments only.
 
 `Access.via` records the path that granted the access. The applicant view (A11,
 A12) and the PII rule (O21, `can_read_pii`) read it.
@@ -63,11 +64,13 @@ class Access:
 
     @property
     def can_see_internal(self) -> bool:
-        """Tell whether the caller sees internal comments and PII.
+        """Tell whether the caller reads and writes internal comments.
 
-        Only a principal does.
+        Only a principal does, and only through a permission or the Gremium read
+        scope. The creator without a read permission (``via="owner"``) reads as the
+        applicant (A12), so the internal comments of the Gremium stay hidden.
         """
-        return self.principal is not None
+        return self.principal is not None and self.via != "owner"
 
     @property
     def is_owning_applicant(self) -> bool:

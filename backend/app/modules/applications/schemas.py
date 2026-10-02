@@ -117,6 +117,11 @@ class ApplicationOut(_CamelModel):
     # Time of the last status change (A9): the newest status event, else the creation
     # time. The status page shows "since" from it.
     state_since: datetime | None = Field(default=None, alias="stateSince")
+    # The ``isPII`` field keys that the server removed from ``data`` for this reader
+    # (O21). Empty for a reader with the PII right. The edit form leaves out these
+    # fields, because a patch keeps their stored values. A missing key in ``data``
+    # alone does not tell "removed" from "never answered".
+    hidden_keys: list[str] = Field(default_factory=list, alias="hiddenKeys")
 
 
 class ApplicationPatch(_CamelModel):

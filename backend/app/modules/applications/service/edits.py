@@ -19,7 +19,6 @@ from app.modules.applications.service.service_base import (
     _scrub_diff,
     _whitelist,
     _without_keys,
-    applicant_actors,
 )
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
@@ -53,8 +52,9 @@ class EditOps(ApplicationsServiceBase):
 
         ``preserve_pii`` is for an editor without the PII right (O21). That editor
         read ``data`` without the ``isPII`` fields, so the patch keeps the stored
-        values of these fields and ignores the sent ones. The response then also
-        holds no ``isPII`` field.
+        values of these fields and ignores the sent ones. A validation error on an
+        ``isPII`` field does not stop that patch, because the editor cannot fix it.
+        The response then also holds no ``isPII`` field.
 
         The edit writes an ``application_update`` audit entry with the version
         number and the keys of the changed fields, never the values. When the
@@ -75,6 +75,7 @@ class EditOps(ApplicationsServiceBase):
             fields = [system_title_field(), *fields]
         # ``has_budget`` comes from the type, as it does on create.
         app_type = await self.session.get(ApplicationType, app.type_id)
+        pii_keys: set[str] = set()
         if preserve_pii:
             pii_keys = await self._pii_keys_for_type(app.type_id)
             stored = app.data or {}
@@ -87,10 +88,16 @@ class EditOps(ApplicationsServiceBase):
         try:
             validate_answers(fields, clean, context)
         except AnswerValidationError as exc:
-            raise ValidationProblem(
-                "Invalid application data.",
-                errors=[{"field": e.field, "msg": e.msg} for e in exc.errors],
-            ) from exc
+            # The editor without the PII right can neither see nor change an
+            # ``isPII`` field. A stored value that is missing or no longer valid
+            # (the field became required or PII later, or anonymization removed
+            # it) is therefore not an error of this edit.
+            errors = [e for e in exc.errors if e.field not in pii_keys]
+            if errors:
+                raise ValidationProblem(
+                    "Invalid application data.",
+                    errors=[{"field": e.field, "msg": e.msg} for e in errors],
+                ) from exc
 
         diff: DataDiff = compute_diff(app.data, clean)
         next_version = await self._current_version(application_id) + 1
@@ -174,7 +181,7 @@ class EditOps(ApplicationsServiceBase):
         app = await self._get_app(application_id)
         already = app.archived_at is not None
         if already == archived:
-            return await self._to_out(app, include_pii=False)
+            return await self._to_out(app, include_pii=False, strip_pii_fields=strip_pii_fields)
 
         await audit_record(
             self.session,
@@ -252,6 +259,7 @@ class EditOps(ApplicationsServiceBase):
         *,
         allow_unconfirmed: bool = True,
         applicant_view: bool = False,
+        magic_link_view: bool = False,
         strip_pii: bool = False,
     ) -> list[VersionOut]:
         """Return the version history, oldest version first.
@@ -260,7 +268,8 @@ class EditOps(ApplicationsServiceBase):
         ``strip_pii`` the ``isPII`` fields leave all three (O21). The
         ``applicant_view`` gets the metadata only (A11, O17): number, time and
         changed keys, no values. Its ``changedBy`` names the Gremium for every edit
-        that the applicant did not do (A12).
+        that the applicant did not do (A12). ``magic_link_view`` marks the
+        magic-link reader; see `_applicant_actors`.
         """
         app = await self._get_app(application_id, allow_unconfirmed=allow_unconfirmed)
         rows = (
@@ -271,7 +280,7 @@ class EditOps(ApplicationsServiceBase):
             )
         ).all()
         hidden = await self._pii_keys_for_type(app.type_id) if strip_pii else set()
-        own = applicant_actors(app.created_by)
+        own = await self._applicant_actors(app, magic_link_view=magic_link_view)
         gremium = await self._gremium_actor(app) if applicant_view else None
         # Resolve the editor sub to a display name. The UI never shows a raw UUID.
         names = await self._author_names({r.changed_by for r in rows if r.changed_by})

@@ -782,10 +782,11 @@ describe('ApplicationsDetailComponent', () => {
   function setupWithFields(
     fields: FormFieldDef[],
     data: Record<string, unknown>,
+    extra: Partial<ApplicationOutWire> = {},
   ): Promise<Awaited<ReturnType<typeof setup>>> {
     return (async () => {
       const ctx = await setup();
-      ctx.http.expectOne(url('')).flush({ ...appWire(), data });
+      ctx.http.expectOne(url('')).flush({ ...appWire(), data, ...extra });
       ctx.http.expectOne(url('/versions')).flush(VERSIONS);
       ctx.http.expectOne(url('/comments')).flush(COMMENTS);
       for (const req of ctx.http.match((r) => r.method === 'GET' && r.url === '/api/budgets')) {
@@ -1133,30 +1134,47 @@ describe('ApplicationsDetailComponent', () => {
     http.verify();
   });
 
+  const PII_FIELDS: FormFieldDef[] = [
+    { key: 'title', type: 'text', label: { de: 'Titel' } },
+    { key: 'iban', type: 'text', label: { de: 'IBAN' }, isPII: true, required: true },
+    { key: 'mail', type: 'text', label: { de: 'Mail' }, isPII: true },
+  ];
+
+  type KeyedField = { key?: unknown; fieldGroup?: unknown[] };
+  const editKeysOf = (fields: KeyedField[]): unknown[] =>
+    fields.flatMap((f) => [f.key, ...editKeysOf((f.fieldGroup ?? []) as KeyedField[])]);
+
   it('leaves a stripped PII field out of the edit form (O21)', async () => {
-    // A reader without the PII right gets `data` without the isPII field.
+    // A reader without the PII right gets `data` without the isPII fields, and the
+    // server names them in `hiddenKeys`.
     const { http, cmp } = await setupWithFields(
-      [
-        { key: 'title', type: 'text', label: { de: 'Titel' } },
-        { key: 'iban', type: 'text', label: { de: 'IBAN' }, isPII: true, required: true },
-        { key: 'mail', type: 'text', label: { de: 'Mail' }, isPII: true },
-      ],
-      { title: 'Förderung Fest', mail: 'a@b.de' },
+      PII_FIELDS,
+      { title: 'Förderung Fest' },
+      { hiddenKeys: ['iban', 'mail'] },
     );
     flushAttachments(http);
-    const keys = (fields: { key?: unknown; fieldGroup?: unknown[] }[]): unknown[] =>
-      fields.flatMap((f) => [
-        f.key,
-        ...keys((f.fieldGroup ?? []) as { key?: unknown; fieldGroup?: unknown[] }[]),
-      ]);
 
     cmp.startEdit(cmp.app() as Application);
-    const editKeys = keys(cmp.editFields() as { key?: unknown; fieldGroup?: unknown[] }[]);
+    const editKeys = editKeysOf(cmp.editFields() as KeyedField[]);
     expect(editKeys).toContain('title');
-    // A PII field that came with the data stays editable.
-    expect(editKeys).toContain('mail');
     expect(editKeys).not.toContain('iban');
+    expect(editKeys).not.toContain('mail');
     expect(screen.queryByText('IBAN')).not.toBeInTheDocument();
+  });
+
+  it('keeps an unanswered PII field editable for a reader with the PII right (O21)', async () => {
+    // The optional `mail` was never answered, so its key is missing from `data`. The
+    // server hid nothing, so the reader can still fill the field.
+    const { http, cmp } = await setupWithFields(PII_FIELDS, {
+      title: 'Förderung Fest',
+      iban: 'DE02120300000000202051',
+    });
+    flushAttachments(http);
+
+    cmp.startEdit(cmp.app() as Application);
+    const editKeys = editKeysOf(cmp.editFields() as KeyedField[]);
+    expect(editKeys).toContain('iban');
+    expect(editKeys).toContain('mail');
   });
 
   it('lists the changed keys of a version without values (A11 metadata view)', async () => {
