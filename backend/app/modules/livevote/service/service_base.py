@@ -16,6 +16,7 @@ from app.modules.admin.models import Gremium
 from app.modules.applications.models import Application
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.livevote.agenda_service import agenda_order, title_of
+from app.modules.livevote.keepers import KeeperSummary
 from app.modules.livevote.models import Meeting, MeetingAgendaItem
 from app.modules.livevote.schemas import CurrentAgendaItemOut, MeetingOut, MeetingVoteOut
 from app.modules.protocol.models import Protocol
@@ -52,7 +53,9 @@ class MeetingServiceBase:
         gremium_name: str | None = None,
         votes: list[MeetingVoteOut] | None = None,
         agenda: AgendaSummary = (0, None),
+        keepers: KeeperSummary | None = None,
     ) -> MeetingOut:
+        periods, planned = keepers if keepers is not None else ([], None)
         return MeetingOut(
             id=meeting.id,
             gremiumId=meeting.gremium_id,
@@ -83,6 +86,8 @@ class MeetingServiceBase:
             canVote=can_vote,
             canFinalize=can_finalize,
             votes=votes or [],
+            keeperPeriods=periods,
+            plannedHandover=planned,
         )
 
     async def _agenda_summaries(self, meetings: Sequence[Meeting]) -> dict[UUID, AgendaSummary]:

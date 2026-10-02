@@ -22,6 +22,7 @@ from app.modules.admin.gremium_roles import (
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.delegations.models import DelegationSubstitute, MeetingDelegation
+from app.modules.livevote.keepers import keeper_summaries
 from app.modules.livevote.models import Meeting
 from app.modules.livevote.schemas import MeetingOut, MeetingVoteOut
 from app.modules.livevote.service.service_base import MeetingServiceBase
@@ -253,6 +254,7 @@ class PermissionOps(MeetingServiceBase):
         name = await self._name_for(self.session, meeting.protokollant_id)
         gremium_name = await self._gremium_name_for(meeting.gremium_id)
         agenda = (await self._agenda_summaries([meeting]))[meeting.id]
+        keepers = (await keeper_summaries(self.session, [meeting.id]))[meeting.id]
         if principal is None:
             return self._to_out(
                 meeting,
@@ -261,6 +263,7 @@ class PermissionOps(MeetingServiceBase):
                 gremium_name=gremium_name,
                 votes=votes,
                 agenda=agenda,
+                keepers=keepers,
             )
         return self._to_out(
             meeting,
@@ -275,4 +278,5 @@ class PermissionOps(MeetingServiceBase):
             gremium_name=gremium_name,
             votes=votes,
             agenda=agenda,
+            keepers=keepers,
         )

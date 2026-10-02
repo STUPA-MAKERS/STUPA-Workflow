@@ -1230,3 +1230,122 @@ def test_attachment_drafts(alembic_cfg: Config, engine: Engine) -> None:
         assert ids == [bound]
         conn.execute(text("DELETE FROM attachment"))
     command.upgrade(alembic_cfg, "head")
+
+
+def test_protocol_keeper_period_backfill(
+    alembic_cfg: Config, engine: Engine, capfd: pytest.CaptureFixture[str]
+) -> None:
+    """Migration 734556b61a72 adds the keeper periods and backfills them (Z3).
+
+    A live or closed meeting with a protokollant gets one period. The start is the
+    real start, else the planned start in Europe/Berlin, else the creation time. A
+    closed meeting ends at `closed_at`, never before the start: a close before the
+    planned start keeps the check. A planned meeting and a meeting without a
+    protokollant get no period. The downgrade drops the table.
+    """
+    command.downgrade(alembic_cfg, "1ee8a0d3928c")
+    with engine.begin() as conn:
+        assert conn.execute(text("SELECT to_regclass('protocol_keeper_period')")).scalar() is None
+        gremium = conn.execute(
+            text("INSERT INTO gremium (name, slug) VALUES ('G', :s) RETURNING id"),
+            {"s": f"g-keeper-{uuid.uuid4()}"},
+        ).scalar_one()
+        keeper = conn.execute(
+            text("INSERT INTO principal (sub) VALUES (:s) RETURNING id"),
+            {"s": f"keeper-{uuid.uuid4()}"},
+        ).scalar_one()
+
+        def meeting(status: str, **cols: object) -> uuid.UUID:
+            names = ["gremium_id", "title", "status", "protokollant_id", *cols]
+            values = {"gremium_id": gremium, "title": "M", "status": status}
+            values["protokollant_id"] = cols.pop("protokollant_id", keeper)
+            values.update(cols)
+            placeholders = ", ".join(f":{n}" for n in names)
+            return conn.execute(
+                text(f"INSERT INTO meeting ({', '.join(names)}) VALUES ({placeholders}) "
+                     "RETURNING id"),
+                values,
+            ).scalar_one()
+
+        live = meeting("live", started_at="2026-06-20T16:05:00+00:00")
+        # Planned start 18:00 Berlin (16:00 UTC), but closed at 15:30 UTC.
+        early = meeting(
+            "closed", date="2026-06-20", start_time="18:00", closed_at="2026-06-20T15:30:00+00:00"
+        )
+        closed = meeting(
+            "closed",
+            date="2026-06-20",
+            start_time="18:00",
+            closed_at="2026-06-20T19:00:00+00:00",
+        )
+        undated = meeting("closed")
+        planned = meeting("planned", date="2026-06-20", start_time="18:00")
+        nobody = meeting("closed", protokollant_id=None)
+
+    capfd.readouterr()
+    command.upgrade(alembic_cfg, "head")
+    assert "4 period(s) backfilled" in capfd.readouterr().err
+
+    with engine.begin() as conn:
+        rows = {
+            r.meeting_id: r
+            for r in conn.execute(
+                text(
+                    "SELECT meeting_id, principal_id, from_at, to_at, handed_over_by, "
+                    "from_agenda_item_id FROM protocol_keeper_period"
+                )
+            )
+        }
+        created = conn.execute(
+            text("SELECT created_at FROM meeting WHERE id = :m"), {"m": undated}
+        ).scalar_one()
+    assert set(rows) >= {live, early, closed, undated}
+    assert planned not in rows and nobody not in rows
+    assert rows[live].from_at.isoformat() == "2026-06-20T16:05:00+00:00"
+    assert rows[live].to_at is None
+    assert rows[early].from_at.isoformat() == "2026-06-20T16:00:00+00:00"
+    assert rows[early].to_at == rows[early].from_at
+    assert rows[closed].to_at.isoformat() == "2026-06-20T19:00:00+00:00"
+    assert rows[undated].from_at == created == rows[undated].to_at
+    assert {r.handed_over_by for r in rows.values()} == {"system:migration"}
+    assert {r.principal_id for r in rows.values()} == {keeper}
+    assert all(r.from_agenda_item_id is None for r in rows.values())
+
+    # The partial unique indexes allow one running and one planned period per meeting.
+    with pytest.raises(IntegrityError), engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO protocol_keeper_period (meeting_id, principal_id, from_at, "
+                "handed_over_by) VALUES (:m, :p, now(), 'x')"
+            ),
+            {"m": live, "p": keeper},
+        )
+    with pytest.raises(IntegrityError), engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO protocol_keeper_period (meeting_id, principal_id, to_at, "
+                "handed_over_by) VALUES (:m, :p, now(), 'x')"
+            ),
+            {"m": live, "p": keeper},
+        )
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO protocol_keeper_period (meeting_id, principal_id, "
+                "handed_over_by) VALUES (:m, :p, 'x')"
+            ),
+            {"m": live, "p": keeper},
+        )
+    with pytest.raises(IntegrityError), engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO protocol_keeper_period (meeting_id, principal_id, "
+                "handed_over_by) VALUES (:m, :p, 'x')"
+            ),
+            {"m": live, "p": keeper},
+        )
+
+    command.downgrade(alembic_cfg, "1ee8a0d3928c")
+    with engine.connect() as conn:
+        assert conn.execute(text("SELECT to_regclass('protocol_keeper_period')")).scalar() is None
+    command.upgrade(alembic_cfg, "head")

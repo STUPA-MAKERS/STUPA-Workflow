@@ -12,6 +12,7 @@ from app.modules.admin.gremium_roles import admin_bypass, gremium_ids_for
 from app.modules.admin.models import Gremium
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
+from app.modules.livevote.keepers import keeper_summaries
 from app.modules.livevote.models import Meeting
 from app.modules.livevote.schemas import MeetingGremiumOut, MeetingOut, MeetingPage
 from app.modules.livevote.service.paging import (
@@ -271,6 +272,7 @@ class ListingOps(PermissionOps, VoteReadOps):
         vote_ids = await self._vote_cast_gremium_ids(principal)
         votes_by_meeting = await self._votes_for([m.id for m in meetings], principal)
         agenda_by_meeting = await self._agenda_summaries(meetings)
+        keepers_by_meeting = await keeper_summaries(self.session, [m.id for m in meetings])
         out: list[MeetingOut] = []
         for m in meetings:
             is_prot = m.protokollant_id is not None and m.protokollant_id == my_id
@@ -291,6 +293,7 @@ class ListingOps(PermissionOps, VoteReadOps):
                     ),
                     votes=votes_by_meeting.get(m.id, []),
                     agenda=agenda_by_meeting[m.id],
+                    keepers=keepers_by_meeting[m.id],
                 )
             )
         return out

@@ -45,6 +45,7 @@ from app.modules.livevote.schemas import (
     MeetingPage,
     MeetingPatch,
     MeetingVoteOpenBody,
+    ProtokollantHandoverBody,
 )
 from app.modules.livevote.service import BrokerPublisher, MeetingService
 from app.modules.notifications.auto import AutoMailer, get_auto_mailer
@@ -217,7 +218,8 @@ async def list_meeting_members(
 
     The caller must be able to manage the Gremium (``session.manage`` or admin).
     The list fills the protokollant picker in the create dialog before a roster
-    exists.
+    exists. ``canKeepProtocol`` marks the members with ``protocol.write`` (O20): only
+    they can be the protokollant.
     """
     if not await service.can_manage(gremium_id, principal):
         raise ForbiddenError("not allowed to manage meetings for this committee")
@@ -312,7 +314,9 @@ async def patch_meeting(
 
     The service applies RBAC per field. Status and active application need
     ``canWrite`` (protokollant or manager). Date, time and protokollant need
-    ``canManage`` (meeting manager). On the start transition (planned to live) the
+    ``canManage`` (meeting manager). A new protokollant needs ``protocol.write`` in
+    the Gremium (O20: 422). While the meeting is live, a new protokollant is a
+    handover ``now`` (Z3). On the start transition (planned to live) the
     router creates the protocol, and that step is idempotent. The protocol is
     created only here, never by hand. The service has already checked that a
     protokollant is set, else it answers 409.
@@ -332,6 +336,48 @@ async def patch_meeting(
         # Re-read so the response carries the new ``protocolId``.
         return await service.get(meeting_id, principal)
     return updated
+
+
+@router.post(
+    "/meetings/{meeting_id}/protokollant-handover",
+    response_model=MeetingOut,
+    responses=_errors(401, 403, 404, 409, 422),
+)
+async def hand_over_protokollant(
+    meeting_id: UUID,
+    payload: ProtokollantHandoverBody,
+    service: ServiceDep,
+    principal: ReaderDep,
+) -> MeetingOut:
+    """Hand the minutes of a live meeting over to another member (Z3, O1).
+
+    ``mode=now`` hands over at once. ``mode=next_item`` plans the handover for the
+    next forward move of the current agenda item and replaces an older plan. The
+    session lead (``session.manage``) or the current protokollant may call it. The
+    new protokollant is an active member (403) with ``protocol.write`` (O20: 422
+    ``protokollant_needs_protocol_write``). 409 ``meeting_not_live`` outside a live
+    meeting, 409 ``already_protokollant`` for the current protokollant, 409
+    ``no_next_item`` for ``next_item`` on the last agenda item. Writes
+    ``protokollant_handover`` and sends ``meeting_state``.
+    """
+    return await service.hand_over(meeting_id, payload.principal_id, payload.mode, principal)
+
+
+@router.delete(
+    "/meetings/{meeting_id}/protokollant-handover",
+    response_model=MeetingOut,
+    responses=_errors(401, 403, 404, 409),
+)
+async def cancel_protokollant_handover(
+    meeting_id: UUID, service: ServiceDep, principal: ReaderDep
+) -> MeetingOut:
+    """Discard the planned handover of a live meeting (Z3).
+
+    The same callers as for the handover. 404 ``no_planned_handover`` without a
+    planned handover. Writes ``protokollant_handover`` (mode ``cancel``) and sends
+    ``meeting_state``.
+    """
+    return await service.cancel_handover(meeting_id, principal)
 
 
 @router.get(

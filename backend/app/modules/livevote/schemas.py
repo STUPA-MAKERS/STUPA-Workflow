@@ -134,6 +134,39 @@ class CurrentAgendaItemOut(_CamelModel):
     title: str | None = None
 
 
+class KeeperPeriodOut(_CamelModel):
+    """One period of a protocol keeper (Z3, A13).
+
+    ``fromAt`` is ``None`` for the planned handover. ``toAt`` is ``None`` while the
+    period runs. The positions are the 1-based numbers of the agenda items in the
+    current agenda order. A position is ``None`` when the period has no item there
+    or the item no longer exists; a reader then shows the time.
+    """
+
+    principal_id: UUID = Field(alias="principalId")
+    name: str | None = None
+    from_at: _datetime | None = Field(default=None, alias="fromAt")
+    to_at: _datetime | None = Field(default=None, alias="toAt")
+    from_agenda_item_id: UUID | None = Field(default=None, alias="fromAgendaItemId")
+    to_agenda_item_id: UUID | None = Field(default=None, alias="toAgendaItemId")
+    from_position: int | None = Field(default=None, alias="fromPosition")
+    to_position: int | None = Field(default=None, alias="toPosition")
+
+
+HandoverMode = Literal["now", "next_item"]
+
+
+class ProtokollantHandoverBody(_CamelModel):
+    """``POST /meetings/{id}/protokollant-handover`` — hand the minutes over (Z3, O1).
+
+    ``now`` hands over at once. ``next_item`` plans the handover for the next
+    forward move of the current agenda item.
+    """
+
+    principal_id: UUID = Field(alias="principalId")
+    mode: HandoverMode = "now"
+
+
 class MeetingOut(_CamelModel):
     """Meeting state (``GET /api/meetings/{id}``)."""
 
@@ -179,6 +212,10 @@ class MeetingOut(_CamelModel):
     # gremium permission ``protocol.finalize``.
     can_finalize: bool = Field(default=False, alias="canFinalize")
     votes: list[MeetingVoteOut] = Field(default_factory=list)
+    # A13: the periods of the protocol keepers in time order (running and ended),
+    # and the planned handover of the next agenda item.
+    keeper_periods: list[KeeperPeriodOut] = Field(default_factory=list, alias="keeperPeriods")
+    planned_handover: KeeperPeriodOut | None = Field(default=None, alias="plannedHandover")
 
 
 TimelineDirection = Literal["past", "upcoming"]
@@ -231,6 +268,9 @@ class AttendanceOut(_CamelModel):
     note: str | None = None
     # True when the requesting principal is this member, which allows self-marking.
     is_self: bool = Field(default=False, alias="isSelf")
+    # O20: the member holds the gremium permission ``protocol.write`` and can keep
+    # the minutes. The keeper pickers offer only these members.
+    can_keep_protocol: bool = Field(default=False, alias="canKeepProtocol")
 
 
 class MeetingMemberOut(_CamelModel):
@@ -239,6 +279,9 @@ class MeetingMemberOut(_CamelModel):
     principal_id: UUID = Field(alias="principalId")
     display_name: str | None = Field(default=None, alias="displayName")
     email: str | None = None
+    # O20: only a member with the gremium permission ``protocol.write`` can keep the
+    # minutes. Another member gives 422 ``protokollant_needs_protocol_write``.
+    can_keep_protocol: bool = Field(default=False, alias="canKeepProtocol")
 
 
 class _AttendanceNoteBody(_CamelModel):

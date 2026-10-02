@@ -4,6 +4,11 @@ The status runs only forward: ``planned`` to ``live`` to ``closed`` (F9, O13). A
 repeat of the current status is a no-op. Every other change gives 409
 ``invalid_status_transition``. A meeting that does not take place is deleted, not
 closed.
+
+The lifecycle also drives the periods of the protocol keeper (Z3, see
+``handover``): the start opens the first period, a forward move of the current
+agenda item starts a planned handover, a new protokollant of a live meeting is a
+handover ``now``, and the close ends the running period.
 """
 
 from __future__ import annotations
@@ -15,15 +20,12 @@ from uuid import UUID
 
 from sqlalchemy import select
 
-from app.modules.admin.gremium_roles import gremium_member_ids
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
-from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.livevote.models import Meeting, MeetingAgendaItem
 from app.modules.livevote.schemas import MeetingCreate, MeetingOut, MeetingPatch
-from app.modules.livevote.service.permissions import PermissionOps
-from app.modules.livevote.service.votes import VoteReadOps
+from app.modules.livevote.service.handover import HandoverOps
 from app.modules.voting.models import Vote
 from app.modules.voting.schemas import VoteOut
 from app.shared.errors import (
@@ -60,7 +62,7 @@ def _snapshot(meeting: Meeting) -> dict[str, str | None]:
     return out
 
 
-class LifecycleOps(PermissionOps, VoteReadOps):
+class LifecycleOps(HandoverOps):
     """Create/patch/delete meetings and broadcast state changes."""
 
     async def create(self, payload: MeetingCreate, principal: Principal) -> MeetingOut:
@@ -99,14 +101,14 @@ class LifecycleOps(PermissionOps, VoteReadOps):
     async def _resolve_protokollant(
         self, gremium_id: UUID, protokollant_id: UUID | None
     ) -> UUID | None:
-        """Validate the protokollant as an active member of the Gremium."""
+        """Validate the protokollant: an active member with ``protocol.write`` (O20).
+
+        The rule applies to a new assignment only. A protokollant who lost
+        ``protocol.write`` after the assignment can still start the meeting.
+        """
         if protokollant_id is None:
             return None
-        row = await self.session.get(PrincipalRow, protokollant_id)
-        if row is None:
-            raise NotFoundError(f"principal {protokollant_id} not found")
-        if gremium_id not in await gremium_member_ids(self.session, row.sub):
-            raise ForbiddenError("protokollant must be an active member of the committee")
+        await self.check_keeper(gremium_id, protokollant_id)
         return protokollant_id
 
     async def patch(
@@ -123,15 +125,19 @@ class LifecycleOps(PermissionOps, VoteReadOps):
         the same transaction, then sends ``vote_cancelled`` after the commit. A status
         change or a planning change writes ``meeting_update`` (F12).
 
+        Z3: the start opens the first keeper period, and the close ends the running
+        one. A forward move of the current agenda item starts a planned handover. A
+        new protokollant of a live meeting is a handover ``now``. Each handover writes
+        ``protokollant_handover`` instead of a protokollant change in
+        ``meeting_update``. The same protokollant again is a no-op. A new
+        protokollant needs ``protocol.write`` in the gremium (O20, 422).
+
         Raises:
             ConflictError: The status change is not ``planned`` to ``live`` or ``live``
                 to ``closed`` (``invalid_status_transition``), the meeting still has an
                 open vote on close (``open_vote``), the start has no protokollant, or
                 the meeting is closed and the patch changes its planning.
         """
-        # A status change locks the meeting row. The open of a vote takes the same
-        # lock, so the open-vote check below and the close cannot race (O12).
-        meeting = await self._get(meeting_id, for_update=payload.status is not None)
         wants_manage = (
             "date" in payload.model_fields_set
             or "start_time" in payload.model_fields_set
@@ -140,6 +146,18 @@ class LifecycleOps(PermissionOps, VoteReadOps):
         )
         wants_write = payload.status is not None or payload.active_application_id is not None
         wants_now = "current_agenda_item_id" in payload.model_fields_set
+        # A status change locks the meeting row. The open of a vote takes the same
+        # lock, so the open-vote check below and the close cannot race (O12). A move
+        # of the agenda item and a protokollant change can change the keeper periods
+        # (Z3), so they take the lock too, as the handover route does.
+        meeting = await self._get(
+            meeting_id,
+            for_update=(
+                payload.status is not None
+                or wants_now
+                or "protokollant_id" in payload.model_fields_set
+            ),
+        )
         if wants_manage and not await self.can_manage(meeting.gremium_id, principal):
             raise ForbiddenError("only a session manager may plan this meeting")
         if wants_write and not await self.can_write(meeting, principal):
@@ -185,15 +203,25 @@ class LifecycleOps(PermissionOps, VoteReadOps):
             raise ConflictError("the session is closed — its settings can no longer be changed")
 
         before = _snapshot(meeting)
+        now = datetime.now(UTC)
         # planned to live: the router creates the protocol at meeting start, after this
         # commit, and nobody takes minutes or votes before that. ``meeting.status`` is
         # set only AFTER the protokollant check, which keeps the change atomic: no
         # ``live`` without a protokollant, not even in memory on a rejected patch.
         going_live = status_change and payload.status == "live"
+        # A handover writes its own audit entry (``protokollant_handover``), so the
+        # ``meeting_update`` entry leaves the protokollant out then.
+        handed_over = False
         if payload.active_application_id is not None:
             meeting.active_application_id = payload.active_application_id
         if wants_now:
+            old_item = meeting.current_agenda_item_id
             meeting.current_agenda_item_id = payload.current_agenda_item_id
+            # Z3: a forward move starts the planned handover in this transaction.
+            if meeting.status == "live" and await self.activate_planned(
+                meeting, old_item, payload.current_agenda_item_id, principal.sub, now
+            ):
+                handed_over = True
         if "date" in payload.model_fields_set:
             meeting.date = payload.date
         if "start_time" in payload.model_fields_set:
@@ -210,24 +238,52 @@ class LifecycleOps(PermissionOps, VoteReadOps):
             and meeting.end_time <= meeting.start_time
         ):
             raise BadRequestError("endTime must be after startTime")
-        if "protokollant_id" in payload.model_fields_set:
+        # The same protokollant again is a no-op, so the settings dialog can send the
+        # value with every save. It skips the O20 check of a new assignment too.
+        if (
+            "protokollant_id" in payload.model_fields_set
+            and payload.protokollant_id != meeting.protokollant_id
+        ):
             # After the finalization the protokollant is part of the signed
             # document, so the assignment is locked.
             if await self._protocol_final(meeting.id):
                 raise ConflictError("protocol is finalized — the protokollant can no longer change")
-            meeting.protokollant_id = await self._resolve_protokollant(
-                meeting.gremium_id, payload.protokollant_id
-            )
+            if meeting.status == "live":
+                # Z3: a new protokollant of a live meeting is a handover ``now``. A
+                # live meeting always keeps a protokollant.
+                if payload.protokollant_id is None:
+                    raise ConflictError(
+                        "a live meeting needs a protokollant — hand the minutes over instead"
+                    )
+                previous = meeting.protokollant_id
+                await self.check_keeper(meeting.gremium_id, payload.protokollant_id)
+                await self.switch_now(meeting, payload.protokollant_id, principal.sub, now)
+                await self._audit_handover(
+                    meeting,
+                    principal.sub,
+                    mode="now",
+                    previous=previous,
+                    target=payload.protokollant_id,
+                )
+                handed_over = True
+            else:
+                meeting.protokollant_id = await self._resolve_protokollant(
+                    meeting.gremium_id, payload.protokollant_id
+                )
         # A meeting needs a protokollant before it goes live. The protokollant
         # writes the protocol that the start creates.
         if going_live and meeting.protokollant_id is None:
             raise ConflictError("assign a protokollant before starting the meeting")
-        now = datetime.now(UTC)
         cancelled: list[Vote] = []
         if going_live and meeting.started_at is None:
             # Z7: the real start, set once. The protocol header and the UI read it.
             meeting.started_at = now
+        if going_live:
+            # Z3: the first period of the protokollant starts with the meeting.
+            await self.open_first_period(meeting, principal.sub, now)
         if closing:
+            # Z3: the close ends the running period and drops the planned one.
+            await self.close_periods(meeting, now)
             # Set the close timestamp once, on the transition to ``closed``. It
             # fills the "end" line of the protocol title page.
             meeting.closed_at = now
@@ -242,6 +298,8 @@ class LifecycleOps(PermissionOps, VoteReadOps):
         if payload.status is not None:
             meeting.status = payload.status
         after = _snapshot(meeting)
+        if handed_over:
+            after["protokollantId"] = before["protokollantId"]
         changes = {
             key: {"from": before[key], "to": after[key]}
             for key in after

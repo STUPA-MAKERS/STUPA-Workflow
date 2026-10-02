@@ -48,6 +48,7 @@ from app.modules.livevote.router import (
     get_voting_service_ws,
 )
 from app.modules.livevote.service import BrokerPublisher, MeetingService
+from app.modules.livevote.service import handover as handover_mod
 from app.modules.livevote.service import lifecycle as lifecycle_mod
 from app.modules.livevote.service import permissions as permissions_mod
 from app.modules.livevote.service.paging import (
@@ -61,6 +62,7 @@ from app.shared.errors import (
     ConflictError,
     ForbiddenError,
     NotFoundError,
+    ValidationProblem,
 )
 
 # pytest-asyncio runs in ``auto`` mode (pyproject). An async test needs no explicit
@@ -1081,10 +1083,30 @@ async def test_resolve_protokollant_not_member(monkeypatch: pytest.MonkeyPatch) 
     async def _none(_s, _sub, now=None):  # noqa: ANN001, ANN202
         return set()
 
-    monkeypatch.setattr(lifecycle_mod, "gremium_member_ids", _none)
+    monkeypatch.setattr(handover_mod, "gremium_member_ids", _none)
     svc = MeetingService(_QueueSession(get_q=[SimpleNamespace(sub="x")]))  # type: ignore[arg-type]
     with pytest.raises(ForbiddenError):
         await svc._resolve_protokollant(uuid4(), uuid4())
+
+
+async def test_resolve_protokollant_needs_protocol_write(monkeypatch: pytest.MonkeyPatch) -> None:
+    """O20: a member without `protocol.write` cannot keep the minutes (422)."""
+    from types import SimpleNamespace
+
+    gid = uuid4()
+
+    async def _member(_s, _sub, now=None):  # noqa: ANN001, ANN202
+        return {gid}
+
+    async def _no_keepers(_s, _gid, now=None):  # noqa: ANN001, ANN202
+        return set()
+
+    monkeypatch.setattr(handover_mod, "gremium_member_ids", _member)
+    monkeypatch.setattr(handover_mod, "keeper_principal_ids", _no_keepers)
+    svc = MeetingService(_QueueSession(get_q=[SimpleNamespace(sub="x")]))  # type: ignore[arg-type]
+    with pytest.raises(ValidationProblem) as ei:
+        await svc._resolve_protokollant(gid, uuid4())
+    assert ei.value.code == "protokollant_needs_protocol_write"
 
 
 async def test_resolve_protokollant_ok(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1095,8 +1117,13 @@ async def test_resolve_protokollant_ok(monkeypatch: pytest.MonkeyPatch) -> None:
     async def _member(_s, _sub, now=None):  # noqa: ANN001, ANN202
         return {gid}
 
-    monkeypatch.setattr(lifecycle_mod, "gremium_member_ids", _member)
     pid = uuid4()
+
+    async def _keepers(_s, _gid, now=None):  # noqa: ANN001, ANN202
+        return {pid}
+
+    monkeypatch.setattr(handover_mod, "gremium_member_ids", _member)
+    monkeypatch.setattr(handover_mod, "keeper_principal_ids", _keepers)
     svc = MeetingService(_QueueSession(get_q=[SimpleNamespace(sub="x")]))  # type: ignore[arg-type]
     assert await svc._resolve_protokollant(gid, pid) == pid
 
@@ -1196,8 +1223,12 @@ async def test_patch_protokollant_resolved(monkeypatch: pytest.MonkeyPatch) -> N
     async def _member(_s, _sub, now=None):  # noqa: ANN001, ANN202
         return {m.gremium_id}
 
+    async def _keepers(_s, _gid, now=None):  # noqa: ANN001, ANN202
+        return {new_pid}
+
     monkeypatch.setattr(MeetingService, "_protocol_final", _final)
-    monkeypatch.setattr(lifecycle_mod, "gremium_member_ids", _member)
+    monkeypatch.setattr(handover_mod, "gremium_member_ids", _member)
+    monkeypatch.setattr(handover_mod, "keeper_principal_ids", _keepers)
     from app.modules.livevote.schemas import MeetingPatch
 
     # The order is _get, then the get of _resolve_protokollant gives the row, then
