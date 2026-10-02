@@ -13,7 +13,7 @@ group = ToolGroup()
 
 @group.tool
 async def list_applications(
-    state: str | None = None,
+    state: list[str] | str | None = None,
     gremium: str | None = None,
     type: str | None = None,
     q: str | None = None,
@@ -24,16 +24,20 @@ async def list_applications(
 ) -> dict:
     """List applications, one page at a time.
 
+    Each item carries `stateSince`, the time of the last status change.
+
     Args:
-        state: Filter by the id of a flow state.
+        state: Filter by flow state ids. Give one id or a list of ids; the result
+            holds the applications in any of these states.
         gremium: Filter by the id of a Gremium.
         type: Filter by the id of an application type.
         q: Full-text search term.
     """
+    states = [state] if isinstance(state, str) else state
     return await api().get(
         "/applications",
         params=params(
-            state=state, gremium=gremium, type=type, q=q,
+            state=states or None, gremium=gremium, type=type, q=q,
             sort=sort, order=order, limit=limit, offset=offset,
         ),
     )
@@ -47,13 +51,21 @@ async def get_application(application_id: str) -> dict:
 
 @group.tool
 async def get_application_timeline(application_id: str) -> dict:
-    """Get the status and transition history of an application."""
+    """Get the status and transition history of an application.
+
+    Each event names the state, the label of the fired transition, the actor and the
+    time.
+    """
     return await api().get(f"/applications/{application_id}/timeline")
 
 
 @group.tool
 async def list_application_versions(application_id: str) -> dict:
-    """Get the version history of the form data of an application, with diffs."""
+    """Get the version history of the form data of an application, with diffs.
+
+    Each version lists its `changedKeys`. Without `application.read` the fields
+    marked as personal data (isPII) are left out of `data` and `diff`.
+    """
     return await api().get(f"/applications/{application_id}/versions")
 
 
