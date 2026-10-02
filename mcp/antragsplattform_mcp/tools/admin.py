@@ -509,8 +509,25 @@ async def list_audit(
 
 @group.tool
 async def verify_audit_chain() -> dict:
-    """Verify the hash chain of the audit log to find tampering. Requires audit.verify."""
+    """Verify the hash chain of the audit log to find tampering. Requires audit.verify.
+
+    The check runs live and stores nothing. It reads the whole log, so it is slow on a
+    long log. To see the result of the last stored check, use
+    `get_latest_audit_verification`.
+    """
     return await api().get("/admin/audit/verify")
+
+
+@group.tool
+async def get_latest_audit_verification() -> dict | None:
+    """Read the newest stored check of the audit hash chain. Requires audit.read.
+
+    The worker checks the chain every night at 04:30 and after each restore. An admin
+    can also start a check. The result holds `startedAt`, `finishedAt`, `valid`,
+    `checked`, `brokenAt` and `reason` (the first break), `trigger`
+    (cron/manual/restore) and `triggeredBy`. It is null before the first check.
+    """
+    return await api().get("/admin/audit/verify/latest")
 
 
 def register(mcp: FastMCP) -> None:

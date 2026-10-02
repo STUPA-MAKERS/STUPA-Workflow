@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import (
 from app.db import get_sessionmaker
 from app.modules.budget.stats import BudgetStatsService
 from app.modules.flow.dispatch import build_worker_dispatcher
+from worker.audit_verify import process_audit_verification
 from worker.backup import create_backup, restore_backup, scheduled_backup
 from worker.backup import on_startup as backup_on_startup
 from worker.deadlines import on_startup as deadlines_on_startup
@@ -126,6 +127,7 @@ class WorkerSettings:
         process_task_reminders,
         process_retention,
         purge_draft_attachments,
+        process_audit_verification,
         func(create_backup, timeout=_BACKUP_JOB_TIMEOUT_SECONDS),
         func(restore_backup, timeout=_BACKUP_JOB_TIMEOUT_SECONDS),
         func(scheduled_backup, timeout=_BACKUP_JOB_TIMEOUT_SECONDS),
@@ -146,6 +148,9 @@ class WorkerSettings:
         # Nightly backup. It runs after the retention job, so the archive holds the
         # already-anonymized state rather than PII that retention is about to drop.
         cron(scheduled_backup, hour=4, minute=0),
+        # Nightly audit-chain check (Z6/O8). It does not depend on the backup and runs
+        # also when backups are off or failed. The result goes to `audit_verification`.
+        cron(process_audit_verification, hour=4, minute=30),
     ]
     on_startup = _on_startup
     on_shutdown = _shutdown

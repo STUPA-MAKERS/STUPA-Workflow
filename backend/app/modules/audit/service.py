@@ -3,25 +3,36 @@
 `AuditService.record` takes a transaction advisory lock before it reads the
 predecessor hash. Concurrent appends therefore serialize and the chain has no
 ``prev_hash`` race. `AuditService.verify_chain` recomputes the chain from genesis.
-It catches both a tampered field and a removed or inserted row. The module-level
-`record` hook is the standard entry point for other modules.
+It catches both a tampered field and a removed or inserted row.
+`AuditService.verify_and_store` runs the same check and stores the result in
+``audit_verification`` (Z6/O8). The module-level `record` hook is the standard entry
+point for other modules.
 """
 
 from __future__ import annotations
 
+import logging
+import time
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import Select, func, select, text
+from sqlalchemy import Select, delete, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.audit.actions import REVERTABLE_BUDGET_ACTIONS, AuditAction
 from app.modules.audit.hashing import canonical_payload, compute_hash
-from app.modules.audit.models import AuditEntry
+from app.modules.audit.models import (
+    VERIFICATION_KEEP,
+    AuditEntry,
+    AuditVerification,
+    VerificationTrigger,
+)
 from app.shared.paging import Page
+
+logger = logging.getLogger("app.audit")
 
 # Fixed advisory-lock key. It serializes chain appends across processes.
 _CHAIN_LOCK_KEY = 0x4155_4449_5400  # "AUDIT\0"
@@ -185,8 +196,12 @@ class AuditService:
         """
         prev_hash: bytes | None = None
         checked = 0
+        # `populate_existing`: the check must read the rows as the database holds
+        # them, never a copy that the identity map of this session still caches.
         stream = await self.session.stream_scalars(
-            select(AuditEntry).order_by(AuditEntry.id.asc())
+            select(AuditEntry)
+            .order_by(AuditEntry.id.asc())
+            .execution_options(populate_existing=True)
         )
         async for entry in stream:
             if entry.prev_hash != prev_hash:
@@ -214,6 +229,85 @@ class AuditService:
             prev_hash = entry.hash
             checked += 1
         return ChainVerification(valid=True, checked=checked)
+
+    async def verify_and_store(
+        self,
+        *,
+        trigger: VerificationTrigger,
+        triggered_by: str | None = None,
+        keep: int = VERIFICATION_KEEP,
+    ) -> AuditVerification:
+        """Verify the whole chain, store the result and commit.
+
+        The method writes one ``audit_verification`` row with the start, the end
+        and the result of `verify_chain`. It then deletes the rows past the newest
+        ``keep`` rows. It logs the duration, because the check reads the whole
+        ``audit_entry`` table and its run time grows with the log.
+
+        Args:
+            trigger: ``cron``, ``manual`` or ``restore``.
+            triggered_by: The principal ``sub`` that started the check. ``None``
+                for the cron.
+            keep: The number of stored checks to keep.
+
+        Returns:
+            The stored row.
+        """
+        started_at = datetime.now(UTC)
+        clock = time.monotonic()
+        result = await self.verify_chain()
+        duration_ms = int((time.monotonic() - clock) * 1000)
+        row = AuditVerification(
+            started_at=started_at,
+            finished_at=datetime.now(UTC),
+            valid=result.valid,
+            checked=result.checked,
+            broken_at=result.broken_at,
+            reason=result.reason,
+            trigger=trigger,
+            triggered_by=triggered_by,
+        )
+        self.session.add(row)
+        await self.session.flush()
+        await self.prune_verifications(keep=keep)
+        await self.session.commit()
+        log = logger.info if result.valid else logger.error
+        log(
+            "audit chain check: trigger=%s valid=%s checked=%d broken_at=%s "
+            "reason=%s duration_ms=%d",
+            trigger,
+            result.valid,
+            result.checked,
+            result.broken_at,
+            result.reason,
+            duration_ms,
+        )
+        return row
+
+    async def prune_verifications(self, *, keep: int = VERIFICATION_KEEP) -> None:
+        """Delete the stored checks past the newest ``keep`` rows. No commit."""
+        newest = (
+            select(AuditVerification.id)
+            .order_by(AuditVerification.started_at.desc(), AuditVerification.id.desc())
+            .limit(keep)
+        )
+        await self.session.execute(
+            delete(AuditVerification)
+            .where(AuditVerification.id.not_in(newest))
+            .execution_options(synchronize_session=False)
+        )
+
+    async def latest_verification(self) -> AuditVerification | None:
+        """Return the newest stored chain check, or ``None`` before the first one."""
+        return (
+            await self.session.execute(
+                select(AuditVerification)
+                .order_by(
+                    AuditVerification.started_at.desc(), AuditVerification.id.desc()
+                )
+                .limit(1)
+            )
+        ).scalar_one_or_none()
 
     async def query(
         self,

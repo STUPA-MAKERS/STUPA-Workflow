@@ -1452,3 +1452,81 @@ def test_substitute_groups(alembic_cfg: Config, engine: Engine) -> None:
     command.upgrade(alembic_cfg, "head")
     with engine.connect() as conn:
         assert conn.execute(text("SELECT to_regclass('substitute_group')")).scalar() is not None
+
+
+def test_audit_verification_and_role_key_report(
+    alembic_cfg: Config, engine: Engine, capfd: pytest.CaptureFixture[str]
+) -> None:
+    """Migration 373c9fe9cafb (Z6, A10).
+
+    The upgrade adds `audit_verification` with its CHECKs and the index on
+    `started_at DESC`. It logs every role key that breaks `^[a-z][a-z0-9_]*$` and
+    changes none. The downgrade drops the table.
+    """
+    command.downgrade(alembic_cfg, "92f23ad77fc5")
+    suffix = uuid.uuid4().hex[:6]
+    with engine.begin() as conn:
+        assert not _has_table(conn, "audit_verification")
+        role = conn.execute(
+            text("INSERT INTO role (key) VALUES (:k) RETURNING id"), {"k": f"Kasse-{suffix}"}
+        ).scalar_one()
+        gremium = conn.execute(
+            text("INSERT INTO gremium (name, slug) VALUES (:n, :s) RETURNING id"),
+            {"n": f"Gremium {suffix}", "s": f"g-a10-{suffix}"},
+        ).scalar_one()
+        conn.execute(
+            text("INSERT INTO gremium_role (gremium_id, key) VALUES (:g, :k)"),
+            {"g": gremium, "k": f"Schrift Fuehrung {suffix}"},
+        )
+        conn.execute(
+            text("INSERT INTO gremium_role (gremium_id, key) VALUES (:g, :k)"),
+            {"g": gremium, "k": f"ok_{suffix}"},
+        )
+
+    capfd.readouterr()
+    command.upgrade(alembic_cfg, "head")
+    err = capfd.readouterr().err
+    assert f"role 'Kasse-{suffix}'" in err
+    assert f"gremium role 'Schrift Fuehrung {suffix}' in gremium 'Gremium {suffix}'" in err
+    assert f"ok_{suffix}" not in err
+
+    with engine.begin() as conn:
+        assert _has_table(conn, "audit_verification")
+        # The pre-check changes nothing.
+        assert conn.execute(
+            text("SELECT key FROM role WHERE id = :i"), {"i": role}
+        ).scalar_one() == f"Kasse-{suffix}"
+        index = conn.execute(
+            text(
+                "SELECT indexdef FROM pg_indexes "
+                "WHERE indexname = 'ix_audit_verification_started_at'"
+            )
+        ).scalar_one()
+        assert "started_at DESC" in index
+        checks = set(
+            conn.execute(
+                text(
+                    "SELECT conname FROM pg_constraint "
+                    "WHERE conrelid = 'audit_verification'::regclass AND contype = 'c'"
+                )
+            ).scalars()
+        )
+        assert checks == {
+            "ck_audit_verification_trigger",
+            "ck_audit_verification_reason",
+            "ck_audit_verification_valid_reason",
+        }
+        conn.execute(
+            text(
+                "INSERT INTO audit_verification (started_at, valid, checked, trigger) "
+                "VALUES (now(), true, 0, 'cron')"
+            )
+        )
+
+    command.downgrade(alembic_cfg, "92f23ad77fc5")
+    with engine.begin() as conn:
+        assert not _has_table(conn, "audit_verification")
+        conn.execute(text("DELETE FROM gremium_role WHERE gremium_id = :g"), {"g": gremium})
+        conn.execute(text("DELETE FROM gremium WHERE id = :g"), {"g": gremium})
+        conn.execute(text("DELETE FROM role WHERE id = :i"), {"i": role})
+    command.upgrade(alembic_cfg, "head")

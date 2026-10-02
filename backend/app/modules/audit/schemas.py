@@ -8,10 +8,16 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.modules.audit.models import AuditEntry
+from app.modules.audit.models import (
+    AuditEntry,
+    AuditVerification,
+    ChainBreak,
+    VerificationTrigger,
+)
 
 
 class _CamelModel(BaseModel):
@@ -98,6 +104,40 @@ class ChainVerificationOut(_CamelModel):
     checked: int
     broken_at: int | None = Field(default=None, alias="brokenAt")
     reason: str | None = None
+
+
+class AuditVerificationOut(_CamelModel):
+    """A stored chain check (``/admin/audit/verify``, ``/admin/audit/verify/latest``).
+
+    ``trigger`` tells what started the check: the nightly ``cron``, a ``manual``
+    call or a ``restore``. ``brokenAt`` and ``reason`` name the first break when
+    ``valid`` is false.
+    """
+
+    id: UUID
+    started_at: datetime = Field(alias="startedAt")
+    finished_at: datetime | None = Field(default=None, alias="finishedAt")
+    valid: bool
+    checked: int
+    broken_at: int | None = Field(default=None, alias="brokenAt")
+    reason: ChainBreak | None = None
+    trigger: VerificationTrigger
+    triggered_by: str | None = Field(default=None, alias="triggeredBy")
+
+    @classmethod
+    def from_row(cls, row: AuditVerification) -> AuditVerificationOut:
+        """Map a stored check to the out schema."""
+        return cls(
+            id=row.id,
+            startedAt=row.started_at,
+            finishedAt=row.finished_at,
+            valid=row.valid,
+            checked=row.checked,
+            brokenAt=row.broken_at,
+            reason=row.reason,  # pyright: ignore[reportArgumentType]  # DB CHECK limits it
+            trigger=row.trigger,  # pyright: ignore[reportArgumentType]  # DB CHECK limits it
+            triggeredBy=row.triggered_by,
+        )
 
 
 class AuditRevertOut(_CamelModel):

@@ -24,7 +24,7 @@ from app.modules.applications.models import (
     StatusEvent,
     SubmissionVersion,
 )
-from app.modules.audit.models import AuditEntry
+from app.modules.audit.models import AuditEntry, AuditVerification
 from app.modules.auth.models import (
     AuthSession,
     GroupMapping,
@@ -75,6 +75,7 @@ __all__ = [
     "Attachment",
     "AttachmentDraftToken",
     "AuditEntry",
+    "AuditVerification",
     "AuthSession",
     "Ballot",
     "Base",

@@ -27,6 +27,7 @@ from app.modules.backup.archive import ArchiveError
 from app.modules.backup.service import BackupError, BackupService, temp_file
 from app.modules.files.storage import build_object_storage
 from app.settings import Settings, load_settings
+from worker.audit_verify import verify_after_restore
 
 logger = logging.getLogger("app.backup")
 
@@ -172,6 +173,9 @@ async def restore_backup(ctx: dict[str, Any], backup_id: str, actor: str | None)
     the restore replaces `audit_entry` along with everything else. The safety archive is
     what proves what the platform looked like beforehand.
 
+    After that entry, the task verifies the restored chain and stores the result with
+    ``trigger = restore`` (Z6). A failed check does not fail the restore.
+
     Returns:
         One of ``done``, ``failed`` or ``gone``.
     """
@@ -240,6 +244,7 @@ async def restore_backup(ctx: dict[str, Any], backup_id: str, actor: str | None)
             },
         )
         await session.commit()
+    await verify_after_restore(_sessionmaker(ctx), actor)
     return "done"
 
 

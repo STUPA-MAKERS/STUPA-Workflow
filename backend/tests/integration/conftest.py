@@ -113,6 +113,8 @@ _DATA_TABLES = (
     # Faculty substitute groups (Z5). The CASCADE clears their members. No FK from
     # the listed tables reaches them.
     "substitute_group",
+    # Stored audit-chain checks (Z6). No FK reaches this table either.
+    "audit_verification",
 )
 
 
