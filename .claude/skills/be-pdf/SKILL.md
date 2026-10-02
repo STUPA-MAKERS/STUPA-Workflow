@@ -32,6 +32,10 @@ MinIO itself.
 - **No browser bucket links.** MinIO has no published port, so a presigned S3 URL binds a
   host the browser cannot resolve. Renders stream through the API the way `be-files` and
   `be-protocol` do. `ObjectStorage` carries no presigning method at all — do not add one.
+- The client passes the Markdown through unchanged. `be-protocol` builds the frontmatter;
+  the `typst` skill lists the contract (`keepers` records, `entschuldigt`, `started_at`,
+  the legacy `protokoll`). A change of that contract needs the api and the typst image
+  deployed together. The legacy keys keep an older typst image working in between.
 - Settings: `typst_url` (`TYPST_URL`), `typst_timeout_seconds`.
 
 **Related:** be-protocol, typst, be-files.
