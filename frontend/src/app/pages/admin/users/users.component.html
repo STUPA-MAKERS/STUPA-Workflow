@@ -45,7 +45,7 @@
     <ng-template appCell="roles" let-p>
       <div class="users__roles">
         @for (id of roleIds($any(p)); track id) {
-          <app-badge variant="primary">{{ roleLabel(id) | capitalize }}</app-badge>
+          <app-badge variant="neutral">{{ roleLabel(id) | capitalize }}</app-badge>
         } @empty {
           <span class="text-muted">{{ 'admin.users.noRoles' | t }}</span>
         }

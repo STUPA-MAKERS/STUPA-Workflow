@@ -37,15 +37,13 @@
   color: var(--color-text-muted);
   white-space: nowrap;
 }
+// One accent fill for every dot (also a passed vote); only a rejected vote is red.
 .fx__dot {
   width: 9px;
   height: 9px;
   border-radius: 50%;
   background: var(--color-accent);
   flex: none;
-}
-.fx__dot--ok {
-  background: var(--color-success);
 }
 .fx__muted {
   color: var(--color-text-muted);
@@ -386,9 +384,6 @@ app-markdown-editor ::ng-deep .mde__host .ProseMirror {
 }
 .fx__dot--live {
   box-shadow: 0 0 0 4px var(--color-primary-subtle);
-}
-.fx__dot[data-result='passed'] {
-  background: var(--color-success);
 }
 .fx__dot[data-result='rejected'] {
   background: var(--color-danger);

@@ -155,7 +155,7 @@
               <span class="font-medium mr-auto">{{ vote.question || vote.title || ('meetings.vote.untitled' | t) }}</span>
               <app-badge [variant]="voteVariant(vote.status)">{{ voteStatusKey(vote.status) | t }}</app-badge>
               @if (vote.applicationId && vote.applicationId === m.activeApplicationId) {
-                <app-badge variant="primary">{{ 'meetings.vote.active' | t }}</app-badge>
+                <app-badge variant="accent">{{ 'meetings.vote.active' | t }}</app-badge>
               }
               @if (vote.result) { <app-badge [variant]="voteResultVariant(vote.result)">{{ voteResultKey(vote.result) | t }}</app-badge> }
               @if (vote.result === 'rejected' && vote.failedReason === 'quorum') {

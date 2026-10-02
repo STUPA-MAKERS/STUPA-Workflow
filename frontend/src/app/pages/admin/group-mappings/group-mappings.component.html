@@ -20,7 +20,7 @@
     [emptyText]="'admin.groupMappings.global.empty' | t"
   >
     <ng-template appCell="oidcGroup" let-r><code>{{ $any(r).oidcGroup }}</code></ng-template>
-    <ng-template appCell="roleLabel" let-r><app-badge variant="primary">{{ $any(r).roleLabel }}</app-badge></ng-template>
+    <ng-template appCell="roleLabel" let-r><app-badge variant="neutral">{{ $any(r).roleLabel }}</app-badge></ng-template>
     <ng-template appCell="actions" let-r>
       <ng-container *ngTemplateOutlet="rowActions; context: { kind: 'global', row: r }" />
     </ng-template>
@@ -69,7 +69,7 @@
     [emptyText]="'admin.groupMappings.role.empty' | t"
   >
     <ng-template appCell="oidcGroup" let-r><code>{{ $any(r).oidcGroup }}</code></ng-template>
-    <ng-template appCell="roleLabel" let-r><app-badge variant="primary">{{ $any(r).roleLabel }}</app-badge></ng-template>
+    <ng-template appCell="roleLabel" let-r><app-badge variant="neutral">{{ $any(r).roleLabel }}</app-badge></ng-template>
     <ng-template appCell="actions" let-r>
       <ng-container *ngTemplateOutlet="rowActions; context: { kind: 'role', row: r }" />
     </ng-template>

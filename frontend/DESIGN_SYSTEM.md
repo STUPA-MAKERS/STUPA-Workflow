@@ -28,7 +28,10 @@ The semantic **names** are stable. A redesign changes their values only, so a pa
 `--color-primary` keeps working. One meaning changed: `--color-primary` is now the accent as
 **text**. A fill (button, bar, dot, selected chip) uses `--color-accent` with
 `--color-on-accent`, or `--color-selected` with `--color-on-selected` for a selection. Do not
-use `--color-primary` as a background, or the page shows a second green.
+use `--color-primary` or `--color-success` as a background, or the page shows a second green.
+Do not use `--color-accent` as a text colour: it has less than 3:1 on the light surfaces. Text
+in the accent uses `--color-accent-text`. The spec `core/theme/token-roles.spec.ts` checks
+both rules.
 
 ## Palette (primitive)
 

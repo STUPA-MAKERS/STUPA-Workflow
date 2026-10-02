@@ -33,10 +33,10 @@
               </app-badge>
             }
             @if (secret()) {
-              <app-badge variant="info">{{ 'vote.tally.secret' | t }}</app-badge>
+              <app-badge variant="neutral">{{ 'vote.tally.secret' | t }}</app-badge>
             }
             @if (delegation()?.exercising) {
-              <app-badge variant="info">{{ 'voting.cast.delegation.badge' | t }}</app-badge>
+              <app-badge variant="neutral">{{ 'voting.cast.delegation.badge' | t }}</app-badge>
             }
             @if (canDelete()) {
               <!-- Only a draft with no ballots and no meeting can be deleted. An
