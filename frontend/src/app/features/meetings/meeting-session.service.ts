@@ -501,6 +501,9 @@ export class MeetingSessionService implements OnDestroy {
     const proto = this.protocol();
     // `isLocked` also covers `rendering`: no second start, no 409 on PATCH.
     if (!proto || proto.isLocked || this.finalizing() || this.agendaSvc.savingTop()) return;
+    // F8, O13: the protocol is finalized only after the close (409 otherwise).
+    // `closeMeeting()` calls this method with the closed meeting from the response.
+    if (this.meeting()?.status !== 'closed') return;
     this.finalizing.set(true);
     // First persist the assembled TOP markdown, then finalize/render.
     this.api.updateProtocol(proto.id, assembleProtocolMarkdown(this.agendaSvc.agenda())).subscribe({
@@ -641,6 +644,10 @@ export class MeetingSessionService implements OnDestroy {
         // TOP bodies can change without a vote. Reload the agenda so live
         // followers see the current protocol state.
         this.agendaSvc.load(m.id, this.canManage(), currentAgendaItemId);
+        // The event carries no rights. A handover (or the start of a planned
+        // handover on a TOP move) moves canWrite, canManageVotes and the keeper
+        // data, so read the meeting again.
+        this.reloadAfterState(m.id);
         // The protocol status can change (rendering → final or draft). The worker
         // broadcasts meeting_state after the background render. Use GET so
         // broadcast bursts do not burn the write rate limit.
@@ -687,6 +694,27 @@ export class MeetingSessionService implements OnDestroy {
       default:
         break;
     }
+  }
+
+  /**
+   * Read the meeting again after a `meeting_state` event (quiet GET).
+   *
+   * The GET gives the rights of this viewer after a handover: the new keeper
+   * gets the editor and the vote controls, the old keeper loses the controls.
+   * When the viewer can write now but has no protocol loaded yet, the method
+   * loads it.
+   */
+  private reloadAfterState(meetingId: Uuid): void {
+    this.api.getMeeting(meetingId, { quiet: true }).subscribe({
+      next: (updated) => {
+        if (this.meeting()?.id !== updated.id) return; // the user opened another meeting
+        this.meeting.set(updated);
+        if (updated.protocolId && !this.protocol() && (this.canWrite() || this.canViewAll())) {
+          this.refreshProtocol();
+        }
+      },
+      error: () => {},
+    });
   }
 
   /** Immutably patch a single vote in the meeting state. */

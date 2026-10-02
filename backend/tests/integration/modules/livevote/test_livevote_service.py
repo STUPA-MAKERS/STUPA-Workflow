@@ -92,7 +92,13 @@ async def _member(session: AsyncSession, gremium: Gremium) -> PrincipalRow:
     p = PrincipalRow(sub=f"s-{uuid.uuid4()}", display_name="Max P", email="m@x.de")
     session.add(p)
     await session.flush()
-    role = GremiumRole(gremium_id=gremium.id, key=f"r-{uuid.uuid4()}", name_i18n={"de": "M"})
+    # O20: the member can keep the minutes.
+    role = GremiumRole(
+        gremium_id=gremium.id,
+        key=f"r-{uuid.uuid4()}",
+        name_i18n={"de": "M"},
+        permissions=["protocol.write"],
+    )
     session.add(role)
     await session.flush()
     session.add(

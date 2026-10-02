@@ -12,6 +12,7 @@ serializer.
 search timeline.
 ``lifecycle`` holds create, patch, delete, the planned to live to closed rules and
 the broadcast.
+``handover`` holds the periods of the protocol keeper and the handover (Z3).
 ``service`` holds the ``MeetingService`` facade that combines the operations.
 
 This module re-exports the facade, ``BrokerPublisher`` and ``meeting_channel``, so

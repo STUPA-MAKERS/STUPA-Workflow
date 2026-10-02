@@ -85,6 +85,8 @@ const MEETING_MODEL: Meeting = {
   canManageVotes: true,
   canVote: false,
   canFinalize: true,
+  keeperPeriods: [],
+  plannedHandover: null,
   votes: [
     {
       id: 'v-1', applicationId: 'app-1', agendaItemId: null, title: 'Antrag A',
@@ -594,7 +596,7 @@ describe('MeetingsComponent', () => {
     http.expectOne('/api/meetings/m-1').flush(MEETING);
     http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
     http.expectOne('/api/meetings/m-1/attendance').flush([
-      { principalId: 'pr-1', displayName: 'Max P', email: 'm@x.de', status: null, source: null, isSelf: false },
+      { principalId: 'pr-1', displayName: 'Max P', email: 'm@x.de', status: null, source: null, isSelf: false, canKeepProtocol: true },
     ]);
     http.expectOne('/api/meetings/m-1/agenda').flush([]);
     http.expectOne('/api/meetings/m-1/agenda/assignable').flush([]);
@@ -603,7 +605,7 @@ describe('MeetingsComponent', () => {
     await userEvent.click(editBtns[0]);
     // openSettings reloads the roster (minute-taker options).
     http.expectOne('/api/meetings/m-1/attendance').flush([
-      { principalId: 'pr-1', displayName: 'Max P', email: 'm@x.de', status: null, source: null, isSelf: false },
+      { principalId: 'pr-1', displayName: 'Max P', email: 'm@x.de', status: null, source: null, isSelf: false, canKeepProtocol: true },
     ]);
     // Match the exact label. The start button carries an aria-label
     // "Protokollant zuweisen …", which makes a /Protokollant/ regex ambiguous.
@@ -929,9 +931,11 @@ describe('MeetingsComponent — methods', () => {
     it('builds create-protokollant options from the loaded members', async () => {
       const { cmp } = await loaded();
       cmp.createMembers.set([
-        { principalId: 'pr-1', displayName: 'Max', email: 'm@x' },
-        { principalId: 'pr-2', displayName: '', email: 'b@x' },
-        { principalId: 'pr-3', displayName: '', email: '' },
+        { principalId: 'pr-1', displayName: 'Max', email: 'm@x', canKeepProtocol: true },
+        { principalId: 'pr-2', displayName: '', email: 'b@x', canKeepProtocol: true },
+        { principalId: 'pr-3', displayName: '', email: '', canKeepProtocol: true },
+        // O20: without `protocol.write` no option.
+        { principalId: 'pr-4', displayName: 'Vera', email: 'v@x', canKeepProtocol: false },
       ] as never);
       const opts = cmp.createProtokollantOptions();
       // First option is always "nobody".
@@ -939,6 +943,7 @@ describe('MeetingsComponent — methods', () => {
       expect(opts[1]).toEqual({ value: 'pr-1', label: 'Max' });
       expect(opts[2]).toEqual({ value: 'pr-2', label: 'b@x' }); // displayName empty → email
       expect(opts[3]).toEqual({ value: 'pr-3', label: 'pr-3' }); // both empty → id
+      expect(opts).toHaveLength(4);
     });
   });
 
@@ -1723,6 +1728,7 @@ describe('MeetingsComponent — methods', () => {
         AGENDA_ITEM({ id: 't-1', applicationId: 'app-1', title: 'Antrag', body: 'Text' }),
         AGENDA_ITEM({ id: 't-2', applicationId: null, title: '', body: '' }),
       ] as never);
+      cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' }); // F8: finalize after the close
       cmp.finalize();
       const saveReq = http.expectOne('/api/protocols/p-1');
       expect(saveReq.request.body.markdown).toContain('# Antrag');
@@ -1744,6 +1750,7 @@ describe('MeetingsComponent — methods', () => {
 
     it('reports a save error before finalize', async () => {
       const { cmp, http } = await loaded();
+      cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' }); // F8: finalize after the close
       cmp.finalize();
       http.expectOne('/api/protocols/p-1').flush(null, { status: 500, statusText: 'e' });
       expect(cmp.finalizing()).toBe(false);
@@ -1751,6 +1758,7 @@ describe('MeetingsComponent — methods', () => {
 
     it('reports a finalize error with the server detail', async () => {
       const { cmp, http } = await loaded();
+      cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' }); // F8: finalize after the close
       cmp.finalize();
       http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
       http
@@ -1761,6 +1769,7 @@ describe('MeetingsComponent — methods', () => {
 
     it('reports a finalize error without a detail', async () => {
       const { cmp, http } = await loaded();
+      cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' }); // F8: finalize after the close
       cmp.finalize();
       http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
       http.expectOne('/api/protocols/p-1/finalize').flush(null, { status: 500, statusText: 'e' });
@@ -1776,6 +1785,8 @@ describe('MeetingsComponent — methods', () => {
       cmp.protocol.set({ ...PROTOCOL, isFinal: false, isLocked: false } as never);
       cmp.savingTop.set(true);
       cmp.finalize(); // savingTop → return
+      cmp.savingTop.set(false);
+      cmp.finalize(); // F8: the meeting is still live → return
       http.verify();
     });
   });
@@ -1903,6 +1914,131 @@ describe('MeetingsComponent — methods', () => {
       cmp.setProtokollant(cmp.meeting()!, 'pr-9');
       http.expectOne('/api/meetings/m-1').flush(null, { status: 409, statusText: 'e' });
       expect(cmp.meeting()!.protokollantId).toBe(before);
+    });
+
+    it('hands the minutes over now and plans the next-item handover (Z3)', async () => {
+      const { cmp, http, fixture } = await loaded();
+      const toast = fixture.debugElement.injector.get(ToastService);
+      const success = jest.spyOn(toast, 'success');
+      cmp.handOver(cmp.meeting()!, 'pr-9', 'now');
+      const now = http.expectOne('/api/meetings/m-1/protokollant-handover');
+      expect(now.request.method).toBe('POST');
+      expect(now.request.body).toEqual({ principalId: 'pr-9', mode: 'now' });
+      now.flush({ ...MEETING, protokollantId: 'pr-9', protokollantName: 'Neu' });
+      expect(cmp.meeting()!.protokollantId).toBe('pr-9');
+      expect(success).toHaveBeenLastCalledWith('Protokollführung übergeben.');
+      cmp.handOver(cmp.meeting()!, 'pr-2', 'next_item');
+      const plan = {
+        principalId: 'pr-2',
+        name: 'B',
+        fromAt: null,
+        toAt: null,
+        fromAgendaItemId: null,
+        toAgendaItemId: null,
+        fromPosition: null,
+        toPosition: null,
+      };
+      http
+        .expectOne('/api/meetings/m-1/protokollant-handover')
+        .flush({ ...MEETING, protokollantId: 'pr-9', plannedHandover: plan });
+      expect(cmp.meeting()!.plannedHandover?.principalId).toBe('pr-2');
+      expect(success).toHaveBeenLastCalledWith('Übergabe mit dem nächsten TOP geplant.');
+    });
+
+    it('reads the meeting again on meeting_state, so a handover reaches the new keeper (Z3)', async () => {
+      // Viewer B: a member with protocol.write in the gremium, not the keeper yet.
+      const { http, ws, fixture } = await setup({ perms: ['protocol.write'] });
+      const cmp = fixture.componentInstance as Cmp;
+      http.expectOne('/api/meetings/m-1').flush({
+        ...MEETING,
+        canManage: false,
+        canWrite: false,
+        canManageVotes: false,
+        canFinalize: false,
+        isProtokollant: false,
+        protokollantId: 'pr-a',
+        protokollantName: 'A',
+      });
+      http.expectOne('/api/meetings/m-1/attendance').flush([]);
+      http.expectOne('/api/meetings/m-1/agenda').flush([]);
+      http.match('/api/meetings/m-1/agenda/assignable').forEach((r) => r.flush([]));
+      flushDelegationContext(http);
+      http.expectNone('/api/meetings/m-1/protocol'); // no write right yet
+      expect(cmp.canWrite()).toBe(false);
+
+      // A hands the minutes over to B. The event carries no rights.
+      ws.subject.next({ type: 'meeting_state', activeApplicationId: 'app-1', status: 'live' });
+      http.expectOne('/api/meetings/m-1/agenda').flush([]);
+      http.match('/api/meetings/m-1/agenda/assignable').forEach((r) => r.flush([]));
+      const plan = {
+        principalId: 'pr-c',
+        name: 'C',
+        fromAt: null,
+        toAt: null,
+        fromAgendaItemId: null,
+        toAgendaItemId: null,
+        fromPosition: null,
+        toPosition: null,
+      };
+      http.expectOne('/api/meetings/m-1').flush({
+        ...MEETING,
+        canManage: false,
+        canWrite: true,
+        canManageVotes: true,
+        canFinalize: false,
+        isProtokollant: true,
+        protokollantId: 'pr-1',
+        protokollantName: 'B',
+        plannedHandover: plan,
+      });
+      expect(cmp.canWrite()).toBe(true);
+      expect(cmp.meeting()!.canManageVotes).toBe(true);
+      expect(cmp.meeting()!.isProtokollant).toBe(true);
+      expect(cmp.meeting()!.protokollantName).toBe('B');
+      expect(cmp.meeting()!.plannedHandover?.principalId).toBe('pr-c');
+      // B can write now, so the editor loads the protocol.
+      http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
+      expect(cmp.protocol()?.id).toBe('p-1');
+    });
+
+    it('reports a refused handover', async () => {
+      const { cmp, http, fixture } = await loaded();
+      const error = jest.spyOn(fixture.debugElement.injector.get(ToastService), 'error');
+      cmp.handOver(cmp.meeting()!, 'pr-9', 'now');
+      http
+        .expectOne('/api/meetings/m-1/protokollant-handover')
+        .flush(
+          { detail: 'x', code: 'protokollant_needs_protocol_write' },
+          { status: 422, statusText: 'Unprocessable' },
+        );
+      expect(error).toHaveBeenLastCalledWith('Diese Person hat im Gremium kein Protokollrecht.');
+      cmp.handOver(cmp.meeting()!, 'pr-9', 'next_item');
+      http
+        .expectOne('/api/meetings/m-1/protokollant-handover')
+        .flush({ detail: 'last item', code: 'no_next_item' }, { status: 409, statusText: 'c' });
+      expect(error.mock.lastCall?.[0]).toContain('last item');
+      cmp.handOver(cmp.meeting()!, 'pr-9', 'now');
+      http
+        .expectOne('/api/meetings/m-1/protokollant-handover')
+        .flush(null, { status: 500, statusText: 'e' });
+      expect(error.mock.lastCall?.[0]).toBe('Aktion fehlgeschlagen.');
+    });
+
+    it('discards the planned handover', async () => {
+      const { cmp, http, fixture } = await loaded();
+      const toast = fixture.debugElement.injector.get(ToastService);
+      const success = jest.spyOn(toast, 'success');
+      const error = jest.spyOn(toast, 'error');
+      cmp.cancelHandover(cmp.meeting()!);
+      const req = http.expectOne('/api/meetings/m-1/protokollant-handover');
+      expect(req.request.method).toBe('DELETE');
+      req.flush({ ...MEETING, plannedHandover: null });
+      expect(success).toHaveBeenLastCalledWith('Geplante Übergabe verworfen.');
+      cmp.cancelHandover(cmp.meeting()!);
+      http
+        .expectOne('/api/meetings/m-1/protokollant-handover')
+        .flush({ code: 'no_planned_handover' }, { status: 404, statusText: 'n' });
+      expect(error).toHaveBeenCalled();
     });
 
     it('ignores saveSettings without a settings meeting or while saving', async () => {
@@ -2422,6 +2558,7 @@ describe('MeetingsComponent — methods', () => {
       jest.useFakeTimers();
       try {
         const { cmp, http } = await loaded();
+        cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' }); // F8: finalize after the close
         cmp.finalize();
         http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
         http.expectOne('/api/protocols/p-1/finalize').flush({ ...PROTOCOL, status: 'rendering', isFinal: false, isLocked: true });
@@ -2797,15 +2934,20 @@ describe('MeetingsComponent — methods', () => {
     it('labels settings protokollant options falling back email → principalId', async () => {
       const { cmp } = await loaded();
       cmp.settingsRoster.set([
-        { principalId: 'pr-1', displayName: 'Max', email: 'm@x', status: null, source: null, isSelf: false },
-        { principalId: 'pr-2', displayName: '', email: 'b@x', status: null, source: null, isSelf: false },
-        { principalId: 'pr-3', displayName: '', email: '', status: null, source: null, isSelf: false },
+        { principalId: 'pr-1', displayName: 'Max', email: 'm@x', status: null, source: null, note: null, isSelf: false, canKeepProtocol: true },
+        { principalId: 'pr-2', displayName: '', email: 'b@x', status: null, source: null, note: null, isSelf: false, canKeepProtocol: true },
+        { principalId: 'pr-3', displayName: '', email: '', status: null, source: null, note: null, isSelf: false, canKeepProtocol: true },
+        // O20: no option without `protocol.write`, unless the member is the current one.
+        { principalId: 'pr-4', displayName: 'Vera', email: 'v@x', status: null, source: null, note: null, isSelf: false },
       ]);
       const opts = cmp.protokollantOptions();
       // [0] = "nobody". Then: displayName → email fallback → principalId fallback.
       expect(opts[1]).toEqual({ value: 'pr-1', label: 'Max' });
       expect(opts[2]).toEqual({ value: 'pr-2', label: 'b@x' }); // displayName empty → email
       expect(opts[3]).toEqual({ value: 'pr-3', label: 'pr-3' }); // both empty → principalId
+      expect(opts).toHaveLength(4);
+      cmp.settingsMeeting.set({ ...cmp.meeting()!, protokollantId: 'pr-4' });
+      expect(cmp.protokollantOptions().map((o) => o.value)).toContain('pr-4');
     });
 
     it('returns empty vote lists when no meeting is loaded', async () => {
@@ -2824,6 +2966,7 @@ describe('MeetingsComponent — methods', () => {
         // bodyTimer: an autosave that has not fired yet.
         cmp.onTopBodyChange('t-1', 'X');
         // renderPollTimer: protocol rendering → watchRendering schedules a poll.
+        cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' }); // F8: finalize after the close
         cmp.finalize();
         http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
         http.expectOne('/api/protocols/p-1/finalize').flush({ ...PROTOCOL, status: 'rendering', isFinal: false, isLocked: true });
@@ -2878,6 +3021,7 @@ describe('MeetingsComponent — methods', () => {
         const { cmp, ws, http } = await loaded();
         // Finalize turns the protocol to rendering, so watchRendering schedules
         // the renderPollTimer.
+        cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' }); // F8: finalize after the close
         cmp.finalize();
         http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
         http.expectOne('/api/protocols/p-1/finalize').flush({ ...PROTOCOL, status: 'rendering', isFinal: false, isLocked: true });
@@ -2901,6 +3045,7 @@ describe('MeetingsComponent — methods', () => {
       jest.useFakeTimers();
       try {
         const { cmp, http } = await loaded();
+        cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' }); // F8: finalize after the close
         cmp.finalize();
         http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
         http.expectOne('/api/protocols/p-1/finalize').flush({ ...PROTOCOL, status: 'rendering', isFinal: false, isLocked: true });

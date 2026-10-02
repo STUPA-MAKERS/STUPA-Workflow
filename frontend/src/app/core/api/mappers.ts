@@ -261,6 +261,8 @@ export function mapMeeting(wire: MeetingOutWire): Meeting {
     canManageVotes: wire.canManageVotes ?? false,
     canVote: wire.canVote ?? false,
     canFinalize: wire.canFinalize ?? false,
+    keeperPeriods: wire.keeperPeriods ?? [],
+    plannedHandover: wire.plannedHandover ?? null,
   };
 }
 

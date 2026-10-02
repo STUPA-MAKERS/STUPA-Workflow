@@ -9,9 +9,9 @@ description: Internal-only protocol Markdown→PDF render service (`typst/`) —
 
 **Key files:**
 - `typst_service/app.py` — FastAPI app: `POST /render`, `GET /health`, raw-body and multipart parsing, body/asset caps, error→status map, path scrubbing, compile semaphore.
-- `typst_service/frontmatter.py` — YAML frontmatter split with `yaml.BaseLoader` (every scalar stays a string: `18:30` is NOT sexagesimal).
+- `typst_service/frontmatter.py` — YAML frontmatter split with `yaml.BaseLoader` (every scalar stays a string: `18:30` is NOT sexagesimal). `parse_frontmatter` also returns the records: a list of flat mappings (string values only), today `keepers`. `split_frontmatter` leaves them out.
 - `typst_service/markdown.py` — marko (CommonMark + GFM) → JSON nodes. Callouts (`[!NOTE]`… and protocol `[!beschluss]`/`[!abstimmung]`/`[!aufgabe]`/`[!frist]`/`[!unterschriften]`), tally parsing, `{{shortcodes}}`, `$…$`/`$$…$$` math, ASCII arrows → math symbols, drops the editor's `:::antrag{#id}` fences. `MAX_DEPTH` caps nesting.
-- `typst_service/document.py` — title, title-page data rows (incl. `datalines`), default logos per variant, `logos`/`footer_logos` config, signatures.
+- `typst_service/document.py` — title, title-page data rows (incl. `datalines`), default logos per variant, `logos`/`footer_logos` config, signatures. The keepers (Z3): the `Protokoll` row lists every period (`Name (TOP 1 – TOP 3)`, or the times without a TOP number; one keeper prints the name only), the `Schriftführung` role gets one signature line per keeper, and a later period adds the line "Die Protokollführung übernimmt <Name> um <hh:mm> Uhr." below the heading of its `from_top` agenda item. Without `keepers` the legacy `protokoll` name stays in use. `entschuldigt` (alias `excused`) is its own list row. `started_at` (`YYYY-MM-DD HH:MM`) fills a missing `datum` or `beginn`.
 - `typst_service/compiler.py` — one temp dir per job as the Typst `--root` (`main.typ`, `doc.json`, `assets/`, symlinks `tpl`→`template/`, `hsrt`→`vendor/hsrtreport-typst/src`), `--ignore-system-fonts`, offline `--package-path`, wall-clock timeout that kills the process group.
 - `template/protocol.typ` — the layout. `template/main.typ` — job entry point.
 - `typst_service/selftest.py` — renders a sample per variant during `docker build`.
@@ -19,6 +19,8 @@ description: Internal-only protocol Markdown→PDF render service (`typst/`) —
 - `fonts/` — FontAwesome 4.7 (box icons, OFL) and Latin Modern Mono (code, GUST).
 - `packages/preview/mitex/0.2.7` — vendored mitex (LaTeX math → Typst math, offline).
 - `Dockerfile` — `python:3.13-slim` + pinned, sha256-checked typst musl binary; uid 10001.
+
+**Frontmatter contract (backend → typst):** `title`, `typ`, `gremium`, `cd`, `datum`, `date`, `beginn`, `ende`, `started_at`, `protokoll` (legacy single name), `keepers` (list of records `name`, `from`, `to`, `from_top`, `to_top`; all strings, empty keys left out), `anwesend`, `entschuldigt`, `abwesend`, `beschlussfaehigkeit`, `datalines`, `unterschriften`. The public variant sends no names and no `keepers`. Deploy the api and the typst images together when the contract changes; the legacy `protokoll` key keeps an older typst image working.
 
 **API surface:**
 - `POST /render?variant=protocol-stupa|protocol-asta|protocol` — raw body (Markdown) or `multipart/form-data` with `source`, `config` (JSON object), repeated `assets` (file name = asset name, plain image file name only). Returns `application/pdf` + `X-Render-Duration-Seconds`. `variant` omitted/`protocol` ⇒ default logos from the `gremium` key (stupa/asta/echo, else STUPA).

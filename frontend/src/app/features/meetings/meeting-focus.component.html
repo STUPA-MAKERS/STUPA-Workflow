@@ -325,6 +325,30 @@
     </div>
   }
 
+  @if (panel() === 'protokollant' && canHandOver()) {
+    <!-- Z3: hand the minutes over during the live meeting, at once or with the next item. -->
+    <div class="fx__sheet fx__sheet--right" role="dialog" [attr.aria-label]="'meetings.handover.title' | t">
+      <div class="fx__sheetHead">
+        <h3 class="fx__sheetTitle">{{ 'meetings.handover.title' | t }}</h3>
+        <button type="button" class="fx__close" [attr.aria-label]="'action.close' | t" (click)="closePanel()">✕</button>
+      </div>
+      <div class="fx__stat">
+        <span>{{ 'meetings.dock.protokollantIs' | t: { name: m.protokollantName ?? '' } }}</span>
+      </div>
+      @if (m.plannedHandover; as plan) {
+        <div class="fx__stat fx__plan" role="status">
+          <span>{{ 'meetings.handover.planned' | t: { name: plan.name ?? '' } }}</span>
+          <app-button variant="ghost" size="sm" (click)="cancelHandover.emit()">{{ 'meetings.handover.discard' | t }}</app-button>
+        </div>
+      }
+      <div class="fx__modes" role="group" [attr.aria-label]="'meetings.handover.when' | t">
+        <app-button size="sm" [block]="true" [variant]="handoverMode() === 'now' ? 'primary' : 'secondary'" [ariaPressed]="handoverMode() === 'now'" (click)="handoverMode.set('now')">{{ 'meetings.handover.now' | t }}</app-button>
+        <app-button size="sm" [block]="true" [variant]="handoverMode() === 'next_item' ? 'primary' : 'secondary'" [ariaPressed]="handoverMode() === 'next_item'" [disabled]="!hasNextForHandover()" [title]="(hasNextForHandover() ? 'meetings.handover.nextItem' : 'meetings.handover.noNextItem') | t" (click)="handoverMode.set('next_item')">{{ 'meetings.handover.nextItem' | t }}</app-button>
+      </div>
+      <ng-container [ngTemplateOutlet]="keeperPicker" />
+    </div>
+  }
+
   @if (openVote(); as vote) {
     <!-- The question does not fit one row next to the controls, so it gets its own.
          Its second line carries the tally, or why the tally is still hidden. -->
@@ -448,34 +472,7 @@
                   <h3 class="fx__sheetTitle">{{ 'meetings.dock.pickProtokollant' | t }}</h3>
                   <button type="button" class="fx__close" [attr.aria-label]="'action.close' | t" (click)="closePanel()">✕</button>
                 </div>
-                <input
-                  class="fx__input"
-                  type="search"
-                  name="protokollantQuery"
-                  [placeholder]="'meetings.dock.searchMember' | t"
-                  [attr.aria-label]="'meetings.dock.searchMember' | t"
-                  [ngModel]="protokollantQuery()"
-                  (ngModelChange)="protokollantQuery.set($event)"
-                />
-                <ul class="fx__people">
-                  @for (a of protokollantCandidates(); track a.principalId) {
-                    <li>
-                      <button
-                        type="button"
-                        class="fx__person"
-                        [class.fx__person--sel]="a.principalId === m.protokollantId"
-                        [attr.aria-pressed]="a.principalId === m.protokollantId"
-                        (click)="pickProtokollant(a.principalId)"
-                      >
-                        <span class="fx__avatar" aria-hidden="true">{{ initials(a) }}</span>
-                        <span class="fx__personName">{{ memberName(a) }}</span>
-                        <span class="fx__personState" [attr.data-status]="a.status">{{ attendanceKey(a.status) | t }}</span>
-                      </button>
-                    </li>
-                  } @empty {
-                    <li class="fx__empty text-text-muted">{{ 'meetings.dock.noMember' | t }}</li>
-                  }
-                </ul>
+                <ng-container [ngTemplateOutlet]="keeperPicker" />
               </div>
             }
           </span>
@@ -510,6 +507,24 @@
       }
     </div>
 
+    @if (canHandOver()) {
+      <button
+        type="button"
+        class="fx__chip fx__chip--tail"
+        [class.fx__chip--open]="panel() === 'protokollant'"
+        [attr.aria-expanded]="panel() === 'protokollant'"
+        aria-haspopup="dialog"
+        [title]="'meetings.handover.title' | t"
+        (click)="togglePanel('protokollant')"
+      >
+        <app-icon name="user" [size]="14" />
+        <span class="fx__chipMain">{{ m.protokollantName ?? ('meetings.protokollant.label' | t) }}</span>
+        @if (m.plannedHandover) {
+          <span class="fx__chipSub">· {{ 'meetings.handover.plannedShort' | t }}</span>
+        }
+        <app-icon name="chevron-up" [size]="12" />
+      </button>
+    }
     <button
       type="button"
       class="fx__chip fx__chip--tail"
@@ -527,3 +542,36 @@
     </button>
   </div>
 </div>
+
+<!-- The member list of the keeper picker. Only members with `protocol.write` can keep
+     the minutes (O20). A planned meeting assigns the pick, a live meeting hands over. -->
+<ng-template #keeperPicker>
+  <input
+    class="fx__input"
+    type="search"
+    name="protokollantQuery"
+    [placeholder]="'meetings.dock.searchMember' | t"
+    [attr.aria-label]="'meetings.dock.searchMember' | t"
+    [ngModel]="protokollantQuery()"
+    (ngModelChange)="protokollantQuery.set($event)"
+  />
+  <ul class="fx__people">
+    @for (a of protokollantCandidates(); track a.principalId) {
+      <li>
+        <button
+          type="button"
+          class="fx__person"
+          [class.fx__person--sel]="a.principalId === meeting().protokollantId"
+          [attr.aria-pressed]="a.principalId === meeting().protokollantId"
+          (click)="pickProtokollant(a.principalId)"
+        >
+          <span class="fx__avatar" aria-hidden="true">{{ initials(a) }}</span>
+          <span class="fx__personName">{{ memberName(a) }}</span>
+          <span class="fx__personState" [attr.data-status]="a.status">{{ attendanceKey(a.status) | t }}</span>
+        </button>
+      </li>
+    } @empty {
+      <li class="fx__empty text-text-muted">{{ 'meetings.dock.noKeeper' | t }}</li>
+    }
+  </ul>
+</ng-template>

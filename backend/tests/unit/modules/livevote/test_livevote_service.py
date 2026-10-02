@@ -222,7 +222,10 @@ class _FakeSession:
         self.commits = 0
         self.added: list[object] = []
 
-    async def execute(self, _stmt: object) -> _Result:
+    async def execute(self, stmt: object) -> _Result:
+        # The meeting has no keeper period (Z3) in these tests.
+        if "protocol_keeper_period" in str(stmt):
+            return _Result(None)
         return _Result(self.existing)
 
     async def get(self, _model: object, _pk: object) -> object | None:

@@ -123,8 +123,50 @@ async def update_meeting(meeting_id: str, patch: S.MeetingPatch) -> dict:
     `startedAt`. The close gives 409 `open_vote` while a vote of the meeting is open
     (close or cancel it first), and it cancels the draft votes. A closed meeting
     keeps its date, time and minute-taker.
+
+    A new minute-taker needs protocol.write in the gremium (422
+    `protokollant_needs_protocol_write`). While the meeting is live, a new
+    minute-taker is a handover with mode `now` (see `protokollant_handover`). The
+    same minute-taker again changes nothing.
     """
     return await api().patch(f"/meetings/{meeting_id}", json=dump_patch(patch))
+
+
+@group.tool
+async def protokollant_handover(
+    meeting_id: str,
+    principal_id: str,
+    mode: Literal["now", "next_item"] = "now",
+) -> dict:
+    """Hand the minutes of a LIVE meeting over to another member.
+
+    `now` hands over at once: the running period of the minute-taker ends and the
+    next one starts. `next_item` plans the handover: the next forward move of the
+    current agenda item starts it. A new plan replaces the old one. The rights that
+    follow the minute-taker move with the handover (agenda item change and votes).
+
+    Callers: session.manage in the meeting's gremium (or admin), or the current
+    minute-taker. The new minute-taker must be an active member (403) with
+    protocol.write in the gremium (422 `protokollant_needs_protocol_write`). 409
+    `meeting_not_live` outside a live meeting, `already_protokollant` for the current
+    minute-taker, `no_next_item` for `next_item` on the last agenda item. Every
+    handover goes into the audit log (`protokollant_handover`). Returns the meeting
+    with `keeperPeriods` and `plannedHandover`.
+    """
+    return await api().post(
+        f"/meetings/{meeting_id}/protokollant-handover",
+        json={"principalId": principal_id, "mode": mode},
+    )
+
+
+@group.tool
+async def cancel_protokollant_handover(meeting_id: str) -> dict:
+    """Discard the planned handover (`next_item`) of a live meeting.
+
+    Same callers as `protokollant_handover`. 404 `no_planned_handover` without a
+    plan. Goes into the audit log. Returns the meeting.
+    """
+    return await api().delete(f"/meetings/{meeting_id}/protokollant-handover")
 
 
 @group.tool
@@ -319,7 +361,8 @@ async def embed_protocol_votes(protocol_id: str, vote_ids: list[str]) -> dict:
     """Append closed votes to the protocol as markdown snippets.
 
     The call is idempotent per vote. Requires write access to the meeting: session.manage
-    or protocol.write in its gremium, the assigned minute-taker, or admin.
+    or protocol.write in its gremium, the assigned minute-taker, or admin. Only the
+    votes of the protocol's own meeting: any other vote gives 422 `vote_not_in_meeting`.
     """
     return await api().post(
         f"/protocols/{protocol_id}/votes", json={"voteIds": vote_ids}
@@ -330,12 +373,15 @@ async def embed_protocol_votes(protocol_id: str, vote_ids: list[str]) -> dict:
 async def finalize_protocol(protocol_id: str) -> dict:
     """Finalize the protocol.
 
+    Only after the meeting is CLOSED (409 `meeting_not_closed` before), and only
+    once: a protocol that is rendering or final gives 409 `protocol_not_draft`.
+
     The call is ASYNC. It returns `status: "rendering"` while a worker renders the PDF
     and mails it to the Gremium. Re-fetch with `get_or_create_protocol(meeting_id)`
     until `status` is `final`. A fall back to `draft` means the render failed. Fix the
-    content and finalize again. The call is idempotent. Requires the write access to
-    the meeting AND the gremium permission protocol.finalize in its gremium (or
-    admin).
+    content and finalize again. Requires the write access to the meeting AND the
+    gremium permission protocol.finalize in its gremium (or admin). The start goes
+    into the audit log (`protocol_finalize`).
     """
     return await api().post(f"/protocols/{protocol_id}/finalize")
 

@@ -18,6 +18,7 @@ import pytest
 from app.modules.admin.models import Gremium
 from app.modules.livevote.models import Meeting
 from app.modules.pdf.typst_client import TypstError
+from app.modules.protocol import service as protocol_service_mod
 from app.modules.protocol.models import Protocol
 from app.modules.protocol.service import ProtocolService, protocol_storage_key
 from app.settings import get_settings
@@ -488,30 +489,52 @@ async def test_get_pdf_bytes_404_without_storage() -> None:
         await _service(session, storage=None).get_pdf_bytes(PID)
 
 
-async def test_start_finalize_marks_rendering_and_requests_enqueue() -> None:
+def _closed_meeting(status: str = "closed") -> SimpleNamespace:
+    return SimpleNamespace(id=MID, gremium_id=GID, status=status)
+
+
+async def test_start_finalize_marks_rendering_and_audits(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[dict[str, Any]] = []
+
+    async def _record(_session: Any, **kw: Any) -> None:
+        calls.append(kw)
+
+    monkeypatch.setattr(protocol_service_mod, "audit_record", _record)
     proto = _protocol()
-    session = FakeSession(results=[result(proto)])
-    out, needs_render = await _service(session).start_finalize(PID)
-    assert needs_render is True
+    session = FakeSession(store={MID: _closed_meeting()}, results=[result(proto)])
+    out = await _service(session).start_finalize(PID, actor="lead")
     assert out.status == "rendering" and proto.status == "rendering"
     assert session.committed == 1  # the status flip commits before the enqueue
+    [entry] = calls
+    assert entry["action"].value == "protocol_finalize"
+    assert entry["actor"] == "lead"
+    assert entry["target_id"] == str(PID)
+    assert entry["data"] == {"meetingId": str(MID), "gremiumId": str(GID)}
 
 
-async def test_start_finalize_idempotent_while_rendering() -> None:
-    proto = _protocol(status="rendering")
-    session = FakeSession(results=[result(proto)])
-    out, needs_render = await _service(session).start_finalize(PID)
-    assert needs_render is False
-    assert out.status == "rendering"
+@pytest.mark.parametrize("status", ["planned", "live"])
+async def test_start_finalize_needs_a_closed_meeting(status: str) -> None:
+    """F8, O13: no finalization while the meeting runs."""
+    proto = _protocol()
+    session = FakeSession(store={MID: _closed_meeting(status)}, results=[result(proto)])
+    with pytest.raises(ConflictError) as ei:
+        await _service(session).start_finalize(PID, actor="lead")
+    assert ei.value.code == "meeting_not_closed"
+    assert proto.status == "draft"
+    assert session.committed == 0
+
+
+@pytest.mark.parametrize("status", ["rendering", "final"])
+async def test_start_finalize_only_once(status: str) -> None:
+    """O2: one finalization, also with several keepers."""
+    proto = _protocol(status=status)
+    session = FakeSession(store={MID: _closed_meeting()}, results=[result(proto)])
+    with pytest.raises(ConflictError) as ei:
+        await _service(session).start_finalize(PID, actor="lead")
+    assert ei.value.code == "protocol_not_draft"
     assert session.committed == 0  # no double enqueue and no write
-
-
-async def test_start_finalize_idempotent_when_final() -> None:
-    proto = _protocol(status="final", pdf_storage_key=protocol_storage_key(PID))
-    session = FakeSession(results=[result(proto)])
-    out, needs_render = await _service(session).start_finalize(PID)
-    assert needs_render is False
-    assert out.status == "final"
 
 
 async def test_revert_to_draft_resets_rendering() -> None:

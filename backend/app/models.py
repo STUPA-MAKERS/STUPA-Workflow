@@ -47,7 +47,12 @@ from app.modules.delegations.models import DelegationSubstitute, MeetingDelegati
 from app.modules.files.models import Attachment, AttachmentDraftToken
 from app.modules.flow.models import FlowVersion, State, Transition
 from app.modules.forms.models import FormField, FormVersion
-from app.modules.livevote.models import Meeting, MeetingAgendaItem, MeetingAttendance
+from app.modules.livevote.models import (
+    Meeting,
+    MeetingAgendaItem,
+    MeetingAttendance,
+    ProtocolKeeperPeriod,
+)
 from app.modules.notifications.models import (
     MailTemplate,
     NotificationPreference,
@@ -93,6 +98,7 @@ __all__ = [
     "Meeting",
     "MeetingAgendaItem",
     "MeetingAttendance",
+    "ProtocolKeeperPeriod",
     "OAuthAuthorizationCode",
     "OAuthToken",
     "ErasureRequest",

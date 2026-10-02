@@ -47,6 +47,7 @@ import type {
   CommentOutWire,
   CommentVisibility,
   EffectiveForm,
+  HandoverMode,
   LogoutOut,
   MagicLinkVerifyResult,
   Meeting,
@@ -594,6 +595,26 @@ export class ApiClient {
   patchMeeting(id: Uuid, body: MeetingPatchBody): Observable<Meeting> {
     return this.http
       .patch<MeetingOutWire>(`${this.base}/meetings/${id}`, body)
+      .pipe(map(mapMeeting));
+  }
+
+  /**
+   * POST /meetings/{id}/protokollant-handover — hand the minutes of a live meeting
+   * over (Z3). `now` at once, `next_item` with the next agenda item.
+   */
+  handOverProtokollant(id: Uuid, principalId: Uuid, mode: HandoverMode): Observable<Meeting> {
+    return this.http
+      .post<MeetingOutWire>(`${this.base}/meetings/${id}/protokollant-handover`, {
+        principalId,
+        mode,
+      })
+      .pipe(map(mapMeeting));
+  }
+
+  /** DELETE /meetings/{id}/protokollant-handover — discard the planned handover. */
+  cancelProtokollantHandover(id: Uuid): Observable<Meeting> {
+    return this.http
+      .delete<MeetingOutWire>(`${this.base}/meetings/${id}/protokollant-handover`)
       .pipe(map(mapMeeting));
   }
 

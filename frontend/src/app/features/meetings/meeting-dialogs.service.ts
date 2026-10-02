@@ -4,7 +4,7 @@ import { Router } from '@angular/router';
 import { ApiClient } from '@core/api/api-client.service';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
-import type { Attendance, Meeting, MeetingMember } from '@core/api/models';
+import type { Attendance, HandoverMode, Meeting, MeetingMember, Uuid } from '@core/api/models';
 import { ToastService, type SelectOption } from '@stupa-makers/ui-kit';
 import { AdminOptionsService } from '../../pages/admin/admin-options.service';
 import { MeetingSessionService } from './meeting-session.service';
@@ -44,12 +44,15 @@ export class MeetingDialogsService {
   /** The last auto-filled title. Overwrite the title only while the user keeps it. */
   private lastAutoPrefill = '';
 
+  /** O20: only a member with `protocol.write` can keep the minutes (422 otherwise). */
   readonly createProtokollantOptions = computed<SelectOption[]>(() => [
     { value: '', label: this.i18n.translate('meetings.protokollant.none') },
-    ...this.createMembers().map((m) => ({
-      value: m.principalId,
-      label: m.displayName || m.email || m.principalId,
-    })),
+    ...this.createMembers()
+      .filter((m) => m.canKeepProtocol)
+      .map((m) => ({
+        value: m.principalId,
+        label: m.displayName || m.email || m.principalId,
+      })),
   ]);
   /** Gremien offered in the create dropdown, read from `/gremien`. */
   readonly gremiumOptions = signal<SelectOption[]>([]);
@@ -75,13 +78,22 @@ export class MeetingDialogsService {
       this.session.meeting()?.id === this.settingsMeeting()?.id &&
       !!this.session.protocol()?.isFinal,
   );
-  readonly protokollantOptions = computed<SelectOption[]>(() => [
-    { value: '', label: this.i18n.translate('meetings.protokollant.none') },
-    ...this.settingsRoster().map((a) => ({
-      value: a.principalId,
-      label: a.displayName || a.email || a.principalId,
-    })),
-  ]);
+  /**
+   * O20: only a member with `protocol.write` can keep the minutes. The current
+   * protokollant stays in the list, so the select still shows the assignment.
+   */
+  readonly protokollantOptions = computed<SelectOption[]>(() => {
+    const current = this.settingsMeeting()?.protokollantId ?? null;
+    return [
+      { value: '', label: this.i18n.translate('meetings.protokollant.none') },
+      ...this.settingsRoster()
+        .filter((a) => a.canKeepProtocol || a.principalId === current)
+        .map((a) => ({
+          value: a.principalId,
+          label: a.displayName || a.email || a.principalId,
+        })),
+    ];
+  });
 
   readonly confirmDeleteMeeting = signal<Meeting | null>(null);
   readonly deletingMeeting = signal(false);
@@ -283,6 +295,47 @@ export class MeetingDialogsService {
       },
       error: () => this.toast.error(this.i18n.translate('meetings.toast.actionFailed')),
     });
+  }
+
+  /**
+   * Hand the minutes of a live meeting over (Z3): `now` at once, `next_item` with the
+   * next agenda item. The server answers 422 for a member without `protocol.write`.
+   */
+  handOver(m: Meeting, principalId: Uuid, mode: HandoverMode): void {
+    this.api.handOverProtokollant(m.id, principalId, mode).subscribe({
+      next: (updated) => {
+        if (this.session.meeting()?.id === updated.id) this.session.meeting.set(updated);
+        this.timeline.replaceInTimeline(updated);
+        this.toast.success(
+          this.i18n.translate(
+            mode === 'now' ? 'meetings.toast.handedOver' : 'meetings.toast.handoverPlanned',
+          ),
+        );
+      },
+      error: (err: unknown) => this.handoverFailed(err),
+    });
+  }
+
+  /** Discard the planned handover of a live meeting. */
+  cancelHandover(m: Meeting): void {
+    this.api.cancelProtokollantHandover(m.id).subscribe({
+      next: (updated) => {
+        if (this.session.meeting()?.id === updated.id) this.session.meeting.set(updated);
+        this.timeline.replaceInTimeline(updated);
+        this.toast.success(this.i18n.translate('meetings.toast.handoverDiscarded'));
+      },
+      error: (err: unknown) => this.handoverFailed(err),
+    });
+  }
+
+  private handoverFailed(err: unknown): void {
+    if (errorCode(err) === 'protokollant_needs_protocol_write') {
+      this.toast.error(this.i18n.translate('meetings.toast.needsProtocolWrite'));
+      return;
+    }
+    const detail = errorDetail(err);
+    const base = this.i18n.translate('meetings.toast.actionFailed');
+    this.toast.error(detail ? `${base}: ${detail}` : base);
   }
 
   askDeleteMeeting(m: Meeting): void {

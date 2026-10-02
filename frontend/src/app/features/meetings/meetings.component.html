@@ -127,6 +127,8 @@
     (finalize)="finalize()"
     (openSettings)="openSettings(m)"
     (setProtokollant)="setProtokollant(m, $event)"
+    (handOver)="handOver(m, $event.principalId, $event.mode)"
+    (cancelHandover)="cancelHandover(m)"
     (deleteMeeting)="askDeleteMeeting(m)"
     (toggleBeamer)="beamerMode.set(true)"
     (attendanceChange)="setAttendance($event.member, $event.status, $event.note)"

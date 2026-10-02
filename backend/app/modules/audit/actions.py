@@ -93,6 +93,15 @@ class AuditAction(StrEnum):
     # Draft protocol removed. A finalized protocol is a signed record and the
     # route refuses to delete it.
     PROTOCOL_DELETE = "protocol_delete"
+    # Start of the finalization of a protocol (F8, F12). ``data`` carries the meeting
+    # and the gremium. A render that fails sets the protocol back to a draft, and a
+    # new finalization writes a new entry.
+    PROTOCOL_FINALIZE = "protocol_finalize"
+    # Handover of the minutes during a live meeting (Z3, F12). ``data`` carries the
+    # ``mode`` (``now``, ``next_item``, ``activate`` when a move of the agenda item
+    # starts the planned period, ``cancel`` when the planned handover goes away),
+    # the principal ids ``from`` and ``to``, and the current agenda item.
+    PROTOKOLLANT_HANDOVER = "protokollant_handover"
     # Vote removed before it ever opened. A vote with ballots is not deletable.
     VOTE_DELETE = "vote_delete"
     # Vote lifecycle (F12). ``data`` carries id references and aggregates only, never
