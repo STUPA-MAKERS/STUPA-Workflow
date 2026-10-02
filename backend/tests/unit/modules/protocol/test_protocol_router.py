@@ -22,6 +22,7 @@ from app.modules.notifications.queue import ArqMailQueue
 from app.modules.protocol.router import _mail_queue, get_protocol_service
 from app.modules.protocol.schemas import ProtocolOut
 from app.settings import get_settings
+from app.shared.errors import ConflictError
 
 MEETING_ID = uuid4()
 PROTOCOL_ID = uuid4()
@@ -95,12 +96,12 @@ class _FakeService:
         self.calls.append(f"embed:{protocol_id}:{len(vote_ids)}")
         return self._out()
 
-    async def start_finalize(self, protocol_id: UUID) -> tuple[ProtocolOut, bool]:
+    async def start_finalize(self, protocol_id: UUID, *, actor: str) -> ProtocolOut:
         self.calls.append(f"start_finalize:{protocol_id}")
         if self.status in ("rendering", "final"):
-            return self._out(status=self.status), False
+            raise ConflictError("not a draft", code="protocol_not_draft")
         self.status = "rendering"
-        return self._out(status="rendering"), True
+        return self._out(status="rendering")
 
     async def finalize(self, protocol_id: UUID, *, now: datetime) -> ProtocolOut:
         self.calls.append(f"finalize:{protocol_id}")
@@ -277,17 +278,17 @@ def test_finalize_protocol_enqueues_with_pool(
     assert fake_service.calls == [f"start_finalize:{PROTOCOL_ID}"]  # no sync render
 
 
-def test_finalize_protocol_idempotent_while_rendering(
+def test_finalize_protocol_refused_while_rendering(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
-    """A second finalize during the render does not enqueue again."""
+    """A second finalize during the render gives 409 and does not enqueue again (O2)."""
     _writer(app)
     fake_service.status = "rendering"
     pool = _FakePool()
     app.state.arq_pool = pool
     r = client.post(f"/api/protocols/{PROTOCOL_ID}/finalize")
-    assert r.status_code == 200
-    assert r.json()["status"] == "rendering"
+    assert r.status_code == 409
+    assert r.json()["code"] == "protocol_not_draft"
     assert pool.jobs == []
     assert fake_service.calls == [f"start_finalize:{PROTOCOL_ID}"]
 

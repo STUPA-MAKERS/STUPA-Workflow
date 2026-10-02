@@ -179,6 +179,22 @@ def protocol_variant_for(cd_variant: str | None) -> str | None:
     return None
 
 
+@dataclass(slots=True, frozen=True)
+class KeeperLine:
+    """One period of a protocol keeper for the header (Z3).
+
+    The times are local `HH:MM` values. The TOP numbers are the 1-based numbers in
+    the current agenda order, or `None` when the period has no agenda item there or
+    the item no longer exists. The renderer then shows the time.
+    """
+
+    name: str
+    from_time: str | None = None
+    to_time: str | None = None
+    from_top: int | None = None
+    to_top: int | None = None
+
+
 @dataclass(slots=True)
 class ProtocolDoc:
     """All header data of a protocol, filled from the database by the service."""
@@ -193,9 +209,20 @@ class ProtocolDoc:
     # start it forms the "Zeit: Start – Ende" title-page line, which the
     # renderer builds from `beginn` and `ende`.
     end_time: _time | None = None
+    # The legacy single name. It stays as the fallback of a render service that does
+    # not know `keepers` yet, and for a meeting without keeper periods.
     protokollant: str | None = None
+    # Z3: every period of a protocol keeper, in time order. The renderer lists them
+    # in the header and adds a handover line at the agenda item where a later
+    # period starts. Only the internal variant carries them.
+    keepers: list[KeeperLine] = field(default_factory=list)
     present: list[str] = field(default_factory=list)
+    # F17: the excused members are their own group.
+    excused: list[str] = field(default_factory=list)
     absent: list[str] = field(default_factory=list)
+    # The real start in local time (`YYYY-MM-DD HH:MM`), or the planned start when
+    # the meeting has no recorded start.
+    started_at: str | None = None
     datalines: list[str] = field(default_factory=list)
     # Quorum from the present members against the active members. `None` means
     # no statement.
@@ -213,6 +240,26 @@ def _yaml_list(key: str, items: list[str]) -> list[str]:
     if not items:
         return []
     return [f"{key}:", *(f"  - {_yaml_scalar(i)}" for i in items)]
+
+
+def _yaml_keepers(keepers: list[KeeperLine]) -> list[str]:
+    """Build the `keepers` block list of mappings, with quoted values only."""
+    if not keepers:
+        return []
+    lines = ["keepers:"]
+    for keeper in keepers:
+        fields = (
+            ("name", keeper.name),
+            ("from", keeper.from_time),
+            ("to", keeper.to_time),
+            ("from_top", None if keeper.from_top is None else str(keeper.from_top)),
+            ("to_top", None if keeper.to_top is None else str(keeper.to_top)),
+        )
+        present = [(k, v) for k, v in fields if v]
+        for n, (key, value) in enumerate(present):
+            lead = "  - " if n == 0 else "    "
+            lines.append(f"{lead}{key}: {_yaml_scalar(value)}")
+    return lines
 
 
 def _frontmatter(doc: ProtocolDoc) -> list[str]:
@@ -234,9 +281,13 @@ def _frontmatter(doc: ProtocolDoc) -> list[str]:
         lines.append(f"beginn: {_yaml_scalar(doc.start_time.strftime('%H:%M'))}")
     if doc.end_time is not None:
         lines.append(f"ende: {_yaml_scalar(doc.end_time.strftime('%H:%M'))}")
+    if doc.started_at:
+        lines.append(f"started_at: {_yaml_scalar(doc.started_at)}")
     if doc.protokollant:
         lines.append(f"protokoll: {_yaml_scalar(doc.protokollant)}")
+    lines += _yaml_keepers(doc.keepers)
     lines += _yaml_list("anwesend", doc.present)
+    lines += _yaml_list("entschuldigt", doc.excused)
     lines += _yaml_list("abwesend", doc.absent)
     if doc.quorate is not None:
         # Quorum as a title-page data line.

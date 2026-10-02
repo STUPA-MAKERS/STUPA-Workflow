@@ -45,6 +45,7 @@ class FakeSession:
         self.store = store or {}
         self._results = list(results)
         self.scalar_results: list[Any] = []
+        self.keeper_rows: list[Any] = []
         self.added: list[Any] = []
         self.deleted: list[Any] = []
         self.flushed = 0
@@ -56,6 +57,10 @@ class FakeSession:
         # does not take the result of another query.
         if "meeting_attendance" in str(_stmt).lower():
             return FakeResult()
+        # The header also reads the keeper periods (Z3). A test that needs them sets
+        # `keeper_rows`. The query never takes a result of the ordered queue.
+        if "protocol_keeper_period" in str(_stmt).lower():
+            return FakeResult(self.keeper_rows)
         return self._results.pop(0) if self._results else FakeResult()
 
     async def scalars(self, _stmt: Any) -> FakeResult:

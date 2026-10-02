@@ -438,23 +438,24 @@ async def test_quorate_none_when_member_count_query_returns_none() -> None:
 
 async def test_header_meta_returns_empty_without_meeting() -> None:
     svc = _service(FakeSession())
-    protokollant, present, absent, count, datalines = await svc._header_meta(None)
-    assert protokollant is None and present == [] and absent == []
-    assert count == 0 and datalines == []
+    header = await svc._header_meta(None)
+    assert header.protokollant is None and header.present == [] and header.absent == []
+    assert header.excused == [] and header.keepers == []
+    assert header.present_count == 0 and header.datalines == []
 
 
 async def test_header_meta_resolves_protokollant_name() -> None:
-    """A set protokollant_id resolves the name through `session.scalar`."""
+    """Without keeper periods, protokollant_id resolves the name through `session.scalar`."""
     session = FakeSession()
     svc = _service(session)
     session.scalar_results = ["Frau Schmidt"]
     meeting = _meeting(protokollant_id=uuid4())
-    protokollant, present, absent, count, datalines = await svc._header_meta(
-        cast("Any", meeting)
-    )
-    assert protokollant == "Frau Schmidt"
+    header = await svc._header_meta(cast("Any", meeting))
+    assert header.protokollant == "Frau Schmidt"
+    assert header.keepers == []
     # The FakeSession short circuits the attendance query, so it stays empty.
-    assert present == [] and absent == [] and count == 0 and datalines == []
+    assert header.present == [] and header.absent == [] and header.present_count == 0
+    assert header.datalines == []
 
 
 async def test_header_meta_public_redacts_names_keeps_counts() -> None:
@@ -466,14 +467,12 @@ async def test_header_meta_public_redacts_names_keeps_counts() -> None:
     svc = _service(session)
     session.scalar_results = ["Frau Schmidt"]
     meeting = _meeting(protokollant_id=uuid4())
-    protokollant, present, absent, count, datalines = await svc._header_meta(
-        cast("Any", meeting), public=True
-    )
-    assert protokollant is None
-    assert present == [] and absent == []
-    # The fake attendance is empty, so both counters are 0.
-    assert count == 0
-    assert datalines == ["Anwesend: 0", "Abwesend: 0"]
+    header = await svc._header_meta(cast("Any", meeting), public=True)
+    assert header.protokollant is None and header.keepers == []
+    assert header.present == [] and header.absent == [] and header.excused == []
+    # The fake attendance is empty, so all counters are 0.
+    assert header.present_count == 0
+    assert header.datalines == ["Anwesend: 0", "Entschuldigt: 0", "Abwesend: 0"]
 
 
 def test_local_end_time_none_when_not_datetime() -> None:
