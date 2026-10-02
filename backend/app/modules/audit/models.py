@@ -39,8 +39,9 @@ VERIFICATION_TRIGGERS: tuple[VerificationTrigger, ...] = ("cron", "manual", "res
 ChainBreak = Literal["prev_hash_mismatch", "hash_mismatch"]
 CHAIN_BREAKS: tuple[ChainBreak, ...] = ("prev_hash_mismatch", "hash_mismatch")
 
-# The number of stored chain checks that the service keeps. The prune keeps failed
-# checks and the newest check of each trigger in addition to these rows.
+# The number of stored chain checks that the service keeps. The prune keeps the first
+# failed check of each break and the newest check of each trigger in addition to these
+# rows.
 VERIFICATION_KEEP = 100
 
 # The minimum time between two manual chain checks. A manual check reads the whole

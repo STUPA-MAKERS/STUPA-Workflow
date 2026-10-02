@@ -1,8 +1,9 @@
 """Integration (real Postgres): stored audit-chain checks (Z6/O8).
 
 `verify_and_store` writes one `audit_verification` row per check and commits it. A
-tampered chain stores the first break. The store keeps the newest rows, every failed
-check and the newest check of each trigger. A manual run refuses while another check
+tampered chain stores the first break. The store keeps the newest rows, the first failed
+check of each break and the newest check of each trigger. A permanently broken chain
+does not grow the store without limit. A manual run refuses while another check
 holds the lock and inside the cooldown. The table CHECKs reject an unknown trigger, an
 unknown reason and a valid row with a reason.
 """
@@ -153,24 +154,33 @@ async def test_many_manual_runs_keep_a_failed_cron_check(session: AsyncSession) 
     assert len(ids) == VERIFICATION_KEEP + 2
 
 
-async def test_the_prune_keeps_old_failed_checks_and_drops_old_valid_ones(
+async def test_the_prune_keeps_the_first_failed_check_of_each_break(
     session: AsyncSession,
 ) -> None:
     svc = AuditService(session)
     base = datetime(2026, 1, 1, tzinfo=UTC)
-    rows = [
+    # (valid, broken_at, reason) per day; every row is a cron check.
+    plan: list[tuple[bool, int | None, str | None]] = [
+        (False, 1, "prev_hash_mismatch"),  # 0: first detection of break A
+        (True, None, None),  # 1
+        (False, 1, "prev_hash_mismatch"),  # 2: repeat of break A
+        (False, 2, "hash_mismatch"),  # 3: first detection of break B
+        (False, 2, "hash_mismatch"),  # 4: repeat of break B
+        (True, None, None),  # 5
+        (True, None, None),  # 6
+    ]
+    session.add_all(
         AuditVerification(
             started_at=base + timedelta(days=i),
             finished_at=base + timedelta(days=i),
             valid=valid,
             checked=i,
-            broken_at=None if valid else 1,
-            reason=None if valid else "prev_hash_mismatch",
+            broken_at=broken_at,
+            reason=reason,
             trigger="cron",
         )
-        for i, valid in enumerate([False, True, False, True, True, True])
-    ]
-    session.add_all(rows)
+        for i, (valid, broken_at, reason) in enumerate(plan)
+    )
     await session.commit()
 
     await svc.prune_verifications(keep=2)
@@ -181,7 +191,34 @@ async def test_the_prune_keeps_old_failed_checks_and_drops_old_valid_ones(
             select(AuditVerification.checked).order_by(AuditVerification.started_at)
         )
     ).all()
-    assert kept == [0, 2, 4, 5]
+    assert kept == [0, 3, 5, 6]
+
+
+async def test_a_permanently_broken_chain_keeps_the_store_bounded(
+    session: AsyncSession, engine: Engine
+) -> None:
+    svc = AuditService(session)
+    first = await svc.record(actor="a", action=AuditAction.LOGIN)
+    await svc.record(actor="b", action=AuditAction.LOGIN)
+    await session.commit()
+    # Tamper past the append-only trigger. Nothing can repair the chain after this.
+    with engine.begin() as conn:
+        conn.execute(text("SET LOCAL session_replication_role = replica"))
+        conn.execute(
+            text("UPDATE audit_entry SET actor = 'evil' WHERE id = :i"), {"i": first.id}
+        )
+
+    detection = await svc.verify_and_store(trigger="manual", triggered_by="admin-1")
+    assert detection.valid is False
+    for _ in range(VERIFICATION_KEEP + 5):
+        row = await svc.verify_and_store(trigger="cron")
+        assert row.valid is False
+
+    rows = (await session.scalars(select(AuditVerification))).all()
+    # The newest 100 cron checks and the first detection. The repeats past them go.
+    assert len(rows) == VERIFICATION_KEEP + 1
+    assert detection.id in {r.id for r in rows}
+    assert all(r.valid is False for r in rows)
 
 
 async def test_a_manual_run_refuses_inside_the_cooldown(session: AsyncSession) -> None:

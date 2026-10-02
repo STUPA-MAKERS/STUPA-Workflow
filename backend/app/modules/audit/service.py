@@ -5,8 +5,8 @@ predecessor hash. Concurrent appends therefore serialize and the chain has no
 ``prev_hash`` race. `AuditService.verify_chain` recomputes the chain from genesis.
 It catches both a tampered field and a removed or inserted row.
 `AuditService.verify_and_store` runs the same check and stores the result in
-``audit_verification`` (Z6/O8). The prune never deletes a failed check, and it keeps
-the newest check of each trigger. `AuditService.run_manual_verification` is the
+``audit_verification`` (Z6/O8). The prune keeps the first failed check of each
+break and the newest check of each trigger. `AuditService.run_manual_verification` is the
 manual entry point. It refuses a run while another run is in progress, and a second
 manual run inside the cooldown. The module-level `record` hook is the standard entry
 point for other modules.
@@ -354,12 +354,17 @@ class AuditService:
         return row
 
     async def prune_verifications(self, *, keep: int = VERIFICATION_KEEP) -> None:
-        """Delete the old valid checks. No commit.
+        """Delete the old checks. No commit.
 
         The prune keeps the newest ``keep`` rows. Past them, it keeps:
 
-        - every failed check (``valid = false``). A failed check is evidence of
+        - the first failed check of each break, that is the oldest row of each
+          distinct ``(broken_at, reason)``. A failed check is evidence of
           tampering. A series of new checks must not push it out of the store.
+          The later checks of the same break repeat that evidence, so the prune
+          deletes them like valid rows. Because ``audit_entry`` is append-only,
+          a break stays until a restore. Thus the table stays bounded also when
+          every check fails.
         - the newest check of each trigger. Many manual checks thus do not push
           out the last cron or restore result.
         """
@@ -377,12 +382,23 @@ class AuditService:
                 AuditVerification.id.desc(),
             )
         )
+        first_per_break = (
+            select(AuditVerification.id)
+            .where(AuditVerification.valid.is_(False))
+            .ext(distinct_on(AuditVerification.broken_at, AuditVerification.reason))
+            .order_by(
+                AuditVerification.broken_at,
+                AuditVerification.reason,
+                AuditVerification.started_at.asc(),
+                AuditVerification.id.asc(),
+            )
+        )
         await self.session.execute(
             delete(AuditVerification)
             .where(
-                AuditVerification.valid.is_(True),
                 AuditVerification.id.not_in(newest),
                 AuditVerification.id.not_in(newest_per_trigger),
+                AuditVerification.id.not_in(first_per_break),
             )
             .execution_options(synchronize_session=False)
         )

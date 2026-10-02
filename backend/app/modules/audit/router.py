@@ -152,8 +152,8 @@ async def run_audit_verification(
 
     The call reads the whole log, so it takes as long as the live check. Only one
     check runs at a time, and a manual check can run again only after a cooldown of
-    5 minutes. The store keeps the newest 100 results, every failed result and the
-    newest result of each trigger.
+    5 minutes. The store keeps the newest 100 results, the first failed result of
+    each break and the newest result of each trigger.
     """
     row = await service.run_manual_verification(triggered_by=principal.sub)
     return AuditVerificationOut.from_row(row)

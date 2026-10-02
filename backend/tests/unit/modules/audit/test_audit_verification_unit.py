@@ -127,8 +127,14 @@ async def test_prune_deletes_past_the_newest_rows() -> None:
     assert "NOT IN" in sql
     assert "ORDER BY audit_verification.started_at DESC, audit_verification.id DESC" in sql
     assert "LIMIT 3" in sql
-    # A failed check is never deleted.
-    assert "audit_verification.valid IS true" in sql
+    # The first failed check of each break stays, not every failed check.
+    assert "audit_verification.valid IS true" not in sql
+    assert "audit_verification.valid IS false" in sql
+    assert "DISTINCT ON (audit_verification.broken_at, audit_verification.reason)" in sql
+    assert (
+        "ORDER BY audit_verification.broken_at, audit_verification.reason, "
+        "audit_verification.started_at ASC, audit_verification.id ASC" in sql
+    )
     # The newest check of each trigger stays.
     assert "DISTINCT ON (audit_verification.trigger)" in sql
 
