@@ -140,7 +140,9 @@ async def verify_audit_chain(service: ServiceDep) -> ChainVerificationOut:
 @router.post(
     "/verify",
     response_model=AuditVerificationOut,
-    responses=_AUTH_ERRORS,
+    # 409 while another check runs. 429 (with Retry-After) inside the cooldown after
+    # the last manual check.
+    responses={**_AUTH_ERRORS, 409: _PROBLEM, 429: _PROBLEM},
 )
 async def run_audit_verification(
     service: ServiceDep,
@@ -148,10 +150,12 @@ async def run_audit_verification(
 ) -> AuditVerificationOut:
     """Verify the whole chain now and store the result (``trigger = manual``).
 
-    The call reads the whole log, so it takes as long as the live check. The store
-    keeps the newest 100 results.
+    The call reads the whole log, so it takes as long as the live check. Only one
+    check runs at a time, and a manual check can run again only after a cooldown of
+    5 minutes. The store keeps the newest 100 results, every failed result and the
+    newest result of each trigger.
     """
-    row = await service.verify_and_store(trigger="manual", triggered_by=principal.sub)
+    row = await service.run_manual_verification(triggered_by=principal.sub)
     return AuditVerificationOut.from_row(row)
 
 

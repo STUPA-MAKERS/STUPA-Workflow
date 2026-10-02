@@ -53,6 +53,8 @@
         name="key"
         placeholder="z. B. vorsitz"
         [disabled]="editingId() !== null"
+        [hint]="editingId() === null ? ('admin.common.roleKeyHint' | t) : ''"
+        [error]="keyError()"
       />
       <app-input
         [label]="'admin.common.labelDe' | t"
@@ -80,7 +82,7 @@
   }
   <div dialog-footer class="flex justify-end gap-3">
     <app-button size="sm" variant="ghost" (click)="close()">{{ 'action.cancel' | t }}</app-button>
-    <app-button size="sm" [disabled]="!draft()?.key?.trim()" (click)="save()">{{ 'action.save' | t }}</app-button>
+    <app-button size="sm" [disabled]="!keyValid()" (click)="save()">{{ 'action.save' | t }}</app-button>
   </div>
 </app-dialog>
 

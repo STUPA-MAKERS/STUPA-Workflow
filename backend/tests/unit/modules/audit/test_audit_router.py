@@ -14,6 +14,7 @@ from app.modules.audit.models import AuditEntry, AuditVerification
 from app.modules.audit.router import get_audit_service
 from app.modules.audit.service import ChainVerification
 from app.modules.auth.principal import Principal
+from app.shared.errors import ConflictError, RateLimitedError
 
 _AT = datetime(2026, 6, 6, 12, 0, 0, tzinfo=UTC)
 
@@ -45,6 +46,7 @@ class _FakeService:
         self.revertable: dict[int, bool] = {}
         self.latest: AuditVerification | None = None
         self.stored: list[tuple[str, str | None]] = []
+        self.refuse: Exception | None = None
 
     async def query_cursor(self, **kwargs: Any) -> tuple[list[AuditEntry], bool]:
         self.cursor_kwargs = kwargs
@@ -74,9 +76,10 @@ class _FakeService:
     async def verify_chain(self) -> ChainVerification:
         return self.verification
 
-    async def verify_and_store(
-        self, *, trigger: str, triggered_by: str | None = None
-    ) -> AuditVerification:
+    async def run_manual_verification(self, *, triggered_by: str) -> AuditVerification:
+        if self.refuse is not None:
+            raise self.refuse
+        trigger = "manual"
         self.stored.append((trigger, triggered_by))
         return AuditVerification(
             id=uuid.UUID(int=1),
@@ -281,6 +284,27 @@ def test_post_verify_requires_audit_verify() -> None:
 
 def test_post_verify_requires_authentication() -> None:
     assert _client(_FakeService(), None).post("/api/admin/audit/verify").status_code == 401
+
+
+def test_post_verify_while_a_check_runs_is_409() -> None:
+    service = _FakeService()
+    service.refuse = ConflictError("busy", code="audit_verify_running")
+    resp = _client(service, _principal("audit.verify")).post("/api/admin/audit/verify")
+    assert resp.status_code == 409
+    assert resp.json()["code"] == "audit_verify_running"
+    assert service.stored == []
+
+
+def test_post_verify_inside_the_cooldown_is_429() -> None:
+    service = _FakeService()
+    service.refuse = RateLimitedError(
+        "too soon", retry_after=120, code="audit_verify_cooldown"
+    )
+    resp = _client(service, _principal("audit.verify")).post("/api/admin/audit/verify")
+    assert resp.status_code == 429
+    assert resp.headers["Retry-After"] == "120"
+    assert resp.json()["code"] == "audit_verify_cooldown"
+    assert service.stored == []
 
 
 def test_latest_verification_returns_the_stored_row() -> None:

@@ -5,7 +5,10 @@ predecessor hash. Concurrent appends therefore serialize and the chain has no
 ``prev_hash`` race. `AuditService.verify_chain` recomputes the chain from genesis.
 It catches both a tampered field and a removed or inserted row.
 `AuditService.verify_and_store` runs the same check and stores the result in
-``audit_verification`` (Z6/O8). The module-level `record` hook is the standard entry
+``audit_verification`` (Z6/O8). The prune never deletes a failed check, and it keeps
+the newest check of each trigger. `AuditService.run_manual_verification` is the
+manual entry point. It refuses a run while another run is in progress, and a second
+manual run inside the cooldown. The module-level `record` hook is the standard entry
 point for other modules.
 """
 
@@ -16,26 +19,31 @@ import time
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import Select, delete, func, select, text
+from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.audit.actions import REVERTABLE_BUDGET_ACTIONS, AuditAction
 from app.modules.audit.hashing import canonical_payload, compute_hash
 from app.modules.audit.models import (
+    MANUAL_VERIFICATION_COOLDOWN,
     VERIFICATION_KEEP,
     AuditEntry,
     AuditVerification,
     VerificationTrigger,
 )
+from app.shared.errors import ConflictError, RateLimitedError
 from app.shared.paging import Page
 
 logger = logging.getLogger("app.audit")
 
 # Fixed advisory-lock key. It serializes chain appends across processes.
 _CHAIN_LOCK_KEY = 0x4155_4449_5400  # "AUDIT\0"
+# Fixed advisory-lock key. It lets only one chain check run at a time.
+_VERIFY_LOCK_KEY = 0x4155_4449_5601  # "AUDIV\1"
 
 
 def data_uuid_strings(data: object) -> set[str]:
@@ -239,10 +247,11 @@ class AuditService:
     ) -> AuditVerification:
         """Verify the whole chain, store the result and commit.
 
-        The method writes one ``audit_verification`` row with the start, the end
-        and the result of `verify_chain`. It then deletes the rows past the newest
-        ``keep`` rows. It logs the duration, because the check reads the whole
-        ``audit_entry`` table and its run time grows with the log.
+        The method first waits for the check lock, so only one check runs at a
+        time. It writes one ``audit_verification`` row with the start, the end and
+        the result of `verify_chain`. It then prunes the stored checks (see
+        `prune_verifications`). It logs the duration, because the check reads the
+        whole ``audit_entry`` table and its run time grows with the log.
 
         Args:
             trigger: ``cron``, ``manual`` or ``restore``.
@@ -253,6 +262,66 @@ class AuditService:
         Returns:
             The stored row.
         """
+        # The key is a fixed integer constant and not user input.
+        await self.session.execute(text(f"SELECT pg_advisory_xact_lock({_VERIFY_LOCK_KEY})"))
+        return await self._verify_and_store_locked(
+            trigger=trigger, triggered_by=triggered_by, keep=keep
+        )
+
+    async def run_manual_verification(
+        self,
+        *,
+        triggered_by: str,
+        cooldown: timedelta = MANUAL_VERIFICATION_COOLDOWN,
+    ) -> AuditVerification:
+        """Run a manual chain check (``trigger = manual``) and store the result.
+
+        The check reads the whole log inside the API request. The method therefore
+        refuses a run that it cannot do now. It does not wait for the check lock.
+
+        Raises:
+            ConflictError: Another check (cron, restore or manual) is in progress.
+            RateLimitedError: A manual check started less than ``cooldown`` ago.
+        """
+        locked = (
+            await self.session.execute(
+                text(f"SELECT pg_try_advisory_xact_lock({_VERIFY_LOCK_KEY})")
+            )
+        ).scalar_one()
+        if not locked:
+            await self.session.rollback()
+            raise ConflictError(
+                "an audit chain check is in progress", code="audit_verify_running"
+            )
+        last_manual = (
+            await self.session.execute(
+                select(func.max(AuditVerification.started_at)).where(
+                    AuditVerification.trigger == "manual"
+                )
+            )
+        ).scalar_one_or_none()
+        if last_manual is not None:
+            wait = last_manual + cooldown - datetime.now(UTC)
+            if wait > timedelta(0):
+                # Release the lock now, not when the request session closes.
+                await self.session.rollback()
+                raise RateLimitedError(
+                    "a manual audit chain check ran a short time ago",
+                    retry_after=int(wait.total_seconds()) + 1,
+                    code="audit_verify_cooldown",
+                )
+        return await self._verify_and_store_locked(
+            trigger="manual", triggered_by=triggered_by, keep=VERIFICATION_KEEP
+        )
+
+    async def _verify_and_store_locked(
+        self,
+        *,
+        trigger: VerificationTrigger,
+        triggered_by: str | None,
+        keep: int,
+    ) -> AuditVerification:
+        """Do the work of `verify_and_store`. The caller holds the check lock."""
         started_at = datetime.now(UTC)
         clock = time.monotonic()
         result = await self.verify_chain()
@@ -285,15 +354,36 @@ class AuditService:
         return row
 
     async def prune_verifications(self, *, keep: int = VERIFICATION_KEEP) -> None:
-        """Delete the stored checks past the newest ``keep`` rows. No commit."""
+        """Delete the old valid checks. No commit.
+
+        The prune keeps the newest ``keep`` rows. Past them, it keeps:
+
+        - every failed check (``valid = false``). A failed check is evidence of
+          tampering. A series of new checks must not push it out of the store.
+        - the newest check of each trigger. Many manual checks thus do not push
+          out the last cron or restore result.
+        """
         newest = (
             select(AuditVerification.id)
             .order_by(AuditVerification.started_at.desc(), AuditVerification.id.desc())
             .limit(keep)
         )
+        newest_per_trigger = (
+            select(AuditVerification.id)
+            .ext(distinct_on(AuditVerification.trigger))
+            .order_by(
+                AuditVerification.trigger,
+                AuditVerification.started_at.desc(),
+                AuditVerification.id.desc(),
+            )
+        )
         await self.session.execute(
             delete(AuditVerification)
-            .where(AuditVerification.id.not_in(newest))
+            .where(
+                AuditVerification.valid.is_(True),
+                AuditVerification.id.not_in(newest),
+                AuditVerification.id.not_in(newest_per_trigger),
+            )
             .execution_options(synchronize_session=False)
         )
 

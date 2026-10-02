@@ -13,7 +13,7 @@ newest 100 rows and deletes the older rows.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Literal
 
 from sqlalchemy import (
@@ -39,8 +39,13 @@ VERIFICATION_TRIGGERS: tuple[VerificationTrigger, ...] = ("cron", "manual", "res
 ChainBreak = Literal["prev_hash_mismatch", "hash_mismatch"]
 CHAIN_BREAKS: tuple[ChainBreak, ...] = ("prev_hash_mismatch", "hash_mismatch")
 
-# The number of stored chain checks that the service keeps.
+# The number of stored chain checks that the service keeps. The prune keeps failed
+# checks and the newest check of each trigger in addition to these rows.
 VERIFICATION_KEEP = 100
+
+# The minimum time between two manual chain checks. A manual check reads the whole
+# log inside an API request.
+MANUAL_VERIFICATION_COOLDOWN = timedelta(minutes=5)
 
 
 class AuditEntry(Base):

@@ -161,6 +161,23 @@ describe('AdminRolesComponent', () => {
     expect(api.createRole).not.toHaveBeenCalled();
   });
 
+  it('refuses a key that breaks the role-key pattern and shows why', async () => {
+    const { inst, api } = await setup();
+    inst.openAdd();
+    expect(inst.keyValid()).toBe(false);
+    expect(inst.keyError()).toBe(''); // a blank key shows no error yet
+    for (const bad of ['Kasse', 'kasse-x', '1kasse', '_kasse', 'kas se']) {
+      inst.patchDraft('key', bad);
+      expect(inst.keyValid()).toBe(false);
+      expect(inst.keyError()).not.toBe('');
+      inst.createRole();
+    }
+    expect(api.createRole).not.toHaveBeenCalled();
+    inst.patchDraft('key', ' kasse_2 ');
+    expect(inst.keyValid()).toBe(true);
+    expect(inst.keyError()).toBe('');
+  });
+
   it('creates a role with only the labels that are non-empty', async () => {
     const { inst, api, toast } = await setup();
     inst.openAdd();

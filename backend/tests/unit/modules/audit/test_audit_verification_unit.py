@@ -7,7 +7,7 @@ results of `tests._support.audit_fakes` in order.
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -15,9 +15,15 @@ from sqlalchemy.dialects import postgresql
 
 from app.modules.audit import service as service_mod
 from app.modules.audit.hashing import canonical_payload, compute_hash
-from app.modules.audit.models import VERIFICATION_KEEP, AuditEntry, AuditVerification
+from app.modules.audit.models import (
+    MANUAL_VERIFICATION_COOLDOWN,
+    VERIFICATION_KEEP,
+    AuditEntry,
+    AuditVerification,
+)
 from app.modules.audit.schemas import AuditVerificationOut
 from app.modules.audit.service import AuditService
+from app.shared.errors import ConflictError, RateLimitedError
 from tests._support.audit_fakes import fake_session, result
 
 _AT = datetime(2026, 6, 6, 12, 0, 0, tzinfo=UTC)
@@ -67,7 +73,8 @@ def _entry(entry_id: int, *, prev: bytes | None = None) -> AuditEntry:
 async def test_verify_and_store_valid_chain(log: _Log) -> None:
     e1 = _entry(1)
     e2 = _entry(2, prev=e1.hash)
-    db = fake_session(result(e1, e2))
+    # The first result answers the lock statement, the second feeds the stream.
+    db = fake_session(result(None), result(e1, e2))
 
     row = await AuditService(db).verify_and_store(trigger="manual", triggered_by="admin-1")
 
@@ -83,8 +90,9 @@ async def test_verify_and_store_valid_chain(log: _Log) -> None:
     assert row.started_at.tzinfo is not None
     assert db.flushed == 1
     assert db.committed == 1
-    # The prune runs in the same transaction, before the commit.
-    assert len(db.statements) == 1
+    # The lock and the prune run in the same transaction, before the commit.
+    assert len(db.statements) == 2
+    assert "pg_advisory_xact_lock" in str(db.statements[0])
     ((level, line),) = log.lines
     assert level == "info"
     assert "trigger=manual valid=True checked=2" in line
@@ -94,7 +102,7 @@ async def test_verify_and_store_valid_chain(log: _Log) -> None:
 async def test_verify_and_store_broken_chain_logs_an_error(log: _Log) -> None:
     e1 = _entry(1)
     tampered = _entry(2, prev=b"\x00" * 32)
-    db = fake_session(result(e1, tampered))
+    db = fake_session(result(None), result(e1, tampered))
 
     row = await AuditService(db).verify_and_store(trigger="cron")
 
@@ -119,6 +127,10 @@ async def test_prune_deletes_past_the_newest_rows() -> None:
     assert "NOT IN" in sql
     assert "ORDER BY audit_verification.started_at DESC, audit_verification.id DESC" in sql
     assert "LIMIT 3" in sql
+    # A failed check is never deleted.
+    assert "audit_verification.valid IS true" in sql
+    # The newest check of each trigger stays.
+    assert "DISTINCT ON (audit_verification.trigger)" in sql
 
 
 async def test_prune_default_keeps_one_hundred() -> None:
@@ -175,3 +187,55 @@ def test_verification_out_maps_the_row() -> None:
         "trigger": "restore",
         "triggeredBy": "admin-1",
     }
+
+
+async def test_manual_run_refuses_while_another_check_runs(log: _Log) -> None:
+    db = fake_session(result(False))
+    with pytest.raises(ConflictError) as exc:
+        await AuditService(db).run_manual_verification(triggered_by="admin-1")
+    assert exc.value.code == "audit_verify_running"
+    assert "pg_try_advisory_xact_lock" in str(db.statements[0])
+    assert db.added == []
+    assert db.rolled_back == 1
+    assert log.lines == []
+
+
+async def test_manual_run_refuses_inside_the_cooldown(log: _Log) -> None:
+    last = datetime.now(UTC) - timedelta(minutes=1)
+    db = fake_session(result(True), result(last))
+    with pytest.raises(RateLimitedError) as exc:
+        await AuditService(db).run_manual_verification(triggered_by="admin-1")
+    assert exc.value.code == "audit_verify_cooldown"
+    assert exc.value.headers is not None
+    retry_after = int(exc.value.headers["Retry-After"])
+    assert 0 < retry_after <= int(MANUAL_VERIFICATION_COOLDOWN.total_seconds())
+    assert db.added == []
+    assert db.rolled_back == 1
+    assert log.lines == []
+
+
+async def test_manual_run_stores_a_check_after_the_cooldown(log: _Log) -> None:
+    e1 = _entry(1)
+    last = datetime.now(UTC) - MANUAL_VERIFICATION_COOLDOWN - timedelta(seconds=1)
+    db = fake_session(result(True), result(last), result(e1))
+
+    row = await AuditService(db).run_manual_verification(triggered_by="admin-1")
+
+    assert db.added == [row]
+    assert row.trigger == "manual"
+    assert row.triggered_by == "admin-1"
+    assert row.valid is True
+    assert db.committed == 1
+    assert db.rolled_back == 0
+    # try-lock, the cooldown read and the prune. No second, blocking lock.
+    assert len(db.statements) == 3
+    assert not any("pg_advisory_xact_lock" in str(st) for st in db.statements)
+
+
+async def test_manual_run_without_an_earlier_manual_check(log: _Log) -> None:
+    db = fake_session(result(True), result(None), result())
+
+    row = await AuditService(db).run_manual_verification(triggered_by="admin-1")
+
+    assert row.trigger == "manual"
+    assert row.checked == 0
