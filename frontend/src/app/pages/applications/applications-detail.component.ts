@@ -710,7 +710,13 @@ export class ApplicationsDetailComponent {
 
   startEdit(app: Application): void {
     const lang = this.i18n.locale();
-    this.editFields.set(toFormlyFields(this.formFields(), lang, { has_budget: true }));
+    // A reader without the PII right gets `data` without the isPII fields (O21), and
+    // the server names them in `hiddenKeys`. The form leaves them out, because the
+    // server keeps their stored values anyway. A key that is only missing from `data`
+    // was never answered, so that field stays editable.
+    const hidden = new Set(app.hiddenKeys ?? []);
+    const fields = this.formFields().filter((f) => !hidden.has(f.key));
+    this.editFields.set(toFormlyFields(fields, lang, { has_budget: true }));
     this.editModel = structuredClone(app.data);
     this.editForm = new FormGroup({});
     this.editing.set(true);

@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import ColumnElement, Text, cast, false, func, or_, select
+from sqlalchemy import ARRAY, ColumnElement, Text, case, cast, false, func, or_, select
+from sqlalchemy.dialects.postgresql import JSONB, array
 
 from app.modules.admin.models import ApplicationType, Gremium, GremiumMembership
 from app.modules.applications.models import Application
@@ -15,6 +17,7 @@ from app.modules.applications.schemas import ApplicationListItem
 from app.modules.applications.service.service_base import (
     ApplicationsServiceBase,
     _title_of,
+    state_since_subquery,
 )
 from app.modules.budget.tree_models import Budget
 from app.modules.flow.models import State
@@ -28,7 +31,7 @@ class ListingOps(ApplicationsServiceBase):
     async def list_applications(
         self,
         *,
-        state_id: UUID | None = None,
+        state_ids: Sequence[UUID] | None = None,
         gremium_id: UUID | None = None,
         type_id: UUID | None = None,
         budget_id: UUID | None = None,
@@ -42,6 +45,7 @@ class ListingOps(ApplicationsServiceBase):
         order: str = "desc",
         owner_sub: str | None = None,
         committee_sub: str | None = None,
+        hide_pii_in_search: bool = False,
         limit: int,
         offset: int,
     ) -> Page[ApplicationListItem]:
@@ -57,6 +61,17 @@ class ListingOps(ApplicationsServiceBase):
         The query combines both limits with OR. If the caller sets neither, the list
         holds every application. That is the full view for `application.read` and for
         admin.
+
+        `state_ids` keeps the applications in one of these states (A4). None or an
+        empty list does not filter.
+
+        Each item carries `stateSince`, the time of the last status change (A9). One
+        grouped subquery over `status_event` gives it for the whole page.
+
+        `hide_pii_in_search` is for a caller without the PII right (O21). The search
+        `q` then skips the `isPII` field values, except in the own applications
+        (`created_by == owner_sub`). Without this rule the search is an oracle: a
+        guessed name or IBAN would tell which readable application holds it.
 
         `archived` defaults to False, so the working list hides archived applications
         without every caller remembering to ask. `True` lists only the archived ones and
@@ -79,8 +94,8 @@ class ListingOps(ApplicationsServiceBase):
             filters.append(Application.archived_at.is_(None))
         elif archived is True:
             filters.append(Application.archived_at.is_not(None))
-        if state_id is not None:
-            filters.append(Application.current_state_id == state_id)
+        if state_ids:
+            filters.append(Application.current_state_id.in_(set(state_ids)))
         if gremium_id is not None:
             filters.append(Application.gremium_id == gremium_id)
         if type_id is not None:
@@ -102,17 +117,15 @@ class ListingOps(ApplicationsServiceBase):
                 )
                 filters.append(Application.budget_id.in_(descendants))
         # The fuzzy search reads meaningful text only: the title and the string answer
-        # values of the `data` JSONB. It skips ids, enums and numbers. Postgres uses the
-        # IMMUTABLE `app_search_text(data)` function, which is the trigram index
-        # expression. The SQLite fallback for the unit stubs has no such function and
-        # searches the whole `data` blob as text with a substring ILIKE.
+        # values of the `data` JSONB. It skips ids, enums and numbers. See
+        # `_search_text` for the dialects and for the PII projection (O21).
         rank_expr: ColumnElement[Any] | None = None
         if q and q.strip():
             dialect = dialect_of(self.session)
-            search_col = (
-                func.app_search_text(Application.data)
-                if dialect == "postgresql"
-                else cast(Application.data, Text)
+            search_col = self._search_text(
+                dialect,
+                hidden_keys=await self._all_pii_keys() if hide_pii_in_search else set(),
+                owner_sub=owner_sub,
             )
             where, rank_expr = trigram_rank(q, [search_col], dialect=dialect)
             filters.append(where)
@@ -136,13 +149,19 @@ class ListingOps(ApplicationsServiceBase):
         total = await self.session.scalar(
             select(func.count()).select_from(Application).where(*filters)
         )
+        since_sq = state_since_subquery()
         rows = (
-            await self.session.scalars(
-                select(Application).where(*filters).order_by(*order_by).limit(limit).offset(offset)
+            await self.session.execute(
+                select(Application, since_sq.c.since)
+                .outerjoin(since_sq, since_sq.c.app_id == Application.id)
+                .where(*filters)
+                .order_by(*order_by)
+                .limit(limit)
+                .offset(offset)
             )
         ).all()
         items: list[ApplicationListItem] = []
-        for app in rows:
+        for app, since in rows:
             state = await self._get_state(app.current_state_id)
             items.append(
                 ApplicationListItem(
@@ -156,9 +175,59 @@ class ListingOps(ApplicationsServiceBase):
                     createdAt=app.created_at,
                     updatedAt=app.updated_at,
                     archivedAt=app.archived_at,
+                    stateSince=since or app.created_at,
                 )
             )
         return Page(items=items, total=total or 0, limit=limit, offset=offset)
+
+    async def _all_pii_keys(self) -> set[str]:
+        """Collect the ``isPII`` field keys of every form version of every type.
+
+        The search hides these keys for a reader without the PII right. The union
+        over all types is stricter than the set of one type: a key that is PII in
+        one type also leaves the search of another type. That loses some recall,
+        but it never leaks.
+        """
+        from app.modules.forms.models import FormField
+
+        rows = await self.session.scalars(
+            select(FormField.key).where(FormField.is_pii.is_(True)).distinct()
+        )
+        return set(rows)
+
+    @staticmethod
+    def _search_text(
+        dialect: str, *, hidden_keys: set[str], owner_sub: str | None
+    ) -> ColumnElement[Any]:
+        """Build the text expression that the fuzzy search reads.
+
+        Postgres uses `app_search_text(data)`, the trigram index expression. The
+        SQLite fallback of the unit stubs reads the whole `data` blob as text.
+        ``hidden_keys`` leaves these top-level keys out of `data` first (O21). An
+        application with ``created_by == owner_sub`` keeps all keys, because the
+        creator reads the own PII. The projection cannot use the trigram index;
+        the read scope of such a caller is small.
+        """
+        full: ColumnElement[Any]
+        projected: ColumnElement[Any]
+        keys = sorted(hidden_keys)
+        if dialect == "postgresql":
+            full = func.app_search_text(Application.data)
+            if not keys:
+                return full
+            stripped = Application.data.op("-", return_type=JSONB)(
+                cast(array(keys, type_=Text), ARRAY(Text))
+            )
+            projected = func.app_search_text(stripped)
+        else:
+            full = cast(Application.data, Text)
+            if not keys:
+                return full
+            paths = ['$."' + k.replace('"', '\\"') + '"' for k in keys]
+            projected = cast(func.json_remove(Application.data, *paths), Text)
+        if owner_sub is None:
+            return projected
+        return case((Application.created_by == owner_sub, full), else_=projected)
 
     async def _committee_read_clauses(self, sub: str) -> list[ColumnElement[bool]]:
         """Build the Gremium read scope as SQL clauses.
@@ -276,6 +345,8 @@ class ListingOps(ApplicationsServiceBase):
           the gremium of the vote state, or
         * at least one manual transition is firable because its guard holds, and the
           principal may fire transitions with `application.transition` or as admin.
+
+        Each task carries `stateSince`, the time of the last status change (A9).
         """
         from app.modules.admin.gremium_roles import gremium_ids_for
         from app.modules.flow.service import FlowService
@@ -342,10 +413,16 @@ class ListingOps(ApplicationsServiceBase):
                         title=_title_of(app.data),
                         state=await self._state_out_resolved(s),
                         gremiumId=app.gremium_id,
-                            amount=app.amount,
+                        amount=app.amount,
                         currency=app.currency,
                         createdAt=app.created_at,
                         updatedAt=app.updated_at,
+                        stateSince=app.created_at,
                     )
                 )
+        # One grouped query for the kept tasks only (A9). An application without a
+        # status event keeps its creation time.
+        since_by_app = await self._state_since_map(item.id for item in items)
+        for item in items:
+            item.state_since = since_by_app.get(item.id, item.state_since)
         return items

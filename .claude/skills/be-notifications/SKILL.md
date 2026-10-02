@@ -20,7 +20,7 @@ description: Email notifications backend — Jinja2 SandboxedEnvironment mail te
 - `layout.py` — `render_layout` branded HTML wrapper + per-kind footer reason text + `text_to_html`/`_linkify`.
 - `action_dispatcher.py` — `NotificationActionDispatcher` implements the flow `ActionDispatcher`. It handles `notify` + `taskNotify` and logs other action types. `flow.dispatch.build_worker_dispatcher` builds it for the API and the worker.
 - `auto.py` — `AutoMailer` background best-effort mails: meeting created, delegation granted/revoked. The role mails (`role_assigned`/`role_revoked`) are gone: since the OIDC-only memberships no route assigns a role, so nothing sent them (F10).
-- `comments.py` — `send_comment_notifications` (applicant↔team, #4-1).
+- `comments.py` — `send_comment_notifications` (applicant↔team, #4-1). The mail to the applicant names the Gremium of the application as the author, never the member (A12, O16). Only the team mail uses the display name.
 - `privacy.py` — GDPR erasure mails (requested/executed/rejected).
 - `models.py` — SQLAlchemy tables. `router.py`/`schemas.py` — API + camelCase DTOs.
 

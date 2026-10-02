@@ -80,6 +80,10 @@ def test_read_creator_without_permission_ok() -> None:
         require_app_read(app_id, _db(created_by="p"), _principal(sub="p"), None)
     )
     assert access.principal is not None and access.actor == "p"
+    # The creator reads as the applicant: no internal comments.
+    assert access.via == "owner"
+    assert access.can_see_internal is False
+    assert access.is_applicant_view is True
 
 
 def test_read_applicant_scoped_view() -> None:

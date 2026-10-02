@@ -126,6 +126,8 @@ class SearchService:
             q=q,
             owner_sub=None if can_read else principal.sub,
             committee_sub=None if can_read else principal.sub,
+            # O21: no search over the isPII field values of another application.
+            hide_pii_in_search=not can_read,
             # `None` is both. The list defaults to hiding archived rows, which is right
             # for a working list and wrong for a search: someone searching by name is
             # looking for one record, and archiving it does not make it stop existing.

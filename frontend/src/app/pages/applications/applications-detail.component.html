@@ -256,6 +256,16 @@
             </div>
             @if (version.version === 1) {
               <p class="text-muted">{{ 'applications.history.initial' | t }}</p>
+            } @else if (!version.diff && version.changedKeys?.length) {
+              <!-- Metadata view (A11): the keys of the changed fields, no values. -->
+              <ul class="det__diff">
+                @for (key of version.changedKeys; track key) {
+                  <li>
+                    <app-badge variant="warning">{{ 'applications.history.diff.changed' | t }}</app-badge>
+                    <code>{{ key }}</code>
+                  </li>
+                }
+              </ul>
             } @else if (!version.diff || isEmptyDiff(version)) {
               <p class="text-muted">{{ 'applications.history.diff.none' | t }}</p>
             } @else {
