@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
 from typing import Any
@@ -15,6 +16,7 @@ from app.modules.applications.schemas import ApplicationListItem
 from app.modules.applications.service.service_base import (
     ApplicationsServiceBase,
     _title_of,
+    state_since_subquery,
 )
 from app.modules.budget.tree_models import Budget
 from app.modules.flow.models import State
@@ -28,7 +30,7 @@ class ListingOps(ApplicationsServiceBase):
     async def list_applications(
         self,
         *,
-        state_id: UUID | None = None,
+        state_ids: Sequence[UUID] | None = None,
         gremium_id: UUID | None = None,
         type_id: UUID | None = None,
         budget_id: UUID | None = None,
@@ -58,6 +60,12 @@ class ListingOps(ApplicationsServiceBase):
         holds every application. That is the full view for `application.read` and for
         admin.
 
+        `state_ids` keeps the applications in one of these states (A4). None or an
+        empty list does not filter.
+
+        Each item carries `stateSince`, the time of the last status change (A9). One
+        grouped subquery over `status_event` gives it for the whole page.
+
         `archived` defaults to False, so the working list hides archived applications
         without every caller remembering to ask. `True` lists only the archived ones and
         `None` lists both. The count follows the same filter, or the total would promise
@@ -79,8 +87,8 @@ class ListingOps(ApplicationsServiceBase):
             filters.append(Application.archived_at.is_(None))
         elif archived is True:
             filters.append(Application.archived_at.is_not(None))
-        if state_id is not None:
-            filters.append(Application.current_state_id == state_id)
+        if state_ids:
+            filters.append(Application.current_state_id.in_(set(state_ids)))
         if gremium_id is not None:
             filters.append(Application.gremium_id == gremium_id)
         if type_id is not None:
@@ -136,13 +144,19 @@ class ListingOps(ApplicationsServiceBase):
         total = await self.session.scalar(
             select(func.count()).select_from(Application).where(*filters)
         )
+        since_sq = state_since_subquery()
         rows = (
-            await self.session.scalars(
-                select(Application).where(*filters).order_by(*order_by).limit(limit).offset(offset)
+            await self.session.execute(
+                select(Application, since_sq.c.since)
+                .outerjoin(since_sq, since_sq.c.app_id == Application.id)
+                .where(*filters)
+                .order_by(*order_by)
+                .limit(limit)
+                .offset(offset)
             )
         ).all()
         items: list[ApplicationListItem] = []
-        for app in rows:
+        for app, since in rows:
             state = await self._get_state(app.current_state_id)
             items.append(
                 ApplicationListItem(
@@ -156,6 +170,7 @@ class ListingOps(ApplicationsServiceBase):
                     createdAt=app.created_at,
                     updatedAt=app.updated_at,
                     archivedAt=app.archived_at,
+                    stateSince=since or app.created_at,
                 )
             )
         return Page(items=items, total=total or 0, limit=limit, offset=offset)
@@ -276,6 +291,8 @@ class ListingOps(ApplicationsServiceBase):
           the gremium of the vote state, or
         * at least one manual transition is firable because its guard holds, and the
           principal may fire transitions with `application.transition` or as admin.
+
+        Each task carries `stateSince`, the time of the last status change (A9).
         """
         from app.modules.admin.gremium_roles import gremium_ids_for
         from app.modules.flow.service import FlowService
@@ -342,10 +359,16 @@ class ListingOps(ApplicationsServiceBase):
                         title=_title_of(app.data),
                         state=await self._state_out_resolved(s),
                         gremiumId=app.gremium_id,
-                            amount=app.amount,
+                        amount=app.amount,
                         currency=app.currency,
                         createdAt=app.created_at,
                         updatedAt=app.updated_at,
+                        stateSince=app.created_at,
                     )
                 )
+        # One grouped query for the kept tasks only (A9). An application without a
+        # status event keeps its creation time.
+        since_by_app = await self._state_since_map(item.id for item in items)
+        for item in items:
+            item.state_since = since_by_app.get(item.id, item.state_since)
         return items

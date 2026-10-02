@@ -8,7 +8,10 @@ from sqlalchemy import select
 
 from app.modules.applications.models import Comment
 from app.modules.applications.schemas import CommentOut
-from app.modules.applications.service.service_base import ApplicationsServiceBase
+from app.modules.applications.service.service_base import (
+    ApplicationsServiceBase,
+    applicant_actors,
+)
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.shared.errors import ForbiddenError, NotFoundError
@@ -75,23 +78,38 @@ class CommentOps(ApplicationsServiceBase):
         allow_unconfirmed: bool = True,
         viewer_sub: str | None = None,
         viewer_is_applicant: bool = False,
+        applicant_view: bool = False,
     ) -> list[CommentOut]:
         """List the comments of one application.
 
         The ``viewer_*`` arguments mark the own comments of the viewer with
         ``isOwn``. A principal matches on the stored author ``sub``. The
         magic-link applicant owns every applicant comment of the own application.
+
+        In the ``applicant_view`` a comment of a member names the Gremium of the
+        application as its author (A12, O16). A comment of the logged-in creator
+        keeps the own name.
         """
-        await self._get_app(application_id, allow_unconfirmed=allow_unconfirmed)
+        app = await self._get_app(application_id, allow_unconfirmed=allow_unconfirmed)
         stmt = select(Comment).where(Comment.application_id == application_id)
         if not include_internal:
             stmt = stmt.where(Comment.visibility == "public")
         rows = (await self.session.scalars(stmt.order_by(Comment.at))).all()
         names = await self._author_names({c.author for c in rows if c.author})
+        own = applicant_actors(app.created_by)
+        gremium = await self._gremium_actor(app) if applicant_view else None
+
+        def _author(c: Comment) -> str | None:
+            if not c.author:
+                return None
+            if applicant_view and c.author not in own:
+                return gremium
+            return names.get(c.author, c.author)
+
         return [
             CommentOut(
                 id=c.id,
-                author=names.get(c.author, c.author) if c.author else None,
+                author=_author(c),
                 authorKind=c.author_kind,  # type: ignore[arg-type]
                 body=c.body,
                 visibility=c.visibility,  # type: ignore[arg-type]

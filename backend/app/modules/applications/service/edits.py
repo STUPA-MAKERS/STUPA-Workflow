@@ -16,7 +16,10 @@ from app.modules.applications.schemas import ApplicationOut, VersionOut
 from app.modules.applications.service.service_base import (
     ApplicationsServiceBase,
     _amount_currency,
+    _scrub_diff,
     _whitelist,
+    _without_keys,
+    applicant_actors,
 )
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
@@ -41,11 +44,17 @@ class EditOps(ApplicationsServiceBase):
         changed_by: str,
         bypass_state_lock: bool = False,
         allow_unconfirmed: bool = True,
+        preserve_pii: bool = False,
     ) -> ApplicationOut:
         """Update ``data`` and write a new version with a diff.
 
         A locked state raises 409, unless ``bypass_state_lock`` is true. The
         caller sets that flag when it holds ``application.edit_any``.
+
+        ``preserve_pii`` is for an editor without the PII right (O21). That editor
+        read ``data`` without the ``isPII`` fields, so the patch keeps the stored
+        values of these fields and ignores the sent ones. The response then also
+        holds no ``isPII`` field.
 
         The edit writes an ``application_update`` audit entry with the version
         number and the keys of the changed fields, never the values. When the
@@ -66,6 +75,13 @@ class EditOps(ApplicationsServiceBase):
             fields = [system_title_field(), *fields]
         # ``has_budget`` comes from the type, as it does on create.
         app_type = await self.session.get(ApplicationType, app.type_id)
+        if preserve_pii:
+            pii_keys = await self._pii_keys_for_type(app.type_id)
+            stored = app.data or {}
+            data = {
+                **_without_keys(data, pii_keys),
+                **{k: v for k, v in stored.items() if k in pii_keys},
+            }
         clean = _whitelist(fields, data)
         context = {"has_budget": app_type.has_budget if app_type is not None else False}
         try:
@@ -123,10 +139,15 @@ class EditOps(ApplicationsServiceBase):
             from app.modules.flow.service import FlowService
 
             await FlowService(self.session).schedule_state_deadline(app, state)
-        return await self._to_out(app, include_pii=False)
+        return await self._to_out(app, include_pii=False, strip_pii_fields=preserve_pii)
 
     async def set_archived(
-        self, application_id: UUID, *, archived: bool, actor: str | None
+        self,
+        application_id: UUID,
+        *,
+        archived: bool,
+        actor: str | None,
+        strip_pii_fields: bool = False,
     ) -> ApplicationOut:
         """Move an application out of the working list, or bring it back.
 
@@ -187,7 +208,7 @@ class EditOps(ApplicationsServiceBase):
         app.archived_by = actor if archived else None
         await self.session.commit()
         await self.session.refresh(app)
-        return await self._to_out(app, include_pii=False)
+        return await self._to_out(app, include_pii=False, strip_pii_fields=strip_pii_fields)
 
     async def delete(self, application_id: UUID, *, actor: str | None) -> None:
         """Delete an application and cascade to the dependent rows.
@@ -226,9 +247,22 @@ class EditOps(ApplicationsServiceBase):
         await self.session.commit()
 
     async def versions(
-        self, application_id: UUID, *, allow_unconfirmed: bool = True
+        self,
+        application_id: UUID,
+        *,
+        allow_unconfirmed: bool = True,
+        applicant_view: bool = False,
+        strip_pii: bool = False,
     ) -> list[VersionOut]:
-        await self._get_app(application_id, allow_unconfirmed=allow_unconfirmed)
+        """Return the version history, oldest version first.
+
+        A full reader gets ``data``, ``diff`` and ``changedKeys``. With
+        ``strip_pii`` the ``isPII`` fields leave all three (O21). The
+        ``applicant_view`` gets the metadata only (A11, O17): number, time and
+        changed keys, no values. Its ``changedBy`` names the Gremium for every edit
+        that the applicant did not do (A12).
+        """
+        app = await self._get_app(application_id, allow_unconfirmed=allow_unconfirmed)
         rows = (
             await self.session.scalars(
                 select(SubmissionVersion)
@@ -236,15 +270,31 @@ class EditOps(ApplicationsServiceBase):
                 .order_by(SubmissionVersion.version)
             )
         ).all()
+        hidden = await self._pii_keys_for_type(app.type_id) if strip_pii else set()
+        own = applicant_actors(app.created_by)
+        gremium = await self._gremium_actor(app) if applicant_view else None
         # Resolve the editor sub to a display name. The UI never shows a raw UUID.
         names = await self._author_names({r.changed_by for r in rows if r.changed_by})
-        return [
-            VersionOut(
-                version=r.version,
-                data=r.data,
-                diff=r.diff,  # type: ignore[arg-type] — stored DataDiff
-                changedBy=(names.get(r.changed_by, r.changed_by) if r.changed_by else None),
-                at=r.at,
+        out: list[VersionOut] = []
+        for r in rows:
+            diff = _scrub_diff(r.diff, hidden) if r.diff else None
+            changed = sorted(
+                {k for bucket in (diff or {}).values() for k in (bucket or {})}
             )
-            for r in rows
-        ]
+            if not r.changed_by:
+                changed_by = None
+            elif applicant_view and r.changed_by not in own:
+                changed_by = gremium
+            else:
+                changed_by = names.get(r.changed_by, r.changed_by)
+            out.append(
+                VersionOut(
+                    version=r.version,
+                    data=None if applicant_view else _without_keys(r.data, hidden),
+                    diff=None if applicant_view else diff,  # type: ignore[arg-type] — stored DataDiff
+                    changedKeys=changed,
+                    changedBy=changed_by,
+                    at=r.at,
+                )
+            )
+        return out

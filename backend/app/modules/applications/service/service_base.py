@@ -7,13 +7,20 @@ also holds the pure module-level field and data helpers.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import Subquery, func, select
 
-from app.modules.applications.models import Applicant, Application, SubmissionVersion
+from app.modules.applications.models import (
+    Applicant,
+    Application,
+    StatusEvent,
+    SubmissionVersion,
+)
 from app.modules.applications.schemas import ApplicantOut, ApplicationOut, StateOut
 from app.modules.flow.models import FlowVersion, State
 from app.modules.forms.validation import extract_promoted
@@ -72,6 +79,42 @@ def _state_out(state: State | None, color_override: str | None = None) -> StateO
         editAllowed=state.edit_allowed,
         kind=state.kind,
     )
+
+
+def state_since_subquery() -> Subquery:
+    """Build the grouped subquery ``(app_id, since)`` of the last status change (A9).
+
+    ``since`` is the time of the newest ``status_event`` of each application. The
+    creation writes the first event, so every application has one. A caller joins
+    the subquery with an outer join and falls back to ``created_at``.
+    """
+    return (
+        select(
+            StatusEvent.application_id.label("app_id"),
+            func.max(StatusEvent.at).label("since"),
+        )
+        .group_by(StatusEvent.application_id)
+        .subquery("state_since")
+    )
+
+
+# Actor value of a magic-link applicant in `status_event`, `submission_version` and
+# the audit log.
+APPLICANT_ACTOR = "applicant"
+
+
+def applicant_actors(created_by: str | None) -> set[str]:
+    """Return the actor values that name the applicant of one application.
+
+    These are the magic-link actor and the ``sub`` of the logged-in creator. The
+    applicant view keeps these actors and shows the Gremium for all others (A12).
+    """
+    return {APPLICANT_ACTOR} | ({created_by} if created_by else set())
+
+
+def _without_keys(data: dict[str, Any] | None, keys: set[str]) -> dict[str, Any]:
+    """Return a copy of ``data`` without ``keys``."""
+    return {k: v for k, v in (data or {}).items() if k not in keys}
 
 
 def _whitelist(fields: list[FormFieldDef], data: dict[str, Any]) -> dict[str, Any]:
@@ -207,6 +250,43 @@ class ApplicationsServiceBase:
         )
         return set(rows)
 
+    async def _state_since_map(self, app_ids: Iterable[UUID]) -> dict[UUID, datetime]:
+        """Map each application id to the time of its last status change (A9).
+
+        One grouped query for all ids. An id without a status event is missing from
+        the map; the caller falls back to ``created_at``.
+        """
+        ids = set(app_ids)
+        if not ids:
+            return {}
+        sq = state_since_subquery()
+        rows = (
+            await self.session.execute(select(sq.c.app_id, sq.c.since).where(sq.c.app_id.in_(ids)))
+        ).all()
+        return {app_id: since for app_id, since in rows}
+
+    async def _strip_pii_fields(
+        self, type_id: UUID, data: dict[str, Any] | None
+    ) -> dict[str, Any]:
+        """Remove the ``isPII`` fields from ``data`` for a reader without the PII right (O21).
+
+        The key set is the union over every form version of the type, as for the
+        anonymization. A field that a later version marks as PII stays hidden too.
+        """
+        return _without_keys(data, await self._pii_keys_for_type(type_id))
+
+    async def _gremium_actor(self, app: Application) -> str | None:
+        """Return the name of the Gremium of the application.
+
+        The applicant view shows this name instead of a member name (A12, O16).
+        Without a Gremium the result is None, so no member name leaks either.
+        """
+        if app.gremium_id is None:
+            return None
+        from app.modules.admin.models import Gremium
+
+        return await self.session.scalar(select(Gremium.name).where(Gremium.id == app.gremium_id))
+
     async def _to_out(
         self,
         app: Application,
@@ -214,9 +294,21 @@ class ApplicationsServiceBase:
         include_pii: bool,
         can_edit: bool = False,
         is_owner: bool = False,
+        strip_pii_fields: bool = False,
     ) -> ApplicationOut:
+        """Serialize one application.
+
+        ``include_pii`` adds the applicant block (email, name). ``strip_pii_fields``
+        removes the ``isPII`` form fields from ``data`` (O21).
+        """
         state = await self._get_state(app.current_state_id)
         version = await self._current_version(app.id)
+        since = (await self._state_since_map([app.id])).get(app.id, app.created_at)
+        data = (
+            await self._strip_pii_fields(app.type_id, app.data)
+            if strip_pii_fields
+            else app.data
+        )
         applicant_out: ApplicantOut | None = None
         if include_pii:
             applicant = (
@@ -239,7 +331,7 @@ class ApplicationsServiceBase:
             fiscalYearId=app.fiscal_year_id,
             amount=app.amount,
             currency=app.currency,
-            data=app.data,
+            data=data,
             version=version,
             lang=app.lang,
             createdAt=app.created_at,
@@ -248,6 +340,7 @@ class ApplicationsServiceBase:
             canEdit=can_edit,
             isOwner=is_owner,
             archivedAt=app.archived_at,
+            stateSince=since,
         )
 
     async def _author_names(self, subs: set[str]) -> dict[str, str]:

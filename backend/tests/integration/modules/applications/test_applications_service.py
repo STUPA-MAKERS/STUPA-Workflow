@@ -261,7 +261,7 @@ async def test_list_filters_and_paging(session: AsyncSession) -> None:
     page = await svc.list_applications(type_id=app_type.id, limit=50, offset=0)
     assert page.total == 2
 
-    by_state = await svc.list_applications(state_id=draft.id, limit=50, offset=0)
+    by_state = await svc.list_applications(state_ids=[draft.id], limit=50, offset=0)
     assert by_state.total == 2
 
     by_q = await svc.list_applications(q="solarpanel", limit=50, offset=0)
@@ -372,7 +372,7 @@ async def test_create_drops_unknown_keys(session: AsyncSession) -> None:
     assert "junk" not in out.data
     # not in v1 either
     v1 = (await svc.versions(app.id))[0]
-    assert "junk" not in v1.data
+    assert "junk" not in (v1.data or {})
 
 
 async def test_patch_drops_unknown_keys(session: AsyncSession) -> None:
@@ -386,7 +386,7 @@ async def test_patch_drops_unknown_keys(session: AsyncSession) -> None:
     )
     assert "evil" not in out.data
     v2 = (await svc.versions(app.id))[1]
-    assert "evil" not in v2.data
+    assert "evil" not in (v2.data or {})
     assert "evil" not in (v2.diff or {}).get("added", {})
 
 
@@ -529,7 +529,7 @@ async def test_anonymize_scrubs_version_history(session: AsyncSession) -> None:
     versions = await svc.versions(app.id)
     assert len(versions) == 2
     for v in versions:
-        assert "note" not in v.data  # PII gone from every snapshot
+        assert "note" not in (v.data or {})  # PII gone from every snapshot
         if v.diff is not None:
             for bucket in ("added", "removed", "changed"):
                 assert "note" not in v.diff.get(bucket, {})

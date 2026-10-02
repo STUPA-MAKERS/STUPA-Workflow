@@ -33,6 +33,7 @@ from app.modules.applications.access import (
     READ_ALL_PERMISSION,
     SHARE_PERMISSION,
     Access,
+    can_read_pii,
     require_app_edit,
     require_app_read,
 )
@@ -249,7 +250,9 @@ async def list_applications(
     service: ServiceDep,
     principal: Annotated[Principal, Depends(require_principal())],
     page: Annotated[PageParams, Depends()],
-    state_id: Annotated[UUID | None, Query(alias="state")] = None,
+    # A4: repeat `state` to keep the applications in any of these states. A single
+    # value works as before.
+    state_ids: Annotated[list[UUID] | None, Query(alias="state")] = None,
     gremium_id: Annotated[UUID | None, Query(alias="gremium")] = None,
     type_id: Annotated[UUID | None, Query(alias="type")] = None,
     budget_id: Annotated[UUID | None, Query(alias="budget")] = None,
@@ -276,6 +279,9 @@ async def list_applications(
     ``archived`` hides archived applications by default. A tri-state string rather than a
     boolean, because "only the archived ones" and "both" are different questions and a
     boolean can only answer one of them.
+
+    ``state`` can repeat (A4): ``?state=a&state=b`` lists the applications in state
+    ``a`` or ``b``. Each item carries ``stateSince`` (A9).
     """
     # `Principal.has` is the single RBAC chokepoint: it grants every right to the admin
     # role AND applies the OAuth scope cap. Reading `principal.roles` directly would skip
@@ -283,7 +289,7 @@ async def list_applications(
     can_read = principal.has("application.read") or principal.has(READ_ALL_PERMISSION)
     restricted = not can_read and not mine
     return await service.list_applications(
-        state_id=state_id,
+        state_ids=state_ids,
         gremium_id=gremium_id,
         type_id=type_id,
         budget_id=budget_id,
@@ -311,7 +317,9 @@ async def list_applications(
 async def export_applications_xlsx(
     service: ServiceDep,
     principal: Annotated[Principal, Depends(require_principal("application.export"))],
-    state_id: Annotated[UUID | None, Query(alias="state")] = None,
+    # A4: repeat `state` to keep the applications in any of these states. A single
+    # value works as before.
+    state_ids: Annotated[list[UUID] | None, Query(alias="state")] = None,
     gremium_id: Annotated[UUID | None, Query(alias="gremium")] = None,
     type_id: Annotated[UUID | None, Query(alias="type")] = None,
     budget_id: Annotated[UUID | None, Query(alias="budget")] = None,
@@ -325,12 +333,13 @@ async def export_applications_xlsx(
 ) -> Response:
     """Export the application list as ``.xlsx``.
 
-    The filters work as in ``GET /applications``.
+    The filters work as in ``GET /applications``, also the repeated ``state``. The
+    workbook holds no form field values, so it holds no ``isPII`` field either.
     """
     from app.shared.xlsx import XLSX_MEDIA_TYPE, build_applications_workbook
 
     page = await service.list_applications(
-        state_id=state_id,
+        state_ids=state_ids,
         gremium_id=gremium_id,
         type_id=type_id,
         budget_id=budget_id,
@@ -383,17 +392,22 @@ async def get_application(
 ) -> ApplicationOut:
     """Read an application.
 
-    Only a principal gets the PII and the internal view.
+    Only a principal gets the applicant block and the internal view. A reader
+    without the PII right (``application.read``, ``application.read_all``, admin,
+    or the own application) gets ``data`` without the ``isPII`` fields and no
+    applicant block (O21). ``stateSince`` is the time of the last status change.
     """
     principal = access.principal
+    pii = await can_read_pii(service.session, access)
     return await service.get(
         access.application_id,
-        include_pii=access.can_see_internal,
+        include_pii=access.can_see_internal and pii,
         requester_sub=principal.sub if principal is not None else None,
         requester_can_manage=principal.has("application.manage")
         if principal is not None
         else False,
         allow_unconfirmed=access.is_owning_applicant,
+        strip_pii_fields=not pii,
     )
 
 
@@ -429,6 +443,10 @@ async def patch_application(
     """Update the application data as a new version.
 
     A locked state answers 409, unless the caller holds ``application.edit_any``.
+
+    An editor without the PII right cannot see the ``isPII`` fields (O21). The
+    patch keeps their stored values, so a form that was read without them does
+    not erase them.
     """
     bypass = access.principal is not None and access.principal.has(EDIT_ANY_PERMISSION)
     return await service.patch(
@@ -437,6 +455,7 @@ async def patch_application(
         changed_by=access.actor,
         bypass_state_lock=bypass,
         allow_unconfirmed=access.is_owning_applicant,
+        preserve_pii=not await can_read_pii(service.session, access),
     )
 
 
@@ -483,7 +502,12 @@ async def archive_application(
     than failing: a second click should not be an error, and it must not overwrite who
     archived it first.
     """
-    return await service.set_archived(application_id, archived=True, actor=principal.sub)
+    return await service.set_archived(
+        application_id,
+        archived=True,
+        actor=principal.sub,
+        strip_pii_fields=not await _principal_reads_pii(service, application_id, principal),
+    )
 
 
 @router.delete(
@@ -497,7 +521,19 @@ async def unarchive_application(
     principal: Annotated[Principal, Depends(require_principal(ARCHIVE_PERMISSION))],
 ) -> ApplicationOut:
     """Bring an application back into the working list. Audited like the archive."""
-    return await service.set_archived(application_id, archived=False, actor=principal.sub)
+    return await service.set_archived(
+        application_id,
+        archived=False,
+        actor=principal.sub,
+        strip_pii_fields=not await _principal_reads_pii(service, application_id, principal),
+    )
+
+
+async def _principal_reads_pii(
+    service: ApplicationsService, application_id: UUID, principal: Principal
+) -> bool:
+    """Apply the PII rule (O21) to a route that gates on a permission only."""
+    return await can_read_pii(service.session, Access(application_id, principal, None))
 
 
 def _share_out(row: ApplicationShare, *, url: str | None = None) -> ShareOut:
@@ -612,29 +648,47 @@ async def get_timeline(
     service: ServiceDep,
     access: Annotated[Access, Depends(require_app_read)],
 ) -> list[TimelineEventOut]:
-    """Status timeline of the application."""
+    """Status timeline of the application.
+
+    Each event carries ``transitionLabel`` (A3). The applicant view (magic link or
+    creator without read permission) shows the Gremium as the actor of every event
+    that the applicant did not do (A12, O16).
+    """
     return await service.timeline(
-        access.application_id, allow_unconfirmed=access.is_owning_applicant
+        access.application_id,
+        allow_unconfirmed=access.is_owning_applicant,
+        applicant_view=access.is_applicant_view,
     )
 
 
 @router.get(
     "/applications/{application_id}/versions",
     response_model=list[VersionOut],
-    dependencies=[Depends(require_principal("application.read"))],
     responses=_errors(401, 403, 404),
 )
 async def get_versions(
-    application_id: UUID,
     service: ServiceDep,
+    access: Annotated[Access, Depends(require_app_read)],
 ) -> list[VersionOut]:
-    """Return the version history and the diff.
+    """Return the version history.
 
-    Only a principal may read this route.
+    Every identity that reads the application reads its versions:
+
+    * The applicant view (magic link, or creator without read permission) gets
+      the metadata only: number, time, changed keys and the editor (A11, O17).
+      The editor is the Gremium for every edit that the applicant did not do.
+    * A principal with the PII right gets ``data``, ``diff`` and ``changedKeys``.
+    * Any other reader (Gremium read scope) gets them without the ``isPII``
+      fields (O21).
     """
-    # This route serves a principal only. An unconfirmed guest submission stays
-    # invisible and answers 404, like the list.
-    return await service.versions(application_id, allow_unconfirmed=False)
+    return await service.versions(
+        access.application_id,
+        # An unconfirmed guest submission stays invisible to a principal and
+        # answers 404, like the list. The magic-link applicant reads it.
+        allow_unconfirmed=access.is_owning_applicant,
+        applicant_view=access.is_applicant_view,
+        strip_pii=not await can_read_pii(service.session, access),
+    )
 
 
 async def _deliver_comment_mails(
@@ -740,7 +794,8 @@ async def list_comments(
 ) -> list[CommentOut]:
     """List the comments.
 
-    An applicant sees the ``public`` comments only.
+    An applicant sees the ``public`` comments only. The applicant view names the
+    Gremium as the author of a member comment (A12, O16).
     """
     return await service.list_comments(
         access.application_id,
@@ -748,6 +803,7 @@ async def list_comments(
         allow_unconfirmed=access.is_owning_applicant,
         viewer_sub=access.principal.sub if access.principal is not None else None,
         viewer_is_applicant=access.is_owning_applicant,
+        applicant_view=access.is_applicant_view,
     )
 
 

@@ -8,12 +8,15 @@ sufficient rights.
 
 `Access.can_see_internal` alone controls internal-comment visibility. Only a
 principal gets it. An applicant sees ``public`` comments only.
+
+`Access.via` records the path that granted the access. The applicant view (A11,
+A12) and the PII rule (O21, `can_read_pii`) read it.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import Depends
@@ -44,6 +47,11 @@ ARCHIVE_PERMISSION = "application.archive"
 SHARE_PERMISSION = "application.share"
 
 
+# The path that granted the access: a permission, the magic link of the applicant,
+# the logged-in creator (owner), or the Gremium read scope (committee).
+AccessVia = Literal["permission", "applicant", "owner", "committee"]
+
+
 @dataclass(slots=True)
 class Access:
     """Resolved access to exactly one application, by a principal or an applicant."""
@@ -51,6 +59,7 @@ class Access:
     application_id: UUID
     principal: Principal | None
     applicant: Applicant | None
+    via: AccessVia = "permission"
 
     @property
     def can_see_internal(self) -> bool:
@@ -69,6 +78,16 @@ class Access:
         the committee scope may not. This mirrors the invisible-in-lists rule.
         """
         return self.applicant is not None
+
+    @property
+    def is_applicant_view(self) -> bool:
+        """Tell whether the caller reads as the applicant of this application.
+
+        This holds for the magic link and for the logged-in creator who has no read
+        permission. The applicant view shows the Gremium instead of member names
+        (A12, O16) and the version metadata without values (A11, O17).
+        """
+        return self.applicant is not None or self.via == "owner"
 
     @property
     def author_kind(self) -> str:
@@ -107,7 +126,7 @@ def resolve_access(
         if str(applicant.application_id) == str(application_id) and applicant.allows(
             scope
         ):
-            return Access(application_id, None, applicant)
+            return Access(application_id, None, applicant, via="applicant")
         raise ForbiddenError("Magic-link does not grant access to this application.")
     raise UnauthorizedError("Authentication required.")
 
@@ -203,7 +222,7 @@ async def _resolve_with_creator(
         return resolve_access(application_id, principal, applicant, perm=perm, scope=scope)
     except ForbiddenError:
         if principal is not None and await _is_creator(db, application_id, principal):
-            return Access(application_id, principal, None)
+            return Access(application_id, principal, None, via="owner")
         raise
 
 
@@ -230,7 +249,7 @@ async def require_app_read(
         if principal is not None and await _committee_can_read(
             db, application_id, principal
         ):
-            return Access(application_id, principal, None)
+            return Access(application_id, principal, None, via="committee")
         raise
 
 
@@ -254,3 +273,31 @@ async def require_app_edit(
     return await _resolve_with_creator(
         db, application_id, principal, applicant, perm=MANAGE_PERMISSION, scope="edit"
     )
+
+
+def principal_reads_pii(principal: Principal) -> bool:
+    """Tell whether a principal reads the ``isPII`` fields of every application (O21).
+
+    The rights are ``application.read`` and ``application.read_all``. An admin holds
+    both through `Principal.has`, which also applies the OAuth scope cap.
+    """
+    return principal.has(READ_PERMISSION) or principal.has(READ_ALL_PERMISSION)
+
+
+async def can_read_pii(db: AsyncSession, access: Access) -> bool:
+    """Tell whether the caller reads the ``isPII`` fields of this application (O21).
+
+    The applicant reads the own data: through the magic link and as the logged-in
+    creator. A principal reads them with `principal_reads_pii`. A member who reads
+    only through the Gremium read scope, or who edits with ``application.manage``
+    alone, gets ``data`` without the ``isPII`` fields and without the applicant
+    block.
+    """
+    if access.applicant is not None:
+        return True
+    principal = access.principal
+    if principal is None:
+        return False
+    if access.via == "owner" or principal_reads_pii(principal):
+        return True
+    return await _is_creator(db, access.application_id, principal)

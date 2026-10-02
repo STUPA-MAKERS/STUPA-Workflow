@@ -281,8 +281,9 @@ async def test_get_with_pii_owner_and_applicant() -> None:
     applicant = _Obj(email="a@b.de", name="Alice", anonymized_at=None)
     session = _Session(
         get_results=[app, state],
-        # _to_out: first the applicant query, then _resolve_state_colors (cached).
-        execute_results=[[applicant], [("draft", "#zzz")]],
+        # _to_out: the stateSince query (no event, so created_at), the applicant
+        # query, then _resolve_state_colors (cached).
+        execute_results=[[], [applicant], [("draft", "#zzz")]],
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     out = await svc.get(app.id, include_pii=True, requester_sub="user-1")
@@ -291,6 +292,7 @@ async def test_get_with_pii_owner_and_applicant() -> None:
     assert out.applicant is not None
     assert out.applicant.email == "a@b.de"
     assert out.version == 0  # scalar() default None → 0
+    assert out.state_since == app.created_at  # no status event → creation time
 
 
 async def test_get_without_pii_and_can_manage() -> None:
@@ -316,7 +318,8 @@ async def test_get_include_pii_but_no_applicant_row() -> None:
     app = _app(current_state_id=state.id)
     session = _Session(
         get_results=[app, state],
-        execute_results=[[], [("draft", "#zzz")]],  # empty applicant result, then colors
+        # stateSince, empty applicant result, then colors
+        execute_results=[[], [], [("draft", "#zzz")]],
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     out = await svc.get(app.id, include_pii=True)
@@ -783,16 +786,50 @@ async def test_timeline_resolves_actor_names_and_states() -> None:
     session = _Session(
         get_results=[app, to_state, to_state],
         execute_results=[
+            # timeline events with the label of the fired transition (A3)
+            [(ev1, {"de": "Genehmigen"}), (ev2, None)],
             [("sub-1", "Alice", None)],  # _author_names
             [("approved", "#0f0")],  # _resolve_state_colors (cached after this call)
         ],
-        scalars_results=[[ev1, ev2]],  # timeline events
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     out = await svc.timeline(app.id)
     assert len(out) == 2
     assert out[0].actor == "Alice"  # resolved
+    assert out[0].transition_label == {"de": "Genehmigen"}
     assert out[1].actor is None  # no actor
+    assert out[1].transition_label is None  # creation or revert
+
+
+async def test_timeline_applicant_view_names_the_gremium() -> None:
+    app = _app(created_by="owner-sub")
+    to_state = _state(key="approved")
+    member = _Obj(
+        from_state_id=None, to_state_id=to_state.id, actor="sub-1", at=NOW, note=None
+    )
+    own = _Obj(
+        from_state_id=None, to_state_id=to_state.id, actor="owner-sub", at=NOW, note=None
+    )
+    magic = _Obj(
+        from_state_id=None, to_state_id=to_state.id, actor="applicant", at=NOW, note=None
+    )
+    session = _Session(
+        get_results=[app, to_state, to_state, to_state],
+        execute_results=[
+            [(member, None), (own, None), (magic, None)],
+            [("sub-1", "Alice", None), ("owner-sub", "Olga", None)],
+            [("approved", "#0f0")],
+        ],
+        scalar_results=["StuPa"],  # name of the Gremium of the application
+    )
+    svc = ApplicationsService(session)  # type: ignore[arg-type]
+    out = await svc.timeline(app.id, applicant_view=True)
+    assert [e.actor for e in out] == ["StuPa", "Olga", "applicant"]
+
+
+async def test_gremium_actor_without_gremium_is_none() -> None:
+    svc = ApplicationsService(_Session())  # type: ignore[arg-type]
+    assert await svc._gremium_actor(_app(gremium_id=None)) is None  # type: ignore[arg-type]
 
 
 async def test_timeline_missing_404() -> None:
@@ -859,8 +896,8 @@ async def test_list_applications_no_filters_default_sort() -> None:
     state = _state()
     session = _Session(
         get_results=[state],
-        execute_results=[[("draft", "#z")]],
-        scalars_results=[[app]],
+        # the page rows with stateSince (none: creation time), then the colors
+        execute_results=[[(app, None)], [("draft", "#z")]],
         scalar_results=[1],  # total
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
@@ -868,6 +905,7 @@ async def test_list_applications_no_filters_default_sort() -> None:
     assert page.total == 1
     assert len(page.items) == 1
     assert page.items[0].title == "Antrag"
+    assert page.items[0].state_since == app.created_at
 
 
 async def test_list_applications_all_filters_postgres_search(
@@ -876,15 +914,15 @@ async def test_list_applications_all_filters_postgres_search(
     app = _app(budget_id=uuid4())
     state = _state()
     node_path = "VS-800"
+    since = datetime(2026, 7, 1, tzinfo=UTC)
     session = _Session(
         get_results=[state],
-        execute_results=[[("draft", "#z")]],
-        scalars_results=[[app]],
+        execute_results=[[(app, since)], [("draft", "#z")]],
         scalar_results=[node_path, 1],  # budget path_key lookup, then total
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     page = await svc.list_applications(
-        state_id=uuid4(),
+        state_ids=[uuid4()],
         gremium_id=uuid4(),
         type_id=uuid4(),
         budget_id=uuid4(),
@@ -901,6 +939,7 @@ async def test_list_applications_all_filters_postgres_search(
     )
     assert page.total == 1
     assert page.offset == 5
+    assert page.items[0].state_since == since
 
 
 async def test_list_applications_unknown_budget_yields_empty() -> None:

@@ -8,7 +8,11 @@ from sqlalchemy import select
 
 from app.modules.applications.models import StatusEvent
 from app.modules.applications.schemas import ApplicationOut, TimelineEventOut
-from app.modules.applications.service.service_base import ApplicationsServiceBase
+from app.modules.applications.service.service_base import (
+    ApplicationsServiceBase,
+    applicant_actors,
+)
+from app.modules.flow.models import Transition
 from app.modules.forms.schemas import EffectiveFormOut
 from app.modules.forms.service import FormsService
 
@@ -40,21 +44,43 @@ class ReadOps(ApplicationsServiceBase):
         requester_sub: str | None = None,
         requester_can_manage: bool = False,
         allow_unconfirmed: bool = True,
+        strip_pii_fields: bool = False,
     ) -> ApplicationOut:
+        """Read one application.
+
+        ``include_pii`` adds the applicant block. ``strip_pii_fields`` removes the
+        ``isPII`` form fields from ``data`` for a reader without the PII right (O21).
+        """
         app = await self._get_app(application_id, allow_unconfirmed=allow_unconfirmed)
         is_owner = requester_sub is not None and app.created_by == requester_sub
         can_edit = requester_can_manage or is_owner
         return await self._to_out(
-            app, include_pii=include_pii, can_edit=can_edit, is_owner=is_owner
+            app,
+            include_pii=include_pii,
+            can_edit=can_edit,
+            is_owner=is_owner,
+            strip_pii_fields=strip_pii_fields,
         )
 
     async def timeline(
-        self, application_id: UUID, *, allow_unconfirmed: bool = True
+        self,
+        application_id: UUID,
+        *,
+        allow_unconfirmed: bool = True,
+        applicant_view: bool = False,
     ) -> list[TimelineEventOut]:
-        await self._get_app(application_id, allow_unconfirmed=allow_unconfirmed)
-        events = (
-            await self.session.scalars(
-                select(StatusEvent)
+        """Return the status timeline, oldest event first.
+
+        Each event carries the label of the fired transition (A3). In the
+        ``applicant_view`` the actor of every event that the applicant did not do is
+        the name of the Gremium of the application (A12, O16). The applicant then
+        never sees the name of a member.
+        """
+        app = await self._get_app(application_id, allow_unconfirmed=allow_unconfirmed)
+        rows = (
+            await self.session.execute(
+                select(StatusEvent, Transition.label_i18n)
+                .outerjoin(Transition, Transition.id == StatusEvent.transition_id)
                 .where(StatusEvent.application_id == application_id)
                 .order_by(StatusEvent.at)
             )
@@ -62,15 +88,24 @@ class ReadOps(ApplicationsServiceBase):
         out: list[TimelineEventOut] = []
         # Map the actor sub to a display name. The user interface must never show a
         # raw UUID.
-        names = await self._author_names({ev.actor for ev in events if ev.actor})
-        for ev in events:
+        names = await self._author_names({ev.actor for ev, _ in rows if ev.actor})
+        own = applicant_actors(app.created_by)
+        gremium = await self._gremium_actor(app) if applicant_view else None
+        for ev, label in rows:
             to_state = await self._get_state(ev.to_state_id)
+            if not ev.actor:
+                actor = None
+            elif applicant_view and ev.actor not in own:
+                actor = gremium
+            else:
+                actor = names.get(ev.actor, ev.actor)
             out.append(
                 TimelineEventOut(
                     fromStateId=ev.from_state_id,
                     toStateId=ev.to_state_id,
                     toState=await self._state_out_resolved(to_state),
-                    actor=(names.get(ev.actor, ev.actor) if ev.actor else None),
+                    transitionLabel=label or None,
+                    actor=actor,
                     at=ev.at,
                     note=ev.note,
                 )

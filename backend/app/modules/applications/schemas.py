@@ -114,6 +114,9 @@ class ApplicationOut(_CamelModel):
     # the timestamp and not just a flag. Archiving is NOT anonymization: this record is
     # complete and readable, it has only left the working list.
     archived_at: datetime | None = Field(default=None, alias="archivedAt")
+    # Time of the last status change (A9): the newest status event, else the creation
+    # time. The status page shows "since" from it.
+    state_since: datetime | None = Field(default=None, alias="stateSince")
 
 
 class ApplicationPatch(_CamelModel):
@@ -126,18 +129,36 @@ class ApplicationPatch(_CamelModel):
 
 
 class TimelineEventOut(_CamelModel):
+    """One status change of the timeline.
+
+    In the applicant view (magic link or creator), ``actor`` names the Gremium of the
+    application for every action that the applicant did not do (A12, O16).
+    """
+
     from_state_id: UUID | None = Field(default=None, alias="fromStateId")
     to_state_id: UUID = Field(alias="toStateId")
     to_state: StateOut | None = Field(default=None, alias="toState")
+    # The i18n label of the fired transition (A3). Null for the creation event and
+    # for a revert, which fire no transition.
+    transition_label: I18nMap | None = Field(default=None, alias="transitionLabel")
     actor: str | None = None
     at: datetime
     note: str | None = None
 
 
 class VersionOut(_CamelModel):
+    """One submission version.
+
+    ``changedKeys`` holds the keys of the added, removed and changed fields. The
+    applicant view gets the metadata only (A11, O17): ``data`` and ``diff`` are null.
+    A reader without the PII right gets ``data``, ``diff`` and ``changedKeys``
+    without the ``isPII`` fields (O21).
+    """
+
     version: int
-    data: dict[str, Any]
+    data: dict[str, Any] | None = None
     diff: DataDiff | None = None
+    changed_keys: list[str] = Field(default_factory=list, alias="changedKeys")
     changed_by: str | None = Field(default=None, alias="changedBy")
     at: datetime
 
@@ -155,6 +176,8 @@ class ApplicationListItem(_CamelModel):
     updated_at: datetime = Field(alias="updatedAt")
     #: Set when the row is archived, so a combined list can mark it.
     archived_at: datetime | None = Field(default=None, alias="archivedAt")
+    #: Time of the last status change (A9), for "waiting since".
+    state_since: datetime | None = Field(default=None, alias="stateSince")
 
 
 class ShareCreate(_CamelModel):
