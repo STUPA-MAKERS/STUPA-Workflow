@@ -123,6 +123,34 @@ describe('GremiumRolesComponent', () => {
     expect(api.createGremiumRole).not.toHaveBeenCalled();
   });
 
+  it('refuses a new key that breaks the role-key pattern and shows why', async () => {
+    const { c, api } = await setup();
+    expect(c.keyValid()).toBe(false); // no draft
+    expect(c.keyError()).toBe('');
+    c.openAdd();
+    expect(c.keyError()).toBe(''); // a blank key shows no error yet
+    for (const bad of ['Vorsitz', 'vor-sitz', '2vorsitz', '_vorsitz']) {
+      c.patch('key', bad);
+      expect(c.keyValid()).toBe(false);
+      expect(c.keyError()).not.toBe('');
+      c.save();
+    }
+    expect(api.createGremiumRole).not.toHaveBeenCalled();
+    c.patch('key', 'vorsitz_2');
+    expect(c.keyValid()).toBe(true);
+    expect(c.keyError()).toBe('');
+  });
+
+  it('does not check the pattern of an existing key on edit', async () => {
+    const { c, api } = await setup();
+    c.openEdit(0);
+    c.patch('key', 'Legacy-Key'); // a key from before the pattern
+    expect(c.keyValid()).toBe(true);
+    expect(c.keyError()).toBe('');
+    c.save();
+    expect(api.updateGremiumRole).toHaveBeenCalled();
+  });
+
   it('creates a role via the dialog (label fallbacks de→en→key)', async () => {
     const { c, api, toast } = await setup();
     c.openAdd();

@@ -2134,3 +2134,81 @@ async def test_delete_transfer_unknown_404() -> None:
     svc = BudgetTreeService(fake_session(result()))
     with pytest.raises(NotFoundError):
         await svc.delete_transfer(uuid.uuid4())
+
+
+# ------------------------------------------------- A6: linked bookings of an invoice
+
+
+def _booking_row(inv: Invoice, *, budget_id: uuid.UUID, path: str, name: str) -> tuple:
+    booking = _expense(budget_id=budget_id, invoice_id=inv.id, amount="40.00")
+    booking.payment_date = date(2026, 3, 1)
+    return (booking, path, name)
+
+
+async def test_list_invoices_paged_carries_linked_bookings_full_view() -> None:
+    inv, other = _invoice(), _invoice(number="R-2")
+    bid = uuid.uuid4()
+    row = _booking_row(inv, budget_id=bid, path="VS-800", name="Kultur")
+    sess = fake_session(result(2), result(inv, other), result(row))  # count, rows, bookings
+    page = await BudgetTreeService(sess).list_invoices_paged()
+    first, second = page.items
+    assert [b.budget_id for b in first.linked_bookings] == [bid]
+    linked = first.linked_bookings[0]
+    assert linked.path_key == "VS-800"
+    assert linked.budget_name == "Kultur"
+    assert linked.amount == Decimal("40.00")
+    assert linked.payment_date == date(2026, 3, 1)
+    assert linked.kind == "expense"
+    assert second.linked_bookings == []
+
+
+async def test_list_invoices_paged_without_rows_runs_no_booking_query() -> None:
+    sess = fake_session(result(0), result())
+    page = await BudgetTreeService(sess).list_invoices_paged(visible_gremium_ids={uuid.uuid4()})
+    assert page.items == []
+    assert sess._results == []  # noqa: SLF001 - nothing extra was read
+
+
+async def test_get_invoice_scoped_to_member_subtrees() -> None:
+    inv = _invoice()
+    visible = uuid.uuid4()
+    row = _booking_row(inv, budget_id=visible, path="VS-800-04", name="Theater")
+    # root paths of the member Gremien, the subtree ids, then the scoped bookings
+    sess = fake_session(result("VS-800"), result(visible), result(row), gets=[inv])
+    out = await BudgetTreeService(sess).get_invoice(
+        inv.id, visible_gremium_ids={uuid.uuid4()}
+    )
+    assert [b.budget_id for b in out.linked_bookings] == [visible]
+
+
+async def test_get_invoice_scope_without_member_gremien_hides_all_bookings() -> None:
+    inv = _invoice()
+    sess = fake_session(result(("never-read",)), gets=[inv])
+    out = await BudgetTreeService(sess).get_invoice(inv.id, visible_gremium_ids=set())
+    assert out.linked_bookings == []
+    assert len(sess._results) == 1  # noqa: SLF001 - no query ran
+
+
+async def test_get_invoice_scope_without_view_nodes_hides_all_bookings() -> None:
+    inv = _invoice()
+    sess = fake_session(result(), result(("never-read",)), gets=[inv])  # no root path
+    out = await BudgetTreeService(sess).get_invoice(
+        inv.id, visible_gremium_ids={uuid.uuid4()}
+    )
+    assert out.linked_bookings == []
+    assert len(sess._results) == 1  # noqa: SLF001 - the booking query did not run
+
+
+async def test_visible_budget_ids_opens_the_subtrees() -> None:
+    a, b = uuid.uuid4(), uuid.uuid4()
+    sess = fake_session(result("VS", "AS-1"), result(a, b))
+    assert await BudgetTreeService(sess).visible_budget_ids({uuid.uuid4()}) == {a, b}
+
+
+async def test_update_invoice_returns_linked_bookings() -> None:
+    inv = _invoice()
+    bid = uuid.uuid4()
+    row = _booking_row(inv, budget_id=bid, path="VS", name="Haushalt")
+    sess = fake_session(result(row), gets=[inv])
+    out = await BudgetTreeService(sess).update_invoice(inv.id, InvoiceUpdate(note="n"))
+    assert [b.budget_id for b in out.linked_bookings] == [bid]

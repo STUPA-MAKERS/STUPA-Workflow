@@ -31,8 +31,9 @@ def test_worker_settings_registers_tasks() -> None:
     assert purge_draft_attachments in WorkerSettings.functions
     assert WorkerSettings.redis_settings is not None
     # Nightly budget rollup, deadline scan every minute (T-44), hourly task reminders,
-    # daily DSGVO retention, the nightly backup and the hourly draft purge (Z4).
-    assert len(WorkerSettings.cron_jobs) == 6
+    # daily DSGVO retention, the nightly backup, the hourly draft purge (Z4) and the
+    # nightly audit-chain check (Z6).
+    assert len(WorkerSettings.cron_jobs) == 7
     assert any(
         job.coroutine is purge_draft_attachments for job in WorkerSettings.cron_jobs
     ), "the hourly draft purge must be scheduled"

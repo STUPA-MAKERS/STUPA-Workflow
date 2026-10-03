@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import (
 from app.db import get_sessionmaker
 from app.modules.budget.stats import BudgetStatsService
 from app.modules.flow.dispatch import build_worker_dispatcher
+from worker.audit_verify import process_audit_verification
 from worker.backup import create_backup, restore_backup, scheduled_backup
 from worker.backup import on_startup as backup_on_startup
 from worker.deadlines import on_startup as deadlines_on_startup
@@ -58,6 +59,13 @@ _WEBHOOK_JOB_TIMEOUT_SECONDS = 30.0
 # puts both back. Neither fits the arq default of 300 s on a real dataset. The bound
 # sits one level above the subprocess timeout `backup_subprocess_timeout_seconds`.
 _BACKUP_JOB_TIMEOUT_SECONDS = 7200.0
+
+# The nightly audit-chain check reads the whole `audit_entry` table, so its run time
+# grows with the log. With the arq default of 300 s, arq cancels the job on a large
+# log, the transaction rolls back and no `audit_verification` row is stored. The tile
+# then keeps the last stored result. The bound is the same as for a backup, which
+# reads the same table and more.
+_AUDIT_VERIFY_JOB_TIMEOUT_SECONDS = 7200.0
 
 
 async def _on_startup(ctx: dict[str, Any]) -> None:
@@ -126,6 +134,7 @@ class WorkerSettings:
         process_task_reminders,
         process_retention,
         purge_draft_attachments,
+        func(process_audit_verification, timeout=_AUDIT_VERIFY_JOB_TIMEOUT_SECONDS),
         func(create_backup, timeout=_BACKUP_JOB_TIMEOUT_SECONDS),
         func(restore_backup, timeout=_BACKUP_JOB_TIMEOUT_SECONDS),
         func(scheduled_backup, timeout=_BACKUP_JOB_TIMEOUT_SECONDS),
@@ -146,6 +155,14 @@ class WorkerSettings:
         # Nightly backup. It runs after the retention job, so the archive holds the
         # already-anonymized state rather than PII that retention is about to drop.
         cron(scheduled_backup, hour=4, minute=0),
+        # Nightly audit-chain check (Z6/O8). It does not depend on the backup and runs
+        # also when backups are off or failed. The result goes to `audit_verification`.
+        cron(
+            process_audit_verification,
+            hour=4,
+            minute=30,
+            timeout=_AUDIT_VERIFY_JOB_TIMEOUT_SECONDS,
+        ),
     ]
     on_startup = _on_startup
     on_shutdown = _shutdown

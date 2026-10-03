@@ -18,7 +18,7 @@ import {
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
-import { GREMIUM_PERMISSIONS, type GremiumRole } from '../admin.models';
+import { GREMIUM_PERMISSIONS, ROLE_KEY_PATTERN, type GremiumRole } from '../admin.models';
 import type { TranslationKey } from '@core/i18n/translations';
 
 interface RoleDraft {
@@ -79,6 +79,24 @@ export class GremiumRolesComponent {
   protected readonly draft = signal<RoleDraft | null>(null);
   protected readonly editingId = signal<string | null>(null);
   protected readonly confirmDelete = signal<GremiumRole | null>(null);
+
+  /**
+   * The draft key can be saved. A new key must match ROLE_KEY_PATTERN, because the
+   * server refuses other keys with 422. An existing key never changes, so the edit
+   * does not check it against the pattern.
+   */
+  protected readonly keyValid = computed(() => {
+    const d = this.draft();
+    if (!d) return false;
+    const key = d.key.trim();
+    return this.editingId() === null ? ROLE_KEY_PATTERN.test(key) : key !== '';
+  });
+  /** The error text under the key input. Empty for a blank key, a valid key or an edit. */
+  protected readonly keyError = computed(() => {
+    const d = this.draft();
+    if (!d || this.editingId() !== null || !d.key.trim() || this.keyValid()) return '';
+    return this.i18n.translate('admin.common.roleKeyInvalid');
+  });
 
   protected readonly columns = computed<ColumnDef[]>(() => [
     { key: 'name', label: this.i18n.translate('admin.gremiumRoles.col.name') },
@@ -145,7 +163,7 @@ export class GremiumRolesComponent {
 
   protected save(): void {
     const d = this.draft();
-    if (!d || !d.key.trim()) return;
+    if (!d || !this.keyValid()) return;
     const name = { de: d.labelDe.trim() || d.key, en: d.labelEn.trim() || d.labelDe.trim() || d.key };
     const permissions = [...d.permissions];
     const id = this.editingId();

@@ -902,3 +902,10 @@ export const LOGO_MAX_SIZE_MB = 2;
 
 /** Re-export so admin code imports only from `admin.models`. */
 export type { FormFieldDef };
+
+/**
+ * Pattern for the key of a new role (global role and gremium role). It mirrors
+ * `ROLE_KEY_PATTERN` in `backend/app/modules/admin/schemas.py`. The server refuses
+ * a key that does not match with 422. A key never changes after the create.
+ */
+export const ROLE_KEY_PATTERN = /^[a-z][a-z0-9_]*$/;

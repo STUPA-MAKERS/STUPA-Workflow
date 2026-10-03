@@ -43,7 +43,7 @@ description: The antragsplattform_mcp MCP server, a standalone FastMCP package. 
   - Group → Gremium role: `list_/create_/update_/delete_gremium_role_mapping` (`/admin/gremium-role-mappings`, body `{oidcGroup, gremiumRoleId}`). The role applies only to a principal who is a member of that Gremium through a membership mapping.
   Each mapping write makes the platform sync the memberships of all principals.
 - Site config: `get_site_config`/`set_site_config_draft` (PUT draft)/`activate_site_config`.
-- Audit: `list_audit` `GET /admin/audit` (keyset-paged via `before`) · `verify_audit_chain` `GET /admin/audit/verify`.
+- Audit: `list_audit` `GET /admin/audit` (keyset-paged via `before`) · `verify_audit_chain` `GET /admin/audit/verify` (live, stores nothing) · `get_latest_audit_verification` `GET /admin/audit/verify/latest` (newest stored check, `null` before the first).
 
 **Conventions & gotchas:**
 - **Hard rule:** the package has no `cast_ballot` tool by design. The server never grants `vote.cast`. Agents manage votes, but they never vote.

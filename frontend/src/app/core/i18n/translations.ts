@@ -1147,6 +1147,9 @@ export const de = {
   'admin.common.moveUp': 'Nach oben',
   'admin.common.moveDown': 'Nach unten',
   'admin.common.key': 'Schlüssel',
+  'admin.common.roleKeyHint': 'Kleinbuchstaben, Ziffern und _. Am Anfang steht ein Buchstabe.',
+  'admin.common.roleKeyInvalid':
+    'Der Schlüssel muss mit einem Kleinbuchstaben beginnen. Erlaubt sind nur Kleinbuchstaben, Ziffern und _.',
   'admin.common.label': 'Bezeichnung',
   'admin.common.labelDe': 'Bezeichnung (DE)',
   'admin.common.labelEn': 'Bezeichnung (EN)',
@@ -3393,6 +3396,9 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.common.moveUp': 'Move up',
   'admin.common.moveDown': 'Move down',
   'admin.common.key': 'Key',
+  'admin.common.roleKeyHint': 'Lowercase letters, digits and _. The first character is a letter.',
+  'admin.common.roleKeyInvalid':
+    'The key must start with a lowercase letter. Use only lowercase letters, digits and _.',
   'admin.common.label': 'Label',
   'admin.common.labelDe': 'Label (DE)',
   'admin.common.labelEn': 'Label (EN)',

@@ -17,7 +17,7 @@ import {
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
-import type { Role } from '../admin.models';
+import { ROLE_KEY_PATTERN, type Role } from '../admin.models';
 
 /** Draft for a new global role. */
 interface RoleDraft {
@@ -66,6 +66,12 @@ export class AdminRolesComponent {
   protected readonly expanded = signal<Set<string>>(new Set());
   protected readonly addOpen = signal(false);
   protected readonly draft = signal<RoleDraft>({ key: '', labelDe: '', labelEn: '' });
+  /** The trimmed draft key matches ROLE_KEY_PATTERN. The server refuses other keys with 422. */
+  protected readonly keyValid = computed(() => ROLE_KEY_PATTERN.test(this.draft().key.trim()));
+  /** The error text under the key input. Empty for a blank key or a valid key. */
+  protected readonly keyError = computed(() =>
+    this.draft().key.trim() && !this.keyValid() ? this.i18n.translate('admin.common.roleKeyInvalid') : '',
+  );
   /** The role that waits for a delete confirmation. */
   protected readonly confirmRole = signal<Role | null>(null);
 
@@ -188,7 +194,7 @@ export class AdminRolesComponent {
 
   protected createRole(): void {
     const d = this.draft();
-    if (!d.key.trim()) return;
+    if (!this.keyValid()) return;
     const label: Record<string, string> = {};
     if (d.labelDe.trim()) label['de'] = d.labelDe.trim();
     if (d.labelEn.trim()) label['en'] = d.labelEn.trim();
