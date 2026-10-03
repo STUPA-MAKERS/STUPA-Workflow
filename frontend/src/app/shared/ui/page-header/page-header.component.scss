@@ -26,7 +26,7 @@
 
 .ph__bar {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
   gap: var(--space-4);
@@ -36,13 +36,28 @@
   min-width: 0;
 }
 
+/* The page title of the design system (d2): 28/36, semibold, a little tighter. */
 .ph__title {
   margin: 0;
+  font-size: var(--fs-d2);
+  line-height: var(--lh-d2);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-tight);
 }
 
+/* The lead line. Give it only when it says something the title does not. */
 .ph__subtitle {
   margin: var(--space-1) 0 0;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
   color: var(--color-text-muted);
+}
+
+@media (max-width: 768px) {
+  .ph__title {
+    font-size: var(--fs-h1);
+    line-height: var(--lh-h1);
+  }
 }
 
 /* The slot stays in the flow only when a page fills it. An empty slot would

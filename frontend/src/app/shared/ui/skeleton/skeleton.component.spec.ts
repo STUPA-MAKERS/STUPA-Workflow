@@ -22,6 +22,9 @@ describe('SkeletonComponent', () => {
     });
     expect(container.querySelectorAll('.sk__row')).toHaveLength(3);
     expect(container.querySelectorAll('.skel--bar')).toHaveLength(6);
+    // Only the last row rounds the bottom corners of the group.
+    expect(container.querySelectorAll('.sk__row--last')).toHaveLength(1);
+    expect(container.querySelectorAll('.sk__row')[2]).toHaveClass('sk__row--last');
   });
 
   it('never draws nothing, whatever count it is given', async () => {

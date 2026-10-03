@@ -10,25 +10,30 @@
 }
 
 .es__icon {
-  color: var(--color-text-muted);
-  opacity: 0.6;
+  color: var(--color-text-subtle);
 }
 
 .es__code {
   margin: 0;
-  font-size: var(--fs-3xl, 2rem);
-  font-weight: var(--fw-bold);
-  color: var(--color-primary);
+  font-family: var(--font-mono);
+  font-size: var(--fs-3xl);
+  line-height: var(--lh-tight);
+  font-weight: var(--fw-medium);
+  color: var(--color-accent-text);
 }
 
 .es__heading {
   margin: var(--space-3) 0 0;
-  font-size: var(--fs-xl);
+  font-size: var(--fs-h1);
+  line-height: var(--lh-h1);
+  font-weight: var(--fw-semibold);
 }
 
 .es__body {
   margin: var(--space-2) 0 0;
   max-width: 32rem;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
   color: var(--color-text-muted);
 }
 

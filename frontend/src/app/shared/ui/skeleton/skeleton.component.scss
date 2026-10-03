@@ -5,16 +5,35 @@
   display: flex;
   flex-direction: column;
 }
-/* A record row: a wide leading block and a narrower trailing one, so a list of rows
-   reads as rows rather than as a stack of identical bars. The heights come from the
+/* The blocks take the colour of a raised surface, so they show on the page and on a
+   sheet alike. */
+.skel {
+  background: var(--color-surface-3);
+}
+/* A record row in the shape of a list row (`app-list-item`): 64px, a wide leading block
+   and a narrower trailing one, so a list of rows reads as rows rather than as a stack of
+   identical bars. The rows sit 2px apart, like a row group. The heights come from the
    shared `.skel--bar`, which `app-data-table` also uses. */
+.sk--rows {
+  gap: 2px;
+}
 .sk__row {
   display: flex;
   align-items: center;
   gap: var(--space-4);
-  height: 3rem;
-  border-bottom: var(--border-width) solid var(--color-border);
+  height: 4rem;
+  padding: 0 var(--space-4);
+  border-radius: 4px;
+  background: var(--color-surface-2);
+}
+.sk__row:first-child {
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+}
+.sk__row--last {
+  border-bottom-left-radius: var(--radius-lg);
+  border-bottom-right-radius: var(--radius-lg);
 }
 .sk__row-lead {
-  width: 30%;
+  width: 40%;
 }
