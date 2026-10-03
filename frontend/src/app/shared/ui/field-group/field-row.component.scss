@@ -1,0 +1,38 @@
+:host {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 3.625rem; /* 58px */
+  padding: 10px var(--space-4);
+}
+
+.fld__text {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.fld__label {
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: var(--fw-medium);
+  color: var(--color-text-subtle);
+}
+
+.fld__value {
+  font-size: var(--fs-md);
+  line-height: 1.375rem;
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+.fld__trail:empty {
+  display: none;
+}
+.fld__trail {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-1);
+}

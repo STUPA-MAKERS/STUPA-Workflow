@@ -1,0 +1,46 @@
+:host {
+  display: flex;
+  gap: 3px;
+  width: 100%;
+  height: 6px;
+}
+:host(.bar--thin) {
+  gap: 2px;
+  height: 4px;
+}
+:host(.bar--fat) {
+  height: 10px;
+}
+
+/* The parts keep their share; the gaps come out of the grey rest, or out of the parts
+   when there is no rest. */
+.bar__seg {
+  display: block;
+  flex: 0 1 auto;
+  min-width: 3px;
+  height: 100%;
+  border-radius: 3px;
+}
+:host(.bar--thin) .bar__seg {
+  border-radius: 2px;
+}
+:host(.bar--fat) .bar__seg {
+  border-radius: 5px;
+}
+
+.bar__seg--filled {
+  background: var(--color-accent);
+}
+.bar__seg--second {
+  background: color-mix(in srgb, var(--color-accent) 45%, var(--color-surface-4));
+}
+.bar__seg--error {
+  background: var(--color-danger);
+}
+.bar__seg--muted {
+  background: var(--color-text-subtle);
+}
+.bar__rest {
+  flex: 1 1 0;
+  background: var(--color-surface-4);
+}

@@ -1,0 +1,32 @@
+<div class="li" [class.li--on]="selected()">
+  <span class="li__lead"><ng-content select="[lead]" /></span>
+  <span class="li__body">
+    @if (link(); as target) {
+      <a
+        class="li__title"
+        [routerLink]="target"
+        [title]="title()"
+        [attr.aria-current]="selected() ? 'true' : null"
+        (click)="activate.emit()"
+        >{{ title() }}</a
+      >
+    } @else {
+      <button
+        type="button"
+        class="li__title"
+        [title]="title()"
+        [attr.aria-current]="selected() ? 'true' : null"
+        (click)="activate.emit()"
+      >
+        {{ title() }}
+      </button>
+    }
+    <span class="li__sub">
+      @if (sub(); as text) {
+        <span class="li__subText">{{ text }}</span>
+      }
+      <ng-content select="[sub]" />
+    </span>
+  </span>
+  <span class="li__trail"><ng-content select="[trail]" /></span>
+</div>

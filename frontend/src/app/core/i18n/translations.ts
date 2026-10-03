@@ -45,6 +45,15 @@ export const de = {
   'action.copy': 'Kopieren',
   'action.save': 'Speichern',
   'common.loading': 'Wird geladen …',
+
+  // Shared building blocks (shared/ui). Only the names of controls; a page passes its
+  // own visible text.
+  'ui.rowMenu.trigger': 'Weitere Aktionen',
+  'ui.rowMenu.empty': 'Keine Aktionen möglich',
+  'ui.selection.toolbar': 'Auswahl',
+  'ui.selection.clear': 'Auswahl aufheben',
+  'ui.listDetail.back': 'Zur Liste',
+  'ui.avatarStack.more': '{count} weitere',
   'account.menu.apiAccess': 'API-Zugang',
   'account.menu.notifications': 'Benachrichtigungen',
   'account.menu.calendar': 'Kalender-Abo',
@@ -2314,6 +2323,13 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'action.save': 'Save',
   'action.cancel': 'Cancel',
   'common.loading': 'Loading …',
+
+  'ui.rowMenu.trigger': 'More actions',
+  'ui.rowMenu.empty': 'No actions available',
+  'ui.selection.toolbar': 'Selection',
+  'ui.selection.clear': 'Clear selection',
+  'ui.listDetail.back': 'Back to list',
+  'ui.avatarStack.more': '{count} more',
   'account.menu.apiAccess': 'API access',
   'account.menu.notifications': 'Notifications',
   'account.menu.calendar': 'Calendar feed',
