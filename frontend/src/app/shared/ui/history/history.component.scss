@@ -1,0 +1,73 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.hist {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.hist__day {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hist__date {
+  margin: 0;
+  padding: 0 4px;
+}
+
+.hist__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hist__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: var(--space-3) 14px;
+}
+
+.hist__icon {
+  flex: none;
+  margin-top: 2px;
+  color: var(--color-text-muted);
+}
+
+.hist__text {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.hist__title {
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  font-weight: var(--fw-semibold);
+  color: var(--color-text);
+}
+/* A status title keeps the weight of the line. */
+.hist__title app-status-text {
+  font-weight: inherit;
+  white-space: normal;
+}
+
+.hist__body,
+.hist__meta {
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  overflow-wrap: anywhere;
+}
+.hist__body {
+  color: var(--color-text-muted);
+}
+.hist__meta {
+  color: var(--color-text-subtle);
+}

@@ -1,0 +1,63 @@
+/* Sticks to the bottom of the scroll area of its container and centres the bar over it.
+   The host lets clicks through, so it does not block the rows under the empty sides. */
+:host {
+  position: sticky;
+  bottom: var(--space-6);
+  z-index: var(--z-sticky);
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.selbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: calc(100% - 2 * var(--space-4));
+  height: 3.5rem;
+  padding: 0 var(--space-2) 0 var(--space-5);
+  border-radius: 1.75rem;
+  background: var(--color-surface-4);
+  color: var(--color-text);
+  box-shadow: var(--shadow-elevated);
+  white-space: nowrap;
+  pointer-events: auto;
+}
+
+.selbar__count {
+  margin-right: 10px;
+  font-weight: var(--fw-semibold);
+}
+
+.selbar__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.selbar__div {
+  align-self: stretch;
+  width: 1px;
+  margin: 14px var(--space-1);
+  background: var(--color-border);
+}
+
+.selbar__clear {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--control-height);
+  height: var(--control-height);
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.selbar__clear:hover {
+  background: var(--color-surface-3);
+  color: var(--color-text);
+}

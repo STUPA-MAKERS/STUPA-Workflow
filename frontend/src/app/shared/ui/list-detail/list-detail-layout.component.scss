@@ -1,0 +1,63 @@
+/* The host fills the height its parent gives it; each pane scrolls on its own. */
+:host {
+  --ld-list-width: 440px;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+
+.ld__list,
+.ld__detail {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+.ld__list[hidden],
+.ld__detail[hidden] {
+  display: none;
+}
+
+/* Wide: the list at a fixed width, the detail sheet fills the rest. */
+:host(.ld--split) {
+  gap: var(--space-3);
+}
+:host(.ld--split) .ld__list {
+  flex: none;
+  width: var(--ld-list-width);
+}
+:host(.ld--split) .ld__detail {
+  flex: 1 1 0;
+}
+
+/* Narrow: one pane at a time, at the full width. */
+:host(.ld--collapsed) .ld__list,
+:host(.ld--collapsed) .ld__detail {
+  flex: 1 1 0;
+}
+
+.ld__detail {
+  display: flex;
+  flex-direction: column;
+}
+
+.ld__back {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: var(--space-1);
+  height: var(--control-height-sm);
+  margin: 0 0 var(--space-2) calc(-1 * var(--space-2));
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-accent-text);
+  font: inherit;
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+.ld__back:hover {
+  background: var(--color-selected);
+}

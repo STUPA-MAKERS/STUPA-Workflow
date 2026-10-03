@@ -1,0 +1,29 @@
+@if (open()) {
+  <div class="ss__scrim" aria-hidden="true" (click)="close()"></div>
+  <div
+    #pane
+    [class]="'ss ss--' + side()"
+    role="dialog"
+    aria-modal="true"
+    tabindex="-1"
+    [attr.aria-labelledby]="id"
+    (keydown)="onKey($event)"
+  >
+    <header class="ss__head">
+      <h2 class="ss__title" [id]="id">{{ heading() }}</h2>
+      <ng-content select="[sheet-actions]" />
+      <button
+        type="button"
+        class="ss__close"
+        [attr.aria-label]="'action.close' | t"
+        [title]="'action.close' | t"
+        (click)="close()"
+      >
+        <app-icon name="x" [size]="20" />
+      </button>
+    </header>
+    <div class="ss__body">
+      <ng-content />
+    </div>
+  </div>
+}

@@ -1,0 +1,31 @@
+<div class="sp">
+  @if (mode() === 'button') {
+    <button
+      type="button"
+      class="sp__field sp__button"
+      [attr.aria-label]="name()"
+      [attr.aria-keyshortcuts]="keys()"
+      (click)="activate.emit()"
+    >
+      <app-icon class="sp__icon" name="search" [size]="20" />
+      <span class="sp__ph">{{ placeholder() }}</span>
+      @if (shortcut()) {
+        <kbd class="kbd sp__kbd" aria-hidden="true">{{ keyLabel() }}</kbd>
+      }
+    </button>
+  } @else {
+    <label class="sp__field">
+      <app-icon class="sp__icon" name="search" [size]="20" />
+      <input
+        class="sp__input"
+        type="search"
+        [placeholder]="placeholder()"
+        [attr.aria-label]="name()"
+        [value]="value()"
+        (input)="onInput($event)"
+        (keydown)="onKey($event)"
+      />
+    </label>
+  }
+  <span class="sp__trail"><ng-content select="[trail]" /></span>
+</div>

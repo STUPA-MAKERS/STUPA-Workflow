@@ -1,0 +1,16 @@
+@if (count() > 0) {
+  <div class="selbar" role="toolbar" [attr.aria-label]="'ui.selection.toolbar' | t">
+    <span class="selbar__count" role="status">{{ countLabel() ?? count() }}</span>
+    <div class="selbar__actions"><ng-content /></div>
+    <span class="selbar__div" aria-hidden="true"></span>
+    <button
+      type="button"
+      class="selbar__clear"
+      [attr.aria-label]="'ui.selection.clear' | t"
+      [title]="'ui.selection.clear' | t"
+      (click)="cleared.emit()"
+    >
+      <app-icon name="x" [size]="17" />
+    </button>
+  </div>
+}

@@ -1,0 +1,32 @@
+<div class="hist">
+  @for (day of days(); track day.key) {
+    <div class="hist__day">
+      <p class="cap hist__date" [id]="id + '-' + day.key">{{ day.label }}</p>
+      <ol
+        class="seg hist__list"
+        [class.seg--bg1]="surface() === 1"
+        [class.seg--bg3]="surface() === 3"
+        [attr.aria-labelledby]="id + '-' + day.key"
+      >
+        @for (e of day.entries; track $index) {
+          <li class="hist__row">
+            <app-icon class="hist__icon" [name]="e.icon" [size]="18" />
+            <div class="hist__text">
+              <span class="hist__title">
+                @if (e.kind) {
+                  <app-status-text [kind]="e.kind">{{ e.title }}</app-status-text>
+                } @else {
+                  {{ e.title }}
+                }
+              </span>
+              @if (e.body) {
+                <span class="hist__body">{{ e.body }}</span>
+              }
+              <time class="hist__meta" [attr.datetime]="e.at">{{ e.meta }}</time>
+            </div>
+          </li>
+        }
+      </ol>
+    </div>
+  }
+</div>
