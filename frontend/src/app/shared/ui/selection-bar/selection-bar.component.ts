@@ -10,7 +10,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
  * table it belongs to. It shows only while something is selected.
  *
  * ```html
- * <app-selection-bar [count]="selected().length" [countLabel]="'3 ausgewählt'" (cleared)="clear()">
+ * <app-selection-bar [count]="selected().length" (cleared)="clear()">
  *   <app-button variant="text" (click)="exportSelected()">Exportieren</app-button>
  * </app-selection-bar>
  * ```
@@ -26,7 +26,10 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 export class SelectionBarComponent {
   /** How many rows are selected. The bar hides at zero. */
   readonly count = input.required<number>();
-  /** The count as the page words it, for example "3 ausgewählt". Defaults to the number. */
+  /**
+   * The count as the page words it. Without it, the bar shows "3 ausgewählt"
+   * (`ui.selection.count`).
+   */
   readonly countLabel = input<string | null>(null);
 
   /** The clear button was pressed. */

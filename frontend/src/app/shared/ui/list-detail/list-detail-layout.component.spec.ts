@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { BREAKPOINTS } from '@stupa-makers/ui-kit';
 import { runAxe } from '../../../../testing/a11y';
 import {
+  LAYOUT_GUTTER,
   LIST_DETAIL_SPLIT_MIN,
   ListDetailLayoutComponent,
   NAV_RAIL_WIDTH,
@@ -42,20 +43,31 @@ class ResizeObserverStub {
   }
 }
 
-/** A viewport of `width`: the media query and the measured content width beside the rail. */
-function viewport(width: number) {
+/** Fires the `change` event of the wide media query. */
+let mediaChange: ((matches: boolean) => void) | null = null;
+
+/**
+ * A viewport of `width`. The measured content width is, by default, the rail shell
+ * content box: the viewport minus the rail and the two page gutters. `content` gives
+ * another content width (for example the current shell without a rail).
+ */
+function viewport(width: number, content = width - NAV_RAIL_WIDTH - 2 * LAYOUT_GUTTER) {
   const wide = width >= BREAKPOINTS.wideMin;
   jest.spyOn(window, 'matchMedia').mockImplementation(
     (query: string) =>
       ({
         matches: wide,
         media: query,
-        addEventListener: () => undefined,
-        removeEventListener: () => undefined,
+        addEventListener: (_: string, cb: (e: MediaQueryListEvent) => void) => {
+          mediaChange = (matches) => cb({ matches } as MediaQueryListEvent);
+        },
+        removeEventListener: () => {
+          mediaChange = null;
+        },
       }) as unknown as MediaQueryList,
   );
   jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
-    width: width - NAV_RAIL_WIDTH,
+    width: content,
   } as DOMRect);
 }
 
@@ -65,6 +77,7 @@ describe('ListDetailLayoutComponent', () => {
   beforeEach(() => {
     globalThis.ResizeObserver = ResizeObserverStub as unknown as typeof ResizeObserver;
     resize = null;
+    mediaChange = null;
     disconnects = 0;
   });
   afterEach(() => {
@@ -76,8 +89,36 @@ describe('ListDetailLayoutComponent', () => {
   const detail = () => screen.getByRole('article', { hidden: true });
   const host = (c: Element) => c.querySelector('app-list-detail') as HTMLElement;
 
-  it('splits at the first wide viewport and not below it', () => {
-    expect(LIST_DETAIL_SPLIT_MIN).toBe(1104);
+  it('takes the content box of the first wide viewport as the split width', () => {
+    expect(LIST_DETAIL_SPLIT_MIN).toBe(1200 - 96 - 2 * 24);
+  });
+
+  describe('at the wide breakpoint', () => {
+    // [viewport, content width, split]: the rail shell (default content) and the current
+    // shell without a rail (content = min(viewport, 1180) - 2 gutters).
+    it.each([
+      [1199, undefined, false],
+      [1200, undefined, true],
+      [1199, 1199 - 2 * LAYOUT_GUTTER, false],
+      [1152, 1152 - 2 * LAYOUT_GUTTER, false],
+      [1200, 1180 - 2 * LAYOUT_GUTTER, true],
+    ])('at %ipx with content %p splits: %p', async (width, content, split) => {
+      viewport(width, content);
+      const view = await render(HostComponent);
+      expect(host(view.container)).toHaveClass(split ? 'ld--split' : 'ld--collapsed');
+    });
+  });
+
+  it('follows the viewport class when it changes', async () => {
+    viewport(1440);
+    const view = await render(HostComponent);
+    expect(host(view.container)).toHaveClass('ld--split');
+    mediaChange?.(false);
+    view.fixture.detectChanges();
+    expect(host(view.container)).toHaveClass('ld--collapsed');
+    mediaChange?.(true);
+    view.fixture.detectChanges();
+    expect(host(view.container)).toHaveClass('ld--split');
   });
 
   describe('at 1440px', () => {
@@ -162,5 +203,6 @@ describe('ListDetailLayoutComponent', () => {
     const view = await render(HostComponent);
     view.fixture.destroy();
     expect(disconnects).toBe(1);
+    expect(mediaChange).toBeNull();
   });
 });

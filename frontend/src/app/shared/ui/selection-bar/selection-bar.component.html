@@ -1,6 +1,8 @@
 @if (count() > 0) {
   <div class="selbar" role="toolbar" [attr.aria-label]="'ui.selection.toolbar' | t">
-    <span class="selbar__count" role="status">{{ countLabel() ?? count() }}</span>
+    <span class="selbar__count" role="status">{{
+      countLabel() ?? ('ui.selection.count' | t: { count: count() })
+    }}</span>
     <div class="selbar__actions"><ng-content /></div>
     <span class="selbar__div" aria-hidden="true"></span>
     <button

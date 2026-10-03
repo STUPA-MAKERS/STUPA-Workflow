@@ -23,9 +23,9 @@ describe('SelectionBarComponent', () => {
     expect(await runAxe(container)).toHaveNoViolations();
   });
 
-  it('falls back to the bare number without a label', async () => {
+  it('says "<n> ausgewählt" without a label', async () => {
     await render(SelectionBarComponent, { inputs: { count: 2 } });
-    expect(screen.getByRole('status')).toHaveTextContent('2');
+    expect(screen.getByRole('status')).toHaveTextContent(/^2 ausgewählt$/);
   });
 
   it('emits cleared when the clear button is pressed', async () => {

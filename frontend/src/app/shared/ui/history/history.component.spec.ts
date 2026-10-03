@@ -117,6 +117,27 @@ describe('HistoryComponent', () => {
     expect(container.querySelector('ol')).not.toHaveClass('seg--bg1');
   });
 
+  it('puts the entries with an invalid date into a last group and does not throw', async () => {
+    await render(HistoryComponent, {
+      inputs: {
+        entries: [
+          { at: 'kein Datum', icon: 'edit', title: 'Kaputt', actor: 'Du' },
+          { at: at(YEAR, 9, 28, 16, 20), icon: 'cal', title: 'Auf Tagesordnung' },
+          { at: null as unknown as string, icon: 'send', title: 'Ohne Zeit' },
+        ],
+      },
+    });
+    const lists = screen.getAllByRole('list');
+    expect(lists).toHaveLength(2);
+    expect(lists[1]).toHaveAccessibleName('Ohne Datum');
+    expect(within(lists[1]).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
+      expect.stringContaining('Kaputt'),
+      expect.stringContaining('Ohne Zeit'),
+    ]);
+    expect(within(lists[1]).getByText('Du').tagName).toBe('SPAN');
+    expect(lists[1].querySelector('time')).toBeNull();
+  });
+
   it('draws nothing for no entries', async () => {
     await render(HistoryComponent, { inputs: { entries: [] } });
     expect(screen.queryByRole('list')).toBeNull();

@@ -4,6 +4,7 @@ import {
   DestroyRef,
   ElementRef,
   afterNextRender,
+  computed,
   inject,
   input,
   output,
@@ -16,23 +17,35 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 export const NAV_RAIL_WIDTH = 96;
 
 /**
+ * The page gutter on one side of the content, in px: `--layout-gutter` (`--space-5`,
+ * 1.5rem at a 16px root font size). The `.page-shell` box has it on the left and on the
+ * right.
+ */
+export const LAYOUT_GUTTER = 24;
+
+/**
  * The narrowest CONTENT width that shows the list and the detail side by side, in px.
  *
- * The layout measures its own width, not the viewport, so it also works in a pane. The
- * value is the content width that the first wide viewport (`BREAKPOINTS.wideMin`, 1200px)
- * leaves beside the navigation rail. A narrow viewport (the 960px boards) is below it, so
- * there the list and the detail are separate views.
+ * The value is the content box that the first wide viewport (`BREAKPOINTS.wideMin`,
+ * 1200px) leaves in the shell: the viewport minus the navigation rail and minus the two
+ * page gutters (1200 - 96 - 2 * 24 = 1056).
+ *
+ * The layout splits only when two conditions are true: the viewport is wide
+ * (`MEDIA.wide`), and the host is at least this wide. The viewport class makes the switch
+ * occur exactly at the wide breakpoint, whatever the shell adds or removes around the
+ * content. The measured width collapses the layout when it is in a pane that is too
+ * narrow for two panes.
  */
-export const LIST_DETAIL_SPLIT_MIN = BREAKPOINTS.wideMin - NAV_RAIL_WIDTH;
+export const LIST_DETAIL_SPLIT_MIN = BREAKPOINTS.wideMin - NAV_RAIL_WIDTH - 2 * LAYOUT_GUTTER;
 
 /**
  * A list with a detail sheet beside it, as on the applications page.
  *
- * Wide: the list on the left at a fixed width (`--ld-list-width`, default 440px), the
- * detail sheet fills the rest. Narrow (content below {@link LIST_DETAIL_SPLIT_MIN}): one
- * view at a time. The list shows until `detailOpen` is set; then the detail shows with a
- * "Zur Liste" control above it that emits `back`. The list stays in the DOM while hidden,
- * so it keeps its scroll position.
+ * Wide (a wide viewport and content of {@link LIST_DETAIL_SPLIT_MIN} or more): the list on
+ * the left at a fixed width (`--ld-list-width`, default 440px), the detail sheet fills the
+ * rest. Otherwise one view at a time. The list shows until `detailOpen` is set; then the
+ * detail shows with a "Zur Liste" control above it that emits `back`. The list stays in the
+ * DOM while hidden, so it keeps its scroll position.
  *
  * Slots: `[list]` and `[detail]`. In the wide layout with no detail open the page puts its
  * own empty state into the detail slot.
@@ -60,24 +73,36 @@ export class ListDetailLayoutComponent {
   /** "Zur Liste" was pressed (narrow layout). The page clears its selection. */
   readonly back = output<void>();
 
-  /** True while the content is too narrow for two panes. */
-  readonly collapsed = signal(!window.matchMedia(MEDIA.wide).matches);
+  /** The viewport is in the wide class (`MEDIA.wide`). */
+  private readonly viewportWide = signal(false);
+  /** The measured width of the host. 0 means "not laid out yet" (hidden, or a test). */
+  private readonly width = signal(0);
+
+  /** True while the viewport or the content is too narrow for two panes. */
+  readonly collapsed = computed(() => {
+    if (!this.viewportWide()) return true;
+    const width = this.width();
+    return width > 0 && width < this.splitMin();
+  });
 
   constructor() {
+    const media = window.matchMedia(MEDIA.wide);
+    this.viewportWide.set(media.matches);
+    const onMedia = (event: MediaQueryListEvent): void => this.viewportWide.set(event.matches);
+    media.addEventListener('change', onMedia);
+
     let observer: ResizeObserver | null = null;
     afterNextRender(() => {
       const el = this.host.nativeElement;
-      this.measure(el.getBoundingClientRect().width);
+      this.width.set(el.getBoundingClientRect().width);
       observer = new ResizeObserver((entries) => {
-        for (const entry of entries) this.measure(entry.contentRect.width);
+        for (const entry of entries) this.width.set(entry.contentRect.width);
       });
       observer.observe(el);
     });
-    inject(DestroyRef).onDestroy(() => observer?.disconnect());
-  }
-
-  /** A width of 0 means "not laid out yet" (hidden, or a test): keep the media query guess. */
-  private measure(width: number): void {
-    if (width > 0) this.collapsed.set(width < this.splitMin());
+    inject(DestroyRef).onDestroy(() => {
+      observer?.disconnect();
+      media.removeEventListener('change', onMedia);
+    });
   }
 }

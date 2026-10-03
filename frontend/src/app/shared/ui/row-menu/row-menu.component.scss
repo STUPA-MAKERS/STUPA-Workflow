@@ -54,7 +54,8 @@
   font-weight: var(--fw-semibold);
   letter-spacing: var(--tracking-cap);
   text-transform: uppercase;
-  color: var(--color-text-subtle);
+  /* The menu is on surface 3, where the subtle text is below 4.5:1 (WCAG 1.4.3). */
+  color: var(--color-text-muted);
 }
 
 .rm__sep {

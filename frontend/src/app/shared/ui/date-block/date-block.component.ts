@@ -7,6 +7,9 @@ import { I18nService } from '@core/i18n/i18n.service';
  *
  * `live` fills the block with the accent, for the meeting that runs now. A screen reader
  * hears the full date instead of the two parts.
+ *
+ * A missing or invalid date (null, or a string that is not a date) shows an empty block
+ * with a dash, so the rows of a list stay aligned.
  */
 @Component({
   selector: 'app-date-block',
@@ -22,12 +25,18 @@ export class DateBlockComponent {
   private readonly i18n = inject(I18nService);
 
   /** The date, as an ISO string or a Date. Shown in local time. */
-  readonly date = input.required<string | Date>();
+  readonly date = input.required<string | Date | null | undefined>();
   readonly live = input(false);
 
-  private readonly parsed = computed(() => new Date(this.date()));
+  private readonly parsed = computed(() => {
+    const value = this.date();
+    return value == null || value === '' ? new Date(NaN) : new Date(value);
+  });
 
-  protected readonly iso = computed(() => this.parsed().toISOString());
+  /** False for a missing or invalid date. The template then shows the empty block. */
+  protected readonly valid = computed(() => !Number.isNaN(this.parsed().getTime()));
+
+  protected readonly iso = computed(() => (this.valid() ? this.parsed().toISOString() : ''));
   protected readonly day = computed(() => String(this.parsed().getDate()).padStart(2, '0'));
   /** "SEP", "OKT", "MÄR": the short month without its dot, three letters. */
   protected readonly month = computed(() =>

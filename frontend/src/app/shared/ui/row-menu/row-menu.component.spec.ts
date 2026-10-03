@@ -108,6 +108,23 @@ describe('RowMenuComponent', () => {
     expect(screen.getByRole('menu')).toBeInTheDocument();
   });
 
+  it('gives each disabled reason its own id, also for a repeated or spaced item id', async () => {
+    const { trigger, user, host, view } = await setup();
+    host.sections.set([
+      { label: 'Eins', items: [{ id: 'move x', label: 'Verschieben A', disabledReason: 'Grund A' }] },
+      { label: 'Zwei', items: [{ id: 'move x', label: 'Verschieben B', disabledReason: 'Grund B' }] },
+    ]);
+    view.fixture.detectChanges();
+    await user.click(trigger);
+    const a = screen.getByRole('menuitem', { name: 'Verschieben A' });
+    const b = screen.getByRole('menuitem', { name: 'Verschieben B' });
+    expect(a).toHaveAccessibleDescription('Grund A');
+    expect(b).toHaveAccessibleDescription('Grund B');
+    const ids = [a, b].map((el) => el.getAttribute('aria-describedby'));
+    expect(new Set(ids).size).toBe(2);
+    for (const id of ids) expect(id).not.toMatch(/\s/);
+  });
+
   it('runs an enabled item, closes and returns the focus to the button', async () => {
     const { trigger, user, host } = await setup();
     await user.click(trigger);

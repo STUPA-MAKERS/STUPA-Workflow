@@ -33,7 +33,7 @@
     } @else if (visibleSections().length === 0) {
       <p class="rm__empty">{{ 'ui.rowMenu.empty' | t }}</p>
     } @else {
-      @for (section of visibleSections(); track $index; let first = $first) {
+      @for (section of visibleSections(); track $index; let first = $first, si = $index) {
         @if (!first) {
           <div class="rm__sep" role="separator"></div>
         }
@@ -41,7 +41,7 @@
           @if (section.label) {
             <div class="rm__cap" aria-hidden="true">{{ section.label }}</div>
           }
-          @for (item of section.items; track item.id) {
+          @for (item of section.items; track item.id; let ii = $index) {
             <button
               type="button"
               class="rm__item"
@@ -51,7 +51,7 @@
               [attr.role]="item.checked === undefined ? 'menuitem' : 'menuitemcheckbox'"
               [attr.aria-checked]="item.checked === undefined ? null : item.checked"
               [attr.aria-disabled]="item.disabledReason ? 'true' : null"
-              [attr.aria-describedby]="item.disabledReason ? menuId + '-' + item.id : null"
+              [attr.aria-describedby]="item.disabledReason ? reasonId(si, ii) : null"
               [attr.title]="item.disabledReason || null"
               (click)="choose(item)"
             >
@@ -69,10 +69,10 @@
       <!-- The reasons of the disabled items. Outside the items, so they describe an item
            without becoming part of its name. -->
       <div hidden>
-        @for (section of visibleSections(); track $index) {
-          @for (item of section.items; track item.id) {
+        @for (section of visibleSections(); track $index; let si = $index) {
+          @for (item of section.items; track item.id; let ii = $index) {
             @if (item.disabledReason) {
-              <span [id]="menuId + '-' + item.id">{{ item.disabledReason }}</span>
+              <span [id]="reasonId(si, ii)">{{ item.disabledReason }}</span>
             }
           }
         }

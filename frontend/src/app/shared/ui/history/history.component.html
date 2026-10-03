@@ -22,7 +22,13 @@
               @if (e.body) {
                 <span class="hist__body">{{ e.body }}</span>
               }
-              <time class="hist__meta" [attr.datetime]="e.at">{{ e.meta }}</time>
+              @if (day.key === 'none') {
+                @if (e.meta) {
+                  <span class="hist__meta">{{ e.meta }}</span>
+                }
+              } @else {
+                <time class="hist__meta" [attr.datetime]="e.at">{{ e.meta }}</time>
+              }
             </div>
           </li>
         }

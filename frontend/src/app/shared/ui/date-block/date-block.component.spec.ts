@@ -39,6 +39,19 @@ describe('DateBlockComponent', () => {
     expect(await runAxe(container)).toHaveNoViolations();
   });
 
+  it.each([['kein Datum'], [''], [null], [undefined]])(
+    'shows an empty block with a dash for %p and does not throw',
+    async (date) => {
+      const { container } = await render(DateBlockComponent, { inputs: { date } });
+      expect(container.querySelector('time')).toBeNull();
+      const block = container.querySelector('.db');
+      expect(block).toHaveClass('db--none');
+      expect(block).toHaveAttribute('aria-hidden', 'true');
+      expect(block).toHaveTextContent('–');
+      expect(await runAxe(container)).toHaveNoViolations();
+    },
+  );
+
   it('fills the block with the accent for a live meeting', async () => {
     const view = await render(DateBlockComponent, {
       inputs: { date: new Date(2026, 8, 29), live: true },

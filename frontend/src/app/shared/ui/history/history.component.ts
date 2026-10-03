@@ -20,6 +20,7 @@ export interface HistoryEntry {
 }
 
 interface HistoryDay {
+  /** `y-m-d`, or `none` for the entries without a valid date. */
   key: string;
   label: string;
   entries: (HistoryEntry & { meta: string })[];
@@ -32,6 +33,8 @@ let nextId = 0;
  *
  * A status title takes its colour (`kind`); any other event stays in the text colour.
  * The meta line gives the actor and the time. Each day is a list, named by its date.
+ * Entries with a missing or invalid `at` go into a last group, "Ohne Datum", without a
+ * time.
  */
 @Component({
   selector: 'app-history',
@@ -54,9 +57,15 @@ export class HistoryComponent {
     const locale = this.i18n.formatLocale();
     const thisYear = new Date().getFullYear();
     const time = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' });
-    const sorted = [...this.entries()]
-      .map((e) => ({ e, d: new Date(e.at) }))
-      .sort((a, b) => b.d.getTime() - a.d.getTime());
+    const dated: { e: HistoryEntry; d: Date }[] = [];
+    const undated: HistoryEntry[] = [];
+    for (const e of this.entries()) {
+      // `new Date(null)` is 1970, so a missing value counts as invalid before the parse.
+      const d = e.at ? new Date(e.at) : new Date(NaN);
+      if (Number.isNaN(d.getTime())) undated.push(e);
+      else dated.push({ e, d });
+    }
+    const sorted = dated.sort((a, b) => b.d.getTime() - a.d.getTime());
 
     const days: HistoryDay[] = [];
     for (const { e, d } of sorted) {
@@ -74,6 +83,13 @@ export class HistoryComponent {
       }
       const meta = [e.actor, time.format(d)].filter((p) => !!p).join(' · ');
       day.entries.push({ ...e, meta });
+    }
+    if (undated.length > 0) {
+      days.push({
+        key: 'none',
+        label: this.i18n.translate('ui.history.noDate'),
+        entries: undated.map((e) => ({ ...e, meta: e.actor ?? '' })),
+      });
     }
     return days;
   });

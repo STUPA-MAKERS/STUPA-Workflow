@@ -90,6 +90,15 @@ export class RowMenuComponent {
   readonly selected = output<RowMenuItem>();
 
   protected readonly menuId = `row-menu-${nextId++}`;
+
+  /**
+   * The id of the disabled reason of an item, from the position of the section and the
+   * item. The id of the caller can repeat across sections or hold a space, which breaks an
+   * IDREF list, so it is not part of the id.
+   */
+  protected reasonId(section: number, item: number): string {
+    return `${this.menuId}-s${section}-${item}`;
+  }
   protected readonly open = signal(false);
   protected readonly position = signal({ top: 0, right: 0 });
 
