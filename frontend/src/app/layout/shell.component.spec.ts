@@ -397,8 +397,8 @@ describe('ShellComponent', () => {
     fixture.detectChanges();
 
     const search = screen.getByRole('button', { name: /Suche öffnen|Open search/i });
-    expect(search.querySelector('.fa-magnifying-glass')).toBeTruthy();
-    expect(search.querySelector('.fa-filter')).toBeNull();
+    expect(search.querySelector('[data-icon="search"]')).toBeTruthy();
+    expect(search.querySelector('[data-icon="filter"]')).toBeNull();
     http.verify();
   });
 

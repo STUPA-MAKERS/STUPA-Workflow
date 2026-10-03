@@ -156,6 +156,12 @@ describe('StatusTimelineComponent', () => {
     expect(screen.getByText(/Referat/)).toBeInTheDocument();
     // Status badge + timeline both carry the label.
     expect(screen.getAllByText('Eingereicht').length).toBeGreaterThan(1);
+    // The state badge shows the configured state colour as text, not as an accent status.
+    const stateBadge = screen
+      .getAllByText('Eingereicht')
+      .find((el) => el.classList.contains('badge'));
+    expect(stateBadge).toHaveClass('badge--custom', 'badge--status');
+    expect(stateBadge).not.toHaveClass('badge--primary');
     // editable → edit form visible
     expect(screen.getByLabelText(/Titel/)).toBeInTheDocument();
   });

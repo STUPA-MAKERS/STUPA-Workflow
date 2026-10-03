@@ -778,7 +778,7 @@ describe('MeetingsComponent — methods', () => {
     it('maps status to badge variants and i18n keys', async () => {
       const { cmp } = await loaded();
       expect(cmp.statusVariant('live')).toBe('success');
-      expect(cmp.statusVariant('closed')).toBe('neutral');
+      expect(cmp.statusVariant('closed')).toBe('info');
       expect(cmp.statusVariant('planned')).toBe('info');
       expect(cmp.statusKey('live')).toBe('meetings.status.live');
     });
@@ -786,7 +786,7 @@ describe('MeetingsComponent — methods', () => {
     it('maps vote status to badge variants and keys', async () => {
       const { cmp } = await loaded();
       expect(cmp.voteVariant('open')).toBe('success');
-      expect(cmp.voteVariant('closed')).toBe('neutral');
+      expect(cmp.voteVariant('closed')).toBe('info');
       expect(cmp.voteVariant('cancelled')).toBe('danger');
       expect(cmp.voteVariant('pending')).toBe('warning');
       expect(cmp.voteStatusKey('open')).toBe('meetings.voteStatus.open');
@@ -799,7 +799,7 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.voteResultKey(undefined)).toBe('vote.result.tie');
       expect(cmp.voteResultVariant('passed')).toBe('success');
       expect(cmp.voteResultVariant('rejected')).toBe('danger');
-      expect(cmp.voteResultVariant('tie')).toBe('neutral');
+      expect(cmp.voteResultVariant('tie')).toBe('info');
     });
 
     it('maps attendance to keys, button + badge variants and icons', async () => {

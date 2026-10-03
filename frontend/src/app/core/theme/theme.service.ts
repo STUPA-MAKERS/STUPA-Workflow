@@ -6,9 +6,20 @@ export type ResolvedTheme = 'light' | 'dark';
 const STORAGE_KEY = 'ap.theme';
 
 /**
+ * Page background per theme (`--color-bg` of the ui-kit tokens). The browser and the
+ * installed PWA colour their bars with the `theme-color` meta tag, so the bars follow the
+ * theme. Keep the values in step with `tokens.scss` and `index.html`.
+ */
+export const THEME_COLOR: Record<ResolvedTheme, string> = {
+  light: '#f6f7f5',
+  dark: '#101211',
+};
+
+/**
  * Theme control:
  * - The preference is `system` (follows the OS), `light` or `dark`. It is persisted.
- * - The service writes the effective theme to `data-theme` on <html>.
+ * - The service writes the effective theme to `data-theme` on <html> and its page
+ *   background to every `<meta name="theme-color">`.
  * - In `system` mode a matchMedia listener picks up an OS change live.
  */
 @Injectable({ providedIn: 'root' })
@@ -49,7 +60,13 @@ export class ThemeService {
   };
 
   private apply(): void {
-    document.documentElement.setAttribute('data-theme', this.resolved());
+    const theme = this.resolved();
+    document.documentElement.setAttribute('data-theme', theme);
+    // index.html carries one tag per OS scheme. An explicit choice in the app overrides
+    // the OS, so both tags take the colour of the theme in effect.
+    document
+      .querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')
+      .forEach((meta) => meta.setAttribute('content', THEME_COLOR[theme]));
   }
 
   private readStored(): ThemePreference {

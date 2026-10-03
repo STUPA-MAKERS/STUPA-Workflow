@@ -20,21 +20,19 @@
   gap: var(--space-2);
   align-self: flex-start;
   padding: var(--space-4) var(--space-6);
-  color: var(--color-on-primary);
-  background: var(--color-primary);
-  border: var(--border-width) solid var(--color-primary);
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+  border: var(--border-width) solid var(--color-accent);
   border-radius: var(--radius-md);
   font-size: var(--fs-lg);
   font-weight: var(--fw-semibold);
   text-decoration: none;
-  transition:
-    background-color var(--motion-fast) var(--ease-standard),
-    border-color var(--motion-fast) var(--ease-standard);
+  transition: filter var(--motion-fast) var(--ease-standard);
 
+  /* The same hover as the kit fill button: one accent, lighter on hover. */
   &:hover,
   &:focus-visible {
-    background: var(--color-primary-hover);
-    border-color: var(--color-primary-hover);
+    filter: brightness(1.08);
   }
 
   &:focus-visible {

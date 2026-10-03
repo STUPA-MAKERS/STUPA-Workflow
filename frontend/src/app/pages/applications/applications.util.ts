@@ -80,7 +80,7 @@ export function formatDateRangeValue(value: unknown, locale: string): string {
   return ends[0] ?? '';
 }
 
-/** Map a scan state to a badge variant. An unknown state gives a neutral badge. */
+/** Map a scan state to a badge variant. An unknown state gives muted status text. */
 export function scanBadgeVariant(state: ScanState): BadgeVariant {
   switch (state) {
     case 'clean':
@@ -90,7 +90,7 @@ export function scanBadgeVariant(state: ScanState): BadgeVariant {
     case 'scanning':
       return 'warning';
     default:
-      return 'neutral';
+      return 'info';
   }
 }
 

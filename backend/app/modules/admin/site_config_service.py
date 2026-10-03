@@ -45,8 +45,10 @@ _MANIFEST_BASE: dict = {
     "display": "standalone",
     "scope": "./",
     "start_url": "./",
-    "theme_color": "#004225",
-    "background_color": "#ffffff",
+    # The light page background of the design system. The theme-color meta tags in
+    # index.html colour the browser bars per theme; the manifest takes one value.
+    "theme_color": "#f6f7f5",
+    "background_color": "#f6f7f5",
     "icons": [
         {"src": "icons/icon-72x72.png", "sizes": "72x72", "type": "image/png", "purpose": "any"},
         {"src": "icons/icon-96x96.png", "sizes": "96x96", "type": "image/png", "purpose": "any"},

@@ -253,7 +253,7 @@
 }
 .mtg__tlItem--live .mtg__tlDot,
 .mtg__tlDot--live {
-  background: var(--color-primary);
+  background: var(--color-accent);
 }
 .mtg__tlBody {
   flex: 1;
@@ -299,7 +299,7 @@
   content: '';
   flex: 1;
   height: var(--border-width);
-  background: var(--color-primary);
+  background: var(--color-accent);
   opacity: 0.4;
   margin-left: var(--space-2);
 }

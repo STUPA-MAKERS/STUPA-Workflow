@@ -35,27 +35,29 @@
   color: var(--color-text-muted);
   cursor: pointer;
 }
-.mtg__attBtn:hover:not(:disabled) {
+// A chosen state keeps its fill on hover, or the glyph loses its contrast.
+.mtg__attBtn:hover:not(:disabled):not(.mtg__attBtn--on) {
   background: var(--color-surface-sunken);
 }
 .mtg__attBtn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
+// Each state uses a token pair, so the glyph keeps 3:1 or more on its fill in both themes.
 .mtg__attBtn--on.mtg__attBtn--present {
-  background: var(--color-success);
-  border-color: var(--color-success);
-  color: #fff;
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-on-accent);
 }
 .mtg__attBtn--on.mtg__attBtn--excused {
-  background: var(--color-warning);
+  background: var(--color-warning-subtle);
   border-color: var(--color-warning);
-  color: #1a1a1a;
+  color: var(--color-warning);
 }
 .mtg__attBtn--on.mtg__attBtn--absent {
   background: var(--color-danger);
   border-color: var(--color-danger);
-  color: #fff;
+  color: var(--color-on-danger);
 }
 .mtg__attNote {
   display: block;

@@ -26,7 +26,7 @@
       </ng-template>
       <ng-template appCell="flags" let-d>
         @if ($any(d).delegateVoting) {
-          <app-badge variant="info">{{ 'delegation.card.votingBadge' | t }}</app-badge>
+          <app-badge variant="neutral">{{ 'delegation.card.votingBadge' | t }}</app-badge>
         }
         @if ($any(d).viaPool) {
           <app-badge variant="neutral">{{ 'delegation.card.poolBadge' | t }}</app-badge>

@@ -1,9 +1,14 @@
 .field__control {
   height: var(--control-height);
-  padding: 0 var(--space-3);
-  background: var(--color-surface);
+  padding: 0 var(--space-4);
+  background: var(--color-surface-sunken);
   color: var(--color-text);
-  border: var(--border-width) solid var(--color-border-strong);
-  border-radius: var(--radius-md);
+  border: 0;
+  border-radius: var(--radius-field);
   font-size: var(--fs-md);
+}
+/* The filled field of the ui-kit: no edge; focus draws a 2px accent line inside. */
+.field__control:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--color-focus-ring);
 }

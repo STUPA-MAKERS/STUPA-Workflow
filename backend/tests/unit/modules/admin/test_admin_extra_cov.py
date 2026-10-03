@@ -475,6 +475,15 @@ async def test_manifest_no_active_config_uses_defaults() -> None:
     assert man["short_name"] == DEFAULT_APP_SHORT_NAME
 
 
+async def test_manifest_colours_are_the_light_page_background() -> None:
+    # The design system has one accent and neutral surfaces. The PWA bars take the light
+    # page background (--color-bg), no longer the old brand green #004225.
+    db = fake_session(result())
+    man = await SiteConfigService(db).manifest()
+    assert man["theme_color"] == "#f6f7f5"
+    assert man["background_color"] == "#f6f7f5"
+
+
 def test_module_constants_consistency() -> None:
     assert set(gr.FORCED_ROLE_DEFAULT_PERMS) == set(FORCED_ROLE_KEYS)
     for perms in gr.FORCED_ROLE_DEFAULT_PERMS.values():

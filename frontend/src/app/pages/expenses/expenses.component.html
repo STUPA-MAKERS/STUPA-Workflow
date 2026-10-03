@@ -327,7 +327,7 @@
         </ng-template>
 
         <ng-template appCell="kind" let-e>
-          <app-badge [variant]="$any(e).kind === 'income' ? 'success' : 'neutral'">{{
+          <app-badge [variant]="$any(e).kind === 'income' ? 'success' : 'info'">{{
             ($any(e).kind === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense') | t
           }}</app-badge>
         </ng-template>

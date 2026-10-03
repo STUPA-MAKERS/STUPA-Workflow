@@ -10,6 +10,20 @@
 @tailwind components;
 @tailwind utilities;
 
+// Text utilities of the design system. The ui-kit base styles bring `.num` (tabular
+// numbers), `.mono` (IBM Plex Mono), `.ell` (one line with an ellipsis; add a `title`),
+// `.cap` (caption) and `.kbd` (a key). The app adds the section heading.
+
+// Section heading above a group of rows or fields (for example "Details", "Verlauf"):
+// accent text, semibold. The surrounding layout sets the spacing.
+.sec {
+  margin: 0;
+  font-size: 0.84375rem; // 13.5px
+  line-height: 1.25rem;
+  font-weight: var(--fw-semibold);
+  color: var(--color-accent-text);
+}
+
 // The layout box of a page. The ui-kit ships the same rules under `.container`, but
 // Tailwind emits a `.container` utility of its own with breakpoint max-widths
 // (640/768/1024/1280/1536px). That utility comes later and wins, so the page width

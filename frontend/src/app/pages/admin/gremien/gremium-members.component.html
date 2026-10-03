@@ -12,7 +12,7 @@
     [loading]="loading()"
     [loadingText]="'common.loading' | t" [columns]="columns()" [rows]="members()" [rowKey]="rowId" [emptyText]="'admin.gremien.membersEmpty' | t">
   <ng-template appCell="email" let-m>{{ $any(m).email || '—' }}</ng-template>
-  <ng-template appCell="roleLabel" let-m><app-badge variant="primary">{{ $any(m).roleLabel }}</app-badge></ng-template>
+  <ng-template appCell="roleLabel" let-m><app-badge variant="neutral">{{ $any(m).roleLabel }}</app-badge></ng-template>
 </app-data-table>
 
 <!-- Substitute pool: elected or appointed substitutes. A delegation to a substitute has

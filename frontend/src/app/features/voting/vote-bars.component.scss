@@ -27,19 +27,21 @@
 
 .bars__fill {
   height: 100%;
-  background: var(--color-primary);
+  background: var(--color-accent);
   border-radius: inherit;
   transition: width var(--motion-base) var(--ease-standard);
 }
 
-.bars__row--leading .bars__fill {
-  background: var(--color-success);
+.bars__row--leading .bars__label {
+  font-weight: var(--fw-bold);
 }
 
+// The leading bar keeps the one accent fill. The star and the bold label mark it, not a
+// second green.
 .bars__row--leading .bars__label::after {
   content: '★';
   margin-left: var(--space-2);
-  color: var(--color-success);
+  color: var(--color-accent-text);
 }
 
 // Beamer variant: large type and high contrast.

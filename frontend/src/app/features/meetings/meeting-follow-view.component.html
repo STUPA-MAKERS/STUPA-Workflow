@@ -9,7 +9,7 @@
             <app-badge variant="primary">{{ 'meetings.follow.now' | t }}</app-badge>
           }
           @if (stateLabelOf(item.stateLabel); as st) {
-            <app-badge variant="neutral">{{ st }}</app-badge>
+            <app-badge variant="info">{{ st }}</app-badge>
           }
         </h3>
         @if (item.applicationId) {

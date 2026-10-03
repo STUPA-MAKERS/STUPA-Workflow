@@ -1,0 +1,61 @@
+// The filled field of the ui-kit (`app-select`): a grey box with the label inside it.
+@use 'field' as f;
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.field__box {
+  @include f.box;
+  @include f.box-labelled;
+}
+.field__box--invalid {
+  @include f.box-invalid;
+}
+.field__label {
+  @include f.label;
+  right: 2.75rem;
+}
+.field__box:focus-within .field__label {
+  @include f.label-focus;
+}
+.field__req {
+  color: var(--color-danger);
+}
+.field__control {
+  @include f.control;
+  @include f.control-labelled;
+  // After the mixin's nested states, so the plain declarations stay in one block.
+  & {
+    appearance: none;
+    -webkit-appearance: none;
+    padding-right: 2.75rem;
+    cursor: pointer;
+    text-overflow: ellipsis;
+  }
+}
+// The field is transparent, so the native option list gets a surface of its own.
+.field__control option {
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+}
+.field__chevron {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+.field__hint,
+.field__error {
+  @include f.message;
+}
+.field__hint {
+  color: var(--color-text-muted);
+}
+.field__error {
+  color: var(--color-danger);
+}

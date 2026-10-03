@@ -108,9 +108,9 @@ describe('scanBadgeVariant', () => {
     expect(scanBadgeVariant('quarantined')).toBe('danger');
   });
 
-  it('falls back to neutral for an unknown/pending scan state', () => {
+  it('falls back to muted status text for an unknown/pending scan state', () => {
     // Covers the `default` arm of the switch, for example "pending" before the scan starts.
-    expect(scanBadgeVariant('pending' as ScanState)).toBe('neutral');
+    expect(scanBadgeVariant('pending' as ScanState)).toBe('info');
   });
 });
 

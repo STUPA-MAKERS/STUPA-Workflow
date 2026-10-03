@@ -114,8 +114,8 @@ export class DashboardComponent {
     return `meetings.status.${status}` as TranslationKey;
   }
 
-  sessionVariant(status: Meeting['status']): 'success' | 'info' | 'neutral' {
-    return status === 'live' ? 'success' : status === 'planned' ? 'info' : 'neutral';
+  sessionVariant(status: Meeting['status']): 'success' | 'info' {
+    return status === 'live' ? 'success' : 'info';
   }
 
   /**

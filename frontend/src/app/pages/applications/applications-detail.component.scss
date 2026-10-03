@@ -185,16 +185,16 @@ formly-form {
 }
 .field__control {
   padding: var(--space-2) var(--space-3);
-  background: var(--color-bg);
+  background: var(--color-surface-sunken);
   color: var(--color-text);
-  border: var(--border-width) solid var(--color-border-strong);
-  border-radius: var(--radius-md);
+  border: 0;
+  border-radius: var(--radius-field);
   font-size: var(--fs-md);
   font-family: inherit;
 }
 .field__control:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 1px;
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--color-focus-ring);
 }
 .det__textarea {
   resize: vertical;

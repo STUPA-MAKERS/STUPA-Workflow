@@ -107,14 +107,14 @@
           @if (top.applicationId) {
             <span class="fx__lbl">{{ 'meetings.dock.application' | t }}</span>
             @if (stateLabelOf(top.stateLabel); as st) {
-              <app-badge variant="neutral">{{ st }}</app-badge>
+              <app-badge variant="info">{{ st }}</app-badge>
             }
             <a class="text-primary text-sm font-medium" [routerLink]="['/applications', top.applicationId]">{{ 'meetings.agenda.openApplication' | t }}</a>
           }
           <!-- While the agenda is editable the checkbox in the agenda popover carries
                the state. The badge takes over once the protocol is locked. -->
           @if (top.nonPublic && !canEditAgenda()) {
-            <app-badge variant="warning">{{ 'meetings.agenda.nonPublic' | t }}</app-badge>
+            <app-badge variant="neutral">{{ 'meetings.agenda.nonPublic' | t }}</app-badge>
           }
         </div>
       }
@@ -141,7 +141,7 @@
 
     @if (proto) {
       <div class="fx__status">
-        <app-badge [variant]="proto.isFinal ? 'success' : proto.status === 'rendering' ? 'warning' : 'neutral'">
+        <app-badge [variant]="proto.isFinal ? 'success' : proto.status === 'rendering' ? 'warning' : 'info'">
           {{ (proto.isFinal ? 'meetings.protocol.final' : proto.status === 'rendering' ? 'meetings.protocol.rendering' : 'meetings.protocol.draft') | t }}
         </app-badge>
         @if (proto.publicPdfUrl) {
@@ -251,7 +251,7 @@
               <span class="fx__tag">{{ 'meetings.dock.done' | t }}</span>
             }
             @if (item.nonPublic && m.status === 'closed' && !canEditAgenda()) {
-              <app-badge variant="warning">{{ 'meetings.agenda.nonPublic' | t }}</app-badge>
+              <app-badge variant="neutral">{{ 'meetings.agenda.nonPublic' | t }}</app-badge>
             }
             @if (canChangeAgenda() && !item.applicationId && renamingTopId() !== item.id) {
               <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.agenda.rename' | t" [title]="'meetings.agenda.rename' | t" [disabled]="savingAgenda()" (click)="$event.stopPropagation(); startRename.emit(item)"><app-icon name="edit" /></app-button>
@@ -315,7 +315,7 @@
           <p class="fx__addH">{{ 'meetings.viewers.title' | t }} ({{ viewers().length }})</p>
           <ul class="fx__viewers" aria-live="polite">
             @for (name of viewers(); track name) {
-              <li><span class="fx__dot fx__dot--ok" aria-hidden="true"></span>{{ name }}</li>
+              <li><span class="fx__dot" aria-hidden="true"></span>{{ name }}</li>
             } @empty {
               <li class="text-text-muted">{{ 'meetings.viewers.empty' | t }}</li>
             }
@@ -442,7 +442,7 @@
 
     <div class="fx__mid">
       @if (m.status === 'planned') {
-        <app-badge variant="neutral">{{ 'meetings.dock.notStarted' | t }}</app-badge>
+        <app-badge variant="info">{{ 'meetings.dock.notStarted' | t }}</app-badge>
         @if (m.canControl) {
           <!-- A start requires a protokollant. The backend creates the protocol on start. -->
           <app-button size="sm" [disabled]="!m.protokollantId" [title]="(m.protokollantId ? 'meetings.control.open' : 'meetings.control.needProtokollant') | t" (click)="startSession.emit()">
@@ -533,7 +533,7 @@
       [title]="'meetings.attendance.title' | t"
       (click)="togglePanel('attendance')"
     >
-      <span class="fx__dot fx__dot--ok" aria-hidden="true"></span>
+      <span class="fx__dot" aria-hidden="true"></span>
       <span class="fx__chipMain">{{ 'meetings.dock.present' | t: { n: presentCount(), m: attendance().length } }}</span>
       @if (m.canWrite) {
         <span class="fx__chipSub">· {{ 'meetings.dock.live' | t: { n: viewers().length } }}</span>

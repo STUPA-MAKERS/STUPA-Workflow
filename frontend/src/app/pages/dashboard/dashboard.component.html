@@ -118,7 +118,7 @@
               </a>
               <span class="dash__row-meta">
                 @if (item.state) {
-                  <app-badge [color]="item.state.color">{{ item.state.label }}</app-badge>
+                  <app-badge variant="info" [color]="item.state.color">{{ item.state.label }}</app-badge>
                 }
                 <a class="dash__row-cta" [routerLink]="['/applications', item.id]">{{ 'dashboard.open' | t }} →</a>
               </span>
@@ -169,7 +169,7 @@
               </a>
               <span class="dash__row-meta">
                 @if (item.state) {
-                  <app-badge [color]="item.state.color">{{ item.state.label }}</app-badge>
+                  <app-badge variant="info" [color]="item.state.color">{{ item.state.label }}</app-badge>
                 }
                 @if (created(item); as c) {
                   <time class="dash__row-date" [attr.datetime]="c">{{ c | ldate: 'mediumDate' }}</time>

@@ -26,7 +26,7 @@
 
   <ng-template appCell="stateLabel" let-row>
     @if ($any(row).stateLabel) {
-      <app-badge [color]="$any(row).stateColor">{{ $any(row).stateLabel }}</app-badge>
+      <app-badge variant="info" [color]="$any(row).stateColor">{{ $any(row).stateLabel }}</app-badge>
     } @else {
       —
     }

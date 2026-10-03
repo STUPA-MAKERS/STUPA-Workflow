@@ -7,7 +7,7 @@
             <p class="flex items-center gap-2 flex-wrap m-0">
               {{ 'delegation.card.outgoing' | t: { name: d.delegateName || d.delegateId } }}
               @if (d.delegateVoting) {
-                <app-badge variant="info">{{ 'delegation.card.votingBadge' | t }}</app-badge>
+                <app-badge variant="neutral">{{ 'delegation.card.votingBadge' | t }}</app-badge>
               }
               @if (d.viaPool) {
                 <app-badge variant="neutral">{{ 'delegation.card.poolBadge' | t }}</app-badge>
@@ -44,7 +44,7 @@
               <p class="flex items-center gap-2 flex-wrap m-0 text-sm">
                 {{ 'delegation.card.incoming' | t: { name: d.delegatorName || d.delegatorId } }}
                 @if (d.delegateVoting) {
-                  <app-badge variant="info">{{ 'delegation.card.votingBadge' | t }}</app-badge>
+                  <app-badge variant="neutral">{{ 'delegation.card.votingBadge' | t }}</app-badge>
                 }
               </p>
             }

@@ -88,7 +88,7 @@
   <section class="det__summary">
     <div class="det__meta">
       @if (application.state) {
-        <app-badge [color]="application.state.color">
+        <app-badge variant="info" [color]="application.state.color">
           {{ application.state.label }}
         </app-badge>
       }
