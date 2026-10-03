@@ -269,16 +269,58 @@ describe('RowMenuComponent', () => {
       expect(trigger).not.toHaveFocus();
     });
 
-    it('closes when the page scrolls or resizes, but not on a scroll in the menu', async () => {
+    it('follows its button when the page scrolls or resizes', async () => {
       const { trigger, user } = await setup();
+      const rect = jest.spyOn(trigger, 'getBoundingClientRect');
+      rect.mockReturnValue({ top: 100, bottom: 140, right: 900 } as DOMRect);
       await user.click(trigger);
-      fireEvent.scroll(screen.getByRole('menu'));
+      const menu = screen.getByRole('menu');
+      expect(menu.style.top).toBe('144px');
+      rect.mockReturnValue({ top: 60, bottom: 100, right: 900 } as DOMRect);
+      fireEvent.scroll(window);
+      expect(menu.style.top).toBe('104px');
+      rect.mockReturnValue({ top: 20, bottom: 60, right: 800 } as DOMRect);
+      fireEvent(window, new Event('resize'));
+      expect(menu.style.top).toBe('64px');
+      expect(menu.style.right).toBe(`${window.innerWidth - 800}px`);
+      expect(screen.getByRole('menu')).toBe(menu);
+    });
+
+    it('copes with a scroll between the opening and the first render', async () => {
+      const view = await render(RowMenuComponent, {
+        inputs: { sections: SECTIONS },
+        on: { opened: () => fireEvent.scroll(window) },
+      });
+      await userEvent.setup().click(screen.getByRole('button', { name: 'Weitere Aktionen' }));
       expect(screen.getByRole('menu')).toBeInTheDocument();
+      expect(view.container).toBeTruthy();
+    });
+
+    it('stays put on a scroll inside the menu', async () => {
+      const { trigger, user } = await setup();
+      const rect = jest.spyOn(trigger, 'getBoundingClientRect');
+      rect.mockReturnValue({ top: 100, bottom: 140, right: 900 } as DOMRect);
+      await user.click(trigger);
+      rect.mockReturnValue({ top: 0, bottom: 40, right: 900 } as DOMRect);
+      fireEvent.scroll(screen.getByRole('menu'));
+      expect(screen.getByRole('menu').style.top).toBe('144px');
+    });
+
+    it('closes when its button scrolls out of view, above or below', async () => {
+      const { trigger, user, host } = await setup();
+      const rect = jest.spyOn(trigger, 'getBoundingClientRect');
+      rect.mockReturnValue({ top: 100, bottom: 140, right: 900 } as DOMRect);
+      await user.click(trigger);
+      rect.mockReturnValue({ top: -60, bottom: -20, right: 900 } as DOMRect);
       fireEvent.scroll(window);
       expect(screen.queryByRole('menu')).toBeNull();
+      rect.mockReturnValue({ top: 100, bottom: 140, right: 900 } as DOMRect);
       await user.click(trigger);
-      fireEvent(window, new Event('resize'));
+      rect.mockReturnValue({ top: window.innerHeight + 10, bottom: window.innerHeight + 50, right: 900 } as DOMRect);
+      fireEvent.scroll(window);
       expect(screen.queryByRole('menu')).toBeNull();
+      expect(host.closedCount).toBe(2);
+      expect(trigger).not.toHaveFocus();
     });
 
     it('ignores outside events while closed', async () => {

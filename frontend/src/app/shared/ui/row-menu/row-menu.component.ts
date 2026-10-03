@@ -60,7 +60,8 @@ const GAP = 4;
  *   Escape closes and returns to the button, Tab closes.
  *
  * The menu opens in the top layer (popover) where the browser has it, so a table with
- * `overflow: hidden` does not clip it. It closes when the page scrolls or resizes.
+ * `overflow: hidden` does not clip it. It follows its button when the page scrolls or
+ * resizes, and closes when the button leaves the viewport.
  */
 @Component({
   selector: 'app-row-menu',
@@ -117,8 +118,8 @@ export class RowMenuComponent {
       if (this.open() && !inside(this.host.nativeElement, e.target)) this.close(false);
     };
     const onViewport = (e: Event) => {
-      // A scroll inside the menu itself is fine.
-      if (this.open() && !inside(this.menu()?.nativeElement, e.target)) this.close(false);
+      // A scroll inside the menu itself does not move the button.
+      if (this.open() && !inside(this.menu()?.nativeElement, e.target)) this.follow();
     };
     document.addEventListener('pointerdown', onPointer, true);
     window.addEventListener('scroll', onViewport, true);
@@ -192,11 +193,7 @@ export class RowMenuComponent {
   }
 
   private show(focus: 'first' | 'last'): void {
-    const rect = this.trigger().nativeElement.getBoundingClientRect();
-    this.position.set({
-      top: rect.bottom + GAP,
-      right: Math.max(EDGE, window.innerWidth - rect.right),
-    });
+    this.placeBelow();
     this.pendingFocus = focus;
     this.open.set(true);
     this.opened.emit();
@@ -239,6 +236,31 @@ export class RowMenuComponent {
   }
 
   /** Open upwards when the menu does not fit below the trigger. */
+  private placeBelow(): void {
+    const rect = this.trigger().nativeElement.getBoundingClientRect();
+    this.position.set({
+      top: rect.bottom + GAP,
+      right: Math.max(EDGE, window.innerWidth - rect.right),
+    });
+  }
+
+  /**
+   * The page scrolled or resized: keep the menu at its button. A phone resizes when its
+   * address bar slides away, so closing here would close the menu as it opens. When the
+   * button leaves the viewport, the menu closes.
+   */
+  private follow(): void {
+    const rect = this.trigger().nativeElement.getBoundingClientRect();
+    if (rect.bottom < 0 || rect.top > window.innerHeight) {
+      this.close(false);
+      return;
+    }
+    this.placeBelow();
+    // Right after the opening the menu is not rendered yet; the scheduled step flips it.
+    const menu = this.menu()?.nativeElement;
+    if (menu) this.flip(menu);
+  }
+
   private flip(menu: HTMLElement): void {
     const pos = this.position();
     const height = menu.getBoundingClientRect().height;

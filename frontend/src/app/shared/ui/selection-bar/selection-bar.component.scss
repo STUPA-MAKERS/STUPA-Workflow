@@ -1,3 +1,5 @@
+@use 'breakpoints' as bp;
+
 /* Sticks to the bottom of the scroll area of its container and centres the bar over it.
    The host lets clicks through, so it does not block the rows under the empty sides. */
 :host {
@@ -60,4 +62,15 @@
 .selbar__clear:hover {
   background: var(--color-surface-3);
   color: var(--color-text);
+}
+
+/* A phone has little room: a narrower edge and a smaller gap after the count. */
+@include bp.phone {
+  .selbar {
+    max-width: calc(100% - var(--space-4));
+    padding-left: var(--space-4);
+  }
+  .selbar__count {
+    margin-right: var(--space-1);
+  }
 }

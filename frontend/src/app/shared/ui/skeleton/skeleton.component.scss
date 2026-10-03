@@ -34,6 +34,10 @@
   border-bottom-left-radius: var(--radius-lg);
   border-bottom-right-radius: var(--radius-lg);
 }
+/* On the row surface the blocks need one step more to show. */
+.sk__row .skel {
+  background: var(--color-surface-4);
+}
 .sk__row-lead {
   width: 40%;
 }
