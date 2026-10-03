@@ -52,6 +52,12 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    # mcp 2.x moved `mcp.server.fastmcp` into the `fastmcp` distribution. The server
+    # cannot import it, so pyproject.toml caps mcp below 2.0. Dependabot raised that
+    # cap to <3 once (#144). Remove this entry during the mcp 2.x migration.
+    ignore:
+      - dependency-name: "mcp"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: pip
     directory: /typst
