@@ -76,23 +76,20 @@
               <app-icon name="x" [size]="15" />
             </button>
           }
-          <button
-            type="button"
-            class="chip apps__chip"
-            [class.on]="states().length > 0"
-            aria-haspopup="dialog"
-            [attr.aria-expanded]="stateSheetOpen()"
-            [title]="stateChipLabel()"
-            (click)="sheet.set('state')"
-          >
-            @if (states().length) {
-              <app-icon name="check" [size]="15" />
-            }
-            <span class="ell">{{ stateChipLabel() }}</span>
-            @if (!states().length) {
-              <app-icon name="down" [size]="15" />
-            }
-          </button>
+          <app-filter-select
+            class="apps__chip"
+            [label]="'applications.list.filter.state' | t"
+            [options]="stateOptions()"
+            [multiple]="true"
+            [values]="states()"
+            (valuesChange)="setStates($event)"
+            [text]="stateChipLabel()"
+            [active]="states().length > 0"
+            [icon]="states().length ? 'check' : null"
+            [chevron]="!states().length"
+            [resetLabel]="'applications.list.filter.reset' | t"
+            [emptyText]="'applications.list.filter.stateNone' | t"
+          />
           @if (budgetTree().length) {
             <button
               type="button"
@@ -113,42 +110,29 @@
             </button>
           }
           @if (types().length) {
-            <!-- A native select over the whole chip: a click anywhere on it opens the list
-                 of the browser. The icons let the click through. -->
-            <label class="chip apps__chip apps__selectChip" [class.on]="typeId() !== ''">
-              @if (typeId()) {
-                <app-icon class="apps__chipLead" name="check" [size]="15" />
-              }
-              <span class="apps__chipText ell" aria-hidden="true">{{ typeChipLabel() }}</span>
-              <app-icon class="apps__chipChev" name="down" [size]="15" />
-              <select
-                class="apps__select"
-                [attr.aria-label]="'applications.list.filter.type' | t"
-                (change)="onSelect('type', $event)"
-              >
-                <option value="" [selected]="typeId() === ''">{{ 'applications.list.filter.allTypes' | t }}</option>
-                @for (type of types(); track type.id) {
-                  <option [value]="type.id" [selected]="type.id === typeId()">{{ type.name }}</option>
-                }
-              </select>
-            </label>
+            <app-filter-select
+              class="apps__chip"
+              [label]="'applications.list.filter.type' | t"
+              [options]="typeOptions()"
+              [value]="typeId()"
+              (valueChange)="setFilter('type', $event)"
+              [text]="typeChipLabel()"
+              [active]="typeId() !== ''"
+              [icon]="typeId() ? 'check' : null"
+              [chevron]="!typeId()"
+            />
           }
-          <label class="chip apps__chip apps__selectChip" [class.on]="archived() !== 'false'">
-            @if (archived() !== 'false') {
-              <app-icon class="apps__chipLead" name="check" [size]="15" />
-            }
-            <span class="apps__chipText ell" aria-hidden="true">{{ archivedChipLabel() }}</span>
-            <app-icon class="apps__chipChev" name="down" [size]="15" />
-            <select
-              class="apps__select"
-              [attr.aria-label]="'applications.list.filter.archived' | t"
-              (change)="onSelect('archived', $event)"
-            >
-              @for (opt of archivedOptions(); track opt.value) {
-                <option [value]="opt.value" [selected]="opt.value === archived()">{{ opt.label }}</option>
-              }
-            </select>
-          </label>
+          <app-filter-select
+            class="apps__chip"
+            [label]="'applications.list.filter.archived' | t"
+            [options]="archivedOptions()"
+            [value]="archived()"
+            (valueChange)="setFilter('archived', $event)"
+            [text]="archivedChipLabel()"
+            [active]="archived() !== 'false'"
+            [icon]="archived() !== 'false' ? 'check' : null"
+            [chevron]="archived() === 'false'"
+          />
           @if (activeFilterCount() > 0) {
             <app-button variant="text" size="sm" (click)="reset()">
               {{ 'applications.list.filter.reset' | t }}
@@ -255,34 +239,6 @@
     </div>
   </app-list-detail>
 </div>
-
-<!-- Status: several states at once, applied on each click. -->
-<app-side-sheet
-  [side]="sheetSide()"
-  [heading]="'applications.list.filter.state' | t"
-  [open]="stateSheetOpen()"
-  (openChange)="sheet.set($event ? 'state' : null)"
->
-  @if (states().length) {
-    <app-button sheet-actions variant="text" size="sm" (click)="clearStates()">
-      {{ 'applications.list.filter.reset' | t }}
-    </app-button>
-  }
-  @if (stateOptions().length) {
-    <div class="rowgroup rowgroup--bg3 apps__checks" role="group" [attr.aria-label]="'applications.list.filter.state' | t">
-      @for (opt of stateOptions(); track opt.value) {
-        <div class="apps__check">
-          <app-checkbox
-            [ngModel]="isStateOn(opt.value)"
-            (ngModelChange)="toggleState(opt.value, $event)"
-          >{{ opt.label }}</app-checkbox>
-        </div>
-      }
-    </div>
-  } @else {
-    <p class="apps__sheetNone">{{ 'applications.list.filter.stateNone' | t }}</p>
-  }
-</app-side-sheet>
 
 <!-- Cost centre: the tree of the budget tab, with "Alle" on top. -->
 <app-side-sheet

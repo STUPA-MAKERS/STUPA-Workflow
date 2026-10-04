@@ -15,6 +15,7 @@ import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { SimplifyPathPipe } from '@shared/budget-path';
 import {
   EmptyStateComponent,
+  FilterSelectComponent,
   ListItemComponent,
   RowMenuComponent,
   type RowMenuItem,
@@ -138,6 +139,7 @@ export const APPS_SHOWN = 5;
     DialogComponent,
     IconComponent,
     EmptyStateComponent,
+    FilterSelectComponent,
     ListItemComponent,
     RowMenuComponent,
     SearchPillComponent,
@@ -262,6 +264,13 @@ export class BudgetDashboardComponent {
   /** The fiscal years of the selected root, for the year chip. */
   readonly years = computed<FiscalYear[]>(
     () => this.fiscalYearsByBudget()[this.selectedBudgetId()] ?? [],
+  );
+  /** The choices of the year chip. */
+  readonly yearOptions = computed(() =>
+    this.years().map((fy) => ({
+      value: fy.id,
+      label: this.i18n.translate('budget.dash.yearShort', { year: fy.display }),
+    })),
   );
   readonly selectedYear = computed<FiscalYear | null>(
     () => this.years().find((f) => f.id === this.selectedFyId()) ?? null,
@@ -424,8 +433,13 @@ export class BudgetDashboardComponent {
     return this.figureLabel(m);
   }
 
-  onMetricChange(event: Event): void {
-    this.metric.set((event.target as HTMLSelectElement).value as DistributionMetric);
+  /** The choices of the metric chip. */
+  readonly metricOptions = computed(() =>
+    this.metrics.map((m) => ({ value: m, label: this.metricLabel(m) })),
+  );
+
+  onMetricChange(value: string): void {
+    this.metric.set(value as DistributionMetric);
   }
 
   /** "Auslastung je Budget": the direct sub cost centres, or the cost centre itself when
@@ -782,10 +796,6 @@ export class BudgetDashboardComponent {
     if (fyId === this.selectedFyId()) return;
     this.setSelection(this.selectedBudgetId(), this.selectedKsId(), fyId);
     this.syncUrl();
-  }
-
-  onYearChange(event: Event): void {
-    this.selectYear((event.target as HTMLSelectElement).value);
   }
 
   openApplications(): void {

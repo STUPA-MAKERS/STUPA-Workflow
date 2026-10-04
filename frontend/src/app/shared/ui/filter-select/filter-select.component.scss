@@ -1,0 +1,195 @@
+:host {
+  display: inline-flex;
+  flex: none;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* The chip look comes from the global `.chip`. The whole chip is the button. */
+.fs__chip {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+/* The pill beside a search pill of size `md` (the meetings list). */
+.fs__chip--md {
+  height: 2.75rem;
+  padding: 0 14px;
+  border-color: var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  color: var(--color-text);
+  font-size: var(--fs-body);
+}
+.fs__chip--md:not(.on) app-icon {
+  color: var(--color-text-muted);
+}
+.fs__chip:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+.fs__text {
+  flex: 1 1 auto;
+  max-width: 18rem;
+}
+.fs__chev {
+  flex: none;
+}
+
+/* The popover: the look of the row menu. Fixed to the viewport, under the chip and
+   aligned to its start. In the top layer the UA styles would centre it, so the reset
+   comes first. */
+.fs__menu {
+  position: fixed;
+  inset: auto;
+  z-index: var(--z-dropdown);
+  margin: 0;
+  min-width: 13rem;
+  max-width: min(22rem, calc(100vw - 16px));
+  max-height: min(24rem, calc(100vh - 16px));
+  overflow-y: auto;
+  padding: 6px 0;
+  border: 0;
+  border-radius: var(--radius-field);
+  background: var(--color-surface-3);
+  color: var(--color-text);
+  box-shadow: var(--shadow-elevated);
+}
+.fs__menu:focus {
+  outline: none;
+}
+
+/* The top-layer box of the phone sheet: no box of its own. The scrim and the sheet inside
+   are fixed to the viewport. */
+.fs__layer {
+  position: fixed;
+  inset: 0;
+  width: auto;
+  height: auto;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  background: transparent;
+  color: inherit;
+}
+
+.fs__options:focus {
+  outline: none;
+}
+
+.fs__option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  height: 2.75rem;
+  padding: 0 var(--space-4);
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--fs-body);
+  font-weight: var(--fw-medium);
+  text-align: start;
+  cursor: pointer;
+}
+.fs__option:hover,
+.fs__option:focus-visible {
+  background: var(--color-surface-4);
+}
+/* Surface 4 on surface 3 is only about 1.2:1, too weak to show the focus (WCAG 2.4.7).
+   The focused option also gets an inset ring in the focus colour. */
+.fs__option:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--color-focus-ring);
+}
+.fs__option[aria-selected='true'] .fs__label {
+  font-weight: var(--fw-semibold);
+}
+/* In the sheet: the rows of a row group (`.rowgroup--bg3`, global) on surface 3, as tall
+   as a list row. The row group sets the surface and the corners. */
+.fs__option--sheet {
+  height: auto;
+  min-height: 52px;
+  background: var(--color-surface-3);
+}
+.fs__option--sheet:hover,
+.fs__option--sheet:focus-visible {
+  background: var(--color-surface-4);
+}
+
+.fs__label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fs__check {
+  flex: none;
+  color: var(--color-accent-text);
+}
+
+/* Several choices: a check box in front of each choice, the look of `app-checkbox`. */
+.fs__box {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  box-shadow: inset 0 0 0 2px var(--color-border-strong);
+  color: var(--color-on-accent);
+}
+.fs__box--on {
+  background: var(--color-accent);
+  box-shadow: none;
+}
+
+.fs__sep {
+  height: 1px;
+  margin: 6px 0;
+  background: var(--color-border);
+}
+.fs__reset {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 2.5rem;
+  padding: 0 var(--space-4);
+  border: 0;
+  background: transparent;
+  color: var(--color-accent-text);
+  font: inherit;
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semibold);
+  text-align: start;
+  cursor: pointer;
+}
+.fs__reset:hover,
+.fs__reset:focus-visible {
+  background: var(--color-surface-4);
+}
+.fs__reset:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--color-focus-ring);
+}
+/* In the sheet header: a text button before the close button. */
+.fs__reset--head {
+  width: auto;
+  height: var(--control-height-sm);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
+}
+.fs__reset--head:hover {
+  background: var(--color-surface-3);
+}
+
+.fs__empty {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}

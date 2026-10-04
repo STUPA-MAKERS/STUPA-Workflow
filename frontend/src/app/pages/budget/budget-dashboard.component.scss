@@ -185,58 +185,10 @@
   background: var(--color-selected);
   color: var(--color-on-selected);
 }
-.bd-chip:focus-visible,
-.bd__selectChip:focus-within {
+.bd-chip:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
-/* The select fills the whole chip, so a click on the padding or on an icon opens it too.
-   The icons sit on top of the select and let the click through. The paddings of the
-   select keep the old look: 12px, icon, 6px gap, text, 6px gap, chevron, 10px. */
-.bd__selectChip {
-  padding: 0;
-}
-.bd__selectLead,
-.bd__selectChev {
-  position: absolute;
-  top: 50%;
-  display: flex;
-  transform: translateY(-50%);
-  pointer-events: none;
-}
-.bd__selectLead {
-  inset-inline-start: 12px;
-}
-.bd__selectChev {
-  inset-inline-end: 10px;
-}
-.bd__select {
-  appearance: none;
-  align-self: stretch;
-  min-width: 0;
-  margin: 0;
-  padding-block: 0;
-  padding-inline: 12px 30px;
-  border: 0;
-  border-radius: inherit;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-/* The year chip: a 15px calendar icon in front and a 15px chevron. */
-.bd__selectChip--lead .bd__select {
-  padding-inline: 33px 31px;
-}
-.bd__select:focus {
-  outline: none;
-}
-/* The options of the native list use the page colours, not the chip colours. */
-.bd__select option {
-  background: var(--color-surface-1);
-  color: var(--color-text);
-}
-
 /* ------------------------------------------------------------------ fades
    An end of a scrolling list fades only when there is more content past it
    (`appScrollFade` sets the classes). The tree and the wide sheet share the mask. */

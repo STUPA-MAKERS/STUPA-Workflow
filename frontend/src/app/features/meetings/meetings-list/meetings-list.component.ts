@@ -7,6 +7,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { meetingStatus, type StatusView } from '@shared/status-kind.util';
 import { DateBlockComponent } from '@shared/ui/date-block/date-block.component';
+import { FilterSelectComponent } from '@shared/ui/filter-select/filter-select.component';
 import { ListItemComponent } from '@shared/ui/list-item/list-item.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.component';
@@ -42,6 +43,7 @@ import { MeetingsTimelineService } from '../meetings-timeline.service';
     NgTemplateOutlet,
     TranslatePipe,
     ButtonComponent,
+    FilterSelectComponent,
     IconComponent,
     PageHeaderComponent,
     SearchPillComponent,
@@ -88,10 +90,6 @@ export class MeetingsListComponent {
 
   remove(m: Meeting): void {
     this.dialogs.askDeleteMeeting(m);
-  }
-
-  onFilter(event: Event): void {
-    this.timeline.selectGremiumFilter((event.target as HTMLSelectElement).value);
   }
 
   status(m: Meeting): StatusView {

@@ -67,6 +67,7 @@ export const de = {
   // own visible text.
   'ui.rowMenu.trigger': 'Weitere Aktionen',
   'ui.rowMenu.empty': 'Keine Aktionen möglich',
+  'ui.filterSelect.empty': 'Keine Auswahl möglich',
   'ui.selection.toolbar': 'Auswahl',
   'ui.selection.clear': 'Auswahl aufheben',
   'ui.selection.count': '{count} ausgewählt',
@@ -2457,6 +2458,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
 
   'ui.rowMenu.trigger': 'More actions',
   'ui.rowMenu.empty': 'No actions available',
+  'ui.filterSelect.empty': 'No options available',
   'ui.selection.toolbar': 'Selection',
   'ui.selection.clear': 'Clear selection',
   'ui.selection.count': '{count} selected',

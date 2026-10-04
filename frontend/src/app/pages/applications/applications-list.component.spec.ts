@@ -434,41 +434,36 @@ describe('ApplicationsListComponent', () => {
       expect(cmp.archived()).toBe('false');
     });
 
-    it('checks and unchecks states in the status sheet, each as a repeated param', async () => {
+    it('checks and unchecks states in the status menu, each as a repeated param', async () => {
       const { cmp, harness } = await start();
+      const http = TestBed.inject(HttpTestingController);
+      const reloadAfter = async (label: string) => {
+        await userEvent.click(screen.getByRole('option', { name: label }));
+        await harness.fixture.whenStable();
+        const req = http.expectOne(LIST);
+        const state = req.request.params.getAll('state');
+        req.flush(page(ROWS));
+        harness.detectChanges();
+        return state;
+      };
       await userEvent.click(screen.getByRole('button', { name: 'Status' }));
       harness.detectChanges();
-      expect(screen.getByRole('dialog', { name: 'Status' })).toBeInTheDocument();
-      cmp.toggleState('s1', true);
-      await harness.fixture.whenStable();
-      let reload = TestBed.inject(HttpTestingController).expectOne(LIST);
-      expect(reload.request.params.getAll('state')).toEqual(['s1']);
-      reload.flush(page(ROWS));
-      cmp.toggleState('s2', true);
-      await harness.fixture.whenStable();
-      reload = TestBed.inject(HttpTestingController).expectOne(LIST);
-      expect(reload.request.params.getAll('state')).toEqual(['s1', 's2']);
-      reload.flush(page(ROWS));
-      harness.detectChanges();
-      expect(cmp.isStateOn('s2')).toBe(true);
+      const list = screen.getByRole('listbox', { name: 'Status' });
+      expect(list).toHaveAttribute('aria-multiselectable', 'true');
+      expect(await reloadAfter('Eingereicht')).toEqual(['s1']);
+      // Several choices: the menu stays open.
+      expect(await reloadAfter('In Prüfung')).toEqual(['s1', 's2']);
+      expect(screen.getByRole('option', { name: 'In Prüfung' })).toHaveAttribute('aria-selected', 'true');
       expect(cmp.stateChipLabel()).toBe('Eingereicht, In Prüfung');
-      cmp.toggleState('s1', false);
-      await harness.fixture.whenStable();
-      reload = TestBed.inject(HttpTestingController).expectOne(LIST);
-      expect(reload.request.params.getAll('state')).toEqual(['s2']);
-      reload.flush(page(ROWS));
+      expect(screen.getByRole('button', { name: 'Status: Eingereicht, In Prüfung' })).toBeInTheDocument();
+      expect(await reloadAfter('Eingereicht')).toEqual(['s2']);
       // Unchecking the last state drops the param.
-      cmp.toggleState('s2', false);
+      expect(await reloadAfter('In Prüfung')).toBeNull();
+      expect(await reloadAfter('In Prüfung')).toEqual(['s2']);
+      // The reset in the menu clears all states.
+      await userEvent.click(document.querySelector<HTMLElement>('.fs__reset')!);
       await harness.fixture.whenStable();
-      reload = TestBed.inject(HttpTestingController).expectOne(LIST);
-      expect(reload.request.params.has('state')).toBe(false);
-      reload.flush(page(ROWS));
-      cmp.toggleState('s2', true);
-      await harness.fixture.whenStable();
-      TestBed.inject(HttpTestingController).expectOne(LIST).flush(page(ROWS));
-      cmp.clearStates();
-      await harness.fixture.whenStable();
-      reload = TestBed.inject(HttpTestingController).expectOne(LIST);
+      const reload = http.expectOne(LIST);
       expect(reload.request.params.has('state')).toBe(false);
       reload.flush(page(ROWS));
     });
@@ -484,6 +479,7 @@ describe('ApplicationsListComponent', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Status' }));
       harness.detectChanges();
       expect(screen.getByText('Noch keine Status in der Liste.')).toBeInTheDocument();
+      expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
     });
 
     it('collects the states of every page, also past a row without a state', async () => {
@@ -522,36 +518,38 @@ describe('ApplicationsListComponent', () => {
     it('hides the cost-centre chip without a tree, and the type chip without types', async () => {
       await start('/applications', { tree: 'error', types: 'error' });
       expect(screen.queryByRole('button', { name: 'Kostenstelle' })).not.toBeInTheDocument();
-      expect(screen.queryByRole('combobox', { name: 'Typ' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Typ' })).not.toBeInTheDocument();
     });
 
-    it('filters by type and by archive through the selects of the chips', async () => {
+    it('filters by type and by archive through the menus of the chips', async () => {
       const { cmp, http, harness } = await start();
-      const type = screen.getByRole('combobox', { name: 'Typ' });
-      await userEvent.selectOptions(type, 't1');
-      await harness.fixture.whenStable();
-      let req = http.expectOne(LIST);
-      expect(req.request.params.get('type')).toBe('t1');
-      req.flush(page(ROWS));
-      harness.detectChanges();
+      // No native select: every chip opens the menu of the app.
+      expect(document.querySelector('.apps__chips select')).toBeNull();
+      const pick = async (chip: string, option: string) => {
+        await userEvent.click(screen.getByRole('button', { name: chip }));
+        harness.detectChanges();
+        await userEvent.click(screen.getByRole('option', { name: option }));
+        await harness.fixture.whenStable();
+        const req = http.expectOne(LIST);
+        req.flush(page(ROWS));
+        harness.detectChanges();
+        return req.request.params;
+      };
+      expect((await pick('Typ', 'Förderantrag')).get('type')).toBe('t1');
       expect(cmp.typeChipLabel()).toBe('Förderantrag');
+      // A single choice closes the menu and the focus goes back to the chip.
+      expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Typ: Förderantrag' }));
 
-      await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Archiv' }), 'true');
-      await harness.fixture.whenStable();
-      req = http.expectOne(LIST);
-      expect(req.request.params.get('archived')).toBe('true');
-      req.flush(page(ROWS));
-      harness.detectChanges();
+      expect((await pick('Archiv', 'Nur archivierte')).get('archived')).toBe('true');
       expect(cmp.archivedChipLabel()).toBe('Archiv: Nur archivierte');
       cmp.archived.set('all');
       expect(cmp.archivedChipLabel()).toBe('Archiv: Alle');
+      harness.detectChanges();
 
       // Back to the default: the param goes away.
-      await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Archiv' }), 'false');
-      await harness.fixture.whenStable();
-      req = http.expectOne(LIST);
-      expect(req.request.params.has('archived')).toBe(false);
-      req.flush(page(ROWS));
+      expect((await pick('Archiv: Alle', 'Ohne archivierte')).has('archived')).toBe(false);
+      expect((await pick('Typ: Förderantrag', 'Alle Typen')).has('type')).toBe(false);
     });
 
     it('names an unknown type with the filter name', async () => {

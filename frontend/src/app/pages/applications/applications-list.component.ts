@@ -34,7 +34,6 @@ import type {
 import { AuthService } from '@core/auth/auth.service';
 import {
   ButtonComponent,
-  CheckboxComponent,
   CurrencyInputComponent,
   DatepickerComponent,
   DialogComponent,
@@ -43,6 +42,7 @@ import {
   ToastService,
 } from '@stupa-makers/ui-kit';
 import {
+  FilterSelectComponent,
   ListDetailLayoutComponent,
   ListItemComponent,
   RowMenuComponent,
@@ -114,7 +114,7 @@ interface ListRow {
 }
 
 /** Which filter sheet is open. */
-type FilterSheet = 'state' | 'budget' | 'more' | null;
+type FilterSheet = 'budget' | 'more' | null;
 
 /**
  * The applications page: the list pane with search and filters, and the detail of the
@@ -138,10 +138,10 @@ type FilterSheet = 'state' | 'budget' | 'more' | null;
     RouterOutlet,
     TranslatePipe,
     ButtonComponent,
-    CheckboxComponent,
     CurrencyInputComponent,
     DatepickerComponent,
     DialogComponent,
+    FilterSelectComponent,
     IconComponent,
     ListDetailLayoutComponent,
     ListItemComponent,
@@ -249,7 +249,6 @@ export class ApplicationsListComponent implements OnDestroy {
 
   /** The open filter sheet. */
   readonly sheet = signal<FilterSheet>(null);
-  readonly stateSheetOpen = computed(() => this.sheet() === 'state');
   readonly budgetSheetOpen = computed(() => this.sheet() === 'budget');
   readonly moreSheetOpen = computed(() => this.sheet() === 'more');
   /** Phone: filters and pickers open from the bottom; wider: from the start edge. */
@@ -321,6 +320,12 @@ export class ApplicationsListComponent implements OnDestroy {
       ),
     });
   });
+
+  /** The choices of the type chip: "Alle Typen" first. */
+  readonly typeOptions = computed(() => [
+    { value: '', label: this.i18n.translate('applications.list.filter.allTypes') },
+    ...this.types().map((t) => ({ value: t.id, label: t.name })),
+  ]);
 
   readonly archivedOptions = computed(() => [
     { value: 'false', label: this.i18n.translate('applications.list.filter.archivedHide') },
@@ -530,24 +535,9 @@ export class ApplicationsListComponent implements OnDestroy {
     this.navigate({ [param]: value === def?.empty ? null : value });
   }
 
-  /** A native select of a chip changed. */
-  onSelect(param: string, event: Event): void {
-    this.setFilter(param, (event.target as HTMLSelectElement).value);
-  }
-
-  /** Check or uncheck one state in the status sheet. */
-  toggleState(id: string, on: boolean): void {
-    const next = this.states().filter((s) => s !== id);
-    if (on) next.push(id);
-    this.navigate({ state: next.length ? next : null });
-  }
-
-  clearStates(): void {
-    this.navigate({ state: null });
-  }
-
-  isStateOn(id: string): boolean {
-    return this.states().includes(id);
+  /** The chosen states of the status chip. */
+  setStates(ids: readonly string[]): void {
+    this.navigate({ state: ids.length ? [...ids] : null });
   }
 
   /** Pick a cost centre in the tree sheet. `''` means all. */

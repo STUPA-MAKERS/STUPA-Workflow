@@ -9,25 +9,16 @@
         (valueChange)="timeline.onSearch($event)"
       />
       @if (showFilter()) {
-        <!-- A native select in a chip: the browser list is accessible on every device.
-             The select is transparent over the chip, so the chip is as wide as the
-             selected label and not as wide as the longest option. -->
-        <label class="mtl__chip">
-          <app-icon class="mtl__chipIcon" name="building" [size]="16" />
-          <span class="mtl__chipLabel ell" aria-hidden="true">{{ filterLabel() }}</span>
-          <app-icon class="mtl__chipIcon" name="down" [size]="15" />
-          <select
-            class="mtl__chipSelect"
-            [attr.aria-label]="'meetings.list.committeeFilter' | t"
-            (change)="onFilter($event)"
-          >
-            @for (opt of timeline.filterGremiumOptions(); track opt.value) {
-              <option [value]="opt.value" [selected]="opt.value === timeline.gremiumFilter()">
-                {{ opt.label }}
-              </option>
-            }
-          </select>
-        </label>
+        <app-filter-select
+          class="mtl__chip"
+          size="md"
+          icon="building"
+          [label]="'meetings.list.committeeFilter' | t"
+          [options]="timeline.filterGremiumOptions()"
+          [value]="timeline.gremiumFilter()"
+          (valueChange)="timeline.selectGremiumFilter($event)"
+          [text]="filterLabel()"
+        />
       }
       @if (canCreate()) {
         <app-button variant="fill" (click)="createOpen.set(true)">
