@@ -1,105 +1,33 @@
+@use 'breakpoints' as bp;
+
 :host {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: var(--space-4);
 }
 
-.bd__status,
-.bd__empty {
-  width: 100%;
-  max-width: var(--layout-max-width);
-  margin-inline: auto;
-}
-
-/* The metric tabs copy the look of the nav pills in the app header. */
-.bd__ovTabs {
-  display: flex;
-  justify-content: center;
-  gap: var(--space-1);
-  margin-block: var(--space-2) var(--space-3);
-}
-
-.bd__ovTab {
-  padding: var(--space-2) var(--space-3);
-  font: inherit;
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-medium);
-  color: var(--color-text-muted);
-  background: none;
-  border: none;
-  border-radius: var(--radius-md);
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.bd__ovTab:hover {
-  color: var(--color-text);
-  background: var(--color-surface-sunken);
-}
-
-.bd__ovTab--active {
-  color: var(--color-primary);
-  background: var(--color-primary-subtle);
-}
-
-/* The active tab must keep its selected background on hover. `.bd__ovTab:hover`
-   (specificity 0,2,0) would otherwise beat `--active` (0,1,0). */
-.bd__ovTab--active:hover {
-  color: var(--color-primary);
-  background: var(--color-primary-subtle);
-}
-
-.bd__filter {
-  flex: 1 1 14rem;
-}
-
-.bd__crumb {
-  border: 0;
-  background: transparent;
-  color: var(--color-primary);
-  cursor: pointer;
-  font: inherit;
-  font-weight: var(--fw-medium);
-  padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-sm);
-}
-
-.bd__crumb:hover:not(:disabled) {
-  background: var(--color-surface-sunken);
-}
-
-.bd__crumb--current {
-  color: var(--color-text);
-  cursor: default;
+/* The page title of the design system (d2). On the wide layout it heads the pane. */
+.bd__title {
+  margin: 0;
+  font-size: var(--fs-d2);
+  line-height: 2.25rem;
+  font-weight: var(--fw-semibold);
+  letter-spacing: -0.01em;
 }
 
 .bd__status {
+  margin: 0;
   color: var(--color-text-muted);
-  padding: var(--space-4) 0;
 }
-
 .bd__status--error {
   color: var(--color-danger);
 }
-
 .bd__empty {
-  padding: var(--space-6);
-  background: var(--color-surface);
-  border: var(--border-width) dashed var(--color-border-strong);
-  border-radius: var(--radius-md);
-  text-align: center;
-  color: var(--color-text-muted);
+  display: flex;
+  justify-content: center;
 }
-
-.bd__emptyTitle {
-  margin: 0 0 var(--space-2);
-  color: var(--color-text);
-}
-
-/* The one next step out of the empty panel. It carries the whole message, so it is a
-   full link colour and not the muted tone of the cross-links in the usage section. */
 .bd__emptyLink {
-  color: var(--color-primary);
+  color: var(--color-accent-text);
   font-weight: var(--fw-semibold);
   text-decoration: none;
 }
@@ -107,336 +35,527 @@
 .bd__emptyLink:focus-visible {
   text-decoration: underline;
 }
-
-/* The applications go below the tree table, not beside it. */
-.bd__cols {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--space-5);
-}
-
-/* Three zones: nav (budget to year), main content (body width) and charts.
-   The middle column stays at `--layout-max-width`. Symmetric 1fr sides center it.
-   Only the tree on the left and the charts on the right reach into the margins. */
-.bd__layout {
-  display: grid;
-  grid-template-columns:
-    minmax(11rem, 1fr)
-    minmax(0, var(--layout-max-width))
-    minmax(10rem, 1fr);
-  gap: var(--space-5);
-  align-items: start;
-}
-.bd__nav {
-  position: sticky;
-  top: calc(var(--layout-header-height) + var(--space-4));
-  min-width: 0;
-  /* Pull toward the middle column: right-aligned inside the left margin. */
-  justify-self: end;
-  width: 100%;
-  max-width: 14rem;
-  /* Stays in view and does not scroll away, even with a long tree. */
-  max-height: 75vh;
-  overflow-y: auto;
-}
-.bd__charts {
-  justify-self: start;
-  width: 100%;
-  max-width: 13rem;
-}
-.bd__main {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-}
-.bd__charts {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-  position: sticky;
-  top: calc(var(--layout-header-height) + var(--space-4));
-  max-height: 75vh;
-  overflow-y: auto;
-}
-.bd__apps {
-  min-width: 0;
-}
-/* On a narrower screen the charts drop below the content and the nav stays left. */
-@media (max-width: 60rem) {
-  .bd__layout {
-    grid-template-columns: minmax(10rem, 13rem) minmax(0, 1fr);
-  }
-  .bd__charts {
-    grid-column: 1 / -1;
-    flex-direction: row;
-    flex-wrap: wrap;
-    position: static;
-  }
-}
-@media (max-width: 40rem) {
-  .bd__layout {
-    grid-template-columns: 1fr;
-  }
-  .bd__nav {
-    position: static;
-  }
-}
-
-.bd__usage {
-  min-width: 0;
-}
-
-.bd__panel-h {
-  font-size: var(--fs-lg);
-  margin: 0 0 var(--space-4);
-}
-
-.bd__table {
-  width: 100%;
-  border-collapse: collapse;
+.bd__none {
+  margin: 0;
+  color: var(--color-text-muted);
   font-size: var(--fs-sm);
 }
 
-.bd__table th {
-  text-align: start;
-  padding: var(--space-2) var(--space-3);
-  font-size: var(--fs-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+/* ------------------------------------------------------------------ frame
+   Wide: the pane (title, year, overview, search, tree) beside the sheet.
+   Narrower: the title and the chips on top, the sheet below, the tree in a side sheet. */
+.bd {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+.bd--wide {
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: start;
+}
+
+.bd__pane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.bd--wide .bd__pane {
+  position: sticky;
+  top: var(--main-pad-top, 0px);
+  max-height: calc(100dvh - var(--main-pad-top, 0px) - var(--space-3));
+  overflow-y: auto;
+  padding-inline-end: var(--space-2);
+}
+.bd--wide .bd__title {
+  padding: var(--space-5) var(--space-2) var(--space-2) var(--space-3);
+}
+.bd__paneBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.bd__top {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.bd__topRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-4);
+}
+.bd__chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.bd__pathChip {
+  max-width: 100%;
+}
+
+/* A chip: 32px, outlined; `--on` is the selected look. The year and the metric are a
+   native select inside the chip, so the keyboard and the phone picker work as usual. */
+.bd-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 2rem;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: transparent;
   color: var(--color-text-muted);
-  border-bottom: var(--border-width) solid var(--color-border);
+  font: inherit;
+  font-size: 0.84375rem;
+  font-weight: var(--fw-medium);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.bd-chip:hover {
+  background: var(--color-surface-2);
+}
+.bd-chip--on,
+.bd-chip--on:hover {
+  border-color: transparent;
+  background: var(--color-selected);
+  color: var(--color-on-selected);
+}
+.bd-chip:focus-visible,
+.bd__selectChip:focus-within {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+.bd__selectChip {
+  padding-inline-end: 10px;
+}
+.bd__select {
+  appearance: none;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.bd__select:focus {
+  outline: none;
+}
+/* The options of the native list use the page colours, not the chip colours. */
+.bd__select option {
+  background: var(--color-surface-1);
+  color: var(--color-text);
 }
 
-.bd__table td {
-  padding: var(--space-2) var(--space-3);
-  border-bottom: var(--border-width) solid var(--color-border);
-  vertical-align: middle;
+/* ------------------------------------------------------------------ tree */
+.bd__tree {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.tn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 3.125rem;
+  padding: 4px var(--space-3) 4px calc(4px + var(--tn-depth, 0) * 20px);
+  border-radius: var(--radius-lg);
+}
+.tn:hover {
+  background: var(--color-surface-2);
+}
+.tn--on,
+.tn--on:hover {
+  background: var(--color-selected);
+  color: var(--color-on-selected);
+}
+.tn__chev {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.tn__chev:disabled {
+  cursor: default;
+}
+button.tn__chev:hover:not(:disabled) {
+  background: var(--color-surface-3);
+}
+.tn__main {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.tn__chev:focus-visible,
+.tn__main:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-md);
+}
+.tn__line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.tn__swatch {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+.tn__name {
+  flex: 1 1 0;
+  min-width: 0;
+  font-size: 0.90625rem; // 14.5px
+  line-height: 1.25rem;
+  font-weight: var(--fw-medium);
+}
+.tn__name--root {
+  font-weight: var(--fw-semibold);
+}
+.tn__amt {
+  flex: none;
+  font-size: 0.78125rem;
 }
 
-.bd__num {
-  text-align: end;
-  font-variant-numeric: tabular-nums;
+/* ------------------------------------------------------------------ sheet */
+.bd__sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  min-width: 0;
+  padding: var(--space-6) var(--space-8);
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface-1);
+}
+.bd--wide .bd__sheet {
+  min-height: calc(100dvh - var(--main-pad-top, 0px) - var(--space-3));
+}
+
+.bd__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+.bd__headText {
+  display: flex;
+  flex: 1 1 16rem;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.bd__crumbs {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  font-size: 0.78125rem;
+  line-height: 1.125rem;
+  color: var(--color-text-muted);
+}
+.bd__crumb {
+  min-width: 0;
+  max-width: 14rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+button.bd__crumb:hover {
+  color: var(--color-text);
+  text-decoration: underline;
+}
+.bd__crumb--current {
+  color: var(--color-text);
+  cursor: default;
+}
+.bd__crumbSep {
+  flex: none;
+}
+.bd__key {
+  flex: none;
+  margin-inline-start: var(--space-2);
+}
+.bd__name {
+  margin: 0;
+  font-size: var(--fs-d2);
+  line-height: 2.25rem;
+  font-weight: var(--fw-semibold);
+  letter-spacing: -0.01em;
+}
+.bd__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+.bd__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* The six figures in one band, split by thin rules. Each figure takes the width of its
+   amount, so a large amount gets more room; a band that does not fit wraps. */
+.bd__figs {
+  display: flex;
+  flex-wrap: wrap;
+  row-gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-4) 0;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
+}
+.bd__fig {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 var(--space-3);
+}
+.bd__fig + .bd__fig {
+  border-inline-start: 1px solid var(--color-border);
+}
+.bd__figLabel {
+  font-size: 0.78125rem;
+  line-height: 1.125rem;
+  color: var(--color-text-muted);
+}
+.bd__figValue {
+  margin: 0;
+  font-size: 1.125rem;
+  line-height: 1.75rem;
+  font-weight: var(--fw-medium);
   white-space: nowrap;
 }
-
-.bd__neg {
+.bd__fig--main .bd__figValue {
+  color: var(--color-accent-text);
+}
+.bd__neg,
+.bd__fig--main .bd__figValue.bd__neg {
   color: var(--color-danger);
 }
 
-.bd__mono {
-  font-family: var(--font-mono, monospace);
-  font-size: var(--fs-xs);
+.bd__cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 40px;
 }
-
-.bd__row--current > td {
-  background: var(--color-primary-subtle);
+.bd__cols--single {
+  grid-template-columns: minmax(0, 1fr);
 }
-
-.bd__ks {
-  display: inline-flex;
-  align-items: baseline;
-  gap: var(--space-2);
-  border: 0;
-  background: transparent;
-  cursor: pointer;
-  font: inherit;
-  color: inherit;
-  text-align: start;
-}
-
-.bd__ks:hover .bd__name {
-  text-decoration: underline;
-}
-
-/* Section head with a cross-link into the bookings tab and the applications tab
-   (#expenses-ux2). */
-.bd__sectionHead {
+.bd__sec {
   display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+.bd__secHead {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  margin-bottom: var(--space-2);
+  gap: var(--space-2) var(--space-4);
+  min-width: 0;
 }
-.bd__sectionHead--end {
-  justify-content: flex-end;
+.bd__secHead--apps {
+  padding-inline-start: var(--space-1);
 }
-.bd__sectionHead .bd__panel-h {
+.bd__h {
+  flex: 1 1 auto;
   margin: 0;
-}
-.bd__sectionLink {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  font-size: var(--fs-sm);
-  color: var(--color-text-muted);
-  text-decoration: none;
-  white-space: nowrap;
-}
-.bd__sectionLink:hover {
-  color: var(--color-primary);
-  text-decoration: underline;
-}
-
-.bd__path {
-  font-family: var(--font-mono, monospace);
+  font-size: var(--fs-h2);
+  line-height: 1.5rem;
   font-weight: var(--fw-semibold);
 }
-
-.bd__name {
+.bd__legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78125rem;
   color: var(--color-text-muted);
-  display: inline-block;
-  max-width: 14rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  vertical-align: bottom;
+}
+.bd__swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+.bd__swatch--spent {
+  background: var(--color-text-muted);
+}
+.bd__swatch--bound {
+  background: color-mix(in srgb, var(--color-text-muted) 40%, var(--color-surface-4));
 }
 
-/* Usage column: a fixed width lines the bars up across the rows. */
-.bd__table th:nth-child(2),
-.bd__table td:nth-child(2) {
-  width: 12rem;
+/* "Auslastung je Budget": a name and three numbers per row, the bar below. */
+.bd__usage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
-
-.bd__bar-cell {
+.bd__usageCols,
+.bd__uline {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-}
-
-.bd__track {
-  flex: 1 1 auto;
   min-width: 0;
-  height: 0.7rem;
-  display: flex;
-  background: var(--color-surface-sunken);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-pill);
-  overflow: hidden;
 }
-
-.bd__seg {
-  height: 100%;
-  background: var(--color-accent);
-}
-
-.bd__seg--bound {
-  background: var(--color-border-strong, #8a8f98);
-}
-
-.bd__seg--expended {
-  background: var(--color-accent);
-}
-
-.bd__seg--over {
-  background: var(--color-danger);
-}
-
-.bd__pct {
-  flex: none;
-  width: 2.75rem;
-  text-align: end;
-  font-variant-numeric: tabular-nums;
-  font-size: var(--fs-xs);
+.bd__usageCols {
+  margin-bottom: calc(-1 * var(--space-2));
+  font-size: 0.78125rem;
   color: var(--color-text-muted);
+}
+.bd__grow,
+.bd__uname {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.bd__c1,
+.bd__c2,
+.bd__c3 {
+  flex: none;
+  text-align: end;
   white-space: nowrap;
 }
-
-.bd__app-row {
+.bd__c1 {
+  width: 5.25rem;
+}
+.bd__c2 {
+  width: 4.875rem;
+}
+.bd__c3 {
+  width: 6rem;
+}
+.bd__uline .bd__c1,
+.bd__uline .bd__c2,
+.bd__uline .bd__c3 {
+  font-size: 0.78125rem;
+}
+.bd__urow {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.bd__uname {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  text-align: start;
   cursor: pointer;
 }
-
-.bd__app-row:hover td,
-.bd__app-row:focus-visible td {
-  background: var(--color-surface-sunken);
-}
-
-.bd__open {
-  color: var(--color-primary);
-  font-weight: var(--fw-medium);
-  text-decoration: none;
-}
-
-.bd__open:hover {
+.bd__uname:hover:not(:disabled) {
   text-decoration: underline;
 }
-
-/* Mobile (<=768px = 48rem): one column with the collapsible picker, then the
-   content, then the charts. Desktop keeps its layout. The toggle exists there
-   too, but stays hidden. */
-.bd__nav-toggle {
-  display: none;
+.bd__uname:disabled {
+  cursor: default;
 }
 
-@media (max-width: 48rem) {
-  .bd__layout {
-    grid-template-columns: 1fr;
+.bd__dot {
+  margin-inline: 6px;
+}
+.bd__appKs {
+  margin-inline-start: 6px;
+}
+.bd__amount {
+  font-size: 0.78125rem;
+}
+
+.bd__ovTabs {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+  margin-block: var(--space-2) var(--space-3);
+}
+
+/* ------------------------------------------------------------------ narrower */
+@include bp.below-wide {
+  .bd__figs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-3);
+    padding: 0;
+    background: none;
   }
-  .bd__nav {
-    position: static;
-    justify-self: stretch;
-    max-width: none;
-    max-height: none;
-    overflow: visible;
+  .bd__fig,
+  .bd__fig + .bd__fig {
+    padding: 14px 18px;
+    border: 0;
+    border-radius: var(--radius-lg);
+    background: var(--color-surface-1);
   }
-  .bd__nav-toggle {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-2);
-    width: 100%;
-    min-height: 2.5rem;
-    padding: var(--space-2) var(--space-3);
-    font: inherit;
-    font-weight: var(--fw-medium);
-    color: var(--color-text);
-    background: var(--color-surface);
-    border: var(--border-width) solid var(--color-border);
-    border-radius: var(--radius-md);
-    cursor: pointer;
+  .bd__sheet {
+    padding: 0;
+    background: none;
   }
-  .bd__nav-toggle-label {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .bd__nav-body {
-    display: none;
-    padding-top: var(--space-3);
-  }
-  .bd__nav-body--open {
-    display: block;
-  }
-  /* Charts below the content: side by side while there is room, else they wrap.
-     Nothing overflows the 375px viewport. */
-  .bd__charts {
-    position: static;
-    justify-self: stretch;
-    max-width: none;
-    max-height: none;
-    overflow: visible;
-    flex-direction: row;
-    flex-wrap: wrap;
+  .bd__cols {
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--space-5);
   }
-  .bd__charts app-budget-pie {
-    flex: 0 1 auto;
-    min-width: 0;
+  .bd__sec {
+    padding: var(--space-5);
+    border-radius: var(--radius-2xl);
+    background: var(--color-surface-1);
   }
-  .bd__ks {
-    flex-wrap: wrap;
+  .bd__head {
+    align-items: center;
   }
   .bd__name {
-    max-width: 100%;
-    white-space: normal;
+    font-size: var(--fs-h2);
+    line-height: 1.5rem;
   }
-  /* Usage bar: in the card layout the flex track collapses to content width
-     (~0). A fixed, right-aligned width gives it room. */
-  .bd__bar-cell {
-    flex: 1 1 auto;
-    max-width: 14rem;
-    margin-left: auto;
+}
+
+@include bp.phone {
+  .bd__figs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .bd__sec {
+    padding: var(--space-4);
+  }
+  .bd__figValue {
+    font-size: 1rem;
+  }
+  .bd__c1 {
+    display: none;
   }
 }

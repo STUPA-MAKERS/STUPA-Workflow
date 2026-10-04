@@ -3,14 +3,17 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
-import { render, screen } from '@testing-library/angular';
+import { render, screen, within } from '@testing-library/angular';
+import { axe } from 'jest-axe';
 import { AuthService } from '@core/auth/auth.service';
-import { BudgetDashboardComponent } from './budget-dashboard.component';
+import { BudgetDashboardComponent, utilisation } from './budget-dashboard.component';
 import type {
   BudgetAllocationView,
+  BudgetApplication,
   BudgetTreeNode,
   FiscalYear,
 } from './budget-tree.api';
+import { PALETTE, shadeColor } from './budget-color.util';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Inst = any;
@@ -63,502 +66,817 @@ const FY: FiscalYear = {
 
 const FY2: FiscalYear = { ...FY, id: 'fy-2', year: 2027, display: '2027' };
 
+/**
+ * VS (1000) → 800 (400, blue) → 810 (100, inherits blue)
+ *          → 900 (300, no colour)
+ * The root keeps 300 for itself.
+ */
 const TREE: BudgetTreeNode[] = [
   node({
     id: 'b-vs',
-    gremiumId: 'g-1',
     key: 'VS',
     pathKey: 'VS',
     name: 'VS-Mittel',
-    color: '#123456',
     byFiscalYear: [
-      alloc({ fiscalYearId: 'fy-1', allocated: '1000', committed: '400', available: '600', requested: '50', bound: '300', expended: '100' }),
+      alloc({ fiscalYearId: 'fy-1', allocated: '1000', bound: '300', expended: '100', committed: '400', income: '50', requested: '70', available: '650' }),
     ],
     children: [
       node({
         id: 'b-800',
         parentId: 'b-vs',
-        gremiumId: 'g-1',
         key: '800',
         pathKey: 'VS-800',
         name: 'Dezentrale Einrichtungen',
+        color: '#0075bf',
         byFiscalYear: [
-          alloc({ fiscalYearId: 'fy-1', allocated: '400', committed: '100', available: '300', requested: '20', bound: '60', expended: '40' }),
+          alloc({ fiscalYearId: 'fy-1', allocated: '400', bound: '60', expended: '40', committed: '100', requested: '20', available: '300' }),
         ],
-        children: [],
+        children: [
+          node({
+            id: 'b-810',
+            parentId: 'b-800',
+            key: '810',
+            pathKey: 'VS-800-810',
+            name: 'Werkstatt',
+            byFiscalYear: [
+              alloc({ fiscalYearId: 'fy-1', allocated: '100', bound: '10', expended: '30', committed: '40', available: '60' }),
+            ],
+          }),
+        ],
+      }),
+      node({
+        id: 'b-900',
+        parentId: 'b-vs',
+        key: '900',
+        pathKey: 'VS-900',
+        name: 'Rücklage',
+        byFiscalYear: [
+          alloc({ fiscalYearId: 'fy-1', allocated: '300', bound: '250', expended: '100', committed: '350', available: '-50' }),
+        ],
       }),
     ],
   }),
 ];
 
+function app(over: Partial<BudgetApplication> & { applicationId: string }): BudgetApplication {
+  return {
+    applicationId: over.applicationId,
+    title: 'title' in over ? (over.title ?? null) : `Antrag ${over.applicationId}`,
+    budgetId: 'budgetId' in over ? (over.budgetId ?? null) : 'b-800',
+    pathKey: 'pathKey' in over ? (over.pathKey ?? null) : 'VS-800',
+    fiscalYearId: over.fiscalYearId ?? 'fy-1',
+    amount: over.amount === undefined ? '120.00' : over.amount,
+    currency: over.currency ?? 'EUR',
+    stateId: over.stateId ?? null,
+    stateLabel: 'stateLabel' in over ? over.stateLabel : { de: 'In Prüfung', en: 'In review' },
+    stateColor: over.stateColor ?? '#d9a400',
+    createdAt: over.createdAt ?? '2026-05-01T10:00:00Z',
+  };
+}
 
-function authStub(canValue = true): AuthService {
-  return { can: (_p: string) => canValue } as unknown as AuthService;
+const ALL_PERMS = ['budget.view', 'budget.structure', 'budget.book', 'budget.export'];
+
+function authStub(perms: string[] = ALL_PERMS): AuthService {
+  const can = (p: string): boolean => perms.includes(p);
+  return { can, canAny: (...ps: string[]) => ps.some(can) } as unknown as AuthService;
+}
+
+/** Let `matchMedia` report a wide viewport (or not). jsdom has none of its own. */
+function setViewport(wide: boolean): void {
+  window.matchMedia = ((query: string) => ({
+    matches: wide && query.includes('min-width: 1200px'),
+    media: query,
+    onchange: null,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+    addListener: () => undefined,
+    removeListener: () => undefined,
+    dispatchEvent: () => false,
+  })) as unknown as typeof window.matchMedia;
 }
 
 interface SetupOpts {
   tree?: BudgetTreeNode[];
   fys?: FiscalYear[];
-  can?: boolean;
+  perms?: string[];
   queryParams?: Record<string, string>;
+  apps?: BudgetApplication[];
+  wide?: boolean;
+}
+
+function providers(opts: SetupOpts, params = new BehaviorSubject(convertToParamMap({}))) {
+  return [
+    provideHttpClient(),
+    provideHttpClientTesting(),
+    provideRouter([]),
+    { provide: AuthService, useValue: authStub(opts.perms) },
+    {
+      provide: ActivatedRoute,
+      useValue: {
+        snapshot: { queryParamMap: params.value },
+        // The page follows the URL after the first restore, so the stub needs the stream
+        // and not only the snapshot.
+        queryParamMap: params,
+      },
+    },
+  ];
+}
+
+/** Answer every outstanding applications request of the sheet. */
+function flushApps(http: HttpTestingController, apps: BudgetApplication[] = []): void {
+  for (const req of http.match((r) => /\/budgets\/[^/]+\/applications$/.test(r.url))) {
+    req.flush(apps);
+  }
 }
 
 async function setup(opts: SetupOpts = {}) {
+  setViewport(opts.wide ?? true);
   const tree = opts.tree ?? TREE;
   const fys = opts.fys ?? [FY];
   const params = new BehaviorSubject(convertToParamMap(opts.queryParams ?? {}));
-  const view = await render(BudgetDashboardComponent, {
-    providers: [
-      provideHttpClient(),
-      provideHttpClientTesting(),
-      provideRouter([]),
-      { provide: AuthService, useValue: authStub(opts.can ?? true) },
-      {
-        provide: ActivatedRoute,
-        useValue: {
-          snapshot: { queryParamMap: params.value },
-          // The page follows the URL after the first restore, so the stub needs the
-          // stream and not only the snapshot.
-          queryParamMap: params,
-        },
-      },
-    ],
-  });
+  const view = await render(BudgetDashboardComponent, { providers: providers(opts, params) });
   const http = TestBed.inject(HttpTestingController);
   http.expectOne((r) => r.url.endsWith('/budgets')).flush(tree);
   const tops = tree.filter((n) => !n.hiddenInBudget);
   for (const top of tops) {
     http.expectOne((r) => r.url.endsWith(`/budgets/${top.id}/fiscal-years`)).flush(fys);
   }
-  // The page does not list applications: that job belongs to /applications, which the
-  // cross-link opens. No request goes out for them.
+  flushApps(http, opts.apps);
   view.fixture.detectChanges();
   return { ...view, http, params, c: view.fixture.componentInstance as unknown as Inst };
 }
 
+/** Render without answering anything, for the loading and error paths. */
+async function bare(opts: SetupOpts = {}) {
+  setViewport(opts.wide ?? true);
+  const view = await render(BudgetDashboardComponent, { providers: providers(opts) });
+  const http = TestBed.inject(HttpTestingController);
+  return { ...view, http, c: view.fixture.componentInstance as unknown as Inst };
+}
+
 describe('BudgetDashboardComponent', () => {
+  const realMatchMedia = window.matchMedia;
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
-  afterEach(() => TestBed.inject(HttpTestingController).verify());
-
-  it('shows the cost-centre subtree with bars', async () => {
-    await setup();
-    expect(screen.getAllByText('VS').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('VS-Mittel').length).toBeGreaterThan(0);
-    // Once, in the usage tree. A second occurrence would mean something below repeats
-    // the cost-centre path per row.
-    expect(screen.getAllByText('VS-800').length).toBe(1);
+  afterEach(() => {
+    const http = TestBed.inject(HttpTestingController);
+    flushApps(http);
+    http.verify();
+    window.matchMedia = realMatchMedia;
   });
 
-  it('drills into a cost centre on click', async () => {
-    const { c } = await setup();
-    c.drillInto(TREE[0].children[0]);
-    expect(c.selectedKsId()).toBe('b-800');
-    expect(c.breadcrumbs().map((n: { key: string }) => n.key)).toEqual(['VS', '800']);
+  // ------------------------------------------------------------------ tree
+
+  describe('tree', () => {
+    it('shows the root open with its children, each with its allocation', async () => {
+      const view = await setup();
+      const tree = within(view.container.querySelector('.bd__tree') as HTMLElement);
+      expect(tree.getByText('VS-Mittel')).toBeTruthy();
+      expect(tree.getByText('Dezentrale Einrichtungen')).toBeTruthy();
+      expect(tree.getByText('Rücklage')).toBeTruthy();
+      // 800 is closed, so its child is not in the tree yet.
+      expect(tree.queryByText('Werkstatt')).toBeNull();
+      expect(tree.getAllByText(/1\.000\s€/).length).toBe(1);
+      const current = view.container.querySelector('.tn--on .tn__name');
+      expect(current?.textContent).toContain('VS-Mittel');
+    });
+
+    it('gives a node its own or inherited colour and draws the swatch only then', async () => {
+      const { c } = await setup({ queryParams: { ks: 'b-810' } });
+      const rows = c.treeRows() as { node: { id: string }; color: string | null }[];
+      const color = (id: string) => rows.find((r) => r.node.id === id)?.color;
+      expect(color('b-vs')).toBeNull();
+      expect(color('b-800')).toBe('#0075bf');
+      // O19: the colour of the faculty above.
+      expect(color('b-810')).toBe('#0075bf');
+      expect(color('b-900')).toBeNull();
+    });
+
+    it('opens the path to a cost centre the URL names', async () => {
+      const view = await setup({ queryParams: { ks: 'b-810' } });
+      const tree = within(view.container.querySelector('.bd__tree') as HTMLElement);
+      expect(tree.getByText('Werkstatt')).toBeTruthy();
+      expect(view.container.querySelector('.tn--on .tn__name')?.textContent).toContain('Werkstatt');
+    });
+
+    it('opens and closes a node with its chevron', async () => {
+      const view = await setup();
+      const btn = screen.getByRole('button', { name: 'Dezentrale Einrichtungen aufklappen' });
+      expect(btn.getAttribute('aria-expanded')).toBe('false');
+      btn.click();
+      view.fixture.detectChanges();
+      expect(screen.getByText('Werkstatt')).toBeTruthy();
+      screen.getByRole('button', { name: 'Dezentrale Einrichtungen zuklappen' }).click();
+      view.fixture.detectChanges();
+      expect(screen.queryByText('Werkstatt')).toBeNull();
+    });
+
+    it('filters the tree by name, key or path and keeps the way to every hit', async () => {
+      const view = await setup();
+      const c = view.fixture.componentInstance as unknown as Inst;
+      c.query.set('werk');
+      view.fixture.detectChanges();
+      const names = (c.treeRows() as { node: { name: string } }[]).map((r) => r.node.name);
+      expect(names).toEqual(['VS-Mittel', 'Dezentrale Einrichtungen', 'Werkstatt']);
+      c.query.set('VS-900');
+      expect((c.treeRows() as { node: { id: string } }[]).map((r) => r.node.id)).toEqual(['b-vs', 'b-900']);
+      c.query.set('gibt es nicht');
+      view.fixture.detectChanges();
+      expect(screen.getByText('Keine Kostenstelle gefunden.')).toBeTruthy();
+    });
+
+    it('draws the utilisation bar of a node in red when it is overdrawn', async () => {
+      const { c } = await setup();
+      const rows = c.treeRows() as { node: { id: string }; segments: { tone: string }[]; percent: number | null }[];
+      const r900 = rows.find((r) => r.node.id === 'b-900')!;
+      expect(r900.segments[0].tone).toBe('error');
+      // 350 committed of 300 → 117 %.
+      expect(r900.percent).toBe(117);
+    });
+
+    it('selects a cost centre from the tree, opens it and loads its applications', async () => {
+      const { c, http, fixture } = await setup();
+      const nav = jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+      within(fixture.nativeElement.querySelector('.bd__tree'))
+        .getByRole('button', { name: /Rücklage/ })
+        .click();
+      fixture.detectChanges();
+      expect(c.selectedKsId()).toBe('b-900');
+      expect(nav).toHaveBeenCalled();
+      const req = http.expectOne((r) => r.url.endsWith('/budgets/b-900/applications'));
+      expect(req.request.params.get('fiscalYear')).toBe('fy-1');
+      req.flush([]);
+    });
+
+    it('does not reload the applications when the same cost centre is picked again', async () => {
+      const { c, http } = await setup();
+      jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+      c.selectKs('b-vs');
+      http.expectNone((r) => r.url.endsWith('/applications'));
+    });
   });
 
+  // ------------------------------------------------------------------ figures
 
-  it('toggleNav flips the mobile nav flag', async () => {
-    const { c } = await setup();
-    expect(c.navOpen()).toBe(false);
-    c.toggleNav();
-    expect(c.navOpen()).toBe(true);
-    c.toggleNav();
-    expect(c.navOpen()).toBe(false);
+  describe('figures', () => {
+    it('shows all six figures, Beantragt and Einnahmen included (N28)', async () => {
+      const view = await setup();
+      const figs = within(view.container.querySelector('.bd__figs') as HTMLElement);
+      for (const label of ['Zuteilung', 'Beantragt', 'Gebunden', 'Ausgegeben', 'Einnahmen', 'Verfügbar']) {
+        expect(figs.getByText(label)).toBeTruthy();
+      }
+      expect(figs.getByText(/^1\.000,00\s€$/)).toBeTruthy();
+      expect(figs.getByText(/^70,00\s€$/)).toBeTruthy();
+      expect(figs.getByText(/^300,00\s€$/)).toBeTruthy();
+      expect(figs.getByText(/^100,00\s€$/)).toBeTruthy();
+      expect(figs.getByText(/^50,00\s€$/)).toBeTruthy();
+      expect(figs.getByText(/^650,00\s€$/)).toBeTruthy();
+    });
+
+    it('shows a negative available amount in the error colour', async () => {
+      const view = await setup({ queryParams: { ks: 'b-900' } });
+      const neg = view.container.querySelector('.bd__fig--main .bd__figValue');
+      expect(neg?.classList).toContain('bd__neg');
+    });
+
+    it('counts a missing allocation as zero', async () => {
+      const { c } = await setup();
+      expect(c.figuresOf(TREE[0], 'other-year').allocated).toBe(0);
+    });
+
   });
 
-  it('navToggleLabel shows budget + fiscal-year, then bare budget, then the generic title', async () => {
-    const { c } = await setup();
-    // Selected budget b-vs + fy-1 → "name · display".
-    expect(c.navToggleLabel()).toBe('VS-Mittel · 2026');
-    // No matching fiscal year → bare budget name.
-    c.selectedFyId.set('nope');
-    expect(c.navToggleLabel()).toBe('VS-Mittel');
-    // No selected budget → generic translated title.
-    c.selectedBudgetId.set('');
-    expect(typeof c.navToggleLabel()).toBe('string');
-    expect(c.navToggleLabel().length).toBeGreaterThan(0);
+  // ------------------------------------------------------------------ path + actions
+
+  describe('header', () => {
+    it('shows the path with the key and goes up on a click', async () => {
+      const view = await setup({ queryParams: { ks: 'b-810' } });
+      const crumbs = within(view.container.querySelector('.bd__crumbs') as HTMLElement);
+      expect(crumbs.getByText('VS-800-810')).toBeTruthy();
+      expect(view.container.querySelector('#bd-title')?.textContent).toContain('Werkstatt');
+      jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+      crumbs.getByRole('button', { name: 'Dezentrale Einrichtungen' }).click();
+      const c = view.fixture.componentInstance as unknown as Inst;
+      expect(c.selectedKsId()).toBe('b-800');
+    });
+
+    it('stops the path at a node whose parent is not in the tree', async () => {
+      const tree = [
+        node({
+          id: 'b-vs',
+          key: 'VS',
+          byFiscalYear: [alloc({ fiscalYearId: 'fy-1', allocated: '100' })],
+          children: [node({ id: 'orphan', parentId: 'does-not-exist', key: 'ORPH' })],
+        }),
+      ];
+      const { c } = await setup({ tree });
+      jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+      c.selectKs('orphan');
+      expect(c.breadcrumbs().map((n: { id: string }) => n.id)).toEqual(['orphan']);
+    });
+
+    it('opens the bookings and the applications of the cost centre', async () => {
+      const view = await setup({ apps: [app({ applicationId: 'a-1' })] });
+      const nav = jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+      screen.getByRole('button', { name: 'Buchungen ansehen' }).click();
+      expect(nav).toHaveBeenCalledWith(['/expenses'], { queryParams: { budget: 'b-vs' } });
+      view.fixture.detectChanges();
+      screen.getByRole('button', { name: 'Alle ansehen' }).click();
+      expect(nav).toHaveBeenCalledWith(['/applications'], { queryParams: { budget: 'b-vs' } });
+    });
+
+    it('exports the selection and resets the flag after the download', async () => {
+      (URL as unknown as { createObjectURL?: unknown }).createObjectURL = () => 'blob:mock';
+      (URL as unknown as { revokeObjectURL?: unknown }).revokeObjectURL = () => undefined;
+      jest.spyOn(URL, 'createObjectURL').mockReturnValue('blob:mock');
+      jest.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+      const { c, http } = await setup();
+      screen.getByRole('button', { name: /Exportieren/ }).click();
+      expect(c.exporting()).toBe(true);
+      // A second click while it runs does nothing.
+      c.onExport();
+      const req = http.expectOne((r) => r.url.includes('/budget/export.xlsx'));
+      expect(req.request.params.get('node')).toBe('b-vs');
+      expect(req.request.params.get('fiscalYear')).toBe('fy-1');
+      req.flush(new Blob(['x']));
+      expect(c.exporting()).toBe(false);
+    });
+
+    it('sends no params for an empty selection and resets the flag on an error', async () => {
+      const { c, http } = await setup();
+      c.selectedKsId.set('');
+      c.selectedFyId.set('');
+      c.onExport();
+      const req = http.expectOne((r) => r.url.includes('/budget/export.xlsx'));
+      expect(req.request.params.keys()).toEqual([]);
+      req.error(new ProgressEvent('err'));
+      expect(c.exporting()).toBe(false);
+    });
+
+    it('gives a gremium-scoped reader neither the export nor the bookings', async () => {
+      // A reader with a scope (viewGremiumId) and no global budget permission: the server
+      // sends the sub cost centres of the scope as roots.
+      const scoped = [
+        node({
+          id: 'b-800',
+          parentId: 'b-vs',
+          key: '800',
+          pathKey: 'VS-800',
+          name: 'Dezentrale Einrichtungen',
+          viewGremiumId: 'g-1',
+          byFiscalYear: [alloc({ fiscalYearId: 'fy-1', allocated: '400', committed: '100', available: '300' })],
+        }),
+      ];
+      const view = await setup({ tree: scoped, perms: [] });
+      const c = view.fixture.componentInstance as unknown as Inst;
+      expect(c.tops().map((n: { id: string }) => n.id)).toEqual(['b-800']);
+      expect(c.selectedKsId()).toBe('b-800');
+      expect(screen.queryByRole('button', { name: /Exportieren/ })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Buchungen ansehen' })).toBeNull();
+      // Its figures are still there.
+      expect(within(view.container.querySelector('.bd__figs') as HTMLElement).getByText(/^400,00\s€$/)).toBeTruthy();
+    });
   });
 
-  it('navToggleLabel uses the bare name when the budget has no fiscal-years entry', async () => {
-    const { c } = await setup();
-    // Select a node that exists in the tree but has no entry in fiscalYearsByBudget.
-    c.selectedBudgetId.set('b-800'); // child, no FY map entry → `?? []` branch
-    c.selectedFyId.set('fy-1');
-    expect(c.navToggleLabel()).toBe('Dezentrale Einrichtungen');
+  // ------------------------------------------------------------------ distribution
+
+  describe('distribution', () => {
+    it('splits the figure over the sub cost centres and adds what the node keeps', async () => {
+      const { c } = await setup();
+      const slices = c.distribution() as { label: string; value: number; color: string; id?: string }[];
+      expect(slices.map((s) => [s.id ?? null, s.value])).toEqual([
+        ['b-800', 400],
+        ['b-900', 300],
+        [null, 300],
+      ]);
+      expect(slices[0].color).toBe('#0075bf');
+      // No colour of its own or above: the palette colour of its position.
+      expect(slices[1].color).toBe(PALETTE[1]);
+      expect(slices[2].label).toBe('VS-Mittel (nicht verteilt)');
+      expect(slices[2].color).toBe('var(--color-text-subtle)');
+    });
+
+    it('switches the figure and drops empty slices', async () => {
+      const view = await setup();
+      const c = view.fixture.componentInstance as unknown as Inst;
+      const select = view.container.querySelector('.bd__secHead select') as HTMLSelectElement;
+      select.value = 'requested';
+      select.dispatchEvent(new Event('change'));
+      expect(c.metric()).toBe('requested');
+      // 800 asked for 20, 900 for nothing, the root holds 50 more.
+      expect(c.distribution().map((s: { value: number }) => s.value)).toEqual([20, 50]);
+    });
+
+    it('shades children that share an inherited colour', async () => {
+      const tree = [
+        node({
+          id: 'b-vs',
+          color: '#0075bf',
+          byFiscalYear: [alloc({ fiscalYearId: 'fy-1', allocated: '30' })],
+          children: [
+            node({ id: 'a', parentId: 'b-vs', byFiscalYear: [alloc({ fiscalYearId: 'fy-1', allocated: '10' })] }),
+            node({ id: 'b', parentId: 'b-vs', byFiscalYear: [alloc({ fiscalYearId: 'fy-1', allocated: '20' })] }),
+          ],
+        }),
+      ];
+      const { c } = await setup({ tree });
+      expect(c.distribution().map((s: { color: string }) => s.color)).toEqual([
+        '#0075bf',
+        shadeColor('#0075bf', 1),
+      ]);
+    });
+
+    it('leaves the chart out for a cost centre without sub cost centres', async () => {
+      const view = await setup({ queryParams: { ks: 'b-900' } });
+      expect(screen.queryByText('Verteilung')).toBeNull();
+      expect(view.container.querySelector('.bd__cols--single')).toBeTruthy();
+      const c = view.fixture.componentInstance as unknown as Inst;
+      expect(c.distribution()).toEqual([]);
+    });
+
+    it('drills into a sub cost centre from the chart', async () => {
+      const { c } = await setup();
+      jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+      c.selectKs('b-800');
+      expect(c.selectedKsId()).toBe('b-800');
+    });
   });
 
-  it('usageRows computes percent and null-percent when the denominator is zero', async () => {
-    const { c } = await setup();
-    const rows = c.usageRows();
-    // Root: committed 400 / (available 600 + committed 400) = 40%.
-    expect(rows[0].percent).toBe(40);
-    expect(rows[0].bound).toBe(300);
-    expect(rows[0].expended).toBe(100);
-    expect(rows[0].income).toBe(0);
-    // The child row is there too, because the subtree is flattened.
-    expect(rows.length).toBe(2);
+  // ------------------------------------------------------------------ utilisation
+
+  describe('utilisation per budget', () => {
+    it('lists the sub cost centres with requested, percent and available', async () => {
+      const view = await setup();
+      const c = view.fixture.componentInstance as unknown as Inst;
+      const rows = c.usageRows();
+      expect(rows.map((r: { node: { id: string } }) => r.node.id)).toEqual(['b-800', 'b-900']);
+      // 800: committed 100 of 400 → 25 %.
+      expect(rows[0].percent).toBe(25);
+      expect(rows[0].segments).toEqual([
+        { value: 40, tone: 'filled' },
+        { value: 60, tone: 'second' },
+      ]);
+      expect(rows[0].total).toBe(400);
+      expect(rows[0].color).toBe('#0075bf');
+      // 900 is overdrawn.
+      expect(rows[1].segments.map((s: { tone: string }) => s.tone)).toEqual(['error', 'error']);
+      const list = within(view.container.querySelector('.bd__usage') as HTMLElement);
+      expect(list.getByText(/^20\s€$/)).toBeTruthy();
+      expect(list.getByText('25 %')).toBeTruthy();
+      expect(list.getByText(/^-50\s€$/).classList).toContain('bd__neg');
+      // No requested amount reads as a dash.
+      expect(list.getAllByText('–').length).toBeGreaterThan(0);
+    });
+
+    it('shows the cost centre itself when it has no sub cost centres', async () => {
+      const { c } = await setup({ queryParams: { ks: 'b-810' } });
+      const rows = c.usageRows();
+      expect(rows.map((r: { node: { id: string } }) => r.node.id)).toEqual(['b-810']);
+      // The inherited colour of the faculty above.
+      expect(rows[0].color).toBe('#0075bf');
+    });
+
+    it('names the numbers of a bar for a screen reader', async () => {
+      const view = await setup();
+      const bar = view.container.querySelector('.bd__usage app-seg-bar');
+      expect(bar?.getAttribute('aria-label')).toMatch(/^25 % ausgelastet: 40,00\s€ ausgegeben, 60,00\s€ gebunden von 400,00\s€$/);
+    });
+
+    it('drills into a row by its name', async () => {
+      const view = await setup();
+      jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+      within(view.container.querySelector('.bd__usage') as HTMLElement)
+        .getByRole('button', { name: 'Rücklage' })
+        .click();
+      const c = view.fixture.componentInstance as unknown as Inst;
+      expect(c.selectedKsId()).toBe('b-900');
+    });
+
+    it('returns no rows without a selection', async () => {
+      const { c } = await setup();
+      c.selectedKsId.set('');
+      expect(c.usageRows()).toEqual([]);
+      expect(c.figures().allocated).toBe(0);
+    });
   });
 
-  it('usageRows returns [] when nothing is selected', async () => {
-    const { c } = await setup();
-    c.selectedKsId.set('');
-    expect(c.usageRows()).toEqual([]);
-  });
+  // ------------------------------------------------------------------ applications
 
-  it('usageRows yields a null percent when available + committed is 0', async () => {
-    const tree = [
-      node({
-        id: 'b-x',
-        key: 'X',
-        byFiscalYear: [alloc({ fiscalYearId: 'fy-1', allocated: '0', committed: '0', available: '0' })],
-      }),
-    ];
-    const { c } = await setup({ tree });
-    expect(c.usageRows()[0].percent).toBeNull();
-  });
-
-  it('usageColumns are the six expected keys', async () => {
-    const { c } = await setup();
-    expect(c.usageColumns().map((col: { key: string }) => col.key)).toEqual([
-      'node',
-      'bar',
-      'requested',
-      'bound',
-      'expended',
-      'available',
-    ]);
-  });
-
-  it('usageRowId returns the row node id', async () => {
-    const { c } = await setup();
-    const row = c.usageRows()[0];
-    expect(c.usageRowId(row)).toBe(row.node.id);
-  });
-
-
-  it('resolveLabel falls back de → en → first value', async () => {
-    const { c } = await setup();
-    localStorage.setItem('ap.locale', 'fr');
-    // No fr, has de.
-    expect(c['resolveLabel']({ de: 'D', en: 'E' })).toBe('D');
-    // No de, has en.
-    expect(c['resolveLabel']({ en: 'E' })).toBe('E');
-    // Neither de/en → first value.
-    expect(c['resolveLabel']({ it: 'I' })).toBe('I');
-    // Empty map → ''.
-    expect(c['resolveLabel']({})).toBe('');
-  });
-
-  it('pie builders include an own-segment when the parent retains a remainder', async () => {
-    const { c } = await setup();
-    // Root allocated 1000, child allocated 400 → own remainder 600 (> 0.005), so the
-    // own slice appears in the parent color.
-    const slices = c.allocPie();
-    const own = slices.find((s: { label: string }) => s.label === 'VS-Mittel');
-    expect(own).toBeTruthy();
-    expect(own.value).toBe(600);
-    expect(own.color).toBe('#123456');
-    expect(slices.some((s: { label: string }) => s.label === 'Dezentrale Einrichtungen')).toBe(true);
-  });
-
-  it('pie returns [] with no selection and filters out zero slices', async () => {
-    const { c } = await setup();
-    c.selectedKsId.set('');
-    expect(c.allocPie()).toEqual([]);
-  });
-
-  it('pie uses palette color when a child has no own color', async () => {
-    const tree = [
-      node({
-        id: 'top',
-        key: 'T',
-        color: null,
-        byFiscalYear: [alloc({ fiscalYearId: 'fy-1', allocated: '100' })],
-        children: [
-          node({ id: 'ch', key: 'C', color: null, byFiscalYear: [alloc({ fiscalYearId: 'fy-1', allocated: '50' })] }),
+  describe('applications on the cost centre', () => {
+    it('lists status, path key, cost centre and amount, newest first', async () => {
+      const view = await setup({
+        apps: [
+          app({ applicationId: 'a-old', title: 'Alt', createdAt: '2026-01-01T00:00:00Z' }),
+          app({
+            applicationId: 'a-new',
+            title: 'Neu',
+            budgetId: 'b-810',
+            pathKey: 'VS-800-810',
+            amount: '2890.00',
+            stateLabel: { de: 'Bewilligt', en: 'Approved' },
+            stateColor: '#3f9a5c',
+            createdAt: '2026-06-01T00:00:00Z',
+          }),
         ],
-      }),
-    ];
-    const { c } = await setup({ tree });
-    const slices = c.allocPie();
-    const child = slices.find((s: { id?: string }) => s.id === 'ch');
-    expect(child.color).toMatch(/^#/);
-    // The own remainder slice falls back to PALETTE[0] when the parent has no color.
-    const own = slices.find((s: { label: string }) => s.label === 'Node top');
-    expect(own.color).toBe('#5fb37a');
+      });
+      const section = view.container.querySelector('[aria-labelledby="bd-apps"]') as HTMLElement;
+      const titles = [...section.querySelectorAll('.li__title')].map((t) => t.textContent?.trim());
+      expect(titles).toEqual(['Neu', 'Alt']);
+      const first = section.querySelector('app-list-item') as HTMLElement;
+      expect(first.querySelector('app-status-text')?.textContent).toContain('Bewilligt');
+      expect(first.querySelector('app-status-text')?.classList).toContain('st--accent');
+      // The path joins the keys with "-".
+      expect(first.textContent).toContain('VS-800-810');
+      expect(first.textContent).toContain('Werkstatt');
+      expect(first.textContent).toMatch(/2\.890,00\s€/);
+      expect(first.querySelector('a.li__title')?.getAttribute('href')).toBe('/applications/a-new');
+    });
+
+    it('shows at most five and falls back to the short id without a title', async () => {
+      const apps = Array.from({ length: 7 }, (_, i) =>
+        app({ applicationId: `abcdefgh-${i}`, title: i === 6 ? null : `A${i}`, createdAt: `2026-0${i + 1}-01T00:00:00Z` }),
+      );
+      const view = await setup({ apps });
+      const c = view.fixture.componentInstance as unknown as Inst;
+      expect(c.appRows()).toHaveLength(5);
+      expect(c.appRows()[0].title).toBe('abcdefgh…');
+      expect(view.container.querySelectorAll('[aria-labelledby="bd-apps"] app-list-item')).toHaveLength(5);
+    });
+
+    it('says so when the cost centre has no applications and hides "Alle ansehen"', async () => {
+      await setup();
+      expect(screen.getByText('Keine Anträge auf dieser Kostenstelle.')).toBeTruthy();
+      expect(screen.queryByRole('button', { name: 'Alle ansehen' })).toBeNull();
+    });
+
+    it('shows a placeholder while loading and an error when the request fails', async () => {
+      const { c, http, fixture } = await setup();
+      jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+      c.selectKs('b-800');
+      fixture.detectChanges();
+      expect(c.apps()).toBeNull();
+      expect(fixture.nativeElement.querySelector('[aria-labelledby="bd-apps"] app-skeleton')).toBeTruthy();
+      http
+        .expectOne((r) => r.url.endsWith('/budgets/b-800/applications'))
+        .flush('x', { status: 500, statusText: 'err' });
+      fixture.detectChanges();
+      expect(screen.getByText('Die Anträge konnten nicht geladen werden.')).toBeTruthy();
+    });
+
+    it('drops a stale answer when the selection moves on', async () => {
+      const { c, http } = await setup();
+      jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+      c.selectKs('b-800');
+      c.selectKs('b-900');
+      const stale = http.expectOne((r) => r.url.endsWith('/budgets/b-800/applications'));
+      expect(stale.cancelled).toBe(true);
+      http.expectOne((r) => r.url.endsWith('/budgets/b-900/applications')).flush([app({ applicationId: 'x' })]);
+      expect(c.apps()).toHaveLength(1);
+    });
+
+    it('resolves the state label in the active locale, then de, en and the first entry', async () => {
+      const { c } = await setup();
+      localStorage.setItem('ap.locale', 'fr');
+      expect(c['resolveLabel']({ de: 'D', en: 'E' })).toBe('D');
+      expect(c['resolveLabel']({ en: 'E' })).toBe('E');
+      expect(c['resolveLabel']({ it: 'I' })).toBe('I');
+      expect(c['resolveLabel']({})).toBe('');
+    });
   });
 
-  it('committed/available/expended pies all build slices', async () => {
+  // ------------------------------------------------------------------ year + roots
+
+  describe('fiscal year and roots', () => {
+    it('switches the fiscal year from the chip and reloads the applications for it', async () => {
+      const view = await setup({ fys: [FY, FY2] });
+      const c = view.fixture.componentInstance as unknown as Inst;
+      const nav = jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+      const select = view.container.querySelector('.bd__pane select') as HTMLSelectElement;
+      expect([...select.options].map((o) => o.textContent?.trim())).toEqual(['HHJ 2026', 'HHJ 2027']);
+      select.value = 'fy-2';
+      select.dispatchEvent(new Event('change'));
+      expect(c.selectedFyId()).toBe('fy-2');
+      expect(nav).toHaveBeenCalled();
+      const req = view.http.expectOne((r) => r.url.endsWith('/budgets/b-vs/applications'));
+      expect(req.request.params.get('fiscalYear')).toBe('fy-2');
+      req.flush([]);
+      // The same year again changes nothing.
+      c.selectYear('fy-2');
+      view.http.expectNone((r) => r.url.endsWith('/applications'));
+    });
+
+    it('moves to another root with the year of the same start year', async () => {
+      const tree = [
+        TREE[0],
+        node({
+          id: 'b-qs',
+          key: 'QS',
+          name: 'QS-Mittel',
+          byFiscalYear: [
+            alloc({ fiscalYearId: 'qs-26', allocated: '500' }),
+            alloc({ fiscalYearId: 'qs-27', allocated: '700' }),
+          ],
+        }),
+        // Only a 2026 year: a 2027 selection shows nothing there and a pick falls back
+        // to its first year.
+        node({ id: 'b-xs', key: 'XS', name: 'XS-Mittel', byFiscalYear: [alloc({ fiscalYearId: 'xs-26', allocated: '90' })] }),
+      ];
+      setViewport(true);
+      const view = await render(BudgetDashboardComponent, { providers: providers({}) });
+      const http = TestBed.inject(HttpTestingController);
+      http.expectOne((r) => r.url.endsWith('/budgets')).flush(tree);
+      http.expectOne((r) => r.url.endsWith('/budgets/b-vs/fiscal-years')).flush([FY, FY2]);
+      http
+        .expectOne((r) => r.url.endsWith('/budgets/b-qs/fiscal-years'))
+        .flush([
+          { ...FY, id: 'qs-26', budgetId: 'b-qs' },
+          { ...FY2, id: 'qs-27', budgetId: 'b-qs' },
+        ]);
+      http.expectOne((r) => r.url.endsWith('/budgets/b-xs/fiscal-years')).flush([{ ...FY, id: 'xs-26', budgetId: 'b-xs' }]);
+      flushApps(http);
+      const c = view.fixture.componentInstance as unknown as Inst;
+      jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+      c.selectYear('fy-2');
+      flushApps(http);
+      // The other root shows its 2027 figures in the tree.
+      const qsRow = c.treeRows().find((r: { node: { id: string } }) => r.node.id === 'b-qs');
+      expect(qsRow.allocated).toBe(700);
+      const xsRow = c.treeRows().find((r: { node: { id: string } }) => r.node.id === 'b-xs');
+      expect(xsRow.allocated).toBe(0);
+      c.selectKs('b-qs');
+      expect(c.selectedBudgetId()).toBe('b-qs');
+      expect(c.selectedFyId()).toBe('qs-27');
+      flushApps(http);
+      c.selectKs('b-xs');
+      expect(c.selectedFyId()).toBe('xs-26');
+      flushApps(http);
+    });
+  });
+
+  // ------------------------------------------------------------------ narrow layout
+
+  describe('narrow layout', () => {
+    it('puts the tree in a side sheet that the path chip opens', async () => {
+      const view = await setup({ wide: false, queryParams: { ks: 'b-800' } });
+      const c = view.fixture.componentInstance as unknown as Inst;
+      expect(view.container.querySelector('.bd__pane')).toBeNull();
+      const chip = view.container.querySelector('.bd__pathChip') as HTMLButtonElement;
+      expect(chip.textContent).toContain('VS-Mittel › Dezentrale Einrichtungen');
+      chip.click();
+      view.fixture.detectChanges();
+      expect(c.navOpen()).toBe(true);
+      // A pick closes the sheet again.
+      jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+      c.selectKs('b-810');
+      expect(c.navOpen()).toBe(false);
+      flushApps(view.http);
+    });
+
+    it('names the sheet after the path and puts the actions beside the title', async () => {
+      const view = await setup({ wide: false });
+      const article = view.container.querySelector('article.bd__sheet');
+      expect(article?.getAttribute('aria-label')).toBe('VS-Mittel');
+      expect(view.container.querySelector('.bd__topRow .bd__actions')).toBeTruthy();
+      expect(view.container.querySelector('.bd__head')).toBeNull();
+    });
+  });
+
+  // ------------------------------------------------------------------ overview
+
+  describe('overview (sunburst)', () => {
+    it('offers only metrics with data and falls back when the chosen one has none', async () => {
+      const { c } = await setup();
+      expect(c.overviewRoot()?.id).toBe('b-vs');
+      expect(c.visibleOverviewMetrics()).toEqual(['allocated', 'available', 'expended']);
+      c.overviewMetric.set('available');
+      expect(c.activeOverviewMetric()).toBe('available');
+      c.selectedKsId.set('');
+      expect(c.visibleOverviewMetrics()).toEqual([]);
+      expect(c.activeOverviewMetric()).toBe('allocated');
+    });
+
+    it('falls back to the first metric with data', async () => {
+      const tree = [
+        node({ id: 'top', key: 'T', byFiscalYear: [alloc({ fiscalYearId: 'fy-1', allocated: '100' })] }),
+      ];
+      const { c } = await setup({ tree });
+      c.overviewMetric.set('expended');
+      expect(c.activeOverviewMetric()).toBe('allocated');
+      expect(c.metricLabel('expended')).toBe('Ausgegeben');
+    });
+
+    it('opens from the chip and closes on a pick', async () => {
+      const view = await setup();
+      const c = view.fixture.componentInstance as unknown as Inst;
+      screen.getByRole('button', { name: /Übersicht/ }).click();
+      expect(c.overviewOpen()).toBe(true);
+      jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+      c.onOverviewPick('b-800');
+      expect(c.overviewOpen()).toBe(false);
+      expect(c.selectedKsId()).toBe('b-800');
+    });
+  });
+
+  // ------------------------------------------------------------------ edge cases
+
+  it('copes with an unknown cost centre, an unknown year and an empty selection', async () => {
+    const { c, http } = await setup();
+    const nav = jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    c.selectedFyId.set('nope');
+    expect(c.selectedYear()).toBeNull();
+    c.selectedFyId.set('fy-1');
+    // A cost centre that is not in the tree is its own root.
+    c.selectKs('ghost');
+    expect(c.selectedBudgetId()).toBe('ghost');
+    expect(c.breadcrumbs()).toEqual([]);
+    expect(c['childColors']()).toEqual([]);
+    flushApps(http);
+    // Nothing selected: no request, no rows, and the URL loses the params.
+    c['setSelection']('', '', '');
+    http.expectNone((r) => r.url.endsWith('/applications'));
+    expect(c.apps()).toEqual([]);
+    c['syncUrl']();
+    expect(nav).toHaveBeenLastCalledWith([], expect.objectContaining({
+      queryParams: { budget: null, ks: null, fy: null },
+    }));
+  });
+
+  it('shows an application without state, cost centre or amount', async () => {
+    const view = await setup({
+      apps: [app({ applicationId: 'a-1', stateLabel: null, budgetId: null, pathKey: null, amount: null })],
+    });
+    const c = view.fixture.componentInstance as unknown as Inst;
+    expect(c.appRows()[0]).toEqual(expect.objectContaining({ statusLabel: null, costCentre: null }));
+    const row = view.container.querySelector('[aria-labelledby="bd-apps"] app-list-item') as HTMLElement;
+    expect(row.querySelector('app-status-text')).toBeNull();
+    expect(row.textContent).toContain('–');
+    // An empty label map gives no status either.
+    c.apps.set([app({ applicationId: 'a-2', stateLabel: {} })]);
+    expect(c.appRows()[0].statusLabel).toBeNull();
+    c.apps.set(null);
+    expect(c.appRows()).toEqual([]);
+  });
+
+  // ------------------------------------------------------------------ formatting
+
+  it('formats money with and without cents', async () => {
     const { c } = await setup();
-    expect(c.committedPie().length).toBeGreaterThan(0);
-    expect(c.availablePie().length).toBeGreaterThan(0);
-    expect(c.expendedPie().length).toBeGreaterThan(0);
-  });
-
-  it('overviewRoot is the selected cost centre and visibleOverviewMetrics drops empty metrics', async () => {
-    const { c } = await setup();
-    expect(c.overviewRoot()?.id).toBe('b-vs');
-    // The root has data for allocated, available and expended, so all three show.
-    expect(c.visibleOverviewMetrics()).toEqual(['allocated', 'available', 'expended']);
-  });
-
-  it('visibleOverviewMetrics is empty without a root', async () => {
-    const { c } = await setup();
-    c.selectedKsId.set('');
-    expect(c.visibleOverviewMetrics()).toEqual([]);
-  });
-
-  it('activeOverviewMetric keeps the current metric when it is visible', async () => {
-    const { c } = await setup();
-    c.overviewMetric.set('available');
-    expect(c.activeOverviewMetric()).toBe('available');
-  });
-
-  it('activeOverviewMetric falls back to the first visible when the chosen one has no data', async () => {
-    const tree = [
-      node({
-        id: 'top',
-        key: 'T',
-        byFiscalYear: [alloc({ fiscalYearId: 'fy-1', allocated: '100', available: '0', expended: '0' })],
-      }),
-    ];
-    const { c } = await setup({ tree });
-    c.overviewMetric.set('expended'); // expended has no data → only 'allocated' visible
-    expect(c.activeOverviewMetric()).toBe('allocated');
-  });
-
-  it('activeOverviewMetric falls back to allocated when nothing is visible', async () => {
-    const { c } = await setup();
-    c.selectedKsId.set('');
-    expect(c.activeOverviewMetric()).toBe('allocated');
-  });
-
-  it('onOverviewPick closes the overlay and selects + reloads the picked cost centre', async () => {
-    const { c } = await setup();
-    c.overviewOpen.set(true);
-    c.onOverviewPick('b-800');
-    expect(c.overviewOpen()).toBe(false);
-    expect(c.selectedKsId()).toBe('b-800');
-  });
-
-  it('metricLabel resolves a translated label per metric', async () => {
-    const { c } = await setup();
-    expect(typeof c.metricLabel('allocated')).toBe('string');
-    expect(typeof c.metricLabel('expended')).toBe('string');
-  });
-
-  it('money formats numbers and empty/null/string inputs', async () => {
-    const { c } = await setup();
-    expect(c.money(100)).toContain('100');
+    expect(c.money(100)).toMatch(/100,00/);
     expect(c.money('250')).toContain('250');
-    // null and '' coerce to 0.
     expect(c.money(null)).toContain('0');
     expect(c.money('')).toContain('0');
     expect(c.money(5, 'USD')).toMatch(/[$]|USD/);
-  });
-
-  it('boundPct and expendedPct clamp to 0..100 and handle a zero denominator', async () => {
-    const { c } = await setup();
-    // The total is 1000 (available 600 + committed 400). Bound 300 gives 30% and
-    // expended 100 gives 10%.
-    const row = c.usageRows()[0];
-    expect(c.boundPct(row)).toBeCloseTo(30);
-    expect(c.expendedPct(row)).toBeCloseTo(10);
-    // Zero denominator → 0.
-    const zero = { available: 0, committed: 0, bound: 5, expended: 5 };
-    expect(c.boundPct(zero)).toBe(0);
-    expect(c.expendedPct(zero)).toBe(0);
-    // Over-budget bound clamps to 100.
-    const over = { available: -50, committed: 200, bound: 1000, expended: 0 };
-    expect(c.boundPct(over)).toBe(100);
-  });
-
-  it('shortId slices the first 8 chars', async () => {
-    const { c } = await setup();
+    expect(c.moneyShort(1234.56)).toMatch(/^1\.235\s€$/);
+    // A node without a currency still formats in euro.
+    expect(c.money(1, '')).toContain('€');
+    expect(c.moneyShort(1, '')).toContain('€');
     expect(c.shortId('aaaaaaaa-1111')).toBe('aaaaaaaa');
   });
 
+  // ------------------------------------------------------------------ load + states
 
-  it('titleOf trims and falls back to a short id', async () => {
-    const { c } = await setup();
-    expect(c.titleOf({ applicationId: 'xxxxxxxx-1', title: '  Hi  ' })).toBe('Hi');
-    expect(c.titleOf({ applicationId: 'yyyyyyyy-1', title: null })).toBe('yyyyyyyy…');
-  });
-
-  it('selectBudget sets root + first fiscal year, syncs the URL and reloads', async () => {
-    const { c } = await setup();
-    const nav = jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
-    c.selectBudget('b-vs');
-    expect(c.selectedBudgetId()).toBe('b-vs');
-    expect(c.selectedKsId()).toBe('b-vs');
-    expect(c.selectedFyId()).toBe('fy-1');
-    expect(nav).toHaveBeenCalled();
-  });
-
-  it('selectBudget with an unknown budget id clears the fiscal year', async () => {
-    const { c } = await setup();
-    jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
-    c.selectBudget('ghost');
-    expect(c.selectedFyId()).toBe('');
-    // ks set to 'ghost' → reloadApplications fires.
-  });
-
-  it('onYearPicked applies the selection, collapses the nav, syncs and reloads', async () => {
-    const { c } = await setup();
-    jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
-    c.navOpen.set(true);
-    c.onYearPicked({ budgetId: 'b-vs', fiscalYearId: 'fy-2' });
-    expect(c.selectedBudgetId()).toBe('b-vs');
-    expect(c.selectedKsId()).toBe('b-vs');
-    expect(c.selectedFyId()).toBe('fy-2');
-    expect(c.navOpen()).toBe(false);
-  });
-
-
-
-  it('renders the export button and exports on click', async () => {
-    // jsdom has no URL.createObjectURL and no URL.revokeObjectURL. Stub both for
-    // downloadBlob.
-    (URL as unknown as { createObjectURL?: unknown }).createObjectURL = () => 'blob:mock';
-    (URL as unknown as { revokeObjectURL?: unknown }).revokeObjectURL = () => undefined;
-    jest.spyOn(URL, 'createObjectURL').mockReturnValue('blob:mock');
-    jest.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
-    const { c, http } = await setup({ can: true });
-    expect(c.canExport()).toBe(true);
-    c.onExport();
-    expect(c.exporting()).toBe(true);
-    const req = http.expectOne((r) => r.url.includes('/budget/export.xlsx'));
-    req.flush(new Blob(['x']));
-    expect(c.exporting()).toBe(false);
-  });
-
-  it('export omits node/fiscalYear params when the selection is empty', async () => {
-    (URL as unknown as { createObjectURL?: unknown }).createObjectURL = () => 'blob:mock';
-    (URL as unknown as { revokeObjectURL?: unknown }).revokeObjectURL = () => undefined;
-    jest.spyOn(URL, 'createObjectURL').mockReturnValue('blob:mock');
-    jest.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
-    const { c, http } = await setup({ can: true });
-    c.selectedKsId.set('');
-    c.selectedFyId.set('');
-    c.onExport();
-    const req = http.expectOne((r) => r.url.includes('/budget/export.xlsx'));
-    // Both `|| undefined` branches run, so the request carries no params.
-    expect(req.request.params.keys()).toEqual([]);
-    req.flush(new Blob(['x']));
-    expect(c.exporting()).toBe(false);
-  });
-
-  it('breadcrumbs stop at a node whose parent is missing from the tree', async () => {
-    // A child pointing at a parentId that is not present in the visible tree.
-    const tree = [
-      node({
-        id: 'b-vs',
-        key: 'VS',
-        byFiscalYear: [alloc({ fiscalYearId: 'fy-1', allocated: '100' })],
-        children: [
-          node({
-            id: 'orphan',
-            parentId: 'does-not-exist',
-            key: 'ORPH',
-            byFiscalYear: [alloc({ fiscalYearId: 'fy-1', allocated: '50' })],
-          }),
-        ],
-      }),
-    ];
-    const { c } = await setup({ tree });
-    jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
-    c.selectKs('orphan');
-    // parentId resolves to nothing (?? null), so the chain holds only the orphan.
-    expect(c.breadcrumbs().map((n: { id: string }) => n.id)).toEqual(['orphan']);
-  });
-
-  it('onExport is a no-op while already exporting', async () => {
-    const { c } = await setup();
-    c.exporting.set(true);
-    c.onExport(); // guard returns immediately, no HTTP request issued
-    expect(c.exporting()).toBe(true);
-  });
-
-  it('onExport resets the flag on error', async () => {
-    const { c, http } = await setup();
-    c.onExport();
-    http.expectOne((r) => r.url.includes('/budget/export.xlsx')).error(new ProgressEvent('err'));
-    expect(c.exporting()).toBe(false);
-  });
-
-  it('hides the export button without the permission', async () => {
-    const { c } = await setup({ can: false });
-    expect(c.canExport()).toBe(false);
-  });
-
-  it('shows the loading state then the error state when the tree request fails', async () => {
-    const view = await render(BudgetDashboardComponent, {
-      providers: [
-        provideHttpClient(),
-        provideHttpClientTesting(),
-        provideRouter([]),
-        { provide: AuthService, useValue: authStub() },
-      ],
-    });
-    const http = TestBed.inject(HttpTestingController);
-    const c = view.fixture.componentInstance as unknown as Inst;
+  it('shows the loading state, then the error when the tree request fails', async () => {
+    const { c, http, fixture } = await bare();
+    fixture.detectChanges();
     expect(c.loading()).toBe(true);
+    expect(fixture.nativeElement.querySelector('[aria-busy="true"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelectorAll('main')).toHaveLength(0);
     http.expectOne((r) => r.url.endsWith('/budgets')).flush('x', { status: 500, statusText: 'err' });
-    view.fixture.detectChanges();
+    fixture.detectChanges();
     expect(c.error()).toBe(true);
     expect(c.loading()).toBe(false);
     expect(screen.getByRole('alert')).toBeTruthy();
-    http.verify();
-  });
-
-  it('renders the empty state when the tree is empty', async () => {
-    const view = await render(BudgetDashboardComponent, {
-      providers: [
-        provideHttpClient(),
-        provideHttpClientTesting(),
-        provideRouter([]),
-        { provide: AuthService, useValue: authStub() },
-      ],
-    });
-    const http = TestBed.inject(HttpTestingController);
-    const c = view.fixture.componentInstance as unknown as Inst;
-    http.expectOne((r) => r.url.endsWith('/budgets')).flush([]);
-    view.fixture.detectChanges();
-    expect(c.tops()).toEqual([]);
-    expect(view.container.querySelector('.bd__empty')).toBeTruthy();
-    http.verify();
   });
 
   it('never claims the budget is empty while it is still loading', async () => {
-    // "There are no cost centres" and "they have not arrived yet" are different claims.
-    // The page used to render the empty panel on every load, because the template asked
-    // whether the tree was empty and never whether it was still loading.
-    const view = await render(BudgetDashboardComponent, {
-      providers: [
-        provideHttpClient(),
-        provideHttpClientTesting(),
-        provideRouter([]),
-        { provide: AuthService, useValue: authStub() },
-      ],
-    });
-    const http = TestBed.inject(HttpTestingController);
-    const c = view.fixture.componentInstance as unknown as Inst;
-    view.fixture.detectChanges();
-
+    const { c, http, fixture, container } = await bare();
+    fixture.detectChanges();
     expect(c.loading()).toBe(true);
-    expect(view.container.querySelector('.bd__empty')).toBeNull();
-    expect(view.container.querySelector('.skel')).toBeTruthy();
-    expect(view.container.querySelector('[aria-busy="true"]')).toBeTruthy();
-
-    // Only once the answer really is "none" does the empty state appear.
+    expect(container.querySelector('.bd__empty')).toBeNull();
+    expect(container.querySelector('.skel')).toBeTruthy();
     http.expectOne((r) => r.url.endsWith('/budgets')).flush([]);
-    view.fixture.detectChanges();
-    expect(view.container.querySelector('.bd__empty')).toBeTruthy();
-    expect(view.container.querySelector('.skel')).toBeNull();
-    http.verify();
+    fixture.detectChanges();
+    expect(container.querySelector('.bd__empty')).toBeTruthy();
+    expect(container.querySelector('.skel')).toBeNull();
+    expect(screen.getByText('Noch keine Budgetdaten')).toBeTruthy();
   });
 
-  it('prunes hidden cost centres from the visible tree and tops', async () => {
+  it('has no axe violations on the wide layout', async () => {
+    const wideView = await setup({ apps: [app({ applicationId: 'a-1' })] });
+    expect(await axe(wideView.container)).toHaveNoViolations();
+  });
+
+  it('has no axe violations on the narrow layout', async () => {
+    const narrow = await setup({ wide: false, apps: [app({ applicationId: 'a-1' })] });
+    expect(await axe(narrow.container)).toHaveNoViolations();
+  });
+
+  it('nests no second main landmark inside the shell main', async () => {
+    const view = await setup();
+    expect(view.container.querySelectorAll('main')).toHaveLength(0);
+    expect(view.container.querySelector('.bd__main')?.getAttribute('role')).toBeNull();
+  });
+
+  it('prunes hidden cost centres from the tree, the roots and the sheet', async () => {
     const tree = [
       node({
         id: 'b-vs',
@@ -569,251 +887,147 @@ describe('BudgetDashboardComponent', () => {
           node({ id: 'b-show', key: 'S', byFiscalYear: [alloc({ fiscalYearId: 'fy-1', allocated: '50' })] }),
         ],
       }),
-      // A hidden top is excluded entirely from tops.
       node({ id: 'b-secret', key: 'SEC', hiddenInBudget: true, byFiscalYear: [alloc({ fiscalYearId: 'fy-1', allocated: '10' })] }),
     ];
     const { c } = await setup({ tree });
-    // tops only includes visible roots with a fiscal year.
     expect(c.tops().map((n: { id: string }) => n.id)).toEqual(['b-vs']);
-    // nodeById does not include the hidden child.
-    const usageIds = c.usageRows().map((r: { node: { id: string } }) => r.node.id);
-    expect(usageIds).toContain('b-show');
-    expect(usageIds).not.toContain('b-hide');
+    const ids = c.usageRows().map((r: { node: { id: string } }) => r.node.id);
+    expect(ids).toEqual(['b-show']);
+    expect(c.treeRows().map((r: { node: { id: string } }) => r.node.id)).not.toContain('b-hide');
   });
 
-  it('restores the selection from query params (budget/ks/fy)', async () => {
-    const tree = [
-      node({
-        id: 'b-vs',
-        key: 'VS',
-        byFiscalYear: [alloc({ fiscalYearId: 'fy-1', allocated: '100' })],
-        children: [node({ id: 'b-800', parentId: 'b-vs', key: '800', byFiscalYear: [alloc({ fiscalYearId: 'fy-1', allocated: '40' })] })],
-      }),
-    ];
-    const { c } = await setup({
-      tree,
-      fys: [FY, FY2],
-      queryParams: { budget: 'b-vs', ks: 'b-800', fy: 'fy-2' },
+  // ------------------------------------------------------------------ URL
+
+  describe('selection from the URL', () => {
+    it('restores budget, cost centre and year from the query params', async () => {
+      const { c } = await setup({ fys: [FY, FY2], queryParams: { budget: 'b-vs', ks: 'b-800', fy: 'fy-2' } });
+      expect(c.selectedBudgetId()).toBe('b-vs');
+      expect(c.selectedKsId()).toBe('b-800');
+      expect(c.selectedFyId()).toBe('fy-2');
     });
-    expect(c.selectedBudgetId()).toBe('b-vs');
-    expect(c.selectedKsId()).toBe('b-800');
-    expect(c.selectedFyId()).toBe('fy-2');
-  });
 
-  it('follows the URL when the palette sends it here while it is already here', async () => {
-    // Same route, new query string: the router keeps this component alive. Nothing
-    // re-read the URL, so the page went on showing the cost centre the reader came
-    // from and the search hit looked ignored.
-    const { c, params } = await setup();
-    expect(c.selectedKsId()).toBe('b-vs');
-
-    params.next(convertToParamMap({ ks: 'b-800' }));
-
-    expect(c.selectedKsId()).toBe('b-800');
-  });
-
-  it('derives the budget from a cost centre the link names on its own', async () => {
-    // The global search sends `/budget?ks=…` with no budget. Falling back to the first
-    // budget put the right cost centre under the wrong root.
-    const tree = [
-      node({ id: 'b-other', key: 'OTHER', pathKey: 'OTHER', name: 'Andere',
-        byFiscalYear: [alloc({ fiscalYearId: 'fy-1' })], children: [] }),
-      ...TREE,
-    ];
-    const { c } = await setup({ tree, queryParams: { ks: 'b-800' } });
-
-    expect(c.selectedKsId()).toBe('b-800');
-    // b-800 hangs under b-vs, not under the first budget in the tree.
-    expect(c.selectedBudgetId()).toBe('b-vs');
-  });
-
-  it('leaves the selection alone when the URL repeats what is already shown', async () => {
-    // The write-back navigates on every selection change, so the stream re-emits what
-    // the page just wrote. Re-applying it would be work for nothing.
-    const { c, params } = await setup();
-    const before = [c.selectedBudgetId(), c.selectedKsId(), c.selectedFyId()];
-
-    params.next(convertToParamMap({ budget: 'b-vs', ks: 'b-vs', fy: 'fy-1' }));
-
-    expect([c.selectedBudgetId(), c.selectedKsId(), c.selectedFyId()]).toEqual(before);
-  });
-
-  it('stops at the highest cost centre it can see when the parent is out of scope', async () => {
-    // A gremium-scoped tree hands back sub cost centres as roots, so a root can name a
-    // parent that is not in the response. Walking up has to stop there rather than
-    // give up and fall back to the first budget.
-    const tree = [
-      node({
-        id: 'b-sub', parentId: 'b-not-in-scope', key: 'SUB', pathKey: 'SUB', name: 'Teilbereich',
-        byFiscalYear: [alloc({ fiscalYearId: 'fy-1' })],
-        children: [
-          node({ id: 'b-leaf', parentId: 'b-sub', key: 'LEAF', pathKey: 'SUB-LEAF', name: 'Blatt',
-            byFiscalYear: [alloc({ fiscalYearId: 'fy-1' })], children: [] }),
-        ],
-      }),
-    ];
-    const { c } = await setup({ tree, queryParams: { ks: 'b-leaf' } });
-
-    expect(c.selectedKsId()).toBe('b-leaf');
-    expect(c.selectedBudgetId()).toBe('b-sub');
-  });
-
-  it('ignores invalid query params and defaults to the first budget/year', async () => {
-    const { c } = await setup({
-      queryParams: { budget: 'ghost', ks: 'ghost', fy: 'ghost' },
+    it('follows the URL when the palette sends it here while it is already here', async () => {
+      const { c, params, http } = await setup();
+      expect(c.selectedKsId()).toBe('b-vs');
+      params.next(convertToParamMap({ ks: 'b-800' }));
+      expect(c.selectedKsId()).toBe('b-800');
+      flushApps(http);
     });
-    expect(c.selectedBudgetId()).toBe('b-vs');
-    expect(c.selectedKsId()).toBe('b-vs');
-    expect(c.selectedFyId()).toBe('fy-1');
-  });
 
-  it('stays selection-free when the fiscal-years request errors (fault-tolerant)', async () => {
-    const view = await render(BudgetDashboardComponent, {
-      providers: [
-        provideHttpClient(),
-        provideHttpClientTesting(),
-        provideRouter([]),
-        { provide: AuthService, useValue: authStub() },
-      ],
+    it('derives the root from a cost centre the link names on its own', async () => {
+      const tree = [
+        node({ id: 'b-other', key: 'OTHER', name: 'Andere', byFiscalYear: [alloc({ fiscalYearId: 'fy-1' })] }),
+        ...TREE,
+      ];
+      const { c } = await setup({ tree, queryParams: { ks: 'b-800' } });
+      expect(c.selectedKsId()).toBe('b-800');
+      expect(c.selectedBudgetId()).toBe('b-vs');
     });
-    const http = TestBed.inject(HttpTestingController);
-    const c = view.fixture.componentInstance as unknown as Inst;
-    http.expectOne((r) => r.url.endsWith('/budgets')).flush([node({ id: 'b-vs', key: 'VS' })]);
-    // listFiscalYears fails, so the error callback runs restoreOrDefault. No fiscal
-    // year exists at that point.
-    http.expectOne((r) => r.url.endsWith('/budgets/b-vs/fiscal-years')).error(new ProgressEvent('err'));
-    view.fixture.detectChanges();
-    expect(c.selectedBudgetId()).toBe('');
-    expect(c.loading()).toBe(false);
-    http.verify();
-  });
 
-  it('defers restore while the chosen budget fiscal-years have not arrived yet', async () => {
-    // Two tops. Flush the SECOND top first. restoreOrDefault then runs with the
-    // first budget chosen but its `fys` still undefined, which takes the
-    // early-return branch.
-    const tree = [
-      node({ id: 'b-a', key: 'A', byFiscalYear: [alloc({ fiscalYearId: 'fy-1', allocated: '10' })] }),
-      node({ id: 'b-b', key: 'B', byFiscalYear: [alloc({ fiscalYearId: 'fy-1', allocated: '10' })] }),
-    ];
-    const view = await render(BudgetDashboardComponent, {
-      providers: [
-        provideHttpClient(),
-        provideHttpClientTesting(),
-        provideRouter([]),
-        { provide: AuthService, useValue: authStub() },
-      ],
+    it('leaves the selection alone when the URL repeats what is already shown', async () => {
+      const { c, params } = await setup();
+      const before = [c.selectedBudgetId(), c.selectedKsId(), c.selectedFyId()];
+      params.next(convertToParamMap({ budget: 'b-vs', ks: 'b-vs', fy: 'fy-1' }));
+      expect([c.selectedBudgetId(), c.selectedKsId(), c.selectedFyId()]).toEqual(before);
     });
-    const http = TestBed.inject(HttpTestingController);
-    const c = view.fixture.componentInstance as unknown as Inst;
-    http.expectOne((r) => r.url.endsWith('/budgets')).flush(tree);
-    // Respond for b-b first. withFy keeps only the tops that have a fiscal year.
-    // Only b-b has one here, so it becomes the default. Its fys then exist and the
-    // restore runs. The later flush for b-a does nothing.
-    http.expectOne((r) => r.url.endsWith('/budgets/b-b/fiscal-years')).flush([{ ...FY, budgetId: 'b-b' }]);
-    http.expectOne((r) => r.url.endsWith('/budgets/b-a/fiscal-years')).flush([{ ...FY, budgetId: 'b-a' }]);
-    view.fixture.detectChanges();
-    expect(c.selectedBudgetId()).toBe('b-b');
-    http.verify();
-  });
 
-  it('skips restore until a top with a fiscal year is loaded', async () => {
-    // The fiscal years of the top come back empty, so restoreOrDefault returns
-    // without a selection.
-    const view = await render(BudgetDashboardComponent, {
-      providers: [
-        provideHttpClient(),
-        provideHttpClientTesting(),
-        provideRouter([]),
-        { provide: AuthService, useValue: authStub() },
-      ],
+    it('stops at the highest cost centre it can see when the parent is out of scope', async () => {
+      const tree = [
+        node({
+          id: 'b-sub', parentId: 'b-not-in-scope', key: 'SUB', name: 'Teilbereich',
+          byFiscalYear: [alloc({ fiscalYearId: 'fy-1' })],
+          children: [
+            node({ id: 'b-leaf', parentId: 'b-sub', key: 'LEAF', name: 'Blatt', byFiscalYear: [alloc({ fiscalYearId: 'fy-1' })] }),
+          ],
+        }),
+      ];
+      const { c } = await setup({ tree, queryParams: { ks: 'b-leaf' } });
+      expect(c.selectedKsId()).toBe('b-leaf');
+      expect(c.selectedBudgetId()).toBe('b-sub');
     });
-    const http = TestBed.inject(HttpTestingController);
-    const c = view.fixture.componentInstance as unknown as Inst;
-    http.expectOne((r) => r.url.endsWith('/budgets')).flush([node({ id: 'b-vs', key: 'VS' })]);
-    http.expectOne((r) => r.url.endsWith('/budgets/b-vs/fiscal-years')).flush([]);
-    view.fixture.detectChanges();
-    // Without a fiscal year nothing is selected.
-    expect(c.selectedBudgetId()).toBe('');
-    http.verify();
-  });
 
-  it('nests no second main landmark inside the shell main', async () => {
-    // The shell already wraps the routed page in `<main id="main">`. A `<main>` in a
-    // page template makes a landmark inside a landmark: HTML forbids it, and a screen
-    // reader then offers two "main" regions without a way to tell which is the page.
-    const view = await setup();
-    expect(view.container.querySelectorAll('main')).toHaveLength(0);
-    const region = view.container.querySelector('.bd__main');
-    expect(region).toBeTruthy();
-    expect(region!.getAttribute('role')).toBeNull();
-  });
-
-  it('nests no second main landmark while the tree is still loading', async () => {
-    const view = await render(BudgetDashboardComponent, {
-      providers: [
-        provideHttpClient(),
-        provideHttpClientTesting(),
-        provideRouter([]),
-        { provide: AuthService, useValue: authStub() },
-      ],
+    it('ignores invalid query params and defaults to the first root and year', async () => {
+      const { c } = await setup({ queryParams: { budget: 'ghost', ks: 'ghost', fy: 'ghost' } });
+      expect(c.selectedBudgetId()).toBe('b-vs');
+      expect(c.selectedKsId()).toBe('b-vs');
+      expect(c.selectedFyId()).toBe('fy-1');
     });
-    const http = TestBed.inject(HttpTestingController);
-    view.fixture.detectChanges();
-    expect(view.container.querySelector('[aria-busy="true"]')).toBeTruthy();
-    expect(view.container.querySelectorAll('main')).toHaveLength(0);
-    http.expectOne((r) => r.url.endsWith('/budgets')).flush([]);
-    view.fixture.detectChanges();
-    http.verify();
-  });
 
-  it('blames the missing fiscal year, not the cost centres, when only the year is gone', async () => {
-    // 46 seeded cost centres and no fiscal year read as "nothing is created yet" before.
-    // The two claims need different words, and different next steps.
-    const view = await setup({ fys: [] });
-    expect(view.container.querySelector('.bd__empty')).toBeTruthy();
-    expect(screen.getByText('Kein Haushaltsjahr angelegt')).toBeTruthy();
-    expect(screen.queryByText('Noch keine Budgetdaten')).toBeNull();
-    const link = screen.getByRole('link', { name: 'Haushaltsjahr anlegen' });
-    expect(link.getAttribute('href')).toBe('/admin/cost-centres');
-  });
-
-  it('keeps the "nothing is configured" wording when there is no cost centre at all', async () => {
-    const view = await setup({ tree: [], fys: [] });
-    expect(screen.getByText('Noch keine Budgetdaten')).toBeTruthy();
-    expect(screen.queryByText('Kein Haushaltsjahr angelegt')).toBeNull();
-    expect(view.container.querySelector('.bd__empty')).toBeTruthy();
-  });
-
-  it('claims neither empty state while the fiscal years are still on the wire', async () => {
-    // The tree lands first and the years follow, one response per budget. "No budget has
-    // a year" is not a fact until the last of them is in.
-    const view = await render(BudgetDashboardComponent, {
-      providers: [
-        provideHttpClient(),
-        provideHttpClientTesting(),
-        provideRouter([]),
-        { provide: AuthService, useValue: authStub() },
-      ],
+    it('stays without a selection when the fiscal-years request fails', async () => {
+      const { c, http, fixture } = await bare();
+      http.expectOne((r) => r.url.endsWith('/budgets')).flush([node({ id: 'b-vs', key: 'VS' })]);
+      http.expectOne((r) => r.url.endsWith('/budgets/b-vs/fiscal-years')).error(new ProgressEvent('err'));
+      fixture.detectChanges();
+      expect(c.selectedBudgetId()).toBe('');
+      expect(c.loading()).toBe(false);
     });
-    const http = TestBed.inject(HttpTestingController);
-    const c = view.fixture.componentInstance as unknown as Inst;
-    http.expectOne((r) => r.url.endsWith('/budgets')).flush(TREE);
-    view.fixture.detectChanges();
-    expect(c.emptyReason()).toBeNull();
-    expect(screen.queryByText('Kein Haushaltsjahr angelegt')).toBeNull();
 
-    http.expectOne((r) => r.url.endsWith('/budgets/b-vs/fiscal-years')).flush([]);
-    view.fixture.detectChanges();
-    expect(c.emptyReason()).toBe('noFiscalYear');
-    http.verify();
+    it('waits for the years of the root the URL names', async () => {
+      const tree = [
+        node({ id: 'b-a', key: 'A', byFiscalYear: [alloc({ fiscalYearId: 'fy-1', allocated: '10' })] }),
+        node({ id: 'b-b', key: 'B', byFiscalYear: [alloc({ fiscalYearId: 'fy-1', allocated: '10' })] }),
+      ];
+      const { c, http, fixture } = await bare();
+      http.expectOne((r) => r.url.endsWith('/budgets')).flush(tree);
+      // Only b-b has years so far, so it becomes the default; the later answer for b-a
+      // changes nothing.
+      http.expectOne((r) => r.url.endsWith('/budgets/b-b/fiscal-years')).flush([{ ...FY, budgetId: 'b-b' }]);
+      http.expectOne((r) => r.url.endsWith('/budgets/b-a/fiscal-years')).flush([{ ...FY, budgetId: 'b-a' }]);
+      fixture.detectChanges();
+      expect(c.selectedBudgetId()).toBe('b-b');
+    });
+
+    it('selects nothing until a root with a fiscal year is loaded', async () => {
+      const { c, http, fixture } = await bare();
+      http.expectOne((r) => r.url.endsWith('/budgets')).flush([node({ id: 'b-vs', key: 'VS' })]);
+      http.expectOne((r) => r.url.endsWith('/budgets/b-vs/fiscal-years')).flush([]);
+      fixture.detectChanges();
+      expect(c.selectedBudgetId()).toBe('');
+    });
   });
 
-  it('hides the fiscal-year link from a reader who cannot create one', async () => {
-    // /admin/cost-centres needs `budget.structure`. Without it the link only leads to a
-    // 403, so the panel states the cause and stops there.
-    await setup({ fys: [], can: false });
-    expect(screen.getByText('Kein Haushaltsjahr angelegt')).toBeTruthy();
-    expect(screen.queryByRole('link', { name: 'Haushaltsjahr anlegen' })).toBeNull();
+  // ------------------------------------------------------------------ empty reasons
+
+  describe('empty states', () => {
+    it('blames the missing fiscal year, not the cost centres, when only the year is gone', async () => {
+      const view = await setup({ fys: [] });
+      expect(view.container.querySelector('.bd__empty')).toBeTruthy();
+      expect(screen.getByText('Kein Haushaltsjahr angelegt')).toBeTruthy();
+      expect(screen.queryByText('Noch keine Budgetdaten')).toBeNull();
+      const link = screen.getByRole('link', { name: 'Haushaltsjahr anlegen' });
+      expect(link.getAttribute('href')).toBe('/admin/cost-centres');
+    });
+
+    it('keeps the "nothing is configured" wording when there is no cost centre at all', async () => {
+      const view = await setup({ tree: [], fys: [] });
+      expect(screen.getByText('Noch keine Budgetdaten')).toBeTruthy();
+      expect(screen.queryByText('Kein Haushaltsjahr angelegt')).toBeNull();
+      expect(view.container.querySelector('.bd__empty')).toBeTruthy();
+    });
+
+    it('claims neither empty state while the fiscal years are still on the wire', async () => {
+      const { c, http, fixture } = await bare();
+      http.expectOne((r) => r.url.endsWith('/budgets')).flush(TREE);
+      fixture.detectChanges();
+      expect(c.emptyReason()).toBeNull();
+      expect(screen.queryByText('Kein Haushaltsjahr angelegt')).toBeNull();
+      http.expectOne((r) => r.url.endsWith('/budgets/b-vs/fiscal-years')).flush([]);
+      fixture.detectChanges();
+      expect(c.emptyReason()).toBe('noFiscalYear');
+    });
+
+    it('hides the fiscal-year link from a reader who cannot create one', async () => {
+      await setup({ fys: [], perms: ['budget.view'] });
+      expect(screen.getByText('Kein Haushaltsjahr angelegt')).toBeTruthy();
+      expect(screen.queryByRole('link', { name: 'Haushaltsjahr anlegen' })).toBeNull();
+    });
+  });
+});
+
+describe('utilisation', () => {
+  it('is committed over the total of allocation and income, or null without a total', () => {
+    const f = { allocated: 100, requested: 0, bound: 20, expended: 30, income: 0, committed: 50, available: 50 };
+    expect(utilisation(f)).toBe(50);
+    expect(utilisation({ ...f, committed: 0, available: 0 })).toBeNull();
   });
 });

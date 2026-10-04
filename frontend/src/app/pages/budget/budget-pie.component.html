@@ -1,0 +1,54 @@
+@if (total() > 0) {
+  <figure class="pie">
+    <div class="pie__chart">
+      <svg [attr.viewBox]="'0 0 ' + SIZE + ' ' + SIZE" class="pie__svg" role="img" [attr.aria-label]="name()">
+        @for (a of arcs(); track $index; let i = $index) {
+          <path
+            [attr.d]="a.d"
+            [style.fill]="a.color"
+            class="pie__slice"
+            [class.pie__slice--link]="!!a.id"
+            [class.pie__slice--dim]="hovered() !== null && hovered() !== i"
+            [style.transform]="sliceTransform(a, i)"
+            (pointerenter)="hovered.set(i)"
+            (pointerleave)="hovered.set(null)"
+            (click)="onSlice(a)"
+          />
+        }
+      </svg>
+      <div class="pie__hole" aria-hidden="true">
+        @if (active(); as a) {
+          <span class="pie__cap">{{ a.percent }} %</span>
+          <span class="pie__total mono">{{ money(a.value) }}</span>
+        } @else {
+          <span class="pie__cap">{{ label() }}</span>
+          <span class="pie__total mono">{{ money(total()) }}</span>
+        }
+      </div>
+    </div>
+    <ul class="pie__legend">
+      @for (a of arcs(); track $index; let i = $index) {
+        <li>
+          <button
+            type="button"
+            class="pie__item"
+            [class.pie__item--on]="hovered() === i"
+            [disabled]="!a.id"
+            [title]="a.label"
+            (pointerenter)="hovered.set(i)"
+            (pointerleave)="hovered.set(null)"
+            (focus)="hovered.set(i)"
+            (blur)="hovered.set(null)"
+            (click)="onSlice(a)"
+          >
+            <span class="pie__swatch" [style.background]="a.color"></span>
+            <span class="pie__name ell">{{ a.label }}</span>
+            <span class="pie__val mono">{{ money(a.value) }}</span>
+          </button>
+        </li>
+      }
+    </ul>
+  </figure>
+} @else {
+  <p class="pie__empty">{{ 'budget.pie.empty' | t }}</p>
+}
