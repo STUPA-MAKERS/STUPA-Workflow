@@ -92,6 +92,9 @@ interface FilterDef {
 /** The sort orders the sort menu offers. */
 type SortKey = 'createdAt:desc' | 'createdAt:asc' | 'amount:desc' | 'amount:asc';
 
+/** The largest page the list endpoint answers (`MAX_LIMIT` of the backend paging). */
+const MAX_PAGE = 200;
+
 const SORTS: readonly { key: SortKey; label: TranslationKey }[] = [
   { key: 'createdAt:desc', label: 'applications.list.sort.newest' },
   { key: 'createdAt:asc', label: 'applications.list.sort.oldest' },
@@ -436,9 +439,10 @@ export class ApplicationsListComponent implements OnDestroy {
       )
       .subscribe(() => this.readSelection());
 
-    // A change in the detail pane (a transition, an edit, an archive) shows in the row.
+    // A change in the detail pane (a transition, an edit, an archive, a delete) shows in
+    // the list. The loaded rows and the scroll position stay.
     this.page.changes$.pipe(takeUntilDestroyed()).subscribe((change) => {
-      if (change.source !== 'list') this.reload();
+      if (change.source !== 'list') this.apply(change.id, change.kind);
     });
 
     effect(() => this.page.split.set(this.split()));
@@ -634,7 +638,7 @@ export class ApplicationsListComponent implements OnDestroy {
   loadMore(): void {
     if (this.loadingMore() || this.loading() || !this.hasMore()) return;
     this.loadingMore.set(true);
-    this.fetch(false);
+    this.fetch('more');
   }
 
   // --- row actions --------------------------------------------------------
@@ -730,11 +734,31 @@ export class ApplicationsListComponent implements OnDestroy {
     if (item) this.changed(item.id, 'updated');
   }
 
-  /** A row changed here: reload the list, the task count and the open detail. */
+  /** A row changed here: update the list, the task count and the open detail. */
   private changed(id: Uuid, kind: 'updated' | 'deleted'): void {
     this.railStatus.refresh();
-    this.reload();
+    this.apply(id, kind);
     this.page.notify({ id, kind, source: 'list' });
+  }
+
+  /**
+   * Show a change of one application in the list, and keep the loaded rows.
+   *
+   * A deleted application leaves the list here, without a request. For an update, the
+   * list loads again as many rows as it has loaded so far (see `refresh`): a new state can
+   * move the row out of the filters, or an archive can hide it.
+   */
+  private apply(id: Uuid, kind: 'updated' | 'deleted'): void {
+    if (kind === 'updated') {
+      this.refresh();
+      return;
+    }
+    const before = this.items().length;
+    this.items.update((cur) => cur.filter((i) => i.id !== id));
+    if (this.items().length < before) {
+      this.total.update((t) => Math.max(0, t - 1));
+      this.nextOffset = Math.max(0, this.nextOffset - 1);
+    }
   }
 
   // --- loading ------------------------------------------------------------
@@ -803,15 +827,33 @@ export class ApplicationsListComponent implements OnDestroy {
     this.loadingMore.set(false);
     this.loading.set(this.items().length === 0);
     this.error.set(false);
-    this.fetch(true);
+    this.fetch('initial');
+  }
+
+  /**
+   * Load the rows again after a change of one application, with the filters unchanged.
+   *
+   * One request from offset 0 gets as many rows as the list has loaded (at least one
+   * page, at most `MAX_PAGE`). The loaded pages thus stay, with the open row
+   * (`aria-current`) and the scroll position. A failure keeps the current rows.
+   */
+  protected refresh(): void {
+    // Nothing shown yet: a plain reload, with its placeholder and its error.
+    if (this.loading() || this.items().length === 0) {
+      this.reload();
+      return;
+    }
+    const size = Math.min(MAX_PAGE, Math.max(this.limit, this.items().length));
+    this.loadingMore.set(false);
+    this.fetch('refresh', size);
   }
 
   /**
    * The request, built from the applied filters. They change only through the URL
    * (`readFilters`), so every page and the export send what the URL and the chips show.
    */
-  private buildQuery(offset: number): ApplicationListQuery {
-    const query = { limit: this.limit, offset } as Record<string, unknown>;
+  private buildQuery(offset: number, limit = this.limit): ApplicationListQuery {
+    const query = { limit, offset } as Record<string, unknown>;
     for (const f of this.filters) {
       const raw = f.signal();
       const value = f.trim ? raw.trim() : raw;
@@ -825,16 +867,22 @@ export class ApplicationsListComponent implements OnDestroy {
   }
 
   /**
-   * Fetch a page. With `initial` the page replaces the list and a failure shows the full
-   * error. Without it the page appends and a load-more error stays silent.
+   * Fetch a page.
+   *
+   * - `initial`: the page replaces the list, and a failure shows the full error.
+   * - `refresh`: as `initial`, but a failure keeps the rows and shows no error.
+   * - `more`: the page appends, and a failure stays silent.
    */
-  private fetch(initial: boolean): void {
+  private fetch(mode: 'initial' | 'refresh' | 'more', limit = this.limit): void {
     const seq = ++this.fetchSeq;
-    this.api.listApplications(this.buildQuery(this.nextOffset)).subscribe({
+    // A refresh starts at 0 but leaves `nextOffset` alone until its answer arrives, so a
+    // failed refresh does not load the first page a second time on the next scroll.
+    const offset = mode === 'refresh' ? 0 : this.nextOffset;
+    this.api.listApplications(this.buildQuery(offset, limit)).subscribe({
       next: (page) => {
         if (seq !== this.fetchSeq) return;
         this.total.set(page.total);
-        this.items.update((cur) => (initial ? page.items : [...cur, ...page.items]));
+        this.items.update((cur) => (mode === 'more' ? [...cur, ...page.items] : page.items));
         this.nextOffset = page.offset + page.items.length;
         this.collectStates(page.items);
         this.loading.set(false);
@@ -842,7 +890,7 @@ export class ApplicationsListComponent implements OnDestroy {
       },
       error: () => {
         if (seq !== this.fetchSeq) return;
-        if (initial) this.error.set(true);
+        if (mode === 'initial') this.error.set(true);
         this.loading.set(false);
         this.loadingMore.set(false);
       },

@@ -862,6 +862,57 @@ describe('ApplicationsListComponent', () => {
       expect(screen.getByRole('link', { name: 'Antrag stellen' })).toHaveAttribute('href', '/apply');
     });
 
+    it('keeps every loaded page when the detail changes an application', async () => {
+      const first = Array.from({ length: 20 }, (_, i) => row({ id: `p0-${i}`, title: `Antrag ${i}` }));
+      const second = Array.from({ length: 5 }, (_, i) => row({ id: `p1-${i}`, title: `Antrag ${20 + i}` }));
+      const { http, cmp, pageService, harness } = await start('/applications', { rows: first, total: 25 });
+      cmp.loadMore();
+      http.expectOne(LIST).flush(page(second, 25, 20));
+      expect(cmp.items()).toHaveLength(25);
+
+      pageService.notify({ id: 'p1-3', kind: 'updated', source: 'detail' });
+      const req = http.expectOne(LIST);
+      expect(req.request.params.get('offset')).toBe('0');
+      expect(req.request.params.get('limit')).toBe('25');
+      req.flush({ items: [...first, ...second], total: 25, limit: 25, offset: 0 });
+      harness.detectChanges();
+      expect(cmp.items().map((i) => i.id)).toContain('p1-3');
+      expect(cmp.hasMore()).toBe(false);
+
+      // A deleted application leaves the list; the other rows stay, without a request.
+      pageService.notify({ id: 'p1-4', kind: 'deleted', source: 'detail' });
+      http.verify();
+      expect(cmp.items()).toHaveLength(24);
+      expect(cmp.total()).toBe(24);
+      // An unknown id changes nothing.
+      pageService.notify({ id: 'gone', kind: 'deleted', source: 'detail' });
+      expect(cmp.total()).toBe(24);
+    });
+
+    it('keeps the rows when the refresh after a change fails, and loads on from the old end', async () => {
+      const first = Array.from({ length: 20 }, (_, i) => row({ id: `p0-${i}`, title: `Antrag ${i}` }));
+      const { http, cmp, pageService } = await start('/applications', { rows: first, total: 30 });
+      pageService.notify({ id: 'p0-1', kind: 'updated', source: 'detail' });
+      http.expectOne(LIST).flush({}, { status: 500, statusText: 'x' });
+      expect(cmp.error()).toBe(false);
+      expect(cmp.items()).toHaveLength(20);
+      cmp.loadMore();
+      const more = http.expectOne(LIST);
+      expect(more.request.params.get('offset')).toBe('20');
+      more.flush(page([], 30, 20));
+    });
+
+    it('reloads the first page when a change arrives before any row', async () => {
+      const { http, cmp, pageService, first } = await start('/applications', { holdList: true });
+      pageService.notify({ id: 'x', kind: 'updated', source: 'detail' });
+      const req = http.expectOne(LIST);
+      expect(req.request.params.get('limit')).toBe('20');
+      first!.flush(page(ROWS));
+      expect(cmp.items()).toHaveLength(0);
+      req.flush(page(ROWS));
+      expect(cmp.items()).toHaveLength(3);
+    });
+
     it('tells the detail the layout and reloads when the detail changed an application', async () => {
       const { pageService, http, cmp } = await start();
       expect(pageService.split()).toBe(cmp.split());
@@ -1003,7 +1054,10 @@ describe('ApplicationsListComponent', () => {
       http.expectOne((r) => r.method === 'DELETE' && r.url === '/api/applications/app-2').flush(null);
       expect(success).toHaveBeenCalled();
       expect(cmp.deleteFor()).toBeNull();
-      http.expectOne(LIST).flush(page(ROWS));
+      // The row leaves the list without a new request.
+      http.verify();
+      expect(cmp.items().map((i) => i.id)).toEqual(['app-1', 'app-3']);
+      expect(cmp.total()).toBe(2);
     });
 
     it('closes the detail when the open application was deleted', async () => {
@@ -1012,7 +1066,6 @@ describe('ApplicationsListComponent', () => {
       cmp.deleteFor.set(cmp.items()[0]);
       cmp.confirmDelete();
       http.expectOne((r) => r.method === 'DELETE').flush(null);
-      http.expectOne(LIST).flush(page(ROWS));
       await new Promise((r) => setTimeout(r));
       expect(router.url).toBe('/applications');
     });

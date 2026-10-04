@@ -69,26 +69,22 @@
       </div>
 
       <h2 id="ad-title" class="ad__title">{{ title() }}</h2>
-      <p class="ad__line">
-        @if (application.state) {
-          <app-status-text [kind]="stateKind()">{{ application.state.label }}</app-status-text>
-        }
-        <!-- Each dot sits in the nowrap part of the item that follows it, so a wrap
-             moves the dot with its item. A dot shows only after a visible item. -->
-        @if (gremiumName(); as gremium) {
-          <span class="ad__part ell" [title]="gremium">
-            @if (application.state) {
-              <span class="ad__dot" aria-hidden="true">·</span>
-            }{{ gremium }}
-          </span>
-        }
-        @if (application.amount !== null) {
-          <span class="ad__part">
-            @if (application.state || gremiumName()) {
-              <span class="ad__dot" aria-hidden="true">·</span>
-            }<span class="mono ad__amount">{{ amount(application) }}</span>
-          </span>
-        }
+      <!-- Every part draws its dot before it (CSS). The line clips the dot of the first
+           part on each line, so a dot shows only between two items, also after a wrap. -->
+      <p class="ad__line ad__seps">
+        <span class="ad__parts">
+          @if (application.state) {
+            <span class="ad__part">
+              <app-status-text [kind]="stateKind()">{{ application.state.label }}</app-status-text>
+            </span>
+          }
+          @if (gremiumName(); as gremium) {
+            <span class="ad__part ell" [title]="gremium">{{ gremium }}</span>
+          }
+          @if (application.amount !== null) {
+            <span class="ad__part"><span class="mono ad__amount">{{ amount(application) }}</span></span>
+          }
+        </span>
       </p>
 
       @if (canTransition() && transitions().length && !editing()) {
@@ -331,12 +327,15 @@
           <li class="ad__version">
             <div class="ad__versionHead">
               <strong>{{ 'applications.history.version' | t: { version: version.version } }}</strong>
-              <span class="ad__versionMeta">
-                @if (version.changedBy) {
-                  <span>{{ 'applications.history.by' | t: { actor: version.changedBy === 'applicant' ? ('applications.comments.author.applicant' | t) : version.changedBy } }}</span>
-                  <span aria-hidden="true">·</span>
-                }
-                <time [attr.datetime]="version.at">{{ version.at | ldate: 'short' }}</time>
+              <span class="ad__versionMeta ad__seps">
+                <span class="ad__parts">
+                  @if (version.changedBy) {
+                    <span class="ad__part ell">{{ 'applications.history.by' | t: { actor: version.changedBy === 'applicant' ? ('applications.comments.author.applicant' | t) : version.changedBy } }}</span>
+                  }
+                  <span class="ad__part">
+                    <time [attr.datetime]="version.at">{{ version.at | ldate: 'short' }}</time>
+                  </span>
+                </span>
               </span>
             </div>
             @if (version.version === 1) {

@@ -829,6 +829,9 @@ export class ApplicationsDetailComponent {
     this.editFields.set(toFormlyFields(fields, lang, { has_budget: true }));
     this.editModel = structuredClone(app.data);
     this.editForm = new FormGroup({});
+    // The form sits in the "Antrag" tab. Without the split layout it would open in a
+    // hidden tab, while the header actions already go away.
+    this.tab.set('app');
     this.editing.set(true);
   }
 

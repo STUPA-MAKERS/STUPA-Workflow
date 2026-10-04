@@ -24,6 +24,7 @@ import type {
   TransitionOutWire,
   VersionOutWire,
 } from '@core/api/models';
+import { provideFormly } from '@shared/formly/formly.providers';
 import { RailStatusService } from '../../layout/rail-status.service';
 import { ApplicationsDetailComponent } from './applications-detail.component';
 import { ApplicationsPageService, type ApplicationChange } from './applications-page.service';
@@ -107,6 +108,7 @@ async function setup(opts: Opts = {}) {
       provideRouter([]),
       provideHttpClient(),
       provideHttpClientTesting(),
+      provideFormly(),
       { provide: USE_MOCK_API, useValue: false },
       {
         provide: AuthService,
@@ -181,25 +183,37 @@ describe('ApplicationsDetailComponent — header', () => {
     expect(screen.getByText('Förderantrag · Version 2')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: 'Zuschuss Kennenlernwochenende' })).toBeInTheDocument();
     const line = document.querySelector('.ad__line') as HTMLElement;
-    // Intl puts a non-breaking space before the currency sign.
-    // Each dot sits in the part of the item after it, so a wrap moves both together.
-    // The gap after a dot is a margin, so the text has no space there.
-    const parts = [...line.children].map((el) => el.textContent?.replace(/\s+/g, ''));
-    expect(parts).toEqual(['Eingereicht', '·Studierendenparlament', '·1.250,00€']);
+    // Intl puts a non-breaking space before the currency sign. The dots are CSS: every
+    // part draws one before it, and the line clips the one at each line start.
+    expect(line).toHaveClass('ad__seps');
+    const parts = [...line.querySelectorAll('.ad__part')].map((el) => el.textContent?.replace(/\s+/g, ''));
+    expect(parts).toEqual(['Eingereicht', 'Studierendenparlament', '1.250,00€']);
+    expect(line.textContent).not.toContain('·');
   });
 
-  it('starts the status line with an item, never with a dot, when the state is missing', async () => {
+  it('starts the status line with an item when the state is missing', async () => {
     await setup({ app: { state: null } });
     const line = document.querySelector('.ad__line') as HTMLElement;
-    expect(line.textContent?.replace(/\s+/g, '')).toBe('Studierendenparlament·1.250,00€');
-    expect(line.querySelectorAll('.ad__dot')).toHaveLength(1);
+    const parts = [...line.querySelectorAll('.ad__part')].map((el) => el.textContent?.replace(/\s+/g, ''));
+    expect(parts).toEqual(['Studierendenparlament', '1.250,00€']);
   });
 
-  it('shows the amount alone without a dot when the state and the gremium are missing', async () => {
+  it('shows the amount alone when the state and the gremium are missing', async () => {
     await setup({ app: { state: null, gremiumId: null } });
     const line = document.querySelector('.ad__line') as HTMLElement;
+    expect(line.querySelectorAll('.ad__part')).toHaveLength(1);
     expect(line.textContent?.replace(/\s+/g, '')).toBe('1.250,00€');
-    expect(line.querySelector('.ad__dot')).toBeNull();
+  });
+
+  it('puts the author and the time of a version into separate parts', async () => {
+    await setup();
+    const metas = [...document.querySelectorAll('.ad__versionMeta')] as HTMLElement[];
+    expect(metas.length).toBeGreaterThan(0);
+    for (const meta of metas) {
+      expect(meta).toHaveClass('ad__seps');
+      expect(meta.textContent).not.toContain('·');
+      expect(meta.querySelectorAll('.ad__part')).toHaveLength(2);
+    }
   });
 
   it('leaves out an unknown type, a missing gremium and a missing amount', async () => {
@@ -390,6 +404,28 @@ describe('ApplicationsDetailComponent — header', () => {
       detectChanges();
       expect(screen.getByRole('tabpanel', { name: 'Verlauf 2' })).toBeInTheDocument();
       expect(screen.queryByRole('tabpanel', { name: 'Antrag' })).not.toBeInTheDocument();
+    });
+
+    it('opens the edit form in the "Antrag" tab from another tab', async () => {
+      const { cmp, detectChanges } = await setup({ split: false });
+      await userEvent.click(screen.getByRole('tab', { name: 'Kommentare 0' }));
+      detectChanges();
+      expect(cmp.tab()).toBe('comments');
+      // The edit form needs structuredClone, which jsdom lacks.
+      const g = globalThis as unknown as { structuredClone?: unknown };
+      const saved = g.structuredClone;
+      g.structuredClone = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
+      try {
+        await userEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }));
+      } finally {
+        g.structuredClone = saved;
+      }
+      detectChanges();
+      expect(cmp.editing()).toBe(true);
+      expect(cmp.tab()).toBe('app');
+      const panel = screen.getByRole('tabpanel', { name: 'Antrag' });
+      expect(panel).toBeVisible();
+      expect(within(panel).getByRole('button', { name: 'Speichern' })).toBeInTheDocument();
     });
 
     it('switches to the history for "Versionen vergleichen"', async () => {
