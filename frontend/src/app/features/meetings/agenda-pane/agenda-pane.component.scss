@@ -1,0 +1,181 @@
+/* The agenda pane: a heading line and the rows. The page decides the width and the
+   scrolling; the pane only fills its box. */
+:host {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.ap__head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 2.5rem;
+  padding: 0 var(--space-1) var(--space-2) var(--space-4);
+}
+.ap__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--fs-small);
+  line-height: 1.125rem;
+  font-weight: var(--fw-semibold);
+  color: var(--color-accent-text);
+}
+.ap__title:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+.ap__add {
+  display: grid;
+  margin-inline-start: auto;
+  place-items: center;
+  width: var(--control-height);
+  height: var(--control-height);
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.ap__add:hover {
+  background: var(--color-surface-3);
+  color: var(--color-text);
+}
+.ap__add:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
+}
+
+.ap__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ap__row {
+  min-width: 0;
+}
+.ap__row app-list-item {
+  --li-hover: var(--color-surface-2);
+}
+/* Rows are denser than a plain list: the boards use 54px rows. */
+.ap__row ::ng-deep .li {
+  min-height: 3.375rem;
+  padding: 7px var(--space-3);
+  gap: 14px;
+}
+.ap__row ::ng-deep .li__title {
+  font-size: 0.90625rem; /* 14.5px */
+}
+.ap__row--done app-list-item {
+  --li-color: var(--color-text-subtle);
+}
+
+.ap__lead {
+  position: relative;
+}
+/* The number: grey, filled with the accent for the item that runs now, a check in an
+   accent ring for a handled one. */
+.ap__num {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  flex: none;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-3);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: var(--fw-semibold);
+  font-variant-numeric: tabular-nums;
+}
+.ap__num--now {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+.ap__num--done {
+  background: transparent;
+  color: var(--color-accent-text);
+  box-shadow: inset 0 0 0 1.5px var(--color-accent);
+}
+
+/* The grip shows on hover and while a control of the row has the focus. It sits in the
+   gutter before the number, so the row does not move when it appears. */
+.ap__grip {
+  position: absolute;
+  inset-inline-end: calc(100% + 2px);
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 1rem;
+  translate: 0 -50%;
+  color: var(--color-text-muted);
+  opacity: 0;
+  cursor: grab;
+}
+.ap__row--drag:hover .ap__grip,
+.ap__row--drag:focus-within .ap__grip {
+  opacity: 1;
+}
+
+.ap__trail {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+/* The menu button shows on hover and focus on a pointer device, and only then takes its
+   room from the title. It keeps no width while hidden, but it stays in the tab order, and
+   the focus opens it. A touch screen has no hover, so the button stays there. */
+@media (hover: hover) {
+  .ap__menu {
+    width: 0;
+    margin-inline-start: calc(-1 * var(--space-2));
+    overflow: hidden;
+  }
+  .ap__row:hover .ap__menu,
+  .ap__row:focus-within .ap__menu,
+  .ap__menu:has([aria-expanded='true']) {
+    width: auto;
+    margin-inline-start: 0;
+    overflow: visible;
+  }
+}
+
+.ap__rename {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 3.375rem;
+  padding: 7px var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
+}
+.ap__input {
+  flex: 1;
+  min-width: 0;
+  height: var(--control-height);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-field);
+  background: var(--color-surface-3);
+  color: var(--color-text);
+  font: inherit;
+}
+.ap__input:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
+}
+
+.ap__empty {
+  padding: var(--space-4) var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+}

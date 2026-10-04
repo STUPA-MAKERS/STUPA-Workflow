@@ -28,8 +28,8 @@ import { DeleteMeetingDialogComponent } from './delete-meeting-dialog/delete-mee
 import { MeetingAgendaService } from './meeting-agenda.service';
 import { MeetingBeamerComponent } from './meeting-beamer.component';
 import { MeetingDialogsService } from './meeting-dialogs.service';
-import { MeetingFocusComponent } from './meeting-focus.component';
 import { MeetingFollowViewComponent } from './meeting-follow-view.component';
+import { MeetingPageComponent } from './meeting-page/meeting-page.component';
 import { MeetingSessionService } from './meeting-session.service';
 import { MeetingSettingsDialogComponent } from './meeting-settings-dialog/meeting-settings-dialog.component';
 import { MeetingsListComponent } from './meetings-list/meetings-list.component';
@@ -50,7 +50,7 @@ import {
 
 /**
  * Meetings page: the list (`/meetings`, `MeetingsListComponent`) and the meeting
- * page (`/meetings/:id`). The meeting page is the focus page for the minute-taker
+ * page (`/meetings/:id`). The meeting page is the session page for the minute-taker
  * and the lead, the follow view for a member, and the beamer. This component wires
  * the component-scoped services and the meeting dialogs; its public surface also
  * drives the specs.
@@ -74,7 +74,7 @@ import {
     LocalizedDatePipe,
     PageHeaderComponent,
     MeetingBeamerComponent,
-    MeetingFocusComponent,
+    MeetingPageComponent,
     MeetingFollowViewComponent,
     MeetingsListComponent,
     MeetingSettingsDialogComponent,
@@ -286,6 +286,11 @@ export class MeetingsComponent {
 
   onTopDrop(index: number): void {
     this.agendaSvc.onTopDrop(this.meeting()?.id ?? null, index);
+  }
+
+  /** "Nach oben" / "Nach unten" in the row menu of an agenda item. */
+  moveTop(from: number, to: number): void {
+    this.agendaSvc.moveTop(this.meeting()?.id ?? null, from, to);
   }
 
   removeFromAgenda(itemId: Uuid): void {

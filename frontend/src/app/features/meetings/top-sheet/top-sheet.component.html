@@ -1,0 +1,103 @@
+@let m = meeting();
+@let proto = protocol();
+
+<article class="ts">
+  @if (top(); as t) {
+    <header class="ts__head">
+      <div class="ts__titles">
+        <span class="ts__kind">
+          {{ kindLine(t) }}
+          @if (stateLabel(); as st) {
+            · <app-status-text kind="neutral">{{ st }}</app-status-text>
+          }
+          @if (t.nonPublic) {
+            · {{ 'meetings.agenda.nonPublicLabel' | t }}
+          }
+        </span>
+        <h1 class="ts__title" [title]="t.title || ('meetings.agenda.untitled' | t)">{{ t.title || ('meetings.agenda.untitled' | t) }}</h1>
+      </div>
+      @if (t.applicationId) {
+        <a class="ts__open" [routerLink]="['/applications', t.applicationId]" target="_blank" rel="noopener">
+          {{ 'meetings.agenda.openApplication' | t }}
+          <app-icon name="ext" [size]="18" />
+        </a>
+      }
+    </header>
+
+    @if (proto) {
+      <div class="ts__bar">
+        @if (editable()) {
+          <div class="ts__tools" role="toolbar" [attr.aria-label]="'meetings.editor.toolbar' | t">
+            @for (tool of tools; track tool.format) {
+              <button
+                type="button"
+                class="ts__tool"
+                [class.ts__tool--on]="ed.activeFormats().has(tool.format)"
+                [attr.aria-pressed]="ed.activeFormats().has(tool.format)"
+                [attr.aria-label]="tool.label | t"
+                [title]="tool.label | t"
+                (mousedown)="$event.preventDefault()"
+                (click)="ed.toggleFormat(tool.format)"
+              >
+                <app-icon [name]="tool.icon" [size]="20" />
+              </button>
+            }
+          </div>
+        }
+        <span class="ts__spacer"></span>
+        @if (!proto.isLocked) {
+          <span class="ts__save mtg__saveState" [attr.data-state]="saveState()" aria-live="polite">
+            @switch (saveState()) {
+              @case ('saving') { {{ 'meetings.protocol.saving' | t }} }
+              @case ('saved') { <app-icon name="check" [size]="16" /> {{ 'meetings.protocol.saved' | t }} }
+              @case ('error') { {{ 'meetings.protocol.saveFailed' | t }} }
+              @default {}
+            }
+          </span>
+        }
+      </div>
+      <div class="ts__rule"></div>
+      <app-markdown-editor
+        #ed
+        class="ts__editor"
+        [docKey]="t.id + ':' + revision()"
+        [value]="t.body ?? ''"
+        [disabled]="!editable()"
+        [placeholder]="'meetings.protocol.placeholder' | t"
+        [hint]="'meetings.protocol.hint' | t"
+        (valueChange)="bodyChange.emit({ itemId: t.id, body: $event })"
+      />
+    }
+  } @else {
+    <div class="ts__empty">
+      <h1 class="ts__title ts__title--muted">{{ 'meetings.dock.noTop' | t }}</h1>
+      @if (proto) {
+        <p class="ts__muted">{{ 'meetings.protocol.selectTop' | t }}</p>
+      }
+    </div>
+  }
+
+  <!-- The system creates the protocol when the meeting starts, never on demand. -->
+  @if (!proto) {
+    <p class="ts__muted ts__pad">{{ (m.status === 'planned' ? 'meetings.protocol.beforeStart' : 'meetings.protocol.none') | t }}</p>
+  }
+
+  @if (proto) {
+    @let ps = protocolState(proto);
+    <footer class="ts__foot">
+      <app-status-text [kind]="ps.kind">{{ ps.key | t }}</app-status-text>
+      @if (proto.publicPdfUrl) {
+        <a class="ts__link" [href]="proto.pdfUrl" target="_blank" rel="noopener">{{ 'meetings.protocol.pdfInternal' | t }}</a>
+        <a class="ts__link" [href]="proto.publicPdfUrl" target="_blank" rel="noopener">{{ 'meetings.protocol.pdfPublic' | t }}</a>
+      } @else if (proto.pdfUrl) {
+        <a class="ts__link" [href]="proto.pdfUrl" target="_blank" rel="noopener">{{ 'meetings.protocol.pdf' | t }}</a>
+      }
+      @if (!proto.isLocked && !canEdit() && m.canWrite) {
+        <span>{{ 'meetings.protocol.takenBy' | t: { name: m.protokollantName ?? '' } }}</span>
+      }
+      @if (protocolHint(proto); as hint) {
+        <span>{{ hint | t }}</span>
+      }
+    </footer>
+  }
+</article>

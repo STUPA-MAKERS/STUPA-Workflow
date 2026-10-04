@@ -1,0 +1,92 @@
+<div class="ap__head">
+  <h2 #heading class="ap__title" [class.sr-only]="inSheet()" tabindex="-1">{{ headingText() }}</h2>
+  @if (canChangeAgenda()) {
+    <button
+      type="button"
+      class="ap__add"
+      [attr.aria-label]="'meetings.agenda.dialogTitle' | t"
+      [title]="'meetings.agenda.dialogTitle' | t"
+      (click)="add.emit()"
+    >
+      <app-icon name="plus" [size]="20" />
+    </button>
+  }
+</div>
+
+<ol class="ap__list">
+  @for (item of agenda(); track item.id; let i = $index) {
+    @let done = isDone(i);
+    <li
+      class="ap__row"
+      [class.ap__row--done]="done"
+      [class.ap__row--drag]="canChangeAgenda()"
+      [attr.draggable]="canChangeAgenda() && renamingTopId() !== item.id"
+      (dragstart)="dragStart.emit(i)"
+      (dragover)="dragOver.emit($event)"
+      (drop)="drop.emit(i)"
+    >
+      @if (renamingTopId() === item.id) {
+        <div class="ap__rename">
+          <span class="ap__num" aria-hidden="true">{{ i + 1 }}</span>
+          <input
+            class="ap__input"
+            name="renameTop"
+            [ngModel]="renameDraft()"
+            (ngModelChange)="renameDraft.set($event)"
+            (keyup.enter)="renameTop.emit(item)"
+            (keyup.escape)="cancelRename.emit()"
+            (blur)="renameTop.emit(item)"
+            [placeholder]="'meetings.agenda.renamePlaceholder' | t"
+            [attr.aria-label]="'meetings.agenda.rename' | t"
+            autofocus
+          />
+        </div>
+      } @else {
+        <app-list-item
+          [title]="title(item)"
+          [sub]="sub(item, i)"
+          [selected]="item.id === selectedId()"
+          (activate)="select.emit(item.id)"
+        >
+          <span lead class="ap__lead">
+            @if (canChangeAgenda()) {
+              <span class="ap__grip" aria-hidden="true" [title]="'meetings.agenda.dragHandle' | t">
+                <app-icon name="menu" [size]="16" />
+              </span>
+            }
+            <span
+              class="ap__num"
+              [class.ap__num--now]="isNow(item)"
+              [class.ap__num--done]="done"
+              aria-hidden="true"
+            >
+              @if (done) {
+                <app-icon name="check" [size]="16" />
+              } @else {
+                {{ i + 1 }}
+              }
+            </span>
+          </span>
+          @if (isNow(item) || done) {
+            <span sub class="sr-only">{{ (isNow(item) ? 'meetings.dock.now' : 'meetings.dock.done') | t }}</span>
+          }
+          <span trail class="ap__trail">
+            @if (item.nonPublic) {
+              <app-badge variant="neutral" [title]="'meetings.agenda.nonPublicHint' | t">{{ 'meetings.agenda.nonPublic' | t }}</app-badge>
+            }
+            @if (menus()[i].length) {
+              <app-row-menu
+                class="ap__menu"
+                [sections]="menus()[i]"
+                [label]="menuLabel(item)"
+                (selected)="onAction(item, i, $event)"
+              />
+            }
+          </span>
+        </app-list-item>
+      }
+    </li>
+  } @empty {
+    <li class="ap__empty">{{ 'meetings.agenda.empty' | t }}</li>
+  }
+</ol>

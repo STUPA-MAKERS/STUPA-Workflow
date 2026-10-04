@@ -1,0 +1,51 @@
+@let m = meeting();
+<section class="pc" aria-labelledby="pc-title">
+  <div class="pc__head">
+    <h1 id="pc-title" class="pc__title">{{ 'meetings.prep.title' | t }}</h1>
+    <p class="pc__lead">{{ 'meetings.prep.lead' | t }}</p>
+  </div>
+
+  <ul class="pc__cards">
+    <li class="pc__card">
+      <app-icon class="pc__icon" name="list" [size]="20" />
+      <div class="pc__text">
+        <h2 class="pc__label">{{ 'meetings.agenda.title' | t }}</h2>
+        <p class="pc__sub">{{ 'meetings.dock.topsPrepared' | t: { n: agenda().length } }}</p>
+      </div>
+      <app-button variant="tonal" size="sm" (click)="editAgenda.emit()">{{ 'meetings.prep.editAgenda' | t }}</app-button>
+    </li>
+
+    <li class="pc__card" [class.pc__card--todo]="!m.protokollantId">
+      <app-icon class="pc__icon" name="edit" [size]="20" />
+      <div class="pc__text">
+        <h2 class="pc__label">{{ 'meetings.protokollant.label' | t }}</h2>
+        @if (m.protokollantId) {
+          <p class="pc__sub">{{ m.protokollantName }}</p>
+        } @else {
+          <p class="pc__sub pc__sub--todo">{{ 'meetings.prep.protokollantMissing' | t }}</p>
+        }
+      </div>
+      @if (m.canManage) {
+        <app-button [variant]="m.protokollantId ? 'tonal' : 'fill'" size="sm" (click)="assignKeeper.emit()">{{ (m.protokollantId ? 'meetings.prep.change' : 'meetings.prep.assign') | t }}</app-button>
+      }
+    </li>
+
+    <li class="pc__card">
+      <app-icon class="pc__icon" name="users" [size]="20" />
+      <div class="pc__text">
+        <h2 class="pc__label">{{ 'meetings.attendance.title' | t }}</h2>
+        <p class="pc__sub">{{ 'meetings.prep.presentCount' | t: { n: presentCount(), m: attendance().length } }}</p>
+      </div>
+      <app-button variant="tonal" size="sm" (click)="recordAttendance.emit()">{{ 'meetings.prep.recordAttendance' | t }}</app-button>
+    </li>
+  </ul>
+
+  @if (m.canControl) {
+    <div class="pc__start">
+      <app-button variant="fill" [disabled]="!m.protokollantId" [title]="(m.protokollantId ? 'meetings.control.open' : 'meetings.control.needProtokollant') | t" (click)="start.emit()">
+        <app-icon name="play" [size]="16" />
+        {{ 'meetings.control.open' | t }}
+      </app-button>
+    </div>
+  }
+</section>

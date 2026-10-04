@@ -10,8 +10,8 @@ import { errorDetail } from './meetings-display.util';
 const AUTOSAVE_DELAY_MS = 1000;
 
 /**
- * Agenda (TOP) state of the loaded meeting: item CRUD, inline rename, drag and drop
- * reorder, per-TOP selection and the debounced body autosave.
+ * Agenda (TOP) state of the loaded meeting: item CRUD, inline rename, reorder by drag
+ * and drop or by the row menu, per-TOP selection and the debounced body autosave.
  * MeetingsComponent provides this service.
  */
 @Injectable()
@@ -156,10 +156,19 @@ export class MeetingAgendaService implements OnDestroy {
   onTopDrop(meetingId: Uuid | null, index: number): void {
     const from = this.dragTopIndex;
     this.dragTopIndex = null;
-    if (from === null || from === index || !meetingId) return;
+    if (from === null) return;
+    this.moveTop(meetingId, from, index);
+  }
+
+  /**
+   * Move the item at `from` to `to` (0-based) and save the new order. The list changes
+   * at once; a refused save reloads the agenda.
+   */
+  moveTop(meetingId: Uuid | null, from: number, to: number): void {
     const items = [...this.agenda()];
+    if (!meetingId || from === to || !items[from] || to < 0 || to >= items.length) return;
     const [moved] = items.splice(from, 1);
-    items.splice(index, 0, moved);
+    items.splice(to, 0, moved);
     this.agenda.set(items); // optimistic update
     this.api.reorderAgenda(meetingId, items.map((i) => i.id)).subscribe({
       next: (rows) => this.agenda.set(rows),
