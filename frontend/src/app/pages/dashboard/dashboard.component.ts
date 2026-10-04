@@ -146,7 +146,7 @@ export class DashboardComponent {
   /** The first word of the display name: "Willkommen, Mara". */
   readonly firstName = computed(() => {
     const name = this.auth.displayName().trim();
-    return name.split(/\s+/)[0] || name;
+    return name.split(/\s+/)[0];
   });
 
   /** The gremien of the user, as one line under the greeting. */
@@ -185,7 +185,7 @@ export class DashboardComponent {
 
   /** Live and planned meetings: live first, then planned ones by date. */
   private readonly activeMeetings = computed<Meeting[]>(() => {
-    const rank = (m: Meeting): number => (m.status === 'live' ? 0 : m.status === 'planned' ? 1 : 2);
+    const rank = (m: Meeting): number => (m.status === 'live' ? 0 : 1);
     return this.meetings()
       .filter((m) => m.status !== 'closed')
       .slice()

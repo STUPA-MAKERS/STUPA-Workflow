@@ -87,8 +87,8 @@ export class TasksComponent {
   }
 
   /** The moment the task started to wait: the last status change, else the last change. */
-  protected since(item: ApplicationListItem): IsoDateTime | null {
-    return item.stateSince ?? item.updatedAt ?? null;
+  protected since(item: ApplicationListItem): IsoDateTime {
+    return item.stateSince ?? item.updatedAt;
   }
 
   /**

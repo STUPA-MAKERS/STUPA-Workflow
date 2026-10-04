@@ -483,6 +483,59 @@ describe('DashboardComponent', () => {
     });
   });
 
+  describe('edge cases', () => {
+    it('handles missing names, titles, counts and dates', async () => {
+      const { fixture, http } = await setup(MEMBER);
+      const c = cmp(fixture);
+      // A live meeting with an item without a title and without an agenda count.
+      const row = c.sessionRow({
+        id: 'x',
+        title: 'X',
+        status: 'live',
+        date: null,
+        startTime: null,
+        gremiumName: null,
+        startedAt: 'kein Datum',
+        currentAgendaItem: { position: 1, title: null },
+      });
+      expect(row.now).toBeNull();
+      expect(row.sub).toBe('');
+      const withCount = c.sessionRow({
+        id: 'y',
+        title: 'Y',
+        status: 'live',
+        date: null,
+        startTime: '18:00',
+        gremiumName: 'G',
+        startedAt: null,
+        currentAgendaItem: { position: 2, title: null },
+        agendaItemCount: 4,
+      });
+      expect(withCount.now).toEqual({ position: 2, title: '', count: 4 });
+      // A planned meeting without date and time has no time line.
+      expect(c.sessionRow({ id: 'z', title: 'Z', status: 'planned', date: 'bald', startTime: null }).sub).toBe('');
+
+      expect(c.otherName({ direction: 'incoming', delegatorName: null })).toBe('?');
+      expect(c.delegationSub({ meetingTitle: null, meetingDate: 'bald' })).toBe('bald');
+      expect(c.delegationSub({ meetingTitle: 'S', meetingDate: null })).toBe('S');
+
+      expect(c.dateOf({ stateSince: null, updatedAt: '2026-01-02T10:00:00Z' })).toBe('2026-01-02T10:00:00Z');
+      expect(c.dateOf({ stateSince: undefined, updatedAt: undefined })).toBeNull();
+      expect(c.shortDay(null)).toBe('');
+      expect(c.shortDay('kein Datum')).toBe('');
+      // Another year shows the year too.
+      expect(c.shortDay('2020-03-05T10:00:00Z')).toBe('05.03.2020');
+      expect(c.typeOf({ typeId: 't1', title: '  ' })).toBeNull();
+      http.verify();
+    });
+
+    it('greets with the whole name when it is one word', async () => {
+      const { http } = await setup({ ...MEMBER, display_name: 'Mia' });
+      expect(screen.getByRole('heading', { level: 1, name: 'Willkommen, Mia' })).toBeInTheDocument();
+      http.verify();
+    });
+  });
+
   describe('phone', () => {
     const live = meeting('m-live', 'live', {
       date: '2026-09-29',
