@@ -29,18 +29,26 @@ export class SiteFooterComponent {
       .footerColumns()
       .map((col) => ({
         label: resolveI18n(col.label, this.i18n.locale()),
-        links: col.links.map((l) => ({ url: l.url, label: resolveI18n(l.label, this.i18n.locale()) })),
+        links: col.links.map((l) => ({
+          url: l.url,
+          label: resolveI18n(l.label, this.i18n.locale()),
+        })),
       }))
       .filter((col) => col.links.length > 0 || col.label),
   );
 
-  /** Legal links for the active locale. */
+  /** Legal links for the active locale. A link without a label or a URL goes, so the
+   *  line never shows a separator next to an empty part. */
   readonly legalLinks = computed(() =>
     this.branding
       .legalLinks()
-      .map((l) => ({ url: l.url, label: resolveI18n(l.label, this.i18n.locale()) })),
+      .map((l) => ({ url: l.url.trim(), label: resolveI18n(l.label, this.i18n.locale()).trim() }))
+      .filter((l) => l.url && l.label),
   );
 
-  /** Copyright line for the active locale. Empty means the built-in co-branding text. */
-  readonly copyright = computed(() => resolveI18n(this.branding.copyright(), this.i18n.locale()));
+  /** Copyright line for the active locale. Empty or blank means the built-in
+   *  co-branding text. */
+  readonly copyright = computed(() =>
+    resolveI18n(this.branding.copyright(), this.i18n.locale()).trim(),
+  );
 }
