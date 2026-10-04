@@ -262,6 +262,7 @@ const MOCK_APPLICATIONS: Page<ApplicationOutWire> = {
       lang: 'de',
       createdAt: '2026-05-30T09:00:00Z',
       updatedAt: '2026-05-30T09:00:00Z',
+      stateSince: '2026-05-30T09:00:00Z',
     },
     {
       id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
@@ -281,6 +282,7 @@ const MOCK_APPLICATIONS: Page<ApplicationOutWire> = {
       lang: 'de',
       createdAt: '2026-06-02T14:30:00Z',
       updatedAt: '2026-06-02T14:30:00Z',
+      stateSince: '2026-06-02T14:30:00Z',
     },
   ],
   total: 2,
@@ -313,6 +315,8 @@ const MOCK_TASKS: ApplicationListItemWire[] = [
     title: 'Hardware für Fachschaftsraum',
     createdAt: '2026-06-06T08:15:00Z',
     updatedAt: '2026-06-07T16:00:00Z',
+    // The time of the last status change (A9): "Wartet seit" counts from here.
+    stateSince: '2026-06-07T16:00:00Z',
   },
   {
     id: 'dddddddd-dddd-dddd-dddd-dddddddddddd',
@@ -330,6 +334,7 @@ const MOCK_TASKS: ApplicationListItemWire[] = [
     currency: 'EUR',
     title: 'Förderung Sommerfest',
     createdAt: '2026-06-04T11:00:00Z',
+    // No stateSince, as from a server before A9: the page falls back to updatedAt.
     updatedAt: '2026-06-08T09:30:00Z',
   },
 ];
@@ -412,9 +417,15 @@ const MOCK_PROTOCOL_ID = 'e0000000-0000-0000-0000-000000000099';
 let MOCK_MEETING: MeetingOutWire = {
   id: MOCK_MEETING_ID,
   title: 'STUPA-Sitzung 12.06.',
+  date: '2026-06-12',
+  startTime: '18:00:00',
   status: 'live',
   activeApplicationId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
   currentAgendaItemId: null,
+  // The start page reads these (P5a): "seit 18:04", "Jetzt: TOP 1 · …", "1 / 2".
+  startedAt: '2026-06-12T16:04:00Z',
+  currentAgendaItem: { position: 1, title: 'Förderung Ersti-Wochenende' },
+  agendaItemCount: 2,
   gremiumId: null,
   gremiumName: 'Studierendenparlament',
   protocolId: MOCK_PROTOCOL_ID,
@@ -444,6 +455,40 @@ let MOCK_MEETING: MeetingOutWire = {
   ],
   createdAt: '2026-06-12T17:00:00Z',
 };
+
+/** A planned meeting beside the live one, for the start page and the meetings list. */
+const MOCK_PLANNED_MEETING: MeetingOutWire = {
+  id: 'd0000000-0000-0000-0000-000000000002',
+  title: 'Haushaltsausschuss 19.06.',
+  date: '2026-06-19',
+  startTime: '17:30:00',
+  status: 'planned',
+  gremiumId: null,
+  gremiumName: 'Haushaltsausschuss',
+  votes: [],
+  createdAt: '2026-06-01T10:00:00Z',
+};
+
+/** GET /delegations: the user represents a member in the planned meeting. */
+const MOCK_DELEGATIONS = [
+  {
+    id: 'f0000000-0000-0000-0000-000000000001',
+    meetingId: MOCK_PLANNED_MEETING.id,
+    meetingTitle: MOCK_PLANNED_MEETING.title,
+    meetingDate: MOCK_PLANNED_MEETING.date,
+    gremiumId: 'g0000000-0000-0000-0000-000000000002',
+    gremiumName: 'Haushaltsausschuss',
+    delegatorId: 'p-3',
+    delegatorName: 'Erika Beispiel',
+    delegateId: 'me',
+    delegateName: 'Demo-Nutzer:in',
+    delegateVoting: true,
+    viaPool: false,
+    createdAt: '2026-06-02T09:00:00Z',
+    revocable: false,
+    direction: 'incoming',
+  },
+];
 
 interface MockAttendance {
   principalId: string;
@@ -599,7 +644,11 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     if (p.endsWith('/applications/tasks')) return ok([...MOCK_TASKS]);
     if (p.endsWith('/applications')) return ok(MOCK_APPLICATIONS);
     if (/\/votes\/[^/]+$/.test(p)) return ok(MOCK_VOTE);
-    if (p.endsWith('/meetings')) return ok([MOCK_MEETING]);
+    if (p.endsWith('/meetings')) return ok([MOCK_MEETING, MOCK_PLANNED_MEETING]);
+    if (p.endsWith('/delegations')) {
+      const meetingId = req.params.get('meetingId');
+      return ok(MOCK_DELEGATIONS.filter((d) => !meetingId || d.meetingId === meetingId));
+    }
     if (/\/meetings\/[^/]+\/attendance$/.test(p)) return ok([...MOCK_ATTENDANCE]);
     if (/\/meetings\/[^/]+\/agenda\/assignable$/.test(p)) {
       const taken = new Set(MOCK_AGENDA.map((a) => a.applicationId));
