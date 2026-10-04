@@ -40,6 +40,9 @@ const GROW = 5; // radial growth on hover
  * it lists every slice with its colour, name and amount. A legend entry and a slice with
  * an `id` are clickable for the drilldown; the legend entries are the keyboard path.
  * Hover on a slice or an entry highlights both. Pure SVG, no third-party library.
+ *
+ * Without an amount (all slices 0) the chart keeps its size and shows one neutral ring
+ * with 0 in the hole, so the layout does not jump when the metric changes.
  */
 @Component({
   selector: 'app-budget-pie',
@@ -63,6 +66,8 @@ export class BudgetPieComponent {
   readonly sliceClick = output<string>();
 
   protected readonly SIZE = SIZE;
+  /** The full ring that shows when there is no amount. */
+  protected readonly EMPTY_RING = donutArc(0, Math.PI * 2);
   protected readonly hovered = signal<number | null>(null);
 
   protected readonly total = computed(() =>
@@ -96,7 +101,14 @@ export class BudgetPieComponent {
     return h === null ? null : (this.arcs()[h] ?? null);
   });
 
-  protected readonly name = computed(() => this.ariaLabel() ?? this.label());
+  /** True when no slice has an amount. */
+  protected readonly empty = computed(() => this.total() <= 0);
+
+  /** The accessible name. Without an amount it also says that there is no amount. */
+  protected readonly name = computed(() => {
+    const name = this.ariaLabel() ?? this.label();
+    return this.empty() ? this.i18n.translate('budget.pie.emptyLabel', { name }) : name;
+  });
 
   protected onSlice(a: Arc): void {
     if (a.id) this.sliceClick.emit(a.id);

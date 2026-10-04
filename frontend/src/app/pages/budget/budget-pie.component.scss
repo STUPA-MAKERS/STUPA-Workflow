@@ -36,6 +36,13 @@
     transform var(--motion-fast) var(--ease-standard),
     opacity var(--motion-fast) var(--ease-standard);
 }
+/* No amount: one ring in a neutral surface colour, like a skeleton. */
+.pie__ring {
+  fill: var(--color-surface-3);
+}
+.pie__total--empty {
+  color: var(--color-text-muted);
+}
 .pie__slice--link {
   cursor: pointer;
 }
@@ -118,6 +125,8 @@
 }
 
 .pie__empty {
+  flex: 1 1 0;
+  min-width: 0;
   margin: 0;
   color: var(--color-text-muted);
   font-size: var(--fs-sm);

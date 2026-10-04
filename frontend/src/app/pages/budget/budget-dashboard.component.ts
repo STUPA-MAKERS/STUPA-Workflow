@@ -11,6 +11,7 @@ import type { Uuid } from '@core/api/models';
 import { ButtonComponent, DialogComponent, IconComponent, MEDIA } from '@stupa-makers/ui-kit';
 import { AuthService } from '@core/auth/auth.service';
 import { downloadBlob } from '@shared/download.util';
+import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { SimplifyPathPipe } from '@shared/budget-path';
 import {
   EmptyStateComponent,
@@ -113,7 +114,10 @@ export const APPS_SHOWN = 5;
  * Beantragt, Gebunden, Ausgegeben, Einnahmen, Verfügbar; N28), the distribution over the
  * sub cost centres, the utilisation per sub cost centre and the applications on it.
  *
- * Below the wide breakpoint the pane moves into a side sheet that a path chip opens. The
+ * On the wide layout the pane fills the height of the viewport and only the tree scrolls.
+ * Below the wide breakpoint the pane moves into a sheet that a path chip opens: a side
+ * sheet from the start, or the dialog of the ui-kit on a phone, which is a bottom sheet
+ * there. The
  * query params hold the selection, so the view is shareable as a link. A reader with a
  * gremium scope (`viewGremiumId`) gets only the subtrees of the server response.
  */
@@ -138,6 +142,7 @@ export const APPS_SHOWN = 5;
     StatusTextComponent,
     BudgetPieComponent,
     BudgetSunburstComponent,
+    ScrollFadeDirective,
   ],
   templateUrl: './budget-dashboard.component.html',
   styleUrl: './budget-dashboard.component.scss',
@@ -151,6 +156,9 @@ export class BudgetDashboardComponent {
 
   /** The pane sits beside the sheet only on a wide viewport. */
   readonly wide = mediaQuerySignal(MEDIA.wide);
+  /** A phone opens the tree in the bottom sheet of the dialog, a narrow viewport in a
+   *  side sheet. */
+  readonly phone = mediaQuerySignal(MEDIA.phone);
 
   readonly canExport = computed(() => this.auth.can('budget.export'));
   /** The bookings page needs a global budget permission; a gremium scope alone has none. */
@@ -752,6 +760,12 @@ export class BudgetDashboardComponent {
     }
     this.navOpen.set(false);
     this.syncUrl();
+  }
+
+  /** Keyboard focus on a tree row scrolls the row into view, clear of the fades. */
+  revealRow(event: FocusEvent): void {
+    const row = (event.target as HTMLElement | null)?.closest<HTMLElement>('.tn');
+    row?.scrollIntoView?.({ block: 'nearest' });
   }
 
   drillInto(node: BudgetTreeNode): void {

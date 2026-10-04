@@ -63,11 +63,14 @@
   gap: var(--space-3);
   min-width: 0;
 }
+/* The pane fills the viewport below the top padding of the shell and does not scroll
+   itself: the title, the chips and the search stay; only the tree scrolls. The page
+   scrolls for the sheet only. */
 .bd--wide .bd__pane {
   position: sticky;
   top: var(--main-pad-top, 0px);
-  max-height: calc(100dvh - var(--main-pad-top, 0px) - var(--space-3));
-  overflow-y: auto;
+  height: calc(100dvh - var(--main-pad-top, 0px) - var(--main-pad-bottom, 0px));
+  overflow: hidden;
   padding-inline-end: var(--space-2);
 }
 .bd--wide .bd__title {
@@ -75,9 +78,17 @@
 }
 .bd__paneBody {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: var(--space-3);
   min-width: 0;
+  min-height: 0;
+}
+/* In the bottom sheet of the dialog the body scrolls by itself and passes no height
+   down. The pane takes a height of its own, so that only the tree scrolls: about 85% of
+   the screen less the handle, the header and the padding of the sheet. */
+.bd__paneBody--sheet {
+  max-height: calc(85dvh - 7.5rem - env(safe-area-inset-bottom, 0px));
 }
 
 .bd__top {
@@ -137,19 +148,43 @@
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
+/* The select fills the whole chip, so a click on the padding or on an icon opens it too.
+   The icons sit on top of the select and let the click through. The paddings of the
+   select keep the old look: 12px, icon, 6px gap, text, 6px gap, chevron, 10px. */
 .bd__selectChip {
-  padding-inline-end: 10px;
+  padding: 0;
+}
+.bd__selectLead,
+.bd__selectChev {
+  position: absolute;
+  top: 50%;
+  display: flex;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+.bd__selectLead {
+  inset-inline-start: 12px;
+}
+.bd__selectChev {
+  inset-inline-end: 10px;
 }
 .bd__select {
   appearance: none;
+  align-self: stretch;
   min-width: 0;
   margin: 0;
-  padding: 0;
+  padding-block: 0;
+  padding-inline: 12px 30px;
   border: 0;
+  border-radius: inherit;
   background: transparent;
   color: inherit;
   font: inherit;
   cursor: pointer;
+}
+/* The year chip: a 15px calendar icon in front and a 15px chevron. */
+.bd__selectChip--lead .bd__select {
+  padding-inline: 33px 31px;
 }
 .bd__select:focus {
   outline: none;
@@ -160,12 +195,49 @@
   color: var(--color-text);
 }
 
-/* ------------------------------------------------------------------ tree */
+/* ------------------------------------------------------------------ tree
+   The tree is the only part of the pane that scrolls. An end fades only when there are
+   more rows past it (`appScrollFade` sets the classes). The scroll padding keeps a row
+   that gets the focus clear of the fade. */
 .bd__tree {
+  --bd-fade: var(--space-6);
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: var(--bd-fade);
+}
+/* The rows keep their size; the list scrolls instead of squeezing them. */
+.bd__tree > * {
+  flex: none;
+}
+.bd__tree.is-fade-start {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--bd-fade));
+  mask-image: linear-gradient(to bottom, transparent, #000 var(--bd-fade));
+}
+.bd__tree.is-fade-end {
+  -webkit-mask-image: linear-gradient(to top, transparent, #000 var(--bd-fade));
+  mask-image: linear-gradient(to top, transparent, #000 var(--bd-fade));
+}
+.bd__tree.is-fade-start.is-fade-end {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--bd-fade),
+    #000 calc(100% - var(--bd-fade)),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--bd-fade),
+    #000 calc(100% - var(--bd-fade)),
+    transparent
+  );
 }
 .tn {
   display: flex;
@@ -401,34 +473,8 @@ button.bd__crumb:hover {
   line-height: 1.5rem;
   font-weight: var(--fw-semibold);
 }
-/* The two legend items wrap as one group, never apart. */
-.bd__legends {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  gap: var(--space-4);
-  white-space: nowrap;
-}
 .bd__secHead > app-button {
   flex: none;
-}
-.bd__legend {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.78125rem;
-  color: var(--color-text-muted);
-}
-.bd__swatch {
-  width: 10px;
-  height: 10px;
-  border-radius: 3px;
-}
-.bd__swatch--spent {
-  background: var(--color-text-muted);
-}
-.bd__swatch--bound {
-  background: color-mix(in srgb, var(--color-text-muted) 40%, var(--color-surface-4));
 }
 
 /* "Auslastung je Budget": a name and three numbers per row, the bar below. */
@@ -573,12 +619,9 @@ button.bd__crumb:hover {
     display: none;
   }
   /* The heading takes the free width and wraps in it, so an action such as
-     "Alle ansehen" stays on the heading row. The legend goes below as one row. */
+     "Alle ansehen" stays on the heading row. */
   .bd__h {
     flex: 1 1 0;
     min-width: 0;
-  }
-  .bd__legends {
-    flex-basis: 100%;
   }
 }

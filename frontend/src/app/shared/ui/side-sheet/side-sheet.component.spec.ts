@@ -9,7 +9,13 @@ import { SideSheetComponent, type SheetSide } from './side-sheet.component';
   imports: [SideSheetComponent],
   template: `
     <button type="button" (click)="open.set(true)">Anwesenheit</button>
-    <app-side-sheet heading="Anwesenheit" [side]="side()" [(open)]="open" (closed)="closes = closes + 1">
+    <app-side-sheet
+      heading="Anwesenheit"
+      [side]="side()"
+      [contentScrolls]="contentScrolls()"
+      [(open)]="open"
+      (closed)="closes = closes + 1"
+    >
       @if (withActions) {
         <button sheet-actions type="button">Zurücksetzen</button>
       }
@@ -23,6 +29,7 @@ import { SideSheetComponent, type SheetSide } from './side-sheet.component';
 class HostComponent {
   readonly open = signal(false);
   readonly side = signal<SheetSide>('end');
+  readonly contentScrolls = signal(false);
   closes = 0;
   withActions = true;
   withContent = true;
@@ -142,6 +149,17 @@ describe('SideSheetComponent', () => {
     host.side.set('bottom');
     view.fixture.detectChanges();
     expect(screen.getByRole('dialog')).toHaveClass('ss--bottom');
+  });
+
+  it('lets the content scroll by itself when asked', async () => {
+    const { host, view } = await setup();
+    host.open.set(true);
+    view.fixture.detectChanges();
+    const body = screen.getByRole('dialog').querySelector('.ss__body') as HTMLElement;
+    expect(body).not.toHaveClass('ss__body--fill');
+    host.contentScrolls.set(true);
+    view.fixture.detectChanges();
+    expect(body).toHaveClass('ss__body--fill');
   });
 
   it('does not emit closed when the page closes it', async () => {
