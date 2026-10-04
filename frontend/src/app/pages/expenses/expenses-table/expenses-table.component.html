@@ -1,0 +1,173 @@
+<app-data-table
+  [columns]="columns()"
+  [rows]="rows()"
+  [rowKey]="rowId"
+  [selectable]="canManage()"
+  [selected]="selected()"
+  (selectedChange)="onSelection($event)"
+  [selectAllLabel]="'expenses.bulk.selectAll' | t"
+  [rowSelectLabel]="rowSelectLabel"
+  [childrenOf]="childrenOf"
+  [sort]="sort()"
+  (sortChange)="onSort($event)"
+  [loading]="loading()"
+  [loadingText]="'expenses.loading' | t"
+  [emptyText]="'expenses.empty' | t"
+>
+  <!-- Below the full set there is no invoice-date column: the date is in the tooltip. -->
+  <ng-template appCell="paymentDate" let-e>
+    <span
+      class="et__date mono"
+      [attr.title]="
+        columnSet() !== 'full' && $any(e).invoiceDate
+          ? ('expenses.col.invoiceDate' | t) + ': ' + ($any(e).invoiceDate | ldate: 'mediumDate')
+          : null
+      "
+      >{{ $any(e).paymentDate ? ($any(e).paymentDate | ldate: 'mediumDate') : '—' }}</span
+    >
+  </ng-template>
+
+  <ng-template appCell="invoiceDate" let-e>
+    <span class="et__date et__muted mono">{{
+      $any(e).invoiceDate ? ($any(e).invoiceDate | ldate: 'mediumDate') : '—'
+    }}</span>
+  </ng-template>
+
+  <ng-template appCell="kind" let-e>
+    <span class="et__kind" [class.et__income]="$any(e).kind === 'income'">{{
+      ($any(e).kind === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense') | t
+    }}</span>
+  </ng-template>
+
+  <!-- A sub-booking row reuses this cell: it gets the "↳" mark instead of the expander. -->
+  <ng-template appCell="description" let-e let-child="child">
+    <span class="et__desc">
+      <span class="et__descLine">
+        @if (child) {
+          <span class="et__subMark" aria-hidden="true">↳</span>
+        } @else if (canManage() && $any(e).childCount) {
+          <button
+            type="button"
+            class="et__expand"
+            [attr.aria-expanded]="sub().isSubExpanded($any(e).id)"
+            [attr.aria-label]="toggleLabel($any(e))"
+            [title]="toggleLabel($any(e))"
+            (click)="sub().toggleSub($any(e))"
+          >
+            <app-icon
+              [name]="sub().isSubExpanded($any(e).id) ? 'chevron-up' : 'chevron-down'"
+              [size]="14"
+            />
+          </button>
+        }
+        <!-- One line with an ellipsis, as on the board. When the column cuts the text,
+             "mehr" opens the full text in the row: a touch, keyboard or read-only user
+             has no tooltip and no edit dialog to read it. Open, the text wraps and
+             "weniger" follows its last word. -->
+        @if (!child && descExpanded($any(e).id)) {
+          <span class="et__descText et__descText--open"
+            >{{ $any(e).description }}
+            <button
+              type="button"
+              class="et__more"
+              data-testid="et-desc-toggle"
+              aria-expanded="true"
+              (click)="toggleDesc($any(e).id)"
+            >
+              {{ 'action.less' | t }}
+            </button></span
+          >
+        } @else {
+          <span
+            class="et__descText ell"
+            [title]="$any(e).description"
+            [appTruncated]="$any(e).description"
+            #cut="appTruncated"
+            >{{ $any(e).description }}</span
+          >
+          @if (!child && cut.truncated()) {
+            <button
+              type="button"
+              class="et__more"
+              data-testid="et-desc-toggle"
+              aria-expanded="false"
+              (click)="toggleDesc($any(e).id)"
+            >
+              {{ 'action.more' | t }}
+            </button>
+          }
+        }
+      </span>
+      <!-- The tight set has no payee column: the payee moves under the description, as
+           in the meta line of board Schmal-Buchungen. -->
+      @if (columnSet() === 'tight' && $any(e).correspondent) {
+        <span class="et__meta ell" data-testid="et-payee" [title]="$any(e).correspondent">{{
+          $any(e).correspondent
+        }}</span>
+      }
+      @if (!child && $any(e).applicationId) {
+        <a
+          class="et__app ell"
+          [routerLink]="['/applications', $any(e).applicationId]"
+          [title]="$any(e).applicationTitle || ('expenses.col.application' | t)"
+          >{{ $any(e).applicationTitle || ('expenses.col.application' | t) }}</a
+        >
+      }
+    </span>
+  </ng-template>
+
+  <ng-template appCell="correspondent" let-e>
+    <span class="et__corr ell" [title]="$any(e).correspondent || ''">{{
+      $any(e).correspondent || '—'
+    }}</span>
+  </ng-template>
+
+  <ng-template appCell="amount" let-e let-child="child">
+    <span
+      class="et__amount mono"
+      [class.et__income]="$any(e).kind === 'income'"
+      [class.et__muted]="child"
+      >{{ signed($any(e)) }}</span
+    >
+  </ng-template>
+
+  <ng-template appCell="costCentre" let-e let-child="child">
+    @if (child) {
+      <span class="et__muted">{{ 'expenses.sub.inherited' | t }}</span>
+    } @else {
+      @let cc = costCentre($any(e));
+      <a
+        class="et__cc"
+        [routerLink]="['/budget']"
+        [queryParams]="budgetLink()($any(e))"
+        [title]="cc.path + ' · ' + cc.name"
+      >
+        @if (cc.color) {
+          <span class="et__swatch" aria-hidden="true" [style.background]="cc.color"></span>
+        }
+        <span class="ell">{{ cc.name }}</span>
+      </a>
+    }
+  </ng-template>
+
+  <ng-template appCell="actions" let-e let-child="child">
+    <span class="et__actions">
+      @if ($any(e).invoiceId) {
+        <app-button
+          variant="text"
+          size="sm"
+          [iconOnly]="true"
+          [ariaLabel]="'expenses.action.viewInvoice' | t"
+          [title]="'expenses.action.viewInvoice' | t"
+          (click)="viewInvoice.emit($any(e))"
+          ><app-icon name="receipt" [size]="17"
+        /></app-button>
+      }
+      <app-row-menu
+        [label]="rowMenuLabel($any(e))"
+        [sections]="menuFor(!!child)"
+        (selected)="onMenu($event, $any(e))"
+      />
+    </span>
+  </ng-template>
+</app-data-table>

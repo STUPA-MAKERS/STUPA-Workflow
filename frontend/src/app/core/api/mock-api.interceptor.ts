@@ -776,6 +776,24 @@ const DEMO_APPLICATION_PATH =
 /** The budget routes the demo data in `mock-budget.ts` answers. */
 const BUDGET_MOCK_PATH = /\/budgets(\/[^/]+\/(fiscal-years|applications))?$/;
 
+/**
+ * The answer to a GET on the bookings, transfers or invoices routes, or null for any other
+ * route. The demo data in `mock-bookings.ts` loads on first use.
+ */
+function mockBookingsGet(p: string, params: URLSearchParams): Observable<unknown> | null {
+  type Demo = typeof import('./mock-bookings');
+  const load = (pick: (m: Demo) => unknown): Observable<unknown> =>
+    from(import('./mock-bookings')).pipe(mergeMap((m) => of(pick(m))));
+  if (p.endsWith('/expenses')) return load((m) => m.mockExpenses(params));
+  const sub = /\/budget-expenses\/([^/]+)\/sub-bookings$/.exec(p);
+  if (sub) return load((m) => m.mockSubBookings(sub[1]));
+  if (p.endsWith('/budget-transfers')) return load((m) => m.mockTransfers(params));
+  if (p.endsWith('/invoices')) return load((m) => m.mockInvoices(params));
+  const one = /\/invoices\/([^/]+)$/.exec(p);
+  if (one) return load((m) => m.mockInvoice(one[1]));
+  return null;
+}
+
 function path(url: string): string {
   return url.split('?')[0];
 }
@@ -881,8 +899,10 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
         mergeMap((m) => ok(m.mockBudgetGet(p, fiscalYear))),
       );
     }
-    // Expenses and income: an empty page keeps a 404 out of the console.
-    if (p.endsWith('/expenses')) return ok({ items: [], total: 0, limit: 20, offset: 0 });
+    // Bookings, transfers and invoices. The demo data loads on first use, like the
+    // budget tree.
+    const bookings = mockBookingsGet(p, new URLSearchParams(req.params.toString()));
+    if (bookings) return bookings.pipe(mergeMap((body) => ok(body)));
     if (p.endsWith('/search')) return ok(mockSearch(req.params.get('q') ?? ''));
     if (p.endsWith('/applications/tasks')) return ok([...MOCK_TASKS]);
     if (/\/votes\/[^/]+$/.test(p)) return ok(MOCK_VOTE);
@@ -933,6 +953,11 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
 
   if (req.method === 'POST') {
     if (p.endsWith('/auth/logout')) return ok(LOGOUT_OUT);
+    if (p.endsWith('/invoices/parse')) {
+      const file = req.body instanceof FormData ? req.body.get('file') : null;
+      const name = file instanceof File ? file.name : 'rechnung.pdf';
+      return from(import('./mock-bookings')).pipe(mergeMap((m) => ok(m.mockParseInvoice(name))));
+    }
     if (/\/meetings\/[^/]+\/votes$/.test(p)) {
       const body = req.body as { applicationId?: string; question?: string | null } | null;
       MOCK_MEETING = {

@@ -9,34 +9,45 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, type ParamMap, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, type ParamMap, Router } from '@angular/router';
 import { from } from 'rxjs';
 import { concatMap } from 'rxjs/operators';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
-  BadgeComponent,
   ButtonComponent,
-  CellDirective,
-  CheckboxComponent,
-  type ColumnDef,
   CurrencyInputComponent,
-  DataTableComponent,
   DatepickerComponent,
   DialogComponent,
   FilterBarComponent,
   FilterFieldComponent,
   FilterRangeComponent,
-  FootCellDirective,
   IconComponent,
+  InputComponent,
+  MEDIA,
+  SegmentedComponent,
+  type SegmentedOption,
   SelectComponent,
   type SortState,
+  ToastService,
 } from '@stupa-makers/ui-kit';
-import { ToastService } from '@stupa-makers/ui-kit';
+import {
+  NoteComponent,
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
+  SearchPillComponent,
+  SelectionBarComponent,
+  SideSheetComponent,
+  StatusTextComponent,
+  invoiceStatus,
+} from '@shared/ui';
+import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { CostCentreTreeComponent } from '../budget/cost-centre-tree.component';
 import {
   BudgetTreeApi,
@@ -49,19 +60,26 @@ import {
 import type { Uuid } from '@core/api/models';
 import {
   ariaSortDir,
+  BOOKINGS_COLUMNS_FULL_MEDIA,
+  COLUMNS_TIGHT_MEDIA,
+  columnSet,
+  costCentreIndex,
   findTopBudgetNode,
   formatEur,
   problemDetail,
   sortIndicator,
 } from '../budget/expense-display.util';
-import { SimplifyPathPipe } from '@shared/budget-path';
 import { downloadBlob } from '@shared/download.util';
-import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
-import { PressSelectDirective } from '@shared/press-select.directive';
+import { mediaQuerySignal } from '../../layout/media-query';
+import { BookingDialogComponent } from './booking-dialog/booking-dialog.component';
 import { ExpenseDialogsState } from './expense-dialogs.state';
 import { ExpenseSubBookingsState } from './expense-sub-bookings.state';
 import { ExpenseTransfersState } from './expense-transfers.state';
+import { type BudgetLink, ExpensesTableComponent } from './expenses-table/expenses-table.component';
 import { ExpensesListState, type ExpenseSortField } from './expenses-list.state';
+import { SubBookingDialogComponent } from './sub-booking-dialog/sub-booking-dialog.component';
+import { TransferDialogComponent } from './transfer-dialog/transfer-dialog.component';
+import { TransfersTableComponent } from './transfers-table/transfers-table.component';
 
 /** The two views of the page. Bookings are the default. */
 export type ExpensesTab = 'bookings' | 'transfers';
@@ -78,28 +96,34 @@ export type ExpensesTab = 'bookings' | 'transfers';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    PageHeaderComponent,
-    FormsModule,
-    LocalizedDatePipe,
-    TranslatePipe,
-    SimplifyPathPipe,
-    BadgeComponent,
+    BookingDialogComponent,
     ButtonComponent,
-    CellDirective,
-    DataTableComponent,
-    FootCellDirective,
+    CostCentreTreeComponent,
     CurrencyInputComponent,
     DatepickerComponent,
     DialogComponent,
+    ExpensesTableComponent,
     FilterBarComponent,
     FilterFieldComponent,
     FilterRangeComponent,
+    FormsModule,
     IconComponent,
+    InputComponent,
+    LocalizedDatePipe,
+    NgTemplateOutlet,
+    NoteComponent,
+    RowMenuComponent,
+    ScrollFadeDirective,
+    SearchPillComponent,
+    SegmentedComponent,
     SelectComponent,
-    CheckboxComponent,
-    CostCentreTreeComponent,
-    PressSelectDirective,
-    RouterLink,
+    SelectionBarComponent,
+    SideSheetComponent,
+    StatusTextComponent,
+    SubBookingDialogComponent,
+    TransferDialogComponent,
+    TransfersTableComponent,
+    TranslatePipe,
   ],
   templateUrl: './expenses.component.html',
   styleUrl: './expenses.component.scss',
@@ -113,10 +137,23 @@ export class ExpensesComponent implements OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 
-  private readonly list = new ExpensesListState();
-  private readonly sub = new ExpenseSubBookingsState(this.list);
-  private readonly transfers = new ExpenseTransfersState(this.list);
-  private readonly dialogs = new ExpenseDialogsState(this.list, this.sub, this.transfers);
+  // The state modules. The template hands them to the table and the dialogs, which read
+  // and set their signals directly; the methods below are the facade the specs drive.
+  protected readonly list = new ExpensesListState();
+  protected readonly sub = new ExpenseSubBookingsState(this.list);
+  protected readonly transfers = new ExpenseTransfersState(this.list);
+  protected readonly dialogs = new ExpenseDialogsState(this.list, this.sub, this.transfers);
+
+  /** >= 1200px: the cost-centre pane beside the table, and the page does not scroll. */
+  readonly wide = mediaQuerySignal(MEDIA.wide);
+  /** < 768px: one primary action in the title row, the rest in a menu. */
+  readonly phone = mediaQuerySignal(MEDIA.phone);
+  private readonly fullColumns = mediaQuerySignal(BOOKINGS_COLUMNS_FULL_MEDIA);
+  private readonly tightColumns = mediaQuerySignal(COLUMNS_TIGHT_MEDIA);
+  /** Which table columns fit the viewport. */
+  readonly columnSet = computed(() =>
+    columnSet({ phone: this.phone(), full: this.fullColumns(), tight: this.tightColumns() }),
+  );
 
   readonly canManage = computed(() => this.auth.can('budget.book'));
 
@@ -166,124 +203,77 @@ export class ExpensesComponent implements OnDestroy {
   readonly bulkReassignOpen = signal(false);
   readonly bulkBudgetId = signal('');
   readonly bulkCategory = signal('');
-  // -- shared-table wiring ----------------------------------------------------
-  //
-  // The bookings table was hand-rolled for years because the shared one could not do
-  // selection, child rows, a totals row or a per-row class. It can now, so this is a
-  // translation layer and nothing more: the component keeps the state it always had and
-  // hands the table the shape it wants.
+  /** The display label of every cost centre: name, path and swatch colour (O19). */
+  readonly costCentres = computed(() => costCentreIndex(this.budgetTree()));
 
-  /** Track by the booking id, so paging in more rows does not re-create the earlier ones. */
-  readonly rowId = (row: unknown): unknown => (row as Expense).id;
-
-  readonly bookingColumns = computed<ColumnDef[]>(() => {
-    const cols: ColumnDef[] = [
-      {
-        key: 'paymentDate',
-        label: this.i18n.translate('expenses.col.paymentDate'),
-        width: '9rem',
-        sortable: true,
-        initialSort: 'desc',
-      },
-      {
-        key: 'invoiceDate',
-        label: this.i18n.translate('expenses.col.invoiceDate'),
-        width: '9rem',
-        sortable: true,
-        initialSort: 'desc',
-        // Off the card: most bookings have none, so it is a labelled em-dash.
-        card: 'hidden',
-      },
-      {
-        key: 'kind',
-        label: this.i18n.translate('expenses.col.kind'),
-        width: '7rem',
-        // Off the card: the amount already carries the sign.
-        card: 'hidden',
-      },
-      {
-        key: 'description',
-        label: this.i18n.translate('expenses.col.description'),
-        // The card's heading. It is what says WHICH booking this is; a date does not.
-        card: 'title',
-      },
-      {
-        key: 'correspondent',
-        label: this.i18n.translate('expenses.col.correspondent'),
-        width: '11rem',
-      },
-      // Amount sits BEFORE the cost centre. The sticky actions column is displaced left
-      // by however much the table overflows and covers whatever is to its left, and the
-      // amount is the one column a reader scans a booking list for.
-      {
-        key: 'amount',
-        label: this.i18n.translate('expenses.col.amount'),
-        align: 'end',
-        width: '9rem',
-        sortable: true,
-        initialSort: 'desc',
-      },
-      {
-        key: 'costCentre',
-        label: this.i18n.translate('expenses.col.costCentre'),
-        width: '10rem',
-      },
-    ];
-    if (this.canManage()) {
-      cols.push({
-        key: 'actions',
-        label: this.i18n.translate('table.actions'),
-        align: 'end',
-        // Explicit, never self-sized. Letting it size itself is what made it 246px and
-        // hid the column beside it.
-        width: '9rem',
-        sticky: 'end',
-      });
-    }
-    return cols;
+  /** The cost centre the list shows, for the chip of the narrower layouts. */
+  readonly costCentreName = computed(() => {
+    const id = this.budgetId();
+    return (id && this.costCentres().get(id)?.name) || this.i18n.translate('expenses.filter.allCostCentres');
   });
 
-  readonly transferRowId = (row: unknown): unknown => (row as { transferId: string }).transferId;
-
-  readonly transferColumns = computed<ColumnDef[]>(() => {
-    const cols: ColumnDef[] = [
-      {
-        key: 'paymentDate',
-        label: this.i18n.translate('expenses.col.paymentDate'),
-        width: '9rem',
-      },
-      {
-        key: 'invoiceDate',
-        label: this.i18n.translate('expenses.col.invoiceDate'),
-        width: '9rem',
-      },
-      { key: 'description', label: this.i18n.translate('expenses.col.description') },
-      { key: 'from', label: this.i18n.translate('expenses.transfers.from'), width: '10rem' },
-      { key: 'to', label: this.i18n.translate('expenses.transfers.to'), width: '10rem' },
-      {
-        key: 'amount',
-        label: this.i18n.translate('expenses.col.amount'),
-        align: 'end',
-        width: '9rem',
-      },
-    ];
-    if (this.canManage()) {
-      cols.push({
-        key: 'actions',
-        label: this.i18n.translate('table.actions'),
-        align: 'end',
-        width: '7rem',
-        sticky: 'end',
-      });
-    }
-    return cols;
+  /** The colour swatch of the chosen cost centre, null for "all". */
+  readonly costCentreColor = computed(() => {
+    const id = this.budgetId();
+    return (id && this.costCentres().get(id)?.color) || null;
   });
+
+  /** Below the wide layout the cost-centre tree opens in a sheet (narrow) or a dialog
+   *  (phone, a bottom sheet). */
+  readonly pickerOpen = signal(false);
+
+  readonly tabOptions = computed<SegmentedOption[]>(() => [
+    { value: 'bookings', label: this.i18n.translate('expenses.tab.bookings') },
+    { value: 'transfers', label: this.i18n.translate('expenses.tab.transfers') },
+  ]);
 
   /** The table speaks `SortState`; the list state speaks a field plus an order. */
   readonly sortState = computed<SortState>(() => ({
     key: this.sortField(),
     direction: this.sortOrder() === 'asc' ? 'asc' : 'desc',
   }));
+
+  /** The page actions that do not fit the title row of a phone. */
+  readonly phoneMenu = computed<RowMenuSection[]>(() => {
+    const items: RowMenuItem[] = [];
+    if (this.canManage()) {
+      items.push({ id: 'transfer', label: this.i18n.translate('expenses.transfer'), icon: 'repeat' });
+    }
+    if (this.canExport()) {
+      items.push({ id: 'export', label: this.i18n.translate('expenses.export'), icon: 'download' });
+    }
+    return [{ items }];
+  });
+
+  onPhoneMenu(item: RowMenuItem): void {
+    if (item.id === 'transfer') this.openTransfer();
+    else if (item.id === 'export') this.onExport();
+  }
+
+  /** "7 ausgewählt", plus the delete cap once the selection is past it. */
+  readonly selectionLabel = computed(() => {
+    const count = this.i18n.translate('expenses.bulk.selectedCount', {
+      count: String(this.selectedCount()),
+    });
+    if (!this.bulkDeleteOverMax()) return count;
+    const cap = this.i18n.translate('expenses.bulk.deleteMax', { max: String(this.bulkDeleteMax) });
+    return `${count} · ${cap}`;
+  });
+
+  /** Why the bulk delete is off, or null while it is on. */
+  readonly bulkDeleteReason = computed(() => {
+    if (this.bulkDeleteOverMax()) {
+      return this.i18n.translate('expenses.bulk.deleteMaxBlocked', { max: String(this.bulkDeleteMax) });
+    }
+    if (this.bulkDeleteBlocked()) return this.i18n.translate('expenses.bulk.deleteAllBlocked');
+    return null;
+  });
+
+  /** The Budget query of a cost-centre cell. */
+  readonly budgetLink = (e: Expense): BudgetLink => this.ksLink(e);
+
+  /** The status of the invoice in the detail dialog. */
+  readonly invoiceStatus = invoiceStatus;
 
   onSortChange(next: SortState): void {
     this.onSort(next.key as ExpenseSortField);
@@ -292,18 +282,6 @@ export class ExpensesComponent implements OnDestroy {
   onSelectionChange(next: Set<unknown>): void {
     this.selected.set(next as ReadonlySet<Uuid>);
   }
-
-  /** Expanded sub-bookings only. A collapsed row contributes no children. */
-  readonly childrenOf = (row: unknown): readonly unknown[] => {
-    const e = row as Expense;
-    return this.isSubExpanded(e.id) ? this.subOf(e.id) : [];
-  };
-
-  /** Income rows carry a tint the table cannot know about. */
-  readonly rowClassFor = (row: unknown): string | null =>
-    (row as Expense).kind === 'income' ? 'exp__tr--income' : null;
-
-  readonly rowSelectLabel = (row: unknown): string => (row as Expense).description;
 
   readonly canSubmitReassign = computed(
     () => !!this.bulkBudgetId() || !!this.bulkCategory().trim(),
@@ -355,8 +333,9 @@ export class ExpensesComponent implements OnDestroy {
   readonly canSubmitTransfer = this.dialogs.canSubmitTransfer;
   readonly canSubmitCreate = this.dialogs.canSubmitCreate;
 
-  // Transfers tab. `budget.book` gates the whole route, so the list, the edit
-  // and the delete follow the same permission as the create.
+  // Transfers tab. The route also admits `budget.view`, but the server lists, edits
+  // and deletes transfers only for `budget.book` (the create permission). So the tab
+  // shows only when `canManage()` is true.
   readonly tab = signal<ExpensesTab>('bookings');
   readonly transferItems = this.transfers.items;
   readonly transferTotal = this.transfers.total;
@@ -379,11 +358,9 @@ export class ExpensesComponent implements OnDestroy {
   readonly subPaymentDate = this.sub.subPaymentDate;
   readonly subCorrespondent = this.sub.subCorrespondent;
 
-  /** On mobile, the tree sits behind a collapsible toggle. On desktop it stays visible. */
-  readonly treeOpen = signal(false);
-  readonly DESC_LIMIT = 90;
-  readonly expandedDesc = signal<ReadonlySet<string>>(new Set());
   readonly sentinel = viewChild<ElementRef<HTMLElement>>('sentinel');
+  /** The scroll box of the list. It scrolls on the wide layout only. */
+  readonly scroller = viewChild<ElementRef<HTMLElement>>('scroller');
 
   constructor() {
     // Apply the URL filters first, then load data exactly once. The URL keeps the view
@@ -425,14 +402,17 @@ export class ExpensesComponent implements OnDestroy {
       );
     });
 
+    // Infinite scroll. The wide layout scrolls the list inside its own box, so the box is
+    // the root there; the narrower layouts scroll the page.
     effect((onCleanup) => {
       const el = this.sentinel()?.nativeElement;
       if (!el || typeof IntersectionObserver === 'undefined') return;
+      const root = this.wide() ? (this.scroller()?.nativeElement ?? null) : null;
       const obs = new IntersectionObserver(
         (entries) => {
           if (entries.some((e) => e.isIntersecting)) this.loadMore();
         },
-        { rootMargin: '400px' },
+        { root, rootMargin: '400px' },
       );
       obs.observe(el);
       onCleanup(() => obs.disconnect());
@@ -481,23 +461,6 @@ export class ExpensesComponent implements OnDestroy {
     return formatEur(Number(amount), this.i18n.locale());
   }
 
-  isDescLong(desc: string): boolean {
-    return desc.length > this.DESC_LIMIT;
-  }
-
-  descExpanded(id: string): boolean {
-    return this.expandedDesc().has(id);
-  }
-
-  toggleDesc(id: string): void {
-    this.expandedDesc.update((s) => {
-      const next = new Set(s);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
   sortInd(field: ExpenseSortField): string {
     return sortIndicator(this.sortField() === field, this.sortOrder());
   }
@@ -512,6 +475,7 @@ export class ExpensesComponent implements OnDestroy {
 
   selectBudget(id: string): void {
     this.list.selectBudget(id);
+    this.pickerOpen.set(false);
   }
 
   onSearch(value: string): void {
@@ -649,6 +613,7 @@ export class ExpensesComponent implements OnDestroy {
   /** Switch the view. The transfers load lazily on the first visit and then
    *  again on every visit, because a booking change can remove a leg. */
   setTab(tab: ExpensesTab): void {
+    if (tab === 'transfers' && !this.canManage()) return;
     this.tab.set(tab);
     if (tab === 'transfers') this.transfers.reload();
   }

@@ -1,0 +1,28 @@
+@use 'breakpoints' as bp;
+
+/* The dialog host adds no box, so a closed dialog takes no gap in the page. */
+:host {
+  display: contents;
+}
+.sd-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  margin: 0;
+}
+.sd-form__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+@include bp.phone {
+  .sd-form__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.sd-form__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
