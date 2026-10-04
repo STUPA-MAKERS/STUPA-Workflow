@@ -31,7 +31,12 @@ import type {
 } from '@core/api/models';
 import { resolveI18n } from '@shared/forms/i18n-text';
 import { toFormlySections } from '@shared/forms/formly-mapper';
-import { formatAnswer, formatFieldValue } from '@shared/forms/answer-format';
+import { formatAnswer, formatEuro, formatFieldValue } from '@shared/forms/answer-format';
+import {
+  normalizePositions,
+  positionValue,
+  positionsTotal,
+} from '@shared/forms/positions';
 import { applyServerErrors, clearServerErrors } from '@shared/forms/server-errors';
 import { AnswerViewComponent } from '@shared/forms/answer-view/answer-view.component';
 import {
@@ -78,8 +83,9 @@ import { ShareLinksDialogComponent } from './share-links-dialog/share-links-dial
 import { mediaQuerySignal } from '../../layout/media-query';
 import { RailStatusService } from '../../layout/rail-status.service';
 
-/** Field types whose old and new value do not fit on one line of the history. */
-const NO_INLINE_DIFF: ReadonlySet<string> = new Set(['positions', 'table', 'textarea']);
+/** Field types whose old and new value do not fit on one line of the history. The
+ *  history opens them as blocks below the change ("Werte anzeigen"). */
+const BLOCK_DIFF: ReadonlySet<string> = new Set(['positions', 'table', 'textarea']);
 
 /** The tabs of the detail when the list and the detail do not sit side by side. */
 type DetailTab = 'app' | 'history' | 'comments' | 'files';
@@ -355,9 +361,10 @@ export class ApplicationsDetailComponent {
   }
 
   /**
-   * One value of the version diff, formatted the way the answers show the field, or
-   * `null` when the value does not fit on one line (cost positions, tables, long texts,
-   * lists): the history then names only the field.
+   * One value of the version diff on the change line, formatted the way the answers
+   * show the field. Cost positions give their summary ("3 Kostenpositionen ·
+   * 395,00 €"). A long text, a table or an object of an unknown key gives `null`: the
+   * line names only the field, and `fmtBlock` gives the value.
    *
    * The diff carries a key, not a field definition, so the type comes from the key.
    * A key the form does not define (an answer of an older form version) keeps the
@@ -365,7 +372,8 @@ export class ApplicationsDetailComponent {
    */
   readonly fmt = (value: unknown, key?: string): string | null => {
     const field = key === undefined ? undefined : this.fieldByKey().get(key);
-    if (field && NO_INLINE_DIFF.has(field.type)) return null;
+    if (field?.type === 'positions') return this.positionsSummary(value);
+    if (field && BLOCK_DIFF.has(field.type)) return null;
     if (!field && value !== null && typeof value === 'object') return null;
     const text = field
       ? formatAnswer(field, value, {
@@ -376,6 +384,63 @@ export class ApplicationsDetailComponent {
       : formatFieldValue(value);
     return text || '—';
   };
+
+  /**
+   * One value of the version diff as a block below the change line, or `null` when the
+   * line holds it all. A text keeps its line breaks. The cost positions give one line
+   * per position and one indented line per offer, so a changed offer shows too. A table
+   * and an object of an unknown key give one line per row.
+   */
+  readonly fmtBlock = (value: unknown, key?: string): string | null => {
+    const field = key === undefined ? undefined : this.fieldByKey().get(key);
+    const block = field ? BLOCK_DIFF.has(field.type) : value !== null && typeof value === 'object';
+    if (!block) return null;
+    if (field?.type === 'positions') return this.positionsBlock(value) || '—';
+    if (typeof value === 'string') return value.trim() ? value : '—';
+    return rowLines(value) || '—';
+  };
+
+  /** "3 Kostenpositionen · 395,00 €"; the total counts the preferred offers. */
+  private positionsSummary(value: unknown): string {
+    const positions = normalizePositions(value);
+    if (!positions.length) return '—';
+    const t = this.i18n;
+    const count = t.translate(
+      positions.length === 1 ? 'apply.positions.countOne' : 'apply.positions.countOther',
+      { count: positions.length },
+    );
+    return `${count} · ${this.money(positionsTotal(positions))}`;
+  }
+
+  /**
+   * The cost positions, one line each ("Raummiete · 177,75 €"), with the offers below
+   * ("– Studierendenwerk · 177,75 € · bevorzugt") and the reason of a position without
+   * comparison offers.
+   */
+  private positionsBlock(value: unknown): string {
+    const t = this.i18n;
+    const lines: string[] = [];
+    for (const p of normalizePositions(value)) {
+      const name = p.label.trim() || t.translate('forms.positions.untitled');
+      lines.push(`${name} · ${this.money(positionValue(p))}`);
+      if (p.noOffers) {
+        const reason = p.noOffersReason.trim();
+        const short = t.translate('forms.positions.noOffersShort');
+        lines.push(`   ${reason ? `${short}: ${reason}` : short}`);
+      }
+      for (const o of p.offers) {
+        const parts = [o.label.trim() || '—', this.money(o.value)];
+        if (o.preferred) parts.push(t.translate('forms.positions.preferred'));
+        lines.push(`   – ${parts.join(' · ')}`);
+      }
+    }
+    return lines.join('\n');
+  }
+
+  /** An amount in euro; a missing value counts as 0, as on the server. */
+  private money(value: number | null): string {
+    return formatEuro(Number(value), this.i18n.locale()) ?? '';
+  }
 
   /** The label of a field of the diff, or its key when the form does not define it. */
   private fieldLabel(key: string): string {
@@ -394,25 +459,45 @@ export class ApplicationsDetailComponent {
         label: this.fieldLabel(key),
       }));
     }
+    // The long values below the line; a side the change does not have stays null.
+    const detail = (
+      key: string,
+      sides: { old?: unknown; new?: unknown },
+    ): HistoryChange['detail'] => {
+      const old = 'old' in sides ? this.fmtBlock(sides.old, key) : null;
+      const neu = 'new' in sides ? this.fmtBlock(sides.new, key) : null;
+      return old === null && neu === null ? null : { old, new: neu };
+    };
     return [
-      ...version.diff.changed.map((c) => ({
-        kind: 'warn' as const,
-        tag: t('applications.history.diff.changed'),
-        label: this.fieldLabel(c.key),
-        old: this.fmt(c.old, c.key),
-        new: this.fmt(c.new, c.key),
-      })),
+      ...version.diff.changed.map((c) => {
+        const more = detail(c.key, { old: c.old, new: c.new });
+        let old = this.fmt(c.old, c.key);
+        let neu = this.fmt(c.new, c.key);
+        // The same summary on both sides ("3 Kostenpositionen · 395,00 €" when an offer
+        // text changed) says nothing: the line names the field, the blocks show it.
+        if (more && old === neu) old = neu = null;
+        return {
+          kind: 'warn' as const,
+          tag: t('applications.history.diff.changed'),
+          label: this.fieldLabel(c.key),
+          old,
+          new: neu,
+          detail: more,
+        };
+      }),
       ...version.diff.added.map((a) => ({
         kind: 'accent' as const,
         tag: t('applications.history.diff.added'),
         label: this.fieldLabel(a.key),
         new: this.fmt(a.value, a.key),
+        detail: detail(a.key, { new: a.value }),
       })),
       ...version.diff.removed.map((r) => ({
         kind: 'error' as const,
         tag: t('applications.history.diff.removed'),
         label: this.fieldLabel(r.key),
         old: this.fmt(r.value, r.key),
+        detail: detail(r.key, { old: r.value }),
       })),
     ];
   }
@@ -1100,4 +1185,26 @@ export class ApplicationsDetailComponent {
       error: () => {},
     });
   }
+}
+
+/**
+ * A table answer, or an object of an unknown key, as lines: one row each, the cells as
+ * "Spalte: Wert" joined by a dot. A scalar row keeps its text.
+ */
+function rowLines(value: unknown): string {
+  const cell = (v: unknown): string =>
+    v !== null && typeof v === 'object' ? JSON.stringify(v) : formatFieldValue(v);
+  const row = (r: unknown): string =>
+    r !== null && typeof r === 'object' && !Array.isArray(r)
+      ? Object.entries(r as Record<string, unknown>)
+          .map(([k, v]) => `${k}: ${cell(v)}`)
+          .join(' · ')
+      : cell(r);
+  if (Array.isArray(value)) return value.map(row).join('\n');
+  if (value !== null && typeof value === 'object') {
+    return Object.entries(value as Record<string, unknown>)
+      .map(([k, v]) => `${k}: ${cell(v)}`)
+      .join('\n');
+  }
+  return formatFieldValue(value);
 }

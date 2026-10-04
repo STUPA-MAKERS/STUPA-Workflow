@@ -1,6 +1,14 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  input,
+  signal,
+} from '@angular/core';
 import { IconComponent, type IconName } from '@stupa-makers/ui-kit';
 import { I18nService } from '@core/i18n/i18n.service';
+import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { StatusKind } from '../../status-kind.util';
 import { StatusTextComponent } from '../status-text/status-text.component';
 
@@ -17,6 +25,13 @@ export interface HistoryChange {
   old?: string | null;
   /** The value after. */
   new?: string | null;
+  /**
+   * The long values of the change (a text, the cost positions, a table), one block each.
+   * The line then has a button that opens them below it ("Werte anzeigen"). A block
+   * keeps its line breaks. Leave out a side that does not exist, for example `old` for
+   * an added field.
+   */
+  detail?: { old?: string | null; new?: string | null } | null;
 }
 
 /** One event of a history. */
@@ -50,8 +65,10 @@ let nextId = 0;
  * A history, grouped by day: newest day first, and in each day the newest event first.
  *
  * A status title takes its colour (`kind`); any other event stays in the text colour.
- * The changed fields of an event follow as lines: "Geändert Feld: alt → neu". The
- * meta line gives the actor and the time. Each day is a list, named by its date.
+ * The changed fields of an event follow as lines: "Geändert Feld: alt → neu". A change
+ * with long values (`detail`) gets a button that opens the old and the new value as
+ * blocks below the line, so a changed text stays readable in full. The meta line gives
+ * the actor and the time. Each day is a list, named by its date.
  * Entries with a missing or invalid `at` go into a last group, "Ohne Datum", without a
  * time.
  */
@@ -59,7 +76,7 @@ let nextId = 0;
   selector: 'app-history',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [IconComponent, StatusTextComponent],
+  imports: [IconComponent, StatusTextComponent, TranslatePipe],
   templateUrl: './history.component.html',
   styleUrl: './history.component.scss',
 })
@@ -71,6 +88,39 @@ export class HistoryComponent {
   readonly surface = input<1 | 2 | 3>(2);
 
   protected readonly id = `history-${nextId++}`;
+
+  /** The changes whose long values the reader opened, as `day:entry:change`. */
+  private readonly opened = signal<ReadonlySet<string>>(new Set());
+
+  /** The values of this change are open. */
+  protected isOpen(key: string): boolean {
+    return this.opened().has(key);
+  }
+
+  /** Open or close the values of a change. */
+  protected toggle(key: string): void {
+    this.opened.update((cur) => {
+      const next = new Set(cur);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  /**
+   * The lines of a long value. The leading spaces of a line become its indent, so a
+   * wrapped line stays in its column (the offers below a cost position). A tab counts as
+   * four spaces.
+   */
+  protected lines(text: string | null | undefined): { text: string; indent: number }[] {
+    return (text ?? '').split('\n').map((line) => {
+      const lead = /^[ \t]*/.exec(line)?.[0] ?? '';
+      return {
+        text: line.slice(lead.length),
+        indent: [...lead].reduce((n, ch) => n + (ch === '\t' ? 4 : 1), 0),
+      };
+    });
+  }
 
   /** A change value is given: an empty text counts, `null` and `undefined` do not. */
   protected has(value: string | null | undefined): boolean {

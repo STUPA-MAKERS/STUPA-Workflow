@@ -26,8 +26,11 @@ class TransitionOut(_CamelModel):
     color: str | None = None
     # Requires action: the transition counts as an open task in the tasks tab.
     requires_action: bool = Field(default=True, alias="requiresAction")
-    # The transition carries an `addToNextSession` action. The UI then offers the
-    # "put on the agenda" dialog with the planned meetings of `agendaGremiumId`.
+    # The transition carries an `addToNextSession` action and leads into a vote state,
+    # so a fire takes a `meetingId`. The UI then offers the "put on the agenda" dialog
+    # with the planned meetings of `agendaGremiumId`. A transition with the action into
+    # a normal state has `false` here: it fires without a meeting, and the action picks
+    # the next planned meeting after the commit.
     adds_to_agenda: bool = Field(default=False, alias="addsToAgenda")
     agenda_gremium_id: UUID | None = Field(default=None, alias="agendaGremiumId")
 

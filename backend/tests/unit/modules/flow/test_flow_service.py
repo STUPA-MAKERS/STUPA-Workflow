@@ -915,6 +915,24 @@ def test_agenda_gremium_id_reads_the_first_agenda_action() -> None:
     ) is None
 
 
+async def test_available_flags_the_agenda_only_into_a_vote_state() -> None:
+    # Only a fire into a vote state takes a meeting (`_check_agenda_meeting`). The UI
+    # asks for one only where `addsToAgenda` is set.
+    flow_id, draft, voting, done, gid = uuid4(), uuid4(), uuid4(), uuid4(), uuid4()
+    app = _app(draft, flow_id)
+    action = [{"type": "addToNextSession", "gremiumId": str(gid)}]
+    to_vote = _transition(flow_id=flow_id, from_id=draft, to_id=voting, actions=action)
+    to_done = _transition(flow_id=flow_id, from_id=draft, to_id=done, actions=action)
+    plain = _transition(flow_id=flow_id, from_id=draft, to_id=voting)
+    # _load_app, _outgoing, the vote states among the agenda targets.
+    db = fake_session(result(app), result(to_vote, to_done, plain), result(voting))
+
+    out = {t.id: t for t in await FlowService(db).available_transitions(app.id, _principal())}
+    assert (out[to_vote.id].adds_to_agenda, out[to_vote.id].agenda_gremium_id) == (True, gid)
+    assert (out[to_done.id].adds_to_agenda, out[to_done.id].agenda_gremium_id) == (False, None)
+    assert (out[plain.id].adds_to_agenda, out[plain.id].agenda_gremium_id) == (False, None)
+
+
 async def test_schedule_deadline_without_commit_leaves_it_to_the_caller() -> None:
     app = SimpleNamespace(id=uuid4(), created_at=None, updated_at=None, flow_version_id=uuid4())
     state = SimpleNamespace(id=uuid4(), config={})

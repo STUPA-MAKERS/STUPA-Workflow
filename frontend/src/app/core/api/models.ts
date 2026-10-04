@@ -327,7 +327,8 @@ export interface TransitionOutWire {
   label: I18nMap;
   /** Optional color for the decision button. */
   color?: string | null;
-  /** The transition carries an `addToNextSession` action (A1). */
+  /** The transition carries an `addToNextSession` action into a vote state (A1), so a
+   *  fire takes a `meetingId`. */
   addsToAgenda?: boolean;
   /** The gremium whose planned meetings the agenda dialog offers (A1). */
   agendaGremiumId?: Uuid | null;
@@ -589,8 +590,11 @@ export interface Transition {
   /** Optional color for the decision button. `null` selects the default. */
   color: string | null;
   /**
-   * The transition puts the application on the agenda of a meeting (A1). The detail and
-   * the row menu open the agenda dialog for it, which asks for the meeting.
+   * The transition puts the application on the agenda of a meeting and leads into a
+   * vote state (A1), so the server takes a chosen meeting. The detail and the row menu
+   * open the agenda dialog for it, which asks for the meeting. A transition whose
+   * action leads into a normal state is `false` here and fires as a plain transition;
+   * the server action then picks the next planned meeting.
    */
   addsToAgenda: boolean;
   /** The gremium whose planned meetings the agenda dialog offers, or null. */

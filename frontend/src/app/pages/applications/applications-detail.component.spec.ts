@@ -902,11 +902,12 @@ describe('ApplicationsDetailComponent', () => {
     fields: FormFieldDef[],
     data: Record<string, unknown>,
     extra: Partial<ApplicationOutWire> = {},
+    versions: VersionOutWire[] = VERSIONS,
   ): Promise<Awaited<ReturnType<typeof setup>>> {
     return (async () => {
       const ctx = await setup();
       ctx.http.expectOne(url('')).flush({ ...appWire(), data, ...extra });
-      ctx.http.expectOne(url('/versions')).flush(VERSIONS);
+      ctx.http.expectOne(url('/versions')).flush(versions);
       ctx.http.expectOne(url('/comments')).flush(COMMENTS);
       for (const req of ctx.http.match((r) => r.method === 'GET' && r.url === '/api/budgets')) {
         req.flush([]);
@@ -1047,22 +1048,114 @@ describe('ApplicationsDetailComponent', () => {
     http.verify();
   });
 
-  it('names a long or complex value of the diff only by its field', async () => {
+  it('keeps a long or complex value of the diff out of the line and in a block', async () => {
     const fields: FormFieldDef[] = [
       { key: 'kosten', type: 'positions', label: { de: 'Kostenaufstellung' } },
       { key: 'text', type: 'textarea', label: { de: 'Beschreibung' } },
+      { key: 'tbl', type: 'table', label: { de: 'Tabelle' } },
       { key: 'agree', type: 'checkbox', label: { de: 'Zustimmung' } },
     ];
     const { http, cmp } = await setupWithFields(fields, {});
     flushAttachments(http);
-    expect(cmp.fmt([{ label: 'x' }], 'kosten')).toBeNull();
+    const positions = [
+      {
+        label: 'Raummiete',
+        offers: [
+          { label: 'Studierendenwerk', value: 177.75, preferred: true },
+          { label: 'Hotel', value: 200, preferred: false },
+        ],
+      },
+      { label: '', noOffers: true, noOffersReason: 'Einziger Anbieter', offers: [{ label: 'Mensa', value: 20, preferred: true }] },
+    ];
+    // Cost positions: the summary on the line, every position and offer in the block.
+    expect(cmp.fmt(positions, 'kosten')).toBe('2 Kostenpositionen · 197,75\u00a0€');
+    expect(cmp.fmt([positions[0]], 'kosten')).toBe('1 Kostenposition · 177,75\u00a0€');
+    expect(cmp.fmt([], 'kosten')).toBe('—');
+    expect(cmp.fmtBlock(positions, 'kosten')).toBe(
+      [
+        'Raummiete · 177,75\u00a0€',
+        '   – Studierendenwerk · 177,75\u00a0€ · bevorzugt',
+        '   – Hotel · 200,00\u00a0€',
+        'Position ohne Namen · 20,00\u00a0€',
+        '   ohne Vergleichsangebote: Einziger Anbieter',
+        '   – Mensa · 20,00\u00a0€ · bevorzugt',
+      ].join('\n'),
+    );
+    expect(cmp.fmtBlock(null, 'kosten')).toBe('—');
+    // A long text: only the field name on the line, the whole text in the block.
     expect(cmp.fmt('lang', 'text')).toBeNull();
+    expect(cmp.fmtBlock('Zeile 1\nZeile 2', 'text')).toBe('Zeile 1\nZeile 2');
+    expect(cmp.fmtBlock('  ', 'text')).toBe('—');
+    // A table: one line per row.
+    expect(cmp.fmt([{ a: 1 }], 'tbl')).toBeNull();
+    expect(cmp.fmtBlock([{ a: 1, b: 'x' }, 'frei', { c: { d: 2 } }], 'tbl')).toBe(
+      'a: 1 · b: x\nfrei\nc: {"d":2}',
+    );
+    expect(cmp.fmtBlock(null, 'tbl')).toBe('—');
+    // A short field: on the line, no block.
     expect(cmp.fmt(false, 'agree')).toBe('Nein');
     expect(cmp.fmt(null, 'agree')).toBe('—');
-    // A key without a field: a scalar stays text, an object has no inline value.
+    expect(cmp.fmtBlock(false, 'agree')).toBeNull();
+    // A key without a field: a scalar stays text, an object goes into the block.
     expect(cmp.fmt('alt', 'gone')).toBe('alt');
+    expect(cmp.fmtBlock('alt', 'gone')).toBeNull();
     expect(cmp.fmt({ a: 1 }, 'gone')).toBeNull();
+    expect(cmp.fmtBlock({ a: 1, b: [2] }, 'gone')).toBe('a: 1\nb: [2]');
     expect(cmp.fmt('ohne', undefined)).toBe('ohne');
+    http.verify();
+  });
+
+  it('opens the old and the new text of a changed long text below its line', async () => {
+    const fields: FormFieldDef[] = [{ key: 'title', type: 'textarea', label: { de: 'Beschreibung' } }];
+    const { http, cmp, detectChanges, container } = await setupWithFields(fields, {});
+    flushAttachments(http);
+    const version2 = cmp.historyEntries().find((e) => e.title === 'Version 2');
+    expect(version2?.changes?.[0]).toMatchObject({
+      label: 'Beschreibung',
+      old: null,
+      new: null,
+      detail: { old: 'Fest', new: 'Förderung Fest' },
+    });
+    const more = screen.getByRole('button', { name: 'Werte anzeigen' });
+    expect(more).toHaveAttribute('aria-expanded', 'false');
+    expect(more).not.toHaveAttribute('aria-controls');
+    await userEvent.click(more);
+    detectChanges();
+    const less = screen.getByRole('button', { name: 'Werte ausblenden' });
+    expect(less).toHaveAttribute('aria-expanded', 'true');
+    const values = container.querySelector(`#${less.getAttribute('aria-controls')}`);
+    expect(values?.querySelector('del')?.textContent?.trim()).toBe('Fest');
+    expect(values?.querySelector('ins')?.textContent?.trim()).toBe('Förderung Fest');
+    expect(values).toHaveTextContent('Vorher');
+    expect(values).toHaveTextContent('Nachher');
+    http.verify();
+  });
+
+  it('leaves out a summary that did not change and keeps the blocks', async () => {
+    const fields: FormFieldDef[] = [{ key: 'kosten', type: 'positions', label: { de: 'Kostenaufstellung' } }];
+    const offer = (label: string) => [
+      { label: 'Raum', offers: [{ label, value: 10, preferred: true }] },
+    ];
+    const { http, cmp } = await setupWithFields(fields, {}, {}, [
+      VERSIONS[0],
+      {
+        ...VERSIONS[1],
+        diff: {
+          added: { kosten: offer('Neu') },
+          removed: {},
+          changed: { kosten: { old: offer('A'), new: offer('B') } },
+        },
+      },
+    ]);
+    flushAttachments(http);
+    const changes = cmp.historyEntries().find((e) => e.title === 'Version 2')?.changes ?? [];
+    // Only an offer text changed: the totals are the same, so only the blocks differ.
+    expect(changes[0]).toMatchObject({ old: null, new: null });
+    expect(changes[0].detail?.old).toContain('– A · 10,00');
+    expect(changes[0].detail?.new).toContain('– B · 10,00');
+    // An added field keeps its summary and has only the new block.
+    expect(changes[1]).toMatchObject({ new: '1 Kostenposition · 10,00\u00a0€' });
+    expect(changes[1].detail?.old).toBeNull();
     http.verify();
   });
 
