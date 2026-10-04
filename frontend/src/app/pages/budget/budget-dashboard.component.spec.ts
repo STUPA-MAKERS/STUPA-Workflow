@@ -241,14 +241,43 @@ describe('BudgetDashboardComponent', () => {
     });
 
     it('gives a node its own or inherited colour and draws the swatch only then', async () => {
-      const { c } = await setup({ queryParams: { ks: 'b-810' } });
-      const rows = c.treeRows() as { node: { id: string }; color: string | null }[];
-      const color = (id: string) => rows.find((r) => r.node.id === id)?.color;
-      expect(color('b-vs')).toBeNull();
-      expect(color('b-800')).toBe('#0075bf');
+      const view = await setup({ queryParams: { ks: 'b-810' } });
+      const rows = view.c.treeRows() as { node: { id: string }; color: string; swatch: boolean }[];
+      const row = (id: string) => rows.find((r) => r.node.id === id);
+      expect(row('b-800')?.color).toBe('#0075bf');
       // O19: the colour of the faculty above.
-      expect(color('b-810')).toBe('#0075bf');
-      expect(color('b-900')).toBeNull();
+      expect(row('b-810')?.color).toBe('#0075bf');
+      // No colour of its own or above: the palette colour of its position (gaps D6).
+      expect(row('b-vs')?.color).toBe(PALETTE[0]);
+      expect(row('b-900')?.color).toBe(PALETTE[1]);
+      expect(rows.map((r) => [r.node.id, r.swatch])).toEqual([
+        ['b-vs', false],
+        ['b-800', true],
+        ['b-810', true],
+        ['b-900', false],
+      ]);
+      expect(view.container.querySelectorAll('.tn__swatch').length).toBe(2);
+    });
+
+    it('draws a cost centre in one colour in the tree, the chart and the bars', async () => {
+      const { c } = await setup();
+      const tree = new Map(
+        (c.treeRows() as { node: { id: string }; color: string }[]).map((r) => [r.node.id, r.color]),
+      );
+      const pie = new Map(
+        (c.distribution() as { id?: string; color: string }[])
+          .filter((s) => s.id)
+          .map((s) => [s.id, s.color]),
+      );
+      const bars = new Map(
+        (c.usageRows() as { node: { id: string }; color: string }[]).map((r) => [r.node.id, r.color]),
+      );
+      for (const id of ['b-800', 'b-900']) {
+        expect(pie.get(id)).toBe(tree.get(id));
+        expect(bars.get(id)).toBe(tree.get(id));
+      }
+      // The node without any colour is the case that drifted apart before.
+      expect(tree.get('b-900')).toBe(PALETTE[1]);
     });
 
     it('opens the path to a cost centre the URL names', async () => {
@@ -788,7 +817,8 @@ describe('BudgetDashboardComponent', () => {
     c.selectKs('ghost');
     expect(c.selectedBudgetId()).toBe('ghost');
     expect(c.breadcrumbs()).toEqual([]);
-    expect(c['childColors']()).toEqual([]);
+    expect(c.distribution()).toEqual([]);
+    expect(c.usageRows()).toEqual([]);
     flushApps(http);
     // Nothing selected: no request, no rows, and the URL loses the params.
     c['setSelection']('', '', '');

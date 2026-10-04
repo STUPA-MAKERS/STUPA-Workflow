@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, input, output } from '@an
 import { NgTemplateOutlet } from '@angular/common';
 import type { Uuid } from '@core/api/models';
 import type { BudgetTreeNode } from './budget-tree.api';
-import { paletteColor } from './budget-color.util';
+import { nodeColors, paletteColor } from './budget-color.util';
 
 /**
  * Reusable cost-centre tree picker. It looks like the budget-to-year tree
@@ -31,12 +31,13 @@ export class CostCentreTreeComponent {
   /** Selected cost center. The value ``''`` means all. */
   readonly picked = output<Uuid | ''>();
 
-  private readonly rootIds = computed(() => this.nodes().map((n) => n.id));
+  /** Display colour per node, by the same rule as the budget page (`nodeColors`). */
+  private readonly colors = computed(() => nodeColors(this.nodes()));
 
-  /** Colour of a root: the set colour, else a stable palette colour by position. */
+  /** Colour of a root: the set colour, else a stable palette colour by position. A node
+   *  that is not in the tree gets its own colour, else the last palette colour. */
   dotColor(node: BudgetTreeNode): string {
-    if (node.color) return node.color;
-    return paletteColor(this.rootIds().indexOf(node.id));
+    return this.colors().get(node.id) ?? (node.color?.trim() || paletteColor(-1));
   }
 
   /** The own colour of a node below the roots, or `null`. Only a node with its own colour

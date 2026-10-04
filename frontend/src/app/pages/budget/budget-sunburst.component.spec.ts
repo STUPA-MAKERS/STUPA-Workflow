@@ -47,7 +47,12 @@ function node(
 const FY = 'fy-1';
 
 async function setup(
-  inputs: Partial<{ root: BudgetTreeNode | null; fyId: string; metric: string }> = {},
+  inputs: Partial<{
+    root: BudgetTreeNode | null;
+    fyId: string;
+    metric: string;
+    colors: ReadonlyMap<string, string> | null;
+  }> = {},
 ) {
   const view = await render(BudgetSunburstComponent, {
     inputs: { root: null, fyId: FY, metric: 'allocated', ...inputs },
@@ -131,6 +136,13 @@ describe('BudgetSunburstComponent', () => {
     const root = node('root', { fiscalYearId: FY, allocated: '50' }, [colored]);
     const { c } = await setup({ root });
     expect(c.segments()[0].color).toBe('#abcdef');
+  });
+
+  it('takes the colours of the page when it gets them', async () => {
+    const child = node('a', { fiscalYearId: FY, allocated: '50' });
+    const root = node('root', { fiscalYearId: FY, allocated: '50' }, [child]);
+    const { c } = await setup({ root, colors: new Map([['a', '#123456']]) });
+    expect(c.segments()[0].color).toBe('#123456');
   });
 
   it('emits the root id from the centre click and the segment id from a segment click', async () => {

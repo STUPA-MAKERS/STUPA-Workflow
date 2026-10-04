@@ -142,11 +142,13 @@
         <section class="bd__sec" aria-labelledby="bd-usage">
           <div class="bd__secHead">
             <h3 id="bd-usage" class="bd__h">{{ 'budget.usage.heading' | t }}</h3>
-            <span class="bd__legend" aria-hidden="true">
-              <span class="bd__swatch bd__swatch--spent"></span>{{ 'budget.dash.fig.expended' | t }}
-            </span>
-            <span class="bd__legend" aria-hidden="true">
-              <span class="bd__swatch bd__swatch--bound"></span>{{ 'budget.dash.fig.bound' | t }}
+            <span class="bd__legends" aria-hidden="true">
+              <span class="bd__legend">
+                <span class="bd__swatch bd__swatch--spent"></span>{{ 'budget.dash.fig.expended' | t }}
+              </span>
+              <span class="bd__legend">
+                <span class="bd__swatch bd__swatch--bound"></span>{{ 'budget.dash.fig.bound' | t }}
+              </span>
             </span>
           </div>
           <div class="bd__usageCols" aria-hidden="true">
@@ -273,7 +275,7 @@
               (click)="selectKs(row.node.id)"
             >
               <span class="tn__line">
-                @if (row.color) {
+                @if (row.swatch) {
                   <span class="tn__swatch" [style.background]="row.color" aria-hidden="true"></span>
                 }
                 <span class="tn__name ell" [class.tn__name--root]="row.depth === 0">{{ row.node.name }}</span>
@@ -347,6 +349,7 @@
       [root]="overviewRoot()"
       [fyId]="selectedFyId()"
       [metric]="activeOverviewMetric()"
+      [colors]="colors()"
       (nodeClick)="onOverviewPick($event)"
     />
   </app-dialog>

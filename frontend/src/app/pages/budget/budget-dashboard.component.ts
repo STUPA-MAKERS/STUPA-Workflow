@@ -35,7 +35,7 @@ import {
 } from './budget-tree.api';
 import { BudgetPieComponent, type PieSlice } from './budget-pie.component';
 import { BudgetSunburstComponent, type SunburstMetric } from './budget-sunburst.component';
-import { resolveNodeColors, siblingColors } from './budget-color.util';
+import { nodeColors, resolveNodeColors } from './budget-color.util';
 
 /** The amounts of one cost centre in one fiscal year, as numbers. */
 export interface Figures {
@@ -62,8 +62,10 @@ interface TreeRow {
   depth: number;
   hasChildren: boolean;
   expanded: boolean;
-  /** Own or inherited colour; `null` draws in the accent. */
-  color: string | null;
+  /** Display colour of the node (see `nodeColors`). */
+  color: string;
+  /** The node has an own or inherited colour, so the row shows a swatch. */
+  swatch: boolean;
   allocated: number;
   segments: Seg[];
   total: number | null;
@@ -73,7 +75,7 @@ interface TreeRow {
 /** One row of "Auslastung je Budget". */
 interface UsageRow {
   node: BudgetTreeNode;
-  color: string | null;
+  color: string;
   figures: Figures;
   percent: number | null;
   segments: Seg[];
@@ -234,8 +236,11 @@ export class BudgetDashboardComponent {
     return out;
   });
 
-  /** Own or inherited colour of every visible node (O19). */
-  private readonly colors = computed(() => resolveNodeColors(this.visibleTree()));
+  /** Own or inherited colour of every visible node, `null` when it has none (O19). */
+  private readonly setColors = computed(() => resolveNodeColors(this.visibleTree()));
+  /** Display colour of every visible node. The tree, the bars and the charts all use it,
+   *  so a cost centre has one colour on the page (gaps D6). */
+  readonly colors = computed(() => nodeColors(this.visibleTree()));
 
   private readonly selectedKs = computed(() => this.nodeById().get(this.selectedKsId()) ?? null);
   /** The selected cost centre, for the template. */
@@ -287,6 +292,7 @@ export class BudgetDashboardComponent {
     const q = this.query().trim().toLowerCase();
     const open = this.expanded();
     const colors = this.colors();
+    const set = this.setColors();
     const out: TreeRow[] = [];
     const matches = (n: BudgetTreeNode): boolean =>
       n.name.toLowerCase().includes(q) ||
@@ -314,7 +320,8 @@ export class BudgetDashboardComponent {
         depth,
         hasChildren: n.children.length > 0,
         expanded,
-        color: colors.get(n.id) ?? null,
+        color: colors.get(n.id) ?? '',
+        swatch: set.get(n.id) != null,
         allocated: f.allocated,
         segments: [{ value: f.committed, tone: f.available < 0 ? 'error' : 'filled' }],
         total: total > 0 ? total : null,
@@ -376,23 +383,17 @@ export class BudgetDashboardComponent {
   /** The selected cost centre has sub cost centres to distribute over. */
   readonly hasChildren = computed(() => (this.selectedKs()?.children.length ?? 0) > 0);
 
-  /** The direct sub cost centres with their chart colours. */
-  private readonly childColors = computed(() => {
-    const ks = this.selectedKs();
-    return ks ? siblingColors(ks.children, this.colors()) : [];
-  });
-
   /** "Verteilung": the chosen figure over the direct sub cost centres. The part the
    *  selected cost centre keeps for itself is its own grey slice. */
   readonly distribution = computed<PieSlice[]>(() => {
     const ks = this.selectedKs();
     if (!ks?.children.length) return [];
     const metric = this.metric();
-    const colors = this.childColors();
-    const slices: PieSlice[] = ks.children.map((c, i) => ({
+    const colors = this.colors();
+    const slices: PieSlice[] = ks.children.map((c) => ({
       label: c.name,
       value: this.figuresOf(c)[metric],
-      color: colors[i],
+      color: colors.get(c.id) ?? '',
       id: c.id,
     }));
     const own = this.figuresOf(ks)[metric] - slices.reduce((s, x) => s + x.value, 0);
@@ -420,15 +421,13 @@ export class BudgetDashboardComponent {
     const ks = this.selectedKs();
     if (!ks) return [];
     const nodes = ks.children.length ? ks.children : [ks];
-    const colors = ks.children.length
-      ? this.childColors()
-      : [this.colors().get(ks.id) ?? null];
-    return nodes.map((node, i) => {
+    const colors = this.colors();
+    return nodes.map((node) => {
       const f = this.figuresOf(node);
       const total = f.available + f.committed;
       return {
         node,
-        color: colors[i],
+        color: colors.get(node.id) ?? '',
         figures: f,
         percent: utilisation(f),
         segments: [

@@ -30,10 +30,14 @@ SUPERSEDED for `/budget`. The data rules, the colours and the URL sync stay.
 - **Narrow and phone:** title + actions on top, a path chip (opens the tree in a start side sheet)
   and the year chip, the figures as cards (3 or 2 columns), the sections as cards.
 - **Colours (O19, user: "koloriert nach Fakultätsfarben"):** `pages/budget/budget-color.util.ts`.
-  A node without an own colour takes the colour of the nearest coloured ancestor. The tree and
-  the bars use it (the seg-bar takes it through `--color-accent`); without one they use the
-  accent. Charts use `siblingColors`: an own colour, else shades of a shared inherited colour,
-  else the PALETTE colour of the position. A swatch shows only for a node with a colour.
+  One function, `nodeColors`, gives each node one display colour (gaps D6). The tree rows, the
+  "Auslastung" bars (the seg-bar takes it through `--color-accent`), the "Verteilung" donut,
+  the sunburst and the picker roots all use it. Rule: an own colour; else the colour of the
+  nearest coloured ancestor, in shades when siblings share it; else the PALETTE colour of the
+  position among the siblings. Below the top level that palette colour goes down to the
+  children like an own colour; a top budget does not hand it down, so its first split shows
+  different colours. A swatch shows only for a node with an own or inherited colour
+  (`resolveNodeColors`).
 - **Several roots:** fiscal years belong to a top budget. A node under another root shows the
   year with the same start year; a pick there switches root and year.
 - **Mock:** `core/api/mock-budget.ts` (lazy import in the mock interceptor) serves /budgets,

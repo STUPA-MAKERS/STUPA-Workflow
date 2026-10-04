@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, input, output } from '@an
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { Uuid } from '@core/api/models';
 import type { BudgetTreeNode, FiscalYear } from './budget-tree.api';
-import { paletteColor } from './budget-color.util';
+import { nodeColors, paletteColor } from './budget-color.util';
 
 /** Selection in the left tree: a top budget and a fiscal year. */
 export interface BudgetYearSelection {
@@ -37,7 +37,8 @@ export class BudgetYearTreeComponent {
 
   private readonly MAX = 5;
 
-  readonly palette = computed(() => this.tops().map((t) => t.id));
+  /** Display colour per budget, by the same rule as the budget page (`nodeColors`). */
+  private readonly colors = computed(() => nodeColors(this.tops()));
 
   years(budgetId: Uuid): FiscalYear[] {
     return this.fiscalYears()[budgetId] ?? [];
@@ -55,10 +56,10 @@ export class BudgetYearTreeComponent {
       .join(', ');
   }
 
-  /** Colour of a node. It uses the set colour, else a stable palette colour by index. */
+  /** Colour of a budget: the set colour, else a stable palette colour by position. A
+   *  node that is not in `tops` gets its own colour, else the last palette colour. */
   dotColor(node: BudgetTreeNode): string {
-    if (node.color) return node.color;
-    return paletteColor(this.palette().indexOf(node.id));
+    return this.colors().get(node.id) ?? (node.color?.trim() || paletteColor(-1));
   }
 
   pickBudget(b: BudgetTreeNode): void {

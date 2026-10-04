@@ -1,10 +1,10 @@
 import type { BudgetTreeNode } from './budget-tree.api';
 import {
   PALETTE,
+  nodeColors,
   paletteColor,
   resolveNodeColors,
   shadeColor,
-  siblingColors,
 } from './budget-color.util';
 
 function node(id: string, color: string | null, children: BudgetTreeNode[] = []): BudgetTreeNode {
@@ -90,18 +90,40 @@ describe('shadeColor', () => {
   });
 });
 
-describe('siblingColors', () => {
+describe('nodeColors', () => {
   it('keeps own colours, shades shared inherited ones and falls back to the palette', () => {
     const parent = node('p', '#0075bf', [node('a', null), node('b', null)]);
     const free = node('f', null);
-    const colors = resolveNodeColors([parent, free]);
-    expect(siblingColors(parent.children, colors)).toEqual(['#0075bf', shadeColor('#0075bf', 1)]);
-    expect(siblingColors([free], colors)).toEqual([PALETTE[0]]);
+    const colors = nodeColors([parent, free]);
+    expect(colors.get('p')).toBe('#0075bf');
+    expect(colors.get('a')).toBe('#0075bf');
+    expect(colors.get('b')).toBe(shadeColor('#0075bf', 1));
+    expect(colors.get('f')).toBe(PALETTE[1]);
   });
 
   it('starts an inherited colour at step 1 when a sibling holds it as its own', () => {
-    const children = [node('a', null), node('b', '#0075bf')];
-    const colors = resolveNodeColors([node('p', '#0075bf', children)]);
-    expect(siblingColors(children, colors)).toEqual([shadeColor('#0075bf', 1), '#0075bf']);
+    const colors = nodeColors([node('p', '#0075bf', [node('a', null), node('b', '#0075bf')])]);
+    expect(colors.get('a')).toBe(shadeColor('#0075bf', 1));
+    expect(colors.get('b')).toBe('#0075bf');
+  });
+
+  it('gives the first split below an uncoloured top node different palette colours', () => {
+    const colors = nodeColors([node('root', null, [node('x', null), node('y', null)])]);
+    expect(colors.get('root')).toBe(PALETTE[0]);
+    expect(colors.get('x')).toBe(PALETTE[0]);
+    expect(colors.get('y')).toBe(PALETTE[1]);
+  });
+
+  it('hands a palette colour down below the top level, so a branch keeps one hue', () => {
+    const branch = node('y', null, [node('y1', null), node('y2', null)]);
+    const colors = nodeColors([node('root', null, [node('x', null), branch])]);
+    expect(colors.get('y')).toBe(PALETTE[1]);
+    expect(colors.get('y1')).toBe(PALETTE[1]);
+    expect(colors.get('y2')).toBe(shadeColor(PALETTE[1], 1));
+  });
+
+  it('starts from the given inherited colour and ignores a blank one', () => {
+    expect(nodeColors([node('a', null)], '#abcdef').get('a')).toBe('#abcdef');
+    expect(nodeColors([node('a', null)], '  ').get('a')).toBe(PALETTE[0]);
   });
 });

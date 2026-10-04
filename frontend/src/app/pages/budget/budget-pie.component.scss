@@ -6,10 +6,12 @@
   container-type: inline-size;
 }
 
+/* The ring keeps 12px of its box free for the lifted slice, so a 16px gap puts the
+   legend about 36px from the ring, as on the Budget board. */
 .pie {
   display: flex;
   align-items: center;
-  gap: var(--space-6);
+  gap: var(--space-4);
   margin: 0;
   min-width: 0;
 }

@@ -1,16 +1,29 @@
 import type { BudgetTreeNode } from './budget-tree.api';
 
 /**
- * The display colours of the cost centres.
+ * The display colours of the cost centres (O19, gaps D6).
  *
  * A cost centre can carry its own colour (`BudgetTreeNode.color`), for example the colour
- * of a faculty. A node without a colour takes the colour of the nearest ancestor that has
- * one (O19), so the sub cost centres of a faculty read as part of it. A node with no
- * coloured ancestor has no colour: the tree and the bars then use the accent, and a chart
- * takes a colour from {@link PALETTE}.
+ * of a faculty. {@link nodeColors} gives every node one display colour, and every view of
+ * the budget page uses it: the tree rows, the "Auslastung je Budget" bars, the
+ * "Verteilung" chart and the overview. The pickers use it for their roots. So a cost
+ * centre has the same colour in each place.
+ *
+ * The rule, in this order:
+ *
+ * 1. A node with its own colour shows that colour.
+ * 2. A node without one takes the colour of the nearest ancestor that has one. Siblings
+ *    that share that colour get lighter and darker steps of it ({@link shadeColor}).
+ * 3. A node with no colour above it takes the {@link PALETTE} colour of its position
+ *    among its siblings. Below the top level, the node hands this colour down as if it
+ *    were its own, so a branch keeps one hue. A top-level node does not hand it down:
+ *    the first split of a budget then shows different colours.
+ *
+ * {@link resolveNodeColors} gives only the set colours (steps 1 and 2 without shading).
+ * The tree uses it to show a swatch only at a node with a set colour.
  */
 
-/** Chart colours for nodes without an own or inherited colour. The index keeps them stable. */
+/** Fallback colours for nodes without an own or inherited colour. The index keeps them stable. */
 export const PALETTE: readonly string[] = [
   '#5fb37a',
   '#4a90d9',
@@ -42,8 +55,7 @@ export function resolveNodeColors(
   const out = new Map<string, string | null>();
   const walk = (nodes: readonly BudgetTreeNode[], above: string | null): void => {
     for (const n of nodes) {
-      const own = n.color?.trim() || null;
-      const color = own ?? above;
+      const color = ownColor(n) ?? above;
       out.set(n.id, color);
       walk(n.children, color);
     }
@@ -54,7 +66,7 @@ export function resolveNodeColors(
 
 /**
  * A lighter or darker step of a hex colour, so that siblings that share an inherited
- * colour stay apart in a chart.
+ * colour stay apart.
  *
  * Step 0 is the colour itself. Odd steps mix towards white, even steps towards black, by
  * 18% more for each pair. A value that is not a `#rgb` or `#rrggbb` hex comes back as it is.
@@ -70,33 +82,46 @@ export function shadeColor(hex: string, step: number): string {
 }
 
 /**
- * The chart colours of a list of sibling nodes.
+ * The display colour of every node in a forest, by the rule at the top of this file.
  *
- * A node with an own colour keeps it. Siblings that share an inherited colour get the
- * steps of {@link shadeColor}, in their order; when a sibling has that colour as its own,
- * the inherited ones start at step 1. A node with no colour at all takes the
- * palette colour of its position.
+ * `inherited` is the colour above the given roots. A gremium-scoped tree starts at a sub
+ * cost centre whose parent is not in the response, so its roots inherit nothing.
  */
-export function siblingColors(
-  nodes: readonly BudgetTreeNode[],
-  colors: ReadonlyMap<string, string | null>,
-): string[] {
-  // An inherited colour that a sibling holds as its own starts at step 1, so the two
-  // never look the same.
-  const seen = new Map<string, number>();
-  for (const n of nodes) {
-    const own = n.color?.trim() || null;
-    if (own) seen.set(own, 1);
-  }
-  return nodes.map((n, i) => {
-    const own = n.color?.trim() || null;
-    if (own) return own;
-    const resolved = colors.get(n.id) ?? null;
-    if (!resolved) return paletteColor(i);
-    const step = seen.get(resolved) ?? 0;
-    seen.set(resolved, step + 1);
-    return shadeColor(resolved, step);
-  });
+export function nodeColors(
+  roots: readonly BudgetTreeNode[],
+  inherited: string | null = null,
+): Map<string, string> {
+  const out = new Map<string, string>();
+  const walk = (nodes: readonly BudgetTreeNode[], above: string | null, top: boolean): void => {
+    // An inherited colour that a sibling holds as its own starts at step 1, so the two
+    // never look the same.
+    const steps = new Map<string, number>();
+    for (const n of nodes) {
+      const own = ownColor(n);
+      if (own) steps.set(own, 1);
+    }
+    nodes.forEach((n, i) => {
+      const own = ownColor(n);
+      let color: string;
+      if (own) {
+        color = own;
+      } else if (above) {
+        const step = steps.get(above) ?? 0;
+        steps.set(above, step + 1);
+        color = shadeColor(above, step);
+      } else {
+        color = paletteColor(i);
+      }
+      out.set(n.id, color);
+      walk(n.children, own ?? above ?? (top ? null : color), false);
+    });
+  };
+  walk(roots, inherited?.trim() || null, true);
+  return out;
+}
+
+function ownColor(node: BudgetTreeNode): string | null {
+  return node.color?.trim() || null;
 }
 
 function parseHex(hex: string): { r: number; g: number; b: number } | null {

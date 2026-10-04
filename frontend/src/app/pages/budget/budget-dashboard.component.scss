@@ -255,7 +255,8 @@ button.tn__chev:hover:not(:disabled) {
   flex-direction: column;
   gap: 22px;
   min-width: 0;
-  padding: var(--space-6) var(--space-8);
+  // 24px 32px, as on the Budget board: the sheet keeps its width for the charts.
+  padding: var(--space-5) var(--space-6);
   border-radius: var(--radius-2xl);
   background: var(--color-surface-1);
 }
@@ -400,6 +401,17 @@ button.bd__crumb:hover {
   line-height: 1.5rem;
   font-weight: var(--fw-semibold);
 }
+/* The two legend items wrap as one group, never apart. */
+.bd__legends {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-4);
+  white-space: nowrap;
+}
+.bd__secHead > app-button {
+  flex: none;
+}
 .bd__legend {
   display: inline-flex;
   align-items: center;
@@ -452,14 +464,16 @@ button.bd__crumb:hover {
   text-align: end;
   white-space: nowrap;
 }
+/* The narrowest widths that still hold the column heads and an amount such as
+   "20.100 €", so the name column gets the rest. */
 .bd__c1 {
-  width: 5.25rem;
+  width: 4.5rem;
 }
 .bd__c2 {
-  width: 4.875rem;
+  width: 4rem;
 }
 .bd__c3 {
-  width: 6rem;
+  width: 5.25rem;
 }
 .bd__uline .bd__c1,
 .bd__uline .bd__c2,
@@ -557,5 +571,14 @@ button.bd__crumb:hover {
   }
   .bd__c1 {
     display: none;
+  }
+  /* The heading takes the free width and wraps in it, so an action such as
+     "Alle ansehen" stays on the heading row. The legend goes below as one row. */
+  .bd__h {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .bd__legends {
+    flex-basis: 100%;
   }
 }
