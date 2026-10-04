@@ -1,0 +1,87 @@
+<app-dialog
+  [open]="open()"
+  [title]="'meetings.agenda.dialogTitle' | t"
+  [subtitle]="meeting().title"
+  [closeLabel]="'action.cancel' | t"
+  (closed)="cancel()"
+>
+  <form class="aid" (submit)="$event.preventDefault(); submit()">
+    <app-segmented
+      class="aid__kind"
+      [ariaLabel]="'meetings.agenda.kind' | t"
+      [options]="kindOptions()"
+      [value]="kind()"
+      (valueChange)="setKind($event)"
+    />
+
+    @if (kind() === 'application') {
+      <app-search-pill
+        size="md"
+        [placeholder]="'meetings.agenda.searchApplication' | t"
+        [value]="query()"
+        (valueChange)="query.set($event)"
+      />
+      <div class="aid__group">
+        <span class="aid__cap cap" id="aid-apps">
+          {{ 'meetings.agenda.assignableCount' | t: { n: shown().length } }}
+        </span>
+        @if (loading()) {
+          <app-skeleton variant="rows" [count]="2" [label]="'common.loading' | t" />
+        } @else if (shown().length) {
+          <div class="aid__list" role="radiogroup" aria-labelledby="aid-apps">
+            @for (a of shown(); track a.applicationId) {
+              <label class="aid__row" [class.aid__row--on]="pick() === a.applicationId">
+                <input
+                  class="aid__radio"
+                  type="radio"
+                  name="aid-pick"
+                  [value]="a.applicationId"
+                  [checked]="pick() === a.applicationId"
+                  (change)="pick.set(a.applicationId)"
+                />
+                <span class="aid__title ell" [title]="a.title ?? ''">{{ a.title }}</span>
+                @if (stateOf(a); as state) {
+                  <app-status-text kind="neutral">{{ state }}</app-status-text>
+                }
+              </label>
+            }
+          </div>
+        } @else {
+          <p class="aid__hint">
+            {{ (query().trim() ? 'meetings.agenda.noMatch' : 'meetings.agenda.noAssignable') | t }}
+          </p>
+        }
+      </div>
+    } @else {
+      <app-input
+        name="freetext"
+        [id]="'aid-title'"
+        [label]="'meetings.agenda.freetextTitle' | t"
+        [required]="true"
+        [ngModel]="freetext()"
+        (ngModelChange)="freetext.set($event)"
+      />
+    }
+    <p class="aid__hint">{{ 'meetings.agenda.appendsAs' | t: { n: nextNumber() } }}</p>
+
+    <app-switch
+      [id]="'aid-np'"
+      [hint]="'meetings.agenda.nonPublicHint' | t"
+      [checked]="nonPublic()"
+      (checkedChange)="nonPublic.set($event)"
+      >{{ 'meetings.agenda.nonPublicLabel' | t }}</app-switch
+    >
+    <button type="submit" hidden></button>
+  </form>
+  <app-button dialog-footer variant="text" (click)="cancel()">{{ 'action.cancel' | t }}</app-button>
+  <app-button
+    dialog-footer
+    variant="fill"
+    [disabled]="!valid()"
+    [loading]="saving()"
+    (click)="submit()"
+  >
+    <app-icon name="plus" [size]="16" />
+    {{ 'meetings.agenda.addFreetext' | t }}
+  </app-button>
+</app-dialog>

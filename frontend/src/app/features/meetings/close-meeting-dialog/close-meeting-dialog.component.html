@@ -1,0 +1,49 @@
+<app-dialog
+  [open]="open()"
+  [title]="'meetings.closeConfirm.title' | t"
+  [subtitle]="meeting().title"
+  [closeLabel]="'action.cancel' | t"
+  (closed)="cancel()"
+>
+  <div class="cmc">
+    <app-note icon="alert">{{ 'meetings.closeConfirm.body' | t }}</app-note>
+    <ul class="cmc__list">
+      @if (openVote()) {
+        <li class="cmc__row cmc__row--blocked">
+          <app-icon class="cmc__icon" name="x" [size]="18" />
+          <span role="alert">{{ 'meetings.closeConfirm.openVote' | t }}</span>
+        </li>
+      } @else {
+        <li class="cmc__row">
+          <app-icon class="cmc__icon cmc__icon--ok" name="check" [size]="18" />
+          <span>{{ 'meetings.closeConfirm.noOpenVote' | t }}</span>
+        </li>
+      }
+      @if (hasDrafts()) {
+        <li class="cmc__row">
+          <app-icon class="cmc__icon" name="x" [size]="18" />
+          <span>{{ 'meetings.closeConfirm.draftsCancelled' | t }}</span>
+        </li>
+      }
+      <li class="cmc__row">
+        <app-icon class="cmc__icon" name="send" [size]="18" />
+        <span>{{
+          (meeting().canFinalize
+            ? 'meetings.closeConfirm.finalizeLater'
+            : 'meetings.closeConfirm.finalizeByOthers'
+          ) | t
+        }}</span>
+      </li>
+    </ul>
+  </div>
+  <app-button dialog-footer variant="text" (click)="cancel()">{{ 'action.cancel' | t }}</app-button>
+  <app-button
+    dialog-footer
+    variant="danger"
+    [disabled]="openVote()"
+    [loading]="closing()"
+    (click)="confirm()"
+  >
+    {{ 'meetings.closeConfirm.confirm' | t }}
+  </app-button>
+</app-dialog>

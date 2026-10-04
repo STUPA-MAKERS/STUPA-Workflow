@@ -24,10 +24,9 @@ import type {
 } from '@core/api/models';
 import { WsService, type MeetingChannel } from '@core/ws/ws.service';
 import type { ServerMessage } from '@core/ws/ws-messages';
-import { ToastService, type SelectOption } from '@stupa-makers/ui-kit';
+import { ToastService } from '@stupa-makers/ui-kit';
 import { MeetingAgendaService } from './meeting-agenda.service';
 import {
-  FIXED_VOTE_OPTIONS,
   assembleProtocolMarkdown,
   canReportOwn,
   errorCode,
@@ -77,21 +76,6 @@ export class MeetingSessionService implements OnDestroy {
   readonly deletingVote = signal<Uuid | null>(null);
   /** Own choice per vote (local, highlights the picked option). */
   readonly myChoices = signal<Record<string, string>>({});
-
-  readonly voteDialogOpen = signal(false);
-  private readonly voteItem = signal<AgendaItem | null>(null);
-  readonly voteQuestion = signal<string>('');
-  readonly voteSecret = signal(false);
-  // Only the majority rule is set per vote. The quorum and the eligible voters
-  // come from the Gremium configuration.
-  readonly voteMajorityRule = signal<'simple' | 'absolute' | 'two_thirds'>('simple');
-  readonly majorityRuleOptions = computed<SelectOption[]>(() =>
-    (['simple', 'absolute', 'two_thirds'] as const).map((v) => ({
-      value: v,
-      label: this.i18n.translate(`vote.majority.${v}`),
-    })),
-  );
-  readonly openingVote = signal(false);
 
   private channel: MeetingChannel | null = null;
 
@@ -178,7 +162,7 @@ export class MeetingSessionService implements OnDestroy {
     // intact. A protocol is only ever created explicitly.
     if (m.protocolId && (this.canWrite() || this.canViewAll())) this.refreshProtocol();
     this.loadAttendance(m.id);
-    this.agendaSvc.load(m.id, this.canManage(), m.currentAgendaItemId);
+    this.agendaSvc.load(m.id, m.currentAgendaItemId);
   }
 
   /**
@@ -206,23 +190,22 @@ export class MeetingSessionService implements OnDestroy {
     this.agendaSvc.agenda().findIndex((a) => a.id === this.meeting()?.currentAgendaItemId),
   );
 
-  setStatus(status: 'live' | 'closed'): void {
+  /**
+   * Start a planned meeting (planned → live). The server creates the protocol on
+   * the start. Only a planned meeting starts, and it needs a minute-taker: the page
+   * says so at once instead of showing the server 409 after the click.
+   *
+   * The close is a dialog of its own (`CloseMeetingDialogComponent`), and a planned
+   * meeting that does not take place is deleted, not closed (O13).
+   */
+  startMeeting(): void {
     const m = this.meeting();
-    if (!m) return;
-    // The status runs only planned → live → closed. The server refuses every other
-    // change (409 `invalid_status_transition`), so the UI does not offer it.
-    if (status === 'closed') {
-      this.closeMeeting();
-      return;
-    }
-    if (m.status !== 'planned') return;
-    // A start requires a protokollant. Check it here instead of showing the
-    // server 409 after the click.
-    if (status === 'live' && !m.protokollantId) {
+    if (!m || m.status !== 'planned') return;
+    if (!m.protokollantId) {
       this.toast.error(this.i18n.translate('meetings.toast.protokollantRequired'));
       return;
     }
-    this.api.patchMeeting(m.id, { status }).subscribe({
+    this.api.patchMeeting(m.id, { status: 'live' }).subscribe({
       next: (updated) => {
         this.meeting.set(updated);
         // The backend creates the protocol on start. Fetch it right away.
@@ -235,47 +218,13 @@ export class MeetingSessionService implements OnDestroy {
   }
 
   /**
-   * Close the meeting irrevocably: set the status to closed and finalize the protocol.
-   *
-   * Only a live meeting closes. A planned meeting that does not take place is
-   * deleted. The server refuses the close while a vote is open (409 `open_vote`):
-   * the protocol then stays a draft and nothing is finalized.
-   */
-  closeMeeting(): void {
-    const m = this.meeting();
-    if (!m || m.status !== 'live' || this.finalizing()) return;
-    this.api.patchMeeting(m.id, { status: 'closed' }).subscribe({
-      next: (updated) => {
-        this.meeting.set(updated);
-        const proto = this.protocol();
-        // The finalize step is implicit: render the PDF and mail it to the list.
-        // It needs the gremium permission `protocol.finalize`. Without it the
-        // protocol stays a draft for a holder of that right.
-        if (proto && !proto.isLocked) {
-          if (updated.canFinalize) {
-            this.finalize();
-          } else {
-            this.toast.show(this.i18n.translate('meetings.protocol.finalizeNeedsRight'), 'info');
-          }
-        }
-      },
-      error: (err: unknown) => this.statusChangeFailed(err),
-    });
-  }
-
-  /**
-   * Show why the server refused a status change, then reload the meeting. A close
-   * with an open vote gets its own message. Any other refusal shows the server
-   * reason, because the meeting may have changed in another tab.
+   * Show why the server refused a status change, then reload the meeting. The
+   * meeting may have changed in another tab.
    */
   private statusChangeFailed(err: unknown): void {
-    if (errorCode(err) === 'open_vote') {
-      this.toast.error(this.i18n.translate('meetings.toast.closeOpenVote'));
-    } else {
-      const detail = errorDetail(err);
-      const base = this.i18n.translate('meetings.toast.actionFailed');
-      this.toast.error(detail ? `${base}: ${detail}` : base);
-    }
+    const detail = errorDetail(err);
+    const base = this.i18n.translate('meetings.toast.actionFailed');
+    this.toast.error(detail ? `${base}: ${detail}` : base);
     const m = this.meeting();
     if (m) {
       this.api.getMeeting(m.id, { quiet: true }).subscribe({
@@ -401,57 +350,6 @@ export class MeetingSessionService implements OnDestroy {
     return !item.applicationId || this.votesForTop(item.id).length === 0;
   }
 
-  openVoteDialog(item: AgendaItem): void {
-    this.voteItem.set(item);
-    // An application TOP carries the application title as its TOP title. Prefill
-    // the question with it. The user can still edit it. A freetext TOP keeps the
-    // raw title.
-    this.voteQuestion.set(
-      item.applicationId
-        ? this.i18n.translate('meetings.vote.questionPrefill', { name: item.title ?? '' })
-        : (item.title ?? ''),
-    );
-    this.voteSecret.set(false);
-    this.voteMajorityRule.set('simple');
-    this.voteDialogOpen.set(true);
-  }
-
-  closeVoteDialog(): void {
-    this.voteDialogOpen.set(false);
-  }
-
-  submitVote(): void {
-    const m = this.meeting();
-    const item = this.voteItem();
-    const options = [...FIXED_VOTE_OPTIONS];
-    if (!m || !item || this.openingVote()) return;
-    this.openingVote.set(true);
-    this.api
-      .openMeetingVote(m.id, {
-        agendaItemId: item.id,
-        question: this.voteQuestion().trim() || null,
-        options,
-        secret: this.voteSecret(),
-        majorityRule: this.voteMajorityRule(),
-        // eligibleCount and quorumPercent are omitted, so the server uses the
-        // Gremium defaults.
-      })
-      .subscribe({
-        next: (updated) => {
-          this.openingVote.set(false);
-          this.voteDialogOpen.set(false);
-          this.meeting.set(updated);
-          this.toast.success(this.i18n.translate('meetings.toast.voteOpened'));
-        },
-        error: (err: unknown) => {
-          this.openingVote.set(false);
-          const detail = errorDetail(err);
-          const base = this.i18n.translate('meetings.toast.actionFailed');
-          this.toast.error(detail ? `${base}: ${detail}` : base);
-        },
-      });
-  }
-
   /** Re-read an existing protocol with GET, which keeps the write rate limit intact. */
   refreshProtocol(): void {
     const m = this.meeting();
@@ -501,8 +399,8 @@ export class MeetingSessionService implements OnDestroy {
     const proto = this.protocol();
     // `isLocked` also covers `rendering`: no second start, no 409 on PATCH.
     if (!proto || proto.isLocked || this.finalizing() || this.agendaSvc.savingTop()) return;
-    // F8, O13: the protocol is finalized only after the close (409 otherwise).
-    // `closeMeeting()` calls this method with the closed meeting from the response.
+    // F8, O13: the protocol is finalized only after the close (409 otherwise), as a
+    // step of its own. The close never finalizes.
     if (this.meeting()?.status !== 'closed') return;
     this.finalizing.set(true);
     // First persist the assembled TOP markdown, then finalize/render.
@@ -643,7 +541,7 @@ export class MeetingSessionService implements OnDestroy {
         });
         // TOP bodies can change without a vote. Reload the agenda so live
         // followers see the current protocol state.
-        this.agendaSvc.load(m.id, this.canManage(), currentAgendaItemId);
+        this.agendaSvc.load(m.id, currentAgendaItemId);
         // The event carries no rights. A handover (or the start of a planned
         // handover on a TOP move) moves canWrite, canManageVotes and the keeper
         // data, so read the meeting again.

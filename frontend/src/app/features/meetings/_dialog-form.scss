@@ -1,0 +1,31 @@
+// Shared layout of the meeting dialogs (create, settings, agenda item, vote, close,
+// delete). Emulated encapsulation scopes styles per component, so each dialog
+// component includes these mixins in its own stylesheet.
+
+// The host of a dialog component. It adds no box, and a closed dialog takes no gap in a
+// flex column of the page.
+@mixin host {
+  :host {
+    display: contents;
+  }
+  app-dialog:empty {
+    display: none;
+  }
+}
+
+// The body of a dialog: a column of fields and blocks, 16px apart.
+@mixin form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  margin: 0;
+}
+
+// Small text below a control or a group: a hint with a function.
+@mixin hint {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.1875rem;
+  color: var(--color-text-muted);
+}

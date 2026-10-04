@@ -1,0 +1,93 @@
+<app-dialog
+  [open]="open()"
+  [title]="'meetings.create.title' | t"
+  [closeLabel]="'action.cancel' | t"
+  (closed)="cancel()"
+>
+  <form class="cmd" (submit)="$event.preventDefault(); submit()">
+    <div class="cmd__steps">
+      <span class="cmd__bar" aria-hidden="true">
+        <span class="cmd__seg cmd__seg--on"></span>
+        <span class="cmd__seg" [class.cmd__seg--on]="step() === 2"></span>
+      </span>
+      <span class="cmd__stepText">{{ 'meetings.create.step' | t: { n: step(), m: 2 } }}</span>
+    </div>
+
+    @if (step() === 1) {
+      <app-select
+        name="gremium"
+        [id]="'cmd-gremium'"
+        [label]="'meetings.create.gremium' | t"
+        [placeholder]="'meetings.create.gremiumPlaceholder' | t"
+        [options]="gremiumOptions()"
+        [required]="true"
+        [ngModel]="gremium()"
+        (ngModelChange)="onGremiumChange($event)"
+      />
+      @if (optionsLoaded() && !gremiumOptions().length) {
+        <p class="cmd__hint" role="status">{{ 'meetings.create.noGremien' | t }}</p>
+      }
+      <!-- Date and start are required: no meeting without an appointment. Without an
+           end the calendar feed assumes one hour. -->
+      <div class="cmd__when">
+        <app-datepicker
+          name="date"
+          [id]="'cmd-date'"
+          [label]="'meetings.create.date' | t"
+          [required]="true"
+          [ngModel]="date()"
+          (ngModelChange)="date.set($event)"
+        />
+        <!-- Always 24 h: the native type="time" follows the browser locale (AM/PM). -->
+        <app-time-input
+          name="time"
+          [id]="'cmd-time'"
+          [label]="'meetings.create.time' | t"
+          [required]="true"
+          [ngModel]="time()"
+          (ngModelChange)="time.set($event)"
+        />
+        <app-time-input
+          name="endTime"
+          [id]="'cmd-end'"
+          [label]="'meetings.create.endTime' | t"
+          [ngModel]="endTime()"
+          (ngModelChange)="endTime.set($event)"
+        />
+      </div>
+    } @else {
+      <app-input
+        name="title"
+        [id]="'cmd-title'"
+        [label]="'meetings.create.name' | t"
+        [required]="true"
+        [ngModel]="title()"
+        (ngModelChange)="title.set($event)"
+      />
+      <app-select
+        name="keeper"
+        [id]="'cmd-keeper'"
+        [label]="'meetings.protokollant.label' | t"
+        [options]="keeperOptions()"
+        [ngModel]="keeper()"
+        (ngModelChange)="keeper.set($event)"
+      />
+    }
+    <!-- Enter in a field submits the step. -->
+    <button type="submit" hidden></button>
+  </form>
+
+  <!-- One pair of buttons for both steps: a slot projects only direct children. -->
+  <app-button dialog-footer variant="text" (click)="step() === 1 ? cancel() : back()">
+    {{ (step() === 1 ? 'action.cancel' : 'meetings.create.back') | t }}
+  </app-button>
+  <app-button
+    dialog-footer
+    variant="fill"
+    [disabled]="step() === 1 ? !step1Valid() : !step2Valid()"
+    [loading]="creating()"
+    (click)="submit()"
+  >
+    {{ (step() === 1 ? 'meetings.create.next' : 'meetings.create.submit') | t }}
+  </app-button>
+</app-dialog>

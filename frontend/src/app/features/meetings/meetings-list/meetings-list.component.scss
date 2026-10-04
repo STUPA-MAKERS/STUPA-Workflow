@@ -1,0 +1,161 @@
+@use 'breakpoints' as bp;
+
+:host {
+  display: block;
+}
+
+/* One centred column, as wide as the board (1080px). */
+.mtl {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 1080px;
+  margin-inline: auto;
+}
+
+.mtl__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.mtl__search {
+  width: 340px;
+  max-width: 100%;
+}
+
+/* The Gremium filter: a chip with a native select. */
+.mtl__chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 2.75rem;
+  padding: 0 14px;
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  color: var(--color-text);
+  font-size: var(--fs-body);
+  font-weight: var(--fw-medium);
+  cursor: pointer;
+}
+.mtl__chip:focus-within {
+  box-shadow: 0 0 0 2px var(--color-focus-ring);
+}
+.mtl__chipIcon {
+  flex: none;
+  color: var(--color-text-muted);
+}
+.mtl__chipSelect {
+  max-width: 14rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  appearance: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.mtl__chipSelect option {
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+}
+
+/* Rows of one group, 2px apart, rounded as one block (see `.rowgroup`). */
+.mtl__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.mtl__row {
+  --li-hover: var(--color-surface-3);
+  --li-radius: 4px;
+  border-radius: var(--li-radius);
+  background: var(--color-surface-2);
+}
+.mtl__row:first-child {
+  --li-radius: var(--radius-lg) var(--radius-lg) 4px 4px;
+}
+.mtl__row:last-child {
+  --li-radius: 4px 4px var(--radius-lg) var(--radius-lg);
+}
+.mtl__row:only-child {
+  --li-radius: var(--radius-lg);
+}
+/* A past meeting steps back: muted text, the status stays readable. */
+.mtl__row--past {
+  --li-color: var(--color-text-muted);
+}
+
+.mtl__meta {
+  display: inline;
+}
+.mtl__fact {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  vertical-align: middle;
+}
+.mtl__fact + .mtl__fact {
+  margin-inline-start: 14px;
+}
+.mtl__trail {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.mtl__chev {
+  color: var(--color-text-muted);
+}
+
+.mtl__more {
+  align-self: flex-start;
+  margin-inline-start: -8px;
+}
+
+/* "Jetzt": an accent caption and a line between the past and the coming meetings. */
+.mtl__now {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 6px 4px;
+}
+.mtl__nowLabel {
+  color: var(--color-accent-text);
+}
+.mtl__nowLine {
+  flex: 1 1 auto;
+  height: 1px;
+  background: color-mix(in srgb, var(--color-accent) 50%, transparent);
+}
+
+.mtl__empty {
+  margin: 0;
+  padding: var(--space-3) 4px;
+  color: var(--color-text-muted);
+}
+
+@include bp.phone {
+  .mtl__search {
+    flex: 1 1 100%;
+    width: auto;
+  }
+  /* The filter and "Neue Sitzung" share the row below the search. */
+  .mtl__chip {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .mtl__chipSelect {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: none;
+  }
+  /* The row actions move into the meeting page; the chevron stays. */
+  .mtl__trail app-button {
+    display: none;
+  }
+}

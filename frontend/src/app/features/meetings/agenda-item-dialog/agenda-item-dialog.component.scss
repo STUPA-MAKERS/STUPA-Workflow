@@ -1,0 +1,74 @@
+@use '../dialog-form' as df;
+
+@include df.host;
+
+.aid {
+  @include df.form;
+}
+.aid__kind {
+  align-self: flex-start;
+  max-width: 100%;
+}
+
+.aid__group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.aid__cap {
+  padding: 0 4px;
+}
+.aid__hint {
+  @include df.hint;
+  padding: 0 4px;
+}
+
+/* The applications: one row per application on surface 3, the chosen one selected. */
+.aid__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 16rem;
+  overflow-y: auto;
+}
+.aid__row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  padding: 12px 14px;
+  border-radius: 4px;
+  background: var(--color-surface-3);
+  cursor: pointer;
+}
+.aid__row:first-child {
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+}
+.aid__row:last-child {
+  border-bottom-left-radius: var(--radius-lg);
+  border-bottom-right-radius: var(--radius-lg);
+}
+.aid__row--on {
+  background: var(--color-selected);
+  color: var(--color-on-selected);
+}
+.aid__row--on app-status-text {
+  color: inherit;
+}
+.aid__radio {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--color-accent);
+}
+.aid__radio:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+.aid__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: var(--fw-medium);
+}
