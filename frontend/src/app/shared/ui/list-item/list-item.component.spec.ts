@@ -42,6 +42,18 @@ class HostComponent {
 })
 class StatusSubHostComponent {}
 
+@Component({
+  standalone: true,
+  imports: [ListItemComponent, StatusTextComponent],
+  template: `
+    <app-list-item title="35. Sitzung">
+      <app-status-text status kind="accent">Live</app-status-text>
+      <span sub>Studierendenparlament</span>
+    </app-list-item>
+  `,
+})
+class StatusTitleHostComponent {}
+
 /** jsdom has no layout: give the sub line a width and a content width. */
 function setWidths(el: Element, scroll: number, client: number): void {
   Object.defineProperty(el, 'scrollWidth', { configurable: true, value: scroll });
@@ -54,6 +66,17 @@ describe('ListItemComponent', () => {
     const title = screen.getByRole('button', { name: LONG });
     expect(title).toHaveAttribute('title', LONG);
     expect(title).toHaveClass('li__title');
+  });
+
+  it('puts a [status] on the title line, after the title and outside the control', async () => {
+    await render(StatusTitleHostComponent);
+    const title = screen.getByRole('button', { name: '35. Sitzung' });
+    const status = screen.getByText('Live');
+    const head = title.parentElement as HTMLElement;
+    expect(head).toHaveClass('li__head');
+    expect(head).toContainElement(status);
+    expect(title).not.toContainElement(status);
+    expect(title.compareDocumentPosition(status) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('projects the lead, the sub line and the trailing slot', async () => {

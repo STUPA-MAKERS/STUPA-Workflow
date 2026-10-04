@@ -683,17 +683,25 @@ export class ApiClient {
     );
   }
 
-  /** POST /meetings/{id}/agenda — put an application on the agenda (meeting lead). */
-  addAgendaItem(meetingId: Uuid, applicationId: Uuid): Observable<AgendaItem[]> {
+  /**
+   * POST /meetings/{id}/agenda — put an application on the agenda (meeting lead).
+   * `nonPublic` marks the new item as non-public (NÖ) at once.
+   */
+  addAgendaItem(meetingId: Uuid, applicationId: Uuid, nonPublic = false): Observable<AgendaItem[]> {
     return this.http.post<AgendaItem[]>(`${this.base}/meetings/${meetingId}/agenda`, {
       applicationId,
+      nonPublic,
     });
   }
 
-  /** POST /meetings/{id}/agenda — create a free-text agenda item (no application). */
-  addAgendaFreetext(meetingId: Uuid, title: string): Observable<AgendaItem[]> {
+  /**
+   * POST /meetings/{id}/agenda — create a free-text agenda item (no application).
+   * `nonPublic` marks the new item as non-public (NÖ) at once.
+   */
+  addAgendaFreetext(meetingId: Uuid, title: string, nonPublic = false): Observable<AgendaItem[]> {
     return this.http.post<AgendaItem[]>(`${this.base}/meetings/${meetingId}/agenda`, {
       title,
+      nonPublic,
     });
   }
 

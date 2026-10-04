@@ -1,6 +1,10 @@
-import type { AgendaItem, MeetingVote } from '@core/api/models';
+import type { AgendaItem, Meeting, MeetingVote } from '@core/api/models';
 import {
   assembleProtocolMarkdown,
+  clockTime,
+  errorCode,
+  meetingDay,
+  meetingTimeText,
   attendanceBadgeVariant,
   attendanceButtonVariant,
   attendanceIcon,
@@ -32,7 +36,7 @@ const VOTE = (over: Partial<MeetingVote> = {}): MeetingVote => ({
   title: null,
   question: null,
   options: [],
-  status: 'pending',
+  status: 'draft',
   result: null,
   counts: null,
   leading: null,
@@ -56,7 +60,7 @@ describe('meetings-display.util', () => {
     expect(voteStatusVariant('open')).toBe('success');
     expect(voteStatusVariant('closed')).toBe('info');
     expect(voteStatusVariant('cancelled')).toBe('danger');
-    expect(voteStatusVariant('pending')).toBe('warning');
+    expect(voteStatusVariant('draft')).toBe('warning');
     expect(voteStatusKey('open')).toBe('meetings.voteStatus.open');
     expect(voteResultKey('passed')).toBe('vote.result.passed');
     expect(voteResultKey(null)).toBe('vote.result.tie');
@@ -69,7 +73,7 @@ describe('meetings-display.util', () => {
     // `neutral` is a tag (a grey plate). A status shows as coloured text only.
     const variants = [
       ...(['planned', 'live', 'closed'] as const).map(meetingStatusVariant),
-      ...(['pending', 'open', 'closed', 'cancelled'] as const).map(voteStatusVariant),
+      ...(['draft', 'open', 'closed', 'cancelled'] as const).map(voteStatusVariant),
       ...['passed', 'rejected', 'tie', null, undefined, 'unknown'].map(voteResultVariant),
       ...(['present', 'excused', 'absent'] as const).flatMap((s) => [
         attendanceBadgeVariant(s),
@@ -198,5 +202,58 @@ describe('meetings-display.util', () => {
       status: 'open',
       revealed: false,
     });
+  });
+
+  it('reads the stable problem+json code of an HTTP error', () => {
+    expect(errorCode({ error: { code: 'open_vote' } })).toBe('open_vote');
+    expect(errorCode({ error: { code: 7 } })).toBe('');
+    expect(errorCode(null)).toBe('');
+  });
+
+  it('prints the clock time of a timestamp in local time, 24 h', () => {
+    const local = new Date(2026, 8, 29, 18, 4).toISOString();
+    expect(clockTime(local, 'de')).toBe('18:04');
+    expect(clockTime(local, 'en')).toBe('18:04');
+    expect(clockTime(null, 'de')).toBe('');
+    expect(clockTime('kaputt', 'de')).toBe('');
+  });
+
+  describe('meetingTimeText', () => {
+    const base = {
+      status: 'planned',
+      startTime: '18:00:00',
+      endTime: null,
+      startedAt: null,
+      closedAt: null,
+    } as unknown as Meeting;
+    const at = (h: number, m: number) => new Date(2026, 8, 29, h, m).toISOString();
+
+    it('shows the planned start, and the end when there is one', () => {
+      expect(meetingTimeText(base, 'de')).toEqual({ text: '18:00', since: false });
+      expect(meetingTimeText({ ...base, startTime: '17:30', endTime: '19:00' }, 'de')).toEqual({
+        text: '17:30–19:00',
+        since: false,
+      });
+      expect(meetingTimeText({ ...base, startTime: null }, 'de')).toEqual({ text: '', since: false });
+    });
+
+    it('shows a live meeting as "since" its real start (O9)', () => {
+      const live = { ...base, status: 'live', startedAt: at(18, 4) } as Meeting;
+      expect(meetingTimeText(live, 'de')).toEqual({ text: '18:04', since: true });
+      // Started before the real start was stored: the planned start.
+      expect(meetingTimeText({ ...live, startedAt: null }, 'de')).toEqual({ text: '18:00', since: false });
+    });
+
+    it('shows a closed meeting from the real start to the close', () => {
+      const closed = { ...base, status: 'closed', startedAt: at(18, 4), closedAt: at(21, 40) } as Meeting;
+      expect(meetingTimeText(closed, 'de')).toEqual({ text: '18:04–21:40', since: false });
+      expect(meetingTimeText({ ...closed, closedAt: null }, 'de')).toEqual({ text: '18:04', since: false });
+      expect(meetingTimeText({ ...closed, startedAt: null }, 'de').text).toBe('18:00');
+    });
+  });
+
+  it('gives the date block a local midnight, or null without a date', () => {
+    expect(meetingDay({ date: '2026-10-13' } as Meeting)).toBe('2026-10-13T00:00:00');
+    expect(meetingDay({ date: null } as Meeting)).toBeNull();
   });
 });

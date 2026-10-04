@@ -733,7 +733,7 @@ export interface MagicLinkVerifyResult {
 }
 
 export type MajorityRule = 'simple' | 'absolute' | 'two_thirds';
-/** `cancelled`. The application left the vote state by hand. The vote stopped. */
+/** `draft`: planned, not open yet. `cancelled`: the application left the vote state by hand, so the vote stopped. */
 export type VoteStatus = 'draft' | 'open' | 'closed' | 'cancelled';
 export type VoteResult = 'passed' | 'rejected' | 'tie';
 
@@ -746,8 +746,8 @@ export interface Quorum {
 /**
  * Vote configuration (`VoteConfig`). The backend `_CamelModel` sends the fields in
  * camelCase. The defaults mirror the Pydantic defaults: `abstainCountsQuorum` is
- * true, `secret` is false. A ballot never changes after the cast, so the config has
- * no `allowChange` (the server refuses the key).
+ * true, `secret` is false. The frontend never sets a tie break: a tie is a
+ * rejection (O18).
  */
 export interface VoteConfig {
   options: string[];
@@ -755,7 +755,6 @@ export interface VoteConfig {
   quorum?: Quorum | null;
   abstainCountsQuorum?: boolean;
   secret?: boolean;
-  tieBreak?: VoteResult;
 }
 
 /**
@@ -852,8 +851,8 @@ export interface VoteClosed {
 
 /** Meeting status. The backend enum is `planned|live|closed`. */
 export type MeetingStatus = 'planned' | 'live' | 'closed';
-/** `cancelled`. The application left the vote state by hand. The vote stopped. */
-export type MeetingVoteStatus = 'pending' | 'open' | 'closed' | 'cancelled';
+/** `draft`: planned, not open yet. `cancelled`: the application left the vote state by hand, so the vote stopped. */
+export type MeetingVoteStatus = 'draft' | 'open' | 'closed' | 'cancelled';
 
 /** `MeetingVoteOut`. A vote summary in the meeting state. GET /meetings/{id}. */
 export interface MeetingVoteOutWire {

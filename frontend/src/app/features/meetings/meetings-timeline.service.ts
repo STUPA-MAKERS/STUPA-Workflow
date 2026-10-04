@@ -7,14 +7,20 @@ import { I18nService } from '@core/i18n/i18n.service';
 import type { Meeting, Uuid } from '@core/api/models';
 import type { SelectOption } from '@stupa-makers/ui-kit';
 
-/** Page size per lazy-load step (both directions). */
-const PAGE = 15;
+/** Page size of a "load more" step (both directions and the search). */
+export const TIMELINE_PAGE = 15;
+/**
+ * Past meetings that the first load shows above the "now" marker. The list opens on
+ * the present: the most recent meetings give the context, "Frühere Sitzungen laden"
+ * reaches the older ones.
+ */
+export const PAST_PREVIEW = 3;
 
 /**
  * Overview timeline state with server-side keyset paging in both directions.
- * Past meetings sit above a "now" marker, upcoming ones below it. The search mode
- * collapses both into one relevance-sorted list with offset paging.
- * Provided by MeetingsComponent.
+ * Past meetings sit above a "now" marker, upcoming ones below it. Each direction
+ * loads more on a button, not on scroll. The search mode collapses both into one
+ * relevance-sorted list with offset paging. Provided by MeetingsComponent.
  */
 @Injectable()
 export class MeetingsTimelineService implements OnDestroy {
@@ -48,8 +54,6 @@ export class MeetingsTimelineService implements OnDestroy {
   readonly pastHasMore = signal(false);
   readonly loadingUpcoming = signal(false);
   readonly loadingPast = signal(false);
-  /** One-shot flag for the initial scroll to the "now" marker (parent effect). */
-  didInitialScroll = false;
 
   /** Gremium filter of the overview ('' = all). */
   readonly gremiumFilter = signal<string>('');
@@ -95,20 +99,6 @@ export class MeetingsTimelineService implements OnDestroy {
     if (this.searchTimer !== null) clearTimeout(this.searchTimer);
   }
 
-  /**
-   * Scroll-driven lazy loading. Near the top edge it loads older past meetings.
-   * Near the bottom edge it loads more upcoming meetings. In search mode the
-   * bottom edge loads the next offset page instead.
-   */
-  onScroll(el: HTMLElement): void {
-    if (this.searchActive()) {
-      if (el.scrollHeight - el.scrollTop - el.clientHeight <= 80) this.loadMoreSearch();
-      return;
-    }
-    if (el.scrollTop <= 80) this.loadMorePast(el);
-    if (el.scrollHeight - el.scrollTop - el.clientHeight <= 80) this.loadMoreUpcoming();
-  }
-
   /** Debounced (~400 ms) header search. An empty query returns to the timeline. */
   onSearch(value: string): void {
     this.searchQuery.set(value);
@@ -141,7 +131,7 @@ export class MeetingsTimelineService implements OnDestroy {
       .listMeetingsTimeline({
         direction: 'upcoming', // no effect in search mode: the backend collapses both
         cursor: this.searchCursor,
-        limit: PAGE,
+        limit: TIMELINE_PAGE,
         gremiumId: this.gremiumFilter() || undefined,
         q: this.searchQuery().trim(),
       })
@@ -170,16 +160,18 @@ export class MeetingsTimelineService implements OnDestroy {
     this.loadList();
   }
 
-  /** Load the next past page and keep the scroll position across the new height. */
-  loadMorePast(el: HTMLElement): void {
+  /**
+   * Load the next past page. The older meetings go on top, right below the button
+   * that asked for them.
+   */
+  loadMorePast(): void {
     if (this.loadingPast() || !this.pastHasMore() || this.pastCursor === null) return;
     this.loadingPast.set(true);
-    const prevHeight = el.scrollHeight;
     this.api
       .listMeetingsTimeline({
         direction: 'past',
         cursor: this.pastCursor,
-        limit: PAGE,
+        limit: TIMELINE_PAGE,
         gremiumId: this.gremiumFilter() || undefined,
       })
       .subscribe({
@@ -190,9 +182,6 @@ export class MeetingsTimelineService implements OnDestroy {
           this.pastItems.update((cur) => [...[...page.items].reverse(), ...cur]);
           this.pastCursor = page.nextCursor;
           this.pastHasMore.set(page.nextCursor !== null);
-          requestAnimationFrame(() => {
-            el.scrollTop += el.scrollHeight - prevHeight;
-          });
         },
         error: () => this.loadingPast.set(false),
       });
@@ -206,7 +195,7 @@ export class MeetingsTimelineService implements OnDestroy {
       .listMeetingsTimeline({
         direction: 'upcoming',
         cursor: this.upcomingCursor,
-        limit: PAGE,
+        limit: TIMELINE_PAGE,
         gremiumId: this.gremiumFilter() || undefined,
       })
       .subscribe({
@@ -220,25 +209,26 @@ export class MeetingsTimelineService implements OnDestroy {
       });
   }
 
-  /** Replace an updated meeting in both directions after a settings save. */
+  /** Replace an updated meeting in both directions and in the search hits. */
   replaceInTimeline(updated: Meeting): void {
     const repl = (list: Meeting[]): Meeting[] =>
       list.map((x) => (x.id === updated.id ? updated : x));
     this.upcomingItems.update(repl);
     this.pastItems.update(repl);
+    this.searchItems.update(repl);
   }
 
-  /** Remove a deleted meeting from both directions. */
+  /** Remove a deleted meeting from both directions and from the search hits. */
   removeFromTimeline(id: Uuid): void {
     const rm = (list: Meeting[]): Meeting[] => list.filter((x) => x.id !== id);
     this.upcomingItems.update(rm);
     this.pastItems.update(rm);
+    this.searchItems.update(rm);
   }
 
-  /** Initial load: first upcoming AND past page in parallel. */
+  /** Initial load: the first upcoming page and the past preview in parallel. */
   loadList(): void {
     if (!this.canReadTimeline()) return;
-    this.didInitialScroll = false;
     this.upcomingItems.set([]);
     this.pastItems.set([]);
     this.upcomingCursor = null;
@@ -249,12 +239,12 @@ export class MeetingsTimelineService implements OnDestroy {
     forkJoin({
       upcoming: this.api.listMeetingsTimeline({
         direction: 'upcoming',
-        limit: PAGE,
+        limit: TIMELINE_PAGE,
         gremiumId: this.gremiumFilter() || undefined,
       }),
       past: this.api.listMeetingsTimeline({
         direction: 'past',
-        limit: PAGE,
+        limit: PAST_PREVIEW,
         gremiumId: this.gremiumFilter() || undefined,
       }),
     }).subscribe({

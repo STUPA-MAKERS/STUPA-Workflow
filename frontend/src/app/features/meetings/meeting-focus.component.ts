@@ -36,8 +36,6 @@ import {
   ButtonComponent,
   CheckboxComponent,
   IconComponent,
-  SelectComponent,
-  type SelectOption,
 } from '@stupa-makers/ui-kit';
 import { MarkdownEditorComponent } from '@stupa-makers/ui-kit/markdown-editor';
 import {
@@ -86,7 +84,6 @@ export type DockPanel = 'none' | 'agenda' | 'attendance' | 'protokollant';
     ButtonComponent,
     CheckboxComponent,
     IconComponent,
-    SelectComponent,
     MarkdownEditorComponent,
     MeetingAttendanceTableComponent,
     MeetingDelegationCardComponent,
@@ -143,11 +140,8 @@ export class MeetingFocusComponent {
   readonly finalizing = input.required<boolean>();
   /** Own choice per vote id. It highlights the picked option. */
   readonly choices = input.required<Record<string, string>>();
-  readonly assignableOptions = input.required<SelectOption[]>();
   readonly savingAgenda = input.required<boolean>();
   readonly renamingTopId = input.required<Uuid | null>();
-  readonly agendaPick = model<string>('');
-  readonly agendaFreetext = model<string>('');
   readonly renameDraft = model<string>('');
 
   /** Leave the session page for the meeting list. */
@@ -167,8 +161,8 @@ export class MeetingFocusComponent {
   readonly toggleBeamer = output<void>();
   readonly attendanceChange = output<AttendanceChange>();
   readonly attendanceReset = output<Attendance>();
-  readonly addToAgenda = output<void>();
-  readonly addFreetext = output<void>();
+  /** Open "TOP hinzufügen". */
+  readonly addTop = output<void>();
   readonly removeFromAgenda = output<Uuid>();
   readonly startRename = output<AgendaItem>();
   readonly cancelRename = output<void>();

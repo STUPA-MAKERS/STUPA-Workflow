@@ -11,10 +11,13 @@
   <app-badge [variant]="statusVariant(m.status)">{{ statusKey(m.status) | t }}</app-badge>
   <span class="fx__spacer"></span>
   <app-button variant="ghost" size="sm" (click)="toggleBeamer.emit()">{{ 'meetings.beamer.enter' | t }}</app-button>
-  <!-- The meeting is closed but the protocol is a draft again: the render failed and
-       rolled back. The explicit retry is the only path to a final protocol. -->
+  <!-- The meeting is closed and the protocol is a draft. The close never finalizes
+       (O13), so this is the way to a final protocol, also after a failed render. -->
   @if (m.status === 'closed' && m.canFinalize && proto && !proto.isFinal && proto.status !== 'rendering') {
-    <app-button variant="ghost" size="sm" [iconOnly]="true" [loading]="finalizing()" [ariaLabel]="'meetings.protocol.finalize' | t" [title]="'meetings.protocol.finalize' | t" (click)="finalize.emit()"><app-icon name="repeat" /></app-button>
+    <app-button variant="fill" size="sm" [loading]="finalizing()" (click)="finalize.emit()">
+      <app-icon name="send" [size]="15" />
+      {{ 'meetings.protocol.finalize' | t }}
+    </app-button>
   }
   @if (m.canManage) {
     <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.settings.title' | t" [title]="'meetings.settings.title' | t" (click)="openSettings.emit()"><app-icon name="edit" /></app-button>
@@ -169,7 +172,7 @@
         } @else if (proto.status === 'rendering') {
           <span>{{ 'meetings.protocol.renderingHint' | t }}</span>
         } @else if (m.canFinalize) {
-          <span>{{ (m.status === 'closed' ? 'meetings.protocol.retryHint' : 'meetings.protocol.finalizeOnClose') | t }}</span>
+          <span>{{ (m.status === 'closed' ? 'meetings.protocol.readyToFinalize' : 'meetings.protocol.finalizeAfterClose') | t }}</span>
         } @else if (m.canWrite) {
           <span>{{ 'meetings.protocol.finalizeNeedsRight' | t }}</span>
         }
@@ -272,18 +275,10 @@
         }
       </ol>
       @if (canChangeAgenda()) {
-        <div class="fx__add">
-          <p class="fx__addH">{{ 'meetings.agenda.assignHeading' | t }}</p>
-          <div class="fx__addRow">
-            <app-select [placeholder]="'meetings.agenda.addPlaceholder' | t" [options]="assignableOptions()" [ngModel]="agendaPick()" (ngModelChange)="agendaPick.set($event)" />
-            <app-button size="sm" [disabled]="!agendaPick() || savingAgenda()" (click)="addToAgenda.emit()">{{ 'meetings.agenda.add' | t }}</app-button>
-          </div>
-          <p class="fx__addH">{{ 'meetings.agenda.freetextHeading' | t }}</p>
-          <div class="fx__addRow">
-            <input class="fx__input" [placeholder]="'meetings.agenda.freetextPlaceholder' | t" [ngModel]="agendaFreetext()" (ngModelChange)="agendaFreetext.set($event)" (keyup.enter)="addFreetext.emit()" name="agendaFreetext" />
-            <app-button variant="secondary" size="sm" [disabled]="!agendaFreetext().trim() || savingAgenda()" (click)="addFreetext.emit()">{{ 'meetings.agenda.addFreetext' | t }}</app-button>
-          </div>
-        </div>
+        <app-button class="fx__add" variant="tonal" size="sm" (click)="addTop.emit()">
+          <app-icon name="plus" [size]="16" />
+          {{ 'meetings.agenda.dialogTitle' | t }}
+        </app-button>
       }
     </div>
   }

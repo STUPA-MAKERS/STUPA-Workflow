@@ -1,0 +1,46 @@
+<app-dialog
+  [open]="item() !== null"
+  [title]="'meetings.vote.dialogTitle' | t"
+  [subtitle]="subtitle()"
+  [closeLabel]="'action.cancel' | t"
+  (closed)="cancel()"
+>
+  <form class="vod" (submit)="$event.preventDefault(); submit()">
+    <label class="vod__field" for="vod-question">
+      <span class="vod__label">{{ 'meetings.vote.question' | t }}</span>
+      <textarea
+        id="vod-question"
+        class="vod__textarea"
+        rows="3"
+        name="question"
+        [placeholder]="'meetings.vote.questionPlaceholder' | t"
+        [ngModel]="question()"
+        (ngModelChange)="question.set($event)"
+      ></textarea>
+    </label>
+
+    <div class="vod__group">
+      <span class="vod__cap cap" aria-hidden="true">{{ 'meetings.vote.majorityRule' | t }}</span>
+      <app-segmented
+        class="vod__seg"
+        [ariaLabel]="'meetings.vote.majorityRule' | t"
+        [options]="ruleOptions()"
+        [value]="majorityRule()"
+        (valueChange)="setRule($event)"
+      />
+    </div>
+
+    <app-switch
+      [id]="'vod-secret'"
+      [hint]="'meetings.vote.secretHint' | t"
+      [checked]="secret()"
+      (checkedChange)="secret.set($event)"
+      ><span class="vod__switchLabel">{{ 'meetings.vote.secret' | t }}</span></app-switch
+    >
+  </form>
+  <app-button dialog-footer variant="text" (click)="cancel()">{{ 'action.cancel' | t }}</app-button>
+  <app-button dialog-footer variant="fill" [loading]="submitting()" (click)="submit()">
+    <app-icon name="vote" [size]="16" />
+    {{ 'meetings.vote.openSubmit' | t }}
+  </app-button>
+</app-dialog>

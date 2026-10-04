@@ -1,0 +1,51 @@
+@use '../dialog-form' as df;
+@use 'breakpoints' as bp;
+
+@include df.host;
+
+.cmd {
+  @include df.form;
+}
+
+/* "Schritt 1 von 2": two thin segments, the done ones in the accent. */
+.cmd__steps {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.cmd__bar {
+  display: flex;
+  flex: 1 1 auto;
+  gap: var(--space-1);
+}
+.cmd__seg {
+  flex: 1 1 0;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--color-surface-4);
+}
+.cmd__seg--on {
+  background: var(--color-accent);
+}
+.cmd__stepText {
+  flex: none;
+  font-size: 0.8125rem;
+  line-height: 1.1875rem;
+  color: var(--color-text-muted);
+}
+
+.cmd__hint {
+  @include df.hint;
+}
+
+/* Date, start and end side by side; one below the other on a phone. */
+.cmd__when {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-3);
+}
+@include bp.phone {
+  .cmd__when {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -3,9 +3,8 @@ import { ApiClient } from '@core/api/api-client.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { AsyncSubject, type Observable, of } from 'rxjs';
-import type { SelectOption } from '@stupa-makers/ui-kit';
-import type { AgendaItem, AssignableApplication, Uuid } from '@core/api/models';
-import { errorDetail, resolveI18n } from './meetings-display.util';
+import type { AgendaItem, Uuid } from '@core/api/models';
+import { errorDetail } from './meetings-display.util';
 
 /** Idle time after the last keystroke before the service autosaves the TOP body. */
 const AUTOSAVE_DELAY_MS = 1000;
@@ -22,10 +21,7 @@ export class MeetingAgendaService implements OnDestroy {
   private readonly toast = inject(ToastService);
 
   readonly agenda = signal<AgendaItem[]>([]);
-  readonly assignable = signal<AssignableApplication[]>([]);
   readonly savingAgenda = signal(false);
-  readonly agendaPick = signal<string>('');
-  readonly agendaFreetext = signal<string>('');
   /** Inline rename of a freetext TOP: the active item and the draft input. */
   readonly renamingTopId = signal<Uuid | null>(null);
   readonly renameDraft = signal<string>('');
@@ -49,14 +45,6 @@ export class MeetingAgendaService implements OnDestroy {
     this.agenda().findIndex((a) => a.id === this.selectedTopId()),
   );
 
-  readonly assignableOptions = computed<SelectOption[]>(() =>
-    this.assignable().map((a) => {
-      const title = a.title || a.applicationId;
-      const state = resolveI18n(a.stateLabel, this.i18n.locale());
-      return { value: a.applicationId, label: state ? `${title} (${state})` : title };
-    }),
-  );
-
   /**
    * Show a refused agenda change with the server reason. A closed meeting answers
    * 409 `meeting_closed`, and an item with an open or closed vote answers 409
@@ -78,7 +66,7 @@ export class MeetingAgendaService implements OnDestroy {
    * Without a valid selection the item the room handles now (`preferred`) is opened,
    * else the first item.
    */
-  load(meetingId: Uuid, canManage: boolean, preferred: Uuid | null = null): void {
+  load(meetingId: Uuid, preferred: Uuid | null = null): void {
     this.api.listAgenda(meetingId, { quiet: true }).subscribe({
       next: (rows) => {
         this.agenda.set(rows);
@@ -90,49 +78,6 @@ export class MeetingAgendaService implements OnDestroy {
       },
       error: () => this.agenda.set([]),
     });
-    if (canManage) this.refreshAssignable(meetingId);
-  }
-
-  refreshAssignable(meetingId: Uuid): void {
-    this.api.listAssignableApplications(meetingId).subscribe({
-      next: (rows) => this.assignable.set(rows),
-      error: () => this.assignable.set([]),
-    });
-  }
-
-  addToAgenda(meetingId: Uuid): void {
-    const appId = this.agendaPick();
-    if (!appId || this.savingAgenda()) return;
-    this.savingAgenda.set(true);
-    this.api.addAgendaItem(meetingId, appId).subscribe({
-      next: (rows) => {
-        this.savingAgenda.set(false);
-        this.agenda.set(rows);
-        this.agendaPick.set('');
-        this.refreshAssignable(meetingId);
-      },
-      error: (err: unknown) => {
-        this.savingAgenda.set(false);
-        this.failed(err);
-      },
-    });
-  }
-
-  addFreetext(meetingId: Uuid): void {
-    const title = this.agendaFreetext().trim();
-    if (!title || this.savingAgenda()) return;
-    this.savingAgenda.set(true);
-    this.api.addAgendaFreetext(meetingId, title).subscribe({
-      next: (rows) => {
-        this.savingAgenda.set(false);
-        this.agenda.set(rows);
-        this.agendaFreetext.set('');
-      },
-      error: (err: unknown) => {
-        this.savingAgenda.set(false);
-        this.failed(err);
-      },
-    });
   }
 
   removeFromAgenda(meetingId: Uuid, itemId: Uuid): void {
@@ -142,7 +87,6 @@ export class MeetingAgendaService implements OnDestroy {
       next: (rows) => {
         this.savingAgenda.set(false);
         this.agenda.set(rows);
-        this.refreshAssignable(meetingId);
       },
       error: (err: unknown) => {
         this.savingAgenda.set(false);
@@ -209,7 +153,7 @@ export class MeetingAgendaService implements OnDestroy {
     if (this.dragTopIndex !== null) event.preventDefault();
   }
 
-  onTopDrop(meetingId: Uuid | null, index: number, canManage: boolean): void {
+  onTopDrop(meetingId: Uuid | null, index: number): void {
     const from = this.dragTopIndex;
     this.dragTopIndex = null;
     if (from === null || from === index || !meetingId) return;
@@ -221,7 +165,7 @@ export class MeetingAgendaService implements OnDestroy {
       next: (rows) => this.agenda.set(rows),
       error: (err: unknown) => {
         this.failed(err);
-        this.load(meetingId, canManage);
+        this.load(meetingId);
       },
     });
   }

@@ -586,7 +586,7 @@ describe('mapProtocol', () => {
 
 describe('mapMeetingVote', () => {
   it('maps every field through and normalises the null/0/true defaults', () => {
-    const minimal = { id: 'v-1', status: 'pending' } as MeetingVoteOutWire;
+    const minimal = { id: 'v-1', status: 'draft' } as MeetingVoteOutWire;
     expect(mapMeetingVote(minimal)).toEqual({
       id: 'v-1',
       applicationId: null,
@@ -594,7 +594,7 @@ describe('mapMeetingVote', () => {
       title: null,
       question: null,
       options: [],
-      status: 'pending',
+      status: 'draft',
       result: null,
       counts: null,
       leading: null,

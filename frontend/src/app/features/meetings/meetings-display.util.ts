@@ -208,3 +208,47 @@ export function liveOpenedVote(
     failedReason: null,
   };
 }
+
+/** The clock time (`HH:MM`, 24 h) of an ISO timestamp in local time, or `''`. */
+export function clockTime(iso: string | null | undefined, i18nLocale: string): string {
+  if (!iso) return '';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat(toFormatLocale(i18nLocale), {
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).format(date);
+}
+
+/** The time line of a meeting row: a running meeting shows its start (`since`). */
+export interface MeetingTimeText {
+  /** `HH:MM` or `HH:MM–HH:MM`. Empty when the meeting has no time at all. */
+  text: string;
+  /** True for a live meeting with a known start: the row reads "seit HH:MM". */
+  since: boolean;
+}
+
+/**
+ * The time of a meeting row in the list.
+ *
+ * A planned meeting shows the planned start and end. A live meeting shows the real
+ * start (`startedAt`, "seit 18:04"). A closed meeting shows the real start and close.
+ * A meeting that started before the real times existed falls back to the planned
+ * times.
+ */
+export function meetingTimeText(m: Meeting, i18nLocale: string): MeetingTimeText {
+  const range = (a: string, b: string): string => (a && b ? `${a}–${b}` : a);
+  const planned = range(shortTime(m.startTime), shortTime(m.endTime));
+  const started = clockTime(m.startedAt, i18nLocale);
+  if (m.status === 'live' && started) return { text: started, since: true };
+  if (m.status === 'closed' && started) {
+    return { text: range(started, clockTime(m.closedAt, i18nLocale)), since: false };
+  }
+  return { text: planned, since: false };
+}
+
+/** The date of a meeting as a local midnight, for the date block. `null` without a date. */
+export function meetingDay(m: Meeting): string | null {
+  return m.date ? `${m.date}T00:00:00` : null;
+}

@@ -5,7 +5,8 @@ import { I18nService } from '@core/i18n/i18n.service';
  * A date as a block: the day large, the month short and in capitals below it ("29" over
  * "SEP"). For lists of meetings and the dashboard.
  *
- * `live` fills the block with the accent, for the meeting that runs now. A screen reader
+ * `live` fills the block with the accent, for the meeting that runs now. `muted` steps the
+ * block back with muted text, for a past meeting. `live` wins over `muted`. A screen reader
  * hears the full date instead of the two parts.
  *
  * A missing or invalid date (null, or a string that is not a date) shows an empty block
@@ -17,6 +18,7 @@ import { I18nService } from '@core/i18n/i18n.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     '[class.db--live]': 'live()',
+    '[class.db--muted]': 'muted() && !live()',
   },
   templateUrl: './date-block.component.html',
   styleUrl: './date-block.component.scss',
@@ -27,6 +29,8 @@ export class DateBlockComponent {
   /** The date, as an ISO string or a Date. Shown in local time. */
   readonly date = input.required<string | Date | null | undefined>();
   readonly live = input(false);
+  /** A date of the past: muted text on the same surface. */
+  readonly muted = input(false);
 
   private readonly parsed = computed(() => {
     const value = this.date();

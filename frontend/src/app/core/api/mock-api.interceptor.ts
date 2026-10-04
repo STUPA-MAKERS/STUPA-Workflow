@@ -104,7 +104,6 @@ const MOCK_VOTE: Vote = {
     quorum: { type: 'percent', value: 50 },
     abstainCountsQuorum: true,
     secret: false,
-    tieBreak: 'rejected',
   },
   status: 'open',
   opensAt: '2026-06-06T09:00:00Z',
@@ -429,8 +428,17 @@ let MOCK_MEETING: MeetingOutWire = {
   gremiumId: null,
   gremiumName: 'Studierendenparlament',
   protocolId: MOCK_PROTOCOL_ID,
+  // The demo user keeps the minutes: an id of the roster below, so that the settings
+  // dialog preselects the same person that the list row shows.
+  protokollantId: MOCK_PRINCIPAL.sub,
+  protokollantName: MOCK_PRINCIPAL.display_name,
   isProtokollant: true,
   canControl: true,
+  // The demo user leads the meeting: the dialogs of the meeting page show.
+  canManage: true,
+  canWrite: true,
+  canManageVotes: true,
+  canFinalize: true,
   votes: [
     {
       id: 'a0000000-0000-0000-0000-0000000000a1',
@@ -446,7 +454,7 @@ let MOCK_MEETING: MeetingOutWire = {
       id: 'a0000000-0000-0000-0000-0000000000a2',
       applicationId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
       title: 'Anschaffung Beamer',
-      status: 'pending',
+      status: 'draft',
       result: null,
       counts: null,
       leading: null,
@@ -489,6 +497,99 @@ const MOCK_DELEGATIONS = [
     direction: 'incoming',
   },
 ];
+/** A local `YYYY-MM-DD` date, `days` away from today. */
+function mockDay(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/** A meeting of the timeline, with the flags of a Gremium lead. */
+function mockTimelineMeeting(
+  n: number,
+  days: number,
+  title: string,
+  status: MeetingOutWire['status'],
+  extra: Partial<MeetingOutWire> = {},
+): MeetingOutWire {
+  const date = mockDay(days);
+  return {
+    id: `d0000000-0000-0000-0000-0000000001${String(n).padStart(2, '0')}`,
+    title,
+    status,
+    date,
+    startTime: '18:00:00',
+    endTime: null,
+    activeApplicationId: null,
+    currentAgendaItemId: null,
+    gremiumId: 'g0000000-0000-0000-0000-000000000001',
+    gremiumName: 'Studierendenparlament',
+    protocolId: status === 'planned' ? null : `e0000000-0000-0000-0000-0000000001${String(n).padStart(2, '0')}`,
+    protokollantId: status === 'planned' ? null : MOCK_PRINCIPAL.sub,
+    protokollantName: status === 'planned' ? null : MOCK_PRINCIPAL.display_name,
+    canManage: true,
+    canControl: true,
+    canWrite: true,
+    votes: [],
+    createdAt: `${date}T08:00:00Z`,
+    ...extra,
+  };
+}
+
+/**
+ * The meeting timeline of the mock: past meetings newest first, then the coming ones
+ * in date order. The live demo meeting leads the coming ones.
+ */
+function mockTimeline(): { past: MeetingOutWire[]; upcoming: MeetingOutWire[] } {
+  const past = [
+    mockTimelineMeeting(1, -9, '33. Sitzung des Studierendenparlaments', 'closed', {
+      startedAt: `${mockDay(-9)}T16:04:00Z`,
+      closedAt: `${mockDay(-9)}T19:40:00Z`,
+    }),
+    mockTimelineMeeting(2, -16, '11. Sitzung des Haushaltsausschusses', 'closed', {
+      gremiumName: 'Haushaltsausschuss',
+      gremiumId: 'g0000000-0000-0000-0000-000000000002',
+      startedAt: `${mockDay(-16)}T15:32:00Z`,
+      closedAt: `${mockDay(-16)}T17:05:00Z`,
+    }),
+    mockTimelineMeeting(3, -30, '32. Sitzung des Studierendenparlaments', 'closed'),
+    mockTimelineMeeting(4, -44, '31. Sitzung des Studierendenparlaments', 'closed'),
+  ];
+  const live: MeetingOutWire = {
+    ...MOCK_MEETING,
+    date: MOCK_MEETING.date ?? mockDay(0),
+    startTime: MOCK_MEETING.startTime ?? '18:00:00',
+    startedAt: MOCK_MEETING.status === 'live' ? `${mockDay(0)}T16:04:00Z` : null,
+    protokollantId: MOCK_MEETING.protokollantId ?? null,
+    protokollantName: MOCK_MEETING.protokollantName ?? null,
+    canManage: true,
+  };
+  const upcoming = [
+    live,
+    mockTimelineMeeting(5, 3, '12. Sitzung des Haushaltsausschusses', 'planned', {
+      gremiumName: 'Haushaltsausschuss',
+      gremiumId: 'g0000000-0000-0000-0000-000000000002',
+      startTime: '17:30:00',
+      endTime: '19:00:00',
+      protokollantId: MOCK_PRINCIPAL.sub,
+      protokollantName: MOCK_PRINCIPAL.display_name,
+      canManage: false,
+      canControl: false,
+      canWrite: false,
+    }),
+    mockTimelineMeeting(6, 14, '35. Sitzung des Studierendenparlaments', 'planned'),
+    mockTimelineMeeting(
+      7,
+      22,
+      'Sondersitzung des Studierendenparlaments zur Haushaltsplanung mit allen Referatsleitungen',
+      'planned',
+      { startTime: '16:00:00' },
+    ),
+    mockTimelineMeeting(8, 28, '36. Sitzung des Studierendenparlaments', 'planned'),
+  ];
+  return { past, upcoming };
+}
 
 interface MockAttendance {
   principalId: string;
@@ -498,12 +599,15 @@ interface MockAttendance {
   source: 'self' | 'lead' | null;
   note: string | null;
   isSelf: boolean;
+  /** O20: the member holds `protocol.write` and can keep the minutes. */
+  canKeepProtocol: boolean;
 }
 
+/** The roster of the mock Gremium. The demo user is in it with the id of the principal. */
 let MOCK_ATTENDANCE: MockAttendance[] = [
-  { principalId: 'me', displayName: 'Demo-Nutzer:in', email: null, status: null, source: null, note: null, isSelf: true },
-  { principalId: 'p-2', displayName: 'Max Mustermann', email: 'max@example.com', status: 'present', source: 'lead', note: null, isSelf: false },
-  { principalId: 'p-3', displayName: 'Erika Beispiel', email: 'erika@example.com', status: 'excused', source: 'self', note: 'Prüfung', isSelf: false },
+  { principalId: MOCK_PRINCIPAL.sub, displayName: MOCK_PRINCIPAL.display_name ?? null, email: MOCK_PRINCIPAL.email ?? null, status: null, source: null, note: null, isSelf: true, canKeepProtocol: true },
+  { principalId: 'p-2', displayName: 'Max Mustermann', email: 'max@example.com', status: 'present', source: 'lead', note: null, isSelf: false, canKeepProtocol: true },
+  { principalId: 'p-3', displayName: 'Erika Beispiel', email: 'erika@example.com', status: 'excused', source: 'self', note: 'Prüfung', isSelf: false, canKeepProtocol: false },
 ];
 
 interface MockAgendaItem {
@@ -512,6 +616,7 @@ interface MockAgendaItem {
   title: string | null;
   body?: string | null;
   position: number;
+  nonPublic?: boolean;
   stateLabel?: Record<string, string> | null;
 }
 
@@ -611,12 +716,41 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     // generic rule otherwise captures `/meetings/timeline` and returns
     // application status events instead of a MeetingPage.
     if (p.endsWith('/meetings/timeline')) {
+      // Keyset paging as an offset in the cursor; `q` collapses both directions into
+      // one list of hits.
+      const { past, upcoming } = mockTimeline();
+      const q = (req.params.get('q') ?? '').trim().toLowerCase();
+      const gremiumId = req.params.get('gremiumId');
       const direction = req.params.get('direction') ?? 'upcoming';
+      let rows = q
+        ? [...upcoming, ...past].filter((m) => m.title.toLowerCase().includes(q))
+        : direction === 'upcoming'
+          ? upcoming
+          : past;
+      if (gremiumId) rows = rows.filter((m) => m.gremiumId === gremiumId);
+      const offset = Number(req.params.get('cursor') ?? '0') || 0;
+      const limit = Number(req.params.get('limit') ?? '15') || 15;
       const page: MeetingPageWire = {
-        items: direction === 'upcoming' ? [MOCK_MEETING] : [],
-        nextCursor: null,
+        items: rows.slice(offset, offset + limit),
+        nextCursor: offset + limit < rows.length ? String(offset + limit) : null,
       };
       return ok(page);
+    }
+    if (p.endsWith('/meetings/gremien')) {
+      return ok([
+        { id: 'g0000000-0000-0000-0000-000000000001', name: 'Studierendenparlament' },
+        { id: 'g0000000-0000-0000-0000-000000000002', name: 'Haushaltsausschuss' },
+      ]);
+    }
+    if (/\/gremien\/[^/]+\/meeting-members$/.test(p)) {
+      return ok(
+        MOCK_ATTENDANCE.map((a) => ({
+          principalId: a.principalId,
+          displayName: a.displayName,
+          email: a.email,
+          canKeepProtocol: a.canKeepProtocol,
+        })),
+      );
     }
     if (p.endsWith('/timeline')) return ok(MOCK_TIMELINE);
     if (p.endsWith('/versions')) return ok([...MOCK_VERSIONS]);
@@ -655,6 +789,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
       return ok(MOCK_ASSIGNABLE.filter((a) => !taken.has(a.applicationId)));
     }
     if (/\/meetings\/[^/]+\/agenda$/.test(p)) return ok([...MOCK_AGENDA]);
+    if (/\/meetings\/[^/]+\/protocol$/.test(p)) return ok(MOCK_PROTOCOL);
     if (/\/meetings\/[^/]+$/.test(p)) return ok(MOCK_MEETING);
     if (/\/applications\/[^/]+\/form$/.test(p)) return ok(MOCK_EFFECTIVE_FORM);
     if (/\/applications\/[^/]+$/.test(p)) return ok(mockApplication());
@@ -710,19 +845,20 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
       return ok(MOCK_MEETING);
     }
     if (/\/meetings\/[^/]+\/agenda$/.test(p)) {
-      const body = req.body as { applicationId?: string; title?: string } | null;
+      const body = req.body as { applicationId?: string; title?: string; nonPublic?: boolean } | null;
       const appId = body?.applicationId;
       const freetext = body?.title;
+      const nonPublic = body?.nonPublic === true;
       if (freetext) {
         MOCK_AGENDA = [
           ...MOCK_AGENDA,
-          { id: `ag-${++MOCK_AGENDA_SEQ}`, applicationId: null, title: freetext, position: MOCK_AGENDA.length },
+          { id: `ag-${++MOCK_AGENDA_SEQ}`, applicationId: null, title: freetext, position: MOCK_AGENDA.length, nonPublic },
         ];
       } else if (appId && !MOCK_AGENDA.some((a) => a.applicationId === appId)) {
         const src = MOCK_ASSIGNABLE.find((a) => a.applicationId === appId);
         MOCK_AGENDA = [
           ...MOCK_AGENDA,
-          { id: `ag-${++MOCK_AGENDA_SEQ}`, applicationId: appId, title: src?.title ?? null, position: MOCK_AGENDA.length, stateLabel: src?.stateLabel ?? null },
+          { id: `ag-${++MOCK_AGENDA_SEQ}`, applicationId: appId, title: src?.title ?? null, position: MOCK_AGENDA.length, stateLabel: src?.stateLabel ?? null, nonPublic },
         ];
       }
       return ok([...MOCK_AGENDA]);
@@ -819,7 +955,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
   }
 
   if (req.method === 'PATCH' && /\/meetings\/[^/]+$/.test(p)) {
-    const body = (req.body as { status?: MeetingOutWire['status']; activeApplicationId?: string; currentAgendaItemId?: string | null; date?: string | null; startTime?: string | null } | null) ?? {};
+    const body = (req.body as { status?: MeetingOutWire['status']; activeApplicationId?: string; currentAgendaItemId?: string | null; date?: string | null; startTime?: string | null; endTime?: string | null; protokollantId?: string | null } | null) ?? {};
     MOCK_MEETING = {
       ...MOCK_MEETING,
       status: body.status ?? MOCK_MEETING.status,
@@ -833,6 +969,18 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
           : MOCK_MEETING.currentAgendaItemId,
       date: body.date !== undefined ? body.date : MOCK_MEETING.date,
       startTime: body.startTime !== undefined ? body.startTime : MOCK_MEETING.startTime,
+      endTime: body.endTime !== undefined ? body.endTime : MOCK_MEETING.endTime,
+      protokollantId:
+        body.protokollantId !== undefined ? body.protokollantId : MOCK_MEETING.protokollantId,
+      protokollantName:
+        body.protokollantId !== undefined
+          ? (MOCK_ATTENDANCE.find((a) => a.principalId === body.protokollantId)?.displayName ?? null)
+          : MOCK_MEETING.protokollantName,
+      isProtokollant:
+        body.protokollantId !== undefined
+          ? body.protokollantId === MOCK_PRINCIPAL.sub
+          : MOCK_MEETING.isProtokollant,
+      closedAt: body.status === 'closed' ? new Date().toISOString() : MOCK_MEETING.closedAt,
     };
     return ok(MOCK_MEETING);
   }

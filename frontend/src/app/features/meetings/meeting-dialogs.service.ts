@@ -1,299 +1,99 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Injectable, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { ApiClient } from '@core/api/api-client.service';
-import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
-import type { Attendance, HandoverMode, Meeting, MeetingMember, Uuid } from '@core/api/models';
-import { ToastService, type SelectOption } from '@stupa-makers/ui-kit';
-import { AdminOptionsService } from '../../pages/admin/admin-options.service';
+import type { AgendaItem, HandoverMode, Meeting, Uuid } from '@core/api/models';
+import { ToastService } from '@stupa-makers/ui-kit';
 import { MeetingSessionService } from './meeting-session.service';
 import { MeetingsTimelineService } from './meetings-timeline.service';
-import { errorCode, errorDetail, longDate } from './meetings-display.util';
+import { errorCode, errorDetail } from './meetings-display.util';
 
 /**
- * Meeting metadata dialogs: the two-step create dialog, the settings dialog for
- * protokollant and date or time, and the delete confirmation.
+ * Which meeting dialog is open, and the meeting actions that come from the dock.
+ *
+ * The dialogs (settings, delete, close, agenda item, vote) are components of their
+ * own. They call the API themselves and report the result; this service opens them
+ * and puts the result into the page state: the loaded meeting and the list.
  * MeetingsComponent provides this service.
  */
 @Injectable()
 export class MeetingDialogsService {
   private readonly api = inject(ApiClient);
-  private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
-  private readonly options = inject(AdminOptionsService);
   private readonly session = inject(MeetingSessionService);
   private readonly timeline = inject(MeetingsTimelineService);
 
-  readonly createOpen = signal(false);
-  /** Step 1 asks for Gremium, date and time. Step 2 asks for name and protokollant. */
-  readonly createStep = signal<1 | 2>(1);
-  readonly creating = signal(false);
-  readonly newTitle = signal('');
-  readonly newDate = signal('');
-  readonly newTime = signal('');
-  /** Optional end time. It must be after `newTime`. */
-  readonly newEndTime = signal('');
-  /** The Gremium is required. An empty value locks the submit. */
-  readonly newGremiumId = signal('');
-  /** The protokollant is optional at create time. The meeting needs one before it starts. */
-  readonly newProtokollant = signal('');
-  readonly createMembers = signal<MeetingMember[]>([]);
-  /** The last auto-filled title. Overwrite the title only while the user keeps it. */
-  private lastAutoPrefill = '';
-
-  /** O20: only a member with `protocol.write` can keep the minutes (422 otherwise). */
-  readonly createProtokollantOptions = computed<SelectOption[]>(() => [
-    { value: '', label: this.i18n.translate('meetings.protokollant.none') },
-    ...this.createMembers()
-      .filter((m) => m.canKeepProtocol)
-      .map((m) => ({
-        value: m.principalId,
-        label: m.displayName || m.email || m.principalId,
-      })),
-  ]);
-  /** Gremien offered in the create dropdown, read from `/gremien`. */
-  readonly gremiumOptions = signal<SelectOption[]>([]);
-
-  readonly createStep1Valid = computed(
-    () => !!this.newGremiumId() && !!this.newDate().trim() && !!this.newTime().trim(),
-  );
-
-  // The settings dialog opens from the toolbar or from the list edit.
+  /** "Sitzung bearbeiten", from a list row or from the meeting page. */
   readonly settingsMeeting = signal<Meeting | null>(null);
-  readonly settingsRoster = signal<Attendance[]>([]);
-  readonly settingsProtokollant = signal<string>('');
-  readonly settingsDate = signal<string>('');
-  readonly settingsTime = signal<string>('');
-  readonly settingsEndTime = signal<string>('');
-  readonly savingSettings = signal(false);
-  /** A closed meeting locks all settings, also in the list edit. */
-  readonly settingsLocked = computed(() => this.settingsMeeting()?.status === 'closed');
-  /** A finalized protocol also locks the protokollant. The protocol status is
-   *  known only in the detail view of the open meeting. */
-  readonly protokollantLocked = computed(
-    () =>
-      this.session.meeting()?.id === this.settingsMeeting()?.id &&
-      !!this.session.protocol()?.isFinal,
-  );
-  /**
-   * O20: only a member with `protocol.write` can keep the minutes. The current
-   * protokollant stays in the list, so the select still shows the assignment.
-   */
-  readonly protokollantOptions = computed<SelectOption[]>(() => {
-    const current = this.settingsMeeting()?.protokollantId ?? null;
-    return [
-      { value: '', label: this.i18n.translate('meetings.protokollant.none') },
-      ...this.settingsRoster()
-        .filter((a) => a.canKeepProtocol || a.principalId === current)
-        .map((a) => ({
-          value: a.principalId,
-          label: a.displayName || a.email || a.principalId,
-        })),
-    ];
-  });
-
-  readonly confirmDeleteMeeting = signal<Meeting | null>(null);
-  readonly deletingMeeting = signal(false);
-
-  constructor() {
-    // Only a meeting manager gets the create dropdown. An admin gets every Gremium.
-    // Everybody else gets only the Gremien that the user manages through a Gremium
-    // role with `session.manage`. The server answers 403 for every other Gremium.
-    const canCreate = this.auth.isAdmin() || this.auth.sessionManageGremien().length > 0;
-    if (canCreate) {
-      this.options
-        .gremiumOptions()
-        .pipe(takeUntilDestroyed())
-        .subscribe({
-          next: (opts) => {
-            if (this.auth.isAdmin()) {
-              this.gremiumOptions.set(opts);
-              return;
-            }
-            const managed = new Set(this.auth.sessionManageGremien());
-            this.gremiumOptions.set(opts.filter((o) => managed.has(o.value)));
-          },
-          error: () => this.gremiumOptions.set([]),
-        });
-    }
-  }
-
-  openCreate(): void {
-    this.newProtokollant.set('');
-    this.createMembers.set([]);
-    this.createStep.set(1);
-    this.lastAutoPrefill = '';
-    // The Gremium can already be set, for example by the overview filter.
-    if (this.newGremiumId()) this.loadCreateMembers(this.newGremiumId());
-    this.createOpen.set(true);
-  }
-
-  closeCreate(): void {
-    this.createOpen.set(false);
-    this.createStep.set(1);
-  }
-
-  /** Go from step 1 to step 2 and prefill the name, such as "Meeting of the
-   *  <Gremium> on <date>". A title that the user edited by hand stays. */
-  goToCreateStep2(): void {
-    if (!this.createStep1Valid()) return;
-    const committee =
-      this.gremiumOptions().find((o) => o.value === this.newGremiumId())?.label ?? '';
-    const suggestion = this.i18n.translate('meetings.create.namePrefill', {
-      committee,
-      date: longDate(this.newDate().trim(), this.i18n.locale()),
-    });
-    const current = this.newTitle();
-    if (!current.trim() || current === this.lastAutoPrefill) {
-      this.newTitle.set(suggestion);
-      this.lastAutoPrefill = suggestion;
-    }
-    this.createStep.set(2);
-  }
-
-  backToCreateStep1(): void {
-    this.createStep.set(1);
-  }
-
-  /** Reload the protokollant candidates after the Gremium changed in the create dialog. */
-  onCreateGremiumChange(gremiumId: string): void {
-    this.newGremiumId.set(gremiumId);
-    this.newProtokollant.set('');
-    this.createMembers.set([]);
-    if (gremiumId) this.loadCreateMembers(gremiumId);
-  }
-
-  private loadCreateMembers(gremiumId: string): void {
-    this.api.listMeetingMembers(gremiumId).subscribe({
-      next: (rows) => this.createMembers.set(rows),
-      error: () => this.createMembers.set([]),
-    });
-  }
-
-  create(): void {
-    const title = this.newTitle().trim();
-    const gremiumId = this.newGremiumId();
-    const date = this.newDate().trim();
-    const startTime = this.newTime().trim();
-    const endTime = this.newEndTime().trim();
-    // The date and the start time are required. The submit stays locked without them.
-    if (!title || !gremiumId || !date || !startTime || this.creating()) return;
-    if (endTime && endTime <= startTime) {
-      this.toast.error(this.i18n.translate('meetings.create.endBeforeStart'));
-      return;
-    }
-    this.creating.set(true);
-    this.api
-      .createMeeting({
-        title,
-        gremiumId,
-        date,
-        startTime,
-        endTime: endTime || null,
-        protokollantId: this.newProtokollant() || null,
-      })
-      .subscribe({
-        next: (m) => {
-          this.creating.set(false);
-          this.newTitle.set('');
-          this.newGremiumId.set('');
-          this.newDate.set('');
-          this.newTime.set('');
-          this.newEndTime.set('');
-          this.newProtokollant.set('');
-          this.createMembers.set([]);
-          this.createOpen.set(false);
-          this.createStep.set(1);
-          this.lastAutoPrefill = '';
-          this.toast.success(this.i18n.translate('meetings.toast.created'));
-          // Go to the detail route so that the user finds the meeting again.
-          void this.router.navigate(['/meetings', m.id]);
-        },
-        error: () => {
-          this.creating.set(false);
-          this.toast.error(this.i18n.translate('meetings.toast.createFailed'));
-        },
-      });
-  }
+  /** "Sitzung löschen", from a list row or from the meeting page. */
+  readonly deleteMeeting = signal<Meeting | null>(null);
+  /** "Sitzung schließen?" for the loaded meeting. */
+  readonly closeOpen = signal(false);
+  /** "TOP hinzufügen" for the loaded meeting. */
+  readonly agendaOpen = signal(false);
+  /** "Abstimmung öffnen" for this agenda item of the loaded meeting. */
+  readonly voteItem = signal<AgendaItem | null>(null);
 
   openSettings(m: Meeting): void {
     this.settingsMeeting.set(m);
-    this.settingsProtokollant.set(m.protokollantId ?? '');
-    this.settingsDate.set(m.date ?? '');
-    this.settingsTime.set(m.startTime ?? '');
-    this.settingsEndTime.set(m.endTime ?? '');
-    this.settingsRoster.set([]);
-    this.api.listAttendance(m.id, { quiet: true }).subscribe({
-      next: (rows) => {
-        this.settingsRoster.set(rows);
-        // Set the selection again after the options load. Without this step the
-        // native <select> falls back to "nobody", because the option is still missing.
-        this.settingsProtokollant.set(m.protokollantId ?? '');
-      },
-      error: () => this.settingsRoster.set([]),
-    });
   }
 
   closeSettings(): void {
     this.settingsMeeting.set(null);
   }
 
-  /** Save the protokollant, the date and the time in one PATCH. */
-  saveSettings(): void {
-    const m = this.settingsMeeting();
-    if (!m || this.savingSettings() || this.settingsLocked()) return;
-    // The date and the time are required, as in the create dialog.
-    if (!this.settingsDate().trim() || !this.settingsTime().trim()) {
-      this.toast.error(this.i18n.translate('meetings.toast.dateTimeRequired'));
-      return;
-    }
-    const settingsEnd = this.settingsEndTime().trim();
-    if (settingsEnd && settingsEnd <= this.settingsTime().trim()) {
-      this.toast.error(this.i18n.translate('meetings.create.endBeforeStart'));
-      return;
-    }
-    this.savingSettings.set(true);
-    // A finalized protocol locks the protokollant. The field stays disabled and the
-    // request omits the value, because the backend answers 409.
-    this.api
-      .patchMeeting(m.id, {
-        ...(this.protokollantLocked()
-          ? {}
-          : { protokollantId: this.settingsProtokollant() || null }),
-        date: this.settingsDate().trim() || null,
-        startTime: this.settingsTime().trim() || null,
-        endTime: this.settingsEndTime().trim() || null,
-      })
-      .subscribe({
-        next: (updated) => {
-          this.savingSettings.set(false);
-          this.settingsMeeting.set(null);
-          if (this.session.meeting()?.id === updated.id) this.session.meeting.set(updated);
-          this.timeline.replaceInTimeline(updated);
-          this.toast.success(this.i18n.translate('meetings.toast.settingsSaved'));
-        },
-        error: () => {
-          this.savingSettings.set(false);
-          this.toast.error(this.i18n.translate('meetings.toast.actionFailed'));
-        },
-      });
+  askDeleteMeeting(m: Meeting): void {
+    this.deleteMeeting.set(m);
+  }
+
+  cancelDelete(): void {
+    this.deleteMeeting.set(null);
+  }
+
+  /** The server changed a meeting: put it into the page and the list. */
+  applyUpdated(updated: Meeting): void {
+    if (this.session.meeting()?.id === updated.id) this.session.meeting.set(updated);
+    this.timeline.replaceInTimeline(updated);
+  }
+
+  /** The settings dialog saved. */
+  settingsSaved(updated: Meeting): void {
+    this.settingsMeeting.set(null);
+    this.applyUpdated(updated);
+  }
+
+  /** The delete dialog deleted the meeting. From its page, go back to the list. */
+  meetingDeleted(id: Uuid): void {
+    this.deleteMeeting.set(null);
+    this.timeline.removeFromTimeline(id);
+    if (this.session.meeting()?.id === id) void this.router.navigate(['/meetings']);
+  }
+
+  /** The close dialog closed the meeting. The protocol stays a draft (O13). */
+  meetingClosed(updated: Meeting): void {
+    this.closeOpen.set(false);
+    this.applyUpdated(updated);
+  }
+
+  /** The vote dialog opened a vote. */
+  voteOpened(updated: Meeting): void {
+    this.voteItem.set(null);
+    this.applyUpdated(updated);
   }
 
   /**
-   * Name the protokollant of a meeting in one PATCH, straight from the session
-   * page. The settings dialog stays the place for the date and the time.
+   * Name the minute-taker of a planned meeting in one PATCH, straight from the
+   * meeting page. The settings dialog stays the place for the date and the time.
    */
   setProtokollant(m: Meeting, principalId: string): void {
     this.api.patchMeeting(m.id, { protokollantId: principalId }).subscribe({
       next: (updated) => {
-        if (this.session.meeting()?.id === updated.id) this.session.meeting.set(updated);
-        this.timeline.replaceInTimeline(updated);
+        this.applyUpdated(updated);
         this.toast.success(this.i18n.translate('meetings.toast.protokollantSet'));
       },
-      error: () => this.toast.error(this.i18n.translate('meetings.toast.actionFailed')),
+      error: (err: unknown) => this.keeperChangeFailed(err),
     });
   }
 
@@ -304,15 +104,14 @@ export class MeetingDialogsService {
   handOver(m: Meeting, principalId: Uuid, mode: HandoverMode): void {
     this.api.handOverProtokollant(m.id, principalId, mode).subscribe({
       next: (updated) => {
-        if (this.session.meeting()?.id === updated.id) this.session.meeting.set(updated);
-        this.timeline.replaceInTimeline(updated);
+        this.applyUpdated(updated);
         this.toast.success(
           this.i18n.translate(
             mode === 'now' ? 'meetings.toast.handedOver' : 'meetings.toast.handoverPlanned',
           ),
         );
       },
-      error: (err: unknown) => this.handoverFailed(err),
+      error: (err: unknown) => this.keeperChangeFailed(err),
     });
   }
 
@@ -320,15 +119,14 @@ export class MeetingDialogsService {
   cancelHandover(m: Meeting): void {
     this.api.cancelProtokollantHandover(m.id).subscribe({
       next: (updated) => {
-        if (this.session.meeting()?.id === updated.id) this.session.meeting.set(updated);
-        this.timeline.replaceInTimeline(updated);
+        this.applyUpdated(updated);
         this.toast.success(this.i18n.translate('meetings.toast.handoverDiscarded'));
       },
-      error: (err: unknown) => this.handoverFailed(err),
+      error: (err: unknown) => this.keeperChangeFailed(err),
     });
   }
 
-  private handoverFailed(err: unknown): void {
+  private keeperChangeFailed(err: unknown): void {
     if (errorCode(err) === 'protokollant_needs_protocol_write') {
       this.toast.error(this.i18n.translate('meetings.toast.needsProtocolWrite'));
       return;
@@ -336,36 +134,5 @@ export class MeetingDialogsService {
     const detail = errorDetail(err);
     const base = this.i18n.translate('meetings.toast.actionFailed');
     this.toast.error(detail ? `${base}: ${detail}` : base);
-  }
-
-  askDeleteMeeting(m: Meeting): void {
-    this.confirmDeleteMeeting.set(m);
-  }
-
-  doDeleteMeeting(): void {
-    const m = this.confirmDeleteMeeting();
-    if (!m || this.deletingMeeting()) return;
-    this.deletingMeeting.set(true);
-    this.api.deleteMeeting(m.id).subscribe({
-      next: () => {
-        this.deletingMeeting.set(false);
-        this.confirmDeleteMeeting.set(null);
-        this.timeline.removeFromTimeline(m.id);
-        this.toast.success(this.i18n.translate('meetings.toast.deleted'));
-        if (this.session.meeting()?.id === m.id) void this.router.navigate(['/meetings']);
-      },
-      error: (err: unknown) => {
-        this.deletingMeeting.set(false);
-        // The server refuses the delete while a vote of the meeting is open
-        // (409 `open_vote`). Any other refusal shows the server reason.
-        if (errorCode(err) === 'open_vote') {
-          this.toast.error(this.i18n.translate('meetings.toast.closeOpenVote'));
-          return;
-        }
-        const detail = errorDetail(err);
-        const base = this.i18n.translate('meetings.toast.actionFailed');
-        this.toast.error(detail ? `${base}: ${detail}` : base);
-      },
-    });
   }
 }

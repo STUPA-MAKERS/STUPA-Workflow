@@ -760,27 +760,14 @@ app-markdown-editor ::ng-deep .mde__host .ProseMirror {
   min-width: 0;
 }
 .fx__add {
+  align-self: flex-start;
   margin-top: var(--space-2);
-  padding-top: var(--space-3);
-  border-top: var(--border-width) solid var(--color-border);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
 }
 .fx__addH {
   margin: 0;
   font-size: var(--fs-sm);
   font-weight: var(--fw-semibold);
   color: var(--color-text-muted);
-}
-.fx__addRow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-.fx__addRow app-select {
-  flex: 1;
-  min-width: 0;
 }
 
 /* Phone: the dock sits on the viewport like a tab bar, the page keeps its height free

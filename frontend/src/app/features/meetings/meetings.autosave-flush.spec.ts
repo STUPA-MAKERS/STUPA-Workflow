@@ -112,7 +112,6 @@ async function loaded() {
   http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
   http.expectOne('/api/meetings/m-1/attendance').flush([]);
   http.expectOne('/api/meetings/m-1/agenda').flush([]);
-  http.expectOne('/api/meetings/m-1/agenda/assignable').flush([]);
   http
     .match((r) => r.url.endsWith('/api/delegations/meetings/m-1/context'))
     .forEach((req) =>

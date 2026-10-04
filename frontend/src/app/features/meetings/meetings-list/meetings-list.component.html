@@ -1,0 +1,186 @@
+<div class="mtl">
+  <app-page-header [title]="'meetings.title' | t" [flush]="true">
+    <div actions class="mtl__actions">
+      <app-search-pill
+        class="mtl__search"
+        size="md"
+        [placeholder]="'meetings.list.searchPlaceholder' | t"
+        [value]="timeline.searchQuery()"
+        (valueChange)="timeline.onSearch($event)"
+      />
+      @if (showFilter()) {
+        <!-- A native select in a chip: the browser list is accessible on every device.
+             The select is transparent over the chip, so the chip is as wide as the
+             selected label and not as wide as the longest option. -->
+        <label class="mtl__chip">
+          <app-icon class="mtl__chipIcon" name="building" [size]="16" />
+          <span class="mtl__chipLabel ell" aria-hidden="true">{{ filterLabel() }}</span>
+          <app-icon class="mtl__chipIcon" name="down" [size]="15" />
+          <select
+            class="mtl__chipSelect"
+            [attr.aria-label]="'meetings.list.committeeFilter' | t"
+            (change)="onFilter($event)"
+          >
+            @for (opt of timeline.filterGremiumOptions(); track opt.value) {
+              <option [value]="opt.value" [selected]="opt.value === timeline.gremiumFilter()">
+                {{ opt.label }}
+              </option>
+            }
+          </select>
+        </label>
+      }
+      @if (canCreate()) {
+        <app-button variant="fill" (click)="createOpen.set(true)">
+          <app-icon name="plus" [size]="17" />
+          {{ 'meetings.list.new' | t }}
+        </app-button>
+      }
+    </div>
+  </app-page-header>
+
+  @if (timeline.loadingList()) {
+    <app-skeleton variant="rows" [count]="5" [label]="'meetings.list.loading' | t" />
+  } @else if (timeline.searchActive()) {
+    <!-- Search: one list of hits by relevance, no "now" marker. -->
+    @if (timeline.searchItems().length) {
+      <div class="mtl__rows" role="list" [attr.aria-label]="'meetings.title' | t">
+        @for (m of timeline.searchItems(); track m.id) {
+          <ng-container *ngTemplateOutlet="row; context: { $implicit: m, past: false }" />
+        }
+      </div>
+    }
+    @if (timeline.searchEmpty()) {
+      <p class="mtl__empty">{{ 'meetings.list.searchEmpty' | t }}</p>
+    }
+    @if (timeline.searchHasMore() || timeline.loadingSearch()) {
+      <app-button
+        class="mtl__more"
+        variant="text"
+        size="sm"
+        [loading]="timeline.loadingSearch()"
+        (click)="timeline.loadMoreSearch()"
+      >
+        <app-icon name="down" [size]="15" />
+        {{ 'meetings.list.loadMore' | t }}
+      </app-button>
+    }
+  } @else {
+    @if (timeline.hasMorePast()) {
+      <app-button
+        class="mtl__more"
+        variant="text"
+        size="sm"
+        [loading]="timeline.loadingPast()"
+        (click)="timeline.loadMorePast()"
+      >
+        <app-icon name="up" [size]="15" />
+        {{ 'meetings.list.loadPast' | t }}
+      </app-button>
+    }
+    @if (timeline.pastItems().length) {
+      <div class="mtl__rows" role="list" [attr.aria-label]="'meetings.list.past' | t">
+        @for (m of timeline.pastItems(); track m.id) {
+          <ng-container *ngTemplateOutlet="row; context: { $implicit: m, past: true }" />
+        }
+      </div>
+    }
+    <div class="mtl__now" role="separator" [attr.aria-label]="'meetings.list.now' | t">
+      <span class="mtl__nowLabel cap" aria-hidden="true">{{ 'meetings.list.now' | t }}</span>
+    </div>
+    @if (timeline.upcomingItems().length) {
+      <div class="mtl__rows" role="list" [attr.aria-label]="'meetings.list.upcoming' | t">
+        @for (m of timeline.upcomingItems(); track m.id) {
+          <ng-container *ngTemplateOutlet="row; context: { $implicit: m, past: false }" />
+        }
+      </div>
+    } @else {
+      <p class="mtl__empty">{{ 'meetings.list.noUpcoming' | t }}</p>
+    }
+    @if (timeline.upcomingHasMore()) {
+      <app-button
+        class="mtl__more"
+        variant="text"
+        size="sm"
+        [loading]="timeline.loadingUpcoming()"
+        (click)="timeline.loadMoreUpcoming()"
+      >
+        <app-icon name="down" [size]="15" />
+        {{ 'meetings.list.loadMore' | t }}
+      </app-button>
+    }
+  }
+</div>
+
+<ng-template #row let-m let-past="past">
+  @let t = time(m);
+  @let st = status(m);
+  <app-list-item
+    class="mtl__row"
+    role="listitem"
+    [class.mtl__row--past]="past"
+    [title]="m.title"
+    (activate)="open(m.id)"
+  >
+    <app-date-block lead [date]="day(m)" [live]="m.status === 'live'" [muted]="past" />
+    <app-status-text status [kind]="st.kind">{{ st.key | t }}</app-status-text>
+    <!-- The sub line is one line. On a phone the time comes first, so the Gremium name
+         takes the ellipsis and the time stays visible. -->
+    <span sub class="mtl__meta">
+      @if (phone() && t.text) {
+        <ng-container *ngTemplateOutlet="timeFact; context: { $implicit: t }" />
+      }
+      @if (m.gremiumName) {
+        <span class="mtl__fact"><app-icon name="building" [size]="13" />{{ m.gremiumName }}</span>
+      }
+      @if (!phone() && t.text) {
+        <ng-container *ngTemplateOutlet="timeFact; context: { $implicit: t }" />
+      }
+      @if (m.protokollantName) {
+        <span class="mtl__fact" [title]="'meetings.protokollant.label' | t">
+          <app-icon name="user" [size]="13" /><span class="sr-only"
+            >{{ 'meetings.protokollant.label' | t }}: </span
+          >{{ m.protokollantName }}
+        </span>
+      }
+    </span>
+    <span trail class="mtl__trail">
+      @if (m.canManage) {
+        <app-button
+          variant="text"
+          size="sm"
+          [iconOnly]="true"
+          [ariaLabel]="('meetings.settings.title' | t) + ': ' + m.title"
+          [title]="'meetings.settings.title' | t"
+          (click)="edit(m)"
+        >
+          <app-icon name="edit" [size]="17" />
+        </app-button>
+        <app-button
+          variant="text"
+          size="sm"
+          [iconOnly]="true"
+          [ariaLabel]="('meetings.delete.title' | t) + ': ' + m.title"
+          [title]="'meetings.delete.title' | t"
+          (click)="remove(m)"
+        >
+          <app-icon name="trash" [size]="17" />
+        </app-button>
+      }
+      <app-icon class="mtl__chev" name="right" [size]="18" />
+    </span>
+  </app-list-item>
+</ng-template>
+
+<ng-template #timeFact let-t>
+  <span class="mtl__fact">
+    <app-icon name="clock" [size]="13" /><span class="mono">{{ t.since ? ('meetings.list.since' | t: { time: t.text }) : t.text }}</span>
+  </span>
+</ng-template>
+
+@if (canCreate()) {
+  <app-create-meeting-dialog
+    [open]="createOpen()"
+    [gremiumId]="timeline.gremiumFilter()"
+    (closed)="createOpen.set(false)"
+  />
+}

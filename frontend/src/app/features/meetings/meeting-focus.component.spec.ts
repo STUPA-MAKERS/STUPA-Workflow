@@ -117,11 +117,8 @@ type Inputs = {
   deletingVote: string | null;
   finalizing: boolean;
   choices: Record<string, string>;
-  assignableOptions: { value: string; label: string }[];
   savingAgenda: boolean;
   renamingTopId: string | null;
-  agendaPick: string;
-  agendaFreetext: string;
   renameDraft: string;
 };
 
@@ -141,11 +138,8 @@ function inputs(over: Partial<Inputs> = {}): Inputs {
     deletingVote: null,
     finalizing: false,
     choices: {},
-    assignableOptions: [{ value: 'app-9', label: 'Antrag Neun' }],
     savingAgenda: false,
     renamingTopId: null,
-    agendaPick: '',
-    agendaFreetext: '',
     renameDraft: '',
     ...over,
   };
@@ -154,7 +148,7 @@ function inputs(over: Partial<Inputs> = {}): Inputs {
 const OUTPUTS = [
   'back', 'selectTop', 'bodyChange', 'castVote', 'voteClose', 'voteCancel', 'voteDelete',
   'voteDialog', 'startSession', 'closeSession', 'finalize', 'openSettings',
-  'deleteMeeting', 'toggleBeamer', 'attendanceChange', 'attendanceReset', 'addToAgenda', 'addFreetext',
+  'deleteMeeting', 'toggleBeamer', 'attendanceChange', 'attendanceReset', 'addTop',
   'removeFromAgenda', 'startRename', 'cancelRename', 'renameTop', 'setNonPublic', 'dragStart',
   'dragOver', 'drop', 'setProtokollant', 'handOver', 'cancelHandover',
 ] as const;
@@ -199,11 +193,18 @@ describe('MeetingFocusComponent', () => {
       expect(on.closeSession).toHaveBeenCalled();
     });
 
-    it('offers the finalize retry once a closed meeting fell back to a draft', async () => {
+    it('offers the finalize as a step of its own on a closed meeting with a draft (O13)', async () => {
       const { on } = await setup({ meeting: meeting({ status: 'closed' }) });
       await userEvent.click(screen.getByRole('button', { name: 'Finalisieren & versenden' }));
       expect(on.finalize).toHaveBeenCalled();
       expect(screen.queryByRole('button', { name: 'Sitzung schließen' })).toBeNull();
+      expect(screen.getByText(/Prüfe das Protokoll und finalisiere es/)).toBeInTheDocument();
+    });
+
+    it('says before the close that the finalize comes after it', async () => {
+      await setup();
+      expect(screen.queryByRole('button', { name: 'Finalisieren & versenden' })).toBeNull();
+      expect(screen.getByText(/finalisierst du das Protokoll als eigenen Schritt/)).toBeInTheDocument();
     });
 
     it('hides the finalize retry without the finalize right and says why', async () => {
@@ -322,7 +323,7 @@ describe('MeetingFocusComponent', () => {
       const popover = screen.getByRole('dialog', { name: 'Anwesenheit' });
       expect(within(popover).getByText('Anwesend 1 von 3')).toBeInTheDocument();
       expect(within(popover).getByText('Mika Mitglied')).toBeInTheDocument();
-      expect(within(popover).getByText('Protokollant')).toBeInTheDocument();
+      expect(within(popover).getByText('Protokollführung')).toBeInTheDocument();
       // Once in the roster, once in the viewer list.
       expect(within(popover).getAllByText('Alina Admin')).toHaveLength(2);
       expect(within(popover).getByText('2 live')).toBeInTheDocument();
@@ -708,8 +709,8 @@ describe('MeetingFocusComponent', () => {
   });
 
   describe('agenda popover', () => {
-    it('edits the agenda: rename, remove, non-public, add paths and reorder', async () => {
-      const { on } = await setup({ agendaPick: 'app-9' });
+    it('edits the agenda: rename, remove, non-public, add and reorder', async () => {
+      const { on } = await setup();
       await userEvent.click(screen.getByTitle('Tagesordnung öffnen'));
       const popover = screen.getByRole('dialog', { name: 'Tagesordnung' });
       await userEvent.click(within(popover).getAllByRole('button', { name: 'TOP umbenennen' })[0]);
@@ -718,10 +719,9 @@ describe('MeetingFocusComponent', () => {
       expect(on.removeFromAgenda).toHaveBeenCalledWith('t-2');
       await userEvent.click(within(popover).getAllByRole('checkbox')[0]);
       expect(on.setNonPublic).toHaveBeenCalledWith({ item: AGENDA[0], nonPublic: true });
-      await userEvent.type(within(popover).getByPlaceholderText(/Freitext-TOP/), 'Verschiedenes{Enter}');
-      expect(on.addFreetext).toHaveBeenCalled();
-      await userEvent.click(within(popover).getByRole('button', { name: 'Hinzufügen' }));
-      expect(on.addToAgenda).toHaveBeenCalled();
+      // Adding is a dialog of its own ("TOP hinzufügen").
+      await userEvent.click(within(popover).getByRole('button', { name: 'TOP hinzufügen' }));
+      expect(on.addTop).toHaveBeenCalled();
       const rows = within(popover).getAllByRole('listitem');
       rows[0].dispatchEvent(new Event('dragstart'));
       rows[1].dispatchEvent(new Event('dragover'));

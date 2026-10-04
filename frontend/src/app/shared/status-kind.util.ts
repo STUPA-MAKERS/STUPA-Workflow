@@ -64,16 +64,16 @@ export function voteResultStatus(result: VoteResult): StatusView {
 const MEETING: Record<MeetingStatus, StatusView> = {
   planned: { kind: 'neutral', key: 'meetings.status.planned' },
   live: { kind: 'accent', key: 'meetings.status.live' },
-  closed: { kind: 'neutral', key: 'meetings.status.closed' },
+  closed: { kind: 'muted', key: 'meetings.status.closed' },
 };
 
-/** The status of a meeting. Only a live meeting takes the accent. */
+/** The status of a meeting. Only a live meeting takes the accent; a closed one is done. */
 export function meetingStatus(status: MeetingStatus): StatusView {
   return MEETING[status];
 }
 
 const MEETING_VOTE: Record<MeetingVoteStatus, StatusView> = {
-  pending: { kind: 'neutral', key: 'meetings.voteStatus.pending' },
+  draft: { kind: 'neutral', key: 'meetings.voteStatus.draft' },
   open: { kind: 'accent', key: 'meetings.voteStatus.open' },
   closed: { kind: 'neutral', key: 'meetings.voteStatus.closed' },
   cancelled: { kind: 'muted', key: 'meetings.voteStatus.cancelled' },

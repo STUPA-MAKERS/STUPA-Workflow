@@ -1,37 +1,7 @@
-@if (!meeting() || beamerMode() || isFollower()) {
-<app-page-header [title]="'meetings.title' | t" [rail]="true" [flush]="true">
-  <div actions class="mtg__headActions">
-    @if (!meeting()) {
-      <!-- Debounced live search. It collapses the timeline into one relevance-sorted list. -->
-      @if (showOverview()) {
-        <input
-          class="mtg__headSearch"
-          type="search"
-          [placeholder]="'meetings.list.searchPlaceholder' | t"
-          [attr.aria-label]="'meetings.list.searchPlaceholder' | t"
-          [ngModel]="searchQuery()"
-          (ngModelChange)="onSearch($event)"
-          name="meetingSearch"
-        />
-      }
-      @if (showOverview() && filterGremiumOptions().length > 2) {
-        <app-select
-          class="mtg__headFilter"
-          name="gremiumFilter"
-          [ariaLabel]="'meetings.list.committeeFilter' | t"
-          [options]="filterGremiumOptions()"
-          [ngModel]="gremiumFilter()"
-          (ngModelChange)="selectGremiumFilter($event)"
-        />
-      }
-      @if (canCreate()) {
-        <app-button size="sm" (click)="openCreate()">
-          <span class="inline-flex items-center gap-2"><app-icon name="add" [size]="16" /> {{ 'meetings.list.new' | t }}</span>
-        </app-button>
-      }
-    }
-  </div>
-</app-page-header>
+<!-- The list carries its own header, and so does the focus page of the minute-taker.
+     Without read access the list does not show, so this header titles the notice. -->
+@if (showForbidden() || (detailMode() && (!meeting() || beamerMode() || isFollower()))) {
+<app-page-header [title]="'meetings.title' | t" [rail]="true" [flush]="true" />
 }
 
 <!-- The focus page of the protokollant carries its own bar, so the meta line shows
@@ -108,11 +78,8 @@
     [deletingVote]="deletingVote()"
     [finalizing]="finalizing()"
     [choices]="myChoices()"
-    [assignableOptions]="assignableOptions()"
     [savingAgenda]="savingAgenda()"
     [renamingTopId]="renamingTopId()"
-    [(agendaPick)]="agendaPick"
-    [(agendaFreetext)]="agendaFreetext"
     [(renameDraft)]="renameDraft"
     (back)="goBack()"
     (selectTop)="jumpTo($event)"
@@ -122,8 +89,8 @@
     (voteCancel)="cancelVote($event)"
     (voteDelete)="deleteVote($event)"
     (voteDialog)="openVoteDialog($event)"
-    (startSession)="setStatus('live')"
-    (closeSession)="closeConfirmOpen.set(true)"
+    (startSession)="startMeeting()"
+    (closeSession)="askCloseMeeting()"
     (finalize)="finalize()"
     (openSettings)="openSettings(m)"
     (setProtokollant)="setProtokollant(m, $event)"
@@ -133,8 +100,7 @@
     (toggleBeamer)="beamerMode.set(true)"
     (attendanceChange)="setAttendance($event.member, $event.status, $event.note)"
     (attendanceReset)="resetAttendance($event)"
-    (addToAgenda)="addToAgenda()"
-    (addFreetext)="addFreetext()"
+    (addTop)="openAgendaDialog()"
     (removeFromAgenda)="removeFromAgenda($event)"
     (startRename)="startRename($event)"
     (cancelRename)="cancelRename()"
@@ -200,306 +166,45 @@
     </app-card>
   }
 
-  <app-dialog
-    [open]="voteDialogOpen()"
-    [title]="'meetings.vote.dialogTitle' | t"
-    [closeLabel]="'action.cancel' | t"
-    (closed)="closeVoteDialog()"
-  >
-    <form class="mtg__voteForm" (submit)="$event.preventDefault(); submitVote()">
-      <label class="text-sm font-medium text-text-muted" for="mtg-vq">{{ 'meetings.vote.question' | t }}</label>
-      <textarea id="mtg-vq" class="mtg__input mtg__voteQuestion" rows="4" [ngModel]="voteQuestion()" (ngModelChange)="voteQuestion.set($event)" name="vq" [placeholder]="'meetings.vote.questionPlaceholder' | t"></textarea>
-      <span class="text-sm font-medium text-text-muted">{{ 'meetings.vote.options' | t }}</span>
-      <!-- The options are fixed. They show as one row of equal fields, not as
-           controls, and the hint below says why. -->
-      <div class="mtg__voteFixed">
-        @for (opt of FIXED_VOTE_OPTIONS; track opt) {
-          <span class="mtg__voteOption">{{ voteOptionLabel(opt) }}</span>
-        }
-      </div>
-      <p class="mtg__voteHint">{{ 'meetings.vote.optionsFixedHint' | t }}</p>
-      <app-checkbox [ngModel]="voteSecret()" (ngModelChange)="voteSecret.set($event)" name="voteSecret">{{ 'meetings.vote.secret' | t }}</app-checkbox>
+  <app-vote-open-dialog
+    [meeting]="m"
+    [item]="dialogs.voteItem()"
+    [topNumber]="voteTopNumber()"
+    (closed)="dialogs.voteItem.set(null)"
+    (opened)="dialogs.voteOpened($event)"
+  />
 
-      <app-select
-        name="vmaj"
-        [label]="'meetings.vote.majorityRule' | t"
-        [options]="majorityRuleOptions()"
-        [ngModel]="voteMajorityRule()"
-        (ngModelChange)="voteMajorityRule.set($event)"
-      />
-      <!-- The quorum and the eligible voters are never set per vote. They come
-           from the Gremium configuration. -->
-    </form>
-    <div dialog-footer class="mtg__dialogFoot">
-      <app-button size="sm" variant="ghost" (click)="closeVoteDialog()">{{ 'action.cancel' | t }}</app-button>
-      <app-button size="sm" [disabled]="openingVote()" [loading]="openingVote()" (click)="submitVote()">
-        {{ 'meetings.vote.openSubmit' | t }}
-      </app-button>
-    </div>
-  </app-dialog>
+  <app-agenda-item-dialog
+    [open]="dialogs.agendaOpen()"
+    [meeting]="m"
+    [nextNumber]="agenda().length + 1"
+    (closed)="dialogs.agendaOpen.set(false)"
+    (added)="agendaAdded($event)"
+  />
 
-  <!-- Close the meeting. This is irrevocable and finalizes the protocol. -->
-  <app-dialog
-    [open]="closeConfirmOpen()"
-    [title]="'meetings.closeConfirm.title' | t"
-    [closeLabel]="'action.cancel' | t"
-    (closed)="closeConfirmOpen.set(false)"
-  >
-    <p>{{ 'meetings.closeConfirm.body' | t }}</p>
-    <div dialog-footer class="mtg__dialogFoot">
-      <app-button size="sm" variant="ghost" (click)="closeConfirmOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
-      <app-button size="sm" variant="danger" [loading]="finalizing()" (click)="closeConfirmOpen.set(false); closeMeeting()">
-        {{ 'meetings.closeConfirm.confirm' | t }}
-      </app-button>
-    </div>
-  </app-dialog>
+  <!-- The close never finalizes the protocol (O13). -->
+  <app-close-meeting-dialog
+    [open]="dialogs.closeOpen()"
+    [meeting]="m"
+    (closed)="dialogs.closeOpen.set(false)"
+    (meetingClosed)="dialogs.meetingClosed($event)"
+  />
   } <!-- /@if (!beamerMode() && !isFollower()) -->
-} @else {
-  <!-- Overview of the existing meetings. Plain Gremium members also see their
-       timeline, filtered on the server. -->
-  @if (showOverview()) {
-    <section class="mtg__listSection">
-      @if (loadingList()) {
-        <!-- The list, not the detail. The two loading branches differ only by a singular
-             and a plural i18n key, which is how the list stayed a bare sentence after the
-             detail was fixed. -->
-        <div class="mtg__listSkel" aria-busy="true">
-          @for (row of skeletonRows; track row) {
-            <span class="skel skel--line"></span>
-          }
-          <span class="sr-only" role="status">{{ 'meetings.list.loading' | t }}</span>
-        </div>
-      } @else {
-        <!-- The timeline shows the "now" bar even without meetings. The empty
-             case is an empty timeline. Past meetings go on top and load lazily
-             on scroll up. Upcoming meetings go below and load lazily on scroll
-             down. -->
-        <div class="mtg__timeline" #tlScroll (scroll)="onTimelineScroll(tlScroll)">
-          @if (searchActive()) {
-            <!-- Search mode: ONE relevance-sorted list, no past and upcoming
-                 split, no "now" marker. Offset paging on scroll down. -->
-            @for (m of searchItems(); track m.id) {
-              <ng-container *ngTemplateOutlet="tlRow; context: { $implicit: m, past: false }" />
-            }
-            @if (searchEmpty()) {
-              <p class="mtg__tlNoUp text-text-muted">{{ 'meetings.list.searchEmpty' | t }}</p>
-            }
-            @if (loadingSearch()) {
-              <p class="mtg__tlNoUp text-text-muted" aria-live="polite">{{ 'meetings.list.loading' | t }}</p>
-            }
-          } @else {
-            @if (hasMorePast()) {
-              <button type="button" class="mtg__tlMore" [disabled]="loadingPast()" (click)="loadMorePast(tlScroll)">
-                <app-icon name="chevron-up" />
-                {{ (loadingPast() ? 'meetings.list.loading' : 'meetings.list.loadPast') | t }}
-              </button>
-            }
-            @for (m of pastItems(); track m.id) {
-              <ng-container *ngTemplateOutlet="tlRow; context: { $implicit: m, past: true }" />
-            }
-            <div class="mtg__tlNow" #nowMarker>
-              <span class="mtg__tlNowLabel">{{ 'meetings.list.now' | t }}</span>
-            </div>
-            @for (m of upcomingItems(); track m.id) {
-              <ng-container *ngTemplateOutlet="tlRow; context: { $implicit: m, past: false }" />
-            } @empty {
-              <p class="mtg__tlNoUp text-text-muted">{{ 'meetings.list.noUpcoming' | t }}</p>
-            }
-            @if (loadingUpcoming()) {
-              <p class="mtg__tlNoUp text-text-muted" aria-live="polite">{{ 'meetings.list.loading' | t }}</p>
-            }
-          }
-        </div>
-
-        <ng-template #tlRow let-m let-past="past">
-          <article
-            class="mtg__tlItem"
-            [class.mtg__tlItem--past]="past"
-            [class.mtg__tlItem--live]="m.status === 'live'"
-            tabindex="0"
-            role="button"
-            [attr.aria-label]="('meetings.list.open' | t) + ': ' + m.title"
-            (click)="openMeeting(m.id)"
-            (keydown.enter)="openMeeting(m.id)"
-          >
-            <span class="mtg__tlDot" [class.mtg__tlDot--live]="m.status === 'live'"></span>
-            <div class="mtg__tlBody">
-              <div class="mtg__tlMeta">
-                <app-badge variant="neutral">
-                  @if (m.date) {
-                    {{ m.date | ldate: 'mediumDate' }}{{ timeSuffix(m.startTime) }}
-                  } @else {
-                    {{ 'meetings.list.noDate' | t }}
-                  }
-                </app-badge>
-                <app-badge [variant]="statusVariant(m.status)">{{ statusKey(m.status) | t }}</app-badge>
-                @if (m.gremiumName) {
-                  <span class="mtg__tlGremium"><app-icon name="parliament" [size]="12" /> {{ m.gremiumName }}</span>
-                }
-              </div>
-              <h3 class="m-0 text-base font-semibold">{{ m.title }}</h3>
-              @if (m.protokollantName) {
-                <span class="mtg__tlGremium" [title]="'meetings.protokollant.label' | t"><app-icon name="user" [size]="12" /> {{ m.protokollantName }}</span>
-              }
-            </div>
-            <span class="mtg__rowActions" (click)="$event.stopPropagation()">
-              @if (canManageAny()) {
-                <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.settings.title' | t" [title]="'meetings.settings.title' | t" (click)="openSettings(m)">
-                  <app-icon name="edit" />
-                </app-button>
-                <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'meetings.delete.title' | t" [title]="'meetings.delete.title' | t" (click)="askDeleteMeeting(m)">
-                  <app-icon name="delete" />
-                </app-button>
-              }
-              <app-icon name="chevron-down" class="mtg__openIcon" />
-            </span>
-          </article>
-        </ng-template>
-      }
-    </section>
-  } @else {
-    <p class="mtg__status">{{ 'meetings.empty' | t }}</p>
-  }
-
-  <!-- Create (meeting leads only), in two steps: step 1 = Gremium, date and time,
-       step 2 = name and protokollant. -->
-  <app-dialog
-    [open]="createOpen()"
-    [title]="'meetings.create.title' | t"
-    [closeLabel]="'action.cancel' | t"
-    (closed)="closeCreate()"
-  >
-    <form id="mtg-create" class="mtg__createForm" (submit)="create($event)">
-      @if (createStep() === 1) {
-        <app-select
-          name="gremium"
-          [label]="'meetings.create.gremium' | t"
-          [placeholder]="'meetings.create.gremiumPlaceholder' | t"
-          [options]="gremiumOptions()"
-          [required]="true"
-          [ngModel]="newGremiumId()"
-          (ngModelChange)="onCreateGremiumChange($event)"
-        />
-        @if (!gremiumOptions().length) {
-          <p class="text-text-muted text-sm self-center">{{ 'meetings.create.noGremien' | t }}</p>
-        }
-        <!-- Date and time are required: no meeting without an appointment. -->
-        <app-datepicker
-          [label]="'meetings.create.date' | t"
-          [required]="true"
-          [ngModel]="newDate()"
-          (ngModelChange)="newDate.set($event)"
-          name="date"
-        />
-        <!-- Forced 24 h: the native type="time" follows the browser locale (AM/PM). -->
-        <app-time-input
-          [id]="'mtg-new-time'"
-          [label]="'meetings.create.time' | t"
-          [required]="true"
-          [ngModel]="newTime()"
-          (ngModelChange)="newTime.set($event)"
-          name="time"
-        />
-        <!-- Optional end time: without it the iCal feed assumes 1 h duration. -->
-        <app-time-input
-          [id]="'mtg-new-end-time'"
-          [label]="'meetings.create.endTime' | t"
-          [ngModel]="newEndTime()"
-          (ngModelChange)="newEndTime.set($event)"
-          name="endTime"
-        />
-      } @else {
-        <label class="text-sm font-medium text-text-muted" [for]="'mtg-new'">{{ 'meetings.create.name' | t }}</label>
-        <input
-          id="mtg-new"
-          class="mtg__input"
-          [placeholder]="'meetings.create.placeholder' | t"
-          [ngModel]="newTitle()"
-          (ngModelChange)="newTitle.set($event)"
-          name="title"
-        />
-        <!-- The protokollant is selectable here. It is required before the start. -->
-        <app-select
-          name="newProt"
-          [label]="'meetings.protokollant.label' | t"
-          [options]="createProtokollantOptions()"
-          [disabled]="!newGremiumId()"
-          [ngModel]="newProtokollant()"
-          (ngModelChange)="newProtokollant.set($event)"
-        />
-      }
-    </form>
-    <div dialog-footer class="mtg__dialogFoot">
-      @if (createStep() === 1) {
-        <app-button size="sm" variant="ghost" (click)="closeCreate()">{{ 'action.cancel' | t }}</app-button>
-        <app-button size="sm" [disabled]="!createStep1Valid()" (click)="goToCreateStep2()">
-          {{ 'meetings.create.next' | t }}
-        </app-button>
-      } @else {
-        <app-button size="sm" variant="ghost" (click)="backToCreateStep1()">{{ 'meetings.create.back' | t }}</app-button>
-        <app-button size="sm"
-          [disabled]="!newTitle().trim() || !newGremiumId() || !newDate().trim() || !newTime().trim()"
-          [loading]="creating()"
-          (click)="create($event)"
-        >
-          {{ 'meetings.create.submit' | t }}
-        </app-button>
-      }
-    </div>
-  </app-dialog>
+} @else if (!detailMode()) {
+  <!-- The list. Plain Gremium members also see their meetings, filtered on the server. -->
+  <app-meetings-list />
 }
 
-<!-- Settings: protokollant, date and time (toolbar OR list edit), top-level. -->
-<app-dialog
-  [open]="settingsMeeting() !== null"
-  [title]="'meetings.settings.title' | t"
-  [closeLabel]="'action.cancel' | t"
-  (closed)="closeSettings()"
->
-  <form class="mtg__createForm" (submit)="$event.preventDefault(); saveSettings()">
-    <!-- A closed meeting is fully locked. The protokollant also locks after the
-         protocol is finalized. The backend rejects both with 409. -->
-    <app-select
-      name="setProt"
-      [label]="'meetings.protokollant.label' | t"
-      [options]="protokollantOptions()"
-      [disabled]="settingsLocked() || protokollantLocked()"
-      [ngModel]="settingsProtokollant()"
-      (ngModelChange)="settingsProtokollant.set($event)"
-    />
-    @if (!settingsLocked() && protokollantLocked()) {
-      <p class="text-text-muted">{{ 'meetings.protokollant.lockedHint' | t }}</p>
-    }
-    <app-datepicker
-      [label]="'meetings.create.date' | t"
-      [required]="true"
-      [disabled]="settingsLocked()"
-      [ngModel]="settingsDate()"
-      (ngModelChange)="settingsDate.set($event)"
-      name="setDate"
-    />
-    <app-time-input [id]="'mtg-set-time'" [label]="'meetings.create.time' | t" [required]="true" [disabled]="settingsLocked()" [ngModel]="settingsTime()" (ngModelChange)="settingsTime.set($event)" name="setTime" />
-    <app-time-input [id]="'mtg-set-end-time'" [label]="'meetings.create.endTime' | t" [disabled]="settingsLocked()" [ngModel]="settingsEndTime()" (ngModelChange)="settingsEndTime.set($event)" name="setEndTime" />
-    @if (settingsLocked()) {
-      <p class="text-text-muted">{{ 'meetings.settings.closedHint' | t }}</p>
-    }
-  </form>
-  <div dialog-footer class="mtg__dialogFoot">
-    <app-button size="sm" variant="ghost" (click)="closeSettings()">{{ 'action.cancel' | t }}</app-button>
-    <app-button size="sm" [loading]="savingSettings()" [disabled]="settingsLocked() || !settingsDate().trim() || !settingsTime().trim()" (click)="saveSettings()">{{ 'action.save' | t }}</app-button>
-  </div>
-</app-dialog>
+<!-- Settings and delete open from a list row and from the meeting page. -->
+<app-meeting-settings-dialog
+  [meeting]="dialogs.settingsMeeting()"
+  [protocolFinal]="!!protocol()?.isFinal && protocol()?.meetingId === dialogs.settingsMeeting()?.id"
+  (closed)="dialogs.closeSettings()"
+  (saved)="dialogs.settingsSaved($event)"
+/>
 
-<!-- Delete meeting (confirmation), top-level. -->
-<app-dialog
-  [open]="confirmDeleteMeeting() !== null"
-  [title]="'meetings.delete.title' | t"
-  [closeLabel]="'action.cancel' | t"
-  (closed)="confirmDeleteMeeting.set(null)"
->
-  <p>{{ 'meetings.delete.body' | t: { name: confirmDeleteMeeting()?.title ?? '' } }}</p>
-  <div dialog-footer class="mtg__dialogFoot">
-    <app-button size="sm" variant="ghost" (click)="confirmDeleteMeeting.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button size="sm" variant="danger" [loading]="deletingMeeting()" (click)="doDeleteMeeting()">{{ 'meetings.delete.confirm' | t }}</app-button>
-  </div>
-</app-dialog>
+<app-delete-meeting-dialog
+  [meeting]="dialogs.deleteMeeting()"
+  (closed)="dialogs.cancelDelete()"
+  (deleted)="dialogs.meetingDeleted($event)"
+/>

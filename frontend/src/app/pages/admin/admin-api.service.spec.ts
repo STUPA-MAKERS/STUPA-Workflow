@@ -6,6 +6,7 @@ import { USE_MOCK_API } from '@core/api/api.config';
 import { I18nService } from '@core/i18n/i18n.service';
 import type { FormFieldDef } from '@core/api/models';
 import { AdminApiService } from './admin-api.service';
+import { MOCK_GREMIUM_STUPA_ID } from './admin.mock';
 import type { Branding, WebhookConfig } from './admin.models';
 
 describe('AdminApiService — mock mode', () => {
@@ -851,7 +852,7 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
   it('CRUDs gremium-roles in the mock store', async () => {
     const s = svc();
     // The seed gives each mock gremium its forced roles.
-    expect((await firstValueFrom(s.listGremiumRoles('g-stupa'))).map((r) => r.key)).toEqual(['board', 'manager', 'member']);
+    expect((await firstValueFrom(s.listGremiumRoles(MOCK_GREMIUM_STUPA_ID))).map((r) => r.key)).toEqual(['board', 'manager', 'member']);
     expect(await firstValueFrom(s.listGremiumRoles('g-empty'))).toEqual([]);
     const created = await firstValueFrom(s.createGremiumRole('g-empty', { key: 'chair', name: { de: 'Vorsitz' } }));
     expect(created.gremiumId).toBe('g-empty');
@@ -882,7 +883,7 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     store.gremiumRoles = undefined;
     await firstValueFrom(s.deleteGremiumRole('any'));
     // The store re-initializes to an array. Nothing crashes and the list is empty.
-    expect(await firstValueFrom(s.listGremiumRoles('g-stupa'))).toEqual([]);
+    expect(await firstValueFrom(s.listGremiumRoles(MOCK_GREMIUM_STUPA_ID))).toEqual([]);
   });
 
   it('CRUDs deadline policies in the mock store', async () => {
@@ -901,7 +902,7 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
 
   it('returns the seeded memberships of one gremium in mock mode', async () => {
     const s = svc();
-    expect((await firstValueFrom(s.listGremiumMemberships('g-stupa'))).length).toBe(2);
+    expect((await firstValueFrom(s.listGremiumMemberships(MOCK_GREMIUM_STUPA_ID))).length).toBe(2);
     expect(await firstValueFrom(s.listGremiumMemberships('g-asta'))).toEqual([]);
   });
 
@@ -927,8 +928,8 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     const s = svc();
     expect((await firstValueFrom(s.listMembershipMappings())).length).toBe(2);
     const created = await firstValueFrom(s.createMembershipMapping({ oidcGroup: 'x', gremiumId: 'g-asta' }));
-    const updated = await firstValueFrom(s.updateMembershipMapping(created.id, { gremiumId: 'g-stupa' }));
-    expect(updated.gremiumId).toBe('g-stupa');
+    const updated = await firstValueFrom(s.updateMembershipMapping(created.id, { gremiumId: MOCK_GREMIUM_STUPA_ID }));
+    expect(updated.gremiumId).toBe(MOCK_GREMIUM_STUPA_ID);
     await firstValueFrom(s.deleteMembershipMapping(created.id));
     expect((await firstValueFrom(s.listMembershipMappings())).length).toBe(2);
   });
@@ -939,10 +940,10 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     const created = await firstValueFrom(s.createRoleMapping({ oidcGroup: 'x', gremiumRoleId: 'gr-asta-board' }));
     expect(created.gremiumId).toBe('g-asta');
     const moved = await firstValueFrom(s.updateRoleMapping(created.id, { gremiumRoleId: 'gr-stupa-member' }));
-    expect(moved.gremiumId).toBe('g-stupa');
+    expect(moved.gremiumId).toBe(MOCK_GREMIUM_STUPA_ID);
     // A change of the group only keeps the gremium.
     const renamed = await firstValueFrom(s.updateRoleMapping(created.id, { oidcGroup: 'y' }));
-    expect(renamed).toMatchObject({ oidcGroup: 'y', gremiumId: 'g-stupa' });
+    expect(renamed).toMatchObject({ oidcGroup: 'y', gremiumId: MOCK_GREMIUM_STUPA_ID });
     // An unknown role gives no gremium.
     const orphan = await firstValueFrom(s.createRoleMapping({ oidcGroup: 'z', gremiumRoleId: 'ghost' }));
     expect(orphan.gremiumId).toBe('');

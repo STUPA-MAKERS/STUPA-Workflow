@@ -1,0 +1,49 @@
+@use '../dialog-form' as df;
+
+@include df.host;
+
+.cmc {
+  @include df.form;
+}
+
+/* The checklist: rows on surface 3, 2px apart, rounded as one group. */
+.cmc__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cmc__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 10px 14px;
+  border-radius: 4px;
+  background: var(--color-surface-3);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--color-text);
+}
+.cmc__row:first-child {
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+}
+.cmc__row:last-child {
+  border-bottom-left-radius: var(--radius-lg);
+  border-bottom-right-radius: var(--radius-lg);
+}
+.cmc__icon {
+  flex: none;
+  color: var(--color-text-muted);
+}
+.cmc__icon--ok {
+  color: var(--color-accent-text);
+}
+.cmc__row--blocked {
+  color: var(--color-danger);
+}
+.cmc__row--blocked .cmc__icon {
+  color: var(--color-danger);
+}
