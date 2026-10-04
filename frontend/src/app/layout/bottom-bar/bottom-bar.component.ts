@@ -3,7 +3,9 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { filter } from 'rxjs';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { SideSheetComponent } from '@shared/ui';
+// By path, not through the `@shared/ui` barrel: the shell is in the initial bundle, and
+// the barrel would pull every shared block a lazy page uses into it.
+import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
 import { IconComponent } from '@stupa-makers/ui-kit';
 import { CommandPaletteService } from '../../features/search/command-palette.service';
 import { AccountMenuComponent } from '../account-menu/account-menu.component';

@@ -15,18 +15,18 @@ import type {
   Uuid,
 } from '@core/api/models';
 import { BadgeComponent, IconComponent, MEDIA } from '@stupa-makers/ui-kit';
-import {
-  AvatarComponent,
-  DateBlockComponent,
-  ListItemComponent,
-  PageHeaderComponent,
-  SearchPillComponent,
-  SegBarComponent,
-  SideSheetComponent,
-  SkeletonComponent,
-  StatusTextComponent,
-  flowColorKind,
-} from '@shared/ui';
+// By path, not through the `@shared/ui` barrel, so this lazy chunk takes only the blocks
+// it uses.
+import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
+import { DateBlockComponent } from '@shared/ui/date-block/date-block.component';
+import { ListItemComponent } from '@shared/ui/list-item/list-item.component';
+import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
+import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.component';
+import { SegBarComponent } from '@shared/ui/seg-bar/seg-bar.component';
+import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
+import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
+import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
+import { flowColorKind } from '@shared/status-kind.util';
 import { shortTime } from '../../features/meetings/meetings-display.util';
 import { CommandPaletteService } from '../../features/search/command-palette.service';
 import { AccountMenuComponent } from '../../layout/account-menu/account-menu.component';

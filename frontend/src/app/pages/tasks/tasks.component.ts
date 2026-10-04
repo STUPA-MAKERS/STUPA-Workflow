@@ -10,7 +10,11 @@ import {
   DataTableComponent,
   IconComponent,
 } from '@stupa-makers/ui-kit';
-import { PageHeaderComponent, StatusTextComponent, flowColorKind } from '@shared/ui';
+// By path, not through the `@shared/ui` barrel, so this lazy chunk takes only the blocks
+// it uses.
+import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
+import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
+import { flowColorKind } from '@shared/status-kind.util';
 
 const DAY_MS = 86_400_000;
 

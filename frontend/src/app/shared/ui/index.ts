@@ -6,6 +6,11 @@
  * model. Import them from here:
  *
  *   import { ListItemComponent, StatusTextComponent } from '@shared/ui';
+ *
+ * Exception: code in the initial bundle (the shell, the layout, the command palette)
+ * imports a block by its path, for example `@shared/ui/avatar/avatar.component`. When the
+ * initial bundle imports this barrel, every block that a lazy page uses goes into the
+ * initial bundle too.
  */
 export { AvatarComponent, AvatarStackComponent, initials } from './avatar/avatar.component';
 export type { AvatarSize } from './avatar/avatar.component';
