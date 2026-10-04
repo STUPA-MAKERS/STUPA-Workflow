@@ -1,9 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/angular';
-import {
-  BudgetYearTreeComponent,
-  PALETTE,
-  type BudgetYearSelection,
-} from './budget-year-tree.component';
+import { BudgetYearTreeComponent, type BudgetYearSelection } from './budget-year-tree.component';
+import { PALETTE } from './budget-color.util';
 import type { BudgetTreeNode, FiscalYear } from './budget-tree.api';
 
 function top(over: Partial<BudgetTreeNode> = {}): BudgetTreeNode {

@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/angular';
 import { CostCentreTreeComponent } from './cost-centre-tree.component';
-import { PALETTE } from './budget-year-tree.component';
+import { PALETTE } from './budget-color.util';
 import type { BudgetTreeNode } from './budget-tree.api';
 
 function node(over: Partial<BudgetTreeNode> = {}): BudgetTreeNode {
@@ -98,6 +98,27 @@ describe('CostCentreTreeComponent', () => {
     expect(fixture.nativeElement.querySelector('nav').getAttribute('aria-label')).toBe(
       'Kostenstellen-Baum',
     );
+  });
+
+  it('draws a swatch below the roots only for a node with its own colour', async () => {
+    const { fixture } = await render(CostCentreTreeComponent, {
+      inputs: {
+        nodes: [
+          node({
+            id: 'r',
+            key: 'R',
+            name: 'Root',
+            children: [
+              node({ id: 'a', key: 'A', name: 'Own', color: '#0075bf' }),
+              node({ id: 'b', key: 'B', name: 'Plain' }),
+            ],
+          }),
+        ],
+      },
+    });
+    // The root swatch and the one of the coloured child; the plain child has none.
+    expect(fixture.nativeElement.querySelectorAll('.cct__dot')).toHaveLength(2);
+    expect(fixture.componentInstance.ownColor(node({ id: 'x', color: '  ' }))).toBeNull();
   });
 
   describe('dotColor', () => {

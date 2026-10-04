@@ -2,13 +2,14 @@ import { ChangeDetectionStrategy, Component, computed, input, output } from '@an
 import { NgTemplateOutlet } from '@angular/common';
 import type { Uuid } from '@core/api/models';
 import type { BudgetTreeNode } from './budget-tree.api';
-import { PALETTE } from './budget-year-tree.component';
+import { paletteColor } from './budget-color.util';
 
 /**
- * Reusable cost-center tree picker. It looks like the budget-to-year tree
- * (`app-budget-year-tree`): colored dots at the roots, dotted light-green connector
- * lines to the sub-nodes, and a compact selection highlight. It recurses over the
- * whole hierarchy. An optional "all" node with the value ``''`` sits at the top.
+ * Reusable cost-centre tree picker. It looks like the budget-to-year tree
+ * (`app-budget-year-tree`): colour swatches at the roots and at every node with its own
+ * colour, dotted connector lines in the colour of the branch, and the selection surface
+ * of the design system. It recurses over the whole hierarchy. An optional "all" node with
+ * the value ``''`` sits at the top.
  */
 @Component({
   selector: 'app-cost-centre-tree',
@@ -32,9 +33,15 @@ export class CostCentreTreeComponent {
 
   private readonly rootIds = computed(() => this.nodes().map((n) => n.id));
 
+  /** Colour of a root: the set colour, else a stable palette colour by position. */
   dotColor(node: BudgetTreeNode): string {
     if (node.color) return node.color;
-    const idx = this.rootIds().indexOf(node.id);
-    return PALETTE[((idx % PALETTE.length) + PALETTE.length) % PALETTE.length];
+    return paletteColor(this.rootIds().indexOf(node.id));
+  }
+
+  /** The own colour of a node below the roots, or `null`. Only a node with its own colour
+   *  (for example a faculty) gets a swatch and passes its colour to its lines (O19). */
+  ownColor(node: BudgetTreeNode): string | null {
+    return node.color?.trim() || null;
   }
 }

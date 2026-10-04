@@ -11,7 +11,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { SimplifyPathPipe } from '@shared/budget-path';
 import type { BudgetTreeNode } from './budget-tree.api';
-import { PALETTE } from './budget-year-tree.component';
+import { paletteColor } from './budget-color.util';
 
 /** Overview metrics (tab selector in the overlay). */
 export type SunburstMetric = 'allocated' | 'available' | 'expended';
@@ -111,9 +111,9 @@ export class BudgetSunburstComponent {
         const v = this.subtree(c);
         if (v <= 0) return;
         const childSpan = span * (v / nodeVal);
-        // The color set on the cost center wins, as in the small pies. Without an own
-        // color the segment inherits the color of the parent branch.
-        const childColor = c.color ?? color ?? PALETTE[i % PALETTE.length];
+        // The colour set on the cost centre wins. Without an own colour the segment
+        // inherits the colour of the parent branch (O19), else a palette colour.
+        const childColor = c.color?.trim() || color || paletteColor(i);
         const r0 = R_CENTER + (depth - 1) * ringW;
         out.push({
           id: c.id,
