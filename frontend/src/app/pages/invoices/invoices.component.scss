@@ -109,6 +109,20 @@
 .inv__muted {
   color: var(--color-text-muted);
 }
+/* A dropped column as a second line of a kept cell: the due date under the issue
+   date, the tax under gross. */
+.inv__grossCell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+.inv__sub {
+  display: block;
+  font-size: 0.75rem; /* 12px */
+  line-height: 1.3;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
 /* The supplier takes the width the fixed columns leave and ends in an ellipsis. */
 .inv__supplier {
   display: block;
@@ -138,6 +152,29 @@
   font-size: 0.8125rem;
   color: var(--color-text-muted);
   white-space: nowrap;
+}
+/* The narrow column: swatch and name on the first line, amount and "+n" below the name. */
+.inv__booking--stacked {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  gap: 0 var(--space-2);
+  align-items: center;
+  line-height: 1.3;
+}
+.inv__booking--stacked .inv__swatch {
+  grid-area: 1 / 1;
+}
+.inv__booking--stacked .inv__bookingName {
+  grid-area: 1 / 2 / auto / -1;
+}
+.inv__booking--stacked .inv__bookingAmount {
+  grid-area: 2 / 2;
+  font-size: 0.75rem;
+}
+.inv__booking--stacked .inv__bookingMore {
+  grid-area: 2 / 3;
+  justify-self: start;
+  font-size: 0.75rem;
 }
 
 /* "5 von 48" beside "Mehr laden", centred under the table. */

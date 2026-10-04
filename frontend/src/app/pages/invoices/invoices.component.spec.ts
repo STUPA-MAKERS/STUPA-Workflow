@@ -820,13 +820,32 @@ describe('InvoicesComponent', () => {
     expect(c.importToken()).toBe('');
   });
 
-  it('canSubmitCreate requires a positive gross amount', async () => {
+  it('canSubmitCreate requires a number, a supplier and a positive gross amount', async () => {
     const { c } = await setup();
     expect(c.canSubmitCreate()).toBe(false);
+    c.newNumber.set('R-1');
+    c.newSupplier.set('Sup');
     c.newGross.set('0');
     expect(c.canSubmitCreate()).toBe(false);
     c.newGross.set('12.50');
     expect(c.canSubmitCreate()).toBe(true);
+    c.newNumber.set('   ');
+    expect(c.canSubmitCreate()).toBe(false);
+    c.newNumber.set('R-1');
+    c.newSupplier.set('');
+    expect(c.canSubmitCreate()).toBe(false);
+  });
+
+  it('create() is a no-op without a number or a supplier (manual entry)', async () => {
+    const { c, http } = await setup();
+    c.openCreate();
+    c.newGross.set('5');
+    c.newSupplier.set('Sup');
+    c.create({ preventDefault: jest.fn() } as unknown as Event);
+    c.newNumber.set('R-1');
+    c.newSupplier.set(' ');
+    c.create({ preventDefault: jest.fn() } as unknown as Event);
+    http.expectNone((r) => r.url.endsWith('/api/invoices') && r.method === 'POST');
   });
 
   it('create() submits trimmed fields, includes the file handle, toasts and reloads', async () => {
@@ -872,14 +891,16 @@ describe('InvoicesComponent', () => {
   it('create() sends nulls for blank optional fields and no file handle', async () => {
     const { c, http } = await setup();
     c.openCreate();
+    c.newNumber.set('R-1');
+    c.newSupplier.set('Sup');
     c.newGross.set('5');
-    // Every other field stays blank and there is no importToken.
+    // Every optional field stays blank and there is no importToken.
     const ev = { preventDefault: jest.fn() } as unknown as Event;
     c.create(ev);
     const req = http.expectOne((r) => r.url.endsWith('/api/invoices') && r.method === 'POST');
     expect(req.request.body).toMatchObject({
-      number: null,
-      supplier: null,
+      number: 'R-1',
+      supplier: 'Sup',
       issueDate: null,
       dueDate: null,
       netAmount: null,
@@ -897,6 +918,8 @@ describe('InvoicesComponent', () => {
   it('create() with a file handle but no mime sends fileMime null', async () => {
     const { c, http } = await setup();
     c.openCreate();
+    c.newNumber.set('R-1');
+    c.newSupplier.set('Sup');
     c.newGross.set('5');
     c.importToken.set('tok');
     c.importFileName.set('f.pdf');
@@ -913,6 +936,8 @@ describe('InvoicesComponent', () => {
   it('create() is a no-op when gross is not positive', async () => {
     const { c, http } = await setup();
     c.openCreate();
+    c.newNumber.set('R-1');
+    c.newSupplier.set('Sup');
     c.newGross.set('0');
     c.create({ preventDefault: jest.fn() } as unknown as Event);
     http.expectNone((r) => r.url.endsWith('/api/invoices') && r.method === 'POST');
@@ -921,6 +946,8 @@ describe('InvoicesComponent', () => {
   it('create() is a no-op while already saving', async () => {
     const { c, http } = await setup();
     c.openCreate();
+    c.newNumber.set('R-1');
+    c.newSupplier.set('Sup');
     c.newGross.set('5');
     c.saving.set(true);
     c.create({ preventDefault: jest.fn() } as unknown as Event);
@@ -931,6 +958,8 @@ describe('InvoicesComponent', () => {
     const { c, http, toast } = await setup();
     const spy = jest.spyOn(toast, 'error');
     c.openCreate();
+    c.newNumber.set('R-1');
+    c.newSupplier.set('Sup');
     c.newGross.set('5');
     c.create({ preventDefault: jest.fn() } as unknown as Event);
     http
@@ -961,13 +990,17 @@ describe('InvoicesComponent', () => {
     expect(c.editSupplier()).toBe('');
     expect(c.editGross()).toBe('99');
     expect(c.editStatus()).toBe('paid');
-    expect(c.editGrossValid()).toBe(true);
+    // An old invoice without number and supplier needs both before it saves.
+    expect(c.canSubmitEdit()).toBe(false);
+    c.editNumber.set('R-1');
+    c.editSupplier.set('Sup');
+    expect(c.canSubmitEdit()).toBe(true);
   });
 
-  it('editGrossValid is false for a non-positive gross', async () => {
+  it('canSubmitEdit is false for a non-positive gross', async () => {
     const { c } = await setup();
     c.openEdit(inv({ grossAmount: '0' }));
-    expect(c.editGrossValid()).toBe(false);
+    expect(c.canSubmitEdit()).toBe(false);
   });
 
   it('saveEdit patches the invoice and replaces it in the list', async () => {
@@ -1018,11 +1051,13 @@ describe('InvoicesComponent', () => {
       ],
     });
     c.openEdit(c.items()[0]);
+    c.editNumber.set(' R-1 ');
+    c.editSupplier.set('Sup');
     c.saveEdit({ preventDefault: jest.fn() } as unknown as Event);
     const req = http.expectOne((r) => r.url.endsWith('/api/invoices/e1') && r.method === 'PATCH');
     expect(req.request.body).toMatchObject({
-      number: null,
-      supplier: null,
+      number: 'R-1',
+      supplier: 'Sup',
       issueDate: null,
       dueDate: null,
       netAmount: null,
@@ -1036,6 +1071,14 @@ describe('InvoicesComponent', () => {
   it('saveEdit is a no-op without an editing target', async () => {
     const { c, http } = await setup();
     c.editing.set(null);
+    c.saveEdit({ preventDefault: jest.fn() } as unknown as Event);
+    http.expectNone((r) => r.method === 'PATCH');
+  });
+
+  it('saveEdit is a no-op without a supplier', async () => {
+    const { c, http } = await setup();
+    c.openEdit(inv({ id: 'e1' }));
+    c.editSupplier.set('  ');
     c.saveEdit({ preventDefault: jest.fn() } as unknown as Event);
     http.expectNone((r) => r.method === 'PATCH');
   });
@@ -1484,5 +1527,58 @@ describe('InvoicesComponent bookings column and redesign wiring', () => {
     setViewport('max-width: 999.98px');
     keys = (await setup()).c.columns().map((col: { key: string }) => col.key);
     expect(keys).not.toContain('dueDate');
+  });
+
+  it('moves a dropped column into a second line, so a reader still sees it', async () => {
+    setViewport('max-width: 999.98px');
+    const { c, container } = await setup({
+      canManage: false,
+      initial: [inv(), inv({ id: 'i-2', taxAmount: null, dueDate: null })],
+    });
+    const due = container.querySelectorAll('[data-testid="inv-due-line"]');
+    // Only the invoice with a due date gets the line.
+    expect(due).toHaveLength(1);
+    expect(due[0].textContent).toMatch(/^fällig 31\.01\.2026/);
+    const split = [...container.querySelectorAll('[data-testid="inv-split"]')].map((e) =>
+      e.textContent?.trim(),
+    );
+    // The tax when the invoice states it; else the net amount.
+    expect(split[0]).toMatch(/^USt\. 19,00/);
+    expect(split[1]).toMatch(/^netto 100,00/);
+    const gross = container.querySelector('.inv__grossCell') as HTMLElement;
+    expect(gross.getAttribute('title')).toMatch(/^Netto 100,00\s€ · USt\. 19,00\s€$/);
+    expect(c.splitLine(inv({ netAmount: null, taxAmount: null }))).toBeNull();
+    expect(c.netTaxTitle(inv({ netAmount: null, taxAmount: null }))).toBe('Netto — · USt. —');
+  });
+
+  it('keeps the split columns and no second lines at full width', async () => {
+    setViewport('min-width: 1400px');
+    const { container } = await setup();
+    expect(container.querySelector('[data-testid="inv-split"]')).toBeNull();
+    expect(container.querySelector('[data-testid="inv-due-line"]')).toBeNull();
+  });
+
+  it('gives the bookings column more room at full width', async () => {
+    setViewport('min-width: 1400px');
+    const { c, http, fixture, container } = await setup({
+      initial: [inv({ linkedBookings: [booking()] })],
+    });
+    http.expectOne((r) => r.url.endsWith('/api/budgets')).flush(TREE);
+    fixture.detectChanges();
+    const col = c.columns().find((x: { key: string }) => x.key === 'bookings');
+    expect(col.width).toBe('15rem');
+    // One line: swatch, name, amount.
+    expect(container.querySelector('.inv__booking--stacked')).toBeNull();
+  });
+
+  it('puts the booking amount under the cost centre in the narrow column', async () => {
+    setViewport('max-width: 999.98px');
+    const { http, fixture, container } = await setup({
+      initial: [inv({ linkedBookings: [booking()] })],
+    });
+    http.expectOne((r) => r.url.endsWith('/api/budgets')).flush(TREE);
+    fixture.detectChanges();
+    const cell = container.querySelector('.inv__booking--stacked') as HTMLElement;
+    expect(cell.textContent).toContain('Maschinenbau');
   });
 });

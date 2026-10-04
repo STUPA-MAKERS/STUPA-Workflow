@@ -110,6 +110,31 @@ describe('ExpensesTableComponent', () => {
     );
   });
 
+  it('moves the payee under the description on the tight set only', async () => {
+    const tight = await setup({
+      columnSet: 'tight',
+      canManage: false,
+      rows: [EXPENSE, { ...EXPENSE, id: 'e-2', correspondent: null }],
+    });
+    const lines = tight.container.querySelectorAll('[data-testid="et-payee"]');
+    expect(lines).toHaveLength(1);
+    expect(lines[0].textContent?.trim()).toBe('Copyshop Müller');
+    tight.fixture.componentRef.setInput('columnSet', 'compact');
+    tight.fixture.detectChanges();
+    expect(tight.container.querySelector('[data-testid="et-payee"]')).toBeNull();
+  });
+
+  it('puts the invoice date into the tooltip of the payment date below the full set', async () => {
+    const compact = await setup({ columnSet: 'compact' });
+    const date = compact.container.querySelector('tbody .et__date') as HTMLElement;
+    expect(date.getAttribute('title')).toMatch(/^Rechnungsdatum: 20\.05\.2026/);
+    compact.fixture.componentRef.setInput('columnSet', 'full');
+    compact.fixture.detectChanges();
+    expect(
+      (compact.container.querySelector('tbody .et__date') as HTMLElement).hasAttribute('title'),
+    ).toBe(false);
+  });
+
   it('shows the signed amount, the kind and the cost centre with its swatch', async () => {
     const { container } = await setup({
       rows: [EXPENSE, { ...EXPENSE, id: 'e-2', kind: 'income', amount: '50.00' }],

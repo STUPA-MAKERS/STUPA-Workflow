@@ -14,10 +14,17 @@
   [loadingText]="'expenses.loading' | t"
   [emptyText]="'expenses.empty' | t"
 >
+  <!-- Below the full set there is no invoice-date column: the date is in the tooltip. -->
   <ng-template appCell="paymentDate" let-e>
-    <span class="et__date mono">{{
-      $any(e).paymentDate ? ($any(e).paymentDate | ldate: 'mediumDate') : '—'
-    }}</span>
+    <span
+      class="et__date mono"
+      [attr.title]="
+        columnSet() !== 'full' && $any(e).invoiceDate
+          ? ('expenses.col.invoiceDate' | t) + ': ' + ($any(e).invoiceDate | ldate: 'mediumDate')
+          : null
+      "
+      >{{ $any(e).paymentDate ? ($any(e).paymentDate | ldate: 'mediumDate') : '—' }}</span
+    >
   </ng-template>
 
   <ng-template appCell="invoiceDate" let-e>
@@ -55,6 +62,13 @@
         }
         <span class="et__descText ell" [title]="$any(e).description">{{ $any(e).description }}</span>
       </span>
+      <!-- The tight set has no payee column: the payee moves under the description, as
+           in the meta line of board Schmal-Buchungen. -->
+      @if (columnSet() === 'tight' && $any(e).correspondent) {
+        <span class="et__meta ell" data-testid="et-payee" [title]="$any(e).correspondent">{{
+          $any(e).correspondent
+        }}</span>
+      }
       @if (!child && $any(e).applicationId) {
         <a
           class="et__app ell"

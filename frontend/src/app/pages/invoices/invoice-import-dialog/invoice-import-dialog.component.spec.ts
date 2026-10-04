@@ -5,6 +5,7 @@ import {
   type InvoiceDialogHost,
   InvoiceImportDialogComponent,
   type InvoiceImportNotice,
+  invoiceFieldsValid,
 } from './invoice-import-dialog.component';
 
 const INVOICE = { id: 'i-1', number: 'R-1', grossAmount: '119.00' } as Invoice;
@@ -20,7 +21,11 @@ function fakeHost(): InvoiceDialogHost & {
   clearAttachment: jest.Mock;
   onCreateFilePicked: jest.Mock;
 } {
+  const newNumber = signal('');
+  const newSupplier = signal('');
   const newGross = signal('');
+  const editNumber = signal('');
+  const editSupplier = signal('');
   const editGross = signal('');
   return {
     saving: signal(false),
@@ -30,8 +35,8 @@ function fakeHost(): InvoiceDialogHost & {
       { value: 'paid', label: 'Bezahlt' },
     ]),
     createOpen: signal(false),
-    newNumber: signal(''),
-    newSupplier: signal(''),
+    newNumber,
+    newSupplier,
     newIssueDate: signal(''),
     newDueDate: signal(''),
     newNet: signal(''),
@@ -43,13 +48,13 @@ function fakeHost(): InvoiceDialogHost & {
     importFileName: signal(''),
     importNotice: signal<InvoiceImportNotice>(null),
     importDuplicate: signal<string | null>(null),
-    canSubmitCreate: computed(() => Number(newGross()) > 0),
+    canSubmitCreate: computed(() => invoiceFieldsValid(newNumber(), newSupplier(), newGross())),
     create: jest.fn(),
     clearAttachment: jest.fn(),
     onCreateFilePicked: jest.fn(),
     editing: signal<Invoice | null>(null),
-    editNumber: signal(''),
-    editSupplier: signal(''),
+    editNumber,
+    editSupplier,
     editIssueDate: signal(''),
     editDueDate: signal(''),
     editNet: signal(''),
@@ -57,7 +62,7 @@ function fakeHost(): InvoiceDialogHost & {
     editGross,
     editStatus: signal<InvoiceStatus>('open'),
     editNote: signal(''),
-    editGrossValid: computed(() => Number(editGross()) > 0),
+    canSubmitEdit: computed(() => invoiceFieldsValid(editNumber(), editSupplier(), editGross())),
     saveEdit: jest.fn(),
   };
 }
@@ -76,6 +81,8 @@ describe('InvoiceImportDialogComponent', () => {
     host.importFileName.set('2026-0931.pdf');
     host.importNotice.set('parsed');
     host.importDuplicate.set('2026-0931');
+    host.newNumber.set('2026-0931');
+    host.newSupplier.set('Getränke Kraus GmbH');
     host.newGross.set('380.00');
     host.createOpen.set(true);
     fixture.detectChanges();
@@ -84,8 +91,8 @@ describe('InvoiceImportDialogComponent', () => {
     expect(screen.getByText('Rechnung gelesen — bitte prüfen.')).toBeInTheDocument();
     expect(screen.getByText('Mögliche Dublette: Rechnung „2026-0931" existiert bereits.')).toBeInTheDocument();
     for (const label of [
-      'Rechnungsnummer',
-      'Lieferant',
+      /^Rechnungsnummer/,
+      /^Lieferant/,
       'Rechnungsdatum',
       'Fälligkeitsdatum',
       'Netto',
@@ -114,9 +121,24 @@ describe('InvoiceImportDialogComponent', () => {
     const input = container.querySelector('input[type=file]') as HTMLInputElement;
     input.dispatchEvent(new Event('change'));
     expect(host.onCreateFilePicked).toHaveBeenCalled();
-    // Gross is the one required amount.
-    const add = screen.getAllByRole('button', { name: 'Rechnung hinzufügen' }).at(-1);
-    expect(add?.hasAttribute('disabled') || add?.closest('[disabled]') !== null).toBe(true);
+    // Number, supplier and gross are required: with any one blank, the add button is off.
+    const add = (): HTMLElement | undefined =>
+      screen.getAllByRole('button', { name: 'Rechnung hinzufügen' }).at(-1);
+    const disabled = (): boolean => {
+      const b = add();
+      return !!b && (b.hasAttribute('disabled') || b.closest('[disabled]') !== null);
+    };
+    expect(disabled()).toBe(true);
+    for (const label of [/^Rechnungsnummer/, /^Lieferant/]) {
+      expect(screen.getByLabelText(label)).toBeRequired();
+    }
+    host.newGross.set('12.00');
+    host.newSupplier.set('Druckerei');
+    fixture.detectChanges();
+    expect(disabled()).toBe(true);
+    host.newNumber.set('R-7');
+    fixture.detectChanges();
+    expect(disabled()).toBe(false);
     screen.getAllByRole('button', { name: 'Abbrechen' }).at(-1)?.click();
     expect(host.createOpen()).toBe(false);
   });
@@ -124,6 +146,8 @@ describe('InvoiceImportDialogComponent', () => {
   it('edits an invoice and closes on cancel', async () => {
     const { host, fixture } = await setup('edit');
     host.editing.set(INVOICE);
+    host.editNumber.set('R-1');
+    host.editSupplier.set('ACME GmbH');
     host.editGross.set('119.00');
     fixture.detectChanges();
     expect(screen.getByRole('dialog', { name: 'Rechnung bearbeiten' })).toBeInTheDocument();

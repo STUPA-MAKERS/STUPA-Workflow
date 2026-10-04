@@ -93,6 +93,12 @@ export function costCentreLabel(
  * * `compact` — below 1400px the secondary columns go (invoice date and kind of a
  *   booking; net and tax of an invoice), so the description keeps a readable width.
  * * `tight` — below 1000px a third one goes as well.
+ *
+ * A dropped column moves into a kept cell, as a second line or a tooltip: the payee
+ * under the description of a booking and its invoice date into the tooltip of the
+ * payment date; the due date under the issue date of an invoice, and net and tax under
+ * its gross. A reader without `budget.book` has no dialog, so the value must stay on
+ * the row.
  */
 export type ColumnSet = 'full' | 'compact' | 'tight';
 

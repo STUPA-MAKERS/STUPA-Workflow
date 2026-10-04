@@ -14,6 +14,17 @@
   flex: none;
   margin-top: 1px;
 }
+/* A warning or an error must stand out from a neutral note beside it (board
+   Arbeit-Rechnung-Import, duplicate warning): the surface takes a tint of the tone,
+   and the text the full text colour. */
+:host(.note--warn) {
+  background: color-mix(in srgb, var(--color-warning) 14%, var(--color-surface-2));
+  color: var(--color-text);
+}
+:host(.note--error) {
+  background: color-mix(in srgb, var(--color-danger) 14%, var(--color-surface-2));
+  color: var(--color-text);
+}
 :host(.note--warn) .note__icon {
   color: var(--color-warning);
 }

@@ -25,6 +25,15 @@ import type { Invoice, InvoiceStatus } from '../../budget/budget-tree.api';
 export type InvoiceImportNotice = 'parsed' | 'manual' | null;
 
 /**
+ * The invoice dialog needs a number, a supplier and a positive gross amount. The server
+ * accepts an invoice without number or supplier, but the dialog does not: a manual entry
+ * without them cannot be found again.
+ */
+export function invoiceFieldsValid(number: string, supplier: string, gross: string): boolean {
+  return number.trim() !== '' && supplier.trim() !== '' && Number(gross) > 0;
+}
+
+/**
  * What the dialog reads and writes on the invoices page. The page keeps the values and
  * the requests, so its specs drive one place.
  */
@@ -62,7 +71,7 @@ export interface InvoiceDialogHost {
   readonly editGross: WritableSignal<string>;
   readonly editStatus: WritableSignal<InvoiceStatus>;
   readonly editNote: WritableSignal<string>;
-  readonly editGrossValid: Signal<boolean>;
+  readonly canSubmitEdit: Signal<boolean>;
   saveEdit(event: Event): void;
 }
 
@@ -71,8 +80,8 @@ export interface InvoiceDialogHost {
  * imported one, or the edit of one.
  *
  * After an import it shows the file, "Rechnung gelesen — bitte prüfen." and, when an
- * invoice with the same number exists, the duplicate warning (N31). Gross is the only
- * required amount; number and supplier stay optional, as on the server.
+ * invoice with the same number exists, the duplicate warning (N31). Number, supplier and
+ * gross are required, as on the board.
  */
 @Component({
   selector: 'app-invoice-import-dialog',

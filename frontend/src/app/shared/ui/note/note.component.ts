@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { IconComponent, type IconName } from '@stupa-makers/ui-kit';
 
-/** The tone of a note: the icon takes the warning or the error colour. */
+/** The tone of a note: the icon takes the warning or the error colour, the surface a tint of it. */
 export type NoteKind = 'neutral' | 'warn' | 'error';
 
 /**

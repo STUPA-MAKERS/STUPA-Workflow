@@ -165,6 +165,12 @@
       <span class="inv__date mono">{{
         $any(i).issueDate ? ($any(i).issueDate | ldate: 'mediumDate') : '—'
       }}</span>
+      <!-- The tight set has no due-date column: the date moves under the issue date. -->
+      @if (columnSet() === 'tight' && $any(i).dueDate) {
+        <span class="inv__sub ell" data-testid="inv-due-line">{{
+          'invoices.dueLine' | t: { date: ($any(i).dueDate | ldate: 'mediumDate') }
+        }}</span>
+      }
     </ng-template>
     <ng-template appCell="dueDate" let-i>
       <span class="inv__date inv__muted mono">{{
@@ -188,7 +194,18 @@
       }}</span>
     </ng-template>
     <ng-template appCell="gross" let-i>
-      <span class="inv__money mono">{{ money($any(i).grossAmount) }}</span>
+      @if (columnSet() === 'full') {
+        <span class="inv__money mono">{{ money($any(i).grossAmount) }}</span>
+      } @else {
+        <!-- No net and tax columns: the split moves under gross and into its tooltip. -->
+        @let split = splitLine($any(i));
+        <span class="inv__grossCell" [title]="netTaxTitle($any(i))">
+          <span class="inv__money mono">{{ money($any(i).grossAmount) }}</span>
+          @if (split) {
+            <span class="inv__sub" data-testid="inv-split">{{ split }}</span>
+          }
+        </span>
+      }
     </ng-template>
     <ng-template appCell="status" let-i>
       @let st = invoiceStatus($any(i).status);
@@ -199,7 +216,13 @@
       @if (bookings.length) {
         @let first = bookings[0];
         @let cc = bookingLabel(first);
-        <span class="inv__booking" [title]="bookingsTitle($any(i))">
+        <!-- Below the full set the column is narrow: the amount goes to a second line, so
+             the cost centre keeps its name. -->
+        <span
+          class="inv__booking"
+          [class.inv__booking--stacked]="columnSet() !== 'full'"
+          [title]="bookingsTitle($any(i))"
+        >
           @if (cc.color) {
             <span class="inv__swatch" aria-hidden="true" [style.background]="cc.color"></span>
           }

@@ -106,6 +106,7 @@ export class ExpensesTableComponent {
     }
     // The heading of a card: it says WHICH booking this is.
     cols.push({ key: 'description', label: t('expenses.col.description'), card: 'title' });
+    // The tight set shows the payee as a line under the description instead.
     if (set !== 'tight') {
       cols.push({ key: 'correspondent', label: t('expenses.col.correspondent'), width: '8rem' });
     }

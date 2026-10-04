@@ -65,6 +65,7 @@ import {
 import {
   type InvoiceDialogHost,
   InvoiceImportDialogComponent,
+  invoiceFieldsValid,
 } from './invoice-import-dialog/invoice-import-dialog.component';
 
 /** What the import found, for the note at the top of the review dialog. */
@@ -146,6 +147,9 @@ export class InvoicesComponent implements OnDestroy, InvoiceDialogHost {
     }
     // The number is what names an invoice, so it heads the card. Net and tax are off
     // it: gross is the figure a reader checks, and the split belongs to the detail.
+    // Below the full set a dropped column moves into a second line of a kept cell:
+    // the due date under the issue date, net and tax under gross. A reader without
+    // `budget.book` has no dialog, so the value must stay on the row.
     cols.push(
       { key: 'number', label: t('invoices.col.number'), width: '6.5rem', card: 'title' },
       { key: 'supplier', label: t('invoices.col.supplier') },
@@ -164,7 +168,9 @@ export class InvoicesComponent implements OnDestroy, InvoiceDialogHost {
       cols.push({
         key: 'bookings',
         label: t('invoices.col.bookings'),
-        width: set === 'tight' ? '9rem' : '12rem',
+        // At full width the cost centre name gets the room it needs (board
+        // Arbeit-Rechnungen: "Maschinenbau −900,00 €"); the supplier takes the rest.
+        width: set === 'full' ? '15rem' : set === 'tight' ? '9rem' : '12rem',
       });
     }
     cols.push({ key: 'file', label: t('invoices.col.file'), align: 'end', width: '3rem' });
@@ -173,6 +179,25 @@ export class InvoicesComponent implements OnDestroy, InvoiceDialogHost {
     }
     return cols;
   });
+
+  /** "Netto 100,00 € · USt. 19,00 €": the tooltip of gross without the split columns. */
+  netTaxTitle(i: Invoice): string {
+    return this.i18n.translate('invoices.netTax', {
+      net: i.netAmount ? this.money(i.netAmount) : '—',
+      tax: i.taxAmount ? this.money(i.taxAmount) : '—',
+    });
+  }
+
+  /**
+   * The second line of gross without the split columns: "USt. 19,00 €", or the net
+   * amount when the invoice states no tax. One line is enough, because the other part
+   * is gross minus this one. `null` when the invoice states neither.
+   */
+  splitLine(i: Invoice): string | null {
+    if (i.taxAmount) return this.i18n.translate('invoices.taxLine', { amount: this.money(i.taxAmount) });
+    if (i.netAmount) return this.i18n.translate('invoices.netLine', { amount: this.money(i.netAmount) });
+    return null;
+  }
 
   /** The status as coloured text. */
   readonly invoiceStatus = invoiceStatus;
@@ -373,7 +398,10 @@ export class InvoicesComponent implements OnDestroy, InvoiceDialogHost {
   readonly importFileName = signal('');
   private importFileMime = '';
 
-  readonly canSubmitCreate = computed(() => Number(this.newGross()) > 0);
+  /** Number, supplier and a positive gross are required (board Arbeit-Rechnung-Import). */
+  readonly canSubmitCreate = computed(() =>
+    invoiceFieldsValid(this.newNumber(), this.newSupplier(), this.newGross()),
+  );
 
   readonly editing = signal<Invoice | null>(null);
   readonly editNumber = signal('');
@@ -385,7 +413,9 @@ export class InvoicesComponent implements OnDestroy, InvoiceDialogHost {
   readonly editGross = signal('');
   readonly editStatus = signal<InvoiceStatus>('open');
   readonly editNote = signal('');
-  readonly editGrossValid = computed(() => Number(this.editGross()) > 0);
+  readonly canSubmitEdit = computed(() =>
+    invoiceFieldsValid(this.editNumber(), this.editSupplier(), this.editGross()),
+  );
   readonly confirmDelete = signal<Invoice | null>(null);
 
   constructor() {
@@ -602,7 +632,6 @@ export class InvoicesComponent implements OnDestroy, InvoiceDialogHost {
     input.value = '';
   }
 
-  /** Parse a PDF. On success, prefill the dialog. Without ZUGFeRD data, open it empty. */
   /** Files from the drop zone. One import at a time, so the first PDF counts. */
   onZoneFiles(files: File[]): void {
     if (this.canManage() && files[0]) this.importFile(files[0]);
@@ -613,6 +642,7 @@ export class InvoicesComponent implements OnDestroy, InvoiceDialogHost {
     this.toast.error(this.i18n.translate('invoices.toast.notPdf'));
   }
 
+  /** Parse a PDF. On success, prefill the dialog. Without ZUGFeRD data, open it empty. */
   private importFile(file: File): void {
     if (this.importing()) return;
     this.importing.set(true);
@@ -713,8 +743,8 @@ export class InvoicesComponent implements OnDestroy, InvoiceDialogHost {
     this.saving.set(true);
     this.api
       .createInvoice({
-        number: this.newNumber().trim() || null,
-        supplier: this.newSupplier().trim() || null,
+        number: this.newNumber().trim(),
+        supplier: this.newSupplier().trim(),
         issueDate: this.newIssueDate() || null,
         dueDate: this.newDueDate() || null,
         netAmount: this.newNet().trim() || null,
@@ -756,12 +786,12 @@ export class InvoicesComponent implements OnDestroy, InvoiceDialogHost {
   saveEdit(event: Event): void {
     event.preventDefault();
     const i = this.editing();
-    if (!i || !this.editGrossValid() || this.saving()) return;
+    if (!i || !this.canSubmitEdit() || this.saving()) return;
     this.saving.set(true);
     this.api
       .updateInvoice(i.id, {
-        number: this.editNumber().trim() || null,
-        supplier: this.editSupplier().trim() || null,
+        number: this.editNumber().trim(),
+        supplier: this.editSupplier().trim(),
         issueDate: this.editIssueDate() || null,
         dueDate: this.editDueDate() || null,
         netAmount: this.editNet().trim() || null,

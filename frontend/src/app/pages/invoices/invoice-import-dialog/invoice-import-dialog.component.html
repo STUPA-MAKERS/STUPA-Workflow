@@ -53,12 +53,14 @@
         <div class="iid__grid">
           <app-input
             name="number"
+            [required]="true"
             [label]="'invoices.field.number' | t"
             [ngModel]="h.newNumber()"
             (ngModelChange)="h.newNumber.set($event)"
           />
           <app-input
             name="supplier"
+            [required]="true"
             [label]="'invoices.field.supplier' | t"
             [ngModel]="h.newSupplier()"
             (ngModelChange)="h.newSupplier.set($event)"
@@ -116,12 +118,14 @@
         <div class="iid__grid">
           <app-input
             name="enumber"
+            [required]="true"
             [label]="'invoices.field.number' | t"
             [ngModel]="h.editNumber()"
             (ngModelChange)="h.editNumber.set($event)"
           />
           <app-input
             name="esupplier"
+            [required]="true"
             [label]="'invoices.field.supplier' | t"
             [ngModel]="h.editSupplier()"
             (ngModelChange)="h.editSupplier.set($event)"
@@ -185,7 +189,7 @@
         <span class="iid__btn"><app-icon name="add" [size]="16" />{{ 'invoices.add' | t }}</span>
       </app-button>
     } @else {
-      <app-button [disabled]="!h.editGrossValid()" [loading]="h.saving()" (click)="submit($event)">{{
+      <app-button [disabled]="!h.canSubmitEdit()" [loading]="h.saving()" (click)="submit($event)">{{
         'action.save' | t
       }}</app-button>
     }
