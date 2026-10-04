@@ -1,25 +1,21 @@
 @if (open()) {
-  <!-- The backdrop blurs what is behind it rather than only dimming it. The palette
-       covers the page it was opened from, and a blurred page reads as "still there,
-       not now" instead of as a new screen. -->
-  <div class="pal__backdrop" (click)="close()"></div>
+  <div class="pal__scrim" (click)="close()"></div>
 
-  <div
-    class="pal"
-    role="dialog"
-    aria-modal="true"
-    [attr.aria-label]="'search.title' | t"
-  >
+  <div class="pal" role="dialog" aria-modal="true" [attr.aria-label]="'search.title' | t">
     <div class="pal__field">
+      <app-icon class="pal__glass" name="search" [size]="22" />
       <input
         #field
         type="text"
         class="pal__input"
+        role="combobox"
         autocomplete="off"
         spellcheck="false"
+        aria-autocomplete="list"
+        aria-controls="palette-results"
         [attr.aria-label]="'search.title' | t"
         [attr.aria-expanded]="rows().length > 0"
-        aria-controls="palette-results"
+        [attr.aria-activedescendant]="activeId()"
         [placeholder]="'search.placeholder' | t"
         [ngModel]="query()"
         (ngModelChange)="onQuery($event)"
@@ -27,36 +23,60 @@
       @if (loading()) {
         <span class="pal__spinner" aria-hidden="true"></span>
       }
-      <kbd class="pal__kbd">{{ escLabel }}</kbd>
+      <!-- Escape on a keyboard; a close button where there is none. -->
+      <button
+        type="button"
+        class="pal__close"
+        [attr.aria-label]="'search.close' | t"
+        [title]="'search.close' | t"
+        (click)="close()"
+      >
+        <span class="kbd pal__esc" aria-hidden="true">{{ escLabel }}</span>
+        <app-icon class="pal__x" name="x" [size]="20" />
+      </button>
     </div>
 
-    <div id="palette-results" class="pal__results" role="listbox">
+    <div id="palette-results" class="pal__results" role="listbox" [attr.aria-label]="'search.title' | t">
       @for (group of groups(); track group.label) {
-        <div class="pal__groupLabel" role="presentation">{{ group.label }}</div>
-        @for (row of group.rows; track row.key) {
-          <button
-            type="button"
-            role="option"
-            class="pal__row"
-            [class.pal__row--active]="indexOf(row) === active()"
-            [attr.aria-selected]="indexOf(row) === active()"
-            (mouseenter)="active.set(indexOf(row))"
-            (click)="go(row)"
-          >
-            <app-icon [name]="row.icon" [size]="16" />
-            <span class="pal__rowText">
-              <span class="pal__rowTitle">
-                {{ row.title }}
-                @if (row.archived) {
-                  <span class="pal__rowBadge">{{ 'search.archived' | t }}</span>
+        <div class="pal__group" role="group" [attr.aria-label]="group.label">
+          <h3 class="sec pal__groupLabel" aria-hidden="true">{{ group.label }}</h3>
+          @for (row of group.rows; track row.key) {
+            @let on = indexOf(row) === active();
+            <div
+              class="pal__row"
+              role="option"
+              [id]="optionId(row)"
+              [class.pal__row--active]="on"
+              [attr.aria-selected]="on"
+              (mouseenter)="active.set(indexOf(row))"
+              (click)="go(row)"
+            >
+              <app-icon class="pal__rowIcon" [name]="row.icon" [size]="19" />
+              <span class="pal__rowText">
+                <span class="pal__rowTitle ell" [title]="row.title">
+                  @for (part of parts(row.title); track $index) {<span [class.pal__hit]="part.hit">{{ part.text }}</span>}
+                </span>
+                @if (row.subtitle) {
+                  @if (row.status) {
+                    <app-status-text class="pal__rowSub" kind="neutral">{{ row.subtitle }}</app-status-text>
+                  } @else {
+                    <span class="pal__rowSub ell" [title]="row.subtitle">
+                      @for (part of parts(row.subtitle); track $index) {<span [class.pal__hit]="part.hit">{{ part.text }}</span>}
+                    </span>
+                  }
                 }
               </span>
-              @if (row.subtitle) {
-                <span class="pal__rowSub">{{ row.subtitle }}</span>
+              @if (row.archived) {
+                <span class="pal__archived">
+                  <app-icon name="archive" [size]="14" />{{ 'search.archived' | t }}
+                </span>
               }
-            </span>
-          </button>
-        }
+              @if (on) {
+                <span class="kbd pal__enter" aria-hidden="true">Enter</span>
+              }
+            </div>
+          }
+        </div>
       }
 
       @if (showEmpty()) {
@@ -69,6 +89,11 @@
       @if (showTruncated()) {
         <p class="pal__note pal__note--foot">{{ 'search.truncated' | t }}</p>
       }
+    </div>
+
+    <div class="pal__keys" aria-hidden="true">
+      <span class="pal__key"><span class="kbd">↑</span><span class="kbd">↓</span>{{ 'search.keys.select' | t }}</span>
+      <span class="pal__key"><span class="kbd">Enter</span>{{ 'search.keys.open' | t }}</span>
     </div>
   </div>
 }

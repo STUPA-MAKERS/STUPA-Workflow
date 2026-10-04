@@ -692,4 +692,23 @@ describe('mockApiInterceptor', () => {
       ctrl.expectOne('/api/applications/x').flush(null);
     });
   });
+
+  it('answers the global search with the mock records whose title matches', async () => {
+    const { api } = setup(true);
+    const apps = await firstValueFrom(api.search('förderung'));
+    expect(apps.hits.map((h) => h.kind)).toEqual(['application', 'application']);
+    expect(apps.hits[0].url).toMatch(/^\/applications\//);
+    expect(apps.hits[0].subtitle).toBeTruthy();
+
+    // Other tests rename the mock meeting, so search for the title it has now.
+    const [current] = await firstValueFrom(api.listMeetings());
+    const meeting = await firstValueFrom(api.search(current.title));
+    expect(meeting.hits).toContainEqual(expect.objectContaining({ kind: 'meeting', title: current.title }));
+
+    const person = await firstValueFrom(api.search('demo'));
+    expect(person.hits).toEqual([expect.objectContaining({ kind: 'principal', title: 'Demo Mitglied' })]);
+
+    const none = await firstValueFrom(api.search('zzzz'));
+    expect(none).toEqual({ hits: [], truncated: false, failed: [] });
+  });
 });
