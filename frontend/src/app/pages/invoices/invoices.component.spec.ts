@@ -672,7 +672,7 @@ describe('InvoicesComponent', () => {
     expect(c.importDuplicate()).toBe('DUP');
     const dialog = within(screen.getByRole('dialog', { name: 'Importierte Rechnung prüfen' }));
     expect(dialog.getByText('Rechnung gelesen — bitte prüfen.')).toBeInTheDocument();
-    expect(dialog.getByText(/Mögliche Dublette: Rechnung „DUP"/)).toBeInTheDocument();
+    expect(dialog.getByText(/Mögliche Dublette: Rechnung „DUP“/)).toBeInTheDocument();
     expect(dialog.getByText('parsed.pdf')).toBeInTheDocument();
   });
 
@@ -990,11 +990,36 @@ describe('InvoicesComponent', () => {
     expect(c.editSupplier()).toBe('');
     expect(c.editGross()).toBe('99');
     expect(c.editStatus()).toBe('paid');
-    // An old invoice without number and supplier needs both before it saves.
-    expect(c.canSubmitEdit()).toBe(false);
-    c.editNumber.set('R-1');
-    c.editSupplier.set('Sup');
+    // A stored invoice without number and supplier saves without them.
+    expect(c.editNumberRequired()).toBe(false);
+    expect(c.editSupplierRequired()).toBe(false);
     expect(c.canSubmitEdit()).toBe(true);
+  });
+
+  it('canSubmitEdit keeps a stored number and supplier from becoming empty', async () => {
+    const { c } = await setup();
+    c.openEdit(inv({ id: 'e1' }));
+    expect(c.editNumberRequired()).toBe(true);
+    expect(c.editSupplierRequired()).toBe(true);
+    c.editNumber.set('  ');
+    expect(c.canSubmitEdit()).toBe(false);
+    c.editNumber.set('R-9');
+    c.editSupplier.set('');
+    expect(c.canSubmitEdit()).toBe(false);
+  });
+
+  it('saveEdit marks an invoice without number and supplier as paid', async () => {
+    const { c, http } = await setup({
+      initial: [inv({ id: 'e1', number: null, supplier: null, status: 'open', grossAmount: '40' })],
+    });
+    c.openEdit(c.items()[0]);
+    c.editStatus.set('paid');
+    c.saveEdit({ preventDefault: jest.fn() } as unknown as Event);
+    const req = http.expectOne((r) => r.url.endsWith('/api/invoices/e1') && r.method === 'PATCH');
+    expect(req.request.body).toMatchObject({ number: null, supplier: null, status: 'paid' });
+    req.flush(inv({ id: 'e1', number: null, supplier: null, status: 'paid' }));
+    expect(c.editing()).toBe(null);
+    expect(c.items()[0].status).toBe('paid');
   });
 
   it('canSubmitEdit is false for a non-positive gross', async () => {
@@ -1019,6 +1044,17 @@ describe('InvoicesComponent', () => {
     expect(c.editing()).toBe(null);
     expect(c.items()[0].supplier).toBe('New Sup');
     expect(spy).toHaveBeenCalled();
+  });
+
+  it('saveEdit keeps the line breaks of a note', async () => {
+    const { c, http } = await setup({ initial: [inv({ id: 'e1', note: 'Teil 1\nTeil 2' })] });
+    c.openEdit(c.items()[0]);
+    expect(c.editNote()).toBe('Teil 1\nTeil 2');
+    c.editNote.set('Teil 1\nTeil 2\nTeil 3\n');
+    c.saveEdit({ preventDefault: jest.fn() } as unknown as Event);
+    const req = http.expectOne((r) => r.url.endsWith('/api/invoices/e1') && r.method === 'PATCH');
+    expect(req.request.body.note).toBe('Teil 1\nTeil 2\nTeil 3');
+    req.flush(inv({ id: 'e1', note: 'Teil 1\nTeil 2\nTeil 3' }));
   });
 
   it('saveEdit leaves untouched list entries alone', async () => {
@@ -1436,7 +1472,19 @@ describe('InvoicesComponent bookings column and redesign wiring', () => {
     const { c, http } = await setup({ initial: [inv({ linkedBookings: [] })] });
     http.expectNone((r) => r.url.endsWith('/api/budgets'));
     const col = c.columns().find((x: { key: string }) => x.key === 'bookings');
-    expect(col.width).toBe('9rem');
+    expect(col.width).toBe('8rem');
+  });
+
+  it('keeps room for the supplier below the full set', async () => {
+    setViewport();
+    const { c } = await setup({ initial: [inv({ linkedBookings: [] })] });
+    expect(c.columnSet()).toBe('compact');
+    const cols = c.columns();
+    const by = (key: string) => cols.find((x: { key: string }) => x.key === key);
+    expect(by('bookings').width).toBe('9rem');
+    expect(by('supplier').width).toBeUndefined();
+    // The short header keeps the date column at its own width.
+    expect(by('issueDate').label).toBe('Datum');
   });
 
   it('keeps the swatches off when the tree fails', async () => {
@@ -1551,6 +1599,17 @@ describe('InvoicesComponent bookings column and redesign wiring', () => {
     expect(c.netTaxTitle(inv({ netAmount: null, taxAmount: null }))).toBe('Netto — · USt. —');
   });
 
+  it('shows the due date as a field of its own on the phone card', async () => {
+    setViewport('max-width: 768px');
+    const { c, container } = await setup({ canManage: false });
+    expect(c.columnSet()).toBe('full');
+    expect(c.showDueLine()).toBe(false);
+    expect(container.querySelector('[data-testid="inv-due-line"]')).toBeNull();
+    const cell = container.querySelector('tbody td[data-label="Fällig"]') as HTMLElement;
+    expect(cell.getAttribute('data-card')).toBeNull();
+    expect(cell.textContent?.trim()).toBe('31.01.2026');
+  });
+
   it('keeps the split columns and no second lines at full width', async () => {
     setViewport('min-width: 1400px');
     const { container } = await setup();
@@ -1567,6 +1626,7 @@ describe('InvoicesComponent bookings column and redesign wiring', () => {
     fixture.detectChanges();
     const col = c.columns().find((x: { key: string }) => x.key === 'bookings');
     expect(col.width).toBe('15rem');
+    expect(c.columns()[0].label).toBe('Rechnungsdatum');
     // One line: swatch, name, amount.
     expect(container.querySelector('.inv__booking--stacked')).toBeNull();
   });

@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  input,
+  output,
+  signal,
+} from '@angular/core';
 import { RouterLink } from '@angular/router';
 import type { Uuid } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -14,6 +22,7 @@ import {
   type SortState,
 } from '@stupa-makers/ui-kit';
 import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@shared/ui';
+import { TruncatedDirective } from '@shared/truncated.directive';
 import type { Expense } from '../../budget/budget-tree.api';
 import {
   type ColumnSet,
@@ -34,8 +43,9 @@ export type BudgetLink = { budget: string | null; ks: string; fy: string };
  * sub-bookings expands in place: each sub-booking is a row of the same columns, marked
  * "↳", and its cost centre reads "erbt", because it takes the cost centre of its parent.
  *
- * The table holds no state. The page owns the rows, the selection and the sort; the
- * sub-booking state module owns which parents are open and their children.
+ * The table holds no data state. The page owns the rows, the selection and the sort;
+ * the sub-booking state module owns which parents are open and their children. The
+ * table keeps only which descriptions are open in full.
  */
 @Component({
   selector: 'app-expenses-table',
@@ -50,6 +60,7 @@ export type BudgetLink = { budget: string | null; ks: string; fy: string };
     RouterLink,
     RowMenuComponent,
     TranslatePipe,
+    TruncatedDirective,
   ],
   templateUrl: './expenses-table.component.html',
   styleUrl: './expenses-table.component.scss',
@@ -182,6 +193,23 @@ export class ExpensesTableComponent {
 
   costCentre(e: Expense): CostCentreLabel {
     return costCentreLabel(this.costCentres(), e.budgetId, e.pathKey);
+  }
+
+  /** The bookings whose description shows in full ("mehr"). */
+  private readonly expandedDesc = signal<ReadonlySet<string>>(new Set());
+
+  descExpanded(id: string): boolean {
+    return this.expandedDesc().has(id);
+  }
+
+  /** Open or close the full description of a booking. */
+  toggleDesc(id: string): void {
+    this.expandedDesc.update((s) => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   }
 
   /** "2 Unterbuchungen ein-/ausklappen": the name of the expand button. */

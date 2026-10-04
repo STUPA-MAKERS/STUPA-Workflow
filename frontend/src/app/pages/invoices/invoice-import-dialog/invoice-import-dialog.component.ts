@@ -25,9 +25,10 @@ import type { Invoice, InvoiceStatus } from '../../budget/budget-tree.api';
 export type InvoiceImportNotice = 'parsed' | 'manual' | null;
 
 /**
- * The invoice dialog needs a number, a supplier and a positive gross amount. The server
- * accepts an invoice without number or supplier, but the dialog does not: a manual entry
- * without them cannot be found again.
+ * A new invoice needs a number, a supplier and a positive gross amount. The server
+ * accepts an invoice without number or supplier, but the create dialog does not: a
+ * manual entry without them cannot be found again. The edit of a stored invoice uses
+ * its own rule (see `canSubmitEdit` on the host).
  */
 export function invoiceFieldsValid(number: string, supplier: string, gross: string): boolean {
   return number.trim() !== '' && supplier.trim() !== '' && Number(gross) > 0;
@@ -71,6 +72,10 @@ export interface InvoiceDialogHost {
   readonly editGross: WritableSignal<string>;
   readonly editStatus: WritableSignal<InvoiceStatus>;
   readonly editNote: WritableSignal<string>;
+  /** True when the stored invoice has a number, so the edit cannot clear it. */
+  readonly editNumberRequired: Signal<boolean>;
+  /** True when the stored invoice has a supplier, so the edit cannot clear it. */
+  readonly editSupplierRequired: Signal<boolean>;
   readonly canSubmitEdit: Signal<boolean>;
   saveEdit(event: Event): void;
 }

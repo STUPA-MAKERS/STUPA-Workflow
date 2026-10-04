@@ -50,6 +50,34 @@
   min-width: 0;
   color: var(--color-text);
 }
+/* The full description, opened with "mehr": it wraps in the column. */
+.et__descText--open {
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+.et__descLine:has(.et__descText--open) {
+  align-items: baseline;
+}
+/* "mehr" / "weniger": a text button after the description, outside the ellipsis. */
+.et__more {
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-accent-text);
+  font: inherit;
+  font-weight: var(--fw-medium);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.et__more:hover {
+  text-decoration: underline;
+}
+.et__more:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
 .et__subMark {
   flex: none;
   padding-inline: var(--space-2) var(--space-1);

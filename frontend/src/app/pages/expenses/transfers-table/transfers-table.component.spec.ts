@@ -68,7 +68,7 @@ describe('TransfersTableComponent', () => {
     expect(edit).toHaveBeenCalledTimes(1);
     expect(remove).toHaveBeenCalledTimes(1);
     expect(cmp.rowId(TRANSFER)).toBe('tr-1');
-    expect(screen.getByRole('button', { name: 'Aktionen für „Umbuchung Fest"' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Aktionen für „Umbuchung Fest“' })).toBeInTheDocument();
   });
 
   it('has no actions column for a reader', async () => {

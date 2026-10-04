@@ -333,8 +333,9 @@ export class ExpensesComponent implements OnDestroy {
   readonly canSubmitTransfer = this.dialogs.canSubmitTransfer;
   readonly canSubmitCreate = this.dialogs.canSubmitCreate;
 
-  // Transfers tab. `budget.book` gates the whole route, so the list, the edit
-  // and the delete follow the same permission as the create.
+  // Transfers tab. The route also admits `budget.view`, but the server lists, edits
+  // and deletes transfers only for `budget.book` (the create permission). So the tab
+  // shows only when `canManage()` is true.
   readonly tab = signal<ExpensesTab>('bookings');
   readonly transferItems = this.transfers.items;
   readonly transferTotal = this.transfers.total;
@@ -612,6 +613,7 @@ export class ExpensesComponent implements OnDestroy {
   /** Switch the view. The transfers load lazily on the first visit and then
    *  again on every visit, because a booking change can remove a leg. */
   setTab(tab: ExpensesTab): void {
+    if (tab === 'transfers' && !this.canManage()) return;
     this.tab.set(tab);
     if (tab === 'transfers') this.transfers.reload();
   }

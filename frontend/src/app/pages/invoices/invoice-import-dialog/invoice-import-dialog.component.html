@@ -107,25 +107,31 @@
             [ngModel]="h.newStatus()"
             (ngModelChange)="h.newStatus.set($event)"
           />
-          <app-input
-            name="note"
-            [label]="'invoices.field.note' | t"
-            [ngModel]="h.newNote()"
-            (ngModelChange)="h.newNote.set($event)"
-          />
+          <!-- A note can have more than one line: a textarea keeps the line breaks. -->
+          <label class="iid__box" for="invoice-note">
+            <span class="iid__label">{{ 'invoices.field.note' | t }}</span>
+            <textarea
+              id="invoice-note"
+              class="iid__area"
+              name="note"
+              rows="1"
+              [ngModel]="h.newNote()"
+              (ngModelChange)="h.newNote.set($event)"
+            ></textarea>
+          </label>
         </div>
       } @else {
         <div class="iid__grid">
           <app-input
             name="enumber"
-            [required]="true"
+            [required]="h.editNumberRequired()"
             [label]="'invoices.field.number' | t"
             [ngModel]="h.editNumber()"
             (ngModelChange)="h.editNumber.set($event)"
           />
           <app-input
             name="esupplier"
-            [required]="true"
+            [required]="h.editSupplierRequired()"
             [label]="'invoices.field.supplier' | t"
             [ngModel]="h.editSupplier()"
             (ngModelChange)="h.editSupplier.set($event)"
@@ -172,12 +178,18 @@
             [ngModel]="h.editStatus()"
             (ngModelChange)="h.editStatus.set($event)"
           />
-          <app-input
-            name="enote"
-            [label]="'invoices.field.note' | t"
-            [ngModel]="h.editNote()"
-            (ngModelChange)="h.editNote.set($event)"
-          />
+          <!-- A note can have more than one line: a textarea keeps the line breaks. -->
+          <label class="iid__box" for="invoice-enote">
+            <span class="iid__label">{{ 'invoices.field.note' | t }}</span>
+            <textarea
+              id="invoice-enote"
+              class="iid__area"
+              name="enote"
+              rows="1"
+              [ngModel]="h.editNote()"
+              (ngModelChange)="h.editNote.set($event)"
+            ></textarea>
+          </label>
         </div>
       }
     </form>

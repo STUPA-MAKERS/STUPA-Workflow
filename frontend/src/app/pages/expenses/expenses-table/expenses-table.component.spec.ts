@@ -210,7 +210,7 @@ describe('ExpensesTableComponent', () => {
     expect(edit).toHaveBeenCalledWith(EXPENSE);
     expect(remove).toHaveBeenCalledWith(EXPENSE);
     expect(
-      screen.getByRole('button', { name: 'Aktionen für „Druckkosten Flyer"' }),
+      screen.getByRole('button', { name: 'Aktionen für „Druckkosten Flyer“' }),
     ).toBeInTheDocument();
   });
 
@@ -235,6 +235,79 @@ describe('ExpensesTableComponent', () => {
       rows: [{ ...EXPENSE, invoiceDate: null, paymentDate: null, correspondent: null }],
     });
     expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(3);
+  });
+
+  describe('long description', () => {
+    const LONG = 'Druck Semesterprogramm, 2.000 Stück auf Recyclingpapier mit Falzung';
+    const widths = { scroll: 0, client: 0 };
+    let scrollSpy: jest.SpyInstance;
+    let clientSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      // jsdom has no layout: the cut text of the long description is wider than its box.
+      scrollSpy = jest
+        .spyOn(HTMLElement.prototype, 'scrollWidth', 'get')
+        .mockImplementation(function (this: HTMLElement) {
+          return this.textContent === LONG ? widths.scroll : 0;
+        });
+      clientSpy = jest
+        .spyOn(HTMLElement.prototype, 'clientWidth', 'get')
+        .mockImplementation(() => widths.client);
+      widths.scroll = 480;
+      widths.client = 160;
+    });
+    afterEach(() => {
+      scrollSpy.mockRestore();
+      clientSpy.mockRestore();
+    });
+
+    it('opens and closes a cut description with "mehr", also for a reader', async () => {
+      const { fixture, container } = await setup({
+        canManage: false,
+        rows: [EXPENSE, { ...EXPENSE, id: 'e-2', description: LONG }],
+      });
+      fixture.detectChanges();
+      const toggles = container.querySelectorAll('[data-testid="et-desc-toggle"]');
+      // Only the cut description gets the button.
+      expect(toggles).toHaveLength(1);
+      const more = screen.getByRole('button', { name: 'mehr' });
+      expect(more).toHaveAttribute('aria-expanded', 'false');
+      const text = (): HTMLElement =>
+        container.querySelector('tbody tr:nth-child(2) .et__descText') as HTMLElement;
+      expect(text()).toHaveClass('ell');
+      expect(text().textContent?.trim()).toBe(LONG);
+      await userEvent.click(more);
+      expect(text()).not.toHaveClass('ell');
+      expect(text()).toHaveClass('et__descText--open');
+      // "weniger" follows the last word of the open text.
+      const less = screen.getByRole('button', { name: 'weniger' });
+      expect(less).toHaveAttribute('aria-expanded', 'true');
+      expect(text()).toContainElement(less);
+      await userEvent.click(less);
+      // The collapsed text measures again after its render.
+      fixture.detectChanges();
+      expect(text()).toHaveClass('ell');
+      expect(screen.getByRole('button', { name: 'mehr' })).toBeInTheDocument();
+    });
+
+    it('shows no button when the description fits', async () => {
+      widths.scroll = 160;
+      const { fixture, container } = await setup({ rows: [{ ...EXPENSE, description: LONG }] });
+      fixture.detectChanges();
+      expect(container.querySelector('[data-testid="et-desc-toggle"]')).toBeNull();
+    });
+
+    it('gives a sub-booking no button', async () => {
+      const child: Expense = { ...EXPENSE, id: 'c-1', parentExpenseId: 'e-1', description: LONG };
+      const { fixture, container, sub } = await setup({
+        rows: [{ ...EXPENSE, childCount: 1 }],
+        children: [child],
+      });
+      sub.toggleSub({ ...EXPENSE, childCount: 1 });
+      fixture.detectChanges();
+      expect(screen.getByText(LONG)).toBeInTheDocument();
+      expect(container.querySelector('[data-testid="et-desc-toggle"]')).toBeNull();
+    });
   });
 
   it('counts a missing child count as none', async () => {

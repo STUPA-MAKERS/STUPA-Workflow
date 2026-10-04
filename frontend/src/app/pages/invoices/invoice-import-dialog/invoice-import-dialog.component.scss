@@ -1,3 +1,4 @@
+@use 'field' as f;
 @use 'breakpoints' as bp;
 
 /* The dialog host adds no box, so a closed dialog takes no gap in the page. */
@@ -21,6 +22,52 @@
 }
 .iid__grid--status {
   grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  /* The note grows with its lines; the status field keeps its height. */
+  align-items: start;
+}
+/* The note: a textarea in the look of the kit fields (a filled box, the label inside).
+   It is one line high when empty, as on the board, and grows with its content. */
+.iid__box {
+  @include f.box;
+  @include f.box-labelled;
+  flex-direction: column;
+  align-items: stretch;
+  padding-top: 26px;
+  cursor: text;
+}
+.iid__label {
+  @include f.label;
+}
+.iid__box:focus-within .iid__label {
+  @include f.label-focus;
+}
+.iid__area {
+  display: block;
+  width: 100%;
+  min-height: 2rem;
+  max-height: 12rem;
+  margin: 0;
+  padding: 0 var(--space-4) 10px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--fs-md);
+  line-height: 1.375rem;
+  resize: vertical;
+  field-sizing: content;
+}
+/* Without content sizing, show three lines so that a longer note stays readable. */
+@supports not (field-sizing: content) {
+  .iid__area {
+    min-height: 4.75rem;
+  }
+}
+@media (max-width: 768px) {
+  .iid__area {
+    font-size: 1rem;
+  }
 }
 @include bp.phone {
   .iid__grid,

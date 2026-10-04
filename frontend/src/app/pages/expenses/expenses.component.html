@@ -154,13 +154,16 @@
             <app-icon name="chevron-down" [size]="15" />
           </button>
         }
-        <app-segmented
-          class="exp__tabs"
-          [ariaLabel]="'expenses.views' | t"
-          [options]="tabOptions()"
-          [value]="tab()"
-          (valueChange)="setTab($any($event))"
-        />
+        <!-- The transfer list needs `budget.book`: a reader without it gets no tabs. -->
+        @if (canManage()) {
+          <app-segmented
+            class="exp__tabs"
+            [ariaLabel]="'expenses.views' | t"
+            [options]="tabOptions()"
+            [value]="tab()"
+            (valueChange)="setTab($any($event))"
+          />
+        }
         @if (tab() === 'transfers' ? transferTotal() > 0 : total() > 0) {
           <span class="exp__count" role="status">{{
             tab() === 'transfers'

@@ -166,7 +166,7 @@
         $any(i).issueDate ? ($any(i).issueDate | ldate: 'mediumDate') : '—'
       }}</span>
       <!-- The tight set has no due-date column: the date moves under the issue date. -->
-      @if (columnSet() === 'tight' && $any(i).dueDate) {
+      @if (showDueLine() && $any(i).dueDate) {
         <span class="inv__sub ell" data-testid="inv-due-line">{{
           'invoices.dueLine' | t: { date: ($any(i).dueDate | ldate: 'mediumDate') }
         }}</span>

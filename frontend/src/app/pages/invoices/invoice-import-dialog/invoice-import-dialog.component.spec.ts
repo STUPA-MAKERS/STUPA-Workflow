@@ -62,6 +62,8 @@ function fakeHost(): InvoiceDialogHost & {
     editGross,
     editStatus: signal<InvoiceStatus>('open'),
     editNote: signal(''),
+    editNumberRequired: signal(true),
+    editSupplierRequired: signal(true),
     canSubmitEdit: computed(() => invoiceFieldsValid(editNumber(), editSupplier(), editGross())),
     saveEdit: jest.fn(),
   };
@@ -89,7 +91,7 @@ describe('InvoiceImportDialogComponent', () => {
     expect(screen.getByRole('dialog', { name: 'Importierte Rechnung prüfen' })).toBeInTheDocument();
     expect(screen.getByText('2026-0931.pdf')).toBeInTheDocument();
     expect(screen.getByText('Rechnung gelesen — bitte prüfen.')).toBeInTheDocument();
-    expect(screen.getByText('Mögliche Dublette: Rechnung „2026-0931" existiert bereits.')).toBeInTheDocument();
+    expect(screen.getByText('Mögliche Dublette: Rechnung „2026-0931“ existiert bereits.')).toBeInTheDocument();
     for (const label of [
       /^Rechnungsnummer/,
       /^Lieferant/,
@@ -156,5 +158,20 @@ describe('InvoiceImportDialogComponent', () => {
     expect(host.saveEdit).toHaveBeenCalled();
     screen.getAllByRole('button', { name: 'Abbrechen' }).at(-1)?.click();
     expect(host.editing()).toBeNull();
+  });
+
+  it('shows a multi-line note in a textarea and keeps its line breaks', async () => {
+    const { host, fixture } = await setup('edit');
+    host.editing.set(INVOICE);
+    host.editNote.set('Zeile 1\nZeile 2');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const note = screen.getByLabelText('Notiz') as HTMLTextAreaElement;
+    expect(note.tagName).toBe('TEXTAREA');
+    expect(note.value).toBe('Zeile 1\nZeile 2');
+    note.value = 'Zeile 1\nZeile 2\nZeile 3';
+    note.dispatchEvent(new Event('input'));
+    expect(host.editNote()).toBe('Zeile 1\nZeile 2\nZeile 3');
   });
 });

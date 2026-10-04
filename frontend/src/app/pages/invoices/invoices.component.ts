@@ -127,6 +127,13 @@ export class InvoicesComponent implements OnDestroy, InvoiceDialogHost {
   );
 
   /**
+   * The due date as a second line under the issue date. Only the tight set has no
+   * due-date column. A reader without `budget.book` has no dialog, so the date must
+   * stay on the row. The phone card shows the due date as a field of its own.
+   */
+  readonly showDueLine = computed(() => this.columnSet() === 'tight');
+
+  /**
    * The bookings column needs `linkedBookings` (A6). A backend without it sends no field:
    * the column then stays away, instead of a request per invoice for its bookings.
    */
@@ -139,11 +146,19 @@ export class InvoicesComponent implements OnDestroy, InvoiceDialogHost {
   readonly columns = computed<ColumnDef[]>(() => {
     const t = (key: TranslationKey): string => this.i18n.translate(key);
     const set = this.columnSet();
+    // Below the full set the short header "Datum" keeps the date column at its 7rem:
+    // "Rechnungsdatum" alone made it 134px wide. The width goes to the supplier.
     const cols: ColumnDef[] = [
-      { key: 'issueDate', label: t('invoices.col.issueDate'), width: '7rem' },
+      {
+        key: 'issueDate',
+        label: t(set === 'full' ? 'invoices.col.issueDate' : 'invoices.col.date'),
+        width: '7rem',
+      },
     ];
     if (set !== 'tight') {
-      cols.push({ key: 'dueDate', label: t('invoices.col.dueDate'), width: '6.5rem', card: 'hidden' });
+      // The phone card keeps the due date as a field of its own: a second line beside
+      // the issue date has no room there and gets cut.
+      cols.push({ key: 'dueDate', label: t('invoices.col.dueDate'), width: '6.5rem' });
     }
     // The number is what names an invoice, so it heads the card. Net and tax are off
     // it: gross is the figure a reader checks, and the split belongs to the detail.
@@ -152,6 +167,8 @@ export class InvoicesComponent implements OnDestroy, InvoiceDialogHost {
     // `budget.book` has no dialog, so the value must stay on the row.
     cols.push(
       { key: 'number', label: t('invoices.col.number'), width: '6.5rem', card: 'title' },
+      // No width: the supplier takes the rest. Its cell keeps at least 7rem (see the
+      // stylesheet), and the bookings column gives up its room first.
       { key: 'supplier', label: t('invoices.col.supplier') },
     );
     if (set === 'full') {
@@ -169,8 +186,9 @@ export class InvoicesComponent implements OnDestroy, InvoiceDialogHost {
         key: 'bookings',
         label: t('invoices.col.bookings'),
         // At full width the cost centre name gets the room it needs (board
-        // Arbeit-Rechnungen: "Maschinenbau −900,00 €"); the supplier takes the rest.
-        width: set === 'full' ? '15rem' : set === 'tight' ? '9rem' : '12rem',
+        // Arbeit-Rechnungen: "Maschinenbau −900,00 €"). Below it the amount moves under
+        // the name, and the column stays narrow, so that the supplier keeps its room.
+        width: set === 'full' ? '15rem' : set === 'tight' ? '8rem' : '9rem',
       });
     }
     cols.push({ key: 'file', label: t('invoices.col.file'), align: 'end', width: '3rem' });
@@ -413,8 +431,18 @@ export class InvoicesComponent implements OnDestroy, InvoiceDialogHost {
   readonly editGross = signal('');
   readonly editStatus = signal<InvoiceStatus>('open');
   readonly editNote = signal('');
-  readonly canSubmitEdit = computed(() =>
-    invoiceFieldsValid(this.editNumber(), this.editSupplier(), this.editGross()),
+  /**
+   * The edit keeps a stored number or supplier: the field cannot become empty. An
+   * invoice without them (from the API, the MCP server or an older import) still saves,
+   * for example a change of its status to paid.
+   */
+  readonly editNumberRequired = computed(() => !!this.editing()?.number);
+  readonly editSupplierRequired = computed(() => !!this.editing()?.supplier);
+  readonly canSubmitEdit = computed(
+    () =>
+      (!this.editNumberRequired() || this.editNumber().trim() !== '') &&
+      (!this.editSupplierRequired() || this.editSupplier().trim() !== '') &&
+      Number(this.editGross()) > 0,
   );
   readonly confirmDelete = signal<Invoice | null>(null);
 
@@ -790,8 +818,8 @@ export class InvoicesComponent implements OnDestroy, InvoiceDialogHost {
     this.saving.set(true);
     this.api
       .updateInvoice(i.id, {
-        number: this.editNumber().trim(),
-        supplier: this.editSupplier().trim(),
+        number: this.editNumber().trim() || null,
+        supplier: this.editSupplier().trim() || null,
         issueDate: this.editIssueDate() || null,
         dueDate: this.editDueDate() || null,
         netAmount: this.editNet().trim() || null,

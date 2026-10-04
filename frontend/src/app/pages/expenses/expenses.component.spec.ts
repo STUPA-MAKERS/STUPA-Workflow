@@ -2257,11 +2257,15 @@ describe('ExpensesComponent — transfers tab', () => {
     ctx.http.verify();
   });
 
-  it('hides the row actions for a viewer without budget.book', async () => {
+  it('shows no transfers tab to a reader without budget.book', async () => {
     const ctx = await setup({ perms: ['budget.view'] });
-    await openTransfers(ctx);
-    expect(screen.getByText('Umbuchung Fest')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Löschen' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: 'Überträge' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: 'Buchungen' })).not.toBeInTheDocument();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = ctx.fixture.componentInstance as any;
+    c.setTab('transfers');
+    expect(c.tab()).toBe('bookings');
+    ctx.http.expectNone((r) => r.url.endsWith('/budget-transfers'));
     ctx.http.verify();
   });
 

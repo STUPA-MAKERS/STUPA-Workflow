@@ -60,7 +60,43 @@
             />
           </button>
         }
-        <span class="et__descText ell" [title]="$any(e).description">{{ $any(e).description }}</span>
+        <!-- One line with an ellipsis, as on the board. When the column cuts the text,
+             "mehr" opens the full text in the row: a touch, keyboard or read-only user
+             has no tooltip and no edit dialog to read it. Open, the text wraps and
+             "weniger" follows its last word. -->
+        @if (!child && descExpanded($any(e).id)) {
+          <span class="et__descText et__descText--open"
+            >{{ $any(e).description }}
+            <button
+              type="button"
+              class="et__more"
+              data-testid="et-desc-toggle"
+              aria-expanded="true"
+              (click)="toggleDesc($any(e).id)"
+            >
+              {{ 'action.less' | t }}
+            </button></span
+          >
+        } @else {
+          <span
+            class="et__descText ell"
+            [title]="$any(e).description"
+            [appTruncated]="$any(e).description"
+            #cut="appTruncated"
+            >{{ $any(e).description }}</span
+          >
+          @if (!child && cut.truncated()) {
+            <button
+              type="button"
+              class="et__more"
+              data-testid="et-desc-toggle"
+              aria-expanded="false"
+              (click)="toggleDesc($any(e).id)"
+            >
+              {{ 'action.more' | t }}
+            </button>
+          }
+        }
       </span>
       <!-- The tight set has no payee column: the payee moves under the description, as
            in the meta line of board Schmal-Buchungen. -->

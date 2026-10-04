@@ -123,10 +123,12 @@
   color: var(--color-text-muted);
   white-space: nowrap;
 }
-/* The supplier takes the width the fixed columns leave and ends in an ellipsis. */
+/* The supplier takes the width the fixed columns leave and ends in an ellipsis. Its
+   7rem are the floor: supplier and number identify an invoice, so on a narrow screen
+   the table scrolls sideways before the name is cut to a few letters. */
 .inv__supplier {
   display: block;
-  width: 0;
+  width: 7rem;
   min-width: 100%;
 }
 /* Buchungen: the first booking (swatch, cost centre, amount) and "+n" for the rest. */

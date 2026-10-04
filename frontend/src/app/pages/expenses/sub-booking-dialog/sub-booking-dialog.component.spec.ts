@@ -41,7 +41,7 @@ describe('SubBookingDialogComponent', () => {
     const { fixture, http, sub } = setup();
     sub.openCreateSub(PARENT);
     fixture.detectChanges();
-    expect(screen.getByText('Erbt Kostenstelle, HHJ und Art von „Lastenrad".')).toBeInTheDocument();
+    expect(screen.getByText('Erbt Kostenstelle, HHJ und Art von „Lastenrad“.')).toBeInTheDocument();
     for (const label of [/^Beschreibung/, /^Betrag/, 'Zahldatum', 'Empfänger/Zahler']) {
       expect(screen.getByLabelText(label)).toBeInTheDocument();
     }
