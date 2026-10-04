@@ -738,6 +738,20 @@ def test_applications_export_xlsx(
     assert fake_service.session.committed is True
 
 
+def test_applications_export_archived_filter(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    """The export takes `archived` as the list does: hidden by default, else only or both."""
+    _as_principal(app, "application.export")
+    expected = {None: False, "false": False, "true": True, "all": None}
+    for raw, value in expected.items():
+        suffix = f"?archived={raw}" if raw else ""
+        r = client.get(f"/api/applications/export.xlsx{suffix}")
+        assert r.status_code == 200
+        assert fake_service.list_kwargs["archived"] is value
+    assert client.get("/api/applications/export.xlsx?archived=maybe").status_code == 422
+
+
 def test_applications_export_caps_rows(app: FastAPI, client: TestClient) -> None:
     """A hit count above EXPORT_MAX_ROWS gives 413, not a huge workbook (anti-DoS, FIX 6)."""
     from app.modules.applications.router import EXPORT_MAX_ROWS
