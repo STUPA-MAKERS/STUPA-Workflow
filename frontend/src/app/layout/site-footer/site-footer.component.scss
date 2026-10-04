@@ -4,6 +4,10 @@
 }
 
 .ft {
+  /* The width between two parts of the line. The separator dot sits in its centre. */
+  --ft-sep: var(--space-5);
+
+  container: ft / inline-size;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -34,16 +38,79 @@
   color: var(--color-text);
 }
 
-.ft__line {
+/* Separated list. Every part has a dot in the --ft-sep strip before it. The list starts
+   --ft-sep before the edge of its clip, so the strip of each part that starts a line
+   (also the first part) is outside the clip. A wrapped line thus never starts with a dot,
+   and no line ends with one. */
+.ft__clip {
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+  max-width: 100%;
+  /* Clip the start side only. The other sides stay open for the focus ring. */
+  clip-path: inset(-8px -8px -8px -4px);
+}
+.ft__clip:dir(rtl) {
+  clip-path: inset(-8px -4px -8px -8px);
+}
+.ft__sep {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
-  gap: 4px var(--space-4);
+  row-gap: 4px;
+  min-width: 0;
   margin: 0;
+  margin-inline-start: calc(-1 * var(--ft-sep));
+  padding: 0;
+  list-style: none;
+}
+.ft__sep > * {
+  position: relative;
+  margin: 0;
+  padding-inline-start: var(--ft-sep);
+}
+.ft__sep > *::before {
+  content: '·';
+  position: absolute;
+  inset-inline-start: 0;
+  width: var(--ft-sep);
+  text-align: center;
+  color: var(--color-text-subtle);
+}
+
+/* Narrow footer: the copyright and the legal links are two centred rows. The copyright
+   then has no separator. */
+.ft__parts {
+  flex-direction: column;
+  align-items: center;
+  margin-inline-start: 0;
+}
+.ft__parts > * {
+  max-width: 100%;
+  padding-inline-start: 0;
+}
+.ft__parts > *::before {
+  content: none;
+}
+.ft__copy {
   text-align: center;
 }
-.ft__dot {
-  color: var(--color-text-subtle);
+
+/* Wide footer: one line, with a dot between the copyright and the first link. */
+@container ft (min-width: 56rem) {
+  .ft__parts {
+    flex-direction: row;
+    align-items: baseline;
+    margin-inline-start: calc(-1 * var(--ft-sep));
+  }
+  .ft__parts > * {
+    padding-inline-start: var(--ft-sep);
+  }
+  .ft__parts > *::before {
+    content: '·';
+  }
+  .ft__copy {
+    text-align: start;
+  }
 }
 
 .ft__link {
