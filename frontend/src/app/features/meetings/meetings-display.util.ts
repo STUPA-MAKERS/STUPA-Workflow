@@ -202,6 +202,9 @@ export function liveOpenedVote(
     counts: null,
     leading: null,
     closesAt: msg.closesAt,
+    // The event carries the secrecy, so the card shows the right hint before the next read.
+    secret: msg.secret,
+    openedAt: new Date().toISOString(),
     voted: 0,
     present: 0,
     revealed: false,
@@ -251,4 +254,39 @@ export function meetingTimeText(m: Meeting, i18nLocale: string): MeetingTimeText
 /** The date of a meeting as a local midnight, for the date block. `null` without a date. */
 export function meetingDay(m: Meeting): string | null {
   return m.date ? `${m.date}T00:00:00` : null;
+}
+
+/**
+ * The rules line of a vote card: "Einfache Mehrheit · offene Abstimmung · Quorum 12 ·
+ * seit 18:48". A part without data stays out: a vote that a live event added before the
+ * next read has no rules yet, and a vote without a quorum shows none.
+ */
+export function voteMetaLine(
+  vote: MeetingVote,
+  translate: (key: TranslationKey, params?: Record<string, string | number>) => string,
+  i18nLocale: string,
+): string {
+  const parts: string[] = [];
+  if (vote.majorityRule) {
+    parts.push(translate(`vote.majority.${vote.majorityRule}` as TranslationKey));
+  }
+  if (vote.secret !== undefined) {
+    parts.push(translate(vote.secret ? 'meetings.vote.secretShort' : 'meetings.vote.publicShort'));
+  }
+  if (vote.quorum) {
+    parts.push(
+      translate(
+        vote.quorum.type === 'percent' ? 'meetings.vote.quorumPercent' : 'meetings.vote.quorumCount',
+        { n: vote.quorum.value },
+      ),
+    );
+  }
+  if (vote.status === 'open') {
+    const since = clockTime(vote.openedAt, i18nLocale);
+    if (since) parts.push(translate('meetings.vote.since', { time: since }));
+  } else if (vote.status === 'closed' || vote.status === 'cancelled') {
+    const ended = clockTime(vote.closedAt, i18nLocale);
+    if (ended) parts.push(translate('meetings.vote.endedAt', { time: ended }));
+  }
+  return parts.join(' · ');
 }

@@ -1,10 +1,10 @@
-<!-- The list carries its own header, and so does the focus page of the minute-taker.
+<!-- The list carries its own header, and so does the session page of the minute-taker.
      Without read access the list does not show, so this header titles the notice. -->
 @if (showForbidden() || (detailMode() && (!meeting() || beamerMode() || isFollower()))) {
 <app-page-header [title]="'meetings.title' | t" [rail]="true" [flush]="true" />
 }
 
-<!-- The focus page of the protokollant carries its own bar, so the meta line shows
+<!-- The session page of the minute-taker carries its own header, so the meta line shows
      for the beamer and the follow view only. -->
 @if (meeting(); as m) {
   @if (beamerMode() || isFollower()) {
@@ -62,8 +62,8 @@
   }
 
   @if (!beamerMode() && !isFollower()) {
-  <!-- Protokollant and session lead: the page is the editor, the dock runs the session. -->
-  <app-meeting-focus
+  <!-- Minute-taker and meeting lead: agenda, sheet, votes and the dock. -->
+  <app-meeting-page
     [meeting]="m"
     [protocol]="protocol()"
     [agenda]="agenda()"
@@ -85,6 +85,7 @@
     (selectTop)="jumpTo($event)"
     (bodyChange)="onTopBodyChange($event.itemId, $event.body)"
     (castVote)="cast($event.voteId, $event.choice)"
+    (voteOpen)="openVote($event)"
     (voteClose)="closeVote($event)"
     (voteCancel)="cancelVote($event)"
     (voteDelete)="deleteVote($event)"
@@ -106,9 +107,10 @@
     (cancelRename)="cancelRename()"
     (renameTop)="renameTop($event)"
     (setNonPublic)="setNonPublic($event.item, $event.nonPublic)"
+    (moveTop)="moveTop($event.from, $event.to)"
     (dragStart)="onTopDragStart($event)"
     (dragOver)="onTopDragOver($event)"
-    (drop)="onTopDrop($event)"
+    (dropAt)="onTopDrop($event)"
   />
 
   <!-- Meeting votes without a TOP binding (legacy or active): the control card. -->

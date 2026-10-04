@@ -1,0 +1,105 @@
+@use 'breakpoints' as bp;
+
+:host {
+  display: block;
+  min-width: 0;
+}
+
+/* An icon before the label of a button keeps the gap of the design (8px). */
+app-button ::ng-deep .btn__label > app-icon:first-child {
+  margin-inline-end: var(--space-1);
+}
+
+.pc {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-8) var(--space-8) var(--space-6);
+}
+.pc__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.pc__title {
+  margin: 0;
+  font-size: var(--fs-h1);
+  line-height: 1.75rem;
+  font-weight: var(--fw-semibold);
+}
+.pc__lead {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+/* Three cards in a row, stacked when the sheet gets narrow. */
+.pc__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pc__card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-4);
+  padding: var(--space-4) 18px 18px;
+  border: var(--border-width) solid transparent;
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-2);
+}
+.pc__card--todo {
+  border-color: var(--color-warning);
+}
+.pc__icon {
+  color: var(--color-text-muted);
+}
+.pc__card--todo .pc__icon {
+  color: var(--color-warning);
+}
+.pc__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.pc__label {
+  margin: 0;
+  font-size: var(--fs-h3);
+  line-height: 1.375rem;
+  font-weight: var(--fw-semibold);
+}
+.pc__sub {
+  margin: 0;
+  font-size: var(--fs-small);
+  line-height: 1.125rem;
+  color: var(--color-text-muted);
+}
+.pc__sub--todo {
+  color: var(--color-warning);
+}
+.pc__start {
+  display: flex;
+}
+
+@include bp.phone {
+  .pc {
+    padding: var(--space-5) var(--space-4);
+  }
+  /* Icon and text in one row, the button always on its own row below the text: every
+     card has the same layout, whatever the length of its text. */
+  .pc__card {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    column-gap: var(--space-4);
+    row-gap: var(--space-3);
+  }
+  .pc__card > app-button {
+    grid-column: 2;
+    justify-self: start;
+  }
+}

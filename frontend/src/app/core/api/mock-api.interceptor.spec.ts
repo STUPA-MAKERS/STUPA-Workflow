@@ -441,8 +441,8 @@ describe('mockApiInterceptor', () => {
       >('/api/meetings');
       expect(list.map((m) => m.status)).toEqual(['live', 'planned']);
       expect(list[0].startedAt).toBeTruthy();
-      expect(list[0].currentAgendaItem?.position).toBe(1);
-      expect(list[0].agendaItemCount).toBe(2);
+      expect(list[0].currentAgendaItem?.position).toBe(3);
+      expect(list[0].agendaItemCount).toBe(6);
     });
 
     it('GET /delegations → the own delegations, filtered by meetingId', async () => {
@@ -461,19 +461,28 @@ describe('mockApiInterceptor', () => {
       expect(roster.length).toBe(3);
     });
 
-    it('GET …/agenda/assignable → filtered list (none taken initially)', async () => {
+    it('GET …/agenda/assignable → filtered list (both seeded applications are taken)', async () => {
       const a = await get<unknown[]>('/api/meetings/m1/agenda/assignable');
-      expect(a.length).toBe(2);
+      expect(a.length).toBe(0);
     });
 
-    it('GET …/agenda → agenda list', async () => {
-      const a = await get<unknown[]>('/api/meetings/m1/agenda');
-      expect(Array.isArray(a)).toBe(true);
+    it('GET …/agenda → the seeded agenda of the live meeting', async () => {
+      const a = await get<{ id: string }[]>('/api/meetings/m1/agenda');
+      expect(a.map((x) => x.id)).toContain('ag-s3');
     });
 
     it('GET /meetings/{id} → single meeting', async () => {
       const m = await get<{ id: string; title: string }>('/api/meetings/m1');
       expect(m.title).toContain('STUPA');
+    });
+
+    it('GET the planned meeting and its agenda by id', async () => {
+      const id = 'd0000000-0000-0000-0000-000000000002';
+      const m = await get<{ status: string; protokollantId: string | null }>(`/api/meetings/${id}`);
+      expect(m.status).toBe('planned');
+      expect(m.protokollantId).toBeNull();
+      const a = await get<unknown[]>(`/api/meetings/${id}/agenda`);
+      expect(a.length).toBe(3);
     });
 
     it('GET /applications/{id}/form → effective form', async () => {
@@ -493,7 +502,7 @@ describe('mockApiInterceptor', () => {
       const after2 = await firstValueFrom(
         http.post<{ id: string }[]>('/api/meetings/m1/agenda', { title: 'TOP B' }),
       );
-      expect(after2.length).toBe(2);
+      expect(after2.length).toBe(after1.length + 1);
       const ids = after2.map((a) => a.id).reverse();
       const reordered = await firstValueFrom(
         http.put<{ id: string; position: number }[]>('/api/meetings/m1/agenda/order', {
@@ -502,7 +511,6 @@ describe('mockApiInterceptor', () => {
       );
       expect(reordered.map((r) => r.id)).toEqual(ids);
       expect(reordered[0].position).toBe(0);
-      void after1;
     });
 
     it('PUT …/agenda/order with no itemIds yields an empty agenda', async () => {
@@ -906,15 +914,26 @@ describe('mockApiInterceptor', () => {
       expect(res.find((a) => a.id === id)?.body).toBe('## md');
     });
 
-    it('PATCH …/agenda/{itemId} with no body defaults to empty string', async () => {
+    it('PATCH …/agenda/{itemId} changes only the sent fields (title, NÖ)', async () => {
       const added = await firstValueFrom(
         http.post<{ id: string }[]>('/api/meetings/m1/agenda', { title: 'TOP Y' }),
       );
       const id = added[added.length - 1].id;
+      await firstValueFrom(http.patch(`/api/meetings/m1/agenda/${id}`, { body: 'Text' }));
       const res = await firstValueFrom(
-        http.patch<{ id: string; body?: string }[]>(`/api/meetings/m1/agenda/${id}`, {}),
+        http.patch<{ id: string; title: string; body?: string; nonPublic?: boolean }[]>(
+          `/api/meetings/m1/agenda/${id}`,
+          { title: 'TOP Z', nonPublic: true },
+        ),
       );
-      expect(res.find((a) => a.id === id)?.body).toBe('');
+      const row = res.find((a) => a.id === id);
+      expect(row?.title).toBe('TOP Z');
+      expect(row?.nonPublic).toBe(true);
+      expect(row?.body).toBe('Text');
+      const same = await firstValueFrom(
+        http.patch<{ id: string; title: string }[]>(`/api/meetings/m1/agenda/${id}`, null),
+      );
+      expect(same.find((a) => a.id === id)?.title).toBe('TOP Z');
     });
 
     it('PATCH /protocols/{id} sets the markdown', async () => {

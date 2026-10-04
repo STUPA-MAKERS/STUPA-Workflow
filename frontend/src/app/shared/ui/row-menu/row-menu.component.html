@@ -58,7 +58,14 @@
               @if (item.icon) {
                 <app-icon class="rm__icon" [name]="item.icon" [size]="18" />
               }
-              <span class="rm__label">{{ item.label }}</span>
+              <span class="rm__text">
+                <span class="rm__label">{{ item.label }}</span>
+                <!-- Visible for a touch user too, who gets no tooltip. Hidden from the
+                     name: the hidden copy below describes the item. -->
+                @if (item.disabledReason) {
+                  <span class="rm__reason" aria-hidden="true">{{ item.disabledReason }}</span>
+                }
+              </span>
               @if (item.checked) {
                 <app-icon class="rm__check" name="check" [size]="18" />
               }

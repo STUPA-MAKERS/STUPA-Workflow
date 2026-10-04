@@ -16,6 +16,8 @@ export interface VoteOpenedMsg {
   question?: string | null;
   options: string[];
   closesAt: string | null;
+  /** A secret vote shows no interim tally. Older servers do not send it. */
+  secret?: boolean;
 }
 export interface VoteTallyMsg {
   type: 'vote_tally';

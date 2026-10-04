@@ -115,10 +115,15 @@ describe('focus in the row menu (WCAG 2.4.7, 1.4.11)', () => {
     );
   });
 
-  it('a disabled item fades only its content, so its focus ring keeps full contrast', () => {
+  it('a disabled item fades only its icon and label, so the focus ring and the reason keep full contrast', () => {
     const disabled = menu.match(/\.rm__item\[aria-disabled='true'\] \{([^}]*)\}/)?.[1] ?? '';
     expect(disabled).not.toContain('opacity');
-    expect(menu).toMatch(/\.rm__item\[aria-disabled='true'\] > \* \{\s*opacity:/);
+    expect(menu).toMatch(
+      /\.rm__item\[aria-disabled='true'\] \.rm__icon,\s*\.rm__item\[aria-disabled='true'\] \.rm__label,\s*\.rm__item\[aria-disabled='true'\] \.rm__check \{\s*opacity:/,
+    );
+    const reason = menu.match(/\.rm__reason \{([^}]*)\}/)?.[1] ?? '';
+    expect(reason).not.toContain('opacity');
+    expect(reason).toContain('color: var(--color-text-muted)');
   });
 });
 

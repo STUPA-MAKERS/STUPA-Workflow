@@ -37,14 +37,25 @@
   width: min(22.5rem, calc(100vw - 24px));
   border-radius: var(--radius-2xl);
 }
-/* From the bottom: the phone sheet, above the gesture bar. */
+/* From the bottom: the phone sheet, above the gesture bar. A swipe moves it with
+   `transform`; after the swipe it snaps back with a short transition. */
 .ss--bottom {
   right: 0;
   bottom: 0;
   left: 0;
   max-height: 85vh;
+  max-height: 85dvh;
   padding-bottom: env(safe-area-inset-bottom);
   border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
+  transition: transform var(--motion-fast) ease-out;
+}
+.ss--dragging {
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ss--bottom {
+    transition: none;
+  }
 }
 
 @include bp.phone {
@@ -56,6 +67,33 @@
     left: 8px;
     width: auto;
   }
+}
+
+/* The handle and the header. On a bottom sheet a swipe down here closes the sheet, so
+   the browser must not take the gesture for a scroll. */
+.ss__top {
+  flex: none;
+}
+.ss--bottom .ss__top {
+  touch-action: none;
+}
+.ss__grip {
+  display: flex;
+  justify-content: center;
+  padding-top: var(--space-3);
+  cursor: grab;
+}
+.ss--dragging .ss__grip {
+  cursor: grabbing;
+}
+.ss__handle {
+  width: 32px;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--color-border-strong);
+}
+.ss--bottom .ss__head {
+  padding-top: var(--space-2);
 }
 
 .ss__head {
@@ -103,4 +141,21 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+/* Fade an end of the body only where more content is hidden in that direction. */
+.ss__body--fadeTop {
+  mask-image: linear-gradient(to bottom, transparent, #000 var(--space-5));
+}
+.ss__body--fadeBottom {
+  mask-image: linear-gradient(to top, transparent, #000 var(--space-5));
+}
+.ss__body--fadeTop.ss__body--fadeBottom {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--space-5),
+    #000 calc(100% - var(--space-5)),
+    transparent
+  );
 }

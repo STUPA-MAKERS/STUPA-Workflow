@@ -94,8 +94,14 @@
   flex: none;
   color: var(--color-text-muted);
 }
-.rm__label {
+.rm__text {
+  display: flex;
   flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.rm__label {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -112,12 +118,26 @@
 }
 
 /* Disabled: still focusable and readable (it says why), but faded and inert. Only the
-   content fades, so the focus ring keeps its full contrast. */
+   icon and the label fade, so the focus ring and the reason keep their full contrast.
+   The item grows to the lines of its reason. */
 .rm__item[aria-disabled='true'] {
+  height: auto;
+  min-height: 2.75rem;
+  padding-block: var(--space-2);
   cursor: not-allowed;
 }
-.rm__item[aria-disabled='true'] > * {
+.rm__item[aria-disabled='true'] .rm__icon,
+.rm__item[aria-disabled='true'] .rm__label,
+.rm__item[aria-disabled='true'] .rm__check {
   opacity: 0.45;
+}
+.rm__reason {
+  font-size: var(--fs-small);
+  line-height: 1.125rem;
+  font-weight: var(--fw-regular);
+  /* The menu is on surface 3, where the subtle text is below 4.5:1 (WCAG 1.4.3). */
+  color: var(--color-text-muted);
+  white-space: normal;
 }
 .rm__item[aria-disabled='true']:hover {
   background: transparent;

@@ -236,6 +236,11 @@ export function mapMeetingVote(wire: MeetingVoteOutWire): MeetingVote {
     revealed: wire.revealed ?? true,
     failedReason: wire.failedReason ?? null,
     myBallot: wire.myBallot ?? null,
+    majorityRule: wire.majorityRule ?? 'simple',
+    secret: wire.secret ?? false,
+    quorum: wire.quorum ?? null,
+    openedAt: wire.openedAt ?? null,
+    closedAt: wire.closedAt ?? null,
   };
 }
 

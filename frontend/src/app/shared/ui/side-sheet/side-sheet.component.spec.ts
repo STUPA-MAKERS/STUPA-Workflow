@@ -1,5 +1,5 @@
 import { Component, signal } from '@angular/core';
-import { render, screen, waitFor } from '@testing-library/angular';
+import { fireEvent, render, screen, waitFor } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { runAxe } from '../../../../testing/a11y';
 import { SideSheetComponent, type SheetSide } from './side-sheet.component';
@@ -160,6 +160,156 @@ describe('SideSheetComponent', () => {
     host.contentScrolls.set(true);
     view.fixture.detectChanges();
     expect(body).toHaveClass('ss__body--fill');
+  });
+
+  describe('the bottom sheet', () => {
+    async function openBottom() {
+      const view = await setup((h) => h.side.set('bottom'));
+      view.host.open.set(true);
+      view.view.fixture.detectChanges();
+      const dialog = screen.getByRole('dialog');
+      const top = dialog.querySelector('.ss__top') as HTMLElement;
+      return { ...view, dialog, top };
+    }
+    const pointer = (
+      y: number,
+      time: number,
+      extra: Partial<{ pointerId: number; isPrimary: boolean }> = {},
+    ) => ({
+      pointerId: 1,
+      isPrimary: true,
+      button: 0,
+      clientY: y,
+      timeStamp: time,
+      ...extra,
+    });
+    /**
+     * jsdom has no PointerEvent: the spec builds a mouse event and adds the pointer
+     * fields, and the time, which no init sets.
+     */
+    function firePointer(el: HTMLElement, type: string, init: ReturnType<typeof pointer>): void {
+      const { pointerId, isPrimary, timeStamp, clientY, button } = init;
+      const event = new MouseEvent(type, { bubbles: true, clientY, button: button as number });
+      Object.defineProperties(event, {
+        pointerId: { value: pointerId },
+        isPrimary: { value: isPrimary },
+        timeStamp: { value: timeStamp },
+      });
+      fireEvent(el, event);
+    }
+
+    it('has a handle, the handle only there', async () => {
+      const { dialog, host, view } = await openBottom();
+      expect(dialog.querySelector('.ss__handle')).not.toBeNull();
+      host.side.set('end');
+      view.fixture.detectChanges();
+      expect(dialog.querySelector('.ss__handle')).toBeNull();
+    });
+
+    it('follows a swipe down and closes after a long way', async () => {
+      const { dialog, top, host, view } = await openBottom();
+      firePointer(top, 'pointerdown', pointer(100, 0));
+      firePointer(top, 'pointermove', pointer(160, 400));
+      view.fixture.detectChanges();
+      expect(dialog).toHaveClass('ss--dragging');
+      expect(dialog.style.transform).toBe('translateY(60px)');
+      // Up past its place: the sheet stays where it is.
+      firePointer(top, 'pointermove', pointer(40, 500));
+      view.fixture.detectChanges();
+      expect(dialog.style.transform).toBe('');
+      firePointer(top, 'pointerup', pointer(300, 1000));
+      view.fixture.detectChanges();
+      expect(host.open()).toBe(false);
+      expect(host.closes).toBe(1);
+    });
+
+    it('closes on a quick flick and snaps back after a slow short pull', async () => {
+      const { dialog, top, host, view } = await openBottom();
+      firePointer(top, 'pointerdown', pointer(100, 0));
+      firePointer(top, 'pointerup', pointer(150, 2000));
+      view.fixture.detectChanges();
+      expect(host.open()).toBe(true);
+      expect(dialog).not.toHaveClass('ss--dragging');
+      expect(dialog.style.transform).toBe('');
+      firePointer(top, 'pointerdown', pointer(100, 0));
+      firePointer(top, 'pointercancel', pointer(400, 10));
+      expect(host.open()).toBe(true);
+      firePointer(top, 'pointerdown', pointer(100, 0));
+      firePointer(top, 'pointerup', pointer(150, 50));
+      view.fixture.detectChanges();
+      expect(host.open()).toBe(false);
+    });
+
+    it('starts no swipe on a control, a side sheet or a second pointer', async () => {
+      const { top, host, view } = await openBottom();
+      const close = screen.getByRole('button', { name: 'Schließen' });
+      firePointer(close, 'pointerdown', pointer(100, 0));
+      firePointer(top, 'pointerup', pointer(400, 10));
+      firePointer(top, 'pointerdown', pointer(100, 0, { isPrimary: false }));
+      firePointer(top, 'pointerup', pointer(400, 10));
+      firePointer(top, 'pointerdown', pointer(100, 0));
+      firePointer(top, 'pointermove', pointer(400, 10, { pointerId: 2 }));
+      firePointer(top, 'pointerup', pointer(400, 10, { pointerId: 2 }));
+      expect(host.open()).toBe(true);
+      host.side.set('end');
+      view.fixture.detectChanges();
+      firePointer(top, 'pointerdown', pointer(100, 0, { pointerId: 3 }));
+      firePointer(top, 'pointerup', pointer(400, 10, { pointerId: 3 }));
+      expect(host.open()).toBe(true);
+    });
+
+    it('fades an end of the body only where more content is hidden', async () => {
+      const { dialog, view } = await openBottom();
+      const body = dialog.querySelector('.ss__body') as HTMLElement;
+      Object.defineProperty(body, 'scrollHeight', { value: 600 });
+      Object.defineProperty(body, 'clientHeight', { value: 300 });
+      body.scrollTop = 0;
+      fireEvent.scroll(body);
+      view.fixture.detectChanges();
+      expect(body).not.toHaveClass('ss__body--fadeTop');
+      expect(body).toHaveClass('ss__body--fadeBottom');
+      body.scrollTop = 150;
+      fireEvent.scroll(body);
+      view.fixture.detectChanges();
+      expect(body).toHaveClass('ss__body--fadeTop', 'ss__body--fadeBottom');
+      body.scrollTop = 300;
+      fireEvent.scroll(body);
+      view.fixture.detectChanges();
+      expect(body).toHaveClass('ss__body--fadeTop');
+      expect(body).not.toHaveClass('ss__body--fadeBottom');
+    });
+
+    it('measures the body once it is open and watches its size', async () => {
+      const observed: Element[] = [];
+      const original = globalThis.ResizeObserver;
+      let fire: () => void = () => undefined;
+      Object.defineProperty(globalThis, 'ResizeObserver', {
+        writable: true,
+        value: class {
+          constructor(cb: () => void) {
+            fire = cb;
+          }
+          observe(el: Element): void {
+            observed.push(el);
+          }
+          disconnect(): void {}
+        },
+      });
+      try {
+        const { dialog, host, view } = await openBottom();
+        const body = dialog.querySelector('.ss__body') as HTMLElement;
+        await waitFor(() => expect(observed).toContain(body));
+        Object.defineProperty(body, 'scrollHeight', { value: 900 });
+        Object.defineProperty(body, 'clientHeight', { value: 300 });
+        fire();
+        view.fixture.detectChanges();
+        expect(body).toHaveClass('ss__body--fadeBottom');
+        host.open.set(false);
+        view.fixture.detectChanges();
+      } finally {
+        Object.defineProperty(globalThis, 'ResizeObserver', { writable: true, value: original });
+      }
+    });
   });
 
   it('does not emit closed when the page closes it', async () => {

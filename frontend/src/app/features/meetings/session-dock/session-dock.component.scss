@@ -1,0 +1,373 @@
+@use 'breakpoints' as bp;
+
+/* The dock: one elevated bar with rounded corners at the foot of the page. The popovers
+   hang above it; the host is their anchor. */
+:host {
+  position: relative;
+  display: block;
+  min-width: 0;
+}
+
+.sd {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 72px;
+  padding: var(--space-2) var(--space-5) var(--space-2) var(--space-2);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-2);
+}
+.sd__small {
+  font-size: var(--fs-small);
+  line-height: 1.125rem;
+  color: var(--color-text-muted);
+}
+.sd__strong {
+  font-size: var(--fs-h3);
+  line-height: 1.375rem;
+  font-weight: var(--fw-semibold);
+}
+.sd__muted {
+  color: var(--color-text-muted);
+}
+.sd__state {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding-inline-start: var(--space-3);
+}
+.sd__nav {
+  display: flex;
+  flex: none;
+  align-items: center;
+}
+.sd__pos {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 84px;
+  padding: 0 var(--space-1);
+}
+.sd__vr {
+  flex: none;
+  align-self: stretch;
+  width: var(--border-width);
+  margin: var(--space-3) 10px;
+  background: var(--color-border);
+}
+.sd__vr--end {
+  margin-inline: 6px;
+}
+.sd__mid {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.sd__now {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--fw-medium);
+}
+.sd__vote {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-accent-text);
+  font-size: var(--fs-body);
+  white-space: nowrap;
+}
+.sd__spacer {
+  flex: 1 1 auto;
+}
+.sd__chips {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.sd__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 40px;
+  padding: 0 var(--space-4);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: 0.84375rem; /* 13.5px */
+  font-weight: var(--fw-medium);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.sd__chip:hover {
+  background: var(--color-surface-3);
+}
+.sd__chip:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
+}
+.sd__chip--open {
+  border-color: transparent;
+  background: var(--color-selected);
+  color: var(--color-on-selected);
+}
+.sd__chip--warn {
+  border-color: var(--color-warning);
+  color: var(--color-warning);
+}
+.sd__chip--static {
+  cursor: default;
+}
+.sd__chip--static:hover {
+  background: transparent;
+}
+.sd__chipText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sd__words {
+  flex: none;
+  font-size: var(--fs-small);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+/* The content of the bottom sheet on a phone. The sheet body scrolls, so the list of
+   members does not scroll by itself in there. */
+.sd__sheet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.sd__sheet .sd__people {
+  max-height: none;
+  overflow: visible;
+}
+/* The bottom sheet has the surface-2 background of the field and of a row hover, so
+   both go one step up; else the search field shows only as its placeholder. */
+.sd__sheet .sd__input,
+.sd__sheet .sd__person:hover {
+  background: var(--color-surface-3);
+}
+
+/* Popovers above the dock */
+.sd__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: default;
+}
+.sd__pop {
+  position: absolute;
+  bottom: calc(100% + var(--space-2));
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 460px;
+  max-width: calc(100vw - 2 * var(--space-4));
+  max-height: calc(100dvh - 9rem);
+  padding: var(--space-4);
+  overflow-y: auto;
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface-1);
+  box-shadow: var(--shadow-lg);
+}
+.sd__pop--end {
+  inset-inline-end: 0;
+}
+.sd__pop--narrow {
+  width: 380px;
+}
+.sd__popHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.sd__popTitle {
+  margin: 0;
+  font-size: var(--fs-h2);
+  font-weight: var(--fw-semibold);
+}
+.sd__close {
+  display: grid;
+  place-items: center;
+  width: var(--control-height);
+  height: var(--control-height);
+  margin-inline-start: auto;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.sd__close:hover {
+  background: var(--color-surface-2);
+  color: var(--color-text);
+}
+.sd__close:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+.sd__stat {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-bottom: var(--space-3);
+  border-bottom: var(--border-width) solid var(--color-border);
+  font-size: var(--fs-body);
+}
+.sd__plan {
+  justify-content: space-between;
+}
+.sd__modes {
+  display: flex;
+  gap: var(--space-2);
+}
+.sd__subHead {
+  margin: 0 0 var(--space-2);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semibold);
+  color: var(--color-text-muted);
+}
+.sd__viewers {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-body);
+}
+.sd__viewers li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.sd__input {
+  height: var(--control-height);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-field);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font: inherit;
+}
+.sd__input:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
+}
+.sd__people {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 18rem;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.sd__person {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-2);
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--fs-body);
+  text-align: start;
+  cursor: pointer;
+}
+.sd__person:hover {
+  background: var(--color-surface-2);
+}
+.sd__person:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+.sd__person--sel {
+  background: var(--color-selected);
+  color: var(--color-on-selected);
+}
+.sd__personName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sd__personState {
+  font-size: var(--fs-small);
+  color: var(--color-text-muted);
+}
+.sd__personState[data-status='present'] {
+  color: var(--color-accent-text);
+}
+.sd__empty {
+  padding: var(--space-3) var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--fs-body);
+}
+
+/* Narrow and phone: the chips may wrap below the step. */
+@include bp.below-wide {
+  .sd {
+    flex-wrap: wrap;
+    row-gap: var(--space-1);
+  }
+  .sd__words {
+    display: none;
+  }
+  .sd__vr--end {
+    display: none;
+  }
+}
+
+/* Phone: one row for the step and the vote, one row for the chips. */
+@include bp.phone {
+  .sd {
+    min-height: 0;
+    padding: var(--space-2) var(--space-3);
+    border-radius: 0;
+  }
+  .sd__nav {
+    flex: 1 1 auto;
+    justify-content: space-between;
+  }
+  .sd__vr {
+    display: none;
+  }
+  .sd__mid {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+  .sd__mid:empty,
+  .sd__spacer {
+    display: none;
+  }
+  .sd__chips {
+    flex: 1 1 100%;
+  }
+  .sd__chip {
+    flex: 1 1 0;
+    justify-content: center;
+    padding: 0 var(--space-3);
+  }
+}

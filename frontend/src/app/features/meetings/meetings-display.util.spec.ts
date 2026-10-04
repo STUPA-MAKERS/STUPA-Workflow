@@ -1,5 +1,6 @@
 import type { AgendaItem, Meeting, MeetingVote } from '@core/api/models';
 import {
+  voteMetaLine,
   assembleProtocolMarkdown,
   clockTime,
   errorCode,
@@ -202,6 +203,9 @@ describe('meetings-display.util', () => {
       status: 'open',
       revealed: false,
     });
+    expect(vote.secret).toBeUndefined();
+    expect(vote.openedAt).toEqual(expect.any(String));
+    expect(liveOpenedVote({ type: 'vote_opened', voteId: 'v-8', options: [], closesAt: null, secret: true }).secret).toBe(true);
   });
 
   it('reads the stable problem+json code of an HTTP error', () => {
@@ -255,5 +259,36 @@ describe('meetings-display.util', () => {
   it('gives the date block a local midnight, or null without a date', () => {
     expect(meetingDay({ date: '2026-10-13' } as Meeting)).toBe('2026-10-13T00:00:00');
     expect(meetingDay({ date: null } as Meeting)).toBeNull();
+  });
+});
+
+describe('voteMetaLine', () => {
+  const base: MeetingVote = {
+    id: 'v-1', applicationId: null, agendaItemId: null, title: null, question: null,
+    options: [], status: 'open', result: null, counts: null, leading: null, closesAt: null,
+    voted: 0, present: 0, revealed: false, failedReason: null,
+  };
+  const t = (key: string, params?: Record<string, string | number>) =>
+    params ? `${key}(${Object.values(params).join(',')})` : key;
+
+  it('joins rule, secrecy, quorum and the open time', () => {
+    const line = voteMetaLine(
+      { ...base, majorityRule: 'two_thirds', secret: false, quorum: { type: 'count', value: 12 }, openedAt: '2026-10-15T16:48:00Z' },
+      t as never,
+      'de',
+    );
+    expect(line).toMatch(/^vote\.majority\.two_thirds · meetings\.vote\.publicShort · meetings\.vote\.quorumCount\(12\) · meetings\.vote\.since\(\d\d:48\)$/);
+  });
+
+  it('names a secret vote, a percentage quorum and the end of a closed or cancelled vote', () => {
+    expect(
+      voteMetaLine({ ...base, status: 'closed', secret: true, quorum: { type: 'percent', value: 50 }, closedAt: '2026-10-15T17:02:00Z' }, t as never, 'de'),
+    ).toMatch(/^meetings\.vote\.secretShort · meetings\.vote\.quorumPercent\(50\) · meetings\.vote\.endedAt\(\d\d:02\)$/);
+    expect(voteMetaLine({ ...base, status: 'cancelled', closedAt: null }, t as never, 'de')).toBe('');
+  });
+
+  it('leaves out what a live event did not bring yet', () => {
+    expect(voteMetaLine(base, t as never, 'de')).toBe('');
+    expect(voteMetaLine({ ...base, status: 'draft', majorityRule: 'simple' }, t as never, 'de')).toBe('vote.majority.simple');
   });
 });

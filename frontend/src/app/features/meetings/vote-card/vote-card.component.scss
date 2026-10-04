@@ -1,0 +1,109 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.vc {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: var(--space-5);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-1);
+}
+.vc__status {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.vc__cap {
+  font-size: var(--fs-cap);
+  line-height: 1rem;
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.vc__result {
+  font-weight: var(--fw-semibold);
+}
+.vc__q {
+  margin: -6px 0 0;
+  font-size: var(--fs-h3);
+  line-height: 1.4;
+  font-weight: var(--fw-semibold);
+  overflow-wrap: anywhere;
+}
+.vc__meta,
+.vc__hint {
+  margin: 0;
+  font-size: var(--fs-small);
+  line-height: 1.125rem;
+  color: var(--color-text-muted);
+}
+.vc__fail {
+  margin: 0;
+  font-size: var(--fs-small);
+  font-weight: var(--fw-medium);
+  color: var(--color-danger);
+}
+
+.vc__progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.vc__progressLine {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  font-size: var(--fs-body);
+}
+.vc__progressText {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.vc__pct {
+  flex: none;
+  color: var(--color-accent-text);
+}
+
+.vc__counts {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
+}
+.vc__count {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--fs-body);
+}
+.vc__count + .vc__count {
+  border-top: var(--border-width) solid var(--color-border);
+}
+.vc__count dt,
+.vc__count dd {
+  margin: 0;
+}
+.vc__count--lead {
+  font-weight: var(--fw-semibold);
+}
+
+.vc__ballot {
+  display: flex;
+  gap: var(--space-2);
+}
+.vc__ballot app-button {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.vc__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}

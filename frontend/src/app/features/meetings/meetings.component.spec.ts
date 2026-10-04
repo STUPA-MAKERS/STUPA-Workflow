@@ -385,19 +385,20 @@ describe('MeetingsComponent', () => {
     ]);
     flushDelegationContext(http);
 
-    // The agenda lives in a popover that opens out of the dock.
+    // Below the wide layout the agenda is a sheet from the start edge.
     await userEvent.click(await screen.findByTitle('Tagesordnung öffnen'));
-    await screen.findByText('Vertraulich');
-    // The page heading marks the open item too, so count the agenda rows alone.
-    const agendaPopover = screen.getByRole('dialog', { name: 'Tagesordnung' });
-    const noe = Array.from(agendaPopover.querySelectorAll('app-badge')).filter(
+    const agendaSheet = await screen.findByRole('dialog', { name: 'Tagesordnung' });
+    await within(agendaSheet).findByText('Vertraulich');
+    const noe = Array.from(agendaSheet.querySelectorAll('app-badge')).filter(
       (b) => b.textContent?.trim() === 'NÖ',
     );
     expect(noe).toHaveLength(1); // only the non-public TOP, not the public one
-    expect(container.querySelectorAll('app-badge').length).toBeGreaterThan(noe.length);
+    // The locked protocol leaves no row menu.
+    expect(within(agendaSheet).queryByRole('button', { name: /Aktionen für/ })).toBeNull();
+    void container;
   });
 
-  it('shows no NÖ badge while the meeting is still live', async () => {
+  it('tags the non-public TOP while the meeting is still live', async () => {
     const { http, container } = await setup();
     http.expectOne('/api/meetings/m-1').flush(MEETING); // status 'live'
     http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
@@ -407,13 +408,13 @@ describe('MeetingsComponent', () => {
     ]);
     flushDelegationContext(http);
 
-    // The agenda lives in a popover that opens out of the dock.
     await userEvent.click(await screen.findByTitle('Tagesordnung öffnen'));
-    await screen.findByText('Vertraulich');
+    const agendaSheet = await screen.findByRole('dialog', { name: 'Tagesordnung' });
+    await within(agendaSheet).findByText('Vertraulich');
     const noe = Array.from(container.querySelectorAll('app-badge')).filter(
       (b) => b.textContent?.trim() === 'NÖ',
     );
-    expect(noe).toHaveLength(0);
+    expect(noe).toHaveLength(1);
   });
 
   it('hides the save-state indicator once the protocol is finalized', async () => {
@@ -503,8 +504,8 @@ describe('MeetingsComponent', () => {
     ]);
     http.expectOne('/api/meetings/m-1/agenda').flush([]);
     flushDelegationContext(http);
-    const editBtns = await screen.findAllByRole('button', { name: /Sitzung bearbeiten/i });
-    await userEvent.click(editBtns[0]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Sitzungsmenü' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Sitzung bearbeiten' }));
     // openSettings reloads the roster (minute-taker options).
     http.expectOne('/api/meetings/m-1/attendance').flush([
       { principalId: 'pr-1', displayName: 'Max P', email: 'm@x.de', status: null, source: null, isSelf: false, canKeepProtocol: true },
@@ -600,22 +601,25 @@ describe('MeetingsComponent', () => {
       await loadOtherProtokollant();
 
       expect(await screen.findByRole('toolbar', { name: 'Sitzungssteuerung' })).toBeInTheDocument();
-      // The start sits in the dock and in the checklist while the meeting is planned.
+      // The start sits in the header and in the checklist while the meeting is planned.
       const starts = screen.getAllByRole('button', { name: 'Sitzung eröffnen' });
       expect(starts).toHaveLength(2);
       starts.forEach((b) => expect(b).toBeEnabled());
-      expect(screen.getByRole('button', { name: 'Sitzung bearbeiten' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Sitzung löschen' })).toBeInTheDocument();
+      // Settings and delete are in the session menu.
+      await userEvent.click(screen.getByRole('button', { name: 'Sitzungsmenü' }));
+      expect(await screen.findByRole('menuitem', { name: 'Sitzung bearbeiten' })).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: 'Sitzung löschen' })).toBeInTheDocument();
       // The follow view must not take the page over.
       expect(screen.queryByText('Live-Sitzung')).not.toBeInTheDocument();
     });
 
     it('keeps the agenda editor and vote creation for a manager who is not the minute-taker', async () => {
-      // A vote needs a started meeting, so the dock offers it while live only.
-      await loadOtherProtokollant({ status: 'live' });
+      // A vote needs a started meeting, so the page offers it while live only. An open
+      // vote on any item blocks a new one, so this meeting has none.
+      await loadOtherProtokollant({ status: 'live', votes: [] });
 
       expect(await screen.findByRole('button', { name: 'Beschlussfrage hinzufügen' })).toBeInTheDocument();
-      // The agenda editor lives in the popover that opens out of the dock.
+      // Below the wide layout the agenda opens as a sheet.
       await userEvent.click(screen.getByTitle('Tagesordnung öffnen'));
       expect(await screen.findByRole('button', { name: 'TOP hinzufügen' })).toBeInTheDocument();
     });
@@ -1044,6 +1048,26 @@ describe('MeetingsComponent — methods', () => {
       cmp.onTopDrop(0); // dragTopIndex null → return
       cmp.onTopDragStart(0);
       cmp.onTopDrop(0); // from === index → return
+      http.verify();
+    });
+
+    it('moves a TOP up and down from the row menu', async () => {
+      const { cmp, http } = await loaded();
+      cmp.agenda.set([
+        AGENDA_ITEM({ id: 't-1' }),
+        AGENDA_ITEM({ id: 't-2', position: 1 }),
+      ] as never);
+      cmp.moveTop(1, 0);
+      const req = http.expectOne('/api/meetings/m-1/agenda/order');
+      expect(req.request.body).toEqual({ itemIds: ['t-2', 't-1'] });
+      req.flush([AGENDA_ITEM({ id: 't-2' }), AGENDA_ITEM({ id: 't-1', position: 1 })]);
+      // Out of range, onto itself or without a meeting: nothing to save.
+      cmp.moveTop(1, 2);
+      cmp.moveTop(0, -1);
+      cmp.moveTop(1, 1);
+      cmp.moveTop(5, 0);
+      cmp.meeting.set(null);
+      cmp.moveTop(1, 0);
       http.verify();
     });
 
@@ -1814,6 +1838,36 @@ describe('MeetingsComponent — methods', () => {
       expect(v?.result).toBe('passed');
     });
 
+    it('keeps the secrecy and the open time of a vote that another manager opened', async () => {
+      const { cmp, ws } = await loaded();
+      ws.subject.next({ type: 'vote_opened', voteId: 'v-2', options: ['yes', 'no'], closesAt: null, secret: true });
+      const v = cmp.meeting()?.votes.find((x) => x.id === 'v-2');
+      expect(v?.secret).toBe(true);
+      expect(v?.openedAt).toEqual(expect.any(String));
+    });
+
+    it('sets the end time on a live close and a live cancel', async () => {
+      const { cmp, ws } = await loaded();
+      ws.subject.next({ type: 'vote_closed', voteId: 'v-1', result: 'passed', counts: { yes: 9 }, failedReason: null });
+      expect(cmp.meeting()?.votes.find((x) => x.id === 'v-1')?.closedAt).toEqual(expect.any(String));
+      ws.subject.next({ type: 'vote_cancelled', voteId: 'v-2' });
+      const cancelled = cmp.meeting()?.votes.find((x) => x.id === 'v-2');
+      expect(cancelled?.status).toBe('cancelled');
+      expect(cancelled?.closedAt).toEqual(expect.any(String));
+    });
+
+    it('sets the open and the end time on an own open, close and cancel', async () => {
+      const { cmp, http } = await loaded();
+      const find = (id: string) => cmp.meeting()?.votes.find((x) => x.id === id);
+      cmp.openVote('v-2');
+      http.expectOne('/api/votes/v-2/open').flush(null, { status: 204, statusText: 'No Content' });
+      expect(find('v-2')?.status).toBe('open');
+      expect(find('v-2')?.openedAt).toEqual(expect.any(String));
+      cmp.cancelVote('v-2');
+      http.expectOne('/api/votes/v-2/cancel').flush(null, { status: 204, statusText: 'No Content' });
+      expect(find('v-2')?.closedAt).toEqual(expect.any(String));
+    });
+
     it('updates the viewer list from a viewers message', async () => {
       const { cmp, ws } = await loaded();
       ws.subject.next({ type: 'viewers', viewers: ['Alice', 'Bob'] });
@@ -1873,11 +1927,13 @@ describe('MeetingsComponent — methods', () => {
       http.expectNone('/api/meetings/m-1');
     });
 
-    it('keeps "now" local without vote management, after the close and without a meeting', async () => {
+    it('keeps "now" local without vote management, before the opening, after the close and without a meeting', async () => {
       const { cmp, http } = await loaded();
       cmp.meeting.set({ ...MEETING_MODEL, canManageVotes: false });
       cmp.jumpTo('t-2');
       cmp.meeting.set({ ...MEETING_MODEL, status: 'closed' });
+      cmp.jumpTo('t-2');
+      cmp.meeting.set({ ...MEETING_MODEL, status: 'planned' });
       cmp.jumpTo('t-2');
       cmp.meeting.set(null);
       cmp.jumpTo('t-2');

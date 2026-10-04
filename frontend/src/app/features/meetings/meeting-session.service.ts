@@ -169,12 +169,13 @@ export class MeetingSessionService implements OnDestroy {
    * Tell the room which agenda item runs now.
    *
    * The protokollant leads, and the session lead may take over, so the gate is
-   * `canManageVotes`. Everybody else keeps a local selection. A closed meeting has
-   * no "now", and the server refuses it.
+   * `canManageVotes`. Everybody else keeps a local selection. Only a live meeting
+   * has a "now": the server refuses it for a closed meeting, and a planned meeting
+   * must not start with an item that a click during the preparation set.
    */
   setCurrentTop(itemId: Uuid): void {
     const m = this.meeting();
-    if (!m || !m.canManageVotes || m.status === 'closed' || m.currentAgendaItemId === itemId) return;
+    if (!m || !m.canManageVotes || m.status !== 'live' || m.currentAgendaItemId === itemId) return;
     this.api.patchMeeting(m.id, { currentAgendaItemId: itemId }).subscribe({
       next: (updated) => this.meeting.set(updated),
       error: () => this.toast.error(this.i18n.translate('meetings.toast.actionFailed')),
@@ -263,7 +264,7 @@ export class MeetingSessionService implements OnDestroy {
 
   openVote(voteId: Uuid): void {
     this.api.openVote(voteId).subscribe({
-      next: () => this.patchVote(voteId, { status: 'open' }),
+      next: () => this.patchVote(voteId, { status: 'open', openedAt: nowIso() }),
       error: (err: unknown) => this.voteActionFailed(err),
     });
   }
@@ -274,7 +275,7 @@ export class MeetingSessionService implements OnDestroy {
   closeVote(voteId: Uuid): void {
     this.api.closeVote(voteId).subscribe({
       next: (closed) => {
-        this.patchVote(voteId, { status: 'closed' });
+        this.patchVote(voteId, { status: 'closed', closedAt: nowIso() });
         // A generic motion has no application and fires no branch on purpose.
         if (closed.applicationId && !closed.branchFired) {
           this.toast.show(this.i18n.translate('meetings.toast.voteBranchBlocked'), 'warning', 10000);
@@ -288,7 +289,7 @@ export class MeetingSessionService implements OnDestroy {
    *  way out when the quorum is not reached, because a close is blocked then. */
   cancelVote(voteId: Uuid): void {
     this.api.cancelVote(voteId).subscribe({
-      next: () => this.patchVote(voteId, { status: 'cancelled' }),
+      next: () => this.patchVote(voteId, { status: 'cancelled', closedAt: nowIso() }),
       error: (err: unknown) => this.voteActionFailed(err),
     });
   }
@@ -561,14 +562,23 @@ export class MeetingSessionService implements OnDestroy {
         }
         break;
       }
-      case 'vote_opened':
-        if (m.votes.some((v) => v.id === msg.voteId)) {
-          this.patchVote(msg.voteId, { status: 'open', closesAt: msg.closesAt });
+      case 'vote_opened': {
+        const known = m.votes.find((v) => v.id === msg.voteId);
+        if (known) {
+          this.patchVote(msg.voteId, {
+            status: 'open',
+            closesAt: msg.closesAt,
+            // Another manager opened it: the card shows "seit HH:MM" at once. Keep the
+            // time of an own open, or of a read.
+            openedAt: known.openedAt ?? nowIso(),
+            secret: msg.secret ?? known.secret,
+          });
         } else {
           // A vote opened live that did not exist at load time (follower).
           this.meeting.set({ ...m, votes: [...m.votes, liveOpenedVote(msg)] });
         }
         break;
+      }
       case 'vote_tally':
         this.patchVote(msg.voteId, {
           counts: msg.counts,
@@ -584,6 +594,13 @@ export class MeetingSessionService implements OnDestroy {
           result: msg.result,
           counts: msg.counts,
           failedReason: msg.failedReason ?? null,
+          closedAt: closedAtOf(m, msg.voteId),
+        });
+        break;
+      case 'vote_cancelled':
+        this.patchVote(msg.voteId, {
+          status: 'cancelled',
+          closedAt: closedAtOf(m, msg.voteId),
         });
         break;
       case 'viewers':
@@ -624,4 +641,14 @@ export class MeetingSessionService implements OnDestroy {
       votes: m.votes.map((v) => (v.id === voteId ? { ...v, ...patch } : v)),
     });
   }
+}
+
+/** The current time as an ISO timestamp, for a vote that changed here or by a live event. */
+function nowIso(): string {
+  return new Date().toISOString();
+}
+
+/** The end time of a vote: the known one (an own close or a read), else now. */
+function closedAtOf(m: Meeting, voteId: Uuid): string {
+  return m.votes.find((v) => v.id === voteId)?.closedAt ?? nowIso();
 }
