@@ -82,6 +82,21 @@ describe('AgendaItemDialogComponent', () => {
     expect(screen.getByText('Kein Antrag passt zur Suche.')).toBeInTheDocument();
   });
 
+  it('does not send a pick that the search hides', async () => {
+    const { http, fixture, cmp } = await setup();
+    flushApps(http, fixture);
+    await userEvent.click(screen.getByRole('radio', { name: /Sommerkino/ }));
+    expect(submitButton()).toBeEnabled();
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Antrag suchen' }), 'kurs');
+    expect(screen.getByRole('radio', { name: /Erste-Hilfe/ })).not.toBeChecked();
+    expect(submitButton()).toBeDisabled();
+    cmp.submit();
+    http.expectNone('/api/meetings/m-1/agenda');
+    await userEvent.clear(screen.getByRole('searchbox', { name: 'Antrag suchen' }));
+    expect(screen.getByRole('radio', { name: /Sommerkino/ })).toBeChecked();
+    expect(submitButton()).toBeEnabled();
+  });
+
   it('says when no application can be assigned, also after a failed load', async () => {
     const { http, fixture } = await setup();
     http.expectOne('/api/meetings/m-1/agenda/assignable').flush(null, { status: 403, statusText: 'x' });

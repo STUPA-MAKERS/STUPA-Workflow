@@ -9,9 +9,13 @@
         (valueChange)="timeline.onSearch($event)"
       />
       @if (showFilter()) {
-        <!-- A native select in a chip: the browser list is accessible on every device. -->
+        <!-- A native select in a chip: the browser list is accessible on every device.
+             The select is transparent over the chip, so the chip is as wide as the
+             selected label and not as wide as the longest option. -->
         <label class="mtl__chip">
           <app-icon class="mtl__chipIcon" name="building" [size]="16" />
+          <span class="mtl__chipLabel ell" aria-hidden="true">{{ filterLabel() }}</span>
+          <app-icon class="mtl__chipIcon" name="down" [size]="15" />
           <select
             class="mtl__chipSelect"
             [attr.aria-label]="'meetings.list.committeeFilter' | t"
@@ -23,7 +27,6 @@
               </option>
             }
           </select>
-          <app-icon class="mtl__chipIcon" name="down" [size]="15" />
         </label>
       }
       @if (canCreate()) {
@@ -83,7 +86,6 @@
     }
     <div class="mtl__now" role="separator" [attr.aria-label]="'meetings.list.now' | t">
       <span class="mtl__nowLabel cap" aria-hidden="true">{{ 'meetings.list.now' | t }}</span>
-      <span class="mtl__nowLine" aria-hidden="true"></span>
     </div>
     @if (timeline.upcomingItems().length) {
       <div class="mtl__rows" role="list" [attr.aria-label]="'meetings.list.upcoming' | t">
@@ -119,23 +121,25 @@
     [title]="m.title"
     (activate)="open(m.id)"
   >
-    <app-date-block lead [date]="day(m)" [live]="m.status === 'live'" />
+    <app-date-block lead [date]="day(m)" [live]="m.status === 'live'" [muted]="past" />
     <app-status-text status [kind]="st.kind">{{ st.key | t }}</app-status-text>
+    <!-- The sub line is one line. On a phone the time comes first, so the Gremium name
+         takes the ellipsis and the time stays visible. -->
     <span sub class="mtl__meta">
+      @if (phone() && t.text) {
+        <ng-container *ngTemplateOutlet="timeFact; context: { $implicit: t }" />
+      }
       @if (m.gremiumName) {
         <span class="mtl__fact"><app-icon name="building" [size]="13" />{{ m.gremiumName }}</span>
       }
-      @if (t.text) {
-        <span class="mtl__fact">
-          <app-icon name="clock" [size]="13" />
-          <span class="mono">{{ t.since ? ('meetings.list.since' | t: { time: t.text }) : t.text }}</span>
-        </span>
+      @if (!phone() && t.text) {
+        <ng-container *ngTemplateOutlet="timeFact; context: { $implicit: t }" />
       }
       @if (m.protokollantName) {
         <span class="mtl__fact" [title]="'meetings.protokollant.label' | t">
-          <app-icon name="user" [size]="13" />
-          <span class="sr-only">{{ 'meetings.protokollant.label' | t }}:</span>
-          {{ m.protokollantName }}
+          <app-icon name="user" [size]="13" /><span class="sr-only"
+            >{{ 'meetings.protokollant.label' | t }}: </span
+          >{{ m.protokollantName }}
         </span>
       }
     </span>
@@ -165,6 +169,12 @@
       <app-icon class="mtl__chev" name="right" [size]="18" />
     </span>
   </app-list-item>
+</ng-template>
+
+<ng-template #timeFact let-t>
+  <span class="mtl__fact">
+    <app-icon name="clock" [size]="13" /><span class="mono">{{ t.since ? ('meetings.list.since' | t: { time: t.text }) : t.text }}</span>
+  </span>
 </ng-template>
 
 @if (canCreate()) {

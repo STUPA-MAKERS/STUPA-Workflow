@@ -100,7 +100,7 @@ describe('status kinds', () => {
       'meeting vote',
       meetingVoteStatus as (s: never) => StatusView,
       {
-        pending: ['neutral', 'Geplant'],
+        draft: ['neutral', 'Geplant'],
         open: ['accent', 'Offen'],
         closed: ['neutral', 'Geschlossen'],
         cancelled: ['muted', 'Abgebrochen'],

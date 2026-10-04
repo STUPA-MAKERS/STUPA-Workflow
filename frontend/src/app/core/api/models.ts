@@ -733,7 +733,7 @@ export interface MagicLinkVerifyResult {
 }
 
 export type MajorityRule = 'simple' | 'absolute' | 'two_thirds';
-/** `cancelled`. The application left the vote state by hand. The vote stopped. */
+/** `draft`: planned, not open yet. `cancelled`: the application left the vote state by hand, so the vote stopped. */
 export type VoteStatus = 'draft' | 'open' | 'closed' | 'cancelled';
 export type VoteResult = 'passed' | 'rejected' | 'tie';
 
@@ -851,8 +851,8 @@ export interface VoteClosed {
 
 /** Meeting status. The backend enum is `planned|live|closed`. */
 export type MeetingStatus = 'planned' | 'live' | 'closed';
-/** `cancelled`. The application left the vote state by hand. The vote stopped. */
-export type MeetingVoteStatus = 'pending' | 'open' | 'closed' | 'cancelled';
+/** `draft`: planned, not open yet. `cancelled`: the application left the vote state by hand, so the vote stopped. */
+export type MeetingVoteStatus = 'draft' | 'open' | 'closed' | 'cancelled';
 
 /** `MeetingVoteOut`. A vote summary in the meeting state. GET /meetings/{id}. */
 export interface MeetingVoteOutWire {

@@ -36,7 +36,7 @@ const VOTE = (over: Partial<MeetingVote> = {}): MeetingVote => ({
   title: null,
   question: null,
   options: [],
-  status: 'pending',
+  status: 'draft',
   result: null,
   counts: null,
   leading: null,
@@ -60,7 +60,7 @@ describe('meetings-display.util', () => {
     expect(voteStatusVariant('open')).toBe('success');
     expect(voteStatusVariant('closed')).toBe('info');
     expect(voteStatusVariant('cancelled')).toBe('danger');
-    expect(voteStatusVariant('pending')).toBe('warning');
+    expect(voteStatusVariant('draft')).toBe('warning');
     expect(voteStatusKey('open')).toBe('meetings.voteStatus.open');
     expect(voteResultKey('passed')).toBe('vote.result.passed');
     expect(voteResultKey(null)).toBe('vote.result.tie');
@@ -73,7 +73,7 @@ describe('meetings-display.util', () => {
     // `neutral` is a tag (a grey plate). A status shows as coloured text only.
     const variants = [
       ...(['planned', 'live', 'closed'] as const).map(meetingStatusVariant),
-      ...(['pending', 'open', 'closed', 'cancelled'] as const).map(voteStatusVariant),
+      ...(['draft', 'open', 'closed', 'cancelled'] as const).map(voteStatusVariant),
       ...['passed', 'rejected', 'tie', null, undefined, 'unknown'].map(voteResultVariant),
       ...(['present', 'excused', 'absent'] as const).flatMap((s) => [
         attendanceBadgeVariant(s),

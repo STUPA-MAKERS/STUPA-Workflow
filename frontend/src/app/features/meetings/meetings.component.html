@@ -1,5 +1,6 @@
-<!-- The list carries its own header, and so does the focus page of the minute-taker. -->
-@if (detailMode() && (!meeting() || beamerMode() || isFollower())) {
+<!-- The list carries its own header, and so does the focus page of the minute-taker.
+     Without read access the list does not show, so this header titles the notice. -->
+@if (showForbidden() || (detailMode() && (!meeting() || beamerMode() || isFollower()))) {
 <app-page-header [title]="'meetings.title' | t" [rail]="true" [flush]="true" />
 }
 

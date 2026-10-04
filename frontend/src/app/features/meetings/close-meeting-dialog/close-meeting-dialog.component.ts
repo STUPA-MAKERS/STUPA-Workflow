@@ -62,7 +62,7 @@ export class CloseMeetingDialogComponent {
     () => this.refused() || this.meeting().votes.some((v) => v.status === 'open'),
   );
   /** The meeting has planned votes, which the close cancels. */
-  readonly hasDrafts = computed(() => this.meeting().votes.some((v) => v.status === 'pending'));
+  readonly hasDrafts = computed(() => this.meeting().votes.some((v) => v.status === 'draft'));
 
   constructor() {
     effect(() => {

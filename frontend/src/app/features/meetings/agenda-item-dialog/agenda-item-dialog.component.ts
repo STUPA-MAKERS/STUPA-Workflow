@@ -94,8 +94,17 @@ export class AgendaItemDialogComponent {
     return needle ? rows.filter((a) => (a.title ?? '').toLocaleLowerCase().includes(needle)) : rows;
   });
 
+  /**
+   * The picked application, but only while the list shows it. A search that filters
+   * the pick out of the list leaves no row checked, so the submit must not send it.
+   */
+  readonly visiblePick = computed<Uuid | null>(() => {
+    const pick = this.pick();
+    return pick !== null && this.shown().some((a) => a.applicationId === pick) ? pick : null;
+  });
+
   readonly valid = computed(() =>
-    this.kind() === 'application' ? this.pick() !== null : !!this.freetext().trim(),
+    this.kind() === 'application' ? this.visiblePick() !== null : !!this.freetext().trim(),
   );
 
   constructor() {
@@ -140,7 +149,7 @@ export class AgendaItemDialogComponent {
   submit(): void {
     if (!this.valid() || this.saving()) return;
     const meetingId = this.meeting().id;
-    const pick = this.pick();
+    const pick = this.visiblePick();
     const req =
       this.kind() === 'application' && pick !== null
         ? this.api.addAgendaItem(meetingId, pick, this.nonPublic())

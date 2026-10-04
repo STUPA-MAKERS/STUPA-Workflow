@@ -450,7 +450,7 @@ let MOCK_MEETING: MeetingOutWire = {
       id: 'a0000000-0000-0000-0000-0000000000a2',
       applicationId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
       title: 'Anschaffung Beamer',
-      status: 'pending',
+      status: 'draft',
       result: null,
       counts: null,
       leading: null,

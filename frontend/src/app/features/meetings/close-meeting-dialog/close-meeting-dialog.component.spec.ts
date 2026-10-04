@@ -51,7 +51,7 @@ describe('CloseMeetingDialogComponent', () => {
   });
 
   it('says that the planned votes are cancelled, and who finalizes without the right', async () => {
-    await setup({ ...LIVE, votes: [vote('pending')], canFinalize: false } as Meeting);
+    await setup({ ...LIVE, votes: [vote('draft')], canFinalize: false } as Meeting);
     expect(screen.getByText('Geplante Abstimmungen werden abgebrochen')).toBeInTheDocument();
     expect(screen.getByText(/finalisiert danach, wer das Recht „Protokoll finalisieren“ hat/)).toBeInTheDocument();
   });
@@ -113,7 +113,7 @@ describe('CloseMeetingDialogComponent', () => {
   });
 
   it('has no axe violations', async () => {
-    await setup({ ...LIVE, votes: [vote('open'), vote('pending')] } as Meeting);
+    await setup({ ...LIVE, votes: [vote('open'), vote('draft')] } as Meeting);
     expect(await runAxe(document.body)).toHaveNoViolations();
   });
 

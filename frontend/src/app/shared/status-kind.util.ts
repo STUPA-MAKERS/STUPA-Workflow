@@ -73,7 +73,7 @@ export function meetingStatus(status: MeetingStatus): StatusView {
 }
 
 const MEETING_VOTE: Record<MeetingVoteStatus, StatusView> = {
-  pending: { kind: 'neutral', key: 'meetings.voteStatus.pending' },
+  draft: { kind: 'neutral', key: 'meetings.voteStatus.draft' },
   open: { kind: 'accent', key: 'meetings.voteStatus.open' },
   closed: { kind: 'neutral', key: 'meetings.voteStatus.closed' },
   cancelled: { kind: 'muted', key: 'meetings.voteStatus.cancelled' },

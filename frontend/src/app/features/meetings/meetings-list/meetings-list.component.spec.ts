@@ -156,6 +156,31 @@ describe('MeetingsListComponent', () => {
     // The live meeting has the accent date block.
     expect(liveRow.querySelector('app-date-block')).toHaveClass('db--live');
     expect(closedRow).toHaveClass('mtl__row--past');
+    // A past meeting mutes its date block too.
+    expect(closedRow.querySelector('app-date-block')).toHaveClass('db--muted');
+    expect(plannedRow.querySelector('app-date-block')).not.toHaveClass('db--muted');
+    // On a wide screen the Gremium comes first, as on the board.
+    const facts = Array.from(plannedRow.querySelectorAll('.mtl__fact')).map((f) => f.textContent?.trim());
+    expect(facts).toEqual(['Studierendenparlament', '17:30–19:00']);
+  });
+
+  it('puts the time first in the sub line on a phone, so the time stays visible', async () => {
+    const original = window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+      ...original(query),
+      matches: query === '(max-width: 768px)',
+    })) as typeof window.matchMedia;
+    try {
+      const view = await setup();
+      load(view);
+      const [closedRow, liveRow] = screen.getAllByRole('listitem');
+      const facts = (row: HTMLElement) =>
+        Array.from(row.querySelectorAll('.mtl__fact')).map((f) => f.textContent?.replace(/\s+/g, ' ').trim());
+      expect(facts(closedRow).slice(0, 2)).toEqual(['18:04–21:40', 'Studierendenparlament']);
+      expect(facts(liveRow).slice(0, 2)).toEqual(['seit 18:04', 'Studierendenparlament']);
+    } finally {
+      window.matchMedia = original;
+    }
   });
 
   it('loads a short past preview first and earlier meetings on request, on top', async () => {
@@ -228,7 +253,11 @@ describe('MeetingsListComponent', () => {
       'StuPa',
       'Finanzausschuss',
     ]);
+    // The chip shows the selected label; the select lies transparent over it.
+    const label = () => view.container.querySelector('.mtl__chipLabel');
+    expect(label()).toHaveTextContent('Alle Gremien');
     await userEvent.selectOptions(filter, 'g-2');
+    expect(label()).toHaveTextContent('Finanzausschuss');
     const up = timelineReq(view.http, 'upcoming');
     expect(up.request.params.get('gremiumId')).toBe('g-2');
     up.flush({ items: [FOREIGN], nextCursor: null });

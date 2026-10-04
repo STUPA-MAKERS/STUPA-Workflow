@@ -59,6 +59,17 @@ describe('DateBlockComponent', () => {
     expect(view.fixture.nativeElement).toHaveClass('db--live');
   });
 
+  it('mutes a past date, but never a live one', async () => {
+    const view = await render(DateBlockComponent, {
+      inputs: { date: new Date(2026, 8, 15), muted: true },
+    });
+    expect(view.fixture.nativeElement).toHaveClass('db--muted');
+    view.fixture.componentRef.setInput('live', true);
+    view.fixture.detectChanges();
+    expect(view.fixture.nativeElement).not.toHaveClass('db--muted');
+    expect(view.fixture.nativeElement).toHaveClass('db--live');
+  });
+
   it('follows the locale', async () => {
     const view = await render(DateBlockComponent, { inputs: { date: new Date(2026, 9, 2) } });
     const i18n = TestBed.inject(I18nService);

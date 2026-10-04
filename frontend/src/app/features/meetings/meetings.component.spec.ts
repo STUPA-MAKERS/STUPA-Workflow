@@ -51,7 +51,7 @@ const MEETING: MeetingOutWire = {
       id: 'v-2',
       applicationId: 'app-2',
       title: 'Antrag B',
-      status: 'pending',
+      status: 'draft',
       result: null,
       counts: null,
       leading: null,
@@ -97,7 +97,7 @@ const MEETING_MODEL: Meeting = {
     },
     {
       id: 'v-2', applicationId: 'app-2', agendaItemId: null, title: 'Antrag B',
-      question: null, options: [], status: 'pending', result: null,
+      question: null, options: [], status: 'draft', result: null,
       counts: null, leading: null, closesAt: null,
       voted: 0, present: 0, revealed: true, failedReason: null,
     },
@@ -238,6 +238,8 @@ describe('MeetingsComponent', () => {
   it('shows a forbidden notice without the required permissions', async () => {
     await setup({ perms: [], id: null });
     expect(screen.getByRole('alert')).toHaveTextContent(/Keine Berechtigung/i);
+    // The list (and its header) does not show, so the page header titles the notice.
+    expect(screen.getByRole('heading', { level: 1, name: 'Sitzungen' })).toBeInTheDocument();
   });
 
   it('loads the meeting and renders session control with votes', async () => {
@@ -755,7 +757,7 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.voteVariant('open')).toBe('success');
       expect(cmp.voteVariant('closed')).toBe('info');
       expect(cmp.voteVariant('cancelled')).toBe('danger');
-      expect(cmp.voteVariant('pending')).toBe('warning');
+      expect(cmp.voteVariant('draft')).toBe('warning');
       expect(cmp.voteStatusKey('open')).toBe('meetings.voteStatus.open');
     });
 
@@ -848,7 +850,7 @@ describe('MeetingsComponent — methods', () => {
       // Neither open nor closed → null.
       cmp.meeting.set({
         ...cmp.meeting()!,
-        votes: [{ ...cmp.meeting()!.votes[0], id: 'p', status: 'pending' }],
+        votes: [{ ...cmp.meeting()!.votes[0], id: 'p', status: 'draft' }],
       });
       expect(cmp.beamerVote()).toBeNull();
     });

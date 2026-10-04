@@ -12,7 +12,8 @@ import { PageHeaderComponent } from '@shared/ui/page-header/page-header.componen
 import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.component';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
-import { ButtonComponent, IconComponent } from '@stupa-makers/ui-kit';
+import { ButtonComponent, IconComponent, MEDIA } from '@stupa-makers/ui-kit';
+import { mediaQuerySignal } from '../../../layout/media-query';
 import { CreateMeetingDialogComponent } from '../create-meeting-dialog/create-meeting-dialog.component';
 import { MeetingDialogsService } from '../meeting-dialogs.service';
 import { type MeetingTimeText, meetingDay, meetingTimeText } from '../meetings-display.util';
@@ -68,6 +69,14 @@ export class MeetingsListComponent {
 
   /** The filter offers a choice only when the user reads more than one Gremium. */
   readonly showFilter = computed(() => this.timeline.filterGremien().length > 1);
+  /** The label of the selected filter option, which the chip shows. */
+  readonly filterLabel = computed(() => {
+    const options = this.timeline.filterGremiumOptions();
+    const value = this.timeline.gremiumFilter();
+    return (options.find((o) => o.value === value) ?? options[0])?.label ?? '';
+  });
+  /** A phone viewport: the sub line of a row puts the time first. */
+  readonly phone = mediaQuerySignal(MEDIA.phone);
 
   open(id: Uuid): void {
     void this.router.navigate(['/meetings', id]);
