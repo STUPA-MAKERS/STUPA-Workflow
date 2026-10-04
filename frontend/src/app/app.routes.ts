@@ -76,12 +76,36 @@ export const routes: Routes = [
         path: 'applications',
         // No permission gate: without `application.read` you see only your own
         // applications. The server filters on `created_by`.
+        //
+        // The list and the detail share one page: the list pane stays while the detail of
+        // `:id` loads in its outlet (board Anträge). A deep link to `/applications/:id`
+        // opens the page with that application, also for its owner.
         data: { title: 'nav.applications', wide: true },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/applications/applications-list.component').then(
             (m) => m.ApplicationsListComponent,
           ),
+        children: [
+          {
+            path: '',
+            data: { fab: true },
+            loadComponent: () =>
+              import('./pages/applications/applications-none.component').then(
+                (m) => m.ApplicationsNoneComponent,
+              ),
+          },
+          {
+            path: ':id',
+            // No permission gate: a creator can reach their own application. The server
+            // authorizes through `application.read`, owner, or magic-link.
+            data: { title: 'applications.detail.crumb', parent: ['applications'] },
+            loadComponent: () =>
+              import('./pages/applications/applications-detail.component').then(
+                (m) => m.ApplicationsDetailComponent,
+              ),
+          },
+        ],
       },
       {
         path: 'tasks',
@@ -90,17 +114,6 @@ export const routes: Routes = [
         data: { title: 'nav.tasks', wide: true },
         canActivate: [authGuard],
         loadComponent: () => import('./pages/tasks/tasks.component').then((m) => m.TasksComponent),
-      },
-      {
-        path: 'applications/:id',
-        // No permission gate: a creator can reach their own application. The server
-        // authorizes through `application.read`, owner, or magic-link.
-        data: { title: 'applications.detail.crumb', parent: ['applications'], wide: true },
-        canActivate: [authGuard],
-        loadComponent: () =>
-          import('./pages/applications/applications-detail.component').then(
-            (m) => m.ApplicationsDetailComponent,
-          ),
       },
       {
         path: 'voting',

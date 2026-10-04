@@ -1,63 +1,31 @@
 /**
- * Public share links on the application detail page.
+ * The public share links of one application.
  *
- * Its own spec file for the same reason as the PDF/comments one: the base spec is
- * already large, and a single file compiles this component past the jest timeout under
- * `--coverage`.
- *
- * What matters here is what the UI promises about the token. It is shown once, the server
+ * What matters is what the UI promises about the token. It is shown once, the server
  * keeps a hash, and a listing can never hand it back — so a test that only checked "a
  * dialog opens" would miss the whole point.
  */
+import { Component, signal } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
 import {
   HttpTestingController,
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
-import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
-import { BehaviorSubject } from 'rxjs';
-import { ApplicationsDetailComponent } from './applications-detail.component';
-import { RailStatusService } from '../../layout/rail-status.service';
-import { AuthService } from '@core/auth/auth.service';
 import { USE_MOCK_API } from '@core/api/api.config';
-import type {
-  ApplicationOutWire,
-  ApplicationShareLink,
-  StateOutWire,
-  VersionOutWire,
-} from '@core/api/models';
+import type { ApplicationShareLink } from '@core/api/models';
+import { ShareLinksDialogComponent } from './share-links-dialog.component';
 
-const SUBMITTED: StateOutWire = {
-  id: 's1',
-  key: 'submitted',
-  label: { de: 'Eingereicht', en: 'Submitted' },
-  color: '#4a90d9',
-  editAllowed: true,
-};
-
-function appWire(): ApplicationOutWire {
-  return {
-    id: 'app-1',
-    typeId: 't1',
-    state: SUBMITTED,
-    gremiumId: null,
-    budgetPotId: null,
-    amount: '250.00',
-    currency: 'EUR',
-    data: { title: 'Förderung Fest' },
-    version: 2,
-    lang: 'de',
-    createdAt: '2026-06-05T10:00:00Z',
-    updatedAt: '2026-06-05T11:00:00Z',
-    applicant: null,
-  };
+@Component({
+  standalone: true,
+  imports: [ShareLinksDialogComponent],
+  template: `<app-share-links-dialog [applicationId]="id()" [(open)]="open" />`,
+})
+class Host {
+  readonly id = signal<string | null>('app-1');
+  readonly open = signal(false);
 }
-
-const VERSIONS: VersionOutWire[] = [
-  { version: 1, data: { title: 'Fest' }, diff: null, changedBy: 'Mia', at: '2026-06-05T10:00:00Z' },
-];
 
 /** A live link, as the listing returns it: no `url`, because the server has only a hash. */
 function liveShare(over: Partial<ApplicationShareLink> = {}): ApplicationShareLink {
@@ -73,463 +41,260 @@ function liveShare(over: Partial<ApplicationShareLink> = {}): ApplicationShareLi
   };
 }
 
-function fakeAuth(permissions: string[]): Partial<AuthService> {
-  return {
-    can: (p: string) => permissions.includes(p),
-    roles: (() => []) as unknown as AuthService['roles'],
-  };
-}
+const LIST = (r: { url: string; method: string }) =>
+  r.method === 'GET' && r.url === '/api/applications/app-1/shares';
 
-async function setup(permissions: string[] = ['application.read', 'application.share']) {
-  const view = await render(ApplicationsDetailComponent, {
+async function setup() {
+  const view = await render(Host, {
     providers: [
-      provideRouter([]),
       provideHttpClient(),
       provideHttpClientTesting(),
       { provide: USE_MOCK_API, useValue: false },
-      { provide: AuthService, useValue: fakeAuth(permissions) },
-      // The real service polls; the page only asks it to refresh.
-      { provide: RailStatusService, useValue: { refresh: jest.fn() } },
-      {
-        provide: ActivatedRoute,
-        useValue: { paramMap: new BehaviorSubject(convertToParamMap({ id: 'app-1' })) },
-      },
     ],
   });
   const http = view.fixture.debugElement.injector.get(HttpTestingController);
-  return { ...view, http, cmp: view.fixture.componentInstance };
+  const host = view.fixture.componentInstance;
+  const cmp = view.fixture.debugElement.children[0].componentInstance as ShareLinksDialogComponent;
+  /** Open the dialog and answer the listing. */
+  const openWith = (rows: ApplicationShareLink[]) => {
+    host.open.set(true);
+    view.detectChanges();
+    http.expectOne(LIST).flush(rows);
+    view.detectChanges();
+  };
+  return { ...view, http, host, cmp, openWith };
 }
 
-const url =
-  (suffix: string) =>
-  (r: { url: string }) =>
-    r.url === `/api/applications/app-1${suffix}`;
-
-/** Answer every request of one page load. */
-function flushPage(http: HttpTestingController) {
-  http.expectOne(url('')).flush(appWire());
-  http.expectOne(url('/versions')).flush(VERSIONS);
-  http.expectOne(url('/comments')).flush([]);
-  http
-    .expectOne(url('/form'))
-    .flush({ applicationTypeId: 't1', formVersionId: 'fv1', sections: [] });
-  for (const req of http.match((r) => r.method === 'GET' && r.url === '/api/budgets')) {
-    req.flush([]);
-  }
-}
-
-/** The attachments panel and the budget list load on their own schedule. */
-function flushRest(http: HttpTestingController) {
-  for (const req of http.match((r) => /\/attachments$/.test(r.url) || r.url === '/api/budgets')) {
-    req.flush([]);
-  }
-}
-
-describe('ApplicationsDetailComponent — share links', () => {
+describe('ShareLinksDialogComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
-  it('hides the share action from someone who may only read', async () => {
-    // Reading an application and deciding it may be read by anyone holding a URL are
-    // different decisions. The server gates on `application.share`; so does the button.
-    const { http, detectChanges } = await setup(['application.read', 'application.manage']);
-    flushPage(http);
-    detectChanges();
-
-    expect(screen.queryByRole('button', { name: 'Teilen' })).not.toBeInTheDocument();
-    flushRest(http);
+  it('loads nothing while closed', async () => {
+    const { http } = await setup();
+    http.verify();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('offers the share action to a holder of application.share', async () => {
-    const { http, detectChanges } = await setup();
-    flushPage(http);
-    detectChanges();
-
-    expect(screen.getByRole('button', { name: 'Teilen' })).toBeInTheDocument();
-    flushRest(http);
-  });
-
-  it('lists the existing links when the dialog opens', async () => {
-    const { http, detectChanges, cmp } = await setup();
-    flushPage(http);
-    detectChanges();
-
-    cmp.openShareDialog();
-    http.expectOne(url('/shares')).flush([liveShare()]);
-    detectChanges();
-
+  it('lists the existing links when it opens', async () => {
+    const { openWith } = await setup();
+    openWith([liveShare()]);
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(screen.getByText('An die Fachschaft')).toBeInTheDocument();
-    flushRest(http);
   });
 
   it('shows a freshly minted link once, and nothing before there is one', async () => {
-    const { http, detectChanges, cmp } = await setup();
-    flushPage(http);
-    detectChanges();
-
-    cmp.openShareDialog();
-    http.expectOne(url('/shares')).flush([]);
-    detectChanges();
+    const { http, detectChanges, cmp, openWith } = await setup();
+    openWith([]);
     // Nothing to copy yet: the token exists only in the response to the create call.
     expect(screen.queryByRole('button', { name: 'Kopieren' })).not.toBeInTheDocument();
+    expect(screen.getByText('Es gibt noch keinen Link zu diesem Antrag.')).toBeInTheDocument();
 
-    cmp.createShare();
-    const post = http.expectOne((r) => r.method === 'POST' && r.url === '/api/applications/app-1/shares');
-    post.flush(liveShare({ url: 'https://x.example/s/token-abc' }));
+    cmp.create();
+    http
+      .expectOne((r) => r.method === 'POST' && r.url === '/api/applications/app-1/shares')
+      .flush(liveShare({ url: 'https://x.example/s/token-abc' }));
     detectChanges();
 
     expect(screen.getByDisplayValue('https://x.example/s/token-abc')).toBeInTheDocument();
-    flushRest(http);
   });
 
   it('sends the chosen lifetime and drops an empty note', async () => {
-    // An empty label must not travel as `""`: the server would store a blank note where
-    // "no note" is what the user meant.
-    const { http, detectChanges, cmp } = await setup();
-    flushPage(http);
-    detectChanges();
-
-    cmp.openShareDialog();
-    http.expectOne(url('/shares')).flush([]);
-    cmp.shareTtl.set('7');
-    cmp.shareLabel.set('   ');
-    cmp.createShare();
-
-    const post = http.expectOne((r) => r.method === 'POST' && r.url === '/api/applications/app-1/shares');
+    // An empty label must not travel as `""`: the server would store a blank note.
+    const { http, cmp, openWith } = await setup();
+    openWith([]);
+    cmp.ttl.set('7');
+    cmp.label.set('   ');
+    cmp.create();
+    const post = http.expectOne((r) => r.method === 'POST');
     expect(post.request.body).toEqual({ ttlDays: 7 });
     post.flush(liveShare({ url: 'https://x.example/s/t' }));
-    flushRest(http);
+  });
+
+  it('sends a note when there is one', async () => {
+    const { http, cmp, openWith } = await setup();
+    openWith([]);
+    cmp.label.set(' Presse ');
+    cmp.create();
+    const post = http.expectOne((r) => r.method === 'POST');
+    expect(post.request.body).toEqual({ ttlDays: 30, label: 'Presse' });
+    post.flush(liveShare({ url: 'https://x/s/t' }));
+    expect(cmp.label()).toBe('');
   });
 
   it('copies the fresh link to the clipboard', async () => {
     const writeText = jest.fn().mockResolvedValue(undefined);
     Object.assign(navigator, { clipboard: { writeText } });
-    const { http, detectChanges, cmp } = await setup();
-    flushPage(http);
-    detectChanges();
-
-    cmp.openShareDialog();
-    http.expectOne(url('/shares')).flush([]);
-    cmp.createShare();
-    http
-      .expectOne((r) => r.method === 'POST')
-      .flush(liveShare({ url: 'https://x.example/s/token-abc' }));
+    const { http, detectChanges, cmp, openWith } = await setup();
+    openWith([]);
+    cmp.create();
+    http.expectOne((r) => r.method === 'POST').flush(liveShare({ url: 'https://x.example/s/token-abc' }));
     detectChanges();
 
     await userEvent.click(screen.getByRole('button', { name: 'Kopieren' }));
     expect(writeText).toHaveBeenCalledWith('https://x.example/s/token-abc');
-    flushRest(http);
+    expect(cmp.copied()).toBe(true);
   });
 
   it('survives a browser without the clipboard API', async () => {
     Object.assign(navigator, { clipboard: undefined });
-    const { http, detectChanges, cmp } = await setup();
-    flushPage(http);
-    detectChanges();
-
-    cmp.openShareDialog();
-    http.expectOne(url('/shares')).flush([]);
-    cmp.createShare();
+    const { http, cmp, openWith } = await setup();
+    openWith([]);
+    cmp.create();
     http.expectOne((r) => r.method === 'POST').flush(liveShare({ url: 'https://x/s/t' }));
-    detectChanges();
+    expect(() => cmp.copy()).not.toThrow();
+    expect(cmp.copied()).toBe(false);
+  });
 
-    expect(() => cmp.copyShareUrl()).not.toThrow();
-    expect(cmp.shareCopied()).toBe(false);
-    flushRest(http);
+  it('marks the link as not copied when the clipboard write is refused', async () => {
+    const writeText = jest.fn().mockRejectedValue(new Error('denied'));
+    Object.assign(navigator, { clipboard: { writeText } });
+    const { http, cmp, openWith } = await setup();
+    openWith([]);
+    cmp.create();
+    http.expectOne((r) => r.method === 'POST').flush(liveShare({ url: 'https://x/s/t' }));
+    cmp.copy();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(cmp.copied()).toBe(false);
+  });
+
+  it('copies nothing when there is no fresh link', async () => {
+    const writeText = jest.fn();
+    Object.assign(navigator, { clipboard: { writeText } });
+    const { cmp, openWith } = await setup();
+    openWith([]);
+    cmp.copy();
+    expect(writeText).not.toHaveBeenCalled();
   });
 
   it('replaces a revoked link in place rather than dropping it from the list', async () => {
-    // "Revocable" only means something if you can see what you revoked.
-    const { http, detectChanges, cmp } = await setup();
-    flushPage(http);
-    detectChanges();
-
-    cmp.openShareDialog();
-    http.expectOne(url('/shares')).flush([liveShare()]);
-    cmp.revokeShare('sh-1');
+    const { http, detectChanges, cmp, openWith } = await setup();
+    openWith([liveShare()]);
+    await userEvent.click(screen.getByRole('button', { name: 'Zurückziehen' }));
     http
       .expectOne((r) => r.method === 'DELETE' && r.url === '/api/applications/app-1/shares/sh-1')
       .flush(liveShare({ revokedAt: '2026-06-06T10:00:00Z' }));
     detectChanges();
 
     expect(cmp.shares()).toHaveLength(1);
-    expect(cmp.shares()[0].revokedAt).toBe('2026-06-06T10:00:00Z');
-    // No revoke button on a link that no longer opens.
     expect(screen.queryByRole('button', { name: 'Zurückziehen' })).not.toBeInTheDocument();
-    flushRest(http);
+    expect(screen.getByText(/Zurückgezogen am/)).toBeInTheDocument();
   });
 
   it('treats an expired link as dead even though it was never revoked', async () => {
-    const { http, detectChanges, cmp } = await setup();
-    flushPage(http);
-    detectChanges();
-
-    cmp.openShareDialog();
-    http.expectOne(url('/shares')).flush([liveShare({ expiresAt: '2020-01-01T00:00:00Z' })]);
-    detectChanges();
-
+    const { openWith } = await setup();
+    openWith([liveShare({ expiresAt: '2020-01-01T00:00:00Z' })]);
     expect(screen.queryByRole('button', { name: 'Zurückziehen' })).not.toBeInTheDocument();
-    flushRest(http);
-  });
-
-  it('forgets the token when the dialog is reopened', async () => {
-    // The plaintext is gone for good once the dialog closes. Showing a stale one on the
-    // next open would promise a link the server can no longer confirm.
-    const { http, detectChanges, cmp } = await setup();
-    flushPage(http);
-    detectChanges();
-
-    cmp.openShareDialog();
-    http.expectOne(url('/shares')).flush([]);
-    cmp.createShare();
-    http.expectOne((r) => r.method === 'POST').flush(liveShare({ url: 'https://x/s/t' }));
-    expect(cmp.freshShareUrl()).toBe('https://x/s/t');
-
-    cmp.openShareDialog();
-    http.expectOne(url('/shares')).flush([]);
-    expect(cmp.freshShareUrl()).toBeNull();
-    flushRest(http);
-  });
-
-  it('reports a failed create instead of leaving the button spinning', async () => {
-    const { http, detectChanges, cmp } = await setup();
-    flushPage(http);
-    detectChanges();
-
-    cmp.openShareDialog();
-    http.expectOne(url('/shares')).flush([]);
-    cmp.createShare();
-    http
-      .expectOne((r) => r.method === 'POST')
-      .flush({ code: 'forbidden' }, { status: 403, statusText: 'Forbidden' });
-
-    expect(cmp.creatingShare()).toBe(false);
-    expect(cmp.freshShareUrl()).toBeNull();
-    flushRest(http);
-  });
-
-  it('reports a failed revoke and keeps the link listed as live', async () => {
-    const { http, detectChanges, cmp } = await setup();
-    flushPage(http);
-    detectChanges();
-
-    cmp.openShareDialog();
-    http.expectOne(url('/shares')).flush([liveShare()]);
-    cmp.revokeShare('sh-1');
-    http
-      .expectOne((r) => r.method === 'DELETE')
-      .flush({ code: 'not_found' }, { status: 404, statusText: 'Not Found' });
-
-    expect(cmp.revokingShare()).toBeNull();
-    expect(cmp.shares()[0].revokedAt).toBeNull();
-    flushRest(http);
-  });
-
-  it('shows an empty list rather than a stale one when the listing fails', async () => {
-    const { http, detectChanges, cmp } = await setup();
-    flushPage(http);
-    detectChanges();
-
-    cmp.openShareDialog();
-    http
-      .expectOne(url('/shares'))
-      .flush({ code: 'forbidden' }, { status: 403, statusText: 'Forbidden' });
-    detectChanges();
-
-    expect(cmp.sharesLoading()).toBe(false);
-    expect(cmp.shares()).toEqual([]);
-    flushRest(http);
-  });
-  it('clears the copyable link when that very link is revoked', async () => {
-    // Leaving it on screen would offer a URL that no longer opens anything.
-    const { http, detectChanges, cmp } = await setup();
-    flushPage(http);
-    detectChanges();
-
-    cmp.openShareDialog();
-    http.expectOne(url('/shares')).flush([]);
-    cmp.createShare();
-    http.expectOne((r) => r.method === 'POST').flush(liveShare({ url: 'https://x/s/t' }));
-    expect(cmp.freshShareUrl()).toBe('https://x/s/t');
-
-    cmp.revokeShare('sh-1');
-    http
-      .expectOne((r) => r.method === 'DELETE')
-      .flush(liveShare({ revokedAt: '2026-06-06T10:00:00Z' }));
-
-    expect(cmp.freshShareUrl()).toBeNull();
-    flushRest(http);
-  });
-
-  it('keeps the copyable link when a different one is revoked', async () => {
-    const { http, detectChanges, cmp } = await setup();
-    flushPage(http);
-    detectChanges();
-
-    cmp.openShareDialog();
-    http.expectOne(url('/shares')).flush([liveShare({ id: 'sh-old' })]);
-    cmp.createShare();
-    http
-      .expectOne((r) => r.method === 'POST')
-      .flush(liveShare({ id: 'sh-new', url: 'https://x/s/new' }));
-
-    cmp.revokeShare('sh-old');
-    http
-      .expectOne((r) => r.method === 'DELETE')
-      .flush(liveShare({ id: 'sh-old', revokedAt: '2026-06-06T10:00:00Z' }));
-
-    expect(cmp.freshShareUrl()).toBe('https://x/s/new');
-    flushRest(http);
+    expect(screen.getByText(/Abgelaufen am/)).toBeInTheDocument();
   });
 
   it('names a link without a note rather than showing an empty row', async () => {
-    const { http, detectChanges, cmp } = await setup();
-    flushPage(http);
-    detectChanges();
-
-    cmp.openShareDialog();
-    http.expectOne(url('/shares')).flush([liveShare({ label: null })]);
-    detectChanges();
-
-    expect(screen.getByText('Ohne Notiz')).toBeInTheDocument();
-    flushRest(http);
+    const { openWith } = await setup();
+    openWith([liveShare({ label: null })]);
+    expect(screen.getAllByText('Ohne Notiz').length).toBeGreaterThan(0);
   });
 
-  it('says when a link was withdrawn, not only that it was', async () => {
-    const { http, detectChanges, cmp } = await setup();
-    flushPage(http);
-    detectChanges();
+  it('forgets the token when it closes and opens again', async () => {
+    const { http, detectChanges, host, cmp, openWith } = await setup();
+    openWith([]);
+    cmp.create();
+    http.expectOne((r) => r.method === 'POST').flush(liveShare({ url: 'https://x/s/t' }));
+    expect(cmp.freshUrl()).toBe('https://x/s/t');
 
-    cmp.openShareDialog();
-    http.expectOne(url('/shares')).flush([liveShare({ revokedAt: '2026-06-06T10:00:00Z' })]);
-    detectChanges();
+    await userEvent.click(screen.getByRole('button', { name: 'Schließen' }));
+    expect(host.open()).toBe(false);
+    expect(cmp.freshUrl()).toBeNull();
 
-    expect(screen.getByText(/Zurückgezogen am/)).toBeInTheDocument();
-    flushRest(http);
+    host.open.set(true);
+    detectChanges();
+    http.expectOne(LIST).flush([]);
+    expect(cmp.freshUrl()).toBeNull();
   });
 
-  it('says when an expired link ran out', async () => {
-    const { http, detectChanges, cmp } = await setup();
-    flushPage(http);
-    detectChanges();
+  it('reports a failed create instead of leaving the button spinning', async () => {
+    const { http, cmp, openWith } = await setup();
+    openWith([]);
+    cmp.create();
+    http.expectOne((r) => r.method === 'POST').flush({}, { status: 403, statusText: 'Forbidden' });
+    expect(cmp.creating()).toBe(false);
+    expect(cmp.freshUrl()).toBeNull();
+  });
 
-    cmp.openShareDialog();
-    http.expectOne(url('/shares')).flush([liveShare({ expiresAt: '2020-01-01T00:00:00Z' })]);
-    detectChanges();
+  it('reports a failed revoke and keeps the link listed as live', async () => {
+    const { http, cmp, openWith } = await setup();
+    openWith([liveShare()]);
+    cmp.revoke('sh-1');
+    http.expectOne((r) => r.method === 'DELETE').flush({}, { status: 404, statusText: 'Not Found' });
+    expect(cmp.revoking()).toBeNull();
+    expect(cmp.shares()[0].revokedAt).toBeNull();
+  });
 
-    expect(screen.getByText(/Abgelaufen am/)).toBeInTheDocument();
-    flushRest(http);
+  it('shows an empty list rather than a stale one when the listing fails', async () => {
+    const { http, detectChanges, host, cmp } = await setup();
+    host.open.set(true);
+    detectChanges();
+    expect(cmp.loading()).toBe(true);
+    http.expectOne(LIST).flush({}, { status: 403, statusText: 'Forbidden' });
+    expect(cmp.loading()).toBe(false);
+    expect(cmp.shares()).toEqual([]);
+  });
+
+  it('clears the copyable link when that very link is revoked, keeps it for another', async () => {
+    const { http, cmp, openWith } = await setup();
+    openWith([liveShare({ id: 'sh-old' })]);
+    cmp.create();
+    http.expectOne((r) => r.method === 'POST').flush(liveShare({ id: 'sh-new', url: 'https://x/s/new' }));
+
+    cmp.revoke('sh-old');
+    http.expectOne((r) => r.method === 'DELETE').flush(liveShare({ id: 'sh-old', revokedAt: 'x' }));
+    expect(cmp.freshUrl()).toBe('https://x/s/new');
+
+    cmp.revoke('sh-new');
+    http.expectOne((r) => r.method === 'DELETE').flush(liveShare({ id: 'sh-new', revokedAt: 'x' }));
+    expect(cmp.freshUrl()).toBeNull();
   });
 
   it('does nothing while a create or a revoke is already in flight', async () => {
-    // The guards keep a double click from minting two links or racing two revokes.
-    const { http, detectChanges, cmp } = await setup();
-    flushPage(http);
-    detectChanges();
-
-    cmp.openShareDialog();
-    http.expectOne(url('/shares')).flush([liveShare()]);
-
-    cmp.createShare();
-    cmp.createShare();
+    const { http, cmp, openWith } = await setup();
+    openWith([liveShare()]);
+    cmp.create();
+    cmp.create();
     http.expectOne((r) => r.method === 'POST').flush(liveShare({ url: 'https://x/s/t' }));
-
-    cmp.revokeShare('sh-1');
-    cmp.revokeShare('sh-1');
+    cmp.revoke('sh-1');
+    cmp.revoke('sh-1');
     http.expectOne((r) => r.method === 'DELETE').flush(liveShare({ revokedAt: 'x' }));
-
-    flushRest(http);
     http.verify();
   });
-  it('marks the link as not copied when the clipboard write is refused', async () => {
-    // A denied clipboard permission must not leave "Kopiert" on the button.
-    const writeText = jest.fn().mockRejectedValue(new Error('denied'));
-    Object.assign(navigator, { clipboard: { writeText } });
-    const { http, detectChanges, cmp } = await setup();
-    flushPage(http);
+
+  it('makes no request at all without an application', async () => {
+    const { http, detectChanges, host, cmp } = await setup();
+    host.id.set(null);
+    host.open.set(true);
     detectChanges();
-
-    cmp.openShareDialog();
-    http.expectOne(url('/shares')).flush([]);
-    cmp.createShare();
-    http.expectOne((r) => r.method === 'POST').flush(liveShare({ url: 'https://x/s/t' }));
-
-    cmp.copyShareUrl();
-    await Promise.resolve();
-    expect(cmp.shareCopied()).toBe(false);
-    flushRest(http);
-  });
-
-  it('copies nothing when there is no fresh link', async () => {
-    const writeText = jest.fn();
-    Object.assign(navigator, { clipboard: { writeText } });
-    const { http, detectChanges, cmp } = await setup();
-    flushPage(http);
-    detectChanges();
-
-    cmp.copyShareUrl();
-    expect(writeText).not.toHaveBeenCalled();
-    flushRest(http);
-  });
-
-  it('makes no request at all when the application is not loaded', async () => {
-    // Every share call reads the application for its id. Without one there is nothing to
-    // share, and firing a request against `undefined` would 404 in the user\'s face.
-    const { http, detectChanges, cmp } = await setup();
-    flushPage(http);
-    detectChanges();
-    flushRest(http);
-
-    cmp.app.set(null);
-    cmp.openShareDialog();
-    cmp.createShare();
-    cmp.revokeShare('sh-1');
-
+    cmp.create();
+    cmp.revoke('sh-1');
     http.verify();
   });
-  it('marks the link as not copied when the clipboard write is refused', async () => {
-    // A denied clipboard permission must not leave "Kopiert" on the button.
-    const writeText = jest.fn().mockRejectedValue(new Error('denied'));
-    Object.assign(navigator, { clipboard: { writeText } });
-    const { http, detectChanges, cmp } = await setup();
-    flushPage(http);
+
+  it('drops a late listing of an application it no longer shows', async () => {
+    const { http, detectChanges, host, cmp } = await setup();
+    host.open.set(true);
     detectChanges();
-
-    cmp.openShareDialog();
-    http.expectOne(url('/shares')).flush([]);
-    cmp.createShare();
-    http.expectOne((r) => r.method === 'POST').flush(liveShare({ url: 'https://x/s/t' }));
-
-    cmp.copyShareUrl();
-    await Promise.resolve();
-    expect(cmp.shareCopied()).toBe(false);
-    flushRest(http);
-  });
-
-  it('copies nothing when there is no fresh link', async () => {
-    const writeText = jest.fn();
-    Object.assign(navigator, { clipboard: { writeText } });
-    const { http, detectChanges, cmp } = await setup();
-    flushPage(http);
+    const first = http.expectOne(LIST);
+    host.id.set('app-2');
     detectChanges();
-
-    cmp.copyShareUrl();
-    expect(writeText).not.toHaveBeenCalled();
-    flushRest(http);
-  });
-
-  it('makes no request at all when the application is not loaded', async () => {
-    // Every share call reads the application for its id. Without one there is nothing to
-    // share, and firing a request at an undefined id would 404 in the user's face.
-    const { http, detectChanges, cmp } = await setup();
-    flushPage(http);
+    const second = http.expectOne((r) => r.url === '/api/applications/app-2/shares');
+    first.flush([liveShare({ label: 'alt' })]);
+    expect(cmp.shares()).toEqual([]);
+    second.flush([liveShare({ label: 'neu' })]);
+    expect(cmp.shares()[0].label).toBe('neu');
+    // A late error of the old listing changes nothing either.
+    host.id.set('app-3');
     detectChanges();
-    flushRest(http);
-
-    cmp.app.set(null);
-    cmp.openShareDialog();
-    cmp.createShare();
-    cmp.revokeShare('sh-1');
-
-    http.verify();
+    const third = http.expectOne((r) => r.url === '/api/applications/app-3/shares');
+    host.id.set('app-4');
+    detectChanges();
+    third.flush({}, { status: 500, statusText: 'x' });
+    expect(cmp.loading()).toBe(true);
+    http.expectOne((r) => r.url === '/api/applications/app-4/shares').flush([]);
   });
 });

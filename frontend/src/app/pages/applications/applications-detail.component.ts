@@ -7,6 +7,7 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { NgTemplateOutlet } from '@angular/common';
 import { FormGroup, FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormlyForm, type FormlyFieldConfig } from '@ngx-formly/core';
@@ -18,24 +19,38 @@ import type { TranslationKey } from '@core/i18n/translations';
 import type {
   Application,
   ApplicationComment,
-  ApplicationShareLink,
-  ApplicationState,
+  ApplicationType,
   ApplicationVersion,
   CommentVisibility,
   FormFieldDef,
   Transition,
   Uuid,
 } from '@core/api/models';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { resolveI18n } from '@shared/forms/i18n-text';
 import { toFormlyFields } from '@shared/forms/formly-mapper';
-import { BadgeComponent } from '@stupa-makers/ui-kit';
-import { ButtonComponent } from '@stupa-makers/ui-kit';
-import { SelectComponent, type SelectOption } from '@stupa-makers/ui-kit';
-import { CardComponent } from '@stupa-makers/ui-kit';
-import { DialogComponent } from '@stupa-makers/ui-kit';
-import { IconComponent } from '@stupa-makers/ui-kit';
-import { ToastService } from '@stupa-makers/ui-kit';
+import {
+  AvatarComponent,
+  EmptyStateComponent,
+  FieldGroupComponent,
+  FieldRowComponent,
+  NoteComponent,
+  RowMenuComponent,
+  StatusTextComponent,
+  flowColorKind,
+  type RowMenuItem,
+  type RowMenuSection,
+} from '@shared/ui';
+import {
+  ButtonComponent,
+  DialogComponent,
+  IconComponent,
+  MEDIA,
+  SelectComponent,
+  TabsComponent,
+  ToastService,
+  type SelectOption,
+  type TabItem,
+} from '@stupa-makers/ui-kit';
 import {
   BudgetTreeApi,
   type BudgetTreeNode,
@@ -50,8 +65,12 @@ import {
   formatDateRangeValue,
   formatFieldValue,
   formatIsoDate,
+  transitionLooks,
 } from './applications.util';
-import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
+import { ApplicationsPageService } from './applications-page.service';
+import { ForceStatusDialogComponent } from './force-status-dialog/force-status-dialog.component';
+import { ShareLinksDialogComponent } from './share-links-dialog/share-links-dialog.component';
+import { mediaQuerySignal } from '../../layout/media-query';
 import { RailStatusService } from '../../layout/rail-status.service';
 
 /** Comparison offer / cost position for the structured detail view. */
@@ -68,34 +87,48 @@ interface DetailPosition {
   noOffersReason?: string;
 }
 
+/** The tabs of the detail when the list and the detail do not sit side by side. */
+type DetailTab = 'app' | 'history' | 'comments' | 'files';
+
 /**
- * Application detail: fields, version history with diff, comments, and status actions.
+ * Application detail: the sheet beside the list (board Anträge), or alone with tabs on a
+ * narrow screen (board Schmal-Anträge-Detail).
  *
- * A comment is internal or public. A status action asks for a confirmation and handles a
- * 409 answer. RBAC here only gates the UX. The server decides. The actions and the
- * internal comment visibility appear only with `application.manage`.
+ * Header: "<Typ> · Version n", the title, "status · gremium · amount", the firable
+ * transitions as buttons, and the actions (share links, edit, archive, and a menu with
+ * Status setzen, Versionen vergleichen, Löschen, Anonymisierung beantragen). Body: the
+ * details, the answers, the attachments, the version history and the comments.
+ *
+ * RBAC here only gates the UX. The server decides.
  */
 @Component({
   selector: 'app-applications-detail',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    PageHeaderComponent,
+    NgTemplateOutlet,
     RouterLink,
-    EmptyStateComponent,
     FormsModule,
     FormlyForm,
     LocalizedDatePipe,
     TranslatePipe,
-    BadgeComponent,
+    AvatarComponent,
+    EmptyStateComponent,
+    FieldGroupComponent,
+    FieldRowComponent,
+    NoteComponent,
+    RowMenuComponent,
+    StatusTextComponent,
     ButtonComponent,
-    CardComponent,
     DialogComponent,
     IconComponent,
     SelectComponent,
+    TabsComponent,
     CostCentreTreeComponent,
     AttachmentsPanelComponent,
     MarkdownViewComponent,
+    ShareLinksDialogComponent,
+    ForceStatusDialogComponent,
   ],
   templateUrl: './applications-detail.component.html',
   styleUrl: './applications-detail.component.scss',
@@ -108,6 +141,13 @@ export class ApplicationsDetailComponent {
   private readonly toast = inject(ToastService);
   private readonly railStatus = inject(RailStatusService);
   private readonly route = inject(ActivatedRoute);
+  /** The link to the list pane. Absent when the detail runs without the list page. */
+  private readonly page = inject(ApplicationsPageService, { optional: true });
+
+  /** The list sits beside the detail: two columns, no tabs. */
+  readonly split = computed(() => this.page?.split() ?? false);
+  /** Phone: every header action goes into the menu. */
+  readonly phone = mediaQuerySignal(MEDIA.phone);
 
   readonly loading = signal(true);
   readonly notFound = signal(false);
@@ -138,8 +178,10 @@ export class ApplicationsDetailComponent {
   readonly deletingComment = signal<ApplicationComment | null>(null);
   readonly removingComment = signal(false);
 
-  /** The version history starts collapsed. The card header holds the toggle. */
-  readonly historyOpen = signal(false);
+  /** The active tab of the narrow layout. */
+  readonly tab = signal<DetailTab>('app');
+  /** The number of attachments, from the panel. `null` until it loaded them. */
+  readonly attachmentCount = signal<number | null>(null);
 
   /** Manual transitions that the server guard allows, plus the fire in flight. */
   readonly transitions = signal<Transition[]>([]);
@@ -233,22 +275,10 @@ export class ApplicationsDetailComponent {
   readonly confirmErase = signal(false);
   readonly requestingErasure = signal(false);
 
-  // Force status is a privileged override that needs `application.force_status`.
-  // The dialog lazy-loads the flow states of the application. It asks for a target
-  // state and for a mandatory reason.
+  // Force status is a privileged override that needs `application.force_status`. The
+  // dialog loads the flow states itself.
   readonly canForceStatus = computed(() => this.auth.can('application.force_status'));
   readonly forceDialogOpen = signal(false);
-  readonly forcingStatus = signal(false);
-  private readonly forceStates = signal<ApplicationState[]>([]);
-  readonly forceStateChoice = signal('');
-  readonly forceNote = signal('');
-  /** Target-state options: every state of the flow except the current one. */
-  readonly forceStateOptions = computed<SelectOption[]>(() => {
-    const currentId = this.app()?.state?.id ?? '';
-    return this.forceStates()
-      .filter((s) => s.id !== currentId)
-      .map((s) => ({ value: s.id, label: s.label || s.key }));
-  });
 
   private readonly router = inject(Router);
   readonly canManage = computed(() => this.auth.can('application.manage'));
@@ -276,6 +306,7 @@ export class ApplicationsDetailComponent {
       next: (updated) => {
         this.app.set(updated);
         this.archiving.set(false);
+        this.page?.notify({ id: updated.id, kind: 'updated', source: 'detail' });
         this.toast.success(
           this.i18n.translate(next ? 'applications.archived' : 'applications.unarchived'),
         );
@@ -289,121 +320,13 @@ export class ApplicationsDetailComponent {
   /**
    * Public share links. `application.share` is its own permission on purpose: reading an
    * application and deciding it may be read by anyone holding a URL are different
-   * decisions, and the server gates on the same key.
+   * decisions, and the server gates on the same key. The dialog does the rest.
    */
   readonly canShare = computed(() => this.auth.can('application.share'));
   readonly shareDialogOpen = signal(false);
-  readonly shares = signal<ApplicationShareLink[]>([]);
-  readonly sharesLoading = signal(false);
-  readonly creatingShare = signal(false);
-  readonly revokingShare = signal<Uuid | null>(null);
-  readonly shareTtl = signal('30');
-  readonly shareLabel = signal('');
-  /**
-   * The link that was just minted, held only for as long as the dialog is open.
-   *
-   * This is the one moment the token exists outside the URL bar of whoever pastes it.
-   * The server stored a hash; closing the dialog loses the plaintext for good, which is
-   * why the copy button sits next to it rather than on the list row.
-   *
-   * The whole row is kept, not just the URL, so that revoking can tell whether the link
-   * on screen is the one that just stopped working.
-   */
-  readonly freshShare = signal<ApplicationShareLink | null>(null);
-  readonly freshShareUrl = computed(() => this.freshShare()?.url ?? null);
-  readonly shareCopied = signal(false);
-
-  /** How long a new link lives. "Never" is deliberately not among the options. */
-  readonly shareTtlOptions: SelectOption[] = [
-    { value: '7', label: '7' },
-    { value: '30', label: '30' },
-    { value: '90', label: '90' },
-    { value: '365', label: '365' },
-  ];
 
   openShareDialog(): void {
-    this.freshShare.set(null);
-    this.shareCopied.set(false);
-    this.shareLabel.set('');
     this.shareDialogOpen.set(true);
-    this.loadShares();
-  }
-
-  private loadShares(): void {
-    const current = this.app();
-    if (!current) return;
-    this.sharesLoading.set(true);
-    this.api.applicationShares(current.id).subscribe({
-      next: (rows) => {
-        this.shares.set(rows);
-        this.sharesLoading.set(false);
-      },
-      error: () => {
-        this.shares.set([]);
-        this.sharesLoading.set(false);
-      },
-    });
-  }
-
-  createShare(): void {
-    const current = this.app();
-    if (!current || this.creatingShare()) return;
-    this.creatingShare.set(true);
-    this.shareCopied.set(false);
-    const label = this.shareLabel().trim();
-    this.api
-      .createApplicationShare(current.id, {
-        ttlDays: Number(this.shareTtl()),
-        ...(label ? { label } : {}),
-      })
-      .subscribe({
-        next: (link) => {
-          this.freshShare.set(link);
-          this.shares.update((rows) => [link, ...rows]);
-          this.shareLabel.set('');
-          this.creatingShare.set(false);
-        },
-        error: () => {
-          this.creatingShare.set(false);
-          this.toast.error(this.i18n.translate('applications.share.createError'));
-        },
-      });
-  }
-
-  revokeShare(shareId: Uuid): void {
-    const current = this.app();
-    if (!current || this.revokingShare()) return;
-    this.revokingShare.set(shareId);
-    this.api.revokeApplicationShare(current.id, shareId).subscribe({
-      next: (updated) => {
-        this.shares.update((rows) => rows.map((r) => (r.id === updated.id ? updated : r)));
-        this.revokingShare.set(null);
-        // A link that was just revoked must not stay on screen as something to copy.
-        if (updated.id === this.freshShare()?.id) {
-          this.freshShare.set(null);
-        }
-        this.toast.success(this.i18n.translate('applications.share.revoked'));
-      },
-      error: () => {
-        this.revokingShare.set(null);
-        this.toast.error(this.i18n.translate('applications.share.revokeError'));
-      },
-    });
-  }
-
-  /** Copy the fresh link. The Clipboard API can be absent, so the write is optional. */
-  copyShareUrl(): void {
-    const url = this.freshShareUrl();
-    if (!url) return;
-    void navigator.clipboard?.writeText(url)?.then(
-      () => this.shareCopied.set(true),
-      () => this.shareCopied.set(false),
-    );
-  }
-
-  /** Whether a link still opens. Revoked and expired both read as dead. */
-  protected shareIsLive(share: ApplicationShareLink): boolean {
-    return share.revokedAt === null && new Date(share.expiresAt).getTime() > Date.now();
   }
 
   /**
@@ -428,12 +351,179 @@ export class ApplicationsDetailComponent {
     applicationTitle(this.app()?.data, this.i18n.translate('applications.list.untitled')),
   );
 
+  /** The application types, for "<Typ> · Version n". */
+  private readonly types = signal<ApplicationType[]>([]);
+  /** Gremium names from the meeting filter list, for a gremium the reader is not in. */
+  private readonly filterGremien = signal<{ id: Uuid; name: string }[]>([]);
+  private gremienRequested = false;
+
+  /** "<Typ> · Version n" above the title. */
+  readonly metaLine = computed(() => {
+    const app = this.app();
+    if (!app) return '';
+    const type = this.types().find((t) => t.id === app.typeId)?.name;
+    const version = this.i18n.translate('applications.detail.version', { version: app.version });
+    return type ? `${type} · ${version}` : version;
+  });
+
+  /** The name of the gremium of the application, or null when it is not known here. */
+  readonly gremiumName = computed(() => {
+    const id = this.app()?.gremiumId;
+    if (!id) return null;
+    const own = this.auth.gremien().find((g) => g.id === id)?.name;
+    return own ?? this.filterGremien().find((g) => g.id === id)?.name ?? null;
+  });
+
+  /** The status of the application as coloured text. */
+  readonly stateKind = computed(() => flowColorKind(this.app()?.state?.color));
+
+  /** The look of each transition button: main action, tonal, or danger (a rejection). */
+  readonly looks = computed(() => transitionLooks(this.transitions()));
+
+  /** The data can change: the edit button and the menu item. */
+  readonly canEditData = computed(() => {
+    const app = this.app();
+    return !!app?.canEdit && !!app.state?.editAllowed;
+  });
+
+  /** The owner may ask for the anonymization of their data (GDPR Art. 17). */
+  readonly canRequestErasure = computed(() => {
+    const app = this.app();
+    return !!app?.isOwner && !app.applicant?.anonymized;
+  });
+
+  /**
+   * The header menu. On a phone it also holds the actions that wider screens show as
+   * icon buttons (share links, edit, archive).
+   */
+  readonly menuSections = computed<RowMenuSection[]>(() => {
+    const app = this.app();
+    if (!app) return [];
+    const t = (key: TranslationKey) => this.i18n.translate(key);
+    const quick: RowMenuItem[] = [];
+    if (this.phone()) {
+      if (this.canShare()) quick.push({ id: 'share', label: t('applications.row.share'), icon: 'link' });
+      if (this.canEditData()) quick.push({ id: 'edit', label: t('applications.detail.edit'), icon: 'edit' });
+      if (this.canArchive()) {
+        quick.push({
+          id: 'archive',
+          label: t(app.archivedAt ? 'applications.row.unarchive' : 'applications.row.archive'),
+          icon: 'archive',
+        });
+      }
+    }
+    const more: RowMenuItem[] = [];
+    if (this.canForceStatus()) {
+      more.push({ id: 'force', label: t('applications.detail.forceStatus'), icon: 'flow' });
+    }
+    if (this.versions().length > 1) {
+      more.push({ id: 'versions', label: t('applications.detail.compareVersions'), icon: 'history' });
+    }
+    const danger: RowMenuItem[] = [];
+    if (this.canDelete()) {
+      danger.push({ id: 'delete', label: t('applications.detail.delete'), icon: 'trash', danger: true });
+    }
+    if (this.canRequestErasure()) {
+      danger.push({ id: 'erase', label: t('applications.detail.eraseRequest'), icon: 'user', danger: true });
+    }
+    return [{ items: quick }, { items: more }, { items: danger }].filter((sec) => sec.items.length);
+  });
+
+  /** The tabs of the narrow layout, with their counts. */
+  readonly tabs = computed<TabItem[]>(() => [
+    { id: 'app', label: this.i18n.translate('applications.detail.tab.app') },
+    {
+      id: 'history',
+      label: this.i18n.translate('applications.detail.tab.history'),
+      count: this.versions().length,
+    },
+    {
+      id: 'comments',
+      label: this.i18n.translate('applications.detail.tab.comments'),
+      count: this.comments().length,
+    },
+    {
+      id: 'files',
+      label: this.i18n.translate('applications.detail.tab.files'),
+      count: this.attachmentCount(),
+    },
+  ]);
+
   constructor() {
     // Use `paramMap`, not `snapshot`. Angular reuses the component on a
     // detail-to-detail navigation, so the constructor does not run again. A snapshot
     // would keep the old `id`. The subscription reloads on every `id` change.
     this.route.paramMap.pipe(takeUntilDestroyed()).subscribe((pm) => {
       this.loadApplication(pm.get('id') ?? '');
+    });
+    this.api.applicationTypes({ quiet: true }).subscribe({
+      next: (types) => this.types.set(types),
+      error: () => this.types.set([]),
+    });
+    // The list pane changed this application (a row action): show the new state.
+    this.page?.changes$.pipe(takeUntilDestroyed()).subscribe((change) => {
+      if (change.source === 'list' && change.id === this.id && change.kind === 'updated') {
+        this.refresh();
+      }
+    });
+  }
+
+  /** A tab of the narrow layout was chosen. */
+  selectTab(id: string | null): void {
+    if (id === 'app' || id === 'history' || id === 'comments' || id === 'files') this.tab.set(id);
+  }
+
+  /** An item of the header menu was chosen. */
+  onMenu(item: RowMenuItem): void {
+    const app = this.app();
+    if (!app) return;
+    switch (item.id) {
+      case 'share':
+        this.openShareDialog();
+        break;
+      case 'edit':
+        this.startEdit(app);
+        break;
+      case 'archive':
+        this.toggleArchived();
+        break;
+      case 'force':
+        this.openForceDialog();
+        break;
+      case 'versions':
+        this.showVersions();
+        break;
+      case 'delete':
+        this.confirmDelete.set(true);
+        break;
+      case 'erase':
+        this.confirmErase.set(true);
+        break;
+    }
+  }
+
+  /**
+   * "Versionen vergleichen": the history holds every version with its changes. The tabs
+   * switch to it; side by side the history section scrolls into view.
+   */
+  showVersions(): void {
+    if (!this.split()) {
+      this.tab.set('history');
+      return;
+    }
+    const el = document.getElementById('ad-history');
+    el?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+    el?.focus({ preventScroll: true });
+  }
+
+  /** Load the gremium names once, when the gremium is not one of the reader's own. */
+  private resolveGremium(app: Application): void {
+    if (!app.gremiumId || this.gremienRequested) return;
+    if (this.auth.gremien().some((g) => g.id === app.gremiumId)) return;
+    this.gremienRequested = true;
+    this.api.listMeetingFilterGremien().subscribe({
+      next: (list) => this.filterGremien.set(list),
+      error: () => this.filterGremien.set([]),
     });
   }
 
@@ -459,6 +549,9 @@ export class ApplicationsDetailComponent {
     this.error.set(false);
     this.editingComment.set(null);
     this.deletingComment.set(null);
+    this.transitions.set([]);
+    this.attachmentCount.set(null);
+    this.tab.set('app');
     if (!id) {
       this.notFound.set(true);
       this.loading.set(false);
@@ -470,6 +563,7 @@ export class ApplicationsDetailComponent {
         if (seq !== this.loadSeq) return;
         this.app.set(app);
         this.loading.set(false);
+        this.resolveGremium(app);
         this.loadAux();
         // Take the effective form from the pinned version of the application, not from
         // the active one. The labels and the edit fields then match the data that the
@@ -548,7 +642,7 @@ export class ApplicationsDetailComponent {
           this.assigningBudget.set(false);
           this.budgetDialogOpen.set(false);
           this.toast.success(this.i18n.translate('applications.actions.success'));
-          this.refresh();
+          this.changed();
         },
         error: (err: { status?: number }) => {
           this.assigningBudget.set(false);
@@ -736,7 +830,7 @@ export class ApplicationsDetailComponent {
         this.savingEdit.set(false);
         this.editing.set(false);
         this.toast.success(this.i18n.translate('applications.detail.saved'));
-        this.refresh();
+        this.changed();
       },
       error: (err: { status?: number }) => {
         this.savingEdit.set(false);
@@ -755,7 +849,8 @@ export class ApplicationsDetailComponent {
         this.deleting.set(false);
         this.confirmDelete.set(false);
         this.toast.success(this.i18n.translate('applications.detail.deleted'));
-        void this.router.navigate(['/applications']);
+        this.page?.notify({ id: this.id, kind: 'deleted', source: 'detail' });
+        void this.router.navigate(['/applications'], { queryParamsHandling: 'preserve' });
       },
       error: () => {
         this.deleting.set(false);
@@ -782,47 +877,14 @@ export class ApplicationsDetailComponent {
     });
   }
 
-  /** Open the force-status dialog, lazy-load the flow states and reset the form. */
+  /** Open the force-status dialog. It loads the flow states itself. */
   openForceDialog(): void {
-    this.forceStateChoice.set('');
-    this.forceNote.set('');
-    if (!this.forceStates().length) {
-      const seq = this.loadSeq;
-      this.api.flowStates(this.id).subscribe({
-        next: (states) => {
-          if (seq === this.loadSeq) this.forceStates.set(states);
-        },
-        error: () => {},
-      });
-    }
     this.forceDialogOpen.set(true);
   }
 
-  /** Force the application directly into the chosen state. The reason is mandatory.
-   *  The server bypasses the flow guards. A 403 or a 409 answer shows a toast. */
-  doForceStatus(): void {
-    const stateId = this.forceStateChoice();
-    const note = this.forceNote().trim();
-    if (!stateId || !note || this.forcingStatus()) return;
-    this.forcingStatus.set(true);
-    this.api.forceStatus(this.id, { stateId, note }).subscribe({
-      next: () => {
-        this.forcingStatus.set(false);
-        this.forceDialogOpen.set(false);
-        this.toast.success(this.i18n.translate('applications.actions.success'));
-        this.refresh();
-      },
-      error: (err: { status?: number }) => {
-        this.forcingStatus.set(false);
-        const key =
-          err.status === 403
-            ? 'applications.transitions.forbidden'
-            : err.status === 409
-              ? 'applications.actions.conflict'
-              : 'applications.actions.error';
-        this.toast.error(this.i18n.translate(key));
-      },
-    });
+  /** The force-status dialog set a state: load the application again. */
+  onForced(): void {
+    this.changed();
   }
 
   /** Display name of a comment: the author, or a fallback based on the role. */
@@ -833,15 +895,6 @@ export class ApplicationsDetailComponent {
         ? 'applications.comments.author.applicant'
         : 'applications.comments.author.committee',
     );
-  }
-
-  /** Initial(s) for the chat avatar. */
-  protected initial(name: string): string {
-    const parts = name.trim().split(/\s+/).filter(Boolean);
-    if (!parts.length) return '?';
-    const first = parts[0][0];
-    const last = parts.length > 1 ? parts[parts.length - 1][0] : '';
-    return (first + last).toUpperCase();
   }
 
   /** Enter sends the comment. Shift+Enter makes a line break.
@@ -945,7 +998,7 @@ export class ApplicationsDetailComponent {
       next: () => {
         this.firing.set(null);
         this.toast.success(this.i18n.translate('applications.actions.success'));
-        this.refresh();
+        this.changed();
       },
       error: (err: { status?: number }) => {
         this.firing.set(null);
@@ -956,9 +1009,15 @@ export class ApplicationsDetailComponent {
               ? 'applications.actions.conflict'
               : 'applications.actions.error';
         this.toast.error(this.i18n.translate(key));
-        this.refresh();
+        this.changed();
       },
     });
+  }
+
+  /** This pane changed the application: load it again and tell the list pane. */
+  private changed(): void {
+    this.refresh();
+    this.page?.notify({ id: this.id, kind: 'updated', source: 'detail' });
   }
 
   /** Reload the application and the dependent sections after a transition. The task
