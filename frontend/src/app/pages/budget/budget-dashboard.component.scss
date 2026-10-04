@@ -50,11 +50,21 @@
   gap: var(--space-4);
   min-width: 0;
 }
+/* The wide layout does not scroll as a page: the pane and the sheet each scroll inside
+   themselves. The host takes the free height of the main column of the shell (the
+   viewport less the footer and the block padding) and gives it to the grid. A basis of 0
+   keeps the content from pushing the page taller than the viewport. */
+:host:has(> .bd--wide) {
+  flex: 1 1 0;
+  min-height: 24rem;
+}
 .bd--wide {
   display: grid;
+  flex: 1 1 0;
   grid-template-columns: 340px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   gap: var(--space-2);
-  align-items: start;
+  min-height: 0;
 }
 
 .bd__pane {
@@ -63,11 +73,11 @@
   gap: var(--space-3);
   min-width: 0;
 }
+/* The pane takes the full height of the frame and does not scroll itself: the title, the
+   chips and the search stay; only the tree scrolls. */
 .bd--wide .bd__pane {
-  position: sticky;
-  top: var(--main-pad-top, 0px);
-  max-height: calc(100dvh - var(--main-pad-top, 0px) - var(--space-3));
-  overflow-y: auto;
+  min-height: 0;
+  overflow: hidden;
   padding-inline-end: var(--space-2);
 }
 .bd--wide .bd__title {
@@ -75,9 +85,22 @@
 }
 .bd__paneBody {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: var(--space-3);
   min-width: 0;
+  min-height: 0;
+}
+/* In the bottom sheet of the dialog the body scrolls by itself and passes no height
+   down. The pane takes a height of its own, so that only the tree scrolls: about 85% of
+   the screen less the handle, the header and the padding of the sheet. */
+.bd__paneBody--sheet {
+  max-height: calc(85dvh - 7.5rem - env(safe-area-inset-bottom, 0px));
+}
+/* The side sheet has the surface-2 background of the search field. The field takes the
+   next surface, so that its edge shows. */
+.bd__paneBody--side app-search-pill {
+  --sp-bg: var(--color-surface-3);
 }
 
 .bd__top {
@@ -85,12 +108,25 @@
   flex-direction: column;
   gap: var(--space-4);
 }
+/* The title and the actions on one line: the actions sit at the end, on the baseline of
+   the title, and do not wrap below it. A phone has the "more" menu instead. */
 .bd__topRow {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
-  gap: var(--space-3) var(--space-4);
+  gap: var(--space-4);
+}
+.bd__topRow > .bd__title {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.bd__topRow .bd__actions {
+  flex: none;
+  flex-wrap: nowrap;
+}
+.bd__more {
+  flex: none;
+  align-self: center;
 }
 .bd__chips {
   display: flex;
@@ -137,19 +173,43 @@
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
+/* The select fills the whole chip, so a click on the padding or on an icon opens it too.
+   The icons sit on top of the select and let the click through. The paddings of the
+   select keep the old look: 12px, icon, 6px gap, text, 6px gap, chevron, 10px. */
 .bd__selectChip {
-  padding-inline-end: 10px;
+  padding: 0;
+}
+.bd__selectLead,
+.bd__selectChev {
+  position: absolute;
+  top: 50%;
+  display: flex;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+.bd__selectLead {
+  inset-inline-start: 12px;
+}
+.bd__selectChev {
+  inset-inline-end: 10px;
 }
 .bd__select {
   appearance: none;
+  align-self: stretch;
   min-width: 0;
   margin: 0;
-  padding: 0;
+  padding-block: 0;
+  padding-inline: 12px 30px;
   border: 0;
+  border-radius: inherit;
   background: transparent;
   color: inherit;
   font: inherit;
   cursor: pointer;
+}
+/* The year chip: a 15px calendar icon in front and a 15px chevron. */
+.bd__selectChip--lead .bd__select {
+  padding-inline: 33px 31px;
 }
 .bd__select:focus {
   outline: none;
@@ -160,12 +220,59 @@
   color: var(--color-text);
 }
 
-/* ------------------------------------------------------------------ tree */
+/* ------------------------------------------------------------------ fades
+   An end of a scrolling list fades only when there is more content past it
+   (`appScrollFade` sets the classes). The tree and the wide sheet share the mask. */
+.bd__tree,
+.bd__sheetBody {
+  --bd-fade: var(--space-6);
+}
+.bd__tree.is-fade-start,
+.bd__sheetBody.is-fade-start {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--bd-fade));
+  mask-image: linear-gradient(to bottom, transparent, #000 var(--bd-fade));
+}
+.bd__tree.is-fade-end,
+.bd__sheetBody.is-fade-end {
+  -webkit-mask-image: linear-gradient(to top, transparent, #000 var(--bd-fade));
+  mask-image: linear-gradient(to top, transparent, #000 var(--bd-fade));
+}
+.bd__tree.is-fade-start.is-fade-end,
+.bd__sheetBody.is-fade-start.is-fade-end {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--bd-fade),
+    #000 calc(100% - var(--bd-fade)),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--bd-fade),
+    #000 calc(100% - var(--bd-fade)),
+    transparent
+  );
+}
+
+/* ------------------------------------------------------------------ tree
+   The tree is the only part of the pane that scrolls. An end fades only when there are
+   more rows past it (`appScrollFade` sets the classes). The scroll padding keeps a row
+   that gets the focus clear of the fade. */
 .bd__tree {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: var(--bd-fade);
+}
+/* The rows keep their size; the list scrolls instead of squeezing them. */
+.bd__tree > * {
+  flex: none;
 }
 .tn {
   display: flex;
@@ -249,19 +356,34 @@ button.tn__chev:hover:not(:disabled) {
   font-size: 0.78125rem;
 }
 
-/* ------------------------------------------------------------------ sheet */
+/* ------------------------------------------------------------------ sheet
+   The card carries the background; the body inside it holds the content and, on the
+   wide layout, scrolls. So the fade masks the content and never the card. */
 .bd__sheet {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface-1);
+}
+.bd--wide .bd__sheet {
+  overflow: hidden;
+}
+.bd__sheetBody {
   display: flex;
   flex-direction: column;
   gap: 22px;
   min-width: 0;
   // 24px 32px, as on the Budget board: the sheet keeps its width for the charts.
   padding: var(--space-5) var(--space-6);
-  border-radius: var(--radius-2xl);
-  background: var(--color-surface-1);
 }
-.bd--wide .bd__sheet {
-  min-height: calc(100dvh - var(--main-pad-top, 0px) - var(--space-3));
+.bd--wide .bd__sheetBody {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
 }
 
 .bd__head {
@@ -401,34 +523,8 @@ button.bd__crumb:hover {
   line-height: 1.5rem;
   font-weight: var(--fw-semibold);
 }
-/* The two legend items wrap as one group, never apart. */
-.bd__legends {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  gap: var(--space-4);
-  white-space: nowrap;
-}
 .bd__secHead > app-button {
   flex: none;
-}
-.bd__legend {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.78125rem;
-  color: var(--color-text-muted);
-}
-.bd__swatch {
-  width: 10px;
-  height: 10px;
-  border-radius: 3px;
-}
-.bd__swatch--spent {
-  background: var(--color-text-muted);
-}
-.bd__swatch--bound {
-  background: color-mix(in srgb, var(--color-text-muted) 40%, var(--color-surface-4));
 }
 
 /* "Auslastung je Budget": a name and three numbers per row, the bar below. */
@@ -453,9 +549,24 @@ button.bd__crumb:hover {
   color: var(--color-text-muted);
 }
 .bd__grow,
-.bd__uname {
+.bd__ucell {
   flex: 1 1 0;
   min-width: 0;
+}
+.bd__ucell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.bd__uname {
+  min-width: 0;
+}
+/* The requested amount below the name: only on a phone, which drops the column. */
+.bd__ureq {
+  display: none;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  color: var(--color-text-muted);
 }
 .bd__c1,
 .bd__c2,
@@ -538,8 +649,10 @@ button.bd__crumb:hover {
     background: var(--color-surface-1);
   }
   .bd__sheet {
-    padding: 0;
     background: none;
+  }
+  .bd__sheetBody {
+    padding: 0;
   }
   .bd__cols {
     grid-template-columns: minmax(0, 1fr);
@@ -569,16 +682,17 @@ button.bd__crumb:hover {
   .bd__figValue {
     font-size: 1rem;
   }
+  /* No room for the "Beantragt" column: the amount moves below the name (N28). */
   .bd__c1 {
     display: none;
   }
+  .bd__ureq {
+    display: block;
+  }
   /* The heading takes the free width and wraps in it, so an action such as
-     "Alle ansehen" stays on the heading row. The legend goes below as one row. */
+     "Alle ansehen" stays on the heading row. */
   .bd__h {
     flex: 1 1 0;
     min-width: 0;
-  }
-  .bd__legends {
-    flex-basis: 100%;
   }
 }

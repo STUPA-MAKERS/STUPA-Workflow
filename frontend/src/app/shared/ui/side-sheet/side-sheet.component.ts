@@ -43,6 +43,11 @@ const FOCUSABLE = [
  *
  * Slots: the content, and `[sheet-actions]` for controls in the header before the close
  * button.
+ *
+ * `contentScrolls`: the content scrolls a list of its own and keeps its header in place
+ * (the cost-centre picker). The body then only passes the height down and does not
+ * scroll. The content must be a flex item that can shrink (`flex: 1 1 auto;
+ * min-height: 0`).
  */
 @Component({
   selector: 'app-side-sheet',
@@ -57,6 +62,8 @@ export class SideSheetComponent {
   /** The title of the sheet, also its accessible name. */
   readonly heading = input.required<string>();
   readonly side = input<SheetSide>('end');
+  /** The content scrolls by itself; the body does not. */
+  readonly contentScrolls = input(false);
 
   readonly closed = output<void>();
 

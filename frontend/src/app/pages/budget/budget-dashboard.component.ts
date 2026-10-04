@@ -11,10 +11,14 @@ import type { Uuid } from '@core/api/models';
 import { ButtonComponent, DialogComponent, IconComponent, MEDIA } from '@stupa-makers/ui-kit';
 import { AuthService } from '@core/auth/auth.service';
 import { downloadBlob } from '@shared/download.util';
+import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { SimplifyPathPipe } from '@shared/budget-path';
 import {
   EmptyStateComponent,
   ListItemComponent,
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
   SearchPillComponent,
   type Seg,
   SegBarComponent,
@@ -113,8 +117,12 @@ export const APPS_SHOWN = 5;
  * Beantragt, Gebunden, Ausgegeben, Einnahmen, Verfügbar; N28), the distribution over the
  * sub cost centres, the utilisation per sub cost centre and the applications on it.
  *
- * Below the wide breakpoint the pane moves into a side sheet that a path chip opens. The
- * query params hold the selection, so the view is shareable as a link. A reader with a
+ * On the wide layout the page fills the height of the viewport and does not scroll: in
+ * the pane only the tree scrolls, and the sheet scrolls inside itself. Below the wide
+ * breakpoint the year and the overview chips sit beside a path chip on the page. The path
+ * chip opens the search and the tree: in a side sheet from the start, or on a phone in
+ * the dialog of the ui-kit, which is a bottom sheet there. The query params hold the
+ * selection, so the view is shareable as a link. A reader with a
  * gremium scope (`viewGremiumId`) gets only the subtrees of the server response.
  */
 @Component({
@@ -131,6 +139,7 @@ export const APPS_SHOWN = 5;
     IconComponent,
     EmptyStateComponent,
     ListItemComponent,
+    RowMenuComponent,
     SearchPillComponent,
     SegBarComponent,
     SideSheetComponent,
@@ -138,6 +147,7 @@ export const APPS_SHOWN = 5;
     StatusTextComponent,
     BudgetPieComponent,
     BudgetSunburstComponent,
+    ScrollFadeDirective,
   ],
   templateUrl: './budget-dashboard.component.html',
   styleUrl: './budget-dashboard.component.scss',
@@ -151,6 +161,9 @@ export class BudgetDashboardComponent {
 
   /** The pane sits beside the sheet only on a wide viewport. */
   readonly wide = mediaQuerySignal(MEDIA.wide);
+  /** A phone opens the tree in the bottom sheet of the dialog, a narrow viewport in a
+   *  side sheet. */
+  readonly phone = mediaQuerySignal(MEDIA.phone);
 
   readonly canExport = computed(() => this.auth.can('budget.export'));
   /** The bookings page needs a global budget permission; a gremium scope alone has none. */
@@ -754,6 +767,12 @@ export class BudgetDashboardComponent {
     this.syncUrl();
   }
 
+  /** Keyboard focus on a tree row scrolls the row into view, clear of the fades. */
+  revealRow(event: FocusEvent): void {
+    const row = (event.target as HTMLElement | null)?.closest<HTMLElement>('.tn');
+    row?.scrollIntoView?.({ block: 'nearest' });
+  }
+
   drillInto(node: BudgetTreeNode): void {
     this.selectKs(node.id);
   }
@@ -771,6 +790,23 @@ export class BudgetDashboardComponent {
 
   openApplications(): void {
     void this.router.navigate(['/applications'], { queryParams: { budget: this.selectedKsId() } });
+  }
+
+  /** The actions of the page, as the "more" menu of a phone. */
+  actionSections(): RowMenuSection[] {
+    const items: RowMenuItem[] = [];
+    if (this.canExport()) {
+      items.push({ id: 'export', label: this.i18n.translate('budget.dash.export'), icon: 'download' });
+    }
+    if (this.canSeeBookings()) {
+      items.push({ id: 'bookings', label: this.i18n.translate('budget.usage.viewExpenses'), icon: 'receipt' });
+    }
+    return [{ items }];
+  }
+
+  onAction(item: RowMenuItem): void {
+    if (item.id === 'export') this.onExport();
+    else if (item.id === 'bookings') this.openBookings();
   }
 
   openBookings(): void {

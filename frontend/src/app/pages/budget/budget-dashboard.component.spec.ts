@@ -141,10 +141,11 @@ function authStub(perms: string[] = ALL_PERMS): AuthService {
   return { can, canAny: (...ps: string[]) => ps.some(can) } as unknown as AuthService;
 }
 
-/** Let `matchMedia` report a wide viewport (or not). jsdom has none of its own. */
-function setViewport(wide: boolean): void {
+/** Let `matchMedia` report a wide viewport (or not), and a phone. jsdom has none of its own. */
+function setViewport(wide: boolean, phone = false): void {
   window.matchMedia = ((query: string) => ({
-    matches: wide && query.includes('min-width: 1200px'),
+    matches:
+      (wide && query.includes('min-width: 1200px')) || (phone && query === '(max-width: 768px)'),
     media: query,
     onchange: null,
     addEventListener: () => undefined,
@@ -162,6 +163,7 @@ interface SetupOpts {
   queryParams?: Record<string, string>;
   apps?: BudgetApplication[];
   wide?: boolean;
+  phone?: boolean;
 }
 
 function providers(opts: SetupOpts, params = new BehaviorSubject(convertToParamMap({}))) {
@@ -190,7 +192,7 @@ function flushApps(http: HttpTestingController, apps: BudgetApplication[] = []):
 }
 
 async function setup(opts: SetupOpts = {}) {
-  setViewport(opts.wide ?? true);
+  setViewport(opts.wide ?? true, opts.phone);
   const tree = opts.tree ?? TREE;
   const fys = opts.fys ?? [FY];
   const params = new BehaviorSubject(convertToParamMap(opts.queryParams ?? {}));
@@ -208,7 +210,7 @@ async function setup(opts: SetupOpts = {}) {
 
 /** Render without answering anything, for the loading and error paths. */
 async function bare(opts: SetupOpts = {}) {
-  setViewport(opts.wide ?? true);
+  setViewport(opts.wide ?? true, opts.phone);
   const view = await render(BudgetDashboardComponent, { providers: providers(opts) });
   const http = TestBed.inject(HttpTestingController);
   return { ...view, http, c: view.fixture.componentInstance as unknown as Inst };
@@ -227,6 +229,55 @@ describe('BudgetDashboardComponent', () => {
   // ------------------------------------------------------------------ tree
 
   describe('tree', () => {
+    it('scrolls only the tree and fades an end only where more rows are', async () => {
+      const view = await setup();
+      const tree = view.container.querySelector('.bd__pane .bd__tree') as HTMLElement;
+      // The year, the overview and the search are outside the scrolling list.
+      expect(tree.querySelector('app-search-pill, .bd-chip')).toBeNull();
+      // The pane sits on the page, so the search field keeps its own surface.
+      expect(view.container.querySelector('.bd__pane .bd__paneBody')).not.toHaveClass('bd__paneBody--side');
+      const geometry = (scrollHeight: number, scrollTop: number) => {
+        Object.defineProperty(tree, 'scrollHeight', { value: scrollHeight, configurable: true });
+        Object.defineProperty(tree, 'clientHeight', { value: 300, configurable: true });
+        Object.defineProperty(tree, 'scrollTop', { value: scrollTop, configurable: true });
+        tree.dispatchEvent(new Event('scroll'));
+      };
+      const fades = () => [tree.classList.contains('is-fade-start'), tree.classList.contains('is-fade-end')];
+      geometry(300, 0);
+      expect(fades()).toEqual([false, false]);
+      geometry(900, 0);
+      expect(fades()).toEqual([false, true]);
+      geometry(900, 300);
+      expect(fades()).toEqual([true, true]);
+      geometry(900, 600);
+      expect(fades()).toEqual([true, false]);
+    });
+
+    it('scrolls the sheet inside itself on the wide layout and fades only the content', async () => {
+      const view = await setup();
+      const sheet = view.container.querySelector('article.bd__sheet') as HTMLElement;
+      const body = sheet.querySelector(':scope > .bd__sheetBody') as HTMLElement;
+      // The body holds all of the content, so the card keeps its background unmasked.
+      expect(sheet.children).toHaveLength(1);
+      expect(body.querySelector('.bd__figs')).toBeTruthy();
+      Object.defineProperty(body, 'scrollHeight', { value: 1200, configurable: true });
+      Object.defineProperty(body, 'clientHeight', { value: 800, configurable: true });
+      Object.defineProperty(body, 'scrollTop', { value: 0, configurable: true });
+      body.dispatchEvent(new Event('scroll'));
+      expect(body).toHaveClass('is-fade-end');
+      expect(body).not.toHaveClass('is-fade-start');
+      expect(sheet).not.toHaveClass('is-fade-end');
+    });
+
+    it('scrolls a row into view when it gets the keyboard focus', async () => {
+      const view = await setup();
+      const row = view.container.querySelector('.bd__tree .tn') as HTMLElement;
+      const scroll = jest.fn();
+      row.scrollIntoView = scroll;
+      (row.querySelector('.tn__main') as HTMLButtonElement).focus();
+      expect(scroll).toHaveBeenCalledWith({ block: 'nearest' });
+    });
+
     it('shows the root open with its children, each with its allocation', async () => {
       const view = await setup();
       const tree = within(view.container.querySelector('.bd__tree') as HTMLElement);
@@ -549,7 +600,8 @@ describe('BudgetDashboardComponent', () => {
       // 900 is overdrawn.
       expect(rows[1].segments.map((s: { tone: string }) => s.tone)).toEqual(['error', 'error']);
       const list = within(view.container.querySelector('.bd__usage') as HTMLElement);
-      expect(list.getByText(/^20\s€$/)).toBeTruthy();
+      // The column, and the line below the name that a phone shows instead.
+      expect(list.getAllByText(/^20\s€$/)).toHaveLength(2);
       expect(list.getByText('25 %')).toBeTruthy();
       expect(list.getByText(/^-50\s€$/).classList).toContain('bd__neg');
       // No requested amount reads as a dash.
@@ -564,10 +616,39 @@ describe('BudgetDashboardComponent', () => {
       expect(rows[0].color).toBe('#0075bf');
     });
 
-    it('names the numbers of a bar for a screen reader', async () => {
+    it('names the spent and the bound amount in the bar label and the row tooltip', async () => {
       const view = await setup();
+      const expected =
+        /^Ausgegeben: 40,00\s€ · Gebunden: 60,00\s€ · von 400,00\s€ \(25 % ausgelastet\)$/;
       const bar = view.container.querySelector('.bd__usage app-seg-bar');
-      expect(bar?.getAttribute('aria-label')).toMatch(/^25 % ausgelastet: 40,00\s€ ausgegeben, 60,00\s€ gebunden von 400,00\s€$/);
+      expect(bar?.getAttribute('aria-label')).toMatch(expected);
+      const row = view.container.querySelector('.bd__usage .bd__urow');
+      expect(row?.getAttribute('title')).toMatch(expected);
+    });
+
+    it('keeps the requested amount on a phone, below the name of the row (N28)', async () => {
+      const view = await setup({ wide: false, phone: true });
+      const row = view.container.querySelector('.bd__usage .bd__urow') as HTMLElement;
+      // The column and the line below the name both exist; CSS shows the line on a phone.
+      expect(row.querySelector('.bd__c1')).toBeTruthy();
+      const req = row.querySelector('.bd__ucell > .bd__uname + .bd__ureq') as HTMLElement;
+      expect(req.textContent).toMatch(/Beantragt:\s*20\s€/);
+    });
+
+    it('shows no shared legend, because each bar has the colour of its cost centre', async () => {
+      const view = await setup();
+      expect(view.container.querySelector('.bd__legends, .bd__legend, .bd__swatch')).toBeNull();
+    });
+
+    it('lets the select fill the metric chip and the chevron pass the click through', async () => {
+      const view = await setup();
+      const chip = view.container.querySelector('#bd-dist')?.parentElement?.querySelector(
+        'label.bd__selectChip',
+      ) as HTMLElement;
+      expect(chip).toBeTruthy();
+      // The chevron is a sibling on top of the select, not a second click target.
+      expect(chip.querySelector('select.bd__select')).toBeTruthy();
+      expect(chip.querySelector('app-icon.bd__selectChev')).toBeTruthy();
     });
 
     it('drills into a row by its name', async () => {
@@ -760,6 +841,81 @@ describe('BudgetDashboardComponent', () => {
       flushApps(view.http);
     });
 
+    it('opens the tree in a side sheet from the start that scrolls only the tree', async () => {
+      const view = await setup({ wide: false });
+      (view.container.querySelector('.bd__pathChip') as HTMLButtonElement).click();
+      view.fixture.detectChanges();
+      const dialog = view.getByRole('dialog', { name: 'Kostenstellen' });
+      expect(dialog).toHaveClass('ss--start');
+      expect(dialog.querySelector('.ss__body')).toHaveClass('ss__body--fill');
+      expect(dialog.querySelector('.ss__body > .bd__paneBody .bd__tree')).toBeTruthy();
+      // The year and the overview sit on the page, so the sheet has only the search and
+      // the tree.
+      expect(dialog.querySelector('.bd-chip, select')).toBeNull();
+      // The sheet has the background of the search field, so the field takes the next
+      // surface there.
+      expect(dialog.querySelector('.bd__paneBody')).toHaveClass('bd__paneBody--side');
+    });
+
+    it('opens the tree in the dialog of the ui-kit on a phone, which is a bottom sheet there', async () => {
+      const view = await setup({ wide: false, phone: true });
+      expect(view.container.querySelector('app-side-sheet')).toBeNull();
+      (view.container.querySelector('.bd__pathChip') as HTMLButtonElement).click();
+      view.fixture.detectChanges();
+      const dialog = view.getByRole('dialog', { name: 'Kostenstellen' });
+      expect(dialog).toHaveClass('dialog');
+      // The handle of the sheet; CSS shows it only on a phone.
+      expect(dialog.querySelector('.dialog__grabber')).toBeTruthy();
+      // The search stays above the tree, which scrolls by itself.
+      const pane = dialog.querySelector('.bd__paneBody') as HTMLElement;
+      expect(pane).toHaveClass('bd__paneBody--sheet');
+      expect(pane).not.toHaveClass('bd__paneBody--side');
+      expect(pane.querySelector(':scope > app-search-pill + .bd__tree')).toBeTruthy();
+      // The close button of the dialog closes it.
+      (dialog.querySelector('.dialog__close') as HTMLButtonElement).click();
+      view.fixture.detectChanges();
+      const c = view.fixture.componentInstance as unknown as Inst;
+      expect(c.navOpen()).toBe(false);
+      expect(view.queryByRole('dialog')).toBeNull();
+    });
+
+    it('puts the actions into a "more" menu on a phone', async () => {
+      const view = await setup({ wide: false, phone: true });
+      const c = view.fixture.componentInstance as unknown as Inst;
+      const row = view.container.querySelector('.bd__topRow') as HTMLElement;
+      expect(row.querySelector('.bd__actions')).toBeNull();
+      const more = within(row).getByRole('button', { name: 'Weitere Aktionen' });
+      more.click();
+      view.fixture.detectChanges();
+      const items = view.getAllByRole('menuitem').map((i) => i.textContent?.trim());
+      expect(items).toEqual(['Exportieren', 'Buchungen ansehen']);
+      const exp = jest.spyOn(c, 'onExport').mockImplementation(() => undefined);
+      const book = jest.spyOn(c, 'openBookings').mockImplementation(() => undefined);
+      view.getAllByRole('menuitem')[0].click();
+      expect(exp).toHaveBeenCalled();
+      c.onAction({ id: 'bookings', label: '' });
+      expect(book).toHaveBeenCalled();
+    });
+
+    it('has no "more" menu on a phone without an action', async () => {
+      const view = await setup({ wide: false, phone: true, perms: [] });
+      expect(view.container.querySelector('.bd__more')).toBeNull();
+    });
+
+    it('shows an overview chip beside the path and the year chip', async () => {
+      const view = await setup({ wide: false, phone: true });
+      const c = view.fixture.componentInstance as unknown as Inst;
+      const chips = view.container.querySelector('.bd__top .bd__chips') as HTMLElement;
+      expect(chips.querySelector('.bd__pathChip')).toBeTruthy();
+      expect(chips.querySelector('label.bd__selectChip select')).toBeTruthy();
+      const chip = within(chips).getByRole('button', { name: 'Übersicht' });
+      expect(chip).not.toHaveClass('bd-chip--on');
+      chip.click();
+      view.fixture.detectChanges();
+      expect(c.overviewOpen()).toBe(true);
+      expect(chip).toHaveClass('bd-chip--on');
+    });
+
     it('names the sheet after the path and puts the actions beside the title', async () => {
       const view = await setup({ wide: false });
       const article = view.container.querySelector('article.bd__sheet');
@@ -802,6 +958,18 @@ describe('BudgetDashboardComponent', () => {
       c.onOverviewPick('b-800');
       expect(c.overviewOpen()).toBe(false);
       expect(c.selectedKsId()).toBe('b-800');
+    });
+
+    it('names the close button in the active locale', async () => {
+      localStorage.setItem('ap.locale', 'en');
+      const view = await setup();
+      const c = view.fixture.componentInstance as unknown as Inst;
+      c.overviewOpen.set(true);
+      view.fixture.detectChanges();
+      const dialog = screen.getByRole('dialog', { name: 'Budget overview' });
+      const close = within(dialog).getByRole('button', { name: 'Close' });
+      expect(close.getAttribute('title')).toBe('Close');
+      expect(within(dialog).queryByRole('button', { name: 'Schließen' })).toBeNull();
     });
   });
 
@@ -868,7 +1036,8 @@ describe('BudgetDashboardComponent', () => {
     const { c, http, fixture } = await bare();
     fixture.detectChanges();
     expect(c.loading()).toBe(true);
-    expect(fixture.nativeElement.querySelector('[aria-busy="true"]')).toBeTruthy();
+    // The placeholder has the two columns of the wide layout, so the page does not jump.
+    expect(fixture.nativeElement.querySelector('[aria-busy="true"]')).toHaveClass('bd--wide');
     expect(fixture.nativeElement.querySelectorAll('main')).toHaveLength(0);
     http.expectOne((r) => r.url.endsWith('/budgets')).flush('x', { status: 500, statusText: 'err' });
     fixture.detectChanges();

@@ -1,31 +1,43 @@
-@if (total() > 0) {
-  <figure class="pie">
-    <div class="pie__chart">
-      <svg [attr.viewBox]="'0 0 ' + SIZE + ' ' + SIZE" class="pie__svg" role="img" [attr.aria-label]="name()">
-        @for (a of arcs(); track $index; let i = $index) {
-          <path
-            [attr.d]="a.d"
-            [style.fill]="a.color"
-            class="pie__slice"
-            [class.pie__slice--link]="!!a.id"
-            [class.pie__slice--dim]="hovered() !== null && hovered() !== i"
-            [style.transform]="sliceTransform(a, i)"
-            (pointerenter)="hovered.set(i)"
-            (pointerleave)="hovered.set(null)"
-            (click)="onSlice(a)"
-          />
-        }
-      </svg>
-      <div class="pie__hole" aria-hidden="true">
-        @if (active(); as a) {
-          <span class="pie__cap">{{ a.percent }} %</span>
-          <span class="pie__total mono">{{ money(a.value) }}</span>
-        } @else {
-          <span class="pie__cap">{{ label() }}</span>
-          <span class="pie__total mono">{{ money(total()) }}</span>
-        }
-      </div>
+<!-- Without an amount the chart keeps its size: one neutral ring, the metric and 0 in the
+     hole, and neutral skeleton lines in place of the legend. No "no data" text: the 0 in
+     the hole and the accessible name say it. -->
+<figure class="pie">
+  <div class="pie__chart">
+    <svg [attr.viewBox]="'0 0 ' + SIZE + ' ' + SIZE" class="pie__svg" role="img" [attr.aria-label]="name()">
+      @if (empty()) {
+        <path [attr.d]="EMPTY_RING" class="pie__ring" />
+      }
+      @for (a of arcs(); track $index; let i = $index) {
+        <path
+          [attr.d]="a.d"
+          [style.fill]="a.color"
+          class="pie__slice"
+          [class.pie__slice--link]="!!a.id"
+          [class.pie__slice--dim]="hovered() !== null && hovered() !== i"
+          [style.transform]="sliceTransform(a, i)"
+          (pointerenter)="hovered.set(i)"
+          (pointerleave)="hovered.set(null)"
+          (click)="onSlice(a)"
+        />
+      }
+    </svg>
+    <div class="pie__hole" aria-hidden="true">
+      @if (active(); as a) {
+        <span class="pie__cap">{{ a.percent }} %</span>
+        <span class="pie__total mono">{{ money(a.value) }}</span>
+      } @else {
+        <span class="pie__cap">{{ label() }}</span>
+        <span class="pie__total mono" [class.pie__total--empty]="empty()">{{ money(total()) }}</span>
+      }
     </div>
+  </div>
+  @if (empty()) {
+    <div class="pie__empty" aria-hidden="true">
+      <span class="pie__skel"></span>
+      <span class="pie__skel"></span>
+      <span class="pie__skel"></span>
+    </div>
+  } @else {
     <ul class="pie__legend">
       @for (a of arcs(); track $index; let i = $index) {
         <li>
@@ -48,7 +60,5 @@
         </li>
       }
     </ul>
-  </figure>
-} @else {
-  <p class="pie__empty">{{ 'budget.pie.empty' | t }}</p>
-}
+  }
+</figure>

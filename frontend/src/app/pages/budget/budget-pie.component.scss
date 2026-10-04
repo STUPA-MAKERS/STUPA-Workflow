@@ -36,6 +36,13 @@
     transform var(--motion-fast) var(--ease-standard),
     opacity var(--motion-fast) var(--ease-standard);
 }
+/* No amount: one ring in a neutral surface colour, like a skeleton. */
+.pie__ring {
+  fill: var(--color-surface-3);
+}
+.pie__total--empty {
+  color: var(--color-text-muted);
+}
 .pie__slice--link {
   cursor: pointer;
 }
@@ -118,9 +125,25 @@
 }
 
 .pie__empty {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--fs-sm);
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: 0 var(--space-2);
+}
+/* One neutral line per legend entry, like a skeleton. No shimmer: nothing loads. */
+.pie__skel {
+  display: block;
+  height: 10px;
+  border-radius: 5px;
+  background: var(--color-surface-3);
+}
+.pie__skel:nth-child(2) {
+  width: 80%;
+}
+.pie__skel:nth-child(3) {
+  width: 60%;
 }
 
 @media (prefers-reduced-motion: reduce) {

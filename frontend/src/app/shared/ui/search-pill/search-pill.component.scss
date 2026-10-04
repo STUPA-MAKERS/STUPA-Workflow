@@ -10,7 +10,9 @@
   height: var(--control-height-lg);
   padding: 0 6px 0 0;
   border-radius: var(--radius-pill);
-  background: var(--color-surface-2);
+  /* A parent on a surface-2 background (a side sheet, for example) sets `--sp-bg` to a
+     different surface, so that the field stays visible. */
+  background: var(--sp-bg, var(--color-surface-2));
   color: var(--color-text-muted);
   font-size: var(--fs-md);
 }

@@ -42,6 +42,9 @@ const R_MAX = SIZE / 2 - 8;
  * selected cost center, with its total value. Hover shows a tooltip with the name,
  * the amount and the share. A click reports the cost center for the drilldown in the
  * tab. The chart is pure SVG and uses no third-party library.
+ *
+ * Without an amount the chart keeps its size and shows one neutral ring with the root
+ * and 0 in the center, like a skeleton. It shows no "no data" text.
  */
 @Component({
   selector: 'app-budget-sunburst',
@@ -67,6 +70,9 @@ export class BudgetSunburstComponent {
   protected readonly CX = CX;
   protected readonly CY = CY;
   protected readonly R_CENTER = R_CENTER;
+  /** The neutral ring without an amount: the middle radius and the width of the rings. */
+  protected readonly R_EMPTY = (R_CENTER + R_MAX) / 2;
+  protected readonly W_EMPTY = R_MAX - R_CENTER;
 
   protected readonly hovered = signal<SunSeg | null>(null);
   protected readonly tip = signal<{ x: number; y: number }>({ x: 0, y: 0 });

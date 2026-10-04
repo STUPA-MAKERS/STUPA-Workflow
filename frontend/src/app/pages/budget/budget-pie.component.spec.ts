@@ -65,10 +65,29 @@ describe('BudgetPieComponent', () => {
     expect(emit).toHaveBeenCalledWith('child');
   });
 
-  it('shows the empty paragraph (not the svg) when total is 0', async () => {
+  it('draws one neutral ring with 0 in the hole when total is 0', async () => {
     const view = await setup({ slices: [] });
-    expect(view.container.querySelector('svg.pie__svg')).toBeNull();
-    expect(view.container.querySelector('p.pie__empty')).toBeTruthy();
+    const svg = view.container.querySelector('svg.pie__svg');
+    // The chart keeps its size, so the layout does not jump.
+    expect(svg).toBeTruthy();
+    expect(svg?.querySelectorAll('path.pie__ring').length).toBe(1);
+    expect(svg?.querySelectorAll('path.pie__slice').length).toBe(0);
+    expect(svg?.getAttribute('aria-label')).toBe('Zuteilung: kein Betrag vorhanden');
+    expect(view.container.querySelector('.pie__cap')?.textContent).toContain('Zuteilung');
+    expect(view.container.querySelector('.pie__total')?.textContent).toMatch(/^0\s€$/);
+    expect(view.container.querySelector('.pie__total--empty')).toBeTruthy();
+    expect(view.container.querySelector('.pie__legend')).toBeNull();
+    // A neutral skeleton in place of the legend, and never a "no data" text.
+    expect(view.container.querySelectorAll('.pie__empty .pie__skel').length).toBe(3);
+    expect(view.container.querySelector('.pie__empty')?.getAttribute('aria-hidden')).toBe('true');
+    expect(view.container.textContent).not.toContain('Keine Daten');
+  });
+
+  it('adds the no-amount note to an explicit aria label', async () => {
+    const view = await setup({ slices: [], ariaLabel: 'Gebunden je Unter-Kostenstelle' });
+    expect(view.container.querySelector('svg.pie__svg')?.getAttribute('aria-label')).toBe(
+      'Gebunden je Unter-Kostenstelle: kein Betrag vorhanden',
+    );
   });
 
   it('treats slices with non-positive values as empty (total clamps negatives to 0)', async () => {
@@ -80,7 +99,7 @@ describe('BudgetPieComponent', () => {
     });
     // Here total() is max(0,-10) + max(0,0) = 0, which takes the empty branch.
     expect(view.fixture.componentInstance as unknown as PieInternals).toBeTruthy();
-    expect(view.container.querySelector('p.pie__empty')).toBeTruthy();
+    expect(view.container.querySelector('.pie__empty')).toBeTruthy();
   });
 
   it('total() sums and floors negative slice values to zero', async () => {

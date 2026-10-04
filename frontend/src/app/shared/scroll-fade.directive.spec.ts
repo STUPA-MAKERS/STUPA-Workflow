@@ -25,6 +25,36 @@ class ResizeObserverStub {
 })
 class Host {}
 
+@Component({
+  standalone: true,
+  imports: [ScrollFadeDirective],
+  template: `<ul appScrollFade="y" class="list"><li>a</li></ul>`,
+})
+class ListHost {}
+
+function verticalGeometry(el: HTMLElement, scrollHeight: number, clientHeight: number, scrollTop = 0) {
+  Object.defineProperty(el, 'scrollHeight', { value: scrollHeight, configurable: true });
+  Object.defineProperty(el, 'clientHeight', { value: clientHeight, configurable: true });
+  Object.defineProperty(el, 'scrollTop', { value: scrollTop, writable: true, configurable: true });
+}
+
+async function setupList(scrollHeight: number, clientHeight: number, scrollTop = 0) {
+  Object.defineProperty(globalThis, 'ResizeObserver', {
+    writable: true,
+    value: ResizeObserverStub,
+  });
+  const view = await render(ListHost);
+  const el = view.container.querySelector('.list') as HTMLElement;
+  verticalGeometry(el, scrollHeight, clientHeight, scrollTop);
+  ResizeObserverStub.last?.cb();
+  return { el, view };
+}
+
+const fades = (el: HTMLElement) => [
+  el.classList.contains('is-fade-start'),
+  el.classList.contains('is-fade-end'),
+];
+
 /** jsdom lays nothing out, so the geometry is stated directly. */
 function geometry(el: HTMLElement, scrollWidth: number, clientWidth: number, scrollLeft = 0) {
   Object.defineProperty(el, 'scrollWidth', { value: scrollWidth, configurable: true });
@@ -91,5 +121,42 @@ describe('ScrollFadeDirective', () => {
     const { view } = await setup(800, 400);
     view.fixture.destroy();
     expect(ResizeObserverStub.last?.disconnected).toBe(true);
+  });
+
+  describe('on the y axis', () => {
+    it('fades neither end when the list fits', async () => {
+      const { el } = await setupList(300, 300);
+      expect(fades(el)).toEqual([false, false]);
+    });
+
+    it('fades only the bottom at the top of the scroll', async () => {
+      expect(fades((await setupList(900, 300, 0)).el)).toEqual([false, true]);
+    });
+
+    it('fades only the top at the bottom of the scroll', async () => {
+      expect(fades((await setupList(900, 300, 600)).el)).toEqual([true, false]);
+    });
+
+    it('fades both ends in the middle', async () => {
+      expect(fades((await setupList(900, 300, 300)).el)).toEqual([true, true]);
+    });
+
+    it('re-measures on scroll and ignores the horizontal geometry', async () => {
+      const { el } = await setupList(900, 300, 0);
+      geometry(el, 800, 400, 200);
+      (el as unknown as { scrollTop: number }).scrollTop = 600;
+      el.dispatchEvent(new Event('scroll'));
+      expect(fades(el)).toEqual([true, false]);
+    });
+
+    it('re-measures when rows come or go', async () => {
+      const { el } = await setupList(300, 300);
+      expect(fades(el)).toEqual([false, false]);
+      verticalGeometry(el, 900, 300, 0);
+      el.appendChild(document.createElement('li'));
+      // A MutationObserver reports in a microtask.
+      await Promise.resolve();
+      expect(fades(el)).toEqual([false, true]);
+    });
   });
 });

@@ -22,7 +22,7 @@
         <app-icon name="x" [size]="20" />
       </button>
     </header>
-    <div class="ss__body">
+    <div class="ss__body" [class.ss__body--fill]="contentScrolls()">
       <ng-content />
     </div>
   </div>
