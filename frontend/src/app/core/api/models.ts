@@ -418,6 +418,14 @@ export interface CommentCreateBody {
 export interface TransitionRequestBody {
   transitionId: Uuid;
   note?: string | null;
+  /**
+   * The meeting whose agenda gets the application (A1). Only for a transition with
+   * `addsToAgenda`; the meeting must be planned and belong to `agendaGremiumId`, else
+   * the server answers 422 `agenda_meeting_invalid`.
+   */
+  meetingId?: Uuid | null;
+  /** The new agenda item is not public (NÖ). Only with `meetingId`. */
+  nonPublic?: boolean;
 }
 
 /** `POST /applications/{id}/force-status`. A privileged direct status override.
@@ -581,8 +589,8 @@ export interface Transition {
   /** Optional color for the decision button. `null` selects the default. */
   color: string | null;
   /**
-   * The transition puts the application on the agenda of a meeting (A1). The agenda
-   * dialog (meeting choice) needs the meeting list; the row menu opens the detail instead.
+   * The transition puts the application on the agenda of a meeting (A1). The detail and
+   * the row menu open the agenda dialog for it, which asks for the meeting.
    */
   addsToAgenda: boolean;
   /** The gremium whose planned meetings the agenda dialog offers, or null. */

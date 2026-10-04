@@ -211,135 +211,63 @@
   color: inherit;
 }
 
-/* ------------------------------------------------------------------ answers */
-.ad__edit {
+/* ------------------------------------------------------------------ edit */
+/* The bar of the edit mode takes the place of the header (board Anträge-Bearbeiten). */
+.ad__editBar {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-.ad__editActions {
-  display: flex;
-  justify-content: flex-end;
+  align-items: center;
   gap: var(--space-2);
+  min-height: 60px;
+  padding: var(--space-2) 0;
+  border-bottom: var(--border-width) solid var(--color-border);
 }
-formly-form formly-field {
-  display: block;
+.ad--split .ad__editBar {
+  margin-inline: calc(-1 * var(--space-6));
+  padding-inline: var(--space-6);
+  border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
+  background: var(--color-surface-2);
 }
-formly-form formly-field + formly-field {
-  margin-top: var(--space-4);
+.ad__editIcon {
+  flex: none;
+  color: var(--color-text-muted);
 }
-formly-form formly-group > formly-field + formly-field {
-  margin-top: var(--space-3);
-}
-
-.ad__positions {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-.ad__posHead {
-  padding: 0 var(--space-1);
-  color: var(--color-text-subtle);
-  font-size: 0.75rem;
-  font-weight: var(--fw-medium);
-}
-.ad__pos {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: 12px var(--space-4);
-}
-.ad__posLine,
-.ad__posTotal {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-.ad__posName {
-  font-size: var(--fs-md);
-  overflow-wrap: anywhere;
-}
-.ad__posTotal {
-  flex-direction: row;
-  font-weight: var(--fw-semibold);
-}
-.ad__offers {
-  display: flex;
-  flex-direction: column;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.ad__offer {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-3);
-  padding: 6px 0;
-  border-top: var(--border-width) solid var(--color-border);
-  font-size: var(--fs-small);
-}
-.ad__offerName {
-  flex: 1 1 auto;
-}
-.ad__offerValue {
+/* The buttons keep their width; the title gives way. */
+.ad__editBar app-button {
   flex: none;
 }
-.ad__noOffers {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+.ad__editText {
+  flex: 1 1 auto;
+  min-width: 0;
   margin: 0;
-  font-size: var(--fs-small);
+  font-size: var(--fs-md);
 }
-
-/* ------------------------------------------------------------------ history */
-.ad__versions {
-  margin: 0;
-  padding: 0;
-  list-style: none;
+.ad__editHint {
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
 }
-.ad__version {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 12px var(--space-4);
+.ad__edit {
+  min-width: 0;
+  container-type: inline-size;
 }
-.ad__versionHead {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0 var(--space-2);
+/* The fields of the form: two columns, long fields over both (`toFormlySections`).
+   Formly draws the fields, so the rules reach into its elements. */
+.ad__edit ::ng-deep .fe-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  min-width: 0;
 }
-.ad__versionMeta {
-  --ad-sep: 16px;
+.ad__edit ::ng-deep .fe-grid > formly-field {
   display: block;
   min-width: 0;
 }
-.ad__versionMeta,
-.ad__diffNone {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
+.ad__edit ::ng-deep .fe-grid > .fe-full {
+  grid-column: 1 / -1;
 }
-.ad__diff {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  font-size: var(--fs-small);
-  overflow-wrap: anywhere;
-}
-.ad__diff app-status-text {
-  margin-inline-end: 6px;
-}
-.ad__diff del {
-  color: var(--color-text-muted);
-}
-.ad__diff ins {
-  text-decoration: none;
+@container (max-width: 32rem) {
+  .ad__edit ::ng-deep .fe-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 /* ------------------------------------------------------------------ comments */
@@ -494,5 +422,9 @@ formly-form formly-group > formly-field + formly-field {
   }
   .ad__pair {
     grid-template-columns: minmax(0, 1fr);
+  }
+  /* The bar keeps the title and the two buttons on one line. */
+  .ad__editHint {
+    display: none;
   }
 }

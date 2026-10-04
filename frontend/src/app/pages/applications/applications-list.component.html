@@ -306,6 +306,14 @@
 
 <app-share-links-dialog [applicationId]="shareFor()" [(open)]="shareOpen" />
 
+<app-agenda-dialog
+  [applicationId]="agendaFor()?.item?.id ?? null"
+  [applicationTitle]="agendaFor() ? titleOf(agendaFor()!.item) : ''"
+  [transition]="agendaFor()?.transition ?? null"
+  [(open)]="agendaOpen"
+  (done)="onAgendaDone()"
+/>
+
 <app-force-status-dialog
   [applicationId]="forceFor()?.id ?? null"
   [currentStateId]="forceFor()?.state?.id ?? null"

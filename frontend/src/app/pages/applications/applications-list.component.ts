@@ -29,6 +29,7 @@ import type {
   ApplicationListItem,
   ApplicationListQuery,
   ApplicationType,
+  Transition,
   Uuid,
 } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
@@ -65,6 +66,7 @@ import { CostCentreTreeComponent } from '../budget/cost-centre-tree.component';
 import { ApplicationsPageService } from './applications-page.service';
 import { groupByMonth, type MonthGroup } from './applications.util';
 import { ForceStatusDialogComponent } from './force-status-dialog/force-status-dialog.component';
+import { AgendaDialogComponent } from './agenda-dialog/agenda-dialog.component';
 import {
   RowTransitionsMenuComponent,
   type RowAction,
@@ -155,6 +157,7 @@ type FilterSheet = 'budget' | 'more' | null;
     RowTransitionsMenuComponent,
     ShareLinksDialogComponent,
     ForceStatusDialogComponent,
+    AgendaDialogComponent,
   ],
   providers: [ApplicationsPageService],
   templateUrl: './applications-list.component.html',
@@ -408,6 +411,9 @@ export class ApplicationsListComponent implements OnDestroy {
   /** The row the force-status dialog acts on. */
   readonly forceFor = signal<ApplicationListItem | null>(null);
   readonly forceOpen = signal(false);
+  /** The row and the transition of the agenda dialog ("Auf Tagesordnung setzen"). */
+  readonly agendaFor = signal<{ item: ApplicationListItem; transition: Transition } | null>(null);
+  readonly agendaOpen = signal(false);
   /** The row that waits for the delete confirmation. */
   readonly deleteFor = signal<ApplicationListItem | null>(null);
   readonly deleting = signal(false);
@@ -653,9 +659,10 @@ export class ApplicationsListComponent implements OnDestroy {
         this.toggleArchived(item);
         return;
       case 'transition':
-        // The agenda dialog (meeting choice) lives on the detail: open it there.
+        // A transition onto the agenda needs the meeting: the dialog asks for it.
         if (action.transition.addsToAgenda) {
-          this.open(item.id);
+          this.agendaFor.set({ item, transition: action.transition });
+          this.agendaOpen.set(true);
           return;
         }
         this.fire(item, action.transition.id);
@@ -716,6 +723,12 @@ export class ApplicationsListComponent implements OnDestroy {
         this.toast.error(this.i18n.translate('applications.detail.deleteFailed'));
       },
     });
+  }
+
+  /** The agenda dialog fired its transition. */
+  onAgendaDone(): void {
+    const target = this.agendaFor();
+    if (target) this.changed(target.item.id, 'updated');
   }
 
   /** The force-status dialog set a state. */

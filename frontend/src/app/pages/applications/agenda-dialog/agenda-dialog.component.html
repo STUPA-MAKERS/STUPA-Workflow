@@ -1,0 +1,86 @@
+<app-dialog
+  [open]="open()"
+  [title]="'applications.agenda.title' | t"
+  [subtitle]="applicationTitle()"
+  [closeLabel]="'action.cancel' | t"
+  (closed)="close()"
+>
+  <form class="agd" (submit)="$event.preventDefault(); submit()">
+    <div class="agd__group">
+      <div class="agd__cap">
+        <span class="cap" id="agd-meetings">{{ 'applications.agenda.pick' | t }}</span>
+        @if (gremiumName()) {
+          <span class="agd__gremium ell" [title]="gremiumName()">{{ gremiumName() }}</span>
+        }
+      </div>
+      @if (loading()) {
+        <app-skeleton variant="rows" [count]="2" [label]="'common.loading' | t" />
+      } @else if (choices().length) {
+        <div class="agd__list" role="radiogroup" aria-labelledby="agd-meetings">
+          @for (c of choices(); track c.meeting.id) {
+            <label class="agd__row" [class.agd__row--on]="pick() === c.meeting.id">
+              <input
+                class="agd__radio"
+                type="radio"
+                name="agd-meeting"
+                [value]="c.meeting.id"
+                [checked]="pick() === c.meeting.id"
+                (change)="pick.set(c.meeting.id)"
+              />
+              <app-date-block [date]="c.meeting.date" />
+              <span class="agd__text">
+                <span class="agd__title ell" [title]="c.meeting.title">{{ c.meeting.title }}</span>
+                @if (c.sub) {
+                  <span class="agd__sub">{{ c.sub }}</span>
+                }
+              </span>
+              @if (suggestedId() === c.meeting.id) {
+                <span class="agd__suggest">{{ 'applications.agenda.suggested' | t }}</span>
+              }
+            </label>
+          }
+        </div>
+      } @else {
+        <p class="agd__none">{{ 'applications.agenda.none' | t }}</p>
+      }
+      @if (refusal(); as key) {
+        <p class="agd__refusal" role="alert">{{ key | t }}</p>
+      }
+    </div>
+    @if (choices().length) {
+      <p class="agd__hint">{{ 'applications.agenda.appends' | t }}</p>
+    }
+
+    <app-switch
+      [id]="'agd-np'"
+      [hint]="'meetings.agenda.nonPublicHint' | t"
+      [checked]="nonPublic()"
+      (checkedChange)="nonPublic.set($event)"
+      ><span class="agd__switchLabel">{{ 'meetings.agenda.nonPublicLabel' | t }}</span></app-switch
+    >
+
+    <label class="agd__note">
+      <span class="agd__noteLabel">{{ 'applications.agenda.note' | t }}</span>
+      <textarea
+        class="agd__noteInput"
+        rows="2"
+        name="agd-note"
+        [placeholder]="'applications.agenda.notePlaceholder' | t"
+        [ngModel]="note()"
+        (ngModelChange)="note.set($event)"
+      ></textarea>
+    </label>
+    <button type="submit" hidden></button>
+  </form>
+  <app-button dialog-footer variant="text" (click)="close()">{{ 'action.cancel' | t }}</app-button>
+  <app-button
+    dialog-footer
+    variant="fill"
+    [disabled]="!pick() || loading()"
+    [loading]="saving()"
+    (click)="submit()"
+  >
+    <app-icon name="cal" [size]="16" />
+    {{ confirmLabel() }}
+  </app-button>
+</app-dialog>

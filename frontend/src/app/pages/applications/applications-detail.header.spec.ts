@@ -58,6 +58,11 @@ function appWire(over: Partial<ApplicationOutWire> = {}): ApplicationOutWire {
   };
 }
 
+/** One section with the title field: the edit form needs the fields of the form. */
+const FORM_SECTIONS = [
+  { key: 'main', label: { de: 'Antrag' }, fields: [{ key: 'title', type: 'text', label: { de: 'Titel' } }] },
+];
+
 const VERSIONS: VersionOutWire[] = [
   { version: 1, data: {}, diff: null, changedBy: 'Lea', at: '2026-09-26T12:12:00Z' },
   { version: 2, data: {}, diff: { added: {}, removed: {}, changed: {} }, changedBy: 'applicant', at: '2026-09-27T21:05:00Z' },
@@ -143,7 +148,7 @@ async function setup(opts: Opts = {}) {
   }
   http
     .expectOne((r) => r.url === '/api/applications/app-1/form')
-    .flush({ applicationTypeId: 't1', formVersionId: 'fv', sections: [] });
+    .flush({ applicationTypeId: 't1', formVersionId: 'fv', hasBudget: false, sections: FORM_SECTIONS });
   view.detectChanges();
   if (opts.tree) {
     for (const req of http.match((r) => r.url === '/api/budgets')) req.flush(opts.tree);
@@ -155,7 +160,7 @@ async function setup(opts: Opts = {}) {
 
 /** The budget tree (managers) and the attachments load on their own. */
 function flushRest(http: HttpTestingController) {
-  for (const req of http.match((r) => r.url === '/api/budgets' || /\/attachments$/.test(r.url))) {
+  for (const req of http.match((r) => r.url === '/api/budgets' || /\/(attachments|timeline)$/.test(r.url))) {
     req.flush([]);
   }
 }
@@ -205,15 +210,16 @@ describe('ApplicationsDetailComponent — header', () => {
     expect(line.textContent?.replace(/\s+/g, '')).toBe('1.250,00€');
   });
 
-  it('puts the author and the time of a version into separate parts', async () => {
+  it('lists the versions in the history with their authors', async () => {
     await setup();
-    const metas = [...document.querySelectorAll('.ad__versionMeta')] as HTMLElement[];
-    expect(metas.length).toBeGreaterThan(0);
-    for (const meta of metas) {
-      expect(meta).toHaveClass('ad__seps');
-      expect(meta.textContent).not.toContain('·');
-      expect(meta.querySelectorAll('.ad__part')).toHaveLength(2);
-    }
+    const history = document.querySelector('#ad-history app-history') as HTMLElement;
+    expect(history).not.toBeNull();
+    const titles = [...history.querySelectorAll('.hist__title')].map((el) => el.textContent?.trim());
+    // Newest first.
+    expect(titles).toEqual(['Version 2', 'Version 1']);
+    const metas = [...history.querySelectorAll('.hist__meta')].map((el) => el.textContent ?? '');
+    expect(metas[0]).toContain('Antragsteller:in');
+    expect(metas[1]).toContain('Lea');
   });
 
   it('leaves out an unknown type, a missing gremium and a missing amount', async () => {
@@ -406,7 +412,7 @@ describe('ApplicationsDetailComponent — header', () => {
       expect(screen.queryByRole('tabpanel', { name: 'Antrag' })).not.toBeInTheDocument();
     });
 
-    it('opens the edit form in the "Antrag" tab from another tab', async () => {
+    it('replaces the tabs with the edit form, also from another tab', async () => {
       const { cmp, detectChanges } = await setup({ split: false });
       await userEvent.click(screen.getByRole('tab', { name: 'Kommentare 0' }));
       detectChanges();
@@ -422,10 +428,17 @@ describe('ApplicationsDetailComponent — header', () => {
       }
       detectChanges();
       expect(cmp.editing()).toBe(true);
-      expect(cmp.tab()).toBe('app');
-      const panel = screen.getByRole('tabpanel', { name: 'Antrag' });
-      expect(panel).toBeVisible();
-      expect(within(panel).getByRole('button', { name: 'Speichern' })).toBeInTheDocument();
+      // The sheet holds only the edit bar and the form: no tabs, no header actions.
+      expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+      expect(screen.queryByRole('heading', { level: 2 })).not.toBeInTheDocument();
+      const bar = document.querySelector('.ad__editBar') as HTMLElement;
+      expect(bar.textContent).toContain('Antrag bearbeiten');
+      expect(bar.textContent).toContain('Speichern legt Version 3 an');
+      expect(within(bar).getByRole('button', { name: 'Speichern' })).toBeInTheDocument();
+      await userEvent.click(within(bar).getByRole('button', { name: 'Abbrechen' }));
+      detectChanges();
+      expect(cmp.editing()).toBe(false);
+      expect(screen.getByRole('tablist')).toBeInTheDocument();
     });
 
     it('switches to the history for "Versionen vergleichen"', async () => {

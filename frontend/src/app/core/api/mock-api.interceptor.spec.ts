@@ -398,16 +398,93 @@ describe('mockApiInterceptor', () => {
         expect((await get<Row>(`/api/applications/${second}`)).state.key).toBe('approved');
 
         const edited = await firstValueFrom(
-          http.patch<{ title: string; data: { title: string } }>(`/api/applications/${second}`, {
+          http.patch<{ title: string; version: number; data: { title: string } }>(`/api/applications/${second}`, {
             data: { title: ' Neuer Titel ' },
           }),
         );
-        expect(edited.data.title).toBe('Neuer Titel');
+        // The edit stores the answers as sent and makes a new version.
+        expect(edited.data.title).toBe(' Neuer Titel ');
+        expect(edited.version).toBe(3);
         await firstValueFrom(http.patch(`/api/applications/${second}`, { data: { title: '  ' } }));
-        expect((await get<Row & { data: { title: string } }>(`/api/applications/${second}`)).data.title).toBe('Neuer Titel');
+        const list = await get<{ items: Row[] }>('/api/applications', new HttpParams().set('archived', 'all'));
+        // A blank title keeps the row title of the list.
+        expect(list.items.find((r) => r.id === second)?.title).toBe('Neuer Titel');
+        const versions = await get<{ version: number; diff: { changed: Record<string, unknown> } }[]>(
+          `/api/applications/${second}/versions`,
+        );
+        expect(versions.map((v) => v.version)).toEqual([1, 2, 3, 4]);
+        expect(Object.keys(versions[2].diff.changed)).toContain('title');
 
         await firstValueFrom(http.delete(`/api/applications/${second}`));
         await expect(get(`/api/applications/${second}`)).rejects.toMatchObject({ status: 404 });
+      });
+
+      it('serves the form, the history and the versions of a demo row', async () => {
+        const form = await get<{ sections: { key: string }[] }>(`/api/applications/${first}/form`);
+        expect(form.sections.map((s) => s.key)).toEqual(['plan', 'costs_section', 'contact']);
+        const app = await get<{ data: { costs: { offers: unknown[]; noOffers?: boolean }[] } }>(
+          `/api/applications/${first}`,
+        );
+        expect(app.data.costs).toHaveLength(3);
+        expect(app.data.costs[2].noOffers).toBe(true);
+        // Row 1 stands "Auf Tagesordnung": submitted, review, agenda.
+        const timeline = await get<{ toState: { key: string }; transitionLabel: unknown }[]>(
+          `/api/applications/${first}/timeline`,
+        );
+        expect(timeline.map((e) => e.toState.key)).toEqual(['submitted', 'review', 'agenda']);
+        expect(timeline[0].transitionLabel).toBeNull();
+        expect(await get<unknown[]>(`/api/applications/${first}/versions`)).toHaveLength(2);
+        // Every third row has one version only; an approved row went through "Bewilligen".
+        expect(await get<unknown[]>('/api/applications/a1000000-0000-0000-0000-000000000003/versions')).toHaveLength(1);
+        const approved = await get<{ transitionLabel: { de: string } | null }[]>(
+          '/api/applications/a1000000-0000-0000-0000-000000000010/timeline',
+        );
+        expect(approved.at(-1)?.transitionLabel?.de).toBe('Bewilligen');
+        // A row without an amount has no cost positions.
+        const noAmount = await get<{ data: Record<string, unknown> }>(
+          '/api/applications/a1000000-0000-0000-0000-000000000015',
+        );
+        expect('costs' in noAmount.data).toBe(false);
+      });
+
+      it('answers 422 for a cost position without any offer (D12)', async () => {
+        const data = { title: 'x', costs: [{ label: 'A', noOffers: true, noOffersReason: 'r', offers: [] }, { label: 'B' }] };
+        await expect(firstValueFrom(http.patch(`/api/applications/${second}`, { data }))).rejects.toMatchObject({
+          status: 422,
+          error: { errors: [{ field: 'costs[0]' }] },
+        });
+      });
+
+      it('puts a row on the agenda of a planned demo meeting and refuses another meeting', async () => {
+        const review = 'a1000000-0000-0000-0000-000000000004';
+        const meetings = await get<{ id: string; status: string; title: string }[]>(
+          '/api/meetings',
+          new HttpParams().set('gremiumId', 'g0000000-0000-0000-0000-000000000001'),
+        );
+        expect(meetings).toHaveLength(3);
+        expect(meetings.every((m) => m.status === 'planned')).toBe(true);
+        const [agenda] = await get<{ id: string }[]>(`/api/applications/${review}/transitions`);
+        await expect(
+          firstValueFrom(http.post(`/api/applications/${review}/transition`, { transitionId: agenda.id, meetingId: 'gone' })),
+        ).rejects.toMatchObject({ status: 422, error: { code: 'agenda_meeting_invalid' } });
+        await firstValueFrom(
+          http.post(`/api/applications/${review}/transition`, {
+            transitionId: agenda.id,
+            meetingId: meetings[0].id,
+            nonPublic: true,
+            note: 'Bitte vorziehen',
+          }),
+        );
+        const timeline = await get<{ toState: { key: string }; note: string | null }[]>(
+          `/api/applications/${review}/timeline`,
+        );
+        expect(timeline.map((e) => e.toState.key)).toEqual(['submitted', 'review', 'agenda']);
+        expect(timeline.at(-1)?.note).toBe(`${meetings[0].title} · Bitte vorziehen`);
+        // A transition without meeting or note records no note.
+        const second2 = 'a1000000-0000-0000-0000-000000000002';
+        const [start] = await get<{ id: string }[]>(`/api/applications/${second2}/transitions`);
+        await firstValueFrom(http.post(`/api/applications/${second2}/transition`, { transitionId: start.id }));
+        expect((await get<{ note: string | null }[]>(`/api/applications/${second2}/timeline`)).at(-1)?.note).toBeNull();
       });
 
       it('answers 404 for a write it does not know', async () => {

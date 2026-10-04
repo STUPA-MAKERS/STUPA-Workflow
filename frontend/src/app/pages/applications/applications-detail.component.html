@@ -22,11 +22,46 @@
     <p class="ad__error" role="alert">{{ 'applications.detail.error' | t }}</p>
   </div>
 } @else if (app(); as application) {
-  <article class="ad" [class.ad--split]="split()" aria-labelledby="ad-title">
-    <header class="ad__head">
-      <div class="ad__bar">
-        <span class="ad__meta ell" [title]="metaLine()">{{ metaLine() }}</span>
-        @if (!editing()) {
+  @if (editing()) {
+    <!-- Edit mode (board Anträge-Bearbeiten): the same sheet holds the form. -->
+    <article class="ad ad--edit" [class.ad--split]="split()" aria-labelledby="ad-edit-title">
+      <header class="ad__editBar">
+        <!-- A phone keeps the title and one action on the line: "Abbrechen" becomes the
+             close button at the start. -->
+        @if (phone()) {
+          <app-button
+            variant="text"
+            [iconOnly]="true"
+            [ariaLabel]="'applications.detail.cancel' | t"
+            (click)="cancelEdit()"
+          ><app-icon name="x" [size]="19" /></app-button>
+        } @else {
+          <app-icon class="ad__editIcon" name="edit" [size]="18" />
+        }
+        <p class="ad__editText ell">
+          <strong id="ad-edit-title">{{ 'applications.edit.title' | t }}</strong>
+          <span class="ad__editHint">
+            · {{ 'applications.edit.versionHint' | t: { version: application.version + 1 } }}
+          </span>
+        </p>
+        @if (!phone()) {
+          <app-button variant="text" (click)="cancelEdit()">{{ 'applications.detail.cancel' | t }}</app-button>
+        }
+        <app-button variant="fill" [loading]="savingEdit()" (click)="saveEdit()">
+          <app-icon name="check" [size]="16" />
+          {{ 'applications.detail.save' | t }}
+        </app-button>
+      </header>
+      <!-- No form element: Enter in a field must not save the whole application. -->
+      <div class="ad__edit">
+        <formly-form [form]="editForm" [fields]="editFields()" [model]="editModel" />
+      </div>
+    </article>
+  } @else {
+    <article class="ad" [class.ad--split]="split()" aria-labelledby="ad-title">
+      <header class="ad__head">
+        <div class="ad__bar">
+          <span class="ad__meta ell" [title]="metaLine()">{{ metaLine() }}</span>
           @if (!phone()) {
             <!-- Outside the edit right: `application.share` decides who may read the
                  record, not who may edit it. -->
@@ -65,118 +100,118 @@
               (selected)="onMenu($event)"
             />
           }
+        </div>
+
+        <h2 id="ad-title" class="ad__title">{{ title() }}</h2>
+        <!-- Every part draws its dot before it (CSS). The line clips the dot of the first
+             part on each line, so a dot shows only between two items, also after a wrap. -->
+        <p class="ad__line ad__seps">
+          <span class="ad__parts">
+            @if (application.state) {
+              <span class="ad__part">
+                <app-status-text [kind]="stateKind()">{{ application.state.label }}</app-status-text>
+              </span>
+            }
+            @if (gremiumName(); as gremium) {
+              <span class="ad__part ell" [title]="gremium">{{ gremium }}</span>
+            }
+            @if (application.amount !== null) {
+              <span class="ad__part"><span class="mono ad__amount">{{ amount(application) }}</span></span>
+            }
+          </span>
+        </p>
+
+        @if (canTransition() && transitions().length) {
+          <div class="ad__transitions" role="group" [attr.aria-label]="'applications.transitions.title' | t">
+            @for (t of transitions(); track t.id) {
+              <app-button
+                [variant]="looks().get(t.id) ?? 'tonal'"
+                [loading]="firing() === t.id"
+                [disabled]="firing() !== null && firing() !== t.id"
+                (click)="fire(t)"
+              >
+                @if (t.addsToAgenda) {
+                  <app-icon name="cal" [size]="17" />
+                }
+                {{ t.label || ('applications.transitions.fallback' | t) }}
+              </app-button>
+            }
+          </div>
         }
-      </div>
 
-      <h2 id="ad-title" class="ad__title">{{ title() }}</h2>
-      <!-- Every part draws its dot before it (CSS). The line clips the dot of the first
-           part on each line, so a dot shows only between two items, also after a wrap. -->
-      <p class="ad__line ad__seps">
-        <span class="ad__parts">
-          @if (application.state) {
-            <span class="ad__part">
-              <app-status-text [kind]="stateKind()">{{ application.state.label }}</app-status-text>
-            </span>
-          }
-          @if (gremiumName(); as gremium) {
-            <span class="ad__part ell" [title]="gremium">{{ gremium }}</span>
-          }
-          @if (application.amount !== null) {
-            <span class="ad__part"><span class="mono ad__amount">{{ amount(application) }}</span></span>
-          }
-        </span>
-      </p>
+        @if (application.archivedAt) {
+          <!-- An archived application looks like an active one, and someone arriving from a
+               link has no other way to know. -->
+          <app-note class="ad__archived" icon="archive" role="status">
+            {{ 'applications.detail.archivedNotice' | t: { at: (application.archivedAt | ldate) } }}
+          </app-note>
+        }
+      </header>
 
-      @if (canTransition() && transitions().length && !editing()) {
-        <div class="ad__transitions" role="group" [attr.aria-label]="'applications.transitions.title' | t">
-          @for (t of transitions(); track t.id) {
-            <app-button
-              [variant]="looks().get(t.id) ?? 'tonal'"
-              [loading]="firing() === t.id"
-              [disabled]="firing() !== null && firing() !== t.id"
-              (click)="fire(t)"
-            >
-              @if (t.addsToAgenda) {
-                <app-icon name="cal" [size]="17" />
-              }
-              {{ t.label || ('applications.transitions.fallback' | t) }}
-            </app-button>
-          }
+      @if (split()) {
+        <div class="ad__cols">
+          <div class="ad__col">
+            <ng-container *ngTemplateOutlet="answers; context: { $implicit: application }" />
+            <ng-container *ngTemplateOutlet="files; context: { $implicit: application }" />
+          </div>
+          <div class="ad__col">
+            <ng-container *ngTemplateOutlet="details; context: { $implicit: application }" />
+            <ng-container *ngTemplateOutlet="history" />
+            <ng-container *ngTemplateOutlet="chat" />
+          </div>
         </div>
-      }
-
-      @if (application.archivedAt) {
-        <!-- An archived application looks like an active one, and someone arriving from a
-             link has no other way to know. -->
-        <app-note class="ad__archived" icon="archive" role="status">
-          {{ 'applications.detail.archivedNotice' | t: { at: (application.archivedAt | ldate) } }}
-        </app-note>
-      }
-    </header>
-
-    @if (split()) {
-      <div class="ad__cols">
-        <div class="ad__col">
-          <ng-container *ngTemplateOutlet="answers; context: { $implicit: application }" />
-          <ng-container *ngTemplateOutlet="files; context: { $implicit: application }" />
-        </div>
-        <div class="ad__col">
+      } @else {
+        <app-tabs
+          #tabBar
+          class="ad__tabs"
+          idPrefix="ad"
+          [ariaLabel]="title()"
+          [tabs]="tabs()"
+          [active]="tab()"
+          (activeChange)="selectTab($event)"
+        />
+        <!-- Every panel stays in the DOM, so the attachment count, a comment draft and the
+             scroll of a list survive a tab change. -->
+        <section
+          class="ad__panel"
+          role="tabpanel"
+          [id]="tabBar.panelId('app')"
+          [attr.aria-labelledby]="tabBar.tabId('app')"
+          [hidden]="tab() !== 'app'"
+        >
           <ng-container *ngTemplateOutlet="details; context: { $implicit: application }" />
+          <ng-container *ngTemplateOutlet="answers; context: { $implicit: application }" />
+        </section>
+        <section
+          class="ad__panel"
+          role="tabpanel"
+          [id]="tabBar.panelId('history')"
+          [attr.aria-labelledby]="tabBar.tabId('history')"
+          [hidden]="tab() !== 'history'"
+        >
           <ng-container *ngTemplateOutlet="history" />
+        </section>
+        <section
+          class="ad__panel"
+          role="tabpanel"
+          [id]="tabBar.panelId('comments')"
+          [attr.aria-labelledby]="tabBar.tabId('comments')"
+          [hidden]="tab() !== 'comments'"
+        >
           <ng-container *ngTemplateOutlet="chat" />
-        </div>
-      </div>
-    } @else {
-      <app-tabs
-        #tabBar
-        class="ad__tabs"
-        idPrefix="ad"
-        [ariaLabel]="title()"
-        [tabs]="tabs()"
-        [active]="tab()"
-        (activeChange)="selectTab($event)"
-      />
-      <!-- Every panel stays in the DOM, so the attachment count, a comment draft and the
-           scroll of a list survive a tab change. -->
-      <section
-        class="ad__panel"
-        role="tabpanel"
-        [id]="tabBar.panelId('app')"
-        [attr.aria-labelledby]="tabBar.tabId('app')"
-        [hidden]="tab() !== 'app'"
-      >
-        <ng-container *ngTemplateOutlet="details; context: { $implicit: application }" />
-        <ng-container *ngTemplateOutlet="answers; context: { $implicit: application }" />
-      </section>
-      <section
-        class="ad__panel"
-        role="tabpanel"
-        [id]="tabBar.panelId('history')"
-        [attr.aria-labelledby]="tabBar.tabId('history')"
-        [hidden]="tab() !== 'history'"
-      >
-        <ng-container *ngTemplateOutlet="history" />
-      </section>
-      <section
-        class="ad__panel"
-        role="tabpanel"
-        [id]="tabBar.panelId('comments')"
-        [attr.aria-labelledby]="tabBar.tabId('comments')"
-        [hidden]="tab() !== 'comments'"
-      >
-        <ng-container *ngTemplateOutlet="chat" />
-      </section>
-      <section
-        class="ad__panel"
-        role="tabpanel"
-        [id]="tabBar.panelId('files')"
-        [attr.aria-labelledby]="tabBar.tabId('files')"
-        [hidden]="tab() !== 'files'"
-      >
-        <ng-container *ngTemplateOutlet="files; context: { $implicit: application }" />
-      </section>
-    }
-  </article>
+        </section>
+        <section
+          class="ad__panel"
+          role="tabpanel"
+          [id]="tabBar.panelId('files')"
+          [attr.aria-labelledby]="tabBar.tabId('files')"
+          [hidden]="tab() !== 'files'"
+        >
+          <ng-container *ngTemplateOutlet="files; context: { $implicit: application }" />
+        </section>
+      }
+    </article>
+  }
 }
 
 <!-- "Details": receipt, last change, applicant, cost centre. -->
@@ -236,74 +271,18 @@
   </section>
 </ng-template>
 
-<!-- The answers of the form, or the edit form. FE4b brings the sections of the form. -->
+<!-- The answers of the form by section (O19). -->
 <ng-template #answers let-application>
-  <section class="ad__sec" aria-labelledby="ad-data">
-    <h3 id="ad-data" class="sec ad__secTitle">{{ 'applications.detail.data.title' | t }}</h3>
-    @if (editing()) {
-      <div class="ad__edit">
-        <formly-form [form]="editForm" [fields]="editFields()" [model]="editModel" />
-        <div class="ad__editActions">
-          <app-button variant="text" size="sm" (click)="cancelEdit()">{{ 'applications.detail.cancel' | t }}</app-button>
-          <app-button variant="fill" size="sm" [disabled]="editForm.invalid" [loading]="savingEdit()" (click)="saveEdit()">{{ 'applications.detail.save' | t }}</app-button>
-        </div>
-      </div>
-    } @else if (dataEntries(application).length || positionEntries(application).length) {
-      @if (dataEntries(application).length) {
-        <app-field-group>
-          @for (entry of dataEntries(application); track entry.key) {
-            <app-field-row [label]="entry.label">
-              @if (entry.md) {
-                <app-markdown-view [src]="entry.value" />
-              } @else {
-                {{ entry.value }}
-              }
-            </app-field-row>
-          }
-        </app-field-group>
-      }
-      @for (pf of positionEntries(application); track pf.key) {
-        <div class="ad__positions">
-          <span class="ad__posHead">{{ pf.label }}</span>
-          <div class="rowgroup">
-            @for (p of pf.positions; track $index) {
-              <div class="ad__pos">
-                <div class="ad__posLine">
-                  <span class="ad__posName">{{ p.label || ('applications.detail.positionUntitled' | t) }}</span>
-                  <span class="mono">{{ money(positionValue(p)) }}</span>
-                </div>
-                @if (p.offers.length) {
-                  <ul class="ad__offers">
-                    @for (o of p.offers; track $index) {
-                      <li class="ad__offer">
-                        <span class="ad__offerName ell" [title]="o.label || '—'">{{ o.label || '—' }}</span>
-                        @if (o.preferred) {
-                          <app-status-text kind="accent">{{ 'apply.positions.preferred' | t }}</app-status-text>
-                        }
-                        <span class="mono ad__offerValue">{{ money(o.value) }}</span>
-                      </li>
-                    }
-                  </ul>
-                }
-                @if (p.noOffers) {
-                  <p class="ad__noOffers">
-                    <app-status-text kind="warn">{{ 'apply.positions.noOffersBadge' | t }}</app-status-text>
-                    <span>{{ p.noOffersReason }}</span>
-                  </p>
-                }
-              </div>
-            }
-            <div class="ad__pos ad__posTotal">
-              <span>{{ 'apply.positions.total' | t }}</span>
-              <span class="mono">{{ money(positionsTotal(pf.positions)) }}</span>
-            </div>
-          </div>
-        </div>
-      }
-    } @else {
-      <p class="ad__none">{{ 'applications.detail.data.empty' | t }}</p>
-    }
-  </section>
+  @if (formLoading()) {
+    <span class="skel skel--panel" aria-hidden="true"></span>
+  } @else {
+    <app-answer-view
+      [sections]="sections()"
+      [data]="application.data"
+      [context]="formContext()"
+      [emptyText]="'applications.detail.data.empty' | t"
+    />
+  }
 </ng-template>
 
 <ng-template #files let-application>
@@ -314,70 +293,15 @@
   />
 </ng-template>
 
-<!-- "Verlauf": every version with its changes. FE4b merges it with the status events. -->
+<!-- "Verlauf": the status changes and the versions with their changes, by day. -->
 <ng-template #history>
   <section id="ad-history" class="ad__sec" tabindex="-1" [attr.aria-labelledby]="split() ? 'ad-history-title' : null">
     <!-- In a tab the tab names the section. -->
     @if (split()) {
       <h3 id="ad-history-title" class="sec ad__secTitle">{{ 'applications.detail.tab.history' | t }}</h3>
     }
-    @if (versions().length) {
-      <ol class="rowgroup ad__versions">
-        @for (version of versions(); track version.version) {
-          <li class="ad__version">
-            <div class="ad__versionHead">
-              <strong>{{ 'applications.history.version' | t: { version: version.version } }}</strong>
-              <span class="ad__versionMeta ad__seps">
-                <span class="ad__parts">
-                  @if (version.changedBy) {
-                    <span class="ad__part ell">{{ 'applications.history.by' | t: { actor: version.changedBy === 'applicant' ? ('applications.comments.author.applicant' | t) : version.changedBy } }}</span>
-                  }
-                  <span class="ad__part">
-                    <time [attr.datetime]="version.at">{{ version.at | ldate: 'short' }}</time>
-                  </span>
-                </span>
-              </span>
-            </div>
-            @if (version.version === 1) {
-              <p class="ad__diffNone">{{ 'applications.history.initial' | t }}</p>
-            } @else if (!version.diff && version.changedKeys?.length) {
-              <!-- Metadata view (A11): the keys of the changed fields, no values. -->
-              <ul class="ad__diff">
-                @for (key of version.changedKeys; track key) {
-                  <li>
-                    <app-status-text kind="warn">{{ 'applications.history.diff.changed' | t }}</app-status-text>
-                    <code>{{ key }}</code>
-                  </li>
-                }
-              </ul>
-            } @else if (!version.diff || isEmptyDiff(version)) {
-              <p class="ad__diffNone">{{ 'applications.history.diff.none' | t }}</p>
-            } @else {
-              <ul class="ad__diff">
-                @for (change of version.diff.changed; track change.key) {
-                  <li>
-                    <app-status-text kind="warn">{{ 'applications.history.diff.changed' | t }}</app-status-text>
-                    <code>{{ change.key }}</code>:
-                    <del>{{ fmt(change.old, change.key) }}</del> → <ins>{{ fmt(change.new, change.key) }}</ins>
-                  </li>
-                }
-                @for (added of version.diff.added; track added.key) {
-                  <li>
-                    <app-status-text kind="accent">{{ 'applications.history.diff.added' | t }}</app-status-text>
-                    <code>{{ added.key }}</code>: <ins>{{ fmt(added.value, added.key) }}</ins>
-                  </li>
-                }
-                @for (removed of version.diff.removed; track removed.key) {
-                  <li>
-                    <app-status-text kind="error">{{ 'applications.history.diff.removed' | t }}</app-status-text>
-                    <code>{{ removed.key }}</code>: <del>{{ fmt(removed.value, removed.key) }}</del>
-                  </li>
-                }
-              </ul>
-            }
-          </li>
-        }
-      </ol>
+    @if (historyEntries().length) {
+      <app-history [entries]="historyEntries()" />
     } @else {
       <p class="ad__none">{{ 'applications.history.empty' | t }}</p>
     }
@@ -584,3 +508,11 @@
 </app-dialog>
 
 <app-share-links-dialog [applicationId]="app()?.id ?? null" [(open)]="shareDialogOpen" />
+
+<app-agenda-dialog
+  [applicationId]="app()?.id ?? null"
+  [applicationTitle]="title()"
+  [transition]="agendaTransition()"
+  [(open)]="agendaOpen"
+  (done)="onAgendaDone()"
+/>

@@ -23,20 +23,29 @@ import type {
   ApplicationVersion,
   CommentVisibility,
   FormFieldDef,
+  FormSection,
+  ProblemDetail,
+  TimelineEntry,
   Transition,
   Uuid,
 } from '@core/api/models';
 import { resolveI18n } from '@shared/forms/i18n-text';
-import { toFormlyFields } from '@shared/forms/formly-mapper';
+import { toFormlySections } from '@shared/forms/formly-mapper';
+import { formatAnswer, formatFieldValue } from '@shared/forms/answer-format';
+import { applyServerErrors, clearServerErrors } from '@shared/forms/server-errors';
+import { AnswerViewComponent } from '@shared/forms/answer-view/answer-view.component';
 import {
   AvatarComponent,
   EmptyStateComponent,
   FieldGroupComponent,
   FieldRowComponent,
+  HistoryComponent,
   NoteComponent,
   RowMenuComponent,
   StatusTextComponent,
   flowColorKind,
+  type HistoryChange,
+  type HistoryEntry,
   type RowMenuItem,
   type RowMenuSection,
 } from '@shared/ui';
@@ -60,34 +69,17 @@ import {
   flattenBudgetOptions,
 } from '../budget/budget-tree.api';
 import { CostCentreTreeComponent } from '../budget/cost-centre-tree.component';
-import { MarkdownViewComponent } from '@shared/markdown/markdown-view.component';
 import { AttachmentsPanelComponent } from './attachments-panel.component';
-import {
-  applicationTitle,
-  formatDateRangeValue,
-  formatFieldValue,
-  formatIsoDate,
-  transitionLooks,
-} from './applications.util';
+import { applicationTitle, transitionLooks } from './applications.util';
+import { AgendaDialogComponent } from './agenda-dialog/agenda-dialog.component';
 import { ApplicationsPageService } from './applications-page.service';
 import { ForceStatusDialogComponent } from './force-status-dialog/force-status-dialog.component';
 import { ShareLinksDialogComponent } from './share-links-dialog/share-links-dialog.component';
 import { mediaQuerySignal } from '../../layout/media-query';
 import { RailStatusService } from '../../layout/rail-status.service';
 
-/** Comparison offer / cost position for the structured detail view. */
-interface DetailOffer {
-  label?: string;
-  value?: number | null;
-  preferred?: boolean;
-}
-interface DetailPosition {
-  label: string;
-  offers: DetailOffer[];
-  /** Opt-out of comparison offers (with the applicant's reason). */
-  noOffers?: boolean;
-  noOffersReason?: string;
-}
+/** Field types whose old and new value do not fit on one line of the history. */
+const NO_INLINE_DIFF: ReadonlySet<string> = new Set(['positions', 'table', 'textarea']);
 
 /** The tabs of the detail when the list and the detail do not sit side by side. */
 type DetailTab = 'app' | 'history' | 'comments' | 'files';
@@ -99,7 +91,13 @@ type DetailTab = 'app' | 'history' | 'comments' | 'files';
  * Header: "<Typ> · Version n", the title, "status · gremium · amount", the firable
  * transitions as buttons, and the actions (share links, edit, archive, and a menu with
  * Status setzen, Versionen vergleichen, Löschen, Anonymisierung beantragen). Body: the
- * details, the answers, the attachments, the version history and the comments.
+ * details, the answers by section (`app-answer-view`), the attachments, the history
+ * (status changes and versions by day) and the comments.
+ *
+ * A transition with `addsToAgenda` opens the agenda dialog, which asks for the meeting.
+ * "Bearbeiten" turns the sheet into the edit form (board Anträge-Bearbeiten): the bar
+ * "Antrag bearbeiten · Speichern legt Version n+1 an" with Abbrechen and Speichern over
+ * the fields of the form by section. A 422 of the server shows on its field.
  *
  * A comment is internal or public. Each comment shows its visibility. The composer
  * offers the internal visibility only with `application.manage`. Without it, a new
@@ -133,9 +131,11 @@ type DetailTab = 'app' | 'history' | 'comments' | 'files';
     TabsComponent,
     CostCentreTreeComponent,
     AttachmentsPanelComponent,
-    MarkdownViewComponent,
+    AnswerViewComponent,
+    HistoryComponent,
     ShareLinksDialogComponent,
     ForceStatusDialogComponent,
+    AgendaDialogComponent,
   ],
   templateUrl: './applications-detail.component.html',
   styleUrl: './applications-detail.component.scss',
@@ -163,8 +163,18 @@ export class ApplicationsDetailComponent {
   readonly app = signal<Application | null>(null);
   readonly versions = signal<ApplicationVersion[]>([]);
   readonly comments = signal<ApplicationComment[]>([]);
+  /** The status changes of the application, oldest first. */
+  readonly timeline = signal<TimelineEntry[]>([]);
+  /** The sections of the pinned form. Empty until it loaded, and on an error. */
+  readonly sections = signal<FormSection[]>([]);
+  /** The form is on its way; the answers wait for it, so no raw keys flash. */
+  readonly formLoading = signal(true);
+  /** The type of the application has a budget: drives `visibleIf: has_budget`. */
+  readonly hasBudget = signal(false);
+  /** The variables of `visibleIf` and `compute` besides the answers. */
+  readonly formContext = computed(() => ({ has_budget: this.hasBudget() }));
   /** Field definitions of the effective form for labels and typed values. Empty on error. */
-  readonly formFields = signal<FormFieldDef[]>([]);
+  readonly formFields = computed<FormFieldDef[]>(() => this.sections().flatMap((s) => s.fields));
   /** The same field definitions by key. The data rows and the version diff both
    *  look a key up, so they share one map. */
   private readonly fieldByKey = computed(
@@ -198,6 +208,9 @@ export class ApplicationsDetailComponent {
   /** Manual transitions that the server guard allows, plus the fire in flight. */
   readonly transitions = signal<Transition[]>([]);
   readonly firing = signal<Uuid | null>(null);
+  /** The transition of the agenda dialog. */
+  readonly agendaTransition = signal<Transition | null>(null);
+  readonly agendaOpen = signal(false);
   readonly canTransition = computed(() => this.auth.can('application.transition'));
 
   protected readonly budgetTree = signal<BudgetTreeNode[]>([]);
@@ -342,20 +355,126 @@ export class ApplicationsDetailComponent {
   }
 
   /**
-   * One value of the version diff, formatted the way the data rows show the field.
+   * One value of the version diff, formatted the way the answers show the field, or
+   * `null` when the value does not fit on one line (cost positions, tables, long texts,
+   * lists): the history then names only the field.
    *
    * The diff carries a key, not a field definition, so the type comes from the key.
-   * A date then reads as a day and a date range as a span, not as an ISO string or
-   * as JSON.
-   *
-   * A key the active form does not define — an answer of an older form version
-   * whose field is gone — keeps the plain rule. A type it never had cannot format
-   * it, and the stored text tells the reader more than a placeholder does.
+   * A key the form does not define (an answer of an older form version) keeps the
+   * plain text for a scalar.
    */
-  readonly fmt = (value: unknown, key?: string): string => {
+  readonly fmt = (value: unknown, key?: string): string | null => {
     const field = key === undefined ? undefined : this.fieldByKey().get(key);
-    return field ? this.formatByField(field, value) : formatFieldValue(value);
+    if (field && NO_INLINE_DIFF.has(field.type)) return null;
+    if (!field && value !== null && typeof value === 'object') return null;
+    const text = field
+      ? formatAnswer(field, value, {
+          lang: this.i18n.locale(),
+          yes: this.i18n.translate('common.yes'),
+          no: this.i18n.translate('common.no'),
+        })
+      : formatFieldValue(value);
+    return text || '—';
   };
+
+  /** The label of a field of the diff, or its key when the form does not define it. */
+  private fieldLabel(key: string): string {
+    const field = this.fieldByKey().get(key);
+    return field ? resolveI18n(field.label, this.i18n.locale()) : key;
+  }
+
+  /** The changed fields of a version as lines of the history. */
+  private versionChanges(version: ApplicationVersion): HistoryChange[] {
+    const t = (key: TranslationKey) => this.i18n.translate(key);
+    if (!version.diff) {
+      // Metadata view (A11): the keys of the changed fields, no values.
+      return (version.changedKeys ?? []).map((key) => ({
+        kind: 'warn',
+        tag: t('applications.history.diff.changed'),
+        label: this.fieldLabel(key),
+      }));
+    }
+    return [
+      ...version.diff.changed.map((c) => ({
+        kind: 'warn' as const,
+        tag: t('applications.history.diff.changed'),
+        label: this.fieldLabel(c.key),
+        old: this.fmt(c.old, c.key),
+        new: this.fmt(c.new, c.key),
+      })),
+      ...version.diff.added.map((a) => ({
+        kind: 'accent' as const,
+        tag: t('applications.history.diff.added'),
+        label: this.fieldLabel(a.key),
+        new: this.fmt(a.value, a.key),
+      })),
+      ...version.diff.removed.map((r) => ({
+        kind: 'error' as const,
+        tag: t('applications.history.diff.removed'),
+        label: this.fieldLabel(r.key),
+        old: this.fmt(r.value, r.key),
+      })),
+    ];
+  }
+
+  /** "Antragsteller:in" for the applicant, else the name the server sent. */
+  private versionActor(version: ApplicationVersion): string | null {
+    if (!version.changedBy) return null;
+    return version.changedBy === 'applicant'
+      ? this.i18n.translate('applications.comments.author.applicant')
+      : version.changedBy;
+  }
+
+  /**
+   * "Verlauf": the status changes and the versions, by day (`app-history`).
+   *
+   * A status change shows the new state in its colour, the transition ("Übergang
+   * „Prüfung beginnen“", A3) and the note. The first status event is the submission and
+   * carries "Version 1". Every later version shows its changed fields with the old and
+   * the new value.
+   */
+  readonly historyEntries = computed<HistoryEntry[]>(() => {
+    const t = (key: TranslationKey, params?: Record<string, string | number>) =>
+      this.i18n.translate(key, params);
+    const events = [...this.timeline()].sort((a, b) => a.at.localeCompare(b.at));
+    const versions = this.versions();
+    const entries: HistoryEntry[] = events.map((e, i) => {
+      const lines: string[] = [];
+      if (i === 0 && versions.some((v) => v.version === 1)) {
+        lines.push(t('applications.history.version', { version: 1 }));
+      }
+      if (e.transitionLabel) {
+        lines.push(t('applications.history.transition', { label: e.transitionLabel }));
+      }
+      if (e.note) lines.push(e.note);
+      return {
+        at: e.at,
+        icon: i === 0 ? 'send' : 'flow',
+        title: e.toState?.label || e.label,
+        kind: flowColorKind(e.toState?.color),
+        actor: e.actor,
+        body: lines.join('\n') || null,
+      };
+    });
+    for (const v of versions) {
+      if (v.version === 1 && events.length) continue;
+      const changes = v.version === 1 ? [] : this.versionChanges(v);
+      entries.push({
+        at: v.at,
+        icon: 'edit',
+        title: t('applications.history.version', { version: v.version }),
+        actor: this.versionActor(v),
+        body:
+          v.version === 1
+            ? t('applications.history.initial')
+            : changes.length
+              ? null
+              : t('applications.history.diff.none'),
+        changes,
+      });
+    }
+    return entries;
+  });
 
   private id: Uuid = '';
 
@@ -392,10 +511,11 @@ export class ApplicationsDetailComponent {
   /** The look of each transition button: main action, tonal, or danger (a rejection). */
   readonly looks = computed(() => transitionLooks(this.transitions()));
 
-  /** The data can change: the edit button and the menu item. */
+  /** The data can change: the edit button and the menu item. The edit form needs the
+   *  fields of the form, so the button waits for them. */
   readonly canEditData = computed(() => {
     const app = this.app();
-    return !!app?.canEdit && !!app.state?.editAllowed;
+    return !!app?.canEdit && !!app.state?.editAllowed && this.sections().length > 0;
   });
 
   /** The owner may ask for the anonymization of their data (GDPR Art. 17). */
@@ -447,7 +567,7 @@ export class ApplicationsDetailComponent {
     {
       id: 'history',
       label: this.i18n.translate('applications.detail.tab.history'),
-      count: this.versions().length,
+      count: this.historyEntries().length,
     },
     {
       id: 'comments',
@@ -552,7 +672,10 @@ export class ApplicationsDetailComponent {
     this.app.set(null);
     this.versions.set([]);
     this.comments.set([]);
-    this.formFields.set([]);
+    this.timeline.set([]);
+    this.sections.set([]);
+    this.formLoading.set(true);
+    this.hasBudget.set(false);
     this.newComment.set('');
     this.visibility.set('public');
     this.editing.set(false);
@@ -562,6 +685,7 @@ export class ApplicationsDetailComponent {
     this.editingComment.set(null);
     this.deletingComment.set(null);
     this.transitions.set([]);
+    this.agendaOpen.set(false);
     this.attachmentCount.set(null);
     this.tab.set('app');
     if (!id) {
@@ -582,10 +706,16 @@ export class ApplicationsDetailComponent {
         // server validates.
         this.api.applicationForm(app.id).subscribe({
           next: (eff) => {
-            if (seq === this.loadSeq) this.formFields.set(eff.sections.flatMap((s) => s.fields));
+            if (seq !== this.loadSeq) return;
+            this.sections.set(eff.sections);
+            this.hasBudget.set(eff.hasBudget);
+            this.formLoading.set(false);
           },
           error: () => {
-            if (seq === this.loadSeq) this.formFields.set([]);
+            // Without the form the answers show as plain text under "Weitere Angaben".
+            if (seq !== this.loadSeq) return;
+            this.sections.set([]);
+            this.formLoading.set(false);
           },
         });
       },
@@ -612,6 +742,12 @@ export class ApplicationsDetailComponent {
     this.api.comments(this.id, { quiet: true }).subscribe({
       next: (c) => {
         if (seq === this.loadSeq) this.comments.set(c);
+      },
+      error: () => {},
+    });
+    this.api.timeline(this.id, { quiet: true }).subscribe({
+      next: (events) => {
+        if (seq === this.loadSeq) this.timeline.set(events);
       },
       error: () => {},
     });
@@ -671,138 +807,6 @@ export class ApplicationsDetailComponent {
       });
   }
 
-  /** Build the application data as label and value rows.
-   *  A field definition gives the label and the typed value. An unknown key stays
-   *  raw. The rows omit `title`, because the header shows it, and they omit the pure
-   *  display fields. A long text (`textarea`) carries the `md` flag and renders as
-   *  Markdown. This keeps the newlines and the simple formatting. */
-  dataEntries(app: Application): { key: string; label: string; value: string; md: boolean }[] {
-    const lang = this.i18n.locale();
-    const byKey = this.fieldByKey();
-    const rows: { key: string; label: string; value: string; md: boolean }[] = [];
-    const seen = new Set<string>();
-
-    const pushField = (f: FormFieldDef): void => {
-      if (f.type === 'markdown' || f.type === 'computed') return;
-      // Cost positions get their own block with the positions and the offers.
-      if (f.type === 'positions') return;
-      if (f.key === 'title') return;
-      if (!(f.key in app.data)) return;
-      seen.add(f.key);
-      rows.push({
-        key: f.key,
-        label: resolveI18n(f.label, lang),
-        value: this.formatByField(f, app.data[f.key]),
-        md: f.type === 'textarea',
-      });
-    };
-
-    for (const f of this.formFields()) pushField(f);
-    // Show data without a matching field definition as a raw value. Skip `title`.
-    for (const [key, value] of Object.entries(app.data)) {
-      if (seen.has(key) || key === 'title' || byKey.has(key)) continue;
-      rows.push({ key, label: key, value: formatFieldValue(value), md: false });
-    }
-    return rows;
-  }
-
-  /** Format a value for display based on its field type. */
-  private formatByField(field: FormFieldDef, value: unknown): string {
-    if (value === null || value === undefined || value === '') return '—';
-    const lang = this.i18n.locale();
-    if (field.type === 'positions') return this.formatPositions(value);
-    if (field.type === 'checkbox' && typeof value === 'boolean') {
-      return this.i18n.translate(value ? 'common.yes' : 'common.no');
-    }
-    // A date and a date range read as a day, not as an ISO string or as JSON. The
-    // public share page shows the same span, so both views agree.
-    if (field.type === 'date') return formatIsoDate(value, lang) || '—';
-    if (field.type === 'daterange') return formatDateRangeValue(value, lang) || '—';
-    // A dynamic picker for a Gremium or a budget carries the options of the server in
-    // the effective form. Resolve them to names, like a plain select.
-    if (field.type === 'select' || field.type === 'gremium_select' || field.type === 'budget_select') {
-      const opt = field.options?.find((o) => o.value === value);
-      return opt ? resolveI18n(opt.label, lang) : formatFieldValue(value);
-    }
-    if (field.type === 'multiselect' && Array.isArray(value)) {
-      return value
-        .map((v) => {
-          const opt = field.options?.find((o) => o.value === v);
-          return opt ? resolveI18n(opt.label, lang) : String(v);
-        })
-        .join(', ');
-    }
-    if (field.type === 'currency') {
-      const n = Number(value);
-      if (Number.isFinite(n)) {
-        return new Intl.NumberFormat(this.i18n.formatLocale(), {
-          style: 'currency',
-          currency: 'EUR',
-        }).format(n);
-      }
-    }
-    return formatFieldValue(value);
-  }
-
-  /** Build the cost-position fields as a structured block for the detail view.
-   *  Each position carries its comparison offers, the preferred one included. */
-  positionEntries(app: Application): {
-    key: string;
-    label: string;
-    positions: DetailPosition[];
-  }[] {
-    const lang = this.i18n.locale();
-    const out: { key: string; label: string; positions: DetailPosition[] }[] = [];
-    for (const f of this.formFields()) {
-      if (f.type !== 'positions' || !(f.key in app.data)) continue;
-      const raw = app.data[f.key];
-      if (!Array.isArray(raw)) continue;
-      const positions = (raw as DetailPosition[]).map((p) => ({
-        label: p.label ?? '',
-        offers: Array.isArray(p.offers) ? p.offers : [],
-        noOffers: p.noOffers === true,
-        noOffersReason: typeof p.noOffersReason === 'string' ? p.noOffersReason : '',
-      }));
-      out.push({ key: f.key, label: resolveI18n(f.label, lang), positions });
-    }
-    return out;
-  }
-
-  /** Value of a comparison offer / position as currency. */
-  money(value: number | null | undefined): string {
-    const n = Number(value ?? 0);
-    return new Intl.NumberFormat(this.i18n.formatLocale(), {
-      style: 'currency',
-      currency: 'EUR',
-    }).format(Number.isFinite(n) ? n : 0);
-  }
-
-  /** The value of a position is the value of the preferred offer. */
-  positionValue(p: DetailPosition): number {
-    return p.offers.find((o) => o.preferred)?.value ?? 0;
-  }
-
-  /** Sum over all position values. */
-  positionsTotal(positions: DetailPosition[]): number {
-    return positions.reduce((s, p) => s + this.positionValue(p), 0);
-  }
-
-  /** Format the cost positions compactly: the position count and the preferred sum. */
-  private formatPositions(value: unknown): string {
-    if (!Array.isArray(value)) return '—';
-    let total = 0;
-    for (const p of value as { offers?: { value?: number | null; preferred?: boolean }[] }[]) {
-      const pref = (p.offers ?? []).find((o) => o.preferred);
-      total += pref?.value ?? 0;
-    }
-    const sum = new Intl.NumberFormat(this.i18n.formatLocale(), {
-      style: 'currency',
-      currency: 'EUR',
-    }).format(total);
-    return `${value.length} × ${this.i18n.translate('applications.detail.positionsTotal')}: ${sum}`;
-  }
-
-
   amount(app: Application): string {
     if (app.amount === null) return this.i18n.translate('applications.detail.notProvided');
     const value = Number(app.amount);
@@ -813,25 +817,18 @@ export class ApplicationsDetailComponent {
     }).format(value);
   }
 
-  isEmptyDiff(version: ApplicationVersion): boolean {
-    const d = version.diff;
-    return !!d && !d.added.length && !d.removed.length && !d.changed.length;
-  }
-
   startEdit(app: Application): void {
-    const lang = this.i18n.locale();
     // A reader without the PII right gets `data` without the isPII fields (O21), and
     // the server names them in `hiddenKeys`. The form leaves them out, because the
     // server keeps their stored values anyway. A key that is only missing from `data`
     // was never answered, so that field stays editable.
-    const hidden = new Set(app.hiddenKeys ?? []);
-    const fields = this.formFields().filter((f) => !hidden.has(f.key));
-    this.editFields.set(toFormlyFields(fields, lang, { has_budget: true }));
+    this.editFields.set(
+      toFormlySections(this.sections(), this.i18n.locale(), this.formContext(), {
+        omitKeys: app.hiddenKeys ?? [],
+      }),
+    );
     this.editModel = structuredClone(app.data);
     this.editForm = new FormGroup({});
-    // The form sits in the "Antrag" tab. Without the split layout it would open in a
-    // hidden tab, while the header actions already go away.
-    this.tab.set('app');
     this.editing.set(true);
   }
 
@@ -839,22 +836,56 @@ export class ApplicationsDetailComponent {
     this.editing.set(false);
   }
 
+  /**
+   * Save the edit as a new version (PATCH). An invalid form shows its errors and sends
+   * nothing. A 422 of the server shows on the fields it names (for example a cost
+   * position without an offer, D12); a 409 means the state no longer allows an edit.
+   */
   saveEdit(): void {
-    if (this.editForm.invalid || this.savingEdit()) return;
+    if (this.savingEdit()) return;
+    clearServerErrors(this.editFields());
+    if (this.editForm.invalid) {
+      this.editForm.markAllAsTouched();
+      this.toast.error(this.i18n.translate('applications.edit.invalid'));
+      this.revealError();
+      return;
+    }
     this.savingEdit.set(true);
     this.api.updateApplication(this.id, { ...this.editModel }).subscribe({
-      next: () => {
+      next: (updated) => {
         this.savingEdit.set(false);
         this.editing.set(false);
-        this.toast.success(this.i18n.translate('applications.detail.saved'));
+        this.toast.success(
+          this.i18n.translate('applications.edit.saved', { version: updated.version }),
+        );
         this.changed();
       },
-      error: (err: { status?: number }) => {
+      error: (err: { status?: number; error?: ProblemDetail | null }) => {
         this.savingEdit.set(false);
+        if (err.status === 422 && err.error?.errors?.length) {
+          const placed = applyServerErrors(this.editFields(), err.error.errors, (key) =>
+            this.i18n.translate(key),
+          );
+          if (placed) {
+            this.toast.error(this.i18n.translate('applications.edit.invalid'));
+            this.revealError();
+            return;
+          }
+        }
         const key =
           err.status === 409 ? 'applications.detail.locked' : 'applications.detail.saveFailed';
         this.toast.error(this.i18n.translate(key));
       },
+    });
+  }
+
+  /** Scroll the first field with an error into view, after the form drew it. */
+  private revealError(): void {
+    setTimeout(() => {
+      const el = document.querySelector<HTMLElement>(
+        '.ad__edit [aria-invalid="true"], .ad__edit [role="alert"]',
+      );
+      el?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
     });
   }
 
@@ -1017,6 +1048,12 @@ export class ApplicationsDetailComponent {
    *  refreshes. */
   fire(t: Transition): void {
     if (this.firing() !== null) return;
+    // A transition onto the agenda needs the meeting: the dialog asks for it and fires.
+    if (t.addsToAgenda) {
+      this.agendaTransition.set(t);
+      this.agendaOpen.set(true);
+      return;
+    }
     this.firing.set(t.id);
     this.api.fireTransition(this.id, { transitionId: t.id }).subscribe({
       next: () => {
@@ -1036,6 +1073,11 @@ export class ApplicationsDetailComponent {
         this.changed();
       },
     });
+  }
+
+  /** The agenda dialog fired its transition. */
+  onAgendaDone(): void {
+    this.changed();
   }
 
   /** This pane changed the application: load it again and tell the list pane. */
