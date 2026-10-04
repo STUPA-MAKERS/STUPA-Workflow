@@ -15,6 +15,11 @@
   min-height: 2.5rem;
   padding: 0 var(--space-1) var(--space-2) var(--space-4);
 }
+/* Only the heading for screen readers is left: the line takes no room. */
+.ap__head--sheet {
+  min-height: 0;
+  padding: 0;
+}
 .ap__title {
   flex: 1 1 auto;
   min-width: 0;

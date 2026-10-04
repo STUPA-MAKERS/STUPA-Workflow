@@ -58,7 +58,11 @@ async function setup(lazy = false) {
 }
 
 const items = () => document.querySelectorAll('[data-menu-item]');
-const focusedName = () => (document.activeElement as HTMLElement | null)?.textContent?.trim();
+/** The label of the focused item (without the visible reason of a disabled one), or its text. */
+const focusedName = () => {
+  const el = document.activeElement as HTMLElement | null;
+  return (el?.querySelector('.rm__label') ?? el)?.textContent?.trim();
+};
 
 describe('RowMenuComponent', () => {
   afterEach(() => {
@@ -103,6 +107,8 @@ describe('RowMenuComponent', () => {
     expect(item).toHaveAttribute('aria-disabled', 'true');
     expect(item).toHaveAttribute('title', 'Erst entscheiden.');
     expect(item).toHaveAccessibleDescription('Erst entscheiden.');
+    // Visible in the item for a touch user, but not part of its name.
+    expect(item.querySelector('.rm__reason')).toHaveTextContent('Erst entscheiden.');
     await user.click(item);
     expect(host.chosen).toEqual([]);
     expect(screen.getByRole('menu')).toBeInTheDocument();

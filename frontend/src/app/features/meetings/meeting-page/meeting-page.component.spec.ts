@@ -30,7 +30,7 @@ const OUTPUTS = [
   'voteDelete', 'voteDialog', 'startSession', 'closeSession', 'finalize', 'openSettings',
   'deleteMeeting', 'toggleBeamer', 'attendanceChange', 'attendanceReset', 'addTop',
   'removeFromAgenda', 'startRename', 'cancelRename', 'renameTop', 'setNonPublic', 'moveTop',
-  'dragStart', 'dragOver', 'drop', 'setProtokollant', 'handOver', 'cancelHandover',
+  'dragStart', 'dragOver', 'dropAt', 'setProtokollant', 'handOver', 'cancelHandover',
 ] as const;
 
 type Inputs = {
@@ -172,6 +172,8 @@ describe('MeetingPageComponent', () => {
       const blocked = screen.getByRole('button', { name: 'Sitzung schließen' });
       expect(blocked).toBeDisabled();
       expect(blocked).toHaveAttribute('title', 'Erst die offene Abstimmung schließen oder abbrechen.');
+      // The reason is also visible text: a disabled button takes no focus and no touch.
+      expect(screen.getByText('Erst die offene Abstimmung schließen oder abbrechen.', { selector: '.mp__blocked' })).toBeVisible();
       await userEvent.click(blocked);
       expect(on.closeSession).toHaveBeenCalledTimes(1);
     });
@@ -228,6 +230,7 @@ describe('MeetingPageComponent', () => {
       const menu = await openMenu();
       const close = within(menu).getByRole('menuitem', { name: /Sitzung schließen/ });
       expect(close).toHaveAttribute('aria-disabled', 'true');
+      expect(close).toHaveTextContent('Erst die offene Abstimmung schließen oder abbrechen.');
       await userEvent.click(close);
       expect(on.closeSession).not.toHaveBeenCalled();
     });
@@ -332,6 +335,21 @@ describe('MeetingPageComponent', () => {
       expect(screen.queryByRole('dialog', { name: 'Tagesordnung' })).toBeNull();
     });
 
+    it('puts the add into the header of the agenda sheet', async () => {
+      const { on, fixture } = await setup();
+      await userEvent.click(screen.getByTitle('Tagesordnung öffnen'));
+      const sheet = await screen.findByRole('dialog', { name: 'Tagesordnung' });
+      const adds = within(sheet).getAllByRole('button', { name: 'TOP hinzufügen' });
+      expect(adds).toHaveLength(1);
+      expect(adds[0].closest('.ss__head')).toBeTruthy();
+      await userEvent.click(adds[0]);
+      expect(on.addTop).toHaveBeenCalledTimes(1);
+      // A closed meeting changes no agenda.
+      fixture.componentRef.setInput('meeting', meeting({ status: 'closed' }));
+      fixture.detectChanges();
+      expect(within(sheet).queryByRole('button', { name: 'TOP hinzufügen' })).toBeNull();
+    });
+
     it('passes the agenda changes on', async () => {
       const { on } = await setup({}, [MEDIA.wide]);
       await userEvent.click(screen.getByRole('button', { name: 'TOP hinzufügen' }));
@@ -354,7 +372,21 @@ describe('MeetingPageComponent', () => {
       rows[1].dispatchEvent(new Event('drop'));
       expect(on.dragStart).toHaveBeenCalledWith(0);
       expect(on.dragOver).toHaveBeenCalled();
-      expect(on.drop).toHaveBeenCalledWith(1);
+      expect(on.dropAt).toHaveBeenCalledWith(1);
+    });
+
+    it('passes on no native event that bubbles out of the agenda as a value', async () => {
+      const { on } = await setup({ renamingTopId: 't-1', renameDraft: 'Neu' }, [MEDIA.wide]);
+      // Text selected in the rename field fires a native `select` that bubbles.
+      const input = screen.getByRole('textbox', { name: 'TOP umbenennen' });
+      input.dispatchEvent(new Event('select', { bubbles: true }));
+      expect(on.selectTop).not.toHaveBeenCalled();
+      // A native `drop` bubbles out of the row after the row gave its index.
+      const rows = screen.getAllByRole('listitem');
+      rows[1].dispatchEvent(new Event('dragstart', { bubbles: true }));
+      rows[2].dispatchEvent(new Event('drop', { bubbles: true }));
+      expect(on.dropAt).toHaveBeenCalledTimes(1);
+      expect(on.dropAt).toHaveBeenCalledWith(2);
     });
 
     it('passes the inline rename on', async () => {

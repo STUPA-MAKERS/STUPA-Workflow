@@ -35,7 +35,11 @@ import {
 import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import { meetingStatus } from '@shared/status-kind.util';
-import { type AgendaMove, AgendaPaneComponent } from '../agenda-pane/agenda-pane.component';
+import {
+  type AgendaMove,
+  AgendaPaneComponent,
+  canChangeAgenda,
+} from '../agenda-pane/agenda-pane.component';
 import type { AttendanceChange } from '../meeting-attendance-table.component';
 import { PrepChecklistComponent } from '../prep-checklist/prep-checklist.component';
 import { type DockPanel, SessionDockComponent } from '../session-dock/session-dock.component';
@@ -151,7 +155,8 @@ export class MeetingPageComponent {
   readonly moveTop = output<AgendaMove>();
   readonly dragStart = output<number>();
   readonly dragOver = output<DragEvent>();
-  readonly drop = output<number>();
+  /** Drop a dragged agenda item at this index. Not `drop`: see `AgendaPaneComponent.pick`. */
+  readonly dropAt = output<number>();
   /** Name the minute-taker of a planned meeting. */
   readonly setProtokollant = output<Uuid>();
   /** Hand the minutes of a live meeting over, now or with the next item (Z3). */
@@ -188,6 +193,9 @@ export class MeetingPageComponent {
   protected readonly editable = computed(
     () => this.protocol() !== null && !this.locked() && this.canEdit(),
   );
+
+  /** "TOP hinzufügen" in the header of the agenda sheet. */
+  protected readonly canAddTop = computed(() => canChangeAgenda(this.meeting(), this.locked()));
 
   /** The planned meeting shows what the opening needs instead of the sheet. */
   protected readonly preparing = computed(() => {

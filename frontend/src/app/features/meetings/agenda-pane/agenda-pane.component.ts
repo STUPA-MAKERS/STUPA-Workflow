@@ -25,6 +25,14 @@ import {
 /** The ids of the row menu items of an agenda item. */
 type AgendaAction = 'rename' | 'up' | 'down' | 'nonPublic' | 'remove';
 
+/**
+ * Add, rename, reorder and remove agenda items: the meeting lead with write access, while
+ * the meeting is planned or live and the protocol is not locked (O22, O25).
+ */
+export function canChangeAgenda(meeting: Meeting, locked: boolean): boolean {
+  return meeting.canWrite && !locked && meeting.status !== 'closed';
+}
+
 /** A move of an agenda item from one position to another (0-based). */
 export interface AgendaMove {
   from: number;
@@ -73,10 +81,18 @@ export class AgendaPaneComponent {
   readonly savingAgenda = input(false);
   readonly renamingTopId = input<Uuid | null>(null);
   readonly renameDraft = model<string>('');
-  /** Inside the agenda sheet, whose title names the agenda: the heading is for screen readers only. */
+  /**
+   * Inside the agenda sheet, whose header names the agenda and holds the add: the heading
+   * is for screen readers only, and the pane shows no add of its own.
+   */
   readonly inSheet = input(false);
 
-  readonly select = output<Uuid>();
+  /**
+   * Open an item in the sheet. No output of the pane has the name of a DOM event: a
+   * native event that bubbles out of the pane (`select` from the rename field, `drop`
+   * from a row) would else reach the same binding with an Event in place of the value.
+   */
+  readonly pick = output<Uuid>();
   /** Open "TOP hinzufügen". */
   readonly add = output<void>();
   readonly startRename = output<AgendaItem>();
@@ -87,13 +103,13 @@ export class AgendaPaneComponent {
   readonly remove = output<Uuid>();
   readonly dragStart = output<number>();
   readonly dragOver = output<DragEvent>();
-  readonly drop = output<number>();
+  readonly dropAt = output<number>();
 
   /** Set the non-public flag: the meeting lead with write access, protocol not locked. */
   protected readonly canEditAgenda = computed(() => this.meeting().canWrite && !this.locked());
   /** Add, rename, reorder and remove: also only while the meeting is planned or live. */
-  protected readonly canChangeAgenda = computed(
-    () => this.canEditAgenda() && this.meeting().status !== 'closed',
+  protected readonly canChangeAgenda = computed(() =>
+    canChangeAgenda(this.meeting(), this.locked()),
   );
 
   protected readonly headingText = computed(() => {

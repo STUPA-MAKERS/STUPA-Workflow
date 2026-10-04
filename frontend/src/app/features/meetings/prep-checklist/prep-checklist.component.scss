@@ -89,12 +89,17 @@ app-button ::ng-deep .btn__label > app-icon:first-child {
   .pc {
     padding: var(--space-5) var(--space-4);
   }
+  /* Icon and text in one row, the button always on its own row below the text: every
+     card has the same layout, whatever the length of its text. */
   .pc__card {
-    flex-direction: row;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
     align-items: center;
+    column-gap: var(--space-4);
+    row-gap: var(--space-3);
   }
-  .pc__text {
-    flex: 1 1 10rem;
+  .pc__card > app-button {
+    grid-column: 2;
+    justify-self: start;
   }
 }

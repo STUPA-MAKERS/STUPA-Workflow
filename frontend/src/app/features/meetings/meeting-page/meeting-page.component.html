@@ -62,6 +62,10 @@
         </app-button>
       }
       @case ('close') {
+        <!-- Visible, not only a tooltip: a disabled button takes no focus and no touch. -->
+        @if (anyOpenVote()) {
+          <span class="mp__blocked">{{ 'meetings.page.closeBlocked' | t }}</span>
+        }
         <app-button variant="danger" [loading]="finalizing()" [disabled]="anyOpenVote()" [title]="(anyOpenVote() ? 'meetings.page.closeBlocked' : 'meetings.control.closeSession') | t" (click)="closeSession.emit()">
           {{ 'meetings.control.closeSession' | t }}
         </app-button>
@@ -89,6 +93,11 @@
     </app-button>
     <!-- A phone opens the agenda as a bottom sheet, a narrow screen from the start edge. -->
     <app-side-sheet [side]="phone() ? 'bottom' : 'start'" [heading]="'meetings.agenda.title' | t" [(open)]="agendaOpen">
+      @if (canAddTop()) {
+        <app-button sheet-actions variant="text" [iconOnly]="true" [ariaLabel]="'meetings.agenda.dialogTitle' | t" (click)="addTop.emit()">
+          <app-icon name="plus" [size]="20" />
+        </app-button>
+      }
       @if (agendaOpen()) {
         <ng-container [ngTemplateOutlet]="agendaTpl" [ngTemplateOutletContext]="{ inSheet: true }" />
       }
@@ -186,7 +195,7 @@
     [savingAgenda]="savingAgenda()"
     [renamingTopId]="renamingTopId()"
     [(renameDraft)]="renameDraft"
-    (select)="jump($event)"
+    (pick)="jump($event)"
     (add)="addTop.emit()"
     (startRename)="startRename.emit($event)"
     (cancelRename)="cancelRename.emit()"
@@ -196,6 +205,6 @@
     (remove)="removeFromAgenda.emit($event)"
     (dragStart)="dragStart.emit($event)"
     (dragOver)="dragOver.emit($event)"
-    (drop)="drop.emit($event)"
+    (dropAt)="dropAt.emit($event)"
   />
 </ng-template>

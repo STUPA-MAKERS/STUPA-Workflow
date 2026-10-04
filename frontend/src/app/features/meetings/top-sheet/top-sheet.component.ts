@@ -97,16 +97,13 @@ export class TopSheetComponent {
     return { kind: 'neutral', key: 'meetings.protocol.draft' };
   }
 
-  /** Why the finalize is not here, or what comes after it. `null` when nothing to say. */
+  /**
+   * Why a closed meeting shows no finalize to this person: the right is missing. Every
+   * other state the status text and the header already say. `null` when nothing to say.
+   */
   protected protocolHint(p: Protocol): TranslationKey | null {
     const m = this.meeting();
-    if (p.isFinal) return 'meetings.protocol.finalizedHint';
-    if (p.status === 'rendering') return 'meetings.protocol.renderingHint';
-    if (m.canFinalize) {
-      return m.status === 'closed'
-        ? 'meetings.protocol.readyToFinalize'
-        : 'meetings.protocol.finalizeAfterClose';
-    }
-    return m.canWrite ? 'meetings.protocol.finalizeNeedsRight' : null;
+    if (p.isFinal || p.status === 'rendering' || m.status !== 'closed') return null;
+    return m.canWrite && !m.canFinalize ? 'meetings.protocol.finalizeNeedsRight' : null;
   }
 }

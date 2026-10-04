@@ -883,9 +883,6 @@ export const de = {
   'meetings.protocol.saved': 'Gespeichert',
   'meetings.protocol.saveFailed': 'Speichern fehlgeschlagen',
   'meetings.protocol.selectTop': 'Wähle links einen TOP, um seinen Text zu bearbeiten.',
-  'meetings.protocol.finalizedHint': 'Das Protokoll ist final und wurde versandt.',
-  'meetings.protocol.renderingHint':
-    'Das PDF wird im Hintergrund gerendert und anschließend versandt.',
   'meetings.protocol.takenBy': '{name} führt das Protokoll — du liest mit.',
   'meetings.create.title': 'Sitzung anlegen',
   'meetings.create.step': 'Schritt {n} von {m}',
@@ -967,10 +964,6 @@ export const de = {
   'meetings.closeConfirm.finalizeLater': 'Das Protokoll finalisierst du danach als eigenen Schritt',
   'meetings.closeConfirm.finalizeByOthers':
     'Das Protokoll finalisiert danach, wer das Recht „Protokoll finalisieren“ hat',
-  'meetings.protocol.finalizeAfterClose':
-    'Nach dem Schließen der Sitzung finalisierst du das Protokoll als eigenen Schritt.',
-  'meetings.protocol.readyToFinalize':
-    'Die Sitzung ist geschlossen. Prüfe das Protokoll und finalisiere es.',
   'meetings.protocol.finalizeNeedsRight':
     'Finalisieren und Versenden braucht das Gremien-Recht „Protokoll finalisieren“. Das Protokoll bleibt bis dahin ein Entwurf.',
   'meetings.dock.prev': 'Vorheriger TOP',
@@ -3267,8 +3260,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.protocol.saved': 'Saved',
   'meetings.protocol.saveFailed': 'Save failed',
   'meetings.protocol.selectTop': 'Select an item on the left to edit its text.',
-  'meetings.protocol.finalizedHint': 'The minutes are final and have been sent.',
-  'meetings.protocol.renderingHint': 'The PDF is rendered in the background and sent afterwards.',
   'meetings.protocol.takenBy': '{name} takes the minutes — you read along.',
   'meetings.create.title': 'Create meeting',
   'meetings.create.step': 'Step {n} of {m}',
@@ -3348,10 +3339,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.closeConfirm.finalizeLater': 'You finalize the minutes afterwards, as a separate step',
   'meetings.closeConfirm.finalizeByOthers':
     'Afterwards a holder of the right “Finalize minutes” finalizes the minutes',
-  'meetings.protocol.finalizeAfterClose':
-    'After the meeting is closed, you finalize the minutes as a separate step.',
-  'meetings.protocol.readyToFinalize':
-    'The meeting is closed. Check the minutes and finalize them.',
   'meetings.protocol.finalizeNeedsRight':
     'Finalizing and sending needs the gremium right "Finalize minutes". Until then the minutes stay a draft.',
   'meetings.dock.prev': 'Previous item',

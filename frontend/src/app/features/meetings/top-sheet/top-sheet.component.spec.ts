@@ -112,7 +112,8 @@ describe('TopSheetComponent', () => {
     expect(screen.getByRole('link', { name: 'Internes Protokoll' })).toHaveAttribute('href', '/p.pdf');
     expect(screen.getByRole('link', { name: 'Öffentliches Protokoll' })).toHaveAttribute('href', '/pub.pdf');
     expect(screen.queryByText('Gespeichert')).toBeNull();
-    expect(screen.getByText('Das Protokoll ist final und wurde versandt.')).toBeInTheDocument();
+    // The status says "Final"; the footer adds no sentence.
+    expect(screen.queryByText(/Gremien-Recht/)).toBeNull();
   });
 
   it('offers one PDF link when nothing is redacted', async () => {
@@ -120,19 +121,26 @@ describe('TopSheetComponent', () => {
     expect(screen.getByRole('link', { name: 'PDF öffnen' })).toBeInTheDocument();
   });
 
-  it('says what the render and the finalize need', async () => {
-    const { fixture } = await setup({ protocol: protocol({ status: 'rendering', isLocked: true }) });
+  it('says only why a closed meeting has no finalize for this person', async () => {
+    const { fixture, container } = await setup({ protocol: protocol({ status: 'rendering', isLocked: true }) });
     expect(screen.getByText('Wird gerendert …')).toBeInTheDocument();
+    const foot = () => container.querySelector('.ts__foot') as HTMLElement;
+    expect(foot().textContent?.trim()).toBe('Wird gerendert …');
+    // Live, or closed with the finalize right: the header already shows the next step.
     fixture.componentRef.setInput('protocol', protocol());
     fixture.detectChanges();
-    expect(screen.getByText(/finalisierst du das Protokoll als eigenen Schritt/)).toBeInTheDocument();
+    expect(foot().textContent?.trim()).toBe('Entwurf');
     fixture.componentRef.setInput('meeting', meeting({ status: 'closed' }));
     fixture.detectChanges();
-    expect(screen.getByText(/Prüfe das Protokoll und finalisiere es/)).toBeInTheDocument();
+    expect(foot().textContent?.trim()).toBe('Entwurf');
+    // A live meeting without the right: the close comes first.
+    fixture.componentRef.setInput('meeting', meeting({ canFinalize: false }));
+    fixture.detectChanges();
+    expect(screen.queryByText(/Gremien-Recht/)).toBeNull();
     fixture.componentRef.setInput('meeting', meeting({ status: 'closed', canFinalize: false }));
     fixture.detectChanges();
     expect(screen.getByText(/Gremien-Recht „Protokoll finalisieren“/)).toBeInTheDocument();
-    fixture.componentRef.setInput('meeting', meeting({ canFinalize: false, canWrite: false }));
+    fixture.componentRef.setInput('meeting', meeting({ status: 'closed', canFinalize: false, canWrite: false }));
     fixture.detectChanges();
     expect(screen.queryByText(/Gremien-Recht/)).toBeNull();
   });

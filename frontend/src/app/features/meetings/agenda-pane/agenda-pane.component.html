@@ -1,6 +1,7 @@
-<div class="ap__head">
+<!-- In the agenda sheet the sheet header names the agenda and holds the add. -->
+<div class="ap__head" [class.ap__head--sheet]="inSheet()">
   <h2 #heading class="ap__title" [class.sr-only]="inSheet()" tabindex="-1">{{ headingText() }}</h2>
-  @if (canChangeAgenda()) {
+  @if (canChangeAgenda() && !inSheet()) {
     <button
       type="button"
       class="ap__add"
@@ -23,7 +24,7 @@
       [attr.draggable]="canChangeAgenda() && renamingTopId() !== item.id"
       (dragstart)="dragStart.emit(i)"
       (dragover)="dragOver.emit($event)"
-      (drop)="drop.emit(i)"
+      (drop)="dropAt.emit(i)"
     >
       @if (renamingTopId() === item.id) {
         <div class="ap__rename">
@@ -46,7 +47,7 @@
           [title]="title(item)"
           [sub]="sub(item, i)"
           [selected]="item.id === selectedId()"
-          (activate)="select.emit(item.id)"
+          (activate)="pick.emit(item.id)"
         >
           <span lead class="ap__lead">
             @if (canChangeAgenda()) {

@@ -5,8 +5,8 @@ import { AGENDA, item, meeting, vote } from '../../../../testing/meeting-fixture
 import { AgendaPaneComponent } from './agenda-pane.component';
 
 const OUTPUTS = [
-  'select', 'add', 'startRename', 'cancelRename', 'renameTop', 'setNonPublic', 'move',
-  'remove', 'dragStart', 'dragOver', 'drop',
+  'pick', 'add', 'startRename', 'cancelRename', 'renameTop', 'setNonPublic', 'move',
+  'remove', 'dragStart', 'dragOver', 'dropAt',
 ] as const;
 
 interface Inputs {
@@ -86,7 +86,7 @@ describe('AgendaPaneComponent', () => {
     const { on } = await setup();
     expect(screen.getByRole('button', { name: 'Begrüßung' })).toHaveAttribute('aria-current', 'true');
     await userEvent.click(screen.getByRole('button', { name: 'Bericht des Finanzreferats' }));
-    expect(on.select).toHaveBeenCalledWith('t-2');
+    expect(on.pick).toHaveBeenCalledWith('t-2');
     await userEvent.click(screen.getByRole('button', { name: 'TOP hinzufügen' }));
     expect(on.add).toHaveBeenCalled();
   });
@@ -231,6 +231,6 @@ describe('AgendaPaneComponent', () => {
     rows[1].dispatchEvent(new Event('drop'));
     expect(on.dragStart).toHaveBeenCalledWith(0);
     expect(on.dragOver).toHaveBeenCalled();
-    expect(on.drop).toHaveBeenCalledWith(1);
+    expect(on.dropAt).toHaveBeenCalledWith(1);
   });
 });
