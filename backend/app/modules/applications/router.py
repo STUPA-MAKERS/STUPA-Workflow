@@ -334,11 +334,15 @@ async def export_applications_xlsx(
     created_to: Annotated[date | None, Query(alias="createdTo")] = None,
     sort: Annotated[Literal["createdAt", "amount"], Query()] = "createdAt",
     order: Annotated[Literal["asc", "desc"], Query()] = "desc",
+    # As in the list: archived applications stay out by default. The export of a list
+    # that shows them must hold them too.
+    archived: Annotated[Literal["false", "true", "all"], Query()] = "false",
 ) -> Response:
     """Export the application list as ``.xlsx``.
 
-    The filters work as in ``GET /applications``, also the repeated ``state``. The
-    workbook holds no form field values, so it holds no ``isPII`` field either.
+    The filters work as in ``GET /applications``, also the repeated ``state`` and
+    ``archived``. The workbook holds no form field values, so it holds no ``isPII``
+    field either.
     """
     from app.shared.xlsx import XLSX_MEDIA_TYPE, build_applications_workbook
 
@@ -352,6 +356,7 @@ async def export_applications_xlsx(
         amount_max=amount_max,
         created_from=created_from,
         created_to=created_to,
+        archived={"false": False, "true": True, "all": None}[archived],
         sort=sort,
         order=order,
         # O21: an exporter without the PII right must not filter on isPII values.

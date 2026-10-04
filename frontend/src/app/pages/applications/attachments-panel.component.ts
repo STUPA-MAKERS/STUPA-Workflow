@@ -5,6 +5,7 @@ import {
   effect,
   inject,
   input,
+  output,
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -16,14 +17,16 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { Attachment, ScanState, Uuid } from '@core/api/models';
-import { BadgeComponent } from '@stupa-makers/ui-kit';
-import { ButtonComponent } from '@stupa-makers/ui-kit';
-import { CardComponent } from '@stupa-makers/ui-kit';
-import { CheckboxComponent } from '@stupa-makers/ui-kit';
-import { DialogComponent } from '@stupa-makers/ui-kit';
-import { IconComponent } from '@stupa-makers/ui-kit';
-import { ToastService } from '@stupa-makers/ui-kit';
-import { formatBytes, scanBadgeVariant } from './applications.util';
+import {
+  ButtonComponent,
+  CheckboxComponent,
+  DialogComponent,
+  IconComponent,
+  ToastService,
+} from '@stupa-makers/ui-kit';
+import { scanStatus } from '@shared/status-kind.util';
+import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
+import { formatBytes } from './applications.util';
 
 /**
  * Attachments panel.
@@ -50,12 +53,11 @@ import { formatBytes, scanBadgeVariant } from './applications.util';
   imports: [
     FormsModule,
     TranslatePipe,
-    BadgeComponent,
     ButtonComponent,
-    CardComponent,
     CheckboxComponent,
     DialogComponent,
     IconComponent,
+    StatusTextComponent,
   ],
   templateUrl: './attachments-panel.component.html',
   styleUrl: './attachments-panel.component.scss',
@@ -74,6 +76,8 @@ export class AttachmentsPanelComponent {
    */
   readonly canDelete = input<boolean | undefined>(undefined);
   readonly deleteAllowed = computed(() => this.canDelete() ?? this.canUpload());
+  /** The number of attachments, after the first load and after each change. */
+  readonly countChange = output<number>();
 
   readonly attachments = signal<Attachment[]>([]);
   readonly uploading = signal(false);
@@ -109,7 +113,10 @@ export class AttachmentsPanelComponent {
   readonly dragActive = signal(false);
   private dragDepth = 0;
 
-  readonly scanVariant = scanBadgeVariant;
+  /** The scan state as coloured text. */
+  readonly scan = scanStatus;
+  /** The list arrived (or failed): from then on the count is true. */
+  private readonly loaded = signal(false);
 
   constructor() {
     // Load existing attachments once the applicationId is set (hydration after reload).
@@ -118,20 +125,25 @@ export class AttachmentsPanelComponent {
       if (!id) return;
       this.selected.set(new Set());
       this.api.listAttachments(id).subscribe({
-        next: (list) => this.attachments.set(list),
+        next: (list) => {
+          this.attachments.set(list);
+          this.loaded.set(true);
+        },
         error: () => {
           /* On an error keep the list empty. Uploads of this session still show. */
+          this.loaded.set(true);
         },
       });
+    });
+    // The tab "Anhänge" of the detail shows the count.
+    effect(() => {
+      const count = this.attachments().length;
+      if (this.loaded()) this.countChange.emit(count);
     });
   }
 
   size(att: Attachment): string {
     return formatBytes(att.size);
-  }
-
-  scanLabel(state: ScanState): TranslationKey {
-    return `applications.attachments.scan.${state}` as TranslationKey;
   }
 
   onFileSelected(event: Event): void {

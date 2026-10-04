@@ -1,0 +1,93 @@
+.sld__lead,
+.sld__hint,
+.sld__none {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+
+/* The token appears here once and never again, so the block is set apart from the form
+   below it rather than reading as one more field. */
+.sld__fresh {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-3);
+}
+.sld__freshRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.sld__url {
+  flex: 1 1 auto;
+  /* A long token must not push the copy button out of the dialog. */
+  min-width: 0;
+  height: var(--control-height-sm);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-1);
+  color: var(--color-text);
+  font-size: var(--fs-small);
+  text-overflow: ellipsis;
+}
+.sld__url:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
+}
+
+.sld__form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+.sld__ttl {
+  flex: 0 1 10rem;
+}
+.sld__label {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+
+.sld__list {
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.sld__list[aria-busy] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.sld__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 56px;
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
+}
+/* A revoked or expired link stays in the list (the record of who published what), but
+   it must not read as one that still opens. */
+.sld__row--dead {
+  color: var(--color-text-muted);
+}
+.sld__rowMain {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.sld__rowLabel {
+  font-weight: var(--fw-medium);
+}
+.sld__rowSub {
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}

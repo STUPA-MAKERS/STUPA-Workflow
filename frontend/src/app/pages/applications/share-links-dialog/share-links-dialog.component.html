@@ -1,0 +1,91 @@
+<!-- The dialog is where a link is minted, read once and revoked; the token itself exists
+     in the response and nowhere else. -->
+<app-dialog
+  [open]="open()"
+  [title]="'applications.share.title' | t"
+  [closeLabel]="'applications.detail.cancel' | t"
+  (closed)="close()"
+>
+  <p class="sld__lead">{{ 'applications.share.lead' | t }}</p>
+
+  @if (freshUrl(); as url) {
+    <!-- Shown once. The server keeps a hash, so closing this dialog loses the token. -->
+    <div class="sld__fresh">
+      <p class="sld__hint">{{ 'applications.share.onceHint' | t }}</p>
+      <div class="sld__freshRow">
+        <input
+          class="sld__url mono"
+          type="text"
+          readonly
+          [value]="url"
+          [attr.aria-label]="'applications.share.url' | t"
+        />
+        <app-button variant="tonal" size="sm" (click)="copy()">
+          {{ (copied() ? 'applications.share.copied' : 'applications.share.copy') | t }}
+        </app-button>
+      </div>
+    </div>
+  }
+
+  <div class="sld__form">
+    <app-select
+      class="sld__ttl"
+      [label]="'applications.share.ttl' | t"
+      [options]="ttlOptions"
+      [ngModel]="ttl()"
+      (ngModelChange)="ttl.set($event)"
+    />
+    <app-input
+      class="sld__label"
+      [label]="'applications.share.label' | t"
+      [placeholder]="'applications.share.labelPlaceholder' | t"
+      [ngModel]="label()"
+      (ngModelChange)="label.set($event)"
+    />
+  </div>
+
+  @if (loading()) {
+    <div class="sld__list" aria-busy="true">
+      <span class="skel skel--line"></span>
+      <span class="skel skel--line"></span>
+    </div>
+  } @else if (shares().length) {
+    <ul class="sld__list rowgroup rowgroup--bg3">
+      @for (share of shares(); track share.id) {
+        <li class="sld__row" [class.sld__row--dead]="!isLive(share)">
+          <div class="sld__rowMain">
+            <span class="sld__rowLabel ell" [title]="share.label || ('applications.share.unlabelled' | t)">
+              {{ share.label || ('applications.share.unlabelled' | t) }}
+            </span>
+            <span class="sld__rowSub">
+              @if (share.revokedAt) {
+                {{ 'applications.share.revokedAt' | t: { at: (share.revokedAt | ldate) } }}
+              } @else if (isLive(share)) {
+                {{ 'applications.share.expiresAt' | t: { at: (share.expiresAt | ldate) } }}
+              } @else {
+                {{ 'applications.share.expired' | t: { at: (share.expiresAt | ldate) } }}
+              }
+            </span>
+          </div>
+          @if (isLive(share)) {
+            <app-button
+              variant="danger"
+              size="sm"
+              [loading]="revoking() === share.id"
+              (click)="revoke(share.id)"
+            >{{ 'applications.share.revoke' | t }}</app-button>
+          }
+        </li>
+      }
+    </ul>
+  } @else {
+    <p class="sld__none">{{ 'applications.share.none' | t }}</p>
+  }
+
+  <div dialog-footer>
+    <app-button variant="text" size="sm" (click)="close()">{{ 'applications.share.close' | t }}</app-button>
+    <app-button variant="fill" size="sm" [loading]="creating()" (click)="create()">
+      {{ 'applications.share.create' | t }}
+    </app-button>
+  </div>
+</app-dialog>

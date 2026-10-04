@@ -8,7 +8,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { RouterLink, type QueryParamsHandling } from '@angular/router';
 
 /**
  * One row of a list: a lead, a title with a sub line, and a trailing slot.
@@ -54,6 +54,11 @@ export class ListItemComponent {
   readonly sub = input<string | null>(null);
   /** A router link. Without it the title is a button that emits `activate`. */
   readonly link = input<string | readonly unknown[] | null>(null);
+  /**
+   * What the link does with the current query params. `preserve` keeps them, for
+   * example the filters of a list whose rows open a detail beside it.
+   */
+  readonly linkQueryParamsHandling = input<QueryParamsHandling>('');
   /** The row is the one open in the detail pane. */
   readonly selected = input(false);
 

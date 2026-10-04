@@ -1,5 +1,6 @@
 import { Component, signal } from '@angular/core';
-import { provideRouter } from '@angular/router';
+import { TestBed } from '@angular/core/testing';
+import { Router, provideRouter } from '@angular/router';
 import { fireEvent, render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { runAxe } from '../../../../testing/a11y';
@@ -126,6 +127,16 @@ describe('ListItemComponent', () => {
     expect(link).toHaveAttribute('aria-current', 'true');
     await userEvent.setup().click(link);
     expect(activate).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the current query params on the link when asked to', async () => {
+    const { fixture } = await render(ListItemComponent, {
+      inputs: { title: 'Druckkosten', link: ['/applications', 'a1'], linkQueryParamsHandling: 'preserve' },
+      providers: [provideRouter([{ path: '**', component: BlankComponent }])],
+    });
+    await TestBed.inject(Router).navigateByUrl('/applications?type=t1');
+    fixture.detectChanges();
+    expect(screen.getByRole('link', { name: 'Druckkosten' })).toHaveAttribute('href', '/applications/a1?type=t1');
   });
 
   it('shows a plain sub line from the input', async () => {

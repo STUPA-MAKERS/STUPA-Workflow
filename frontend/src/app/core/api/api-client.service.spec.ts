@@ -120,14 +120,15 @@ describe('ApiClient', () => {
   });
 
   it('serialises list query params and maps the page items', (done) => {
-    api.listApplications({ state: 'draft', q: 'foo', limit: 10 }).subscribe((page) => {
+    api.listApplications({ state: ['draft', 'review'], q: 'foo', limit: 10 }).subscribe((page) => {
       expect(page.total).toBe(1);
       expect(page.items[0].typeId).toBe('t1');
       expect(page.items[0].state?.label).toBe('Eingereicht');
       done();
     });
     const req = http.expectOne((r) => r.url === '/api/applications');
-    expect(req.request.params.get('state')).toBe('draft');
+    // A4: one `state` per chosen state, repeated.
+    expect(req.request.params.getAll('state')).toEqual(['draft', 'review']);
     expect(req.request.params.get('q')).toBe('foo');
     expect(req.request.params.get('limit')).toBe('10');
     req.flush({ items: [appWire()], total: 1, limit: 10, offset: 0 });
@@ -428,6 +429,13 @@ describe('ApiClient', () => {
     req.flush(new Blob(['x']));
   });
 
+  it('sends no state for an empty state list', () => {
+    api.listApplications({ state: [] }).subscribe();
+    const req = http.expectOne((r) => r.url === '/api/applications');
+    expect(req.request.params.has('state')).toBe(false);
+    req.flush({ items: [], total: 0, limit: 20, offset: 0 });
+  });
+
   it('skips null/undefined query values when serialising the list query', () => {
     api.listApplications({ state: undefined, q: null as unknown as string, limit: 5 }).subscribe();
     const req = http.expectOne((r) => r.url === '/api/applications');
@@ -439,14 +447,14 @@ describe('ApiClient', () => {
 
   it('exports xlsx as a Blob, dropping limit/offset but keeping filters', (done) => {
     api
-      .exportApplicationsXlsx({ state: 'draft', q: 'x', limit: 50, offset: 10 })
+      .exportApplicationsXlsx({ state: ['draft', 'review'], q: 'x', limit: 50, offset: 10 })
       .subscribe((blob) => {
         expect(blob).toBeInstanceOf(Blob);
         done();
       });
     const req = http.expectOne((r) => r.url === '/api/applications/export.xlsx');
     expect(req.request.responseType).toBe('blob');
-    expect(req.request.params.get('state')).toBe('draft');
+    expect(req.request.params.getAll('state')).toEqual(['draft', 'review']);
     expect(req.request.params.get('q')).toBe('x');
     expect(req.request.params.has('limit')).toBe(false);
     expect(req.request.params.has('offset')).toBe(false);

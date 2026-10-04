@@ -4,9 +4,11 @@ import {
   formatDateRangeValue,
   formatFieldValue,
   formatIsoDate,
-  scanBadgeVariant,
+  groupByMonth,
+  isRejection,
+  transitionLooks,
 } from './applications.util';
-import type { ScanState } from '@core/api/models';
+import type { Transition } from '@core/api/models';
 
 describe('applicationTitle', () => {
   it('prefers the first non-empty known title field', () => {
@@ -101,19 +103,6 @@ describe('formatDateRangeValue', () => {
   });
 });
 
-describe('scanBadgeVariant', () => {
-  it('maps each scan state to a badge variant', () => {
-    expect(scanBadgeVariant('scanning')).toBe('warning');
-    expect(scanBadgeVariant('clean')).toBe('success');
-    expect(scanBadgeVariant('quarantined')).toBe('danger');
-  });
-
-  it('falls back to muted status text for an unknown/pending scan state', () => {
-    // Covers the `default` arm of the switch, for example "pending" before the scan starts.
-    expect(scanBadgeVariant('pending' as ScanState)).toBe('info');
-  });
-});
-
 describe('formatBytes', () => {
   it('formats bytes/KB/MB with a binary base', () => {
     expect(formatBytes(0)).toBe('0 B');
@@ -136,5 +125,72 @@ describe('formatBytes', () => {
     expect(formatBytes(-1)).toBe('—');
     expect(formatBytes(NaN)).toBe('—');
     expect(formatBytes(Infinity)).toBe('—');
+  });
+});
+
+describe('groupByMonth', () => {
+  const row = (id: string, createdAt: string) => ({ id, createdAt });
+
+  it('groups consecutive rows by the month of their submission', () => {
+    const groups = groupByMonth(
+      [
+        row('a', '2026-09-28T10:00:00'),
+        row('b', '2026-09-02T10:00:00'),
+        row('c', '2026-08-15T10:00:00'),
+      ],
+      'de',
+    );
+    expect(groups.map((g) => [g.key, g.label, g.items.map((i) => i.id)])).toEqual([
+      ['2026-09', 'September 2026', ['a', 'b']],
+      ['2026-08', 'August 2026', ['c']],
+    ]);
+  });
+
+  it('names the month in the locale of the reader', () => {
+    expect(groupByMonth([row('a', '2026-10-01T12:00:00')], 'en')[0].label).toBe('October 2026');
+  });
+
+  it('starts a new group when a month comes back later', () => {
+    const groups = groupByMonth(
+      [row('a', '2026-09-01T12:00:00'), row('b', '2026-08-01T12:00:00'), row('c', '2026-09-03T12:00:00')],
+      'de',
+    );
+    expect(groups.map((g) => g.key)).toEqual(['2026-09', '2026-08', '2026-09']);
+  });
+
+  it('puts rows with an invalid date into a group without a label', () => {
+    const groups = groupByMonth([row('a', 'kaputt'), row('b', 'auch kaputt')], 'de');
+    expect(groups).toEqual([{ key: '', label: '', items: [row('a', 'kaputt'), row('b', 'auch kaputt')] }]);
+  });
+
+  it('gives no group for no rows', () => {
+    expect(groupByMonth([], 'de')).toEqual([]);
+  });
+});
+
+describe('transitionLooks', () => {
+  const t = (id: string, color: string | null): Transition => ({
+    id,
+    fromStateId: 's1',
+    toStateId: 's2',
+    label: id,
+    color,
+    addsToAgenda: false,
+    agendaGremiumId: null,
+  });
+
+  it('makes the first non-red transition the main action and the red ones danger', () => {
+    const looks = transitionLooks([t('reject', '#d9534f'), t('agenda', null), t('more', '#e8a33d')]);
+    expect([...looks]).toEqual([
+      ['reject', 'danger'],
+      ['agenda', 'fill'],
+      ['more', 'tonal'],
+    ]);
+  });
+
+  it('reads a red colour as a rejection and anything else as not', () => {
+    expect(isRejection({ color: '#c0392b' })).toBe(true);
+    expect(isRejection({ color: '#72a384' })).toBe(false);
+    expect(isRejection({ color: null })).toBe(false);
   });
 });

@@ -8,6 +8,7 @@ import { AuthService } from '@core/auth/auth.service';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { BrandingService } from '@core/branding/branding.service';
 import type { Principal } from '@core/api/models';
+import { PageFrameService } from './page-frame.service';
 import { RailStatusService } from './rail-status.service';
 import { createLocationMock, provideLocationMock } from '../../testing/location-mock';
 
@@ -319,6 +320,18 @@ describe('ShellComponent', () => {
       const footer = screen.getByRole('contentinfo');
       expect(within(footer).getByRole('link', { name: 'Impressum' })).toBeInTheDocument();
       expect(within(footer).getByRole('heading', { name: 'Kontakt' })).toBeInTheDocument();
+    });
+
+    it('leaves the footer out while the page fills the viewport', async () => {
+      const view = await setup(MEMBER, { branding });
+      const frame = view.fixture.debugElement.injector.get(PageFrameService);
+      frame.fill.set(true);
+      view.fixture.detectChanges();
+      expect(screen.queryByRole('contentinfo')).not.toBeInTheDocument();
+      expect(view.container.querySelector('main')).toHaveClass('main--fill');
+      frame.fill.set(false);
+      view.fixture.detectChanges();
+      expect(screen.getByRole('contentinfo')).toBeInTheDocument();
     });
   });
 });

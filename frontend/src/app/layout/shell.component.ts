@@ -10,6 +10,7 @@ import { CommandPaletteComponent } from '../features/search/command-palette.comp
 import { BottomBarComponent } from './bottom-bar/bottom-bar.component';
 import { mediaQuerySignal } from './media-query';
 import { NavRailComponent } from './nav-rail/nav-rail.component';
+import { PageFrameService } from './page-frame.service';
 import { PublicHeaderComponent } from './public-header/public-header.component';
 import { SiteFooterComponent } from './site-footer/site-footer.component';
 
@@ -60,6 +61,9 @@ export class ShellComponent {
   readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+
+  /** The page fills the viewport (see `PageFrameService`): no footer, a small foot gap. */
+  readonly fill = inject(PageFrameService).fill;
 
   /** The viewport is a phone (<= 768px): bottom bar instead of the rail. */
   readonly phone = mediaQuerySignal(MEDIA.phone);

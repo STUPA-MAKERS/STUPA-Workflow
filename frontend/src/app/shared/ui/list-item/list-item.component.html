@@ -6,6 +6,7 @@
         <a
           class="li__title"
           [routerLink]="target"
+          [queryParamsHandling]="linkQueryParamsHandling()"
           [title]="tooltip()"
           [attr.aria-current]="selected() ? 'true' : null"
           (click)="activate.emit()"

@@ -4,10 +4,11 @@ import {
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
-import { render, screen } from '@testing-library/angular';
+import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { BehaviorSubject } from 'rxjs';
 import { ApplicationsDetailComponent } from './applications-detail.component';
+import { ApplicationsPageService } from './applications-page.service';
 import { RailStatusService } from '../../layout/rail-status.service';
 import { TestBed } from '@angular/core/testing';
 import { AuthService } from '@core/auth/auth.service';
@@ -81,6 +82,13 @@ function fakeAuth(permissions: string[], roles: string[] = []): Partial<AuthServ
   };
 }
 
+/** The page link of the side-by-side layout. */
+function splitPage(): ApplicationsPageService {
+  const page = new ApplicationsPageService();
+  page.split.set(true);
+  return page;
+}
+
 async function setup(
   permissions: string[] = ['application.read', 'application.manage'],
   paramMap$ = new BehaviorSubject(convertToParamMap({ id: 'app-1' })),
@@ -96,6 +104,8 @@ async function setup(
       // The real service polls; the page only asks it to refresh.
       { provide: RailStatusService, useValue: { refresh: jest.fn() } },
       { provide: ActivatedRoute, useValue: { paramMap: paramMap$ } },
+      // Side by side with the list: every section shows at once, no tabs.
+      { provide: ApplicationsPageService, useFactory: splitPage },
     ],
   });
   const http = view.fixture.debugElement.injector.get(HttpTestingController);
@@ -146,6 +156,7 @@ function flushDateForm(http: HttpTestingController, id = 'app-1') {
 // The form loads on the initial load only. A refresh does not reload the form.
 // A status change runs through the flow, so no further /transitions request follows.
 function flushAll(http: HttpTestingController, id = 'app-1', form = true) {
+  flushTypes(http);
   http.expectOne(url('', id)).flush({ ...appWire(), id });
   http.expectOne(url('/versions', id)).flush(VERSIONS);
   http.expectOne(url('/comments', id)).flush(COMMENTS);
@@ -158,12 +169,25 @@ function flushAll(http: HttpTestingController, id = 'app-1', form = true) {
 
 // The attachments panel loads the attachments on render. An empty answer is fine.
 function flushAttachments(http: HttpTestingController) {
+  flushTypes(http);
   for (const req of http.match((r) => r.method === 'GET' && /\/attachments$/.test(r.url))) {
     req.flush([]);
   }
   // A manager also loads the cost-centre tree. An empty answer is fine.
   for (const req of http.match((r) => r.method === 'GET' && r.url === '/api/budgets')) {
     req.flush([]);
+  }
+}
+
+/** The application types load once, for "<Typ> · Version n" above the title. */
+function flushTypes(http: HttpTestingController) {
+  for (const req of http.match((r) => r.method === 'GET' && r.url === '/api/application-types')) {
+    req.flush({
+      items: [{ id: 't1', name: 'Finanzantrag', hasBudget: true, active: true, activeFormVersionId: 'v1' }],
+      total: 1,
+      limit: 20,
+      offset: 0,
+    });
   }
 }
 
@@ -185,14 +209,12 @@ describe('ApplicationsDetailComponent', () => {
     flushAll(http);
     detectChanges();
 
-    expect(screen.getByRole('heading', { name: 'Förderung Fest', level: 1 })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Förderung Fest', level: 2 })).toBeInTheDocument();
     expect(screen.getByText('Eingereicht')).toBeInTheDocument();
     // "Version 2" shows in the header and again as a history entry.
     expect(screen.getAllByText('Version 2').length).toBeGreaterThan(0);
     expect(screen.getByText('Mia')).toBeInTheDocument();
     // The history starts collapsed. Expand it to make the diff visible.
-    expect(screen.queryByText('Fest')).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: /Versionshistorie/ }));
     detectChanges();
     expect(screen.getByText('Fest')).toBeInTheDocument();
     expect(screen.getByText('Bitte Kostenplan ergänzen.')).toBeInTheDocument();
@@ -200,7 +222,7 @@ describe('ApplicationsDetailComponent', () => {
     http.verify();
   });
 
-  it('hides the internal-visibility select for non-managers', async () => {
+  it('hides the visibility toggle without application.manage and posts public', async () => {
     const { http, detectChanges } = await setup(['application.read']);
     http.expectOne(url('')).flush(appWire());
     http.expectOne(url('/versions')).flush(VERSIONS);
@@ -209,17 +231,31 @@ describe('ApplicationsDetailComponent', () => {
 
     // The flow handles a status change. There is no manual UI and no manager option.
     expect(screen.queryByRole('heading', { name: 'Statuswechsel' })).not.toBeInTheDocument();
-    expect(screen.queryByText('Sichtbarkeit')).not.toBeInTheDocument();
+    expect(screen.queryByRole('radiogroup', { name: 'Sichtbarkeit' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: 'Intern' })).not.toBeInTheDocument();
+    // The comment still tells its visibility.
+    expect(document.querySelector('.ad__msgMeta')?.textContent).toContain('Öffentlich');
+
+    await userEvent.type(screen.getByLabelText('Kommentar hinzufügen'), 'Frage');
+    await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
+    const post = http.expectOne(url('/comments'));
+    expect(post.request.body).toEqual({ body: 'Frage', visibility: 'public' });
+    post.flush(
+      { id: 'c3', author: null, authorKind: 'principal', body: 'Frage', visibility: 'public', at: '2026-06-05T13:00:00Z' },
+      { status: 201, statusText: 'Created' },
+    );
     flushForm(http);
     flushAttachments(http);
     http.verify();
   });
 
-  it('posts a new comment with the chosen visibility', async () => {
+  it('posts a public comment by default', async () => {
     const { http, detectChanges } = await setup();
     flushAll(http);
     detectChanges();
 
+    const group = screen.getByRole('radiogroup', { name: 'Sichtbarkeit' });
+    expect(within(group).getByRole('radio', { name: 'Öffentlich' })).toHaveAttribute('aria-checked', 'true');
     await userEvent.type(screen.getByLabelText('Kommentar hinzufügen'), 'Danke!');
     await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
 
@@ -239,6 +275,33 @@ describe('ApplicationsDetailComponent', () => {
     );
     detectChanges();
     expect(screen.getByText('Danke!')).toBeInTheDocument();
+    flushAttachments(http);
+    http.verify();
+  });
+
+  it('posts an internal comment when the toggle says so, then resets it to public', async () => {
+    const { http, detectChanges } = await setup();
+    flushAll(http);
+    detectChanges();
+
+    await userEvent.click(screen.getByRole('radio', { name: 'Intern' }));
+    detectChanges();
+    expect(screen.getByRole('radio', { name: 'Intern' })).toHaveAttribute('aria-checked', 'true');
+    await userEvent.type(screen.getByLabelText('Kommentar hinzufügen'), 'Nur für uns');
+    await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
+
+    const post = http.expectOne(url('/comments'));
+    expect(post.request.body).toEqual({ body: 'Nur für uns', visibility: 'internal' });
+    post.flush(
+      { id: 'c4', author: null, authorKind: 'principal', body: 'Nur für uns', visibility: 'internal', at: '2026-06-05T13:00:00Z', isOwn: true },
+      { status: 201, statusText: 'Created' },
+    );
+    detectChanges();
+    // The new comment shows "Intern" in its meta line. The toggle is public again.
+    const metas = [...document.querySelectorAll('.ad__msgMeta')].map((el) => el.textContent ?? '');
+    expect(metas[0]).toContain('Öffentlich');
+    expect(metas[1]).toContain('Intern');
+    expect(screen.getByRole('radio', { name: 'Öffentlich' })).toHaveAttribute('aria-checked', 'true');
     flushAttachments(http);
     http.verify();
   });
@@ -273,7 +336,6 @@ describe('ApplicationsDetailComponent', () => {
     ]);
     http.expectOne(url('/comments')).flush(COMMENTS);
     detectChanges();
-    await userEvent.click(screen.getByRole('button', { name: /Versionshistorie/ }));
     detectChanges();
     expect(screen.getByText('Keine Feldänderungen.')).toBeInTheDocument();
     flushForm(http);
@@ -306,7 +368,6 @@ describe('ApplicationsDetailComponent', () => {
     http.expectOne(url('/comments')).flush([]);
     flushDateForm(http);
     detectChanges();
-    await userEvent.click(screen.getByRole('button', { name: /Versionshistorie/ }));
     detectChanges();
 
     expect(screen.getByText('01.06.2026 – 02.06.2026')).toBeInTheDocument();
@@ -339,7 +400,6 @@ describe('ApplicationsDetailComponent', () => {
     http.expectOne(url('/comments')).flush([]);
     flushDateForm(http);
     detectChanges();
-    await userEvent.click(screen.getByRole('button', { name: /Versionshistorie/ }));
     detectChanges();
 
     // A field the active form version dropped keeps the stored text. No crash and no
@@ -387,7 +447,7 @@ describe('ApplicationsDetailComponent', () => {
     flushForm(http, 'app-2'); // loadApplication for app-2 also fetches the effective form.
     detectChanges();
 
-    expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2 })).toBeInTheDocument();
     flushAttachments(http);
     http.verify();
   });
@@ -512,6 +572,7 @@ describe('ApplicationsDetailComponent', () => {
     expect(cmp.notFound()).toBe(true);
     expect(cmp.loading()).toBe(false);
     expect(screen.getByText('Antrag nicht gefunden.')).toBeInTheDocument();
+    flushTypes(http);
     http.verify();
   });
 
@@ -522,6 +583,7 @@ describe('ApplicationsDetailComponent', () => {
     expect(cmp.error()).toBe(true);
     expect(cmp.notFound()).toBe(false);
     expect(screen.getByText('Antrag konnte nicht geladen werden.')).toBeInTheDocument();
+    flushTypes(http);
     http.verify();
   });
 
@@ -693,6 +755,54 @@ describe('ApplicationsDetailComponent', () => {
     expect(cmp.budgetLabel(null)).toBe('');
     expect(cmp.budgetLabel('unknown')).toBe('');
     expect(screen.getByText(/Veranstaltungen/)).toBeInTheDocument();
+    flushAttachments(http);
+    http.verify();
+  });
+
+  /** The value of the "Kostenstelle" row in "Details". */
+  function budgetRow(): HTMLElement {
+    const label = screen.getByText('Kostenstelle');
+    return label.closest('app-field-row') as HTMLElement;
+  }
+
+  it('names the cost centre also for a reader without application.manage', async () => {
+    const { http, detectChanges } = await setup(['application.read']);
+    http.expectOne(url('')).flush({ ...appWire(), budgetId: 'b1' });
+    http.expectOne(url('/versions')).flush(VERSIONS);
+    http.expectOne(url('/comments')).flush(COMMENTS);
+    http.expectOne((r) => r.method === 'GET' && r.url === '/api/budgets').flush(budgetTree());
+    http.expectOne((r) => r.url === '/api/budgets/b1/fiscal-years').flush([]);
+    flushForm(http);
+    detectChanges();
+    expect(budgetRow()).toHaveTextContent('Veranstaltungen');
+    expect(budgetRow()).not.toHaveTextContent('Keine');
+    // Only a manager changes it.
+    expect(screen.queryByRole('button', { name: 'Kostenstelle ändern' })).not.toBeInTheDocument();
+    flushAttachments(http);
+    http.verify();
+  });
+
+  it('never says "Keine" for an assigned cost centre outside the tree of the reader', async () => {
+    const { http, detectChanges } = await setup(['application.read']);
+    http.expectOne(url('')).flush({ ...appWire(), budgetId: 'b1' });
+    http.expectOne(url('/versions')).flush(VERSIONS);
+    http.expectOne(url('/comments')).flush(COMMENTS);
+    http
+      .expectOne((r) => r.method === 'GET' && r.url === '/api/budgets')
+      .flush({ title: 'e' }, { status: 403, statusText: 'Forbidden' });
+    flushForm(http);
+    detectChanges();
+    expect(budgetRow()).toHaveTextContent('—');
+    expect(budgetRow()).not.toHaveTextContent('Keine');
+    flushAttachments(http);
+    http.verify();
+  });
+
+  it('says "Keine" without a cost centre', async () => {
+    const { http, detectChanges } = await setup(['application.read']);
+    flushAll(http);
+    detectChanges();
+    expect(budgetRow()).toHaveTextContent('Keine');
     flushAttachments(http);
     http.verify();
   });
@@ -1070,7 +1180,7 @@ describe('ApplicationsDetailComponent', () => {
     ).toBe(false);
   });
 
-  it('derives the author name and avatar initials', async () => {
+  it('derives the author name', async () => {
     const { cmp } = await setup();
     expect(cmp['authorName']({ author: 'Mia Müller' } as ApplicationComment)).toBe('Mia Müller');
     expect(
@@ -1079,9 +1189,6 @@ describe('ApplicationsDetailComponent', () => {
     expect(
       cmp['authorName']({ author: null, authorKind: 'principal' } as ApplicationComment),
     ).toBe('Gremium');
-    expect(cmp['initial']('Mia Müller')).toBe('MM');
-    expect(cmp['initial']('Solo')).toBe('S');
-    expect(cmp['initial']('   ')).toBe('?');
   });
 
   it('does not post an empty/whitespace comment and guards against double-submit', async () => {
@@ -1193,7 +1300,6 @@ describe('ApplicationsDetailComponent', () => {
     ]);
     http.expectOne(url('/comments')).flush([]);
     detectChanges();
-    await userEvent.click(screen.getByRole('button', { name: /Versionshistorie/ }));
     detectChanges();
     expect(screen.getByText('projectNote')).toBeInTheDocument();
     expect(screen.queryByText('Keine Feldänderungen.')).not.toBeInTheDocument();
@@ -1281,7 +1387,7 @@ describe('ApplicationsDetailComponent', () => {
     expect(cmp.deleting()).toBe(false);
     expect(cmp.confirmDelete()).toBe(false);
     expect(success).toHaveBeenCalled();
-    expect(nav).toHaveBeenCalledWith(['/applications']);
+    expect(nav).toHaveBeenCalledWith(['/applications'], { queryParamsHandling: 'preserve' });
     http.verify();
   });
 

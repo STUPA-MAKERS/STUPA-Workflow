@@ -1,0 +1,7 @@
+<app-row-menu
+  [label]="label()"
+  [sections]="sections()"
+  [loading]="pending()"
+  (opened)="onOpened()"
+  (selected)="onSelected($event)"
+/>

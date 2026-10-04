@@ -1,32 +1,37 @@
-<div
+<section
   class="att"
+  aria-labelledby="att-title"
   (dragenter)="onDragEnter($event)"
   (dragover)="onDragOver($event)"
   (dragleave)="onDragLeave($event)"
   (drop)="onDrop($event)"
 >
-<app-card [heading]="'applications.attachments.title' | t">
-  @if (canUpload()) {
-    <div class="att__upload">
+  <div class="att__head">
+    <h3 id="att-title" class="sec att__title">{{ 'applications.attachments.title' | t }}</h3>
+    @if (canUpload()) {
       <input
         #fileInput
         type="file"
         multiple
         class="sr-only"
+        tabindex="-1"
         (change)="onFileSelected($event)"
         [attr.aria-label]="'applications.attachments.upload' | t"
       />
       <app-button
-        type="button"
+        variant="text"
         size="sm"
         [loading]="uploading()"
+        [title]="'applications.attachments.dropHint' | t"
         (click)="fileInput.click()"
       >
-        {{ (uploading() ? 'applications.attachments.uploading' : 'applications.attachments.upload') | t }}
+        <span class="att__btn">
+          <app-icon name="upload" [size]="15" />
+          {{ (uploading() ? 'applications.attachments.uploading' : 'applications.attachments.upload') | t }}
+        </span>
       </app-button>
-      <p class="m-0 text-muted text-sm">{{ 'applications.attachments.dropHint' | t }}</p>
-    </div>
-  }
+    }
+  </div>
 
   @if (attachments().length) {
     @if (deleteAllowed()) {
@@ -51,64 +56,67 @@
         }
       </div>
     }
-    <ul class="att__list">
+    <ul class="rowgroup att__list">
       @for (att of attachments(); track att.id) {
-        <li class="flex items-center justify-between gap-4 pb-3 border-0 border-b border-solid border-line flex-wrap">
+        @let st = scan(att.scanState);
+        <li class="att__row">
+          @if (deleteAllowed()) {
+            <app-checkbox
+              [ngModel]="isSelected(att.id)"
+              (ngModelChange)="toggleSelect(att.id, $event)"
+              [attr.aria-label]="att.filename"
+            />
+          } @else {
+            <app-icon class="att__icon" name="clip" [size]="19" />
+          }
           <div class="att__meta">
-            @if (deleteAllowed()) {
-              <app-checkbox
-                [ngModel]="isSelected(att.id)"
-                (ngModelChange)="toggleSelect(att.id, $event)"
-                [attr.aria-label]="att.filename"
-              />
-            }
-            <span class="att__name">{{ att.filename }}</span>
-            <span class="att__size">{{ size(att) }}</span>
-            @if (att.isComparisonOffer) {
-              <app-badge variant="info">
-                {{ 'applications.attachments.comparisonOffer' | t }}
-              </app-badge>
-            }
-            <app-badge [variant]="scanVariant(att.scanState)">
-              {{ scanLabel(att.scanState) | t }}
-            </app-badge>
+            <span class="att__name ell" [title]="att.filename">{{ att.filename }}</span>
+            <span class="att__sub">
+              <span class="num">{{ size(att) }}</span>
+              <span class="att__dot" aria-hidden="true">·</span>
+              <app-status-text [kind]="st.kind">{{ st.key | t }}</app-status-text>
+              @if (att.isComparisonOffer) {
+                <span class="att__dot" aria-hidden="true">·</span>
+                <span>{{ 'applications.attachments.comparisonOffer' | t }}</span>
+              }
+            </span>
           </div>
-          <div class="flex items-center gap-2">
+          <div class="att__actions">
             @if (canPreview(att)) {
               <app-button
-                variant="ghost"
+                variant="text"
                 size="sm"
                 [iconOnly]="true"
                 [ariaLabel]="'applications.attachments.preview' | t"
-                [title]="'applications.attachments.preview' | t"
                 [loading]="previewLoadingId() === att.id"
                 [disabled]="previewLoadingId() !== null && previewLoadingId() !== att.id"
                 (click)="openPreview(att)"
               >
-                <app-icon name="eye" [size]="15" />
+                <app-icon name="eye" [size]="18" />
               </app-button>
             }
             <app-button
-              variant="secondary"
+              variant="text"
               size="sm"
+              [iconOnly]="true"
+              [ariaLabel]="'applications.attachments.download' | t"
               [disabled]="att.scanState !== 'clean' || downloadingId() === att.id"
               [loading]="downloadingId() === att.id"
               (click)="download(att)"
             >
-              {{ 'applications.attachments.download' | t }}
+              <app-icon name="download" [size]="18" />
             </app-button>
             @if (deleteAllowed()) {
               <app-button
-                variant="ghost"
+                variant="text"
                 size="sm"
                 [iconOnly]="true"
                 [ariaLabel]="'applications.attachments.delete' | t"
-                [title]="'applications.attachments.delete' | t"
                 [disabled]="removingId() === att.id"
                 [loading]="removingId() === att.id"
                 (click)="remove(att)"
               >
-                ✕
+                <app-icon name="trash" [size]="18" />
               </app-button>
             }
           </div>
@@ -116,12 +124,10 @@
       }
     </ul>
   } @else {
-    <p class="text-muted">{{ 'applications.attachments.empty' | t }}</p>
+    <p class="att__empty">{{ 'applications.attachments.empty' | t }}</p>
   }
-</app-card>
 
-  <!-- Drop overlay, styled like the invoices page. It shows while a file hovers
-       over the panel. -->
+  <!-- Drop overlay. It shows while a file hovers over the panel. -->
   @if (dragActive()) {
     <div class="att__dropOverlay" aria-hidden="true">
       <div class="att__dropInner">
@@ -130,7 +136,7 @@
       </div>
     </div>
   }
-</div>
+</section>
 
 <!-- Large inline preview of an image or a PDF. It needs no download. -->
 <app-dialog

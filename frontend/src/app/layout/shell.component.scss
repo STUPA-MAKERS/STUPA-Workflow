@@ -97,6 +97,12 @@
   --main-pad-top: var(--space-6);
 }
 
+/* A page that fills the viewport (`PageFrameService.fill`): no footer below it, and only
+   a small gap at the bottom, so the page ends just above the viewport edge. */
+.frame--rail .main.main--fill {
+  --main-pad-bottom: var(--space-3);
+}
+
 /* Beamer: nothing but the page. */
 .frame--bare .main {
   --main-pad-top: 0px;

@@ -1,169 +1,373 @@
-<app-page-header
-  [rail]="true"
-  [title]="'applications.list.title' | t"
->
-  <div actions class="apps__headActions">
-    <!-- The header search is debounced. It writes the q query parameter. -->
-    <input
-      class="apps__search"
-      type="search"
-      [placeholder]="'applications.list.search.placeholder' | t"
-      [attr.aria-label]="'applications.list.search.placeholder' | t"
-      [ngModel]="q()"
-      (ngModelChange)="onSearch($event)"
-      name="qHeader"
-    />
-    <!-- The export has no `mine` filter. Hide it while `mine` is set, so that the button
-         never exports more rows than the list shows. -->
-    @if (canExport() && !mine()) {
-      <app-button variant="secondary" size="sm" (click)="onExport()" [loading]="exporting()">
-        <span class="inline-flex items-center gap-2">
-          <app-icon name="export" [size]="16" />
-          {{ 'applications.list.export' | t }}
-        </span>
-      </app-button>
-    }
-    <app-filter-bar
-      [activeCount]="activeFilterCount()"
-      [label]="'applications.list.filter.button' | t"
-      [applyLabel]="'applications.list.filter.apply' | t"
-      [resetLabel]="'applications.list.filter.reset' | t"
-      (apply)="applyFilters()"
-      (reset)="reset()"
-    >
-      <app-filter-field [label]="'applications.list.search' | t">
-        <input
-          type="search"
-          [placeholder]="'applications.list.search.placeholder' | t"
-          [ngModel]="q()"
-          (ngModelChange)="q.set($event)"
-          name="q"
-        />
-      </app-filter-field>
-      <app-select
-        id="apps-type"
-        name="type"
-        [label]="'applications.list.filter.type' | t"
-        [placeholder]="'applications.list.filter.all' | t"
-        [options]="typeOptions()"
-        [ngModel]="typeId()"
-        (ngModelChange)="typeId.set($event)"
-      />
-      <app-select
-        id="apps-state"
-        name="state"
-        [label]="'applications.list.filter.state' | t"
-        [placeholder]="'applications.list.filter.all' | t"
-        [options]="stateOptions()"
-        [ngModel]="state()"
-        (ngModelChange)="state.set($event)"
-      />
-      <!-- The same segmented control the bookings and invoices filters use: three states,
-           all visible, one click each. `group` because it is three controls and not one —
-           a plain field wraps its content in a label, which binds to the first button and
-           takes its name away. -->
-      <app-filter-field [label]="'applications.list.filter.archived' | t" [group]="true">
-        <div class="inline-flex gap-1">
-          @for (opt of archivedOptions(); track opt.value) {
+<div class="apps" [class.apps--split]="split()">
+  <app-list-detail [detailOpen]="selectedId() !== null" (back)="closeDetail()">
+    <section list class="apps__pane" aria-labelledby="apps-title">
+      <header class="apps__head">
+        <h1 id="apps-title" class="apps__title">{{ 'applications.list.title' | t }}</h1>
+        @if (phone()) {
+          <!-- Phone: the title and one menu. The sort orders and the export sit in it. -->
+          <app-row-menu
+            [label]="'applications.list.menu' | t"
+            [sections]="phoneMenuSections()"
+            (selected)="onHeaderMenu($event)"
+          />
+        } @else {
+          <!-- The export has no `mine` filter: hide it while `mine` is set, so that it
+               never exports more rows than the list shows. -->
+          @if (exportShown()) {
             <app-button
-              [variant]="archived() === opt.value ? 'primary' : 'ghost'"
-              size="sm"
-              [ariaPressed]="archived() === opt.value"
-              (click)="setFilter('archived', opt.value)"
-            >{{ opt.label }}</app-button>
+              variant="text"
+              [iconOnly]="true"
+              [loading]="exporting()"
+              [ariaLabel]="'applications.list.export' | t"
+              (click)="onExport()"
+            >
+              <app-icon name="download" [size]="21" />
+            </app-button>
+          }
+          <app-row-menu
+            icon="sort"
+            [label]="'applications.list.sort.title' | t"
+            [sections]="sortSections()"
+            (selected)="onHeaderMenu($event)"
+          />
+        }
+      </header>
+
+      <div class="apps__filters">
+        <app-search-pill
+          [placeholder]="searchPlaceholder()"
+          [label]="'applications.list.searchLabel' | t"
+          [value]="searchText()"
+          (valueChange)="onSearch($event)"
+        >
+          <!-- "Weitere Filter": amount and submission date. -->
+          <button
+            trail
+            type="button"
+            class="apps__tune"
+            [class.apps__tune--on]="moreCount() > 0"
+            aria-haspopup="dialog"
+            [attr.aria-expanded]="moreSheetOpen()"
+            [attr.aria-label]="moreCount() ? ('applications.list.filter.moreCount' | t: { count: moreCount() }) : ('applications.list.filter.more' | t)"
+            [title]="'applications.list.filter.more' | t"
+            (click)="openMore()"
+          >
+            <app-icon name="tune" [size]="20" />
+            @if (moreCount()) {
+              <span class="apps__tuneCount" aria-hidden="true">{{ moreCount() }}</span>
+            }
+          </button>
+        </app-search-pill>
+        <div
+          class="apps__chips"
+          role="group"
+          appScrollFade="x"
+          [attr.aria-label]="'applications.list.filter.group' | t"
+        >
+          @if (mine()) {
+            <!-- `mine` has no control of its own: this chip shows it and removes it. -->
+            <button
+              type="button"
+              class="chip on"
+              [attr.aria-label]="'applications.list.filter.mineClear' | t"
+              (click)="clearMine()"
+            >
+              {{ 'applications.list.filter.mine' | t }}
+              <app-icon name="x" [size]="15" />
+            </button>
+          }
+          <button
+            type="button"
+            class="chip apps__chip"
+            [class.on]="states().length > 0"
+            aria-haspopup="dialog"
+            [attr.aria-expanded]="stateSheetOpen()"
+            [title]="stateChipLabel()"
+            (click)="sheet.set('state')"
+          >
+            @if (states().length) {
+              <app-icon name="check" [size]="15" />
+            }
+            <span class="ell">{{ stateChipLabel() }}</span>
+            @if (!states().length) {
+              <app-icon name="down" [size]="15" />
+            }
+          </button>
+          @if (budgetTree().length) {
+            <button
+              type="button"
+              class="chip apps__chip"
+              [class.on]="budgetId() !== ''"
+              aria-haspopup="dialog"
+              [attr.aria-expanded]="budgetSheetOpen()"
+              [title]="budgetChipLabel()"
+              (click)="sheet.set('budget')"
+            >
+              @if (budgetId()) {
+                <app-icon name="check" [size]="15" />
+              }
+              <span class="ell">{{ budgetChipLabel() }}</span>
+              @if (!budgetId()) {
+                <app-icon name="down" [size]="15" />
+              }
+            </button>
+          }
+          @if (types().length) {
+            <!-- A native select over the whole chip: a click anywhere on it opens the list
+                 of the browser. The icons let the click through. -->
+            <label class="chip apps__chip apps__selectChip" [class.on]="typeId() !== ''">
+              @if (typeId()) {
+                <app-icon class="apps__chipLead" name="check" [size]="15" />
+              }
+              <span class="apps__chipText ell" aria-hidden="true">{{ typeChipLabel() }}</span>
+              <app-icon class="apps__chipChev" name="down" [size]="15" />
+              <select
+                class="apps__select"
+                [attr.aria-label]="'applications.list.filter.type' | t"
+                (change)="onSelect('type', $event)"
+              >
+                <option value="" [selected]="typeId() === ''">{{ 'applications.list.filter.allTypes' | t }}</option>
+                @for (type of types(); track type.id) {
+                  <option [value]="type.id" [selected]="type.id === typeId()">{{ type.name }}</option>
+                }
+              </select>
+            </label>
+          }
+          <label class="chip apps__chip apps__selectChip" [class.on]="archived() !== 'false'">
+            @if (archived() !== 'false') {
+              <app-icon class="apps__chipLead" name="check" [size]="15" />
+            }
+            <span class="apps__chipText ell" aria-hidden="true">{{ archivedChipLabel() }}</span>
+            <app-icon class="apps__chipChev" name="down" [size]="15" />
+            <select
+              class="apps__select"
+              [attr.aria-label]="'applications.list.filter.archived' | t"
+              (change)="onSelect('archived', $event)"
+            >
+              @for (opt of archivedOptions(); track opt.value) {
+                <option [value]="opt.value" [selected]="opt.value === archived()">{{ opt.label }}</option>
+              }
+            </select>
+          </label>
+          @if (activeFilterCount() > 0) {
+            <app-button variant="text" size="sm" (click)="reset()">
+              {{ 'applications.list.filter.reset' | t }}
+            </app-button>
           }
         </div>
-      </app-filter-field>
-      <app-filter-field [label]="'applications.list.filter.amount' | t">
-        <app-filter-range>
-          <app-currency-input start name="amountMin" [placeholder]="'applications.list.filter.min' | t" [ariaLabel]="'applications.list.filter.min' | t" [ngModel]="amountMin()" (ngModelChange)="amountMin.set($event)" />
-          <app-currency-input end name="amountMax" [placeholder]="'applications.list.filter.max' | t" [ariaLabel]="'applications.list.filter.max' | t" [ngModel]="amountMax()" (ngModelChange)="amountMax.set($event)" />
-        </app-filter-range>
-      </app-filter-field>
-      <app-filter-field [label]="'applications.list.filter.date' | t">
-        <app-filter-range>
-          <app-datepicker start [ariaLabel]="'applications.list.filter.from' | t" [ngModel]="createdFrom()" (ngModelChange)="createdFrom.set($event)" name="createdFrom" />
-          <app-datepicker end [ariaLabel]="'applications.list.filter.to' | t" [ngModel]="createdTo()" (ngModelChange)="createdTo.set($event)" name="createdTo" />
-        </app-filter-range>
-      </app-filter-field>
-    </app-filter-bar>
-  </div>
-</app-page-header>
+      </div>
 
-<div class="apps__layout">
-<!-- The toggle appears on mobile only (max 768px). The desktop layout always shows
-     the tree, like the picker of the budget tab. -->
-<aside class="apps__tree">
-  <button
-    type="button"
-    class="apps__treeToggle"
-    [attr.aria-expanded]="treeOpen()"
-    (click)="treeOpen.set(!treeOpen())"
-  >
-    {{ 'applications.list.filter.budget' | t }}
-    <app-icon [name]="treeOpen() ? 'chevron-up' : 'chevron-down'" [size]="14" />
-  </button>
-  <div class="apps__treeBody" [class.apps__treeBody--open]="treeOpen()">
-    <app-cost-centre-tree
-      [nodes]="budgetTree()"
-      [selectedId]="budgetId()"
-      [allLabel]="'applications.list.filter.all' | t"
-      [ariaLabel]="'applications.list.filter.budget' | t"
-      (picked)="selectBudgetNode($event); treeOpen.set(false)"
-    />
-  </div>
-</aside>
-<div class="apps__main">
-@if (mine()) {
-  <!-- `mine` has no control in the filter panel. This chip shows the narrowing and removes it. -->
-  <p class="apps__scope">
-    <span class="apps__scopeChip">
-      {{ 'applications.list.filter.mine' | t }}
-      <button
-        type="button"
-        class="apps__scopeClear"
-        [attr.aria-label]="'applications.list.filter.mineClear' | t"
-        (click)="clearMine()"
-      >
-        <app-icon name="x" [size]="14" />
-      </button>
-    </span>
-  </p>
-}
-@if (error()) {
-  <p class="apps__status apps__status--error" role="alert">
-    {{ 'applications.list.error' | t }}
-  </p>
-} @else {
-  <!-- The table owns the loading state. Hiding it behind a line of text made the whole
-       list vanish on every filter and sort, and made the first load a bare sentence
-       where a table was about to appear. The table keeps its header and column widths
-       and draws skeleton rows instead. -->
-  <app-applications-table
-    [rows]="tableRows()"
-    [sort]="sortState()"
-    [loading]="loading()"
-    [emptyText]="'applications.list.empty' | t"
-    (sortChange)="onSort($event)"
-  />
+      <div class="apps__scroll" appScrollFade="y">
+        @if (error()) {
+          <p class="apps__status apps__status--error" role="alert">
+            {{ 'applications.list.error' | t }}
+          </p>
+        } @else if (loading()) {
+          <app-skeleton variant="rows" [count]="6" [label]="'applications.list.loading' | t" />
+        } @else if (!rows().length) {
+          <p class="empty-state apps__empty">{{ 'applications.list.empty' | t }}</p>
+        } @else {
+          @for (group of groups(); track group.key + $index) {
+            <section class="apps__group" [attr.aria-label]="group.label || null">
+              @if (group.label) {
+                <h2 class="sec apps__month">{{ group.label }}</h2>
+              }
+              <div class="apps__rows" [class.rowgroup]="!split()" role="list">
+                @for (row of group.items; track row.item.id) {
+                  <app-list-item
+                    role="listitem"
+                    class="apps__row"
+                    [class.apps__row--busy]="busyRow() === row.item.id"
+                    [title]="row.title"
+                    [link]="['/applications', row.item.id]"
+                    linkQueryParamsHandling="preserve"
+                    [selected]="row.item.id === selectedId()"
+                  >
+                    <span sub>
+                      @if (row.stateLabel) {
+                        <app-status-text [kind]="row.stateKind">{{ row.stateLabel }}</app-status-text>
+                      }
+                      @if (row.stateLabel && row.typeLabel) {
+                        <span class="apps__dot" aria-hidden="true">·</span>
+                      }
+                      @if (row.typeLabel) {
+                        <span>{{ row.typeLabel }}</span>
+                      }
+                      @if (row.item.archivedAt) {
+                        @if (row.stateLabel || row.typeLabel) {
+                          <span class="apps__dot" aria-hidden="true">·</span>
+                        }
+                        <span class="apps__archived">
+                          <app-icon name="archive" [size]="13" />{{ 'applications.list.archivedRow' | t }}
+                        </span>
+                      }
+                    </span>
+                    <span trail class="apps__trail">
+                      @if (row.amount) {
+                        <span class="mono apps__amount">{{ row.amount }}</span>
+                      }
+                      <span class="apps__menuSlot">
+                        @if (!split()) {
+                          <span class="apps__chev" aria-hidden="true">
+                            <app-icon name="chevron-right" [size]="17" />
+                          </span>
+                        }
+                        <app-row-transitions-menu
+                          class="apps__menu"
+                          [item]="row.item"
+                          [title]="row.title"
+                          (action)="onRowAction(row.item, $event)"
+                        />
+                      </span>
+                    </span>
+                  </app-list-item>
+                }
+              </div>
+            </section>
+          }
 
-  @if (hasMore()) {
-    <div #sentinel class="apps__sentinel" aria-hidden="true"></div>
-    <div class="flex justify-center mt-4">
-      @if (loadingMore()) {
-        <span class="apps__status" aria-live="polite">{{ 'applications.list.loadingMore' | t }}</span>
-      } @else {
-        <app-button variant="secondary" size="sm" (click)="loadMore()">
-          {{ 'applications.list.loadMore' | t }}
-        </app-button>
+          @if (hasMore()) {
+            <div #sentinel class="apps__sentinel" aria-hidden="true"></div>
+            <div class="apps__more">
+              @if (loadingMore()) {
+                <span class="apps__status" aria-live="polite">{{ 'applications.list.loadingMore' | t }}</span>
+              } @else {
+                <app-button variant="text" size="sm" (click)="loadMore()">
+                  {{ 'applications.list.loadMore' | t }}
+                </app-button>
+              }
+            </div>
+          }
+          <p class="apps__count" aria-live="polite">
+            {{ 'applications.list.count' | t: { count: items().length, total: total() } }}
+          </p>
+        }
+      </div>
+
+      <a class="apps__fab" routerLink="/apply">
+        <app-icon name="plus" [size]="22" />
+        {{ 'applications.list.create' | t }}
+      </a>
+    </section>
+
+    <div detail class="apps__detail">
+      <router-outlet />
+    </div>
+  </app-list-detail>
+</div>
+
+<!-- Status: several states at once, applied on each click. -->
+<app-side-sheet
+  [side]="sheetSide()"
+  [heading]="'applications.list.filter.state' | t"
+  [open]="stateSheetOpen()"
+  (openChange)="sheet.set($event ? 'state' : null)"
+>
+  @if (states().length) {
+    <app-button sheet-actions variant="text" size="sm" (click)="clearStates()">
+      {{ 'applications.list.filter.reset' | t }}
+    </app-button>
+  }
+  @if (stateOptions().length) {
+    <div class="rowgroup rowgroup--bg3 apps__checks" role="group" [attr.aria-label]="'applications.list.filter.state' | t">
+      @for (opt of stateOptions(); track opt.value) {
+        <div class="apps__check">
+          <app-checkbox
+            [ngModel]="isStateOn(opt.value)"
+            (ngModelChange)="toggleState(opt.value, $event)"
+          >{{ opt.label }}</app-checkbox>
+        </div>
       }
     </div>
+  } @else {
+    <p class="apps__sheetNone">{{ 'applications.list.filter.stateNone' | t }}</p>
   }
-  @if (total() > 0) {
-    <p class="text-center text-muted text-sm mt-3" aria-live="polite">
-      {{ 'applications.list.count' | t: { count: items().length, total: total() } }}
-    </p>
-  }
-}
-</div>
-</div>
+</app-side-sheet>
+
+<!-- Cost centre: the tree of the budget tab, with "Alle" on top. -->
+<app-side-sheet
+  [side]="sheetSide()"
+  [heading]="'applications.list.filter.budget' | t"
+  [open]="budgetSheetOpen()"
+  (openChange)="sheet.set($event ? 'budget' : null)"
+>
+  <app-cost-centre-tree
+    [nodes]="budgetTree()"
+    [selectedId]="budgetId()"
+    [allLabel]="'applications.list.filter.all' | t"
+    [ariaLabel]="'applications.list.filter.budget' | t"
+    (picked)="selectBudgetNode($event)"
+  />
+</app-side-sheet>
+
+<!-- Amount and submission date: typed values, so the sheet edits a draft and only
+     "Anwenden" applies it. Another close of the sheet leaves the filters as they were. -->
+<app-side-sheet
+  [side]="sheetSide()"
+  [heading]="'applications.list.filter.more' | t"
+  [open]="moreSheetOpen()"
+  (openChange)="sheet.set($event ? 'more' : null)"
+>
+  <div class="apps__moreForm">
+    <div class="apps__range" role="group" aria-labelledby="apps-amount">
+      <span id="apps-amount" class="apps__legend">{{ 'applications.list.filter.amount' | t }}</span>
+      <app-currency-input
+        name="amountMin"
+        [placeholder]="'applications.list.filter.min' | t"
+        [ariaLabel]="'applications.list.filter.amountMin' | t"
+        [ngModel]="draftAmountMin()"
+        (ngModelChange)="draftAmountMin.set($event ?? '')"
+      />
+      <app-currency-input
+        name="amountMax"
+        [placeholder]="'applications.list.filter.max' | t"
+        [ariaLabel]="'applications.list.filter.amountMax' | t"
+        [ngModel]="draftAmountMax()"
+        (ngModelChange)="draftAmountMax.set($event ?? '')"
+      />
+    </div>
+    <div class="apps__range" role="group" aria-labelledby="apps-date">
+      <span id="apps-date" class="apps__legend">{{ 'applications.list.filter.date' | t }}</span>
+      <app-datepicker
+        name="createdFrom"
+        [ariaLabel]="'applications.list.filter.from' | t"
+        [ngModel]="draftCreatedFrom()"
+        (ngModelChange)="draftCreatedFrom.set($event ?? '')"
+      />
+      <app-datepicker
+        name="createdTo"
+        [ariaLabel]="'applications.list.filter.to' | t"
+        [ngModel]="draftCreatedTo()"
+        (ngModelChange)="draftCreatedTo.set($event ?? '')"
+      />
+    </div>
+    <div class="apps__moreActions">
+      <app-button variant="text" size="sm" (click)="clearMore()">{{ 'applications.list.filter.reset' | t }}</app-button>
+      <app-button variant="fill" size="sm" (click)="applyMore()">{{ 'applications.list.filter.apply' | t }}</app-button>
+    </div>
+  </div>
+</app-side-sheet>
+
+<app-share-links-dialog [applicationId]="shareFor()" [(open)]="shareOpen" />
+
+<app-force-status-dialog
+  [applicationId]="forceFor()?.id ?? null"
+  [currentStateId]="forceFor()?.state?.id ?? null"
+  [(open)]="forceOpen"
+  (done)="onForced()"
+/>
+
+<app-dialog
+  [open]="deleteFor() !== null"
+  [title]="'applications.detail.deleteTitle' | t"
+  [closeLabel]="'applications.detail.cancel' | t"
+  (closed)="deleteFor.set(null)"
+>
+  <p>{{ 'applications.list.deleteConfirm' | t: { title: deleteFor() ? titleOf(deleteFor()!) : '' } }}</p>
+  <div dialog-footer>
+    <app-button variant="text" size="sm" (click)="deleteFor.set(null)">{{ 'applications.detail.cancel' | t }}</app-button>
+    <app-button variant="danger" size="sm" [loading]="deleting()" (click)="confirmDelete()">
+      {{ 'applications.detail.delete' | t }}
+    </app-button>
+  </div>
+</app-dialog>

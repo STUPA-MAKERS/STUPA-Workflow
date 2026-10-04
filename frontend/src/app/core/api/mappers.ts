@@ -166,6 +166,8 @@ export function mapTransition(wire: TransitionOutWire, lang: string): Transition
     toStateId: wire.toStateId,
     label: resolveI18n(wire.label, lang),
     color: wire.color ?? null,
+    addsToAgenda: wire.addsToAgenda === true,
+    agendaGremiumId: wire.agendaGremiumId ?? null,
   };
 }
 

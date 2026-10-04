@@ -1,588 +1,498 @@
+@use 'breakpoints' as bp;
+
 :host {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
-  gap: var(--space-5);
-}
-/* Summary block below the page header. It carries the centering itself, so the
-   status line and the fact grid align with the center column. */
-.det__summary {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  width: 100%;
-  max-width: var(--layout-max-width);
-  margin-inline: auto;
-}
-.det__ownerActions {
-  display: flex;
-  gap: var(--space-2);
-}
-.det__meta {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-}
-.det__facts {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-  gap: var(--space-3) var(--space-5);
-  margin: 0;
-}
-.det__facts dt {
-  font-size: var(--fs-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--color-text-muted);
-}
-.det__facts dd {
-  margin: 0;
-  color: var(--color-text);
-}
-.det__data,
-.det__history,
-.det__comments {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.det__dataRow {
-  display: grid;
-  grid-template-columns: minmax(8rem, 14rem) 1fr;
-  gap: var(--space-4);
-  padding: var(--space-2) 0;
-  border-bottom: var(--border-width) solid var(--color-border);
-}
-.det__dataRow dt {
-  color: var(--color-text-muted);
-  font-weight: var(--fw-medium);
-}
-.det__dataRow dd {
-  margin: 0;
-  word-break: break-word;
-}
-formly-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-.det__pos-val {
-  font-variant-numeric: tabular-nums;
-}
-.det__offers {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-.det__offer-label {
-  flex: 1;
   min-width: 0;
 }
-.det__offer-val {
-  font-variant-numeric: tabular-nums;
-  color: var(--color-text-muted);
+
+[hidden] {
+  display: none !important;
 }
-.det__offer--pref .det__offer-val {
-  color: var(--color-text);
-  font-weight: var(--fw-medium);
-}
-.det__pos-total {
-  margin: 0;
-  font-variant-numeric: tabular-nums;
-}
-.det__actions {
+
+/* The sheet the application sits on (surface 1, large radius). One pane at a time it
+   loses the sheet and sits on the page, like the other single views. */
+.ad {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-top: var(--space-3);
-}
-.det__ccTree {
-  max-height: 50vh;
-  overflow-y: auto;
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: var(--space-2);
-}
-.det__history {
-  display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-5);
+  min-width: 0;
 }
-/* The whole header row of the version history acts as the toggle. */
-.det__historyToggle {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.ad--split {
+  padding: 0 var(--space-6) var(--space-6);
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface-1);
+}
+.ad--busy {
   gap: var(--space-3);
-  width: 100%;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--color-text);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
 }
-.det__historyMeta {
-  display: inline-flex;
+.ad__skelMeta {
+  width: 30%;
+}
+.ad__skelTitle {
+  width: 60%;
+  height: 2rem;
+}
+.ad--center {
   align-items: center;
-  gap: var(--space-2);
-  color: var(--color-text-muted);
+  justify-content: center;
 }
-.det__historyCount {
-  background: var(--color-surface-sunken);
-  border-radius: var(--radius-pill);
-  padding: 0 var(--space-2);
-  font-size: var(--fs-xs);
-  line-height: 1.6;
-}
-.det__diff {
+.ad__error {
   margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  font-size: var(--fs-sm);
-}
-/* The template writes the badge and the field name on separate lines, but Angular
-   strips that whitespace (`preserveWhitespaces` is off), so the two boxes touched and
-   the row read "Changedtermin". Measured gap was 0px. The margin restores the word
-   break the source already implies. */
-.det__diff app-badge {
-  margin-right: var(--space-1);
-}
-.det__diff code {
-  background: var(--color-surface-sunken);
-  padding: 0 var(--space-1);
-  border-radius: var(--radius-sm);
-}
-.det__diff del {
+  padding: var(--space-5) 0;
   color: var(--color-danger);
 }
-.det__diff ins {
-  color: var(--color-success);
-  text-decoration: none;
-}
-.det__comments {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  margin-bottom: var(--space-5);
-}
-.det__comment-head {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-  margin-bottom: var(--space-1);
-}
-.det__comment-body {
-  margin: 0;
-  white-space: pre-wrap;
-}
-.field__control {
-  padding: var(--space-2) var(--space-3);
-  background: var(--color-surface-sunken);
-  color: var(--color-text);
-  border: 0;
-  border-radius: var(--radius-field);
-  font-size: var(--fs-md);
-  font-family: inherit;
-}
-.field__control:focus-visible {
-  outline: none;
-  box-shadow: inset 0 0 0 2px var(--color-focus-ring);
-}
-.det__textarea {
-  resize: vertical;
-}
 
-/* Breakout layout: the transitions and the chat float in the margins. The content stays
-   centered at body width, like the tree and the charts of the budget tab. */
-.det__layout {
-  display: grid;
-  grid-template-columns:
-    minmax(11rem, 1fr)
-    minmax(0, var(--layout-max-width))
-    minmax(16rem, 1fr);
-  gap: var(--space-5);
-  align-items: start;
-}
-.det__center {
-  min-width: 0;
-  width: 100%;
+/* ------------------------------------------------------------------ header */
+.ad__head {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: 10px;
+  padding-bottom: 22px;
+  border-bottom: var(--border-width) solid var(--color-border);
 }
-.det__rail {
-  position: sticky;
-  top: calc(var(--layout-header-height) + var(--space-4));
-  min-width: 0;
-  width: 100%;
-}
-.det__rail--left {
-  justify-self: end;
-  max-width: 15rem;
-}
-.det__rail--right {
-  justify-self: start;
-  max-width: 24rem;
-}
-.det__railLead {
-  font-size: var(--fs-sm);
-  margin: 0 0 var(--space-3);
-}
-.det__layout--editing {
-  grid-template-columns: 1fr;
-}
-.det__layout--editing .det__rail {
-  display: none;
-}
-@media (max-width: 70rem) {
-  .det__layout {
-    grid-template-columns: 1fr;
-  }
-  .det__rail {
-    position: static;
-  }
-}
-
-.det__chat {
+.ad__bar {
   display: flex;
-  flex-direction: column;
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
-  overflow: hidden;
-  max-height: calc(100vh - var(--layout-header-height) - 6rem);
-}
-.det__chatScroll {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  overflow-y: auto;
-  padding: var(--space-4);
-  min-height: 5rem;
-}
-.det__msg {
-  display: flex;
-  gap: var(--space-2);
-  max-width: 90%;
-  align-self: flex-start;
-}
-.det__msg--own {
-  align-self: flex-end;
-  flex-direction: row-reverse;
-}
-.det__avatar {
-  flex: 0 0 auto;
-  width: 1.75rem;
-  height: 1.75rem;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  font-size: var(--fs-xs);
-  font-weight: var(--fw-semibold);
-  background: var(--color-surface-sunken);
-  color: var(--color-text-muted);
-}
-.det__msg--own .det__avatar {
-  background: var(--color-primary-subtle);
-  color: var(--color-primary);
-}
-.det__msgBody {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  min-width: 0;
-}
-.det__msg--own .det__msgBody {
-  align-items: flex-end;
-}
-.det__intern {
-  display: inline-flex;
   align-items: center;
   gap: 2px;
-  color: var(--color-warning, #c08a2a);
+  min-height: 60px;
 }
-.det__msgTime {
+/* On the sheet the icon buttons sit in its padding, like on the board. Without the sheet
+   a negative margin would make the pane scroll sideways. */
+.ad--split .ad__bar {
+  margin-inline-end: calc(-1 * var(--space-3));
+}
+.ad__meta {
+  flex: 1 1 auto;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+.ad__title {
+  margin: 0;
+  font-size: var(--fs-d2);
+  line-height: var(--lh-d2);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-tight);
+  overflow-wrap: anywhere;
+}
+.ad__line {
+  --ad-sep: 24px;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-md);
+  min-width: 0;
+}
+/* Items with a dot between two of them, also after a wrap (DECISIONS: never a dot at a
+   line start or a line end).
+
+   Every part draws its dot before it, in a box of `--ad-sep`. The parts start
+   `--ad-sep` before the clip box, so the dot of the first part on each line falls
+   outside it. `overflow-x: clip` leaves the line height alone. */
+.ad__seps {
+  overflow-x: clip;
+}
+.ad__parts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  margin-inline-start: calc(-1 * var(--ad-sep));
+  min-width: 0;
+}
+/* A part never breaks inside, so a wrap takes its dot to the line start, where the
+   clip hides it. */
+.ad__part {
+  min-width: 0;
   white-space: nowrap;
 }
-.det__bubble {
-  padding: var(--space-2) var(--space-3);
-  border-radius: 0 var(--radius-lg) var(--radius-lg) var(--radius-lg);
-  background: var(--color-surface-sunken);
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-size: var(--fs-sm);
-  line-height: 1.5;
+.ad__part::before {
+  display: inline-block;
+  width: var(--ad-sep);
+  color: var(--color-text-subtle);
+  text-align: center;
+  content: '·';
+  content: '·' / '';
 }
-.det__msg--own .det__bubble {
-  border-radius: var(--radius-lg) 0 var(--radius-lg) var(--radius-lg);
-  background: var(--color-primary-subtle);
-}
-.det__msg--internal .det__bubble {
-  background: transparent;
-  border: var(--border-width) dashed var(--color-border-strong);
-}
-.det__visToggle {
-  display: inline-flex;
-  align-self: flex-start;
-  padding: 2px;
-  gap: 2px;
-  background: var(--color-surface-sunken);
-  border-radius: var(--radius-pill);
-}
-.det__visToggle button {
-  border: 0;
-  background: transparent;
-  color: var(--color-text-muted);
-  font: inherit;
-  font-size: var(--fs-xs);
-  padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-pill);
-  cursor: pointer;
-}
-.det__visToggle button.is-active {
-  background: var(--color-surface);
+.ad__amount {
   color: var(--color-text);
-  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.2));
 }
-.det__composerInput {
-  flex: 1;
-  min-width: 0;
-  resize: none;
-  max-height: 8rem;
-  padding: var(--space-2) var(--space-3);
-  background: var(--color-bg);
-  color: var(--color-text);
-  border: var(--border-width) solid var(--color-border-strong);
-  border-radius: var(--radius-lg);
-  font: inherit;
-  font-size: var(--fs-sm);
-  line-height: 1.4;
+.ad__transitions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
 }
-.det__composerInput:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 1px;
+.ad__transitions app-icon {
+  margin-inline-end: 6px;
+}
+.ad__archived {
+  margin-top: var(--space-2);
 }
 
-/* Edit and delete of one comment. The buttons stay in the message meta line, so
-   a row with actions keeps the height of a row without them. */
-.det__msgActions {
-  display: inline-flex;
-  gap: 2px;
-  margin-inline-start: auto;
+/* ------------------------------------------------------------------ body */
+/* Two columns in the ratio 1.4 : 1, as on the board. Each column has a floor: the
+   right one fits the two dates of the Details pair, the left one the attachment rows.
+   When the sheet cannot give both floors (below about 740px), the columns wrap and
+   stack. The floors use `min(100%, …)`, so a column never overflows the sheet. */
+.ad__cols {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px 28px;
+  align-items: flex-start;
 }
-
-.det__commentEdit,
-.det__forceReason {
+.ad__col {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
-
-  span {
-    font-size: var(--fs-sm);
-    font-weight: var(--fw-medium);
-    color: var(--color-text-muted);
-  }
-
-  textarea {
-    width: 100%;
-    resize: vertical;
-    padding: var(--space-2) var(--space-3);
-    background: var(--color-bg);
-    color: var(--color-text);
-    border: var(--border-width) solid var(--color-border-strong);
-    border-radius: var(--radius-lg);
-    font: inherit;
-    font-size: var(--fs-sm);
-    line-height: 1.4;
-  }
-
-  textarea:focus-visible {
-    outline: 2px solid var(--color-primary);
-    outline-offset: 1px;
-  }
+  gap: 18px;
+}
+.ad__col:first-child {
+  flex: 1.4 1 0;
+  min-width: min(100%, 22.5rem);
+}
+.ad__col:last-child {
+  flex: 1 1 0;
+  min-width: min(100%, 22rem);
+}
+.ad__tabs {
+  margin-top: calc(-1 * var(--space-5));
+}
+.ad__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
 }
 
+.ad__sec {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.ad__sec:focus {
+  outline: none;
+}
+.ad__secTitle {
+  padding: 0 var(--space-1);
+}
+.ad__secHead {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+.ad__count {
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+.ad__none {
+  margin: 0;
+  padding: 0 var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+.ad__none--row {
+  padding: var(--space-4);
+}
+
+/* Two fields in one row of a field group (Eingegangen | Aktualisiert). A cell is at
+   least 11rem wide, which holds a medium date in DE and EN on one line. A narrower pair
+   puts the fields one below the other. */
+.ad__pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+}
+/* A date never breaks inside a word. */
+.ad__pair time {
+  white-space: nowrap;
+}
+.ad__mail {
+  display: block;
+  color: inherit;
+}
+
+/* ------------------------------------------------------------------ answers */
+.ad__edit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.ad__editActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
 formly-form formly-field {
   display: block;
 }
 formly-form formly-field + formly-field {
   margin-top: var(--space-4);
 }
-
-@media (max-width: 768px) {
-  .det__meta {
-    flex-wrap: wrap;
-  }
-  .det__ownerActions {
-    flex-wrap: wrap;
-  }
-  .det__rail--left,
-  .det__rail--right {
-    max-width: none;
-    justify-self: stretch;
-  }
-  .det__dataRow {
-    grid-template-columns: 1fr;
-    gap: var(--space-1);
-  }
-  .det__diff li {
-    word-break: break-word;
-  }
-  .det__chat {
-    max-height: 70vh;
-  }
-}
 formly-form formly-group > formly-field + formly-field {
   margin-top: var(--space-3);
 }
 
-/* Same affordance as the 404 page: a way out, styled as a button. */
-.det__backLink {
-  display: inline-flex;
-  padding: var(--space-3) var(--space-5);
+.ad__positions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.ad__posHead {
+  padding: 0 var(--space-1);
+  color: var(--color-text-subtle);
+  font-size: 0.75rem;
+  font-weight: var(--fw-medium);
+}
+.ad__pos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 12px var(--space-4);
+}
+.ad__posLine,
+.ad__posTotal {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.ad__posName {
+  font-size: var(--fs-md);
+  overflow-wrap: anywhere;
+}
+.ad__posTotal {
+  flex-direction: row;
   font-weight: var(--fw-semibold);
-  color: var(--color-text);
-  background: var(--color-surface);
-  border: var(--border-width) solid var(--color-border-strong);
-  border-radius: var(--radius-md);
+}
+.ad__offers {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ad__offer {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding: 6px 0;
+  border-top: var(--border-width) solid var(--color-border);
+  font-size: var(--fs-small);
+}
+.ad__offerName {
+  flex: 1 1 auto;
+}
+.ad__offerValue {
+  flex: none;
+}
+.ad__noOffers {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  font-size: var(--fs-small);
+}
+
+/* ------------------------------------------------------------------ history */
+.ad__versions {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ad__version {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px var(--space-4);
+}
+.ad__versionHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--space-2);
+}
+.ad__versionMeta {
+  --ad-sep: 16px;
+  display: block;
+  min-width: 0;
+}
+.ad__versionMeta,
+.ad__diffNone {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+.ad__diff {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-small);
+  overflow-wrap: anywhere;
+}
+.ad__diff app-status-text {
+  margin-inline-end: 6px;
+}
+.ad__diff del {
+  color: var(--color-text-muted);
+}
+.ad__diff ins {
   text-decoration: none;
 }
-.det__backLink:hover {
-  background: var(--color-surface-sunken);
+
+/* ------------------------------------------------------------------ comments */
+.ad__msg {
+  display: flex;
+  gap: var(--space-3);
+  padding: 12px var(--space-3) 12px var(--space-4);
 }
-
-/* An archived application looks exactly like an active one, and someone arriving from a
-   link has no other way to tell. Muted rather than alarming: nothing is wrong with it,
-   it has only left the working list. */
-.det__archived {
-  width: 100%;
-  max-width: var(--layout-max-width);
-  margin-inline: auto;
-  padding: var(--space-2) var(--space-3);
-  border-inline-start: 3px solid var(--color-border-strong);
-  background: var(--color-surface-sunken);
-  border-radius: var(--radius-md);
-  color: var(--color-text-muted);
-  font-size: var(--fs-sm);
+.ad__msgBody {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
 }
-
-/* -- share links ---------------------------------------------------------- */
-
-/* The token appears here once and never again, so the block is set apart from the
-   form below it rather than reading as one more field. */
-.det__shareFresh {
-  padding: var(--space-3);
-  border: var(--border-width) solid var(--color-border-strong);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface-muted, var(--color-bg));
-}
-
-.det__shareFreshHint {
-  margin: 0 0 var(--space-2);
-  font-size: var(--fs-sm);
-  color: var(--color-text-muted);
-}
-
-.det__shareFreshRow {
+.ad__msgHead {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  min-height: 24px;
 }
-
-.det__shareUrl {
+.ad__msgAuthor {
   flex: 1 1 auto;
-  /* A long token must not push the copy button out of the dialog. */
-  min-width: 0;
-  padding: var(--space-2) var(--space-3);
-  background: var(--color-bg);
-  color: var(--color-text);
-  border: var(--border-width) solid var(--color-border-strong);
-  border-radius: var(--radius-lg);
-  font-family: var(--font-mono, monospace);
-  font-size: var(--fs-sm);
-  text-overflow: ellipsis;
+  font-weight: var(--fw-semibold);
 }
-
-.det__shareForm {
+.ad__msgActions {
+  display: inline-flex;
+  flex: none;
+  gap: 2px;
+  margin-block: -6px;
+}
+.ad__msgMeta {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}
+.ad__msgDot {
+  color: var(--color-text-subtle);
+}
+.ad__msgPublic {
+  color: var(--color-primary);
+}
+.ad__msgText {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ad__composer {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: var(--space-3);
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+}
+.ad__composerInput {
+  /* Below 14rem the toggle and the send button wrap to a second line. */
+  flex: 1 1 14rem;
+  min-width: 0;
+  min-height: var(--control-height);
+  max-height: 12rem;
+  padding: 10px 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  line-height: 1.4;
+  /* A plain field as on the board: no resize grip. It grows with its text where the
+     browser can (`field-sizing`), up to the max height, and then scrolls. */
+  resize: none;
+  field-sizing: content;
+  overflow-y: auto;
+}
+.ad__composerVis {
+  flex: none;
+  /* On the second line the toggle and the send button align right. */
+  margin-left: auto;
+  /* Center the 36px toggle on the 40px send button. */
+  margin-bottom: 2px;
+}
+.ad__composerInput:focus-visible {
+  outline: none;
+}
+/* The ring marks the text field. The toggle draws its own focus ring. */
+.ad__composer:has(.ad__composerInput:focus-visible) {
+  box-shadow: inset 0 0 0 2px var(--color-focus-ring);
 }
 
-.det__shareLabel {
+/* ------------------------------------------------------------------ dialogs */
+.ad__dlgLead {
+  margin: 0 0 var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+.ad__ccTree {
+  max-height: 50vh;
+  overflow-y: auto;
+}
+.ad__ccFy {
+  display: block;
+  margin-top: var(--space-3);
+}
+.ad__commentEdit {
   display: flex;
-  flex: 1 1 14rem;
   flex-direction: column;
   gap: var(--space-1);
 
   span {
-    font-size: var(--fs-sm);
-    font-weight: var(--fw-medium);
     color: var(--color-text-muted);
+    font-size: var(--fs-small);
+    font-weight: var(--fw-medium);
   }
 
-  input {
+  textarea {
     width: 100%;
+    resize: vertical;
     padding: var(--space-2) var(--space-3);
-    background: var(--color-bg);
+    border: 0;
+    border-radius: var(--radius-field);
+    background: var(--color-surface-3);
     color: var(--color-text);
-    border: var(--border-width) solid var(--color-border-strong);
-    border-radius: var(--radius-lg);
     font: inherit;
-    font-size: var(--fs-sm);
+    line-height: 1.4;
   }
 
-  input:focus-visible {
-    outline: 2px solid var(--color-primary);
+  textarea:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
     outline-offset: 1px;
   }
 }
 
-.det__shareList {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  margin: var(--space-4) 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.det__shareRow {
-  display: flex;
+/* Same affordance as the 404 page: a way out, styled as a button. */
+.ad__backLink {
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-lg);
+  height: var(--control-height);
+  padding: 0 var(--space-5);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-3);
+  color: var(--color-text);
+  font-weight: var(--fw-semibold);
+  text-decoration: none;
+}
+.ad__backLink:hover {
+  background: var(--color-surface-4);
 }
 
-/* A revoked or expired link stays in the list — that is the record of who published
-   what — but it must not read as one that still opens. */
-.det__shareRow--dead {
-  opacity: 0.6;
-}
-
-.det__shareRowMain {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
-.det__shareRowLabel {
-  overflow: hidden;
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-medium);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+@include bp.phone {
+  .ad__title {
+    font-size: var(--fs-h1);
+    line-height: var(--lh-h1);
+  }
+  .ad__pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
