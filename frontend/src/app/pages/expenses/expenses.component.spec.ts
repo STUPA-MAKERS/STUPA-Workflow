@@ -76,7 +76,7 @@ function setViewport(...parts: string[]): void {
   })) as unknown as typeof window.matchMedia;
 }
 const WIDE = 'min-width: 1200px';
-const FULL = 'min-width: 1400px';
+const FULL = 'min-width: 1536px';
 const PHONE = 'max-width: 768px';
 const realMatchMedia = window.matchMedia;
 afterEach(() => {

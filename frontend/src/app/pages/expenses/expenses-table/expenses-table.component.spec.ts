@@ -98,6 +98,15 @@ describe('ExpensesTableComponent', () => {
     );
   });
 
+  it('marks the host on the full set only, for the floor of the description', async () => {
+    const { fixture } = await setup();
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.classList).toContain('et--full');
+    fixture.componentRef.setInput('columnSet', 'compact');
+    fixture.detectChanges();
+    expect(host.classList).not.toContain('et--full');
+  });
+
   it('drops invoice date and kind on the compact set, and the payee on the tight one', async () => {
     const compact = await setup({ columnSet: 'compact' });
     const keys = compact.fixture.componentInstance.columns().map((c) => c.key);

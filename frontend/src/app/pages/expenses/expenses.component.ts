@@ -60,7 +60,7 @@ import {
 import type { Uuid } from '@core/api/models';
 import {
   ariaSortDir,
-  COLUMNS_FULL_MEDIA,
+  BOOKINGS_COLUMNS_FULL_MEDIA,
   COLUMNS_TIGHT_MEDIA,
   columnSet,
   costCentreIndex,
@@ -148,7 +148,7 @@ export class ExpensesComponent implements OnDestroy {
   readonly wide = mediaQuerySignal(MEDIA.wide);
   /** < 768px: one primary action in the title row, the rest in a menu. */
   readonly phone = mediaQuerySignal(MEDIA.phone);
-  private readonly fullColumns = mediaQuerySignal(COLUMNS_FULL_MEDIA);
+  private readonly fullColumns = mediaQuerySignal(BOOKINGS_COLUMNS_FULL_MEDIA);
   private readonly tightColumns = mediaQuerySignal(COLUMNS_TIGHT_MEDIA);
   /** Which table columns fit the viewport. */
   readonly columnSet = computed(() =>

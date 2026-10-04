@@ -1,7 +1,9 @@
 import type { BudgetTreeNode } from './budget-tree.api';
 import {
   ariaSortDir,
+  BOOKINGS_COLUMNS_FULL_MEDIA,
   columnSet,
+  COLUMNS_FULL_MEDIA,
   costCentreIndex,
   costCentreLabel,
   findTopBudgetNode,
@@ -90,8 +92,12 @@ describe('columnSet', () => {
     expect(columnSet({ phone: true, full: false, tight: true })).toBe('full');
     expect(columnSet({ phone: false, full: true, tight: false })).toBe('full');
   });
-  it('drops columns below 1400px and more below 1000px', () => {
+  it('drops columns below the full width and more below 1000px', () => {
     expect(columnSet({ phone: false, full: false, tight: false })).toBe('compact');
     expect(columnSet({ phone: false, full: false, tight: true })).toBe('tight');
+  });
+  it('gives the bookings table a higher full width than the invoices table', () => {
+    expect(COLUMNS_FULL_MEDIA).toBe('(min-width: 1400px)');
+    expect(BOOKINGS_COLUMNS_FULL_MEDIA).toBe('(min-width: 1536px)');
   });
 });

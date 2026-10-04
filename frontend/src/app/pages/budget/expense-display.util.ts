@@ -90,8 +90,10 @@ export function costCentreLabel(
  *
  * * `full` — every column. A phone also gets every column: the table stacks into cards
  *   there, and each column says by its card role whether the card shows it.
- * * `compact` — below 1400px the secondary columns go (invoice date and kind of a
- *   booking; net and tax of an invoice), so the description keeps a readable width.
+ * * `compact` — below the full width the secondary columns go (invoice date and kind of
+ *   a booking; net and tax of an invoice), so the description keeps a readable width.
+ *   The full width is 1400px for invoices and 1536px for bookings
+ *   ({@link BOOKINGS_COLUMNS_FULL_MEDIA}).
  * * `tight` — below 1000px a third one goes as well.
  *
  * A dropped column moves into a kept cell, as a second line or a tooltip: the payee
@@ -104,6 +106,15 @@ export type ColumnSet = 'full' | 'compact' | 'tight';
 
 /** The viewport from which a table shows every column. */
 export const COLUMNS_FULL_MEDIA = '(min-width: 1400px)';
+/**
+ * The viewport from which the bookings table shows every column.
+ *
+ * Higher than {@link COLUMNS_FULL_MEDIA}: the cost-centre pane takes about 400px of the
+ * page, and the fixed columns of the full set take about 860px. At 1440px the full set
+ * left the description about 120px of text, less than the compact set gets at 1280px.
+ * From 1536px the description gets at least about 270px.
+ */
+export const BOOKINGS_COLUMNS_FULL_MEDIA = '(min-width: 1536px)';
 /** The viewport below which a table drops to its tightest set. */
 export const COLUMNS_TIGHT_MEDIA = '(max-width: 999.98px)';
 

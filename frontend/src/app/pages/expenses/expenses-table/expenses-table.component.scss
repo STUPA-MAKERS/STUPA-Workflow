@@ -40,6 +40,17 @@
   min-width: 100%;
   padding-block: var(--space-2);
 }
+/* The floor of the full set: the fixed columns take about 860px there, so they must not
+   push the description below 14rem of text. When the table has less room, it scrolls
+   sideways (the actions column stays pinned) instead. The page shows the full set only
+   from a width where this floor holds, so the floor is a safety net (a larger font, a
+   longer translation). The compact and tight sets have no floor: they leave the
+   description the width the viewport has. */
+@include bp.not-phone {
+  :host(.et--full) .et__desc {
+    min-width: max(100%, 14rem);
+  }
+}
 .et__descLine {
   display: flex;
   align-items: center;

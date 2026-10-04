@@ -62,6 +62,8 @@ export type BudgetLink = { budget: string | null; ks: string; fy: string };
     TranslatePipe,
     TruncatedDirective,
   ],
+  // The full set marks the host, so the stylesheet can give the description a floor.
+  host: { '[class.et--full]': "columnSet() === 'full'" },
   templateUrl: './expenses-table.component.html',
   styleUrl: './expenses-table.component.scss',
 })
