@@ -106,7 +106,8 @@ export class ApplicationsListComponent implements OnDestroy {
   readonly gremium = signal('');
   /**
    * `mine=true`: only the own applications ("Alle ansehen" under "Meine Anträge" on the
-   * start page). No visible control; the reset clears it with the other filters.
+   * start page). It has no control in the filter panel. A removable chip above the table
+   * shows it, the filter count includes it, and the reset clears it with the other filters.
    */
   readonly mine = signal('');
   readonly types = signal<ApplicationType[]>([]);
@@ -160,6 +161,7 @@ export class ApplicationsListComponent implements OnDestroy {
         this.amountMax(),
         this.createdFrom(),
         this.createdTo(),
+        this.mine(),
         // Anything other than the default is a filter the reader has set.
         this.archived() === 'false' ? '' : this.archived(),
       ].filter((v) => String(v ?? '').trim() !== '').length,
@@ -279,7 +281,17 @@ export class ApplicationsListComponent implements OnDestroy {
     if (changed) this.seenStates.set(next);
   }
 
-  /** Export the current list as Excel. The filters come from the query params. */
+  /** Remove the `mine` filter (the chip above the table). */
+  clearMine(): void {
+    this.setFilter('mine', '');
+  }
+
+  /**
+   * Export the current list as Excel. The filters come from the query params.
+   *
+   * The export endpoint has no `mine` filter, so the template hides the button while
+   * `mine` is set. Otherwise the download holds more rows than the list shows.
+   */
   onExport(): void {
     if (this.exporting()) return;
     this.exporting.set(true);
@@ -291,7 +303,6 @@ export class ApplicationsListComponent implements OnDestroy {
     };
     str('q'); str('type'); str('state'); str('gremium'); str('budget');
     str('createdFrom'); str('createdTo');
-    if (pm.get('mine') === 'true') query.mine = true;
     const min = pm.get('amountMin'); if (min) query.amountMin = Number(min);
     const max = pm.get('amountMax'); if (max) query.amountMax = Number(max);
     const sort = pm.get('sort'); if (sort === 'amount' || sort === 'createdAt') query.sort = sort;

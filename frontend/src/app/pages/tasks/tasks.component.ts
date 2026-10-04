@@ -25,7 +25,8 @@ const DAY_MS = 86_400_000;
  * The columns are title, type, status (as coloured text), amount and "Wartet seit". The
  * waiting time counts from the last status change (`stateSince`). An older server that
  * does not send it gives the time of the last change (`updatedAt`). A click on a row
- * opens the application. The vote and the transition happen there.
+ * opens the application. The vote and the transition happen there. When the request
+ * fails, the page shows an error message instead of the table and the header count.
  */
 @Component({
   selector: 'app-tasks',
@@ -49,6 +50,8 @@ export class TasksComponent {
 
   protected readonly tasks = signal<ApplicationListItem[]>([]);
   protected readonly loading = signal(true);
+  /** The task request failed. The page then shows an error and no count, not "0 offen". */
+  protected readonly error = signal(false);
   private readonly types = signal<ApplicationType[]>([]);
   private readonly typesById = computed(
     () => new Map(this.types().map((t) => [t.id, t.name])),
@@ -94,7 +97,8 @@ export class TasksComponent {
   }
 
   /**
-   * How long the task waits, in whole days: "seit heute", "seit 1 Tag", "seit 5 Tagen".
+   * How long the task waits, in whole days: "seit heute", "seit 1 Tag", "seit 5 Tagen"
+   * (EN "today", "for 1 day", "for 5 days" under the header "Waiting").
    * A missing or invalid time gives a dash.
    */
   protected waitingSince(at: IsoDateTime | null | undefined): string {
@@ -131,6 +135,7 @@ export class TasksComponent {
       },
       error: () => {
         this.tasks.set([]);
+        this.error.set(true);
         this.loading.set(false);
       },
     });

@@ -101,6 +101,9 @@ describe('TasksComponent', () => {
     const c = cmp(fixture);
     expect(c.waitingSince(new Date(Date.now() - 3 * DAY).toISOString())).toBe('for 3 days');
     expect(c.waitingSince(new Date(Date.now() - DAY - 60_000).toISOString())).toBe('for 1 day');
+    // The header reads "Waiting", so each value reads after it: "today", "for 3 days".
+    expect(c.waitingSince(new Date().toISOString())).toBe('today');
+    expect(c.columns().find((col: { key: string }) => col.key === 'waiting').label).toBe('Waiting');
   });
 
   it('formats a missing, odd or foreign-currency amount', async () => {
@@ -113,12 +116,22 @@ describe('TasksComponent', () => {
     expect(c.money(task('x', { amount: '10', currency: null }))).toBe('10,00\u00a0€');
   });
 
-  it('shows the empty state and clears loading when the request fails', async () => {
+  it('shows an error and no count, not an empty list, when the request fails', async () => {
     const { fixture } = await setup([], { tasksError: true });
     const c = cmp(fixture);
     expect(c.tasks()).toEqual([]);
     expect(c.loading()).toBe(false);
+    expect(c.error()).toBe(true);
+    expect(screen.getByRole('alert')).toHaveTextContent('Aufgaben konnten nicht geladen werden.');
+    expect(screen.queryByText('Keine offenen Aufgaben.')).not.toBeInTheDocument();
+    expect(screen.queryByText('0 offen')).not.toBeInTheDocument();
+  });
+
+  it('shows the empty state and the count 0 when there are no tasks', async () => {
+    await setup([]);
     expect(screen.getByText('Keine offenen Aufgaben.')).toBeInTheDocument();
+    expect(screen.getByText('0 offen')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('tolerates a failing type load and an untitled task without a state', async () => {

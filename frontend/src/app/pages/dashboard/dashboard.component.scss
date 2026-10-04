@@ -293,7 +293,14 @@
 }
 :host(.dash--phone) .dash__live {
   gap: var(--space-3);
-  padding: 14px;
+  /* The inline padding is the one of the list-item rows below, so the date blocks of the
+     live and the planned meetings line up (board Telefon-Start). */
+  padding: 14px var(--space-4);
+}
+/* Phone: "Live" sits at the end of the title row (board Telefon-Start). */
+:host(.dash--phone) .dash__liveTitle .dash__name {
+  flex: 1 1 0;
+  min-width: 0;
 }
 :host(.dash--phone) .dash__now {
   padding-inline-start: 0;

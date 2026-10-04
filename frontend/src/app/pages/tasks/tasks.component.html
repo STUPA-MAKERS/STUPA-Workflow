@@ -1,39 +1,43 @@
 <app-page-header [title]="'tasks.title' | t" [subtitle]="'tasks.subtitle' | t">
-  @if (!loading()) {
+  @if (!loading() && !error()) {
     <span actions class="tasks__count">{{ 'tasks.count' | t: { n: tasks().length } }}</span>
   }
 </app-page-header>
 
-<app-data-table
-  [loading]="loading()"
-  [loadingText]="'tasks.loading' | t"
-  [columns]="columns()"
-  [rows]="tasks()"
-  [emptyText]="'tasks.empty' | t"
-  [clickable]="true"
-  (rowClick)="open($any($event).id)"
->
-  <ng-template appCell="title" let-r>
-    <span class="tasks__title ell" [title]="titleOf($any(r))">{{ titleOf($any(r)) }}</span>
-  </ng-template>
-  <ng-template appCell="type" let-r>
-    <span class="tasks__muted tasks__nowrap">{{ typeName($any(r).typeId) }}</span>
-  </ng-template>
-  <ng-template appCell="state" let-r>
-    @if ($any(r).state; as s) {
-      <app-status-text class="tasks__nowrap" [kind]="flowColorKind(s.color)">{{ s.label }}</app-status-text>
-    } @else {
-      <span class="tasks__muted">—</span>
-    }
-  </ng-template>
-  <ng-template appCell="amount" let-r>
-    <span class="mono tasks__nowrap">{{ money($any(r)) }}</span>
-  </ng-template>
-  <ng-template appCell="waiting" let-r>
-    @let at = since($any(r));
-    <span class="tasks__waiting" [attr.title]="sinceTitle(at)">{{ waitingSince(at) }}</span>
-  </ng-template>
-  <ng-template appCell="open" let-r>
-    <app-icon class="tasks__chev" name="right" [size]="17" />
-  </ng-template>
-</app-data-table>
+@if (error()) {
+  <p class="tasks__error" role="alert">{{ 'tasks.error' | t }}</p>
+} @else {
+  <app-data-table
+    [loading]="loading()"
+    [loadingText]="'tasks.loading' | t"
+    [columns]="columns()"
+    [rows]="tasks()"
+    [emptyText]="'tasks.empty' | t"
+    [clickable]="true"
+    (rowClick)="open($any($event).id)"
+  >
+    <ng-template appCell="title" let-r>
+      <span class="tasks__title ell" [title]="titleOf($any(r))">{{ titleOf($any(r)) }}</span>
+    </ng-template>
+    <ng-template appCell="type" let-r>
+      <span class="tasks__muted tasks__nowrap">{{ typeName($any(r).typeId) }}</span>
+    </ng-template>
+    <ng-template appCell="state" let-r>
+      @if ($any(r).state; as s) {
+        <app-status-text class="tasks__nowrap" [kind]="flowColorKind(s.color)">{{ s.label }}</app-status-text>
+      } @else {
+        <span class="tasks__muted">—</span>
+      }
+    </ng-template>
+    <ng-template appCell="amount" let-r>
+      <span class="mono tasks__nowrap">{{ money($any(r)) }}</span>
+    </ng-template>
+    <ng-template appCell="waiting" let-r>
+      @let at = since($any(r));
+      <span class="tasks__waiting" [attr.title]="sinceTitle(at)">{{ waitingSince(at) }}</span>
+    </ng-template>
+    <ng-template appCell="open" let-r>
+      <app-icon class="tasks__chev" name="right" [size]="17" />
+    </ng-template>
+  </app-data-table>
+}

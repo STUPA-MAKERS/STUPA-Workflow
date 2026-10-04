@@ -68,10 +68,10 @@
                         <span class="dash__name ell" [title]="s.meeting.title">{{ s.meeting.title }}</span>
                         <app-status-text kind="accent">{{ 'meetings.status.live' | t }}</app-status-text>
                       </span>
-                      @if (phone()) {
-                        @if (s.now; as now) {
-                          <span class="dash__sub">{{ 'dashboard.sessions.nowShort' | t: { n: now.position, count: now.count } }}</span>
-                        }
+                      <!-- Phone: the short agenda line. Without a current agenda item, the
+                           gremium and the start time, as on a wide screen. -->
+                      @if (phone() && s.now; as now) {
+                        <span class="dash__sub">{{ 'dashboard.sessions.nowShort' | t: { n: now.position, count: now.count } }}</span>
                       } @else if (s.sub) {
                         <span class="dash__sub ell">{{ s.sub }}</span>
                       }

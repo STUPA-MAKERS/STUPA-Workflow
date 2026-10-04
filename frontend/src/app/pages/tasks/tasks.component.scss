@@ -24,6 +24,13 @@
   color: var(--color-text);
 }
 
+/* The request failed: one line in the danger colour, like the error of the start page. */
+.tasks__error {
+  margin: 0;
+  padding: var(--space-5) 0;
+  color: var(--color-danger);
+}
+
 .tasks__muted {
   color: var(--color-text-muted);
 }

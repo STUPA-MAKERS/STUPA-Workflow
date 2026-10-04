@@ -113,3 +113,38 @@
     min-width: 0;
   }
 }
+/* The `mine` chip: the look of the filter chip when it is on, with a remove button. */
+.apps__scope {
+  margin: 0 0 var(--space-3);
+}
+.apps__scopeChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: var(--control-height-sm);
+  padding: 0 var(--space-1) 0 var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-selected);
+  color: var(--color-on-selected);
+  font-size: 0.84375rem; /* 13.5px */
+  font-weight: var(--fw-medium);
+}
+.apps__scopeClear {
+  display: inline-grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.apps__scopeClear:hover {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+.apps__scopeClear:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
+}

@@ -64,8 +64,8 @@ export interface SessionRow {
  * On a phone the page gets a compact head (search and account) and a floating "Antrag"
  * button, and the sections show fewer rows.
  *
- * Only the applications list shows the global loading overlay (the first paint). The other
- * requests run beside it with `skipLoading`, and each section has its own state.
+ * No request of the page shows the global loading overlay: each one runs with
+ * `skipLoading`, and each section shows its own skeleton, empty or error state.
  */
 @Component({
   selector: 'app-dashboard',

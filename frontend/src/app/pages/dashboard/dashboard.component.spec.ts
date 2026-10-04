@@ -563,6 +563,24 @@ describe('DashboardComponent', () => {
       http.verify();
     });
 
+    it('shows the gremium and the start of a live meeting without a current item', async () => {
+      const { http } = await setup(MEMBER, {
+        phone: true,
+        meetings: [
+          meeting('m-live', 'live', {
+            date: '2026-09-29',
+            startTime: '18:00:00',
+            gremiumName: 'StuPa',
+            startedAt: null,
+            agendaItemCount: 8,
+          }),
+        ],
+      });
+      expect(screen.getByText('StuPa · seit 18:00')).toBeInTheDocument();
+      expect(screen.queryByText(/Jetzt:/)).not.toBeInTheDocument();
+      http.verify();
+    });
+
     it('opens the account menu in a sheet from the avatar in the pill', async () => {
       const { fixture, http } = await setup(MEMBER, { phone: true });
       const me = screen.getByRole('button', { name: 'Konto: Mia Member' });
