@@ -440,11 +440,12 @@ let MOCK_MEETING: MeetingOutWire = {
   startTime: '18:00:00',
   status: 'live',
   activeApplicationId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-  currentAgendaItemId: null,
-  // The start page reads these (P5a): "seit 18:04", "Jetzt: TOP 1 · …", "1 / 2".
+  // The room handles the third item of the seeded agenda below.
+  currentAgendaItemId: 'ag-s3',
+  // The start page reads these (P5a): "seit 18:04", "Jetzt: TOP 3 · …", "3 / 6".
   startedAt: '2026-06-12T16:04:00Z',
-  currentAgendaItem: { position: 1, title: 'Förderung Ersti-Wochenende' },
-  agendaItemCount: 2,
+  currentAgendaItem: { position: 3, title: 'Förderung Ersti-Wochenende' },
+  agendaItemCount: 6,
   gremiumId: null,
   gremiumName: 'Studierendenparlament',
   protocolId: MOCK_PROTOCOL_ID,
@@ -463,17 +464,32 @@ let MOCK_MEETING: MeetingOutWire = {
     {
       id: 'a0000000-0000-0000-0000-0000000000a1',
       applicationId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+      agendaItemId: 'ag-s3',
       title: 'Förderung Ersti-Wochenende',
+      question: 'Soll der Antrag „Förderung Ersti-Wochenende“ wie beschrieben gefördert werden?',
+      options: ['yes', 'no', 'abstain'],
       status: 'open',
       result: null,
       counts: { ja: 12, nein: 3, enthaltung: 1 },
       leading: 'ja',
       closesAt: null,
+      // Not every present member voted yet, so the tally stays hidden.
+      voted: 9,
+      present: 12,
+      revealed: false,
+      majorityRule: 'simple',
+      secret: false,
+      quorum: { type: 'count', value: 8 },
+      openedAt: '2026-06-12T16:48:00Z',
     },
     {
       id: 'a0000000-0000-0000-0000-0000000000a2',
       applicationId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+      agendaItemId: 'ag-s4',
       title: 'Anschaffung Beamer',
+      question: 'Wird die Anschaffung des Beamers beschlossen?',
+      majorityRule: 'absolute',
+      secret: true,
       status: 'draft',
       result: null,
       counts: null,
@@ -495,7 +511,22 @@ const MOCK_PLANNED_MEETING: MeetingOutWire = {
   gremiumName: 'Haushaltsausschuss',
   votes: [],
   createdAt: '2026-06-01T10:00:00Z',
+  // The demo user leads it and nobody keeps the minutes yet: the preparation shows.
+  protocolId: null,
+  protokollantId: null,
+  protokollantName: null,
+  canControl: true,
+  canManage: true,
+  canWrite: true,
+  canManageVotes: true,
 };
+
+/** The agenda of the planned meeting. GET only: the mock changes the live agenda. */
+const MOCK_PLANNED_AGENDA = [
+  { id: 'ag-p1', applicationId: null, title: 'Begrüßung', body: '', position: 0 },
+  { id: 'ag-p2', applicationId: null, title: 'Haushaltsplan 2027', body: '', position: 1 },
+  { id: 'ag-p3', applicationId: null, title: 'Verschiedenes', body: '', position: 2 },
+];
 
 /** GET /delegations: the user represents a member in the planned meeting. */
 const MOCK_DELEGATIONS = [
@@ -640,7 +671,41 @@ interface MockAgendaItem {
   stateLabel?: Record<string, string> | null;
 }
 
-let MOCK_AGENDA: MockAgendaItem[] = [];
+/** The agenda of the live meeting: freetext items, two applications and a non-public item. */
+let MOCK_AGENDA: MockAgendaItem[] = [
+  {
+    id: 'ag-s1',
+    applicationId: null,
+    title: 'Begrüßung und Beschlussfähigkeit',
+    body: 'Die Sitzungsleitung eröffnet die Sitzung. 12 von 15 Mitgliedern sind anwesend; das Gremium ist beschlussfähig.',
+    position: 0,
+  },
+  {
+    id: 'ag-s2',
+    applicationId: null,
+    title: 'Genehmigung der Tagesordnung',
+    body: 'Die Tagesordnung wird ohne Änderungen genehmigt.',
+    position: 1,
+  },
+  {
+    id: 'ag-s3',
+    applicationId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+    title: 'Förderung Ersti-Wochenende',
+    body: 'Die Antragstellerin stellt den Antrag vor.\n\n## Rückfragen\n\n- Unterkunft: Jugendherberge, Preis pro Person liegt vor.\n- Anreise: Bus, ein Angebot liegt bei.\n\nDie Sitzungsleitung stellt die Beschlussfrage zur Abstimmung.',
+    position: 2,
+    stateLabel: { de: 'Abstimmung', en: 'Vote' },
+  },
+  {
+    id: 'ag-s4',
+    applicationId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+    title: 'Anschaffung Beamer',
+    body: '',
+    position: 3,
+    stateLabel: { de: 'Abstimmung', en: 'Vote' },
+  },
+  { id: 'ag-s5', applicationId: null, title: 'Personalangelegenheit', body: '', position: 4, nonPublic: true },
+  { id: 'ag-s6', applicationId: null, title: 'Verschiedenes', body: '', position: 5 },
+];
 let MOCK_AGENDA_SEQ = 0;
 const MOCK_ASSIGNABLE: { applicationId: string; title: string; stateLabel: Record<string, string> }[] = [
   { applicationId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', title: 'Förderung Ersti-Wochenende', stateLabel: { de: 'Abstimmung', en: 'Vote' } },
@@ -831,8 +896,10 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
       const taken = new Set(MOCK_AGENDA.map((a) => a.applicationId));
       return ok(MOCK_ASSIGNABLE.filter((a) => !taken.has(a.applicationId)));
     }
+    if (p.endsWith(`/meetings/${MOCK_PLANNED_MEETING.id}/agenda`)) return ok([...MOCK_PLANNED_AGENDA]);
     if (/\/meetings\/[^/]+\/agenda$/.test(p)) return ok([...MOCK_AGENDA]);
     if (/\/meetings\/[^/]+\/protocol$/.test(p)) return ok(MOCK_PROTOCOL);
+    if (p.endsWith(`/meetings/${MOCK_PLANNED_MEETING.id}`)) return ok(MOCK_PLANNED_MEETING);
     if (/\/meetings\/[^/]+$/.test(p)) return ok(MOCK_MEETING);
     if (/\/applications\/[^/]+\/form$/.test(p)) return ok(MOCK_EFFECTIVE_FORM);
     if (/\/applications\/[^/]+$/.test(p)) return ok(mockApplication());
@@ -1029,10 +1096,11 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
   }
 
   if (req.method === 'PATCH') {
-    const body = /\/meetings\/[^/]+\/agenda\/([^/]+)$/.exec(p);
-    if (body) {
-      const text = (req.body as { body?: string } | null)?.body ?? '';
-      MOCK_AGENDA = MOCK_AGENDA.map((a) => (a.id === body[1] ? { ...a, body: text } : a));
+    const item = /\/meetings\/[^/]+\/agenda\/([^/]+)$/.exec(p);
+    if (item) {
+      // Like the server: only the sent fields change (text, title of a freetext item, NÖ).
+      const patch = (req.body as { body?: string; title?: string; nonPublic?: boolean } | null) ?? {};
+      MOCK_AGENDA = MOCK_AGENDA.map((a) => (a.id === item[1] ? { ...a, ...patch } : a));
       return ok([...MOCK_AGENDA]);
     }
   }

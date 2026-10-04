@@ -620,6 +620,11 @@ describe('mapMeetingVote', () => {
       revealed: true,
       failedReason: null,
       myBallot: null,
+      majorityRule: 'simple',
+      secret: false,
+      quorum: null,
+      openedAt: null,
+      closedAt: null,
     });
   });
 
@@ -648,6 +653,24 @@ describe('mapMeetingVote', () => {
     expect(v.voted).toBe(10);
     expect(v.present).toBe(12);
     expect(v.result).toBe('rejected');
+  });
+
+  it('keeps the rules and the times of the vote for the vote card', () => {
+    const wire = {
+      id: 'v-4',
+      status: 'open',
+      majorityRule: 'two_thirds',
+      secret: true,
+      quorum: { type: 'count', value: 12 },
+      openedAt: '2026-06-12T16:48:00Z',
+      closedAt: null,
+    } as MeetingVoteOutWire;
+    const v = mapMeetingVote(wire);
+    expect(v.majorityRule).toBe('two_thirds');
+    expect(v.secret).toBe(true);
+    expect(v.quorum).toEqual({ type: 'count', value: 12 });
+    expect(v.openedAt).toBe('2026-06-12T16:48:00Z');
+    expect(v.closedAt).toBeNull();
   });
 
   it('keeps the own ballot of the caller', () => {

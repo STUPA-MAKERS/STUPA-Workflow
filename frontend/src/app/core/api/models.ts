@@ -1061,6 +1061,14 @@ export interface MeetingVote {
   /** The own ballot of the caller. A secret vote gives only `cast`. `null` when the
    *  server sent none (for example a broadcast). */
   myBallot?: MyBallot | null;
+  /** The rules of the vote, for the vote card (A5). A vote that a WS event added
+   *  before the next GET has none of them. */
+  majorityRule?: MajorityRule;
+  secret?: boolean;
+  quorum?: Quorum | null;
+  /** The real open time, and the real end time (close or cancel). */
+  openedAt?: IsoDateTime | null;
+  closedAt?: IsoDateTime | null;
 }
 
 /** The agenda item the room handles now, as `MeetingOut.currentAgendaItem` sends it. */
