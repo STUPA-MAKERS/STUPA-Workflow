@@ -76,8 +76,9 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
       else next.add(pi);
       return next;
     });
-    // An open position with a server error closes only after the error is gone.
-    if (this.serverError(pi)) this.clearServerErrors();
+    // An open position with a server error closes only after its error is gone. The
+    // errors of the other positions stay.
+    if (this.serverError(pi)) this.dropServerError(pi);
   }
 
   protected cardId(pi: number): string {
@@ -111,6 +112,26 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
 
   private clearServerErrors(): void {
     if (this.props['serverErrors']) delete this.props['serverErrors'];
+  }
+
+  /** Remove the 422 message of one position. When no message is left, the control is
+   *  valid or invalid by its own checks again. */
+  private dropServerError(pi: number): void {
+    const map = { ...(this.props['serverErrors'] as Record<number, string>) };
+    delete map[pi];
+    if (Object.keys(map).length) {
+      this.props['serverErrors'] = map;
+      return;
+    }
+    this.clearServerErrors();
+    this.revalidate(this.positions);
+  }
+
+  /** The accessible name of the radio of an offer: "Bevorzugt: <supplier>". */
+  protected radioLabel(o: Offer, oi: number): string {
+    const name =
+      o.label.trim() || this.i18n.translate('forms.positions.offerN', { n: oi + 1 });
+    return this.i18n.translate('forms.positions.preferOfferNamed', { name });
   }
 
   private positionComplete(p: Position): boolean {

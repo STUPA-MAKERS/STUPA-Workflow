@@ -208,21 +208,42 @@ describe('AgendaDialogComponent', () => {
     http.verify();
   });
 
-  it('says so when the gremium has no planned meeting, and cannot confirm', async () => {
-    const { http, detectChanges } = await setup();
+  it('fires without a meeting when no planned meeting is visible', async () => {
+    const { http, detectChanges, toast, done, fixture } = await setup();
     http.expectOne(LIST).flush([meeting({ status: 'closed' })]);
     detectChanges();
-    expect(screen.getByText(/keine geplante Sitzung/)).toBeInTheDocument();
+    const success = jest.spyOn(toast, 'success');
+    // The text does not claim that no meeting exists: the reader may not see it.
+    expect(
+      screen.getByText(
+        'Keine geplante Sitzung sichtbar. Der Antrag kommt automatisch auf die nächste geplante Sitzung des Gremiums, falls es eine gibt.',
+      ),
+    ).toBeInTheDocument();
     expect(screen.queryByText('Der Antrag kommt als neuer TOP ans Ende.')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Auf Tagesordnung setzen' })).toBeDisabled();
+    // "Nicht öffentlich" needs a chosen meeting.
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText('Notiz zum Übergang (optional)'), 'Eilt');
+    detectChanges();
+    const confirm = screen.getByRole('button', { name: 'Auf Tagesordnung setzen' });
+    expect(confirm).toBeEnabled();
+    await userEvent.click(confirm);
+    // Without `meetingId` the server picks the next planned meeting after the commit.
+    const post = http.expectOne(FIRE);
+    expect(post.request.body).toEqual({ transitionId: 'tr-agenda', note: 'Eilt' });
+    post.flush({ newStateId: 's2', statusEventId: 'e1', dispatchedActions: [] });
+    expect(success).toHaveBeenCalledWith('Status geändert.');
+    expect(done).toHaveBeenCalledTimes(1);
+    expect(fixture.componentInstance.open()).toBe(false);
     http.verify();
   });
 
-  it('treats a failed load as no meetings', async () => {
-    const { http, detectChanges } = await setup();
+  it('treats a failed load as no visible meeting', async () => {
+    const { http, detectChanges, fixture } = await setup();
     http.expectOne(LIST).flush({}, { status: 500, statusText: 'x' });
     detectChanges();
-    expect(screen.getByText(/keine geplante Sitzung/)).toBeInTheDocument();
+    expect(screen.getByText(/Keine geplante Sitzung sichtbar/)).toBeInTheDocument();
+    fixture.componentInstance.submit();
+    expect(http.expectOne(FIRE).request.body).toEqual({ transitionId: 'tr-agenda', note: null });
     http.verify();
   });
 
@@ -268,8 +289,18 @@ describe('AgendaDialogComponent', () => {
   it('loads nothing without an agenda gremium; the button names the dialog', async () => {
     const { http } = await setup({ ...AGENDA, agendaGremiumId: null, label: '' });
     http.verify();
-    // Without its own label the button says what the dialog does.
+    // Without its own label the button says what the dialog does. No meeting is
+    // visible, so it fires without one.
+    expect(screen.getByRole('button', { name: 'Auf Tagesordnung setzen' })).toBeEnabled();
+  });
+
+  it('cannot confirm while the meetings load', async () => {
+    const { http, fixture } = await setup();
+    const list = http.expectOne(LIST);
     expect(screen.getByRole('button', { name: 'Auf Tagesordnung setzen' })).toBeDisabled();
+    fixture.componentInstance.submit();
+    list.flush([]);
+    http.verify();
   });
 
   it('loads nothing while closed', async () => {

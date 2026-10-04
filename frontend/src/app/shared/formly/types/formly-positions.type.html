@@ -24,13 +24,12 @@
             type="button"
             class="pos__summary"
             [attr.aria-expanded]="false"
-            [attr.aria-controls]="cardId(pi)"
             (click)="toggleOpen(pi)"
           >
             <app-icon class="pos__chev" name="down" [size]="18" />
             <span class="pos__sumText">
-              <span class="pos__sumName ell" [title]="p.label">{{ p.label || t('forms.positions.untitled') }}</span>
-              <span class="pos__sumSub ell">{{ summary(p) }}</span>
+              <span class="pos__sumName">{{ p.label || t('forms.positions.untitled') }}</span>
+              <span class="pos__sumSub">{{ summary(p) }}</span>
             </span>
             <span class="mono pos__sumValue">{{ fmt(positionValue(p)) }}</span>
           </button>
@@ -99,7 +98,7 @@
                     [name]="radioName(pi)"
                     [checked]="o.preferred"
                     (change)="setPreferred(pi, oi)"
-                    [attr.aria-label]="t('forms.positions.preferOffer')"
+                    [attr.aria-label]="radioLabel(o, oi)"
                   />
                 }
                 <label class="pf pos__grow" [class.pf--invalid]="offerLabelInvalid(o)">

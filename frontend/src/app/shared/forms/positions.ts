@@ -67,3 +67,18 @@ export function positionValue(p: Pick<CostPosition, 'offers'>): number {
 export function positionsTotal(positions: readonly Pick<CostPosition, 'offers'>[]): number {
   return positions.reduce((sum, p) => sum + positionValue(p), 0);
 }
+
+/**
+ * The link of an offer whose text is an http(s) URL, else null. Applicants often name
+ * a comparison offer by the URL of the shop page; the view then shows a real link.
+ */
+export function offerHref(label: string): string | null {
+  const text = label.trim();
+  if (!/^https?:\/\/\S+$/i.test(text)) return null;
+  try {
+    const url = new URL(text);
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : null;
+  } catch {
+    return null;
+  }
+}

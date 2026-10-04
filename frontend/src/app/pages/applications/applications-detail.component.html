@@ -238,7 +238,7 @@
           </app-field-row>
           @if (!application.applicant.anonymized && application.applicant.email) {
             <app-field-row [label]="'applications.detail.email' | t">
-              <a class="ad__mail ell" [attr.href]="'mailto:' + application.applicant.email" [title]="application.applicant.email">{{ application.applicant.email }}</a>
+              <a class="ad__mail" [attr.href]="'mailto:' + application.applicant.email">{{ application.applicant.email }}</a>
             </app-field-row>
           }
         </div>

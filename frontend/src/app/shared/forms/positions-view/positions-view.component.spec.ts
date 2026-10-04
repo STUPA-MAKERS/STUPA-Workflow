@@ -97,6 +97,37 @@ describe('PositionsViewComponent', () => {
     expect(parts(container.querySelector('.pv__total')!, 'span')).toBe('Gesamtbetrag | 0,00 €');
   });
 
+  it('links an offer URL and never cuts names, suppliers or offer texts', async () => {
+    const url = 'https://www.example.com/shop/produkt/sehr-langer-pfad-zum-angebot?id=12345';
+    const { container } = await view([
+      {
+        label: 'Eine sehr lange Bezeichnung der Position, die umbrechen muss',
+        offers: [
+          { label: url, value: 100, preferred: true },
+          { label: 'http//kein-link.de', value: 120, preferred: false },
+          { label: 'ftp://example.com/a', value: 130, preferred: false },
+        ],
+      },
+    ]);
+    const row = screen.getByRole('button');
+    // The collapsed row is one button: no link inside it, and no ellipsis.
+    expect(row.querySelector('a')).toBeNull();
+    expect(row.querySelector('.ell')).toBeNull();
+    expect(row.querySelector('.pv__pref')).toHaveTextContent(`bevorzugt: ${url}`);
+    // The row controls the body only while the body is there.
+    expect(row).not.toHaveAttribute('aria-controls');
+    await userEvent.click(row);
+    const link = screen.getByRole('link', { name: url });
+    expect(link).toHaveAttribute('href', url);
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener');
+    expect(link).toHaveClass('pv__offerName');
+    expect(link).not.toHaveClass('ell');
+    // Only an http(s) URL is a link.
+    expect(screen.getAllByRole('link')).toHaveLength(1);
+    expect(container.querySelector('.ell')).toBeNull();
+  });
+
   it('shows only the total for an answer that is no list', async () => {
     const { container } = await view('kaputt', { surface: 1 });
     expect(screen.queryAllByRole('button')).toHaveLength(0);

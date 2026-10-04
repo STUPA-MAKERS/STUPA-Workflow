@@ -207,8 +207,10 @@
   white-space: nowrap;
 }
 .ad__mail {
-  display: block;
+  display: inline;
   color: inherit;
+  /* An e-mail address is never cut: it wraps and stays selectable. */
+  overflow-wrap: anywhere;
 }
 
 /* ------------------------------------------------------------------ edit */

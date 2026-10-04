@@ -102,12 +102,17 @@
   flex-direction: column;
   min-width: 0;
 }
+/* The name and the preferred supplier (often a URL) are never cut: they wrap. */
 .pos__sumName {
+  min-width: 0;
   font-size: var(--fs-md);
+  overflow-wrap: anywhere;
 }
 .pos__sumSub {
+  min-width: 0;
   color: var(--color-text-muted);
   font-size: 0.8125rem;
+  overflow-wrap: anywhere;
 }
 .pos__sumValue {
   flex: none;

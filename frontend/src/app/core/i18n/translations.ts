@@ -719,7 +719,8 @@ export const de = {
   'applications.agenda.title': 'Auf Tagesordnung setzen',
   'applications.agenda.pick': 'Sitzung wählen',
   'applications.agenda.suggested': 'Vorschlag',
-  'applications.agenda.none': 'Das Gremium hat keine geplante Sitzung. Lege zuerst eine Sitzung an.',
+  'applications.agenda.none':
+    'Keine geplante Sitzung sichtbar. Der Antrag kommt automatisch auf die nächste geplante Sitzung des Gremiums, falls es eine gibt.',
   'applications.agenda.meetingInvalid':
     'Diese Sitzung nimmt keine Anträge mehr an. Wähle eine andere geplante Sitzung.',
   'applications.agenda.appends': 'Der Antrag kommt als neuer TOP ans Ende.',
@@ -746,12 +747,16 @@ export const de = {
   'forms.positions.provider': 'Anbieter',
   'forms.positions.amount': 'Betrag',
   'forms.positions.offersLead': 'Angebote · das bevorzugte bestimmt den Betrag',
-  'forms.positions.preferOffer': 'Bevorzugtes Angebot',
+  'forms.positions.preferOfferNamed': 'Bevorzugt: {name}',
+  'forms.positions.offerN': 'Angebot {n}',
   'forms.positions.removePosition': 'Position entfernen',
   'forms.positions.removeOffer': 'Angebot entfernen',
   'forms.positions.collapse': 'Position zuklappen',
   'forms.positions.errOffersServer':
     'Diese Position braucht mehr Angebote. Ohne Vergleichsangebote: ein Angebot und eine Begründung.',
+  'forms.positions.errTooManyOffers': 'Diese Position hat zu viele Angebote. Entferne Angebote.',
+  'forms.positions.errNoWaiver':
+    'Dieses Feld erlaubt keine Position ohne Vergleichsangebote. Gib die Vergleichsangebote an.',
   'forms.errors.server': 'Der Server hat diesen Wert abgelehnt.',
   'applications.comments.title': 'Kommentare',
   'applications.comments.empty': 'Noch keine Kommentare.',
@@ -3157,7 +3162,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'applications.agenda.title': 'Put on the agenda',
   'applications.agenda.pick': 'Choose a meeting',
   'applications.agenda.suggested': 'Suggested',
-  'applications.agenda.none': 'The committee has no planned meeting. Create a meeting first.',
+  'applications.agenda.none':
+    'No planned meeting is visible. The application goes automatically on the next planned meeting of the committee, if there is one.',
   'applications.agenda.meetingInvalid':
     'This meeting no longer takes applications. Choose another planned meeting.',
   'applications.agenda.appends': 'The application becomes a new item at the end.',
@@ -3182,12 +3188,16 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'forms.positions.provider': 'Supplier',
   'forms.positions.amount': 'Amount',
   'forms.positions.offersLead': 'Offers · the preferred one sets the amount',
-  'forms.positions.preferOffer': 'Preferred offer',
+  'forms.positions.preferOfferNamed': 'Preferred: {name}',
+  'forms.positions.offerN': 'Offer {n}',
   'forms.positions.removePosition': 'Remove position',
   'forms.positions.removeOffer': 'Remove offer',
   'forms.positions.collapse': 'Collapse position',
   'forms.positions.errOffersServer':
     'This position needs more offers. Without comparison offers: one offer and a reason.',
+  'forms.positions.errTooManyOffers': 'This position has too many offers. Remove offers.',
+  'forms.positions.errNoWaiver':
+    'This field does not allow a position without comparison offers. Give the comparison offers.',
   'forms.errors.server': 'The server refused this value.',
   'applications.comments.title': 'Comments',
   'applications.comments.empty': 'No comments yet.',

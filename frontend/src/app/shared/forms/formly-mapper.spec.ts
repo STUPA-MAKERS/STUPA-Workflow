@@ -325,6 +325,25 @@ describe('toFormlySections', () => {
     expect(callExpr(room, 'hide', {})).toBe(true);
   });
 
+  it('shows several choices as a half-width dropdown, the wizard as a checkbox list', () => {
+    const fields: FormFieldDef[] = [
+      { key: 'gremium', type: 'gremium_select', label: { de: 'Gremium' }, options: [] },
+      {
+        key: 'cat',
+        type: 'multiselect',
+        label: { de: 'Kategorie' },
+        options: [{ value: 'party', label: { de: 'Party' } }],
+      },
+    ];
+    const [group] = toFormlySections([{ key: 's', label: { de: 'S' }, fields }], 'de');
+    const cat = group.fieldGroup?.find((f) => f.key === 'cat');
+    expect(cat?.type).toBe('multiselect');
+    expect(cat?.className).toBe('fe-half');
+    expect(cat?.props?.['options']).toEqual([{ value: 'party', label: 'Party' }]);
+    expect(group.fieldGroup?.find((f) => f.key === 'gremium')?.className).toBe('fe-half');
+    expect(toFormlyFields(fields, 'de')[1].type).toBe('multicheckbox');
+  });
+
   it('works without a title and without options', () => {
     const [group] = toFormlySections([{ key: 'm', label: { de: 'M' }, fields: [{ key: 'a', type: 'text', label: { de: 'A' } }] }], 'de');
     expect(group.fieldGroup?.map((f) => f.key ?? f.props?.label)).toEqual(['M', 'a']);

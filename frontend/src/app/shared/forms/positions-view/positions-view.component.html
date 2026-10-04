@@ -21,12 +21,12 @@
           type="button"
           class="pv__toggle"
           [attr.aria-expanded]="isOpen(i)"
-          [attr.aria-controls]="id + '-' + i"
+          [attr.aria-controls]="isOpen(i) ? id + '-' + i : null"
           (click)="toggle(i)"
         >
           <app-icon class="pv__chev" [class.pv__chev--open]="isOpen(i)" name="down" [size]="18" />
           <span class="pv__text">
-            <span class="pv__name ell" [title]="p.label">{{ p.label || ('forms.positions.untitled' | t) }}</span>
+            <span class="pv__name">{{ p.label || ('forms.positions.untitled' | t) }}</span>
             <span class="pv__sub">
               <span class="pv__count">{{ p.count }}</span>
               @if (p.noOffers) {
@@ -34,7 +34,7 @@
                 <app-status-text kind="warn">{{ 'forms.positions.noOffersShort' | t }}</app-status-text>
               } @else if (p.preferred) {
                 <span class="pv__dot" aria-hidden="true">·</span>
-                <span class="ell" [title]="p.preferred">{{ 'forms.positions.preferredBy' | t: { name: p.preferred } }}</span>
+                <span class="pv__pref">{{ 'forms.positions.preferredBy' | t: { name: p.preferred } }}</span>
               }
             </span>
           </span>
@@ -47,7 +47,11 @@
               <ul class="pv__offers" [attr.aria-label]="'forms.positions.offers' | t">
                 @for (o of p.offers; track $index) {
                   <li class="pv__offer" [class.pv__offer--pref]="o.preferred">
-                    <span class="pv__offerName ell" [title]="o.label">{{ o.label || '—' }}</span>
+                    @if (o.href) {
+                      <a class="pv__offerName" [href]="o.href" target="_blank" rel="noopener">{{ o.label }}</a>
+                    } @else {
+                      <span class="pv__offerName">{{ o.label || '—' }}</span>
+                    }
                     @if (o.preferred) {
                       <app-status-text kind="accent">{{ 'forms.positions.preferred' | t }}</app-status-text>
                     }

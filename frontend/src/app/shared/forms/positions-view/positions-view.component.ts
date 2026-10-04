@@ -6,14 +6,23 @@ import { StatusTextComponent } from '@shared/ui/status-text/status-text.componen
 import { formatEuro } from '../answer-format';
 import {
   normalizePositions,
+  offerHref,
   positionValue,
   positionsTotal,
   preferredOffer,
   type CostPosition,
+  type PositionOffer,
 } from '../positions';
+
+/** One offer as the view draws it. */
+interface OfferRow extends PositionOffer {
+  /** The link of an offer whose text is an http(s) URL, else null. */
+  href: string | null;
+}
 
 /** One position as the view draws it. */
 interface PositionRow extends CostPosition {
+  offers: OfferRow[];
   amount: string;
   /** "3 Angebote" or "1 Angebot". */
   count: string;
@@ -32,6 +41,9 @@ let nextId = 0;
  * preferred one is marked "bevorzugt" and its value is the amount of the position. A
  * position without comparison offers shows "ohne Vergleichsangebote" and the reason
  * instead. The last row gives the total.
+ *
+ * Names, suppliers and offer texts are never cut: they wrap. An offer text that is an
+ * http(s) URL is a link in the open position (a link cannot sit in the row button).
  *
  * Comparison offers stay tagged attachments (O5): the offers here have no file.
  */
@@ -64,6 +76,7 @@ export class PositionsViewComponent {
     // The texts follow a language switch: `translate` and `money` read the locale signal.
     return normalizePositions(this.value()).map((p) => ({
       ...p,
+      offers: p.offers.map((o) => ({ ...o, href: offerHref(o.label) })),
       amount: this.money(positionValue(p)),
       count: this.i18n.translate(
         p.offers.length === 1 ? 'forms.positions.offerOne' : 'forms.positions.offerOther',

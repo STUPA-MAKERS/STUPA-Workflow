@@ -1354,7 +1354,7 @@ describe('ApplicationsDetailComponent', () => {
       .expectOne((r) => r.url === '/api/meetings' && r.params.get('gremiumId') === 'g1')
       .flush([]);
     detectChanges();
-    expect(screen.getByText(/keine geplante Sitzung/)).toBeInTheDocument();
+    expect(screen.getByText(/Keine geplante Sitzung sichtbar/)).toBeInTheDocument();
 
     // The dialog fired: the detail loads the application again.
     cmp.onAgendaDone();

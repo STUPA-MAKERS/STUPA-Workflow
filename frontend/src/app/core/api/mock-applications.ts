@@ -414,7 +414,9 @@ function positionsFor(amount: number): Record<string, unknown>[] {
       label: 'Verpflegung',
       offers: [
         { label: 'Mensa-Catering', value: b, preferred: true },
-        { label: 'Bäckerei am Campus', value: Math.round(b * 109) / 100, preferred: false },
+        // A supplier named by the URL of its offer: the view links it and wraps it.
+        { label: 'https://www.baeckerei-am-campus.example/catering/angebote/sommerfest-2026',
+          value: Math.round(b * 109) / 100, preferred: false },
       ],
     },
     {

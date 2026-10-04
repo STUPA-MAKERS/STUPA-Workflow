@@ -20,13 +20,16 @@
 }
 
 /* Two short fields side by side, as on the boards. Inside the row the cells have no
-   surface of their own. */
+   surface of their own. The cells align at the top, so both labels stay on one line
+   when one value wraps. */
 .av__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
   padding-block: 4px;
 }
 .av__grid app-field-row {
+  align-items: flex-start;
   min-height: 3.125rem;
   padding-block: 6px;
 }

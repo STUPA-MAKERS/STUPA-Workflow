@@ -51,13 +51,15 @@
       <p class="agd__hint">{{ 'applications.agenda.appends' | t }}</p>
     }
 
-    <app-switch
-      [id]="'agd-np'"
-      [hint]="'meetings.agenda.nonPublicHint' | t"
-      [checked]="nonPublic()"
-      (checkedChange)="nonPublic.set($event)"
-      ><span class="agd__switchLabel">{{ 'meetings.agenda.nonPublicLabel' | t }}</span></app-switch
-    >
+    @if (!noMeeting()) {
+      <app-switch
+        [id]="'agd-np'"
+        [hint]="'meetings.agenda.nonPublicHint' | t"
+        [checked]="nonPublic()"
+        (checkedChange)="nonPublic.set($event)"
+        ><span class="agd__switchLabel">{{ 'meetings.agenda.nonPublicLabel' | t }}</span></app-switch
+      >
+    }
 
     <label class="agd__note">
       <span class="agd__noteLabel">{{ 'applications.agenda.note' | t }}</span>
@@ -76,7 +78,7 @@
   <app-button
     dialog-footer
     variant="fill"
-    [disabled]="!pick() || loading()"
+    [disabled]="!canConfirm()"
     [loading]="saving()"
     (click)="submit()"
   >

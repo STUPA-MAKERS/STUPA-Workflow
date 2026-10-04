@@ -50,6 +50,12 @@ function localToday(): string {
  * without a meeting. "Nicht öffentlich" makes the new agenda item non-public; the note
  * goes into the history of the application.
  *
+ * The reader sees only the meetings of the gremien they can see. When no planned meeting
+ * is visible (the reader is not in the agenda gremium, the gremium has no planned
+ * meeting, or the load failed), the dialog still fires the transition, but without a
+ * meeting: the action of the server then picks the next planned meeting after the
+ * commit, as before A1. "Nicht öffentlich" has no effect then, so the dialog hides it.
+ *
  * The list page (row menu) and the detail (header) both open it; `done` fires after the
  * transition, and also after a 409, so the caller loads the application again.
  */
@@ -102,6 +108,12 @@ export class AgendaDialogComponent {
   protected readonly choices = computed<MeetingChoice[]>(() =>
     this.meetings().map((meeting) => ({ meeting, sub: this.subLine(meeting) })),
   );
+
+  /** No planned meeting is visible: the transition fires without a meeting. */
+  protected readonly noMeeting = computed(() => !this.loading() && this.choices().length === 0);
+
+  /** The confirm button works: a meeting is chosen, or none is visible. */
+  protected readonly canConfirm = computed(() => !this.loading() && (!!this.pick() || this.noMeeting()));
 
   /** The gremium of the meetings, at the end of the caption line. */
   protected readonly gremiumName = computed(() => this.meetings()[0]?.gremiumName ?? '');
@@ -186,28 +198,28 @@ export class AgendaDialogComponent {
     return parts.join(' · ');
   }
 
-  /** Fire the transition with the chosen meeting. */
+  /** Fire the transition with the chosen meeting, or without one when none is visible. */
   submit(): void {
     const id = this.applicationId();
     const transition = this.transition();
-    const meetingId = this.pick();
-    if (!id || !transition || !meetingId || this.saving()) return;
+    const meetingId = this.noMeeting() ? null : this.pick();
+    if (!id || !transition || !this.canConfirm() || this.saving()) return;
     this.saving.set(true);
     this.refusal.set(null);
-    const note = this.note().trim();
+    const note = this.note().trim() || null;
+    const body = meetingId
+      ? { transitionId: transition.id, meetingId, nonPublic: this.nonPublic(), note }
+      : { transitionId: transition.id, note };
     this.api
-      .fireTransition(id, {
-        transitionId: transition.id,
-        meetingId,
-        nonPublic: this.nonPublic(),
-        note: note || null,
-      })
+      .fireTransition(id, body)
       .subscribe({
         next: () => {
           this.saving.set(false);
           const meeting = this.meetings().find((m) => m.id === meetingId);
           this.toast.success(
-            this.i18n.translate('applications.agenda.added', { meeting: meeting?.title ?? '' }),
+            meeting
+              ? this.i18n.translate('applications.agenda.added', { meeting: meeting.title })
+              : this.i18n.translate('applications.actions.success'),
           );
           this.open.set(false);
           this.done.emit();

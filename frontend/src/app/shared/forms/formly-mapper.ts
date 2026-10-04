@@ -67,10 +67,10 @@ export function toFormlyFields(
   );
 }
 
-/** Field types that take the full width of the edit grid; the rest take one half. */
+/** Field types that take the full width of the edit grid; the rest take one half. A
+ *  `multiselect` takes one half there: the edit form shows it as a dropdown. */
 const FULL_WIDTH_TYPES: ReadonlySet<FieldType> = new Set<FieldType>([
   'textarea',
-  'multiselect',
   'daterange',
   'markdown',
   'table',
@@ -113,10 +113,11 @@ export function toFormlySections(
       props: { heading: true, label: resolveI18n(section.label, lang) },
     });
     for (const f of fields) {
-      group.push({
-        ...mapField(f, lang, extraContext),
-        className: FULL_WIDTH_TYPES.has(f.type) ? 'fe-full' : 'fe-half',
-      });
+      const mapped = mapField(f, lang, extraContext);
+      // The edit form shows several choices as a dropdown (board Anträge-Bearbeiten), not
+      // as the checkbox list of the wizard.
+      if (f.type === 'multiselect') mapped.type = 'multiselect';
+      group.push({ ...mapped, className: FULL_WIDTH_TYPES.has(f.type) ? 'fe-full' : 'fe-half' });
     }
   }
   return [{ fieldGroupClassName: 'fe-grid', fieldGroup: group }];

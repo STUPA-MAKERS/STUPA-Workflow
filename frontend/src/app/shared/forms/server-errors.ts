@@ -27,7 +27,12 @@ export function positionErrorKey(error: ServerFieldError): TranslationKey {
   const msg = error.msg.toLowerCase();
   if (/\.offers\[\d+\]/.test(error.field)) return 'apply.positions.errOffers';
   if (msg.includes('needs a reason')) return 'apply.positions.errNoOffersReason';
-  if (msg.includes('comparison offer')) return 'forms.positions.errOffersServer';
+  if (msg.includes('not allowed here')) return 'forms.positions.errNoWaiver';
+  if (msg.includes('comparison offer')) {
+    if (msg.includes('has more than')) return 'forms.positions.errTooManyOffers';
+    if (msg.includes('needs at least')) return 'forms.positions.errOffersServer';
+    return 'forms.errors.server';
+  }
   if (msg.includes('preferred')) return 'apply.positions.errPreferred';
   if (msg.includes('label')) return 'apply.positions.errLabel';
   return 'forms.errors.server';
