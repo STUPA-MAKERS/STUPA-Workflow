@@ -1,0 +1,55 @@
+<app-data-table
+  [columns]="columns()"
+  [rows]="rows()"
+  [rowKey]="rowId"
+  [loading]="loading()"
+  [loadingText]="'expenses.loading' | t"
+  [emptyText]="'expenses.transfers.empty' | t"
+>
+  <ng-template appCell="paymentDate" let-t>
+    <span class="tt__date mono">{{
+      $any(t).paymentDate ? ($any(t).paymentDate | ldate: 'mediumDate') : '—'
+    }}</span>
+  </ng-template>
+  <ng-template appCell="invoiceDate" let-t>
+    <span class="tt__date tt__muted mono">{{
+      $any(t).invoiceDate ? ($any(t).invoiceDate | ldate: 'mediumDate') : '—'
+    }}</span>
+  </ng-template>
+  <ng-template appCell="description" let-t>
+    <span class="tt__desc">
+      <span class="ell" [title]="$any(t).description">{{ $any(t).description }}</span>
+      @if ($any(t).note) {
+        <span class="tt__note ell" [title]="$any(t).note">{{ $any(t).note }}</span>
+      }
+    </span>
+  </ng-template>
+  <ng-template appCell="from" let-t>
+    @let cc = costCentre($any(t).fromBudgetId, $any(t).fromPathKey);
+    <span class="tt__cc" [title]="cc.path + ' · ' + cc.name">
+      @if (cc.color) {
+        <span class="tt__swatch" aria-hidden="true" [style.background]="cc.color"></span>
+      }
+      <span class="ell">{{ cc.name }}</span>
+    </span>
+  </ng-template>
+  <ng-template appCell="to" let-t>
+    @let cc = costCentre($any(t).toBudgetId, $any(t).toPathKey);
+    <span class="tt__cc" [title]="cc.path + ' · ' + cc.name">
+      @if (cc.color) {
+        <span class="tt__swatch" aria-hidden="true" [style.background]="cc.color"></span>
+      }
+      <span class="ell">{{ cc.name }}</span>
+    </span>
+  </ng-template>
+  <ng-template appCell="amount" let-t>
+    <span class="tt__amount mono">{{ money($any(t).amount) }}</span>
+  </ng-template>
+  <ng-template appCell="actions" let-t>
+    <app-row-menu
+      [label]="rowMenuLabel($any(t))"
+      [sections]="menu()"
+      (selected)="onMenu($event, $any(t))"
+    />
+  </ng-template>
+</app-data-table>

@@ -1,0 +1,312 @@
+@let s = state();
+<app-dialog
+  size="lg"
+  [open]="open()"
+  [title]="(mode() === 'create' ? 'expenses.add' : 'expenses.edit') | t"
+  [closeLabel]="'action.cancel' | t"
+  (closed)="close()"
+>
+  @if (open()) {
+    <form class="bd-form" [id]="'booking-' + mode()" (submit)="submit($event)">
+      @if (mode() === 'create') {
+        <app-segmented
+          class="bd-form__kind"
+          [ariaLabel]="'expenses.col.kind' | t"
+          [options]="kindOptions()"
+          [value]="s.newKind()"
+          (valueChange)="setKind($event)"
+        />
+        <app-input
+          name="description"
+          [label]="'expenses.field.description' | t"
+          [required]="true"
+          [placeholder]="'expenses.field.descriptionPlaceholder' | t"
+          [ngModel]="s.newDescription()"
+          (ngModelChange)="s.newDescription.set($event)"
+        />
+        <div class="bd-form__grid">
+          <app-currency-input
+            name="amount"
+            [label]="'expenses.field.amount' | t"
+            [required]="true"
+            [ngModel]="s.newAmount()"
+            (ngModelChange)="s.newAmount.set($event)"
+          />
+          @if (s.newKind() === 'expense') {
+            <!-- The application search: a combobox in a filled field like the kit inputs. -->
+            <div class="bd-form__app">
+              <div class="bd-form__box">
+                <label class="bd-form__label" for="booking-app">{{
+                  'expenses.field.linkApplication' | t
+                }}</label>
+                @if (s.newApplicationId()) {
+                  <span class="bd-form__picked">
+                    <span class="ell" [title]="s.appQuery()">{{ s.appQuery() }}</span>
+                    <button
+                      type="button"
+                      class="bd-form__unlink"
+                      [attr.aria-label]="'expenses.field.unlink' | t"
+                      [title]="'expenses.field.unlink' | t"
+                      (click)="s.clearApp()"
+                    >
+                      <app-icon name="x" [size]="16" />
+                    </button>
+                  </span>
+                } @else {
+                  <input
+                    id="booking-app"
+                    class="bd-form__control"
+                    type="search"
+                    autocomplete="off"
+                    name="appSearch"
+                    role="combobox"
+                    aria-autocomplete="list"
+                    aria-controls="booking-app-list"
+                    [attr.aria-expanded]="suggestOpen()"
+                    [placeholder]="'expenses.field.linkApplicationPlaceholder' | t"
+                    [ngModel]="s.appQuery()"
+                    (ngModelChange)="s.onAppSearch($event)"
+                  />
+                  <app-icon class="bd-form__searchIcon" name="search" [size]="18" />
+                }
+              </div>
+              @if (suggestOpen()) {
+                <ul id="booking-app-list" class="bd-form__suggest" role="listbox">
+                  @for (a of s.appCandidates(); track a.id) {
+                    <li role="presentation">
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected="false"
+                        class="bd-form__option ell"
+                        [title]="a.title"
+                        (click)="s.pickApp(a)"
+                      >
+                        {{ a.title }}
+                      </button>
+                    </li>
+                  }
+                </ul>
+              }
+            </div>
+          }
+        </div>
+        @if (s.newApplicationId()) {
+          <app-note icon="info">{{ 'expenses.field.inheritedCostCentre' | t }}</app-note>
+        } @else {
+          <div class="bd-form__grid">
+            <app-select
+              name="cc"
+              [label]="'expenses.field.costCentre' | t"
+              [placeholder]="'expenses.field.costCentrePlaceholder' | t"
+              [options]="costCentreOptions()"
+              [required]="true"
+              [ngModel]="s.newBudgetId()"
+              (ngModelChange)="s.onPickBudget($event)"
+            />
+            <app-select
+              name="fy"
+              [label]="'expenses.field.fiscalYear' | t"
+              [placeholder]="'expenses.field.fiscalYearPlaceholder' | t"
+              [options]="s.fiscalYearOptions()"
+              [required]="true"
+              [error]="
+                s.newBudgetId() && !s.fiscalYearOptions().length
+                  ? ('expenses.field.noFiscalYear' | t)
+                  : ''
+              "
+              [ngModel]="s.newFiscalYearId()"
+              (ngModelChange)="s.newFiscalYearId.set($event)"
+            />
+          </div>
+        }
+        <div class="bd-form__grid">
+          <app-select
+            name="invoice"
+            [label]="'expenses.field.invoice' | t"
+            [placeholder]="'expenses.field.invoicePlaceholder' | t"
+            [options]="s.invoiceOptions()"
+            [ngModel]="s.newInvoiceId()"
+            (ngModelChange)="s.onPickInvoice($event)"
+          />
+          <app-input
+            name="corr"
+            [label]="'expenses.field.correspondent' | t"
+            [placeholder]="'expenses.field.correspondentPlaceholder' | t"
+            [ngModel]="s.newCorrespondent()"
+            (ngModelChange)="s.newCorrespondent.set($event)"
+          />
+        </div>
+        <div class="bd-form__grid">
+          <app-datepicker
+            name="invDate"
+            [label]="'expenses.field.invoiceDate' | t"
+            [ngModel]="s.newInvoiceDate()"
+            (ngModelChange)="s.newInvoiceDate.set($event)"
+          />
+          <app-datepicker
+            name="payDate"
+            [label]="'expenses.field.paymentDate' | t"
+            [ngModel]="s.newPaymentDate()"
+            (ngModelChange)="s.newPaymentDate.set($event)"
+          />
+        </div>
+        <div class="bd-form__grid">
+          <app-input
+            name="ref"
+            [label]="'expenses.field.referenceNumber' | t"
+            [ngModel]="s.newReferenceNumber()"
+            (ngModelChange)="s.newReferenceNumber.set($event)"
+          />
+          <app-select
+            name="paymethod"
+            [label]="'expenses.field.paymentMethod' | t"
+            [placeholder]="'expenses.field.paymentMethodPlaceholder' | t"
+            [options]="s.paymentMethodOptions()"
+            [ngModel]="s.newPaymentMethod()"
+            (ngModelChange)="s.newPaymentMethod.set($event)"
+          />
+        </div>
+        <app-input
+          name="cat"
+          [label]="'expenses.field.category' | t"
+          [ngModel]="s.newCategory()"
+          (ngModelChange)="s.newCategory.set($event)"
+        />
+        <label class="bd-form__box bd-form__box--area" for="booking-note">
+          <span class="bd-form__label">{{ 'expenses.field.note' | t }}</span>
+          <textarea
+            id="booking-note"
+            class="bd-form__area"
+            name="note"
+            rows="3"
+            [ngModel]="s.newNote()"
+            (ngModelChange)="s.newNote.set($event)"
+          ></textarea>
+        </label>
+      } @else {
+        @let e = s.editing();
+        <app-input
+          name="edesc"
+          [label]="'expenses.field.description' | t"
+          [required]="true"
+          [ngModel]="s.editDescription()"
+          (ngModelChange)="s.editDescription.set($event)"
+        />
+        <div class="bd-form__grid">
+          @if (parentAmount(); as sum) {
+            <!-- The parent amount is the sum of its sub-bookings and read-only on the server. -->
+            <div class="bd-form__box bd-form__box--static">
+              <span class="bd-form__label">{{ 'expenses.field.amount' | t }}</span>
+              <span class="bd-form__static mono">{{ sum }}</span>
+              <span class="bd-form__hint">{{ 'expenses.sub.parentAmount' | t }}</span>
+            </div>
+          } @else {
+            <app-currency-input
+              name="eamount"
+              [label]="'expenses.field.amount' | t"
+              [required]="true"
+              [ngModel]="s.editAmount()"
+              (ngModelChange)="s.editAmount.set($event)"
+            />
+          }
+          @if (editOwnsCostCentre()) {
+            <app-select
+              name="ecc"
+              [label]="'expenses.field.costCentre' | t"
+              [placeholder]="'expenses.field.costCentrePlaceholder' | t"
+              [options]="costCentreOptions()"
+              [required]="true"
+              [ngModel]="s.editBudgetId()"
+              (ngModelChange)="s.editBudgetId.set($event)"
+            />
+          }
+        </div>
+        @if (e?.applicationId) {
+          <app-note icon="info">{{ 'expenses.field.inheritedCostCentre' | t }}</app-note>
+        } @else if (e?.parentExpenseId) {
+          <app-note icon="info">{{ 'expenses.sub.inheritsShort' | t }}</app-note>
+        }
+        <div class="bd-form__grid">
+          <app-select
+            name="einvoice"
+            [label]="'expenses.field.invoice' | t"
+            [placeholder]="'expenses.field.invoicePlaceholder' | t"
+            [options]="s.editInvoiceOptions()"
+            [ngModel]="s.editInvoiceId()"
+            (ngModelChange)="s.onPickEditInvoice($event)"
+          />
+          <app-input
+            name="ecorr"
+            [label]="'expenses.field.correspondent' | t"
+            [placeholder]="'expenses.field.correspondentPlaceholder' | t"
+            [ngModel]="s.editCorrespondent()"
+            (ngModelChange)="s.editCorrespondent.set($event)"
+          />
+        </div>
+        <div class="bd-form__grid">
+          <app-datepicker
+            name="einvDate"
+            [label]="'expenses.field.invoiceDate' | t"
+            [ngModel]="s.editInvoiceDate()"
+            (ngModelChange)="s.editInvoiceDate.set($event)"
+          />
+          <app-datepicker
+            name="epayDate"
+            [label]="'expenses.field.paymentDate' | t"
+            [ngModel]="s.editPaymentDate()"
+            (ngModelChange)="s.editPaymentDate.set($event)"
+          />
+        </div>
+        <div class="bd-form__grid">
+          <app-input
+            name="eref"
+            [label]="'expenses.field.referenceNumber' | t"
+            [ngModel]="s.editReferenceNumber()"
+            (ngModelChange)="s.editReferenceNumber.set($event)"
+          />
+          <app-select
+            name="epaymethod"
+            [label]="'expenses.field.paymentMethod' | t"
+            [placeholder]="'expenses.field.paymentMethodPlaceholder' | t"
+            [options]="s.paymentMethodOptions()"
+            [ngModel]="s.editPaymentMethod()"
+            (ngModelChange)="s.editPaymentMethod.set($event)"
+          />
+        </div>
+        <app-input
+          name="ecat"
+          [label]="'expenses.field.category' | t"
+          [ngModel]="s.editCategory()"
+          (ngModelChange)="s.editCategory.set($event)"
+        />
+        <label class="bd-form__box bd-form__box--area" for="booking-enote">
+          <span class="bd-form__label">{{ 'expenses.field.note' | t }}</span>
+          <textarea
+            id="booking-enote"
+            class="bd-form__area"
+            name="enote"
+            rows="3"
+            [ngModel]="s.editNote()"
+            (ngModelChange)="s.editNote.set($event)"
+          ></textarea>
+        </label>
+      }
+    </form>
+  }
+  <div dialog-footer class="bd-form__footer">
+    <app-button variant="text" (click)="close()">{{ 'action.cancel' | t }}</app-button>
+    @if (mode() === 'create') {
+      <app-button
+        [disabled]="!s.canSubmitCreate()"
+        [loading]="saving()"
+        (click)="submit($event)"
+        >{{ 'expenses.add' | t }}</app-button
+      >
+    } @else {
+      <app-button [loading]="saving()" (click)="submit($event)">{{
+        'action.save' | t
+      }}</app-button>
+    }
+  </div>
+</app-dialog>

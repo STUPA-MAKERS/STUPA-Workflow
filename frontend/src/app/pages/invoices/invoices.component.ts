@@ -17,8 +17,8 @@ import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
+import type { TranslationKey } from '@core/i18n/translations';
 import {
-  BadgeComponent,
   ButtonComponent,
   CellDirective,
   type ColumnDef,
@@ -30,19 +30,45 @@ import {
   FilterFieldComponent,
   FilterRangeComponent,
   IconComponent,
-  SelectComponent,
+  MEDIA,
   type SelectOption,
+  ToastService,
 } from '@stupa-makers/ui-kit';
-import { ToastService } from '@stupa-makers/ui-kit';
+import {
+  FileDropZoneComponent,
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
+  SearchPillComponent,
+  StatusTextComponent,
+  invoiceStatus,
+} from '@shared/ui';
 import { downloadBlob } from '@shared/download.util';
-import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
+import { mediaQuerySignal } from '../../layout/media-query';
 import {
   BudgetTreeApi,
+  type BudgetTreeNode,
   type Invoice,
+  type InvoiceBooking,
   type InvoiceParseResult,
   type InvoiceQuery,
   type InvoiceStatus,
 } from '../budget/budget-tree.api';
+import {
+  COLUMNS_FULL_MEDIA,
+  COLUMNS_TIGHT_MEDIA,
+  type CostCentreLabel,
+  columnSet,
+  costCentreIndex,
+  costCentreLabel,
+} from '../budget/expense-display.util';
+import {
+  type InvoiceDialogHost,
+  InvoiceImportDialogComponent,
+} from './invoice-import-dialog/invoice-import-dialog.component';
+
+/** What the import found, for the note at the top of the review dialog. */
+export type ImportNotice = 'parsed' | 'manual' | null;
 
 /**
  * Invoices tab. It shows, creates, and manages invoices. An invoice is a standalone
@@ -58,27 +84,29 @@ import {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    FormsModule,
-    LocalizedDatePipe,
-    TranslatePipe,
-    BadgeComponent,
     ButtonComponent,
     CellDirective,
     CurrencyInputComponent,
     DataTableComponent,
     DatepickerComponent,
     DialogComponent,
+    FileDropZoneComponent,
     FilterBarComponent,
     FilterFieldComponent,
     FilterRangeComponent,
+    FormsModule,
     IconComponent,
-    SelectComponent,
-    PageHeaderComponent,
+    InvoiceImportDialogComponent,
+    LocalizedDatePipe,
+    RowMenuComponent,
+    SearchPillComponent,
+    StatusTextComponent,
+    TranslatePipe,
   ],
   templateUrl: './invoices.component.html',
   styleUrl: './invoices.component.scss',
 })
-export class InvoicesComponent implements OnDestroy {
+export class InvoicesComponent implements OnDestroy, InvoiceDialogHost {
   private readonly api = inject(BudgetTreeApi);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -88,35 +116,113 @@ export class InvoicesComponent implements OnDestroy {
 
   readonly canManage = computed(() => this.auth.can('budget.book'));
 
+  /** < 768px: one primary action in the title row, the rest in a menu. */
+  readonly phone = mediaQuerySignal(MEDIA.phone);
+  private readonly fullColumns = mediaQuerySignal(COLUMNS_FULL_MEDIA);
+  private readonly tightColumns = mediaQuerySignal(COLUMNS_TIGHT_MEDIA);
+  /** Which table columns fit the viewport. */
+  readonly columnSet = computed(() =>
+    columnSet({ phone: this.phone(), full: this.fullColumns(), tight: this.tightColumns() }),
+  );
+
   /**
-   * The actions column exists only for a user who may book, and it is pinned so edit
-   * and delete stay reachable while this wide table scrolls sideways.
+   * The bookings column needs `linkedBookings` (A6). A backend without it sends no field:
+   * the column then stays away, instead of a request per invoice for its bookings.
+   */
+  readonly showBookings = computed(() => this.items().some((i) => i.linkedBookings !== undefined));
+
+  /**
+   * The actions column exists only for a user who may book, and it is pinned so the
+   * menu stays reachable while this wide table scrolls sideways.
    */
   readonly columns = computed<ColumnDef[]>(() => {
+    const t = (key: TranslationKey): string => this.i18n.translate(key);
+    const set = this.columnSet();
     const cols: ColumnDef[] = [
-      { key: 'issueDate', label: this.i18n.translate('invoices.col.issueDate'), width: '9rem' },
-      { key: 'dueDate', label: this.i18n.translate('invoices.col.dueDate'), width: '9rem' },
-      // The number is what names an invoice, so it heads the card. Net and tax are off
-      // it: gross is the figure a reader checks, and the split belongs to the detail.
-      { key: 'number', label: this.i18n.translate('invoices.col.number'), card: 'title' },
-      { key: 'supplier', label: this.i18n.translate('invoices.col.supplier') },
-      { key: 'net', label: this.i18n.translate('invoices.col.net'), align: 'end', card: 'hidden' },
-      { key: 'tax', label: this.i18n.translate('invoices.col.tax'), align: 'end', card: 'hidden' },
-      { key: 'gross', label: this.i18n.translate('invoices.col.gross'), align: 'end' },
-      { key: 'status', label: this.i18n.translate('invoices.col.status') },
-      { key: 'file', label: this.i18n.translate('invoices.col.file') },
+      { key: 'issueDate', label: t('invoices.col.issueDate'), width: '7rem' },
     ];
-    if (this.canManage()) {
+    if (set !== 'tight') {
+      cols.push({ key: 'dueDate', label: t('invoices.col.dueDate'), width: '6.5rem', card: 'hidden' });
+    }
+    // The number is what names an invoice, so it heads the card. Net and tax are off
+    // it: gross is the figure a reader checks, and the split belongs to the detail.
+    cols.push(
+      { key: 'number', label: t('invoices.col.number'), width: '6.5rem', card: 'title' },
+      { key: 'supplier', label: t('invoices.col.supplier') },
+    );
+    if (set === 'full') {
+      cols.push(
+        { key: 'net', label: t('invoices.col.net'), align: 'end', width: '6rem', card: 'hidden' },
+        { key: 'tax', label: t('invoices.col.tax'), align: 'end', width: '5rem', card: 'hidden' },
+      );
+    }
+    cols.push(
+      { key: 'gross', label: t('invoices.col.gross'), align: 'end', width: '6rem' },
+      { key: 'status', label: t('invoices.col.status'), width: '5rem' },
+    );
+    if (this.showBookings()) {
       cols.push({
-        key: 'actions',
-        label: this.i18n.translate('table.actions'),
-        align: 'end',
-        width: '7rem',
-        sticky: 'end',
+        key: 'bookings',
+        label: t('invoices.col.bookings'),
+        width: set === 'tight' ? '9rem' : '12rem',
       });
+    }
+    cols.push({ key: 'file', label: t('invoices.col.file'), align: 'end', width: '3rem' });
+    if (this.canManage()) {
+      cols.push({ key: 'actions', label: t('table.actions'), align: 'end', width: '3.5rem', sticky: 'end' });
     }
     return cols;
   });
+
+  /** The status as coloured text. */
+  readonly invoiceStatus = invoiceStatus;
+
+  /** The row actions of an invoice. */
+  readonly rowMenu = computed<RowMenuSection[]>(() => [
+    { items: [{ id: 'edit', label: this.i18n.translate('action.edit'), icon: 'edit' }] },
+    {
+      items: [
+        { id: 'delete', label: this.i18n.translate('action.delete'), icon: 'delete', danger: true },
+      ],
+    },
+  ]);
+
+  onRowMenu(item: RowMenuItem, i: Invoice): void {
+    if (item.id === 'edit') this.openEdit(i);
+    else if (item.id === 'delete') this.askDelete(i);
+  }
+
+  /** The page actions that do not fit the title row of a phone. */
+  readonly phoneMenu = computed<RowMenuSection[]>(() => [
+    { items: [{ id: 'import', label: this.i18n.translate('invoices.import'), icon: 'upload' }] },
+  ]);
+
+  rowMenuLabel(i: Invoice): string {
+    return this.i18n.translate('invoices.rowMenu', { number: i.number || i.supplier || '' });
+  }
+
+  /** The cost-centre tree, only for the swatch colours of the bookings column. It loads
+   *  once the first invoice with a booking shows up. */
+  private readonly tree = signal<BudgetTreeNode[]>([]);
+  private treeRequested = false;
+  readonly costCentres = computed(() => costCentreIndex(this.tree()));
+
+  /** The first booking of an invoice, as the column shows it. */
+  bookingLabel(b: InvoiceBooking): CostCentreLabel {
+    return costCentreLabel(this.costCentres(), b.budgetId, b.pathKey || null);
+  }
+
+  /** "Maschinenbau −900,00 €": the cost centre name is the server's, the colour ours. */
+  bookingAmount(b: InvoiceBooking): string {
+    return (b.kind === 'income' ? '+' : '−') + this.money(b.amount);
+  }
+
+  /** The full list of bookings, for the tooltip of the cell. */
+  bookingsTitle(i: Invoice): string {
+    return (i.linkedBookings ?? [])
+      .map((b) => `${b.budgetName || b.pathKey} ${this.bookingAmount(b)} · ${b.description}`)
+      .join('\n');
+  }
 
   /** Track by the invoice id, so paging in more rows does not re-create the earlier ones. */
   readonly rowId = (row: unknown): unknown => (row as Invoice).id;
@@ -236,6 +342,11 @@ export class InvoicesComponent implements OnDestroy {
   }
 
   readonly fileInput = viewChild<ElementRef<HTMLInputElement>>('fileInput');
+
+  /** What the import found: the note at the top of the review dialog. */
+  readonly importNotice = signal<ImportNotice>(null);
+  /** The number of an invoice that exists already (N31), or null. */
+  readonly importDuplicate = signal<string | null>(null);
 
   private dragDepth = 0;
   readonly dragActive = signal(false);
@@ -379,10 +490,6 @@ export class InvoicesComponent implements OnDestroy {
     });
   }
 
-  statusLabel(status: InvoiceStatus): string {
-    return this.i18n.translate(status === 'paid' ? 'invoices.status.paid' : 'invoices.status.open');
-  }
-
   /**
    * Reload page 0 after a filter or sort change, WITHOUT emptying the list first.
    *
@@ -421,6 +528,7 @@ export class InvoicesComponent implements OnDestroy {
           this.nextOffset = page.offset + page.items.length;
           this.loading.set(false);
           this.loadingMore.set(false);
+          this.loadTreeOnce(page.items);
         },
         error: () => {
           if (initial) {
@@ -433,8 +541,25 @@ export class InvoicesComponent implements OnDestroy {
       });
   }
 
+  /** Load the tree for the swatches, once, and only when a booking needs a colour. */
+  private loadTreeOnce(rows: readonly Invoice[]): void {
+    if (this.treeRequested || !rows.some((i) => (i.linkedBookings?.length ?? 0) > 0)) return;
+    this.treeRequested = true;
+    this.api.tree().subscribe({
+      next: (nodes) => this.tree.set(nodes),
+      error: () => this.tree.set([]),
+    });
+  }
+
+  /** A drag event that the drop zone handles itself. The page overlay leaves it alone, so
+   *  one drop never imports twice. */
+  private inDropZone(event: DragEvent): boolean {
+    const target = event.target as Element | null;
+    return !!target && typeof target.closest === 'function' && !!target.closest('app-file-drop-zone');
+  }
+
   onDragEnter(event: DragEvent): void {
-    if (!this.canManage() || !this.hasFiles(event)) return;
+    if (!this.canManage() || !this.hasFiles(event) || this.inDropZone(event)) return;
     event.preventDefault();
     this.dragDepth++;
     this.dragActive.set(true);
@@ -446,7 +571,7 @@ export class InvoicesComponent implements OnDestroy {
   }
 
   onDragLeave(event: DragEvent): void {
-    if (!this.dragActive()) return;
+    if (!this.dragActive() || this.inDropZone(event)) return;
     event.preventDefault();
     this.dragDepth = Math.max(0, this.dragDepth - 1);
     if (this.dragDepth === 0) this.dragActive.set(false);
@@ -454,6 +579,11 @@ export class InvoicesComponent implements OnDestroy {
 
   onDrop(event: DragEvent): void {
     if (!this.canManage()) return;
+    if (this.inDropZone(event)) {
+      this.dragDepth = 0;
+      this.dragActive.set(false);
+      return;
+    }
     event.preventDefault();
     this.dragDepth = 0;
     this.dragActive.set(false);
@@ -473,6 +603,16 @@ export class InvoicesComponent implements OnDestroy {
   }
 
   /** Parse a PDF. On success, prefill the dialog. Without ZUGFeRD data, open it empty. */
+  /** Files from the drop zone. One import at a time, so the first PDF counts. */
+  onZoneFiles(files: File[]): void {
+    if (this.canManage() && files[0]) this.importFile(files[0]);
+  }
+
+  /** The zone takes PDFs only. */
+  onZoneRejected(): void {
+    this.toast.error(this.i18n.translate('invoices.toast.notPdf'));
+  }
+
   private importFile(file: File): void {
     if (this.importing()) return;
     this.importing.set(true);
@@ -480,7 +620,6 @@ export class InvoicesComponent implements OnDestroy {
       next: (parsed) => {
         this.importing.set(false);
         this.prefillFromParse(parsed);
-        this.toast.success(this.i18n.translate('invoices.toast.imported'));
       },
       error: (err) => {
         this.importing.set(false);
@@ -489,8 +628,8 @@ export class InvoicesComponent implements OnDestroy {
           // The PDF embeds no ZUGFeRD data. The user enters the invoice manually.
           // The dropped PDF still becomes the receipt.
           this.openCreate();
+          this.importNotice.set('manual');
           this.attachFile(file);
-          this.toast.show(this.i18n.translate('invoices.toast.notZugferd'), 'info');
         } else {
           this.toast.error(this.problemDetail(err));
         }
@@ -511,14 +650,11 @@ export class InvoicesComponent implements OnDestroy {
     this.importToken.set(p.fileToken);
     this.importFileName.set(p.fileName);
     this.importFileMime = p.fileMime;
+    this.importNotice.set('parsed');
+    // The server sets the flag when an invoice with the same number exists. The dialog
+    // shows it as a warning above the fields (N31).
+    this.importDuplicate.set(p.duplicate ? (p.number ?? '') : null);
     this.createOpen.set(true);
-    // The server sets the flag when an invoice with the same number exists.
-    if (p.duplicate) {
-      this.toast.show(
-        this.i18n.translate('invoices.toast.duplicate', { number: p.number ?? '' }),
-        'warning',
-      );
-    }
   }
 
   /** Upload the receipt PDF and keep it as an attachment. It serves manual entry and a
@@ -566,6 +702,8 @@ export class InvoicesComponent implements OnDestroy {
     this.importToken.set('');
     this.importFileName.set('');
     this.importFileMime = '';
+    this.importNotice.set(null);
+    this.importDuplicate.set(null);
     this.createOpen.set(true);
   }
 

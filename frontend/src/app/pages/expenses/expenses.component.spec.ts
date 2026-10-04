@@ -3,7 +3,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
-import { render, screen } from '@testing-library/angular';
+import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { AuthService } from '@core/auth/auth.service';
 import { USE_MOCK_API } from '@core/api/api.config';
@@ -59,6 +59,30 @@ function page(items: Expense[], total = items.length, offset = 0): ExpensePage {
   return { items, total, limit: 20, offset };
 }
 
+/**
+ * Let `matchMedia` match the queries that contain one of the given parts. jsdom has no
+ * viewport, and its stub matches nothing, which reads as the narrow layout.
+ */
+function setViewport(...parts: string[]): void {
+  window.matchMedia = ((query: string) => ({
+    matches: parts.some((p) => query.includes(p)),
+    media: query,
+    onchange: null,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+    addListener: () => undefined,
+    removeListener: () => undefined,
+    dispatchEvent: () => false,
+  })) as unknown as typeof window.matchMedia;
+}
+const WIDE = 'min-width: 1200px';
+const FULL = 'min-width: 1400px';
+const PHONE = 'max-width: 768px';
+const realMatchMedia = window.matchMedia;
+afterEach(() => {
+  window.matchMedia = realMatchMedia;
+});
+
 function fakeAuth(perms: string[]): Partial<AuthService> {
   const set = new Set(perms);
   return { can: (p: string) => set.has(p), canAny: (...p: string[]) => p.some((x) => set.has(x)) };
@@ -105,6 +129,7 @@ describe('ExpensesComponent (rendered)', () => {
   });
 
   it('renders invoice date, payment date and payee/payer columns (#1-1/#3)', async () => {
+    setViewport(WIDE, FULL);
     await setup({ page: page([EXPENSE]) });
     expect(await screen.findByText('Druckkosten Flyer')).toBeInTheDocument();
     expect(screen.getByText('Copyshop Müller')).toBeInTheDocument();
@@ -115,14 +140,53 @@ describe('ExpensesComponent (rendered)', () => {
   it('books a standalone expense via POST /expenses', async () => {
     const { http } = await setup();
     await userEvent.click(await screen.findByRole('button', { name: 'Buchung hinzufügen' }));
-    await userEvent.type(screen.getByLabelText('Beschreibung'), 'Kaffee');
-    await userEvent.type(screen.getByLabelText('Betrag (€)'), '12.50');
+    const dialog = within(screen.getByRole('dialog', { name: 'Buchung hinzufügen' }));
+    await userEvent.type(dialog.getByLabelText(/^Beschreibung/), 'Kaffee');
+    await userEvent.type(dialog.getByLabelText(/^Betrag \(€\)/), '12.50');
     // A cost center is required. Without a selection the submit button stays disabled.
     // This test only checks the request shape after the select holds a cost center.
-    const select = screen.getByLabelText('Kostenstelle') as HTMLSelectElement;
+    const select = dialog.getByLabelText(/^Kostenstelle/) as HTMLSelectElement;
     // The tree is empty, so the select has no real option and nothing can be selected.
     expect(select).toBeInTheDocument();
     http.verify();
+  });
+
+  it('shows the linked application as a link under the description (N29)', async () => {
+    await setup({
+      page: page([{ ...EXPENSE, applicationId: 'app-1', applicationTitle: 'Sommerfest' }]),
+    });
+    const link = await screen.findByRole('link', { name: 'Sommerfest' });
+    expect(link.getAttribute('href')).toBe('/applications/app-1');
+  });
+
+  it('puts the cost-centre tree in a pane beside the list on the wide layout', async () => {
+    setViewport(WIDE);
+    const { container } = await setup({ page: page([EXPENSE]) });
+    expect(container.querySelector('.exp__pane app-cost-centre-tree')).not.toBeNull();
+    expect(container.querySelector('.exp__ccChip')).toBeNull();
+  });
+
+  it('opens the tree from the chip in a side sheet below the wide layout', async () => {
+    const { container, fixture } = await setup({ page: page([EXPENSE]) });
+    expect(container.querySelector('.exp__pane')).toBeNull();
+    const chip = container.querySelector('.exp__ccChip') as HTMLButtonElement;
+    expect(chip.textContent).toContain('Alle Kostenstellen');
+    chip.click();
+    fixture.detectChanges();
+    expect(chip.getAttribute('aria-expanded')).toBe('true');
+    expect(container.querySelector('app-side-sheet app-cost-centre-tree')).not.toBeNull();
+  });
+
+  it('opens the tree in a bottom sheet on a phone and keeps one action in the title row', async () => {
+    setViewport(PHONE);
+    const { container, fixture } = await setup({ page: page([EXPENSE]) });
+    // "Buchung" alone in the title row; transfer and export sit in the menu.
+    expect(screen.getByRole('button', { name: 'Buchung' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Übertrag/ })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Weitere Aktionen' })).toBeInTheDocument();
+    (container.querySelector('.exp__ccChip') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(container.querySelector('app-dialog app-cost-centre-tree')).not.toBeNull();
   });
 
   it('hides add/edit controls for a viewer without budget.book', async () => {
@@ -1225,35 +1289,6 @@ function toastSpies(cmp: ExpensesComponent): {
   return { success: jest.spyOn(toast, 'success'), error: jest.spyOn(toast, 'error') };
 }
 
-describe('ExpensesComponent (descriptions)', () => {
-  beforeEach(() => localStorage.setItem('ap.locale', 'de'));
-  afterEach(() => {
-    try {
-      TestBed.inject(HttpTestingController).verify();
-    } catch {
-      /* module already reset */
-    }
-  });
-
-  it('isDescLong flags only descriptions beyond the limit', () => {
-    const { cmp } = build();
-    expect(cmp.isDescLong('kurz')).toBe(false);
-    expect(cmp.isDescLong('x'.repeat(cmp.DESC_LIMIT))).toBe(false);
-    expect(cmp.isDescLong('x'.repeat(cmp.DESC_LIMIT + 1))).toBe(true);
-  });
-
-  it('toggleDesc expands and collapses a description', () => {
-    const { cmp } = build();
-    expect(cmp.descExpanded('e-1')).toBe(false);
-    cmp.toggleDesc('e-1');
-    expect(cmp.descExpanded('e-1')).toBe(true);
-    // other rows stay untouched
-    expect(cmp.descExpanded('e-2')).toBe(false);
-    cmp.toggleDesc('e-1');
-    expect(cmp.descExpanded('e-1')).toBe(false);
-  });
-});
-
 describe('ExpensesComponent (sub-bookings)', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
   afterEach(() => {
@@ -1597,6 +1632,23 @@ describe('ExpensesComponent (infinite scroll)', () => {
 
     delete (globalThis as unknown as { IntersectionObserver?: unknown }).IntersectionObserver;
     http.verify();
+  });
+  it('watches the sentinel inside the list box on the wide layout', async () => {
+    setViewport(WIDE);
+    const roots: (Element | Document | null | undefined)[] = [];
+    class IOStub {
+      constructor(_cb: unknown, opts?: IntersectionObserverInit) {
+        roots.push(opts?.root);
+      }
+      observe = jest.fn();
+      disconnect = jest.fn();
+    }
+    (globalThis as unknown as { IntersectionObserver: unknown }).IntersectionObserver = IOStub;
+    const { container, fixture } = await setup({ page: page([EXPENSE], 3) });
+    fixture.detectChanges();
+    // The list scrolls inside its own box there, so the box is the root.
+    expect(roots.at(-1)).toBe(container.querySelector('.exp__scroll'));
+    delete (globalThis as unknown as { IntersectionObserver?: unknown }).IntersectionObserver;
   });
 });
 
@@ -2181,7 +2233,7 @@ async function openTransfers(
   ctx: Awaited<ReturnType<typeof setup>>,
   body: unknown = transferPage(),
 ) {
-  await userEvent.click(await screen.findByRole('tab', { name: 'Überträge' }));
+  await userEvent.click(await screen.findByRole('radio', { name: 'Überträge' }));
   ctx.http.expectOne((r) => r.url.endsWith('/budget-transfers') && r.method === 'GET').flush(body);
   ctx.detectChanges();
 }
@@ -2334,7 +2386,7 @@ describe('ExpensesComponent — transfers tab', () => {
 
   it('reports a failed load and shows the empty state', async () => {
     const ctx = await setup();
-    await userEvent.click(await screen.findByRole('tab', { name: 'Überträge' }));
+    await userEvent.click(await screen.findByRole('radio', { name: 'Überträge' }));
     ctx.http
       .expectOne((r) => r.url.endsWith('/budget-transfers') && r.method === 'GET')
       .flush({ title: 'e' }, { status: 500, statusText: 'Server Error' });
@@ -2394,7 +2446,7 @@ describe('ExpensesComponent — transfers tab', () => {
   it('switches back to the bookings tab without a further transfer request', async () => {
     const ctx = await setup();
     await openTransfers(ctx);
-    await userEvent.click(screen.getByRole('tab', { name: 'Buchungen' }));
+    await userEvent.click(screen.getByRole('radio', { name: 'Buchungen' }));
     ctx.detectChanges();
     expect(screen.getByText('Keine Buchungen gefunden.')).toBeInTheDocument();
     ctx.http.verify();
@@ -2523,5 +2575,115 @@ describe('ExpensesComponent (filters, generically)', () => {
     const values = Object.values(params).filter((v) => v !== undefined);
     // Eight filters plus sort and order.
     expect(values.length).toBe(state.filterSignals.length + 2);
+  });
+});
+
+describe('ExpensesComponent (redesign wiring)', () => {
+  beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+  afterEach(() => {
+    try {
+      TestBed.inject(HttpTestingController).verify();
+    } catch {
+      /* module already reset */
+    }
+  });
+
+  const COLOURED: BudgetTreeNode[] = [
+    { ...ROOT_TREE[0], children: [{ ...ROOT_TREE[0].children[0], color: '#2f7fc1' }] },
+  ];
+
+  it('names the chosen cost centre and its colour for the chip, "all" without one', () => {
+    const { cmp, http } = build({ tree: COLOURED });
+    expect(cmp.costCentreName()).toBe('Alle Kostenstellen');
+    expect(cmp.costCentreColor()).toBeNull();
+    cmp.pickerOpen.set(true);
+    cmp.selectBudget('child-1');
+    flushList(http, page([]));
+    expect(cmp.costCentreName()).toBe('Öffentlichkeit');
+    expect(cmp.costCentreColor()).toBe('#2f7fc1');
+    // Picking closes the sheet of the narrower layouts.
+    expect(cmp.pickerOpen()).toBe(false);
+    // An unknown id falls back to "all".
+    cmp.budgetId.set('gone');
+    expect(cmp.costCentreName()).toBe('Alle Kostenstellen');
+    expect(cmp.costCentreColor()).toBeNull();
+  });
+
+  it('builds the phone menu from the rights and runs its items', () => {
+    const { cmp, http } = build();
+    expect(cmp.phoneMenu()[0].items.map((i) => i.id)).toEqual(['transfer', 'export']);
+    cmp.onPhoneMenu({ id: 'transfer', label: '' });
+    expect(cmp.transferOpen()).toBe(true);
+    cmp.onPhoneMenu({ id: 'export', label: '' });
+    // The export runs; a failed one only ends the busy state.
+    http.expectOne((r) => r.url.endsWith('/expenses/export.xlsx')).error(new ProgressEvent('err'));
+    expect(cmp.exporting()).toBe(false);
+    // An unknown item does nothing.
+    cmp.onPhoneMenu({ id: 'other', label: '' });
+    http.verify();
+  });
+
+  it('leaves the phone menu empty for a reader', () => {
+    const { cmp } = build({ perms: ['budget.view'] });
+    expect(cmp.phoneMenu()[0].items).toEqual([]);
+  });
+
+  it('names the selection and, past the cap, the delete limit', () => {
+    const items = Array.from({ length: 7 }, (_, i) => ({ ...EXPENSE, id: `e-${i}` }));
+    const { cmp } = build({ expenses: page(items) });
+    cmp.toggleSelect('e-0', true);
+    cmp.toggleSelect('e-1', true);
+    expect(cmp.selectionLabel()).toBe('2 ausgewählt');
+    expect(cmp.bulkDeleteReason()).toBeNull();
+    cmp.toggleSelectAll(true);
+    expect(cmp.selectionLabel()).toContain('7 ausgewählt');
+    expect(cmp.selectionLabel()).toContain('max. 5');
+    expect(cmp.bulkDeleteReason()).toContain('5');
+  });
+
+  it('blocks the bulk delete of an "all" selection and says why', () => {
+    const items = [
+      { ...EXPENSE, id: 'e-1' },
+      { ...EXPENSE, id: 'e-2' },
+    ];
+    const { cmp } = build({ expenses: page(items) });
+    cmp.toggleSelectAll(true);
+    expect(cmp.bulkDeleteReason()).toContain('Alle auswählen');
+  });
+
+  it('maps the table sort and selection back onto the state', () => {
+    const { cmp, http } = build();
+    expect(cmp.sortState()).toEqual({ key: 'paymentDate', direction: 'desc' });
+    cmp.onSortChange({ key: 'amount', direction: 'desc' });
+    flushList(http, page([]));
+    expect(cmp.sortField()).toBe('amount');
+    cmp.onSortChange({ key: 'amount', direction: 'asc' });
+    flushList(http, page([]));
+    expect(cmp.sortState()).toEqual({ key: 'amount', direction: 'asc' });
+    cmp.onSelectionChange(new Set(['x']));
+    expect(cmp.selected()).toEqual(new Set(['x']));
+  });
+
+  it('links a cost centre to the Budget page at its top budget and year', () => {
+    const { cmp } = build({ tree: ROOT_TREE });
+    expect(cmp.budgetLink({ ...EXPENSE, budgetId: 'child-1' })).toEqual({
+      budget: 'top-1',
+      ks: 'child-1',
+      fy: 'fy-1',
+    });
+  });
+
+  it('picks the full column set only on a wide or a phone viewport', () => {
+    setViewport(FULL);
+    expect(build().cmp.columnSet()).toBe('full');
+    TestBed.resetTestingModule();
+    setViewport(PHONE);
+    expect(build().cmp.columnSet()).toBe('full');
+    TestBed.resetTestingModule();
+    setViewport('max-width: 999.98px');
+    expect(build().cmp.columnSet()).toBe('tight');
+    TestBed.resetTestingModule();
+    setViewport();
+    expect(build().cmp.columnSet()).toBe('compact');
   });
 });

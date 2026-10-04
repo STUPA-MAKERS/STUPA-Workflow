@@ -1,0 +1,52 @@
+@use 'breakpoints' as bp;
+
+/* The dialog host adds no box, so a closed dialog takes no gap in the page. */
+:host {
+  display: contents;
+}
+.td-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  margin: 0;
+}
+.td-form__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+@include bp.phone {
+  .td-form__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+/* The fixed pair of a transfer: from → to, each with the swatch of its cost centre. */
+.td-form__pair {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  font-weight: var(--fw-medium);
+}
+.td-form__cc {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.td-form__swatch {
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 2px;
+}
+.td-form__arrow {
+  flex: none;
+  color: var(--color-text-muted);
+}
+.td-form__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}

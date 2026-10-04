@@ -7,7 +7,8 @@
  * rather than in production.
  *
  * A page loading is not a message. It is a shape, and either `app-skeleton` or
- * `app-data-table` (which draws its own skeleton rows) has to draw it.
+ * `app-data-table` (which draws its own skeleton rows) has to draw it, directly or through
+ * a table component of the page that passes `[loading]` on.
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { extname, join } from 'node:path';
@@ -39,7 +40,9 @@ function withoutPlaceholder(): string[] {
     if (ALLOWED.some((a) => file.endsWith(a))) return false;
     const src = readFileSync(file, 'utf8');
     if (!/\bloading\w*\(\)/.test(src)) return false;
-    return !/app-skeleton|app-data-table|skel/.test(src);
+    // A table component of the page (`app-expenses-table`) that gets `[loading]` wraps
+    // `app-data-table`, and that one draws the rows.
+    return !/app-skeleton|app-data-table|skel|<app-[\w-]+-table\b[^>]*\[loading\]/.test(src);
   });
 }
 

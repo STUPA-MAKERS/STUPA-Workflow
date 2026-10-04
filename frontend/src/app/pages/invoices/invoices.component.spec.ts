@@ -3,14 +3,16 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
-import { render } from '@testing-library/angular';
+import { render, screen, within } from '@testing-library/angular';
 import { AuthService } from '@core/auth/auth.service';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { ToastService } from '@stupa-makers/ui-kit';
 import * as downloadUtil from '@shared/download.util';
 import { InvoicesComponent } from './invoices.component';
 import type {
+  BudgetTreeNode,
   Invoice,
+  InvoiceBooking,
   InvoiceFileResult,
   InvoicePage,
   InvoiceParseResult,
@@ -345,10 +347,10 @@ describe('InvoicesComponent', () => {
     expect(en).toContain('€');
   });
 
-  it('statusLabel() maps both statuses', async () => {
-    const { c } = await setup();
-    expect(c.statusLabel('paid')).toBe('Bezahlt');
-    expect(c.statusLabel('open')).toBe('Offen');
+  it('shows the status as coloured text', async () => {
+    const { container } = await setup({ initial: [inv({ status: 'paid' })] });
+    const status = container.querySelector('app-status-text');
+    expect(status?.textContent?.trim()).toBe('Bezahlt');
   });
 
   it('onSearch debounces and reloads with the q param', async () => {
@@ -609,7 +611,7 @@ describe('InvoicesComponent', () => {
     http.expectNone((r) => r.url.includes('/invoices/parse'));
   });
 
-  it('successful parse prefills the create dialog + success toast', async () => {
+  it('successful parse prefills the review dialog and says so in it, not in a toast', async () => {
     const { c, http, toast } = await setup();
     const spy = jest.spyOn(toast, 'success');
     const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
@@ -621,7 +623,9 @@ describe('InvoicesComponent', () => {
     expect(c.newGross()).toBe('238.00');
     expect(c.importToken()).toBe('tok-parse');
     expect(c.importFileName()).toBe('parsed.pdf');
-    expect(spy).toHaveBeenCalled();
+    expect(c.importNotice()).toBe('parsed');
+    expect(c.importDuplicate()).toBeNull();
+    expect(spy).not.toHaveBeenCalled();
   });
 
   it('parse with null fields prefills empty strings', async () => {
@@ -657,31 +661,46 @@ describe('InvoicesComponent', () => {
     expect(c.newGross()).toBe('');
   });
 
-  it('parse flagged as duplicate shows a warning toast', async () => {
-    const { c, http, toast } = await setup();
-    const spy = jest.spyOn(toast, 'show');
+  it('parse flagged as duplicate shows the warning in the review dialog (N31)', async () => {
+    const { c, http, fixture } = await setup();
     const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
     c.onFilePicked({ target: { files: [file], value: 'x' } } as unknown as Event);
     http
       .expectOne((r) => r.url.endsWith('/api/invoices/parse'))
       .flush({ ...PARSE, duplicate: true, number: 'DUP' });
-    expect(spy).toHaveBeenCalledWith(expect.any(String), 'warning');
+    fixture.detectChanges();
+    expect(c.importDuplicate()).toBe('DUP');
+    const dialog = within(screen.getByRole('dialog', { name: 'Importierte Rechnung prüfen' }));
+    expect(dialog.getByText('Rechnung gelesen — bitte prüfen.')).toBeInTheDocument();
+    expect(dialog.getByText(/Mögliche Dublette: Rechnung „DUP"/)).toBeInTheDocument();
+    expect(dialog.getByText('parsed.pdf')).toBeInTheDocument();
   });
 
   it('duplicate warning tolerates a null number', async () => {
-    const { c, http, toast } = await setup();
-    const spy = jest.spyOn(toast, 'show');
+    const { c, http } = await setup();
     const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
     c.onFilePicked({ target: { files: [file], value: 'x' } } as unknown as Event);
     http
       .expectOne((r) => r.url.endsWith('/api/invoices/parse'))
       .flush({ ...PARSE, duplicate: true, number: null });
-    expect(spy).toHaveBeenCalledWith(expect.any(String), 'warning');
+    expect(c.importDuplicate()).toBe('');
+  });
+
+  it('a manual add clears the notes of an earlier import', async () => {
+    const { c, http } = await setup();
+    const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
+    c.onFilePicked({ target: { files: [file], value: 'x' } } as unknown as Event);
+    http
+      .expectOne((r) => r.url.endsWith('/api/invoices/parse'))
+      .flush({ ...PARSE, duplicate: true });
+    c.createOpen.set(false);
+    c.openCreate();
+    expect(c.importNotice()).toBeNull();
+    expect(c.importDuplicate()).toBeNull();
   });
 
   it('not-zugferd parse error opens an empty dialog and attaches the file', async () => {
-    const { c, http, toast } = await setup();
-    const showSpy = jest.spyOn(toast, 'show');
+    const { c, http } = await setup();
     const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
     c.onFilePicked({ target: { files: [file], value: 'x' } } as unknown as Event);
     http
@@ -695,7 +714,8 @@ describe('InvoicesComponent', () => {
     up.flush(FILE_RES);
     expect(c.importToken()).toBe('tok-upload');
     expect(c.importFileName()).toBe('manual.pdf');
-    expect(showSpy).toHaveBeenCalledWith(expect.any(String), 'info');
+    // The dialog says why the fields are empty.
+    expect(c.importNotice()).toBe('manual');
   });
 
   it('other parse errors surface a problem-detail error toast', async () => {
@@ -1259,5 +1279,210 @@ describe('InvoicesComponent filter declaration', () => {
     expect(host.activeFilterCount()).toBe(
       host.filterSignals.filter((f) => f.clearedByReset).length,
     );
+  });
+});
+
+describe('InvoicesComponent bookings column and redesign wiring', () => {
+  const realMatchMedia = window.matchMedia;
+  afterEach(() => {
+    window.matchMedia = realMatchMedia;
+    TestBed.inject(HttpTestingController).verify();
+  });
+
+  function setViewport(...parts: string[]): void {
+    window.matchMedia = ((query: string) => ({
+      matches: parts.some((p) => query.includes(p)),
+      media: query,
+      onchange: null,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      addListener: () => undefined,
+      removeListener: () => undefined,
+      dispatchEvent: () => false,
+    })) as unknown as typeof window.matchMedia;
+  }
+
+  function booking(over: Partial<InvoiceBooking> = {}): InvoiceBooking {
+    return {
+      id: 'e-1',
+      budgetId: 'b-1',
+      pathKey: 'VS-800',
+      budgetName: 'Maschinenbau',
+      fiscalYearId: 'fy-1',
+      kind: 'expense',
+      amount: '900.00',
+      description: 'Lastenrad',
+      paymentDate: '2026-09-25',
+      parentExpenseId: null,
+      createdAt: '2026-09-25T10:00:00Z',
+      ...over,
+    };
+  }
+
+  const TREE: BudgetTreeNode[] = [
+    {
+      id: 'b-1',
+      parentId: null,
+      gremiumId: null,
+      key: 'VS',
+      pathKey: 'VS-800',
+      name: 'Maschinenbau',
+      currency: 'EUR',
+      active: true,
+      color: '#e08a1e',
+      acceptedStateKeys: [],
+      deniedStateKeys: [],
+      hiddenInBudget: false,
+      viewGremiumId: null,
+      fiscalStartMonth: 1,
+      fiscalStartDay: 1,
+      byFiscalYear: [],
+      children: [],
+    },
+  ];
+
+  it('hides the bookings column when the server sends no linkedBookings', async () => {
+    const { c, container } = await setup({ initial: [inv()] });
+    expect(c.showBookings()).toBe(false);
+    expect(container.textContent).not.toContain('Buchungen');
+  });
+
+  it('shows the first booking with "+n" and loads the tree once for the swatch (A6)', async () => {
+    const two = inv({
+      id: 'i-2',
+      linkedBookings: [booking(), booking({ id: 'e-2', amount: '100.00', kind: 'income' })],
+    });
+    const none = inv({ id: 'i-3', linkedBookings: [] });
+    const { c, http, fixture, container } = await setup({ initial: [two, none] });
+    // One tree request for the colours, not one per invoice.
+    http.expectOne((r) => r.url.endsWith('/api/budgets')).flush(TREE);
+    fixture.detectChanges();
+    expect(c.showBookings()).toBe(true);
+    const cell = container.querySelector('.inv__booking') as HTMLElement;
+    expect(cell.textContent).toContain('Maschinenbau');
+    expect(cell.textContent).toMatch(/−900,00/);
+    expect(cell.textContent).toContain('+1');
+    expect(cell.getAttribute('title')).toContain('+100,00');
+    const swatch = cell.querySelector('.inv__swatch') as HTMLElement;
+    expect(swatch.style.background).toBeTruthy();
+    // The empty invoice shows a dash.
+    expect(c.bookingLabel(booking({ budgetId: 'unknown', pathKey: '' })).name).toBe('—');
+    // A second page with bookings asks for no further tree.
+    c.total.set(5);
+    c.loadMore();
+    http
+      .expectOne((r) => r.url.endsWith('/api/invoices') && r.method === 'GET')
+      .flush(page([inv({ id: 'i-4', linkedBookings: [booking()] })], 5, 2));
+    http.expectNone((r) => r.url.endsWith('/api/budgets'));
+  });
+
+  it('lists every booking in the tooltip, by name or else by path', async () => {
+    const { c, http } = await setup({ initial: [inv()] });
+    http.expectNone((r) => r.url.endsWith('/api/budgets'));
+    expect(c.bookingsTitle(inv())).toBe('');
+    const title = c.bookingsTitle(
+      inv({ linkedBookings: [booking(), booking({ budgetName: '', kind: 'income' })] }),
+    );
+    expect(title.split('\n')).toHaveLength(2);
+    expect(title).toMatch(/^Maschinenbau −900,00/);
+    expect(title).toMatch(/\nVS-800 \+900,00/);
+  });
+
+  it('narrows the bookings column on the tight set', async () => {
+    setViewport('max-width: 999.98px');
+    const { c, http } = await setup({ initial: [inv({ linkedBookings: [] })] });
+    http.expectNone((r) => r.url.endsWith('/api/budgets'));
+    const col = c.columns().find((x: { key: string }) => x.key === 'bookings');
+    expect(col.width).toBe('9rem');
+  });
+
+  it('keeps the swatches off when the tree fails', async () => {
+    const { c, http } = await setup({ initial: [inv({ linkedBookings: [booking()] })] });
+    http
+      .expectOne((r) => r.url.endsWith('/api/budgets'))
+      .flush(null, { status: 403, statusText: 'Forbidden' });
+    expect(c.bookingLabel(booking()).color).toBeNull();
+  });
+
+  it('runs edit and delete from the row menu', async () => {
+    const { c } = await setup();
+    const row = inv();
+    c.onRowMenu({ id: 'edit', label: '' }, row);
+    expect(c.editing()).toEqual(row);
+    c.onRowMenu({ id: 'delete', label: '' }, row);
+    expect(c.confirmDelete()).toEqual(row);
+    c.onRowMenu({ id: 'other', label: '' }, inv({ id: 'x' }));
+    expect(c.confirmDelete()).toEqual(row);
+    expect(c.rowMenuLabel(row)).toContain('R-001');
+    expect(c.rowMenuLabel(inv({ number: null }))).toContain('ACME');
+    expect(c.rowMenuLabel(inv({ number: null, supplier: null }))).toBe('Aktionen für Rechnung ');
+  });
+
+  it('imports the first PDF of the drop zone and names a rejected file', async () => {
+    const { c, http, toast } = await setup();
+    const spy = jest.spyOn(toast, 'error');
+    c.onZoneFiles([new File(['x'], 'a.pdf', { type: 'application/pdf' })]);
+    http.expectOne((r) => r.url.endsWith('/api/invoices/parse')).flush(PARSE);
+    c.onZoneFiles([]);
+    c.onZoneRejected();
+    expect(spy).toHaveBeenCalledWith('Nur PDF-Dateien lassen sich importieren.');
+  });
+
+  it('ignores the drop zone for a reader', async () => {
+    const { c, http } = await setup({ canManage: false });
+    c.onZoneFiles([new File(['x'], 'a.pdf', { type: 'application/pdf' })]);
+    http.expectNone((r) => r.url.endsWith('/api/invoices/parse'));
+  });
+
+  it('leaves a drag over the drop zone to the zone, so one drop imports once', async () => {
+    const { c, http } = await setup();
+    const zone = document.createElement('app-file-drop-zone');
+    const inner = document.createElement('div');
+    zone.appendChild(inner);
+    const ev = (type: string) =>
+      ({
+        type,
+        target: inner,
+        preventDefault: jest.fn(),
+        dataTransfer: {
+          types: ['Files'],
+          files: [new File(['x'], 'a.pdf')] as unknown as FileList,
+        },
+      }) as unknown as DragEvent;
+    c.onDragEnter(ev('dragenter'));
+    expect(c.dragActive()).toBe(false);
+    c.dragActive.set(true);
+    c.onDragLeave(ev('dragleave'));
+    expect(c.dragActive()).toBe(true);
+    c.onDrop(ev('drop'));
+    expect(c.dragActive()).toBe(false);
+    http.expectNone((r) => r.url.endsWith('/api/invoices/parse'));
+  });
+
+  it('keeps one action in the title row of a phone and hides the drop zone', async () => {
+    setViewport('max-width: 768px');
+    const { container, c } = await setup();
+    expect(screen.getByRole('button', { name: 'Rechnung' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Importieren' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Weitere Aktionen' })).toBeInTheDocument();
+    expect(container.querySelector('app-file-drop-zone')).toBeNull();
+    expect(c.phoneMenu()[0].items[0].id).toBe('import');
+  });
+
+  it('drops net and tax below 1400px and the due date below 1000px', async () => {
+    setViewport('min-width: 1400px');
+    let keys = (await setup()).c.columns().map((col: { key: string }) => col.key);
+    expect(keys).toEqual(expect.arrayContaining(['dueDate', 'net', 'tax']));
+    TestBed.inject(HttpTestingController).verify();
+    TestBed.resetTestingModule();
+    setViewport();
+    keys = (await setup()).c.columns().map((col: { key: string }) => col.key);
+    expect(keys).toContain('dueDate');
+    expect(keys).not.toContain('net');
+    TestBed.inject(HttpTestingController).verify();
+    TestBed.resetTestingModule();
+    setViewport('max-width: 999.98px');
+    keys = (await setup()).c.columns().map((col: { key: string }) => col.key);
+    expect(keys).not.toContain('dueDate');
   });
 });

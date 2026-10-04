@@ -1,6 +1,9 @@
 import type { BudgetTreeNode } from './budget-tree.api';
 import {
   ariaSortDir,
+  columnSet,
+  costCentreIndex,
+  costCentreLabel,
   findTopBudgetNode,
   formatEur,
   problemCode,
@@ -60,5 +63,35 @@ describe('expense-display.util', () => {
     expect(findTopBudgetNode(tree, 'child-1')?.id).toBe('top-1');
     expect(findTopBudgetNode(tree, 'top-2')?.id).toBe('top-2');
     expect(findTopBudgetNode(tree, 'ghost')).toBeNull();
+  });
+});
+
+describe('cost-centre labels', () => {
+  it('indexes every node with its name, path and display colour', () => {
+    const child = { ...node('c'), name: 'Kultur', pathKey: 'VS-120' };
+    const root = { ...node('r', [child]), color: '#2f7fc1' };
+    const index = costCentreIndex([root]);
+    expect(index.get('r')).toEqual({ name: 'r', path: 'r', color: '#2f7fc1' });
+    // The child inherits the colour of its parent (O19), in a shade of it.
+    expect(index.get('c')?.name).toBe('Kultur');
+    expect(index.get('c')?.path).toBe('VS-120');
+    expect(index.get('c')?.color).toMatch(/^#/);
+  });
+
+  it('falls back to the path, or a dash, outside the tree', () => {
+    const index = costCentreIndex([]);
+    expect(costCentreLabel(index, 'x', 'VS-900')).toEqual({ name: 'VS-900', path: 'VS-900', color: null });
+    expect(costCentreLabel(index, 'x', null)).toEqual({ name: '—', path: '—', color: null });
+  });
+});
+
+describe('columnSet', () => {
+  it('shows every column on a phone (cards) and on a wide viewport', () => {
+    expect(columnSet({ phone: true, full: false, tight: true })).toBe('full');
+    expect(columnSet({ phone: false, full: true, tight: false })).toBe('full');
+  });
+  it('drops columns below 1400px and more below 1000px', () => {
+    expect(columnSet({ phone: false, full: false, tight: false })).toBe('compact');
+    expect(columnSet({ phone: false, full: false, tight: true })).toBe('tight');
   });
 });

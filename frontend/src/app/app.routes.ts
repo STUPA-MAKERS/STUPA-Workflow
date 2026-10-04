@@ -215,8 +215,8 @@ export const routes: Routes = [
       },
       {
         path: 'invoices',
-        // Narrow body like the tasks tab: no `wide` keeps the default container width.
-        data: { title: 'nav.invoices', permission: BUDGET_PERMISSIONS },
+        // Full width, as on the board: up to eleven columns.
+        data: { title: 'nav.invoices', permission: BUDGET_PERMISSIONS, wide: true },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/invoices/invoices.component').then((m) => m.InvoicesComponent),
