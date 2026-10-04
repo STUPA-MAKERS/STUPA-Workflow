@@ -266,7 +266,7 @@ export class DashboardComponent {
     return this.delegationsRaw()
       .filter((d) => d.direction !== null && !closed.has(d.meetingId))
       .filter((d) => active.has(d.meetingId) || (!!d.meetingDate && d.meetingDate >= today))
-      .slice(0, ROWS);
+      .slice(0, this.rowCap());
   });
 
   /** Outgoing means another person represents the user. The server sets the direction. */

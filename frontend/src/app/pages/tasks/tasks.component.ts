@@ -97,15 +97,19 @@ export class TasksComponent {
   }
 
   /**
-   * How long the task waits, in whole days: "seit heute", "seit 1 Tag", "seit 5 Tagen"
+   * How long the task waits, in calendar days: "seit heute", "seit 1 Tag", "seit 5 Tagen"
    * (EN "today", "for 1 day", "for 5 days" under the header "Waiting").
-   * A missing or invalid time gives a dash.
+   * The days are local calendar days, not blocks of 24 hours: a change yesterday at 23:00
+   * shows "seit 1 Tag" at 09:00 today. A missing or invalid time gives a dash.
    */
   protected waitingSince(at: IsoDateTime | null | undefined): string {
     if (!at) return '—';
-    const t = new Date(at).getTime();
-    if (Number.isNaN(t)) return '—';
-    const days = Math.max(0, Math.floor((Date.now() - t) / DAY_MS));
+    const then = new Date(at);
+    if (Number.isNaN(then.getTime())) return '—';
+    const now = new Date(Date.now());
+    const day = (d: Date): number => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    // Round, not floor: a day with a DST change has 23 or 25 hours.
+    const days = Math.max(0, Math.round((day(now) - day(then)) / DAY_MS));
     if (days === 0) return this.i18n.translate('tasks.waiting.today');
     if (days === 1) return this.i18n.translate('tasks.waiting.one');
     return this.i18n.translate('tasks.waiting.other', { n: days });

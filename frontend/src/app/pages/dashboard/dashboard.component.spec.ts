@@ -363,6 +363,15 @@ describe('DashboardComponent', () => {
       http.verify();
     });
 
+    it('shows at most four delegations on a wide screen', async () => {
+      const five = Array.from({ length: 5 }, (_, i) =>
+        delegation(`d${i}`, 'incoming', { meetingId: `m${i}`, meetingDate: '2999-01-01' }),
+      );
+      const { fixture, http } = await setup(MEMBER, { delegations: five });
+      expect(cmp(fixture).delegations().length).toBe(4);
+      http.verify();
+    });
+
     it('keeps only own delegations of meetings that are not over', async () => {
       const { fixture, http } = await setup(MEMBER, {
         meetings: [
@@ -578,6 +587,15 @@ describe('DashboardComponent', () => {
       });
       expect(screen.getByText('StuPa · seit 18:00')).toBeInTheDocument();
       expect(screen.queryByText(/Jetzt:/)).not.toBeInTheDocument();
+      http.verify();
+    });
+
+    it('shows three delegations on a phone, like the tasks (four on a wide screen)', async () => {
+      const five = Array.from({ length: 5 }, (_, i) =>
+        delegation(`d${i}`, 'incoming', { meetingId: `m${i}`, meetingDate: '2999-01-01' }),
+      );
+      const { fixture, http } = await setup(MEMBER, { phone: true, delegations: five });
+      expect(cmp(fixture).delegations().length).toBe(3);
       http.verify();
     });
 
