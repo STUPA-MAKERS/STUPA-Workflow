@@ -1,5 +1,9 @@
-/* Fixed to the bottom edge on surface 1. The safe-area padding keeps the entries above
-   the gesture bar of an installed app (viewport-fit=cover). */
+/* Fixed to the bottom edge. The bar has its own surface (surface 3) and a top border, so
+   it stands out from the page and from the cards on it (surface 1 and 2) in both themes.
+   The entries fill the bar height, so each one is a 64px high touch target. The
+   safe-area padding keeps the entries above the gesture bar of an installed app
+   (viewport-fit=cover). The shell sets --bottom-bar-height and keeps the page clear of
+   the bar with it. */
 :host {
   display: block;
 }
@@ -9,13 +13,15 @@
   inset: auto 0 0 0;
   z-index: var(--z-sticky);
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;
   justify-content: space-around;
-  height: calc(var(--bottom-bar-height, 80px) + env(safe-area-inset-bottom));
-  padding: 10px 4px calc(12px + env(safe-area-inset-bottom));
-  background: var(--color-surface-1);
+  box-sizing: border-box;
+  height: calc(var(--bottom-bar-height, 64px) + env(safe-area-inset-bottom));
+  padding: 0 4px env(safe-area-inset-bottom);
+  border-top: var(--border-width) solid var(--color-border);
+  background: var(--color-surface-3);
   /* The live dot gets a ring in the colour of the bar. */
-  --nav-mark-ring: var(--color-surface-1);
+  --nav-mark-ring: var(--color-surface-3);
 }
 
 .bb__item {
@@ -23,6 +29,7 @@
   flex: 1 1 0;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 4px;
   min-width: 0;
   max-width: 88px;
@@ -55,8 +62,10 @@
   color: var(--color-text);
   font-weight: var(--fw-semibold);
 }
+/* The selected token is too close to surface 3 in both themes. The pill mixes the accent
+   into the bar surface instead. */
 .bb__item.is-active .bb__ind {
-  background: var(--color-selected);
+  background: color-mix(in srgb, var(--color-accent) 28%, var(--color-surface-3));
   color: var(--color-accent-text);
 }
 .bb__item:focus-visible {
