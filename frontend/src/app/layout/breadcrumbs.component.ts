@@ -3,6 +3,8 @@ import { NavigationEnd, Router, RouterLink, type ActivatedRouteSnapshot } from '
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { filter } from 'rxjs';
 import { I18nService } from '@core/i18n/i18n.service';
+import { TranslatePipe } from '@core/i18n/translate.pipe';
+import { IconComponent } from '@stupa-makers/ui-kit';
 import type { TranslationKey } from '@core/i18n/translations';
 
 interface Crumb {
@@ -17,14 +19,14 @@ interface Crumb {
  * `data.title`. Where a route has flat siblings instead of real child routes, it
  * prepends the parents declared in `data.parent`, a list of paths. There is no
  * "Home" or dashboard prefix. The bar appears only when a parent level exists,
- * because the H1 is otherwise enough. The style follows the budget crumbs: pill
- * links and `›` separators.
+ * because the H1 is otherwise enough. The parents are accent links with a chevron
+ * between them; the current page is muted text with `aria-current`.
  */
 @Component({
   selector: 'app-breadcrumbs',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink],
+  imports: [RouterLink, TranslatePipe, IconComponent],
   templateUrl: './breadcrumbs.component.html',
   styleUrl: './breadcrumbs.component.scss',
 })

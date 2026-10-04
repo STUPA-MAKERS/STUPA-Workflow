@@ -1,24 +1,50 @@
-/* The host must be a block, so the bar takes the full width of the page header
-   that holds it. `app-page-header` owns the width and the outer spacing. This
-   component only draws the crumb row. */
+/* The host must be a block, so the bar takes the full width of the page header that
+   holds it. `app-page-header` owns the width and the outer spacing. This component only
+   draws the crumb row: small text, the parents as accent links, the page itself muted. */
 :host {
   display: block;
 }
 .bc {
-  margin-bottom: var(--space-2);
+  margin-bottom: 6px;
+}
+.bc__list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+.bc__entry {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
 }
 .bc__crumb {
-  color: var(--color-primary);
-  font-weight: var(--fw-medium);
+  max-width: 24rem;
+}
+.bc__crumb--link {
+  color: var(--color-accent-text);
+  font-weight: var(--fw-semibold);
   text-decoration: none;
-  padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-sm);
 }
-/* Align the first crumb with the content edge (H1). Pull the horizontal pill
-   padding out to the left. The hover box stays. */
-.bc__crumb:first-child {
-  margin-left: calc(-1 * var(--space-2));
+.bc__crumb--link:hover {
+  text-decoration: underline;
 }
-a.bc__crumb:hover {
-  background: var(--color-surface-sunken);
+.bc__crumb--link:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+.bc__crumb--current {
+  color: var(--color-text-muted);
+}
+.bc__sep {
+  flex: none;
+  color: var(--color-text-subtle);
 }

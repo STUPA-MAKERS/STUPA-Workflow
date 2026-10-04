@@ -1,0 +1,9 @@
+<section class="err">
+  <p class="err__code mono" aria-hidden="true">{{ code() }}</p>
+  <div class="err__head">
+    <app-icon class="err__icon" [name]="icon()" [size]="22" />
+    <h1 class="err__heading">{{ heading() }}</h1>
+  </div>
+  <p class="err__body">{{ body() }}</p>
+  <a class="err__action" [routerLink]="actionLink()">{{ actionLabel() }}</a>
+</section>
