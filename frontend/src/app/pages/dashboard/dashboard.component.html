@@ -1,196 +1,273 @@
-<!-- The top row of the start page (board Main): the global search and the one action
-     taken from here. The pill is the pointer and touch way into the search palette; the
-     rail has no search entry. The apply link is a primary button, not a banner and not
-     a muted text link: an outlined button on the surface of the panels reads as part of
-     the furniture. -->
+<!-- The head (boards Main and Telefon-Start). Wide and narrow: the search pill and the
+     one action taken from here. Phone: a compact pill with the account button at its end;
+     the apply action moves to the floating button at the foot. -->
 <div class="dash__top">
-  <app-search-pill
-    class="dash__search"
-    mode="button"
-    [shortcut]="true"
-    [placeholder]="'search.placeholder' | t"
-    [label]="'search.title' | t"
-    (activate)="palette.open()"
-  />
-  <a class="dash__apply" routerLink="/apply">
-    <app-icon name="form" [size]="20" />
-    {{ 'dashboard.apply.title' | t }}
-  </a>
+  @if (phone()) {
+    <app-search-pill
+      class="dash__search"
+      mode="button"
+      [placeholder]="'dashboard.search.short' | t"
+      [label]="'search.title' | t"
+      (activate)="palette.open()"
+    >
+      <button
+        trail
+        type="button"
+        class="dash__me"
+        aria-haspopup="dialog"
+        [attr.aria-expanded]="accountOpen()"
+        [attr.aria-label]="'shell.account.open' | t: { name: auth.displayName() }"
+        (click)="openAccount()"
+      >
+        <app-avatar [name]="auth.displayName()" size="sm" [decorative]="true" />
+      </button>
+    </app-search-pill>
+  } @else {
+    <app-search-pill
+      class="dash__search"
+      mode="button"
+      [shortcut]="true"
+      [placeholder]="'search.placeholder' | t"
+      [label]="'search.title' | t"
+      (activate)="palette.open()"
+    />
+    <a class="dash__btn dash__btn--fill" routerLink="/apply">
+      <app-icon name="plus" [size]="18" />
+      {{ 'dashboard.apply.title' | t }}
+    </a>
+  }
 </div>
 
 <app-page-header
-  [title]="'dashboard.greeting' | t: { name: auth.displayName() }"
+  [flush]="true"
+  [title]="'dashboard.greeting' | t: { name: firstName() }"
+  [subtitle]="gremienLine() || null"
 />
 
-<!-- Below the greeting, not beside it. In the actions slot the chips read as controls
-     glued to the right of a heading; on their own line they read as what they are, the
-     Gremien this person's work belongs to. Roles are still NOT shown: an RBAC role name
-     says nothing a member acts on. -->
-@if (gremien().length) {
-  <div class="dash__gremien">
-    @for (g of gremien(); track g.id) {
-      <app-badge variant="neutral">{{ g.name }}</app-badge>
-    }
-  </div>
-}
-
-@if (sessionShortcuts().length) {
-  <section class="flex flex-col gap-3" aria-labelledby="dash-sessions-h">
-    <h2 id="dash-sessions-h" class="dash__quick-h">{{ 'dashboard.sessions.title' | t }}</h2>
-    <div class="dash__grid">
-      @for (s of sessionShortcuts(); track s.id) {
-        <a class="dash__tile dash__session" [class.dash__session--live]="s.status === 'live'" [routerLink]="['/meetings', s.id]">
-          <span class="dash__session-badge">
-            <app-badge [variant]="sessionVariant(s.status)">{{ sessionStatusKey(s.status) | t }}</app-badge>
-          </span>
-          <span class="dash__session-title">{{ s.title }}</span>
-          @if (s.date) {
-            <time class="dash__session-date" [attr.datetime]="s.date">{{ s.date | ldate: 'mediumDate' }}{{ sessionTimeSuffix(s.startTime) }}</time>
-          }
-          <span class="dash__link">
-            {{ (s.status === 'live' ? 'dashboard.sessions.join' : 'dashboard.sessions.inspect') | t }} →
-          </span>
-        </a>
-      }
-    </div>
-  </section>
-}
-
-<!-- Active meeting-bound delegations. Outgoing means another person represents the
-     user. Incoming means the user represents another person. -->
-@if (delegations().length) {
-  <section class="dash__delegations flex flex-col gap-4 p-5 bg-surface border border-solid border-line rounded-lg shadow-sm" aria-labelledby="dash-deleg-h">
-    <div class="flex items-start justify-between gap-3">
-      <div>
-        <h2 id="dash-deleg-h" class="m-0 text-lg">{{ 'delegation.dash.title' | t }}</h2>
-        <p class="mt-1 text-muted text-sm">{{ 'delegation.dash.subtitle' | t }}</p>
-      </div>
-    </div>
-    <ul class="list-none m-0 p-0 flex flex-col">
-      @for (d of delegations(); track d.id) {
-        <li class="dash__row">
-          <a class="dash__row-link" [routerLink]="['/meetings', d.meetingId]">
-            <span class="dash__row-title">
-              {{ (isOutgoing(d) ? 'delegation.dash.outgoing' : 'delegation.dash.incoming')
-                | t: { name: (isOutgoing(d) ? d.delegateName : d.delegatorName) || '?' } }}
-            </span>
-            <span class="text-muted text-xs">
-              {{ d.meetingTitle }}@if (d.meetingDate) {, {{ d.meetingDate | ldate: 'mediumDate' }}}
-            </span>
-          </a>
-          <span class="dash__row-meta">
-            @if (d.delegateVoting) {
-              <app-badge variant="info">{{ 'delegation.card.votingBadge' | t }}</app-badge>
+<div class="dash__grid" [class.dash__grid--one]="!hasStartColumn() || !canReadApplications()">
+  @if (hasStartColumn()) {
+    <div class="dash__col">
+      @if (sessions().length) {
+        <section class="dash__sec" aria-labelledby="dash-sessions-h">
+          <div class="dash__h">
+            @if (phone()) {
+              <h2 id="dash-sessions-h" class="sec">{{ 'dashboard.sessions.short' | t }}</h2>
+            } @else {
+              <h2 id="dash-sessions-h" class="dash__title">{{ 'dashboard.sessions.title' | t }}</h2>
+              <span class="dash__count">{{ sessionCount() }}</span>
             }
-            <a class="dash__row-cta" [routerLink]="['/meetings', d.meetingId]">{{ 'dashboard.open' | t }} →</a>
-          </span>
-        </li>
+          </div>
+          <div class="rowgroup">
+            @for (s of sessions(); track s.meeting.id) {
+              @if (s.live) {
+                <div class="dash__live">
+                  <div class="dash__liveHead">
+                    <app-date-block [date]="s.meeting.date" [live]="true" />
+                    <div class="dash__liveText">
+                      <span class="dash__liveTitle">
+                        <span class="dash__name ell" [title]="s.meeting.title">{{ s.meeting.title }}</span>
+                        <app-status-text kind="accent">{{ 'meetings.status.live' | t }}</app-status-text>
+                      </span>
+                      @if (phone()) {
+                        @if (s.now; as now) {
+                          <span class="dash__sub">{{ 'dashboard.sessions.nowShort' | t: { n: now.position, count: now.count } }}</span>
+                        }
+                      } @else if (s.sub) {
+                        <span class="dash__sub ell">{{ s.sub }}</span>
+                      }
+                    </div>
+                    @if (!phone()) {
+                      <a class="dash__btn dash__btn--fill" [routerLink]="['/meetings', s.meeting.id]">
+                        <app-icon name="play" [size]="14" />
+                        {{ 'dashboard.sessions.join' | t }}
+                      </a>
+                    }
+                  </div>
+                  @if (s.now; as now) {
+                    <div class="dash__now">
+                      @if (!phone()) {
+                        <div class="dash__nowLine">
+                          <span class="ell" [title]="'dashboard.sessions.now' | t: { n: now.position, title: now.title }">
+                            {{ 'dashboard.sessions.now' | t: { n: now.position, title: now.title } }}
+                          </span>
+                          <span class="mono dash__nowCount" aria-hidden="true">{{ now.position }} / {{ now.count }}</span>
+                        </div>
+                      }
+                      <app-seg-bar
+                        size="thin"
+                        [segments]="[{ value: now.position, tone: 'filled' }]"
+                        [total]="now.count"
+                        [label]="'dashboard.sessions.progress' | t: { n: now.position, count: now.count }"
+                      />
+                    </div>
+                  }
+                  @if (phone()) {
+                    <a class="dash__btn dash__btn--fill dash__btn--block" [routerLink]="['/meetings', s.meeting.id]">
+                      <app-icon name="play" [size]="14" />
+                      {{ 'dashboard.sessions.join' | t }}
+                    </a>
+                  }
+                </div>
+              } @else {
+                <app-list-item [title]="s.meeting.title" [link]="['/meetings', s.meeting.id]">
+                  <app-date-block lead [date]="s.meeting.date" />
+                  @if (s.sub) {
+                    <span sub>{{ s.sub }}</span>
+                  }
+                  @if (phone()) {
+                    <app-icon trail class="dash__chev" name="right" [size]="18" />
+                  } @else {
+                    <span trail class="dash__link">{{ 'dashboard.sessions.inspect' | t }}</span>
+                  }
+                </app-list-item>
+              }
+            }
+          </div>
+        </section>
       }
-    </ul>
-  </section>
-}
 
-@if (canReadApplications()) {
-  <div class="dash__panels">
-    <section class="flex flex-col gap-4 p-5 bg-surface border border-solid border-line rounded-lg shadow-sm" aria-labelledby="dash-tasks-h">
-      <div class="flex items-start justify-between gap-3">
-        <div>
-          <h2 id="dash-tasks-h" class="m-0 text-lg">{{ 'dashboard.tasks.title' | t }}</h2>
-          <p class="mt-1 text-muted text-sm">{{ 'dashboard.tasks.subtitle' | t }}</p>
-        </div>
-        @if (!loading() && !error() && openTasks().length) {
-          <app-badge variant="warning">{{ openTasks().length }}</app-badge>
-        }
-      </div>
+      <!-- Meeting-bound delegations. Incoming: the user represents another member.
+           Outgoing: another person represents the user. -->
+      @if (delegations().length) {
+        <section class="dash__sec" aria-labelledby="dash-deleg-h">
+          <div class="dash__h">
+            @if (phone()) {
+              <h2 id="dash-deleg-h" class="sec">{{ 'delegation.dash.title' | t }} · {{ delegations().length }}</h2>
+            } @else {
+              <h2 id="dash-deleg-h" class="dash__title">{{ 'delegation.dash.title' | t }}</h2>
+              <span class="dash__count">{{ delegations().length }}</span>
+            }
+          </div>
+          <div class="rowgroup">
+            @for (d of delegations(); track d.id) {
+              <app-list-item
+                [title]="(isOutgoing(d) ? 'delegation.dash.outgoing' : 'delegation.dash.incoming') | t: { name: otherName(d) }"
+                [sub]="delegationSub(d)"
+                [link]="['/meetings', d.meetingId]"
+              >
+                <app-avatar lead [name]="otherName(d)" [decorative]="true" />
+                @if (d.delegateVoting) {
+                  <app-badge trail variant="neutral">{{ 'delegation.card.votingBadge' | t }}</app-badge>
+                }
+              </app-list-item>
+            }
+          </div>
+        </section>
+      }
+    </div>
+  }
 
-      @if (loading()) {
-        <!-- Rows in outline, not a sentence. Each panel is a list, so the placeholder
-             holds the height of one and the card does not resize under the reader when
-             the real rows land. -->
-        <div class="dash__skel" aria-busy="true">
-          <span class="skel skel--line"></span>
-          <span class="skel skel--line"></span>
-          <span class="skel skel--line"></span>
-          <span class="sr-only" role="status">{{ 'dashboard.loading' | t }}</span>
-        </div>
-      } @else if (error()) {
-        <p class="dash__state dash__state--error" role="alert">{{ 'dashboard.error' | t }}</p>
-      } @else if (taskRows().length === 0) {
-        <p class="dash__state">{{ 'dashboard.tasks.empty' | t }}</p>
-      } @else {
-        <ul class="list-none m-0 p-0 flex flex-col">
-          @for (item of taskRows(); track item.id) {
-            <li class="dash__row">
-              <a class="dash__row-link" [routerLink]="['/applications', item.id]">
-                <span class="dash__row-title">{{ titleOf(item) }}</span>
-                @if (item.title?.trim()) {
-                  <span class="text-muted text-xs">{{ name(item) }}</span>
-                }
-              </a>
-              <span class="dash__row-meta">
-                @if (item.state) {
-                  <app-badge variant="info" [color]="item.state.color">{{ item.state.label }}</app-badge>
-                }
-                <a class="dash__row-cta" [routerLink]="['/applications', item.id]">{{ 'dashboard.open' | t }} →</a>
-              </span>
-            </li>
+  @if (canReadApplications()) {
+    <div class="dash__col">
+      <section class="dash__sec" aria-labelledby="dash-tasks-h">
+        <div class="dash__h">
+          @if (phone()) {
+            <h2 id="dash-tasks-h" class="sec dash__grow">
+              {{ 'dashboard.tasks.title' | t }}
+              @if (!tasksLoading() && !tasksError()) {
+                · {{ openTasks().length }}
+              }
+            </h2>
+          } @else {
+            <h2 id="dash-tasks-h" class="dash__title">{{ 'dashboard.tasks.title' | t }}</h2>
+            <span class="dash__count dash__grow">
+              @if (!tasksLoading() && !tasksError()) {
+                {{ openTasks().length }}
+              }
+            </span>
           }
-        </ul>
-        <a class="dash__more" routerLink="/applications">{{ 'dashboard.viewAll' | t }} →</a>
-      }
-    </section>
-
-    <section class="flex flex-col gap-4 p-5 bg-surface border border-solid border-line rounded-lg shadow-sm" aria-labelledby="dash-apps-h">
-      <div class="flex items-start justify-between gap-3">
-        <div>
-          <h2 id="dash-apps-h" class="m-0 text-lg">{{ 'dashboard.applications.title' | t }}</h2>
-          <p class="mt-1 text-muted text-sm">{{ 'dashboard.applications.subtitle' | t }}</p>
-        </div>
-        @if (!loading() && !error() && total()) {
-          <app-badge variant="primary">{{ total() }}</app-badge>
-        }
-      </div>
-
-      @if (loading()) {
-        <!-- Rows in outline, not a sentence. Each panel is a list, so the placeholder
-             holds the height of one and the card does not resize under the reader when
-             the real rows land. -->
-        <div class="dash__skel" aria-busy="true">
-          <span class="skel skel--line"></span>
-          <span class="skel skel--line"></span>
-          <span class="skel skel--line"></span>
-          <span class="sr-only" role="status">{{ 'dashboard.loading' | t }}</span>
-        </div>
-      } @else if (error()) {
-        <p class="dash__state dash__state--error" role="alert">{{ 'dashboard.error' | t }}</p>
-      } @else if (applicationRows().length === 0) {
-        <div class="flex flex-col gap-2 items-start">
-          <p class="dash__state">{{ 'dashboard.applications.empty' | t }}</p>
-          <a class="dash__empty-cta" routerLink="/apply">{{ 'dashboard.applications.emptyCta' | t }} →</a>
-        </div>
-      } @else {
-        <ul class="list-none m-0 p-0 flex flex-col">
-          @for (item of applicationRows(); track item.id) {
-            <li class="dash__row">
-              <a class="dash__row-link" [routerLink]="['/applications', item.id]">
-                <span class="dash__row-title">{{ titleOf(item) }}</span>
-                @if (item.title?.trim()) {
-                  <span class="text-muted text-xs">{{ name(item) }}</span>
-                }
-              </a>
-              <span class="dash__row-meta">
-                @if (item.state) {
-                  <app-badge variant="info" [color]="item.state.color">{{ item.state.label }}</app-badge>
-                }
-                @if (created(item); as c) {
-                  <time class="dash__row-date" [attr.datetime]="c">{{ c | ldate: 'mediumDate' }}</time>
-                }
-              </span>
-            </li>
+          @if (openTasks().length) {
+            <a class="dash__more" routerLink="/tasks">{{ 'dashboard.viewAll' | t }}</a>
           }
-        </ul>
-        <a class="dash__more" routerLink="/applications">{{ 'dashboard.viewAll' | t }} →</a>
-      }
-    </section>
-  </div>
+        </div>
+        @if (tasksLoading()) {
+          <app-skeleton variant="rows" [count]="3" [label]="'dashboard.loading' | t" />
+        } @else if (tasksError()) {
+          <p class="dash__state dash__state--error" role="alert">{{ 'dashboard.error' | t }}</p>
+        } @else if (taskRows().length === 0) {
+          <p class="dash__state">{{ 'dashboard.tasks.empty' | t }}</p>
+        } @else {
+          <div class="rowgroup">
+            @for (item of taskRows(); track item.id) {
+              <app-list-item [title]="titleOf(item)" [link]="['/applications', item.id]">
+                <span sub>
+                  @if (typeOf(item); as type) {
+                    {{ type }}<span class="dash__dot" aria-hidden="true">·</span>
+                  }
+                  @if (item.state; as st) {
+                    <app-status-text [kind]="flowColorKind(st.color)">{{ st.label }}</app-status-text>
+                  }
+                </span>
+                @if (!phone()) {
+                  <app-icon trail class="dash__chev" name="right" [size]="18" />
+                }
+              </app-list-item>
+            }
+          </div>
+        }
+      </section>
+
+      <section class="dash__sec" aria-labelledby="dash-apps-h">
+        <div class="dash__h">
+          @if (phone()) {
+            <h2 id="dash-apps-h" class="sec dash__grow">
+              {{ 'dashboard.applications.title' | t }}
+              @if (!loading() && !error()) {
+                · {{ total() }}
+              }
+            </h2>
+          } @else {
+            <h2 id="dash-apps-h" class="dash__title">{{ 'dashboard.applications.title' | t }}</h2>
+            <span class="dash__count dash__grow">
+              @if (!loading() && !error()) {
+                {{ total() }}
+              }
+            </span>
+          }
+          @if (total()) {
+            <a class="dash__more" routerLink="/applications" [queryParams]="{ mine: 'true' }">{{ 'dashboard.viewAll' | t }}</a>
+          }
+        </div>
+        @if (loading()) {
+          <app-skeleton variant="rows" [count]="3" [label]="'dashboard.loading' | t" />
+        } @else if (error()) {
+          <p class="dash__state dash__state--error" role="alert">{{ 'dashboard.error' | t }}</p>
+        } @else if (applicationRows().length === 0) {
+          <div class="dash__empty">
+            <p class="dash__state">{{ 'dashboard.applications.empty' | t }}</p>
+            <a class="dash__btn dash__btn--tonal" routerLink="/apply">{{ 'dashboard.applications.emptyCta' | t }}</a>
+          </div>
+        } @else {
+          <div class="rowgroup">
+            @for (item of applicationRows(); track item.id) {
+              <app-list-item [title]="titleOf(item)" [link]="['/applications', item.id]">
+                <span sub>
+                  @if (typeOf(item); as type) {
+                    {{ type }}<span class="dash__dot" aria-hidden="true">·</span>
+                  }
+                  @if (item.state; as st) {
+                    <app-status-text [kind]="flowColorKind(st.color)">{{ st.label }}</app-status-text>
+                  }
+                </span>
+                @if (dateOf(item); as at) {
+                  <time trail class="dash__date num" [attr.datetime]="at">{{ shortDay(at) }}</time>
+                }
+              </app-list-item>
+            }
+          </div>
+        }
+      </section>
+    </div>
+  }
+</div>
+
+@if (phone()) {
+  <a class="dash__fab" routerLink="/apply">
+    <app-icon name="plus" [size]="22" />
+    {{ 'dashboard.apply.short' | t }}
+  </a>
+
+  <app-side-sheet side="bottom" [heading]="'shell.account.region' | t" [(open)]="accountOpen">
+    <app-account-menu variant="sheet" (navigated)="closeAccount()" />
+  </app-side-sheet>
 }

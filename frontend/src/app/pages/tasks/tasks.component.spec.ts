@@ -6,18 +6,21 @@ import { I18nService } from '@core/i18n/i18n.service';
 import type { ApplicationListItem } from '@core/api/models';
 import { TasksComponent } from './tasks.component';
 
-function task(id: string, kind: string, title = 'Mein Antrag'): ApplicationListItem {
+const DAY = 86_400_000;
+
+function task(id: string, extra: Partial<ApplicationListItem> = {}): ApplicationListItem {
   return {
     id,
     typeId: 't1',
-    title,
-    state: { id: 's1', key: 's', label: 'Abstimmung', color: '#9b59b6', editAllowed: false, kind },
+    title: 'Mein Antrag',
+    state: { id: 's1', key: 's', label: 'In Prüfung', color: '#e8a33d', editAllowed: false, kind: 'vote' },
     gremiumId: null,
-    budgetPotId: null,
-    amount: '120.00',
+    amount: '1250.00',
     currency: 'EUR',
     createdAt: '2026-06-01T10:00:00Z',
     updatedAt: '2026-06-01T10:00:00Z',
+    archivedAt: null,
+    ...extra,
   };
 }
 
@@ -30,97 +33,105 @@ async function setup(
     : jest.fn(() => of(items));
   const applicationTypes = opts.typesError
     ? jest.fn(() => throwError(() => new Error('boom')))
-    : jest.fn(() => of([{ id: 't1', name: 'Finanzantrag' }]));
-  const api = { listTasks, applicationTypes };
+    : jest.fn(() => of([{ id: 't1', name: 'Förderantrag' }]));
   const view = await render(TasksComponent, {
-    providers: [provideRouter([]), { provide: ApiClient, useValue: api }],
+    providers: [provideRouter([]), { provide: ApiClient, useValue: { listTasks, applicationTypes } }],
   });
   return { ...view, listTasks, applicationTypes };
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const cmp = (fixture: { componentInstance: unknown }): any => fixture.componentInstance;
+
 describe('TasksComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
-  it('lists vote tasks awaiting the user with type and waiting age', async () => {
-    await setup([task('v1', 'vote')]);
-    expect(screen.getByText('Mein Antrag')).toBeInTheDocument();
-    expect(screen.getByText('Abstimmung')).toBeInTheDocument();
-    // Type column (resolved via the loaded types).
-    expect(await screen.findByText('Finanzantrag')).toBeInTheDocument();
-    // "Waiting since" column shows a relative value (… days ago).
-    expect(screen.getByText(/Tag(en)?/)).toBeInTheDocument();
+  it('shows the columns Titel, Typ, Status, Betrag and Wartet seit', async () => {
+    await setup([task('a1')]);
+    for (const name of ['Titel', 'Typ', 'Status', 'Betrag', 'Wartet seit']) {
+      expect(screen.getByRole('columnheader', { name })).toBeInTheDocument();
+    }
   });
 
-  it('shows no inline decision buttons (acting happens in the detail view)', async () => {
-    await setup([task('v1', 'vote')]);
-    expect(screen.queryByRole('button', { name: 'Annehmen' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Ablehnen' })).not.toBeInTheDocument();
+  it('fills a row: title, type, status as text, amount and waiting time', async () => {
+    const since = new Date(Date.now() - 4 * DAY - 3_600_000).toISOString();
+    await setup([task('a1', { stateSince: since })]);
+    expect(screen.getByText('Mein Antrag')).toHaveAttribute('title', 'Mein Antrag');
+    expect(screen.getByText('Förderantrag')).toBeInTheDocument();
+    // The status is coloured text, not a badge: a yellow flow colour reads as "warn".
+    const state = screen.getByText('In Prüfung');
+    expect(state.closest('app-status-text')).toHaveClass('st--warn');
+    expect(document.querySelector('app-badge')).toBeNull();
+    expect(screen.getByText('1.250,00 €')).toHaveClass('mono');
+    const waiting = screen.getByText('seit 4 Tagen');
+    expect(waiting.getAttribute('title')).toMatch(/^Status seit /);
   });
 
-  it('clears loading and shows empty state when the tasks request fails', async () => {
+  it('counts the open tasks in the header', async () => {
+    await setup([task('a1'), task('a2')]);
+    expect(screen.getByText('2 offen')).toBeInTheDocument();
+  });
+
+  it('counts "Wartet seit" from stateSince, else from updatedAt', async () => {
+    const { fixture } = await setup([]);
+    const c = cmp(fixture);
+    const stateSince = new Date(Date.now() - 2 * DAY).toISOString();
+    const updatedAt = new Date(Date.now() - 9 * DAY).toISOString();
+    expect(c.waitingSince(c.since(task('x', { stateSince, updatedAt })))).toBe('seit 2 Tagen');
+    expect(c.waitingSince(c.since(task('x', { stateSince: null, updatedAt })))).toBe('seit 9 Tagen');
+    expect(c.waitingSince(c.since(task('x', { stateSince: undefined, updatedAt })))).toBe('seit 9 Tagen');
+  });
+
+  it('says "seit heute", "seit 1 Tag" and a dash for a missing or invalid time', async () => {
+    const { fixture } = await setup([]);
+    const c = cmp(fixture);
+    expect(c.waitingSince(new Date().toISOString())).toBe('seit heute');
+    // A clock a little ahead of the server is still today, not a negative age.
+    expect(c.waitingSince(new Date(Date.now() + 60_000).toISOString())).toBe('seit heute');
+    expect(c.waitingSince(new Date(Date.now() - DAY - 60_000).toISOString())).toBe('seit 1 Tag');
+    expect(c.waitingSince(null)).toBe('—');
+    expect(c.waitingSince('kein Datum')).toBe('—');
+    expect(c.sinceTitle(null)).toBeNull();
+    expect(c.sinceTitle('kein Datum')).toBeNull();
+  });
+
+  it('uses the English wording in English', async () => {
+    const { fixture } = await setup([]);
+    fixture.debugElement.injector.get(I18nService).setLocale('en');
+    const c = cmp(fixture);
+    expect(c.waitingSince(new Date(Date.now() - 3 * DAY).toISOString())).toBe('for 3 days');
+    expect(c.waitingSince(new Date(Date.now() - DAY - 60_000).toISOString())).toBe('for 1 day');
+  });
+
+  it('formats a missing, odd or foreign-currency amount', async () => {
+    const { fixture } = await setup([]);
+    const c = cmp(fixture);
+    expect(c.money(task('x', { amount: null }))).toBe('—');
+    expect(c.money(task('x', { amount: '' }))).toBe('—');
+    expect(c.money(task('x', { amount: 'abc' }))).toBe('abc');
+    // Without a currency the amount is in euro. Intl puts a no-break space before the sign.
+    expect(c.money(task('x', { amount: '10', currency: null }))).toBe('10,00\u00a0€');
+  });
+
+  it('shows the empty state and clears loading when the request fails', async () => {
     const { fixture } = await setup([], { tasksError: true });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const c = fixture.componentInstance as any;
+    const c = cmp(fixture);
     expect(c.tasks()).toEqual([]);
     expect(c.loading()).toBe(false);
+    expect(screen.getByText('Keine offenen Aufgaben.')).toBeInTheDocument();
   });
 
-  it('tolerates a failing application-types load (empty types)', async () => {
-    const { fixture } = await setup([task('v1', 'vote')], { typesError: true });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const c = fixture.componentInstance as any;
-    // Unknown type id falls back to the em-dash placeholder.
-    expect(c.typeName('t1')).toBe('—');
+  it('tolerates a failing type load and an untitled task without a state', async () => {
+    await setup([task('a1', { title: '', state: null })], { typesError: true });
+    expect(screen.getByText('Ohne Titel')).toBeInTheDocument();
+    expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(2);
   });
 
-  it('falls back to the untitled label when a task has no title', async () => {
-    const { fixture } = await setup([task('v1', 'vote', '')]);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const c = fixture.componentInstance as any;
-    const item = c.tasks()[0];
-    expect(c.titleOf(item)).toBe('Ohne Titel');
-  });
-
-  it('waitingSince handles missing, same-day and prior-day dates', async () => {
-    const { fixture } = await setup([task('v1', 'vote')]);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const c = fixture.componentInstance as any;
-    expect(c.waitingSince(null)).toBe('—');
-    // today → days <= 0 branch → "heute"/"today"
-    const today = new Date().toISOString();
-    expect(c.waitingSince(today)).toMatch(/heute|today/i);
-    // a week ago → relative "vor N Tagen"
-    const past = new Date(Date.now() - 7 * 86_400_000).toISOString();
-    expect(c.waitingSince(past)).toMatch(/Tag/);
-  });
-
-  it('uses the English relative format when the locale is en', async () => {
-    const view = await render(TasksComponent, {
-      providers: [
-        provideRouter([]),
-        { provide: ApiClient, useValue: { listTasks: jest.fn(() => of([])), applicationTypes: jest.fn(() => of([])) } },
-      ],
-    });
-    const i18n = view.fixture.debugElement.injector.get(I18nService);
-    i18n.setLocale('en');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const c = view.fixture.componentInstance as any;
-    const past = new Date(Date.now() - 3 * 86_400_000).toISOString();
-    expect(c.waitingSince(past)).toMatch(/day/i);
-  });
-
-  it('navigates to the application detail when a row is opened', async () => {
-    const view = await render(TasksComponent, {
-      providers: [
-        provideRouter([]),
-        { provide: ApiClient, useValue: { listTasks: jest.fn(() => of([])), applicationTypes: jest.fn(() => of([])) } },
-      ],
-    });
-    const router = view.fixture.debugElement.injector.get(Router);
+  it('opens the application when a row is clicked', async () => {
+    const { fixture } = await setup([task('app-9')]);
+    const router = fixture.debugElement.injector.get(Router);
     const navigate = jest.spyOn(router, 'navigate').mockResolvedValue(true);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const c = view.fixture.componentInstance as any;
-    c.open('app-9');
+    screen.getByText('Mein Antrag').click();
     expect(navigate).toHaveBeenCalledWith(['/applications', 'app-9']);
   });
 });

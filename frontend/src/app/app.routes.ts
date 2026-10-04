@@ -65,7 +65,8 @@ export const routes: Routes = [
       },
       {
         path: 'dashboard',
-        data: { title: 'nav.dashboard' },
+        // Wide: the two columns of the start page fill the width (board Main).
+        data: { title: 'nav.dashboard', wide: true },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/dashboard/dashboard.component').then((m) => m.DashboardComponent),
@@ -85,7 +86,7 @@ export const routes: Routes = [
         path: 'tasks',
         // No permission gate: the tab shows at least your own applications in an editable
         // state.
-        data: { title: 'nav.tasks' },
+        data: { title: 'nav.tasks', wide: true },
         canActivate: [authGuard],
         loadComponent: () => import('./pages/tasks/tasks.component').then((m) => m.TasksComponent),
       },
