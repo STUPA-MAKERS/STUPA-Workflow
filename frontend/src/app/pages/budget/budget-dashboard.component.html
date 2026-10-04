@@ -67,6 +67,17 @@
             <app-icon name="chevron-down" [size]="15" />
           </button>
           <ng-container *ngTemplateOutlet="yearChip" />
+          <!-- The overview is also in the sheet, but on a phone the page must reach it
+               without the picker. -->
+          <button
+            type="button"
+            class="bd-chip"
+            aria-haspopup="dialog"
+            [class.bd-chip--on]="overviewOpen()"
+            (click)="overviewOpen.set(true)"
+          >
+            <app-icon name="grid" [size]="15" />{{ 'budget.overview.button' | t }}
+          </button>
         </div>
       </div>
     }
@@ -309,17 +320,25 @@
     </div>
   </ng-template>
 
+  <!-- A phone has no room for two buttons beside the title, so the actions go into a
+       "more" menu there. -->
   <ng-template #actions>
-    <div class="bd__actions">
-      @if (canExport()) {
-        <app-button variant="outlined" [size]="wide() ? 'md' : 'sm'" (click)="onExport()" [loading]="exporting()">
-          <span class="bd__btn"><app-icon name="download" [size]="17" />{{ 'budget.dash.export' | t }}</span>
-        </app-button>
+    @if (phone()) {
+      @if (actionSections()[0].items.length) {
+        <app-row-menu class="bd__more" [sections]="actionSections()" (selected)="onAction($event)" />
       }
-      @if (canSeeBookings()) {
-        <app-button variant="tonal" [size]="wide() ? 'md' : 'sm'" (click)="openBookings()">{{ 'budget.usage.viewExpenses' | t }}</app-button>
-      }
-    </div>
+    } @else {
+      <div class="bd__actions">
+        @if (canExport()) {
+          <app-button variant="outlined" [size]="wide() ? 'md' : 'sm'" (click)="onExport()" [loading]="exporting()">
+            <span class="bd__btn"><app-icon name="download" [size]="17" />{{ 'budget.dash.export' | t }}</span>
+          </app-button>
+        }
+        @if (canSeeBookings()) {
+          <app-button variant="tonal" [size]="wide() ? 'md' : 'sm'" (click)="openBookings()">{{ 'budget.usage.viewExpenses' | t }}</app-button>
+        }
+      </div>
+    }
   </ng-template>
 
   <ng-template #yearChip>

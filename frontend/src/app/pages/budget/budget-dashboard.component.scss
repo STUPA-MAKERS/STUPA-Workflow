@@ -96,12 +96,25 @@
   flex-direction: column;
   gap: var(--space-4);
 }
+/* The title and the actions on one line: the actions sit at the end, on the baseline of
+   the title, and do not wrap below it. A phone has the "more" menu instead. */
 .bd__topRow {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
-  gap: var(--space-3) var(--space-4);
+  gap: var(--space-4);
+}
+.bd__topRow > .bd__title {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.bd__topRow .bd__actions {
+  flex: none;
+  flex-wrap: nowrap;
+}
+.bd__more {
+  flex: none;
+  align-self: center;
 }
 .bd__chips {
   display: flex;

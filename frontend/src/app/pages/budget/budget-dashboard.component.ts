@@ -16,6 +16,9 @@ import { SimplifyPathPipe } from '@shared/budget-path';
 import {
   EmptyStateComponent,
   ListItemComponent,
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
   SearchPillComponent,
   type Seg,
   SegBarComponent,
@@ -135,6 +138,7 @@ export const APPS_SHOWN = 5;
     IconComponent,
     EmptyStateComponent,
     ListItemComponent,
+    RowMenuComponent,
     SearchPillComponent,
     SegBarComponent,
     SideSheetComponent,
@@ -785,6 +789,23 @@ export class BudgetDashboardComponent {
 
   openApplications(): void {
     void this.router.navigate(['/applications'], { queryParams: { budget: this.selectedKsId() } });
+  }
+
+  /** The actions of the page, as the "more" menu of a phone. */
+  actionSections(): RowMenuSection[] {
+    const items: RowMenuItem[] = [];
+    if (this.canExport()) {
+      items.push({ id: 'export', label: this.i18n.translate('budget.dash.export'), icon: 'download' });
+    }
+    if (this.canSeeBookings()) {
+      items.push({ id: 'bookings', label: this.i18n.translate('budget.usage.viewExpenses'), icon: 'receipt' });
+    }
+    return [{ items }];
+  }
+
+  onAction(item: RowMenuItem): void {
+    if (item.id === 'export') this.onExport();
+    else if (item.id === 'bookings') this.openBookings();
   }
 
   openBookings(): void {
