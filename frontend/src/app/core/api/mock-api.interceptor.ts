@@ -5,8 +5,8 @@ import {
   HttpResponse,
 } from '@angular/common/http';
 import { inject, isDevMode } from '@angular/core';
-import { type Observable, of, throwError } from 'rxjs';
-import { delay } from 'rxjs/operators';
+import { type Observable, from, of, throwError } from 'rxjs';
+import { delay, mergeMap } from 'rxjs/operators';
 import { USE_MOCK_API } from './api.config';
 import type {
   ApplicationCreatedWire,
@@ -67,10 +67,12 @@ const MOCK_PRINCIPAL: Principal = {
     'form.configure',
     'flow.configure',
     'webhook.manage',
-    // `budget.view`, `budget.structure` and `budget.book` drive the budget stats page.
+    // `budget.view`, `budget.structure`, `budget.book` and `budget.export` drive the
+    // budget page and its export.
     'budget.view',
     'budget.structure',
     'budget.book',
+    'budget.export',
   ],
   groups: [],
   gremien: [
@@ -532,6 +534,9 @@ function mockSearch(q: string): SearchResults {
   return { hits, truncated: false, failed: [] };
 }
 
+/** The budget routes the demo data in `mock-budget.ts` answers. */
+const BUDGET_MOCK_PATH = /\/budgets(\/[^/]+\/(fiscal-years|applications))?$/;
+
 function path(url: string): string {
   return url.split('?')[0];
 }
@@ -579,8 +584,16 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
       };
       return ok(signed);
     }
-    // Expenses and income: empty page. There is no tree mock, and this keeps a
-    // 404 out of the console.
+    // The budget tree, its fiscal years and the applications per cost centre. Before the
+    // generic `/applications` rule, which would otherwise answer `/budgets/{id}/applications`.
+    // The demo data loads on first use, so it stays out of the initial bundle.
+    if (BUDGET_MOCK_PATH.test(p)) {
+      const fiscalYear = req.params.get('fiscalYear');
+      return from(import('./mock-budget')).pipe(
+        mergeMap((m) => ok(m.mockBudgetGet(p, fiscalYear))),
+      );
+    }
+    // Expenses and income: an empty page keeps a 404 out of the console.
     if (p.endsWith('/expenses')) return ok({ items: [], total: 0, limit: 20, offset: 0 });
     if (p.endsWith('/search')) return ok(mockSearch(req.params.get('q') ?? ''));
     if (p.endsWith('/applications/tasks')) return ok([...MOCK_TASKS]);
