@@ -1,0 +1,6 @@
+@for (p of parts().segs; track $index) {
+  <span class="bar__seg" [class]="'bar__seg bar__seg--' + p.tone" [style.flex-basis.%]="p.width"></span>
+}
+@if (parts().rest) {
+  <span class="bar__seg bar__rest"></span>
+}

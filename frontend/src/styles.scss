@@ -24,6 +24,42 @@
   color: var(--color-accent-text);
 }
 
+// A group of rows that reads as one block (`app-field-group`, the days of a history, a
+// short list on a sheet): the rows sit 2px apart on their own surface, and only the outer
+// corners are round. The rows sit on surface 2, which suits the page and a sheet on
+// surface 1. `.rowgroup--bg1` and `.rowgroup--bg3` pick another row surface, for example surface 3
+// in a side sheet on surface 2. Global, because the rows are projected content.
+.rowgroup {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.rowgroup > * {
+  border-radius: 4px;
+  background: var(--color-surface-2);
+}
+.rowgroup > :first-child {
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+}
+.rowgroup > :last-child {
+  border-bottom-left-radius: var(--radius-lg);
+  border-bottom-right-radius: var(--radius-lg);
+}
+.rowgroup.rowgroup--bg1 > * {
+  background: var(--color-surface-1);
+}
+.rowgroup.rowgroup--bg3 > * {
+  background: var(--color-surface-3);
+}
+// On surface 3 the subtle text of a muted status is below 4.5:1 (WCAG 1.4.3). The muted
+// text passes. This rule is more specific than the `:host(.st--muted)` rule of
+// `app-status-text`, so it wins.
+.rowgroup--bg3 app-status-text.st--muted {
+  color: var(--color-text-muted);
+}
+
 // The layout box of a page. The ui-kit ships the same rules under `.container`, but
 // Tailwind emits a `.container` utility of its own with breakpoint max-widths
 // (640/768/1024/1280/1536px). That utility comes later and wins, so the page width

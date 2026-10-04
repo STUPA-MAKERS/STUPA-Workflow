@@ -1,0 +1,24 @@
+/* Text in its colour, nothing else. The size follows the line it sits in. */
+:host {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  white-space: nowrap;
+  font-weight: var(--fw-medium);
+}
+
+:host(.st--neutral) {
+  color: var(--color-text-muted);
+}
+:host(.st--muted) {
+  color: var(--color-text-subtle);
+}
+:host(.st--accent) {
+  color: var(--color-accent-text);
+}
+:host(.st--warn) {
+  color: var(--color-warning);
+}
+:host(.st--error) {
+  color: var(--color-danger);
+}

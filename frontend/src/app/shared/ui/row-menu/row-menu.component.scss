@@ -1,0 +1,138 @@
+:host {
+  display: inline-flex;
+  flex: none;
+}
+
+.rm__trigger {
+  display: grid;
+  place-items: center;
+  width: var(--control-height);
+  height: var(--control-height);
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.rm__trigger:hover {
+  background: var(--color-surface-3);
+  color: var(--color-text);
+}
+.rm__trigger--on,
+.rm__trigger--on:hover {
+  background: var(--color-selected);
+  color: var(--color-accent-text);
+}
+
+/* Fixed to the viewport, below the trigger and aligned to its end. In the top layer
+   (popover) the UA styles would centre it, so the reset comes first. */
+.rm__menu {
+  position: fixed;
+  inset: auto;
+  z-index: var(--z-dropdown);
+  margin: 0;
+  min-width: 15rem;
+  max-width: min(22rem, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  padding: 6px 0;
+  border: 0;
+  border-radius: var(--radius-field);
+  background: var(--color-surface-3);
+  color: var(--color-text);
+  box-shadow: var(--shadow-elevated);
+}
+.rm__menu:focus {
+  outline: none;
+}
+
+.rm__cap {
+  padding: 8px var(--space-4) 6px;
+  font-size: var(--fs-cap);
+  line-height: var(--lh-cap);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-cap);
+  text-transform: uppercase;
+  /* The menu is on surface 3, where the subtle text is below 4.5:1 (WCAG 1.4.3). */
+  color: var(--color-text-muted);
+}
+
+.rm__sep {
+  height: 1px;
+  margin: 6px 0;
+  background: var(--color-border);
+}
+
+.rm__item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  height: 2.75rem;
+  padding: 0 var(--space-4);
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--fs-body);
+  font-weight: var(--fw-medium);
+  text-align: start;
+  cursor: pointer;
+}
+.rm__item:hover,
+.rm__item:focus-visible {
+  background: var(--color-surface-4);
+}
+/* Surface 4 on surface 3 is only about 1.2:1, too weak to show the focus (WCAG 2.4.7).
+   The focused item also gets an inset ring in the focus colour. */
+.rm__item:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--color-focus-ring);
+}
+.rm__icon {
+  flex: none;
+  color: var(--color-text-muted);
+}
+.rm__label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rm__check {
+  flex: none;
+  color: var(--color-accent-text);
+}
+
+.rm__item--danger,
+.rm__item--danger .rm__icon {
+  color: var(--color-danger);
+}
+
+/* Disabled: still focusable and readable (it says why), but faded and inert. Only the
+   content fades, so the focus ring keeps its full contrast. */
+.rm__item[aria-disabled='true'] {
+  cursor: not-allowed;
+}
+.rm__item[aria-disabled='true'] > * {
+  opacity: 0.45;
+}
+.rm__item[aria-disabled='true']:hover {
+  background: transparent;
+}
+
+.rm__loading {
+  padding: var(--space-3) var(--space-4) 0;
+}
+/* The skeleton blocks are on surface 3 by default, the same as the menu. One step up, so
+   that they show while a lazy menu loads. */
+.rm__loading ::ng-deep .skel {
+  background: var(--color-surface-4);
+}
+.rm__empty {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  color: var(--color-text-muted);
+}

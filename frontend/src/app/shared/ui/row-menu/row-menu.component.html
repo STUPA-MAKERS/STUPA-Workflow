@@ -1,0 +1,82 @@
+<button
+  #trigger
+  type="button"
+  class="rm__trigger"
+  [class.rm__trigger--on]="open()"
+  aria-haspopup="menu"
+  [attr.aria-expanded]="open()"
+  [attr.aria-controls]="open() ? menuId : null"
+  [attr.aria-label]="label() ?? ('ui.rowMenu.trigger' | t)"
+  [title]="label() ?? ('ui.rowMenu.trigger' | t)"
+  (click)="toggle()"
+  (keydown)="onTriggerKey($event)"
+>
+  <app-icon [name]="icon()" [size]="19" />
+</button>
+
+@if (open()) {
+  <div
+    #menu
+    class="rm__menu"
+    popover="manual"
+    role="menu"
+    tabindex="-1"
+    [id]="menuId"
+    [attr.aria-label]="label() ?? ('ui.rowMenu.trigger' | t)"
+    [attr.aria-busy]="loading() ? 'true' : null"
+    [style.top.px]="position().top"
+    [style.right.px]="position().right"
+    (keydown)="onMenuKey($event)"
+  >
+    @if (loading()) {
+      <app-skeleton class="rm__loading" variant="lines" [count]="2" [label]="'common.loading' | t" />
+    } @else if (visibleSections().length === 0) {
+      <p class="rm__empty">{{ 'ui.rowMenu.empty' | t }}</p>
+    } @else {
+      @for (section of visibleSections(); track $index; let first = $first, si = $index) {
+        @if (!first) {
+          <div class="rm__sep" role="separator"></div>
+        }
+        <div class="rm__section" role="group" [attr.aria-label]="section.label || null">
+          @if (section.label) {
+            <div class="rm__cap" aria-hidden="true">{{ section.label }}</div>
+          }
+          @for (item of section.items; track item.id; let ii = $index) {
+            <button
+              type="button"
+              class="rm__item"
+              data-menu-item
+              tabindex="-1"
+              [class.rm__item--danger]="item.danger"
+              [attr.role]="item.checked === undefined ? 'menuitem' : 'menuitemcheckbox'"
+              [attr.aria-checked]="item.checked === undefined ? null : item.checked"
+              [attr.aria-disabled]="item.disabledReason ? 'true' : null"
+              [attr.aria-describedby]="item.disabledReason ? reasonId(si, ii) : null"
+              [attr.title]="item.disabledReason || null"
+              (click)="choose(item)"
+            >
+              @if (item.icon) {
+                <app-icon class="rm__icon" [name]="item.icon" [size]="18" />
+              }
+              <span class="rm__label">{{ item.label }}</span>
+              @if (item.checked) {
+                <app-icon class="rm__check" name="check" [size]="18" />
+              }
+            </button>
+          }
+        </div>
+      }
+      <!-- The reasons of the disabled items. Outside the items, so they describe an item
+           without becoming part of its name. -->
+      <div hidden>
+        @for (section of visibleSections(); track $index; let si = $index) {
+          @for (item of section.items; track item.id; let ii = $index) {
+            @if (item.disabledReason) {
+              <span [id]="reasonId(si, ii)">{{ item.disabledReason }}</span>
+            }
+          }
+        }
+      </div>
+    }
+  </div>
+}

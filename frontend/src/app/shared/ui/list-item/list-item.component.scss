@@ -1,0 +1,109 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.li {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 4rem;
+  padding: 10px var(--space-4);
+  border-radius: var(--radius-lg);
+  color: var(--color-text);
+  transition: background-color var(--motion-fast) var(--ease-standard);
+}
+.li:hover {
+  background: var(--color-surface-2);
+}
+.li--on,
+.li--on:hover {
+  background: var(--color-selected);
+  color: var(--color-on-selected);
+}
+
+/* An empty slot takes no gap. */
+.li__lead:empty,
+.li__trail:empty,
+.li__sub:empty {
+  display: none;
+}
+.li__lead,
+.li__trail {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+}
+/* Controls in the trailing slot stay above the stretched title. */
+.li__trail {
+  position: relative;
+  z-index: 1;
+}
+
+.li__body {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* The title is the control. Its ::after covers the whole row, so the row is one target. */
+.li__title {
+  display: block;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: var(--fs-md);
+  line-height: 1.375rem;
+  font-weight: var(--fw-medium);
+  text-align: start;
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.li__title::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.li__title:focus-visible {
+  outline: none;
+}
+.li__title:focus-visible::after {
+  border-radius: var(--radius-lg);
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+
+/* A block, not a flex row, so a long sub line gets an ellipsis also when it comes from the
+   [sub] slot with a status in it. The status is inline text for this. */
+.li__sub {
+  display: block;
+  min-width: 0;
+  font-size: 0.8125rem; /* 13px */
+  line-height: 1.1875rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.li__sub ::ng-deep app-status-text {
+  display: inline;
+}
+.li__subText + ::ng-deep * {
+  margin-inline-start: 6px;
+}
+/* On the selected row the subtle text of a muted status is below 4.5:1 (WCAG 1.4.3). The
+   muted text passes. */
+.li--on .li__sub ::ng-deep app-status-text.st--muted {
+  color: var(--color-text-muted);
+}

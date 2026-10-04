@@ -1,0 +1,24 @@
+/* A person: initials in a 40px circle (32px small). */
+:host {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  background: var(--color-surface-3);
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  font-weight: var(--fw-semibold);
+  line-height: 1;
+  user-select: none;
+}
+:host(.av--sm) {
+  width: 2rem;
+  height: 2rem;
+  font-size: 0.75rem;
+}
+:host(.av--accent) {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}

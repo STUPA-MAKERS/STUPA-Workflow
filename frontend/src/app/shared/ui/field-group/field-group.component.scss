@@ -1,0 +1,5 @@
+/* The look of the group is the global `.rowgroup` class (styles.scss), because its rows are
+   projected and a component style does not reach projected content. */
+:host {
+  min-width: 0;
+}
