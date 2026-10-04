@@ -22,12 +22,13 @@
       class="main"
       [class.page-shell]="frame() !== 'bare'"
       [class.main--wide]="wide()"
+      [class.main--fill]="fill()"
       tabindex="-1"
     >
       <router-outlet />
     </main>
 
-    @if (frame() === 'rail' || frame() === 'public') {
+    @if ((frame() === 'rail' || frame() === 'public') && !fill()) {
       <app-site-footer class="frame__footer" />
     }
   </div>
