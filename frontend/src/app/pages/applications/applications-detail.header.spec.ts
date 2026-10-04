@@ -44,7 +44,7 @@ function appWire(over: Partial<ApplicationOutWire> = {}): ApplicationOutWire {
     gremiumId: 'g1',
     amount: '1250.00',
     currency: 'EUR',
-    data: { title: 'Zuschuss Erstsemester-Abend' },
+    data: { title: 'Zuschuss Kennenlernwochenende' },
     version: 2,
     lang: 'de',
     createdAt: '2026-09-26T12:12:00Z',
@@ -179,11 +179,27 @@ describe('ApplicationsDetailComponent — header', () => {
   it('shows "<Typ> · Version n", the title, and status · gremium · amount', async () => {
     await setup();
     expect(screen.getByText('Förderantrag · Version 2')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 2, name: 'Zuschuss Erstsemester-Abend' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Zuschuss Kennenlernwochenende' })).toBeInTheDocument();
     const line = document.querySelector('.ad__line') as HTMLElement;
     // Intl puts a non-breaking space before the currency sign.
-    const parts = [...line.children].map((el) => el.textContent?.replace(/\s/g, ' ').trim());
-    expect(parts).toEqual(['Eingereicht', '·', 'Studierendenparlament', '·', '1.250,00 €']);
+    // Each dot sits in the part of the item after it, so a wrap moves both together.
+    // The gap after a dot is a margin, so the text has no space there.
+    const parts = [...line.children].map((el) => el.textContent?.replace(/\s+/g, ''));
+    expect(parts).toEqual(['Eingereicht', '·Studierendenparlament', '·1.250,00€']);
+  });
+
+  it('starts the status line with an item, never with a dot, when the state is missing', async () => {
+    await setup({ app: { state: null } });
+    const line = document.querySelector('.ad__line') as HTMLElement;
+    expect(line.textContent?.replace(/\s+/g, '')).toBe('Studierendenparlament·1.250,00€');
+    expect(line.querySelectorAll('.ad__dot')).toHaveLength(1);
+  });
+
+  it('shows the amount alone without a dot when the state and the gremium are missing', async () => {
+    await setup({ app: { state: null, gremiumId: null } });
+    const line = document.querySelector('.ad__line') as HTMLElement;
+    expect(line.textContent?.replace(/\s+/g, '')).toBe('1.250,00€');
+    expect(line.querySelector('.ad__dot')).toBeNull();
   });
 
   it('leaves out an unknown type, a missing gremium and a missing amount', async () => {

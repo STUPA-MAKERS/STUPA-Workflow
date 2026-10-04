@@ -61,7 +61,7 @@ function row(over: Partial<ApplicationListItemWire> = {}): ApplicationListItemWi
   return {
     id: 'app-1',
     typeId: 't1',
-    title: 'Zuschuss Erstsemester-Abend',
+    title: 'Zuschuss Kennenlernwochenende',
     state: SUBMITTED,
     gremiumId: null,
     amount: '1250.00',
@@ -75,7 +75,7 @@ function row(over: Partial<ApplicationListItemWire> = {}): ApplicationListItemWi
 
 const ROWS: ApplicationListItemWire[] = [
   row(),
-  row({ id: 'app-2', title: 'Druck des Semesterplaners', state: REVIEW, amount: '480.00', createdAt: '2026-09-02T12:00:00' }),
+  row({ id: 'app-2', title: 'Flyer für die Hochschulgruppen-Messe', state: REVIEW, amount: '480.00', createdAt: '2026-09-02T12:00:00' }),
   row({ id: 'app-3', title: 'Trikots', amount: null, createdAt: '2026-08-15T12:00:00', archivedAt: '2026-09-01T10:00:00Z' }),
 ];
 
@@ -217,7 +217,7 @@ describe('ApplicationsListComponent', () => {
 
     it('shows title, status text, type and amount; an archived row says so', async () => {
       await start();
-      expect(screen.getByRole('link', { name: 'Zuschuss Erstsemester-Abend' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Zuschuss Kennenlernwochenende' })).toBeInTheDocument();
       expect(screen.getAllByText('Eingereicht').length).toBeGreaterThan(0);
       const items = screen.getAllByRole('listitem');
       expect(items.filter((li) => within(li).queryByText('Förderantrag')).length).toBe(3);
@@ -236,6 +236,23 @@ describe('ApplicationsListComponent', () => {
       // An amount the browser cannot read stays as the server sent it.
       expect(screen.getByText('abc')).toBeInTheDocument();
       expect(document.querySelector('.apps__dot')).toBeNull();
+    });
+
+    it('starts an archived row without state and type with the marker, not with a dot', async () => {
+      await start('/applications?archived=all', {
+        rows: [row({ typeId: 'unknown', state: null, archivedAt: '2026-09-01T10:00:00Z' })],
+      });
+      expect(screen.getByText('Archiviert')).toBeInTheDocument();
+      expect(document.querySelector('.apps__dot')).toBeNull();
+    });
+
+    it('puts a chevron in the place of the row menu in the full-width list', async () => {
+      const { cmp } = await start();
+      expect(cmp.split()).toBe(false);
+      const chevrons = document.querySelectorAll('.apps__menuSlot .apps__chev');
+      expect(chevrons).toHaveLength(ROWS.length);
+      // The chevron is decoration. The row menu stays the control.
+      expect(chevrons[0].getAttribute('aria-hidden')).toBe('true');
     });
 
     it('formats an amount without a currency as euros', async () => {
@@ -793,7 +810,7 @@ describe('ApplicationsListComponent', () => {
       const { go, router, cmp, harness } = await start();
       await go('/applications?q=fest');
       // The title is a real link with the filters, so it also opens in a new tab.
-      const link = screen.getByRole('link', { name: 'Druck des Semesterplaners' });
+      const link = screen.getByRole('link', { name: 'Flyer für die Hochschulgruppen-Messe' });
       expect(link).toHaveAttribute('href', '/applications/app-2?q=fest');
       await userEvent.click(link);
       await harness.fixture.whenStable();
@@ -803,7 +820,7 @@ describe('ApplicationsListComponent', () => {
       // The list stays (one pane at a time here, so hidden): the filters did not change,
       // so nothing reloads, and the open row is marked.
       expect(
-        screen.getByRole('link', { name: 'Druck des Semesterplaners', hidden: true }),
+        screen.getByRole('link', { name: 'Flyer für die Hochschulgruppen-Messe', hidden: true }),
       ).toHaveAttribute('aria-current', 'true');
       expect(screen.getByText('detail')).toBeInTheDocument();
     });
@@ -872,7 +889,7 @@ describe('ApplicationsListComponent', () => {
       const notices: unknown[] = [];
       pageService.changes$.subscribe((c) => notices.push(c));
       http.verify();
-      await openRowMenu(http, 'Zuschuss Erstsemester-Abend', [START], () => harness.detectChanges());
+      await openRowMenu(http, 'Zuschuss Kennenlernwochenende', [START], () => harness.detectChanges());
       await userEvent.click(screen.getByRole('menuitem', { name: 'Prüfung beginnen' }));
       const post = http.expectOne((r) => r.method === 'POST' && r.url === '/api/applications/app-1/transition');
       expect(post.request.body).toEqual({ transitionId: 'tr-1' });
@@ -902,7 +919,7 @@ describe('ApplicationsListComponent', () => {
 
     it('opens the detail for a transition that puts the application on an agenda', async () => {
       const { http, harness, router } = await start();
-      await openRowMenu(http, 'Zuschuss Erstsemester-Abend', [AGENDA], () => harness.detectChanges());
+      await openRowMenu(http, 'Zuschuss Kennenlernwochenende', [AGENDA], () => harness.detectChanges());
       await userEvent.click(screen.getByRole('menuitem', { name: 'Auf Tagesordnung setzen' }));
       await harness.fixture.whenStable();
       expect(router.url).toBe('/applications/app-1');
@@ -910,7 +927,7 @@ describe('ApplicationsListComponent', () => {
 
     it('opens the row through "Öffnen"', async () => {
       const { http, harness, router } = await start();
-      await openRowMenu(http, 'Druck des Semesterplaners', [], () => harness.detectChanges());
+      await openRowMenu(http, 'Flyer für die Hochschulgruppen-Messe', [], () => harness.detectChanges());
       await userEvent.click(screen.getByRole('menuitem', { name: 'Öffnen' }));
       await harness.fixture.whenStable();
       expect(router.url).toBe('/applications/app-2');
@@ -918,7 +935,7 @@ describe('ApplicationsListComponent', () => {
 
     it('opens the share links of the row', async () => {
       const { http, harness, cmp } = await start();
-      await openRowMenu(http, 'Druck des Semesterplaners', [], () => harness.detectChanges());
+      await openRowMenu(http, 'Flyer für die Hochschulgruppen-Messe', [], () => harness.detectChanges());
       await userEvent.click(screen.getByRole('menuitem', { name: 'Öffentliche Links' }));
       harness.detectChanges();
       expect(cmp.shareFor()).toBe('app-2');
@@ -928,7 +945,7 @@ describe('ApplicationsListComponent', () => {
 
     it('opens "Status setzen" for the row and reloads after it', async () => {
       const { http, harness, cmp } = await start();
-      await openRowMenu(http, 'Druck des Semesterplaners', [], () => harness.detectChanges());
+      await openRowMenu(http, 'Flyer für die Hochschulgruppen-Messe', [], () => harness.detectChanges());
       await userEvent.click(screen.getByRole('menuitem', { name: 'Status setzen' }));
       harness.detectChanges();
       http.expectOne((r) => r.url === '/api/applications/app-2/flow-states').flush([]);
@@ -943,7 +960,7 @@ describe('ApplicationsListComponent', () => {
     it('archives a row and brings an archived one back, without a question', async () => {
       const { http, harness, toast, cmp } = await start();
       const success = jest.spyOn(toast, 'success');
-      await openRowMenu(http, 'Druck des Semesterplaners', [], () => harness.detectChanges());
+      await openRowMenu(http, 'Flyer für die Hochschulgruppen-Messe', [], () => harness.detectChanges());
       await userEvent.click(screen.getByRole('menuitem', { name: 'Archivieren' }));
       http.expectOne((r) => r.method === 'POST' && r.url === '/api/applications/app-2/archive').flush(ROWS[1]);
       expect(success).toHaveBeenCalledWith('Antrag archiviert.');
@@ -972,14 +989,14 @@ describe('ApplicationsListComponent', () => {
     it('deletes only after the red confirmation', async () => {
       const { http, harness, toast, cmp } = await start();
       const success = jest.spyOn(toast, 'success');
-      await openRowMenu(http, 'Druck des Semesterplaners', [], () => harness.detectChanges());
+      await openRowMenu(http, 'Flyer für die Hochschulgruppen-Messe', [], () => harness.detectChanges());
       const del = screen.getByRole('menuitem', { name: 'Löschen' });
       expect(del).toHaveClass('rm__item--danger');
       await userEvent.click(del);
       harness.detectChanges();
       http.verify();
       const dialog = screen.getByRole('dialog', { name: 'Antrag löschen' });
-      expect(dialog).toHaveTextContent('„Druck des Semesterplaners“ endgültig löschen?');
+      expect(dialog).toHaveTextContent('„Flyer für die Hochschulgruppen-Messe“ endgültig löschen?');
       const confirm = within(dialog).getAllByRole('button', { name: 'Löschen' }).pop()!;
       await userEvent.click(confirm);
       cmp.confirmDelete();

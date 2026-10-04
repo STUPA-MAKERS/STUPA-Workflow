@@ -66,22 +66,22 @@ interface DemoApp {
 }
 
 const DEMO: DemoApp[] = [
-  { n: 1, title: 'Zuschuss Erstsemester-Abend im Wintersemester', type: TYPE_FUND, state: 'agenda', amount: 1250, created: '2026-09-26T14:12:00Z' },
-  { n: 2, title: 'Druck des Semesterplaners', type: TYPE_FUND, state: 'submitted', amount: 480, created: '2026-09-24T09:30:00Z' },
-  { n: 3, title: 'Transportrad für das Fachschaftsbüro', type: TYPE_OTHER, state: 'agenda', amount: 2890, created: '2026-09-21T16:05:00Z' },
-  { n: 4, title: 'Open-Air-Kino auf dem Campus', type: TYPE_FUND, state: 'review', amount: 2400, created: '2026-09-18T11:00:00Z' },
-  { n: 5, title: 'Workshopreihe zu barrierefreier Lehre mit Honorar und Raummiete für zwei Tage', type: TYPE_FUND, state: 'submitted', amount: 1980, created: '2026-09-15T08:45:00Z' },
-  { n: 6, title: 'Material für die Reparaturwerkstatt', type: TYPE_FUND, state: 'submitted', amount: 360, created: '2026-09-11T13:20:00Z' },
-  { n: 7, title: 'Erste-Hilfe-Schulung für Fachschaften', type: TYPE_FUND, state: 'agenda', amount: 540, created: '2026-09-08T10:10:00Z' },
-  { n: 8, title: 'Mikrofone für die Hochschulradio-AG', type: TYPE_OTHER, state: 'review', amount: 550, created: '2026-09-03T15:40:00Z' },
-  { n: 9, title: 'Trikots Hochschulsport Handball', type: TYPE_FUND, state: 'review', amount: 1020, created: '2026-08-27T12:00:00Z' },
-  { n: 10, title: 'Plakate zur Gremienwahl', type: TYPE_FUND, state: 'approved', amount: 540, created: '2026-08-19T09:00:00Z' },
-  { n: 11, title: 'Spieleabend in der Mensa', type: TYPE_OTHER, state: 'review', amount: 220, created: '2026-08-12T17:30:00Z', archived: '2026-09-01T10:00:00Z' },
-  { n: 12, title: 'Fahrt zur Landes-ASten-Konferenz', type: TYPE_OTHER, state: 'rejected', amount: 312.4, created: '2026-08-05T08:15:00Z' },
-  { n: 13, title: 'Laptop für das AStA-Büro', type: TYPE_FUND, state: 'approved', amount: 899, created: '2026-07-28T10:00:00Z' },
-  { n: 14, title: 'Fahrtkosten Fachschaftentagung', type: TYPE_OTHER, state: 'review', amount: 264.8, created: '2026-07-21T14:00:00Z' },
-  { n: 15, title: 'Beratungsabend zum Studienstart', type: TYPE_OTHER, state: 'submitted', amount: null, created: '2026-07-14T09:00:00Z' },
-  { n: 16, title: 'Leinwand für den Hörsaal', type: TYPE_FUND, state: 'approved', amount: 640, created: '2026-07-02T11:30:00Z' },
+  { n: 1, title: 'Zuschuss Kennenlernwochenende der Fachschaft Wirtschaft', type: TYPE_FUND, state: 'agenda', amount: 1340, created: '2026-09-29T10:25:00Z' },
+  { n: 2, title: 'Flyer für die Hochschulgruppen-Messe', type: TYPE_FUND, state: 'submitted', amount: 395, created: '2026-09-25T15:05:00Z' },
+  { n: 3, title: 'Werkzeugkiste für die Fahrradwerkstatt', type: TYPE_OTHER, state: 'agenda', amount: 1765, created: '2026-09-22T08:40:00Z' },
+  { n: 4, title: 'Lesung mit einer Autorin im Foyer', type: TYPE_FUND, state: 'review', amount: 1180, created: '2026-09-17T13:15:00Z' },
+  { n: 5, title: 'Seminarreihe Nachhaltigkeit im Studium mit Referierenden und Verpflegung an drei Abenden', type: TYPE_FUND, state: 'submitted', amount: 2260, created: '2026-09-14T09:50:00Z' },
+  { n: 6, title: 'Saatgut und Erde für den Campusgarten', type: TYPE_FUND, state: 'submitted', amount: 145, created: '2026-09-10T16:30:00Z' },
+  { n: 7, title: 'Brandschutzhelfer-Kurs für Hochschulgruppen', type: TYPE_FUND, state: 'agenda', amount: 610, created: '2026-09-07T11:45:00Z' },
+  { n: 8, title: 'Kamera für die Foto-AG', type: TYPE_OTHER, state: 'review', amount: 735, created: '2026-09-02T14:20:00Z' },
+  { n: 9, title: 'Turnierbälle Hochschulsport Basketball', type: TYPE_FUND, state: 'review', amount: 455, created: '2026-08-28T10:35:00Z' },
+  { n: 10, title: 'Banner für den Tag der offenen Tür', type: TYPE_FUND, state: 'approved', amount: 290, created: '2026-08-20T08:55:00Z' },
+  { n: 11, title: 'Quizabend im Studierendencafé', type: TYPE_OTHER, state: 'review', amount: 175, created: '2026-08-13T18:10:00Z', archived: '2026-09-03T09:00:00Z' },
+  { n: 12, title: 'Anreise zur Bundeskonferenz der Studierendenschaften', type: TYPE_OTHER, state: 'rejected', amount: 428.6, created: '2026-08-06T12:40:00Z' },
+  { n: 13, title: 'Drucker für den Fachschaftsraum', type: TYPE_FUND, state: 'approved', amount: 349, created: '2026-07-30T09:20:00Z' },
+  { n: 14, title: 'Bahnfahrt zur Gremienschulung', type: TYPE_OTHER, state: 'review', amount: 187.5, created: '2026-07-22T15:30:00Z' },
+  { n: 15, title: 'Infoabend zum Auslandssemester', type: TYPE_OTHER, state: 'submitted', amount: null, created: '2026-07-15T10:45:00Z' },
+  { n: 16, title: 'Beamer für den Seminarraum', type: TYPE_FUND, state: 'approved', amount: 820, created: '2026-07-03T13:05:00Z' },
 ];
 
 /** The demo rows as they stand now. Transitions, archive and delete change them. */
@@ -114,7 +114,7 @@ function detail(d: DemoApp): ApplicationOutWire {
     data: {
       title: d.title,
       description:
-        'Ein Abend zum Semesterstart mit Programm, Getränken und einem Awareness-Team.\n\nDer Antrag deckt die Raummiete und die Technik.',
+        'Ein Wochenende zum Kennenlernen mit Workshops, Wanderung und gemeinsamem Kochen.\n\nDer Antrag deckt die Unterkunft und die Busfahrt.',
       category: 'event',
       amount: d.amount,
     },
@@ -181,9 +181,9 @@ function transitions(d: DemoApp): TransitionOutWire[] {
 }
 
 const ATTACHMENTS: AttachmentOutWire[] = [
-  { id: 'att10000-0000-0000-0000-000000000001', filename: 'Angebot_Getraenke.pdf', mime: 'application/pdf', size: 212_000, scanned: true, is_comparison_offer: true },
-  { id: 'att10000-0000-0000-0000-000000000002', filename: 'Angebot_Technik_Verleih.pdf', mime: 'application/pdf', size: 184_000, scanned: true, is_comparison_offer: true },
-  { id: 'att10000-0000-0000-0000-000000000003', filename: 'Raumplan_Mensa.png', mime: 'image/png', size: 148_000, scanned: false, is_comparison_offer: false },
+  { id: 'att10000-0000-0000-0000-000000000001', filename: 'Angebot_Jugendherberge.pdf', mime: 'application/pdf', size: 236_000, scanned: true, is_comparison_offer: true },
+  { id: 'att10000-0000-0000-0000-000000000002', filename: 'Angebot_Busunternehmen.pdf', mime: 'application/pdf', size: 171_000, scanned: true, is_comparison_offer: true },
+  { id: 'att10000-0000-0000-0000-000000000003', filename: 'Programm_Wochenende.png', mime: 'image/png', size: 127_000, scanned: false, is_comparison_offer: false },
 ];
 
 const DETAIL_PATH = /\/applications\/(a1000000-[^/]+)(?:\/(transitions|attachments|shares|flow-states))?$/;

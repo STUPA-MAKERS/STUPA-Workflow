@@ -249,11 +249,11 @@ describe('mockApiInterceptor', () => {
         expect(page.items.every((r) => [review, agenda].includes(r.state.id))).toBe(true);
         expect(page.items.length).toBe(7);
 
-        params = new HttpParams().set('type', '22222222-2222-2222-2222-222222222222').set('q', 'fahrt');
+        params = new HttpParams().set('type', '22222222-2222-2222-2222-222222222222').set('q', 'zur');
         page = await get<{ items: Row[] }>('/api/applications', params);
         expect(page.items.map((r) => r.title)).toEqual([
-          'Fahrt zur Landes-ASten-Konferenz',
-          'Fahrtkosten Fachschaftentagung',
+          'Anreise zur Bundeskonferenz der Studierendenschaften',
+          'Bahnfahrt zur Gremienschulung',
         ]);
 
         params = new HttpParams().set('amountMin', '1000').set('amountMax', '2000');
@@ -266,7 +266,7 @@ describe('mockApiInterceptor', () => {
 
         params = new HttpParams().set('archived', 'true');
         page = await get<{ items: Row[] }>('/api/applications', params);
-        expect(page.items.map((r) => r.title)).toEqual(['Spieleabend in der Mensa']);
+        expect(page.items.map((r) => r.title)).toEqual(['Quizabend im Studierendencafé']);
         params = new HttpParams().set('archived', 'all');
         expect((await get<{ total: number }>('/api/applications', params)).total).toBe(16);
       });
@@ -274,7 +274,7 @@ describe('mockApiInterceptor', () => {
       it('sorts by amount and by date in both directions and pages', async () => {
         let params = new HttpParams().set('sort', 'amount').set('order', 'desc');
         let page = await get<{ items: Row[] }>('/api/applications', params);
-        expect(page.items[0].amount).toBe('2890.00');
+        expect(page.items[0].amount).toBe('2260.00');
         params = new HttpParams().set('sort', 'amount').set('order', 'asc');
         page = await get<{ items: Row[] }>('/api/applications', params);
         expect(page.items[0].amount).toBeNull();

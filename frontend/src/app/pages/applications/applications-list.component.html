@@ -194,7 +194,9 @@
                         <span>{{ row.typeLabel }}</span>
                       }
                       @if (row.item.archivedAt) {
-                        <span class="apps__dot" aria-hidden="true">·</span>
+                        @if (row.stateLabel || row.typeLabel) {
+                          <span class="apps__dot" aria-hidden="true">·</span>
+                        }
                         <span class="apps__archived">
                           <app-icon name="archive" [size]="13" />{{ 'applications.list.archivedRow' | t }}
                         </span>
@@ -204,12 +206,19 @@
                       @if (row.amount) {
                         <span class="mono apps__amount">{{ row.amount }}</span>
                       }
-                      <app-row-transitions-menu
-                        class="apps__menu"
-                        [item]="row.item"
-                        [title]="row.title"
-                        (action)="onRowAction(row.item, $event)"
-                      />
+                      <span class="apps__menuSlot">
+                        @if (!split()) {
+                          <span class="apps__chev" aria-hidden="true">
+                            <app-icon name="chevron-right" [size]="17" />
+                          </span>
+                        }
+                        <app-row-transitions-menu
+                          class="apps__menu"
+                          [item]="row.item"
+                          [title]="row.title"
+                          (action)="onRowAction(row.item, $event)"
+                        />
+                      </span>
                     </span>
                   </app-list-item>
                 }

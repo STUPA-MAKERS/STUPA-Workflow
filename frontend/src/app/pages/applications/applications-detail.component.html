@@ -73,13 +73,21 @@
         @if (application.state) {
           <app-status-text [kind]="stateKind()">{{ application.state.label }}</app-status-text>
         }
+        <!-- Each dot sits in the nowrap part of the item that follows it, so a wrap
+             moves the dot with its item. A dot shows only after a visible item. -->
         @if (gremiumName(); as gremium) {
-          <span class="ad__dot" aria-hidden="true">·</span>
-          <span class="ell" [title]="gremium">{{ gremium }}</span>
+          <span class="ad__part ell" [title]="gremium">
+            @if (application.state) {
+              <span class="ad__dot" aria-hidden="true">·</span>
+            }{{ gremium }}
+          </span>
         }
         @if (application.amount !== null) {
-          <span class="ad__dot" aria-hidden="true">·</span>
-          <span class="mono ad__amount">{{ amount(application) }}</span>
+          <span class="ad__part">
+            @if (application.state || gremiumName()) {
+              <span class="ad__dot" aria-hidden="true">·</span>
+            }<span class="mono ad__amount">{{ amount(application) }}</span>
+          </span>
         }
       </p>
 
@@ -412,7 +420,15 @@
                 </span>
               }
             </div>
-            <time class="ad__msgTime" [attr.datetime]="comment.at">{{ comment.at | ldate: 'short' }}</time>
+            <span class="ad__msgMeta">
+              <time [attr.datetime]="comment.at">{{ comment.at | ldate: 'short' }}</time>
+              <span class="ad__msgDot" aria-hidden="true">·</span>
+              @if (comment.visibility === 'internal') {
+                <span>{{ 'applications.comments.internal' | t }}</span>
+              } @else {
+                <span class="ad__msgPublic">{{ 'applications.comments.public' | t }}</span>
+              }
+            </span>
             <p class="ad__msgText">{{ comment.body }}</p>
           </div>
         </article>
@@ -430,6 +446,15 @@
           name="comment"
           [attr.aria-label]="'applications.comments.add' | t"
         ></textarea>
+        @if (canManage()) {
+          <app-segmented
+            class="ad__composerVis"
+            [ariaLabel]="'applications.comments.visibility' | t"
+            [options]="visibilityOptions()"
+            [value]="visibility()"
+            (valueChange)="setVisibility($event)"
+          />
+        }
         <app-button
           type="submit"
           variant="text"

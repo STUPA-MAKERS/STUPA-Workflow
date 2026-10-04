@@ -45,9 +45,11 @@ import {
   DialogComponent,
   IconComponent,
   MEDIA,
+  SegmentedComponent,
   SelectComponent,
   TabsComponent,
   ToastService,
+  type SegmentedOption,
   type SelectOption,
   type TabItem,
 } from '@stupa-makers/ui-kit';
@@ -99,6 +101,10 @@ type DetailTab = 'app' | 'history' | 'comments' | 'files';
  * Status setzen, Versionen vergleichen, Löschen, Anonymisierung beantragen). Body: the
  * details, the answers, the attachments, the version history and the comments.
  *
+ * A comment is internal or public. Each comment shows its visibility. The composer
+ * offers the internal visibility only with `application.manage`. Without it, a new
+ * comment is public.
+ *
  * RBAC here only gates the UX. The server decides.
  */
 @Component({
@@ -122,6 +128,7 @@ type DetailTab = 'app' | 'history' | 'comments' | 'files';
     ButtonComponent,
     DialogComponent,
     IconComponent,
+    SegmentedComponent,
     SelectComponent,
     TabsComponent,
     CostCentreTreeComponent,
@@ -165,7 +172,12 @@ export class ApplicationsDetailComponent {
   );
 
   readonly newComment = signal('');
+  /** The visibility of the next comment. It goes back to public after each post. */
   readonly visibility = signal<CommentVisibility>('public');
+  readonly visibilityOptions = computed<SegmentedOption[]>(() => [
+    { value: 'public', label: this.i18n.translate('applications.comments.public') },
+    { value: 'internal', label: this.i18n.translate('applications.comments.internal') },
+  ]);
   readonly posting = signal(false);
 
   // Edit and delete of one comment. Both run in a dialog. The server allows the
@@ -905,15 +917,22 @@ export class ApplicationsDetailComponent {
     this.submitComment(event);
   }
 
+  protected setVisibility(value: string | null): void {
+    this.visibility.set(value === 'internal' ? 'internal' : 'public');
+  }
+
   submitComment(event: Event): void {
     event.preventDefault();
     const body = this.newComment().trim();
     if (!body || this.posting()) return;
     this.posting.set(true);
-    this.api.addComment(this.id, body, this.visibility()).subscribe({
+    // Without `application.manage` the composer has no toggle, so the comment is public.
+    const visibility = this.canManage() ? this.visibility() : 'public';
+    this.api.addComment(this.id, body, visibility).subscribe({
       next: (created) => {
         this.comments.update((list) => [...list, created]);
         this.newComment.set('');
+        this.visibility.set('public');
         this.posting.set(false);
         this.toast.success(this.i18n.translate('applications.comments.added'));
       },

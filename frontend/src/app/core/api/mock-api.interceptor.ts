@@ -378,6 +378,14 @@ const MOCK_COMMENTS: CommentOutWire[] = [
     visibility: 'public',
     at: '2026-06-05T13:00:00Z',
   },
+  {
+    id: 'c0000000-0000-0000-0000-000000000002',
+    author: 'Haushaltsausschuss',
+    authorKind: 'principal',
+    body: 'Das zweite Angebot fehlt noch. Vor der Sitzung nachfragen.',
+    visibility: 'internal',
+    at: '2026-06-05T13:30:00Z',
+  },
 ];
 
 const MOCK_VERSIONS: VersionOutWire[] = [

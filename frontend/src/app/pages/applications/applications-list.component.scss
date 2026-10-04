@@ -245,17 +245,44 @@
   white-space: nowrap;
 }
 
-/* Side by side with a pointer: the row menu shows on hover and on focus, so a calm list
-   reads as titles and amounts. It keeps its place, so nothing shifts. */
+/* With a pointer, the row menu shows on hover, on focus and while it is open, so a calm
+   list reads as titles and amounts. It keeps its place, so nothing shifts. The full-width
+   list shows a chevron in that place while the menu is hidden (board
+   Schmal-Antraege-Liste). Keyboard users reach the menu through :focus-within. Without
+   hover (touch), the menu always shows. */
+.apps__menuSlot {
+  position: relative;
+  display: inline-flex;
+}
+.apps__chev {
+  display: none;
+}
 @media (hover: hover) {
-  .apps--split .apps__menu {
-    opacity: 0;
+  .apps__menu,
+  .apps__chev {
     transition: opacity var(--motion-fast) var(--ease-standard);
   }
-  .apps--split .apps__row:hover .apps__menu,
-  .apps--split .apps__row:focus-within .apps__menu,
-  .apps--split .apps__menu:has([aria-expanded='true']) {
+  .apps__menu {
+    opacity: 0;
+  }
+  .apps__chev {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text-muted);
+    pointer-events: none;
+  }
+  .apps__row:hover .apps__menu,
+  .apps__row:focus-within .apps__menu,
+  .apps__menu:has([aria-expanded='true']) {
     opacity: 1;
+  }
+  .apps__row:hover .apps__chev,
+  .apps__row:focus-within .apps__chev,
+  .apps__menuSlot:has([aria-expanded='true']) .apps__chev {
+    opacity: 0;
   }
 }
 

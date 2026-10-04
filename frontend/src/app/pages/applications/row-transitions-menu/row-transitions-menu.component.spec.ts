@@ -13,7 +13,7 @@ import { RowTransitionsMenuComponent, type RowAction } from './row-transitions-m
 const ITEM: ApplicationListItem = {
   id: 'app-1',
   typeId: 't1',
-  title: 'Druck des Semesterplaners',
+  title: 'Flyer für die Hochschulgruppen-Messe',
   state: { id: 's1', key: 'submitted', label: 'Eingereicht', color: null, editAllowed: true },
   gremiumId: null,
   amount: '480.00',
@@ -51,7 +51,7 @@ async function setup(perms: string[] = ALL, item: ApplicationListItem = ITEM) {
     ],
   });
   const http = view.fixture.debugElement.injector.get(HttpTestingController);
-  const trigger = screen.getByRole('button', { name: 'Aktionen für Druck des Semesterplaners' });
+  const trigger = screen.getByRole('button', { name: 'Aktionen für Flyer für die Hochschulgruppen-Messe' });
   return { ...view, http, actions, trigger };
 }
 
