@@ -7,6 +7,8 @@ import type { ApplicationListItem } from '@core/api/models';
 import { TasksComponent } from './tasks.component';
 
 const DAY = 86_400_000;
+/** A fixed local "now" (4 Oct 2026, 09:00), so that no case depends on the time of the run. */
+const NOW = new Date(2026, 9, 4, 9, 0).getTime();
 
 function task(id: string, extra: Partial<ApplicationListItem> = {}): ApplicationListItem {
   return {
@@ -44,7 +46,11 @@ async function setup(
 const cmp = (fixture: { componentInstance: unknown }): any => fixture.componentInstance;
 
 describe('TasksComponent', () => {
-  beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+  beforeEach(() => {
+    localStorage.setItem('ap.locale', 'de');
+    jest.spyOn(Date, 'now').mockReturnValue(NOW);
+  });
+  afterEach(() => jest.restoreAllMocks());
 
   it('shows the columns Titel, Typ, Status, Betrag and Wartet seit', async () => {
     await setup([task('a1')]);
@@ -93,6 +99,27 @@ describe('TasksComponent', () => {
     expect(c.waitingSince('kein Datum')).toBe('—');
     expect(c.sinceTitle(null)).toBeNull();
     expect(c.sinceTitle('kein Datum')).toBeNull();
+  });
+
+  it('counts local calendar days, not blocks of 24 hours', async () => {
+    const { fixture } = await setup([]);
+    const c = cmp(fixture);
+    // Now is 4 Oct, 09:00. Yesterday late in the evening is one day, not "today".
+    expect(c.waitingSince(new Date(2026, 9, 3, 23, 0).toISOString())).toBe('seit 1 Tag');
+    // Two days ago in the evening is two days, not one.
+    expect(c.waitingSince(new Date(2026, 9, 2, 20, 0).toISOString())).toBe('seit 2 Tagen');
+    // Earlier the same day is today.
+    expect(c.waitingSince(new Date(2026, 9, 4, 0, 5).toISOString())).toBe('seit heute');
+  });
+
+  it('counts a day across a DST change as one day', async () => {
+    const { fixture } = await setup([]);
+    const c = cmp(fixture);
+    // In a zone with DST, 25 or 23 hours lie between these local midnights.
+    jest.spyOn(Date, 'now').mockReturnValue(new Date(2026, 9, 26, 0, 30).getTime());
+    expect(c.waitingSince(new Date(2026, 9, 25, 0, 30).toISOString())).toBe('seit 1 Tag');
+    jest.spyOn(Date, 'now').mockReturnValue(new Date(2026, 2, 30, 0, 30).getTime());
+    expect(c.waitingSince(new Date(2026, 2, 28, 23, 30).toISOString())).toBe('seit 2 Tagen');
   });
 
   it('uses the English wording in English', async () => {
