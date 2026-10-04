@@ -127,6 +127,46 @@ describe('AccountMenuComponent', () => {
       expect(screen.queryByRole('region', { name: 'Konto' })).not.toBeInTheDocument();
     });
 
+    it('closes when the focus leaves it, and leaves the focus where it went', async () => {
+      const { fixture, container } = await setup();
+      const after = document.createElement('a');
+      after.href = '#after';
+      after.textContent = 'Danach';
+      container.parentElement!.appendChild(after);
+      await userEvent.click(trigger());
+      fixture.detectChanges();
+      screen.getByRole('button', { name: 'Abmelden' }).focus();
+      fixture.detectChanges();
+      expect(fixture.componentInstance.open()).toBe(true);
+
+      await userEvent.tab();
+      fixture.detectChanges();
+      expect(fixture.componentInstance.open()).toBe(false);
+      expect(screen.queryByRole('region', { name: 'Konto' })).not.toBeInTheDocument();
+      expect(after).toHaveFocus();
+      after.remove();
+    });
+
+    it('stays open while the focus moves inside it', async () => {
+      const { fixture } = await setup();
+      await userEvent.click(trigger());
+      fixture.detectChanges();
+      screen.getByRole('link', { name: 'Benachrichtigungen' }).focus();
+      await userEvent.tab();
+      fixture.detectChanges();
+      expect(screen.getByRole('link', { name: 'Kalender-Abo' })).toHaveFocus();
+      expect(fixture.componentInstance.open()).toBe(true);
+    });
+
+    it('closes when the window is resized', async () => {
+      const { fixture } = await setup();
+      await userEvent.click(trigger());
+      fixture.detectChanges();
+      window.dispatchEvent(new Event('resize'));
+      fixture.detectChanges();
+      expect(screen.queryByRole('region', { name: 'Konto' })).not.toBeInTheDocument();
+    });
+
     it('closes when a link is followed', async () => {
       const { fixture } = await setup();
       await userEvent.click(trigger());

@@ -38,7 +38,9 @@ let nextId = 0;
  *
  * The popover is a disclosure (a button with `aria-expanded` and a panel), not an ARIA
  * menu: it holds a select and a switch, which a `role="menu"` cannot contain. Tab moves
- * through it, Escape and a click outside close it, and the focus goes back to the avatar.
+ * through it. Escape closes it and gives the focus back to the avatar. A click outside,
+ * focus that leaves it (Tab past the last control) and a resize of the window also close
+ * it, so the fixed panel never covers the focused control and never keeps a stale position.
  */
 @Component({
   selector: 'app-account-menu',
@@ -129,5 +131,18 @@ export class AccountMenuComponent {
   onPointerDown(event: Event): void {
     if (!this.open()) return;
     if (!this.host.nativeElement.contains(event.target as Node)) this.close();
+  }
+
+  /** The focus moved out of the menu: close it, and leave the focus where it went. */
+  @HostListener('document:focusin', ['$event'])
+  onFocusIn(event: FocusEvent): void {
+    if (!this.open()) return;
+    if (!this.host.nativeElement.contains(event.target as Node)) this.close();
+  }
+
+  /** The popover keeps the position from when it opened; after a resize that is stale. */
+  @HostListener('window:resize')
+  onResize(): void {
+    this.close();
   }
 }
