@@ -27,6 +27,7 @@ const ROUTES: Routes = [
   { path: 'dashboard', component: StubPage },
   { path: 'tasks', component: StubPage },
   { path: 'beamer', component: StubPage, data: { chrome: false } },
+  { path: 'start', component: StubPage, data: { fab: true } },
   {
     path: 'budget',
     component: StubPage,
@@ -159,6 +160,32 @@ describe('ShellComponent', () => {
       } finally {
         restore();
       }
+    });
+
+    it('keeps the foot of the page free for a floating button only on a phone route with `fab`', async () => {
+      const restore = phoneViewport();
+      try {
+        const { router, fixture, container } = await setup(MEMBER);
+        const frame = () => container.querySelector('.frame') as HTMLElement;
+
+        await router.navigateByUrl('/dashboard');
+        fixture.detectChanges();
+        expect(frame()).not.toHaveClass('frame--fab');
+
+        await router.navigateByUrl('/start');
+        fixture.detectChanges();
+        expect(frame()).toHaveClass('frame--phone');
+        expect(frame()).toHaveClass('frame--fab');
+      } finally {
+        restore();
+      }
+    });
+
+    it('gives a `fab` route no clearance outside a phone', async () => {
+      const { router, fixture, container } = await setup(MEMBER);
+      await router.navigateByUrl('/start');
+      fixture.detectChanges();
+      expect(container.querySelector('.frame--fab')).toBeNull();
     });
 
     it('resolves the wide layout from the deepest active route data', async () => {

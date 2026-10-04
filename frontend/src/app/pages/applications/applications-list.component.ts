@@ -104,6 +104,12 @@ export class ApplicationsListComponent implements OnDestroy {
   private fetchSeq = 0;
   /** `gremium` has no visible control. It still mirrors the URL. */
   readonly gremium = signal('');
+  /**
+   * `mine=true`: only the own applications ("Alle ansehen" under "Meine Anträge" on the
+   * start page). It has no control in the filter panel. A removable chip above the table
+   * shows it, the filter count includes it, and the reset clears it with the other filters.
+   */
+  readonly mine = signal('');
   readonly types = signal<ApplicationType[]>([]);
 
   /** Visible filter controls. They mirror the query params. */
@@ -155,6 +161,7 @@ export class ApplicationsListComponent implements OnDestroy {
         this.amountMax(),
         this.createdFrom(),
         this.createdTo(),
+        this.mine(),
         // Anything other than the default is a filter the reader has set.
         this.archived() === 'false' ? '' : this.archived(),
       ].filter((v) => String(v ?? '').trim() !== '').length,
@@ -274,7 +281,17 @@ export class ApplicationsListComponent implements OnDestroy {
     if (changed) this.seenStates.set(next);
   }
 
-  /** Export the current list as Excel. The filters come from the query params. */
+  /** Remove the `mine` filter (the chip above the table). */
+  clearMine(): void {
+    this.setFilter('mine', '');
+  }
+
+  /**
+   * Export the current list as Excel. The filters come from the query params.
+   *
+   * The export endpoint has no `mine` filter, so the template hides the button while
+   * `mine` is set. Otherwise the download holds more rows than the list shows.
+   */
   onExport(): void {
     if (this.exporting()) return;
     this.exporting.set(true);
@@ -376,6 +393,7 @@ export class ApplicationsListComponent implements OnDestroy {
     { param: 'type', signal: this.typeId, empty: '' },
     { param: 'state', signal: this.state, empty: '' },
     { param: 'gremium', signal: this.gremium, empty: '' },
+    { param: 'mine', signal: this.mine, empty: '', parse: (raw) => (raw === 'true' ? raw : '') },
     { param: 'budget', signal: this.budgetId, empty: '' },
     { param: 'amountMin', signal: this.amountMin, empty: '', numeric: true, trim: true },
     { param: 'amountMax', signal: this.amountMax, empty: '', numeric: true, trim: true },

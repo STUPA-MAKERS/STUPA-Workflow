@@ -1,1 +1,65 @@
-:host { display: flex; flex-direction: column; gap: var(--space-4); }
+@use 'breakpoints' as bp;
+
+:host {
+  display: flex;
+  flex-direction: column;
+}
+
+/* "8 offen": a count beside the title, not a control. */
+.tasks__count {
+  align-self: flex-start;
+  margin-top: var(--space-2);
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+
+/* The title gives no width to its column (width 0) and fills the cell (min-width 100%),
+   so a long title takes the width that is left and ends in an ellipsis. It never makes
+   the table wider than the page. */
+.tasks__title {
+  display: block;
+  width: 0;
+  min-width: 100%;
+  font-weight: var(--fw-medium);
+  color: var(--color-text);
+}
+
+/* The request failed: one line in the danger colour, like the error of the start page. */
+.tasks__error {
+  margin: 0;
+  padding: var(--space-5) 0;
+  color: var(--color-danger);
+}
+
+.tasks__muted {
+  color: var(--color-text-muted);
+}
+
+/* One line, so each of these columns is as wide as its longest value and the title
+   column takes the rest. */
+.tasks__nowrap {
+  white-space: nowrap;
+}
+
+.tasks__waiting {
+  font-size: 0.8125rem; /* 13px */
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.tasks__chev {
+  display: inline-flex;
+  color: var(--color-text-subtle);
+}
+
+/* A card has the width for the full title, so it wraps there. */
+@include bp.phone {
+  .tasks__nowrap {
+    white-space: normal;
+  }
+  .tasks__title {
+    width: auto;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}

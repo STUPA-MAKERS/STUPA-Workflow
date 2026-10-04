@@ -193,6 +193,49 @@ describe('ApplicationsListComponent', () => {
     http.verify();
   });
 
+  it('asks for the own applications only with ?mine=true (start page "Alle ansehen")', async () => {
+    const { http, router } = await setup();
+    flushTypes(http);
+    http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
+
+    await router.navigate([], { queryParams: { mine: 'true' } });
+    const own = http.expectOne((r) => r.url === '/api/applications');
+    expect(own.request.params.get('mine')).toBe('true');
+    own.flush(listPage([ITEM]));
+
+    // Any other value is no filter: a hand-edited URL cannot send a value the API rejects.
+    await router.navigate([], { queryParams: { mine: 'yes' } });
+    const all = http.expectOne((r) => r.url === '/api/applications');
+    expect(all.request.params.has('mine')).toBe(false);
+    all.flush(listPage([ITEM]));
+    http.verify();
+  });
+
+  it('shows the mine filter as a removable chip and counts it as a filter', async () => {
+    const { http, detectChanges, cmp, router } = await setup();
+    flushTypes(http);
+    http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
+    detectChanges();
+    expect(cmp.activeFilterCount()).toBe(0);
+    expect(screen.queryByText('Nur meine Anträge')).not.toBeInTheDocument();
+
+    await router.navigate([], { queryParams: { mine: 'true' } });
+    http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
+    detectChanges();
+    expect(cmp.activeFilterCount()).toBe(1);
+    expect(screen.getByText('Nur meine Anträge')).toBeInTheDocument();
+
+    const navigate = jest.spyOn(router, 'navigate').mockResolvedValue(true);
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Filter „Nur meine Anträge“ entfernen' }),
+    );
+    expect(navigate).toHaveBeenCalledWith(
+      [],
+      expect.objectContaining({ queryParams: { mine: null, offset: null } }),
+    );
+    http.verify();
+  });
+
   it('clears every filter param on reset', async () => {
     const { http, detectChanges, router } = await setup();
     flushTypes(http);
@@ -207,7 +250,7 @@ describe('ApplicationsListComponent', () => {
       [],
       expect.objectContaining({
         queryParams: {
-          q: null, type: null, state: null, gremium: null, budget: null,
+          q: null, type: null, state: null, gremium: null, mine: null, budget: null,
           amountMin: null, amountMax: null, createdFrom: null, createdTo: null,
           // `archived` clears with the rest. It is a tri-state, so a reset has to put it
           // back to its default rather than merely leave it alone.
@@ -397,7 +440,10 @@ describe('ApplicationsListComponent', () => {
     it('reads every filter back out of the URL', async () => {
       const { cmp, http } = await ready();
       const raw: Record<string, string> = {};
-      for (const f of defs(cmp)) raw[f.param] = f.param === 'archived' ? 'all' : '42';
+      // A tri-state or a flag takes only its own values; every other filter takes '42'.
+      const valueOf = (param: string): string =>
+        param === 'archived' ? 'all' : param === 'mine' ? 'true' : '42';
+      for (const f of defs(cmp)) raw[f.param] = valueOf(f.param);
 
       cmp.readFilters(convertToParamMap(raw));
 
@@ -606,6 +652,22 @@ describe('ApplicationsListComponent', () => {
       req.flush(new Blob(['x']));
       expect(cmp.exporting()).toBe(false);
       restore();
+      http.verify();
+    });
+
+    it('hides the export button while the mine filter is set', async () => {
+      // The export endpoint has no `mine` filter. The button must not export more rows
+      // than the list shows.
+      const { http, detectChanges, router } = await setup({ perms: ['application.export'] });
+      flushTypes(http);
+      http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
+      detectChanges();
+      expect(screen.getByRole('button', { name: /Export/i })).toBeInTheDocument();
+
+      await router.navigate([], { queryParams: { mine: 'true' } });
+      http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
+      detectChanges();
+      expect(screen.queryByRole('button', { name: /Export/i })).not.toBeInTheDocument();
       http.verify();
     });
 

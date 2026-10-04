@@ -219,8 +219,11 @@ describe('mockApiInterceptor', () => {
     });
 
     it('GET /applications/tasks → task list', async () => {
-      const tasks = await get<unknown[]>('/api/applications/tasks');
+      const tasks = await get<{ stateSince?: string }[]>('/api/applications/tasks');
       expect(tasks.length).toBe(2);
+      // One task carries stateSince (A9), one shows the updatedAt fallback.
+      expect(tasks[0].stateSince).toBeTruthy();
+      expect(tasks[1].stateSince).toBeUndefined();
     });
 
     it('GET /applications → page', async () => {
@@ -254,9 +257,30 @@ describe('mockApiInterceptor', () => {
       expect(page.items.length).toBe(1);
     });
 
-    it('GET /meetings → list', async () => {
-      const list = await get<unknown[]>('/api/meetings');
-      expect(list.length).toBe(1);
+    it('GET /meetings → the live and a planned meeting, with the start-page fields', async () => {
+      const list = await get<
+        {
+          status: string;
+          startedAt?: string;
+          currentAgendaItem?: { position: number };
+          agendaItemCount?: number;
+        }[]
+      >('/api/meetings');
+      expect(list.map((m) => m.status)).toEqual(['live', 'planned']);
+      expect(list[0].startedAt).toBeTruthy();
+      expect(list[0].currentAgendaItem?.position).toBe(1);
+      expect(list[0].agendaItemCount).toBe(2);
+    });
+
+    it('GET /delegations → the own delegations, filtered by meetingId', async () => {
+      const all = await get<{ meetingId: string; direction: string }[]>('/api/delegations');
+      expect(all.length).toBe(1);
+      expect(all[0].direction).toBe('incoming');
+      const none = await get<unknown[]>(
+        '/api/delegations',
+        new HttpParams().set('meetingId', 'other'),
+      );
+      expect(none).toEqual([]);
     });
 
     it('GET …/attendance → roster', async () => {

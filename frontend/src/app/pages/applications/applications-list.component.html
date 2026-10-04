@@ -13,7 +13,9 @@
       (ngModelChange)="onSearch($event)"
       name="qHeader"
     />
-    @if (canExport()) {
+    <!-- The export has no `mine` filter. Hide it while `mine` is set, so that the button
+         never exports more rows than the list shows. -->
+    @if (canExport() && !mine()) {
       <app-button variant="secondary" size="sm" (click)="onExport()" [loading]="exporting()">
         <span class="inline-flex items-center gap-2">
           <app-icon name="export" [size]="16" />
@@ -112,6 +114,22 @@
   </div>
 </aside>
 <div class="apps__main">
+@if (mine()) {
+  <!-- `mine` has no control in the filter panel. This chip shows the narrowing and removes it. -->
+  <p class="apps__scope">
+    <span class="apps__scopeChip">
+      {{ 'applications.list.filter.mine' | t }}
+      <button
+        type="button"
+        class="apps__scopeClear"
+        [attr.aria-label]="'applications.list.filter.mineClear' | t"
+        (click)="clearMine()"
+      >
+        <app-icon name="x" [size]="14" />
+      </button>
+    </span>
+  </p>
+}
 @if (error()) {
   <p class="apps__status apps__status--error" role="alert">
     {{ 'applications.list.error' | t }}

@@ -4,6 +4,7 @@
   class="frame"
   [class.frame--rail]="frame() === 'rail' && !phone()"
   [class.frame--phone]="frame() === 'rail' && phone()"
+  [class.frame--fab]="frame() === 'rail' && phone() && fab()"
   [class.frame--public]="frame() === 'public'"
   [class.frame--bare]="frame() === 'bare'"
 >
