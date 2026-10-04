@@ -50,11 +50,21 @@
   gap: var(--space-4);
   min-width: 0;
 }
+/* The wide layout does not scroll as a page: the pane and the sheet each scroll inside
+   themselves. The host takes the free height of the main column of the shell (the
+   viewport less the footer and the block padding) and gives it to the grid. A basis of 0
+   keeps the content from pushing the page taller than the viewport. */
+:host:has(> .bd--wide) {
+  flex: 1 1 0;
+  min-height: 24rem;
+}
 .bd--wide {
   display: grid;
+  flex: 1 1 0;
   grid-template-columns: 340px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   gap: var(--space-2);
-  align-items: start;
+  min-height: 0;
 }
 
 .bd__pane {
@@ -63,13 +73,10 @@
   gap: var(--space-3);
   min-width: 0;
 }
-/* The pane fills the viewport below the top padding of the shell and does not scroll
-   itself: the title, the chips and the search stay; only the tree scrolls. The page
-   scrolls for the sheet only. */
+/* The pane takes the full height of the frame and does not scroll itself: the title, the
+   chips and the search stay; only the tree scrolls. */
 .bd--wide .bd__pane {
-  position: sticky;
-  top: var(--main-pad-top, 0px);
-  height: calc(100dvh - var(--main-pad-top, 0px) - var(--main-pad-bottom, 0px));
+  min-height: 0;
   overflow: hidden;
   padding-inline-end: var(--space-2);
 }
@@ -208,35 +215,25 @@
   color: var(--color-text);
 }
 
-/* ------------------------------------------------------------------ tree
-   The tree is the only part of the pane that scrolls. An end fades only when there are
-   more rows past it (`appScrollFade` sets the classes). The scroll padding keeps a row
-   that gets the focus clear of the fade. */
-.bd__tree {
+/* ------------------------------------------------------------------ fades
+   An end of a scrolling list fades only when there is more content past it
+   (`appScrollFade` sets the classes). The tree and the wide sheet share the mask. */
+.bd__tree,
+.bd__sheetBody {
   --bd-fade: var(--space-6);
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scroll-padding-block: var(--bd-fade);
 }
-/* The rows keep their size; the list scrolls instead of squeezing them. */
-.bd__tree > * {
-  flex: none;
-}
-.bd__tree.is-fade-start {
+.bd__tree.is-fade-start,
+.bd__sheetBody.is-fade-start {
   -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--bd-fade));
   mask-image: linear-gradient(to bottom, transparent, #000 var(--bd-fade));
 }
-.bd__tree.is-fade-end {
+.bd__tree.is-fade-end,
+.bd__sheetBody.is-fade-end {
   -webkit-mask-image: linear-gradient(to top, transparent, #000 var(--bd-fade));
   mask-image: linear-gradient(to top, transparent, #000 var(--bd-fade));
 }
-.bd__tree.is-fade-start.is-fade-end {
+.bd__tree.is-fade-start.is-fade-end,
+.bd__sheetBody.is-fade-start.is-fade-end {
   -webkit-mask-image: linear-gradient(
     to bottom,
     transparent,
@@ -251,6 +248,26 @@
     #000 calc(100% - var(--bd-fade)),
     transparent
   );
+}
+
+/* ------------------------------------------------------------------ tree
+   The tree is the only part of the pane that scrolls. An end fades only when there are
+   more rows past it (`appScrollFade` sets the classes). The scroll padding keeps a row
+   that gets the focus clear of the fade. */
+.bd__tree {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: var(--bd-fade);
+}
+/* The rows keep their size; the list scrolls instead of squeezing them. */
+.bd__tree > * {
+  flex: none;
 }
 .tn {
   display: flex;
@@ -334,19 +351,34 @@ button.tn__chev:hover:not(:disabled) {
   font-size: 0.78125rem;
 }
 
-/* ------------------------------------------------------------------ sheet */
+/* ------------------------------------------------------------------ sheet
+   The card carries the background; the body inside it holds the content and, on the
+   wide layout, scrolls. So the fade masks the content and never the card. */
 .bd__sheet {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface-1);
+}
+.bd--wide .bd__sheet {
+  overflow: hidden;
+}
+.bd__sheetBody {
   display: flex;
   flex-direction: column;
   gap: 22px;
   min-width: 0;
   // 24px 32px, as on the Budget board: the sheet keeps its width for the charts.
   padding: var(--space-5) var(--space-6);
-  border-radius: var(--radius-2xl);
-  background: var(--color-surface-1);
 }
-.bd--wide .bd__sheet {
-  min-height: calc(100dvh - var(--main-pad-top, 0px) - var(--space-3));
+.bd--wide .bd__sheetBody {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
 }
 
 .bd__head {
@@ -512,9 +544,24 @@ button.bd__crumb:hover {
   color: var(--color-text-muted);
 }
 .bd__grow,
-.bd__uname {
+.bd__ucell {
   flex: 1 1 0;
   min-width: 0;
+}
+.bd__ucell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.bd__uname {
+  min-width: 0;
+}
+/* The requested amount below the name: only on a phone, which drops the column. */
+.bd__ureq {
+  display: none;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  color: var(--color-text-muted);
 }
 .bd__c1,
 .bd__c2,
@@ -597,8 +644,10 @@ button.bd__crumb:hover {
     background: var(--color-surface-1);
   }
   .bd__sheet {
-    padding: 0;
     background: none;
+  }
+  .bd__sheetBody {
+    padding: 0;
   }
   .bd__cols {
     grid-template-columns: minmax(0, 1fr);
@@ -628,8 +677,12 @@ button.bd__crumb:hover {
   .bd__figValue {
     font-size: 1rem;
   }
+  /* No room for the "Beantragt" column: the amount moves below the name (N28). */
   .bd__c1 {
     display: none;
+  }
+  .bd__ureq {
+    display: block;
   }
   /* The heading takes the free width and wraps in it, so an action such as
      "Alle ansehen" stays on the heading row. */

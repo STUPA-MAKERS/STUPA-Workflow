@@ -251,6 +251,22 @@ describe('BudgetDashboardComponent', () => {
       expect(fades()).toEqual([true, false]);
     });
 
+    it('scrolls the sheet inside itself on the wide layout and fades only the content', async () => {
+      const view = await setup();
+      const sheet = view.container.querySelector('article.bd__sheet') as HTMLElement;
+      const body = sheet.querySelector(':scope > .bd__sheetBody') as HTMLElement;
+      // The body holds all of the content, so the card keeps its background unmasked.
+      expect(sheet.children).toHaveLength(1);
+      expect(body.querySelector('.bd__figs')).toBeTruthy();
+      Object.defineProperty(body, 'scrollHeight', { value: 1200, configurable: true });
+      Object.defineProperty(body, 'clientHeight', { value: 800, configurable: true });
+      Object.defineProperty(body, 'scrollTop', { value: 0, configurable: true });
+      body.dispatchEvent(new Event('scroll'));
+      expect(body).toHaveClass('is-fade-end');
+      expect(body).not.toHaveClass('is-fade-start');
+      expect(sheet).not.toHaveClass('is-fade-end');
+    });
+
     it('scrolls a row into view when it gets the keyboard focus', async () => {
       const view = await setup();
       const row = view.container.querySelector('.bd__tree .tn') as HTMLElement;
@@ -582,7 +598,8 @@ describe('BudgetDashboardComponent', () => {
       // 900 is overdrawn.
       expect(rows[1].segments.map((s: { tone: string }) => s.tone)).toEqual(['error', 'error']);
       const list = within(view.container.querySelector('.bd__usage') as HTMLElement);
-      expect(list.getByText(/^20\s€$/)).toBeTruthy();
+      // The column, and the line below the name that a phone shows instead.
+      expect(list.getAllByText(/^20\s€$/)).toHaveLength(2);
       expect(list.getByText('25 %')).toBeTruthy();
       expect(list.getByText(/^-50\s€$/).classList).toContain('bd__neg');
       // No requested amount reads as a dash.
@@ -605,6 +622,15 @@ describe('BudgetDashboardComponent', () => {
       expect(bar?.getAttribute('aria-label')).toMatch(expected);
       const row = view.container.querySelector('.bd__usage .bd__urow');
       expect(row?.getAttribute('title')).toMatch(expected);
+    });
+
+    it('keeps the requested amount on a phone, below the name of the row (N28)', async () => {
+      const view = await setup({ wide: false, phone: true });
+      const row = view.container.querySelector('.bd__usage .bd__urow') as HTMLElement;
+      // The column and the line below the name both exist; CSS shows the line on a phone.
+      expect(row.querySelector('.bd__c1')).toBeTruthy();
+      const req = row.querySelector('.bd__ucell > .bd__uname + .bd__ureq') as HTMLElement;
+      expect(req.textContent).toMatch(/Beantragt:\s*20\s€/);
     });
 
     it('shows no shared legend, because each bar has the colour of its cost centre', async () => {
@@ -821,6 +847,9 @@ describe('BudgetDashboardComponent', () => {
       expect(dialog).toHaveClass('ss--start');
       expect(dialog.querySelector('.ss__body')).toHaveClass('ss__body--fill');
       expect(dialog.querySelector('.ss__body > .bd__paneBody .bd__tree')).toBeTruthy();
+      // The year and the overview sit on the page, so the sheet has only the search and
+      // the tree.
+      expect(dialog.querySelector('.bd-chip, select')).toBeNull();
     });
 
     it('opens the tree in the dialog of the ui-kit on a phone, which is a bottom sheet there', async () => {
@@ -871,6 +900,8 @@ describe('BudgetDashboardComponent', () => {
       const view = await setup({ wide: false, phone: true });
       const c = view.fixture.componentInstance as unknown as Inst;
       const chips = view.container.querySelector('.bd__top .bd__chips') as HTMLElement;
+      expect(chips.querySelector('.bd__pathChip')).toBeTruthy();
+      expect(chips.querySelector('label.bd__selectChip select')).toBeTruthy();
       const chip = within(chips).getByRole('button', { name: 'Übersicht' });
       expect(chip).not.toHaveClass('bd-chip--on');
       chip.click();
@@ -987,7 +1018,8 @@ describe('BudgetDashboardComponent', () => {
     const { c, http, fixture } = await bare();
     fixture.detectChanges();
     expect(c.loading()).toBe(true);
-    expect(fixture.nativeElement.querySelector('[aria-busy="true"]')).toBeTruthy();
+    // The placeholder has the two columns of the wide layout, so the page does not jump.
+    expect(fixture.nativeElement.querySelector('[aria-busy="true"]')).toHaveClass('bd--wide');
     expect(fixture.nativeElement.querySelectorAll('main')).toHaveLength(0);
     http.expectOne((r) => r.url.endsWith('/budgets')).flush('x', { status: 500, statusText: 'err' });
     fixture.detectChanges();

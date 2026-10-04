@@ -8,7 +8,6 @@ import {
   signal,
 } from '@angular/core';
 import { I18nService } from '@core/i18n/i18n.service';
-import { TranslatePipe } from '@core/i18n/translate.pipe';
 
 /** A pie slice: label, value in currency units and colour (any CSS colour).
  *  An `id`, which is a cost centre id, makes the slice clickable for a drilldown. */
@@ -42,13 +41,13 @@ const GROW = 5; // radial growth on hover
  * Hover on a slice or an entry highlights both. Pure SVG, no third-party library.
  *
  * Without an amount (all slices 0) the chart keeps its size and shows one neutral ring
- * with 0 in the hole, so the layout does not jump when the metric changes.
+ * with 0 in the hole and neutral skeleton lines in place of the legend, so the layout
+ * does not jump when the metric changes. It shows no "no data" text.
  */
 @Component({
   selector: 'app-budget-pie',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe],
   templateUrl: './budget-pie.component.html',
   styleUrl: './budget-pie.component.scss',
 })

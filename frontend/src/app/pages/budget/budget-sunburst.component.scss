@@ -43,8 +43,15 @@
   z-index: 1;
   max-width: 16rem;
 }
-.sb__hint,
-.sb__empty {
+/* No amount: one ring in a neutral surface colour, like a skeleton. */
+.sb__ring {
+  fill: none;
+  stroke: var(--color-surface-3);
+}
+.sb__center--empty {
+  cursor: default;
+}
+.sb__hint {
   color: var(--color-text-muted);
   font-size: var(--fs-xs);
   text-align: center;

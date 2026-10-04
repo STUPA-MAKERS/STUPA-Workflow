@@ -125,11 +125,25 @@
 }
 
 .pie__empty {
+  display: flex;
   flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--space-3);
   min-width: 0;
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--fs-sm);
+  padding: 0 var(--space-2);
+}
+/* One neutral line per legend entry, like a skeleton. No shimmer: nothing loads. */
+.pie__skel {
+  display: block;
+  height: 10px;
+  border-radius: 5px;
+  background: var(--color-surface-3);
+}
+.pie__skel:nth-child(2) {
+  width: 80%;
+}
+.pie__skel:nth-child(3) {
+  width: 60%;
 }
 
 @media (prefers-reduced-motion: reduce) {

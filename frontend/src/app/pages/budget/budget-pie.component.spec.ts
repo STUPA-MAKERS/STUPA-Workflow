@@ -77,7 +77,10 @@ describe('BudgetPieComponent', () => {
     expect(view.container.querySelector('.pie__total')?.textContent).toMatch(/^0\s€$/);
     expect(view.container.querySelector('.pie__total--empty')).toBeTruthy();
     expect(view.container.querySelector('.pie__legend')).toBeNull();
-    expect(view.container.querySelector('p.pie__empty')?.textContent).toContain('Keine Daten');
+    // A neutral skeleton in place of the legend, and never a "no data" text.
+    expect(view.container.querySelectorAll('.pie__empty .pie__skel').length).toBe(3);
+    expect(view.container.querySelector('.pie__empty')?.getAttribute('aria-hidden')).toBe('true');
+    expect(view.container.textContent).not.toContain('Keine Daten');
   });
 
   it('adds the no-amount note to an explicit aria label', async () => {
@@ -96,7 +99,7 @@ describe('BudgetPieComponent', () => {
     });
     // Here total() is max(0,-10) + max(0,0) = 0, which takes the empty branch.
     expect(view.fixture.componentInstance as unknown as PieInternals).toBeTruthy();
-    expect(view.container.querySelector('p.pie__empty')).toBeTruthy();
+    expect(view.container.querySelector('.pie__empty')).toBeTruthy();
   });
 
   it('total() sums and floors negative slice values to zero', async () => {

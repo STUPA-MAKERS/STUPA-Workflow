@@ -63,11 +63,22 @@ async function setup(
 describe('BudgetSunburstComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
-  it('total() is 0 with no root and shows the empty paragraph', async () => {
+  it('total() is 0 with no root and shows one neutral ring, never a "no data" text', async () => {
     const view = await setup({ root: null });
     expect((view.fixture.componentInstance as unknown as SunInternals).total()).toBe(0);
-    expect(view.container.querySelector('p.sb__empty')).toBeTruthy();
-    expect(view.container.querySelector('svg.sb__svg')).toBeNull();
+    const svg = view.container.querySelector('svg.sb__svg--empty');
+    expect(svg?.querySelectorAll('circle.sb__ring')).toHaveLength(1);
+    expect(svg?.querySelectorAll('path.sb__seg')).toHaveLength(0);
+    expect(svg?.querySelector('.sb__center-val')?.textContent).toMatch(/^0\s€$/);
+    expect(view.container.textContent).not.toContain('Keine Daten');
+  });
+
+  it('names the root and says that there is no amount when the root total is 0', async () => {
+    const root = node('root', { fiscalYearId: FY, allocated: '0' });
+    const view = await setup({ root });
+    const svg = view.container.querySelector('svg.sb__svg--empty');
+    expect(svg?.getAttribute('aria-label')).toMatch(/: kein Betrag vorhanden$/);
+    expect(svg?.querySelector('.sb__center-name')?.textContent).toBe(root.name);
   });
 
   it('segments() is empty when the root total is 0 (no metric data)', async () => {
@@ -219,6 +230,6 @@ describe('BudgetSunburstComponent', () => {
     });
     expect(view.container.querySelector('svg.sb__svg')).toBeTruthy();
     expect(view.container.querySelector('text.sb__center-name')?.textContent).toContain('Node root');
-    expect(view.container.querySelector('p.sb__empty')).toBeNull();
+    expect(view.container.querySelector('svg.sb__svg--empty')).toBeNull();
   });
 });

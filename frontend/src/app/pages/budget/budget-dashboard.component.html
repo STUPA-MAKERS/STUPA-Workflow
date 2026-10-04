@@ -4,15 +4,16 @@
 } @else if (loading()) {
   <!-- Never the empty state while loading. "There are no cost centres" and "they have
        not arrived yet" are different claims, and the first one is false during every
-       load. The placeholder holds the shape of the layout. -->
-  <div class="bd" aria-busy="true">
+       load. The placeholder holds the shape of the layout, the two columns of the wide
+       layout included, so the page does not jump when the data arrives. -->
+  <div class="bd" [class.bd--wide]="wide()" aria-busy="true">
     <section class="bd__pane" aria-hidden="true">
       <h1 class="bd__title">{{ 'nav.budget' | t }}</h1>
       <span class="skel skel--line"></span>
       <span class="skel skel--line"></span>
       <span class="skel skel--line"></span>
     </section>
-    <div class="bd__sheet">
+    <div class="bd__sheet bd__sheetBody">
       <span class="skel skel--panel"></span>
       <span class="sr-only" role="status">{{ 'budget.loading' | t }}</span>
     </div>
@@ -67,8 +68,7 @@
             <app-icon name="chevron-down" [size]="15" />
           </button>
           <ng-container *ngTemplateOutlet="yearChip" />
-          <!-- The overview is also in the sheet, but on a phone the page must reach it
-               without the picker. -->
+          <!-- The page reaches the overview without the picker, as on the wide layout. -->
           <button
             type="button"
             class="bd-chip"
@@ -88,147 +88,159 @@
       [attr.aria-labelledby]="wide() ? 'bd-title' : null"
       [attr.aria-label]="wide() ? null : pathLabel()"
     >
-      <!-- Narrower layouts name the path in the chip above and put the actions beside the
-           page title, so the sheet starts with the figures. -->
-      @if (wide()) {
-        <header class="bd__head">
-          <div class="bd__headText">
-            <nav class="bd__crumbs" [attr.aria-label]="'budget.breadcrumbs' | t">
-              @for (node of breadcrumbs(); track node.id; let last = $last) {
-                @if (last) {
-                  <span class="bd__crumb bd__crumb--current ell" aria-current="page" [title]="node.name">{{ node.name }}</span>
-                  <span class="bd__key mono">{{ node.pathKey | simplifyPath }}</span>
-                } @else {
-                  <button type="button" class="bd__crumb ell" [title]="node.name" (click)="selectKs(node.id)">{{ node.name }}</button>
-                  <app-icon class="bd__crumbSep" name="chevron-right" [size]="13" />
-                }
-              }
-            </nav>
-            <h2 id="bd-title" class="bd__name ell" [title]="current()?.name ?? ''">
-              {{ current()?.name }}
-            </h2>
-          </div>
-          <ng-container *ngTemplateOutlet="actions" />
-        </header>
-      } @else {
-        <h2 class="sr-only">{{ current()?.name }}</h2>
-      }
-
-      <dl class="bd__figs">
-        @for (f of figureList(); track f.key) {
-          <div class="bd__fig" [class.bd__fig--main]="f.key === 'available'">
-            <dt class="bd__figLabel">{{ f.label }}</dt>
-            <dd class="bd__figValue mono" [class.bd__neg]="f.value < 0">{{ money(f.value, current()?.currency) }}</dd>
-          </div>
-        }
-      </dl>
-
-      <!-- A cost centre without sub cost centres has nothing to distribute: the chart
-           would be one ring of its own amount, so only the utilisation shows. -->
-      <div class="bd__cols" [class.bd__cols--single]="!hasChildren()">
-        @if (hasChildren()) {
-          <section class="bd__sec" aria-labelledby="bd-dist">
-            <div class="bd__secHead">
-              <h3 id="bd-dist" class="bd__h">{{ 'budget.dash.distribution' | t }}</h3>
-              <label class="bd-chip bd-chip--on bd__selectChip">
-                <span class="sr-only">{{ 'budget.dash.metric' | t }}</span>
-                <select class="bd__select" [value]="metric()" (change)="onMetricChange($event)">
-                  @for (m of metrics; track m) {
-                    <option [value]="m" [selected]="m === metric()">{{ metricLabel(m) }}</option>
+      <!-- The wide layout scrolls the sheet inside itself, with a fade at an end only where
+           more content is. The card keeps its background; only the content fades. -->
+      <div class="bd__sheetBody" appScrollFade="y">
+        <!-- Narrower layouts name the path in the chip above and put the actions beside the
+             page title, so the sheet starts with the figures. -->
+        @if (wide()) {
+          <header class="bd__head">
+            <div class="bd__headText">
+              <nav class="bd__crumbs" [attr.aria-label]="'budget.breadcrumbs' | t">
+                @for (node of breadcrumbs(); track node.id; let last = $last) {
+                  @if (last) {
+                    <span class="bd__crumb bd__crumb--current ell" aria-current="page" [title]="node.name">{{ node.name }}</span>
+                    <span class="bd__key mono">{{ node.pathKey | simplifyPath }}</span>
+                  } @else {
+                    <button type="button" class="bd__crumb ell" [title]="node.name" (click)="selectKs(node.id)">{{ node.name }}</button>
+                    <app-icon class="bd__crumbSep" name="chevron-right" [size]="13" />
                   }
-                </select>
-                <app-icon class="bd__selectChev" name="chevron-down" [size]="14" />
-              </label>
+                }
+              </nav>
+              <h2 id="bd-title" class="bd__name ell" [title]="current()?.name ?? ''">
+                {{ current()?.name }}
+              </h2>
             </div>
-            <app-budget-pie
-              [label]="metricLabel(metric())"
-              [ariaLabel]="('budget.dash.distributionOf' | t: { metric: metricLabel(metric()) })"
-              [slices]="distribution()"
-              [currency]="current()?.currency ?? 'EUR'"
-              (sliceClick)="selectKs($event)"
-            />
-          </section>
+            <ng-container *ngTemplateOutlet="actions" />
+          </header>
+        } @else {
+          <h2 class="sr-only">{{ current()?.name }}</h2>
         }
 
-        <section class="bd__sec" aria-labelledby="bd-usage">
-          <div class="bd__secHead">
-            <h3 id="bd-usage" class="bd__h">{{ 'budget.usage.heading' | t }}</h3>
-          </div>
-          <div class="bd__usageCols" aria-hidden="true">
-            <span class="bd__grow"></span>
-            <span class="bd__c1">{{ 'budget.dash.fig.requested' | t }}</span>
-            <span class="bd__c2">{{ 'budget.usage.bar' | t }}</span>
-            <span class="bd__c3">{{ 'budget.dash.fig.available' | t }}</span>
-          </div>
-          <ul class="bd__usage">
-            @for (row of usageRows(); track row.node.id) {
-              <!-- Each bar has the colour of its cost centre, so a shared legend cannot match it.
-                   The tooltip of the row and the label of the bar name the amounts instead.
-                   The bar is only 6px high, so the whole row carries the tooltip. -->
-              <li class="bd__urow" [style.--color-accent]="row.color" [title]="usageLabel(row)">
-                <div class="bd__uline">
-                  <button
-                    type="button"
-                    class="bd__uname ell"
-                    [title]="row.node.name"
-                    [disabled]="row.node.id === selectedKsId()"
-                    (click)="drillInto(row.node)"
-                  >{{ row.node.name }}</button>
-                  <span class="bd__c1 mono">
-                    <span class="sr-only">{{ 'budget.dash.fig.requested' | t }}:</span>
-                    {{ row.figures.requested ? moneyShort(row.figures.requested, row.node.currency) : '–' }}
-                  </span>
-                  <span class="bd__c2 mono">
-                    <span class="sr-only">{{ 'budget.usage.bar' | t }}:</span>
-                    {{ row.percent === null ? '–' : row.percent + ' %' }}
-                  </span>
-                  <span class="bd__c3 mono" [class.bd__neg]="row.figures.available < 0">
-                    <span class="sr-only">{{ 'budget.dash.fig.available' | t }}:</span>
-                    {{ moneyShort(row.figures.available, row.node.currency) }}
-                  </span>
-                </div>
-                <app-seg-bar [segments]="row.segments" [total]="row.total" [label]="usageLabel(row)" />
-              </li>
+        <dl class="bd__figs">
+          @for (f of figureList(); track f.key) {
+            <div class="bd__fig" [class.bd__fig--main]="f.key === 'available'">
+              <dt class="bd__figLabel">{{ f.label }}</dt>
+              <dd class="bd__figValue mono" [class.bd__neg]="f.value < 0">{{ money(f.value, current()?.currency) }}</dd>
+            </div>
+          }
+        </dl>
+
+        <!-- A cost centre without sub cost centres has nothing to distribute: the chart
+             would be one ring of its own amount, so only the utilisation shows. -->
+        <div class="bd__cols" [class.bd__cols--single]="!hasChildren()">
+          @if (hasChildren()) {
+            <section class="bd__sec" aria-labelledby="bd-dist">
+              <div class="bd__secHead">
+                <h3 id="bd-dist" class="bd__h">{{ 'budget.dash.distribution' | t }}</h3>
+                <label class="bd-chip bd-chip--on bd__selectChip">
+                  <span class="sr-only">{{ 'budget.dash.metric' | t }}</span>
+                  <select class="bd__select" [value]="metric()" (change)="onMetricChange($event)">
+                    @for (m of metrics; track m) {
+                      <option [value]="m" [selected]="m === metric()">{{ metricLabel(m) }}</option>
+                    }
+                  </select>
+                  <app-icon class="bd__selectChev" name="chevron-down" [size]="14" />
+                </label>
+              </div>
+              <app-budget-pie
+                [label]="metricLabel(metric())"
+                [ariaLabel]="('budget.dash.distributionOf' | t: { metric: metricLabel(metric()) })"
+                [slices]="distribution()"
+                [currency]="current()?.currency ?? 'EUR'"
+                (sliceClick)="selectKs($event)"
+              />
+            </section>
+          }
+
+          <section class="bd__sec" aria-labelledby="bd-usage">
+            <div class="bd__secHead">
+              <h3 id="bd-usage" class="bd__h">{{ 'budget.usage.heading' | t }}</h3>
+            </div>
+            <div class="bd__usageCols" aria-hidden="true">
+              <span class="bd__grow"></span>
+              <span class="bd__c1">{{ 'budget.dash.fig.requested' | t }}</span>
+              <span class="bd__c2">{{ 'budget.usage.bar' | t }}</span>
+              <span class="bd__c3">{{ 'budget.dash.fig.available' | t }}</span>
+            </div>
+            <ul class="bd__usage">
+              @for (row of usageRows(); track row.node.id) {
+                <!-- Each bar has the colour of its cost centre, so a shared legend cannot match it.
+                     The tooltip of the row and the label of the bar name the amounts instead.
+                     The bar is only 6px high, so the whole row carries the tooltip. -->
+                <li class="bd__urow" [style.--color-accent]="row.color" [title]="usageLabel(row)">
+                  <div class="bd__uline">
+                    <div class="bd__ucell">
+                      <button
+                        type="button"
+                        class="bd__uname ell"
+                        [title]="row.node.name"
+                        [disabled]="row.node.id === selectedKsId()"
+                        (click)="drillInto(row.node)"
+                      >{{ row.node.name }}</button>
+                      <!-- A phone has no room for the "Beantragt" column, so the amount goes
+                           below the name there. CSS shows exactly one of the two. -->
+                      <span class="bd__ureq">
+                        {{ 'budget.dash.fig.requested' | t }}:
+                        <span class="mono">{{ row.figures.requested ? moneyShort(row.figures.requested, row.node.currency) : '–' }}</span>
+                      </span>
+                    </div>
+                    <span class="bd__c1 mono">
+                      <span class="sr-only">{{ 'budget.dash.fig.requested' | t }}:</span>
+                      {{ row.figures.requested ? moneyShort(row.figures.requested, row.node.currency) : '–' }}
+                    </span>
+                    <span class="bd__c2 mono">
+                      <span class="sr-only">{{ 'budget.usage.bar' | t }}:</span>
+                      {{ row.percent === null ? '–' : row.percent + ' %' }}
+                    </span>
+                    <span class="bd__c3 mono" [class.bd__neg]="row.figures.available < 0">
+                      <span class="sr-only">{{ 'budget.dash.fig.available' | t }}:</span>
+                      {{ moneyShort(row.figures.available, row.node.currency) }}
+                    </span>
+                  </div>
+                  <app-seg-bar [segments]="row.segments" [total]="row.total" [label]="usageLabel(row)" />
+                </li>
+              }
+            </ul>
+          </section>
+        </div>
+
+        <section class="bd__sec" aria-labelledby="bd-apps">
+          <div class="bd__secHead bd__secHead--apps">
+            <h3 id="bd-apps" class="bd__h">{{ 'budget.dash.apps' | t }}</h3>
+            @if (apps()?.length) {
+              <app-button variant="text" size="sm" (click)="openApplications()">{{ 'budget.dash.appsAll' | t }}</app-button>
             }
-          </ul>
+          </div>
+          @if (apps() === null) {
+            <app-skeleton variant="rows" [count]="3" [label]="'budget.dash.appsLoading' | t" />
+          } @else if (appsError()) {
+            <p class="bd__status bd__status--error" role="alert">{{ 'budget.dash.appsError' | t }}</p>
+          } @else if (!appRows().length) {
+            <p class="empty-state bd__none">{{ 'budget.dash.appsNone' | t }}</p>
+          } @else {
+            <div class="rowgroup">
+              @for (r of appRows(); track r.app.applicationId) {
+                <app-list-item [title]="r.title" [link]="['/applications', r.app.applicationId]">
+                  <span sub>
+                    @if (r.statusLabel) {
+                      <app-status-text [kind]="r.statusKind">{{ r.statusLabel }}</app-status-text>
+                      <span class="bd__dot" aria-hidden="true">·</span>
+                    }
+                    @if (r.app.pathKey) {
+                      <span class="mono">{{ r.app.pathKey | simplifyPath }}</span>
+                    }
+                    @if (r.costCentre) {
+                      <span class="bd__appKs">{{ r.costCentre }}</span>
+                    }
+                  </span>
+                  <span trail class="mono bd__amount">{{ r.app.amount === null ? '–' : money(r.app.amount, r.app.currency ?? 'EUR') }}</span>
+                </app-list-item>
+              }
+            </div>
+          }
         </section>
       </div>
-
-      <section class="bd__sec" aria-labelledby="bd-apps">
-        <div class="bd__secHead bd__secHead--apps">
-          <h3 id="bd-apps" class="bd__h">{{ 'budget.dash.apps' | t }}</h3>
-          @if (apps()?.length) {
-            <app-button variant="text" size="sm" (click)="openApplications()">{{ 'budget.dash.appsAll' | t }}</app-button>
-          }
-        </div>
-        @if (apps() === null) {
-          <app-skeleton variant="rows" [count]="3" [label]="'budget.dash.appsLoading' | t" />
-        } @else if (appsError()) {
-          <p class="bd__status bd__status--error" role="alert">{{ 'budget.dash.appsError' | t }}</p>
-        } @else if (!appRows().length) {
-          <p class="empty-state bd__none">{{ 'budget.dash.appsNone' | t }}</p>
-        } @else {
-          <div class="rowgroup">
-            @for (r of appRows(); track r.app.applicationId) {
-              <app-list-item [title]="r.title" [link]="['/applications', r.app.applicationId]">
-                <span sub>
-                  @if (r.statusLabel) {
-                    <app-status-text [kind]="r.statusKind">{{ r.statusLabel }}</app-status-text>
-                    <span class="bd__dot" aria-hidden="true">·</span>
-                  }
-                  @if (r.app.pathKey) {
-                    <span class="mono">{{ r.app.pathKey | simplifyPath }}</span>
-                  }
-                  @if (r.costCentre) {
-                    <span class="bd__appKs">{{ r.costCentre }}</span>
-                  }
-                </span>
-                <span trail class="mono bd__amount">{{ r.app.amount === null ? '–' : money(r.app.amount, r.app.currency ?? 'EUR') }}</span>
-              </app-list-item>
-            }
-          </div>
-        }
-      </section>
     </article>
   </div>
 
@@ -250,19 +262,21 @@
   }
 
   <!-- The pane: year, overview, search and the cost-centre tree. The wide layout shows it
-       beside the sheet; a narrower one shows it in the side sheet, a phone in the bottom
-       sheet of the dialog. The chips and the search stay in place; only the tree scrolls, with a fade
-       at an end where more rows are. -->
+       beside the sheet; a narrower one shows the search and the tree in the side sheet, a
+       phone in the bottom sheet of the dialog. The chips and the search stay in place;
+       only the tree scrolls, with a fade at an end where more rows are. -->
   <ng-template #treePane let-inSheet>
     <div class="bd__paneBody" [class.bd__paneBody--sheet]="inSheet">
-      <div class="bd__chips">
-        @if (wide()) {
+      <!-- Below the wide layout the year and the overview chips sit on the page, beside
+           the path chip, so the sheet holds only the search and the tree. -->
+      @if (wide()) {
+        <div class="bd__chips">
           <ng-container *ngTemplateOutlet="yearChip" />
-        }
-        <button type="button" class="bd-chip" (click)="overviewOpen.set(true)">
-          <app-icon name="grid" [size]="15" />{{ 'budget.overview.button' | t }}
-        </button>
-      </div>
+          <button type="button" class="bd-chip" (click)="overviewOpen.set(true)">
+            <app-icon name="grid" [size]="15" />{{ 'budget.overview.button' | t }}
+          </button>
+        </div>
+      }
       <app-search-pill size="md" [placeholder]="'budget.dash.search' | t" [(value)]="query" />
       <nav
         class="bd__tree"

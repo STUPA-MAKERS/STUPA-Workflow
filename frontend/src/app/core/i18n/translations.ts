@@ -1110,7 +1110,6 @@ export const de = {
   'budget.overview.title': 'Budget-Übersicht',
   'budget.overview.hint':
     'Ringe = Ebenen des Kostenstellen-Baums (außen = tiefer). Klick auf ein Segment öffnet die Kostenstelle.',
-  'budget.pie.empty': 'Keine Daten',
   'budget.pie.emptyLabel': '{name}: kein Betrag vorhanden',
   'budget.tree.col.color': 'Farbe',
   'budget.tree.stateConfig': 'Beantragt/Gebunden-States',
@@ -3427,7 +3426,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'budget.overview.title': 'Budget overview',
   'budget.overview.hint':
     'Rings = levels of the cost-centre tree (outer = deeper). Click a segment to open the cost centre.',
-  'budget.pie.empty': 'No data',
   'budget.pie.emptyLabel': '{name}: no amount',
   'budget.tree.col.color': 'Colour',
   'budget.tree.stateConfig': 'Requested/committed states',

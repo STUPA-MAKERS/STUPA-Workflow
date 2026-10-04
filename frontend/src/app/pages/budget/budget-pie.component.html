@@ -1,5 +1,6 @@
 <!-- Without an amount the chart keeps its size: one neutral ring, the metric and 0 in the
-     hole, and a muted note in place of the legend. -->
+     hole, and neutral skeleton lines in place of the legend. No "no data" text: the 0 in
+     the hole and the accessible name say it. -->
 <figure class="pie">
   <div class="pie__chart">
     <svg [attr.viewBox]="'0 0 ' + SIZE + ' ' + SIZE" class="pie__svg" role="img" [attr.aria-label]="name()">
@@ -31,7 +32,11 @@
     </div>
   </div>
   @if (empty()) {
-    <p class="pie__empty" aria-hidden="true">{{ 'budget.pie.empty' | t }}</p>
+    <div class="pie__empty" aria-hidden="true">
+      <span class="pie__skel"></span>
+      <span class="pie__skel"></span>
+      <span class="pie__skel"></span>
+    </div>
   } @else {
     <ul class="pie__legend">
       @for (a of arcs(); track $index; let i = $index) {

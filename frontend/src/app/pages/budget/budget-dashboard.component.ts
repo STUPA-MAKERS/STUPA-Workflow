@@ -117,11 +117,12 @@ export const APPS_SHOWN = 5;
  * Beantragt, Gebunden, Ausgegeben, Einnahmen, Verfügbar; N28), the distribution over the
  * sub cost centres, the utilisation per sub cost centre and the applications on it.
  *
- * On the wide layout the pane fills the height of the viewport and only the tree scrolls.
- * Below the wide breakpoint the pane moves into a sheet that a path chip opens: a side
- * sheet from the start, or the dialog of the ui-kit on a phone, which is a bottom sheet
- * there. The
- * query params hold the selection, so the view is shareable as a link. A reader with a
+ * On the wide layout the page fills the height of the viewport and does not scroll: in
+ * the pane only the tree scrolls, and the sheet scrolls inside itself. Below the wide
+ * breakpoint the year and the overview chips sit beside a path chip on the page. The path
+ * chip opens the search and the tree: in a side sheet from the start, or on a phone in
+ * the dialog of the ui-kit, which is a bottom sheet there. The query params hold the
+ * selection, so the view is shareable as a link. A reader with a
  * gremium scope (`viewGremiumId`) gets only the subtrees of the server response.
  */
 @Component({
