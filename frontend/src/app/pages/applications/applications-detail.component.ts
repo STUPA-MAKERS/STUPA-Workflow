@@ -613,22 +613,24 @@ export class ApplicationsDetailComponent {
         },
       });
     }
-    // The badge label and the dialog picker both need the cost-centre tree.
+    // The "Kostenstelle" row and the dialog picker both need the cost-centre tree. Every
+    // reader loads it (the server scopes it), so the row names the cost centre also for a
+    // reader without `application.manage`. Only the "Ändern" button needs that right.
     if (this.canManage()) {
       this.budgetChoice.set(this.app()?.budgetId ?? '');
       this.fiscalChoice.set(this.app()?.fiscalYearId ?? '');
-      this.budgetApi.tree().subscribe({
-        next: (tree) => {
-          if (seq !== this.loadSeq) return;
-          this.budgetTree.set(tree);
-          // The badge needs the fiscal years of the current cost centre.
-          this.loadFiscalYears(this.app()?.budgetId ?? null);
-        },
-        error: () => {
-          if (seq === this.loadSeq) this.budgetTree.set([]);
-        },
-      });
     }
+    this.budgetApi.tree().subscribe({
+      next: (tree) => {
+        if (seq !== this.loadSeq) return;
+        this.budgetTree.set(tree);
+        // The row needs the fiscal years of the current cost centre.
+        this.loadFiscalYears(this.app()?.budgetId ?? null);
+      },
+      error: () => {
+        if (seq === this.loadSeq) this.budgetTree.set([]);
+      },
+    });
   }
 
   /** Assign or unassign the cost centre with POST /assign-budget, then reload. */

@@ -182,10 +182,10 @@
     <app-field-group>
       <div class="ad__pair">
         <app-field-row [label]="'applications.detail.created' | t">
-          <time [attr.datetime]="application.createdAt">{{ application.createdAt | ldate: 'short' }}</time>
+          <time [attr.datetime]="application.createdAt">{{ application.createdAt | ldate: 'medium' }}</time>
         </app-field-row>
         <app-field-row [label]="'applications.detail.updated' | t">
-          <time [attr.datetime]="application.updatedAt">{{ application.updatedAt | ldate: 'short' }}</time>
+          <time [attr.datetime]="application.updatedAt">{{ application.updatedAt | ldate: 'medium' }}</time>
         </app-field-row>
       </div>
       @if (application.applicant) {
@@ -209,7 +209,13 @@
           ? ('applications.detail.budgetWithYear' | t: { year: fiscalLabel(application.fiscalYearId) })
           : ('applications.budget.field' | t)"
       >
-        {{ (application.budgetId && budgetLabel(application.budgetId)) || ('applications.budget.none' | t) }}
+        <!-- "Keine" only without a cost centre. A cost centre outside the tree of this
+             reader (or a tree that did not load) shows a dash, never "Keine". -->
+        @if (!application.budgetId) {
+          {{ 'applications.budget.none' | t }}
+        } @else {
+          {{ budgetLabel(application.budgetId) || '—' }}
+        }
         @if (canManage()) {
           <app-button
             trail

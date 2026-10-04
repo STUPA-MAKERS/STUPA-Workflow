@@ -13,7 +13,7 @@
         } @else {
           <!-- The export has no `mine` filter: hide it while `mine` is set, so that it
                never exports more rows than the list shows. -->
-          @if (canExport() && !mine()) {
+          @if (exportShown()) {
             <app-button
               variant="text"
               [iconOnly]="true"
@@ -37,7 +37,7 @@
         <app-search-pill
           [placeholder]="searchPlaceholder()"
           [label]="'applications.list.searchLabel' | t"
-          [value]="q()"
+          [value]="searchText()"
           (valueChange)="onSearch($event)"
         >
           <!-- "Weitere Filter": amount and submission date. -->
@@ -50,7 +50,7 @@
             [attr.aria-expanded]="moreSheetOpen()"
             [attr.aria-label]="moreCount() ? ('applications.list.filter.moreCount' | t: { count: moreCount() }) : ('applications.list.filter.more' | t)"
             [title]="'applications.list.filter.more' | t"
-            (click)="sheet.set('more')"
+            (click)="openMore()"
           >
             <app-icon name="tune" [size]="20" />
             @if (moreCount()) {
@@ -179,8 +179,9 @@
                     class="apps__row"
                     [class.apps__row--busy]="busyRow() === row.item.id"
                     [title]="row.title"
+                    [link]="['/applications', row.item.id]"
+                    linkQueryParamsHandling="preserve"
                     [selected]="row.item.id === selectedId()"
-                    (activate)="open(row.item.id)"
                   >
                     <span sub>
                       @if (row.stateLabel) {
@@ -290,7 +291,8 @@
   />
 </app-side-sheet>
 
-<!-- Amount and submission date: typed values, so the sheet applies them at once. -->
+<!-- Amount and submission date: typed values, so the sheet edits a draft and only
+     "Anwenden" applies it. Another close of the sheet leaves the filters as they were. -->
 <app-side-sheet
   [side]="sheetSide()"
   [heading]="'applications.list.filter.more' | t"
@@ -304,15 +306,15 @@
         name="amountMin"
         [placeholder]="'applications.list.filter.min' | t"
         [ariaLabel]="'applications.list.filter.amountMin' | t"
-        [ngModel]="amountMin()"
-        (ngModelChange)="amountMin.set($event ?? '')"
+        [ngModel]="draftAmountMin()"
+        (ngModelChange)="draftAmountMin.set($event ?? '')"
       />
       <app-currency-input
         name="amountMax"
         [placeholder]="'applications.list.filter.max' | t"
         [ariaLabel]="'applications.list.filter.amountMax' | t"
-        [ngModel]="amountMax()"
-        (ngModelChange)="amountMax.set($event ?? '')"
+        [ngModel]="draftAmountMax()"
+        (ngModelChange)="draftAmountMax.set($event ?? '')"
       />
     </div>
     <div class="apps__range" role="group" aria-labelledby="apps-date">
@@ -320,14 +322,14 @@
       <app-datepicker
         name="createdFrom"
         [ariaLabel]="'applications.list.filter.from' | t"
-        [ngModel]="createdFrom()"
-        (ngModelChange)="createdFrom.set($event ?? '')"
+        [ngModel]="draftCreatedFrom()"
+        (ngModelChange)="draftCreatedFrom.set($event ?? '')"
       />
       <app-datepicker
         name="createdTo"
         [ariaLabel]="'applications.list.filter.to' | t"
-        [ngModel]="createdTo()"
-        (ngModelChange)="createdTo.set($event ?? '')"
+        [ngModel]="draftCreatedTo()"
+        (ngModelChange)="draftCreatedTo.set($event ?? '')"
       />
     </div>
     <div class="apps__moreActions">

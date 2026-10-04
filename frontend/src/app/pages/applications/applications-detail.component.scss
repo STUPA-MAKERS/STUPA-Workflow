@@ -355,7 +355,11 @@ formly-form formly-group > formly-field + formly-field {
   color: var(--color-text);
   font: inherit;
   line-height: 1.4;
-  resize: vertical;
+  /* A plain field as on the board: no resize grip. It grows with its text where the
+     browser can (`field-sizing`), up to the max height, and then scrolls. */
+  resize: none;
+  field-sizing: content;
+  overflow-y: auto;
 }
 .ad__composerInput:focus-visible {
   outline: none;

@@ -718,6 +718,54 @@ describe('ApplicationsDetailComponent', () => {
     http.verify();
   });
 
+  /** The value of the "Kostenstelle" row in "Details". */
+  function budgetRow(): HTMLElement {
+    const label = screen.getByText('Kostenstelle');
+    return label.closest('app-field-row') as HTMLElement;
+  }
+
+  it('names the cost centre also for a reader without application.manage', async () => {
+    const { http, detectChanges } = await setup(['application.read']);
+    http.expectOne(url('')).flush({ ...appWire(), budgetId: 'b1' });
+    http.expectOne(url('/versions')).flush(VERSIONS);
+    http.expectOne(url('/comments')).flush(COMMENTS);
+    http.expectOne((r) => r.method === 'GET' && r.url === '/api/budgets').flush(budgetTree());
+    http.expectOne((r) => r.url === '/api/budgets/b1/fiscal-years').flush([]);
+    flushForm(http);
+    detectChanges();
+    expect(budgetRow()).toHaveTextContent('Veranstaltungen');
+    expect(budgetRow()).not.toHaveTextContent('Keine');
+    // Only a manager changes it.
+    expect(screen.queryByRole('button', { name: 'Kostenstelle ändern' })).not.toBeInTheDocument();
+    flushAttachments(http);
+    http.verify();
+  });
+
+  it('never says "Keine" for an assigned cost centre outside the tree of the reader', async () => {
+    const { http, detectChanges } = await setup(['application.read']);
+    http.expectOne(url('')).flush({ ...appWire(), budgetId: 'b1' });
+    http.expectOne(url('/versions')).flush(VERSIONS);
+    http.expectOne(url('/comments')).flush(COMMENTS);
+    http
+      .expectOne((r) => r.method === 'GET' && r.url === '/api/budgets')
+      .flush({ title: 'e' }, { status: 403, statusText: 'Forbidden' });
+    flushForm(http);
+    detectChanges();
+    expect(budgetRow()).toHaveTextContent('—');
+    expect(budgetRow()).not.toHaveTextContent('Keine');
+    flushAttachments(http);
+    http.verify();
+  });
+
+  it('says "Keine" without a cost centre', async () => {
+    const { http, detectChanges } = await setup(['application.read']);
+    flushAll(http);
+    detectChanges();
+    expect(budgetRow()).toHaveTextContent('Keine');
+    flushAttachments(http);
+    http.verify();
+  });
+
   it('degrades the budget tree to empty on a load error', async () => {
     const { http, detectChanges, cmp } = await setup();
     http.expectOne(url('')).flush(appWire());

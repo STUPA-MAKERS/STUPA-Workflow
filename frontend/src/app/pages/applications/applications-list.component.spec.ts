@@ -193,6 +193,15 @@ async function openRowMenu(
   return req;
 }
 
+/** Let a download run without a real file. Returns the undo. */
+function stubDownload() {
+  const u = URL as unknown as { createObjectURL?: unknown; revokeObjectURL?: unknown };
+  u.createObjectURL = () => 'blob:mock';
+  u.revokeObjectURL = () => undefined;
+  const click = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+  return () => click.mockRestore();
+}
+
 describe('ApplicationsListComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
   afterEach(() => TestBed.inject(HttpTestingController).verify());
@@ -208,14 +217,14 @@ describe('ApplicationsListComponent', () => {
 
     it('shows title, status text, type and amount; an archived row says so', async () => {
       await start();
-      expect(screen.getByRole('button', { name: 'Zuschuss Erstsemester-Abend' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Zuschuss Erstsemester-Abend' })).toBeInTheDocument();
       expect(screen.getAllByText('Eingereicht').length).toBeGreaterThan(0);
       const items = screen.getAllByRole('listitem');
       expect(items.filter((li) => within(li).queryByText('Förderantrag')).length).toBe(3);
       expect(screen.getByText('1.250,00 €')).toBeInTheDocument();
       expect(screen.getByText('Archiviert')).toBeInTheDocument();
       // No amount, no placeholder.
-      const trikots = screen.getByRole('button', { name: 'Trikots' }).closest('app-list-item')!;
+      const trikots = screen.getByRole('link', { name: 'Trikots' }).closest('app-list-item')!;
       expect(trikots.querySelector('.apps__amount')).toBeNull();
     });
 
@@ -223,7 +232,7 @@ describe('ApplicationsListComponent', () => {
       await start('/applications', {
         rows: [row({ title: '  ', typeId: 'unknown', state: null, amount: 'abc', currency: null })],
       });
-      expect(screen.getByRole('button', { name: 'Ohne Titel' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Ohne Titel' })).toBeInTheDocument();
       // An amount the browser cannot read stays as the server sent it.
       expect(screen.getByText('abc')).toBeInTheDocument();
       expect(document.querySelector('.apps__dot')).toBeNull();
@@ -273,6 +282,8 @@ describe('ApplicationsListComponent', () => {
     it('puts the number of applications into the search field', async () => {
       const { cmp } = await start('/applications', { total: 132 });
       expect(screen.getByPlaceholderText('132 Anträge durchsuchen')).toBeInTheDocument();
+      cmp.total.set(1);
+      expect(cmp.searchPlaceholder()).toBe('1 Antrag durchsuchen');
       cmp.total.set(0);
       cmp.loading.set(true);
       expect(cmp.searchPlaceholder()).toBe('Anträge durchsuchen');
@@ -537,10 +548,10 @@ describe('ApplicationsListComponent', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Weitere Filter' }));
       harness.detectChanges();
       expect(cmp.moreSheetOpen()).toBe(true);
-      cmp.amountMin.set(' 100 ');
-      cmp.amountMax.set('');
-      cmp.createdFrom.set('2026-01-01');
-      cmp.createdTo.set('2026-06-30');
+      cmp.draftAmountMin.set(' 100 ');
+      cmp.draftAmountMax.set('');
+      cmp.draftCreatedFrom.set('2026-01-01');
+      cmp.draftCreatedTo.set('2026-06-30');
       cmp.applyMore();
       await harness.fixture.whenStable();
       let req = http.expectOne(LIST);
@@ -553,12 +564,69 @@ describe('ApplicationsListComponent', () => {
       expect(cmp.moreCount()).toBe(3);
       expect(screen.getByRole('button', { name: 'Weitere Filter, 3 aktiv' })).toBeInTheDocument();
 
+      // The sheet opens again with the applied values as its draft.
+      cmp.openMore();
+      expect(cmp.draftAmountMin()).toBe('100');
+      expect(cmp.draftCreatedTo()).toBe('2026-06-30');
+
       cmp.clearMore();
       await harness.fixture.whenStable();
       req = http.expectOne(LIST);
       expect(req.request.params.has('amountMin')).toBe(false);
       expect(req.request.params.has('createdFrom')).toBe(false);
       req.flush(page(ROWS));
+    });
+
+    it('drops the draft of "Weitere Filter" when the sheet closes without "Anwenden"', async () => {
+      const restore = stubDownload();
+      try {
+        const { cmp, http, harness } = await start('/applications', { total: 40 });
+        await userEvent.click(screen.getByRole('button', { name: 'Weitere Filter' }));
+        harness.detectChanges();
+        cmp.draftAmountMin.set('500');
+        cmp.draftCreatedFrom.set('2026-01-01');
+        // Escape, the scrim or a swipe: the sheet closes, nothing is applied.
+        cmp.sheet.set(null);
+        harness.detectChanges();
+        expect(cmp.moreCount()).toBe(0);
+        expect(cmp.activeFilterCount()).toBe(0);
+        expect(screen.getByRole('button', { name: 'Weitere Filter' })).toBeInTheDocument();
+
+        // The next page and the export send no unapplied value.
+        cmp.loadMore();
+        const more = http.expectOne(LIST);
+        expect(more.request.params.has('amountMin')).toBe(false);
+        expect(more.request.params.has('createdFrom')).toBe(false);
+        expect(more.request.params.get('offset')).toBe('3');
+        more.flush(page(ROWS));
+        cmp.onExport();
+        const xlsx = http.expectOne((r) => r.url === '/api/applications/export.xlsx');
+        expect(xlsx.request.params.has('amountMin')).toBe(false);
+        xlsx.flush(new Blob(['x']));
+
+        // A new open of the sheet starts from the applied values again.
+        cmp.openMore();
+        expect(cmp.draftAmountMin()).toBe('');
+        expect(cmp.draftCreatedFrom()).toBe('');
+      } finally {
+        restore();
+      }
+    });
+
+    it('sends only the applied search while the debounce waits', async () => {
+      jest.useFakeTimers();
+      try {
+        const { cmp, http } = await start('/applications', { total: 40 });
+        cmp.onSearch('fest');
+        expect(cmp.searchText()).toBe('fest');
+        expect(cmp.q()).toBe('');
+        cmp.loadMore();
+        const more = http.expectOne(LIST);
+        expect(more.request.params.has('q')).toBe(false);
+        more.flush(page(ROWS));
+      } finally {
+        jest.useRealTimers();
+      }
     });
 
     it('debounces the search and writes q to the URL', async () => {
@@ -643,14 +711,6 @@ describe('ApplicationsListComponent', () => {
       req.flush(page(ROWS));
     });
 
-    function stubDownload() {
-      const u = URL as unknown as { createObjectURL?: unknown; revokeObjectURL?: unknown };
-      u.createObjectURL = () => 'blob:mock';
-      u.revokeObjectURL = () => undefined;
-      const click = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
-      return () => click.mockRestore();
-    }
-
     it('exports the list with its filters, without paging and without mine', async () => {
       const restore = stubDownload();
       try {
@@ -686,11 +746,29 @@ describe('ApplicationsListComponent', () => {
       expect(screen.queryByRole('button', { name: 'Exportieren' })).not.toBeInTheDocument();
     });
 
+    it('exports the archived rows when the list shows them', async () => {
+      const restore = stubDownload();
+      try {
+        const { go, http, cmp } = await start();
+        await go('/applications?archived=all');
+        expect(screen.getByRole('button', { name: 'Exportieren' })).toBeInTheDocument();
+        cmp.onExport();
+        const req = http.expectOne((r) => r.url === '/api/applications/export.xlsx');
+        expect(req.request.params.get('archived')).toBe('all');
+        req.flush(new Blob(['x']));
+      } finally {
+        restore();
+      }
+    });
+
     it('hides the export while mine is set', async () => {
-      const { go } = await start();
+      const { go, cmp, http } = await start();
       expect(screen.getByRole('button', { name: 'Exportieren' })).toBeInTheDocument();
       await go('/applications?mine=true');
       expect(screen.queryByRole('button', { name: 'Exportieren' })).not.toBeInTheDocument();
+      // A call from elsewhere (the phone menu) sends nothing either.
+      cmp.onExport();
+      http.expectNone((r) => r.url === '/api/applications/export.xlsx');
     });
 
     it('puts the sort orders and the export into one menu on a phone', async () => {
@@ -714,7 +792,10 @@ describe('ApplicationsListComponent', () => {
     it('opens a row in the detail and keeps the filters', async () => {
       const { go, router, cmp, harness } = await start();
       await go('/applications?q=fest');
-      await userEvent.click(screen.getByRole('button', { name: 'Druck des Semesterplaners' }));
+      // The title is a real link with the filters, so it also opens in a new tab.
+      const link = screen.getByRole('link', { name: 'Druck des Semesterplaners' });
+      expect(link).toHaveAttribute('href', '/applications/app-2?q=fest');
+      await userEvent.click(link);
       await harness.fixture.whenStable();
       harness.detectChanges();
       expect(router.url).toBe('/applications/app-2?q=fest');
@@ -722,7 +803,7 @@ describe('ApplicationsListComponent', () => {
       // The list stays (one pane at a time here, so hidden): the filters did not change,
       // so nothing reloads, and the open row is marked.
       expect(
-        screen.getByRole('button', { name: 'Druck des Semesterplaners', hidden: true }),
+        screen.getByRole('link', { name: 'Druck des Semesterplaners', hidden: true }),
       ).toHaveAttribute('aria-current', 'true');
       expect(screen.getByText('detail')).toBeInTheDocument();
     });

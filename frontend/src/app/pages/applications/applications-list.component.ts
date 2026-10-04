@@ -58,6 +58,7 @@ import {
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { downloadBlob } from '@shared/download.util';
 import { mediaQuerySignal } from '../../layout/media-query';
+import { PageFrameService } from '../../layout/page-frame.service';
 import { RailStatusService } from '../../layout/rail-status.service';
 import { BudgetTreeApi, type BudgetTreeNode } from '../budget/budget-tree.api';
 import { CostCentreTreeComponent } from '../budget/cost-centre-tree.component';
@@ -166,6 +167,7 @@ export class ApplicationsListComponent implements OnDestroy {
   private readonly toast = inject(ToastService);
   private readonly railStatus = inject(RailStatusService);
   private readonly page = inject(ApplicationsPageService);
+  private readonly frame = inject(PageFrameService);
 
   readonly canExport = computed(() => this.auth.can('application.export'));
   readonly exporting = signal(false);
@@ -204,7 +206,13 @@ export class ApplicationsListComponent implements OnDestroy {
    * start page). A removable chip shows it, and the reset clears it with the others.
    */
   readonly mine = signal('');
+  /** The applied search: what the URL holds and what the request sends. */
   readonly q = signal('');
+  /**
+   * The text in the search pill. It runs ahead of `q` while the debounce waits, so a
+   * load of the next page in that time still sends the applied search only.
+   */
+  readonly searchText = signal('');
   /** Debounce timer of the search (about 400 ms, like /expenses). */
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
   readonly typeId = signal('');
@@ -222,6 +230,16 @@ export class ApplicationsListComponent implements OnDestroy {
   readonly budgetId = signal('');
   readonly sortField = signal<'createdAt' | 'amount'>('createdAt');
   readonly sortOrder = signal<'asc' | 'desc'>('desc');
+
+  /**
+   * The values in the "Weitere Filter" sheet. They are a draft: only "Anwenden" puts them
+   * into the URL, and from there into the applied filters. A sheet closed in another way
+   * (scrim, Escape, swipe) thus changes no request and no badge.
+   */
+  readonly draftAmountMin = signal('');
+  readonly draftAmountMax = signal('');
+  readonly draftCreatedFrom = signal('');
+  readonly draftCreatedTo = signal('');
 
   /** Cost-centre tree of the filter, without the cost centres hidden in the budget tab. */
   readonly budgetTree = signal<BudgetTreeNode[]>([]);
@@ -308,17 +326,24 @@ export class ApplicationsListComponent implements OnDestroy {
   ]);
 
   /** The search placeholder with the number of applications, as on the board. */
-  readonly searchPlaceholder = computed(() =>
-    this.loading() && this.total() === 0
-      ? this.i18n.translate('applications.list.searchPlain')
-      : this.i18n.translate('applications.list.searchCount', { count: this.total() }),
-  );
+  readonly searchPlaceholder = computed(() => {
+    if (this.loading() && this.total() === 0) return this.i18n.translate('applications.list.searchPlain');
+    if (this.total() === 1) return this.i18n.translate('applications.list.searchCountOne');
+    return this.i18n.translate('applications.list.searchCount', { count: this.total() });
+  });
 
   /** True while unloaded applications are left. It controls the sentinel and "load more". */
   readonly hasMore = computed(() => this.items().length < this.total());
 
   /** Sentinel at the list end. The next load starts when it becomes visible. */
   readonly sentinel = viewChild<ElementRef<HTMLElement>>('sentinel');
+
+  /**
+   * The export can carry every filter of the list except `mine`: the endpoint has no
+   * such parameter. So the export goes away while `mine` is set. Otherwise the download
+   * holds more rows than the list shows.
+   */
+  readonly exportShown = computed(() => this.canExport() && !this.mine());
 
   private readonly typesById = computed(
     () => new Map(this.types().map((t) => [t.id, t.name])),
@@ -360,7 +385,7 @@ export class ApplicationsListComponent implements OnDestroy {
   /** Phone: the sort orders and the export in one "more" menu of the header. */
   readonly phoneMenuSections = computed<RowMenuSection[]>(() => {
     const sections = [...this.sortSections()];
-    if (this.canExport() && !this.mine()) {
+    if (this.exportShown()) {
       sections.push({
         items: [{ id: 'export', label: this.i18n.translate('applications.list.export'), icon: 'download' }],
       });
@@ -417,6 +442,9 @@ export class ApplicationsListComponent implements OnDestroy {
     });
 
     effect(() => this.page.split.set(this.split()));
+    // Side by side the page fills the viewport: the frame drops the footer below it, so
+    // only the panes scroll.
+    effect(() => this.frame.fill.set(this.split()));
 
     // Lazy infinite scroll: an IntersectionObserver on the sentinel loads the next page
     // once the list end comes into view. The rootMargin acts as a prefetch. The effect
@@ -438,6 +466,7 @@ export class ApplicationsListComponent implements OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.frame.fill.set(false);
     if (this.searchTimer) clearTimeout(this.searchTimer);
   }
 
@@ -480,10 +509,10 @@ export class ApplicationsListComponent implements OnDestroy {
    * reloads. The value stays in the URL, so the filtered list is shareable as a link.
    */
   onSearch(value: string): void {
-    this.q.set(value);
+    this.searchText.set(value);
     if (this.searchTimer) clearTimeout(this.searchTimer);
     this.searchTimer = setTimeout(
-      () => this.navigate({ q: this.q().trim() || null }),
+      () => this.navigate({ q: this.searchText().trim() || null }),
       400,
     );
   }
@@ -523,16 +552,26 @@ export class ApplicationsListComponent implements OnDestroy {
     this.navigate({ budget: id || null });
   }
 
-  /** "Weitere Filter": apply the amount and the date range of the sheet. */
+  /** Open "Weitere Filter" with the applied values as the draft. */
+  openMore(): void {
+    this.draftAmountMin.set(this.amountMin());
+    this.draftAmountMax.set(this.amountMax());
+    this.draftCreatedFrom.set(this.createdFrom());
+    this.draftCreatedTo.set(this.createdTo());
+    this.sheet.set('more');
+  }
+
+  /** "Weitere Filter": apply the drafted amount and date range through the URL. */
   applyMore(): void {
     this.sheet.set(null);
-    const out: Record<string, string | number | null> = {};
-    for (const f of this.filters) {
-      if (!['amountMin', 'amountMax', 'createdFrom', 'createdTo'].includes(f.param)) continue;
-      const value = f.signal().trim();
-      out[f.param] = value === '' ? null : f.numeric ? Number(value) : value;
-    }
-    this.navigate(out);
+    const amount = (raw: string) => (raw.trim() === '' ? null : Number(raw.trim()));
+    const date = (raw: string) => raw.trim() || null;
+    this.navigate({
+      amountMin: amount(this.draftAmountMin()),
+      amountMax: amount(this.draftAmountMax()),
+      createdFrom: date(this.draftCreatedFrom()),
+      createdTo: date(this.draftCreatedTo()),
+    });
   }
 
   /** "Weitere Filter": clear the amount and the date range. */
@@ -553,6 +592,7 @@ export class ApplicationsListComponent implements OnDestroy {
   reset(): void {
     for (const f of this.filters) f.signal.set(f.empty);
     this.states.set([]);
+    this.searchText.set('');
     if (this.searchTimer) clearTimeout(this.searchTimer);
     this.navigate({ ...this.filterParams(true), state: null });
   }
@@ -568,13 +608,11 @@ export class ApplicationsListComponent implements OnDestroy {
   }
 
   /**
-   * Export the current list as Excel, with the filters of the URL.
-   *
-   * The export endpoint has no `mine` filter, so the template hides the export while
-   * `mine` is set. Otherwise the download holds more rows than the list shows.
+   * Export the current list as Excel, with the filters of the URL (also `archived`).
+   * Without `mine`, see `exportShown`.
    */
   onExport(): void {
-    if (this.exporting()) return;
+    if (this.exporting() || !this.exportShown()) return;
     this.exporting.set(true);
     const query = this.buildQuery(0);
     delete query.limit;
@@ -740,6 +778,7 @@ export class ApplicationsListComponent implements OnDestroy {
       const raw = pm.get(f.param) ?? f.empty;
       f.signal.set(f.parse ? f.parse(raw) : raw);
     }
+    this.searchText.set(this.q());
     this.states.set(pm.getAll('state').filter((s) => s.trim() !== ''));
   }
 
@@ -767,7 +806,10 @@ export class ApplicationsListComponent implements OnDestroy {
     this.fetch(true);
   }
 
-  /** The request, built from the same filters the URL holds. */
+  /**
+   * The request, built from the applied filters. They change only through the URL
+   * (`readFilters`), so every page and the export send what the URL and the chips show.
+   */
   private buildQuery(offset: number): ApplicationListQuery {
     const query = { limit: this.limit, offset } as Record<string, unknown>;
     for (const f of this.filters) {
