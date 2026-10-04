@@ -131,17 +131,28 @@
 }
 
 /* ------------------------------------------------------------------ body */
+/* Two columns in the ratio 1.4 : 1, as on the board. Each column has a floor: the
+   right one fits the two dates of the Details pair, the left one the attachment rows.
+   When the sheet cannot give both floors (below about 740px), the columns wrap and
+   stack. The floors use `min(100%, …)`, so a column never overflows the sheet. */
 .ad__cols {
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
-  gap: 28px;
-  align-items: start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px 28px;
+  align-items: flex-start;
 }
 .ad__col {
   display: flex;
   flex-direction: column;
   gap: 18px;
-  min-width: 0;
+}
+.ad__col:first-child {
+  flex: 1.4 1 0;
+  min-width: min(100%, 22.5rem);
+}
+.ad__col:last-child {
+  flex: 1 1 0;
+  min-width: min(100%, 22rem);
 }
 .ad__tabs {
   margin-top: calc(-1 * var(--space-5));
@@ -184,10 +195,16 @@
   padding: var(--space-4);
 }
 
-/* Two fields in one row of a field group (Eingegangen | Aktualisiert). */
+/* Two fields in one row of a field group (Eingegangen | Aktualisiert). A cell is at
+   least 11rem wide, which holds a medium date in DE and EN on one line. A narrower pair
+   puts the fields one below the other. */
 .ad__pair {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+}
+/* A date never breaks inside a word. */
+.ad__pair time {
+  white-space: nowrap;
 }
 .ad__mail {
   display: block;
