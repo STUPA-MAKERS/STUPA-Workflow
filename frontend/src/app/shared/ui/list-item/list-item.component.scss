@@ -102,3 +102,8 @@
 .li__subText + ::ng-deep * {
   margin-inline-start: 6px;
 }
+/* On the selected row the subtle text of a muted status is below 4.5:1 (WCAG 1.4.3). The
+   muted text passes. */
+.li--on .li__sub ::ng-deep app-status-text.st--muted {
+  color: var(--color-text-muted);
+}

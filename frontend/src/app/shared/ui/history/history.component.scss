@@ -72,8 +72,8 @@
   color: var(--color-text-subtle);
 }
 /* On surface 3 the subtle text is below 4.5:1 (WCAG 1.4.3); the muted text passes.
-   This also applies to a status title of the kind `muted`. */
-.rowgroup--bg3 .hist__meta,
-.rowgroup--bg3 .hist__title app-status-text.st--muted {
+   A status title of the kind `muted` gets the same fix from the global `.rowgroup--bg3`
+   rule in `styles.scss`. */
+.rowgroup--bg3 .hist__meta {
   color: var(--color-text-muted);
 }

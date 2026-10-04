@@ -53,6 +53,12 @@
 .rowgroup.rowgroup--bg3 > * {
   background: var(--color-surface-3);
 }
+// On surface 3 the subtle text of a muted status is below 4.5:1 (WCAG 1.4.3). The muted
+// text passes. This rule is more specific than the `:host(.st--muted)` rule of
+// `app-status-text`, so it wins.
+.rowgroup--bg3 app-status-text.st--muted {
+  color: var(--color-text-muted);
+}
 
 // The layout box of a page. The ui-kit ships the same rules under `.container`, but
 // Tailwind emits a `.container` utility of its own with breakpoint max-widths

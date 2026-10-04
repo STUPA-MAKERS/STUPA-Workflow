@@ -83,7 +83,12 @@
 .rm__item:hover,
 .rm__item:focus-visible {
   background: var(--color-surface-4);
+}
+/* Surface 4 on surface 3 is only about 1.2:1, too weak to show the focus (WCAG 2.4.7).
+   The focused item also gets an inset ring in the focus colour. */
+.rm__item:focus-visible {
   outline: none;
+  box-shadow: inset 0 0 0 2px var(--color-focus-ring);
 }
 .rm__icon {
   flex: none;
@@ -106,10 +111,13 @@
   color: var(--color-danger);
 }
 
-/* Disabled: still focusable and readable (it says why), but faded and inert. */
+/* Disabled: still focusable and readable (it says why), but faded and inert. Only the
+   content fades, so the focus ring keeps its full contrast. */
 .rm__item[aria-disabled='true'] {
-  opacity: 0.45;
   cursor: not-allowed;
+}
+.rm__item[aria-disabled='true'] > * {
+  opacity: 0.45;
 }
 .rm__item[aria-disabled='true']:hover {
   background: transparent;
@@ -117,6 +125,11 @@
 
 .rm__loading {
   padding: var(--space-3) var(--space-4) 0;
+}
+/* The skeleton blocks are on surface 3 by default, the same as the menu. One step up, so
+   that they show while a lazy menu loads. */
+.rm__loading ::ng-deep .skel {
+  background: var(--color-surface-4);
 }
 .rm__empty {
   margin: 0;

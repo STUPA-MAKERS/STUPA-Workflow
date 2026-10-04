@@ -1,5 +1,6 @@
 /**
- * Text contrast of the shared building blocks on surface 3 (WCAG 2.1 AA, 1.4.3).
+ * Contrast of the shared building blocks on surface 3 and on the selected row (WCAG 2.1
+ * AA: 1.4.3 text, 1.4.11 focus ring, 2.4.7 visible focus).
  *
  * axe cannot compute contrast in jsdom (see `testing/a11y.ts`), so this spec reads the
  * CD tokens of the ui-kit and the styles of the components. On surface 3 the subtle text
@@ -62,9 +63,15 @@ describe('text on surface 3', () => {
     );
   });
 
-  it('the history meta line and a muted status on surface 3 use the muted text', () => {
+  it('the history meta line on surface 3 uses the muted text', () => {
     expect(scss('history/history.component.scss')).toMatch(
-      /\.rowgroup--bg3 \.hist__meta,\s*\.rowgroup--bg3 \.hist__title app-status-text\.st--muted \{\s*color: var\(--color-text-muted\);/,
+      /\.rowgroup--bg3 \.hist__meta \{\s*color: var\(--color-text-muted\);/,
+    );
+  });
+
+  it('a muted status in any row group on surface 3 uses the muted text', () => {
+    expect(scss('../../../styles.scss')).toMatch(
+      /\.rowgroup--bg3 app-status-text\.st--muted \{\s*color: var\(--color-text-muted\);/,
     );
   });
 
@@ -74,5 +81,60 @@ describe('text on surface 3', () => {
     const cap = menu.match(/\.rm__cap \{([^}]*)\}/)?.[1] ?? '';
     expect(cap).toContain('color: var(--color-text-muted);');
     expect(menu).not.toContain('--color-text-subtle');
+  });
+
+  it('the row menu draws its loading blocks on surface 4, not on its own surface 3', () => {
+    const menu = scss('row-menu/row-menu.component.scss');
+    expect(menu).toMatch(
+      /\.rm__loading ::ng-deep \.skel \{\s*background: var\(--color-surface-4\);/,
+    );
+    // The skeleton itself defaults to surface 3, which is why the menu needs the override.
+    expect(scss('skeleton/skeleton.component.scss')).toMatch(
+      /\n\.skel \{\s*background: var\(--color-surface-3\);/,
+    );
+    for (const theme of ['light', 'dark'] as const) {
+      expect(semantic(theme, '--color-surface-4')).not.toBe(semantic(theme, '--color-surface-3'));
+    }
+  });
+});
+
+describe('focus in the row menu (WCAG 2.4.7, 1.4.11)', () => {
+  const menu = scss('row-menu/row-menu.component.scss');
+
+  for (const theme of ['light', 'dark'] as const) {
+    it(`${theme}: the focus ring shows on the item, the surface change alone does not`, () => {
+      const item = semantic(theme, '--color-surface-4');
+      expect(ratio(item, semantic(theme, '--color-surface-3'))).toBeLessThan(3);
+      expect(ratio(semantic(theme, '--color-focus-ring'), item)).toBeGreaterThanOrEqual(3);
+    });
+  }
+
+  it('a focused item gets an inset ring in the focus colour', () => {
+    expect(menu).toMatch(
+      /\.rm__item:focus-visible \{[^}]*box-shadow: inset 0 0 0 2px var\(--color-focus-ring\);/,
+    );
+  });
+
+  it('a disabled item fades only its content, so its focus ring keeps full contrast', () => {
+    const disabled = menu.match(/\.rm__item\[aria-disabled='true'\] \{([^}]*)\}/)?.[1] ?? '';
+    expect(disabled).not.toContain('opacity');
+    expect(menu).toMatch(/\.rm__item\[aria-disabled='true'\] > \* \{\s*opacity:/);
+  });
+});
+
+describe('text on the selected row', () => {
+  for (const theme of ['light', 'dark'] as const) {
+    it(`${theme}: muted text passes 4.5:1, subtle text does not`, () => {
+      const bg = semantic(theme, '--color-selected');
+      expect(ratio(semantic(theme, '--color-text-muted'), bg)).toBeGreaterThanOrEqual(4.5);
+      // If this changes, the override below can go.
+      expect(ratio(semantic(theme, '--color-text-subtle'), bg)).toBeLessThan(4.5);
+    });
+  }
+
+  it('a muted status in the sub line of a selected list item uses the muted text', () => {
+    expect(scss('list-item/list-item.component.scss')).toMatch(
+      /\.li--on \.li__sub ::ng-deep app-status-text\.st--muted \{\s*color: var\(--color-text-muted\);/,
+    );
   });
 });
