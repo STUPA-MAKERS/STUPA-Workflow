@@ -54,6 +54,7 @@ from app.modules.admin.schemas import (
     CdVariantUpdate,
     FlowVersionCreate,
     FlowVersionOut,
+    GremiumAdminOut,
     GremiumCreate,
     GremiumMailRecipients,
     GremiumMembershipMappingCreate,
@@ -233,12 +234,13 @@ async def get_config_schemas() -> dict[str, dict[str, Any]]:
 
 @router.get(
     "/gremien",
-    response_model=list[GremiumOut],
+    response_model=list[GremiumAdminOut],
     dependencies=[_GREMIEN],
     responses=_errors(401, 403),
 )
-async def list_gremien(service: ServiceDep) -> list[GremiumOut]:
-    return await service.list_gremien()
+async def list_gremien(service: ServiceDep) -> list[GremiumAdminOut]:
+    """List the gremien with their member and role counts (admin overview)."""
+    return await service.list_gremien_admin()
 
 
 @router.post(

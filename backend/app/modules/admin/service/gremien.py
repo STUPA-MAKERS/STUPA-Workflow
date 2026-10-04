@@ -4,11 +4,19 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, distinct, func, select
 
 from app.modules.admin.gremium_roles import GremiumRoleService
-from app.modules.admin.models import ApplicationType, CdVariant, Gremium, MailList
+from app.modules.admin.models import (
+    ApplicationType,
+    CdVariant,
+    Gremium,
+    GremiumMembership,
+    GremiumRole,
+    MailList,
+)
 from app.modules.admin.schemas import (
+    GremiumAdminOut,
     GremiumCreate,
     GremiumMailRecipients,
     GremiumOut,
@@ -39,6 +47,39 @@ class GremiumOps(ConfigServiceBase):
     async def list_gremien(self) -> list[GremiumOut]:
         rows = (await self.session.scalars(select(Gremium).order_by(Gremium.name))).all()
         return [_gremium_out(r) for r in rows]
+
+    async def list_gremien_admin(self) -> list[GremiumAdminOut]:
+        """List the gremien with the number of members and of gremium roles.
+
+        Two grouped counts give the numbers for all gremien at once, so the admin
+        list needs no request per gremium.
+        """
+        rows = (await self.session.scalars(select(Gremium).order_by(Gremium.name))).all()
+        member_rows = (
+            await self.session.execute(
+                select(
+                    GremiumMembership.gremium_id,
+                    func.count(distinct(GremiumMembership.principal_id)),
+                ).group_by(GremiumMembership.gremium_id)
+            )
+        ).all()
+        role_rows = (
+            await self.session.execute(
+                select(GremiumRole.gremium_id, func.count(GremiumRole.id)).group_by(
+                    GremiumRole.gremium_id
+                )
+            )
+        ).all()
+        members: dict[UUID, int] = {gid: int(n) for gid, n in member_rows}
+        roles: dict[UUID, int] = {gid: int(n) for gid, n in role_rows}
+        return [
+            GremiumAdminOut(
+                **_gremium_out(r).model_dump(),
+                member_count=members.get(r.id, 0),
+                role_count=roles.get(r.id, 0),
+            )
+            for r in rows
+        ]
 
     async def create_gremium(self, payload: GremiumCreate, actor: str) -> GremiumOut:
         if await self._gremium_by_slug(payload.slug) is not None:

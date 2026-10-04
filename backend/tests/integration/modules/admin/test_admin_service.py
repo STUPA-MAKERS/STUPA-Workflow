@@ -21,6 +21,8 @@ from app.modules.admin.branding import Branding
 from app.modules.admin.models import (
     ApplicationType,
     Gremium,
+    GremiumMembership,
+    GremiumRole,
     SiteConfigVersion,
     Webhook,
 )
@@ -249,6 +251,38 @@ async def test_gremium_crud_and_slug_conflict(session: AsyncSession) -> None:
         created.id, GremiumUpdate(name="AStA neu"), _ACTOR
     )
     assert updated.name == "AStA neu"
+
+
+async def test_admin_gremien_list_counts_members_and_roles(session: AsyncSession) -> None:
+    """The admin list counts the distinct members and the roles of each gremium."""
+    svc = ConfigService(session)
+    full = await svc.create_gremium(
+        GremiumCreate(name="Zählgremium", slug=f"z-{uuid.uuid4().hex[:8]}"), _ACTOR
+    )
+    empty = await svc.create_gremium(
+        GremiumCreate(name="Leergremium", slug=f"l-{uuid.uuid4().hex[:8]}"), _ACTOR
+    )
+    roles = (
+        await session.scalars(select(GremiumRole).where(GremiumRole.gremium_id == full.id))
+    ).all()
+    member_role = next(r for r in roles if r.key == "member")
+    for _ in range(2):
+        principal = Principal(sub=f"s-{uuid.uuid4()}", display_name="P")
+        session.add(principal)
+        await session.flush()
+        session.add(
+            GremiumMembership(
+                principal_id=principal.id, gremium_id=full.id, gremium_role_id=member_role.id
+            )
+        )
+    await session.commit()
+
+    by_id = {g.id: g for g in await svc.list_gremien_admin()}
+    assert by_id[full.id].member_count == 2
+    assert by_id[full.id].role_count == len(roles)
+    assert by_id[empty.id].member_count == 0
+    # The forced roles exist in every gremium.
+    assert by_id[empty.id].role_count == len(roles)
 
 
 async def test_application_type_crud_and_conflict(session: AsyncSession) -> None:

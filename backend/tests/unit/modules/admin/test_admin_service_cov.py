@@ -314,6 +314,19 @@ async def test_list_gremien() -> None:
     assert len(out) == 2
 
 
+async def test_list_gremien_admin_counts() -> None:
+    a = gremium_row(name="A")
+    b = gremium_row(name="B")
+    # Queue: the gremien, then the member counts, then the role counts. B has no member.
+    s, _ = svc([res(a, b), res((a.id, 3)), res((a.id, 4), (b.id, 3))])
+    out = await s.list_gremien_admin()
+    assert [(g.name, g.member_count, g.role_count) for g in out] == [
+        ("A", 3, 4),
+        ("B", 0, 3),
+    ]
+    assert out[0].model_dump(by_alias=True)["memberCount"] == 3
+
+
 async def test_create_gremium_ok() -> None:
     # Queue: _gremium_by_slug finds no row so the slug is free, ensure_forced_roles finds
     # no role, then the two audit results.
