@@ -67,6 +67,35 @@
 }
 .hist__body {
   color: var(--color-text-muted);
+  white-space: pre-line;
+}
+
+.hist__changes {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  overflow-wrap: anywhere;
+}
+.hist__changes app-status-text {
+  margin-inline-end: 4px;
+  font-weight: var(--fw-semibold);
+  white-space: normal;
+}
+.hist__arrow {
+  margin-inline: 4px;
+}
+.hist__changes del {
+  color: var(--color-text-subtle);
+}
+.hist__changes ins {
+  color: var(--color-text);
+  text-decoration: none;
 }
 .hist__meta {
   color: var(--color-text-subtle);
@@ -75,5 +104,8 @@
    A status title of the kind `muted` gets the same fix from the global `.rowgroup--bg3`
    rule in `styles.scss`. */
 .rowgroup--bg3 .hist__meta {
+  color: var(--color-text-muted);
+}
+.rowgroup--bg3 .hist__changes del {
   color: var(--color-text-muted);
 }

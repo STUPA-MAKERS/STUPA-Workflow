@@ -21,7 +21,7 @@ export { FileDropZoneComponent, acceptsFile } from './file-drop-zone/file-drop-z
 export { FilterSelectComponent } from './filter-select/filter-select.component';
 export type { FilterSelectOption } from './filter-select/filter-select.component';
 export { HistoryComponent } from './history/history.component';
-export type { HistoryEntry } from './history/history.component';
+export type { HistoryChange, HistoryEntry } from './history/history.component';
 export {
   LIST_DETAIL_SPLIT_MIN,
   ListDetailLayoutComponent,

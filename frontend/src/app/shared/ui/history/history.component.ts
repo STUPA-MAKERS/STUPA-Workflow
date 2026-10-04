@@ -4,6 +4,21 @@ import { I18nService } from '@core/i18n/i18n.service';
 import type { StatusKind } from '../../status-kind.util';
 import { StatusTextComponent } from '../status-text/status-text.component';
 
+/** One changed field of an event, for example of a new version. */
+export interface HistoryChange {
+  /** The colour of the tag: `warn` for a change, `accent` for an addition, `error` for a
+   *  removal. */
+  kind: StatusKind;
+  /** "Geändert", "Hinzugefügt", "Entfernt". */
+  tag: string;
+  /** The name of the field. */
+  label: string;
+  /** The value before, struck through. Leave it out for a field without a short text. */
+  old?: string | null;
+  /** The value after. */
+  new?: string | null;
+}
+
 /** One event of a history. */
 export interface HistoryEntry {
   /** When it happened (ISO 8601). */
@@ -15,8 +30,11 @@ export interface HistoryEntry {
   kind?: StatusKind | null;
   /** Who did it: a person, or the gremium for the applicant (O16). */
   actor?: string | null;
-  /** One more line, for example the transition ("Übergang „Prüfung beginnen“"). */
+  /** One more line, for example the transition ("Übergang „Prüfung beginnen“"). A line
+   *  break in the text starts a new line. */
   body?: string | null;
+  /** The changed fields, one line each, below the body. */
+  changes?: readonly HistoryChange[] | null;
 }
 
 interface HistoryDay {
@@ -32,7 +50,8 @@ let nextId = 0;
  * A history, grouped by day: newest day first, and in each day the newest event first.
  *
  * A status title takes its colour (`kind`); any other event stays in the text colour.
- * The meta line gives the actor and the time. Each day is a list, named by its date.
+ * The changed fields of an event follow as lines: "Geändert Feld: alt → neu". The
+ * meta line gives the actor and the time. Each day is a list, named by its date.
  * Entries with a missing or invalid `at` go into a last group, "Ohne Datum", without a
  * time.
  */
@@ -52,6 +71,11 @@ export class HistoryComponent {
   readonly surface = input<1 | 2 | 3>(2);
 
   protected readonly id = `history-${nextId++}`;
+
+  /** A change value is given: an empty text counts, `null` and `undefined` do not. */
+  protected has(value: string | null | undefined): boolean {
+    return value !== null && value !== undefined;
+  }
 
   protected readonly days = computed<HistoryDay[]>(() => {
     const locale = this.i18n.formatLocale();

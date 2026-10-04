@@ -138,6 +138,42 @@ describe('HistoryComponent', () => {
     expect(lists[1].querySelector('time')).toBeNull();
   });
 
+  it('lists the changed fields of an event with the old and the new value', async () => {
+    const { container } = await render(HistoryComponent, {
+      inputs: {
+        entries: [
+          {
+            at: at(YEAR, 9, 27, 21, 5),
+            icon: 'edit',
+            title: 'Version 2',
+            body: 'Zeile 1\nZeile 2',
+            changes: [
+              { kind: 'warn', tag: 'Geändert', label: 'Teilnehmende', old: '300', new: '350' },
+              { kind: 'warn', tag: 'Geändert', label: 'Kostenaufstellung' },
+              { kind: 'accent', tag: 'Hinzugefügt', label: 'Raum', new: 'R 101' },
+              { kind: 'error', tag: 'Entfernt', label: 'Notiz', old: 'alt' },
+            ],
+          },
+        ],
+      },
+    });
+    const items = [...container.querySelectorAll('.hist__changes li')];
+    expect(items).toHaveLength(4);
+    expect(items[0].querySelector('app-status-text')).toHaveClass('st--warn');
+    expect(items[0].querySelector('del')?.textContent).toBe('300');
+    expect(items[0].querySelector('ins')?.textContent).toBe('350');
+    expect(items[0].querySelector('.hist__arrow')).not.toBeNull();
+    // A field without a short value shows only its name.
+    expect(items[1].querySelector('del, ins')).toBeNull();
+    expect(items[1].textContent).not.toContain(':');
+    expect(items[2].querySelector('del')).toBeNull();
+    expect(items[2].querySelector('.hist__arrow')).toBeNull();
+    expect(items[3].querySelector('ins')).toBeNull();
+    expect(items[3].querySelector('app-status-text')).toHaveClass('st--error');
+    expect(container.querySelector('.hist__body')?.textContent).toBe('Zeile 1\nZeile 2');
+    expect(await runAxe(container)).toHaveNoViolations();
+  });
+
   it('draws nothing for no entries', async () => {
     await render(HistoryComponent, { inputs: { entries: [] } });
     expect(screen.queryByRole('list')).toBeNull();

@@ -1,0 +1,178 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.pv {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* The first row names the block, as a field label does. */
+.pv__head {
+  padding: 10px var(--space-4) 6px;
+}
+.pv__label {
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: var(--fw-medium);
+  color: var(--color-text-subtle);
+}
+
+.pv__pos {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* The collapsed row is one button over the full width and height of the row. */
+.pv__toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 3.75rem;
+  padding: 10px var(--space-4) 10px var(--space-3);
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.pv__toggle:hover {
+  background: var(--color-surface-3);
+}
+.pv--bg1 .pv__toggle:hover {
+  background: var(--color-surface-2);
+}
+.pv--bg3 .pv__toggle:hover {
+  background: var(--color-surface-4);
+}
+.pv__toggle:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+
+.pv__chev {
+  flex: none;
+  color: var(--color-text-muted);
+  transition: transform 0.15s ease;
+}
+.pv__chev--open {
+  transform: rotate(180deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .pv__chev {
+    transition: none;
+  }
+}
+
+.pv__text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.pv__name {
+  font-size: var(--fs-md);
+  line-height: 1.375rem;
+}
+.pv__sub {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  line-height: 1.1875rem;
+}
+.pv__count {
+  flex: none;
+}
+.pv__dot {
+  flex: none;
+  color: var(--color-text-subtle);
+}
+.pv__amount {
+  flex: none;
+  font-size: var(--fs-md);
+}
+
+/* Open: the offers below the row, set in by the chevron column. */
+.pv__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: 0 var(--space-4) var(--space-3) calc(var(--space-3) + 18px + var(--space-3));
+}
+.pv__offers {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pv__offer {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: 9px 0;
+  border-top: var(--border-width) solid var(--color-border);
+  color: var(--color-text-muted);
+}
+.pv__offer:last-child {
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+.pv__offer--pref {
+  color: var(--color-text);
+}
+.pv__offerName {
+  flex: 1 1 auto;
+}
+.pv__offer app-status-text {
+  flex: none;
+  font-size: 0.8125rem;
+  font-weight: var(--fw-semibold);
+}
+.pv__offerValue {
+  flex: none;
+  min-width: 6.5rem;
+  font-size: 0.8125rem;
+  text-align: end;
+}
+
+.pv__reason {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.pv__reason app-status-text {
+  font-size: 0.8125rem;
+  font-weight: var(--fw-semibold);
+}
+
+.pv__total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 14px var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+}
+.pv--bg1 .pv__total {
+  background: var(--color-surface-1);
+}
+.pv--bg3 .pv__total {
+  background: var(--color-surface-3);
+}

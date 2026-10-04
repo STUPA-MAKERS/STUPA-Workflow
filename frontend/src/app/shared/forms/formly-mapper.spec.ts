@@ -1,6 +1,6 @@
 import type { FormlyFieldConfig } from '@ngx-formly/core';
-import type { FormFieldDef } from '@core/api/models';
-import { toFormlyFields } from './formly-mapper';
+import type { FormFieldDef, FormSection } from '@core/api/models';
+import { toFormlyFields, toFormlySections } from './formly-mapper';
 
 function callExpr(
   config: FormlyFieldConfig,
@@ -279,5 +279,54 @@ describe('toFormlyFields', () => {
     ];
     expect(toFormlyFields(fields, 'en')[0].props?.label).toBe('EN');
     expect(toFormlyFields(fields, 'fr')[0].props?.label).toBe('DE');
+  });
+});
+
+describe('toFormlySections', () => {
+  const sections: FormSection[] = [
+    {
+      key: 'plan',
+      label: { de: 'Vorhaben' },
+      fields: [
+        { key: 'title', type: 'text', label: { de: 'Titel' } },
+        { key: 'desc', type: 'textarea', label: { de: 'Beschreibung' } },
+        { key: 'date', type: 'date', label: { de: 'Datum' } },
+        { key: 'room', type: 'text', label: { de: 'Raum' }, visibleIf: { '==': [{ var: 'has_budget' }, true] } },
+      ],
+    },
+    {
+      key: 'costs',
+      label: { de: 'Kosten' },
+      fields: [
+        { key: 'costs', type: 'positions', label: { de: 'Kostenaufstellung' } },
+        { key: 'marker', type: 'section', label: { de: 'Marke' } },
+      ],
+    },
+    { key: 'hidden', label: { de: 'Kontakt' }, fields: [{ key: 'iban', type: 'iban', label: { de: 'IBAN' } }] },
+  ];
+
+  it('puts the title first, then a heading per section, in a grid group', () => {
+    const [group] = toFormlySections(sections, 'de', { has_budget: false }, { omitKeys: ['iban'] });
+    expect(group.fieldGroupClassName).toBe('fe-grid');
+    const rows = (group.fieldGroup ?? []).map((f) => [f.key ?? f.props?.label, f.className]);
+    expect(rows).toEqual([
+      ['title', 'fe-full'],
+      ['Vorhaben', 'fe-full fe-heading'],
+      ['desc', 'fe-full'],
+      ['date', 'fe-half'],
+      ['room', 'fe-half'],
+      ['Kosten', 'fe-full fe-heading'],
+      ['costs', 'fe-full'],
+    ]);
+    // The section without a field left (the omitted PII field) has no heading.
+    expect(rows.some(([label]) => label === 'Kontakt')).toBe(false);
+    // The context reaches visibleIf.
+    const room = group.fieldGroup?.find((f) => f.key === 'room') as FormlyFieldConfig;
+    expect(callExpr(room, 'hide', {})).toBe(true);
+  });
+
+  it('works without a title and without options', () => {
+    const [group] = toFormlySections([{ key: 'm', label: { de: 'M' }, fields: [{ key: 'a', type: 'text', label: { de: 'A' } }] }], 'de');
+    expect(group.fieldGroup?.map((f) => f.key ?? f.props?.label)).toEqual(['M', 'a']);
   });
 });
