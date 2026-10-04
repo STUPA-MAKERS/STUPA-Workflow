@@ -41,7 +41,7 @@ sibling memory here.
 ## Feature specs & designs
 
 - [budget-kostenstellen-spec](budget-kostenstellen-spec.md) — hierarchical budgets: VS-800-40 naming, roll-down available / roll-up consumed
-- [budget-tab-redesign](budget-tab-redesign.md) — Budget tab: left Budget→Year tree, stacked pies, requested column, cost-center colors, URL sync
+- [budget-tab-redesign](budget-tab-redesign.md) — Budget tab: FE10a tree pane + sheet (six figures, Verteilung, Auslastung, applications), O19 colour inheritance, URL sync
 - [budget-import-zugferd](budget-import-zugferd.md) — ZUGFeRD/Factur-X expense import, drag-into-window + drop-overlay
 - [flow-engine-redesign](flow-engine-redesign.md) — guard catalog + compare guard, 3 actions (webhook/notify/addToNextSession), 16-perm rework
 - [sessions-protokollant-redesign](sessions-protokollant-redesign.md) — per-meeting protokollant, granular Gremium-role perms, 3-pane meeting view, beamer follow

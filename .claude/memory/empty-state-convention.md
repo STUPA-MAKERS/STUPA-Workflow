@@ -31,8 +31,8 @@ now a framed standalone card.
 Current consumers of `.empty-state`: invoices, expenses, applications-table and konten. The data-table
 pages (tasks and admin) frame through `dt--boxed`. grants frames through its `.card`.
 INTENTIONAL exceptions, left alone because they are not no-results table empties:
-budget-dashboard `.bd__empty` (a dashed "create your first budget" onboarding panel with a
-title and a body) and the meetings sub-panel empties (`mtg__muted` and `mtg__tocEmpty`, the
+budget-dashboard `.bd__empty` (since FE10a an `app-empty-state` with a heading, a body and, for
+the missing fiscal year, the link to /admin/cost-centres) and the meetings sub-panel empties (`mtg__muted` and `mtg__tocEmpty`, the
 dense 3-pane meeting UI). invoices keeps `min-height:60vh` for a functional reason: the
 `.inv__dropOverlay` ZUGFeRD drag-drop needs the relative parent height. So its card
 top-aligns and leaves a gap below.
