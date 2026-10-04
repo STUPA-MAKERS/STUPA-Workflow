@@ -21,15 +21,17 @@ import type {
   Meeting,
   Uuid,
 } from '@core/api/models';
-import { ButtonComponent, IconComponent } from '@stupa-makers/ui-kit';
+import { ButtonComponent, IconComponent, MEDIA } from '@stupa-makers/ui-kit';
 import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
+import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
+import { mediaQuerySignal } from '../../../layout/media-query';
 import {
   type AttendanceChange,
   MeetingAttendanceTableComponent,
 } from '../meeting-attendance-table.component';
 import { MeetingDelegationCardComponent } from '../meeting-delegation-card.component';
 
-/** The popover that is open above the dock. */
+/** The panel that is open: a popover above the dock, or a bottom sheet on a phone. */
 export type DockPanel = 'none' | 'attendance' | 'protokollant';
 
 /**
@@ -43,8 +45,8 @@ export type DockPanel = 'none' | 'attendance' | 'protokollant';
  * ("Protokoll: Mara Keller", the handover for the lead and the minute-taker, Z3) and the
  * word count of the open item.
  *
- * The attendance and the minute-taker open as popovers above the dock. On a phone the
- * dock sits on the viewport above the navigation bar.
+ * The attendance and the minute-taker open as popovers above the dock. On a phone they
+ * open as a bottom sheet, and the dock sits on the viewport above the navigation bar.
  */
 @Component({
   selector: 'app-session-dock',
@@ -59,15 +61,23 @@ export type DockPanel = 'none' | 'attendance' | 'protokollant';
     AvatarComponent,
     MeetingAttendanceTableComponent,
     MeetingDelegationCardComponent,
+    SideSheetComponent,
   ],
   templateUrl: './session-dock.component.html',
   styleUrl: './session-dock.component.scss',
   host: {
     '(document:keydown.escape)': 'closePanel()',
+    // On a phone the dock is a fixed layer above the page. The bottom sheet lives in it,
+    // so the layer moves up to the dialog level while the sheet is open; else the
+    // navigation bar covers the sheet and its scrim.
+    '[style.z-index]': "phone() && shownPanel() !== 'none' ? 'var(--z-dialog)' : null",
   },
 })
 export class SessionDockComponent {
   private readonly i18n = inject(I18nService);
+
+  /** A phone opens the panels as a bottom sheet instead of a popover. */
+  protected readonly phone = mediaQuerySignal(MEDIA.phone);
 
   readonly meeting = input.required<Meeting>();
   readonly agenda = input.required<AgendaItem[]>();
@@ -135,6 +145,17 @@ export class SessionDockComponent {
   protected readonly hasNextForHandover = computed(() => {
     const count = this.agenda().length;
     return count > 0 && this.nowIndex() < count - 1;
+  });
+
+  /** The panel on screen: the minute-taker only for the people who may change it. */
+  protected readonly shownPanel = computed<DockPanel>(() => {
+    const panel = this.panel();
+    if (panel === 'protokollant' && !this.canPickKeeper() && !this.canHandOver()) return 'none';
+    return panel;
+  });
+  protected readonly panelHeading = computed<TranslationKey>(() => {
+    if (this.shownPanel() === 'attendance') return 'meetings.attendance.title';
+    return this.canHandOver() ? 'meetings.handover.title' : 'meetings.dock.pickProtokollant';
   });
 
   /**

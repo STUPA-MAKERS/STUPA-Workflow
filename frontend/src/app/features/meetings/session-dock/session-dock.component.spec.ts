@@ -11,8 +11,10 @@ import {
   ATTENDANCE,
   DELEGATION_CONTEXT,
   WITH_VOTER,
+  matchMediaQueries,
   meeting,
 } from '../../../../testing/meeting-fixtures';
+import { MEDIA } from '@stupa-makers/ui-kit';
 import { type DockPanel, SessionDockComponent } from './session-dock.component';
 
 const OUTPUTS = [
@@ -32,7 +34,16 @@ interface Inputs {
   panel: DockPanel;
 }
 
-async function setup(over: Partial<Inputs> = {}) {
+let restoreMedia: (() => void) | null = null;
+afterEach(() => {
+  restoreMedia?.();
+  restoreMedia = null;
+  document.body.style.overflow = '';
+});
+
+/** Render the dock; `media` lists the width queries that match (none: wider than a phone). */
+async function setup(over: Partial<Inputs> = {}, media: string[] = []) {
+  restoreMedia = matchMediaQueries(...media);
   const on = Object.fromEntries(OUTPUTS.map((name) => [name, jest.fn()])) as Record<
     (typeof OUTPUTS)[number],
     jest.Mock
@@ -311,6 +322,58 @@ describe('SessionDockComponent', () => {
       await setup({ meeting: planned({ protokollantId: null, protokollantName: null, canManage: false }) });
       expect(screen.getByText('Protokollführung fehlt')).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /Protokollführung fehlt/ })).toBeNull();
+    });
+  });
+
+  describe('on a phone', () => {
+    it('opens the attendance as a bottom sheet over the navigation bar', async () => {
+      const { fixture, container, http } = await setup({}, [MEDIA.phone]);
+      const dock = fixture.componentInstance;
+      const host = fixture.nativeElement as HTMLElement;
+      expect(host.style.zIndex).toBe('');
+      await userEvent.click(screen.getByTitle('Anwesenheit'));
+      const sheet = screen.getByRole('dialog', { name: 'Anwesenheit' });
+      expect(sheet).toHaveClass('ss', 'ss--bottom');
+      expect(sheet).toHaveAttribute('aria-modal', 'true');
+      expect(sheet.querySelector('.ss__handle')).not.toBeNull();
+      expect(within(sheet).getByText('Anwesend 1 von 3')).toBeInTheDocument();
+      // No popover and no own backdrop: the sheet has its scrim.
+      expect(container.querySelector('.sd__pop')).toBeNull();
+      expect(container.querySelector('.sd__backdrop')).toBeNull();
+      expect(host.style.zIndex).toBe('var(--z-dialog)');
+      await userEvent.click(container.querySelector('.ss__scrim') as HTMLElement);
+      expect(dock.panel()).toBe('none');
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(host.style.zIndex).toBe('');
+      http.match((r) => r.url.includes('/delegations/')).forEach((req) => req.flush(DELEGATION_CONTEXT));
+    });
+
+    it('picks the minute-taker in a bottom sheet and closes it on Escape', async () => {
+      const { fixture, on } = await setup(
+        { meeting: planned({ protokollantId: null, protokollantName: null }) },
+        [MEDIA.phone],
+      );
+      const dock = fixture.componentInstance;
+      await userEvent.click(screen.getByRole('button', { name: /Protokollführung fehlt/ }));
+      let sheet = screen.getByRole('dialog', { name: 'Protokollführung wählen' });
+      expect(sheet).toHaveClass('ss--bottom');
+      await userEvent.keyboard('{Escape}');
+      expect(dock.panel()).toBe('none');
+      await userEvent.click(screen.getByRole('button', { name: /Protokollführung fehlt/ }));
+      sheet = screen.getByRole('dialog', { name: 'Protokollführung wählen' });
+      await userEvent.click(within(sheet).getByRole('button', { name: /Mika Mitglied/ }));
+      expect(on.setProtokollant).toHaveBeenCalledWith('pr-2');
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+
+    it('opens no sheet for the minute-taker without the right to change it', async () => {
+      const { fixture } = await setup(
+        { meeting: meeting({ canManage: false, isProtokollant: false }) },
+        [MEDIA.phone],
+      );
+      fixture.componentRef.setInput('panel', 'protokollant');
+      fixture.detectChanges();
+      expect(screen.queryByRole('dialog')).toBeNull();
     });
   });
 });

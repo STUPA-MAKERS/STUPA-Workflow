@@ -159,18 +159,21 @@ describe('MeetingPageComponent', () => {
       expect(screen.queryByRole('button', { name: '0 live' })).toBeNull();
     });
 
-    it('closes a live meeting and names an open vote in the tooltip', async () => {
+    it('closes a live meeting, and an open vote on any item blocks the close', async () => {
       const { on, fixture } = await setup();
       const close = screen.getByRole('button', { name: 'Sitzung schließen' });
       expect(close).toHaveClass('btn--danger');
+      expect(close).toBeEnabled();
       await userEvent.click(close);
-      expect(on.closeSession).toHaveBeenCalled();
-      fixture.componentRef.setInput('meeting', meeting({ votes: [vote()] }));
+      expect(on.closeSession).toHaveBeenCalledTimes(1);
+      // The open vote is on another item than the one in the sheet.
+      fixture.componentRef.setInput('meeting', meeting({ votes: [vote({ agendaItemId: AGENDA[1].id })] }));
       fixture.detectChanges();
-      expect(screen.getByRole('button', { name: 'Sitzung schließen' })).toHaveAttribute(
-        'title',
-        'Erst die offene Abstimmung schließen oder abbrechen.',
-      );
+      const blocked = screen.getByRole('button', { name: 'Sitzung schließen' });
+      expect(blocked).toBeDisabled();
+      expect(blocked).toHaveAttribute('title', 'Erst die offene Abstimmung schließen oder abbrechen.');
+      await userEvent.click(blocked);
+      expect(on.closeSession).toHaveBeenCalledTimes(1);
     });
 
     it('finalizes the draft of a closed meeting as a step of its own (O13)', async () => {
@@ -218,6 +221,34 @@ describe('MeetingPageComponent', () => {
       expect(on.toggleBeamer).toHaveBeenCalled();
       const menu = await openMenu();
       expect(within(menu).queryByRole('menuitem', { name: 'Beamer-Ansicht' })).toBeNull();
+    });
+
+    it('disables the close in the phone menu while a vote is open', async () => {
+      const { on } = await setup({ meeting: meeting({ votes: [vote()] }) }, [MEDIA.phone]);
+      const menu = await openMenu();
+      const close = within(menu).getByRole('menuitem', { name: /Sitzung schließen/ });
+      expect(close).toHaveAttribute('aria-disabled', 'true');
+      await userEvent.click(close);
+      expect(on.closeSession).not.toHaveBeenCalled();
+    });
+
+    it('opens the agenda and the attendance as bottom sheets on a phone', async () => {
+      const { flushDelegations } = await setup({}, [MEDIA.phone]);
+      await userEvent.click(screen.getByRole('button', { name: /Tagesordnung/ }));
+      const agenda = screen.getByRole('dialog', { name: 'Tagesordnung' });
+      expect(agenda).toHaveClass('ss--bottom');
+      await userEvent.keyboard('{Escape}');
+      expect(screen.queryByRole('dialog')).toBeNull();
+      const menu = await openMenu();
+      await userEvent.click(within(menu).getByRole('menuitem', { name: 'Anwesenheit erfassen' }));
+      expect(screen.getByRole('dialog', { name: 'Anwesenheit' })).toHaveClass('ss--bottom');
+      flushDelegations();
+    });
+
+    it('opens the agenda from the start edge below the wide layout', async () => {
+      await setup();
+      await userEvent.click(screen.getByRole('button', { name: /Tagesordnung/ }));
+      expect(screen.getByRole('dialog', { name: 'Tagesordnung' })).toHaveClass('ss--start');
     });
 
     it('moves the close and the finalize into the menu on a phone', async () => {

@@ -8,6 +8,7 @@ import {
   input,
   model,
   output,
+  signal,
   viewChild,
 } from '@angular/core';
 import { IconComponent } from '@stupa-makers/ui-kit';
@@ -15,7 +16,8 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 
 /**
  * Where the sheet comes from: `end` (the attendance sheet), `start` (the agenda drawer)
- * or `bottom` (the "Mehr" sheet of the phone bar).
+ * or `bottom` (the phone sheet: the "Mehr" sheet of the phone bar, and the pickers and
+ * secondary panes of a page on a phone).
  */
 export type SheetSide = 'end' | 'start' | 'bottom';
 
@@ -30,6 +32,15 @@ const FOCUSABLE = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(',');
 
+/** A drag down by more than this many pixels closes a bottom sheet. */
+const SWIPE_CLOSE_PX = 96;
+/** A quick flick down (px per ms) closes it after a shorter way too. */
+const SWIPE_CLOSE_SPEED = 0.5;
+/** The way down that a flick needs at least, so a tap does not close the sheet. */
+const SWIPE_MIN_PX = 24;
+/** Controls in the header keep their own pointer events and start no drag. */
+const NO_DRAG = 'button, a, input, select, textarea';
+
 /**
  * A modal sheet over a scrim: the attendance sheet (end), the agenda drawer (start) and
  * the "Mehr" sheet of the phone bar (bottom).
@@ -43,6 +54,11 @@ const FOCUSABLE = [
  *
  * Slots: the content, and `[sheet-actions]` for controls in the header before the close
  * button.
+ *
+ * The bottom sheet is the phone sheet: a handle above a fixed header, rounded top
+ * corners, at most 85% of the viewport high. A swipe down on the handle or the header
+ * closes it too. The body scrolls inside and fades at an end only where more content is
+ * hidden.
  *
  * `contentScrolls`: the content scrolls a list of its own and keeps its header in place
  * (the cost-centre picker). The body then only passes the height down and does not
@@ -69,6 +85,18 @@ export class SideSheetComponent {
 
   protected readonly id = `side-sheet-${nextId++}`;
   private readonly pane = viewChild<ElementRef<HTMLElement>>('pane');
+  private readonly body = viewChild<ElementRef<HTMLElement>>('body');
+
+  /** More content above or below the visible part of the body. */
+  protected readonly fadeTop = signal(false);
+  protected readonly fadeBottom = signal(false);
+  /** How far a swipe pulls the bottom sheet down now, in px. */
+  protected readonly dragY = signal(0);
+  /** A swipe runs: the sheet follows the finger without a transition. */
+  protected readonly dragging = signal(false);
+
+  private drag: { pointerId: number; startY: number; startTime: number } | null = null;
+  private bodyObserver: ResizeObserver | null = null;
 
   private returnFocus: HTMLElement | null = null;
   private bodyOverflow: string | null = null;
@@ -85,6 +113,46 @@ export class SideSheetComponent {
   close(): void {
     this.open.set(false);
     this.closed.emit();
+  }
+
+  /** Read the scroll position of the body and set the fades. */
+  protected measure(): void {
+    const el = this.body()?.nativeElement;
+    if (!el) return;
+    // A sub-pixel layout leaves a fraction of a pixel over on a body that fits.
+    const slack = 1;
+    this.fadeTop.set(el.scrollTop > slack);
+    this.fadeBottom.set(el.scrollTop < el.scrollHeight - el.clientHeight - slack);
+  }
+
+  /** Start a swipe on the handle or the header of a bottom sheet. */
+  protected dragStart(event: PointerEvent): void {
+    if (this.side() !== 'bottom' || !event.isPrimary || event.button !== 0) return;
+    if ((event.target as Element | null)?.closest(NO_DRAG)) return;
+    this.drag = { pointerId: event.pointerId, startY: event.clientY, startTime: event.timeStamp };
+    this.dragging.set(true);
+    (event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId);
+  }
+
+  protected dragMove(event: PointerEvent): void {
+    if (event.pointerId !== this.drag?.pointerId) return;
+    // The sheet follows the finger down, never up past its place.
+    this.dragY.set(Math.max(0, event.clientY - this.drag.startY));
+  }
+
+  /** End a swipe: a long or quick way down closes the sheet, else it snaps back. */
+  protected dragEnd(event: PointerEvent): void {
+    const drag = this.drag;
+    if (event.pointerId !== drag?.pointerId) return;
+    const distance = Math.max(0, event.clientY - drag.startY);
+    const speed = distance / Math.max(1, event.timeStamp - drag.startTime);
+    this.drag = null;
+    this.dragging.set(false);
+    this.dragY.set(0);
+    if (event.type === 'pointercancel') return;
+    if (distance > SWIPE_CLOSE_PX || (distance > SWIPE_MIN_PX && speed > SWIPE_CLOSE_SPEED)) {
+      this.close();
+    }
   }
 
   protected onKey(event: KeyboardEvent): void {
@@ -125,12 +193,31 @@ export class SideSheetComponent {
       this.timer = null;
       const pane = this.pane()!.nativeElement;
       (this.focusables(pane)[0] ?? pane).focus();
+      this.watchBody();
     });
+  }
+
+  /**
+   * Measure the fades now and whenever the body or its content changes size. The body
+   * keeps its height while the content grows inside it, so the children are watched too.
+   */
+  private watchBody(): void {
+    const el = this.body()?.nativeElement;
+    if (!el) return;
+    this.bodyObserver = new ResizeObserver(() => this.measure());
+    this.bodyObserver.observe(el);
+    for (const child of Array.from(el.children)) this.bodyObserver.observe(child);
+    this.measure();
   }
 
   private deactivate(): void {
     clearTimeout(this.timer ?? undefined);
     this.timer = null;
+    this.bodyObserver?.disconnect();
+    this.bodyObserver = null;
+    this.drag = null;
+    this.dragging.set(false);
+    this.dragY.set(0);
     // Closed from the start: nothing to undo.
     if (this.bodyOverflow === null) return;
     document.body.style.overflow = this.bodyOverflow;

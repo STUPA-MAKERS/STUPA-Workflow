@@ -58,7 +58,8 @@ type SessionAction = 'settings' | 'attendance' | 'beamer' | 'close' | 'finalize'
  * minute-taker.
  *
  * Wide (>= 1200px): three columns. Below that the agenda moves into a sheet from the
- * start edge, and the vote cards go above the item.
+ * start edge, and the vote cards go above the item. On a phone the agenda sheet, the
+ * attendance and the minute-taker open as bottom sheets.
  */
 @Component({
   selector: 'app-meeting-page',
@@ -158,7 +159,7 @@ export class MeetingPageComponent {
   /** Discard the planned handover. */
   readonly cancelHandover = output<void>();
 
-  /** The popover that is open above the dock. */
+  /** The dock panel that is open: a popover above the dock, a bottom sheet on a phone. */
   readonly panel = signal<DockPanel>('none');
   /** The agenda sheet below the wide layout. */
   readonly agendaOpen = signal(false);
@@ -257,7 +258,13 @@ export class MeetingPageComponent {
     const sections: RowMenuSection[] = [{ items: main }];
     const danger: RowMenuItem[] = [];
     if (this.phone() && this.mainAction() === 'close') {
-      danger.push({ id: 'close', label: t('meetings.control.closeSession'), icon: 'stop', danger: true });
+      danger.push({
+        id: 'close',
+        label: t('meetings.control.closeSession'),
+        icon: 'stop',
+        danger: true,
+        disabledReason: this.anyOpenVote() ? t('meetings.page.closeBlocked') : null,
+      });
     }
     if (m.canManage) {
       danger.push({ id: 'delete', label: t('meetings.delete.title'), icon: 'delete', danger: true });
@@ -277,6 +284,13 @@ export class MeetingPageComponent {
   });
   protected readonly openVote = computed(
     () => this.votes().find((v) => v.status === 'open') ?? null,
+  );
+  /**
+   * An open vote on any item of the meeting. It blocks the close of the meeting, so the
+   * close button is disabled and says why.
+   */
+  protected readonly anyOpenVote = computed(() =>
+    this.meeting().votes.some((v) => v.status === 'open'),
   );
 
   /** The newest closed vote whose result is not in the text yet. */

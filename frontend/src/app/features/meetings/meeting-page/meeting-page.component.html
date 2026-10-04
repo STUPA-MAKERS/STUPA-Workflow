@@ -62,7 +62,7 @@
         </app-button>
       }
       @case ('close') {
-        <app-button variant="danger" [loading]="finalizing()" [title]="(openVote() ? 'meetings.page.closeBlocked' : 'meetings.control.closeSession') | t" (click)="closeSession.emit()">
+        <app-button variant="danger" [loading]="finalizing()" [disabled]="anyOpenVote()" [title]="(anyOpenVote() ? 'meetings.page.closeBlocked' : 'meetings.control.closeSession') | t" (click)="closeSession.emit()">
           {{ 'meetings.control.closeSession' | t }}
         </app-button>
       }
@@ -87,7 +87,8 @@
       {{ 'meetings.agenda.title' | t }}
       <span class="mp__muted">· {{ agenda().length }}</span>
     </app-button>
-    <app-side-sheet side="start" [heading]="'meetings.agenda.title' | t" [(open)]="agendaOpen">
+    <!-- A phone opens the agenda as a bottom sheet, a narrow screen from the start edge. -->
+    <app-side-sheet [side]="phone() ? 'bottom' : 'start'" [heading]="'meetings.agenda.title' | t" [(open)]="agendaOpen">
       @if (agendaOpen()) {
         <ng-container [ngTemplateOutlet]="agendaTpl" [ngTemplateOutletContext]="{ inSheet: true }" />
       }

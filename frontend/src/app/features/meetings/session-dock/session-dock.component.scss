@@ -141,6 +141,18 @@
   white-space: nowrap;
 }
 
+/* The content of the bottom sheet on a phone. The sheet body scrolls, so the list of
+   members does not scroll by itself in there. */
+.sd__sheet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.sd__sheet .sd__people {
+  max-height: none;
+  overflow: visible;
+}
+
 /* Popovers above the dock */
 .sd__backdrop {
   position: fixed;
@@ -351,14 +363,5 @@
     flex: 1 1 0;
     justify-content: center;
     padding: 0 var(--space-3);
-  }
-  .sd__pop,
-  .sd__pop--narrow {
-    position: fixed;
-    inset-inline: var(--space-3);
-    bottom: calc(var(--fx-dock-h, 0px) + var(--app-bottom-inset, 0px) + var(--space-2));
-    width: auto;
-    max-width: none;
-    max-height: calc(100dvh - var(--fx-dock-h, 0px) - var(--app-bottom-inset, 0px) - 5rem);
   }
 }

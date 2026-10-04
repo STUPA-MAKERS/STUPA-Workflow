@@ -1837,6 +1837,36 @@ describe('MeetingsComponent — methods', () => {
       expect(v?.result).toBe('passed');
     });
 
+    it('keeps the secrecy and the open time of a vote that another manager opened', async () => {
+      const { cmp, ws } = await loaded();
+      ws.subject.next({ type: 'vote_opened', voteId: 'v-2', options: ['yes', 'no'], closesAt: null, secret: true });
+      const v = cmp.meeting()?.votes.find((x) => x.id === 'v-2');
+      expect(v?.secret).toBe(true);
+      expect(v?.openedAt).toEqual(expect.any(String));
+    });
+
+    it('sets the end time on a live close and a live cancel', async () => {
+      const { cmp, ws } = await loaded();
+      ws.subject.next({ type: 'vote_closed', voteId: 'v-1', result: 'passed', counts: { yes: 9 }, failedReason: null });
+      expect(cmp.meeting()?.votes.find((x) => x.id === 'v-1')?.closedAt).toEqual(expect.any(String));
+      ws.subject.next({ type: 'vote_cancelled', voteId: 'v-2' });
+      const cancelled = cmp.meeting()?.votes.find((x) => x.id === 'v-2');
+      expect(cancelled?.status).toBe('cancelled');
+      expect(cancelled?.closedAt).toEqual(expect.any(String));
+    });
+
+    it('sets the open and the end time on an own open, close and cancel', async () => {
+      const { cmp, http } = await loaded();
+      const find = (id: string) => cmp.meeting()?.votes.find((x) => x.id === id);
+      cmp.openVote('v-2');
+      http.expectOne('/api/votes/v-2/open').flush(null, { status: 204, statusText: 'No Content' });
+      expect(find('v-2')?.status).toBe('open');
+      expect(find('v-2')?.openedAt).toEqual(expect.any(String));
+      cmp.cancelVote('v-2');
+      http.expectOne('/api/votes/v-2/cancel').flush(null, { status: 204, statusText: 'No Content' });
+      expect(find('v-2')?.closedAt).toEqual(expect.any(String));
+    });
+
     it('updates the viewer list from a viewers message', async () => {
       const { cmp, ws } = await loaded();
       ws.subject.next({ type: 'viewers', viewers: ['Alice', 'Bob'] });

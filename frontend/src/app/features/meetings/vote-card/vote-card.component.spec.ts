@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import type { MeetingStatus, MeetingVote } from '@core/api/models';
 import { vote } from '../../../../testing/meeting-fixtures';
+import { liveOpenedVote } from '../meetings-display.util';
 import { VoteCardComponent } from './vote-card.component';
 
 const OUTPUTS = ['close', 'cancel', 'open', 'remove', 'cast', 'insertResult'] as const;
@@ -76,6 +77,23 @@ describe('VoteCardComponent', () => {
       await setup({ vote: vote({ secret: true, quorum: { type: 'percent', value: 50 } }) });
       expect(screen.getByText(/geheime Abstimmung · Quorum 50 %/)).toBeInTheDocument();
       expect(screen.getByText(/Das Ergebnis zeigt sich nach dem Schließen/)).toBeInTheDocument();
+    });
+
+    it('names a secret vote that another manager opened live, before the next read', async () => {
+      await setup({
+        vote: liveOpenedVote({
+          type: 'vote_opened',
+          voteId: 'v-live',
+          agendaItemId: 't-1',
+          question: 'Geheim?',
+          options: ['yes', 'no', 'abstain'],
+          closesAt: null,
+          secret: true,
+        }),
+      });
+      expect(screen.getByText(/^geheime Abstimmung · seit \d\d:\d\d$/)).toBeInTheDocument();
+      expect(screen.getByText(/Das Ergebnis zeigt sich nach dem Schließen/)).toBeInTheDocument();
+      expect(screen.queryByText(/Zwischenstand sichtbar/)).toBeNull();
     });
 
     it('shows 0 % without anybody present', async () => {

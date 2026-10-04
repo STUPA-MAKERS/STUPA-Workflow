@@ -203,6 +203,9 @@ describe('meetings-display.util', () => {
       status: 'open',
       revealed: false,
     });
+    expect(vote.secret).toBeUndefined();
+    expect(vote.openedAt).toEqual(expect.any(String));
+    expect(liveOpenedVote({ type: 'vote_opened', voteId: 'v-8', options: [], closesAt: null, secret: true }).secret).toBe(true);
   });
 
   it('reads the stable problem+json code of an HTTP error', () => {

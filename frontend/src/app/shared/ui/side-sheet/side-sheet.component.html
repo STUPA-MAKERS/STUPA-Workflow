@@ -3,26 +3,47 @@
   <div
     #pane
     [class]="'ss ss--' + side()"
+    [class.ss--dragging]="dragging()"
+    [style.transform]="dragY() ? 'translateY(' + dragY() + 'px)' : null"
     role="dialog"
     aria-modal="true"
     tabindex="-1"
     [attr.aria-labelledby]="id"
     (keydown)="onKey($event)"
   >
-    <header class="ss__head">
-      <h2 class="ss__title" [id]="id">{{ heading() }}</h2>
-      <ng-content select="[sheet-actions]" />
-      <button
-        type="button"
-        class="ss__close"
-        [attr.aria-label]="'action.close' | t"
-        [title]="'action.close' | t"
-        (click)="close()"
-      >
-        <app-icon name="x" [size]="20" />
-      </button>
-    </header>
-    <div class="ss__body" [class.ss__body--fill]="contentScrolls()">
+    <!-- The handle and the header take a swipe down on a bottom sheet. -->
+    <div
+      class="ss__top"
+      (pointerdown)="dragStart($event)"
+      (pointermove)="dragMove($event)"
+      (pointerup)="dragEnd($event)"
+      (pointercancel)="dragEnd($event)"
+    >
+      @if (side() === 'bottom') {
+        <div class="ss__grip" aria-hidden="true"><span class="ss__handle"></span></div>
+      }
+      <header class="ss__head">
+        <h2 class="ss__title" [id]="id">{{ heading() }}</h2>
+        <ng-content select="[sheet-actions]" />
+        <button
+          type="button"
+          class="ss__close"
+          [attr.aria-label]="'action.close' | t"
+          [title]="'action.close' | t"
+          (click)="close()"
+        >
+          <app-icon name="x" [size]="20" />
+        </button>
+      </header>
+    </div>
+    <div
+      #body
+      class="ss__body"
+      [class.ss__body--fill]="contentScrolls()"
+      [class.ss__body--fadeTop]="fadeTop()"
+      [class.ss__body--fadeBottom]="fadeBottom()"
+      (scroll)="measure()"
+    >
       <ng-content />
     </div>
   </div>

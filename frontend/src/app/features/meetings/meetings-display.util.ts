@@ -202,6 +202,9 @@ export function liveOpenedVote(
     counts: null,
     leading: null,
     closesAt: msg.closesAt,
+    // The event carries the secrecy, so the card shows the right hint before the next read.
+    secret: msg.secret,
+    openedAt: new Date().toISOString(),
     voted: 0,
     present: 0,
     revealed: false,
