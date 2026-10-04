@@ -119,7 +119,10 @@ In a stylesheet: `@use 'breakpoints' as bp;` and `@include bp.phone { … }` (al
 - **Controls** `--control-height-sm/-/-lg` = 32 / 40 / 52px, `--field-height` = 56px.
 - **Motion** `--motion-fast/base` plus `--ease-standard`. Motion respects
   `prefers-reduced-motion`.
-- **Layout** `--layout-max-width`, `--layout-header-height`, `--layout-gutter`.
+- **Layout** `--layout-max-width`, `--layout-header-height`, `--layout-gutter`. The app shell sets
+  `--layout-header-height` to 0 (the rail replaced the top bar) and adds `--rail-width` 96px,
+  `--bottom-bar-height` 80px, `--main-pad-top`/`--main-pad-bottom` (the block padding of the main
+  region) and, on a phone, `--app-bottom-inset` (how far up the bottom bar reaches).
 - **Z-index** `--z-dropdown/sticky/dialog/toast`.
 
 ## Rules
