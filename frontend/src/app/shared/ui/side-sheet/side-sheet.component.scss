@@ -98,3 +98,9 @@
   overflow-y: auto;
   padding: var(--space-2) var(--space-4) var(--space-4);
 }
+/* The content scrolls by itself: the body passes the height down. */
+.ss__body--fill {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}

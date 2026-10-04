@@ -126,7 +126,7 @@
                     <option [value]="m" [selected]="m === metric()">{{ metricLabel(m) }}</option>
                   }
                 </select>
-                <app-icon name="chevron-down" [size]="14" />
+                <app-icon class="bd__selectChev" name="chevron-down" [size]="14" />
               </label>
             </div>
             <app-budget-pie
@@ -142,14 +142,6 @@
         <section class="bd__sec" aria-labelledby="bd-usage">
           <div class="bd__secHead">
             <h3 id="bd-usage" class="bd__h">{{ 'budget.usage.heading' | t }}</h3>
-            <span class="bd__legends" aria-hidden="true">
-              <span class="bd__legend">
-                <span class="bd__swatch bd__swatch--spent"></span>{{ 'budget.dash.fig.expended' | t }}
-              </span>
-              <span class="bd__legend">
-                <span class="bd__swatch bd__swatch--bound"></span>{{ 'budget.dash.fig.bound' | t }}
-              </span>
-            </span>
           </div>
           <div class="bd__usageCols" aria-hidden="true">
             <span class="bd__grow"></span>
@@ -159,7 +151,10 @@
           </div>
           <ul class="bd__usage">
             @for (row of usageRows(); track row.node.id) {
-              <li class="bd__urow" [style.--color-accent]="row.color">
+              <!-- Each bar has the colour of its cost centre, so a shared legend cannot match it.
+                   The tooltip of the row and the label of the bar name the amounts instead.
+                   The bar is only 6px high, so the whole row carries the tooltip. -->
+              <li class="bd__urow" [style.--color-accent]="row.color" [title]="usageLabel(row)">
                 <div class="bd__uline">
                   <button
                     type="button"
@@ -226,16 +221,29 @@
     </article>
   </div>
 
-  @if (!wide()) {
-    <app-side-sheet side="start" [heading]="'budget.dash.tree' | t" [(open)]="navOpen">
+  @if (phone()) {
+    <!-- A phone: the dialog of the ui-kit, which is a bottom sheet there (handle, swipe
+         down, scrim, Escape, focus trap). -->
+    <app-dialog
+      [open]="navOpen()"
+      [title]="'budget.dash.tree' | t"
+      [closeLabel]="'action.close' | t"
+      (closed)="navOpen.set(false)"
+    >
+      <ng-container *ngTemplateOutlet="treePane; context: { $implicit: true }" />
+    </app-dialog>
+  } @else if (!wide()) {
+    <app-side-sheet side="start" [contentScrolls]="true" [heading]="'budget.dash.tree' | t" [(open)]="navOpen">
       <ng-container *ngTemplateOutlet="treePane" />
     </app-side-sheet>
   }
 
   <!-- The pane: year, overview, search and the cost-centre tree. The wide layout shows it
-       beside the sheet; a narrower one shows it in the side sheet. -->
-  <ng-template #treePane>
-    <div class="bd__paneBody">
+       beside the sheet; a narrower one shows it in the side sheet, a phone in the bottom
+       sheet of the dialog. The chips and the search stay in place; only the tree scrolls, with a fade
+       at an end where more rows are. -->
+  <ng-template #treePane let-inSheet>
+    <div class="bd__paneBody" [class.bd__paneBody--sheet]="inSheet">
       <div class="bd__chips">
         @if (wide()) {
           <ng-container *ngTemplateOutlet="yearChip" />
@@ -245,7 +253,12 @@
         </button>
       </div>
       <app-search-pill size="md" [placeholder]="'budget.dash.search' | t" [(value)]="query" />
-      <nav class="bd__tree" [attr.aria-label]="'budget.dash.tree' | t">
+      <nav
+        class="bd__tree"
+        appScrollFade="y"
+        [attr.aria-label]="'budget.dash.tree' | t"
+        (focusin)="revealRow($event)"
+      >
         @for (row of treeRows(); track row.node.id) {
           <div
             class="tn"
@@ -310,15 +323,15 @@
   </ng-template>
 
   <ng-template #yearChip>
-    <label class="bd-chip bd-chip--on bd__selectChip">
-      <app-icon name="cal" [size]="15" />
+    <label class="bd-chip bd-chip--on bd__selectChip bd__selectChip--lead">
+      <app-icon class="bd__selectLead" name="cal" [size]="15" />
       <span class="sr-only">{{ 'budget.dash.year' | t }}</span>
       <select class="bd__select" [value]="selectedFyId()" (change)="onYearChange($event)">
         @for (fy of years(); track fy.id) {
           <option [value]="fy.id" [selected]="fy.id === selectedFyId()">{{ 'budget.dash.yearShort' | t: { year: fy.display } }}</option>
         }
       </select>
-      <app-icon name="chevron-down" [size]="15" />
+      <app-icon class="bd__selectChev" name="chevron-down" [size]="15" />
     </label>
   </ng-template>
 

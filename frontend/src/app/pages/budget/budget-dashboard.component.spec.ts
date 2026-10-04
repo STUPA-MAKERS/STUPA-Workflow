@@ -141,10 +141,11 @@ function authStub(perms: string[] = ALL_PERMS): AuthService {
   return { can, canAny: (...ps: string[]) => ps.some(can) } as unknown as AuthService;
 }
 
-/** Let `matchMedia` report a wide viewport (or not). jsdom has none of its own. */
-function setViewport(wide: boolean): void {
+/** Let `matchMedia` report a wide viewport (or not), and a phone. jsdom has none of its own. */
+function setViewport(wide: boolean, phone = false): void {
   window.matchMedia = ((query: string) => ({
-    matches: wide && query.includes('min-width: 1200px'),
+    matches:
+      (wide && query.includes('min-width: 1200px')) || (phone && query === '(max-width: 768px)'),
     media: query,
     onchange: null,
     addEventListener: () => undefined,
@@ -162,6 +163,7 @@ interface SetupOpts {
   queryParams?: Record<string, string>;
   apps?: BudgetApplication[];
   wide?: boolean;
+  phone?: boolean;
 }
 
 function providers(opts: SetupOpts, params = new BehaviorSubject(convertToParamMap({}))) {
@@ -190,7 +192,7 @@ function flushApps(http: HttpTestingController, apps: BudgetApplication[] = []):
 }
 
 async function setup(opts: SetupOpts = {}) {
-  setViewport(opts.wide ?? true);
+  setViewport(opts.wide ?? true, opts.phone);
   const tree = opts.tree ?? TREE;
   const fys = opts.fys ?? [FY];
   const params = new BehaviorSubject(convertToParamMap(opts.queryParams ?? {}));
@@ -208,7 +210,7 @@ async function setup(opts: SetupOpts = {}) {
 
 /** Render without answering anything, for the loading and error paths. */
 async function bare(opts: SetupOpts = {}) {
-  setViewport(opts.wide ?? true);
+  setViewport(opts.wide ?? true, opts.phone);
   const view = await render(BudgetDashboardComponent, { providers: providers(opts) });
   const http = TestBed.inject(HttpTestingController);
   return { ...view, http, c: view.fixture.componentInstance as unknown as Inst };
@@ -227,6 +229,37 @@ describe('BudgetDashboardComponent', () => {
   // ------------------------------------------------------------------ tree
 
   describe('tree', () => {
+    it('scrolls only the tree and fades an end only where more rows are', async () => {
+      const view = await setup();
+      const tree = view.container.querySelector('.bd__pane .bd__tree') as HTMLElement;
+      // The year, the overview and the search are outside the scrolling list.
+      expect(tree.querySelector('app-search-pill, .bd-chip')).toBeNull();
+      const geometry = (scrollHeight: number, scrollTop: number) => {
+        Object.defineProperty(tree, 'scrollHeight', { value: scrollHeight, configurable: true });
+        Object.defineProperty(tree, 'clientHeight', { value: 300, configurable: true });
+        Object.defineProperty(tree, 'scrollTop', { value: scrollTop, configurable: true });
+        tree.dispatchEvent(new Event('scroll'));
+      };
+      const fades = () => [tree.classList.contains('is-fade-start'), tree.classList.contains('is-fade-end')];
+      geometry(300, 0);
+      expect(fades()).toEqual([false, false]);
+      geometry(900, 0);
+      expect(fades()).toEqual([false, true]);
+      geometry(900, 300);
+      expect(fades()).toEqual([true, true]);
+      geometry(900, 600);
+      expect(fades()).toEqual([true, false]);
+    });
+
+    it('scrolls a row into view when it gets the keyboard focus', async () => {
+      const view = await setup();
+      const row = view.container.querySelector('.bd__tree .tn') as HTMLElement;
+      const scroll = jest.fn();
+      row.scrollIntoView = scroll;
+      (row.querySelector('.tn__main') as HTMLButtonElement).focus();
+      expect(scroll).toHaveBeenCalledWith({ block: 'nearest' });
+    });
+
     it('shows the root open with its children, each with its allocation', async () => {
       const view = await setup();
       const tree = within(view.container.querySelector('.bd__tree') as HTMLElement);
@@ -564,10 +597,30 @@ describe('BudgetDashboardComponent', () => {
       expect(rows[0].color).toBe('#0075bf');
     });
 
-    it('names the numbers of a bar for a screen reader', async () => {
+    it('names the spent and the bound amount in the bar label and the row tooltip', async () => {
       const view = await setup();
+      const expected =
+        /^Ausgegeben: 40,00\s€ · Gebunden: 60,00\s€ · von 400,00\s€ \(25 % ausgelastet\)$/;
       const bar = view.container.querySelector('.bd__usage app-seg-bar');
-      expect(bar?.getAttribute('aria-label')).toMatch(/^25 % ausgelastet: 40,00\s€ ausgegeben, 60,00\s€ gebunden von 400,00\s€$/);
+      expect(bar?.getAttribute('aria-label')).toMatch(expected);
+      const row = view.container.querySelector('.bd__usage .bd__urow');
+      expect(row?.getAttribute('title')).toMatch(expected);
+    });
+
+    it('shows no shared legend, because each bar has the colour of its cost centre', async () => {
+      const view = await setup();
+      expect(view.container.querySelector('.bd__legends, .bd__legend, .bd__swatch')).toBeNull();
+    });
+
+    it('lets the select fill the metric chip and the chevron pass the click through', async () => {
+      const view = await setup();
+      const chip = view.container.querySelector('#bd-dist')?.parentElement?.querySelector(
+        'label.bd__selectChip',
+      ) as HTMLElement;
+      expect(chip).toBeTruthy();
+      // The chevron is a sibling on top of the select, not a second click target.
+      expect(chip.querySelector('select.bd__select')).toBeTruthy();
+      expect(chip.querySelector('app-icon.bd__selectChev')).toBeTruthy();
     });
 
     it('drills into a row by its name', async () => {
@@ -758,6 +811,37 @@ describe('BudgetDashboardComponent', () => {
       c.selectKs('b-810');
       expect(c.navOpen()).toBe(false);
       flushApps(view.http);
+    });
+
+    it('opens the tree in a side sheet from the start that scrolls only the tree', async () => {
+      const view = await setup({ wide: false });
+      (view.container.querySelector('.bd__pathChip') as HTMLButtonElement).click();
+      view.fixture.detectChanges();
+      const dialog = view.getByRole('dialog', { name: 'Kostenstellen' });
+      expect(dialog).toHaveClass('ss--start');
+      expect(dialog.querySelector('.ss__body')).toHaveClass('ss__body--fill');
+      expect(dialog.querySelector('.ss__body > .bd__paneBody .bd__tree')).toBeTruthy();
+    });
+
+    it('opens the tree in the dialog of the ui-kit on a phone, which is a bottom sheet there', async () => {
+      const view = await setup({ wide: false, phone: true });
+      expect(view.container.querySelector('app-side-sheet')).toBeNull();
+      (view.container.querySelector('.bd__pathChip') as HTMLButtonElement).click();
+      view.fixture.detectChanges();
+      const dialog = view.getByRole('dialog', { name: 'Kostenstellen' });
+      expect(dialog).toHaveClass('dialog');
+      // The handle of the sheet; CSS shows it only on a phone.
+      expect(dialog.querySelector('.dialog__grabber')).toBeTruthy();
+      // The search stays above the tree, which scrolls by itself.
+      const pane = dialog.querySelector('.bd__paneBody') as HTMLElement;
+      expect(pane).toHaveClass('bd__paneBody--sheet');
+      expect(pane.querySelector(':scope > app-search-pill + .bd__tree')).toBeTruthy();
+      // The close button of the dialog closes it.
+      (dialog.querySelector('.dialog__close') as HTMLButtonElement).click();
+      view.fixture.detectChanges();
+      const c = view.fixture.componentInstance as unknown as Inst;
+      expect(c.navOpen()).toBe(false);
+      expect(view.queryByRole('dialog')).toBeNull();
     });
 
     it('names the sheet after the path and puts the actions beside the title', async () => {

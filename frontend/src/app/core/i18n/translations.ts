@@ -1111,6 +1111,7 @@ export const de = {
   'budget.overview.hint':
     'Ringe = Ebenen des Kostenstellen-Baums (außen = tiefer). Klick auf ein Segment öffnet die Kostenstelle.',
   'budget.pie.empty': 'Keine Daten',
+  'budget.pie.emptyLabel': '{name}: kein Betrag vorhanden',
   'budget.tree.col.color': 'Farbe',
   'budget.tree.stateConfig': 'Beantragt/Gebunden-States',
   'budget.tree.stateConfigHint':
@@ -2142,7 +2143,7 @@ export const de = {
   'budget.dash.distributionOf': '{metric} je Unter-Kostenstelle',
   'budget.dash.metric': 'Kennzahl',
   'budget.dash.ownShare': '{name} (nicht verteilt)',
-  'budget.dash.usageLabel': '{percent} % ausgelastet: {expended} ausgegeben, {bound} gebunden von {total}',
+  'budget.dash.usageLabel': 'Ausgegeben: {expended} · Gebunden: {bound} · von {total} ({percent} % ausgelastet)',
   'budget.dash.apps': 'Anträge auf dieser Kostenstelle',
   'budget.dash.appsAll': 'Alle ansehen',
   'budget.dash.appsLoading': 'Anträge werden geladen …',
@@ -3427,6 +3428,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'budget.overview.hint':
     'Rings = levels of the cost-centre tree (outer = deeper). Click a segment to open the cost centre.',
   'budget.pie.empty': 'No data',
+  'budget.pie.emptyLabel': '{name}: no amount',
   'budget.tree.col.color': 'Colour',
   'budget.tree.stateConfig': 'Requested/committed states',
   'budget.tree.stateConfigHint':
@@ -4441,7 +4443,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'budget.dash.distributionOf': '{metric} per sub cost centre',
   'budget.dash.metric': 'Figure',
   'budget.dash.ownShare': '{name} (not distributed)',
-  'budget.dash.usageLabel': '{percent} % used: {expended} spent, {bound} bound of {total}',
+  'budget.dash.usageLabel': 'Spent: {expended} · Bound: {bound} · of {total} ({percent} % used)',
   'budget.dash.apps': 'Applications on this cost centre',
   'budget.dash.appsAll': 'View all',
   'budget.dash.appsLoading': 'Loading applications …',
