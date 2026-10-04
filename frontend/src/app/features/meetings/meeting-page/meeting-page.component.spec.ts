@@ -462,6 +462,33 @@ describe('MeetingPageComponent', () => {
       expect(on.voteOpen).toHaveBeenCalledWith('v-1');
     });
 
+    it('opens no second vote while a vote on another item is open', async () => {
+      const votes = [
+        vote({ id: 'v-1', status: 'draft' }),
+        vote({ id: 'v-x', agendaItemId: 't-2', question: 'Anderer TOP?' }),
+      ];
+      const { on, fixture } = await setup({ meeting: meeting({ votes }) });
+      const open = screen.getByRole('button', { name: 'Abstimmung öffnen' });
+      expect(open).toBeDisabled();
+      expect(open).toHaveAttribute('title', 'Erst die offene Abstimmung schließen oder abbrechen.');
+      await userEvent.click(open);
+      expect(on.voteOpen).not.toHaveBeenCalled();
+      // A free-text item offers no new question either, and an empty item no vote column.
+      expect(screen.queryByRole('button', { name: 'Beschlussfrage hinzufügen' })).toBeNull();
+      fixture.componentRef.setInput('meeting', meeting({ votes: [votes[1]] }));
+      fixture.detectChanges();
+      expect(screen.queryByRole('button', { name: 'Beschlussfrage hinzufügen' })).toBeNull();
+      expect(screen.queryByRole('complementary', { name: 'Abstimmungen' })).toBeNull();
+      // Once the other vote ends, both come back.
+      fixture.componentRef.setInput(
+        'meeting',
+        meeting({ votes: [votes[0], { ...votes[1], status: 'closed', result: 'passed' }] }),
+      );
+      fixture.detectChanges();
+      expect(screen.getByRole('button', { name: 'Abstimmung öffnen' })).toBeEnabled();
+      expect(screen.getByRole('button', { name: 'Beschlussfrage hinzufügen' })).toBeEnabled();
+    });
+
     it('shows the own ballot in the dock: this session, the server, a secret one', async () => {
       const { fixture } = await setup({ meeting: meeting({ votes: [vote()] }), choices: { 'v-1': 'no' } });
       expect(screen.getByText('Deine Stimme', { exact: false })).toHaveTextContent('Deine Stimme: Nein');

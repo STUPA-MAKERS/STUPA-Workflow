@@ -614,8 +614,9 @@ describe('MeetingsComponent', () => {
     });
 
     it('keeps the agenda editor and vote creation for a manager who is not the minute-taker', async () => {
-      // A vote needs a started meeting, so the page offers it while live only.
-      await loadOtherProtokollant({ status: 'live' });
+      // A vote needs a started meeting, so the page offers it while live only. An open
+      // vote on any item blocks a new one, so this meeting has none.
+      await loadOtherProtokollant({ status: 'live', votes: [] });
 
       expect(await screen.findByRole('button', { name: 'Beschlussfrage hinzufügen' })).toBeInTheDocument();
       // Below the wide layout the agenda opens as a sheet.

@@ -17,6 +17,7 @@ interface Inputs {
   deleting: string | null;
   locked: boolean;
   canInsert: boolean;
+  otherOpen: boolean;
 }
 
 async function setup(over: Partial<Inputs> = {}) {
@@ -35,6 +36,7 @@ async function setup(over: Partial<Inputs> = {}) {
       deleting: null,
       locked: false,
       canInsert: false,
+      otherOpen: false,
       ...over,
     },
     on,
@@ -185,6 +187,18 @@ describe('VoteCardComponent', () => {
       expect(on.open).toHaveBeenCalledWith('v-1');
       await userEvent.click(screen.getByRole('button', { name: 'Beschlussfrage löschen' }));
       expect(on.remove).toHaveBeenCalledWith('v-1');
+    });
+
+    it('keeps a planned vote shut while another vote of the meeting is open', async () => {
+      const { on } = await setup({ vote: vote({ status: 'draft' }), otherOpen: true });
+      const open = screen.getByRole('button', { name: 'Abstimmung öffnen' });
+      expect(open).toBeDisabled();
+      expect(open).toHaveAttribute('title', 'Erst die offene Abstimmung schließen oder abbrechen.');
+      expect(screen.getByText('Erst die offene Abstimmung schließen oder abbrechen.')).toHaveClass('vc__hint');
+      await userEvent.click(open);
+      expect(on.open).not.toHaveBeenCalled();
+      // The planned vote can still go.
+      expect(screen.getByRole('button', { name: 'Beschlussfrage löschen' })).toBeEnabled();
     });
 
     it('does not open a planned vote before the meeting runs', async () => {

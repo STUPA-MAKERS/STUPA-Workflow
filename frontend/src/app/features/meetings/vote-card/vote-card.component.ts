@@ -18,7 +18,8 @@ import { countEntries, voteMetaLine, voteOptionLabel, voteOptionsFor } from '../
  * member voted on an open vote, or after the close. The card then shows them.
  *
  * The vote manager closes or cancels (danger) an open vote, opens a planned one and
- * deletes a planned or cancelled one while the meeting is planned or live (O24). A voter
+ * deletes a planned or cancelled one while the meeting is planned or live (O24). Only one
+ * vote of the meeting is open at a time, so "Abstimmung öffnen" waits for it. A voter
  * who did not vote yet gets the options; a ballot never changes once it is cast (O11).
  * A closed vote offers to put its result into the text of the item.
  */
@@ -48,6 +49,11 @@ export class VoteCardComponent {
   readonly locked = input(false);
   /** Offer "Ergebnis ins Protokoll übernehmen": the result is not in the text yet. */
   readonly canInsert = input(false);
+  /**
+   * A vote of the meeting is open, on this item or on another one. A planned vote then
+   * waits: the reconnect state, the beamer and the dock follow only one open vote.
+   */
+  readonly otherOpen = input(false);
 
   readonly close = output<Uuid>();
   readonly cancel = output<Uuid>();

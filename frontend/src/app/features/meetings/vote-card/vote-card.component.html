@@ -55,8 +55,11 @@
 
   @if (v.status === 'draft' && canEdit() && meetingStatus() === 'live') {
     <div class="vc__actions">
-      <app-button variant="fill" [block]="true" (click)="open.emit(v.id)">{{ 'meetings.vote.open' | t }}</app-button>
+      <app-button variant="fill" [block]="true" [disabled]="otherOpen()" [title]="(otherOpen() ? 'meetings.vote.openBlocked' : 'meetings.vote.open') | t" (click)="open.emit(v.id)">{{ 'meetings.vote.open' | t }}</app-button>
     </div>
+    @if (otherOpen()) {
+      <p class="vc__hint">{{ 'meetings.vote.openBlocked' | t }}</p>
+    }
   }
 
   @if (v.status === 'closed' && canInsert()) {

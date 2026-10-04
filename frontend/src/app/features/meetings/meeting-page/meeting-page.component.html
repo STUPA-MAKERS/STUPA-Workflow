@@ -108,6 +108,7 @@
           [deleting]="deletingVote()"
           [locked]="locked()"
           [canInsert]="pendingResult()?.id === vote.id && editable()"
+          [otherOpen]="anyOpenVote()"
           (close)="voteClose.emit($event)"
           (cancel)="voteCancel.emit($event)"
           (open)="voteOpen.emit($event)"

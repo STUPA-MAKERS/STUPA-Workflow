@@ -287,7 +287,8 @@ export class MeetingPageComponent {
   );
   /**
    * An open vote on any item of the meeting. It blocks the close of the meeting, so the
-   * close button is disabled and says why.
+   * close button is disabled and says why. It also blocks a second vote: the reconnect
+   * state, the beamer and the dock follow only one open vote.
    */
   protected readonly anyOpenVote = computed(() =>
     this.meeting().votes.some((v) => v.status === 'open'),
@@ -302,12 +303,15 @@ export class MeetingPageComponent {
     );
   });
 
-  /** "Beschlussfrage hinzufügen": an application item holds one vote, free text any number. */
+  /**
+   * "Beschlussfrage hinzufügen": an application item holds one vote, free text any number.
+   * A new vote waits while a vote on any item of the meeting is open.
+   */
   protected readonly canAddVote = computed(() => {
     const m = this.meeting();
     const t = this.top();
     if (!t || !m.canManageVotes || this.locked() || m.status !== 'live') return false;
-    if (this.openVote()) return false;
+    if (this.anyOpenVote()) return false;
     return !t.applicationId || this.votes().length === 0;
   });
 

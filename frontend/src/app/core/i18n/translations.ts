@@ -860,6 +860,7 @@ export const de = {
   'meetings.vote.rule.two_thirds': 'Zwei Drittel',
   'meetings.vote.openSubmit': 'Abstimmung öffnen',
   'meetings.vote.open': 'Abstimmung öffnen',
+  'meetings.vote.openBlocked': 'Erst die offene Abstimmung schließen oder abbrechen.',
   'meetings.vote.close': 'Abstimmung schließen',
   'meetings.vote.cancel': 'Abstimmung abbrechen',
   'meetings.protokollant.lockedHint':
@@ -3245,6 +3246,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.vote.rule.two_thirds': 'Two thirds',
   'meetings.vote.openSubmit': 'Open vote',
   'meetings.vote.open': 'Open vote',
+  'meetings.vote.openBlocked': 'Close or cancel the open vote first.',
   'meetings.vote.close': 'Close vote',
   'meetings.vote.cancel': 'Cancel vote',
   'meetings.protokollant.lockedHint':
