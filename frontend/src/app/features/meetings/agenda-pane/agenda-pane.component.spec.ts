@@ -77,6 +77,17 @@ describe('AgendaPaneComponent', () => {
     expect(container.querySelector('.ap__num--now')?.closest('li')).toBe(rows[1]);
   });
 
+  it('marks no item as handled or now in a planned meeting, also with a stale id', async () => {
+    const { container } = await setup({
+      meeting: meeting({ status: 'planned', currentAgendaItemId: 't-3' }),
+    });
+    const rows = screen.getAllByRole('listitem');
+    rows.forEach((row) => expect(row).not.toHaveClass('ap__row--done'));
+    expect(screen.queryByText('behandelt')).toBeNull();
+    expect(screen.queryByText('jetzt')).toBeNull();
+    expect(container.querySelector('.ap__num--now')).toBeNull();
+  });
+
   it('marks nothing as handled while no item runs', async () => {
     await setup({ meeting: meeting({ currentAgendaItemId: null }) });
     expect(screen.queryByText('behandelt')).toBeNull();

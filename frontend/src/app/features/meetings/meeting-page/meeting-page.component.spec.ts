@@ -310,6 +310,20 @@ describe('MeetingPageComponent', () => {
       expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Tagesordnung · 3 TOPs' }));
     });
 
+    it('changes no current item on a pick in the preparation pane', async () => {
+      const { on } = await setup({ meeting: planned({ canManageVotes: true }), protocol: null }, [MEDIA.wide]);
+      await userEvent.click(screen.getByRole('button', { name: 'Bericht des Finanzreferats' }));
+      expect(on.selectTop).not.toHaveBeenCalled();
+    });
+
+    it('changes no current item on a pick in the preparation sheet', async () => {
+      const { on } = await setup({ meeting: planned({ canManageVotes: true }), protocol: null });
+      await userEvent.click(screen.getByTitle('Tagesordnung öffnen'));
+      const sheet = await screen.findByRole('dialog', { name: 'Tagesordnung' });
+      await userEvent.click(within(sheet).getByRole('button', { name: 'Bericht des Finanzreferats' }));
+      expect(on.selectTop).not.toHaveBeenCalled();
+    });
+
     it('shows a reader without session rights the sheet instead of the checklist', async () => {
       await setup({ meeting: planned({ canControl: false, canManage: false }), protocol: null });
       expect(screen.queryByRole('heading', { name: 'Sitzung vorbereiten' })).toBeNull();

@@ -119,10 +119,20 @@ export class AgendaPaneComponent {
     });
   });
 
+  /**
+   * The id of the item that the room handles now. Only a live or closed meeting has
+   * one: a planned meeting shows no "now" and no handled item, also when it holds a
+   * stale id.
+   */
+  private readonly nowId = computed(() => {
+    const m = this.meeting();
+    return m.status === 'planned' ? null : m.currentAgendaItemId;
+  });
   /** The index of the item that the room handles now, or -1. */
-  private readonly nowIndex = computed(() =>
-    this.agenda().findIndex((a) => a.id === this.meeting().currentAgendaItemId),
-  );
+  private readonly nowIndex = computed(() => {
+    const id = this.nowId();
+    return id ? this.agenda().findIndex((a) => a.id === id) : -1;
+  });
 
   /** Put the focus on the heading of the pane, for "Tagesordnung bearbeiten". */
   focus(): void {
@@ -149,7 +159,7 @@ export class AgendaPaneComponent {
 
   /** The item the room handles now. */
   protected isNow(item: AgendaItem): boolean {
-    return item.id === this.meeting().currentAgendaItemId;
+    return this.nowId() !== null && item.id === this.nowId();
   }
 
   /** An item before "now" in the agenda order counts as handled (O19). */

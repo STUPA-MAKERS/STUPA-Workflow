@@ -118,10 +118,12 @@ export class SessionDockComponent {
     () => this.topIndex() >= 0 && this.topIndex() < this.agenda().length - 1,
   );
 
-  /** The index of the item that the room handles now, or -1. */
-  private readonly nowIndex = computed(() =>
-    this.agenda().findIndex((a) => a.id === this.meeting().currentAgendaItemId),
-  );
+  /** The index of the item that the room handles now, or -1. A planned meeting has none. */
+  private readonly nowIndex = computed(() => {
+    const m = this.meeting();
+    if (m.status === 'planned' || !m.currentAgendaItemId) return -1;
+    return this.agenda().findIndex((a) => a.id === m.currentAgendaItemId);
+  });
   /** The item the room handles now with its label, when it is not the open one. */
   protected readonly nowElsewhere = computed<{ item: AgendaItem; label: string } | null>(() => {
     const now = this.nowIndex();

@@ -152,6 +152,12 @@
   max-height: none;
   overflow: visible;
 }
+/* The bottom sheet has the surface-2 background of the field and of a row hover, so
+   both go one step up; else the search field shows only as its placeholder. */
+.sd__sheet .sd__input,
+.sd__sheet .sd__person:hover {
+  background: var(--color-surface-3);
+}
 
 /* Popovers above the dock */
 .sd__backdrop {

@@ -1927,11 +1927,13 @@ describe('MeetingsComponent — methods', () => {
       http.expectNone('/api/meetings/m-1');
     });
 
-    it('keeps "now" local without vote management, after the close and without a meeting', async () => {
+    it('keeps "now" local without vote management, before the opening, after the close and without a meeting', async () => {
       const { cmp, http } = await loaded();
       cmp.meeting.set({ ...MEETING_MODEL, canManageVotes: false });
       cmp.jumpTo('t-2');
       cmp.meeting.set({ ...MEETING_MODEL, status: 'closed' });
+      cmp.jumpTo('t-2');
+      cmp.meeting.set({ ...MEETING_MODEL, status: 'planned' });
       cmp.jumpTo('t-2');
       cmp.meeting.set(null);
       cmp.jumpTo('t-2');

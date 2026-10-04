@@ -354,7 +354,13 @@ export class MeetingPageComponent {
     if (next) this.jump(next.id);
   }
 
+  /**
+   * Open an agenda item and, for the room lead, make it the item the room handles now.
+   * The preparation shows the checklist and no item, and a planned meeting has no
+   * "now", so a pick there does nothing.
+   */
   jump(id: Uuid): void {
+    if (this.preparing()) return;
     this.panel.set('none');
     this.agendaOpen.set(false);
     this.selectTop.emit(id);
