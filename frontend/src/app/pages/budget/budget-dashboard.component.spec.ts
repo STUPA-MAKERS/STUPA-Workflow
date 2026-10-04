@@ -844,6 +844,41 @@ describe('BudgetDashboardComponent', () => {
       expect(view.queryByRole('dialog')).toBeNull();
     });
 
+    it('puts the actions into a "more" menu on a phone', async () => {
+      const view = await setup({ wide: false, phone: true });
+      const c = view.fixture.componentInstance as unknown as Inst;
+      const row = view.container.querySelector('.bd__topRow') as HTMLElement;
+      expect(row.querySelector('.bd__actions')).toBeNull();
+      const more = within(row).getByRole('button', { name: 'Weitere Aktionen' });
+      more.click();
+      view.fixture.detectChanges();
+      const items = view.getAllByRole('menuitem').map((i) => i.textContent?.trim());
+      expect(items).toEqual(['Exportieren', 'Buchungen ansehen']);
+      const exp = jest.spyOn(c, 'onExport').mockImplementation(() => undefined);
+      const book = jest.spyOn(c, 'openBookings').mockImplementation(() => undefined);
+      view.getAllByRole('menuitem')[0].click();
+      expect(exp).toHaveBeenCalled();
+      c.onAction({ id: 'bookings', label: '' });
+      expect(book).toHaveBeenCalled();
+    });
+
+    it('has no "more" menu on a phone without an action', async () => {
+      const view = await setup({ wide: false, phone: true, perms: [] });
+      expect(view.container.querySelector('.bd__more')).toBeNull();
+    });
+
+    it('shows an overview chip beside the path and the year chip', async () => {
+      const view = await setup({ wide: false, phone: true });
+      const c = view.fixture.componentInstance as unknown as Inst;
+      const chips = view.container.querySelector('.bd__top .bd__chips') as HTMLElement;
+      const chip = within(chips).getByRole('button', { name: 'Übersicht' });
+      expect(chip).not.toHaveClass('bd-chip--on');
+      chip.click();
+      view.fixture.detectChanges();
+      expect(c.overviewOpen()).toBe(true);
+      expect(chip).toHaveClass('bd-chip--on');
+    });
+
     it('names the sheet after the path and puts the actions beside the title', async () => {
       const view = await setup({ wide: false });
       const article = view.container.querySelector('article.bd__sheet');
