@@ -10,12 +10,13 @@
   gap: var(--space-4);
   min-height: 4rem;
   padding: 10px var(--space-4);
-  border-radius: var(--radius-lg);
-  color: var(--color-text);
+  border-radius: var(--li-radius, var(--radius-lg));
+  color: var(--li-color, var(--color-text));
   transition: background-color var(--motion-fast) var(--ease-standard);
 }
+/* `--li-hover` lets a list on surface 2 pick a hover that differs from its rows. */
 .li:hover {
-  background: var(--color-surface-2);
+  background: var(--li-hover, var(--color-surface-2));
 }
 .li--on,
 .li--on:hover {
@@ -47,6 +48,21 @@
   flex: 1 1 0;
   flex-direction: column;
   min-width: 0;
+}
+
+/* The title line: the title, then an optional status right after it (`[status]` slot).
+   The title gives way first, so a long title gets the ellipsis and the status stays. */
+.li__head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+.li__head > * {
+  flex: none;
+}
+.li__head > .li__title {
+  flex: 0 1 auto;
 }
 
 /* The title is the control. Its ::after covers the whole row, so the row is one target. */

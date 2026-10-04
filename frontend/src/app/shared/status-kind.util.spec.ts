@@ -93,7 +93,7 @@ describe('status kinds', () => {
       {
         planned: ['neutral', 'Geplant'],
         live: ['accent', 'Live'],
-        closed: ['neutral', 'Geschlossen'],
+        closed: ['muted', 'Geschlossen'],
       },
     ],
     [
