@@ -746,8 +746,8 @@ export interface Quorum {
 /**
  * Vote configuration (`VoteConfig`). The backend `_CamelModel` sends the fields in
  * camelCase. The defaults mirror the Pydantic defaults: `abstainCountsQuorum` is
- * true, `secret` is false. A ballot never changes after the cast, so the config has
- * no `allowChange` (the server refuses the key).
+ * true, `secret` is false. The frontend never sets a tie break: a tie is a
+ * rejection (O18).
  */
 export interface VoteConfig {
   options: string[];
@@ -755,7 +755,6 @@ export interface VoteConfig {
   quorum?: Quorum | null;
   abstainCountsQuorum?: boolean;
   secret?: boolean;
-  tieBreak?: VoteResult;
 }
 
 /**

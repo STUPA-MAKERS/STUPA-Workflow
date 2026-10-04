@@ -787,7 +787,14 @@ describe('ApiClient', () => {
     api.addAgendaItem('m-1', 'app-1').subscribe();
     const req = http.expectOne('/api/meetings/m-1/agenda');
     expect(req.request.method).toBe('POST');
-    expect(req.request.body).toEqual({ applicationId: 'app-1' });
+    expect(req.request.body).toEqual({ applicationId: 'app-1', nonPublic: false });
+    req.flush([]);
+  });
+
+  it('adds a non-public application agenda item', () => {
+    api.addAgendaItem('m-1', 'app-1', true).subscribe();
+    const req = http.expectOne('/api/meetings/m-1/agenda');
+    expect(req.request.body).toEqual({ applicationId: 'app-1', nonPublic: true });
     req.flush([]);
   });
 
@@ -795,7 +802,14 @@ describe('ApiClient', () => {
     api.addAgendaFreetext('m-1', 'Sonstiges').subscribe();
     const req = http.expectOne('/api/meetings/m-1/agenda');
     expect(req.request.method).toBe('POST');
-    expect(req.request.body).toEqual({ title: 'Sonstiges' });
+    expect(req.request.body).toEqual({ title: 'Sonstiges', nonPublic: false });
+    req.flush([]);
+  });
+
+  it('adds a non-public freetext agenda item', () => {
+    api.addAgendaFreetext('m-1', 'Personal', true).subscribe();
+    const req = http.expectOne('/api/meetings/m-1/agenda');
+    expect(req.request.body).toEqual({ title: 'Personal', nonPublic: true });
     req.flush([]);
   });
 

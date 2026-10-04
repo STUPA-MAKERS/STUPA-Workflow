@@ -236,25 +236,79 @@ describe('mockApiInterceptor', () => {
       expect(v.status).toBe('open');
     });
 
-    it('GET /meetings/timeline?direction=upcoming → one meeting', async () => {
-      const page = await get<{ items: unknown[] }>(
+    it('GET /meetings/timeline?direction=upcoming → the live meeting first, then the planned ones', async () => {
+      const page = await get<{ items: { status: string }[]; nextCursor: string | null }>(
         '/api/meetings/timeline',
         new HttpParams().set('direction', 'upcoming'),
       );
-      expect(page.items.length).toBe(1);
+      expect(page.items.length).toBe(5);
+      expect(page.items[0].status).toBe('live');
+      expect(page.items.slice(1).every((m) => m.status === 'planned')).toBe(true);
+      expect(page.nextCursor).toBeNull();
     });
 
-    it('GET /meetings/timeline?direction=past → empty', async () => {
-      const page = await get<{ items: unknown[] }>(
+    it('GET /meetings/timeline?direction=past → closed meetings, newest first', async () => {
+      const page = await get<{ items: { status: string; date: string }[] }>(
         '/api/meetings/timeline',
         new HttpParams().set('direction', 'past'),
       );
-      expect(page.items).toEqual([]);
+      expect(page.items.length).toBe(4);
+      expect(page.items.every((m) => m.status === 'closed')).toBe(true);
+      expect(page.items[0].date > page.items[1].date).toBe(true);
     });
 
     it('GET /meetings/timeline with no direction defaults to upcoming', async () => {
-      const page = await get<{ items: unknown[] }>('/api/meetings/timeline');
-      expect(page.items.length).toBe(1);
+      const page = await get<{ items: { status: string }[] }>('/api/meetings/timeline');
+      expect(page.items[0].status).toBe('live');
+    });
+
+    it('GET /meetings/timeline pages with limit and cursor', async () => {
+      const first = await get<{ items: unknown[]; nextCursor: string | null }>(
+        '/api/meetings/timeline',
+        new HttpParams().set('direction', 'past').set('limit', '3'),
+      );
+      expect(first.items.length).toBe(3);
+      expect(first.nextCursor).toBe('3');
+      const rest = await get<{ items: unknown[]; nextCursor: string | null }>(
+        '/api/meetings/timeline',
+        new HttpParams().set('direction', 'past').set('limit', '3').set('cursor', '3'),
+      );
+      expect(rest.items.length).toBe(1);
+      expect(rest.nextCursor).toBeNull();
+    });
+
+    it('GET /meetings/timeline with q searches both directions, with gremiumId filters', async () => {
+      const hits = await get<{ items: { title: string }[] }>(
+        '/api/meetings/timeline',
+        new HttpParams().set('q', 'haushaltsausschuss'),
+      );
+      expect(hits.items.map((m) => m.title)).toEqual([
+        '12. Sitzung des Haushaltsausschusses',
+        '11. Sitzung des Haushaltsausschusses',
+      ]);
+      const filtered = await get<{ items: { gremiumId: string }[] }>(
+        '/api/meetings/timeline',
+        new HttpParams()
+          .set('direction', 'past')
+          .set('gremiumId', 'g0000000-0000-0000-0000-000000000002'),
+      );
+      expect(filtered.items.length).toBe(1);
+    });
+
+    it('GET /meetings/gremien → the filter Gremien', async () => {
+      const gs = await get<{ name: string }[]>('/api/meetings/gremien');
+      expect(gs.map((g) => g.name)).toEqual(['Studierendenparlament', 'Haushaltsausschuss']);
+    });
+
+    it('GET /gremien/{id}/meeting-members → members, one without protocol.write', async () => {
+      const ms = await get<{ canKeepProtocol: boolean }[]>('/api/gremien/g1/meeting-members');
+      expect(ms.length).toBe(3);
+      expect(ms.filter((m) => !m.canKeepProtocol).length).toBe(1);
+    });
+
+    it('GET /meetings/{id}/protocol → protocol', async () => {
+      const p = await get<{ status: string }>('/api/meetings/m1/protocol');
+      expect(p.status).toBeTruthy();
     });
 
     it('GET /meetings → the live and a planned meeting, with the start-page fields', async () => {
@@ -439,6 +493,16 @@ describe('mockApiInterceptor', () => {
       const last = a[a.length - 1];
       expect(last.applicationId).toBeNull();
       expect(last.title).toBe('Freitext-TOP');
+    });
+
+    it('POST …/agenda keeps the nonPublic flag of a new item', async () => {
+      const a = await firstValueFrom(
+        http.post<{ nonPublic?: boolean }[]>('/api/meetings/m1/agenda', {
+          title: 'Personal',
+          nonPublic: true,
+        }),
+      );
+      expect(a[a.length - 1].nonPublic).toBe(true);
     });
 
     it('POST …/agenda with a known applicationId adds it once (idempotent)', async () => {
@@ -681,6 +745,17 @@ describe('mockApiInterceptor', () => {
       );
       expect(m.date).toBe('2026-08-01');
       expect(m.startTime).toBe('19:30');
+    });
+
+    it('PATCH /meetings/{id} sets the end time and the minute-taker', async () => {
+      const m = await firstValueFrom(
+        http.patch<{ endTime: string | null; protokollantId: string | null }>('/api/meetings/m1', {
+          endTime: '21:00',
+          protokollantId: 'p-2',
+        }),
+      );
+      expect(m.endTime).toBe('21:00');
+      expect(m.protokollantId).toBe('p-2');
     });
 
     it('PATCH /meetings/{id} with no body keeps the existing fields', async () => {
