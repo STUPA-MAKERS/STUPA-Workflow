@@ -51,12 +51,29 @@
   min-width: 0;
 }
 /* The wide layout does not scroll as a page: the pane and the sheet each scroll inside
-   themselves. The host takes the free height of the main column of the shell (the
-   viewport less the footer and the block padding) and gives it to the grid. A basis of 0
-   keeps the content from pushing the page taller than the viewport. */
+   themselves. The main column of the shell is a flex column above the footer, so the
+   host takes its free height with `flex: 1 1 0` and gives it to the grid. A basis of 0
+   keeps the content from pushing the page taller than the viewport.
+   The bottom padding of the main column is for a page that scrolls. Here it would put
+   empty space between the panes and the footer, so the host pulls it back; the top
+   padding of the footer is then the gap. Without the footer (installed app) the panes
+   keep --space-4 and the safe area clear of the bottom edge. */
 :host:has(> .bd--wide) {
   flex: 1 1 0;
   min-height: 24rem;
+  margin-bottom: calc(-1 * var(--main-pad-bottom, 0px));
+}
+@media all and (display-mode: standalone) {
+  :host:has(> .bd--wide) {
+    margin-bottom: calc(var(--space-4) + env(safe-area-inset-bottom) - var(--main-pad-bottom, 0px));
+  }
+}
+/* The dialogs are flex items of the host too. A closed one is empty, but the gap of the
+   host would still add a strip of --space-4 below the grid. Their content is a fixed
+   overlay, so they take no box of their own. */
+:host > app-dialog,
+:host > app-side-sheet {
+  display: contents;
 }
 .bd--wide {
   display: grid;
